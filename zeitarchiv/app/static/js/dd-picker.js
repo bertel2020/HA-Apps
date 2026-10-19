@@ -28,7 +28,12 @@ function selectDDOption(prefix, value, label) {
   input.value = value;
   const btn = document.getElementById(prefix + '-btn');
   if (btn) btn.textContent = label + ' ▾';
-  document.getElementById(prefix + '-popover').classList.remove('open');
+  const popover = document.getElementById(prefix + '-popover');
+  const fromKeyboard = popover.contains(document.activeElement);
+  popover.classList.remove('open');
+  // Per Tastatur gewählt: Fokus zurück auf den Auslöser, sonst stünde er auf
+  // einer jetzt unsichtbaren Zeile und Tab spränge an den Seitenanfang.
+  if (fromKeyboard && btn) btn.focus();
   // bubbles:true, damit sowohl ein onchange direkt am Feld als auch ein
   // htmx hx-trigger="change" auf einem umschließenden Container (z. B.
   // #controls) unverändert weiter greifen — dieselbe Erwartung wie bei
@@ -82,4 +87,105 @@ document.addEventListener('click', (e) => {
       wrap.querySelector('.dd-picker-popover')?.classList.remove('open');
     }
   });
+});
+
+// Tastaturbedienung für alle .dd-picker-Popover (Review vom 16.10., Punkt 6).
+// Zentral hier statt je Template: die Zeilen sind <div>s mit onclick und
+// ohne eigenen Fokus. Sie werden beim Öffnen per Tastatur fokussierbar
+// gemacht (tabindex=-1, also nur per Pfeiltaste, nicht per Tab erreichbar):
+// Enter/Leertaste/Pfeil runter am Auslöser öffnet und fokussiert die aktive
+// Zeile, Pfeile/Pos1/Ende bewegen, Enter/Leertaste wählt (= Klick), Escape
+// schließt und gibt den Fokus an den Auslöser zurück, Tab schließt.
+function _ddRows(popover) {
+  return Array.from(popover.querySelectorAll('.dd-picker-row')).filter(
+    (row) => _ddVisible(row) && !row.classList.contains('is-empty')
+  );
+}
+
+// getClientRects statt offsetParent: die Alpine-Popover im Tabellen-Editor
+// sind position:fixed, dort ist offsetParent auch sichtbar immer null.
+function _ddVisible(el) {
+  return el.getClientRects().length > 0;
+}
+
+function _ddIsOpen(popover) {
+  return _ddVisible(popover);
+}
+
+function _ddFocusRow(popover, which) {
+  const rows = _ddRows(popover);
+  if (!rows.length) return;
+  rows.forEach((row) => { if (!row.hasAttribute('tabindex')) row.setAttribute('tabindex', '-1'); });
+  let target = rows[0];
+  if (which === 'active') target = popover.querySelector('.dd-picker-row.active') || rows[0];
+  else if (which === 'last') target = rows[rows.length - 1];
+  else if (typeof which === 'number') target = rows[Math.max(0, Math.min(rows.length - 1, which))];
+  if (!rows.includes(target)) target = rows[0];
+  target.focus({preventScroll: true});
+  target.scrollIntoView({block: 'nearest', inline: 'nearest'});
+}
+
+function _ddClose(wrap, popover) {
+  if (popover.classList.contains('open')) {
+    popover.classList.remove('open');
+  } else if (_ddVisible(popover)) {
+    // Alpine-gesteuerte Variante (x-show statt .open): deren Auslöser schaltet um.
+    wrap.querySelector('button')?.click();
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  const wrap = e.target.closest && e.target.closest('.dd-picker-wrap');
+  if (!wrap) return;
+  const popover = wrap.querySelector('.dd-picker-popover');
+  if (!popover) return;
+  const trigger = wrap.querySelector('button');
+  const inPopover = popover.contains(e.target);
+  const typing = e.target.matches('input:not([type=checkbox]):not([type=radio]), textarea');
+
+  if (!inPopover) {
+    if (e.target !== trigger) return;
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+      // Selbst klicken statt auf den Browser zu warten: die Leertaste löst den
+      // Button-Klick erst beim Loslassen aus, also nach diesem Handler.
+      e.preventDefault();
+      if (!(e.key === 'ArrowDown' && _ddIsOpen(popover))) trigger.click();
+      // Alpine rendert x-show asynchron — erst danach die Zeile fokussieren.
+      setTimeout(() => { if (_ddIsOpen(popover)) _ddFocusRow(popover, 'active'); }, 0);
+    } else if (e.key === 'Escape' && _ddIsOpen(popover)) {
+      e.preventDefault();
+      _ddClose(wrap, popover);
+    }
+    return;
+  }
+
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    _ddClose(wrap, popover);
+    trigger?.focus();
+    return;
+  }
+  if (e.key === 'Tab') {
+    _ddClose(wrap, popover);
+    return;
+  }
+  const rows = _ddRows(popover);
+  const index = rows.indexOf(e.target.closest('.dd-picker-row'));
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _ddFocusRow(popover, index + 1);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (index > 0) _ddFocusRow(popover, index - 1);
+    else if (index === 0) trigger?.focus();
+  } else if (!typing && e.key === 'Home') {
+    e.preventDefault();
+    _ddFocusRow(popover, 'first');
+  } else if (!typing && e.key === 'End') {
+    e.preventDefault();
+    _ddFocusRow(popover, 'last');
+  } else if (!typing && (e.key === 'Enter' || e.key === ' ') && index >= 0) {
+    e.preventDefault();
+    e.target.closest('.dd-picker-row').click();
+  }
 });

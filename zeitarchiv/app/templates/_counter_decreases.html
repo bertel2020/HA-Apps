@@ -60,13 +60,13 @@
         <div class="tbl-wrap">
           {% if counter_decreases %}
           <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
-            <colgroup><col><col class="hk-col-cd-count"><col class="hk-col-cd-last"><col class="hk-col-cd-verdict"><col class="hk-col-cd-action"></colgroup>
-            <thead><tr><th>{{ _("Entität") }}</th><th class="cd-num">{{ _("Rückgänge") }}</th><th>{{ _("Zuletzt") }}</th><th>{{ _("Einordnung") }}</th><th class="cd-action">{{ _("Aktion") }}</th></tr></thead>
+            <colgroup><col><col class="hk-col-cd-count"><col class="hk-col-cd-last"><col class="hk-col-cd-verdict"></colgroup>
+            <thead><tr><th>{{ _("Entität") }}</th><th class="cd-num">{{ _("Rückgänge") }}</th><th>{{ _("Zuletzt") }}</th><th>{{ _("Einordnung") }}</th></tr></thead>
             <tbody>
             {% for row in counter_decreases %}
             <tr>
               <td class="entity" data-sort="{{ row.friendly_name or row.entity_id }}">
-                <a href="entities/{{ row.entity_id }}/cleanup" class="entity-tooltip-host">
+                <a href="entities/{{ row.entity_id }}/cleanup?filter=counter_decreases&amp;range=all" class="entity-tooltip-host">
                   {% if row.friendly_name %}
                   <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
                   {% else %}
@@ -81,10 +81,9 @@
               </td>
               <td class="cd-num" data-sort="{{ row.count }}">{{ row.count_label }}</td>
               <td data-sort="{{ row.last_ts }}">{{ row.last_label }}{% if row.change %}<div class="counter-note">{{ row.change }}</div>{% endif %}</td>
-              {# Bei „bleibt niedrig“ steht die Begründung in der Einleitung (Info-Symbol) und hier nur als Tooltip; bei den übrigen trägt sie die Zeile (Zeitpunkt und Wert der Rückkehr). #}
-              <td>{% if row.verdict != 'none' %}<span class="counter-verdict {{ row.verdict }}"{% if row.verdict == 'stays' %} title="{{ row.note }}"{% endif %}>{% if row.verdict == 'returns' %}{{ _("kehrt zurück") }}{% elif row.verdict == 'stays' %}{{ _("bleibt niedrig") }}{% else %}{{ _("noch offen") }}{% endif %}</span>{% endif %}{% if row.verdict != 'stays' %}<div class="counter-note">{{ row.note }}</div>{% endif %}</td>
-              <td class="cd-action">{% if row.verdict == 'stays' %}<button type="button" class="btn btn-sm" hx-post="entities/{{ row.entity_id }}/counter-decreases" hx-vals='{"counter_decreases": "allow", "from": "housekeeping"}'
-                      hx-target="#counter-decreases" hx-swap="innerHTML" title="{{ _('Der Zähler setzt sich planmäßig zurück: Rückgänge nicht mehr melden') }}">{{ _("Als normal erlauben") }}</button>{% endif %}</td>
+              {# Die Einordnung nennt die Deutung („Vermutlich …“), die Begründung steht in jedem Fall sichtbar darunter. #}
+              <td>{% if row.verdict != 'none' %}<span class="counter-verdict {{ row.verdict }}">{% if row.verdict == 'returns' %}{{ _("Vermutlich Fehlwert") }}{% elif row.verdict == 'stays' %}{{ _("Vermutlich Reset") }}{% else %}{{ _("Noch offen") }}{% endif %}</span>{% endif %}<div class="counter-note">{{ row.note }}</div>{% if row.verdict == 'stays' %}<button type="button" class="counter-allow-link" hx-post="entities/{{ row.entity_id }}/counter-decreases" hx-vals='{"counter_decreases": "allow", "from": "housekeeping"}'
+                      hx-target="#counter-decreases" hx-swap="innerHTML" title="{{ _('Der Zähler setzt sich planmäßig zurück: Rückgänge nicht mehr melden') }}">{{ _("Rückgänge erlauben") }}</button>{% endif %}</td>
             </tr>
             {% endfor %}
             </tbody>

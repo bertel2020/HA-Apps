@@ -1,0 +1,22 @@
+{# Aufgeklappte Zeile der Datenqualitäts-Übersicht: bis zu fünf der jüngsten Befunde je Kategorie. #}
+{% set labels = {'duplicates': _("Duplikate"), 'counter_decreases': _("Zählerrückgänge"), 'outliers': _("Ausreißer"), 'gaps': _("Lücken")} %}
+{% for group in groups %}
+<div class="dq-group">
+  <div class="dq-group-head">
+    <span class="dq-pill {{ group.severity }}">{{ labels[group.key] }}</span>
+    <span class="dq-group-count">{{ _("{shown} von {total}", shown=group.shown, total=group.total_label) }}</span>
+    <a class="btn btn-sm dq-open" href="{{ app_root }}/{{ group.href }}">{{ _("In der Bereinigung öffnen") }}</a>
+  </div>
+  <div class="dq-findings">
+    {% for row in group.rows %}
+    <div class="dq-find">
+      <span class="dq-ts">{{ row.ts_label }}</span>
+      <span class="dq-val">{{ row.value_label }}</span>
+      <span class="dq-why">{{ row.reasons | join(' · ') }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<span class="hint">{{ _("Keine Einzelbefunde im betrachteten Zeitraum.") }}</span>
+{% endfor %}

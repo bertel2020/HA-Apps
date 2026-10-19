@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import cleanup_stats, counter_auto
+from . import cleanup_stats, counter_auto, data_quality
 from . import purge_auto
 from . import ha_integration
 from . import tips as tips_mod
@@ -133,6 +133,15 @@ def refresh_import_leftovers_if_stale(*dirs: Path) -> None:
     total_bytes, newest_mtime = dir_size_and_newest_mtime(dirs)
     _import_leftovers = {"bytes": total_bytes, "newest_mtime": newest_mtime}
     _import_leftovers_checked_at = time.time()
+
+
+def forget_import_leftovers() -> None:
+    """Nach „Daten löschen“ im Import: Die Meldung steht sonst bis zur nächsten
+    stündlichen Messung weiter da, obwohl die Quelldaten schon weg sind."""
+    global _import_leftovers
+    _import_leftovers = None
+
+
 # Täglich statt mehrtägig (Konzept-Entscheidung): nur so garantiert "morgen"
 # auch wirklich einen ANDEREN Tipp, wenn der heutige ausgeblendet wurde —
 # siehe hide_tip_today(). Bei einem mehrtägigen Fenster wäre der übernächste
@@ -581,7 +590,7 @@ def build_notices(
         })
 
     # Grundlage ist ausschließlich der ohnehin vorhandene Cache (der
-    # Wartungsplaner füllt ihn, eine Entität je Takt) — die Meldung rechnet
+    # Wartungsplaner füllt ihn, je Takt im Zeitbudget) — die Meldung rechnet
     # nichts nach und kostet damit einen SELECT. Genau EINE Meldung für die
     # ganze Installation, egal ob eine oder hundert Entitäten betroffen sind:
     # das Meldungs-Center trägt Titel, zwei Sätze und einen Link, hundert
@@ -771,6 +780,20 @@ def build_notices(
     if counter_notice:
         notices.append(counter_notice)
 
+    new_quality = data_quality.new_findings(index)
+    if new_quality:
+        notices.append({
+            "id": "housekeeping.data_quality_new",
+            "severity": "info",
+            "title": tr("Neue Befunde in der Datenqualität"),
+            "detail": tr(
+                "{new} neue Befunde in {entities} Entität(en) seit dem letzten Besuch der Datenqualität.",
+                new=format_int(new_quality["new"]), entities=format_int(new_quality["entities"]),
+            ),
+            "meta": tr("Datenqualität"),
+            "link": "/housekeeping/datenqualitaet",
+        })
+
     if stale_entity_count:
         notices.append({
             "id": "housekeeping.rotation_pending",
@@ -800,6 +823,22 @@ def build_notices(
             "title": tr("Inaktive Entitäten gefunden"),
             "detail": (
                 tr("{entities} seit mindestens {days} keinen neuen Wert geliefert.", entities=(tr("{count} Entität hat", count=count) if count == 1 else tr("{count} Entitäten haben", count=count)), days=(tr("{count} Tag", count=threshold_days) if threshold_days == 1 else tr("{count} Tagen", count=threshold_days)))
+            ),
+            "meta": tr("Housekeeping"),
+            "link": "/housekeeping#entitaeten",
+        })
+
+    # „Historisch“-Markierung, obwohl wieder Werte kommen: die Markierung bleibt
+    # bewusst stehen (siehe Handbuch „Historisch“), also muss jemand hinsehen.
+    alive_historic = _count_alive_historic_entities(index)
+    if alive_historic:
+        notices.append({
+            "id": "housekeeping.historic_alive",
+            "severity": "warn",
+            "title": tr("Historische Entitäten liefern wieder Werte"),
+            "detail": (
+                tr("{count} als historisch markierte Entität hat seit der Markierung neue Werte geliefert. Prüfen, ob die Markierung noch stimmt.", count=alive_historic) if alive_historic == 1
+                else tr("{count} als historisch markierte Entitäten haben seit der Markierung neue Werte geliefert. Prüfen, ob die Markierung noch stimmt.", count=alive_historic)
             ),
             "meta": tr("Housekeeping"),
             "link": "/housekeeping#entitaeten",
@@ -852,6 +891,8 @@ def _bucket_inactive_entities(index, tz: ZoneInfo) -> dict[str, int]:
     now_ts = datetime.now(tz).timestamp()
     counts = {"info": 0, "warn": 0, "error": 0}
     for entity in index.list_entities():
+        if entity["historic"]:
+            continue
         last_ts = entity["last_ts"]
         if last_ts is None:
             counts["error"] += 1
@@ -864,6 +905,16 @@ def _bucket_inactive_entities(index, tz: ZoneInfo) -> dict[str, int]:
         elif days >= INACTIVE_ENTITY_INFO_DAYS:
             counts["info"] += 1
     return counts
+
+
+def _count_alive_historic_entities(index) -> int:
+    """Historisch markierte Entitäten mit einem Wert NACH dem Markierzeitpunkt —
+    dieselbe Bedingung wie „liefert noch Werte“ in der Housekeeping-Liste.
+    Ohne Markierzeitpunkt (ältere Markierungen) keine Aussage, also nicht gezählt."""
+    return sum(
+        1 for e in index.list_entities()
+        if e["historic"] and e["historic_since"] is not None and e["last_ts"] is not None and e["last_ts"] > e["historic_since"]
+    )
 
 
 def tips_enabled(index) -> bool:
@@ -1074,9 +1125,9 @@ def counter_decrease_notice(rows: list[dict], tz: ZoneInfo) -> dict | None:
         )
         if returning:
             detail += " " + (
-                tr("Bei einem davon kehrt der Stand sofort zurück, das sieht nach einem Fehlwert aus.")
+                tr("Bei einem davon kehrt der Stand zurück, das sieht nach einem Fehlwert aus.")
                 if returning == 1
-                else tr("Bei {count} davon kehrt der Stand sofort zurück, das sieht nach Fehlwerten aus.", count=format_int(returning))
+                else tr("Bei {count} davon kehrt der Stand zurück, das sieht nach Fehlwerten aus.", count=format_int(returning))
             )
         return {
             "id": "housekeeping.counter_decreases", "severity": "warn", "title": title, "detail": detail,
@@ -1103,7 +1154,7 @@ def counter_decrease_notice(rows: list[dict], tz: ZoneInfo) -> dict | None:
                 recovered=counter_value_label(last["recovered_value"], row),
             )
         elif last["returns"] is False:
-            detail += " " + tr("Er blieb danach niedrig. Möglicherweise ein Zählerwechsel.")
+            detail += " " + tr("Er blieb danach niedrig, vermutlich ein Reset oder Zählertausch.")
     return {
         "id": "housekeeping.counter_decreases", "severity": "warn", "title": title, "detail": detail,
         "meta": tr("Zählerrückgänge"), "link": f"/entities/{row['entity_id']}/cleanup",

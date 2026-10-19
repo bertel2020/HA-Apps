@@ -6,6 +6,7 @@ läuft über den echten BackgroundService."""
 
 from __future__ import annotations
 
+import fnmatch
 import os
 import threading
 import time
@@ -91,6 +92,36 @@ def test_transfer_copies_atomically_and_keeps_the_mtime(tmp_path) -> None:
     assert int(final.stat().st_mtime) == 1_700_000_000
     assert not list(target.glob("*.part")) and not list(target.glob(".*part"))
     assert seen and seen[-1] == size
+
+
+def test_a_late_old_transfer_does_not_corrupt_the_retry(tmp_path, monkeypatch) -> None:
+    """Nach einem Watchdog-Timeout läuft der alte Versuch als Daemon weiter.
+    Mit einem gemeinsamen .part-Namen schrieb er in die Datei, die der Retry
+    gerade unter den Endnamen gelegt hatte — der Endname enthielt danach mehr
+    Bytes als das Backup. Nachgestellt: mitten im ersten Versuch läuft ein
+    zweiter vollständig durch, dann macht der erste weiter."""
+    monkeypatch.setattr(backup_external, "COPY_CHUNK_BYTES", 1000)
+    source = tmp_path / "zeitarchiv-backup-2026-10-11-030000.zip"
+    source.write_bytes(os.urandom(5000))
+    target = tmp_path / "ziel"
+    retried = []
+
+    def beat() -> None:
+        if not retried:
+            retried.append(True)
+            backup_external.transfer(source, target)
+
+    backup_external.transfer(source, target, beat)
+    assert retried
+    assert (target / source.name).read_bytes() == source.read_bytes()
+    assert not list(target.glob(backup_external.PART_GLOB))
+
+
+def test_every_attempt_gets_its_own_part_name() -> None:
+    first = backup_external.webdav.unique_part_name("zeitarchiv-backup-x.zip")
+    second = backup_external.webdav.unique_part_name("zeitarchiv-backup-x.zip")
+    assert first != second
+    assert fnmatch.fnmatch(first, backup_external.PART_GLOB)
 
 
 def test_transfer_leaves_no_part_file_after_a_write_error(tmp_path, monkeypatch) -> None:

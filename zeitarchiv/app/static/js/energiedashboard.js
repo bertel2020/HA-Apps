@@ -321,6 +321,7 @@
       // Zeile — eine lange Geräteliste sprengte sonst die Kartenhöhe neben
       // der (durch Versorgungsanteile jetzt schmaleren) Nachbarkarte.
       verbraucherExpanded: false,
+      collapsedRows: {},
       versorgungBreakdown: [],
       erzeugerBreakdown: [],
       speicherBreakdown: [],
@@ -648,15 +649,58 @@
         return cssVar(SHARE_COLORS[idx % SHARE_COLORS.length]);
       },
 
-      // Zwischenzähler (kind 'meter') haben in der Tabelle eine Zeile mit eingerückten Geräten, der Donut zeigt
-      // dagegen nur die Blätter: sonst stünde der Zähler neben seinen eigenen Geräten, und die Segmente
-      // ergäben mehr als den Verbrauch. Farbe und Hover hängen deshalb am Index unter den Blättern.
+      // Zwischenzähler (kind 'meter') und Gruppen (kind 'group') haben in der Tabelle eine Summenzeile mit
+      // eingerückten Mitgliedern, der Donut zeigt dagegen nur die Blätter: sonst stünde die Summe neben
+      // ihren eigenen Geräten, und die Segmente ergäben mehr als den Verbrauch. Farbe und Hover hängen
+      // deshalb am Index unter den Blättern.
+      isSummenzeile(item) {
+        return item.kind === 'meter' || item.kind === 'group';
+      },
       get verbraucherLeaves() {
-        return this.verbraucherBreakdown.filter((i) => i.kind !== 'meter');
+        return this.verbraucherBreakdown.filter((i) => !this.isSummenzeile(i));
       },
       leafColor(item) {
         const idx = this.verbraucherLeaves.findIndex((i) => i.name === item.name);
         return idx === -1 ? 'transparent' : this.shareColor(idx);
+      },
+      // Alle Blätter unterhalb einer Zeile (Gruppe → Zähler → Geräte), für den Hover auf einer Gruppenzeile.
+      leafNamesUnder(item) {
+        const names = [];
+        const walk = (parentName) => {
+          this.verbraucherBreakdown.filter((i) => i.parent === parentName).forEach((child) => {
+            if (this.isSummenzeile(child)) walk(child.name); else names.push(child.name);
+          });
+        };
+        walk(item.name);
+        return names;
+      },
+      highlightRow(item) {
+        if (item.kind === 'group') this.leafNamesUnder(item).forEach((n) => this.highlightShare(n, false));
+        else if (!this.isSummenzeile(item)) this.highlightShare(item.name);
+      },
+      unhighlightRow(item) {
+        if (item.kind === 'group') this.leafNamesUnder(item).forEach((n) => this.unhighlightShare(n));
+        else if (!this.isSummenzeile(item)) this.unhighlightShare(item.name);
+      },
+      // Auf-/Zuklappen von Gruppen- und Zählerzeilen (Standard: aufgeklappt). Eine Zeile ist verborgen,
+      // sobald irgendeiner ihrer Vorfahren zugeklappt ist.
+      toggleRow(item) {
+        this.collapsedRows = {...this.collapsedRows, [item.name]: !this.collapsedRows[item.name]};
+      },
+      hasChildren(item) {
+        return this.isSummenzeile(item) && this.verbraucherBreakdown.some((i) => i.parent === item.name);
+      },
+      rowHidden(item) {
+        let parentName = item.parent;
+        while (parentName) {
+          if (this.collapsedRows[parentName]) return true;
+          const parentRow = this.verbraucherBreakdown.find((i) => i.name === parentName);
+          parentName = parentRow ? parentRow.parent : null;
+        }
+        return false;
+      },
+      get verbraucherRows() {
+        return this.verbraucherBreakdown.filter((i) => !this.rowHidden(i));
       },
 
       // Kosten-Spalte in der Verbraucheranteile-Tabelle nur einblenden, wenn
@@ -673,13 +717,12 @@
 
       // Nur die Tabelle deckelt sich (siehe verbraucherExpanded oben) — der
       // Donut zeigt weiterhin alle Verbraucher, seine Segmente bleiben damit
-      // unabhängig vom Auf-/Zuklappen stabil. Die ersten 8 statt irgendeiner
-      // Auswahl, weil verbraucherBreakdown bereits nach Wert absteigend
-      // sortiert ist (server-seitig) — Index 0..7 hier deckt sich exakt mit
-      // Index 0..7 in renderShareChart()/shareColor(), auch nach dem
-      // Aufklappen.
+      // unabhängig vom Auf-/Zuklappen stabil (die Farbe hängt am Namen, siehe
+      // leafColor()). Die ersten 8 statt irgendeiner Auswahl, weil
+      // verbraucherBreakdown bereits nach Wert absteigend sortiert ist
+      // (server-seitig); zugeklappte Zeilen zählen nicht mit.
       visibleVerbraucherBreakdown() {
-        return this.verbraucherExpanded ? this.verbraucherBreakdown : this.verbraucherBreakdown.slice(0, 8);
+        return this.verbraucherExpanded ? this.verbraucherRows : this.verbraucherRows.slice(0, 8);
       },
 
       versorgungTotal() {
@@ -1363,10 +1406,10 @@
 
       // Tabellenzeile ↔ Donut-Segment verbinden (Hover), identisch zur
       // Zeile/Donut-Kopplung bei "Speichernutzung" in statistik.html.
-      highlightShare(name) {
+      highlightShare(name, withTip = true) {
         if (!shareChartInstance) return;
         shareChartInstance.dispatchAction({type: 'highlight', seriesIndex: 0, name});
-        shareChartInstance.dispatchAction({type: 'showTip', seriesIndex: 0, name});
+        if (withTip) shareChartInstance.dispatchAction({type: 'showTip', seriesIndex: 0, name});
       },
       unhighlightShare(name) {
         if (!shareChartInstance) return;

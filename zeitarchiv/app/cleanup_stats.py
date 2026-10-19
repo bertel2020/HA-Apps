@@ -48,8 +48,15 @@ OUTLIER_RATE_NOTABLE_PERCENT = 1.0
 # der Testinstallation 37 s für alle 34 Entitäten, bei einer je 30-Sekunden-
 # Takt also gut eine Viertelstunde für einen Durchgang. Sechs Stunden lassen
 # genug Luft, dass der Planer nicht dauernd scannt, und halten die Liste
-# trotzdem tagesaktuell.
+# trotzdem tagesaktuell. Erneuert wird ohnehin nur, wer seitdem neue Werte hat.
 OUTLIER_RATE_REFRESH_AGE_SECONDS = 6 * 60 * 60
+
+# Zeitbudget je Planer-Takt für die Messung: es werden so viele fällige
+# Entitäten gemessen, bis es verbraucht ist, mindestens eine. Eine feste
+# Stückzahl wäre bei 1000 Entitäten zu langsam (ein Durchgang über 8 Stunden),
+# bei Entitäten mit großer Historie dagegen zu lang. Bei schwacher Hardware
+# (Raspberry Pi) auf etwa 5 Sekunden senken.
+OUTLIER_RATE_TICK_BUDGET_SECONDS = 10.0
 
 
 def counter_decreases_flagged(entity) -> bool:
@@ -139,7 +146,8 @@ def alltime_counts(
     )
     counts = analysis["counts"]
     index.set_cleanup_alltime_stats(
-        entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION
+        entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION,
+        daily=analysis["daily"], gap_threshold=gap_threshold,
     )
     return counts
 
@@ -191,6 +199,15 @@ def _rate_from_entry(entity, eintrag: dict | None) -> dict | None:
     }
 
 
+def gaps_measured(entity, eintrag: dict | None) -> bool:
+    """Ob der Cache-Eintrag eine zur aktuellen Lücken-Schwelle passende Lücken-Zahl
+    enthält. Bei ausgeschalteter Erkennung gibt es nichts zu messen (True: der
+    Eintrag ist in diesem Punkt aktuell, die Zahl ist 0)."""
+    if entity["gap_threshold"] == "off":
+        return True
+    return eintrag is not None and eintrag.get("gap_threshold") == entity["gap_threshold"]
+
+
 def rate_labels(rate: dict) -> dict:
     """Fertige Beschriftungen einer Quote für die Vorlagen — Prozent mit Komma,
     Zahlen mit Tausenderpunkt, Schwelle als "50×". Hier statt in jeder Vorlage,
@@ -207,24 +224,12 @@ def rate_labels(rate: dict) -> dict:
     )
 
 
-def outlier_rate_overview(index: Index) -> dict:
-    """Markierungsquoten ALLER Entitäten aus dem vorhandenen Cache — Grundlage
-    für Housekeeping → Ausreißer und die zugehörige Meldung.
-
-    Rechnet selbst nichts nach: die Zahlen sind exakt die, die auch am
-    Konfigurationsfeld der jeweiligen Entität stehen (siehe outlier_rate()).
-    Zwei Stellen mit zwei verschieden gemessenen "Markierungsquoten" wären
-    genau die Verwirrung, die eine Übersicht auflösen soll.
-
-    Gefüllt wird der Cache vom Wartungsplaner (eine Entität je Takt, siehe
-    background.py) und nebenbei von jedem Besuch der Bereinigungsseite.
-
-    - ``rows``: auffällige Entitäten, absteigend nach Quote
-    - ``highest``: die höchste gemessene Quote überhaupt, auch unauffällig —
-      damit ein leerer Abschnitt belegen kann, dass gemessen wurde
-    - ``measured``/``pending``: wie weit der Hintergrundlauf ist. Ohne diese
-      Zahl sähe "nichts gefunden" genauso aus wie "noch nichts gemessen".
-    """
+def outlier_rates_measured(index: Index) -> tuple[list[dict], int]:
+    """Alle gemessenen Markierungsquoten (absteigend nach Quote) und die Zahl
+    der Entitäten, die noch keine belastbare Messung haben — ohne den
+    Auffälligkeits-Filter von outlier_rate_overview(). Gemeinsame Quelle für
+    Housekeeping → Ausreißer und die Datenqualitäts-Übersicht, damit beide
+    exakt dieselbe Messung zeigen."""
     eintraege = index.list_cleanup_alltime_stats()
     gemessen: list[dict] = []
     offen = 0
@@ -245,6 +250,28 @@ def outlier_rate_overview(index: Index) -> dict:
             **quote,
         }))
     gemessen.sort(key=lambda r: r["percent"], reverse=True)
+    return gemessen, offen
+
+
+def outlier_rate_overview(index: Index) -> dict:
+    """Markierungsquoten ALLER Entitäten aus dem vorhandenen Cache — Grundlage
+    für Housekeeping → Ausreißer und die zugehörige Meldung.
+
+    Rechnet selbst nichts nach: die Zahlen sind exakt die, die auch am
+    Konfigurationsfeld der jeweiligen Entität stehen (siehe outlier_rate()).
+    Zwei Stellen mit zwei verschieden gemessenen "Markierungsquoten" wären
+    genau die Verwirrung, die eine Übersicht auflösen soll.
+
+    Gefüllt wird der Cache vom Wartungsplaner (je Takt im Zeitbudget, siehe
+    background.py) und nebenbei von jedem Besuch der Bereinigungsseite.
+
+    - ``rows``: auffällige Entitäten, absteigend nach Quote
+    - ``highest``: die höchste gemessene Quote überhaupt, auch unauffällig —
+      damit ein leerer Abschnitt belegen kann, dass gemessen wurde
+    - ``measured``/``pending``: wie weit der Hintergrundlauf ist. Ohne diese
+      Zahl sähe "nichts gefunden" genauso aus wie "noch nichts gemessen".
+    """
+    gemessen, offen = outlier_rates_measured(index)
     return {
         "rows": [r for r in gemessen if r["percent"] >= OUTLIER_RATE_NOTABLE_PERCENT],
         "highest": gemessen[0] if gemessen else None,
@@ -253,29 +280,51 @@ def outlier_rate_overview(index: Index) -> dict:
     }
 
 
-def next_entity_for_outlier_rate(index: Index, now: float):
-    """Die eine Entität, deren Gesamt-Zählung der Wartungsplaner als Nächstes
-    erneuern soll — oder None, wenn nichts ansteht.
+def due_entities_for_outlier_rate(index: Index, now: float) -> list:
+    """Alle Entitäten, deren Gesamt-Zählung der Wartungsplaner erneuern soll,
+    in der Reihenfolge, in der sie drankommen — leer, wenn nichts ansteht.
 
     Reihenfolge: erst die nie gemessenen bzw. die mit veralteter Schwelle
-    (deren Quote zeigt die Oberfläche gar nicht an), dann die ältesten. Eine je
-    Takt statt alle auf einmal, weil ein Durchgang über alle Entitäten an der
-    Testinstallation 37 s dauert — das gehört nicht in einen 30-Sekunden-Takt
-    am Stück, wohl aber verteilt darauf."""
+    (deren Quote zeigt die Oberfläche gar nicht an), dann die ältesten. Gemessen
+    werden alle Entitäten mit Daten, auch die ohne Ausreißer-Erkennung.
+
+    Fällig ist eine Entität, wenn ihre Zählung fehlt oder ungültig ist
+    (``computed_at`` leer, so setzen Duplikat-Entfernung und "Rückgängig" sie
+    zurück), oder wenn sie seit der letzten Messung neue Werte bekommen hat
+    (``last_ts``) und diese Messung mindestens ``OUTLIER_RATE_REFRESH_AGE_SECONDS``
+    alt ist. Eine stille Entität (Konfigurationswert, abgeschaltetes Gerät)
+    wird nach der Erstmessung nicht mehr angefasst: ihre Historie ändert sich
+    nicht, ein erneuter Vollscan ergäbe dieselben Zahlen."""
     eintraege = index.list_cleanup_alltime_stats()
     faellig = []
     for entity in index.list_entities():
-        if effective_outlier_threshold(
-            entity["aggregation_type"], entity["outlier_threshold"]
-        ) == "off" or not entity["first_ts"]:
+        if not entity["first_ts"]:
             continue
         eintrag = eintraege.get(entity["entity_id"])
-        if _rate_from_entry(entity, eintrag) is None:
+        # Auch Entitäten ohne Ausreißer-Erkennung: ihre Zählung liefert
+        # Duplikate und Zählerrückgänge für die Datenqualität. Nur die
+        # Schwellen-Prüfung entfällt, sie gibt es dort nicht.
+        ohne_erkennung = effective_outlier_threshold(
+            entity["aggregation_type"], entity["outlier_threshold"]
+        ) == "off"
+        berechnet = (eintrag or {}).get("computed_at") or 0.0
+        if (
+            eintrag is None
+            or not berechnet
+            or (not ohne_erkennung and _rate_from_entry(entity, eintrag) is None)
+            or not gaps_measured(entity, eintrag)
+            or "daily" not in eintrag  # vor den Tageszählern gemessen: für die Heatmap neu rechnen
+        ):
             faellig.append((0.0, entity))
             continue
-        berechnet = eintrag.get("computed_at") or 0.0
-        if now - berechnet >= OUTLIER_RATE_REFRESH_AGE_SECONDS:
+        neue_daten = (entity["last_ts"] or 0.0) > berechnet
+        if neue_daten and now - berechnet >= OUTLIER_RATE_REFRESH_AGE_SECONDS:
             faellig.append((berechnet, entity))
-    if not faellig:
-        return None
-    return min(faellig, key=lambda paar: paar[0])[1]
+    faellig.sort(key=lambda paar: paar[0])
+    return [entity for _berechnet, entity in faellig]
+
+
+def next_entity_for_outlier_rate(index: Index, now: float):
+    """Die erste fällige Entität (siehe due_entities_for_outlier_rate) oder None."""
+    faellig = due_entities_for_outlier_rate(index, now)
+    return faellig[0] if faellig else None

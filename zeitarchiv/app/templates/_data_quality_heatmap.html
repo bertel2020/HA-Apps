@@ -1,0 +1,66 @@
+{# Heatmap der Datenqualität: eine Zeile je Entität, ein Feld je Tag. Der Farbton zeigt den
+   häufigsten Befundtyp des Tages, die Stärke die Zahl im Vergleich zu den übrigen Tagen
+   derselben Entität. Ein Feld mit Befund öffnet die Bereinigung der Entität für genau diesen Tag. #}
+{% if heatmap.rows %}
+<div class="dq-legend">
+  {% for item in heatmap.legend %}<span class="dq-legend-item"><span class="hm-dot k-{{ item.key }}"></span>{{ item.label }}</span>{% endfor %}
+  <span class="dq-legend-note">{{ _("Stärke = Befunde dieses Tags im Vergleich zu den übrigen Tagen der Entität") }}</span>
+  <span class="dq-scroll" id="dq-heat-scroll" hidden>
+    <button type="button" class="btn navbtn" data-dir="-1" title="{{ _('Früher') }}" aria-label="{{ _('Früher') }}">‹</button>
+    <button type="button" class="btn navbtn" data-dir="1" title="{{ _('Später') }}" aria-label="{{ _('Später') }}">›</button>
+  </span>
+</div>
+{% endif %}
+<div class="tbl-wrap dq-heat-wrap">
+  {% if heatmap.rows %}
+  <table class="dq-heat">
+    <thead><tr>
+      <th class="dq-heat-entity">{{ _("Entität") }}</th>
+      {% for day in heatmap.day_list %}
+      <th class="dq-heat-day{% if day[8:] == '01' %} first{% endif %}" data-tooltip-fixed="{{ heatmap.day_labels[day] }}">{{ day[8:] | int }}</th>
+      {% endfor %}
+      <th class="dq-num">{{ _("Summe") }}</th>
+    </tr></thead>
+    <tbody>
+      {% for row in heatmap.rows %}
+      <tr>
+        <td class="dq-heat-entity entity" data-tooltip-fixed="{{ row.friendly_name }}&#10;{{ row.entity_id }}"><span class="name">{{ row.friendly_name }}</span>{% if row.friendly_name != row.entity_id %}<span class="id">{{ row.entity_id }}</span>{% endif %}</td>
+        {% for cell in row.cells %}
+        <td class="dq-heat-cell{% if cell.first %} first{% endif %}">{% if cell.href %}<a class="hm k-{{ cell.kind }} l{{ cell.level }}" href="{{ app_root }}/{{ cell.href }}" data-tooltip-fixed="{{ cell.day_label }} — {{ cell.detail }}" aria-label="{{ cell.day_label }} — {{ cell.detail }}"></a>{% else %}<span class="hm l0"></span>{% endif %}</td>
+        {% endfor %}
+        <td class="dq-num">{{ row.total_label }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">{{ _("Keine Befunde im gewählten Zeitraum.") }}</div>
+  {% endif %}
+</div>
+<script src="{{ asset('js/fixed-tooltip.js') }}"></script>
+{# Die Tabelle scrollt seitlich: Pfeile für die Maus, und gleich die jüngsten Tage zeigen. #}
+<script>
+  (function () {
+    var wrap = document.querySelector('.dq-heat-wrap');
+    var arrows = document.getElementById('dq-heat-scroll');
+    if (!wrap) return;
+    wrap.scrollLeft = wrap.scrollWidth;
+    var buttons = arrows ? arrows.querySelectorAll('button') : [];
+    function update() {
+      var max = wrap.scrollWidth - wrap.clientWidth;
+      wrap.classList.toggle('has-more', wrap.scrollLeft < max - 1);
+      if (!arrows) return;
+      arrows.hidden = max <= 1;
+      buttons[0].disabled = wrap.scrollLeft <= 1;
+      buttons[1].disabled = wrap.scrollLeft >= max - 1;
+    }
+    buttons.forEach(function (button) {
+      button.addEventListener('click', function () {
+        wrap.scrollBy({left: Number(button.dataset.dir) * wrap.clientWidth * 0.7, behavior: 'smooth'});
+      });
+    });
+    wrap.addEventListener('scroll', update, {passive: true});
+    window.addEventListener('resize', update);
+    update();
+  })();
+</script>

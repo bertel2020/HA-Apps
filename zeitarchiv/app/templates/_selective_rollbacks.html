@@ -1,0 +1,28 @@
+<div id="selective-rollbacks" class="rw-rollbacks">
+  {% if message %}<div class="rw-note rw-note--info" role="status">{{ message }}</div>{% endif %}
+  {% if rollbacks %}
+  <h3 style="margin:24px 0 10px;">{{ _("Selektive Wiederherstellungen") }}</h3>
+  <p class="sub" style="margin-bottom:10px;">{{ _("Teil-Rollbacks aus dem Restore-Assistenten. Es bleiben die letzten drei erhalten.") }}</p>
+  <div class="tbl-wrap">
+    <table class="dt">
+      <tr><th>{{ _("Zeitpunkt") }}</th><th>{{ _("Art") }}</th><th>{{ _("Quelle") }}</th><th>{{ _("Größe") }}</th><th></th></tr>
+      {% for r in rollbacks %}
+      <tr>
+        <td>{{ r.created }}</td>
+        <td>{% if r.kind == 'entities' %}{{ _("Entitäten: {n}", n=r.entities | length) }}{% else %}{{ _("Einstellungen") }}{% endif %}</td>
+        <td>{{ r.source }}</td>
+        <td>{{ r.size }}</td>
+        <td style="text-align:right;">
+          <span style="display:inline-flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;">
+            <button type="button" class="btn" hx-post="{{ app_root }}/backup/selective/undo/{{ r.name }}" hx-target="#selective-rollbacks" hx-swap="outerHTML" hx-disabled-elt="this"
+                    hx-confirm="{{ _('Wiederherstellung rückgängig machen? Der Stand davor wird wiederhergestellt.') }}">{{ _("Rückgängig machen") }}</button>
+            <button type="button" class="btn btn-danger" hx-post="{{ app_root }}/backup/selective/delete/{{ r.name }}" hx-target="#selective-rollbacks" hx-swap="outerHTML"
+                    hx-confirm="{{ _('Rollback {name} endgültig löschen?', name=r.name) }}">{{ _("Rollback löschen") }}</button>
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+</div>

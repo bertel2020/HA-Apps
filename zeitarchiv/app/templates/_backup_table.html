@@ -41,12 +41,7 @@
                     hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="this">
               {{ _("Prüfen") }}
             </button>
-            <button type="button" class="btn btn-danger"
-                    hx-post="backup/restore/{{ b.filename }}"
-                    hx-target="#backup-status" hx-swap="outerHTML" hx-disabled-elt="this"
-                    hx-confirm="{{ _('Backup {created_at} nach dem nächsten Add-on-Neustart wiederherstellen? Der aktuelle Datenstand wird als Rollback behalten.', created_at=b.created_at) }}">
-              {{ _("Wiederherstellen") }}
-            </button>
+            <a class="btn btn-danger" href="{{ app_root }}/backup/restore/{{ b.filename }}">{{ _("Wiederherstellen") }}</a>
             <a class="btn" href="backup/download/{{ b.filename }}">{{ _("Herunterladen") }}</a>
             <button type="button" class="btn btn-danger"
                     hx-post="backup/delete/{{ b.filename }}"

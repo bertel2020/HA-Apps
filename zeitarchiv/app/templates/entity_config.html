@@ -20,7 +20,7 @@
     </div>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
-      Typ: <strong>{{ type_label }}</strong> &middot;
+      Typ: <strong>{{ type_label }}</strong>{% if state_class %} ({{ state_class }}){% endif %} &middot;
       {# Siehe cleanup.html: der Verlauf ist jetzt ein Reiter, hier steht
          stattdessen der Weg eine Ebene höher. #}
       <a href="{{ app_root }}/entities">{{ _("← zurück zu Entitäten") }}</a>
@@ -29,7 +29,7 @@
     {% with active = 'konfig' %}{% include "_entity_tabs.html" %}{% endwith %}
 
     <div class="stat-row">
-      <div class="stat"><div class="label">{{ _("Typ") }}</div><div class="value">{{ type_label }}</div></div>
+      <div class="stat"><div class="label">{{ _("Typ") }}</div><div class="value">{{ type_label }}</div>{% if state_class %}<div class="sub-value">{{ state_class }}</div>{% endif %}</div>
       <div class="stat"><div class="label">{{ _("Einheit") }}</div><div class="value">{{ unit }}</div></div>
       <div class="stat"><div class="label">{{ _("Datensätze") }}</div><div class="value">{{ row_count }}</div></div>
     </div>

@@ -59,9 +59,9 @@ Zeitarchiv consists of two separate, independently versioned parts:
 | **Stays fast** | Charts over weeks, months or years load quickly, even with a very long history |
 | **Your own dashboards** | Freely combinable charts (line, bar, timeline) and comparison tables on any number of your own dashboards |
 | **Energy dashboard** | Dedicated Sankey view of the energy flow with self-sufficiency, cost and CO₂ analysis — enabled with one click if desired |
-| **Data maintenance** | Detect, correct or clean up outliers, gaps and duplicates |
+| **Data maintenance** | Detect, correct or clean up outliers, gaps, duplicates and counter decreases — with a data quality overview across all entities |
 | **Data import** | Import existing history from Symcon, CSV files or directly from Home Assistant |
-| **Backup** | Verifiable, portable ZIP backups with restore and schedule |
+| **Backup** | Verifiable, portable ZIP backups with schedule; a restore can bring back everything, single entities or just the settings |
 | **Demo mode** | Separate instance with synthetic showcase data, completely isolated from the real data — switchable via add-on option |
 | **Secured** | Runs behind Home Assistant's own login, write access strictly separated from the rest of the interface |
 
@@ -177,7 +177,7 @@ and rounding. An optional, purely app-internal display name overrides Home
 Assistant's own name in the presentation only, if needed.
 
 **Housekeeping.** A dedicated area for things that are otherwise easy to
-overlook: detected duplicates, inactive entities, contradictory configuration
+overlook: detected duplicates, inactive entities (deliberately retired ones can be excluded as “Historic”), contradictory configuration
 combinations (e.g. a gap detection that can never trigger because of the
 resolution or a value-change filter), unused charts/tables, free space on the
 host file system, as well as storage, retention and rotation management in one
@@ -259,6 +259,11 @@ a coarser resolution (minute, hour, day) instead of the complete raw values.
   <a href="docs/img/en/notices.png"><img src="docs/img/en/notices.png" alt="Notice center in the header" width="270"></a>
   <a href="docs/img/en/energy-dashboard-scheme-ha.png"><img src="docs/img/en/energy-dashboard-scheme-ha.png" alt="Home Assistant color scheme" width="270"></a>
   <br><sub>Comparison table &nbsp;·&nbsp; Notice center &nbsp;·&nbsp; "Home Assistant" color scheme</sub>
+</p>
+
+<p align="center">
+  <a href="docs/img/en/long-term-comparison-dark.png"><img src="docs/img/en/long-term-comparison-dark.png" alt="Long-term comparison: one line per year with average line and year × month table" width="270"></a>
+  <br><sub>Long-term comparison</sub>
 </p>
 
 <p align="center"><sub>Adapts automatically to light/dark (see home page/energy dashboard above); besides "Zeitarchiv" (default) and "Home Assistant" also selectable as "Modern". More views: <a href="docs/img/en">docs/img/en</a>.</sub></p>
@@ -457,7 +462,7 @@ Zeitarchiv therefore provides these tasks directly in the interface:
 - correct individual measurements after the fact
 - hide suspicious values via soft delete first
 - review changes before data is permanently removed
-- detect inactive entities
+- detect inactive entities (exclude retired ones as “Historic”)
 - close historical gaps through imports
 - not re-create existing timestamps on import
 - show contradictory settings and unused analyses

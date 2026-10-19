@@ -15,6 +15,7 @@ from __future__ import annotations
 import base64
 import http.client
 import re
+import secrets
 import socket
 import ssl
 import xml.etree.ElementTree as ET
@@ -25,9 +26,34 @@ from urllib.parse import quote, unquote, urlsplit
 
 from ..i18n import tr
 
+
+def unique_part_name(name: str) -> str:
+    """Temporärer Name für genau einen Übertragungsversuch.
+
+    Eindeutig je Versuch, weil der Watchdog (backup_external.run_with_watchdog)
+    einen hängenden Versuch nur aufgibt, nicht beendet: kehrt das Netz zurück,
+    schreibt der alte Thread weiter, während der Retry schon läuft. Mit einem
+    gemeinsamen .part-Namen schrieben beide in dieselbe Datei. Passt weiter auf
+    das Aufräummuster ``.zeitarchiv-backup-*.part``."""
+    return f".{name}.{secrets.token_hex(4)}.part"
+
+
+UPLOAD_PREFIX = ".zeitarchiv-upload-"
+
+
+def unique_upload_name(name: str) -> str:
+    """Temporärer Name am WebDAV-Ziel, eindeutig je Versuch wie
+    unique_part_name — aber mit derselben Endung wie der Endname. Nextcloud
+    verbietet ab Version 31 Dateinamen auf .part grundsätzlich (intern belegt)
+    und lehnt den PUT mit 400 ab; frei konfigurierbare Endungsverbote treffen
+    so den Zwischennamen nie, ohne auch den Endnamen zu treffen."""
+    return f"{UPLOAD_PREFIX}{secrets.token_hex(4)}-{name}"
+
 SOCKET_TIMEOUT_SECONDS = 30.0
 UPLOAD_CHUNK_BYTES = 1024 * 1024
 DAV_NS = "{DAV:}"
+SABRE_NS = "{http://sabredav.org/ns}"
+SERVER_MESSAGE_MAX_CHARS = 500
 
 PROPFIND_BODY = (
     '<?xml version="1.0" encoding="utf-8"?>'
@@ -140,7 +166,25 @@ class WebDavClient:
         status = response.status
         if status in expect:
             return status, {k.lower(): v for k, v in response.getheaders()}, data
-        raise self._status_error(status, response.getheader("Location"))
+        raise self._failed_step_error(method, status, response.getheader("Location"), data)
+
+    @classmethod
+    def _failed_step_error(cls, method: str, status: int, location: str | None, data: bytes) -> WebDavError:
+        """Fehlertext mit dem gescheiterten Schritt und, falls vorhanden, der
+        Begründung des Servers — ein bloßer Statuscode (etwa 400 von Nextcloud
+        bei einem abgebrochenen Upload) lässt sonst nicht erkennen, was schiefging."""
+        steps = {
+            "PROPFIND": tr("Abfragen"),
+            "MKCOL": tr("Ordner anlegen"),
+            "PUT": tr("Hochladen"),
+            "MOVE": tr("Umbenennen"),
+            "DELETE": tr("Löschen"),
+        }
+        text = tr("{step} fehlgeschlagen: {error}", step=steps.get(method, method), error=cls._status_error(status, location))
+        server_message = _server_message(data)
+        if server_message:
+            text += " " + tr("Meldung des Servers: {message}", message=server_message)
+        return WebDavError(text)
 
     @staticmethod
     def _status_error(status: int, location: str | None) -> WebDavError:
@@ -180,10 +224,10 @@ class WebDavClient:
         beat: Callable[[], None] = lambda: None,
         on_progress: Callable[[int, int], None] | None = None,
     ) -> int:
-        """Lädt unter .part-Namen hoch, prüft die Größe und benennt per MOVE
-        um — unter dem Endnamen liegt nie eine halbe Datei."""
+        """Lädt unter temporärem Namen hoch, prüft die Größe und benennt per
+        MOVE um — unter dem Endnamen liegt nie eine halbe Datei."""
         size = source.stat().st_size
-        part = f".{name}.part"
+        part = unique_upload_name(name)
         body = _UploadBody(source, beat, on_progress)
         try:
             self._request(
@@ -235,6 +279,17 @@ class WebDavClient:
         finally:
             self.delete(name, missing_ok=True)
         return {"free_bytes": None}
+
+
+def _server_message(data: bytes) -> str:
+    """<s:message> aus einer SabreDAV-Fehlerantwort (Nextcloud, ownCloud), sonst
+    leer. HTML-Fehlerseiten anderer Server bleiben bewusst draußen."""
+    try:
+        root = ET.fromstring(data)
+    except ET.ParseError:
+        return ""
+    message = " ".join((root.findtext(f".//{SABRE_NS}message") or "").split())
+    return message[:SERVER_MESSAGE_MAX_CHARS]
 
 
 def _parse_multistatus(data: bytes) -> list[RemoteFile]:

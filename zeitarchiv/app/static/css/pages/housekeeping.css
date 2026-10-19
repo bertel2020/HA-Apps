@@ -183,10 +183,20 @@
 
      Breiten gemessen wie unten, Überschrift gegen längsten Wert:
      "Letzter Wert" 173 (Wert), "Vor" 103 (Wert), "Datenpunkte" 113 (Kopf). */
-  #stale-entities-body table.dt{table-layout:fixed;min-width:620px;}
+  #stale-entities-body table.dt{table-layout:fixed;min-width:680px;}
   .hk-col-letzter-wert{width:176px;}
   .hk-col-vor{width:108px;}
   .hk-col-datenpunkte{width:118px;}
+  /* Aktionsknopf ("Historisch" / "Wieder aufnehmen"): schmal, rechtsbündig, damit der Name den Platz bekommt. */
+  .hk-col-aktion{width:160px;}
+  .hk-col-seit{width:250px;}
+  #stale-entities-body .hk-historic table.dt{min-width:820px;}
+  /* Historische Entitäten, die nach der Markierung noch Werte bekommen: Warnleiste und Badge in Warnfarbe. */
+  .hk-historic .alert-warn{margin:10px 0;padding:9px 12px;border:1px solid var(--warning);border-radius:8px;background:var(--warning-soft);color:var(--ink);font-size:calc(13px * var(--font-scale, 1));}
+  .hk-historic .badge-warn{display:inline-block;padding:2px 10px;border:1px solid var(--warning);border-radius:999px;background:var(--warning-soft);color:var(--notice-warn);font-weight:600;font-size:calc(12px * var(--font-scale, 1));white-space:nowrap;}
+  .hk-historic .muted{color:var(--ink-faint);}
+  #stale-entities-body td .btn{white-space:nowrap;}
+  #stale-entities-body td.num:last-child,#stale-entities-body th.num:last-child{text-align:right;}
 
 /* Zählerrückgänge: Einordnung als kleine Marke, darunter die Begründung. */
 .counter-verdict{
@@ -197,16 +207,17 @@
 .counter-verdict.stays{background:var(--accent-line-soft);color:var(--accent-line);}
 .counter-verdict.rule{background:var(--positive-soft, var(--surface-alt));color:var(--positive);margin-left:6px;}
 .counter-note{color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));margin-top:2px;}
+/* „Rückgänge erlauben“: Textlink unter der Begründung, nur bei „Vermutlich Reset“. */
+.counter-allow-link{font:inherit;font-size:calc(12.5px * var(--font-scale, 1));color:var(--accent-line);background:none;border:0;padding:0;margin-top:5px;cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
 /* Zählerrückgänge: Spalten wie bei den übrigen Tabellen dieser Seite — feste Breiten auf den Wertspalten,
    die Entität bekommt den Rest. Die Karte ist auf dem Desktop rund 860px breit; die Breiten sind so gewählt,
    dass dann noch gut 220px für Name und ID bleiben. Werte und Einheiten sind durch geschützte Leerzeichen
    zusammengehalten (housekeeping_routes.py), umbrochen wird nur am Pfeil bzw. zwischen den Sätzen.
-   Gemessen: Rückgänge 100 (Kopf), Aktion 172 ("Als normal erlauben" 144 + 28 Zellabstand). */
-#zaehlerrueckgaenge table.stats-dt{min-width:840px;}
+   Gemessen: Rückgänge 100 (Kopf), Einordnung 290 (Hinweistext und Aktion als Link unter dem Etikett). */
+#zaehlerrueckgaenge table.stats-dt{min-width:780px;}
 .hk-col-cd-count{width:100px;}
 .hk-col-cd-last{width:168px;}
-.hk-col-cd-verdict{width:196px;}
-.hk-col-cd-action{width:172px;}
+.hk-col-cd-verdict{width:290px;}
 #zaehlerrueckgaenge .cd-num{text-align:right;}
 /* Sammelaktion „Fehlwerte markieren“ über der Tabelle und der Hinweis danach. */
 .counter-bulk,.counter-result{

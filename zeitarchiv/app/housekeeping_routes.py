@@ -31,6 +31,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -40,7 +41,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import formats
 from . import cleanup_stats
-from . import cleanup_tile, counter_auto, counter_bulk
+from . import cleanup_tile, counter_auto, counter_bulk, data_quality
 from . import demo_mode
 from . import notices as notices_mod
 from .backup_scheduler import parse_schedule_time
@@ -75,6 +76,7 @@ from .formatting import (
 )
 from .progress import JobBusy, JobProgress
 from .storage import cleanup, rotate
+from .storage import reset as reset_storage
 from .storage.coordinator import StorageCoordinator
 from .storage.index import (
     DEFAULT_GAP_THRESHOLD,
@@ -99,6 +101,10 @@ _purge_progress = JobProgress("purge", unit=N_("Monate"), label=N_("Bereinigung"
 #: weiterhin höchstens eine Bereinigung gleichzeitig, und sie steht in der
 #: Kopfleiste und in Housekeeping, egal von wo sie angestoßen wurde.
 purge_progress = _purge_progress
+#: Fortschritt des Zurücksetzens (Einstellungen → Zurücksetzen). Modulweit aus
+#: demselben Grund wie _purge_progress: das Polling muss denselben Auftrag
+#: sehen wie der Start, auch nach einem Seitenwechsel.
+_reset_progress = JobProgress("reset", label=N_("Zurücksetzen"))
 
 #: Fortschritt der manuellen Rotation. Sie bleibt bewusst synchron — wer sie
 #: auslöst, wartet auf die Antwort und braucht keine eigene Anzeige. In der
@@ -161,6 +167,11 @@ class HousekeepingDependencies:
     # None vom Programmstart eingefroren.
     host_disk_usage_cached: Callable[[], dict | None]
     storage_reconcile_last: Callable[[], dict | None]
+    # Für das optionale Vorab-Backup des Zurücksetzens. run_backup startet
+    # einen Hintergrund-Thread und kehrt sofort zurück; backup_progress ist
+    # das Objekt, an dem sich sein Ende ablesen lässt.
+    run_backup: Callable[..., bool]
+    backup_progress: object
 
 
 def demo_progress_context() -> dict:
@@ -271,16 +282,16 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             if last["returns"]:
                 verdict = "returns"
                 note = tr(
-                    "nach {minutes} Min. wieder bei {value}",
+                    "Stand danach wieder bei {value} (nach {minutes} Min.)",
                     minutes=max(1, round((last["recovered_after"] or 0) / 60)),
                     value=_keep_together(notices_mod.counter_value_label(last["recovered_value"], row)),
                 )
             elif last["returns"] is False:
                 verdict = "stays"
-                note = tr("kein Wiederanstieg auf den Vorwert in den folgenden 30 Minuten")
+                note = tr("Stand blieb danach niedrig. Setzt sich der Zähler planmäßig zurück?")
             else:
                 verdict = "open"
-                note = tr("noch zu wenige Folgewerte")
+                note = tr("Zu wenig Folgewerte für eine Einschätzung.")
             rows.append({
                 "entity_id": row["entity_id"],
                 "friendly_name": row["friendly_name"],
@@ -341,7 +352,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
 
     deps.templates.env.globals["counter_auto_state"] = _counter_auto_state
     # Einordnung der Zählerrückgänge in der Bereinigungsansicht (_rows_table.html).
-    deps.templates.env.globals["counter_verdicts"] = lambda entity_id, rows: counter_bulk.verdicts_for_rows(
+    deps.templates.env.globals["counter_verdicts"] = lambda entity_id, rows: counter_bulk.verdict_details_for_rows(
         deps.data_dir, deps.index, deps.tz, entity_id, rows
     )
 
@@ -370,7 +381,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             what = tr("1 Fehlwert") if returning == 1 else tr("{returning} Fehlwerte", returning=returning)
             title = tr("{what} markieren?", what=what)
             bulk = {
-                "lead": tr("{returning} von {total} Rückgängen kehren sofort zurück", returning=returning, total=total),
+                "lead": tr("{returning} von {total} Rückgängen kehren zurück", returning=returning, total=total),
                 "rest": tr("und sehen nach Fehlwerten aus."),
                 "button": tr("1 Fehlwert markieren …") if returning == 1 else tr("{returning} Fehlwerte markieren …", returning=returning),
                 "confirm_label": tr("1 Fehlwert markieren") if returning == 1 else tr("{returning} Fehlwerte markieren", returning=returning),
@@ -779,33 +790,37 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     _STALE_ENTITIES_DEFAULT_DAYS = "3"
 
 
-    def _stale_entities_context(days: str = _STALE_ENTITIES_DEFAULT_DAYS) -> dict:
+    def _stale_entities_context(days: str = _STALE_ENTITIES_DEFAULT_DAYS, hist_open: bool = False) -> dict:
         """Entitäten, deren letzter Wert (entities.last_ts, ohnehin vorhanden —
         kein neuer Hintergrundjob nötig) länger als der gewählte Schwellwert
         zurückliegt. Meist harmlos (Gerät im Standby, seltener Sensor), aber ein
         früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte
         HA-Entität. Nie empfangene Entitäten (last_ts NULL) erscheinen unabhängig
         vom gewählten Schwellwert immer — für sie gibt es kein sinnvolles "seit
-        wann", das sich unter- oder überschreiten ließe."""
+        wann", das sich unter- oder überschreiten ließe.
+
+        Als „historisch“ markierte Entitäten (entities.historic) fehlen in dieser
+        Liste und stehen stattdessen vollständig — unabhängig vom Schwellwert,
+        auch wenn sie gerade Werte liefern — im eigenen Abschnitt darunter, damit
+        sich die Markierung dort wieder zurücknehmen lässt."""
         if days not in dict(_STALE_ENTITIES_DAY_OPTIONS):
             days = _STALE_ENTITIES_DEFAULT_DAYS
         threshold_seconds = int(days) * 86400
         now_ts = time.time()
-        rows = []
-        for entity in deps.index.list_entities():
-            last_ts = entity["last_ts"]
-            if last_ts is None:
-                days_ago = None
-            else:
-                age_seconds = now_ts - last_ts
-                if age_seconds < threshold_seconds:
-                    continue
-                days_ago = age_seconds / 86400
-            has_name = bool(entity["custom_name"] or entity["friendly_name"])
-            rows.append({
+
+        def _row(entity, last_ts, days_ago) -> dict:
+            since = entity["historic_since"] if entity["historic"] else None
+            # „Liefert noch Werte“: seit der Markierung ist ein Wert eingetroffen.
+            # Die Zahl ist der Zuwachs von row_count (kann durch Löschen kleiner
+            # werden, daher nie unter 0); ohne Markierzeitpunkt keine Aussage.
+            alive = since is not None and last_ts is not None and last_ts > since
+            return {
+                "since_label": formats.format_date(datetime.fromtimestamp(since, deps.tz)) if since is not None else "—",
+                "alive": alive,
+                "new_values": format_int(max((entity["row_count"] or 0) - (entity["historic_rows"] or 0), 0)) if alive else "0",
                 "entity_id": entity["entity_id"],
                 "display_name": entity_display_name(entity["entity_id"], entity["friendly_name"], entity["custom_name"]),
-                "has_name": has_name,
+                "has_name": bool(entity["custom_name"] or entity["friendly_name"]),
                 "last_value_label": (
                     formats.format_datetime(datetime.fromtimestamp(last_ts, deps.tz), seconds=False, comma=True) if last_ts is not None else "Nie empfangen"
                 ),
@@ -817,13 +832,44 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "days_ago_label": tr("{format_value} Tage", format_value=format_value(days_ago, 1)) if days_ago is not None else "—",
                 "row_count": format_int(entity["row_count"]),
                 "row_count_raw": entity["row_count"],
-            })
+            }
+
+        rows = []
+        historic_rows = []
+        for entity in deps.index.list_entities():
+            last_ts = entity["last_ts"]
+            days_ago = None if last_ts is None else (now_ts - last_ts) / 86400
+            if entity["historic"]:
+                historic_rows.append(_row(entity, last_ts, days_ago))
+            elif last_ts is None or now_ts - last_ts >= threshold_seconds:
+                rows.append(_row(entity, last_ts, days_ago))
         rows.sort(key=lambda r: r["days_ago_raw"], reverse=True)
+        historic_rows.sort(key=lambda r: (not r["alive"], r["display_name"].lower()))
         return {
             "stale_entities": rows,
             "stale_entities_days": days,
             "stale_entities_day_options": _STALE_ENTITIES_DAY_OPTIONS,
+            "historic_entities": historic_rows,
+            "historic_open": hist_open,
+            "historic_alive_count": sum(1 for r in historic_rows if r["alive"]),
         }
+
+
+    @router.post("/housekeeping/entities/{entity_id}/historic", response_class=HTMLResponse)
+    def housekeeping_set_historic(
+        request: Request, entity_id: str, value: str = Query("1"), days: str = Query(_STALE_ENTITIES_DEFAULT_DAYS),
+        hist_open: str = Query("0"),
+    ) -> HTMLResponse:
+        """Setzt bzw. entfernt die Markierung „historisch“. Antwortet mit dem
+        Inhalt von #stale-entities-body, damit die Liste und der Abschnitt
+        darunter in einem Zug aktualisiert werden; die Entitätsseite lädt nach
+        dem Aufruf neu und ignoriert den Rumpf."""
+        if deps.index.get_entity(entity_id) is None:
+            raise HTTPException(status_code=404, detail=tr("Entität nicht gefunden"))
+        deps.index.set_entity_historic(entity_id, value == "1")
+        return deps.templates.TemplateResponse(
+            request, "_stale_entities_body.html", _stale_entities_context(days, hist_open == "1")
+        )
 
 
     @router.get("/housekeeping/stale-entities", response_class=HTMLResponse)
@@ -873,6 +919,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "duplicates_by_entity": duplicates_by_entity,
                 "duplicates_total": duplicates_total,
                 **_counter_decreases_context(),
+                "data_quality": data_quality.build_matrix(deps.index),
                 "gap_threshold_conflicts": notices_mod.gap_threshold_conflicts(deps.index),
                 "outlier_rates": cleanup_stats.outlier_rate_overview(deps.index),
                 "outlier_notable_percent": format_value(
@@ -1284,6 +1331,112 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             request, "_settings_retention_form.html", _settings_retention_context(result=result)
         )
 
+    @router.get("/housekeeping/datenqualitaet", response_class=HTMLResponse)
+    def data_quality_view(
+        request: Request, page: int = 1, page_size: int = data_quality.DEFAULT_PAGE_SIZE,
+        period: str = data_quality.DEFAULT_PERIOD,
+        q: str = "", kind: str = "all", sort: str = "total", dir: str = "desc",
+    ) -> HTMLResponse:
+        """Datenqualität: Duplikate, Zählerrückgänge und Ausreißer aller Entitäten in einer Matrix
+        (siehe data_quality.build_matrix). Eigene Seite statt Abschnitt in /housekeeping, weil sie
+        mit aufklappbaren Zeilen deutlich mehr Platz braucht als die übrigen Abschnitte. Der Pfad
+        liegt unter /housekeeping, damit die Hauptnavigation dort aktiv bleibt."""
+        matrix = data_quality.build_matrix(
+            deps.index, period=period, today=datetime.now(deps.tz).date(), tz=deps.tz
+        )
+        # Die Heatmap-Ansicht (data_quality.build_heatmap, _data_quality_heatmap.html) ist vorerst
+        # aus der Oberfläche genommen, siehe ROADMAP.md; Dienst und Vorlage bleiben bestehen.
+        if sort not in data_quality.SORT_KEYS:
+            sort = "total"
+        if kind not in data_quality.KIND_KEYS:
+            kind = "all"
+        direction = "asc" if dir == "asc" else "desc"
+        matrix["rows"] = data_quality.filter_and_sort(
+            matrix["rows"], q=q, kind=kind, sort=sort, direction=direction
+        )
+        matrix["rows"], pagination = data_quality.paginate(matrix["rows"], page, page_size)
+        # Zustand der Ansicht für Links, Pager und Formulare: nur, was vom Standard abweicht
+        state = {
+            "period": matrix["period"], "q": q.strip(), "kind": kind,
+            "sort": sort, "dir": direction, "page_size": pagination["page_size"],
+        }
+        defaults = {
+            "period": data_quality.DEFAULT_PERIOD, "q": "", "kind": "all", "sort": "total",
+            "dir": "desc", "page_size": data_quality.DEFAULT_PAGE_SIZE,
+        }
+
+        def dq_url(**changes) -> str:
+            """Query-String der Ansicht mit den übergebenen Änderungen (page, sort, …)."""
+            merged = {**state, **changes}
+            query = urlencode({k: v for k, v in merged.items() if v not in ("", None) and v != defaults.get(k)})
+            return f"?{query}" if query else ""  # ohne Pfad: die Vorlage setzt app_root davor
+
+        # Besuch merken, bevor die Seite (samt Meldungen) gerendert wird: der Hinweis "neue Befunde
+        # seit dem letzten Besuch" soll auf dieser Seite selbst nicht mehr erscheinen.
+        data_quality.mark_seen(deps.index)
+        return deps.templates.TemplateResponse(
+            request, "data_quality.html",
+            {
+                "data_quality": matrix, "heatmap": None, "pagination": pagination, "view": "table",
+                "dq_state": state, "dq_url": dq_url,
+            },
+        )
+
+    @router.get("/entities/{entity_id}/data-quality", response_class=HTMLResponse)
+    @deps.storage_locked(lambda args: args["entity_id"])
+    def entity_data_quality(request: Request, entity_id: str) -> HTMLResponse:
+        """Aufgeklappte Zeile der Datenqualitäts-Übersicht: die jüngsten Einzelbefunde
+        dieser Entität (siehe data_quality.findings_for_entity). Wird erst beim Aufklappen geladen,
+        weil sie die Rohdaten liest."""
+        entity = deps.index.get_entity(entity_id)
+        if entity is None:
+            raise HTTPException(status_code=404, detail=tr("Entität nicht gefunden"))
+        return deps.templates.TemplateResponse(
+            request,
+            "_data_quality_detail.html",
+            {"groups": data_quality.findings_for_entity(deps.data_dir, deps.index, deps.tz, entity)},
+        )
+
+    @router.post("/housekeeping/datenqualitaet/duplicates/preview", response_class=HTMLResponse)
+    async def data_quality_duplicates_preview(request: Request) -> HTMLResponse:
+        """Sammelaktion der Datenqualität, Schritt 1: zeigt je gewählter Entität, wie viele Duplikate
+        entfernt würden, ohne etwas zu schreiben. Gelöscht wird erst nach der Bestätigung."""
+        entity_ids = [str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"]
+        preview = await run_in_threadpool(
+            data_quality.preview_duplicate_removal, deps.data_dir, deps.index, deps.tz, entity_ids,
+            deps.coordinator.entity,
+        )
+        return deps.templates.TemplateResponse(
+            request, "_data_quality_bulk.html", {"step": "preview", "bulk": preview}
+        )
+
+    @router.post("/housekeeping/datenqualitaet/duplicates/delete", response_class=HTMLResponse)
+    async def data_quality_duplicates_delete(request: Request) -> HTMLResponse:
+        """Schritt 2: entfernt die Duplikate der bestätigten Entitäten (Soft-Delete, rückgängig machbar)."""
+        entity_ids = [str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"]
+        done = await run_in_threadpool(
+            data_quality.remove_duplicates, deps.data_dir, deps.index, deps.tz, entity_ids,
+            deps.coordinator.entity,
+        )
+        if done["total"]:
+            deps.invalidate_purge_preview()
+        return deps.templates.TemplateResponse(
+            request, "_data_quality_bulk.html", {"step": "done", "bulk": done}
+        )
+
+    @router.post("/housekeeping/datenqualitaet/duplicates/undo", response_class=HTMLResponse)
+    async def data_quality_duplicates_undo(request: Request) -> HTMLResponse:
+        """Nimmt den Sammellauf von eben wieder zurück (je Entität die zuletzt gelöschte Charge)."""
+        entity_ids = [str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"]
+        restored = await run_in_threadpool(
+            data_quality.undo_duplicate_removal, deps.index, entity_ids, deps.coordinator.entity
+        )
+        if restored:
+            deps.invalidate_purge_preview()
+        return deps.templates.TemplateResponse(
+            request, "_data_quality_bulk.html", {"step": "undone", "bulk": {"total_label": format_int(restored)}}
+        )
+
     @router.post("/entities/{entity_id}/counter-decreases", response_class=HTMLResponse)
     async def entity_counter_decreases(request: Request, entity_id: str) -> HTMLResponse:
         """Stellt einen Zähler auf „Melden“ oder „Erlauben“ (planmäßig zurücksetzender Zähler).
@@ -1454,6 +1607,112 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         return HTMLResponse(
             '<div id="demo-nav-entry" hx-swap-oob="delete"></div>'
             "<script>refreshNoticePanel();</script>"
+        )
+
+    # -- Zurücksetzen (Einstellungen) --------------------------------------
+
+    def _reset_context(error: str | None = None, result: str | None = None) -> dict:
+        info = reset_storage.preview(deps.index)
+        return {
+            "reset_info": info,
+            "reset_size": format_size(info["size_bytes"]),
+            "reset_word": tr("LÖSCHEN"),
+            "reset_demo": deps.demo_mode_active,
+            "reset_error": error,
+            "reset_result": result,
+        }
+
+    def _reset_progress_context() -> dict:
+        return {
+            **_reset_progress.snapshot(),
+            "progress_id": "reset-progress",
+            "poll_url": "settings/reset/progress",
+        }
+
+    def _reset_worker(scope: str, with_backup: bool) -> str:
+        started_at = time.time()
+        if with_backup:
+            _reset_progress.set_phase(N_("Backup wird erstellt…"))
+            # Läuft schon ein Backup, erst dessen Ende abwarten und dann ein
+            # eigenes starten — ein fremder Lauf wäre kein Backup VOR dem Reset.
+            while True:
+                with deps.backup_progress.lock:
+                    busy = deps.backup_progress.running
+                if not busy:
+                    break
+                time.sleep(0.5)
+            if not deps.run_backup(trigger="manual"):
+                raise RuntimeError(tr("Backup konnte nicht gestartet werden"))
+            time.sleep(0.2)
+            while True:
+                with deps.backup_progress.lock:
+                    busy = deps.backup_progress.running
+                    error = deps.backup_progress.error
+                if not busy:
+                    break
+                time.sleep(0.5)
+            if error:
+                # Kein Backup, kein Löschen: genau dafür war die Option da.
+                raise RuntimeError(tr("Backup fehlgeschlagen, es wurde nichts gelöscht: {error}", error=error))
+        _reset_progress.set_phase(N_("Daten werden gelöscht…"))
+        with deps.coordinator.exclusive():
+            before = reset_storage.reset(deps.data_dir, deps.index, scope)
+        deps.invalidate_purge_preview()
+        logger.info(
+            "Zurücksetzen abgeschlossen · event=reset_completed scope=%s "
+            "entities=%d rows=%d duration_s=%.1f",
+            scope, before["entities"], before["rows"], time.time() - started_at,
+        )
+        if scope == reset_storage.SCOPE_FULL:
+            return tr("Zeitarchiv wurde komplett zurückgesetzt.")
+        return tr("Alle Messwerte wurden gelöscht.")
+
+    @router.get("/settings/reset", response_class=HTMLResponse)
+    def settings_reset_form(request: Request) -> HTMLResponse:
+        stand = _reset_progress.snapshot()
+        if stand["running"]:
+            return deps.templates.TemplateResponse(request, "_job_progress.html", _reset_progress_context())
+        return deps.templates.TemplateResponse(request, "_settings_reset_form.html", _reset_context())
+
+    @router.post("/settings/reset", response_class=HTMLResponse)
+    async def settings_reset(request: Request) -> HTMLResponse:
+        """Startet das Zurücksetzen im Hintergrund. Das Bestätigungswort wird
+        hier noch einmal geprüft — der deaktivierte Knopf im Formular ist nur
+        Bedienkomfort, kein Schutz. Zwei Umfänge: nur Messwerte oder alles."""
+        if deps.demo_mode_active:
+            raise HTTPException(status_code=409, detail=tr("Nicht möglich, während die Instanz im Demo-Modus läuft"))
+        form = await request.form()
+        scope = str(form.get("scope", ""))
+        with_backup = form.get("backup") == "1"
+        if scope not in reset_storage.SCOPES:
+            return deps.templates.TemplateResponse(
+                request, "_settings_reset_form.html",
+                _reset_context(error=tr("Bitte einen Umfang wählen.")), status_code=422,
+            )
+        if str(form.get("confirm", "")).strip() != tr("LÖSCHEN"):
+            return deps.templates.TemplateResponse(
+                request, "_settings_reset_form.html",
+                _reset_context(error=tr("Bestätigungswort stimmt nicht.")), status_code=422,
+            )
+        try:
+            _reset_progress.start(lambda: _reset_worker(scope, with_backup), logger)
+        except JobBusy:
+            logger.info("Zurücksetzen bereits aktiv · event=reset_already_running")
+        return deps.templates.TemplateResponse(request, "_job_progress.html", _reset_progress_context())
+
+    @router.get("/settings/reset/progress", response_class=HTMLResponse)
+    def settings_reset_progress(request: Request) -> HTMLResponse:
+        stand = _reset_progress.snapshot()
+        if not stand["started"]:
+            return HTMLResponse("")
+        if stand["running"]:
+            return deps.templates.TemplateResponse(request, "_job_progress.html", _reset_progress_context())
+        if stand["error"]:
+            return deps.templates.TemplateResponse(
+                request, "_settings_reset_form.html", _reset_context(error=stand["error"])
+            )
+        return deps.templates.TemplateResponse(
+            request, "_settings_reset_form.html", _reset_context(result=stand["result"])
         )
 
     return router

@@ -66,6 +66,18 @@ def mark_returning(data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | N
     return {"batch_at": batch_at, "entities": marked, "values": sum(marked.values())}
 
 
+def mark_entity_returning(data_dir: Path, index: Index, tz: ZoneInfo, entity_id: str) -> int:
+    """Wie mark_returning, aber nur für einen Zähler (Bereinigungsansicht der Entität, Filter
+    „Zählerrückgänge“). Rückgänge, die niedrig bleiben (Reset, Zählerwechsel), bleiben unberührt.
+    Liefert die Anzahl markierter Werte."""
+    before = index.get_counter_decrease_snapshot()
+    timestamps = returning_timestamps(data_dir, index, tz, entity_id)
+    if timestamps:
+        cleanup.soft_delete(index, entity_id, timestamps, source="counter_bulk")
+        refresh_snapshot(data_dir, index, tz, before, {entity_id})
+    return len(timestamps)
+
+
 def undo_batch(
     data_dir: Path, index: Index, tz: ZoneInfo, batch_at: float, entity_ids: list[str]
 ) -> int:
@@ -97,17 +109,35 @@ _LOOKBACK_SECONDS = 3 * 86400
 _LOOKAHEAD_SECONDS = 6 * 3600
 
 
-def verdicts_for_rows(
+def followup_note(item: dict, entity: dict) -> str:
+    """Satz zur Einordnung eines Rückgangs: was danach mit dem Stand geschah. Dieselben Texte
+    wie Housekeeping → Zählerrückgänge, damit beide Stellen dasselbe sagen."""
+    from .notices import counter_value_label
+
+    if item["returns"]:
+        return tr(
+            "Stand danach wieder bei {value} (nach {minutes} Min.)",
+            minutes=max(1, round((item["recovered_after"] or 0) / 60)),
+            value=counter_value_label(item["recovered_value"], dict(entity)).replace(" ", "\u00a0"),
+        )
+    if item["returns"] is False:
+        return tr("Stand blieb danach niedrig.")
+    return tr("Zu wenig Folgewerte für eine Einschätzung.")
+
+
+def verdict_details_for_rows(
     data_dir: Path, index: Index, tz: ZoneInfo, entity_id: str, rows: list[dict], now: datetime | None = None
-) -> dict[float, bool]:
+) -> dict[float, dict]:
     """Einordnung der Zählerrückgänge einer Seite der Bereinigungsansicht: Zeitstempel →
-    True (kehrt zurück, wahrscheinlich Fehlwert) oder False (bleibt niedrig, wahrscheinlich
-    Zählerwechsel). Ein Durchlauf über das Fenster der angezeigten Rückgänge statt je Zeile
-    einer; Rückgänge ohne Entscheidung und planmäßige Rücksetzer um Mitternacht fehlen im
-    Ergebnis — dort steht dann kein Zusatz."""
+    ``{"returns": True | False | None, "note": Satz}``. True = kehrt zurück (wahrscheinlich
+    Fehlwert), False = bleibt niedrig (wahrscheinlich Zählerwechsel oder Reset), None = die Daten
+    enden, bevor sich das entscheiden lässt. Ein Durchlauf über das Fenster der angezeigten
+    Rückgänge statt je Zeile einer. Jede markierte Zeile kommt im Ergebnis vor; findet die
+    Einordnung sie nicht, gilt sie als offen."""
     label = tr("Zählerrückgang")
     stamps = {row["ts"] for row in rows if any(flag["label"] == label for flag in row.get("flags") or [])}
-    if not stamps:
+    entity = index.get_entity(entity_id)
+    if not stamps or entity is None:
         return {}
     now = now or datetime.now(tz)
     decreases = cleanup.classify_counter_decreases(
@@ -117,7 +147,23 @@ def verdicts_for_rows(
         ),
         tz,
     )
-    return {item["ts"]: item["returns"] for item in decreases if item["ts"] in stamps and item["returns"] is not None}
+    details = {
+        item["ts"]: {"returns": item["returns"], "note": followup_note(item, entity)}
+        for item in decreases if item["ts"] in stamps
+    }
+    # Eine markierte Zeile ohne Einordnung gibt es nicht: was die Einordnung nicht findet
+    # (Markierung und Einordnung rechnen getrennt), steht als „Noch offen“ da.
+    offen = {"returns": None, "note": followup_note({"returns": None}, entity)}
+    return {ts: details.get(ts, offen) for ts in stamps}
+
+
+def verdicts_for_rows(
+    data_dir: Path, index: Index, tz: ZoneInfo, entity_id: str, rows: list[dict], now: datetime | None = None
+) -> dict[float, bool]:
+    """Wie verdict_details_for_rows, aber nur das Urteil: Zeitstempel → True (Fehlwert) oder False
+    (bleibt niedrig). Rückgänge ohne Entscheidung fehlen im Ergebnis."""
+    details = verdict_details_for_rows(data_dir, index, tz, entity_id, rows, now)
+    return {ts: item["returns"] for ts, item in details.items() if item["returns"] is not None}
 
 
 def set_mode(data_dir: Path, index: Index, tz: ZoneInfo, entity_id: str, mode: str) -> None:

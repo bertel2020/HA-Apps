@@ -574,7 +574,10 @@
   /* Zwischenzähler: Geräte und Rest eingerückt unter ihm. Der Rest ist schwächer und kursiv, weil er kein
      gemessenes Gerät ist, sondern Zähler minus Geräte. */
   .edash-share-table tr.edash-share-child td.label{padding-left:30px;}
+  .edash-share-table tr.edash-share-deep td.label{padding-left:46px;}
   .edash-share-table tr.edash-share-child td:not(.label){color:var(--ink-muted);}
+  /* Auf-/Zuklappen-Pfeil an Gruppen- und Zählerzeilen: ohne Rahmen, nimmt den Platz des Farbpunkts ein. */
+  .edash-share-toggle{background:none;border:0;padding:0;margin-right:6px;width:14px;color:var(--ink-muted);cursor:pointer;font:inherit;line-height:1;vertical-align:middle;}
   .edash-share-table tr.edash-share-rest td.label{font-style:italic;color:var(--ink-muted);}
   .edash-share-table tr.edash-share-meter td.label .edash-share-link,.edash-share-table tr.edash-share-meter td.label span{font-weight:600;}
   /* white-space:nowrap zusätzlich zum bestehenden text-align:right — ohne
@@ -612,6 +615,10 @@
     .edash-share-table .edash-share-dot{position:absolute;left:6px;top:0;bottom:0;margin:auto 0;width:8px;height:8px;}
     .edash-share-table tr.edash-share-child td.label{padding-left:30px;}
     .edash-share-table tr.edash-share-child .edash-share-dot{left:16px;}
+    .edash-share-table tr.edash-share-deep td.label{padding-left:46px;}
+    .edash-share-table tr.edash-share-deep .edash-share-dot{left:32px;}
+    .edash-share-table .edash-share-toggle{position:absolute;left:2px;top:0;bottom:0;margin:auto 0;}
+    .edash-share-table tr.edash-share-child .edash-share-toggle{left:12px;}
   }
   /* Mobil: flex-basis (220px) ausschalten, sonst gewinnt sie gegen
      width:100% und der Donut hängt 220px breit links in der Kachel. Als

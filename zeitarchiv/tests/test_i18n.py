@@ -82,7 +82,10 @@ GERMAN_HINT = re.compile(
     r"Fehler|Wert|Werte|Zeit|Auswahl|wird|werden|ist|mit|für|von|bei|Alle|Neu|Name|Einheit|Summe)\b"
 )
 # Bewusst deutsch gelassene Literale (Datei -> Texte); neue Einträge brauchen eine Begründung.
-UNTRANSLATED_SCRIPT_TEXT_OK: dict[str, set[str]] = {}
+UNTRANSLATED_SCRIPT_TEXT_OK: dict[str, set[str]] = {
+    # Name der Tab-Taste in e.key, kein sichtbarer Text — gleicht nur zufällig dem Katalogschlüssel "Tab".
+    "dd-picker.js": {"Tab"},
+}
 
 
 def test_no_german_script_text_is_left_outside_t() -> None:

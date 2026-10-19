@@ -15,7 +15,8 @@
     </div>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
-      Typ: <strong>{{ type_label }}</strong> &middot; <a href="{{ app_root }}/entities">{{ _("&larr; zurück zu Entitäten") }}</a>
+      Typ: <strong>{{ type_label }}</strong>{% if state_class %} ({{ state_class }}){% endif %} &middot; <a href="{{ app_root }}/entities">{{ _("&larr; zurück zu Entitäten") }}</a>
+      {% if historic %}&middot; <span class="badge historic" title="{{ _('Keine neuen Werte mehr erwartet: wird nicht als inaktiv gemeldet') }}">{{ _("Historisch") }}</span>{% endif %}
       {% if used_in_energiedashboard %}
       {# Statisch statt referrer-basiert (dynamic-back-link.js unten deckt
          die übrigen Herkunftsseiten ab) — unter Home-Assistant-Ingress fehlt
@@ -63,6 +64,10 @@
             {% include "_calendar_popover.html" %}
           </div>
           <button class="btn navbtn" :disabled="!canGoForward" @click="goForward()" aria-label="{{ _('Nächster Zeitraum') }}">›</button>
+          {# Sichtbarer Rückweg zur laufenden Periode, wie im Chart-Editor — der
+             erneute Klick auf den aktiven Zeitraum (setRange()) bleibt als
+             Zweitweg bestehen. Nur außerhalb der laufenden Periode. #}
+          <button type="button" class="chip now-chip" x-show="offset !== 0" x-cloak @click="goToNow()">{{ _("Zurück zu jetzt") }}</button>
         </div>
         {# Markierungs-Chip. Nur wenn die Anzeige läuft und es im Zeitraum
            tatsächlich Markierungen gibt — sonst stünde dort dauerhaft ein
@@ -359,6 +364,7 @@
   </div>
 
   <script src="{{ asset('vendor/echarts.min.js') }}"></script>
+  <script src="{{ asset('js/confirm-dialog.js') }}"></script>
   <script src="{{ asset('js/number-format.js') }}"></script>
   <script src="{{ asset('js/favorite-toggle.js') }}"></script>
   <script src="{{ asset('js/calendar-picker.js') }}"></script>

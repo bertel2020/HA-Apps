@@ -172,7 +172,7 @@ TIPS = [
     {
         "slug": "zaehlerrueckgaenge",
         "title": N_("Tipp: Zählerrückgänge werden gemeldet"),
-        "detail": N_("Sinkt ein Zählerstand, meldet das Meldungs-Center es und ordnet es ein: „kehrt zurück“ ist meist ein Fehlwert, „bleibt niedrig“ eher ein Zählertausch. Housekeeping → Zählerrückgänge listet alle Fälle."),
+        "detail": N_("Sinkt ein Zählerstand, meldet das Meldungs-Center es und ordnet es ein: „Vermutlich Fehlwert“ heißt: der Stand kehrt zurück, „Vermutlich Reset“: er bleibt niedrig. Housekeeping → Zählerrückgänge listet alle Fälle."),
         "meta": N_("Bereinigung"),
         "link": "/housekeeping#zaehlerrueckgaenge",
     },
@@ -273,6 +273,13 @@ TIPS = [
         "detail": N_("Unter Optionen → Legenden-Stil → Tabelle stehen die Kennzahlen als Spalten statt in Chips — auch beim Jahresvergleich mit Laufsumme, mit einer Zeile je Entität und Jahr."),
         "meta": N_("Charts"),
         "link": None,
+    },
+    {
+        "slug": "historisch_markieren",
+        "title": N_("Tipp: Stillgelegte Entitäten als historisch markieren"),
+        "detail": N_("Liefert eine Entität bewusst keine Werte mehr (z. B. ein ausgemusterter Zähler), nimmt „Historisch“ sie aus der Inaktiv-Erkennung — Daten und Charts bleiben unverändert. Zu finden im Reiter „Konfiguration“ der Entität."),
+        "meta": N_("Entitäten"),
+        "link": "/housekeeping#entitaeten",
     },
 ]
 

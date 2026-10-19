@@ -243,20 +243,22 @@ def test_gruppe_mit_einem_mitglied_wird_aufgeloest(monkeypatch, tmp: Path) -> No
         a.close()
 
 
-def test_verbraucheranteile_gruppieren_fasst_gruppen_zu_einer_zeile_zusammen(monkeypatch, tmp: Path) -> None:
+def test_verbraucheranteile_gruppieren_zeigt_gruppen_als_summenzeile_mit_mitgliedern(monkeypatch, tmp: Path) -> None:
     """Mit aktiviertem Schalter erscheint "Haushalt" (Waschmaschine+Trockner)
-    als eine Zeile — die aufgelöste Einzel-"Gruppe" Wallbox bleibt unverändert
-    ein eigener Eintrag, genau wie im Sankey (siehe Test oben)."""
+    als Summenzeile, ihre Mitglieder stehen darunter — die aufgelöste
+    Einzel-"Gruppe" Wallbox bleibt unverändert ein eigener Eintrag, genau wie
+    im Sankey (siehe Test oben). Die oberste Ebene ergibt weiter den Verbrauch."""
     a, config = _beispielanlage(tmp)
     config["verbraucheranteile_gruppieren"] = True
     monkeypatch.setattr(ed, "datetime", _FesteUhr)
     try:
         flow = a.service.compute_flow(config, "day", -1)
         anteile = {i["name"]: i["value"] for i in flow["verbraucher_breakdown"]}
-        assert anteile.keys() == {"Haushalt", "Wallbox", "Grundlast"}
+        assert anteile.keys() == {"Haushalt", "Waschmaschine", "Trockner", "Wallbox", "Grundlast"}
         assert anteile["Haushalt"] == pytest.approx(3.0)
         assert anteile["Wallbox"] == pytest.approx(4.0)
-        assert sum(anteile.values()) == pytest.approx(flow["kpi"]["verbrauch"])
+        oberste = sum(i["value"] for i in flow["verbraucher_breakdown"] if not i.get("parent"))
+        assert oberste == pytest.approx(flow["kpi"]["verbrauch"])
     finally:
         a.close()
 

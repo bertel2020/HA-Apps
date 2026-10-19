@@ -15,7 +15,7 @@
       <div class="dd-picker-popover" id="activity-entity-popover">
         {% for value, label in activity_entity_options %}
         <div class="dd-picker-row{{ ' active' if value == activity_entity_filter else '' }}"
-             onclick="selectDDOption('activity-entity', '{{ value }}', '{{ label }}')">{{ label }}</div>
+             data-value="{{ value }}" data-label="{{ label }}" onclick="selectDDOption('activity-entity', this.dataset.value, this.dataset.label)">{{ label }}</div>
         {% endfor %}
       </div>
     </span>
@@ -25,7 +25,7 @@
       <div class="dd-picker-popover" id="activity-action-popover">
         {% for value, label in activity_action_options %}
         <div class="dd-picker-row{{ ' active' if value == activity_action_filter else '' }}"
-             onclick="selectDDOption('activity-action', '{{ value }}', '{{ label }}')">{{ label }}</div>
+             data-value="{{ value }}" data-label="{{ label }}" onclick="selectDDOption('activity-action', this.dataset.value, this.dataset.label)">{{ label }}</div>
         {% endfor %}
       </div>
     </span>
@@ -35,7 +35,7 @@
       <div class="dd-picker-popover" id="activity-status-popover">
         {% for value, label in activity_status_options %}
         <div class="dd-picker-row{{ ' active' if value == activity_status_filter else '' }}"
-             onclick="selectDDOption('activity-status', '{{ value }}', '{{ label }}')">{{ label }}</div>
+             data-value="{{ value }}" data-label="{{ label }}" onclick="selectDDOption('activity-status', this.dataset.value, this.dataset.label)">{{ label }}</div>
         {% endfor %}
       </div>
     </span>
@@ -45,7 +45,7 @@
       <div class="dd-picker-popover" id="activity-days-popover">
         {% for value, label in activity_days_options %}
         <div class="dd-picker-row{{ ' active' if value == activity_days_filter else '' }}"
-             onclick="selectDDOption('activity-days', '{{ value }}', '{{ label }}')">{{ label }}</div>
+             data-value="{{ value }}" data-label="{{ label }}" onclick="selectDDOption('activity-days', this.dataset.value, this.dataset.label)">{{ label }}</div>
         {% endfor %}
       </div>
     </span>

@@ -9,12 +9,15 @@
     <h1>{{ _("Entitäten") }}</h1>
     <p class="sub">{{ _("Alle archivierten Entitäten — durchsuchen, filtern, je Entität zum Verlauf oder zur Konfiguration springen.") }}</p>
 
-    <div class="settings-panel">
+    <div class="settings-panel" id="entities-panel">
 
         <div id="controls" hx-trigger="load, change from:#controls, keyup delay:300ms from:[name=search]"
              hx-get="entities-table" hx-include="#controls, [name=page_size]" hx-target="#entities-table" hx-swap="innerHTML">
           <input type="search" name="search" placeholder="{{ _('Entität suchen …') }}" onchange="resetEntitiesPage()">
           <label class="filter-chip"><input type="checkbox" name="favorites" value="true" onchange="resetEntitiesPage()"><span>{{ _("★ Nur Favoriten") }}</span></label>
+          <button type="button" class="btn" id="sel-toggle" aria-pressed="false"
+                  data-label-on="{{ _('Auswahl beenden') }}" data-label-off="{{ _('Auswählen') }}"
+                  title="{{ _('Entitäten markieren, um mehrere gemeinsam zu löschen') }}">{{ _("Auswählen") }}</button>
           <span id="type-filter-wrap" class="dd-picker-wrap" style="display:{{ 'inline-block' if 'type' in visible_columns else 'none' }};">
             <button type="button" class="btn" id="type-filter-btn" onclick="toggleDDPicker('type-filter')">{{ _("Typ: Alle ▾") }}</button>
             <div class="dd-picker-popover" id="type-filter-popover">
@@ -30,7 +33,7 @@
             <div class="dd-picker-popover" id="unit-filter-popover">
               <div class="dd-picker-row" onclick="selectDDOption('unit-filter', 'all', t('Alle')); resetEntitiesPage();">{{ _("Alle Einheiten") }}</div>
               {% for opt in unit_options %}
-              <div class="dd-picker-row" onclick="selectDDOption('unit-filter', '{{ opt.value }}', '{{ opt.label }}'); resetEntitiesPage();">{{ opt.label }}</div>
+              <div class="dd-picker-row" data-value="{{ opt.value }}" data-label="{{ opt.label }}" onclick="selectDDOption('unit-filter', this.dataset.value, this.dataset.label); resetEntitiesPage();">{{ opt.label }}</div>
               {% endfor %}
             </div>
           </span>
@@ -58,6 +61,17 @@
           </div>
         </div>
 
+        <!-- Auswahl für „Löschen …“: lebt außerhalb von #entities-table, damit sie das Neuladen
+             der Tabelle (Suche, Filter, Seite) übersteht — die Haken setzt entities_list.js nach
+             jedem Laden aus dem gemerkten Bestand neu. -->
+        <div id="sel-bar" class="sel-bar" hidden>
+          <span id="sel-count" class="sel-count"></span>
+          <button type="button" class="btn btn-sm" id="sel-show" aria-expanded="false">{{ _("Auswahl anzeigen") }}</button>
+          <button type="button" class="btn btn-sm" id="sel-clear">{{ _("Auswahl aufheben") }}</button>
+          <button type="button" class="btn btn-sm btn-danger" id="sel-delete">{{ _("Löschen …") }}</button>
+        </div>
+        <div id="sel-panel" class="sel-panel" hidden></div>
+
         <div id="entities-table"></div>
     </div>
   </div>
@@ -66,6 +80,7 @@
   <script src="{{ asset('js/resizable-tables.js') }}"></script>
   <script src="{{ asset('js/favorite-toggle.js') }}"></script>
   <script src="{{ asset('js/dd-picker.js') }}"></script>
+  <script src="{{ asset('js/confirm-dialog.js') }}"></script>
   <script src="{{ asset('js/table-cards.js') }}"></script>
   <!-- Nach table-cards.js: das Sortiermenü, das dieses Skript mit einsammelt,
        entsteht dort. -->

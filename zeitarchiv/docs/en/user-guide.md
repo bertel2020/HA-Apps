@@ -34,6 +34,7 @@ internals for developers are in the other documents of this folder (see
   - [Daily load profile](#daily-load-profile)
   - [Energy report](#energy-report)
 - [Entities and histories](#entities-and-histories)
+  - [Deleting several entities](#deleting-several-entities)
   - [Period navigation](#period-navigation)
   - [Presentation](#presentation)
   - [Zooming into a section](#zooming-into-a-section)
@@ -78,6 +79,7 @@ internals for developers are in the other documents of this folder (see
   - [Deleting values: three levels](#deleting-values-three-levels)
   - [Changing and adding values](#changing-and-adding-values)
   - [Gaps, duplicates, repeats and counter decreases in detail](#gaps-duplicates-repeats-and-counter-decreases-in-detail)
+- [Data quality](#data-quality)
 - [Housekeeping](#housekeeping)
 
 **Import, export &amp; backup**
@@ -520,8 +522,10 @@ entries; with more consumers, **"show more"** reveals the rest — the donut
 next to it always shows all, independently of that. If you have created
 groups, you can additionally switch in the role assignment under **"Consumer
 shares" → "Show by group"** whether the table shows each consumer
-individually or grouped (one row per group, ungrouped devices stay
-individual).
+individually or grouped. Grouped, each group gets a total row (with an arrow
+to collapse it) and its devices indented below; ungrouped devices stay
+individual. If a sub-meter is in a group, its devices belong to it too and
+sit one level deeper. The donut always shows only the individual devices.
 
 ### Devices behind a sub-meter
 
@@ -625,9 +629,9 @@ report, like everything in Zeitarchiv, stays exclusively local.
 ## Entities and histories
 
 **Entities** lists all known entities, searchable via the name or the entity
-ID. Via **Columns ▾**, eleven additional columns can be shown/hidden (type,
+ID. Via **Columns ▾**, twelve additional columns can be shown/hidden (type,
 first/last value, resolution, retention, unit, records, size, value filter,
-gap/outlier threshold) — the selection applies globally to the whole add-on,
+gap/outlier threshold, Historic; the last one is off by default) — the selection applies globally to the whole add-on,
 not just in the current browser. If the columns **Type** or **Unit** are
 shown, a matching filter appears next to them (type: default/counter/switch,
 multiple selection possible; unit: one of the units actually occurring). A
@@ -642,13 +646,42 @@ so that switching only exchanges the content below. The options menu of the
 history view therefore contains only actions and presentation switches, no
 navigation anymore.
 
+### Deleting several entities
+
+**Select** (to the right of “Favorites only”) shows a checkbox in front of every
+row and a selection bar at the top; without this switch the list stays compact.
+The selection is kept while you search, filter and page. The checkbox in the
+table header only acts on the rows currently visible. **Show selection** lists
+all marked entities, each can be taken out again with ×, and **Clear
+selection** empties the selection. **End selection** hides the column and
+discards the marks.
+
+**Delete …** opens a dialog “Permanently delete N entities?”. It shows a single
+list: entities that are still used in charts, tables, tiles or the energy
+dashboard are at the top, highlighted in yellow, with the kind of use. This
+does not prevent the deletion, it only makes visible beforehand what will
+point to nothing afterwards. Below that the dialog offers to **create a backup
+first**; the box is ticked if there is no backup yet or the latest one is
+older than seven days. The backup covers the whole archive; you bring single
+entities back from it with the restore wizard (see
+[Backup / Restore](#backup--restore)). If the backup fails or you cancel,
+nothing is deleted.
+
+Deletion is final, there is no soft delete. Charts and tables that mention a
+deleted entity remain and show **“Entity missing”** — as a badge in the chart
+and table list, as a note above “Used in” and as a warning symbol on the tile
+title. The references are deliberately not removed: if Home Assistant keeps
+sending values, the integration recreates the entity. If you no longer need it,
+take it out in the editor of the chart or table.
+
 ### Period navigation
 
 - Choose hour, day, week, month, year or decade as the base unit; forward/
   back arrows page by one unit each.
 - **Clicking the already selected unit again jumps back to the current
   period** — "Day" to today, "Month" to the current month. The same gesture as
-  in the energy dashboard.
+  in the energy dashboard. Outside the current period, the **Back to now**
+  button next to the arrows takes you there too.
 - **Current** ("up to today") shows the current, not yet completed period,
   e.g. "this week so far" — even before any data exists for the rest of the
   period, the axis extends to the full calendar boundary (e.g. to Sunday for
@@ -767,6 +800,9 @@ series without leaving the period.
 **Save as chart** (options menu) stores the current view — including all
 chosen options and any additionally added entities — as a standalone chart,
 which afterwards can be edited like any other chart and pinned to a dashboard.
+If the page currently shows a past period (for example the year 2025), the
+chart shows that period too. The entity's own page still opens with the
+current period.
 
 ### Saved options
 
@@ -870,14 +906,36 @@ donut, stacked, orientation and resolution "Full" are disabled as long as
 Compare is active — Compare takes precedence instead of being silently
 switched off in the background when toggling.
 
+**Long-term:** With the period **Year** and exactly one entity, Compare also
+offers **Long-term**. Every year is then drawn as its own line from January
+to December: the current year bold, older years paler, plus the average of the
+previous years as a dashed line (**Ø line**, can be switched off). The
+**Years** field (2, 5, 10 or All) sets how many previous years are shown in
+addition to the current year; years without data are left out. Below the
+chart, a year × month table shows each year's value and its deviation from the
+average, either as values or as deviation per month. The current year is
+compared with the average up to the same day. Long-term is not available with
+"Rolling".
+
+**Comparison on the dashboard:** A chart's tile shows the comparison saved
+with it, like the chart page, without a setting of its own. For long-term, the
+year × month table is left out, and the legend names only the current year and
+the average, the other years as "+N years". A 1×1 tile draws only the current
+year and the average.
+
 ### Differences from the history view of a single entity
 
-When viewing, a chart always shows the **current period** — unlike the
-history view of a single entity, there is no forward/back navigation to past
-periods here. Zooming into a section is also missing (see [Zooming into a
+When viewing, a chart always shows the **current period**. When
+**customizing**, ‹ and › next to the period label page back to past periods,
+as on the page of a single entity; clicking the label opens a calendar for a
+direct jump. **Back to now** or clicking the selected period again returns to
+the current period. The period shown is saved: a chart saved at 2025 still
+shows 2025 later, when viewing and on the dashboard. A chart saved in the
+current period always shows whatever is current. Choosing a comparison (such
+as "Previous year" or "Long-term") returns to the current period. Comparisons refer to the period shown.
+Unlike there, zooming into a section is missing (see [Zooming into a
 section](#zooming-into-a-section)) — a chart can only be narrowed via period
-and resolution, not by mouse/touch. Anyone who needs both will find the same
-chart type with both functions on the page of the individual entity itself.
+and resolution, not by mouse/touch.
 
 ### Order, names and visibility
 
@@ -907,9 +965,12 @@ for donut), period including the Rolling switch, resolution (including
 orientation for the ranking comparison), dynamic Y axis, show values, average
 line (including flat/moving), decimal places, legend statistics, area,
 stacked/shares (%) and timeline are all saved with the chart and then also
-apply to its preview on dashboards. **Points on/off, raw values and Compare,
-on the other hand, are not** — these three are pure view settings for the
-current visit and are back to their initial value on the next opening.
+apply to its preview on dashboards. A past period shown and **Compare**
+(including running total and target entity, or years and Ø line for
+long-term) are saved too; the dashboard tile shows the comparison as well
+(see below). **Points on/off and raw values, on the other
+hand, are not** — both are pure view settings for the current visit and are
+back to their initial value on the next opening.
 
 A saved chart always shows the currently available data when viewed, not a
 frozen snapshot from the time of saving. The opened view shows under **Used
@@ -955,7 +1016,10 @@ for example, to place the same month over twelve consecutive years side by
 side in twelve columns. The label can contain placeholders such as `{jahr}`,
 `{monat}`, `{quartal}` or `{woche}` (also English: `{year}`, `{month}`,
 `{quarter}`, `{week}` — both spellings work in every language, the insert
-helper uses the one of the interface), which resolve automatically to the
+helper uses the one of the interface). `{wochentag}` (Monday) and
+`{wochentag_kurz}` (Mon), in English `{weekday}` and `{weekday_short}`, name
+the weekday of the start of the column — e.g. `{wochentag_kurz} {tag}.{monat_nr}.`
+for “Mon 12.10.”. All placeholders resolve automatically to the
 respective period of the column (insert helper directly in the label field,
 with live preview of the resolved value). The time zone of the app (option
 `timezone`) is decisive, not that of the browser — so even while traveling,
@@ -1116,7 +1180,7 @@ defaults never apply retroactively to entities that already exist.
 
 ### Where do I start?
 
-The eight fields act at very different points. This classification matters
+The fields act at very different points. This classification matters
 more when configuring than the order in the form:
 
 | Acts on … | Fields | Reversible? |
@@ -1124,7 +1188,7 @@ more when configuring than the order in the form:
 | **What is stored at all** | Resolution, value change filter | No — what was not stored is gone |
 | **How long it stays** | Retention | Yes, until the next deletion |
 | **What is shown** | Display name, decimal places, display mode | At any time |
-| **What cleanup marks** | Gap detection, outlier detection | At any time |
+| **What cleanup marks** | Gap detection, outlier detection, historic | At any time |
 
 The first two fields discard measurements on arrival. Everything below can be
 changed as often as you like without losing anything.
@@ -1140,6 +1204,17 @@ Zeitarchiv** (lists, selection fields, diagrams, tables) — Home Assistant's ow
 `friendly_name` and the entity ID remain untouched. A tag icon marks
 everywhere where a custom name is active. Leaving it empty restores the HA
 name.
+
+### Historic
+
+For entities that intentionally receive no new values, such as archived meters.
+With **Mark as historic** the entity no longer counts as inactive: it is missing
+from the "Inactive entities" list, from the number on the status tile and from
+the notice about them. Data, charts and rotation stay unchanged, and the mark
+can be removed at any time. All marked entities are listed in Housekeeping under
+"Historic entities", where the mark can also be removed. If values still arrive after marking, the
+list shows "still delivers values" with the number of new values; the mark stays
+in place anyway, so a running sensor marked by mistake gets noticed.
 
 ### Resolution
 
@@ -1227,6 +1302,28 @@ it, the two could not be distinguished in the data, and the inactivity notice
 would trigger wrongly.
 
 Active by default for newly detected entities.
+
+### Ignore values
+
+Discards measurements that **exactly** match one of the entered values as soon
+as they arrive — they never reach the archive. Meant for sensors that briefly
+report **0** when Home Assistant starts, until the integration has the first
+real value from the hardware.
+
+The switch is **Off** by default; the previous behavior applies. With **On** a
+text field appears: separate several values with a **semicolon** (`0; -1`), a
+decimal comma is allowed, at most ten values. It starts out with `0`. Turning
+it off keeps the list; it just no longer applies.
+
+- **Genuine values are lost too.** If the entity legitimately reports 0 during
+  normal operation (PV power at night, an empty battery), those values are
+  missing from the archive. Only enter values that never occur for real.
+- **New values only.** Stored values stay; imports (CSV, Home Assistant,
+  Symcon, VictoriaMetrics) ignore the list.
+- **Not for switches.** 0 is a real state there ("off"); the field is locked.
+- For counters, the *Mark bad values automatically* rule (see *Counter
+  decreases*) already catches zeros at startup after the fact. *Ignore values*
+  prevents them in the first place.
 
 ### Gap detection
 
@@ -1373,7 +1470,7 @@ areas:
 
 Detected outliers, gaps, duplicates and repeats that are equal after rounding
 are shown as a list, each with a short reason — visible when the mouse pointer
-is on the red marker. It names the rule the mark is based on and the
+is on the marker. It names the rule the mark is based on and the
 immediately preceding value with its time:
 
 > `3 h 50 min since previous value 21.2 °C at 08:10`
@@ -1390,6 +1487,31 @@ energy meters), lower subsequent values are logged separately as possible
 counter resets and marked under "Counter decreases"; they remain stored by
 default, since a reset (e.g. meter replacement) can be a valid event and is not
 automatically treated as an error.
+
+**Colors: Can I do something?** The color of a marker says whether you can
+clean up — not how bad the finding is. **Yellow** means you can do something
+here (outlier, duplicate, repeat, counter decrease with “Probably a bad
+value”); a row with such a marker has a faint yellow background, and the
+strongest marker of the row decides. **Grey** is information only (gap, “Still
+open”). **Green-teal** means expected and fine (“Probably a reset”). Red is
+reserved for errors and the delete button. The same colors apply in the key
+figures table above the list, in the **Marking** filter menu and on the
+[Data quality](#data-quality) page.
+
+**Every counter decrease is assessed.** The label says what happened after the
+decrease, and a reason is in the tooltip (on the phone as a grey line below):
+
+- **Probably a bad value** — the reading returned to the old level shortly
+  afterwards (“Reading back at … afterwards (after … min)”). A candidate for
+  deletion.
+- **Probably a reset** — the reading stayed low (“The reading stayed low
+  afterwards”), for example after a meter replacement or a reset. If the
+  counter resets on a schedule, you can record that in the entity's
+  configuration with **Allow decreases**.
+- **Still open** — there are too few subsequent values for an assessment.
+
+The scheduled reset of a daily counter (“… today”) at midnight does not count
+as a counter decrease and is neither marked nor counted.
 
 Repeats (subsequent values equal after rounding) can also be condensed
 retroactively using the same six-hour sign-of-life rule as the ongoing value
@@ -1583,7 +1705,7 @@ rule of their own:
 | **Gap** | The time distance between two consecutive values exceeds the threshold set per entity (**Gap detection**, in minutes; "Off" disables the detection completely) | Only a mark, no automatic action — gaps are shown, not deleted |
 | **Duplicate** | Two or more values share exactly the same timestamp (not just a similar one) | The chronologically first stored value is kept, all further ones at the same timestamp are proposed for deletion |
 | **Repeat** | A value is (after rounding to the configured decimal places) identical to the last *kept* value — the same rule that is also used continuously for condensing when new values arrive (see [Value change filter](#value-change-filter)) | The first value of a series of equal values is kept, all following ones are proposed — **unless** 6 hours have already passed since the last kept value (sign-of-life rule), in which case an unchanged value is kept as well |
-| **Counter decrease** | Only for counter entities: a value is lower than the immediately preceding kept value | Only a mark, **never** deleted automatically — a decrease can be a real event (e.g. meter replacement, reset after restart) |
+| **Counter decrease** | Only for counter entities: a value is lower than the immediately preceding kept value | A mark with an assessment (Probably a bad value, Probably a reset, Still open), **never** deleted unasked — a decrease can be a real event (e.g. meter replacement, reset after restart). The scheduled zeroing of a daily counter at midnight does not count |
 
 Important: these marks are **not mutually exclusive**. One and the same value
 can, for example, be marked simultaneously as an outlier **and** as part of a
@@ -1591,6 +1713,68 @@ duplicate — the **Mark** selection above the list only chooses which values
 carry a particular mark; it does not divide the list into separate,
 non-overlapping groups. Each entry of the selection names its hit count in the
 selected period; categories without hits are not selectable.
+
+## Data quality
+
+One page for all entities instead of each one separately: **duplicates, counter
+decreases, outliers and gaps** at a glance. It is under **System → Housekeeping**
+(section “Data quality”, button **Open overview**) and linked from the notice
+“New findings in data quality”. The page does not recalculate anything itself:
+it reads the same total counts that also provide the hit counts on the **Edit
+values** page — both show the same numbers, over the **entire history** of the
+entity.
+
+**Layout**
+
+- **Key figures** at the top: how many entities are affected (of all) and the
+  total per finding type. They change neither with the search nor with the
+  filter.
+- **Status line** below: “All n entities measured · oldest measurement … ago”.
+  While the first measurement is still running it says “n of m entities
+  measured” with a progress bar; if measurements are older than six hours, the
+  line gives their number.
+- **Search, finding and period**: search by name or ID, restrict to one finding
+  type and choose the period (7 days, 30 days, 1 year, **Total** — default).
+  Sorting is by clicking a column heading; on the phone, where the headings
+  are missing, there is a separate **Sorting** selection. Search, sorting and
+  page are kept while paging and when changing the period.
+- **Table**: one row per entity with a finding, one column per finding type,
+  plus **As of** (when the numbers were last measured). A click on a number
+  opens **Edit values** of the entity with the matching filter; a click on the
+  row unfolds the most recent individual findings (up to five per type, with
+  reason).
+
+**Colors** follow the same rule as in Edit values (see [Cleanup](#cleanup)):
+**yellow** means you can clean up (duplicates, counter decreases, outliers),
+**grey** is information only (gaps). The counter decrease cell is yellow as soon
+as the number is above zero — even if only scheduled resets are behind it: the
+overview only knows the number, the assessment (Probably a bad value, Probably
+a reset, Still open) is only visible in Edit values. Counters with **Allow
+decreases** show “allowed” in italics, counters of the class `total` show
+“n/a”, because Home Assistant allows them to decrease and they are therefore
+never checked for decreases.
+
+**Remove duplicates (bulk action).** For the period **Total**, entities with
+duplicates have a checkbox (the one in the table header selects all on the
+page). **Remove duplicates …** shows a preview per entity; after confirming,
+the result appears with **Undo**. As with deleting in Edit values, this is
+a soft delete at first; the value stored first chronologically is kept. Undo
+applies per entity only to the most recently deleted batch, i.e. the run you
+just did. There is no bulk action for outliers and gaps: outliers have to be
+looked at one by one, and gaps have no rows to delete. Counter decreases can be
+bundled in [Housekeeping](#housekeeping).
+
+**How it is measured.** The maintenance scheduler works through one entity
+after the other in the background, within a time budget per run. An existing
+measurement is only renewed if the entity has received **new values** since
+and the measurement is at least six hours old; silent entities count as
+current and therefore do not show up as “outdated”. New entities appear once
+the measurement has reached them. After an update that changes the counting,
+the first round over all entities can take a while.
+
+**Notice.** An info notice says how many findings in how many entities have been
+added since you last visited the page. It can be muted like the other
+notices; there is none on the first visit after an update.
 
 ## Housekeeping
 
@@ -1600,6 +1784,8 @@ settings:
 
 | Area | Shows |
 | --- | --- |
+| **Data quality** | Totals of all finding types over the entire history and the button **Open overview** to the [Data quality](#data-quality) page. The sections below count duplicates and counter decreases only for the last 30 days |
+| **Counter decreases** | Counters with decreases in the last 30 days, per entity with assessment (Probably a bad value, Probably a reset, Still open) and reason. For “Probably a reset”, **Allow decreases** is below it. A bulk action marks all returning decreases (bad values) for deletion in one step; they end up in the “Marked” tab of the respective entity and can be undone together |
 | **Inactive entities** | Entities without a new value for a selectable threshold (1 to 30 days). Entities never received always appear regardless of the threshold. Usually harmless (standby, rare sensor), but an early hint of a dead integration or a renamed/removed HA entity. |
 | **Duplicates** | Duplicate timestamps of the last 30 days detected archive-wide, per entity — the same hourly background snapshot that also triggers the "Duplicates found" notice. Removable via "Remove duplicates automatically" on the respective cleanup page. |
 | **Outliers** | Entities for which the configured outlier threshold marks more than 1 % of their values — with threshold, absolute number and rate. Then the threshold is too tight for this signal: what gets marked is no longer the implausible but normal behavior. These are the same numbers shown below the threshold field of the respective entity (see [Configuring an entity](#configuring-an-entity)); the list calculates nothing of its own. No bulk correction — the appropriate threshold depends on the signal. |
@@ -1680,6 +1866,8 @@ backup/retention runs, Zeitarchiv checks, among other things:
 - Final cleanup possible, duplicates found, rotation pending
 - Inactive entities, three-tiered by age (1/3/7 days, with increasing
   severity)
+- Entities marked as "Historic" that have delivered values again since being
+  marked
 - Gap detection of an entity can structurally never apply because of its
   resolution or the active value change filter (see [Housekeeping →
   Configuration](#housekeeping) and [Configuring an
@@ -1915,17 +2103,47 @@ Menu item of its own **System → Backup / Restore** (not under Settings):
 - **Check:** checksum check of an existing backup without applying it — useful
   to confirm the integrity of a backup before an actual need for restoration
   arises. Applies equally to self-created and imported backups.
-- **Restore:** only prepares the swap — it is applied only at the **next
-  restart of the Zeitarchiv add-on**, before the database is opened again.
-  After the click, a dialog actively asks "Restart now?"; a confirmation
-  triggers the restart directly via the Supervisor, "Later" postpones it (the
-  restore remains scheduled anyway and is applied at the next regular restart).
-  Without a restart, the current inventory remains usable unchanged until
-  then. At restart, the previous state is moved into a restore rollback before
-  being overwritten, not deleted — so if needed the state before the
-  restoration can be brought back (see below). After a restore, a short look at
-  **Statistics** is recommended to check whether the expected entities and
-  record counts are back.
+- **Restore:** opens the restore assistant, a page of its own with four steps
+  (Type → Selection → Review → Done). First you choose **what** should be
+  restored:
+  - **Everything:** replaces the entire data set. The swap is only scheduled
+    and applied at the **next restart of the Zeitarchiv add-on**, before the
+    database is opened again. After the click the page offers "Restart now";
+    "Later" postpones the restart (the restore stays scheduled). At restart
+    the previous state is moved into a restore rollback, not deleted (see
+    below).
+  - **Individual entities:** brings back only the chosen entities (archive,
+    rollup and hot buffer) from the backup, **without a restart**. The list
+    compares every entity with the current state (missing now, differs,
+    identical; row count and time span) and can be searched and filtered. Your
+    per-entity settings (name, retention, filters …) are kept; if the entity
+    no longer exists it is created anew, with its settings, from the backup.
+    Deleted data points of the entity follow the backup afterwards. Writes
+    pause briefly during the swap.
+  - **Settings:** brings back dashboards, charts, comparison tables, field
+    groups of the entity settings (name, retention, filters, counter, display)
+    and general settings one by one, also without a restart. Matching is done
+    by name. By default an object that does not exist currently, or differs,
+    is added as a **copy** and nothing existing is changed; optionally a
+    differing object can be **overwritten**. If you pick a dashboard, the
+    charts and tables it needs are included automatically and its tiles then
+    point to the right objects. Tiles for entities that no longer exist are
+    skipped. Credentials (API token, WebDAV login) and operating state (last
+    and next runs) are never restored. **Be careful with retention:** if it is
+    shorter in the backup than now, the next retention run permanently deletes
+    older data. Retention is therefore never preselected and the review warns
+    about it.
+
+  Before anything runs, the **Review** step shows what will be added, changed
+  and kept; the button only becomes active once you tick the confirmation.
+  After a restore, a short look at **Statistics** is recommended to check
+  whether the expected entities and record counts are back.
+- **Selective restores:** every restore of individual entities or settings
+  creates a small partial rollback (the files of the selection or the
+  overwritten settings rows). The list below the backup table shows the last
+  three with time, source and size; "Undo" brings back the state before, "Delete
+  rollback" removes it. When undoing entities, values that arrived for these
+  entities since the restore are lost.
 - **Run history:** lists every backup run as well as every restoration actually
   applied (its own trigger "Restoration") with time, status, duration/"—" and
   size. A failed or interrupted run is marked red; a click on the row shows the
@@ -2056,6 +2274,7 @@ long as necessary.
 | **Notices** | Switch the tip display on/off and dialog with all tips (see [Housekeeping](#housekeeping)); overview of muted system notices with remaining duration, individually re-enableable early |
 | **Connection** | Show/regenerate API token, last received value, number of writes and auth errors since start, connected integration version with "last seen" time (notice for outdated or newly available version) |
 | **Diagnostics** | Record the next write once completely (sensitive raw data, automatic deletion after 60 minutes at the latest); trace a single entity for 15 minutes including ingest result; download diagnostic report; process start and uptime; **Background processes** overview (last run/status of each maintenance scheduler task) |
+| **Reset** | Deletes data permanently — in two levels: **Delete measured values only** (entities, configuration, dashboards and settings are kept) or **Reset everything** (additionally entities, dashboards, saved charts and tables, activity log and settings, as on a fresh installation). The API token, the backup settings and all backup files are kept; the Home Assistant integration recreates entities with the next value. Key figures (entities, records, size) say beforehand what would be deleted. By default **a backup is created first** — if it fails, nothing is deleted. To confirm, you type the word “DELETE”. Not available in demo mode |
 | **Demo data** | Only visible with active demo mode or a leftover demo instance — see the separate section [Demo mode](#demo-mode) |
 | **About Zeitarchiv** | Version (with notice as soon as an update is available), time zone, data directory, links to documentation/changelog/bug report |
 

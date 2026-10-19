@@ -179,6 +179,59 @@ def should_accept_value(
     return new_ts - last_ts >= VALUE_FILTER_HEARTBEAT_SECONDS
 
 
+MAX_IGNORE_VALUES = 10
+
+
+class TooManyIgnoreValues(ValueError):
+    """Mehr als MAX_IGNORE_VALUES Werte in der Liste."""
+
+
+def parse_ignore_values(text: str) -> list[float]:
+    """Zerlegt die Eingabe „0; -1; 0,5“ in Zahlen. Trenner ist das Semikolon,
+    weil das Komma das deutsche Dezimalzeichen ist; ein Dezimalkomma wird wie
+    ein Punkt gelesen. Leere Teile (``0;;1``, abschließendes ``;``) zählen
+    nicht. Wirft ValueError mit dem Teil, der keine endliche Zahl ist, bzw.
+    TooManyIgnoreValues bei mehr als MAX_IGNORE_VALUES Werten."""
+    values: list[float] = []
+    for part in text.split(";"):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            number = float(part.replace(",", "."))
+        except ValueError:
+            raise ValueError(part) from None
+        if not math.isfinite(number):
+            raise ValueError(part)
+        if number not in values:
+            values.append(number)
+    if len(values) > MAX_IGNORE_VALUES:
+        raise TooManyIgnoreValues(len(values))
+    return values
+
+
+def normalize_ignore_values(values: list[float]) -> str:
+    """Speicherform der Liste: ``0;-1;0.5`` (Punkt, ohne Leerzeichen, ``-0``
+    als ``0``). Gegenstück zu parse_ignore_values()."""
+    return ";".join(format(v + 0.0, "g") for v in values)
+
+
+def should_ignore_value(enabled: int | bool, ignore_values: str, value: float) -> bool:
+    """True, wenn der Wert beim Erfassen verworfen werden soll: Schalter an und
+    der Wert steht (exakt) in der Liste. Gespeichert wird die Liste im
+    normalisierten Text; ein unlesbarer Eintrag bricht den Schreibpfad nicht
+    ab, sondern wird übersprungen."""
+    if not enabled or not ignore_values:
+        return False
+    for part in ignore_values.split(";"):
+        try:
+            if float(part) == value:
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 def effective_gap_floor_minutes(resolution: str, value_filter: str) -> int:
     """Engste Lücken-Erkennung (Minuten), die bei dieser Auflösung/diesem
     Wertänderungsfilter noch NICHT bei jedem normalen Zyklus fälschlich als
@@ -280,6 +333,7 @@ SORTABLE_COLUMNS = {
     # — CAST auf INTEGER für den natürlichen Größenvergleich.
     "gap_threshold": "CASE WHEN gap_threshold = 'off' THEN 999999 ELSE CAST(gap_threshold AS INTEGER) END",
     "outlier_threshold": "CASE WHEN outlier_threshold = 'off' THEN 999999 ELSE CAST(outlier_threshold AS INTEGER) END",
+    "historic": "historic",
 }
 
 _SCHEMA = """
@@ -290,6 +344,8 @@ CREATE TABLE IF NOT EXISTS entities (
     retention TEXT NOT NULL DEFAULT 'unlimited',
     decimals TEXT NOT NULL DEFAULT 'auto',
     value_filter TEXT NOT NULL DEFAULT 'off',
+    ignore_values_enabled INTEGER NOT NULL DEFAULT 0,
+    ignore_values TEXT NOT NULL DEFAULT '',
     gap_threshold TEXT NOT NULL DEFAULT '15',
     outlier_threshold TEXT NOT NULL DEFAULT '50',
     counter_decreases TEXT NOT NULL DEFAULT 'report',
@@ -852,6 +908,10 @@ class Index:
             self._conn.execute("ALTER TABLE entities ADD COLUMN decimals TEXT NOT NULL DEFAULT 'auto'")
         if "value_filter" not in columns:
             self._conn.execute("ALTER TABLE entities ADD COLUMN value_filter TEXT NOT NULL DEFAULT 'off'")
+        if "ignore_values_enabled" not in columns:
+            self._conn.execute("ALTER TABLE entities ADD COLUMN ignore_values_enabled INTEGER NOT NULL DEFAULT 0")
+        if "ignore_values" not in columns:
+            self._conn.execute("ALTER TABLE entities ADD COLUMN ignore_values TEXT NOT NULL DEFAULT ''")
         if "last_value" not in columns:
             self._conn.execute("ALTER TABLE entities ADD COLUMN last_value REAL")
         if "gap_threshold" not in columns:
@@ -879,6 +939,22 @@ class Index:
             # als Dauer (h/m) oder als Rohwert/AN-Anteil anzeigen. 'onoff' erhält
             # das bisherige Verhalten für alle bestehenden Entitäten bei.
             self._conn.execute("ALTER TABLE entities ADD COLUMN display_mode TEXT NOT NULL DEFAULT 'onoff'")
+        if "historic" not in columns:
+            # „Historisch“: die Entität bekommt bewusst keine neuen Werte mehr
+            # (archivierte Zähler, stillgelegte Geräte). Sie zählt dann nicht
+            # mehr als inaktiv (Housekeeping-Liste, Status-Kachel, Meldung).
+            # Daten, Charts und Rotation bleiben unberührt. Default 0 = bisheriges
+            # Verhalten.
+            self._conn.execute("ALTER TABLE entities ADD COLUMN historic INTEGER NOT NULL DEFAULT 0")
+        if "historic_since" not in columns:
+            # Zeitpunkt der Markierung und Zeilenzahl dazu: Grundlage der Warnung
+            # „liefert noch Werte“ (Housekeeping → Historische Entitäten). Die
+            # Markierung selbst bleibt trotz neuer Werte bestehen, damit eine
+            # zu Unrecht markierte, laufende Entität auffällt statt stillschweigend
+            # wieder in der Inaktiv-Liste zu landen. NULL bei Markierungen aus der
+            # Zeit davor: dort gibt es keinen Bezugspunkt, also keine Warnung.
+            self._conn.execute("ALTER TABLE entities ADD COLUMN historic_since REAL")
+            self._conn.execute("ALTER TABLE entities ADD COLUMN historic_rows INTEGER")
         if "chart_options" not in columns:
             # Individuelle Übersteuerung der Chart-Optionen (Optionen-Menü auf
             # der Entität-eigenen Chart-Seite, entity_detail.html) — ein
@@ -1070,6 +1146,14 @@ class Index:
             self._conn.execute(
                 "ALTER TABLE saved_charts ADD COLUMN area_fill INTEGER NOT NULL DEFAULT 1"
             )
+        if "show_points" not in sc_columns:
+            # "Punkte" (Optionen-Menü, "Darstellung") — Datenpunkte auf der
+            # Linie markieren. Wurde bislang nur im Editor-Zustand gehalten und
+            # beim Speichern verworfen; die Dashboard-Kachel zeichnete deshalb
+            # nie Punkte. Default AUS: das entspricht dem bisherigen Aussehen.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN show_points INTEGER NOT NULL DEFAULT 0"
+            )
         if "decimals" not in sc_columns:
             # Nachkommastellen-Übersteuerung (Optionen-Menü, "Darstellung") —
             # "auto" übernimmt weiterhin je Serie deren eigene entities.decimals-
@@ -1127,6 +1211,19 @@ class Index:
             self._conn.execute(
                 "ALTER TABLE saved_charts ADD COLUMN donut_aggregation TEXT NOT NULL DEFAULT 'sum'"
             )
+        if "period_anchor" not in sc_columns:
+            # Fester Zeitraum: ein Tag (JJJJ-MM-TT) in der gespeicherten
+            # Periode, z. B. 2025-07-02 für "Jahr 2025". NULL = wie bisher immer
+            # die laufende Periode. Ein Datum statt eines Versatzes, weil "ein
+            # Jahr zurück" mit der Zeit weiterwandern würde (siehe
+            # periodAnchorForSave in chart_editor.js).
+            self._conn.execute("ALTER TABLE saved_charts ADD COLUMN period_anchor TEXT")
+        if "compare_settings" not in sc_columns:
+            # Vergleich des Charts (Vorjahr/Langzeit samt Laufsumme, Soll,
+            # Jahren, Ø-Linie) als JSON — bis dahin eine reine Ansicht, die
+            # beim nächsten Öffnen wieder "Aus" war. Aufbau siehe
+            # compare_settings_or_400() in chart_period.py; '{}' = kein Vergleich.
+            self._conn.execute("ALTER TABLE saved_charts ADD COLUMN compare_settings TEXT NOT NULL DEFAULT '{}'")
 
         if self._conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='saved_tables'").fetchone()[0]:
             st_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(saved_tables)")}
@@ -1631,6 +1728,8 @@ class Index:
         display_mode: str | None = None,
         custom_name: str | None = None,
         compact_target: str | None = None,
+        ignore_values_enabled: bool | None = None,
+        ignore_values: str | None = None,
     ) -> None:
         """Ändert Auflösung, Aufbewahrung, Nachkommastellen und/oder die Lücken-/
         Ausreißer-Schwellwerte einer Entität (Konzept Abschnitt 03/04). Alle
@@ -1638,7 +1737,7 @@ class Index:
         Gültigkeitsprüfung der Werte liegt bewusst beim Aufrufer (main.py) — der
         Index ist hier bewusst dünn und kennt die Anzeige-Labels nicht."""
         updates: list[str] = []
-        params: list[str] = []
+        params: list[str | int] = []
         if resolution is not None:
             updates.append("resolution = ?")
             params.append(resolution)
@@ -1651,6 +1750,12 @@ class Index:
         if value_filter is not None:
             updates.append("value_filter = ?")
             params.append(value_filter)
+        if ignore_values_enabled is not None:
+            updates.append("ignore_values_enabled = ?")
+            params.append(int(ignore_values_enabled))
+        if ignore_values is not None:
+            updates.append("ignore_values = ?")
+            params.append(ignore_values)
         if gap_threshold is not None:
             updates.append("gap_threshold = ?")
             params.append(gap_threshold)
@@ -1873,6 +1978,22 @@ class Index:
                 "SELECT entity_id FROM entities WHERE hourly_rollup = 1"
             ).fetchall()
             return [row["entity_id"] for row in rows]
+
+    def set_entity_historic(self, entity_id: str, historic: bool) -> None:
+        """Markiert eine Entität als „historisch“ bzw. nimmt die Markierung zurück
+        (siehe Spalten-Migration oben). Berührt updated_at nicht: das ist keine
+        Änderung an der Entität selbst, sondern an der Inaktiv-Erkennung."""
+        with self._lock, self._conn:
+            if historic:
+                self._conn.execute(
+                    "UPDATE entities SET historic = 1, historic_since = ?, historic_rows = row_count WHERE entity_id = ?",
+                    (time.time(), entity_id),
+                )
+            else:
+                self._conn.execute(
+                    "UPDATE entities SET historic = 0, historic_since = NULL, historic_rows = NULL WHERE entity_id = ?",
+                    (entity_id,),
+                )
 
     def set_entity_chart_options(self, entity_id: str, options: dict) -> None:
         """Speichert den vollständigen Chart-Optionen-Stand einer Entität
@@ -2215,11 +2336,14 @@ class Index:
         show_values: bool = False,
         average_line: bool = False,
         area_fill: bool = True,
+        show_points: bool = False,
         stacked: bool = False,
         normalize: bool = False,
         average_style: str = "flat",
         horizontal: bool = False,
         donut_aggregation: str = "sum",
+        period_anchor: str | None = None,
+        compare_settings: dict | None = None,
     ) -> int:
         now = time.time()
         with self._lock, self._conn:
@@ -2229,9 +2353,10 @@ class Index:
                 "(name, entity_ids, range_key, continuous, entity_names, hidden_entity_ids, "
                 "resolution_preset, "
                 "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
-                "chart_type, decimals, show_values, average_line, area_fill, stacked, normalize, "
-                "average_style, horizontal, donut_aggregation, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "chart_type, decimals, show_values, average_line, area_fill, show_points, stacked, normalize, "
+                "average_style, horizontal, donut_aggregation, period_anchor, compare_settings, "
+                "created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -2239,8 +2364,9 @@ class Index:
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
-                    int(average_line), int(area_fill), int(stacked), int(normalize),
-                    average_style, int(horizontal), donut_aggregation, now, now,
+                    int(average_line), int(area_fill), int(show_points), int(stacked), int(normalize),
+                    average_style, int(horizontal), donut_aggregation, period_anchor,
+                    json.dumps(compare_settings or {}), now, now,
                 ),
             )
             return cur.lastrowid
@@ -2265,11 +2391,14 @@ class Index:
         show_values: bool = False,
         average_line: bool = False,
         area_fill: bool = True,
+        show_points: bool = False,
         stacked: bool = False,
         normalize: bool = False,
         average_style: str = "flat",
         horizontal: bool = False,
         donut_aggregation: str = "sum",
+        period_anchor: str | None = None,
+        compare_settings: dict | None = None,
     ) -> None:
         with self._lock, self._conn:
             self._ensure_valid_name_locked("saved_charts", name, exclude_id=chart_id)
@@ -2278,8 +2407,9 @@ class Index:
                 "entity_names = ?, hidden_entity_ids = ?, resolution_preset = ?, "
                 "dynamic_y_axis = ?, dashboard_animation = ?, "
                 "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, decimals = ?, "
-                "show_values = ?, average_line = ?, area_fill = ?, stacked = ?, normalize = ?, "
-                "average_style = ?, horizontal = ?, donut_aggregation = ?, updated_at = ? WHERE id = ?",
+                "show_values = ?, average_line = ?, area_fill = ?, show_points = ?, stacked = ?, normalize = ?, "
+                "average_style = ?, horizontal = ?, donut_aggregation = ?, period_anchor = ?, "
+                "compare_settings = ?, updated_at = ? WHERE id = ?",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -2287,8 +2417,9 @@ class Index:
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
-                    int(average_line), int(area_fill), int(stacked), int(normalize),
-                    average_style, int(horizontal), donut_aggregation, time.time(), chart_id,
+                    int(average_line), int(area_fill), int(show_points), int(stacked), int(normalize),
+                    average_style, int(horizontal), donut_aggregation, period_anchor,
+                    json.dumps(compare_settings or {}), time.time(), chart_id,
                 ),
             )
 
@@ -2306,11 +2437,14 @@ class Index:
         d["show_values"] = bool(d.get("show_values", 0))
         d["average_line"] = bool(d.get("average_line", 0))
         d["area_fill"] = bool(d.get("area_fill", 1))
+        d["show_points"] = bool(d.get("show_points", 0))
         d["stacked"] = bool(d.get("stacked", 0))
         d["normalize"] = bool(d.get("normalize", 0))
         d["average_style"] = d.get("average_style") or "flat"
         d["horizontal"] = bool(d.get("horizontal", 0))
         d["donut_aggregation"] = d.get("donut_aggregation") or "sum"
+        d["period_anchor"] = d.get("period_anchor") or None
+        d["compare_settings"] = json.loads(d["compare_settings"]) if d.get("compare_settings") else {}
         d["entity_names"] = json.loads(d["entity_names"]) if d.get("entity_names") else {}
         d["hidden_entity_ids"] = (
             json.loads(d["hidden_entity_ids"]) if d.get("hidden_entity_ids") else []
@@ -3511,6 +3645,26 @@ class Index:
         # Nach anderen Regeln berechnet: lieber keine Zahlen als falsche, bis der nächste Lauf neu rechnet.
         return snapshot if snapshot.get("rules") == self._COUNTER_DECREASE_RULES else None
 
+    def invalidate_finding_caches(self, entity_id: str) -> None:
+        """Nach dem Markieren oder Zurückholen von Werten: die zwischengespeicherten Befunde
+        (globale Duplikat-Zählung, Gesamt-Zählung dieser Entität) gelten nicht mehr. Ohne das
+        stünden Meldungen wie „Duplikate gefunden“ oder „Ausreißer-Erkennung markiert auffällig
+        viel“ bis zu eine Stunde weiter da, obwohl die Ursache behoben ist. Der nächste
+        Wartungstakt rechnet neu; die alten Zahlen bleiben bis dahin stehen (Ausreißer) bzw. die
+        Duplikat-Liste ist leer (wie beim Zählerrückgang-Schnappschuss)."""
+        if self.get_setting(self._DUPLICATE_SNAPSHOT_KEY) is not None:
+            self.set_setting(self._DUPLICATE_SNAPSHOT_KEY, json.dumps({"checked_at": 0, "rows": []}))
+        key = self._CLEANUP_ALLTIME_STATS_PREFIX + entity_id
+        raw = self.get_setting(key)
+        if raw is not None:
+            try:
+                entry = json.loads(raw)
+            except json.JSONDecodeError:
+                return
+            if isinstance(entry, dict):
+                entry["computed_at"] = 0
+                self.set_setting(key, json.dumps(entry))
+
     def invalidate_counter_decrease_snapshot(self) -> None:
         """Nach dem Markieren: die Meldung soll nicht eine Stunde lang auf einen Rückgang
         zeigen, den man gerade zur Löschung markiert hat. Der nächste Wartungstakt rechnet neu."""
@@ -3588,21 +3742,32 @@ class Index:
         counts: dict,
         outlier_threshold: str | None = None,
         outlier_rule: int | None = None,
+        daily: dict | None = None,
+        gap_threshold: str | None = None,
     ) -> None:
-        """`outlier_threshold` ist die Schwelle, MIT DER gezählt wurde, und
+        """`daily` sind die Befunde je Kalendertag ({"JJJJ-MM-TT": {Kategorie:
+        Anzahl}}, nur Tage mit Befund), aus demselben Durchlauf wie `counts`.
+        `gap_threshold` ist die Lücken-Schwelle, MIT DER gezählt wurde (wie
+        `outlier_threshold`: eine Lücken-Zahl gehört nur zu genau dieser Schwelle).
+        Ohne sie (None) fehlt der Schlüssel: der Eintrag stammt dann aus einem
+        Pfad, der keine Tageszahlen liefert, und gilt für Tagesansichten als
+        nicht gemessen — nicht als "keine Befunde". `outlier_threshold` ist die Schwelle, MIT DER gezählt wurde, und
         `outlier_rule` die Regel (cleanup.OUTLIER_RULE_VERSION). Ohne beides
         ließe sich die gespeicherte Ausreißer-Zahl später keiner Einstellung
         zuordnen: wer die Schwelle ändert, bekäme eine Quote der alten zu sehen
         — und wer die App aktualisiert, eine der alten Regel, obwohl die
         Schwelle unverändert dasteht. Alte Einträge ohne die Felder gelten
         deshalb als 'unbekannt' (siehe outlier_rate() in cleanup_stats.py)."""
-        payload = json.dumps({
+        entry = {
             "computed_at": time.time(),
             "counts": counts,
             "outlier_threshold": outlier_threshold,
             "outlier_rule": outlier_rule,
-        })
-        self.set_setting(self._CLEANUP_ALLTIME_STATS_PREFIX + entity_id, payload)
+            "gap_threshold": gap_threshold,
+        }
+        if daily is not None:
+            entry["daily"] = daily
+        self.set_setting(self._CLEANUP_ALLTIME_STATS_PREFIX + entity_id, json.dumps(entry))
 
     def list_cleanup_alltime_stats(self) -> dict[str, dict]:
         """Alle gecachten Gesamt-Zählungen auf einmal, {entity_id: Eintrag}.
@@ -3787,6 +3952,57 @@ class Index:
                 (time.time(), entity_id),
             )
 
+    def clear_all_values(self) -> None:
+        """Wie clear_entity_data(), aber für alle Entitäten in einem Zug —
+        Konfiguration, Dashboards und Einstellungen bleiben."""
+        with self._lock, self._conn:
+            for table in (
+                "deleted_points", "ingested_events", "counter_mark_ignored",
+                "compacted_months", "stats_snapshots",
+            ):
+                self._conn.execute(f"DELETE FROM {table}")  # noqa: S608 — feste Namen
+            self._conn.execute(
+                """UPDATE entities
+                   SET first_ts = NULL, last_ts = NULL, last_value = NULL, row_count = 0,
+                       deleted_count = 0, size_bytes = 0, counter_auto_since = NULL,
+                       counter_auto_halted_at = NULL, updated_at = ?""",
+                (time.time(),),
+            )
+
+    def reset_everything(self, keep_setting_prefixes: tuple[str, ...] = ()) -> None:
+        """Setzt den Index auf den Zustand einer frischen Installation zurück:
+        Werte, Entitäten, Charts, Tabellen, Dashboards, Aktivitätslog und
+        Einstellungen. Das Schema bleibt, die Verbindung bleibt offen (die
+        Datei selbst wird bewusst nicht gelöscht, die laufende Instanz hält sie).
+
+        Einstellungen, deren Schlüssel mit einem der keep_setting_prefixes
+        beginnt, bleiben erhalten — der Aufrufer nennt dort Token und
+        Backup-Konfiguration. backup_jobs bleibt unangetastet, weil die
+        Backup-Dateien selbst auch bleiben."""
+        self.clear_all_values()
+        with self._lock, self._conn:
+            for table in (
+                "dashboard_pins", "table_rows", "table_columns", "saved_tables",
+                "saved_charts", "entity_actions", "retention_jobs",
+                "memory_snapshots", "entities",
+            ):
+                self._conn.execute(f"DELETE FROM {table}")  # noqa: S608 — feste Namen
+            # Das Default-Dashboard (id 1) ist fest verankert und nicht
+            # löschbar — es wird auf Auslieferungszustand zurückgesetzt.
+            self._conn.execute("DELETE FROM dashboards WHERE id != 1")
+            self._conn.execute(
+                "UPDATE dashboards SET name = 'Übersicht', position = 0, is_default = 1, "
+                "locked = 0, is_favorite = 0, precise_mode = 0, fill_gaps = 0 WHERE id = 1"
+            )
+            if keep_setting_prefixes:
+                clause = " AND ".join("key NOT LIKE ?" for _ in keep_setting_prefixes)
+                self._conn.execute(
+                    f"DELETE FROM settings WHERE {clause}",  # noqa: S608 — nur Platzhalter
+                    tuple(f"{prefix}%" for prefix in keep_setting_prefixes),
+                )
+            else:
+                self._conn.execute("DELETE FROM settings")
+
     def delete_entity(self, entity_id: str) -> None:
         """Entfernt die Entität und alle direkt zugehörigen Indexdaten."""
         validate_entity_id(entity_id)
@@ -3826,6 +4042,8 @@ class Index:
                 "UPDATE entities SET deleted_count = deleted_count + ? WHERE entity_id = ?",
                 (len(timestamps), entity_id),
             )
+        if timestamps:
+            self.invalidate_finding_caches(entity_id)
 
     def oldest_deleted_at(self, entity_id: str | None = None) -> float | None:
         """Zeitpunkt der ältesten noch bestehenden Markierung (einer Entität oder insgesamt) — für die
@@ -3858,7 +4076,10 @@ class Index:
                 "UPDATE entities SET deleted_count = deleted_count - ? WHERE entity_id = ?",
                 (cursor.rowcount, entity_id),
             )
-            return cursor.rowcount
+            restored = cursor.rowcount
+        if restored:
+            self.invalidate_finding_caches(entity_id)
+        return restored
 
     def _undo_deleted_where(self, entity_id: str, where: str, params: tuple) -> int:
         """Nimmt Markierungen zurück, die `where` trifft, und führt deleted_count
@@ -3872,7 +4093,10 @@ class Index:
                 "UPDATE entities SET deleted_count = deleted_count - ? WHERE entity_id = ?",
                 (cursor.rowcount, entity_id),
             )
-            return cursor.rowcount
+            restored = cursor.rowcount
+        if restored:
+            self.invalidate_finding_caches(entity_id)
+        return restored
 
     def undo_deleted_ids(self, entity_id: str, ids: list[int]) -> int:
         """Nimmt einzelne Markierungen zurück (deleted_points.id, nicht der

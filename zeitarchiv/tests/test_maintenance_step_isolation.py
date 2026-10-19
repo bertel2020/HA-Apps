@@ -74,7 +74,7 @@ def test_a_failing_duplicate_scan_does_not_block_backup_retention_compaction_or_
     for name in (
         "_run_backup_schedule_if_due", "_run_retention_enforcement_if_due",
         "_run_automatic_compaction_if_due", "_run_automatic_purge_if_due",
-        "_flush_stale_resolution_windows", "_refresh_one_outlier_rate",
+        "_flush_stale_resolution_windows", "_refresh_due_outlier_rates",
     ):
         monkeypatch.setattr(dienst, name, merke(name))
     # Netz-/Dateisystem-Schritte, die hier nichts zu tun haben sollen.
@@ -95,7 +95,7 @@ def test_a_failing_duplicate_scan_does_not_block_backup_retention_compaction_or_
         dienst._maintenance_scheduler_loop()
 
     assert aufgerufen == [
-        "_refresh_one_outlier_rate", "_run_backup_schedule_if_due", "_run_retention_enforcement_if_due",
+        "_refresh_due_outlier_rates", "_run_backup_schedule_if_due", "_run_retention_enforcement_if_due",
         "_flush_stale_resolution_windows", "_run_automatic_compaction_if_due", "_run_automatic_purge_if_due",
     ]
     assert any("step=duplicate_snapshot" in r.getMessage() for r in caplog.records)

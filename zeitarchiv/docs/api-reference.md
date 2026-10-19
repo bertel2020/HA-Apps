@@ -157,6 +157,15 @@ Wie `/api/query`, aber `entity_ids` (kommagetrennt, max.
 is_current}`, ein Eintrag in `series` je Entität mit `friendly_name`, `unit`,
 `decimals`, `display_mode`, `aggregation_type`, `chart_type`, `points`.
 
+`compare_mode` kennt hier zusätzlich `longterm` (im Chart-Editor
+„Langzeit“), zusammen mit `previous_years` (Default `1`, `0` = alle
+Vorjahre, negativ → `400`). Es greift nur bei `compare=true`, `range=year`,
+nicht `continuous`, ohne `raw` und mit genau einer Entität; sonst entfällt
+der Vergleich. Statt `compare_points` trägt der Eintrag dann `years`:
+`[{year, points, cut_points}]`, neuestes Vorjahr zuerst, Jahre ganz ohne Werte
+fehlen. `cut_points` ist nur im laufenden Jahr (`offset=0`) gesetzt und
+enthält jedes Vorjahr bis zum gleichen Tag, sonst `null`.
+
 ## `POST /api/query-table` (Ingress-intern)
 
 Lädt alle Zeiträume einer Vergleichstabelle in einer gemeinsamen Anfrage

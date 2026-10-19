@@ -267,6 +267,15 @@ def analyze_raw_rows_page(
         "repetitions": 0,
         "counter_decreases": 0,
     }
+    # Befunde je Kalendertag (nur Tage mit Befund): dieselben Einheiten wie
+    # ``counts``, damit die Tagessummen genau die Gesamtzahl ergeben.
+    daily: dict[str, dict[str, int]] = {}
+
+    def count_day(ts: float, key: str, amount: int = 1) -> None:
+        day = datetime.fromtimestamp(ts, tz).strftime("%Y-%m-%d")
+        bucket = daily.setdefault(day, {})
+        bucket[key] = bucket.get(key, 0) + amount
+
     total_matches = 0
     previous_ts: float | None = None
     previous_value: float | None = None
@@ -300,18 +309,23 @@ def analyze_raw_rows_page(
             duplicate_reason = tr("{len}× derselbe Zeitstempel — Werte: {formatted_values}", len=len(group_rows), formatted_values=formatted_values)
         if group_outlier is not None:
             counts["outliers"] += 1
+            count_day(group_ts, "outliers")
         if group_gap is not None:
             counts["gaps"] += 1
+            count_day(group_ts, "gaps")
         if duplicate_reason is not None:
             counts["duplicates"] += len(group_rows)
+            count_day(group_ts, "duplicates", len(group_rows))
 
         for row in group_rows:
             repetition_reason = row.pop("repetition_reason")
             counter_decrease_reason = row.pop("counter_decrease_reason")
             if repetition_reason is not None:
                 counts["repetitions"] += 1
+                count_day(group_ts, "repetitions")
             if counter_decrease_reason is not None:
                 counts["counter_decreases"] += 1
+                count_day(group_ts, "counter_decreases")
             row_matches = (
                 selected_filter == "all"
                 or (selected_filter == "outliers" and group_outlier is not None)
@@ -374,6 +388,7 @@ def analyze_raw_rows_page(
                 and counter_previous_value is not None
                 and ts > counter_previous_ts
                 and value < counter_previous_value
+                and not _is_periodic_reset(counter_previous_ts, ts, counter_previous_value, value, tz)
             ):
                 counter_decrease_reason = _counter_decrease_reason(
                     counter_previous_value, value
@@ -401,6 +416,7 @@ def analyze_raw_rows_page(
     return {
         "rows": page_rows,
         "counts": counts,
+        "daily": daily,
         "pagination": {
             "page": actual_page,
             "page_size": page_size,
@@ -596,7 +612,7 @@ def _counter_decrease_reason(previous_value: float, value: float) -> str:
 
 
 def detect_counter_decreases(
-    rows: Iterable[tuple[float, float]],
+    rows: Iterable[tuple[float, float]], tz: ZoneInfo | None = None
 ) -> dict[float, str]:
     """Markiert den ersten niedrigeren Wert nach einem höheren Zählerstand.
 
@@ -604,13 +620,19 @@ def detect_counter_decreases(
     die Rückgangskante markiert; anschließend steigende Werte werden nicht
     gegen das historische Maximum geprüft. Bei Zeitstempel-Duplikaten bleibt
     das erste Vorkommen die Referenz, passend zur Duplikatbereinigung.
+
+    Mit ``tz`` werden planmäßige Rücksetzer um Mitternacht (siehe _is_periodic_reset) nicht
+    markiert, wie in classify_counter_decreases(). Ohne bleibt es bei jedem Rückgang — so
+    die Verdichtung, die jeden Reset-Zeitpunkt als Rohzeile behalten muss.
     """
     decreases: dict[float, str] = {}
     previous_ts: float | None = None
     previous_value: float | None = None
     for ts, value in rows:
         if previous_ts is not None and ts > previous_ts:
-            if previous_value is not None and value < previous_value:
+            if previous_value is not None and value < previous_value and not (
+                tz is not None and _is_periodic_reset(previous_ts, ts, previous_value, value, tz)
+            ):
                 decreases[ts] = _counter_decrease_reason(previous_value, value)
             previous_ts, previous_value = ts, value
         elif previous_ts is None:

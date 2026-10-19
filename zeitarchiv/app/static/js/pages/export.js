@@ -215,9 +215,6 @@
           : t('Mittelwert je Intervall, bei Zählern und Schaltern der letzte Wert des Intervalls.');
       }
 
-      function escapeHtml(text) {
-        return String(text).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
-      }
       function renderReview() {
         const st = stats(state.resolution);
         const error = $('export-error');

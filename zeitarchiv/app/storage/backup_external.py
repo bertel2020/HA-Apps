@@ -363,7 +363,7 @@ def transfer(
     if free is not None and free < size:
         raise ExternalTargetError(tr("Zu wenig Platz am Ziel."))
     final = target_dir / source.name
-    part = target_dir / f".{source.name}.part"
+    part = target_dir / webdav.unique_part_name(source.name)
     try:
         copied = 0
         with source.open("rb") as src, part.open("wb") as dst:
@@ -430,7 +430,10 @@ def transfer_webdav(
         client.ensure_folder()
         beat()
         for leftover in client.list_files():  # abgebrochene Uploads dieser App
-            if leftover.name.startswith(".zeitarchiv-backup-") and leftover.name.endswith(".part"):
+            # .part-Namen stammen aus Versionen vor dem Umstieg auf unique_upload_name
+            if leftover.name.startswith(webdav.UPLOAD_PREFIX) or (
+                leftover.name.startswith(".zeitarchiv-backup-") and leftover.name.endswith(".part")
+            ):
                 client.delete(leftover.name, missing_ok=True)
         return client.upload(source, source.name, beat, on_progress)
     except webdav.WebDavError as exc:

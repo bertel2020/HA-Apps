@@ -62,9 +62,9 @@ Zeitarchiv besteht aus zwei getrennten, unabhängig versionierten Teilen:
 | **Bleibt schnell** | Charts über Wochen, Monate oder Jahre laden zügig, auch bei sehr langer Historie |
 | **Eigene Dashboards** | Frei kombinierbare Charts (Linie, Balken, Zeitstrahl) und Vergleichstabellen auf beliebig vielen eigenen Dashboards |
 | **Energiedashboard** | Eigene Sankey-Ansicht des Energieflusses mit Autarkie-, Kosten- und CO₂-Auswertung — auf Wunsch mit einem Klick aktiviert |
-| **Datenpflege** | Ausreißer, Lücken und Duplikate erkennen, korrigieren oder bereinigen |
+| **Datenpflege** | Ausreißer, Lücken, Duplikate und Zählerrückgänge erkennen, korrigieren oder bereinigen — mit einer Datenqualität-Übersicht über alle Entitäten |
 | **Datenübernahme** | Bestehende Historie aus Symcon, CSV-Dateien oder direkt aus Home Assistant importieren |
-| **Sicherung** | Prüfbare, portable ZIP-Backups mit Wiederherstellung und Zeitplan |
+| **Sicherung** | Prüfbare, portable ZIP-Backups mit Zeitplan; die Wiederherstellung kann alles, einzelne Entitäten oder nur die Einstellungen zurückholen |
 | **Demo-Modus** | Eigene Instanz mit synthetischen Vorführdaten, komplett getrennt von den echten Daten — per Add-on-Option umschaltbar |
 | **Abgesichert** | Läuft hinter Home Assistants eigenem Login, Schreibzugriff strikt vom Rest der Oberfläche getrennt |
 
@@ -186,7 +186,7 @@ Aufbewahrung und Rundung. Ein optionaler, rein app-interner Anzeigename
 Darstellung.
 
 **Housekeeping.** Eigener Bereich für Dinge, die sonst leicht übersehen
-werden: erkannte Duplikate, inaktive Entitäten, widersprüchliche
+werden: erkannte Duplikate, inaktive Entitäten (bewusst stillgelegte lassen sich als „Historisch“ ausnehmen), widersprüchliche
 Konfigurationskombinationen (z. B. eine Lücken-Erkennung, die durch
 Auflösung oder Wertänderungsfilter nie zutreffen kann), ungenutzte
 Charts/Tabellen, freier Speicherplatz auf dem Host-Dateisystem, sowie
@@ -272,6 +272,17 @@ gröberer Auflösung (Minute, Stunde, Tag) statt der kompletten Rohwerte.
   <a href="docs/img/meldungen.png"><img src="docs/img/meldungen.png" alt="Meldungs-Center in der Kopfzeile" width="270"></a>
   <a href="docs/img/energiedashboard-scheme-ha.png"><img src="docs/img/energiedashboard-scheme-ha.png" alt="Farbschema Home Assistant" width="270"></a>
   <br><sub>Vergleichstabelle &nbsp;·&nbsp; Meldungs-Center &nbsp;·&nbsp; Farbschema „Home Assistant"</sub>
+</p>
+
+<p align="center">
+  <a href="docs/img/datenqualitaet-light.png"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/datenqualitaet-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/img/datenqualitaet-light.png">
+    <img src="docs/img/datenqualitaet-light.png" alt="Datenqualität: Ausreißer, Lücken, Duplikate und Zählerrückgänge je Entität" width="270">
+  </picture></a>
+  <a href="docs/img/wiederherstellen-assistent-light.png"><img src="docs/img/wiederherstellen-assistent-light.png" alt="Wiederherstellen mit Auswahl: alles, einzelne Entitäten oder nur Einstellungen" width="270"></a>
+  <a href="docs/img/langzeit-vergleich-dark.png"><img src="docs/img/langzeit-vergleich-dark.png" alt="Langzeit-Vergleich: ein Jahr je Linie mit Ø-Linie und Tabelle Jahr × Monat" width="270"></a>
+  <br><sub>Datenqualität &nbsp;·&nbsp; Wiederherstellen mit Auswahl &nbsp;·&nbsp; Langzeit-Vergleich</sub>
 </p>
 
 <p align="center"><sub>Passt sich automatisch Hell/Dunkel an (siehe Startseite/Energiedashboard oben); neben „Zeitarchiv" (Standard) und „Home Assistant" auch als „Modern" wählbar. Weitere Ansichten: <a href="docs/img">docs/img</a>.</sub></p>
@@ -485,7 +496,7 @@ Zeitarchiv stellt diese Aufgaben deshalb direkt in der Oberfläche bereit:
 - einzelne Messwerte nachträglich korrigieren
 - verdächtige Werte zunächst per Soft Delete ausblenden
 - Änderungen prüfen, bevor Daten endgültig entfernt werden
-- inaktive Entitäten erkennen
+- inaktive Entitäten erkennen (stillgelegte als „Historisch“ ausnehmen)
 - historische Lücken durch Importe schließen
 - vorhandene Zeitstempel beim Import nicht erneut anlegen
 - widersprüchliche Einstellungen und ungenutzte Auswertungen anzeigen

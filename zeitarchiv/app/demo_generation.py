@@ -1291,6 +1291,58 @@ def inject_data_quality_issues(
     return result
 
 
+# Ungewollte Zählerrückgänge (Testfall für Reset-/Rückgang-Erkennung), je
+# Entität alle ``every_days`` Tage. Zwei Muster:
+#   "glitch": der Zählerstand fällt für ``steps`` Messpunkte um ``depth``
+#     unter den simulierten Wert und springt danach auf die korrekte Linie
+#     zurück (typischer Sensor-Aussetzer → "Vermutlich Fehlwert").
+#   "reset":  der Zählerstand fällt um ``depth`` und BLEIBT niedriger (alle
+#     Folgewerte verschoben, wie nach Zählertausch/Reset → "Vermutlich Reset
+#     oder Zählertausch"). Bei --append läuft die Simulation vom gespeicherten
+#     (bereits niedrigeren) Endwert weiter, der Versatz bleibt also erhalten.
+# Zeitpunkt, Tiefe und Dauer leiten sich allein aus der Tagesnummer ab — kein
+# rng-Verbrauch, damit alle übrigen Demo-Daten unverändert bleiben, und
+# --append-Läufe erzeugen dieselben Rückgänge. Die Intervalle sind teilerfremd,
+# damit die Rückgänge der Entitäten nicht am selben Tag auftreten.
+@dataclass(frozen=True)
+class CounterDipSpec:
+    every_days: int
+    depth: tuple[float, float]
+    mode: str  # "glitch" | "reset"
+    steps: tuple[int, int] = (2, 4)
+
+
+COUNTER_DIPS: dict[str, CounterDipSpec] = {
+    "sensor.demo_boiler_energie": CounterDipSpec(9, (0.4, 2.5), "glitch"),
+    "sensor.demo_wallbox_energie": CounterDipSpec(25, (5.0, 30.0), "reset"),
+    "sensor.demo_wasserzaehler": CounterDipSpec(17, (0.01, 0.05), "glitch"),
+}
+
+
+def inject_counter_dips(entity: DemoEntity, rows: list[Row]) -> list[Row]:
+    spec = COUNTER_DIPS.get(entity.entity_id)
+    if spec is None or len(rows) < 20:
+        return rows
+    result = list(rows)
+    offset = 0.0
+    last_day = None
+    for i, (ts, _value) in enumerate(rows):
+        day = int(ts // 86400)
+        if day != last_day and day % spec.every_days == 0 and (ts % 86400) >= (8 + day % 13) * 3600:
+            last_day = day
+            depth = spec.depth[0] + (day * 7 % 100) / 100 * (spec.depth[1] - spec.depth[0])
+            if spec.mode == "reset":
+                offset += depth
+            else:
+                steps = spec.steps[0] + day % (spec.steps[1] - spec.steps[0] + 1)
+                for j in range(i, min(i + steps, len(rows))):
+                    result[j] = (rows[j][0], round(max(rows[j][1] - depth, 0.0), 3))
+        if offset:
+            ts_i, value_i = result[i]
+            result[i] = (ts_i, round(max(value_i - offset, 0.0), 3))
+    return result
+
+
 # Sprache der laufenden Erzeugung für die Lesehelfer unten (sie bekommen nur die deutschen IDs).
 _run_language: contextvars.ContextVar[str] = contextvars.ContextVar("demo_language", default=SOURCE_LANGUAGE)
 
@@ -1738,6 +1790,7 @@ def run_generation(
     total_rows = 0
     for index_in_list, entity in enumerate(DEMO_ENTITIES, start=1):
         rows = inject_data_quality_issues(entity, rows_by_key[entity.entity_id], rng, month_boundary_ts)
+        rows = inject_counter_dips(entity, rows)
         write_entity(data_dir, index, tz, entity, rows, language)
         total_rows += len(rows)
         if on_entity is not None:

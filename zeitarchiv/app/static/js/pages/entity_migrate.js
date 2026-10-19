@@ -30,7 +30,23 @@ async function _loadPreview(target, factor, overlapResolution) {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({target_entity_id: target, factor, overlap_resolution: overlapResolution}),
   });
+  // fetch() wirft bei 4xx/5xx nicht — ohne diese Prüfung landete die
+  // Fehlerantwort im Vorschaufenster und der Assistent ging zu Schritt 2.
+  if (!response.ok) {
+    let detail = '';
+    try {
+      const data = await response.json();
+      if (typeof data.detail === 'string') detail = data.detail;
+    } catch (e) {
+      // kein JSON (z. B. Gateway-Fehler) — dann nur die allgemeine Meldung
+    }
+    throw Object.assign(new Error(detail), {serverDetail: detail});
+  }
   document.getElementById('migrate-preview').innerHTML = await response.text();
+}
+
+function _previewErrorMessage(message, error) {
+  return error && error.serverDetail ? `${message} ${error.serverDetail}` : message;
 }
 
 async function migratePreview() {
@@ -48,7 +64,7 @@ async function migratePreview() {
     await _loadPreview(target, 1, 'target');
     goToStep(2);
   } catch (error) {
-    appAlert(t('Die Vorschau konnte nicht geladen werden.'));
+    appAlert(_previewErrorMessage(t('Die Vorschau konnte nicht geladen werden.'), error));
   } finally {
     button.disabled = false;
   }
@@ -63,7 +79,7 @@ async function migrateRecalculate() {
   try {
     await _loadPreview(target, _currentFactor(), overlapResolution);
   } catch (error) {
-    appAlert(t('Die Vorschau konnte nicht neu berechnet werden.'));
+    appAlert(_previewErrorMessage(t('Die Vorschau konnte nicht neu berechnet werden.'), error));
   } finally {
     // Bei Erfolg hat _loadPreview() den Knopf längst durch ein frisches
     // Fragment ersetzt — dieses disabled=false trifft dann ins Leere,
@@ -132,11 +148,6 @@ async function migrateExecute() {
   }
 }
 
-function _escapeHtml(value) {
-  const map = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'};
-  return String(value).replace(/[&<>"']/g, (c) => map[c]);
-}
-
 const _POST_ACTION_RESULT_LABELS = {delete: t('Quelle entfernt'), clear: t('Quelle geleert'), keep: t('Quelle erhalten')};
 
 function showResult(result) {
@@ -162,7 +173,7 @@ function showResult(result) {
   if (result.repointed_dashboards.length) {
     notes.push(`<div class="migrate-banner positive">✓ ${t('{count} Dashboard-Kachel(n) automatisch auf die neue Entität umgehängt — Titel, Rundung und Sparkline-Einstellungen bleiben dabei erhalten.', {count: result.repointed_dashboards.length})}</div>`);
     notes.push('<div class="migrate-result-list">' + result.repointed_dashboards.map((name) =>
-      `<div class="migrate-result-row"><span>${_escapeHtml(name)}</span><span class="tag">→ ${_escapeHtml(result.target_entity_id)}</span></div>`
+      `<div class="migrate-result-row"><span>${escapeHtml(name)}</span><span class="tag">→ ${escapeHtml(result.target_entity_id)}</span></div>`
     ).join('') + '</div>');
   }
   document.getElementById('migrate-result-dashboards').innerHTML = notes.join('');

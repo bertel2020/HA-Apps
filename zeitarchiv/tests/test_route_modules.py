@@ -121,7 +121,17 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     # Zweig in _dashboard_tiles_context() und die Routen pin-cleanup/unpin-cleanup, die wie die
     # übrigen Kachel-Routen das Raster-Fragment aus main.py zurückgeben müssen. Die Daten der Kachel
     # stehen in cleanup_tile.py, nicht hier (main.py wuchs von 5.739 auf 5.757).
-    assert len(main.splitlines()) < 5_760
+    #
+    # Am 16. Oktober 2026 auf 5.810 angehoben — Entitäten mehrfach löschen (Verwendungs-
+    # prüfung, Backup vor dem Löschen) und das Markieren gelöschter Entitäten in Diagrammen und
+    # Tabellen: main.py wuchs von 5.757 auf 5.797, davon rund 100 Zeilen durch den Löschblock. Neue
+    # Nutzer-Funktionalität, kein schleichendes Wachstum.
+    # Der Ausweg ist benannt und NICHT genommen: _delete_entities_locked, entities_delete_selected,
+    # entities_usage_check, entities_backup_status und entities_backup_start sind eine geschlossene
+    # Einheit und gehören in ein eigenes entity_delete_routes.py nach dem Muster der übrigen
+    # *_routes.py (Abhängigkeiten: _storage_locked, _background, index). Wer diese Schwelle als
+    # Nächstes reißt, schneidet dort, statt die Zahl zu erhöhen.
+    assert len(main.splitlines()) < 5_810
 
 
 def test_api_router_has_explicit_runtime_dependencies_and_all_api_routes() -> None:

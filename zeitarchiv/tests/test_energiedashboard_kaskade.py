@@ -184,3 +184,60 @@ def test_saving_rejects_pointers_the_form_never_offers() -> None:
     with pytest.raises(HTTPException):
         ed._check_cascade([{"entity_id": "a", "parent": "b"}, {"entity_id": "b", "parent": "c"}, {"entity_id": "c"}])
     ed._check_cascade([{"entity_id": "a", "parent": "b"}, {"entity_id": "b"}])
+
+
+def _gruppiert(a, config: dict) -> dict:
+    """Werkstatt-Zähler (5 kWh, davon Waschmaschine 1 + Trockner 2) und Wallbox (4 kWh) in der Gruppe
+    „Keller“; Waschmaschine hat keine eigene Gruppe, sie gehört über den Zähler dazu."""
+    _kaskade(a, config, zaehler_kwh=5.0)
+    config["verbraucher"][0]["gruppe"] = "Keller"
+    config["verbraucher"][3]["gruppe"] = "Keller"
+    config["verbraucheranteile_gruppieren"] = True
+    return config
+
+
+def test_a_group_row_sums_its_members_and_keeps_them_below_it(monkeypatch, tmp: Path) -> None:
+    a, config = _beispielanlage(tmp)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(_gruppiert(a, config), "day", -1)
+        zeilen = flow["verbraucher_breakdown"]
+        by_name = _breakdown(flow)
+        assert by_name["Keller"]["kind"] == "group"
+        assert by_name["Keller"]["value"] == pytest.approx(9.0)
+        assert [(z["name"], z["level"]) for z in zeilen if z["name"] != "Grundlast"] == [
+            ("Keller", 0), ("Werkstatt", 1), ("Trockner", 2), ("Waschmaschine", 2),
+            ("Werkstatt, übrige Verbraucher", 2), ("Wallbox", 1),
+        ]
+        assert by_name["Werkstatt"]["parent"] == "Keller"
+        assert by_name["Waschmaschine"]["parent"] == "Werkstatt"
+    finally:
+        a.close()
+
+
+def test_grouping_does_not_change_the_balance(monkeypatch, tmp: Path) -> None:
+    a, config = _beispielanlage(tmp)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        gruppiert = a.service.compute_flow(_gruppiert(a, config), "day", -1)
+        config["verbraucheranteile_gruppieren"] = False
+        flach = a.service.compute_flow(config, "day", -1)
+        assert gruppiert["kpi"]["verbrauch"] == pytest.approx(flach["kpi"]["verbrauch"])
+        oberste = sum(z["value"] for z in gruppiert["verbraucher_breakdown"] if not z.get("parent"))
+        assert oberste == pytest.approx(gruppiert["kpi"]["verbrauch"])
+    finally:
+        a.close()
+
+
+def test_a_single_member_group_gets_no_group_row(monkeypatch, tmp: Path) -> None:
+    a, config = _beispielanlage(tmp)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        config["verbraucheranteile_gruppieren"] = True
+        flow = a.service.compute_flow(config, "day", -1)
+        by_name = _breakdown(flow)
+        assert by_name["Haushalt"]["kind"] == "group"
+        assert "Mobilität" not in by_name
+        assert by_name["Wallbox"]["level"] == 0 and not by_name["Wallbox"].get("parent")
+    finally:
+        a.close()

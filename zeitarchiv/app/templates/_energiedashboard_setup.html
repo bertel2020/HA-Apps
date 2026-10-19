@@ -435,7 +435,7 @@
         <div class="edash-toggle-list">
           <label class="filter-chip"><input type="checkbox" name="verbraucheranteile_gruppieren" {% if config.verbraucheranteile_gruppieren %}checked{% endif %}><span>{{ _("Nach Gruppe anzeigen") }}</span></label>
         </div>
-        {% call hint_body() %}{{ _("Verbraucher mit zugewiesener Gruppe (siehe unten) erscheinen dann als eine gemeinsame Zeile statt einzeln — Geräte ohne Gruppe bleiben unverändert einzeln aufgeführt.") }}{% endcall %}
+        {% call hint_body() %}{{ _("Verbraucher mit zugewiesener Gruppe (siehe unten) erscheinen dann unter einer gemeinsamen Summenzeile, die sich zuklappen lässt. Geräte hinter einem Zwischenzähler gehören zur Gruppe des Zählers. Geräte ohne Gruppe bleiben unverändert einzeln aufgeführt.") }}{% endcall %}
       </div>
     </section>
 

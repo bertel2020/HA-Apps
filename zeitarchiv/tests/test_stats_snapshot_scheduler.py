@@ -168,7 +168,7 @@ WARTUNGSPLANER_ZEILEN: dict[str, str | None] = {
     "_refresh_duplicate_snapshot_if_stale": "Duplikat-Erkennung",
     "_refresh_counter_decrease_snapshot_if_stale": "Zählerrückgang-Erkennung",
     "run_if_due": "Fehlwerte-Regel",
-    "_refresh_one_outlier_rate": "Ausreißer-Quoten",
+    "_refresh_due_outlier_rates": "Ausreißer-Quoten",
     "refresh_if_stale": "Versionsprüfung",
     "process_pending_hourly_backfill": "Energiedashboard · Stunden-Rollup-Backfill",
     "refresh_heatmap_weekday_cache_if_stale": "Energiedashboard · Tageslastprofil-Cache",

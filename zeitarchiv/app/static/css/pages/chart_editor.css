@@ -146,3 +146,84 @@
     .save-row input[type=text]{flex-basis:100%;}
     .save-row button:first-of-type{margin-left:auto;}
   }
+
+  /* Mehrjahresvergleich ("Jahre" ab 2, siehe renderMultiYear()): Ø-Eintrag
+     der Legende als gestrichelter Strich statt Farbpunkt — wie die Ø-Linie
+     im Chart selbst. Dieselben Maße wie .dot, damit Namen bündig bleiben. */
+  .chart-legend-item .dash,.chart-legend-table .legend-name-cell .dash{
+    width:14px;height:0;border-top:2px dashed;flex:none;align-self:center;
+  }
+  .chart-legend-item .values .compare-cut{
+    color:var(--accent-line);background:var(--accent-line-soft);border-radius:8px;padding:0 7px;
+  }
+  /* Tabelle Jahr × Monat: Zahlen rechtsbündig, Jahresspalte beim seitlichen
+     Scrollen (mobil) fest — die Tabelle hat 15 Spalten und passt auf keinem
+     Telefon ganz ins Bild. */
+  .multi-year-table-block{margin-top:20px;}
+  .multi-year-table-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;}
+  .multi-year-table th,.multi-year-table td{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .multi-year-table th:first-child,.multi-year-table td:first-child{
+    text-align:left;position:sticky;left:0;z-index:1;background:var(--surface);font-weight:600;color:var(--ink);
+  }
+  .multi-year-table .total{font-weight:600;border-left:1px solid var(--border);}
+  .multi-year-table tr.current td{color:var(--accent-line);}
+  .multi-year-table td.partial{font-style:italic;}
+  .multi-year-table td.empty{color:var(--ink-faint);}
+  .multi-year-table tfoot td{font-weight:600;background:var(--surface-alt);}
+  .multi-year-table tfoot td:first-child{background:var(--surface-alt);}
+  .multi-year-table-note{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);margin:6px 2px 0;}
+
+  /* Zeitraum-Navigation an der Zeitraumanzeige (‹ Zeitraum ›, Kalender,
+     "Zurück zu jetzt") — dieselbe Bauart wie .nav/.period-label in
+     entity_detail.css, wie dort in der Zeitraum-Leiste rechts neben der
+     Zeitraumauswahl. Die Anzeige selbst ist hier sonst ein Block mit eigenem
+     Abstand nach unten (.period-label oben); als Knopf in der Navigation
+     gelten diese Regeln nicht. */
+  .chart-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .chart-nav .period-label{
+    display:inline;margin:0;min-width:130px;text-align:center;white-space:nowrap;
+    background:none;border:none;padding:0;cursor:pointer;border-radius:6px;
+  }
+  .chart-nav .period-label:hover:not(:disabled){color:var(--accent-line);}
+  .chart-nav .period-label:disabled{cursor:default;}
+  .chart-nav .now-chip{font-size:calc(12px * var(--font-scale, 1));padding:4px 11px;}
+  @media (max-width:480px){.chart-nav{width:100%;justify-content:center;}}
+
+  /* Kalender-Widget für den Datums-Sprung — Aufbau/Verhalten identisch zur
+     Entitätsseite (entity_detail.css) und Bereinigung, siehe
+     static/js/calendar-picker.js. */
+  .cal-wrap{position:relative;display:inline-block;}
+  .calendar-popover{
+    position:absolute;top:calc(100% + 6px);left:0;z-index:40;width:260px;
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    box-shadow:var(--shadow);padding:10px;text-align:left;
+  }
+  .calendar-header{display:flex;align-items:center;gap:4px;margin-bottom:8px;}
+  .calendar-header .navbtn{flex:none;}
+  .calendar-month-select,.calendar-year-select{
+    font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;color:var(--ink);
+    padding:5px 4px;border-radius:6px;border:1px solid var(--border);background:var(--surface);
+  }
+  .calendar-month-select{flex:1.4;min-width:0;}
+  .calendar-year-select{flex:1;min-width:0;}
+  .calendar-weekdays,.calendar-grid{display:grid;grid-template-columns:repeat(7, 1fr);}
+  .calendar-weekdays{margin-bottom:4px;}
+  .calendar-weekdays span{text-align:center;font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);font-family:var(--font-mono);}
+  .calendar-day{
+    height:32px;box-sizing:border-box;border:none;border-radius:6px;font-size:calc(12px * var(--font-scale, 1));background:transparent;color:var(--ink);
+    cursor:pointer;font-family:inherit;font-variant-numeric:tabular-nums;
+  }
+  .calendar-day:hover:not(:disabled){background:var(--surface-alt);}
+  .calendar-day.blank{visibility:hidden;cursor:default;}
+  .calendar-day.out-of-range{color:var(--ink-faint);opacity:.3;}
+  .calendar-day.no-data{color:var(--ink-faint);text-decoration:line-through;opacity:.55;}
+  .calendar-day.has-data{color:var(--ink);font-weight:600;}
+  .calendar-day:disabled{cursor:default;}
+  .calendar-loading{margin:8px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);text-align:center;}
+  .calendar-today-btn{width:100%;margin-top:8px;text-align:center;}
+
+  /* Felder von Vorjahr (Laufsumme, Soll) bzw. Langzeit (Jahre, Ø-Linie) in der
+     Zeile der Zeitraumanzeige: rechtsbündig, nebeneinander. Als Klasse statt
+     Inline-Style, weil x-show="editing" beim Einblenden die display-Angabe im
+     style-Attribut entfernt — die Felder standen dann untereinander. */
+  .compare-ext-fields{display:flex;gap:16px;flex-wrap:wrap;margin-left:auto;}

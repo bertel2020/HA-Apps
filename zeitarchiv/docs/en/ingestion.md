@@ -26,7 +26,12 @@ Flow per event, under the **entity lock** (`StorageCoordinator.entity()`, see
    increasing live path, a comparison with `entities.last_ts` is sufficient (no
    file I/O); only if the new timestamp is not beyond the index maximum is the
    file actually searched.
-4. **Resolution filter**, type-dependent (see
+4. **Ignore values** (`should_ignore_value`) — only if the entity has the
+   switch turned on: a value that exactly matches its list (e.g. the 0 a sensor
+   reports at HA startup) is discarded before resolution and value change
+   filter see it. `last_value`/`last_ts` stay untouched. Counted as `filtered`.
+   Imports do not go through this path.
+5. **Resolution filter**, type-dependent (see
    [data-model.md](data-model.md#resolution-write-throttle)): for
    counters and switches, `should_accept_write` throttles to a fixed time grid
    and discards values in between without replacement (switch resolution is
@@ -34,21 +39,21 @@ Flow per event, under the **entity lock** (`StorageCoordinator.entity()`, see
    resolution ≠ `raw`, on the other hand, let every value through and only
    afterwards condense it window by window into one avg/min/max row
    (`resolution.py`) — no `skipped` here.
-5. **Value change filter** (`should_accept_value`) — skips subsequent values
+6. **Value change filter** (`should_accept_value`) — skips subsequent values
    that are equal after rounding, but keeps a sign of life at least every six
    hours (prevents a chart from showing a gap for a sensor that has been
    unchanged for days).
-6. **Counter decrease detection**: for `state_class = total_increasing`, a
+7. **Counter decrease detection**: for `state_class = total_increasing`, a
    lower subsequent value is only **logged** (`logger.warning`, visible under
    "Counter decreases" in the cleanup), never blocked — a real counter reset
    (device replacement, restart) is a valid value.
-7. **Rotation check** (`rotate.rotate_if_needed()`) — month change since this
+8. **Rotation check** (`rotate.rotate_if_needed()`) — month change since this
    entity's last write?
-8. **Append** to the hot CSV (`hotbuffer.append()`), claim set to `done`.
+9. **Append** to the hot CSV (`hotbuffer.append()`), claim set to `done`.
 
 Return values (also the HTTP response of `/api/write` per event, aggregated as
 counters): `written`, `duplicate`, `recovered`, `skipped` (resolution),
-`filtered` (value change).
+`filtered` (value change or ignored value).
 
 ## Crash recovery
 

@@ -9,8 +9,8 @@
      Spalten Überlappung riskiert (zu niedrig, siehe .col-*-Breiten in
      entities_list.html). Passt sich dadurch bei jedem htmx-Reload dieses
      Fragments automatisch der jeweils aktiven Auswahl an. #}
-  {% set _col_widths = {'type': 112, 'first_ts': 126, 'last_ts': 126, 'resolution': 104, 'retention': 118, 'unit': 84, 'rows': 114, 'size': 96, 'value_filter': 96, 'gap_threshold': 92, 'outlier_threshold': 92} %}
-  {% set ns = namespace(min_width = 40 + 330) %}
+  {% set _col_widths = {'type': 112, 'first_ts': 126, 'last_ts': 126, 'resolution': 104, 'retention': 118, 'unit': 84, 'rows': 114, 'size': 96, 'value_filter': 96, 'gap_threshold': 92, 'outlier_threshold': 92, 'historic': 96} %}
+  {% set ns = namespace(min_width = 40 + 36 + 330) %}
   {% for col, px in _col_widths.items() %}
     {% if col in visible_columns %}{% set ns.min_width = ns.min_width + px %}{% endif %}
   {% endfor %}
@@ -20,6 +20,7 @@
        etwas geliefert hat. Siehe table-cards.js. -->
   <table class="dt entities-dt" data-card-lead="Letzter Wert" style="min-width:{{ ns.min_width }}px;">
     <colgroup>
+      <col class="col-sel">
       <col class="col-fav">
       <col class="col-entity">
       {% if 'type' in visible_columns %}<col class="col-type">{% endif %}
@@ -33,8 +34,10 @@
       {% if 'value_filter' in visible_columns %}<col class="col-value-filter">{% endif %}
       {% if 'gap_threshold' in visible_columns %}<col class="col-gap-threshold">{% endif %}
       {% if 'outlier_threshold' in visible_columns %}<col class="col-outlier-threshold">{% endif %}
+      {% if 'historic' in visible_columns %}<col class="col-historic">{% endif %}
     </colgroup>
     <tr>
+      <th class="col-sel"><input type="checkbox" class="sel-all" title="{{ _('Alle sichtbaren Entitäten wählen') }}" aria-label="{{ _('Alle sichtbaren Entitäten wählen') }}"></th>
       <th class="col-fav"></th>
       {% for col in columns %}
       <th class="{{ col.col_class }}">
@@ -49,6 +52,7 @@
     </tr>
     {% for row in rows %}
     <tr{% if row.pending_purge %} class="has-pending-purge"{% endif %}>
+      <td class="col-sel"><input type="checkbox" class="sel-row" value="{{ row.entity_id }}" data-name="{{ row.display_name }}" aria-label="{{ _('Für Sammelaktion wählen') }}"></td>
       <td class="fav-cell col-fav">
         <button type="button" class="fav-star {{ 'active' if row.is_favorite else '' }}" aria-pressed="{{ 'true' if row.is_favorite else 'false' }}"
                 title="{{ _('Favorit') }}" onclick="toggleFavorite('entities/{{ row.entity_id }}/favorite', this)">★</button>
@@ -64,7 +68,7 @@
         </a>
         {% if row.pending_purge %}<span class="pending-purge-note"><i class="pending-dot" aria-hidden="true"></i>{% if row.pending_purge == 1 %}{{ _("1 Wert zur Löschung markiert · Bereinigung ausstehend") }}{% else %}{{ _("{count} Werte zur Löschung markiert · Bereinigung ausstehend", count=(row.pending_purge | format_int)) }}{% endif %}</span>{% endif %}
       </td>
-      {% if 'type' in visible_columns %}<td class="va-mid col-type"><span class="badge {{ row.aggregation_type }}">{{ row.type_label }}</span></td>{% endif %}
+      {% if 'type' in visible_columns %}<td class="va-mid col-type"><span class="badge {{ row.aggregation_type }}"{% if row.state_class %} data-tooltip="{{ _('HA state_class: {value}', value=row.state_class) }}"{% endif %}>{{ row.type_label }}</span></td>{% endif %}
       {% if 'first_ts' in visible_columns %}<td class="col-date">{{ row.first_ts }}{% if row.first_ts_time %}<span class="ts-time">{{ row.first_ts_time }}</span>{% endif %}</td>{% endif %}
       {% if 'last_ts' in visible_columns %}<td class="col-date">{{ row.last_ts }}{% if row.last_ts_time %}<span class="ts-time">{{ row.last_ts_time }}</span>{% endif %}</td>{% endif %}
       {% if 'resolution' in visible_columns %}<td class="va-mid col-resolution">{{ row.resolution_label }}</td>{% endif %}
@@ -75,6 +79,7 @@
       {% if 'value_filter' in visible_columns %}<td class="va-mid col-value-filter">{{ row.value_filter_label }}</td>{% endif %}
       {% if 'gap_threshold' in visible_columns %}<td class="va-mid col-gap-threshold">{{ row.gap_threshold_label }}</td>{% endif %}
       {% if 'outlier_threshold' in visible_columns %}<td class="va-mid col-outlier-threshold">{{ row.outlier_threshold_label }}</td>{% endif %}
+      {% if 'historic' in visible_columns %}<td class="va-mid col-historic">{{ row.historic_label }}</td>{% endif %}
     </tr>
     {% endfor %}
   </table>

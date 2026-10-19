@@ -65,7 +65,7 @@
           <td class="label">{{ _("Gesamter Zeitraum") }}</td>
           <td class="num val">{{ total_row_count_label }}</td>
           {% if outlier_detection_enabled %}<td class="num val {{ 'has-issues' if alltime_counts.outliers else '' }}">{{ alltime_counts.outliers | format_int }}</td>{% endif %}
-          {% if gap_detection_enabled %}<td class="num val {{ 'has-issues' if alltime_counts.gaps else '' }}">{{ alltime_counts.gaps | format_int }}</td>{% endif %}
+          {% if gap_detection_enabled %}<td class="num val">{{ alltime_counts.gaps | format_int }}</td>{% endif %}
           <td class="num val {{ 'has-issues' if alltime_counts.duplicates else '' }}">{{ alltime_counts.duplicates | format_int }}</td>
           <td class="num val {{ 'has-issues' if alltime_counts.repetitions else '' }}">{{ alltime_counts.repetitions | format_int }}</td>
           {% if counter_decrease_enabled %}<td class="num val {{ 'has-issues' if alltime_counts.counter_decreases else '' }}">{{ alltime_counts.counter_decreases | format_int }}</td>{% endif %}
@@ -74,7 +74,7 @@
           <td class="label" title="{{ period_label }}">{{ period_label }}</td>
           <td class="num val">{{ range_row_count_label }}</td>
           {% if outlier_detection_enabled %}<td class="num val {{ 'has-issues' if counts.outliers else '' }}">{{ counts.outliers | format_int }}</td>{% endif %}
-          {% if gap_detection_enabled %}<td class="num val {{ 'has-issues' if counts.gaps else '' }}">{{ counts.gaps | format_int }}</td>{% endif %}
+          {% if gap_detection_enabled %}<td class="num val">{{ counts.gaps | format_int }}</td>{% endif %}
           <td class="num val {{ 'has-issues' if counts.duplicates else '' }}">{{ counts.duplicates | format_int }}</td>
           <td class="num val {{ 'has-issues' if counts.repetitions else '' }}">{{ counts.repetitions | format_int }}</td>
           {% if counter_decrease_enabled %}<td class="num val {{ 'has-issues' if counts.counter_decreases else '' }}">{{ counts.counter_decreases | format_int }}</td>{% endif %}
@@ -150,6 +150,15 @@
       {{ _("Wiederholungen verdichten") }}
     </button>
     {% endif %}
+    {% if filter == 'counter_decreases' %}
+    <button class="btn btn-danger-outline"
+            {% if counts.counter_decreases == 0 %}disabled title="{{ _('Keine Zählerrückgänge im aktuellen Zeitraum') }}"{% endif %}
+            hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/counter-returning-delete"
+            hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this"
+            hx-confirm="{{ _('Alle Rückgänge, die zurückkehren („Vermutlich Fehlwert“), zur Löschung markieren? Rückgänge, nach denen der Stand niedrig bleibt, bleiben unberührt. Es wird nichts endgültig gelöscht; im Reiter „Markiert“ lässt sich alles wiederherstellen.') }}">
+      {{ _("Fehlwert-Rückgänge markieren") }}
+    </button>
+    {% endif %}
     {# id für den Direkteinstieg aus dem Markierungs-Menü des Charts
        (…/cleanup?undo=1, siehe cleanup.js) — sonst müsste das Skript den Knopf
        über seinen Beschriftungstext suchen. #}
@@ -173,6 +182,12 @@
 </div>
 
 {% if rows %}
+{% set counter_verdicts_map = counter_verdicts(entity_id, rows) if counter_verdicts is defined and counter_decrease_enabled else {} %}
+{# Hinweis nur, wenn die Mehrheit der Rückgänge auf der Seite nach planmäßigem Reset aussieht: die Einstellung betrifft die ganze Entität, deshalb Link statt Knopf in der Zeile. #}
+{% set reset_count = counter_verdicts_map.values() | selectattr('returns', 'false') | list | length %}
+{% if counter_verdicts_map and reset_count * 2 > counter_verdicts_map | length %}
+<p class="rows-hint">{{ _("Die meisten Rückgänge sehen nach einem planmäßigen Reset aus. Setzt sich der Zähler von selbst zurück, erlaube die Rückgänge in der Konfiguration des Zählers.") }} <a href="{{ app_root }}/entities/{{ entity_id | urlencode }}">{{ _("Konfiguration öffnen") }}</a></p>
+{% endif %}
 <div class="tbl-wrap">
   {# data-cards="off": Diese Tabelle bleibt auf dem Telefon eine Tabelle und
      scrollt waagerecht, statt zu Zeilenkarten zu werden. Karten lohnen sich,
@@ -198,9 +213,12 @@
       {% endif %}
       <th>{{ _("Zeitstempel") }}</th><th>{{ _("Wert") }}</th><th>{{ _("Status") }}</th>
     </tr>
-    {% set counter_verdicts_map = counter_verdicts(entity_id, rows) if counter_verdicts is defined and counter_decrease_enabled else {} %}
     {% for row in rows %}
-    <tr class="{{ 'flag' if row.flags else '' }}">
+    {# Zeilenhintergrund nur, wenn sich etwas aufräumen lässt (Ausreißer, Duplikat, Wiederholung, Fehlwert); Lücke, „Noch offen“ und „Vermutlich Reset“ färben die Zeile nicht. #}
+    {% set act_labels = [_("Ausreißer"), "Duplikat", "Wiederholung"] %}
+    {% set zeile = namespace(act=false) %}
+    {% for flag in row.flags %}{% set v = counter_verdicts_map.get(row.ts) if flag.label == _("Zählerrückgang") and counter_verdicts_map else none %}{% if flag.label in act_labels or (v and v.returns) %}{% set zeile.act = true %}{% endif %}{% endfor %}
+    <tr class="{{ 'flag-act' if zeile.act else '' }}">
       {% if mode == 'correct' %}
       <td><button type="button" class="correct-edit-btn" title="{{ _('Wert korrigieren') }}" onclick="startCorrect(this)">✎</button></td>
       {% else %}
@@ -213,7 +231,7 @@
       <td>{{ row.formatted_value }}{% if unit %} <span class="value-unit">{{ unit }}</span>{% endif %}</td>
       {% endif %}
       <td>
-        {% for flag in row.flags %}<span class="flag-badge" data-tooltip="{{ flag.reason }}">{{ flag.label }}{% if flag.label == _("Zählerrückgang") and counter_verdicts_map and row.ts in counter_verdicts_map %} · {{ _("kehrt zurück") if counter_verdicts_map[row.ts] else _("bleibt niedrig") }}{% endif %}</span>{% endfor %}
+        {% for flag in row.flags %}{% set verdict = counter_verdicts_map.get(row.ts) if flag.label == _("Zählerrückgang") and counter_verdicts_map else none %}<span class="flag-badge {{ ('verdict-returns' if verdict.returns else ('verdict-stays' if verdict.returns is false else 'verdict-open')) if verdict else ('sev-act' if flag.label in act_labels else 'sev-info') }}" data-tooltip="{{ flag.reason }}{% if verdict %} {{ verdict.note }}{% endif %}">{{ flag.label }}{% if verdict %} · {{ _("Vermutlich Fehlwert") if verdict.returns else (_("Vermutlich Reset") if verdict.returns is false else _("Noch offen")) }}{% endif %}</span>{% if verdict %}<span class="flag-note">{{ verdict.note }}</span>{% endif %}{% endfor %}
         {% if not row.flags %}&mdash;{% endif %}
       </td>
     </tr>

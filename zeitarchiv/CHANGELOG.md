@@ -1,5 +1,334 @@
 # Changelog
 
+## 1.8.0 - 2026-10-19
+
+### Neu
+
+- **Langzeit-Vergleich**: Im Chart-Editor bietet „Vergleichen“ beim Zeitraum
+  „Jahr“ mit einer Entität den neuen Eintrag „Langzeit“. Jedes Jahr liegt dann
+  als eigene Linie über Januar bis Dezember, dazu der Durchschnitt der Vorjahre
+  als gestrichelte Linie; wie viele Vorjahre, legt das Feld „Jahre“ fest (2, 5,
+  10 oder Alle). Unter dem Chart zeigt eine Tabelle Jahr × Monat die Werte und
+  die Abweichung zum Durchschnitt; das laufende Jahr wird mit dem Durchschnitt
+  bis zum gleichen Tag verglichen.
+- **Vergleich in Dashboard-Kacheln**: Die Kachel eines Charts zeigt jetzt den
+  mit ihm gespeicherten Vergleich wie die Chart-Seite – Vorjahr, Laufsumme mit
+  Soll und Langzeit. Bei Langzeit nennt die Legende das laufende Jahr und den
+  Durchschnitt; eine 1×1-Kachel zeichnet nur diese beiden.
+- **Charts mit festem Zeitraum**: Beim Anpassen eines Charts lässt sich wie auf
+  der Seite einer einzelnen Entität mit ‹ und › oder über einen Kalender zu
+  vergangenen Perioden blättern. Ein bei 2025 gespeichertes Chart zeigt auch
+  später 2025, beim Ansehen und auf dem Dashboard; in der laufenden Periode
+  gespeichert, bleibt es immer aktuell. „Als Chart speichern“ auf der Seite
+  einer Entität übernimmt die dort angezeigte Periode.
+- **Zurück zu jetzt**: Die Seite einer Entität hat wie der Chart-Editor einen
+  Knopf „Zurück zu jetzt“, sobald eine vergangene Periode angezeigt wird. Im
+  Chart-Editor steht die Navigation jetzt wie dort rechts neben der
+  Zeitraumauswahl.
+
+### Geändert
+
+- **Auswahllisten per Tastatur**: Die Auswahllisten in Filtern, Einstellungen
+  und Housekeeping lassen sich jetzt ohne Maus bedienen: Enter, Leertaste oder
+  Pfeil nach unten öffnet die Liste, die Pfeiltasten wählen den Eintrag, Enter
+  übernimmt ihn, Escape schließt.
+- **Fehlermeldungen beim WebDAV-Ziel**: Scheitert eine Übertragung, nennt die
+  Meldung jetzt den Schritt, der fehlschlug (etwa „Hochladen“), und bei
+  Nextcloud auch die Begründung des Servers.
+- **Importdaten nicht im Home-Assistant-Backup**: Hochgeladene Symcon- und
+  CSV-Importdaten landen nicht mehr im Backup von Home Assistant – wie schon
+  bisher beim eigenen Zeitarchiv-Backup. Sie lassen sich jederzeit neu
+  hochladen.
+- **Neues Logo**: Zeitarchiv hat ein neues Logo; die Kopfzeile zeigt dessen
+  Schriftzug, passend zum hellen und dunklen Farbschema.
+
+### Behoben
+
+- **Vergleich im Chart wurde nicht gespeichert**: „Vorjahr“, „Langzeit“ und die
+  übrigen Vergleiche samt Laufsumme, Soll Entität, Jahren und Ø-Linie standen
+  beim nächsten Öffnen eines Charts wieder auf „Aus“. Sie bleiben jetzt am Chart
+  erhalten.
+- **Tabellen-Kacheln mit Anführungszeichen in Spaltennamen**: Enthielt eine
+  Spaltenbeschriftung ein Anführungszeichen, war der Hinweis zur Abweichung in
+  der Dashboard-Kachel abgeschnitten oder fehlte. Er wird jetzt vollständig
+  angezeigt.
+- **Auswahllisten mit Apostroph**: Enthielt eine Einheit, ein Spaltenkopf beim
+  CSV-Import oder ein Entitätsname im Aktivitätsfilter einen Apostroph, ließ
+  sich der Eintrag nicht auswählen. Das funktioniert jetzt.
+- **Externes Backup nach Verbindungsabbruch**: Kam ein hängender
+  Netzwerkspeicher zurück, während schon ein neuer Versuch lief, konnten sich
+  beide Übertragungen in die Quere kommen und die Kopie am Ziel beschädigen.
+  Jeder Versuch schreibt jetzt in eine eigene temporäre Datei.
+- **Tippfehler in Tabellenformeln**: Eine Zahl wie „1,2,3“ oder „2..5“ in
+  einer berechneten Zeile ergab bisher still einen falschen Wert. Jetzt zeigt
+  die Zelle einen Formelfehler.
+- **Migrationsassistent bei Fehlern**: Konnte die Vorschau nicht berechnet
+  werden (etwa bei unbekannter Ziel-Entität), wechselte der Assistent trotzdem
+  zu Schritt 2 und zeigte dort die Fehlerantwort. Jetzt bleibt er in Schritt 1
+  und nennt den Grund.
+- **Löschen im Chart- und Tabellen-Editor**: Schlug das Löschen fehl, ging
+  es trotzdem zur Liste zurück, in der das Chart bzw. die Tabelle weiter stand.
+  Jetzt bleibt der Editor offen und meldet „Löschen fehlgeschlagen.“
+- **Chart-Optionen einer Entität**: Konnte eine Änderung im Optionen-Menü
+  nicht gespeichert werden, sah sie trotzdem gespeichert aus und war beim
+  nächsten Besuch weg. Jetzt erscheint eine Meldung; dasselbe gilt für „Auf
+  Standard zurücksetzen“.
+- **Englische Oberfläche**: Die Auswahl „Kopfzeile“ beim CSV-Import zeigte
+  „Ja“/„Nein“ und der Markierungsfilter „Markierung:“ auf Deutsch. Beides ist
+  jetzt übersetzt.
+- **WebDAV-Backup auf Nextcloud**: Ab Nextcloud 31 scheiterte die Übertragung
+  mit „Status 400“, obwohl der Verbindungstest erfolgreich war. Backups landen
+  jetzt wieder am Ziel.
+
+---
+
+### English
+
+#### New
+
+- **Long-term comparison**: In the chart editor, “Compare” now offers
+  “Long-term” for the period “Year” with one entity. Every year is drawn as its
+  own line from January to December, with the average of the previous years as
+  a dashed line; the “Years” field sets how many previous years (2, 5, 10 or
+  All). Below the chart, a year × month table shows the values and the deviation
+  from the average; the current year is compared with the average up to the
+  same day.
+- **Comparison in dashboard tiles**: A chart's tile now shows the comparison
+  saved with it, like the chart page – previous year, running total with target
+  and long-term. For long-term, the legend names the current year and the
+  average; a 1×1 tile draws only these two.
+- **Charts with a fixed period**: When customizing a chart, you can page back
+  to past periods with ‹ and › or a calendar, like on the page of a single
+  entity. A chart saved at 2025 still shows 2025 later, when viewing and on the
+  dashboard; saved in the current period, it always stays current. “Save as
+  chart” on an entity's page takes over the period shown there.
+- **Back to now**: Like the chart editor, an entity's page now has a “Back to
+  now” button whenever a past period is shown. In the chart editor, the
+  navigation now sits next to the period selection, as it does there.
+
+#### Changed
+
+- **Selection lists by keyboard**: The selection lists in filters, settings
+  and housekeeping can now be used without a mouse: Enter, Space or Arrow Down
+  opens the list, the arrow keys move through the entries, Enter picks one,
+  Escape closes it.
+- **Error messages for the WebDAV target**: If a transfer fails, the message
+  now names the step that failed (such as “Upload”) and, with Nextcloud, the
+  server's reason.
+- **Import data not in the Home Assistant backup**: Uploaded Symcon and CSV
+  import data no longer ends up in Home Assistant's backup – as was already
+  the case for Zeitarchiv's own backup. It can be uploaded again at any time.
+- **New logo**: Zeitarchiv has a new logo; the header shows its wordmark,
+  matching the light and dark color scheme.
+
+#### Fixed
+
+- **Chart comparison was not saved**: “Previous year”, “Long-term” and the other
+  comparisons, including running total, target entity, years and Ø line, were
+  back to “Off” the next time a chart was opened. They now stay with the chart.
+- **Table tiles with quotation marks in column names**: If a column label
+  contained a quotation mark, the deviation hint in the dashboard tile was cut
+  off or missing. It is now shown in full.
+- **Selection lists with apostrophes**: If a unit, a column header in the CSV
+  import or an entity name in the activity filter contained an apostrophe, the
+  entry could not be selected. This now works.
+- **External backup after a lost connection**: If a stalled network storage
+  came back while a new attempt was already running, the two transfers could
+  get in each other's way and damage the copy at the target. Each attempt now
+  writes to its own temporary file.
+- **Typos in table formulas**: A number such as “1,2,3” or “2..5” in a
+  calculated row used to give a wrong value without notice. The cell now shows
+  a formula error.
+- **Migration wizard on errors**: If the preview could not be calculated
+  (for example for an unknown target entity), the wizard still moved to step 2
+  and showed the error response there. It now stays in step 1 and names the
+  reason.
+- **Deleting in the chart and table editor**: If deleting failed, the editor
+  still went back to the list, where the chart or table was still there. The
+  editor now stays open and reports “Deleting failed.”
+- **Chart options of an entity**: If a change in the options menu could not
+  be saved, it still looked saved and was gone on the next visit. A message now
+  appears; the same applies to “Reset to default”.
+- **English interface**: The “Header row” selection in the CSV import showed
+  “Ja”/“Nein” and the mark filter showed “Markierung:” in German. Both are now
+  translated.
+- **WebDAV backup to Nextcloud**: From Nextcloud 31 on, the transfer failed
+  with “status 400” even though the connection test succeeded. Backups reach
+  the target again.
+
+## 1.7.0 - 2026-10-19
+
+### Neu
+
+- **Historisch**: Entitäten, die bewusst keine Werte mehr bekommen (etwa ein
+  ausgemusterter Zähler), lassen sich als „Historisch“ markieren. Sie zählen
+  dann nicht mehr als inaktiv, weder in der Housekeeping-Liste noch in der
+  Status-Kachel oder der Meldung. Daten und Charts bleiben unverändert. Gesetzt
+  wird es im Reiter „Konfiguration“ der Entität oder direkt in der Liste der
+  inaktiven Entitäten; eine Kennzeichnung an der Entität zeigt es an, ein
+  eigener Abschnitt im Housekeeping listet alle markierten. Kommen nach der
+  Markierung wieder Werte, bleibt sie bestehen, aber der Abschnitt warnt (auch
+  zugeklappt) und eine Meldung weist darauf hin. In der Entitäten-Übersicht gibt
+  es dazu eine optionale, sortierbare Spalte „Historisch“ (standardmäßig
+  ausgeblendet).
+- **Zählerrückgänge**: Ein Sammelknopf löscht alle Rückgänge, die als „Vermutlich
+  Fehlwert“ eingeordnet sind. Echte Resets und Zählerwechsel bleiben unberührt.
+
+### Geändert
+
+- Meldungen bleiben aktuell: Zum Beispiel verschwindet „Import-Quelldaten liegen
+  noch“ nach dem Löschen sofort, und Duplikate und Ausreißer werden nach dem
+  Markieren oder Zurückholen neu bewertet.
+- Die Links für Duplikate, Ausreißer und Zählerrückgänge in Housekeeping öffnen
+  die Bereinigung mit dem passenden Filter.
+- Aus der Datenqualität bleibt der Rücklink auch nach Bereinigen und Korrigieren
+  erhalten.
+
+### Behoben
+
+- Die Chart-Option „Punkte“ wird gespeichert und wirkt auch auf den Kacheln der
+  Übersicht.
+- Der Hinweis „Du kannst die Seite verlassen …“ im Fortschritt der
+  Entitäts-Bereinigung erscheint nicht mehr mehrfach untereinander.
+
+---
+
+### English
+
+#### New
+
+- **Historic**: Entities that deliberately stop receiving values (for example a
+  decommissioned meter) can be marked as “Historic”. They then no longer count
+  as inactive, neither in the housekeeping list nor in the status tile or the
+  notice. Data and charts stay unchanged. You set it on the entity's
+  “Configuration” tab or directly in the list of inactive entities; a badge on
+  the entity shows it, and a separate housekeeping section lists all marked
+  entities. If values arrive after the mark, the mark stays, but the section
+  warns (even when collapsed) and a notice points it out. The entities overview
+  gets an optional, sortable column “Historic” (hidden by default).
+- **Counter decreases**: A bulk button deletes all decreases rated “Probably a
+  bad value”. Genuine resets and meter replacements are left untouched.
+
+#### Changed
+
+- Notices stay up to date: for example “Import source data still present”
+  disappears right after deleting it, and duplicates and outliers are
+  re-evaluated after marking or restoring.
+- The links for duplicates, outliers and counter decreases in housekeeping open
+  the cleanup with the matching filter.
+- The back link from data quality is kept after cleaning up and correcting.
+
+#### Fixed
+
+- The chart option “Points” is saved and also applies to the tiles on the
+  overview.
+- The note “You can leave the page …” in the progress of an entity cleanup no
+  longer appears several times in a row.
+
+## 1.6.0 - 2026-10-16
+
+### Neu
+
+- **Datenqualität**: Eine neue Seite zeigt je Entität Ausreißer, Lücken,
+  Duplikate und Zählerrückgänge, mit Suche, Befund-Filter, Sortierung und
+  Zeitraum (7 Tage bis Gesamt). Eine Statuszeile und die Spalte „Stand“ sagen,
+  wie aktuell die Zahlen sind, und eine Meldung weist auf neue Befunde hin. Die
+  Farben folgen der Frage „Kann ich etwas tun?“: Gelb heißt aufräumen, Grau ist
+  nur Information.
+- **Duplikate entfernen** als Sammelaktion über mehrere Entitäten, mit Vorschau
+  und Rückgängig.
+- **Wiederherstellen mit Auswahl**: Ein Assistent führt in vier Schritten durch
+  die Wiederherstellung. Zur Wahl stehen die ganze Sicherung, einzelne
+  Entitäten oder nur die Einstellungen. Die beiden letzten laufen ohne Neustart,
+  fügen Diagramme und Tabellen standardmäßig als Kopie hinzu und lassen sich
+  rückgängig machen.
+- **Entitäten mehrfach löschen**: Mit „Auswählen“ in der Entitäten-Übersicht
+  markierst du mehrere Entitäten. Der Dialog nennt vorher, wo sie noch benutzt
+  werden (Diagramme, Tabellen, Kacheln, Energiedashboard), und bietet ein Backup
+  an. Diagramme und Tabellen, die eine gelöschte Entität nennen, zeigen
+  „Entität fehlt“.
+- **Werte ignorieren** je Entität: Sensoren, die beim Start kurz 0 melden,
+  lassen sich so filtern. Du gibst die Werte an, die nicht gespeichert werden
+  sollen.
+- **Werte bearbeiten**: Zählerrückgänge tragen eine Einordnung („Vermutlich
+  Fehlwert“, „Vermutlich Reset“, „Noch offen“) samt Begründung. Die Markierungen
+  sind nach Bedeutung gefärbt statt alles in Rot.
+- **Einstellungen → Zurücksetzen**: Du kannst nur die Messwerte oder den
+  kompletten Datenbestand löschen. Das Löschen verlangt eine Tipp-Bestätigung
+  und bietet vorher ein Backup an. API-Token, Backup-Einstellungen und die
+  Backup-Dateien bleiben erhalten.
+- Die Beschriftung von Tabellenspalten kennt die Platzhalter `{wochentag}` und
+  `{wochentag_kurz}`.
+- Die Typ-Anzeige nennt die `state_class` einer Entität. Bei der Klasse `total`
+  steht in der Datenqualität „n. a.“, weil sie nicht auf Rückgänge geprüft wird.
+- Energiedashboard: „Nach Gruppe anzeigen“ bei den Verbraucheranteilen zeigt
+  jede Gruppe als Summenzeile mit ihren Geräten, zum Auf- und Zuklappen.
+
+### Geändert
+
+- Die Messung der Datenqualität läuft im Hintergrund mit Zeitbudget und nur
+  noch bei Entitäten mit neuen Werten. Stille Entitäten gelten nicht als
+  veraltet.
+- Die Einordnung der Zählerrückgänge ist verständlicher formuliert. Die Aktion
+  heißt jetzt „Rückgänge erlauben“.
+
+### Behoben
+
+- Diagramme, die eine gelöschte Entität nennen, laden wieder, statt auf „Lädt …“
+  zu bleiben.
+- Tageszähler („… heute“) zeigen den planmäßigen Reset um Mitternacht nicht mehr
+  als Zählerrückgang, auch nicht bei großen Entitäten im Zeitraum Gesamt.
+
+---
+
+### English
+
+#### New
+
+- **Data quality**: A new page shows outliers, gaps, duplicates and counter
+  decreases per entity, with search, finding filter, sorting and period (7 days
+  to all time). A status line and the “As of” column tell you how current the
+  numbers are, and a notice points to new findings. The colors follow the
+  question “Can I do something?”: yellow means you can clean up, grey is
+  information only.
+- **Remove duplicates** as a bulk action across several entities, with preview
+  and undo.
+- **Restore with selection**: A wizard guides you through the restore in four
+  steps. You can restore the whole backup, single entities or just the
+  settings. The last two run without a restart, add charts and tables as a copy
+  by default and can be undone.
+- **Delete several entities**: With “Select” in the entities overview you mark
+  several entities. The dialog first tells you where they are still used
+  (charts, tables, tiles, energy dashboard) and offers a backup. Charts and
+  tables that mention a deleted entity show “Entity missing”.
+- **Ignore values** per entity: Sensors that briefly report 0 at startup can be
+  filtered this way. You name the values that should not be stored.
+- **Edit values**: Counter decreases carry an assessment (“Probably a bad
+  value”, “Probably a reset”, “Still open”) with a reason. The markings are
+  colored by meaning instead of everything in red.
+- **Settings → Reset**: You can delete just the measured values or the entire
+  data set. Deleting requires typing a confirmation and offers a backup first.
+  The API token, backup settings and the backup files are kept.
+- Table column labels know the placeholders `{weekday}` and `{weekday_short}`.
+- The type display names the entity’s `state_class`. For the class `total`,
+  data quality shows “n/a” because it is not checked for decreases.
+- Energy dashboard: “Show by group” in the consumer shares shows each group as a
+  total row with its devices, collapsible.
+
+#### Changed
+
+- Data quality is measured in the background within a time budget and only for
+  entities with new values. Silent entities no longer count as outdated.
+- The assessment of counter decreases is worded more clearly. The action is now
+  called “Allow decreases”.
+
+#### Fixed
+
+- Charts that mention a deleted entity load again instead of staying on
+  “Loading …”.
+- Daily counters (“… today”) no longer show the scheduled reset at midnight as a
+  counter decrease, even for large entities over the period All time.
+
 ## 1.5.0 - 2026-10-11
 
 ### Neu

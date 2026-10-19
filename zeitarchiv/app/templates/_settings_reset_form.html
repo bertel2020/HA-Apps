@@ -1,0 +1,66 @@
+{# Zurücksetzen: zwei Stufen, Tipp-Bestätigung. Das Wort kommt aus der
+   Übersetzung (reset_word) und wird serverseitig noch einmal geprüft — der
+   deaktivierte Knopf ist nur Bedienkomfort. #}
+{% if reset_result %}<p class="save-status">✓ {{ reset_result }}</p>{% endif %}
+{% if reset_error %}<p class="hint hint-status" style="color:var(--danger);">{{ reset_error }}</p>{% endif %}
+{% if reset_demo %}
+<p class="hint hint-status">{{ _("Im Demo-Modus nicht verfügbar.") }}</p>
+{% else %}
+<p class="hint hint-warn hint-warn-strong" style="margin:0 0 14px;">{{ _("Löscht Daten endgültig und lässt sich nicht rückgängig machen. Vorhandene Backups bleiben erhalten.") }}</p>
+<div class="stat-row" style="margin-bottom:14px;">
+  <div class="stat">
+    <div class="label">{{ _("Entitäten") }}</div>
+    <div class="value">{{ reset_info.entities | format_int }}</div>
+  </div>
+  <div class="stat">
+    <div class="label">{{ _("Datensätze") }}</div>
+    <div class="value">{{ reset_info.rows | format_int }}</div>
+  </div>
+  <div class="stat">
+    <div class="label">{{ _("Größe") }}</div>
+    <div class="value">{{ reset_size }}</div>
+  </div>
+</div>
+{# Das Bestätigungswort steht im Dialog, nicht im Formular: erst der Klick auf
+   „Jetzt zurücksetzen" öffnet ihn. Das <dialog> liegt INNERHALB des <form>,
+   damit confirm mit abgeschickt wird; dieselbe Optik wie das App-weite
+   Bestätigungs-Popup (.confirm-overlay, siehe confirm-dialog.js). Das Wort
+   prüft der Server nochmals — der deaktivierte Knopf ist nur Komfort. #}
+<form hx-post="settings/reset" hx-target="#reset-form" hx-swap="innerHTML" data-word="{{ reset_word }}">
+  <div class="settings-minor-section">
+    <label style="display:block;margin:0 0 10px;">
+      <input type="radio" name="scope" value="values" checked data-title="{{ _('Nur Messwerte löschen') }}">
+      <strong>{{ _("Nur Messwerte löschen") }}</strong>
+      <span class="hint" style="display:block;margin:2px 0 0 22px;">{{ _("Entitäten, Konfiguration, Dashboards und Einstellungen bleiben erhalten.") }}</span>
+    </label>
+    <label style="display:block;margin:0 0 14px;">
+      <input type="radio" name="scope" value="full" data-title="{{ _('Komplett zurücksetzen') }}">
+      <strong>{{ _("Komplett zurücksetzen") }}</strong>
+      <span class="hint" style="display:block;margin:2px 0 0 22px;">{{ _("Zusätzlich werden Entitäten, Dashboards, gespeicherte Charts und Tabellen, das Aktivitätsprotokoll und die Einstellungen gelöscht, wie bei einer frischen Installation. Der API-Token und die Backup-Einstellungen bleiben. Die Home-Assistant-Integration legt Entitäten beim nächsten Wert wieder an.") }}</span>
+    </label>
+    <label style="display:block;margin:0 0 14px;">
+      <input type="checkbox" name="backup" value="1" checked>
+      {{ _("Vorher ein Backup erstellen") }}
+      <span class="hint" style="display:block;margin:2px 0 0 22px;">{{ _("Schlägt das Backup fehl, wird nichts gelöscht.") }}</span>
+    </label>
+  </div>
+  <div class="toolbar" style="margin:16px 0 0;justify-content:flex-end;">
+    <button type="button" class="btn btn-danger"
+            onclick="var f=this.closest('form'),d=f.querySelector('dialog');d.querySelector('.reset-scope').textContent=f.querySelector('input[name=scope]:checked').dataset.title;f.confirm.value='';d.querySelector('button[type=submit]').disabled=true;d.showModal();f.confirm.focus();">{{ _("Jetzt zurücksetzen") }}</button>
+  </div>
+  <dialog class="confirm-overlay open" aria-labelledby="reset-dialog-title"
+          oncancel="this.close()">
+    <p class="confirm-message" id="reset-dialog-title"><strong class="reset-scope"></strong><br>{{ _("Das lässt sich nicht rückgängig machen.") }}</p>
+    <div class="field" style="margin:14px 0 0;">
+      <label for="reset-confirm">{{ _("Zur Bestätigung „{word}“ eintippen:", word=reset_word) }}</label>
+      <input type="text" id="reset-confirm" name="confirm" autocomplete="off" autocapitalize="characters" spellcheck="false" style="width:100%;"
+             oninput="var f=this.form;f.querySelector('dialog button[type=submit]').disabled=this.value.trim()!==f.dataset.word;">
+    </div>
+    <div class="confirm-actions">
+      <button type="button" class="btn" onclick="this.closest('dialog').close()">{{ _("Abbrechen") }}</button>
+      <button type="submit" class="btn btn-danger" disabled
+              onclick="var d=this.closest('dialog');setTimeout(function(){d.close()},0);">{{ _("Jetzt zurücksetzen") }}</button>
+    </div>
+  </dialog>
+</form>
+{% endif %}

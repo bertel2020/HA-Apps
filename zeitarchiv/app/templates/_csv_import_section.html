@@ -46,12 +46,12 @@
     <div class="field">
       <label>{{ _("Kopfzeile") }}</label>
       <span class="dd-picker-wrap">
-        <button type="button" class="btn" id="header-btn" onclick="toggleDDPicker('header')">{{ "Ja" if has_header else _("Nein") }} ▾</button>
+        <button type="button" class="btn" id="header-btn" onclick="toggleDDPicker('header')">{{ _("Ja") if has_header else _("Nein") }} ▾</button>
         <input type="hidden" name="has_header" id="header-input" value="{{ "on" if has_header else "" }}"
                hx-post="import/csv/preview" hx-include="#csv-form" hx-target="#csv-section" hx-swap="outerHTML">
         <div class="dd-picker-popover" id="header-popover">
-          <div class="dd-picker-row" onclick="selectDDOption('header', 'on', 'Ja')">{{ _("Ja") }}</div>
-          <div class="dd-picker-row" onclick="selectDDOption('header', '', 'Nein')">{{ _("Nein") }}</div>
+          <div class="dd-picker-row" data-label="{{ _("Ja") }}" onclick="selectDDOption('header', 'on', this.dataset.label)">{{ _("Ja") }}</div>
+          <div class="dd-picker-row" data-label="{{ _("Nein") }}" onclick="selectDDOption('header', '', this.dataset.label)">{{ _("Nein") }}</div>
         </div>
       </span>
     </div>
@@ -63,7 +63,7 @@
         <input type="hidden" name="ts_col" id="ts-col-input" value="{{ ts_col }}">
         <div class="dd-picker-popover" id="ts-col-popover">
           {% for col in columns %}
-          <div class="dd-picker-row" onclick="selectDDOption('ts-col', '{{ loop.index0 }}', '{{ col }}')">{{ col }}</div>
+          <div class="dd-picker-row" data-label="{{ col }}" onclick="selectDDOption('ts-col', '{{ loop.index0 }}', this.dataset.label)">{{ col }}</div>
           {% endfor %}
         </div>
       </span>
@@ -75,7 +75,7 @@
         <input type="hidden" name="value_col" id="value-col-input" value="{{ value_col }}">
         <div class="dd-picker-popover" id="value-col-popover">
           {% for col in columns %}
-          <div class="dd-picker-row" onclick="selectDDOption('value-col', '{{ loop.index0 }}', '{{ col }}')">{{ col }}</div>
+          <div class="dd-picker-row" data-label="{{ col }}" onclick="selectDDOption('value-col', '{{ loop.index0 }}', this.dataset.label)">{{ col }}</div>
           {% endfor %}
         </div>
       </span>

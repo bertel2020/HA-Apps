@@ -99,7 +99,7 @@ storage.ingestion.IngestionService.ingest()
    │ StorageCoordinator.entity(entity_id)  ← serialisiert je Entität
    │ Idempotenz-Claim (SQLite ingested_events)
    │ Dedup (Event-ID, dann Zeitstempel)
-   │ Auflösungs-/Wertänderungsfilter
+   │ Werte ignorieren, Auflösungs-/Wertänderungsfilter
    │ Zähler-Rückgang-Erkennung (nur protokolliert, nicht blockiert)
    ▼
 storage.rotate.rotate_if_needed()   ← Monatswechsel? Hot → Archiv + Rollup

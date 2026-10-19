@@ -632,10 +632,13 @@
               <thead><tr><th>{{ _("Verbraucher") }}</th><th>{{ _("kWh") }}</th><th>{{ _("Anteil") }}</th><th x-show="verbraucherHasKosten">{{ _("Kosten") }}</th></tr></thead>
               <tbody>
                 <template x-for="(item, idx) in visibleVerbraucherBreakdown()" :key="item.name">
-                  <tr :class="{'edash-share-child': item.parent, 'edash-share-rest': item.rest, 'edash-share-meter': item.kind === 'meter'}"
-                      @mouseenter="item.kind !== 'meter' && highlightShare(item.name)" @mouseleave="item.kind !== 'meter' && unhighlightShare(item.name)">
+                  <tr :class="{'edash-share-child': item.parent, 'edash-share-deep': item.level > 1, 'edash-share-rest': item.rest, 'edash-share-meter': isSummenzeile(item)}"
+                      @mouseenter="highlightRow(item)" @mouseleave="unhighlightRow(item)">
                     <td class="label">
-                      <span class="edash-share-dot" x-show="item.kind !== 'meter'" :style="{background: leafColor(item)}"></span>
+                      <button type="button" class="edash-share-toggle" x-show="hasChildren(item)" @click="toggleRow(item)"
+                              :aria-expanded="!collapsedRows[item.name]" :aria-label="item.name"
+                              x-text="collapsedRows[item.name] ? '▸' : '▾'"></button>
+                      <span class="edash-share-dot" x-show="!isSummenzeile(item)" :style="{background: leafColor(item)}"></span>
                       <a x-show="item.entity_id" class="edash-share-link" :href="'entities/' + encodeURIComponent(item.entity_id || '')" x-text="item.name"></a>
                       <span x-show="!item.entity_id" x-text="item.name"></span>
                     </td>
@@ -644,10 +647,10 @@
                     <td x-show="verbraucherHasKosten" x-text="fmtCurrency(item.kosten)"></td>
                   </tr>
                 </template>
-                <tr class="edash-share-more-row" x-show="verbraucherBreakdown.length > 8">
+                <tr class="edash-share-more-row" x-show="verbraucherRows.length > 8">
                   <td colspan="4">
                     <button type="button" class="edash-share-more-btn" @click="verbraucherExpanded = !verbraucherExpanded"
-                            x-text="verbraucherExpanded ? t('Weniger anzeigen') : t('+ {count} weitere anzeigen', {count: verbraucherBreakdown.length - 8})"></button>
+                            x-text="verbraucherExpanded ? t('Weniger anzeigen') : t('+ {count} weitere anzeigen', {count: verbraucherRows.length - 8})"></button>
                   </td>
                 </tr>
               </tbody>

@@ -111,6 +111,61 @@ def test_both_row_paths_use_the_same_outlier_rule() -> None:
     ]
 
 
+def test_both_row_paths_skip_the_scheduled_midnight_reset() -> None:
+    """Ein Tageszähler setzt sich um Mitternacht auf 0 zurück. detect_counter_decreases()
+    überspringt das, der Streaming-Weg ("Jahr"/"Gesamt") markierte es einmal trotzdem —
+    bei Tageszählern jede Nacht, ohne dass Meldung und Housekeeping es zählten."""
+    rows = [
+        (_ts(2024, 7, 1, 22), 8.0), (_ts(2024, 7, 2, 0), 0.0),   # planmäßiger Reset
+        (_ts(2024, 7, 2, 12), 6.0), (_ts(2024, 7, 2, 13), 1.0),  # Rückgang am selben Tag
+    ]
+    direkt = cleanup.detect_counter_decreases(rows, TZ)
+    streaming = cleanup.analyze_raw_rows_page(
+        lambda: iter(rows), filter_="counter_decreases", page=1, page_size=50,
+        gap_threshold_minutes=None, outlier_factor=None, tz=TZ,
+        counter_decrease_enabled=True,
+    )
+    assert set(direkt) == {_ts(2024, 7, 2, 13)}
+    assert {row["ts"] for row in streaming["rows"]} == set(direkt)
+    assert streaming["counts"]["counter_decreases"] == 1
+
+
+def test_daily_counts_add_up_to_the_totals() -> None:
+    """Die Tageszahlen kommen aus demselben Durchlauf wie die Gesamtzahlen und
+    müssen in jeder Kategorie genau deren Summe ergeben, sonst zeigte eine
+    Tagesansicht andere Zahlen als der Filter der Bereinigungsseite."""
+    rows = [
+        (_ts(2024, 7, 1, 8), 10.0), (_ts(2024, 7, 1, 8), 10.0),  # Duplikat (2 Zeilen)
+        (_ts(2024, 7, 1, 9), 11.0),
+        (_ts(2024, 7, 2, 9), 5.0),  # Zählerrückgang
+        (_ts(2024, 7, 3, 9), 5.0),  # Wiederholung
+        (_ts(2024, 7, 3, 23), 6.0),
+    ]
+    analysis = cleanup.analyze_raw_rows_page(
+        lambda: iter(rows), filter_="all", page=1, page_size=50,
+        gap_threshold_minutes=None, outlier_factor=None, tz=TZ,
+        counter_decrease_enabled=True,
+    )
+    daily = analysis["daily"]
+    assert daily["2024-07-01"]["duplicates"] == 2
+    assert daily["2024-07-02"] == {"counter_decreases": 1}
+    for key in ("outliers", "gaps", "duplicates", "repetitions", "counter_decreases"):
+        assert sum(day.get(key, 0) for day in daily.values()) == analysis["counts"][key]
+
+
+def test_daily_counts_are_stored_with_the_alltime_stats() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        index.set_cleanup_alltime_stats("sensor.a", {"all": 1}, daily={"2024-07-01": {"gaps": 1}})
+        index.set_cleanup_alltime_stats("sensor.b", {"all": 1})
+        assert index.get_cleanup_alltime_stats("sensor.a")["daily"] == {"2024-07-01": {"gaps": 1}}
+        assert "daily" not in index.get_cleanup_alltime_stats("sensor.b")
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_soft_delete_excludes_row_and_undo_restores_it() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
     try:

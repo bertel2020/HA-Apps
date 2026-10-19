@@ -1,0 +1,141 @@
+{# Seite Datenqualität (/housekeeping/datenqualitaet): eine Zeile je Entität mit Befund, eine Spalte je
+   Befundtyp. Rechnet nichts nach, die Zahlen kommen aus denselben
+   Gesamt-Zählungen wie die Trefferzahlen der Bereinigungsseite (siehe data_quality.py). Eine
+   Zahl führt auf die Bereinigungsseite der Entität mit gesetztem Filter, die
+   Zeile selbst klappt die jüngsten Einzelbefunde auf. #}
+{% set dq = data_quality %}
+{% set labels = {'duplicates': _("Duplikate"), 'counter_decreases': _("Zählerrückgänge"), 'outliers': _("Ausreißer"), 'gaps': _("Lücken")} %}
+<div class="stat-row">
+  <div class="stat"><div class="label">{{ _("Entitäten betroffen") }}</div><div class="value">{{ dq.affected_label }}</div><div class="sub-value">{{ _("von {total}", total=dq.entity_count) }}</div></div>
+  {% for col in dq.columns %}
+  <div class="stat"><div class="label">{{ labels[col.key] }}</div><div class="value">{{ dq.totals[col.key].label }}</div></div>
+  {% endfor %}
+</div>
+{# Gesamtstand der Messung: wie viele Entitäten eine belastbare Zählung haben und wie alt die älteste ist.
+   Die Zahlen darunter sind Cache-Stände des Wartungsplaners (siehe data_quality.build_matrix). #}
+{% set st = dq.status %}
+{% if st.total %}
+<div class="dq-status{% if st.measured < st.total %} is-running{% elif st.stale %} is-stale{% endif %}" role="status">
+  <span class="dq-status-dot" aria-hidden="true"></span>
+  {% if st.measured < st.total %}
+  <strong>{{ _("{measured} von {total} Entitäten gemessen", measured=st.measured | format_int, total=st.total | format_int) }}</strong>
+  <span class="dq-status-bar" aria-hidden="true"><i style="width:{{ (st.measured * 100 / st.total) | round(0, 'floor') | int }}%"></i></span>
+  <span class="dq-status-sep" aria-hidden="true">·</span><span>{{ _("Messung läuft im Hintergrund") }}</span>
+  {% elif st.stale %}
+  <strong>{{ _("{total} Entitäten gemessen", total=st.total | format_int) }}</strong>
+  <span class="dq-status-sep" aria-hidden="true">·</span><span>{{ _("{stale} älter als {hours} Std., älteste {oldest}", stale=st.stale | format_int, hours=st.stale_hours, oldest=st.oldest_label) }}</span>
+  {% else %}
+  <strong>{{ _("Alle {total} Entitäten gemessen", total=st.total | format_int) }}</strong>
+  {% if st.oldest_label %}<span class="dq-status-sep" aria-hidden="true">·</span><span>{{ _("älteste Messung {oldest}", oldest=st.oldest_label) }}</span>{% endif %}
+  {% endif %}
+</div>
+{% endif %}
+{% macro sort_link(key, label) %}{% set active = dq_state.sort == key %}{% set next_dir = ('asc' if dq_state.dir == 'desc' else 'desc') if active else ('asc' if key in ('name', 'measured') else 'desc') %}<a class="dq-sort{% if active %} is-active{% endif %}" href="{{ app_root }}/housekeeping/datenqualitaet{{ dq_url(sort=key, dir=next_dir, page=1) }}" title="{{ _('Sortieren') }}">{{ label }}{% if active %}<span class="dq-sort-arrow" aria-hidden="true">{{ '▾' if dq_state.dir == 'desc' else '▴' }}</span>{% endif %}</a>{% endmacro %}
+{% set is_heat = view == 'heatmap' %}
+{% set period = dq.period %}
+{% set period_labels = {'7d': _("7 Tage"), '30d': _("30 Tage"), 'year': _("1 Jahr"), 'all': _("Gesamt")} %}
+{% set sort_labels = {'total': _("Summe"), 'name': _("Name"), 'duplicates': labels.duplicates, 'counter_decreases': labels.counter_decreases, 'outliers': labels.outliers, 'gaps': labels.gaps, 'measured': _("Stand (älteste zuerst)")} %}
+<div class="dq-toolbar">
+  <form class="dq-filters" method="get" action="{{ app_root }}/housekeeping/datenqualitaet">
+    <input type="search" class="dq-search" name="q" value="{{ dq_state.q }}" placeholder="{{ _('Entität suchen …') }}" aria-label="{{ _('Entität suchen') }}">
+    <label for="dq-kind">{{ _("Befund") }}</label>
+    <select id="dq-kind" name="kind" onchange="this.form.submit()">
+      <option value="all" {% if dq_state.kind == 'all' %}selected{% endif %}>{{ _("Alle Befunde") }}</option>
+      {% for col in dq.columns %}<option value="{{ col.key }}" {% if dq_state.kind == col.key %}selected{% endif %}>{{ labels[col.key] }}</option>{% endfor %}
+    </select>
+    <label for="dq-period">{{ _("Zeitraum") }}</label>
+    <select id="dq-period" name="period" onchange="this.form.submit()">
+      {% for key, label in period_labels.items() %}
+      <option value="{{ key }}" {% if period == key %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <span class="dq-sort-mobile">
+      <label for="dq-sort">{{ _("Sortierung") }}</label>
+      <select id="dq-sort" name="sort" onchange="this.form.submit()">
+        {% for key, label in sort_labels.items() %}<option value="{{ key }}" {% if dq_state.sort == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </span>
+    <input type="hidden" name="dir" value="{{ dq_state.dir }}">
+    <input type="hidden" name="page_size" value="{{ dq_state.page_size }}">
+  </form>
+</div>
+{# Die Heatmap-Ansicht (Umschalter, Filter) ist vorerst aus der Seite genommen, siehe ROADMAP.md;
+   Vorlage, Dienst und Stile bleiben bestehen. #}
+{% if is_heat %}
+{% include "_data_quality_heatmap.html" %}
+{% else %}
+{% set dup_ids = (dq.rows | selectattr('cells.duplicates') | map(attribute='entity_id') | list) if period == 'all' else [] %}
+<div x-data="{ selected: [] }">
+<form id="dq-bulk-form" hx-post="{{ app_root }}/housekeeping/datenqualitaet/duplicates/preview"
+      hx-target="#dq-bulk-panel" hx-swap="innerHTML"></form>
+<div class="dq-bulkbar" x-show="selected.length" x-cloak>
+  <span class="dq-bulkbar-count" x-text="selected.length + ' {{ _('gewählt') }}'"></span>
+  <button type="submit" form="dq-bulk-form" class="btn btn-sm">{{ _("Duplikate entfernen …") }}</button>
+  <button type="button" class="btn btn-sm" @click="selected = []">{{ _("Auswahl aufheben") }}</button>
+</div>
+<div id="dq-bulk-panel"></div>
+<div class="tbl-wrap">
+  {% if dq.rows %}
+  <table class="dt dq-table">
+    <thead><tr>
+      <th><div class="dq-entity-cell dq-head-cell">{% if dup_ids %}<input type="checkbox" class="dq-check" title="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" aria-label="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" :checked="selected.length === {{ dup_ids | length }}" @change='selected = $event.target.checked ? {{ dup_ids | tojson }} : []'>{% else %}<span class="dq-check" aria-hidden="true"></span>{% endif %}<span class="dq-caret" aria-hidden="true"></span>{{ sort_link("name", _("Entität")) }}</div></th>
+      {% for col in dq.columns %}
+      <th class="dq-num">{{ sort_link(col.key, labels[col.key]) }}</th>
+      {% endfor %}
+      <th class="dq-stand">{{ sort_link("measured", _("Stand")) }}</th>
+    </tr></thead>
+    {% for row in dq.rows %}
+    <tbody class="dq-entity" x-data="{ open: false }">
+      <tr class="dq-row" :class="{ 'is-open': open }" tabindex="0"
+          hx-get="{{ app_root }}/entities/{{ row.entity_id }}/data-quality" hx-trigger="click once, keydown[key=='Enter'] once"
+          hx-target="#dq-detail-{{ loop.index }}" hx-swap="innerHTML"
+          @click="open = !open" @keydown.enter="open = !open">
+        <td class="entity">
+          <div class="dq-entity-cell">
+            {% if row.cells.duplicates and period == 'all' %}<input type="checkbox" class="dq-check" name="entity_id" value="{{ row.entity_id }}" form="dq-bulk-form" x-model="selected" @click.stop aria-label="{{ _('Für Sammelaktion wählen') }}">{% else %}<span class="dq-check" aria-hidden="true"></span>{% endif %}
+            <span class="dq-caret" aria-hidden="true">▸</span>
+            <div class="dq-entity-text">
+              <span class="name">{{ row.friendly_name }}</span>{% if row.friendly_name != row.entity_id %}<span class="id">{{ row.entity_id }}</span>{% endif %}
+            </div>
+          </div>
+        </td>
+        {% for col in dq.columns %}
+        {% set cell = row.cells[col.key] %}
+        <td class="dq-num" data-label="{{ labels[col.key] }}">{% if cell %}<a class="dq-pill {{ col.severity }}" href="{{ app_root }}/{{ cell.href }}" @click.stop>{{ cell.label }}</a>{% elif col.key == 'counter_decreases' and row.counter_allowed %}<span class="dq-allowed" title="{{ _('Rückgänge sind für diesen Zähler erlaubt: keine Markierung, keine Meldung, kein Eintrag in Housekeeping.') }}">{{ _("erlaubt") }}</span>{% elif col.key == 'counter_decreases' and row.counter_na %}<span class="dq-allowed" title="{{ _('state_class total: Rückgänge sind bei diesem Zähler normal und werden nicht geprüft.') }}">{{ _("n. a.") }}</span>{% else %}<span class="dq-none">–</span>{% endif %}</td>
+        {% endfor %}
+        <td class="dq-stand" data-label="{{ _('Stand') }}"><span class="dq-age{% if row.measured_old %} is-old{% endif %}"{% if row.measured_title %} title="{{ _('Gemessen am {ts}', ts=row.measured_title) }}"{% endif %}>{{ row.measured_label }}</span></td>
+      </tr>
+      <tr class="dq-detail" x-show="open" x-cloak>
+        <td colspan="{{ dq.columns | length + 2 }}"><div id="dq-detail-{{ loop.index }}" class="dq-detail-body"><span class="hint">{{ _("Lädt …") }}</span></div></td>
+      </tr>
+    </tbody>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="empty">{{ _("Keine Befunde gefunden.") }}</div>
+  {% endif %}
+</div>
+</div>
+{% endif %}
+{% if pagination and pagination.total > 10 %}
+<form class="pager dq-pager" method="get" action="{{ app_root }}/housekeeping/datenqualitaet">
+  {% for name, value in dq_state.items() if name != 'page_size' and value != '' %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+  <div class="dq-pager-nav">
+    <span class="pager-range">{{ _("{start}&ndash;{end} von {total}", start=pagination.start, end=pagination.end, total=pagination.total) }}</span>
+    {% for label, target, off, title in [('«', 1, pagination.page <= 1, _('Erste Seite')), ('‹', pagination.page - 1, pagination.page <= 1, _('Vorherige Seite')), ('›', pagination.page + 1, pagination.page >= pagination.total_pages, _('Nächste Seite')), ('»', pagination.total_pages, pagination.page >= pagination.total_pages, _('Letzte Seite'))] %}
+    {% if loop.index == 3 %}
+    <span class="pager-page">{{ _("Seite") }} <input type="number" class="pager-page-input" name="page" min="1" max="{{ pagination.total_pages }}" value="{{ pagination.page }}" onchange="this.form.submit()"> / {{ pagination.total_pages }}</span>
+    {% endif %}
+    {% if off %}<span class="btn navbtn is-disabled" aria-disabled="true">{{ label }}</span>{% else %}<a class="btn navbtn" href="{{ app_root }}/housekeeping/datenqualitaet{{ dq_url(page=target) }}" title="{{ title }}">{{ label }}</a>{% endif %}
+    {% endfor %}
+  </div>
+  <select name="page_size" title="{{ _('Zeilen pro Seite') }}" onchange="this.form.page.value=1;this.form.submit()">
+    {% for size in pagination.page_sizes %}
+    <option value="{{ size }}" {% if pagination.page_size == size %}selected{% endif %}>{{ _("{size} / Seite", size=size) }}</option>
+    {% endfor %}
+  </select>
+</form>
+{% endif %}
+{% if is_heat and heatmap.pending %}
+<p class="hint hint-status" style="margin-top:14px;">{{ _("Für {pending} von {total} Entitäten liegen noch keine vollständigen Tageszahlen vor, die Messung läuft im Hintergrund.", pending=heatmap.pending, total=dq.entity_count) }}</p>
+{% endif %}

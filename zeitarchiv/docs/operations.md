@@ -35,6 +35,19 @@ Sowohl Backup als auch Restore laufen unter
 `StorageCoordinator.exclusive()` (siehe [architecture.md](architecture.md)) —
 kein gleichzeitiger Schreibverkehr während der Operation.
 
+### Home-Assistant-Backup
+
+Ein Backup von Home Assistant, das das Add-on einschließt, enthält auch den
+Zeitarchiv-Datenbestand. `backup: cold` in `config.yaml` hält das Add-on
+dafür kurz an, damit Index und Parquet-Dateien in einem konsistenten Zustand
+gesichert werden. `backup_exclude` nimmt aus: die eigenen Backup-ZIPs
+(`backups/`), die Arbeitsverzeichnisse einer laufenden Wiederherstellung
+(`.zeitarchiv-restore-staging/`, `.zeitarchiv-restore-rollback-*`) und, wie
+im eigenen Backup, die hochgeladenen Importdaten (`symcon_import/`,
+`csv_import/`). Die Liste liest der Supervisor aus der `config.yaml` der
+installierten Version; eine Änderung greift also erst mit dem nächsten
+Update.
+
 ### Externes Ziel
 
 Implementierung: `storage/backup_external.py` (Netzwerkspeicher),
@@ -62,8 +75,12 @@ Mount belegt also einen Thread, aber nicht den Worker.
 `os.replace` umbenannt, unter dem Endnamen liegt nie eine halbe Datei. Die
 Änderungszeit wird übernommen, damit die Reihenfolge der Aufbewahrung stimmt.
 Übrig gebliebene `.part`-Dateien (Abbruch, Absturz) räumt die App nach 24 h
-am Ziel weg. Bei WebDAV heißt der Zwischenstand `.<name>.part` und wird per
-`PUT`, `PROPFIND` (Größenvergleich) und `MOVE` abgeschlossen; Weiterleitungen
+am Ziel weg. Bei WebDAV heißt der Zwischenstand
+`.zeitarchiv-upload-<zufall>-<name>` — er endet bewusst wie der Endname auf
+`.zip`, weil Nextcloud ab Version 31 Dateinamen auf `.part` mit Status 400
+ablehnt — und wird per `PUT`, `PROPFIND` (Größenvergleich) und `MOVE`
+abgeschlossen. Reste abgebrochener Uploads (auch alte `.part`-Namen) räumt
+die App vor jeder Übertragung weg. Weiterleitungen
 folgt der Client nicht, sondern nennt die Zieladresse im Fehlertext.
 
 **Aufbewahrung.** Lokal gilt dieselbe Anzahl-/Alters-Regel wie bisher, mit einer

@@ -27,6 +27,63 @@
     getComputedStyle(document.documentElement).getPropertyValue('--font-scale')
   ) || 1;
   const scaledFont = size => Math.round(size * UI_FONT_SCALE * 10) / 10;
+  // Wortgleich mit withOpacity() in chart_editor.js (Begründung dort: der
+  // Tooltip-Marker ignoriert itemStyle.opacity).
+  const withOpacity = (hex, opacity) => {
+    const n = parseInt(hex.replace('#', ''), 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${opacity})`;
+  };
+  const MONTH_LABELS = () => [t('Jan'), t('Feb'), t('Mär'), t('Apr'), t('Mai'), t('Jun'), t('Jul'), t('Aug'), t('Sep'), t('Okt'), t('Nov'), t('Dez')];
+  // Kalendermonats-Buckets und Laufsumme — wortgleich mit monthlyBuckets()/
+  // cumulate() in chart_editor.js (Begründungen dort).
+  function monthlyBuckets(points, aggregationType) {
+    const groups = Array.from({length: 12}, () => []);
+    (points || []).forEach(point => {
+      if (!Number.isFinite(point.value)) return;
+      groups[new Date(point.ts * 1000).getMonth()].push(point.value);
+    });
+    return groups.map(values => {
+      if (!values.length) return null;
+      const sum = values.reduce((total, v) => total + v, 0);
+      return aggregationType === 'standard' ? sum / values.length : sum;
+    });
+  }
+  function cumulate(values) {
+    let lastReal = -1;
+    values.forEach((v, i) => { if (v != null) lastReal = i; });
+    let sum = 0;
+    return values.map((v, i) => {
+      if (i > lastReal) return null;
+      if (v != null) sum += v;
+      return sum;
+    });
+  }
+
+  // Vergleich, der mit dem Chart gespeichert ist (saved_charts.compare_settings,
+  // data-compare-settings) — dieselben Regeln wie chart_editor.js: kein
+  // Vergleich bei Zeitstrahl, Donut, Auflösung "Voll" oder gestapelten Balken
+  // (dort ist der Knopf gesperrt), "Langzeit" nur bei Jahr/kalendarisch/genau
+  // einer Entität, sonst wie im Editor "Vorjahr" (load()); "Vorjahr" mit
+  // Laufsumme oder Soll zeichnet Monats-Balkenpaare (yearsCompareActive).
+  const COMPARE_YEAR_RANGES = ['hour', 'day', 'week', 'month'];
+  function tileCompare(el, {range, continuous, entityIds, chartType, resolutionPreset, stacked}) {
+    let settings = {};
+    try { settings = JSON.parse(el.dataset.compareSettings || '{}') || {}; } catch (e) { settings = {}; }
+    if (!settings.compare || ['timeline', 'donut'].includes(chartType) || resolutionPreset === 'full'
+        || (stacked && entityIds.length >= 2)) return null;
+    let mode = settings.mode || 'previous';
+    const longterm = mode === 'longterm' && range === 'year' && !continuous && entityIds.length === 1;
+    if (mode === 'longterm' && !longterm) mode = 'previous';
+    if (mode === 'year' && !COMPARE_YEAR_RANGES.includes(range)) mode = 'previous';
+    const target = settings.target && entityIds.includes(settings.target) ? settings.target : '';
+    const cumsum = !!settings.cumsum;
+    return {
+      mode, longterm, target, cumsum,
+      years: settings.years ?? 5,
+      average: settings.average ?? true,
+      yearsCompare: mode === 'previous' && range === 'year' && (cumsum || !!target),
+    };
+  }
 
   // Durchschnitt der gezeichneten Werte, oder null wenn es keine gibt.
   // Wortgleich mit averageOf() in entity_detail.js/chart_editor.js — selbst
@@ -103,6 +160,12 @@
   }
 
   const instances = new Map();  // chartId -> echarts instance
+  // Einmal für die ganze Seite statt in setup(): das läuft nach jedem
+  // htmx-Austausch des Dashboard-Gitters erneut, und jeder Lauf legte einen
+  // weiteren Listener an — nach n Austauschen n Resize-Durchläufe je Ereignis.
+  // Die Sammlung wird beim Austausch geleert und neu befüllt, der eine
+  // Listener sieht so immer die aktuellen Instanzen.
+  window.addEventListener('resize', () => instances.forEach(c => c.resize()));
   // chartId -> {items, legendMetrics, showStats} — die zuletzt geladenen und
   // berechneten Legenden-Kennzahlen einer Chart-Kachel, unabhängig vom
   // aktuellen Sichtbarkeitszustand der Legende zwischengespeichert. Ein
@@ -197,30 +260,36 @@
   // war bis jetzt der einzige verbliebene Text-Ausreißer.
   const LEGEND_METRIC_LABELS = {last: t('Aktuell'), min: t('Min'), max: t('Max'), average: 'Ø', sum: 'Σ'};
 
-  function escLegend(s) {
-    return String(s).replace(/</g, '&lt;').replace(/"/g, '&quot;');
-  }
-
   // Chip-Variante (Standard) — dieselben Chips/Kennzahlen wie chart_editor.html
   // (.chart-legend-item aus app.css), hier zusätzlich klickbar (siehe
   // toggleTileLegendItem()), anders als die "static" (nicht umschaltbare)
   // Variante auf entity_detail.html.
+  // Punkt wie bisher, gestrichelt für die Ø-Linie der Langzeit-Kachel (wie
+  // auf der Chart-Seite).
+  function legendSwatch(item) {
+    return item.dash
+      ? `<span class="dash" style="border-color:${item.color};"></span>`
+      : `<span class="dot" style="background:${item.color};"></span>`;
+  }
+
   function renderLegendChips(items, legendMetrics, showStats, hiddenSet) {
     return items.map(item => {
+      // "+N Jahre" (Langzeit-Kachel): nur ein Hinweis, kein Serien-Umschalter.
+      if (item.more) return `<span class="chart-legend-item is-more">${escapeHtml(item.more)}</span>`;
       let values = '';
       if (showStats) {
         const parts = [];
         for (const key of ['last', 'min', 'max', 'average', 'sum']) {
           if (!legendMetrics.includes(key)) continue;
           if (key === 'sum' && item.sum === null) continue;
-          parts.push(`<span>${LEGEND_METRIC_LABELS[key]} <strong>${escLegend(item[key])}</strong></span>`);
+          parts.push(`<span>${LEGEND_METRIC_LABELS[key]} <strong>${escapeHtml(item[key])}</strong></span>`);
         }
         if (parts.length) values = `<span class="values">${parts.join('')}</span>`;
       }
       const inactive = hiddenSet.has(item.name) ? ' inactive' : '';
-      return `<span class="chart-legend-item${inactive}" data-series="${escLegend(item.name)}" role="button" tabindex="0">`
-           + `<span class="dot" style="background:${item.color};"></span>`
-           + `<span class="name">${escLegend(item.name)}</span>${values}</span>`;
+      return `<span class="chart-legend-item${inactive}" data-series="${escapeHtml(item.name)}" role="button" tabindex="0">`
+           + legendSwatch(item)
+           + `<span class="name">${escapeHtml(item.name)}</span>${values}</span>`;
     }).join('');
   }
 
@@ -231,13 +300,13 @@
   function renderLegendTable(items, legendMetrics, showStats, hiddenSet) {
     const cols = showStats ? ['last', 'min', 'max', 'average', 'sum'].filter(k => legendMetrics.includes(k)) : [];
     const headerCells = cols.map(key => `<th>${LEGEND_METRIC_LABELS[key]}</th>`).join('');
-    const rows = items.map(item => {
-      const cells = cols.map(key => `<td>${escLegend(key === 'sum' && item.sum === null ? '—' : item[key])}</td>`).join('');
+    const rows = items.filter(item => !item.more).map(item => {
+      const cells = cols.map(key => `<td>${escapeHtml(key === 'sum' && item.sum === null ? '—' : item[key])}</td>`).join('');
       const inactive = hiddenSet.has(item.name) ? ' inactive' : '';
-      return `<tr class="chart-legend-table-row${inactive}" data-series="${escLegend(item.name)}" role="button" tabindex="0">`
+      return `<tr class="chart-legend-table-row${inactive}" data-series="${escapeHtml(item.name)}" role="button" tabindex="0">`
            + `<td class="legend-name-col"><span class="legend-name-cell">`
-           + `<span class="dot" style="background:${item.color};"></span>`
-           + `<span class="name">${escLegend(item.name)}</span></span></td>${cells}</tr>`;
+           + legendSwatch(item)
+           + `<span class="name">${escapeHtml(item.name)}</span></span></td>${cells}</tr>`;
     }).join('');
     return `<div class="tbl-wrap"><table class="dt compact chart-legend-table">`
          + `<thead><tr><th class="legend-name-col">Name</th>${headerCells}</tr></thead>`
@@ -397,6 +466,7 @@
     // dezente Füllfläche wie auf der eigenen Chart-Seite, damit ein
     // angeheftetes Chart nicht anders aussieht als dasselbe Chart dort.
     const areaFill = el.dataset.areaFill !== 'false';
+    const showPoints = el.dataset.showPoints === 'true';
     // "Gestapelt"/"Anteile (%)" (Optionen-Menü der Chart-Seite) — dieselbe
     // stacked-Kachel-Vorschau wie auf der eigenen Chart-Seite, siehe
     // stackedActive/normalizeActive weiter unten (chart_editor.js-Parität).
@@ -409,10 +479,24 @@
     if (!chartEl || !entityIds.length) return;
 
     const base = el.closest('#dashboard-grid')?.dataset.appRoot || '';
+    // Fester Zeitraum des Charts (saved_charts.period_anchor, JJJJ-MM-TT):
+    // dieselbe Umrechnung in einen Versatz wie im Chart-Editor, damit Kachel
+    // und Chart-Seite dieselbe Periode zeigen. Ohne Anker die laufende.
+    let offset = 0;
+    if (el.dataset.periodAnchor) {
+      const [y, m, d] = el.dataset.periodAnchor.split('-').map(Number);
+      offset = PeriodNavigation.offsetForRange(range, new Date(y, m - 1, d, 12).getTime());
+    }
     const params = new URLSearchParams({
-      entity_ids: entityIds.join(','), range, offset: '0', continuous: String(continuous),
+      entity_ids: entityIds.join(','), range, offset: String(offset), continuous: String(continuous),
       raw: String(timeline),
     });
+    const compare = tileCompare(el, {range, continuous, entityIds, chartType, resolutionPreset, stacked});
+    if (compare) {
+      params.set('compare', 'true');
+      params.set('compare_mode', compare.mode);
+      if (compare.longterm) params.set('previous_years', String(compare.years));
+    }
     let data;
     try {
       const res = await fetch(`${base}/api/query-multi?${params}`);
@@ -433,10 +517,10 @@
     // bekommt sonst beim ersten Rendern die volle (noch legendenlose)
     // Kachelhöhe gemessen und die Legende schiebt ihn erst beim nächsten
     // Resize-Event auf seine endgültige Höhe.
-    const legendItems = series.map((s, i) => {
-      const values = (s.points || []).map(p => p.value).filter(Number.isFinite);
-      const minima = (s.points || []).map(p => Number.isFinite(p.min) ? p.min : p.value).filter(Number.isFinite);
-      const maxima = (s.points || []).map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
+    const statsItem = (s, points, name, color) => {
+      const values = (points || []).map(p => p.value).filter(Number.isFinite);
+      const minima = (points || []).map(p => Number.isFinite(p.min) ? p.min : p.value).filter(Number.isFinite);
+      const maxima = (points || []).map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
       const isDuration = s.aggregation_type === 'switch' && s.display_mode === 'time';
       const unit = s.unit ? ` ${s.unit}` : '';
       const formatted = value => isDuration ? NumberFormat.fmtDuration(value) : `${fmtCompactNumber(value, effectiveDecimals(s))}${unit}`;
@@ -447,7 +531,7 @@
       // unten, da die Punktwerte dann nur noch 0/1-Zustände sind.
       const isSwitch = s.aggregation_type === 'switch';
       const hasSum = s.aggregation_type === 'counter' || isSwitch;
-      const sumValue = timeline && isSwitch ? switchOnDuration(s.points, data.window_end) : values.reduce((sum, v) => sum + v, 0);
+      const sumValue = timeline && isSwitch ? switchOnDuration(points, data.window_end) : values.reduce((sum, v) => sum + v, 0);
       // Summe bei Schaltern ist immer eine Dauer in Sekunden — unabhängig
       // vom Anzeigemodus immer als h/m/s formatiert statt über
       // fmtCompactNumber()s generische 4-signifikante-Stellen-Rundung, die
@@ -455,21 +539,64 @@
       // chart_editor.html/entity_detail.html, derselbe Fix).
       const sumFormatted = isSwitch ? NumberFormat.fmtDuration(sumValue) : formatted(sumValue);
       return {
-        name: entityNames[s.entity_id] || s.friendly_name,
-        color: PALETTE[colorIndexFor(s.entity_id) % PALETTE.length],
+        name,
+        color,
         last: values.length ? formatted(values[values.length - 1]) : '—',
         min: minima.length ? formatted(Math.min(...minima)) : '—',
         max: maxima.length ? formatted(Math.max(...maxima)) : '—',
         average: values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—',
         sum: hasSum ? (values.length ? sumFormatted : '—') : null,
       };
-    });
+    };
+    const tileEl = el.closest('.dtile');
+    // Langzeit-Kachel: Größenwechsel über 1×1 hinweg zeichnet neu (siehe
+    // setupSizePickers()), weil 1×1 nur das angezeigte Jahr und den Ø zeigt.
+    const multiYear = compare?.longterm && series.length === 1 && Array.isArray(series[0].years)
+      ? tileMultiYear(series[0], data, compare, {
+        small: tileEl?.dataset.gridCols === '1' && tileEl?.dataset.gridRows === '1',
+        color: PALETTE[colorIndexFor(series[0].entity_id) % PALETTE.length],
+        inkMuted: getComputedStyle(document.body).getPropertyValue('--ink-muted').trim(),
+      })
+      : null;
+    el.dataset.longtermActive = multiYear ? 'true' : 'false';
+    let legendItems;
+    if (multiYear) {
+      // Entschieden: nur das angezeigte Jahr und der Ø, die übrigen Jahre als
+      // "+N Jahre" (die Tabellen-Legende zeigt nur die beiden Zeilen).
+      const s = series[0];
+      legendItems = [statsItem(s, s.points, multiYear.series[0].name, multiYear.series[0].color)];
+      if (multiYear.averageSeries) {
+        legendItems.push({
+          ...statsItem(s, multiYear.averageSeries.monthly.filter(v => v != null).map(v => ({value: v})),
+            multiYear.averageSeries.name, multiYear.averageSeries.color),
+          dash: true,
+        });
+      }
+      if (multiYear.hiddenYears > 0) legendItems.push({more: t('+{n} Jahre', {n: multiYear.hiddenYears})});
+    } else if (compare?.yearsCompare) {
+      // Wie die Balkenpaare: je Entität angezeigtes Jahr und Vorjahr, die
+      // Soll-Entität als eigene Zeile — Namen wie die Serien, damit das
+      // Umschalten per Legende greift.
+      const currentYear = data.window_start ? new Date(data.window_start * 1000).getFullYear() : new Date().getFullYear();
+      legendItems = [];
+      series.forEach(s => {
+        if (!s.compare_points) return;
+        const color = PALETTE[colorIndexFor(s.entity_id) % PALETTE.length];
+        const displayName = entityNames[s.entity_id] || s.friendly_name;
+        if (s.entity_id === compare.target) { legendItems.push(statsItem(s, s.points, displayName, color)); return; }
+        legendItems.push(statsItem(s, s.points, `${displayName} (${currentYear})`, color));
+        legendItems.push(statsItem(s, s.compare_points, `${displayName} (${currentYear - 1})`, withOpacity(color, 0.55)));
+      });
+    } else {
+      legendItems = series.map(s => statsItem(
+        s, s.points, entityNames[s.entity_id] || s.friendly_name, PALETTE[colorIndexFor(s.entity_id) % PALETTE.length]
+      ));
+    }
     const legendMetrics = JSON.parse(el.dataset.legendMetrics || '["sum"]');
     const showStats = el.dataset.chartStats === 'true';
     const legendStyle = el.dataset.legendStyle || 'chips';
     const legend = {items: legendItems, legendMetrics, showStats, style: legendStyle};
     legendCache.set(chartId, legend);
-    const tileEl = el.closest('.dtile');
     const legendVisible = el.dataset.showLegend === 'true'
       && parseInt(tileEl?.dataset.gridCols || '1', 10) >= 2
       && parseInt(tileEl?.dataset.gridRows || '1', 10) >= 2;
@@ -508,6 +635,20 @@
     // renderTimelineMulti() in chart_editor.html), springt hier komplett aus
     // der Linie-/Balken-Aufbereitung unten heraus, die bei AN/AUS-Intervallen
     // ohnehin keinen Sinn ergäbe.
+    if (multiYear) {
+      renderTileMultiYear(chart, multiYear, series[0], {
+        effectiveDecimals, animation, style, borderColor, inkFaint, inkMuted, surface,
+        hiddenSet: legendHidden.get(chartId),
+      });
+      return;
+    }
+    if (compare?.yearsCompare) {
+      renderTileYearsCompare(chart, series, compare, data, {
+        entityNames, colorIndexFor, effectiveDecimals, animation, style, borderColor, inkFaint, inkMuted, surface,
+        hiddenSet: legendHidden.get(chartId),
+      });
+      return;
+    }
     if (timeline) {
       renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface, colorIndexFor);
       return;
@@ -775,7 +916,7 @@
       };
       if (s.chart_type === 'line') {
         cfg.smooth = true;
-        cfg.symbol = 'none';
+        if (!showPoints) cfg.symbol = 'none';
         // Dezente Füllfläche unter der Linie — macht eine einzelne Kurve auf
         // den ersten Blick lesbarer, stört bei mehreren überlagerten Serien
         // dank der niedrigen Deckkraft nicht. Abschaltbar (Optionen-Menü,
@@ -833,6 +974,46 @@
       return cfg;
     });
     echartsSeries.push(...rollingSeries);
+    // Vorjahr/Vorperiode als blassere, gestrichelte Nebenserie je Entität —
+    // dieselbe Technik wie render() in chart_editor.js: um die exakte
+    // Fensterdifferenz verschoben, nicht über den Array-Index zugeordnet.
+    if (compare && !singleBucket) {
+      series.forEach(s => {
+        if (!s.compare_points || !s.compare_points.length) return;
+        const color = PALETTE[colorIndexFor(s.entity_id) % PALETTE.length];
+        const displayName = entityNames[s.entity_id] || s.friendly_name;
+        const shiftMs = (s.compare_window_start != null && data.window_start != null)
+          ? (data.window_start - s.compare_window_start) * 1000
+          : 0;
+        const comparePoints = resamplePoints(
+          s.compare_points, range, resolutionPreset, s.aggregation_type, s.compare_window_start
+        );
+        const compareData = comparePoints.map(p => [p.ts * 1000 + shiftMs, p.value, s.unit, effectiveDecimals(s), isDurationSeries(s)]);
+        if (s.chart_type === 'line' && compareData.length && data.window_end != null
+            && compareData[compareData.length - 1][0] < data.window_end * 1000) {
+          const last = compareData[compareData.length - 1];
+          compareData.push([data.window_end * 1000, last[1], last[2], last[3], last[4]]);
+        }
+        const cmp = {
+          name: `${displayName} (${compare.mode === 'year' ? t('Vorjahr') : t('Vorperiode')})`,
+          type: s.chart_type,
+          yAxisIndex: units.indexOf(axisKey(s)),
+          data: compareData,
+          lineStyle: {width: 1.5, color: withOpacity(color, 0.5), type: 'dashed'},
+          itemStyle: {color: withOpacity(color, 0.5)},
+          barMaxWidth: 28,
+          clip: s.chart_type !== 'bar',
+        };
+        if (s.chart_type === 'line') {
+          cmp.smooth = true;
+          if (!showPoints) cmp.symbol = 'none';
+          if (areaFill) cmp.areaStyle = {color, opacity: 0.05};
+        } else {
+          cmp.itemStyle.borderRadius = [3, 3, 0, 0];
+        }
+        echartsSeries.push(cmp);
+      });
+    }
     padStackedSeries(echartsSeries);
 
     // ECharts' eigene Legende bleibt unsichtbar (show:false, wie in
@@ -941,6 +1122,206 @@
       // bleiben. chart_editor.html nutzt aus demselben Grund ebenfalls
       // setOption(..., true).
     }, true);
+  }
+
+  // Langzeit-Kachel: Rechengrundlage wie der multiYear-Getter in
+  // chart_editor.js (Kalendermonate je Jahr, Ø je Monat über die Vorjahre),
+  // ohne Tabelle und Jahreswerte — die gibt es nur auf der Chart-Seite.
+  // Entschieden: eine 1×1-Kachel zeichnet nur das angezeigte Jahr und den Ø.
+  function tileMultiYear(s, data, compare, {small, color, inkMuted}) {
+    const agg = s.aggregation_type;
+    const mean = values => values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+    const currentYear = data.window_start ? new Date(data.window_start * 1000).getFullYear() : new Date().getFullYear();
+    const running = (data.is_current ?? true) && data.window_end != null;
+    const cutMonth = running ? new Date(data.window_end * 1000 - 1).getMonth() : null;
+    const years = [
+      {year: currentYear, monthly: monthlyBuckets(s.points, agg), isCurrent: true},
+      ...s.years.map(y => ({year: y.year, monthly: monthlyBuckets(y.points, agg), isCurrent: false})),
+    ];
+    const previous = years.slice(1);
+    const total = years.length;
+    // Farbe je Alter abgestuft — wortgleich mit multiYearColor() in chart_editor.js.
+    const yearColor = index => {
+      if (index === 0) return color;
+      const steps = Math.max(total - 1, 1);
+      return withOpacity(color, total === 2 ? 0.55 : 0.75 - 0.5 * (index - 1) / Math.max(steps - 1, 1));
+    };
+    const shown = small ? years.slice(0, 1) : years;
+    const averageSeries = compare.average && previous.length ? {
+      name: t('Ø {from}–{to}', {from: previous[previous.length - 1].year, to: previous[0].year}),
+      monthly: Array.from({length: 12}, (_, m) => mean(previous.map(y => y.monthly[m]).filter(v => v != null))),
+      color: inkMuted,
+    } : null;
+    return {
+      cutMonth,
+      series: shown.map((y, i) => ({...y, name: String(y.year), color: yearColor(i)})),
+      averageSeries,
+      // Jahre, die die Legende nicht einzeln nennt (nur bei mehr als 1×1 —
+      // dort sind sie gezeichnet, aber nicht benannt).
+      hiddenYears: small ? 0 : total - 1,
+    };
+  }
+
+  function tileValueFormatter(s, decimals) {
+    const isDuration = s.aggregation_type === 'switch' && s.display_mode === 'time';
+    return v => v == null ? '—' : (isDuration ? NumberFormat.fmtDuration(v) : `${fmtCompactNumber(v, decimals)}${s.unit ? ' ' + s.unit : ''}`);
+  }
+
+  // Gemeinsamer Rahmen der beiden Monats-Renderpfade unten: feste
+  // Jan–Dez-Achse statt Zeitachse, Tooltip mit den nicht leeren Zeilen.
+  function tileMonthOption(echartsSeries, yAxis, {animation, style, borderColor, inkFaint, inkMuted, surface, hiddenSet, orderRows}) {
+    const legendSelected = {};
+    echartsSeries.forEach(x => { legendSelected[x.name] = !hiddenSet || !hiddenSet.has(x.name); });
+    return {
+      animation,
+      textStyle: {fontFamily: style.getPropertyValue('--font-mono')},
+      grid: {left: 6, right: 6, top: 10, bottom: 20, containLabel: true},
+      xAxis: {
+        type: 'category', data: MONTH_LABELS(),
+        axisLabel: {fontSize: scaledFont(10), color: inkFaint, hideOverlap: true},
+        axisLine: {lineStyle: {color: borderColor}}, axisTick: {show: false},
+      },
+      yAxis,
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: surface,
+        borderColor,
+        textStyle: {color: inkMuted, fontFamily: style.getPropertyValue('--font-mono'), fontSize: scaledFont(12)},
+        formatter: (allParams) => {
+          const params = orderRows(allParams.filter(p => p.value != null));
+          if (!params.length) return '';
+          const rows = params.map(p => {
+            const fmt = echartsSeries[p.seriesIndex]?.valueFormatter || (v => String(v));
+            return `<div style="display:flex;justify-content:space-between;gap:14px;">`
+                 + `<span>${p.marker}${p.seriesName}</span><strong style="margin-left:8px;">${fmt(p.value)}</strong></div>`;
+          }).join('');
+          return `<div style="margin-bottom:4px;color:${inkFaint};">${allParams[0]?.axisValue ?? ''}</div>${rows}`;
+        },
+        appendToBody: true,
+      },
+      legend: {show: false, data: echartsSeries.map(x => x.name), selected: legendSelected},
+      series: echartsSeries.map(({valueFormatter, ...rest}) => rest),
+    };
+  }
+
+  function renderTileMultiYear(chart, my, s, opts) {
+    const format = tileValueFormatter(s, opts.effectiveDecimals(s));
+    // Älteste zuerst, damit das angezeigte Jahr obenauf liegt (wie im Editor).
+    const echartsSeries = my.series.map(y => ({
+      name: y.name,
+      type: 'line',
+      data: y.monthly.map((v, m) => (y.isCurrent && m === my.cutMonth && v != null
+        ? {value: v, symbol: 'emptyCircle', symbolSize: 7}
+        : v)),
+      lineStyle: {color: y.color, width: y.isCurrent ? 2.5 : 1.2},
+      itemStyle: {color: y.color},
+      symbol: y.isCurrent ? 'circle' : 'none',
+      symbolSize: 4,
+      z: y.isCurrent ? 4 : 2,
+      valueFormatter: format,
+    })).reverse();
+    if (my.averageSeries) {
+      echartsSeries.push({
+        name: my.averageSeries.name,
+        type: 'line',
+        data: my.averageSeries.monthly,
+        lineStyle: {color: my.averageSeries.color, type: 'dashed', width: 1.8},
+        itemStyle: {color: my.averageSeries.color},
+        symbol: 'none',
+        z: 5,
+        valueFormatter: format,
+      });
+    }
+    const yAxis = {
+      type: 'value', scale: true,
+      axisLabel: {fontSize: scaledFont(10), color: opts.inkFaint, formatter: v => fmtCompactNumber(v, opts.effectiveDecimals(s))},
+      axisLine: {show: false}, axisTick: {show: false},
+      splitLine: {lineStyle: {color: opts.borderColor, type: 'dashed'}},
+    };
+    // Entschieden: alle gezeichneten Jahre, das neueste oben, der Ø zuletzt.
+    const orderRows = params => {
+      const average = params.filter(p => my.averageSeries && p.seriesName === my.averageSeries.name);
+      return [...params.filter(p => !average.includes(p)).reverse(), ...average];
+    };
+    chart.setOption(tileMonthOption(echartsSeries, yAxis, {...opts, orderRows}), true);
+  }
+
+  // "Vorjahr" mit Laufsumme oder Soll: Monats-Balkenpaare wie
+  // renderYearsCompare() in chart_editor.js — Laufsumme auf eigener,
+  // unsichtbarer Achse je Einheit, Soll als gepunktete Linie. Ohne
+  // Achsennamen: dafür ist in der Kachel kein Platz.
+  function renderTileYearsCompare(chart, series, compare, data, opts) {
+    const {entityNames, colorIndexFor, effectiveDecimals} = opts;
+    const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
+    const axisUnit = s => isDurationSeries(s) ? ' duration' : s.unit;
+    const hasCompare = s => !!s.compare_points;
+    const isSoll = s => !!compare.target && s.entity_id === compare.target;
+    const currentYear = data.window_start ? new Date(data.window_start * 1000).getFullYear() : new Date().getFullYear();
+    const units = [...new Set(series.filter(hasCompare).map(axisUnit))];
+    const cumUnits = compare.cumsum ? [...new Set(series.filter(s => hasCompare(s) && !isSoll(s)).map(axisUnit))] : [];
+    const barUnits = new Set(series.filter(s => hasCompare(s) && !isSoll(s)).map(axisUnit));
+    const unitDecimals = new Map();
+    series.forEach(s => {
+      const d = effectiveDecimals(s);
+      if (d == null) return;
+      const current = unitDecimals.get(axisUnit(s));
+      if (current == null || d < current) unitDecimals.set(axisUnit(s), d);
+    });
+    let visiblePos = 0;
+    const yAxis = [...units, ...cumUnits].map((u, i) => {
+      const hidden = i >= units.length || !barUnits.has(u);
+      const pos = hidden ? 0 : visiblePos++;
+      const decimals = unitDecimals.get(u);
+      return {
+        type: 'value',
+        show: !hidden,
+        position: pos % 2 === 0 ? 'left' : 'right',
+        offset: Math.floor(pos / 2) * 46,
+        min: value => Math.min(0, value.min),
+        max: value => Math.max(0, value.max),
+        axisLine: {show: false}, axisTick: {show: false},
+        splitLine: {show: !hidden, lineStyle: {color: opts.borderColor, type: 'dashed'}},
+        axisLabel: {
+          show: !hidden, fontSize: scaledFont(10), color: opts.inkFaint,
+          formatter: v => u === ' duration' ? NumberFormat.fmtDuration(v) : fmtCompactNumber(v, decimals),
+        },
+      };
+    });
+    const cumAxisIndex = u => units.length + cumUnits.indexOf(u);
+    const echartsSeries = [];
+    series.forEach(s => {
+      if (!hasCompare(s)) return;
+      const color = PALETTE[colorIndexFor(s.entity_id) % PALETTE.length];
+      const displayName = entityNames[s.entity_id] || s.friendly_name;
+      const valueFormatter = tileValueFormatter(s, unitDecimals.get(axisUnit(s)));
+      if (isSoll(s)) {
+        echartsSeries.push({
+          name: displayName, type: 'line', yAxisIndex: units.indexOf(axisUnit(s)),
+          data: monthlyBuckets(s.points, s.aggregation_type),
+          lineStyle: {type: 'dotted', width: 2, color}, itemStyle: {color}, symbol: 'none', z: 3, valueFormatter,
+        });
+        return;
+      }
+      [
+        {year: currentYear, points: s.points, opacity: 1},
+        {year: currentYear - 1, points: s.compare_points, opacity: 0.55},
+      ].forEach(({year, points, opacity}) => {
+        const monthly = monthlyBuckets(points, s.aggregation_type);
+        echartsSeries.push({
+          name: `${displayName} (${year})`, type: 'bar', yAxisIndex: units.indexOf(axisUnit(s)), barGap: '20%',
+          barMaxWidth: 14, data: monthly, itemStyle: {color: withOpacity(color, opacity), borderRadius: [2, 2, 0, 0]}, valueFormatter,
+        });
+        if (compare.cumsum) {
+          echartsSeries.push({
+            name: t('{name} ({year}) kumuliert', {name: displayName, year}), type: 'line',
+            yAxisIndex: cumAxisIndex(axisUnit(s)), data: cumulate(monthly),
+            lineStyle: {type: 'dashed', width: 2, color: withOpacity(color, opacity)},
+            itemStyle: {color: withOpacity(color, opacity)}, symbol: 'none', z: 4, valueFormatter,
+          });
+        }
+      });
+    });
+    chart.setOption(tileMonthOption(echartsSeries, yAxis, {...opts, orderRows: params => params}), true);
   }
 
   // Kompakter Zeitstrahl für eine Kachel — eine Kategorie-Zeile je Entität,
@@ -1358,12 +1739,6 @@
     }
   }
 
-  function escapeHtml(s) {
-    const div = document.createElement('div');
-    div.textContent = s == null ? '' : String(s);
-    return div.innerHTML;
-  }
-
   // Baut dieselbe Linie+Füllfläche-Sparkline (SVG-Pfade, gerade Segmente) wie
   // die Statistik-Kacheln der Übersichtsseite (main.py _sparkline_paths(),
   // entities.html .sparkline/.area/.line) — hier als JS-Gegenstück, weil die
@@ -1647,7 +2022,6 @@
     chartTiles.forEach(el => observer.observe(el));
     tableTiles.forEach(el => observer.observe(el));
     entityTiles.forEach(el => observer.observe(el));
-    window.addEventListener('resize', () => instances.forEach(c => c.resize()));
     setupSizePickers();
     setupDragAndDrop();
     setupLegendToggles();
@@ -1784,6 +2158,8 @@
             // Charts brauchen nach der CSS-Grid-Änderung ein explizites Resize.
             const tableBody = tile.querySelector('.dtile-body[data-columns]');
             if (tableBody) await renderTableTile(tableBody);
+            // Langzeit-Kachel: 1×1 zeichnet nur das angezeigte Jahr und den Ø.
+            if (dtileBody?.dataset.longtermActive === 'true') await renderTile(dtileBody);
             const chart = instances.get(tile.dataset.itemId);
             requestAnimationFrame(() => chart && chart.resize());
           } catch (e) {

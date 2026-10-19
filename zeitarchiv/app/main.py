@@ -62,6 +62,7 @@ from .formatting import (
     RESOLUTION_LABELS,
     RETENTION_LABELS,
     VALUE_FILTER_LABELS,
+    IGNORE_VALUES_LABELS,
     decimals_to_int,
     entity_display_name,
     format_compact_target,
@@ -116,7 +117,11 @@ from .storage.index import (
     DEFAULT_RETENTION,
     DEFAULT_VALUE_FILTER,
     effective_outlier_threshold,
+    MAX_IGNORE_VALUES,
+    TooManyIgnoreValues,
+    normalize_ignore_values,
     outlier_detection_applies,
+    parse_ignore_values,
     should_raise_gap_threshold,
     MAX_CUSTOM_NAME_LENGTH,
     MAX_SAVED_NAME_LENGTH,
@@ -144,6 +149,7 @@ from .housekeeping_routes import (
     demo_data_context,
 )
 from .backup_external_routes import BackupExternalDependencies, create_backup_external_router
+from .restore_routes import RestoreDependencies, create_restore_router
 from .export_routes import ExportDependencies, create_export_router
 from .marked_values_routes import MarkedValuesDependencies, create_marked_values_router
 from .report_routes import ReportDependencies, ReportService
@@ -155,11 +161,12 @@ from .energiedashboard_routes import (
     entity_has_energiedashboard_role,
     is_energiedashboard_configured,
 )
-from . import cleanup_stats, cleanup_tile
+from . import cleanup_stats, cleanup_tile, counter_bulk, data_quality, entity_usage
 from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size, storage_locked
 from . import notices as notices_mod
 from . import version_check
 from .notices import collect_notices
+from .chart_period import calendar_bounds, compare_settings_or_400, period_anchor_or_400
 from .chart_types import CHART_EDITOR_CHART_TYPES, ENTITY_CHART_TYPES, chart_type_label, chart_type_key, effective_chart_type
 from .progress import activity_snapshot, register_source
 
@@ -2534,6 +2541,7 @@ ENTITIES_OPTIONAL_COLUMNS = [
     ("value_filter", N_("Wertfilter")),
     ("gap_threshold", N_("Lücken")),
     ("outlier_threshold", N_("Ausreißer")),
+    ("historic", N_("Historisch")),
 ]
 # Nur Auflösung/Aufbewahrung initial aus — diese beiden Konfigurationsdetails
 # sind für den ersten Überblick am ehesten verzichtbar. Alle übrigen Spalten,
@@ -2591,6 +2599,7 @@ def _entities_table_response(
         if "type" in visible_columns:
             entry["aggregation_type"] = row["aggregation_type"]
             entry["type_label"] = format_type(row["aggregation_type"])
+            entry["state_class"] = row["state_class"] or ""
         if "first_ts" in visible_columns:
             entry["first_ts"] = format_timestamp(row["first_ts"], TZ)
             entry["first_ts_time"] = format_time(row["first_ts"], TZ)
@@ -2624,6 +2633,8 @@ def _entities_table_response(
                 if outlier_detection_applies(row["aggregation_type"])
                 else "—"
             )
+        if "historic" in visible_columns:
+            entry["historic_label"] = tr("Ja") if row["historic"] else "—"
         rows.append(entry)
 
     def _next_dir(column: str) -> str:
@@ -2637,20 +2648,7 @@ def _entities_table_response(
     # Ausrichtung (Entität links, Typ zentriert, alles andere rechts) in
     # genau einer Regel je Klasse statt Positions-Selektoren, die bei
     # ein-/ausgeblendeten optionalen Spalten sonst verrutschen würden.
-    col_class = {
-        "entity_id": "col-entity",
-        "type": "col-type",
-        "first_ts": "col-date",
-        "last_ts": "col-date",
-        "resolution": "col-resolution",
-        "retention": "col-retention",
-        "unit": "col-unit",
-        "rows": "col-rows",
-        "size": "col-size",
-        "value_filter": "col-value-filter",
-        "gap_threshold": "col-gap-threshold",
-        "outlier_threshold": "col-outlier-threshold",
-    }
+    col_class = {"entity_id": "col-entity", "first_ts": "col-date", "last_ts": "col-date"}
     header_links = [
         {
             "key": key,
@@ -2658,7 +2656,7 @@ def _entities_table_response(
             "next_dir": _next_dir(key),
             "active": sort == key,
             "arrow": ("↓" if direction == "asc" else "↑") if sort == key else "",
-            "col_class": col_class[key],
+            "col_class": col_class.get(key) or "col-" + key.replace("_", "-"),
         }
         for key, label in columns
     ]
@@ -2759,10 +2757,11 @@ def _entity_config_context(entity) -> dict:
         "custom_name": entity["custom_name"] or "",
         # Für den Favoritenstern im Seitenkopf: die drei Entitätsseiten tragen
         # seit der Reiterzeile denselben Kopf, und dort gehört er dazu.
-        "is_favorite": bool(entity["is_favorite"]),
+        "is_favorite": bool(entity["is_favorite"]), "historic": bool(entity["historic"]),
         "custom_name_max_length": MAX_CUSTOM_NAME_LENGTH,
         "aggregation_type": entity["aggregation_type"],
         "type_label": format_type(entity["aggregation_type"]),
+        "state_class": entity["state_class"] or "",
         "unit": entity["unit"] or "—",
         "row_count": format_int(_visible_row_count(entity)),
         "first_ts": format_timestamp(entity["first_ts"], TZ),
@@ -2779,6 +2778,10 @@ def _entity_config_context(entity) -> dict:
         "retention": entity["retention"],
         "decimals": decimals,
         "value_filter": entity["value_filter"],
+        "ignore_values_mode": "on" if entity["ignore_values_enabled"] else "off",
+        "ignore_values": entity["ignore_values"].replace(";", "; "),
+        "ignore_values_blocked": entity["aggregation_type"] == "switch",
+        "ignore_values_options": list(IGNORE_VALUES_LABELS.items()),
         "gap_threshold": entity["gap_threshold"],
         "outlier_threshold": entity["outlier_threshold"],
         "outlier_blocked_reason": OUTLIER_BLOCKED_REASONS.get(entity["aggregation_type"]),
@@ -2848,6 +2851,8 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
     retention = form.get("retention")
     decimals = form.get("decimals")
     value_filter = form.get("value_filter")
+    ignore_values_mode = form.get("ignore_values_mode")
+    ignore_values_text = form.get("ignore_values")
     gap_threshold = form.get("gap_threshold")
     outlier_threshold = form.get("outlier_threshold")
     display_mode = form.get("display_mode")
@@ -2868,6 +2873,8 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
         raise HTTPException(status_code=400, detail=tr("Ungültige Nachkommastellen-Angabe"))
     if value_filter is not None and value_filter not in VALUE_FILTER_LABELS:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Wertänderungsfilter"))
+    if ignore_values_mode is not None and ignore_values_mode not in IGNORE_VALUES_LABELS:
+        raise HTTPException(status_code=400, detail=tr("Ungültige Angabe bei „Werte ignorieren“"))
     if gap_threshold is not None and gap_threshold not in GAP_THRESHOLD_LABELS:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Lücken-Schwellwert"))
     if outlier_threshold is not None and outlier_threshold not in OUTLIER_THRESHOLD_LABELS:
@@ -2890,6 +2897,37 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
         compact_target = None
     if display_mode is not None and display_mode not in DISPLAY_MODE_LABELS:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Anzeigemodus"))
+    # Werte ignorieren: für Schalter gesperrt (0 ist dort ein echter Zustand);
+    # ein trotzdem mitgeschickter Wert wird wie bei outlier_threshold verworfen.
+    # Die Liste bleibt beim Ausschalten gespeichert. Beim ersten Einschalten
+    # ohne Liste wird "0" vorbelegt, der Hauptfall (Wert 0 beim HA-Start).
+    ignore_values_enabled: bool | None = None
+    ignore_values_normalized: str | None = None
+    if entity["aggregation_type"] == "switch":
+        ignore_values_mode = None
+        ignore_values_text = None
+    if ignore_values_text is not None:
+        try:
+            ignore_values_normalized = normalize_ignore_values(parse_ignore_values(ignore_values_text))
+        except TooManyIgnoreValues:
+            raise HTTPException(
+                status_code=400, detail=tr("Höchstens {max} Werte erlaubt", max=MAX_IGNORE_VALUES)
+            ) from None
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=tr("„{part}“ ist keine Zahl. Bitte nur Zahlen eintragen, getrennt durch Semikolon.", part=str(exc)),
+            ) from None
+    if ignore_values_mode is not None:
+        ignore_values_enabled = ignore_values_mode == "on"
+    effective_list = ignore_values_normalized if ignore_values_normalized is not None else entity["ignore_values"]
+    if ignore_values_enabled is None and entity["ignore_values_enabled"] and ignore_values_normalized == "":
+        raise HTTPException(
+            status_code=400,
+            detail=tr("Bei eingeschaltetem „Werte ignorieren“ muss mindestens ein Wert eingetragen sein."),
+        )
+    if ignore_values_enabled and not effective_list:
+        ignore_values_normalized = "0"
     def update_locked() -> HTMLResponse:
         with storage_coordinator.entity(entity_id):
             index.set_config(
@@ -2903,6 +2941,8 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
                 display_mode=str(display_mode) if display_mode is not None else None,
                 custom_name=custom_name if custom_name is not None else None,
                 compact_target=str(compact_target) if compact_target is not None else None,
+                ignore_values_enabled=ignore_values_enabled,
+                ignore_values=ignore_values_normalized,
             )
             if retention is not None:
                 _background.invalidate_retention_overview()
@@ -3019,6 +3059,101 @@ def entity_delete(entity_id: str) -> dict:
     entity_removal.delete_entity(DATA_DIR, index, entity_id)
     _background.invalidate_retention_overview()
     return {"ok": True}
+
+
+@_storage_locked(lambda args: args["entity_ids"])
+def _delete_entities_locked(entity_ids: list[str]) -> dict:
+    deleted: list[str] = []
+    missing: list[str] = []
+    failed: list[dict] = []
+    for entity_id in entity_ids:
+        try:
+            if index.get_entity(entity_id) is None:
+                missing.append(entity_id)
+                continue
+            entity_removal.delete_entity(DATA_DIR, index, entity_id)
+            deleted.append(entity_id)
+        except Exception as exc:  # eine fehlerhafte Entität bricht die übrigen nicht ab
+            logger.exception("Entität %s konnte nicht gelöscht werden", entity_id)
+            failed.append({"entity_id": entity_id, "error": str(exc)})
+    if deleted:
+        _background.invalidate_retention_overview()
+    return {"deleted": deleted, "missing": missing, "failed": failed}
+
+
+@app.post("/entities/delete-selected")
+async def entities_delete_selected(request: Request) -> dict:
+    """Löscht mehrere Entitäten endgültig (Auswahl in der Entitäten-Übersicht)."""
+    entity_ids = list(dict.fromkeys(
+        str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"
+    ))
+    if not entity_ids:
+        raise HTTPException(status_code=400, detail=tr("Keine Entität gewählt"))
+    # Ungültige IDs vorab aussortieren: die Sperre prüft das Format und würde sonst die ganze Anfrage abbrechen.
+    valid: list[str] = []
+    invalid: list[dict] = []
+    for entity_id in entity_ids:
+        try:
+            validate_entity_id(entity_id)
+            valid.append(entity_id)
+        except ValueError as exc:
+            invalid.append({"entity_id": entity_id, "error": str(exc)})
+    result = await run_in_threadpool(_delete_entities_locked, valid) if valid else {"deleted": [], "missing": [], "failed": []}
+    result["failed"] = invalid + result["failed"]
+    return result
+
+
+@app.post("/entities/usage-check")
+async def entities_usage_check(request: Request) -> dict:
+    """Prüft vor dem Löschen, wo die gewählten Entitäten noch verwendet werden (nur lesend)."""
+    entity_ids = [str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"]
+    usages = await run_in_threadpool(entity_usage.find_usages, index, entity_ids)
+    return {"usages": usages, "summary": entity_usage.summarize(usages)}
+
+
+_BACKUP_FINAL_STATES = ("success", "failed", "interrupted", "skipped")
+
+
+@app.get("/entities/backup-status")
+def entities_backup_status(job_id: int | None = None) -> dict:
+    """Stand des Backups für den Löschdialog: Alter des letzten erfolgreichen Laufs und, mit
+    ``job_id``, Fortschritt und Ergebnis genau dieses Laufs."""
+    with _background.backup_progress.lock:
+        running = _background.backup_progress.running
+        done = _background.backup_progress.done
+        total = _background.backup_progress.total
+    last = index.get_last_successful_backup_job()
+    last_ts = last["finished_at"] if last is not None else None
+    result: dict = {
+        "running": running,
+        "percent": int(done / total * 100) if total else 0,
+        "last_success_ts": last_ts,
+        "last_success_text": (
+            f"{format_timestamp(last_ts, TZ)} {format_time(last_ts, TZ)} "
+            f"({tr('vor {format_uptime}', format_uptime=format_uptime(time.time() - last_ts))})"
+            if last_ts else None
+        ),
+        "job": None,
+    }
+    if job_id is not None:
+        for job in index.list_backup_jobs(20):
+            if job["id"] == job_id:
+                result["job"] = {
+                    "status": job["status"], "final": job["status"] in _BACKUP_FINAL_STATES,
+                    "error": job["error"],
+                }
+                break
+    return result
+
+
+@app.post("/entities/backup-start")
+def entities_backup_start() -> dict:
+    """Startet ein Backup vor dem Löschen (oder hängt sich an ein bereits laufendes). Die
+    ``job_id`` gehört dem Lauf, auf dessen Ende der Dialog dann wartet."""
+    _background.run_backup()
+    with _background.backup_progress.lock:
+        job_id = _background.backup_progress.job_id
+    return {"job_id": job_id}
 
 
 @app.get("/entities/{entity_id}/migrate", response_class=HTMLResponse)
@@ -3310,11 +3445,13 @@ def charts_list(request: Request) -> HTMLResponse:
     charts = index.list_saved_charts()
     # Einmal alle Entitätstypen holen statt je Chart einzeln nachzuschlagen.
     aggregation_types = _aggregation_types()
+    existing = entity_usage.existing_entity_ids(index)
     rows = [
         {
             "id": c["id"],
             "name": c["name"],
             "entity_count": len(c["entity_ids"]),
+            "missing_ids": entity_usage.missing_entity_ids(c["entity_ids"], existing),
             "range_label": dict(_CHART_RANGE_OPTIONS).get(c["range_key"], c["range_key"]),
             "type_label": chart_type_label(c, aggregation_types),
             "type_key": chart_type_key(c, aggregation_types),
@@ -3335,12 +3472,13 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
     damit nur noch ein Name vergeben und gespeichert werden muss. Ein
     bestehendes Chart (chart != None) ignoriert prefill immer, dessen eigene
     gespeicherte Werte haben Vorrang."""
+    rows = index.list_entities()
     entity_options = [
         {
             "entity_id": row["entity_id"],
             "label": row["friendly_name"] or row["entity_id"],
         }
-        for row in index.list_entities()
+        for row in rows
     ]
     prefill = prefill or {}
     return {
@@ -3356,25 +3494,25 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "legend_style": chart["legend_style"] if chart else "chips",
         "chart_type": effective_chart_type(chart, _aggregation_types()) if chart else "auto",
         "decimals": chart["decimals"] if chart else "auto",
-        "show_values": chart["show_values"] if chart else False,
-        "average_line": chart["average_line"] if chart else False,
-        "area_fill": chart["area_fill"] if chart else True,
+        "show_values": chart["show_values"] if chart else False, "average_line": chart["average_line"] if chart else False,
+        "area_fill": chart["area_fill"] if chart else True, "show_points": chart["show_points"] if chart else False,
         "stacked": chart["stacked"] if chart else False,
         "normalize": chart["normalize"] if chart else False,
         "average_style": chart["average_style"] if chart else "flat",
         "horizontal": chart["horizontal"] if chart else False,
         "donut_aggregation": chart["donut_aggregation"] if chart else "sum",
+        "period_anchor": chart["period_anchor"] if chart else prefill.get("period_anchor"),  # Start des Editors
         "entity_names": chart["entity_names"] if chart else {},
         "hidden_entity_ids": chart["hidden_entity_ids"] if chart else [],
         "entity_options": entity_options,
+        **calendar_bounds(rows, TZ),
         "range_options": _CHART_RANGE_OPTIONS,
         "dashboard_usage": index.list_item_dashboards("chart", chart["id"]) if chart else [],
-        # compare/compare_mode sind (wie im Chart-Editor selbst) reine
-        # Laufzeit-Ansichtseinstellungen, kein gespeichertes Chart-Feld — nur
-        # der Anfangszustand eines gerade erst über prefill eröffneten neuen
-        # Charts kann sie daher überhaupt sinnvoll setzen.
-        "compare": prefill.get("compare", False) if not chart else False,
-        "compare_mode": prefill.get("compare_mode", "previous") if not chart else "previous",
+        "missing_ids": entity_usage.missing_entity_ids(chart["entity_ids"], entity_usage.existing_entity_ids(index)) if chart else [],
+        # Vergleich: gespeichert am Chart (compare_settings), bei einem neuen Chart aus dem prefill.
+        "compare": chart["compare_settings"].get("compare", False) if chart else prefill.get("compare", False),
+        "compare_mode": chart["compare_settings"].get("mode", "previous") if chart else prefill.get("compare_mode", "previous"),
+        "compare_settings": chart["compare_settings"] if chart else {},
     }
 
 
@@ -3388,6 +3526,7 @@ def charts_new(
     resolution_preset: str = "auto",
     compare: bool = False,
     compare_mode: str = "previous",
+    anchor: str | None = None,
 ) -> HTMLResponse:
     prefill = None
     if entity_id:
@@ -3404,6 +3543,7 @@ def charts_new(
             "resolution_preset": resolution_preset if resolution_preset in _CHART_RESOLUTION_PRESETS else "auto",
             "compare": compare,
             "compare_mode": compare_mode if compare_mode in ("previous", "year") else "previous",
+            "period_anchor": period_anchor_or_400(anchor),
         }
     return templates.TemplateResponse(request, "chart_editor.html", _chart_editor_context(None, prefill))
 
@@ -3425,11 +3565,14 @@ class _SaveChartBody(BaseModel):
     show_values: bool = False
     average_line: bool = False
     area_fill: bool = True
+    show_points: bool = False
     stacked: bool = False
     normalize: bool = False
     average_style: str = "flat"
     horizontal: bool = False
     donut_aggregation: str = "sum"
+    period_anchor: str | None = None  # fester Zeitraum, siehe chart_period.py
+    compare_settings: dict = {}  # Vergleich, siehe chart_period.py
 
 
 def _hidden_for(body: _SaveChartBody) -> list[str]:
@@ -3472,9 +3615,10 @@ def charts_create(body: _SaveChartBody) -> dict:
         chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
         legend_style=body.legend_style, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
-        average_line=body.average_line, area_fill=body.area_fill,
+        average_line=body.average_line, area_fill=body.area_fill, show_points=body.show_points,
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
         horizontal=body.horizontal, donut_aggregation=body.donut_aggregation,
+        period_anchor=period_anchor_or_400(body.period_anchor), compare_settings=compare_settings_or_400(body.compare_settings),
     )
     return {"id": chart_id}
 
@@ -3519,9 +3663,10 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         dynamic_y_axis=body.dynamic_y_axis, chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
         legend_style=body.legend_style, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
-        average_line=body.average_line, area_fill=body.area_fill,
+        average_line=body.average_line, area_fill=body.area_fill, show_points=body.show_points,
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
         horizontal=body.horizontal, donut_aggregation=body.donut_aggregation,
+        period_anchor=period_anchor_or_400(body.period_anchor), compare_settings=compare_settings_or_400(body.compare_settings),
     )
     return {"id": chart_id}
 
@@ -3559,9 +3704,10 @@ def charts_duplicate(chart_id: int) -> dict:
         chart_stats=chart["chart_stats"], legend_metrics=chart["legend_metrics"],
         legend_style=chart["legend_style"], chart_type=chart["chart_type"],
         decimals=chart["decimals"], show_values=chart["show_values"],
-        average_line=chart["average_line"], area_fill=chart["area_fill"],
+        average_line=chart["average_line"], area_fill=chart["area_fill"], show_points=chart["show_points"],
         stacked=chart["stacked"], normalize=chart["normalize"], average_style=chart["average_style"],
         horizontal=chart["horizontal"], donut_aggregation=chart["donut_aggregation"],
+        period_anchor=chart["period_anchor"], compare_settings=chart["compare_settings"],
     )
     return {"id": new_id}
 
@@ -3705,6 +3851,7 @@ def _dashboard_tiles_context(
     entfällt beides: der Präfix ist absolut und tiefenunabhängig (ZG-03)."""
     pins = index.list_dashboard_pins(dashboard_id)
     aggregation_types = _aggregation_types()
+    existing_ids = entity_usage.existing_entity_ids(index)
     tiles = []
     # Sektionen (item_type='section') gruppieren die Kacheln rein über ihre
     # Position in derselben Liste — keine Kachel trägt eine section_id. Die
@@ -3725,6 +3872,7 @@ def _dashboard_tiles_context(
                 continue
             tiles.append({
                 "kind": "chart", "id": c["id"], "name": c["name"],
+                "missing_ids": entity_usage.missing_entity_ids(c["entity_ids"], existing_ids),
                 "entity_ids": c["entity_ids"], "range_key": c["range_key"],
                 "continuous": c["continuous"], "entity_names": c["entity_names"],
                 # Ausgeblendete Serien reichen bis in die Kachel: sie sollen
@@ -3744,12 +3892,12 @@ def _dashboard_tiles_context(
                 # gezeigt werden, und Chips vs. Tabelle sind dort konfiguriert,
                 # nicht hier erneut.
                 "chart_stats": c["chart_stats"], "legend_metrics": c["legend_metrics"],
-                "legend_style": c["legend_style"],
-                "chart_type": effective_chart_type(c, aggregation_types),
+                "legend_style": c["legend_style"], "chart_type": effective_chart_type(c, aggregation_types),
                 "show_values": c["show_values"], "decimals": c["decimals"],
-                "average_line": c["average_line"], "area_fill": c["area_fill"],
+                "average_line": c["average_line"], "area_fill": c["area_fill"], "show_points": c["show_points"],
                 "stacked": c["stacked"], "normalize": c["normalize"], "average_style": c["average_style"],
-                "horizontal": c["horizontal"], "donut_aggregation": c["donut_aggregation"],
+                "horizontal": c["horizontal"], "donut_aggregation": c["donut_aggregation"], "period_anchor": c["period_anchor"],
+                "compare_settings": c["compare_settings"],  # Vergleich wie auf der Chart-Seite
             })
             groups[-1]["tiles"].append(tiles[-1])
         elif p["item_type"] == "table":
@@ -3758,6 +3906,7 @@ def _dashboard_tiles_context(
                 continue
             tiles.append({
                 "kind": "table", "id": t["id"], "name": t["name"],
+                "missing_ids": entity_usage.missing_entity_ids(entity_usage.table_entity_ids(t), existing_ids),
                 "columns": t["columns"], "rows": t["rows"], "style": t["style"],
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
             })
@@ -4591,8 +4740,13 @@ class _SaveTableBody(BaseModel):
 
 @app.get("/tables", response_class=HTMLResponse)
 def tables_list(request: Request) -> HTMLResponse:
-    tables = index.list_saved_tables()
-    return templates.TemplateResponse(request, "tables.html", {"rows": tables})
+    existing = entity_usage.existing_entity_ids(index)
+    rows = []
+    for table in index.list_saved_tables():
+        full = index.get_saved_table(table["id"])
+        missing = entity_usage.missing_entity_ids(entity_usage.table_entity_ids(full), existing) if full else []
+        rows.append({**table, "missing_ids": missing})
+    return templates.TemplateResponse(request, "tables.html", {"rows": rows})
 
 
 def _table_editor_context(table: dict | None) -> dict:
@@ -4614,6 +4768,7 @@ def _table_editor_context(table: dict | None) -> dict:
         "entity_options": entity_options,
         "range_options": _CHART_RANGE_OPTIONS,
         "dashboard_usage": index.list_item_dashboards("table", table["id"]) if table else [],
+        "missing_ids": entity_usage.missing_entity_ids(entity_usage.table_entity_ids(table), entity_usage.existing_entity_ids(index)) if table else [],
     }
 
 
@@ -4792,12 +4947,13 @@ def entity_detail(
             "custom_name": entity["custom_name"] or "",
             "aggregation_type": entity["aggregation_type"],
             "type_label": format_type(entity["aggregation_type"]),
+            "state_class": entity["state_class"] or "",
             "unit": entity["unit"],
             "decimals": decimals_to_int(effective_decimals),
             "display_mode": entity["display_mode"],
             "first_date": first_date,
             "last_date": last_date,
-            "is_favorite": bool(entity["is_favorite"]),
+            "is_favorite": bool(entity["is_favorite"]), "historic": bool(entity["historic"]),
             "chart_options": chart_options,
             "entity_chart_defaults": _get_entity_chart_defaults(),
             "initial_range": initial_range,
@@ -4823,8 +4979,25 @@ def entity_detail(
 
 @app.get("/entities/{entity_id}/cleanup", response_class=HTMLResponse)
 @_storage_locked(lambda args: args["entity_id"])
-def entity_cleanup(request: Request, entity_id: str) -> HTMLResponse:
+def entity_cleanup(
+    request: Request, entity_id: str, filter: str = "all", range_key: str = Query("day", alias="range"),
+    date: str | None = None,
+) -> HTMLResponse:
     entity = _require_entity(entity_id)
+    outlier_detection_enabled = effective_outlier_threshold(
+        entity["aggregation_type"], entity["outlier_threshold"]
+    ) != "off"
+    # Startwerte aus dem Link der Datenqualitäts-Übersicht (Housekeeping).
+    initial_filter, initial_range = data_quality.initial_cleanup_view(
+        filter, range_key,
+        outliers=outlier_detection_enabled,
+        gaps=entity["gap_threshold"] != "off",
+        counter_decreases=cleanup_stats.counter_decreases_flagged(entity),
+    )
+    # Heatmap: ?date=JJJJ-MM-TT öffnet den Zeitraum "Tag" für genau diesen Tag.
+    initial_offset = (
+        data_quality.offset_for_day(date, datetime.now(TZ).date()) if initial_range == "day" else 0
+    )
     # first_date/last_date grenzen den Kalender-Sprung auf den Zeitraum ein, in
     # dem die Entität überhaupt Daten hat (Monatsnavigation im Widget) — welche
     # einzelnen Tage INNERHALB dieses Bereichs tatsächlich Daten haben, liefert
@@ -4845,10 +5018,11 @@ def entity_cleanup(request: Request, entity_id: str) -> HTMLResponse:
             "first_date": first_date,
             "last_date": last_date,
             "gap_detection_enabled": entity["gap_threshold"] != "off",
-            "outlier_detection_enabled": effective_outlier_threshold(
-                entity["aggregation_type"], entity["outlier_threshold"]
-            ) != "off",
+            "outlier_detection_enabled": outlier_detection_enabled,
             "counter_decrease_enabled": cleanup_stats.counter_decreases_flagged(entity),
+            "initial_filter": initial_filter,
+            "initial_range": initial_range,
+            "initial_offset": initial_offset,
             "is_favorite": bool(entity["is_favorite"]),
             "aggregation_type": entity["aggregation_type"],
             "compact_target_options": list(COMPACT_TARGET_LABELS.items()),
@@ -5002,6 +5176,7 @@ def _rows_fragment(
             outlier_mode=cleanup_stats.outlier_mode(entity),
         )
         counts = analysis["counts"]
+        daily_counts = analysis["daily"]
         pagination = analysis["pagination"]
         display_rows = [
             {
@@ -5033,7 +5208,7 @@ def _rows_fragment(
         duplicates = cleanup.detect_duplicates(rows, entity["decimals"])
         repetitions = cleanup.detect_repetitions(rows, entity["decimals"], TZ)
         counter_decreases = (
-            cleanup.detect_counter_decreases(rows)
+            cleanup.detect_counter_decreases(rows, TZ)
             if cleanup_stats.counter_decreases_flagged(entity)
             else {}
         )
@@ -5109,7 +5284,8 @@ def _rows_fragment(
         # engerem Zeitraum-Chip muss dann nicht sofort neu scannen).
         alltime_counts = counts
         index.set_cleanup_alltime_stats(
-            entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION
+            entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION,
+            daily=daily_counts, gap_threshold=gap_threshold,
         )
     else:
         alltime_counts = cleanup_stats.alltime_counts(DATA_DIR, index, TZ, entity, now)
@@ -5540,6 +5716,18 @@ async def repetitions_delete(request: Request, entity_id: str) -> HTMLResponse:
     return result
 
 
+@app.post("/entities/{entity_id}/rows/counter-returning-delete", response_class=HTMLResponse)
+async def counter_returning_delete(request: Request, entity_id: str) -> HTMLResponse:
+    _require_entity(entity_id)  # markiert die zurückkehrenden Rückgänge (counter_bulk)
+    args = _rows_form_common(await request.form())
+    def run() -> HTMLResponse:
+        with storage_coordinator.entity(entity_id):
+            n = counter_bulk.mark_entity_returning(DATA_DIR, index, TZ, entity_id)
+            n and _background.invalidate_purge_preview()
+            return _rows_fragment(request, entity_id, *args, deleted_count=n or None)
+    return await run_in_threadpool(run)
+
+
 # Symcon-/CSV-/Home-Assistant-Import (Upload, Scan, Dry-Run/Start, /import
 # selbst) — ausgelagert nach import_routes.py, gleiches Muster wie oben bei
 # api_routes.py/report_routes.py (Konzept "main.py-Zeilenbudget", siehe
@@ -5570,6 +5758,10 @@ app.include_router(_import_service.router())
 app.include_router(create_backup_external_router(BackupExternalDependencies(
     index=index, templates=templates, background=_background, tz=TZ, base_dir=BASE_DIR,
     backup_table_context=lambda: _backup_list_context(),
+)))
+app.include_router(create_restore_router(RestoreDependencies(
+    index=index, templates=templates, data_dir=DATA_DIR, backups_dir=BACKUPS_DIR,
+    coordinator=storage_coordinator, tz=TZ,
 )))
 app.include_router(create_export_router(ExportDependencies(
     index=index, data_dir=DATA_DIR, tz=TZ, coordinator=storage_coordinator, templates=templates,
@@ -5611,4 +5803,6 @@ app.include_router(create_housekeeping_router(HousekeepingDependencies(
     # ein Feldwert wäre für immer das None vom Programmstart.
     host_disk_usage_cached=lambda: _background.host_disk_usage_cached,
     storage_reconcile_last=lambda: _background.storage_reconcile_last,
+    run_backup=_background.run_backup,
+    backup_progress=_background.backup_progress,
 )))

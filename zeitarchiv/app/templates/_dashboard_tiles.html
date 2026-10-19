@@ -1,4 +1,5 @@
 {% from "_icons.html" import custom_name_icon %}
+{% from "_missing_entities.html" import badge as missing_badge with context %}
 <!-- Dashboard-Kacheln einer Dashboard-Seite (Konzept "Offene Punkte", erweitert
      um Vergleichstabellen, mehrere unabhängige Dashboards UND Sektionen) —
      eigenes Fragment statt inline in entities.html/dashboard_detail.html, weil
@@ -107,6 +108,8 @@
            {% if not dashboard_locked %}title="Zum Umsortieren ziehen"{% endif %}>
         {% if not dashboard_locked %}{% include "_dashboard_tile_menu.html" %}{% endif %}
         <a class="dtile-body" href="{{ href_base }}charts/{{ tile.id }}" draggable="false"
+           data-period-anchor="{{ tile.period_anchor or '' }}"
+           data-compare-settings='{{ tile.compare_settings | default({}) | tojson }}'
            data-entity-ids='{{ tile.entity_ids | tojson }}'
            data-entity-names='{{ tile.entity_names | tojson }}'
           data-hidden-entity-ids='{{ tile.hidden_entity_ids | default([]) | tojson }}'
@@ -122,13 +125,14 @@
            data-show-values="{{ 'true' if tile.show_values else 'false' }}"
            data-average-line="{{ 'true' if tile.average_line else 'false' }}"
            data-area-fill="{{ 'true' if tile.area_fill else 'false' }}"
+           data-show-points="{{ 'true' if tile.show_points else 'false' }}"
            data-stacked="{{ 'true' if tile.stacked else 'false' }}"
            data-normalize="{{ 'true' if tile.normalize else 'false' }}"
            data-average-style="{{ tile.average_style }}"
            data-horizontal="{{ 'true' if tile.horizontal else 'false' }}"
            data-decimals="{{ tile.decimals }}"
            data-animation="{{ 'true' if dashboard_animation_enabled else 'false' }}">
-          <div class="dtile-title">{{ tile.name }}</div>
+          <div class="dtile-title">{{ tile.name }}{{ missing_badge(tile.missing_ids, tile=true) }}</div>
           <div class="dtile-chart"><div class="dtile-loading">&hellip;</div></div>
           <div class="dtile-legend"></div>
         </a>
@@ -141,7 +145,7 @@
         {% if not dashboard_locked %}{% include "_dashboard_tile_menu.html" %}{% endif %}
         <a class="dtile-body" href="{{ href_base }}tables/{{ tile.id }}" draggable="false"
            data-columns='{{ tile.columns | tojson }}' data-rows='{{ tile.rows | tojson }}' data-style='{{ tile.style | tojson }}'>
-          <div class="dtile-title">{{ tile.name }}</div>
+          <div class="dtile-title">{{ tile.name }}{{ missing_badge(tile.missing_ids, tile=true) }}</div>
           <div class="dtile-table-preview"><div class="dtile-loading">&hellip;</div></div>
         </a>
       </div>

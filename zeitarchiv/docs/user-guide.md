@@ -34,6 +34,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
   - [Tageslastprofil](#tageslastprofil)
   - [Energiebericht](#energiebericht)
 - [Entitäten und Verläufe](#entitäten-und-verläufe)
+  - [Mehrere Entitäten löschen](#mehrere-entitäten-löschen)
   - [Zeitraum-Navigation](#zeitraum-navigation)
   - [Darstellung](#darstellung)
   - [In einen Ausschnitt hineinzoomen](#in-einen-ausschnitt-hineinzoomen)
@@ -78,6 +79,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
   - [Werte löschen: drei Stufen](#werte-löschen-drei-stufen)
   - [Werte ändern und hinzufügen](#werte-ändern-und-hinzufügen)
   - [Lücken, Duplikate, Wiederholungen und Zählerrückgänge im Detail](#lücken-duplikate-wiederholungen-und-zählerrückgänge-im-detail)
+- [Datenqualität](#datenqualität)
 - [Housekeeping](#housekeeping)
 
 **Import, Export &amp; Sicherung**
@@ -562,8 +564,11 @@ größten Einträge; bei mehr Verbrauchern blendet **„weitere anzeigen"** den
 Rest ein — der Donut daneben zeigt unabhängig davon immer alle. Wer Gruppen
 angelegt hat, kann zusätzlich in der Rollenzuordnung unter
 **„Verbraucheranteile" → „Nach Gruppe anzeigen"** umschalten, ob die Tabelle
-jeden Verbraucher einzeln oder gruppiert (eine Zeile je Gruppe, ungruppierte
-Geräte bleiben einzeln) zeigt.
+jeden Verbraucher einzeln oder gruppiert zeigt. Gruppiert steht je Gruppe eine
+Summenzeile (mit Pfeil zum Zuklappen), darunter eingerückt ihre Geräte;
+ungruppierte Geräte bleiben einzeln. Hängt ein Zwischenzähler in einer Gruppe,
+gehören auch seine Geräte dazu und stehen eine Ebene tiefer. Der Donut zeigt
+unabhängig davon immer nur die einzelnen Geräte.
 
 ### Geräte hinter einem Zwischenzähler
 
@@ -673,9 +678,10 @@ der Bericht bleibt, wie alles in Zeitarchiv, ausschließlich lokal.
 ## Entitäten und Verläufe
 
 **Entitäten** listet alle bekannten Entitäten, durchsuchbar über den Namen
-oder die Entity-ID. Über **Spalten ▾** lassen sich elf zusätzliche Spalten
+oder die Entity-ID. Über **Spalten ▾** lassen sich zwölf zusätzliche Spalten
 ein-/ausblenden (Typ, Erster/Letzter Wert, Auflösung, Aufbewahrung, Einheit,
-Datensätze, Größe, Wertfilter, Lücken-/Ausreißer-Schwelle) — die Auswahl
+Datensätze, Größe, Wertfilter, Lücken-/Ausreißer-Schwelle, Historisch; letztere
+ist standardmäßig aus) — die Auswahl
 gilt global fürs ganze Add-on, nicht nur im aktuellen Browser. Sind die
 Spalten **Typ** oder **Einheit** eingeblendet, erscheint daneben ein
 passender Filter (Typ: Standard/Zähler/Schalter, mehrfach wählbar; Einheit:
@@ -691,13 +697,44 @@ zurück zur Liste —, sodass ein Wechsel nur den Inhalt darunter austauscht. Da
 Optionen-Menü der Verlaufsansicht enthält deshalb nur noch Aktionen und
 Darstellungs-Schalter, keine Navigation mehr.
 
+### Mehrere Entitäten löschen
+
+**Auswählen** (rechts neben „Nur Favoriten“) blendet vor jeder Zeile ein
+Kontrollkästchen und oben eine Auswahlleiste ein; ohne diesen Schalter bleibt
+die Liste platzsparend. Die Auswahl bleibt beim Suchen, Filtern und Blättern
+erhalten. Das Kästchen im Tabellenkopf wirkt nur auf die gerade sichtbaren
+Zeilen. **Auswahl anzeigen** listet alle markierten Entitäten, jede lässt sich
+dort mit × wieder herausnehmen, **Auswahl aufheben** leert die Auswahl. Mit
+**Auswahl beenden** verschwindet die Spalte, und die Markierungen werden
+verworfen.
+
+**Löschen …** öffnet einen Dialog „N Entitäten endgültig löschen?“. Er zeigt
+eine einzige Liste: Entitäten, die noch in Charts, Tabellen, Kacheln oder im
+Energiedashboard vorkommen, stehen oben, gelb hinterlegt, mit der Art der
+Verwendung. Das verhindert das Löschen nicht, es macht nur vorher sichtbar,
+was danach ins Leere zeigt. Darunter bietet der Dialog an, **vorher ein
+Backup zu erstellen**; der Haken ist gesetzt, wenn es noch kein Backup gibt
+oder das letzte älter als sieben Tage ist. Das Backup sichert das ganze
+Archiv, einzelne Entitäten holst du daraus über den Restore-Assistenten
+zurück (siehe [Backup / Restore](#backup--restore)). Schlägt das Backup fehl
+oder brichst du ab, wird nichts gelöscht.
+
+Gelöscht wird endgültig, es gibt kein Soft-Delete. Charts und Tabellen, die
+eine gelöschte Entität nennen, bleiben bestehen und zeigen **„Entität
+fehlt“** — als Abzeichen in der Chart- und Tabellenliste, als Hinweis über
+„Verwendet in“ und als Warnsymbol am Titel der Kachel. Die Verweise werden
+bewusst nicht entfernt: Sendet Home Assistant weiter Werte, legt die
+Integration die Entität neu an. Wer sie nicht mehr braucht, nimmt sie im
+Editor des Charts bzw. der Tabelle heraus.
+
 ### Zeitraum-Navigation
 
 - Auswahl von Stunde, Tag, Woche, Monat, Jahr oder Dekade als Basiseinheit;
   Vor-/Zurück-Pfeile blättern jeweils um eine Einheit.
 - **Ein erneuter Klick auf die bereits gewählte Einheit springt zurück in die
   laufende Periode** — „Tag" auf heute, „Monat" auf den aktuellen Monat.
-  Dieselbe Geste wie im Energiedashboard.
+  Dieselbe Geste wie im Energiedashboard. Außerhalb der laufenden Periode
+  führt auch der Knopf **Zurück zu jetzt** neben den Pfeilen dorthin.
 - **Laufend** ("bis heute") zeigt den aktuellen, noch nicht abgeschlossenen
   Zeitraum, z. B. "diese Woche bis jetzt" — auch bevor für die restliche
   Periode überhaupt Daten vorliegen, reicht die Achse bis zur vollen
@@ -826,7 +863,10 @@ um einzelne Reihen ein- oder auszublenden, ohne den Zeitraum zu verlassen.
 **Als Chart speichern** (Optionen-Menü) legt die aktuelle Ansicht —
 inklusive aller gewählten Optionen und ggf. bereits hinzugefügter weiterer
 Entitäten — als eigenständiges Chart ab, das sich danach wie jedes andere
-Chart bearbeiten und auf ein Dashboard anheften lässt.
+Chart bearbeiten und auf ein Dashboard anheften lässt. Zeigt die Seite gerade
+eine vergangene Periode (etwa das Jahr 2025), zeigt auch das Chart diese
+Periode. Die Seite der Entität selbst öffnet weiterhin mit der laufenden
+Periode.
 
 ### Gespeicherte Optionen
 
@@ -943,16 +983,39 @@ Auflösung „Voll" sind deaktiviert, solange Vergleichen aktiv ist —
 Vergleichen hat Vorrang, statt beim Umschalten still im Hintergrund
 abgeschaltet zu werden.
 
+**Langzeit:** Beim Zeitraum **Jahr** mit genau einer Entität bietet
+Vergleichen zusätzlich **Langzeit**. Dann liegt jedes Jahr als eigene Linie
+über Januar bis Dezember: das laufende Jahr kräftig, ältere Jahre blasser,
+dazu gestrichelt der Durchschnitt der Vorjahre (**Ø-Linie**, abschaltbar).
+Das Feld **Jahre** (2, 5, 10 oder Alle) legt fest, wie viele Vorjahre
+zusätzlich zum laufenden Jahr gezeigt werden; Jahre ohne Daten werden
+ausgelassen. Unter dem Chart steht eine Tabelle Jahr × Monat mit Jahreswert
+und Abweichung zum Durchschnitt, wahlweise als Werte oder als Abweichung je
+Monat. Das laufende Jahr wird dabei mit dem Durchschnitt bis zum gleichen
+Tag verglichen. Bei „Rollierend" gibt es Langzeit nicht.
+
+**Vergleich auf dem Dashboard:** Die Kachel eines Charts zeigt den mit ihm
+gespeicherten Vergleich wie die Chart-Seite, ohne eigene Einstellung. Bei
+Langzeit fehlt die Tabelle Jahr × Monat, und die Legende nennt nur das
+laufende Jahr und den Durchschnitt, die übrigen Jahre als „+N Jahre“. Eine
+1×1-Kachel zeichnet nur das laufende Jahr und den Durchschnitt.
+
 ### Unterschiede zur Verlaufsansicht einer einzelnen Entität
 
-Ein Chart zeigt beim Ansehen immer die **aktuelle Periode** — anders als die
-Verlaufsansicht einer einzelnen Entität gibt es hier keine Vor-/Zurück-
-Navigation zu vergangenen Perioden. Ebenso fehlt das Hineinzoomen in einen
-Ausschnitt (siehe
+Ein Chart zeigt beim Ansehen immer die **aktuelle Periode**. Beim
+**Anpassen** blättert man mit ‹ und › neben der Zeitraumanzeige wie auf der
+Seite einer einzelnen Entität zu vergangenen Perioden; ein Klick auf die
+Anzeige öffnet einen Kalender für einen gezielten Sprung. **Zurück zu jetzt**
+oder ein erneuter Klick auf den gewählten Zeitraum führt zur laufenden
+Periode zurück. Gespeichert wird die angezeigte Periode: ein Chart, das bei
+2025 gespeichert wird, zeigt auch später 2025, beim Ansehen und auf dem
+Dashboard. Ein Chart, das in der laufenden Periode gespeichert wird, zeigt
+immer die jeweils aktuelle. Wer einen Vergleich wählt (etwa „Vorjahr“ oder
+„Langzeit“), landet wieder in der laufenden Periode. Vergleiche beziehen sich auf die angezeigte
+Periode. Anders als dort fehlt das Hineinzoomen in einen Ausschnitt (siehe
 [In einen Ausschnitt hineinzoomen](#in-einen-ausschnitt-hineinzoomen)) — ein
 Chart lässt sich nur über Zeitraum und Auflösung, nicht per Maus/Touch
-eingrenzen. Wer beides braucht, findet auf der Seite der einzelnen Entität
-selbst denselben Chart-Typ mit beiden Funktionen.
+eingrenzen.
 
 ### Reihenfolge, Namen und Sichtbarkeit
 
@@ -986,10 +1049,12 @@ Rollierend-Schalter, Auflösung (samt Ausrichtung beim Ranking-Vergleich),
 dynamische Y-Achse, Werte anzeigen, Durchschnittslinie (samt Flach/Gleitend),
 Nachkommastellen, Legenden-Statistik, Fläche, Gestapelt/Anteile (%) sowie
 Zeitstrahl werden alle mit dem Chart gespeichert und
-gelten dann auch für dessen Vorschau auf Dashboards. **Punkte an/aus,
-Rohwerte und Vergleichen dagegen nicht** — diese drei sind reine
-Ansichtseinstellungen für den aktuellen Besuch und stehen beim nächsten
-Öffnen wieder auf ihrem Ausgangswert.
+gelten dann auch für dessen Vorschau auf Dashboards. Ebenfalls gespeichert
+werden eine angezeigte vergangene Periode und **Vergleichen** (samt Laufsumme
+und Soll Entität bzw. Jahren und Ø-Linie bei Langzeit); die Dashboard-Kachel zeigt
+den Vergleich mit (siehe unten). **Punkte an/aus und
+Rohwerte dagegen nicht** — beides sind reine Ansichtseinstellungen für den
+aktuellen Besuch und steht beim nächsten Öffnen wieder auf dem Ausgangswert.
 
 Ein gespeichertes Chart zeigt beim Ansehen immer die aktuell verfügbaren
 Daten, kein eingefrorener Schnappschuss zum Speicherzeitpunkt. Die geöffnete
@@ -1037,9 +1102,11 @@ usw.). So lässt sich z. B. derselbe Monat über zwölf aufeinanderfolgende
 Jahre in zwölf Spalten nebeneinanderstellen. Die Beschriftung kann
 Platzhalter wie `{jahr}`, `{monat}`, `{quartal}` oder `{woche}` enthalten
 (auch englisch: `{year}`, `{month}`, `{quarter}`, `{week}` — beide Schreibweisen
-funktionieren in jeder Sprache, die Einfüge-Hilfe nutzt die der Oberfläche),
-die sich automatisch auf den jeweiligen Zeitraum der Spalte auflösen
-(Einfüge-Hilfe direkt im Beschriftungsfeld, mit Live-Vorschau des
+funktionieren in jeder Sprache, die Einfüge-Hilfe nutzt die der Oberfläche).
+`{wochentag}` (Montag) und `{wochentag_kurz}` (Mo), englisch `{weekday}` und
+`{weekday_short}`, nennen den Wochentag des Spaltenbeginns — z. B.
+`{wochentag_kurz} {tag}.{monat_nr}.` für „Mo 12.10.“. Alle Platzhalter lösen sich automatisch auf den jeweiligen Zeitraum der Spalte
+auf (Einfüge-Hilfe direkt im Beschriftungsfeld, mit Live-Vorschau des
 aufgelösten Werts). Maßgeblich ist die Zeitzone der App (Option `timezone`),
 nicht die des Browsers — auch auf Reisen zeigt `{jahr}` also das Jahr des
 Zeitraums, den die Tabelle tatsächlich abfragt.
@@ -1212,7 +1279,7 @@ globale Standards wirken nie rückwirkend auf bereits angelegte Entitäten.
 
 ### Womit fange ich an?
 
-Die acht Felder greifen an sehr unterschiedlichen Stellen an. Diese Einteilung
+Die Felder greifen an sehr unterschiedlichen Stellen an. Diese Einteilung
 ist beim Einstellen wichtiger als die Reihenfolge im Formular:
 
 | Wirkt auf … | Felder | Rückgängig? |
@@ -1220,7 +1287,7 @@ ist beim Einstellen wichtiger als die Reihenfolge im Formular:
 | **Was überhaupt gespeichert wird** | Auflösung, Wertänderungsfilter | Nein — was nicht gespeichert wurde, ist weg |
 | **Wie lange es bleibt** | Aufbewahrung | Bis zur nächsten Löschung ja |
 | **Was gezeigt wird** | Anzeigename, Nachkommastellen, Anzeigemodus | Jederzeit |
-| **Was die Bereinigung markiert** | Lücken-Erkennung, Ausreißer-Erkennung | Jederzeit |
+| **Was die Bereinigung markiert** | Lücken-Erkennung, Ausreißer-Erkennung, Historisch | Jederzeit |
 
 Die beiden ersten Felder verwerfen Messwerte beim Eintreffen. Alles darunter
 lässt sich beliebig oft ändern, ohne etwas zu verlieren.
@@ -1236,6 +1303,19 @@ Optional, bis 40 Zeichen. Überschreibt die Darstellung **nur in Zeitarchiv**
 `friendly_name` und die Entitäts-ID bleiben unangetastet. Ein Tag-Symbol
 markiert überall, wo ein eigener Name aktiv ist. Leer lassen stellt den
 HA-Namen wieder her.
+
+### Historisch
+
+Für Entitäten, die bewusst keine neuen Werte mehr bekommen, etwa archivierte
+Zähler. Mit **Als historisch markieren** zählt die Entität nicht mehr als
+inaktiv: Sie fehlt in der Liste „Inaktive Entitäten“, in der Zahl der
+Status-Kachel und in der Meldung darüber. Daten, Charts und Rotation bleiben
+unverändert, die Markierung lässt sich jederzeit aufheben. Alle markierten
+Entitäten stehen in Housekeeping im Abschnitt „Historische Entitäten“, wo sich
+die Markierung auch zurücknehmen lässt. Kommen nach der Markierung noch Werte
+an, steht dort „liefert noch Werte“ mit der Zahl der neuen Werte; die Markierung
+bleibt trotzdem bestehen, damit ein versehentlich markierter, laufender Sensor
+auffällt.
 
 ### Auflösung
 
@@ -1328,6 +1408,30 @@ mehr" — ohne es wäre beides in den Daten nicht zu unterscheiden, und die
 Inaktivitäts-Meldung würde falsch anschlagen.
 
 Bei neu erkannten Entitäten standardmäßig aktiv.
+
+### Werte ignorieren
+
+Verwirft Messwerte, die **genau** einem der eingetragenen Werte entsprechen,
+schon beim Erfassen — sie landen gar nicht erst im Archiv. Gedacht für Sensoren,
+die beim Start von Home Assistant kurz **0** melden, bis die Integration den
+ersten echten Wert von der Hardware hat.
+
+Der Schalter steht standardmäßig auf **Aus**; dann gilt das bisherige Verhalten.
+Bei **Ein** erscheint ein Textfeld: mehrere Werte mit **Semikolon** trennen
+(`0; -1`), ein Dezimalkomma ist erlaubt, höchstens zehn Werte. Beim ersten
+Einschalten steht `0` darin. Ausschalten behält die Liste, sie gilt dann nur
+nicht mehr.
+
+- **Echte Werte gehen mit verloren.** Meldet die Entität auch im Betrieb
+  rechtmäßig 0 (PV-Leistung nachts, ein leerer Akku), fehlen diese Werte im
+  Archiv. Nur Werte eintragen, die nie echt vorkommen.
+- **Nur neue Werte.** Bereits gespeicherte bleiben, Importe (CSV, Home
+  Assistant, Symcon, VictoriaMetrics) ignorieren die Liste.
+- **Nicht für Schalter.** Dort ist 0 ein echter Zustand („aus"); das Feld ist
+  gesperrt.
+- Bei Zählern fängt die Regel *Fehlwerte automatisch markieren* (siehe
+  *Zählerrückgänge*) Nullwerte beim Start bereits nachträglich ab. *Werte
+  ignorieren* verhindert sie von vornherein.
 
 ### Lücken-Erkennung
 
@@ -1479,7 +1583,7 @@ darin drei Bereiche:
 
 Erkannte Ausreißer, Lücken, Duplikate und gerundet gleiche Wiederholungen
 werden als Liste angezeigt, je mit einer kurzen Begründung — sichtbar, wenn
-der Mauszeiger auf der roten Markierung steht. Sie nennt die Regel, an der
+der Mauszeiger auf der Markierung steht. Sie nennt die Regel, an der
 die Markierung hängt, und den unmittelbar vorhergehenden Wert mit Zeitpunkt:
 
 > `3 Std. 50 Min. seit vorherigem Wert 21,2 °C um 08:10`
@@ -1495,6 +1599,33 @@ z. B. Energiezähler) werden niedrigere Folgewerte gesondert als mögliche
 Zähler-Resets protokolliert und unter "Zählerrückgänge" markiert; sie
 bleiben standardmäßig gespeichert, da ein Reset (z. B. Zählertausch) ein
 gültiges Ereignis sein kann und nicht automatisch als Fehler gilt.
+
+**Farben: Kann ich etwas tun?** Die Farbe einer Markierung sagt, ob sich
+aufräumen lässt — nicht, wie schlimm der Fund ist. **Gelb** heißt: hier kannst
+du etwas tun (Ausreißer, Duplikat, Wiederholung, Zählerrückgang mit „Vermutlich
+Fehlwert“); eine Zeile mit einer solchen Markierung hat einen zarten gelben
+Hintergrund, und die stärkste Markierung der Zeile entscheidet. **Grau** ist
+nur Information (Lücke, „Noch offen“). **Grün-türkis** heißt erwartet und in
+Ordnung („Vermutlich Reset“). Rot bleibt Fehlern und dem Löschen-Knopf
+vorbehalten. Dieselbe Farbsprache gilt in der Kennzahlen-Tabelle über der
+Liste, im Filtermenü **Markierung** und auf der Seite
+[Datenqualität](#datenqualität).
+
+**Jeder Zählerrückgang wird eingeordnet.** Das Etikett nennt, was nach dem
+Rückgang geschah, und eine Begründung steht im Tooltip (auf dem Telefon als
+graue Zeile darunter):
+
+- **Vermutlich Fehlwert** — der Stand kehrte kurz darauf auf das alte Niveau
+  zurück („Stand danach wieder bei … (nach … Min.)“). Das ist ein Kandidat zum
+  Löschen.
+- **Vermutlich Reset** — der Stand blieb danach niedrig („Stand blieb danach
+  niedrig“), etwa bei einem Zählertausch oder einem Reset. Setzt sich der
+  Zähler planmäßig zurück, lässt sich das in der Konfiguration der Entität
+  mit **Rückgänge erlauben** festhalten.
+- **Noch offen** — es gibt noch zu wenige Folgewerte für eine Einschätzung.
+
+Der planmäßige Reset eines Tageszählers („… heute“) um Mitternacht zählt nicht
+als Zählerrückgang und wird weder markiert noch gezählt.
 
 Wiederholungen (gerundet gleiche Folgewerte) lassen sich mit derselben
 Sechs-Stunden-Lebenszeichenregel wie der laufende Wertänderungsfilter auch
@@ -1707,7 +1838,7 @@ folgen jeweils einer eigenen, festen Regel:
 | **Lücke** | Der zeitliche Abstand zweier aufeinanderfolgender Werte überschreitet die je Entität eingestellte Schwelle (**Lücken-Erkennung**, in Minuten; "Aus" deaktiviert die Erkennung komplett) | Nur eine Markierung, keine automatische Aktion — Lücken werden angezeigt, nicht gelöscht |
 | **Duplikat** | Zwei oder mehr Werte teilen sich exakt denselben Zeitstempel (nicht nur einen ähnlichen) | Der chronologisch zuerst gespeicherte Wert bleibt erhalten, alle weiteren zum selben Zeitstempel werden zum Löschen vorgeschlagen |
 | **Wiederholung** | Ein Wert ist (nach Rundung auf die eingestellten Nachkommastellen) identisch zum zuletzt *behaltenen* Wert — dieselbe Regel, die auch beim Eintreffen neuer Werte laufend zur Verdichtung verwendet wird (siehe [Wertänderungsfilter](#entität-konfigurieren)) | Der erste Wert einer Serie gleicher Werte bleibt erhalten, alle folgenden werden vorgeschlagen — **außer** seit dem letzten behaltenen Wert sind bereits 6 Stunden vergangen (Lebenszeichenregel), dann bleibt auch ein unveränderter Wert erhalten |
-| **Zählerrückgang** | Nur bei Zähler-Entitäten: ein Wert liegt niedriger als der unmittelbar vorherige behaltene Wert | Nur eine Markierung, **niemals** automatisch gelöscht — ein Rückgang kann ein echtes Ereignis sein (z. B. Zählertausch, Reset nach Neustart) |
+| **Zählerrückgang** | Nur bei Zähler-Entitäten: ein Wert liegt niedriger als der unmittelbar vorherige behaltene Wert | Eine Markierung mit Einordnung (Vermutlich Fehlwert, Vermutlich Reset, Noch offen), **niemals** ungefragt gelöscht — ein Rückgang kann ein echtes Ereignis sein (z. B. Zählertausch, Reset nach Neustart). Die planmäßige Nullung eines Tageszählers um Mitternacht zählt nicht |
 
 Wichtig: Diese Markierungen schließen sich **nicht gegenseitig aus**. Ein
 und derselbe Wert kann z. B. gleichzeitig als Ausreißer **und** als Teil
@@ -1717,6 +1848,70 @@ teilt die Liste nicht in getrennte, überschneidungsfreie Gruppen auf. Jeder
 Eintrag der Auswahl nennt seine Trefferzahl im gewählten Zeitraum; Kategorien
 ohne Treffer sind nicht wählbar.
 
+## Datenqualität
+
+Eine Seite für alle Entitäten statt jeder einzeln: **Duplikate, Zählerrückgänge,
+Ausreißer und Lücken** auf einen Blick. Sie liegt unter **System → Housekeeping**
+(Abschnitt „Datenqualität“, Knopf **Übersicht öffnen**) und ist über die Meldung
+„Neue Befunde in der Datenqualität“ verlinkt. Die Seite rechnet nichts selbst
+nach: Sie liest dieselben Gesamt-Zählungen, die auch die Trefferzahlen auf der
+Seite **Werte bearbeiten** liefern — beide zeigen also dieselben Zahlen, über
+die **gesamte Historie** der Entität.
+
+**Aufbau**
+
+- **Kennzahlen** oben: wie viele Entitäten betroffen sind (von allen) und die
+  Summe je Befundtyp. Sie ändern sich weder mit der Suche noch mit dem Filter.
+- **Statuszeile** darunter: „Alle n Entitäten gemessen · älteste Messung vor …“.
+  Läuft die Erstmessung noch, steht dort „n von m Entitäten gemessen“ mit einer
+  Fortschrittsleiste; sind Messungen älter als sechs Stunden, nennt die Zeile
+  deren Zahl.
+- **Suche, Befund und Zeitraum**: nach Name oder ID suchen, auf einen
+  Befundtyp einschränken und den Zeitraum wählen (7 Tage, 30 Tage, 1 Jahr,
+  **Gesamt** — Standard). Sortiert wird per Klick auf eine Spaltenüberschrift;
+  auf dem Telefon, wo die Überschriften fehlen, gibt es dafür eine eigene
+  Auswahl **Sortierung**. Suche, Sortierung und Seite bleiben beim Blättern und
+  beim Wechsel des Zeitraums erhalten.
+- **Tabelle**: eine Zeile je Entität mit Befund, je Befundtyp eine Spalte, dazu
+  **Stand** (wann die Zahlen zuletzt gemessen wurden). Ein Klick auf eine Zahl
+  öffnet **Werte bearbeiten** der Entität mit dem passenden Filter; ein Klick
+  auf die Zeile klappt die jüngsten Einzelbefunde auf (bis zu fünf je Typ, mit
+  Begründung).
+
+**Farben** folgen derselben Regel wie in Werte bearbeiten (siehe
+[Bereinigung](#bereinigung)): **Gelb** heißt, dass sich aufräumen lässt
+(Duplikate, Zählerrückgänge, Ausreißer), **Grau** ist nur Information (Lücken).
+Die Zählerrückgang-Zelle ist gelb, sobald die Zahl über null liegt — auch wenn
+darunter nur planmäßige Resets stehen: Die Übersicht kennt nur die Zahl, die
+Einordnung (Vermutlich Fehlwert, Vermutlich Reset, Noch offen) sieht man erst
+in Werte bearbeiten. Zähler mit **Rückgänge erlauben** zeigen kursiv „erlaubt“,
+Zähler der Klasse `total` ein „n. a.“, weil Home Assistant sie sinken lassen
+darf und sie deshalb nie auf Rückgänge geprüft werden.
+
+**Duplikate entfernen (Sammelaktion).** Bei Zeitraum **Gesamt** haben
+Entitäten mit Duplikaten ein Kontrollkästchen (das im Tabellenkopf wählt alle
+auf der Seite). **Duplikate entfernen …** zeigt eine Vorschau je Entität; nach
+dem Bestätigen steht das Ergebnis mit **Rückgängig** da. Wie beim Löschen in
+Werte bearbeiten ist das zunächst ein Soft-Delete; der chronologisch zuerst
+gespeicherte Wert bleibt erhalten. Rückgängig gilt je Entität nur für die
+zuletzt gelöschte Charge, also den Lauf von eben. Für Ausreißer und Lücken gibt
+es keine Sammelaktion: Ausreißer müssen einzeln angesehen werden, und Lücken
+haben keine Zeilen zum Löschen. Zählerrückgänge lassen sich in
+[Housekeeping](#housekeeping) bündeln.
+
+**Wie gemessen wird.** Der Wartungsplaner rechnet im Hintergrund eine Entität
+nach der anderen durch, innerhalb eines Zeitbudgets je Durchlauf. Eine
+vorhandene Messung wird nur erneuert, wenn die Entität seitdem **neue Werte**
+bekommen hat und die Messung mindestens sechs Stunden alt ist; stille
+Entitäten gelten als aktuell und erscheinen deshalb nicht als „veraltet“. Neue
+Entitäten erscheinen, sobald die Messung sie erreicht hat. Nach einem Update,
+das die Zählung ändert, kann die erste Runde über alle Entitäten dauern.
+
+**Meldung.** Eine Info-Meldung sagt, wie viele Befunde in wie vielen Entitäten
+seit dem letzten Besuch der Seite dazugekommen sind. Sie lässt sich wie die
+übrigen Hinweise stummschalten; beim ersten Besuch nach einem Update gibt es
+keine.
+
 ## Housekeeping
 
 Eigener Menüpunkt unter **System**, unterhalb Statistik — sammelt an einer
@@ -1725,6 +1920,8 @@ wie die Einstellungen:
 
 | Bereich | Zeigt |
 | --- | --- |
+| **Datenqualität** | Summen aller Befundtypen über die gesamte Historie und der Knopf **Übersicht öffnen** zur Seite [Datenqualität](#datenqualität). Die Abschnitte darunter zählen Duplikate und Zählerrückgänge nur für die letzten 30 Tage |
+| **Zählerrückgänge** | Zähler mit Rückgängen der letzten 30 Tage, je Entität mit Einordnung (Vermutlich Fehlwert, Vermutlich Reset, Noch offen) und Begründung. Bei „Vermutlich Reset“ steht darunter **Rückgänge erlauben**. Eine Sammelaktion markiert alle zurückkehrenden Rückgänge (Fehlwerte) in einem Schritt zur Löschung; sie landen im Reiter „Markiert“ der jeweiligen Entität und lassen sich gemeinsam zurücknehmen |
 | **Inaktive Entitäten** | Entitäten ohne neuen Wert seit einem wählbaren Schwellwert (1 bis 30 Tage). Nie empfangene Entitäten erscheinen unabhängig vom Schwellwert immer. Meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität. |
 | **Duplikate** | Archivweit erkannte doppelte Zeitstempel der letzten 30 Tage, je Entität — derselbe stündliche Hintergrund-Schnappschuss, der auch die Meldung „Duplikate gefunden" auslöst. Entfernbar über „Duplikate automatisch entfernen" auf der jeweiligen Bereinigungs-Seite. |
 | **Ausreißer** | Entitäten, bei denen die eingestellte Ausreißer-Schwelle mehr als 1 % ihrer Werte markiert — mit Schwelle, absoluter Zahl und Quote. Dann ist die Schwelle für dieses Signal zu eng: markiert wird nicht mehr das Unplausible, sondern normales Verhalten. Es sind dieselben Zahlen, die unter dem Schwellenfeld der jeweiligen Entität stehen (siehe [Entität konfigurieren](#entität-konfigurieren)); die Liste rechnet nichts eigenes. Keine Sammel-Korrektur — die passende Schwelle hängt am Signal. |
@@ -1809,6 +2006,8 @@ Zeitarchiv unter anderem:
 - Endgültige Bereinigung möglich, Duplikate gefunden, Rotation ausstehend
 - Inaktive Entitäten, dreistufig nach Alter (1/3/7 Tage, mit steigendem
   Schweregrad)
+- Als „Historisch“ markierte Entitäten, die seit der Markierung wieder Werte
+  geliefert haben
 - Lücken-Erkennung einer Entität kann durch ihre Auflösung oder den aktiven
   Wertänderungsfilter strukturell nie zutreffen (siehe
   [Housekeeping → Konfiguration](#housekeeping) und
@@ -2061,19 +2260,53 @@ Eigener Menüpunkt **System → Backup / Restore** (nicht unter Einstellungen):
   anzuwenden — sinnvoll, um die Integrität eines Backups vor einem
   tatsächlichen Wiederherstellungsbedarf zu bestätigen. Gilt gleichermaßen
   für selbst erstellte wie für importierte Backups.
-- **Wiederherstellen:** bereitet den Austausch nur vor — angewendet wird er
-  erst beim **nächsten Neustart des Zeitarchiv-Add-ons**, bevor die
-  Datenbank wieder geöffnet wird. Nach dem Klick fragt ein Dialog aktiv
-  „Jetzt neu starten?"; eine Bestätigung stößt den Neustart über den
-  Supervisor direkt an, „Später" verschiebt ihn (der Restore bleibt
-  trotzdem vorgemerkt und wird beim nächsten regulären Neustart
-  eingespielt). Ohne Neustart bleibt der aktuelle Datenbestand bis dahin
-  unverändert nutzbar. Der bisherige Stand wird beim Neustart vor dem
-  Überschreiben in ein Restore-Rollback verschoben, nicht gelöscht — bei
-  Bedarf lässt sich der Zustand vor der Wiederherstellung also zurückholen
-  (siehe unten). Nach einer Wiederherstellung empfiehlt sich ein kurzer
-  Blick auf **Statistik**, um zu prüfen, ob die erwarteten Entitäten und
+- **Wiederherstellen:** öffnet den Restore-Assistenten, eine eigene Seite mit
+  vier Schritten (Art → Auswahl → Prüfen → Fertig). Zuerst wählst du, **was**
+  zurückgespielt werden soll:
+  - **Alles:** ersetzt den kompletten Datenbestand. Der Austausch wird nur
+    vorgemerkt und erst beim **nächsten Neustart des Zeitarchiv-Add-ons**
+    angewendet, bevor die Datenbank wieder geöffnet wird. Nach dem Klick
+    bietet die Seite „Jetzt neu starten“ an; „Später“ verschiebt den
+    Neustart (der Restore bleibt vorgemerkt). Der bisherige Stand wird beim
+    Neustart in ein Restore-Rollback verschoben, nicht gelöscht (siehe
+    unten).
+  - **Einzelne Entitäten:** holt nur die gewählten Entitäten (Archiv,
+    Rollup und Hot-Buffer) aus dem Backup zurück, **ohne Neustart**. Die
+    Liste vergleicht jede Entität mit dem aktuellen Stand (fehlt aktuell,
+    weicht ab, identisch; Zeilenzahl und Zeitspanne) und lässt sich
+    durchsuchen und filtern. Deine Einstellungen je Entität (Name,
+    Aufbewahrung, Filter …) bleiben erhalten; gibt es die Entität nicht mehr,
+    wird sie samt Einstellungen aus dem Backup neu angelegt. Gelöschte
+    Messpunkte der Entität gelten danach wie im Backup. Während des
+    Austauschs pausieren die Schreibzugriffe kurz.
+  - **Einstellungen:** holt Dashboards, Charts, Vergleichstabellen,
+    Feldgruppen der Entitäts-Einstellungen (Name, Aufbewahrung, Filter,
+    Zähler, Anzeige) und allgemeine Einstellungen einzeln zurück, ebenfalls
+    ohne Neustart. Der Abgleich läuft über den Namen. Standardmäßig kommt ein
+    Objekt, das es aktuell nicht oder anders gibt, als **Kopie** dazu und
+    nichts Bestehendes wird verändert; optional lässt sich ein abweichendes
+    Objekt **überschreiben**. Wählst du ein Dashboard, werden die Charts und
+    Tabellen, die es braucht, automatisch mitgeholt, und seine Kacheln
+    zeigen danach auf die richtigen Objekte. Kacheln auf Entitäten, die es
+    nicht mehr gibt, werden übersprungen. Zugangsdaten (API-Token,
+    WebDAV-Anmeldung) und Betriebszustand (letzte und nächste Läufe) werden
+    nie übernommen. **Vorsicht bei der Aufbewahrung:** ist sie im Backup
+    kürzer als jetzt, löscht der nächste Retention-Lauf ältere Daten
+    endgültig. Die Aufbewahrung ist deshalb nie vorausgewählt, und die
+    Prüfung warnt davor.
+
+  Vor jedem Ausführen zeigt der Schritt **Prüfen**, was hinzugefügt, geändert
+  und beibehalten wird; erst nach dem Ankreuzen der Bestätigung wird der
+  Button aktiv. Nach einer Wiederherstellung empfiehlt sich ein kurzer Blick
+  auf **Statistik**, um zu prüfen, ob die erwarteten Entitäten und
   Datensatzmengen wieder vorhanden sind.
+- **Selektive Wiederherstellungen:** jede Wiederherstellung einzelner
+  Entitäten oder Einstellungen legt ein kleines Teil-Rollback an (Dateien der
+  Auswahl bzw. die überschriebenen Einstellungszeilen). Die Liste unter der
+  Backup-Tabelle zeigt die letzten drei mit Zeitpunkt, Quelle und Größe;
+  „Rückgängig machen“ stellt den Stand davor wieder her, „Rollback löschen“
+  entfernt ihn. Beim Rückgängig-Machen von Entitäten gehen Messwerte verloren,
+  die seit der Wiederherstellung für diese Entitäten eingegangen sind.
 - **Ausführungsverlauf:** listet jeden Backup-Lauf sowie jede tatsächlich
   angewendete Wiederherstellung (eigener Auslöser „Wiederherstellung") mit
   Zeitpunkt, Status, Dauer/„—" und Größe. Ein fehlgeschlagener oder
@@ -2214,6 +2447,7 @@ nur so lange wie nötig aktiv beziehungsweise gespeichert bleiben.
 | **Meldungen** | Tipp-Anzeige an-/ausschalten und Dialog mit allen Tipps (siehe [Housekeeping](#housekeeping)); Übersicht stummgeschalteter Systemmeldungen mit verbleibender Dauer, einzeln vorzeitig wieder aktivierbar |
 | **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start, verbundene Integrationsversion mit Zeitpunkt "zuletzt gesehen" (Hinweis bei veralteter oder neu verfügbarer Version) |
 | **Diagnose** | Nächsten Schreibvorgang einmalig vollständig aufzeichnen (sensible Rohdaten, automatische Löschung spätestens nach 60 Minuten); eine einzelne Entität 15 Minuten lang einschließlich Ingest-Ergebnis verfolgen; Diagnosebericht herunterladen; Prozess-Start und -Laufzeit; **Hintergrundprozesse**-Übersicht (letzter Lauf/Status jeder Wartungsplaner-Aufgabe) |
+| **Zurücksetzen** | Löscht Daten endgültig — in zwei Stufen: **Nur Messwerte löschen** (Entitäten, Konfiguration, Dashboards und Einstellungen bleiben) oder **Komplett zurücksetzen** (zusätzlich Entitäten, Dashboards, gespeicherte Charts und Tabellen, Aktivitätsprotokoll und Einstellungen, wie bei einer frischen Installation). Der API-Token, die Backup-Einstellungen und alle Backup-Dateien bleiben erhalten; die Home-Assistant-Integration legt Entitäten mit dem nächsten Wert neu an. Kennzahlen (Entitäten, Datensätze, Größe) nennen vorab, was gelöscht würde. Standardmäßig wird **vorher ein Backup erstellt** — schlägt es fehl, wird nichts gelöscht. Zum Bestätigen tippst du das Wort „LÖSCHEN“ ein. Im Demo-Modus nicht verfügbar |
 | **Demo-Daten** | Nur sichtbar mit aktivem Demo-Modus oder einer liegengebliebenen Demo-Instanz — siehe eigener Abschnitt [Demo-Modus](#demo-modus) |
 | **Über Zeitarchiv** | Version (mit Hinweis, sobald ein Update verfügbar ist), Zeitzone, Datenverzeichnis, Links zu Dokumentation/Changelog/Fehlermeldung |
 

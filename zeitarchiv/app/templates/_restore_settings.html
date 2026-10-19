@@ -1,0 +1,148 @@
+{% macro status_pill(st) -%}
+<span class="rw-pill rw-pill--{{ st }}">{% if st == 'new' %}{{ _("nur im Backup") }}{% elif st == 'diff' %}{{ _("weicht ab") }}{% else %}{{ _("identisch") }}{% endif %}</span>
+{%- endmacro %}
+
+{% macro object_panel(kind, items, hint, ov) %}
+<div class="rw-subpanel" data-panel-kind="{{ kind }}" data-filter="all" hidden>
+  <p class="rw-hint">{{ hint }}</p>
+  {% if items %}
+  <div class="rw-chips">
+    <button type="button" class="rw-chip" data-filter="all" aria-pressed="true">{{ _("Alle") }}<b>{{ items | length }}</b></button>
+    <button type="button" class="rw-chip" data-filter="new" aria-pressed="false">{{ _("Nur im Backup") }}<b>{{ items | selectattr('st', 'equalto', 'new') | list | length }}</b></button>
+    <button type="button" class="rw-chip" data-filter="diff" aria-pressed="false">{{ _("Weicht ab") }}<b>{{ items | selectattr('st', 'equalto', 'diff') | list | length }}</b></button>
+    <button type="button" class="rw-chip" data-filter="same" aria-pressed="false">{{ _("Identisch") }}<b>{{ items | selectattr('st', 'equalto', 'same') | list | length }}</b></button>
+    <button type="button" class="rw-link rw-bulk">{{ _("Alle Unterschiede wählen") }}</button>
+  </div>
+  <div class="tbl-wrap">
+    <table class="dt rw-table">
+      <thead><tr><th class="rw-check"></th><th>{{ _("Name") }}</th><th>{{ _("Status") }}</th><th>{{ _("Vorgehen") }}</th></tr></thead>
+      <tbody>
+        {% for it in items %}
+        <tr data-st="{{ it.st }}">
+          <td class="rw-check"><input type="checkbox" name="sel" value="{{ it.key }}" data-key="{{ it.key }}"{% if kind == 'd' %} data-needs="{{ it.needs | join(' ') }}"{% endif %} aria-label="{{ it.name }}"{% if it.st == 'same' %} disabled{% endif %}></td>
+          <td>{{ it.name }}<span class="rw-detail">{{ it.detail }}</span>
+            {% if kind == 'd' %}
+            {% if it.needs %}
+            <span class="rw-dep">{{ _("Abhängigkeiten: {n}", n=it.needs | length) }}:
+              {% if it.dep.same %}{{ _("{n} vorhanden", n=it.dep.same) }}{% endif %}
+              {% if it.dep.new %}{% if it.dep.same %} · {% endif %}{{ _("{n} neu", n=it.dep.new) }}{% endif %}
+              {% if it.dep.diff %}{% if it.dep.same or it.dep.new %} · {% endif %}{{ _("{n} abweichend, kommen als Kopie", n=it.dep.diff) }}{% endif %}</span>
+            {% else %}
+            <span class="rw-dep">{{ _("Keine Abhängigkeiten") }}</span>
+            {% endif %}
+            {% if it.missing_entities %}<span class="rw-dep rw-dep--warn">{{ _("Kacheln auf fehlende Entitäten werden übersprungen: {n}", n=it.missing_entities) }}</span>{% endif %}
+            {% endif %}
+          </td>
+          <td>{{ status_pill(it.st) }}</td>
+          <td class="rw-action">
+            {% if it.st == 'same' %}<span class="rw-span">{{ _("nichts zu tun") }}</span>
+            {% else %}
+            <span class="rw-act-auto" hidden>{{ _("wird mitgeholt") }}</span>
+            {% if it.st == 'new' %}<span class="rw-act-plain rw-span">{{ _("wird hinzugefügt") }}</span>
+            {% else %}
+            <select class="rw-act-plain rw-strat" name="strat:{{ it.key }}" aria-label="{{ _('Vorgehen für {name}', name=it.name) }}">
+              <option value="copy">{{ _("Als Kopie hinzufügen") }}</option>
+              <option value="over">{{ _("Bestehendes überschreiben") }}</option>
+            </select>
+            {% endif %}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="rw-note">{{ _("Das Backup enthält hier nichts.") }}</div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+<div class="rw-options" data-kind="settings">
+  <h2>{{ _("Was soll aus den Einstellungen zurückgeholt werden?") }}</h2>
+  <p class="rw-lead">{{ _("Wähle einzelne Objekte. Standardmäßig kommen sie als Kopie dazu, bestehende Dashboards, Charts und Tabellen bleiben unverändert.") }}</p>
+  <div class="rw-tabs" role="tablist">
+    <button type="button" role="tab" class="rw-tab" data-tab="d" aria-selected="true">{{ _("Dashboards") }}<span class="rw-n">0</span></button>
+    <button type="button" role="tab" class="rw-tab" data-tab="c" aria-selected="false">{{ _("Charts") }}<span class="rw-n">0</span></button>
+    <button type="button" role="tab" class="rw-tab" data-tab="t" aria-selected="false">{{ _("Tabellen") }}<span class="rw-n">0</span></button>
+    <button type="button" role="tab" class="rw-tab" data-tab="e" aria-selected="false">{{ _("Entitäten") }}<span class="rw-n">0</span></button>
+    <button type="button" role="tab" class="rw-tab" data-tab="g" aria-selected="false">{{ _("Allgemein") }}<span class="rw-n">0</span></button>
+  </div>
+
+  {{ object_panel('d', ov.dashboards, _("Ein Dashboard bringt seine Kacheln mit. Die Charts und Tabellen, die es braucht, werden automatisch geprüft und bei Bedarf mitgeholt."), ov) }}
+  {{ object_panel('c', ov.charts, _("Gespeicherte Charts. Abgleich über den Namen."), ov) }}
+  {{ object_panel('t', ov.tables, _("Vergleichstabellen mit Spalten und Zeilen. Abgleich über den Namen."), ov) }}
+
+  <div class="rw-subpanel" data-panel-kind="e" hidden>
+    <p class="rw-hint">{{ _("Nur Entitäten, die es aktuell gibt und bei denen sich Einstellungen unterscheiden. Messdaten bleiben unberührt. Jede Feldgruppe lässt sich einzeln wählen, angezeigt ist aktuell → Backup.") }}</p>
+    {% if ov.entities %}
+    <div class="tbl-wrap">
+      <table class="dt rw-table">
+        <thead><tr><th>{{ _("Entität") }}</th>{% for g in entity_group_order %}<th>{{ _(groups[g]) }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for e in ov.entities %}
+          <tr>
+            <td>{{ e.name }}<span class="rw-id">{{ e.entity_id }}</span></td>
+            {% for g in entity_group_order %}
+            {% set grp = e.groups.get(g) %}
+            {% if grp %}
+            <td class="rw-grp{% if grp.short %} rw-grp--danger{% endif %}">
+              <label><input type="checkbox" name="sel" value="e:{{ e.entity_id }}|{{ g }}" data-key="e:{{ e.entity_id }}|{{ g }}">
+                <span>{% if grp.short %}<b>{{ _("Kürzer!") }}</b>{% else %}{{ _("Ändern") }}{% endif %}
+                  {% for line in grp.lines %}<span class="rw-val">{{ line }}</span>{% endfor %}</span></label>
+            </td>
+            {% else %}<td class="rw-none">–</td>{% endif %}
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="rw-note rw-note--danger">{{ _("Aufbewahrung ist nicht vorausgewählt. Ist sie im Backup kürzer als jetzt, löscht der nächste Retention-Lauf ältere Daten endgültig. Bei einer solchen Auswahl zeigt die Prüfung eine Warnung.") }}</div>
+    {% else %}
+    <div class="rw-note">{{ _("Bei keiner Entität unterscheiden sich die Einstellungen.") }}</div>
+    {% endif %}
+  </div>
+
+  <div class="rw-subpanel" data-panel-kind="g" hidden>
+    <p class="rw-hint">{{ _("Allgemeine Einstellungen, angezeigt ist aktuell → Backup.") }}</p>
+    {% if ov.general %}
+    <div class="tbl-wrap">
+      <table class="dt rw-table">
+        <thead><tr><th class="rw-check"></th><th>{{ _("Einstellung") }}</th><th>{{ _("Aktuell") }}</th><th>{{ _("Backup") }}</th></tr></thead>
+        <tbody>
+          {% for g in ov.general %}
+          <tr>
+            <td class="rw-check"><input type="checkbox" name="sel" value="{{ g.key }}" data-key="{{ g.key }}" aria-label="{{ g.label }}"></td>
+            <td>{{ g.label }}<span class="rw-id">{{ g.name }}</span></td>
+            <td class="rw-mono">{{ g.old }}</td>
+            <td class="rw-mono">{{ g.new }}{% if g.warn %} <span class="rw-pill rw-pill--diff">{{ _("kürzer") }}</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="rw-note">{{ _("Alle allgemeinen Einstellungen sind identisch.") }}</div>
+    {% endif %}
+    {% if ov.extra %}
+    <div class="rw-sect">{{ _("Weitere") }}</div>
+    <div class="tbl-wrap">
+      <table class="dt rw-table">
+        <tbody>
+          {% for x in ov.extra %}
+          <tr>
+            <td class="rw-check"><input type="checkbox" name="sel" value="{{ x.key }}" data-key="{{ x.key }}" aria-label="{{ x.label }}"{% if x.st == 'same' %} disabled{% endif %}></td>
+            <td>{{ x.label }}<span class="rw-detail">{{ x.detail }}</span></td>
+            <td>{{ status_pill(x.st) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+    <div class="rw-excl"><b>{{ _("Wird nie übernommen:") }}</b> {{ _("Zugangsdaten (API-Token, WebDAV-Anmeldung) und Betriebszustand (letzte und nächste Läufe, Neustart-Marker). Diese Werte gehören zur laufenden Installation.") }}</div>
+  </div>
+
+  <div class="rw-selbar"><span><b data-count>0</b> {{ _("Änderungen ausgewählt") }}</span></div>
+</div>

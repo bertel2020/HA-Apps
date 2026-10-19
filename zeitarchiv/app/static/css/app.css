@@ -406,7 +406,13 @@ h2{font-size:calc(16.8px * var(--font-scale, 1));font-weight:700;margin:28px 0 1
    64er-Viewbox (knapp 22%), 7px auf 30px trifft das, 6px hätte bei der neuen
    Größe eine sichtbar eckigere CSS-Kante über die runde SVG-Ecke gelegt. */
 .topnav-brand svg{width:30px;height:30px;border-radius:7px;flex-shrink:0;}
-.topnav-brand span{font-weight:600;font-size:calc(15px * var(--font-scale, 1));color:var(--ink);}
+/* Schriftzug aus dem Logo (logo.png, Variante 18) statt gesetzter Schrift.
+   Als Maske eingefärbt, damit er mit --ink zwischen hell und dunkel wechselt —
+   das Original ist dunkelgrün und wäre im dunklen Schema unsichtbar. Höhe
+   20px: im Logo ist die Wortmarke gut zwei Drittel so hoch wie das Icon. Der
+   Dateiname trägt die Variante, weil url() keinen Cache-Buster mitführt
+   (siehe @font-face oben). */
+.topnav-wordmark{display:block;height:20px;aspect-ratio:358/66;flex-shrink:0;background:var(--ink);-webkit-mask:url(../img/wortmarke-v18.png) center/contain no-repeat;mask:url(../img/wortmarke-v18.png) center/contain no-repeat;}
 .topnav-icon{width:16px;height:16px;flex-shrink:0;}
 .topnav-links{display:flex;align-items:center;gap:22px;height:100%;margin-left:auto;}
 .topnav-link{position:relative;display:flex;align-items:center;gap:6px;height:100%;font-size:calc(13.5px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);text-decoration:none;}
@@ -776,6 +782,8 @@ button.dd-picker-clear{
 }
 .dd-picker-row{display:flex;align-items:center;gap:7px;padding:5px 4px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);cursor:pointer;border-radius:6px;}
 .dd-picker-row:hover{background:var(--surface-alt);}
+/* Fokus per Pfeiltaste (dd-picker.js) — derselbe Ring wie bei Buttons. */
+.dd-picker-row:focus-visible{outline:2px solid var(--accent-line);outline-offset:-2px;}
 /* Suchbare Varianten (Alpine-gesteuert statt der globalen .open-Klasse aus
    dd-picker.js, siehe table_editor.html) — x-show schaltet die INLINE
    display-Eigenschaft, die .open-Regel oben griffe hier nicht. */
@@ -929,6 +937,12 @@ button.menu-row{border:none;background:none;width:100%;text-align:left;font-fami
    Zusatzinformation dem eigentlichen Inhalt optisch untergeordnet bleibt. */
 .dashboard-usage{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 12px;min-height:30px;}
 .dashboard-usage-label,.dashboard-usage-empty{font-size:calc(12.5px * var(--font-scale,1));color:var(--ink-faint);}
+.missing-badge{display:inline-flex;align-items:center;gap:4px;font-size:calc(11.5px * var(--font-scale,1));line-height:1.4;padding:2px 8px;border-radius:999px;border:1px solid var(--warning);background:var(--warning-soft);color:var(--warning);white-space:nowrap;}
+.missing-badge.is-tile{padding:0 6px;border-radius:6px;}
+.missing-note{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px;font-size:calc(12.5px * var(--font-scale,1));}
+.missing-note-ids{font-family:var(--font-mono);color:var(--ink-muted);overflow-wrap:anywhere;}
+.chart-card.has-missing{border-color:var(--warning);}
+.dtile-title .missing-badge{margin-left:6px;vertical-align:middle;}
 .dashboard-usage-link{text-decoration:none;padding:4px 10px;font-size:calc(12px * var(--font-scale,1));}
 .dashboard-usage-link:hover{color:var(--accent-line);border-color:var(--accent-line);background:var(--surface-alt);}
 .dashboard-usage-default{
@@ -1502,6 +1516,8 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
 .badge.counter{color:var(--accent-bar);border-color:var(--accent-bar);}
 .badge.standard{color:var(--accent-line);border-color:var(--accent-line);}
 .badge.switch{color:var(--ink-muted);}
+/* „Historisch“ (entities.historic): gefüllt statt nur umrandet, damit die Kennzeichnung auf der Entitätsseite auffällt. */
+.badge.historic{background:var(--accent-line-soft);color:var(--accent-line);border-color:var(--accent-line);}
 [data-tooltip]{cursor:help;position:relative;}
 /* data-tooltip-fixed: dieselbe Optik wie [data-tooltip]::after unten, aber
    JS-positioniert (dashboard-tiles.js setupFixedTooltips()) statt per
@@ -1542,6 +1558,8 @@ button[data-tooltip]{cursor:pointer;}
    nur beim Erscheinen; das Verschwinden bleibt instant (transition-delay
    wird nur in der :hover-Regel gesetzt, nicht in der Basisregel). */
 [data-tooltip]:hover::after{opacity:1;visibility:visible;transition-delay:.6s;}
+/* Das Badge setzt Großbuchstaben und Sperrung; der Tooltip daran soll normal lesbar bleiben (state_class). */
+.badge[data-tooltip]::after{text-transform:none;letter-spacing:normal;}
 /* Entitäten-Tooltips brauchen echtes Markup statt content:attr(...), damit
    Friendly Name und Entity-ID unterschiedlich formatiert, aber immer als zwei
    getrennte Zeilen erscheinen. max-content richtet die Box an der längeren
@@ -1985,6 +2003,8 @@ table.dt tbody tr.has-pending-purge:hover td{background:var(--warning-soft);}
   border:1px solid var(--border);background:var(--surface);color:var(--ink);box-sizing:border-box;
 }
 .field input[type="text"]:focus{outline:none;border-color:var(--accent-line);}
+.ignore-values-list{margin-top:10px;}
+.ignore-values-list input[type="text"]{width:100%;max-width:320px;font-family:var(--font-mono);}
 /* Drei Sorten Text trugen lange dieselbe Klasse. Die Rollenklassen kommen
    ZUSÄTZLICH zu .hint/.tbl-hint/.settings-compact-hint und sehen bewusst
    gleich aus — sie sind da, damit ansprechbar ist, was ausgeblendet werden

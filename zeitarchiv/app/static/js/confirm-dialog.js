@@ -87,8 +87,18 @@
         e.preventDefault();
         close(false);
       }
-      okBtn.onclick = () => close(true);
-      cancelBtn.onclick = () => close(false);
+      // opts.onConfirm: asynchroner Schritt VOR dem Schließen (z. B. ein Backup, auf das der Dialog
+      // wartet). Liefert er false, bleibt der Dialog offen; „Abbrechen“ bleibt währenddessen möglich
+      // und setzt ctl.cancelled, damit der Schritt aufhört zu warten.
+      const ctl = {cancelled: false, ok: okBtn, rich: richEl};
+      okBtn.onclick = async () => {
+        if (!opts.onConfirm) return close(true);
+        okBtn.disabled = true;
+        let proceed = false;
+        try { proceed = (await opts.onConfirm(ctl)) !== false; } finally { okBtn.disabled = false; }
+        if (proceed && !ctl.cancelled) close(true);
+      };
+      cancelBtn.onclick = () => { ctl.cancelled = true; close(false); };
       overlay.onclick = (e) => { if (e.target === overlay) close(false); };
       overlay.addEventListener('cancel', onCancel);
     });

@@ -3,6 +3,8 @@
    .menu-popover, .menu-row), damit Interaktion und Theme identisch zu den
    übrigen Optionen-Popovern bleiben. Rein informativ: Links öffnen das
    Dashboard, Zuordnungen werden weiterhin dort verwaltet. #}
+{% from "_missing_entities.html" import note with context %}
+{{ note(missing_ids) }}
 <div class="dashboard-usage">
   <span class="dashboard-usage-label">{{ _("Verwendet in") }}</span>
   {% if not dashboard_usage %}

@@ -147,6 +147,7 @@ def test_only_the_irreversible_warnings_are_marked() -> None:
         "_settings_purge_form.html": 1,  # entfernt endgültig
         "_settings_retention_form.html": 1,  # löscht nach Ablauf, endgültig
         "_housekeeping_demo_data_body.html": 1,  # Demo-Daten entfernen, unwiderruflich
+        "_settings_reset_form.html": 1,  # Zurücksetzen löscht den Bestand, unwiderruflich
     }
     assert "hint-warn-strong" not in quellen["_settings_debug_tools.html"]
 

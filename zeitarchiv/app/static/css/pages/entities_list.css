@@ -34,6 +34,14 @@
      zur Verfügung (statt vorher 1fr neben einer 190px-Sidebar) — die
      Spalten sind entsprechend breiter gezogen, Entität überproportional
      stark, da sie der einzige Frei-Text (Name + ID) ist. */
+  .col-sel{width:36px;}
+  /* Markierspalte nur im Auswahlmodus (Button „Auswählen“); die Klasse hängt am Rahmen außerhalb
+     des nachgeladenen Fragments, damit Suche und Sortierung sie nicht zurücksetzen. */
+  #entities-panel:not(.is-selecting) .col-sel{display:none;}
+  #sel-toggle[aria-pressed="true"]{border-color:var(--accent-line);color:var(--accent-line);background:var(--accent-line-soft);}
+  /* Zwölf Zeilen sind höher als das allgemeine max-height des Popovers (360px)
+     und die letzte läge sonst unsichtbar hinter dem Scrollbereich. */
+  #col-picker-popover{max-height:min(480px, 80vh);}
   .col-fav{width:40px;}
   .col-entity{width:330px;}    /* längster aktueller friendly_name ("Proxon FWT Energy (Tariff 1)") ≈ 172px + deutlich mehr Puffer für den nun verfügbaren Platz */
   .col-type{width:112px;}      /* Badge "Standard"/"Schalter" ≈ 68px + Puffer */
@@ -46,6 +54,7 @@
   .col-value-filter{width:96px;}    /* Header "Wertfilter" ≈ 62px + Puffer */
   .col-gap-threshold{width:92px;}   /* "6 Stunden" ≈ 58px + Puffer */
   .col-outlier-threshold{width:92px;} /* Header "Ausreißer" ≈ 58px + Puffer */
+  .col-historic{width:96px;}        /* Header "Historisch" ≈ 66px + Puffer */
   /* Ausrichtung je Spalte statt Position (:not(:first-child)) — dieselbe
      Klasse steuert oben schon die Breite, für th UND td gemeinsam, damit
      Kopf- und Datenzeile nie auseinanderlaufen. Favorit + Typ + Einheit
@@ -53,6 +62,7 @@
      übrigen Spalten (Auflösung/Aufbewahrung, Datensätze, Größe, die
      optionalen Konfigurationsspalten) sind rechtsbündig. th a{text-align:inherit}
      lässt die Ausrichtung vom <th> auf den Sortierlink durchreichen. */
+  .entities-dt th.col-sel,.entities-dt td.col-sel,
   .entities-dt th.col-fav,.entities-dt td.col-fav,
   .entities-dt th.col-type,.entities-dt td.col-type,
   .entities-dt th.col-unit,.entities-dt td.col-unit{text-align:center;}
@@ -63,7 +73,8 @@
   .entities-dt th.col-retention,.entities-dt td.col-retention,
   .entities-dt th.col-value-filter,.entities-dt td.col-value-filter,
   .entities-dt th.col-gap-threshold,.entities-dt td.col-gap-threshold,
-  .entities-dt th.col-outlier-threshold,.entities-dt td.col-outlier-threshold{text-align:right;}
+  .entities-dt th.col-outlier-threshold,.entities-dt td.col-outlier-threshold,
+  .entities-dt th.col-historic,.entities-dt td.col-historic{text-align:right;}
   /* Einfache (einzeilige) Spalten zusätzlich vertikal zentrieren — Entität
      und Erster/Letzter Wert bleiben oben ausgerichtet (vertical-align:top,
      geerbt von table.dt td), weil sie zweizeiligen Inhalt (Name+ID bzw.
@@ -114,3 +125,46 @@
 
   /* Spalten-Auswahl und Typ-Filter nutzen beide das gemeinsame Dropdown-
      Picker-Muster (.dd-picker-*, app.css) statt eigener Optik hier. */
+
+  /* Auswahl für „Löschen …“ (Checkbox-Spalte, Leiste, Liste der Gewählten). */
+  .sel-row,.sel-all{width:16px;height:16px;accent-color:var(--accent-line);cursor:pointer;vertical-align:middle;}
+  .entities-dt td.col-sel{vertical-align:middle;}
+  .sel-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-bottom:10px;padding:8px 12px;border:1px solid var(--accent-line);border-radius:8px;background:var(--accent-line-soft);font-size:calc(13px * var(--font-scale, 1));}
+  .sel-bar[hidden],.sel-panel[hidden]{display:none;}
+  .sel-count{font-weight:600;color:var(--accent-line);margin-right:auto;}
+  .sel-panel{margin-bottom:10px;max-height:260px;overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
+  .sel-item{display:flex;align-items:center;gap:10px;padding:8px 8px 8px 14px;border-bottom:1px solid var(--border);}
+  .sel-item:last-child{border-bottom:none;}
+  .sel-item:hover{background:var(--surface-alt);}
+  .sel-item-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+  .sel-item-name{font-weight:600;font-size:calc(13px * var(--font-scale, 1));overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sel-item-id{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sel-item button{flex:none;width:28px;height:28px;border-radius:50%;background:none;border:none;cursor:pointer;color:var(--ink-faint);font-size:calc(18px * var(--font-scale, 1));line-height:1;}
+  .sel-item button:hover{color:var(--danger);background:var(--danger-soft);}
+  /* Bestätigungsdialog „Löschen …“ */
+  .del-head{margin:0 0 4px;font-size:calc(17px * var(--font-scale, 1));font-weight:600;color:var(--ink);}
+  .del-sub{margin:0 0 12px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);line-height:1.5;}
+  .del-warn{margin:0 0 8px;padding:8px 10px;border-radius:8px;background:var(--warning-soft);color:var(--warning);font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;line-height:1.4;}
+  .del-list{list-style:none;margin:0;padding:0;max-height:260px;overflow:auto;border:1px solid var(--border);border-radius:10px;text-align:left;}
+  .del-item{display:flex;flex-direction:column;gap:1px;padding:8px 12px;border-bottom:1px solid var(--border);}
+  .del-item:last-child{border-bottom:none;}
+  .del-item.is-used{border-left:3px solid var(--warning);background:var(--warning-soft);}
+  .del-name{font-weight:600;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);}
+  .del-id{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);overflow-wrap:anywhere;}
+  .del-uses{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:3px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink);}
+  .del-kind{display:inline-block;margin-right:6px;padding:0 6px;border-radius:999px;border:1px solid var(--warning);color:var(--warning);font-size:calc(10.5px * var(--font-scale, 1));}
+  .del-detail{color:var(--ink-muted);}
+  @media (max-width:480px){
+    .confirm-overlay:has(.del-list) .confirm-actions{flex-wrap:wrap;}
+    .confirm-overlay:has(.del-list) .confirm-actions .btn{flex:1 1 100%;}
+  }
+  .del-backup{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);text-align:left;}
+  .del-backup p{margin:0;}
+  .del-backup-last{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
+  .del-backup-opt{display:flex;align-items:center;gap:8px;margin:6px 0 2px;font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);cursor:pointer;}
+  .del-backup-opt input{width:16px;height:16px;accent-color:var(--accent-line);}
+  .del-backup-hint{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);line-height:1.45;}
+  .del-backup-status{margin-top:6px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+  .del-backup-status:empty{display:none;}
+  .del-backup-status.is-error{color:var(--danger);font-weight:600;}
+  .del-foot{margin:10px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);line-height:1.5;text-align:left;}

@@ -29,6 +29,12 @@ except ImportError:
 pytestmark = pytest.mark.skipif(not _AVAILABLE, reason="pyarrow nicht installiert")
 
 TZ = ZoneInfo("Europe/Berlin")
+NEXTCLOUD_INVALID_PATH = (
+    b'<?xml version="1.0" encoding="utf-8"?>'
+    b'<d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">'
+    b"<s:exception>OCA\\DAV\\Connector\\Sabre\\Exception\\InvalidPath</s:exception>"
+    b'<s:message>".part" is a forbidden file type.</s:message></d:error>'
+)
 BASE = "/dav/backups/"
 
 
@@ -39,6 +45,9 @@ class _State:
         self.credentials = ("roberto", "geheim")
         self.max_size: int | None = None
         self.redirect_to: str | None = None
+        self.put_error: tuple[int, bytes] | None = None
+        # wie Nextcloud ab 31: Dateinamen auf .part sind verboten (InvalidPath → 400)
+        self.forbid_part_names = True
         self.requests: list[str] = []
 
 
@@ -91,6 +100,10 @@ def _make_handler(state: _State):
             if not state.folder:
                 return self._reply(404)
             if method == "PUT":
+                if state.forbid_part_names and name.endswith(".part"):
+                    return self._reply(400, NEXTCLOUD_INVALID_PATH, {"Content-Type": "application/xml"})
+                if state.put_error is not None:
+                    return self._reply(state.put_error[0], state.put_error[1], {"Content-Type": "application/xml"})
                 if state.max_size is not None and len(body) > state.max_size:
                     return self._reply(413)
                 state.files[name] = body
@@ -207,6 +220,17 @@ def test_upload_lands_under_the_final_name_without_a_part_file(server, tmp_path)
     assert seen and seen[-1] == 500_000
 
 
+def test_the_temporary_upload_name_is_accepted_by_nextcloud(server, tmp_path) -> None:
+    """Nextcloud lehnt PUT auf *.part mit 400 ab (HA-Apps#23) — der Zwischenname
+    endet deshalb wie der Endname."""
+    source = tmp_path / "zeitarchiv-backup-2026-10-19-030000.zip"
+    source.write_bytes(b"z" * 10)
+    _client(server).upload(source, source.name)
+    puts = [r for r in server.requests if r.startswith("PUT")]
+    assert len(puts) == 1 and puts[0].endswith(".zip") and webdav.UPLOAD_PREFIX in puts[0]
+    assert server.files == {source.name: b"z" * 10}
+
+
 def test_a_too_large_file_is_explained(server, tmp_path) -> None:
     server.max_size = 100
     source = tmp_path / "zeitarchiv-backup-x.zip"
@@ -216,8 +240,40 @@ def test_a_too_large_file_is_explained(server, tmp_path) -> None:
     assert server.files == {}
 
 
+SABRE_BAD_REQUEST = (
+    b'<?xml version="1.0" encoding="utf-8"?>'
+    b'<d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">'
+    b"<s:exception>Sabre\\DAV\\Exception\\BadRequest</s:exception>"
+    b"<s:message>Expected filesize of 1000 bytes but read (from Nextcloud client)\n"
+    b"  and wrote (to Nextcloud storage) 400 bytes.</s:message></d:error>"
+)
+
+
+def test_a_failed_upload_names_the_step_and_the_server_message(server, tmp_path) -> None:
+    server.put_error = (400, SABRE_BAD_REQUEST)
+    source = tmp_path / "zeitarchiv-backup-x.zip"
+    source.write_bytes(b"z" * 1000)
+    with pytest.raises(webdav.WebDavError) as caught:
+        _client(server).upload(source, source.name)
+    assert str(caught.value) == (
+        "Hochladen fehlgeschlagen: Der WebDAV-Server antwortete mit Status 400. "
+        "Meldung des Servers: Expected filesize of 1000 bytes but read (from Nextcloud client) "
+        "and wrote (to Nextcloud storage) 400 bytes."
+    )
+
+
+def test_an_error_page_that_is_not_sabre_xml_adds_no_server_message(server, tmp_path) -> None:
+    server.put_error = (400, b"<html><body>Bad Request</body></html>")
+    source = tmp_path / "zeitarchiv-backup-x.zip"
+    source.write_bytes(b"z" * 10)
+    with pytest.raises(webdav.WebDavError) as caught:
+        _client(server).upload(source, source.name)
+    assert str(caught.value) == "Hochladen fehlgeschlagen: Der WebDAV-Server antwortete mit Status 400."
+
+
 def test_transfer_clears_leftover_part_files_of_this_app(server, tmp_path) -> None:
     server.files[".zeitarchiv-backup-alt.zip.part"] = b"x"
+    server.files[".zeitarchiv-upload-0badc0de-zeitarchiv-backup-alt.zip"] = b"x"
     server.files["fremd.txt"] = b"x"
     source = tmp_path / "zeitarchiv-backup-2026-10-11-030000.zip"
     source.write_bytes(b"z" * 10)
