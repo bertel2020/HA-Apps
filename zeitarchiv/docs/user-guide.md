@@ -992,14 +992,17 @@ Tag verglichen. Bei „Rollierend" gibt es Langzeit nicht.
 
 ### Unterschiede zur Verlaufsansicht einer einzelnen Entität
 
-Ein Chart zeigt beim Ansehen immer die **aktuelle Periode** — anders als die
-Verlaufsansicht einer einzelnen Entität gibt es hier keine Vor-/Zurück-
-Navigation zu vergangenen Perioden. Ebenso fehlt das Hineinzoomen in einen
-Ausschnitt (siehe
+Ein Chart öffnet immer mit der **aktuellen Periode**. Mit ‹ und › neben der
+Zeitraumanzeige blättert man wie auf der Seite einer einzelnen Entität zu
+vergangenen Perioden, beim Ansehen wie beim Anpassen; ein Klick auf die
+Anzeige öffnet einen Kalender für einen gezielten Sprung. **Zurück zu jetzt**
+(oder beim Anpassen ein erneuter Klick auf den gewählten Zeitraum) führt zur
+laufenden Periode zurück. Gespeichert wird dabei nur die Art des Zeitraums,
+nicht die angezeigte Periode. Vergleiche beziehen sich auf die angezeigte
+Periode. Anders als dort fehlt das Hineinzoomen in einen Ausschnitt (siehe
 [In einen Ausschnitt hineinzoomen](#in-einen-ausschnitt-hineinzoomen)) — ein
 Chart lässt sich nur über Zeitraum und Auflösung, nicht per Maus/Touch
-eingrenzen. Wer beides braucht, findet auf der Seite der einzelnen Entität
-selbst denselben Chart-Typ mit beiden Funktionen.
+eingrenzen.
 
 ### Reihenfolge, Namen und Sichtbarkeit
 

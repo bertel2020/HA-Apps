@@ -3471,13 +3471,19 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
     damit nur noch ein Name vergeben und gespeichert werden muss. Ein
     bestehendes Chart (chart != None) ignoriert prefill immer, dessen eigene
     gespeicherte Werte haben Vorrang."""
+    rows = index.list_entities()
     entity_options = [
         {
             "entity_id": row["entity_id"],
             "label": row["friendly_name"] or row["entity_id"],
         }
-        for row in index.list_entities()
+        for row in rows
     ]
+    # Grenzen des Kalender-Sprungs (Zeitraumanzeige anklicken): das ganze
+    # Archiv statt der gerade gewählten Entitäten — die Auswahl ändert sich im
+    # Editor laufend, der Kalender wird aber nur einmal aufgebaut.
+    first_values = [row["first_ts"] for row in rows if row["first_ts"]]
+    last_values = [row["last_ts"] for row in rows if row["last_ts"]]
     prefill = prefill or {}
     return {
         "chart_id": chart["id"] if chart else None,
@@ -3502,6 +3508,8 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "entity_names": chart["entity_names"] if chart else {},
         "hidden_entity_ids": chart["hidden_entity_ids"] if chart else [],
         "entity_options": entity_options,
+        "calendar_first_date": datetime.fromtimestamp(min(first_values), TZ).strftime("%Y-%m-%d") if first_values else None,
+        "calendar_last_date": datetime.fromtimestamp(max(last_values), TZ).strftime("%Y-%m-%d") if last_values else None,
         "range_options": _CHART_RANGE_OPTIONS,
         "dashboard_usage": index.list_item_dashboards("chart", chart["id"]) if chart else [],
         "missing_ids": entity_usage.missing_entity_ids(chart["entity_ids"], entity_usage.existing_entity_ids(index)) if chart else [],

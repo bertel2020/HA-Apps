@@ -464,7 +464,24 @@
              Label-über-Wert wie .menu-section-label (app.css), keine neuen
              Farben. -->
         <div class="chart-title-row chart-title-row-end">
-          <span class="period-label" x-text="periodLabel"></span>
+          <!-- Zeitraum-Navigation wie auf der Entitätsseite (entity_detail.html):
+               ‹ ›, Klick auf die Anzeige öffnet den Kalender. In beiden Modi
+               (Ansehen und Anpassen), nie gespeichert (offset in
+               chart_editor.js). calendarPicker(null, …): ein Chart hat mehrere
+               Entitäten, deshalb keine Tages-Abfrage je Entität und als
+               Grenzen das ganze Archiv (calendar_first/last_date). -->
+          <span class="nav chart-nav">
+            <button type="button" class="btn navbtn" @click="goBack()" aria-label="{{ _('Vorheriger Zeitraum') }}">‹</button>
+            <span class="cal-wrap" x-data='calendarPicker(null, {{ app_root | tojson }}, {{ calendar_first_date | tojson }}, {{ calendar_last_date | tojson }})'>
+              <button type="button" class="period-label" :disabled="range === 'decade'" @click="toggle()" :title="range === 'decade' ? '' : t('Zu einem bestimmten Zeitpunkt springen')" x-text="periodLabel"></button>
+              {% include "_calendar_popover.html" %}
+            </span>
+            <button type="button" class="btn navbtn" :disabled="!canGoForward" @click="goForward()" aria-label="{{ _('Nächster Zeitraum') }}">›</button>
+            <!-- Beim Ansehen gibt es keine Zeitraum-Leiste, deren erneuter
+                 Klick zurückführt — deshalb dieser Chip, nur außerhalb der
+                 laufenden Periode. -->
+            <button type="button" class="chip now-chip" x-show="offset !== 0" x-cloak @click="goToNow()">{{ _("Zurück zu jetzt") }}</button>
+          </span>
           <template x-if="compare && compareMode === 'previous' && range === 'year'">
             <span style="display:flex;gap:16px;">
               <!-- Reine Render-Einstellung, keine neue Abfrage (Laufsumme wird
@@ -813,6 +830,10 @@
           <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ _("Speichern") if chart_id else _("Chart erstellen") }}</button>
           <span class="save-status" x-show="savedMessage" x-text="savedMessage"></span>
         </div>
+        <!-- Der angezeigte Versatz (z. B. 2025 statt des laufenden Jahres) wird
+             nicht gespeichert — sonst stünde ein Chart dauerhaft in der
+             Vergangenheit, ohne dass man es ihm ansieht. -->
+        <p class="save-offset-note" x-show="editing && offset !== 0" x-cloak>{{ _("Gespeichert wird nur die Art des Zeitraums. Beim Öffnen zeigt das Chart wieder die laufende Periode.") }}</p>
     </div>
   </div>
 
@@ -826,6 +847,10 @@
   <script src="{{ asset('js/menu-popover-clamp.js') }}"></script>
   <!-- Tooltips in der scrollenden Entitätenauswahl, siehe data-tooltip-fixed dort. -->
   <script src="{{ asset('js/fixed-tooltip.js') }}"></script>
+  <!-- Zeitraum-Navigation und Kalender-Sprung, dieselben Bausteine wie auf der
+       Entitätsseite. -->
+  <script src="{{ asset('js/period-navigation.js') }}"></script>
+  <script src="{{ asset('js/calendar-picker.js') }}"></script>
   <script>
     const BASE = {{ app_root | tojson }};
     const CHART_ID = {{ chart_id | tojson }};

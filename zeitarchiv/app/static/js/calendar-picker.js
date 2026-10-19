@@ -13,6 +13,10 @@
 // (>100 Klicks) — mit den Dropdowns sind es zwei Klicks, unabhängig davon,
 // wie lang die Historie ist.
 //
+// entityId darf null sein (Chart-Editor: mehrere Entitäten in einem Chart).
+// Dann gibt es keine Tages-Abfrage, und jeder Tag zwischen firstDate und
+// lastDate ist wählbar — ein Tag ohne Werte zeigt eben ein leeres Chart.
+//
 // Ruft bei einem gültigen Klick die globale Funktion jumpToDate(dateStr) auf
 // — jede einbindende Seite definiert diese selbst, weil "zu einem Datum
 // springen" pro Seite unterschiedlich in Zustand übersetzt wird (cleanup.html:
@@ -114,6 +118,7 @@ function calendarPicker(entityId, base, firstDate, lastDate) {
       popEl.style.transform = 'none';
     },
     async loadMonth() {
+      if (!entityId) return;
       // Eine zweite Auswahl vor Antwort der ersten darf deren (jetzt
       // veraltete) Antwort nicht mehr übernehmen dürfen — sonst kann eine
       // spät eintreffende alte Antwort dataDays für den FALSCHEN, längst
@@ -181,7 +186,7 @@ function calendarPicker(entityId, base, firstDate, lastDate) {
       for (let d = 1; d <= daysInMonth; d++) {
         const dateStr = `${this.year}-${pad2(this.month)}-${pad2(d)}`;
         const inRange = (!firstDate || dateStr >= firstDate) && (!lastDate || dateStr <= lastDate);
-        cells.push({ day: d, dateStr, inRange, hasData: this.dataDays.includes(d) });
+        cells.push({ day: d, dateStr, inRange, hasData: !entityId || this.dataDays.includes(d) });
       }
       return cells;
     },
@@ -224,7 +229,7 @@ function calendarPicker(entityId, base, firstDate, lastDate) {
       }
       const todayStr = `${y}-${pad2(m)}-${pad2(d)}`;
       const inRange = (!firstDate || todayStr >= firstDate) && (!lastDate || todayStr <= lastDate);
-      if (inRange && this.dataDays.includes(d)) {
+      if (inRange && (!entityId || this.dataDays.includes(d))) {
         jumpToDate(todayStr);
         this.open = false;
       }

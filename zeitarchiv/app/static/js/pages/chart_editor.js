@@ -48,6 +48,18 @@
     // Formatierung wie überall sonst in der Oberfläche, siehe Kommentar dort.
     const fmtNum = NumberFormat.fmt;
 
+    // Ziel des Kalender-Sprungs (calendar-picker.js ruft diese globale
+    // Funktion auf) — dieselbe Übersetzung "Datum → Perioden-Offset des
+    // gewählten Zeitraums" wie jumpToDate() in entity_detail.js.
+    function jumpToDate(dateStr) {
+      const root = Alpine.$data(document.querySelector('.page'));
+      const [y, m, d] = dateStr.split('-').map(Number);
+      root._rangeAnchorMs = new Date(y, m - 1, d, 12).getTime();
+      root.offset = PeriodNavigation.offsetForRange(root.range, root._rangeAnchorMs);
+      root.load();
+    }
+    window.jumpToDate = jumpToDate;
+
     function filterEntityPicker(value) {
       const q = value.trim().toLowerCase();
       document.querySelectorAll('#entity-picker .entity-picker-row').forEach(row => {
@@ -515,6 +527,14 @@
         // bis wohin der letzte bekannte Linienwert gehalten wird — dort wird
         // bewusst NICHT in die Zukunft fortgeschrieben.
         periodEnd: null,
+        // Zeitraum-Navigation (‹ › und Kalender an der Zeitraumanzeige) wie
+        // auf der Entitätsseite: 0 = laufende Periode, -1 = eine davor usw.
+        // Reine Ansicht, nie mit dem Chart gespeichert — ein gespeichertes
+        // Chart öffnet immer mit der laufenden Periode (siehe save()).
+        offset: 0,
+        // Zeitlicher Anker beim Wechsel des Zeitraums (siehe setRange()), wie
+        // _rangeAnchorMs in entity_detail.js.
+        _rangeAnchorMs: null,
         isCurrent: true,
         // Explizit in load() gesetzt statt als Getter über this.series
         // berechnet — ein Getter, der this.series nur verschachtelt über
@@ -1164,7 +1184,28 @@
           [this.selectedEntityIds[idxA], this.selectedEntityIds[idxB]] = [this.selectedEntityIds[idxB], this.selectedEntityIds[idxA]];
           this.load();
         },
+        get canGoForward() { return this.offset < 0; },
+        goBack() { this._rangeAnchorMs = null; this.offset -= 1; this.load(); },
+        goForward() {
+          if (this.canGoForward) { this._rangeAnchorMs = null; this.offset += 1; this.load(); }
+        },
+        goToNow() { this._rangeAnchorMs = null; this.offset = 0; this.load(); },
         setRange(key) {
+          // Erneuter Klick auf den aktiven Zeitraum: zurück zur laufenden
+          // Periode, dieselbe Geste wie auf der Entitätsseite. Steht die
+          // Ansicht schon dort, passiert nichts.
+          if (key === this.range) {
+            if (this.offset !== 0) this.goToNow();
+            return;
+          }
+          // Den angezeigten Zeitpunkt beim Wechsel des Zeitraums behalten
+          // (aus 2025 wird bei "Monat" der Dezember 2025), statt auf die
+          // laufende Periode zurückzuspringen — wie in entity_detail.js.
+          const anchorMs = this._rangeAnchorMs ?? PeriodNavigation.anchorForWindow(
+            this.windowStart, this.windowEnd, this.isCurrent
+          );
+          this._rangeAnchorMs = anchorMs;
+          this.offset = PeriodNavigation.offsetForRange(key, anchorMs);
           this.range = key;
           // Anders als auf der Entitätsseite bleibt der Vergleich beim
           // Zeitraumwechsel eingeschaltet — ein stehengebliebener
@@ -1381,7 +1422,7 @@
           this.loading = true;
           const params = new URLSearchParams({
             entity_ids: this.visibleEntityIds.join(','),
-            range: this.range, offset: '0', continuous: String(this.continuous),
+            range: this.range, offset: String(this.offset), continuous: String(this.continuous),
             compare: String(this.compare), compare_mode: this.compareMode,
             raw: String(this.raw),
           });

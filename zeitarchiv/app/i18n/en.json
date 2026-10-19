@@ -1,5 +1,7 @@
 {
   "app": {
+    "Zurück zu jetzt": "Back to now",
+    "Gespeichert wird nur die Art des Zeitraums. Beim Öffnen zeigt das Chart wieder die laufende Periode.": "Only the kind of period is saved. When opened, the chart shows the current period again.",
     "Langzeit": "Long-term",
     "Jahre": "Years",
     "Ø-Linie": "Ø line",
