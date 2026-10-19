@@ -34,6 +34,10 @@ backup_exclude:
   - "backups/**"
   - ".zeitarchiv-restore-staging/**"
   - ".zeitarchiv-restore-rollback-*/**"
+  # Hochgeladene Importdaten bleiben bis „Daten löschen“ liegen und können
+  # mehrere GB groß sein; jederzeit neu hochladbar, wie im eigenen Backup.
+  - "symcon_import/**"
+  - "csv_import/**"
 panel_icon: "mdi:database-clock"
 options:
   timezone: "Europe/Berlin"
