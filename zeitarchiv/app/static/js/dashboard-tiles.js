@@ -1737,10 +1737,12 @@
     }
   }
 
+  // Auch für Attributwerte (data-tooltip-fixed="…"): der frühere Umweg über
+  // textContent/innerHTML maskiert nur & < >, keine Anführungszeichen — eine
+  // Spaltenbeschriftung mit " brach dort aus dem Attribut aus.
+  const HTML_ESCAPES = {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'};
   function escapeHtml(s) {
-    const div = document.createElement('div');
-    div.textContent = s == null ? '' : String(s);
-    return div.innerHTML;
+    return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => HTML_ESCAPES[c]);
   }
 
   // Baut dieselbe Linie+Füllfläche-Sparkline (SVG-Pfade, gerade Segmente) wie

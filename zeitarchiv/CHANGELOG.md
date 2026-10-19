@@ -32,6 +32,10 @@
   übrigen Vergleiche samt Laufsumme, Soll Entität, Jahren und Ø-Linie standen
   beim nächsten Öffnen eines Charts wieder auf „Aus“. Sie bleiben jetzt am Chart
   erhalten.
+- **Tabellen-Kacheln mit Anführungszeichen in Spaltennamen**: Enthielt eine
+  Spaltenbeschriftung ein Anführungszeichen, war der Hinweis zur Abweichung in
+  der Dashboard-Kachel abgeschnitten oder fehlte. Er wird jetzt vollständig
+  angezeigt.
 
 ---
 
@@ -64,6 +68,9 @@
 - **Chart comparison was not saved**: “Previous year”, “Long-term” and the other
   comparisons, including running total, target entity, years and Ø line, were
   back to “Off” the next time a chart was opened. They now stay with the chart.
+- **Table tiles with quotation marks in column names**: If a column label
+  contained a quotation mark, the deviation hint in the dashboard tile was cut
+  off or missing. It is now shown in full.
 
 ## 1.7.0 - 2026-10-19
 
