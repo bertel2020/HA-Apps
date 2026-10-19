@@ -799,6 +799,9 @@ series without leaving the period.
 **Save as chart** (options menu) stores the current view — including all
 chosen options and any additionally added entities — as a standalone chart,
 which afterwards can be edited like any other chart and pinned to a dashboard.
+If the page currently shows a past period (for example the year 2025), the
+chart shows that period too. The entity's own page still opens with the
+current period.
 
 ### Saved options
 
@@ -919,8 +922,10 @@ When viewing, a chart always shows the **current period**. When
 **customizing**, ‹ and › next to the period label page back to past periods,
 as on the page of a single entity; clicking the label opens a calendar for a
 direct jump. **Back to now** or clicking the selected period again returns to
-the current period. Only the kind of period is saved, not the period shown;
-after saving, the chart shows the current period again. Comparisons refer to the period shown.
+the current period. The period shown is saved: a chart saved at 2025 still
+shows 2025 later, when viewing and on the dashboard. A chart saved in the
+current period always shows whatever is current. Choosing a comparison (such
+as "Previous year" or "Long-term") returns to the current period. Comparisons refer to the period shown.
 Unlike there, zooming into a section is missing (see [Zooming into a
 section](#zooming-into-a-section)) — a chart can only be narrowed via period
 and resolution, not by mouse/touch.

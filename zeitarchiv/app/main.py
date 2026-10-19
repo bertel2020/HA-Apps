@@ -166,6 +166,7 @@ from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size, s
 from . import notices as notices_mod
 from . import version_check
 from .notices import collect_notices
+from .chart_period import calendar_bounds, period_anchor_or_400
 from .chart_types import CHART_EDITOR_CHART_TYPES, ENTITY_CHART_TYPES, chart_type_label, chart_type_key, effective_chart_type
 from .progress import activity_snapshot, register_source
 
@@ -3479,11 +3480,6 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         }
         for row in rows
     ]
-    # Grenzen des Kalender-Sprungs (Zeitraumanzeige anklicken): das ganze
-    # Archiv statt der gerade gewählten Entitäten — die Auswahl ändert sich im
-    # Editor laufend, der Kalender wird aber nur einmal aufgebaut.
-    first_values = [row["first_ts"] for row in rows if row["first_ts"]]
-    last_values = [row["last_ts"] for row in rows if row["last_ts"]]
     prefill = prefill or {}
     return {
         "chart_id": chart["id"] if chart else None,
@@ -3505,11 +3501,11 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "average_style": chart["average_style"] if chart else "flat",
         "horizontal": chart["horizontal"] if chart else False,
         "donut_aggregation": chart["donut_aggregation"] if chart else "sum",
+        "period_anchor": chart["period_anchor"] if chart else prefill.get("period_anchor"),  # Start des Editors
         "entity_names": chart["entity_names"] if chart else {},
         "hidden_entity_ids": chart["hidden_entity_ids"] if chart else [],
         "entity_options": entity_options,
-        "calendar_first_date": datetime.fromtimestamp(min(first_values), TZ).strftime("%Y-%m-%d") if first_values else None,
-        "calendar_last_date": datetime.fromtimestamp(max(last_values), TZ).strftime("%Y-%m-%d") if last_values else None,
+        **calendar_bounds(rows, TZ),
         "range_options": _CHART_RANGE_OPTIONS,
         "dashboard_usage": index.list_item_dashboards("chart", chart["id"]) if chart else [],
         "missing_ids": entity_usage.missing_entity_ids(chart["entity_ids"], entity_usage.existing_entity_ids(index)) if chart else [],
@@ -3532,6 +3528,7 @@ def charts_new(
     resolution_preset: str = "auto",
     compare: bool = False,
     compare_mode: str = "previous",
+    anchor: str | None = None,
 ) -> HTMLResponse:
     prefill = None
     if entity_id:
@@ -3548,6 +3545,7 @@ def charts_new(
             "resolution_preset": resolution_preset if resolution_preset in _CHART_RESOLUTION_PRESETS else "auto",
             "compare": compare,
             "compare_mode": compare_mode if compare_mode in ("previous", "year") else "previous",
+            "period_anchor": period_anchor_or_400(anchor),
         }
     return templates.TemplateResponse(request, "chart_editor.html", _chart_editor_context(None, prefill))
 
@@ -3575,6 +3573,7 @@ class _SaveChartBody(BaseModel):
     average_style: str = "flat"
     horizontal: bool = False
     donut_aggregation: str = "sum"
+    period_anchor: str | None = None  # fester Zeitraum, siehe chart_period.py
 
 
 def _hidden_for(body: _SaveChartBody) -> list[str]:
@@ -3620,6 +3619,7 @@ def charts_create(body: _SaveChartBody) -> dict:
         average_line=body.average_line, area_fill=body.area_fill, show_points=body.show_points,
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
         horizontal=body.horizontal, donut_aggregation=body.donut_aggregation,
+        period_anchor=period_anchor_or_400(body.period_anchor),
     )
     return {"id": chart_id}
 
@@ -3667,6 +3667,7 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         average_line=body.average_line, area_fill=body.area_fill, show_points=body.show_points,
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
         horizontal=body.horizontal, donut_aggregation=body.donut_aggregation,
+        period_anchor=period_anchor_or_400(body.period_anchor),
     )
     return {"id": chart_id}
 
@@ -3707,6 +3708,7 @@ def charts_duplicate(chart_id: int) -> dict:
         average_line=chart["average_line"], area_fill=chart["area_fill"], show_points=chart["show_points"],
         stacked=chart["stacked"], normalize=chart["normalize"], average_style=chart["average_style"],
         horizontal=chart["horizontal"], donut_aggregation=chart["donut_aggregation"],
+        period_anchor=chart["period_anchor"],
     )
     return {"id": new_id}
 
@@ -3896,7 +3898,7 @@ def _dashboard_tiles_context(
                 "show_values": c["show_values"], "decimals": c["decimals"],
                 "average_line": c["average_line"], "area_fill": c["area_fill"], "show_points": c["show_points"],
                 "stacked": c["stacked"], "normalize": c["normalize"], "average_style": c["average_style"],
-                "horizontal": c["horizontal"], "donut_aggregation": c["donut_aggregation"],
+                "horizontal": c["horizontal"], "donut_aggregation": c["donut_aggregation"], "period_anchor": c["period_anchor"],
             })
             groups[-1]["tiles"].append(tiles[-1])
         elif p["item_type"] == "table":

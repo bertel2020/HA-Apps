@@ -1211,6 +1211,13 @@ class Index:
             self._conn.execute(
                 "ALTER TABLE saved_charts ADD COLUMN donut_aggregation TEXT NOT NULL DEFAULT 'sum'"
             )
+        if "period_anchor" not in sc_columns:
+            # Fester Zeitraum: ein Tag (JJJJ-MM-TT) in der gespeicherten
+            # Periode, z. B. 2025-07-02 für "Jahr 2025". NULL = wie bisher immer
+            # die laufende Periode. Ein Datum statt eines Versatzes, weil "ein
+            # Jahr zurück" mit der Zeit weiterwandern würde (siehe
+            # periodAnchorForSave in chart_editor.js).
+            self._conn.execute("ALTER TABLE saved_charts ADD COLUMN period_anchor TEXT")
 
         if self._conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='saved_tables'").fetchone()[0]:
             st_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(saved_tables)")}
@@ -2329,6 +2336,7 @@ class Index:
         average_style: str = "flat",
         horizontal: bool = False,
         donut_aggregation: str = "sum",
+        period_anchor: str | None = None,
     ) -> int:
         now = time.time()
         with self._lock, self._conn:
@@ -2339,8 +2347,8 @@ class Index:
                 "resolution_preset, "
                 "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
                 "chart_type, decimals, show_values, average_line, area_fill, show_points, stacked, normalize, "
-                "average_style, horizontal, donut_aggregation, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "average_style, horizontal, donut_aggregation, period_anchor, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -2349,7 +2357,7 @@ class Index:
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
                     int(average_line), int(area_fill), int(show_points), int(stacked), int(normalize),
-                    average_style, int(horizontal), donut_aggregation, now, now,
+                    average_style, int(horizontal), donut_aggregation, period_anchor, now, now,
                 ),
             )
             return cur.lastrowid
@@ -2380,6 +2388,7 @@ class Index:
         average_style: str = "flat",
         horizontal: bool = False,
         donut_aggregation: str = "sum",
+        period_anchor: str | None = None,
     ) -> None:
         with self._lock, self._conn:
             self._ensure_valid_name_locked("saved_charts", name, exclude_id=chart_id)
@@ -2389,7 +2398,8 @@ class Index:
                 "dynamic_y_axis = ?, dashboard_animation = ?, "
                 "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, decimals = ?, "
                 "show_values = ?, average_line = ?, area_fill = ?, show_points = ?, stacked = ?, normalize = ?, "
-                "average_style = ?, horizontal = ?, donut_aggregation = ?, updated_at = ? WHERE id = ?",
+                "average_style = ?, horizontal = ?, donut_aggregation = ?, period_anchor = ?, "
+                "updated_at = ? WHERE id = ?",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -2398,7 +2408,7 @@ class Index:
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, chart_type, decimals, int(show_values),
                     int(average_line), int(area_fill), int(show_points), int(stacked), int(normalize),
-                    average_style, int(horizontal), donut_aggregation, time.time(), chart_id,
+                    average_style, int(horizontal), donut_aggregation, period_anchor, time.time(), chart_id,
                 ),
             )
 
@@ -2422,6 +2432,7 @@ class Index:
         d["average_style"] = d.get("average_style") or "flat"
         d["horizontal"] = bool(d.get("horizontal", 0))
         d["donut_aggregation"] = d.get("donut_aggregation") or "sum"
+        d["period_anchor"] = d.get("period_anchor") or None
         d["entity_names"] = json.loads(d["entity_names"]) if d.get("entity_names") else {}
         d["hidden_entity_ids"] = (
             json.loads(d["hidden_entity_ids"]) if d.get("hidden_entity_ids") else []

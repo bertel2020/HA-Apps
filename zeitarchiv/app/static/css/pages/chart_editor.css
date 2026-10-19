@@ -187,7 +187,6 @@
   .chart-nav .period-label:disabled{cursor:default;}
   .chart-nav .now-chip{font-size:calc(12px * var(--font-scale, 1));padding:4px 11px;}
   @media (max-width:480px){.chart-nav{width:100%;justify-content:center;}}
-  .save-offset-note{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);margin:8px 0 0;}
 
   /* Kalender-Widget für den Datums-Sprung — Aufbau/Verhalten identisch zur
      Entitätsseite (entity_detail.css) und Bereinigung, siehe

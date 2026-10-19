@@ -410,8 +410,16 @@
     if (!chartEl || !entityIds.length) return;
 
     const base = el.closest('#dashboard-grid')?.dataset.appRoot || '';
+    // Fester Zeitraum des Charts (saved_charts.period_anchor, JJJJ-MM-TT):
+    // dieselbe Umrechnung in einen Versatz wie im Chart-Editor, damit Kachel
+    // und Chart-Seite dieselbe Periode zeigen. Ohne Anker die laufende.
+    let offset = 0;
+    if (el.dataset.periodAnchor) {
+      const [y, m, d] = el.dataset.periodAnchor.split('-').map(Number);
+      offset = PeriodNavigation.offsetForRange(range, new Date(y, m - 1, d, 12).getTime());
+    }
     const params = new URLSearchParams({
-      entity_ids: entityIds.join(','), range, offset: '0', continuous: String(continuous),
+      entity_ids: entityIds.join(','), range, offset: String(offset), continuous: String(continuous),
       raw: String(timeline),
     });
     let data;

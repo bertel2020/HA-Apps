@@ -862,7 +862,10 @@ um einzelne Reihen ein- oder auszublenden, ohne den Zeitraum zu verlassen.
 **Als Chart speichern** (Optionen-Menü) legt die aktuelle Ansicht —
 inklusive aller gewählten Optionen und ggf. bereits hinzugefügter weiterer
 Entitäten — als eigenständiges Chart ab, das sich danach wie jedes andere
-Chart bearbeiten und auf ein Dashboard anheften lässt.
+Chart bearbeiten und auf ein Dashboard anheften lässt. Zeigt die Seite gerade
+eine vergangene Periode (etwa das Jahr 2025), zeigt auch das Chart diese
+Periode. Die Seite der Entität selbst öffnet weiterhin mit der laufenden
+Periode.
 
 ### Gespeicherte Optionen
 
@@ -997,9 +1000,11 @@ Ein Chart zeigt beim Ansehen immer die **aktuelle Periode**. Beim
 Seite einer einzelnen Entität zu vergangenen Perioden; ein Klick auf die
 Anzeige öffnet einen Kalender für einen gezielten Sprung. **Zurück zu jetzt**
 oder ein erneuter Klick auf den gewählten Zeitraum führt zur laufenden
-Periode zurück. Gespeichert wird nur die Art des Zeitraums, nicht die
-angezeigte Periode; nach dem Speichern zeigt das Chart wieder die laufende
-Periode. Vergleiche beziehen sich auf die angezeigte
+Periode zurück. Gespeichert wird die angezeigte Periode: ein Chart, das bei
+2025 gespeichert wird, zeigt auch später 2025, beim Ansehen und auf dem
+Dashboard. Ein Chart, das in der laufenden Periode gespeichert wird, zeigt
+immer die jeweils aktuelle. Wer einen Vergleich wählt (etwa „Vorjahr“ oder
+„Langzeit“), landet wieder in der laufenden Periode. Vergleiche beziehen sich auf die angezeigte
 Periode. Anders als dort fehlt das Hineinzoomen in einen Ausschnitt (siehe
 [In einen Ausschnitt hineinzoomen](#in-einen-ausschnitt-hineinzoomen)) — ein
 Chart lässt sich nur über Zeitraum und Auflösung, nicht per Maus/Touch

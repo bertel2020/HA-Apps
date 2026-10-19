@@ -141,6 +141,7 @@ _CHART_FIELD_LABELS = {
     "entity_names": N_("Entitäten"),
     "range_key": N_("Zeitraum"),
     "continuous": N_("Zeitraum"),
+    "period_anchor": N_("Zeitraum"),
     "chart_type": N_("Typ"),
     "resolution_preset": N_("Auflösung"),
 }

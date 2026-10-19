@@ -468,8 +468,9 @@
           <span class="period-label" x-show="!editing" x-text="periodLabel"></span>
           <!-- Zeitraum-Navigation wie auf der Entitätsseite (entity_detail.html):
                ‹ ›, Klick auf die Anzeige öffnet den Kalender. Nur beim
-               Anpassen, nie gespeichert (offset in chart_editor.js; save()
-               springt beim Verlassen des Modus zurück zur laufenden Periode).
+               Anpassen. Gespeichert wird die angezeigte Periode: eine
+               vergangene als fester Zeitraum, die laufende als "immer
+               aktuell" (periodAnchorForSave in chart_editor.js).
                calendarPicker(null, …): ein Chart hat mehrere Entitäten,
                deshalb keine Tages-Abfrage je Entität und als Grenzen das
                ganze Archiv (calendar_first/last_date). -->
@@ -833,10 +834,6 @@
           <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ _("Speichern") if chart_id else _("Chart erstellen") }}</button>
           <span class="save-status" x-show="savedMessage" x-text="savedMessage"></span>
         </div>
-        <!-- Der angezeigte Versatz (z. B. 2025 statt des laufenden Jahres) wird
-             nicht gespeichert — sonst stünde ein Chart dauerhaft in der
-             Vergangenheit, ohne dass man es ihm ansieht. -->
-        <p class="save-offset-note" x-show="editing && offset !== 0" x-cloak>{{ _("Gespeichert wird nur die Art des Zeitraums. Beim Öffnen zeigt das Chart wieder die laufende Periode.") }}</p>
     </div>
   </div>
 
@@ -859,6 +856,9 @@
     const CHART_ID = {{ chart_id | tojson }};
     const CHART_NAME = {{ chart_name | tojson }};
     const RANGE_KEY = {{ range_key | tojson }};
+    // Fester Zeitraum (JJJJ-MM-TT) oder null = laufende Periode, siehe
+    // saved_charts.period_anchor.
+    const PERIOD_ANCHOR = {{ period_anchor | tojson }};
     const CONTINUOUS = {{ continuous | tojson }};
     const SELECTED_ENTITY_IDS = {{ selected_entity_ids | tojson }};
     const ENTITY_NAMES = {{ entity_names | tojson }};

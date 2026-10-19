@@ -60,6 +60,19 @@
     }
     window.jumpToDate = jumpToDate;
 
+    // Fester Zeitraum eines Charts (saved_charts.period_anchor): ein Tag als
+    // JJJJ-MM-TT. Mittags statt Mitternacht, damit eine Zeitumstellung den
+    // Tag nicht verschiebt — dieselbe Wahl wie jumpToDate().
+    function anchorDateToMs(dateStr) {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      return new Date(y, m - 1, d, 12).getTime();
+    }
+    function msToAnchorDate(ms) {
+      const d = new Date(ms);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+
     function filterEntityPicker(value) {
       const q = value.trim().toLowerCase();
       document.querySelectorAll('#entity-picker .entity-picker-row').forEach(row => {
@@ -529,13 +542,14 @@
         periodEnd: null,
         // Zeitraum-Navigation (‹ › und Kalender an der Zeitraumanzeige, nur
         // beim Anpassen) wie auf der Entitätsseite: 0 = laufende Periode,
-        // -1 = eine davor usw. Nie mit dem Chart gespeichert — ein
-        // gespeichertes Chart öffnet immer mit der laufenden Periode, und
-        // save() springt beim Verlassen des Modus dorthin zurück.
-        offset: 0,
+        // -1 = eine davor usw. Ein Chart mit festem Zeitraum (PERIOD_ANCHOR)
+        // startet in seiner Periode; beim Speichern wird die angezeigte
+        // Periode übernommen (periodAnchorForSave).
+        offset: PERIOD_ANCHOR ? PeriodNavigation.offsetForRange(RANGE_KEY, anchorDateToMs(PERIOD_ANCHOR)) : 0,
         // Zeitlicher Anker beim Wechsel des Zeitraums (siehe setRange()), wie
-        // _rangeAnchorMs in entity_detail.js.
-        _rangeAnchorMs: null,
+        // _rangeAnchorMs in entity_detail.js. Bei festem Zeitraum von Anfang an
+        // gesetzt, damit ein Zeitraumwechsel vor dem ersten Laden ihn behält.
+        _rangeAnchorMs: PERIOD_ANCHOR ? anchorDateToMs(PERIOD_ANCHOR) : null,
         isCurrent: true,
         // Explizit in load() gesetzt statt als Getter über this.series
         // berechnet — ein Getter, der this.series nur verschachtelt über
@@ -1186,6 +1200,15 @@
           this.load();
         },
         get canGoForward() { return this.offset < 0; },
+        // Was beim Speichern als fester Zeitraum mitgeht: in der laufenden
+        // Periode nichts (das Chart bleibt "immer aktuell"), sonst ein Tag in
+        // der angezeigten Periode — deren Mitte, wie PeriodNavigation sie als
+        // Anker nimmt. Ein Datum statt des Versatzes, weil "ein Jahr zurück"
+        // nächstes Jahr ein anderes Jahr wäre.
+        get periodAnchorForSave() {
+          if (this.offset === 0 || this.windowStart == null || this.windowEnd == null) return null;
+          return msToAnchorDate(PeriodNavigation.anchorForWindow(this.windowStart, this.windowEnd, false));
+        },
         goBack() { this._rangeAnchorMs = null; this.offset -= 1; this.load(); },
         goForward() {
           if (this.canGoForward) { this._rangeAnchorMs = null; this.offset += 1; this.load(); }
@@ -1289,6 +1312,11 @@
           this.stacked = false;
           this.timeline = false;
           this.donut = false;
+          // Ein Vergleich (Vorjahr, Langzeit, …) bezieht sich immer auf die
+          // laufende Periode — wer vorher z. B. auf 2024 geblättert hatte,
+          // landet wieder bei "jetzt", statt 2024 mit 2023 zu vergleichen.
+          this.offset = 0;
+          this._rangeAnchorMs = null;
           this.load();
         },
         disableCompare() {
@@ -2585,6 +2613,7 @@
             entity_ids: this.selectedEntityIds,
             range_key: this.range,
             continuous: this.continuous,
+            period_anchor: this.periodAnchorForSave,
             entity_names: entityNames,
             // Nur ausgeblendete IDs mitschicken, die überhaupt noch ausgewählt
             // sind — sonst hielte eine abgewählte Entität ihren Ausblend-Zustand
@@ -2624,9 +2653,6 @@
             }
             this.savedMessage = t('✓ Gespeichert');
             this.editing = false;
-            // Die Navigation gibt es nur beim Anpassen; beim Ansehen soll das
-            // Chart wieder die laufende Periode zeigen, wie nach dem Öffnen.
-            if (this.offset !== 0) this.goToNow();
             setTimeout(() => { this.savedMessage = ''; }, 2000);
           } finally {
             this.saving = false;

@@ -439,6 +439,15 @@ function selectBrush() {
             range: this.range, continuous: String(this.continuous),
             compare: String(this.compare), compare_mode: this.compareMode,
           });
+          // Eine vergangene Periode (z. B. 2025) geht als fester Zeitraum mit:
+          // ein Tag darin (Mitte des Fensters) statt des Versatzes, siehe
+          // saved_charts.period_anchor. Die laufende Periode bleibt "immer
+          // aktuell". Diese Seite selbst merkt sich die Periode nicht.
+          if (this.offset !== 0 && this.windowStart != null && this.windowEnd != null) {
+            const d = new Date(PeriodNavigation.anchorForWindow(this.windowStart, this.windowEnd, false));
+            const pad = n => String(n).padStart(2, '0');
+            params.set('anchor', `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+          }
           return `${BASE}/charts/new?${params}`;
         },
         get comparePreviousLabel() {
