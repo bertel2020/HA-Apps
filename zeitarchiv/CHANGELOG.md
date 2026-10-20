@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Behoben
+
+- Auswahlmenüs, deren Knopf weit links steht (z. B. „Lücken-Erkennung“ in der
+  Konfiguration einer Entität), ragen nicht mehr links aus dem Fenster und sind
+  wieder vollständig lesbar.
+
+---
+
+### English
+
+#### Fixed
+
+- Dropdown menus whose button sits far to the left (e.g. "Gap detection" in an
+  entity's configuration) no longer extend past the left edge of the window and
+  are fully readable again.
+
 ## 1.8.0 - 2026-10-19
 
 ### Neu

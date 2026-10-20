@@ -773,6 +773,8 @@ button.dd-picker-clear{
   max-height:min(360px, 60vh);overflow-y:auto;
 }
 .dd-picker-popover.open{display:block;}
+/* Gesetzt von toggleDDPicker(), wenn das rechtsbündige Popover links aus dem Fenster ragte. */
+.dd-picker-popover.dd-picker-popover-left{left:0;right:auto;}
 /* Housekeeping → Aktivität: die Filter-Optionen tragen teils lange
    Entitätsnamen ("Demo Balkonkraftwerk Ladeleistung") — die Standardbreite
    ließ sie umbrechen. Nur diese vier, nicht global: die meisten anderen
