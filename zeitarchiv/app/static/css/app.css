@@ -1537,11 +1537,18 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
 .dash-period-steps{display:inline-flex;gap:4px;}
 .dash-period-nav .chip{font-size:calc(12px * var(--font-scale, 1));padding:4px 11px;}
 .dash-period-banner{
-  display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0 14px;padding:8px 14px;
-  background:var(--warning-soft);border:1px solid var(--warning);border-radius:8px;
-  color:var(--warning);font-size:calc(13px * var(--font-scale, 1));
+  display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;margin:10px 0 12px;padding:3px 12px;
+  background:var(--warning-soft);border-radius:999px;
+  color:var(--warning);font-size:calc(12px * var(--font-scale, 1));
 }
-.dash-period-banner .btn{margin-left:auto;}
+.dash-period-banner strong{font-weight:600;}
+.dash-period-banner-sep{opacity:.6;}
+.dash-period-banner-back{
+  font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;
+  text-decoration:underline;text-underline-offset:2px;
+}
+.dash-period-banner-back:hover{color:var(--ink);}
+@media (max-width:480px){.dash-period-banner-paused{display:none;}}
 @media (max-width:480px){.dash-period-nav{width:100%;margin-left:0;justify-content:center;}}
 
 /* Kalender-Widget dafür, identisch zu den Kopien in chart_editor.css,

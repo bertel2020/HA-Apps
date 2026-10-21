@@ -28,9 +28,14 @@
 {% endmacro %}
 
 {% macro banner() %}
-<div class="dash-period-banner" role="status" x-data x-show="!$store.dashStichtag.isToday" x-cloak>
-  <span><strong>{{ _("Rückblick") }}</strong> · <span x-text="$store.dashStichtag.label"></span> — {{ _("Jede Kachel zeigt ihren Zeitraum, der diesen Tag enthält. Kacheln mit festem Zeitraum bleiben unverändert, die automatische Aktualisierung pausiert.") }}</span>
-  <button type="button" class="btn" @click="$store.dashStichtag.set(null)">{{ _("Zurück zu heute") }}</button>
+<!-- Bewusst nur eine schmale Zeile: die Erklärung steht im Tooltip und im
+     Hinweis des Editors, hier reicht, DASS es ein Rückblick ist. -->
+<div class="dash-period-banner" role="status" x-data x-show="!$store.dashStichtag.isToday" x-cloak
+     title="{{ _('Jede Kachel zeigt ihren Zeitraum, der diesen Tag enthält. Kacheln mit festem Zeitraum bleiben unverändert, die automatische Aktualisierung pausiert.') }}">
+  <span>{{ _("Rückblick auf") }} <strong x-text="$store.dashStichtag.label"></strong></span>
+  <span class="dash-period-banner-paused"><span class="dash-period-banner-sep" aria-hidden="true">·</span> {{ _("Aktualisierung pausiert") }}</span>
+  <span class="dash-period-banner-sep" aria-hidden="true">·</span>
+  <button type="button" class="dash-period-banner-back" @click="$store.dashStichtag.set(null)">{{ _("Zurück zu heute") }}</button>
 </div>
 {% endmacro %}
 

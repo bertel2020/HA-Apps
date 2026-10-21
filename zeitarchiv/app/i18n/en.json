@@ -2748,9 +2748,10 @@
     "Stichtag": "Reference date",
     "Zu einem bestimmten Tag springen": "Jump to a specific day",
     "Schrittweite": "Step",
-    "Rückblick": "Looking back",
     "Jede Kachel zeigt ihren Zeitraum, der diesen Tag enthält. Kacheln mit festem Zeitraum bleiben unverändert, die automatische Aktualisierung pausiert.": "Each tile shows its period that contains this day. Tiles with a fixed period stay unchanged; automatic refresh is paused.",
-    "Zurück zu heute": "Back to today"
+    "Zurück zu heute": "Back to today",
+    "Rückblick auf": "Looking back at",
+    "Aktualisierung pausiert": "Refresh paused"
   },
   "js": {
     "Langzeit": "Long-term",
