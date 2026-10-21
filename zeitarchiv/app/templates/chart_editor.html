@@ -369,6 +369,16 @@
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
+                <div class="menu-row menu-row-stack" x-show="!timeline && !hasState">
+                  <span class="menu-row-label">{{ _("Nachkommastellen") }}</span>
+                  <div class="seg">
+                    <button :class="{active: decimals === 'auto'}" @click="decimals = 'auto'; render()">{{ _("Auto") }}</button>
+                    <button :class="{active: decimals === '0'}" @click="decimals = '0'; render()">0</button>
+                    <button :class="{active: decimals === '1'}" @click="decimals = '1'; render()">1</button>
+                    <button :class="{active: decimals === '2'}" @click="decimals = '2'; render()">2</button>
+                    <button :class="{active: decimals === '3'}" @click="decimals = '3'; render()">3</button>
+                  </div>
+                </div>
                 <label class="menu-row" x-show="!donut && !timeline">
                   <span class="menu-row-label">{{ _("Dynamische Y-Achse") }}</span>
                   <span class="menu-toggle">
@@ -382,16 +392,6 @@
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
-                <div class="menu-row menu-row-stack" x-show="!timeline && !hasState">
-                  <span class="menu-row-label">{{ _("Nachkommastellen") }}</span>
-                  <div class="seg">
-                    <button :class="{active: decimals === 'auto'}" @click="decimals = 'auto'; render()">{{ _("Auto") }}</button>
-                    <button :class="{active: decimals === '0'}" @click="decimals = '0'; render()">0</button>
-                    <button :class="{active: decimals === '1'}" @click="decimals = '1'; render()">1</button>
-                    <button :class="{active: decimals === '2'}" @click="decimals = '2'; render()">2</button>
-                    <button :class="{active: decimals === '3'}" @click="decimals = '3'; render()">3</button>
-                  </div>
-                </div>
                 {# Eigene Zeile, ausdrücklich NICHT an "Statistik in Legende"
                    gehängt: die Legende nennt die Zahl, die Linie zeigt, wo sie
                    im Bild liegt. Das eine will man oft ohne das andere — und
