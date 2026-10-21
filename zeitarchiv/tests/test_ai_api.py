@@ -83,6 +83,18 @@ def _fresh_usage():
     ai_usage.USAGE.reset()
 
 
+@pytest.fixture(autouse=True)
+def _fresh_rejection_log():
+    # Die Drosselung der Ablehnungs-Logzeilen ist modulweiter Zustand.
+    def clear() -> None:
+        for key in [k for k in logging_setup._RATE_LIMIT_STATE if k.startswith("ai_tool_rejected:")]:
+            logging_setup._RATE_LIMIT_STATE.pop(key, None)
+
+    clear()
+    yield
+    clear()
+
+
 @pytest.fixture
 def ctx(anlage, tmp_path: Path):
     _client, index = anlage
@@ -566,3 +578,41 @@ def test_settings_form_saves_tools_and_notes_and_shows_usage(client) -> None:
             app_index, enabled=False, scope="all", entities=[], exclude_presence=True,
             tools_disabled=[], instructions="",
         )
+
+
+# ------------------------------------------------------------ Logging
+
+
+def test_rejected_calls_are_logged_once(anlage, caplog) -> None:
+    client, index = anlage
+    with caplog.at_level("INFO", logger="app.ai_routes"):
+        for _ in range(3):
+            client.post("/api/ai/search_entities", json={}, headers=AUTH)
+        ai_settings.save(
+            index, enabled=True, scope="all", entities=[], exclude_presence=True, tools_disabled=["get_series"],
+        )
+        client.post(
+            "/api/ai/get_series", json={"entity_ids": ["sensor.temperatur"], "period": "day"}, headers=AUTH,
+        )
+    lines = [r.getMessage() for r in caplog.records if "event=ai_tool_rejected" in r.getMessage()]
+    # Wiederholte Anfragen desselben Werkzeugs erscheinen nur einmal (gedrosselt).
+    assert len(lines) == 2
+    assert "tool=search_entities reason=ai_disabled" in lines[0]
+    assert "tool=get_series reason=tool_disabled" in lines[1]
+
+
+def test_settings_change_is_logged_without_the_note_text(client, caplog) -> None:
+    from app.main import index as app_index
+
+    try:
+        with caplog.at_level("INFO", logger="app.ai_settings_routes"):
+            client.post("/settings/ai", data={
+                "enabled": "1", "scope": "include", "entity": ["sensor.a", "sensor.b"],
+                "tool": ["get_summary"], "instructions": "geheimer Notiztext",
+            })
+        text = " ".join(r.getMessage() for r in caplog.records)
+        assert "event=ai_access_changed enabled=True scope=include entities=2" in text
+        assert "exclude_presence=False" in text
+        assert "geheimer Notiztext" not in text
+    finally:
+        ai_settings.save(app_index, enabled=False, scope="all", entities=[], exclude_presence=True)

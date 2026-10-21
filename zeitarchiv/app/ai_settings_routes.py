@@ -10,6 +10,7 @@ die Daten besitzt, nicht der Integration: Es gibt genau eine Stelle, die gilt.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 
 from fastapi import APIRouter, Request
@@ -22,6 +23,8 @@ from . import ai_settings, ai_tools, ai_usage
 from .formatting import entity_display_name, format_time, format_timestamp
 from .i18n import active_language, tr
 from .storage.index import Index
+
+logger = logging.getLogger(__name__)
 
 
 def _example_questions() -> list[str]:
@@ -114,14 +117,24 @@ def make_router(get_index: Callable[[], Index], templates: Jinja2Templates, tz: 
         scope = form.get("scope", "all")
         if scope not in ai_settings.SCOPES:
             scope = "all"
+        enabled = form.get("enabled") == "1"
+        entities = [str(item) for item in form.getlist("entity")]
+        exclude_presence = form.get("exclude_presence") == "1"
+        tools_disabled = [name for name in ai_tools.TOOL_TEXTS if name not in set(form.getlist("tool"))]
         ai_settings.save(
             get_index(),
-            enabled=form.get("enabled") == "1",
+            enabled=enabled,
             scope=scope,
-            entities=[str(item) for item in form.getlist("entity")],
-            exclude_presence=form.get("exclude_presence") == "1",
-            tools_disabled=[name for name in ai_tools.TOOL_TEXTS if name not in set(form.getlist("tool"))],
+            entities=entities,
+            exclude_presence=exclude_presence,
+            tools_disabled=tools_disabled,
             instructions=str(form.get("instructions", "")),
+        )
+        # Ohne den Notiztext: Der ist Freitext des Nutzers und gehört nicht ins Log.
+        logger.info(
+            "KI-Zugriff geändert · event=ai_access_changed enabled=%s scope=%s entities=%d "
+            "exclude_presence=%s tools_disabled=%d",
+            enabled, scope, len(entities), exclude_presence, len(tools_disabled),
         )
         return templates.TemplateResponse(request, "_settings_ki_form.html", context(request, saved=True))
 

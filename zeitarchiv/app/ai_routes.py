@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 
 from . import ai_settings, ai_tools, ai_usage
 from .i18n import active_language
+from .logging_setup import log_rate_limited
 from .route_support import storage_locked
 from .storage.coordinator import StorageCoordinator
 from .storage.index import Index
@@ -152,6 +153,13 @@ def create_ai_router(deps: AiDependencies) -> APIRouter:
     def error(status: int, code: str, message: str, headers: dict | None = None) -> JSONResponse:
         return JSONResponse({"error": code, "message": message}, status_code=status, headers=headers)
 
+    def reject(tool: str, reason: str) -> None:
+        # Eine KI, die trotz "Aus" immer wieder fragt, soll das Log nicht fluten.
+        log_rate_limited(
+            logger, logging.INFO, f"ai_tool_rejected:{reason}:{tool}",
+            "KI-Aufruf abgelehnt · event=ai_tool_rejected tool=%s reason=%s", tool, reason,
+        )
+
     def run(
         request: Request, authorization: str | None, integration_version: str | None,
         tool: str, entity_count: int, call: Callable[[ai_tools.AiToolContext], dict],
@@ -159,8 +167,10 @@ def create_ai_router(deps: AiDependencies) -> APIRouter:
         authenticate(request, authorization, integration_version)
         access = ai_settings.load(deps.index)
         if not access.enabled:
+            reject(tool, "ai_disabled")
             return error(403, "ai_disabled", "AI access is switched off in Zeitarchiv.")
         if tool in access.tools_disabled:
+            reject(tool, "tool_disabled")
             return error(403, "tool_disabled", "The owner switched this tool off; use another tool or tell the user.")
         if (reason := limiter.acquire()) is not None:
             return error(
