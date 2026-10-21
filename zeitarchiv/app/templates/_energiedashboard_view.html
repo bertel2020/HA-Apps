@@ -636,8 +636,8 @@
                       @mouseenter="highlightRow(item)" @mouseleave="unhighlightRow(item)">
                     <td class="label">
                       <button type="button" class="edash-share-toggle" x-show="hasChildren(item)" @click="toggleRow(item)"
-                              :aria-expanded="!collapsedRows[item.name]" :aria-label="item.name"
-                              x-text="collapsedRows[item.name] ? '▸' : '▾'"></button>
+                              :aria-expanded="!!expandedRows[item.name]" :aria-label="item.name"
+                              x-text="expandedRows[item.name] ? '▾' : '▸'"></button>
                       <span class="edash-share-dot" x-show="!isSummenzeile(item)" :style="{background: leafColor(item)}"></span>
                       <a x-show="item.entity_id" class="edash-share-link" :href="'entities/' + encodeURIComponent(item.entity_id || '')" x-text="item.name"></a>
                       <span x-show="!item.entity_id" x-text="item.name"></span>

@@ -321,7 +321,7 @@
       // Zeile — eine lange Geräteliste sprengte sonst die Kartenhöhe neben
       // der (durch Versorgungsanteile jetzt schmaleren) Nachbarkarte.
       verbraucherExpanded: false,
-      collapsedRows: {},
+      expandedRows: {},
       versorgungBreakdown: [],
       erzeugerBreakdown: [],
       speicherBreakdown: [],
@@ -682,10 +682,10 @@
         if (item.kind === 'group') this.leafNamesUnder(item).forEach((n) => this.unhighlightShare(n));
         else if (!this.isSummenzeile(item)) this.unhighlightShare(item.name);
       },
-      // Auf-/Zuklappen von Gruppen- und Zählerzeilen (Standard: aufgeklappt). Eine Zeile ist verborgen,
-      // sobald irgendeiner ihrer Vorfahren zugeklappt ist.
+      // Auf-/Zuklappen von Gruppen- und Zählerzeilen (Standard: zugeklappt). Eine Zeile ist verborgen,
+      // sobald irgendeiner ihrer Vorfahren nicht aufgeklappt ist.
       toggleRow(item) {
-        this.collapsedRows = {...this.collapsedRows, [item.name]: !this.collapsedRows[item.name]};
+        this.expandedRows = {...this.expandedRows, [item.name]: !this.expandedRows[item.name]};
       },
       hasChildren(item) {
         return this.isSummenzeile(item) && this.verbraucherBreakdown.some((i) => i.parent === item.name);
@@ -693,7 +693,7 @@
       rowHidden(item) {
         let parentName = item.parent;
         while (parentName) {
-          if (this.collapsedRows[parentName]) return true;
+          if (!this.expandedRows[parentName]) return true;
           const parentRow = this.verbraucherBreakdown.find((i) => i.name === parentName);
           parentName = parentRow ? parentRow.parent : null;
         }
