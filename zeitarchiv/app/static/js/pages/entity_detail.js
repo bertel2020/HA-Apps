@@ -504,7 +504,7 @@ function selectBrush() {
             // beim Speichern verloren. Der Editor kennt "line" nicht: eine
             // Schalter-Entität ohne Zeitstrahl heißt dort "bar", alles andere
             // bestimmt "auto" je Serie selbst.
-            chart_type: this.chartType === 'timeline' ? 'timeline' : (DEFAULT_CHART_TYPE === 'timeline' ? 'bar' : 'auto'),
+            chart_type: this.isState ? this.stateMode : (this.chartType === 'timeline' ? 'timeline' : (DEFAULT_CHART_TYPE === 'timeline' ? 'bar' : 'auto')),
             decimals: this.decimals,
             show_points: String(this.showPoints), show_values: String(this.showValues),
             dynamic_y_axis: String(this.dynamicYAxis), average_line: String(this.averageLine),
@@ -1622,6 +1622,33 @@ function selectBrush() {
               },
               encode: {x: [1, 2], y: 0},
               data: [],
+            }, {
+              // Zur Löschung markierte Bereiche als senkrechte Bänder hinter dem
+              // Zeitstrahl, wie im Linien-/Balkenpfad (markArea in render()).
+              // Eine eigene Reihe statt markArea: die custom-Reihe des Zeitstrahls
+              // trägt keines. Ohne markierte Werte oder bei ausgeschaltetem
+              // Schalter bleibt sie leer.
+              id: 'marked',
+              type: 'custom',
+              silent: true,
+              z: 1,
+              renderItem: (params, api) => {
+                const start = api.coord([api.value(1), 0]);
+                const end = api.coord([api.value(2), 0]);
+                const rectShape = echarts.graphic.clipRectByRect(
+                  {x: start[0], y: params.coordSys.y, width: Math.max(end[0] - start[0], 3), height: params.coordSys.height},
+                  {x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height}
+                );
+                const css = getComputedStyle(document.body);
+                // Das Band des Zeitstrahls liegt davor und deckt die Mitte ab: der Rand
+                // in Warnfarbe zeigt die Markierung oberhalb und unterhalb davon.
+                return rectShape && {
+                  type: 'rect', shape: rectShape,
+                  style: {fill: css.getPropertyValue('--danger-soft').trim(), stroke: css.getPropertyValue('--danger').trim(), lineWidth: 1},
+                };
+              },
+              encode: {x: [1, 2], y: 0},
+              data: this.showMarked ? this.markedRanges.map(b => [0, b.start * 1000, b.end * 1000]) : [],
             }],
             // Der Zeitstrahl bekommt den Zoom IMMER, ohne die Punkt-Schwelle
             // der Linien-/Balken-Ansicht. Grund ist kein Komfort, sondern

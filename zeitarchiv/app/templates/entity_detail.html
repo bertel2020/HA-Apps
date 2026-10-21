@@ -165,7 +165,7 @@
                Abfrage etwas herausgefiltert hat. Für jeden Entitätstyp
                verfügbar: ein senkrechtes Band braucht nur die Zeitachse und
                trifft keine Aussage über den Wert. #}
-            <label class="menu-row">
+            <label class="menu-row"{% if aggregation_type == 'state' %} x-show="stateMode === 'timeline'"{% endif %}>
               <span class="menu-row-label">{{ _("Markierte Werte") }}</span>
               <span class="menu-toggle">
                 <input type="checkbox" :checked="showMarked" @change="toggleMarked()">
