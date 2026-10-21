@@ -19,6 +19,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field, model_validator
 
 from . import ha_integration
+from .ai_routes import AiDependencies, create_ai_router
 from .chart_period import stichtag_or_400, stichtag_window
 from .formatting import decimals_to_int, entity_display_name
 from .limits import (
@@ -74,7 +75,9 @@ EventText = Annotated[str, Field(max_length=MAX_EVENT_TEXT_LENGTH)]
 # eines Versionsvergleichs: Die Integration muss dann keine App-Version
 # kennen, ab der etwas geht, und eine Fähigkeit lässt sich auch wieder
 # zurücknehmen. "state": /api/write nimmt Text-Zustände (state/state_label).
-API_CAPABILITIES = ("state",)
+# "ai": /api/ai/* existiert (ROADMAP 1.31); ob der Zugriff eingeschaltet ist,
+# sagt erst die Antwort dort (403 = aus).
+API_CAPABILITIES = ("state", "ai")
 
 
 class EventIn(BaseModel):
@@ -1001,4 +1004,8 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             })
         return {"columns": column_results}
 
+    router.include_router(create_ai_router(AiDependencies(
+        data_dir=deps.data_dir, index=deps.index, tz=deps.tz,
+        coordinator=deps.coordinator, check_auth=check_auth,
+    )))
     return router

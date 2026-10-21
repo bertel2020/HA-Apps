@@ -159,6 +159,12 @@ PYTHON_TEXT_KEYS = {"label", "title", "message", "detail", "error", "msg", "text
 # Bewusst unübersetzte Python-Texte (Datei -> Texte); Produktname oder in beiden Sprachen gleich.
 UNTRANSLATED_PYTHON_TEXT_OK: dict[str, set[str]] = {
     "main.py": {"Zeitarchiv", "Rollups", "Backups"},
+    # Antworten für Sprachmodelle sind fest Englisch (ROADMAP 1.31, "Sprache und Format").
+    "ai_routes.py": {"AI access is switched off in Zeitarchiv."},
+    "ai_tools.py": {
+        "Not in the archive; call zeitarchiv_search_entities to find the right entity_id.",
+        "Text-state entities are not supported by this tool yet.",
+    },
 }
 
 
