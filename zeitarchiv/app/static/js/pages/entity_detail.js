@@ -342,7 +342,15 @@ function selectBrush() {
     // Zeitstrahl, ab dem Monat die Anteile (ROADMAP 1.29 — ein Jahr Zeitstrahl
     // wären zehntausende Rechtecke, und die Frage dort ist "wie lange", nicht
     // "wann genau").
-    const stateModeFor = range => (StateEntities.SERVER_SHARE_RANGES.includes(range) ? 'shares' : 'timeline');
+    // Eine selbst gewählte Darstellung (chosen) bleibt beim Zeitraumwechsel
+    // erhalten; nur der Zeitstrahl geht ab dem Monat nicht (siehe oben) und
+    // fällt dort auf den Standard zurück — wer danach wieder in einen kurzen
+    // Zeitraum wechselt, bekommt ihn zurück.
+    const stateModeFor = (range, chosen = null) => {
+      const longRange = StateEntities.SERVER_SHARE_RANGES.includes(range);
+      if (chosen && !(chosen === 'timeline' && longRange)) return chosen;
+      return longRange ? 'shares' : 'timeline';
+    };
     // Klick auf einen Balken öffnet den Zeitraum darunter.
     const STATE_DRILL = {week: 'day', month: 'day', year: 'month', decade: 'year', day: 'hour'};
 
@@ -399,8 +407,10 @@ function selectBrush() {
         states: [],
         // Zeitstrahl, Anteile oder Wechsel je Bucket. Nicht gespeichert: der
         // Zeitraum bestimmt den Ausgangspunkt (stateModeFor), umgeschaltet
-        // wird für den Moment.
+        // wird für den Moment. stateModeChosen merkt die eigene Wahl, damit sie
+        // einen Zeitraumwechsel überlebt.
         stateMode: stateModeFor(INITIAL_RANGE || 'day'),
+        stateModeChosen: null,
         // Anteile je Bucket vom Server (chart_type "shares"), nur ab dem Monat.
         // points bleiben die Rohwechsel — Protokoll und längster Abschnitt
         // brauchen sie in jedem Zeitraum.
@@ -712,6 +722,7 @@ function selectBrush() {
         stateSwatch(idx) { return stateSwatchStyle(idx); },
         stateShare(row) { return StateEntities.fmtShare(row.share); },
         setStateMode(mode) {
+          this.stateModeChosen = mode;
           if (mode === this.stateMode) return;
           this.stateMode = mode;
           this.zoomRange = null;
@@ -789,7 +800,7 @@ function selectBrush() {
           // jedem Zeitraum — sonst kämen gebucketete Daten, bis man auf
           // Balken und zurück schaltet.
           this.raw = this.chartType === 'timeline';
-          if (this.isState) this.stateMode = stateModeFor(key);
+          if (this.isState) this.stateMode = stateModeFor(key, this.stateModeChosen);
           this.offset = nextOffset;
           this.continuous = false;
           this.load();
