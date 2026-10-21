@@ -730,6 +730,11 @@
         // Zustands-Entitäten (ROADMAP 1.29) gibt es nur als Zeitstrahl oder
         // Donut — eine Linie aus Zustandsindizes hätte keine Aussage.
         get hasState() { return this.series.some(s => s.aggregation_type === 'state'); },
+        // Nur Zustände im Chart: die Legende trägt dann immer Dauer und Anteil,
+        // wie auf der Entitätsseite — der Schalter "Statistik in Legende"
+        // entfällt, statsShown ersetzt chartStats in der Legende.
+        get allState() { return this.series.length > 0 && this.series.every(s => s.aggregation_type === 'state'); },
+        get statsShown() { return this.chartStats || this.allState; },
         get resolutionOptions() {
           const labels = RESOLUTION_LABELS[this.range] || RESOLUTION_LABELS.day;
           const options = [

@@ -433,7 +433,7 @@
                     <button :class="{active: averageStyle === 'rolling'}" @click="averageStyle = 'rolling'; render()">{{ _("Gleitend") }}</button>
                   </div>
                 </div>
-                <label class="menu-row">
+                <label class="menu-row" x-show="!allState">
                   <span class="menu-row-label">{{ _("Statistik in Legende") }}</span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="chartStats" @change="chartStats = !chartStats; render()">
@@ -450,7 +450,7 @@
                     </label>
                   </template>
                 </div>
-                <div class="menu-row" x-show="chartStats">
+                <div class="menu-row" x-show="statsShown">
                   <span class="menu-row-label">{{ _("Legenden-Stil") }}</span>
                   <div class="seg">
                     <button :class="{active: legendStyle === 'chips'}" @click="legendStyle = 'chips'">{{ _("Chips") }}</button>
@@ -583,7 +583,7 @@
              keine sinnvollen Einträge (zwei eigenständige Jahresserien statt
              einer gedämpften Vergleichs-Nebenserie), deshalb zusätzlich
              ausgeblendet statt nur per hasData. -->
-        <div class="chart-legend" x-show="hasData && !yearsCompareActive && !multiYearActive && (legendStyle === 'chips' || !chartStats)">
+        <div class="chart-legend" x-show="hasData && !yearsCompareActive && !multiYearActive && (legendStyle === 'chips' || !statsShown)">
           <template x-for="stat in seriesStats" :key="stat.entityId">
             <button type="button" class="chart-legend-item" :class="{inactive: legendHiddenIds.includes(stat.entityId)}"
                     @click="toggleLegendItem(stat.entityId, stat.name)"
@@ -594,7 +594,7 @@
                  und Anteil je Zustand statt Min/Max über Indizes. #}
               <span class="values state-legend-values" x-show="stat.isState">
                 <template x-for="row in stat.stateRows" :key="row.idx">
-                  <span :title="row.raw"><span class="dot state-dot" :style="row.swatch"></span> <span x-text="row.label"></span><strong x-show="chartStats" x-text="' ' + row.text"></strong></span>
+                  <span :title="row.raw"><span class="dot state-dot" :style="row.swatch"></span> <span x-text="row.label"></span><strong x-show="statsShown" x-text="' ' + row.text"></strong></span>
                 </template>
               </span>
               <span class="values" x-show="chartStats && !stat.isState">
@@ -657,7 +657,7 @@
              Entität und Jahr, nicht klickbar wie die Chips dort. -->
         {# Zustände: eine Zeile je Entität und Zustand (Dauer, Anteil, Wechsel)
            statt Min/Max/Ø über Zustandsindizes — wie die Tabelle der Entitätsseite. #}
-        <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && chartStats && hasState && legendStyle === 'table'">
+        <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && statsShown && hasState && legendStyle === 'table'">
           <table class="dt compact chart-legend-table state-legend-table">
             <thead>
               <tr>
