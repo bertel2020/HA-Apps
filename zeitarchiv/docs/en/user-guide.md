@@ -359,6 +359,15 @@ something to scroll.
   pinning order. Both switches can be combined independently of each other. On
   narrow displays the presentation deliberately stays single-column even in
   Precise mode so that tiles remain readable and usable.
+- **Period navigation** (dashboard editor, off by default): shows a
+  reference-date bar on the right of the title row (‹ date ›, calendar, step
+  Day/Week/Month/Year, "Today"). It moves the whole dashboard to another day:
+  each tile shows the period of its own range that contains this day — the
+  month tile the whole month, the year tile the year, rolling windows
+  ("last 24 h") end at the end of that day, value tiles show the state at the
+  end of the period. Charts with a fixed period stay unchanged. While looking
+  back, automatic refresh is paused. The day is part of the address
+  (`?date=YYYY-MM-DD`) and is not saved.
 - **Lock dashboard** (editor, "Locked" switch): blocks rearranging, resizing
   and removing tiles on the view itself — protects against accidental moving
   on, for example, a permanently displayed wall tablet. Renaming and deleting

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_dashboard_period_nav.html" import nav as period_nav, banner as period_banner, assets as period_assets with context %}
 {% block title %}{{ _("Zeitarchiv — {name}", name=((dashboard.name | retranslate) if dashboard.is_default else dashboard.name)) }}{% endblock %}
 {% block root_vars %}--dashboard-row-height:{{ dashboard_row_height | default(218) }}px;{% endblock %}
 {% block page_css %}
@@ -14,7 +15,9 @@
       {% else %}
       <a class="dash-rename-btn" href="{{ app_root }}/dashboards/{{ dashboard.id }}/edit" title="{{ _('Bearbeiten') }}">✎</a>
       {% endif %}
+      {% if dashboard_period_nav %}{{ period_nav() }}{% endif %}
     </div>
+    {% if dashboard_period_nav %}{{ period_banner() }}{% endif %}
 
     <div class="dashboard-section">
       {% include "_dashboard_tiles.html" %}
@@ -30,5 +33,6 @@
   <script src="{{ asset('js/fixed-tooltip.js') }}"></script>
   <!-- PeriodNavigation: Kacheln mit festem Zeitraum (dashboard-tiles.js). -->
   <script src="{{ asset('js/period-navigation.js') }}"></script>
+  {% if dashboard_period_nav %}{{ period_assets() }}{% endif %}
   <script src="{{ asset('js/dashboard-tiles.js') }}"></script>
 {% endblock %}

@@ -590,7 +590,8 @@ CREATE TABLE IF NOT EXISTS dashboards (
     locked INTEGER NOT NULL DEFAULT 0,
     is_favorite INTEGER NOT NULL DEFAULT 0,
     precise_mode INTEGER NOT NULL DEFAULT 0,
-    fill_gaps INTEGER NOT NULL DEFAULT 0
+    fill_gaps INTEGER NOT NULL DEFAULT 0,
+    period_nav INTEGER NOT NULL DEFAULT 0
 );
 
 -- dashboard_id verweist auf dashboards.id — mehrere, unabhängige Dashboards
@@ -1456,6 +1457,10 @@ class Index:
             # is-dense) — Standard aus, damit bestehende Dashboards ihre
             # heutige strikte Reihenfolge-Anordnung nicht ungefragt ändern.
             self._conn.execute("ALTER TABLE dashboards ADD COLUMN fill_gaps INTEGER NOT NULL DEFAULT 0")
+        if "period_nav" not in dashboards_columns:
+            # Zeitraum-Navigation (Stichtag-Leiste über den Kacheln) — Standard
+            # aus, damit kein bestehendes Dashboard ungefragt eine Leiste bekommt.
+            self._conn.execute("ALTER TABLE dashboards ADD COLUMN period_nav INTEGER NOT NULL DEFAULT 0")
 
         # Einmalige Anlage des migrierten Default-Dashboards ("Übersicht", fest
         # verankert an id=1, siehe dashboard_pins-Migration oben) — nur beim
@@ -2611,6 +2616,13 @@ class Index:
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE dashboards SET fill_gaps = ? WHERE id = ?", (1 if fill_gaps else 0, dashboard_id)
+            )
+            return cursor.rowcount > 0
+
+    def set_dashboard_period_nav(self, dashboard_id: int, period_nav: bool) -> bool:
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboards SET period_nav = ? WHERE id = ?", (1 if period_nav else 0, dashboard_id)
             )
             return cursor.rowcount > 0
 
@@ -3992,7 +4004,7 @@ class Index:
             self._conn.execute("DELETE FROM dashboards WHERE id != 1")
             self._conn.execute(
                 "UPDATE dashboards SET name = 'Übersicht', position = 0, is_default = 1, "
-                "locked = 0, is_favorite = 0, precise_mode = 0, fill_gaps = 0 WHERE id = 1"
+                "locked = 0, is_favorite = 0, precise_mode = 0, fill_gaps = 0, period_nav = 0 WHERE id = 1"
             )
             if keep_setting_prefixes:
                 clause = " AND ".join("key NOT LIKE ?" for _ in keep_setting_prefixes)

@@ -3903,6 +3903,7 @@ def _dashboard_tiles_context(
     dashboard_locked = bool(dashboard["locked"]) if dashboard else False
     dashboard_precise = bool(dashboard["precise_mode"]) if dashboard else False
     dashboard_fill_gaps = bool(dashboard["fill_gaps"]) if dashboard else False
+    entity_rows = index.list_entities()
     all_entities = [
         {
             "entity_id": row["entity_id"],
@@ -3910,7 +3911,7 @@ def _dashboard_tiles_context(
             "ha_name": row["friendly_name"] or row["entity_id"],
             "is_custom": bool(row["custom_name"]),
         }
-        for row in index.list_entities()
+        for row in entity_rows
     ]
     return {
         "dashboard_id": dashboard_id,
@@ -3922,6 +3923,9 @@ def _dashboard_tiles_context(
         # Lücken auffüllen: grid-auto-flow: dense (.dashboard-grid.is-dense) —
         # unabhängig vom Präzisen Modus, beide lassen sich frei kombinieren.
         "dashboard_fill_gaps": dashboard_fill_gaps,
+        # Zeitraum-Navigation: Stichtag-Leiste über den Kacheln (_dashboard_period_nav.html),
+        # der Kalender reicht über das ganze Archiv wie im Chart-Editor.
+        "dashboard_period_nav": bool(dashboard["period_nav"]) if dashboard else False, **calendar_bounds(entity_rows, TZ),
         "groups": groups,
         "auto_open_pin_id": auto_open_pin_id,
         # "pinned" ist rein informativ (Hinweis im Picker) — eine bereits
@@ -4473,6 +4477,17 @@ def dashboards_fill_gaps(dashboard_id: int, body: _DashboardFillGapsBody) -> dic
     if not index.set_dashboard_fill_gaps(dashboard_id, body.fill_gaps):
         raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     return {"ok": True, "fill_gaps": body.fill_gaps}
+
+
+class _DashboardPeriodNavBody(BaseModel):
+    period_nav: bool
+
+
+@app.post("/dashboards/{dashboard_id}/period-nav")
+def dashboards_period_nav(dashboard_id: int, body: _DashboardPeriodNavBody) -> dict:
+    if not index.set_dashboard_period_nav(dashboard_id, body.period_nav):
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
+    return {"ok": True, "period_nav": body.period_nav}
 
 
 @app.post("/dashboards/{dashboard_id}/delete")

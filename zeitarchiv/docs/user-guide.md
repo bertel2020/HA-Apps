@@ -391,6 +391,15 @@ etwas kommt; er erscheint nur, wenn es tatsächlich etwas zu scrollen gibt.
   wird. **Lücken auffüllen** lässt spätere, kleinere Kacheln freie Lücken
   im Raster füllen statt strikt der Anheft-Reihenfolge zu folgen. Beide
   Schalter sind unabhängig voneinander kombinierbar.
+- **Zeitraum-Navigation** (Dashboard-Editor, Standard aus): blendet rechts in
+  der Titelzeile eine Stichtag-Leiste ein (‹ Datum ›, Kalender, Schrittweite
+  Tag/Woche/Monat/Jahr, "Heute"). Das ganze Dashboard springt damit auf einen
+  anderen Tag: Jede Kachel zeigt die Periode ihres Zeitraums, die diesen Tag
+  enthält — die Monatskachel den ganzen Monat, die Jahreskachel das Jahr,
+  rollierende Fenster ("letzte 24 Std.") enden am Ende des Tages, Werte-Kacheln
+  zeigen den Stand am Ende des Zeitraums. Charts mit festem Zeitraum bleiben
+  unverändert. Im Rückblick pausiert die automatische Aktualisierung. Der Tag
+  steht in der Adresse (`?date=JJJJ-MM-TT`) und wird nicht gespeichert.
   Auf schmalen Displays bleibt die Darstellung auch im Präzisen Modus bewusst
   einspaltig, damit Kacheln lesbar und bedienbar bleiben.
 - **Dashboard fixieren** (Editor, Schalter "Fixiert"): sperrt Umsortieren,

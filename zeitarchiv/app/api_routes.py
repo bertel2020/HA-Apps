@@ -19,6 +19,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from . import ha_integration
+from .chart_period import stichtag_or_400, stichtag_window
 from .formatting import decimals_to_int, entity_display_name
 from .limits import (
     MAX_EVENT_TEXT_LENGTH,
@@ -101,6 +102,9 @@ class TableQueryRequest(BaseModel):
 
     entity_ids: list[EntityId] = Field(min_length=1, max_length=MAX_MULTI_QUERY_ENTITIES)
     columns: list[TableQueryColumn] = Field(min_length=1, max_length=100)
+    # Stichtag der Zeitraum-Navigation eines Dashboards (JJJJ-MM-TT), siehe
+    # chart_period.stichtag_window(). None = heute.
+    at: str | None = None
 
 
 @dataclass
@@ -626,8 +630,13 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         compare_mode: str = "previous",
         raw: bool = False,
         previous_years: int = 1,
+        at: str | None = None,
     ) -> dict:
-        now = datetime.now(deps.tz)
+        # at: Stichtag der Zeitraum-Navigation eines Dashboards — verschiebt
+        # Bezugszeitpunkt bzw. Versatz, alles Weitere (Vergleich, Langzeit)
+        # rechnet unverändert relativ dazu.
+        now, shift = stichtag_window(range, continuous, stichtag_or_400(at), datetime.now(deps.tz))
+        offset += shift
         ids = limited_multi_entity_ids({"entity_ids": entity_ids})
         for entity_id in ids:
             _validate_entity_id_or_400(entity_id)
@@ -717,6 +726,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         continuous: bool = False,
         resolution: str = "raw",
         stats: bool = False,
+        at: str | None = None,
     ) -> dict:
         """Alles, was eine Werte-Kachel anzeigt, in einer Runde — für mehrere
         Kacheln gleichzeitig.
@@ -742,7 +752,8 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         for entity_id in ids:
             _validate_entity_id_or_400(entity_id)
 
-        now = datetime.now(deps.tz)
+        # at: Stichtag der Zeitraum-Navigation, siehe api_query_multi().
+        now, offset = stichtag_window(range, continuous, stichtag_or_400(at), datetime.now(deps.tz))
         read_cache = query_mod.QueryReadCache()
         # Rohwerte liefern zwei Dinge auf einmal: die Sparkline-Punkte und den
         # aktuellen Wert samt Alter. Jenseits einer Woche gibt es sie nicht,
@@ -760,7 +771,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             if raw_capable:
                 raw = query_mod.query_raw_series(
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
-                    continuous=continuous,
+                    offset=offset, continuous=continuous,
                 )
                 points = _resample_sparkline(
                     [p for p in raw["points"] if p["value"] is not None], resolution
@@ -772,7 +783,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             if stats or not raw_capable:
                 bucketed = query_mod.query_series(
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
-                    continuous=continuous, read_cache=read_cache,
+                    offset=offset, continuous=continuous, read_cache=read_cache,
                 )
                 if stats:
                     aggregates = _tile_aggregates(bucketed)
@@ -789,8 +800,10 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 # Wert" muss deshalb immer aus Rohwerten kommen. Rollierend,
                 # damit die Kachel nicht kurz nach Mitternacht ohne Wert
                 # dasteht, nur weil der Kalendertag noch fast leer ist.
+                # Mit Stichtag: der Stand am Ende des gezeigten Zeitraums.
+                recent_now = now if offset == 0 else datetime.fromtimestamp(window_end, deps.tz)
                 recent = query_mod.query_raw_series(
-                    deps.data_dir, deps.index, entity_id, "day", deps.tz, now, continuous=True,
+                    deps.data_dir, deps.index, entity_id, "day", deps.tz, recent_now, continuous=True,
                 )
                 fresh = [p for p in recent["points"] if p["value"] is not None]
                 if fresh:
@@ -843,10 +856,14 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             if column.range_key not in query_mod.RANGE_KEYS:
                 raise HTTPException(status_code=400, detail=tr("Ungültiger Tabellenzeitraum"))
 
-        now = datetime.now(deps.tz)
+        real_now = datetime.now(deps.tz)
+        stichtag = stichtag_or_400(body.at)
         read_cache = query_mod.QueryReadCache()
         column_results = []
         for column in body.columns:
+            # Tabellenspalten sind immer kalendarisch, der Stichtag verschiebt
+            # also nur den Versatz (siehe chart_period.stichtag_window()).
+            now, shift = stichtag_window(column.range_key, False, stichtag, real_now)
             series = []
             window_start = window_end = period_end = elapsed_seconds = None
             is_current = True
@@ -859,7 +876,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     column.range_key,
                     deps.tz,
                     now,
-                    offset=column.offset,
+                    offset=column.offset + shift,
                     year_over_year=column.year_over_year,
                     read_cache=read_cache,
                     same_elapsed=column.same_elapsed,

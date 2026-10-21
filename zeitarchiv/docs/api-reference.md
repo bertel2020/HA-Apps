@@ -166,6 +166,14 @@ der Vergleich. Statt `compare_points` trägt der Eintrag dann `years`:
 fehlen. `cut_points` ist nur im laufenden Jahr (`offset=0`) gesetzt und
 enthält jedes Vorjahr bis zum gleichen Tag, sonst `null`.
 
+`at` (`JJJJ-MM-TT`, optional): Stichtag der Zeitraum-Navigation eines
+Dashboards. Kalendarische Zeiträume wandern auf die Periode, die diesen Tag
+enthält (zusätzlich zu `offset`, vollständig, nicht am Tag gekappt),
+rollierende enden am Ende des Tages. Heute oder später ändert nichts, ein
+anderes Format → `400`. Dasselbe Feld kennen `/api/query-table` (im Body, für
+alle Spalten; Tabellenspalten sind immer kalendarisch) und
+`/api/entity-stats` (dort ist `last` dann der Stand am Ende des Fensters).
+
 ## `POST /api/query-table` (Ingress-intern)
 
 Lädt alle Zeiträume einer Vergleichstabelle in einer gemeinsamen Anfrage

@@ -160,6 +160,14 @@ first, years without any value are left out. `cut_points` is only set in the
 current year (`offset=0`) and holds each previous year up to the same day,
 otherwise `null`.
 
+`at` (`YYYY-MM-DD`, optional): reference date of a dashboard's period
+navigation. Calendar ranges move to the period that contains this day (on top
+of `offset`, complete, not cut at that day), rolling ones end at the end of
+the day. Today or later changes nothing, any other format → `400`. The same
+field exists for `/api/query-table` (in the body, for all columns; table
+columns are always calendar-based) and `/api/entity-stats` (where `last` is
+then the state at the end of the window).
+
 ## `POST /api/query-table` (Ingress-internal)
 
 Loads all periods of a comparison table in one shared request (at most 25

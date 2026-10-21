@@ -278,7 +278,11 @@ window.TableCompute = (() => {
   // unten). Bleibt null, solange die Spalte keine Entität/Gruppen-Zeile
   // referenziert (kein Request nötig) — resolveLabel() liefert dann
   // unverändert die rohe Beschriftung zurück.
-  async function computeValues(base, columns, rows) {
+  // at: Stichtag der Zeitraum-Navigation eines Dashboards (JJJJ-MM-TT, nur
+  // dashboard-tiles.js) — der Server verschiebt damit jede Spalte auf die
+  // Periode, die diesen Tag enthält. Eine solche Periode läuft nicht mehr,
+  // deshalb dann auch kein "Gleicher Zeitpunkt"-Vergleich.
+  async function computeValues(base, columns, rows, {at = null} = {}) {
     const letters = rowLetters(rows);
     const entityRows = rows.filter(r => r.row_type === 'entity' || r.row_type === 'group');
     const allEntityIds = [...new Set(entityRows.flatMap(r => r.entity_ids))];
@@ -309,6 +313,7 @@ window.TableCompute = (() => {
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({
             entity_ids: allEntityIds,
+            at,
             columns: columns.map(col => ({
               range_key: col.range_key,
               offset: col.offset || 0,
@@ -320,7 +325,7 @@ window.TableCompute = (() => {
               // Vorjahresvergleich) mit demselben Zeitraum-Typ enthält. Ohne
               // Basis-Spalte bleibt die Vergleichsspalte unverändert vollständig
               // (z. B. eine reine "Vormonat"-Spalte ohne "Monat" daneben).
-              same_elapsed: (col.offset || 0) < 0 && !col.year_over_year
+              same_elapsed: !at && (col.offset || 0) < 0 && !col.year_over_year
                 && columns.some(c => c.range_key === col.range_key && (c.offset || 0) === 0 && !c.year_over_year),
             })),
           }),

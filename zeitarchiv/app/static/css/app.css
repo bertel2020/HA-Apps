@@ -1521,6 +1521,63 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
 /* „Historisch“ (entities.historic): gefüllt statt nur umrandet, damit die Kennzeichnung auf der Entitätsseite auffällt. */
 .badge.historic{background:var(--accent-line-soft);color:var(--accent-line);border-color:var(--accent-line);}
 [data-tooltip]{cursor:help;position:relative;}
+/* Zeitraum-Navigation eines Dashboards (_dashboard_period_nav.html, auf
+   dashboard_detail.html und der Übersicht). Dieselbe Bauart wie
+   .chart-nav im Chart-Editor (‹ Anzeige ›, Kalender, Chips), rechts in der
+   Titelzeile; auf schmalen Bildschirmen eine eigene Zeile. */
+.dash-title-row,.dashboard-head{flex-wrap:wrap;row-gap:8px;}
+.dash-period-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto;align-self:center;}
+.dash-period-nav .period-label{
+  font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);
+  min-width:130px;text-align:center;white-space:nowrap;
+  background:none;border:none;padding:4px 6px;cursor:pointer;border-radius:6px;
+}
+.dash-period-nav .period-label:hover{color:var(--accent-line);}
+.dash-period-nav .period-label.is-past{color:var(--accent-line);font-weight:600;}
+.dash-period-steps{display:inline-flex;gap:4px;}
+.dash-period-nav .chip{font-size:calc(12px * var(--font-scale, 1));padding:4px 11px;}
+.dash-period-banner{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 0 14px;padding:8px 14px;
+  background:var(--warning-soft);border:1px solid var(--warning);border-radius:8px;
+  color:var(--warning);font-size:calc(13px * var(--font-scale, 1));
+}
+.dash-period-banner .btn{margin-left:auto;}
+@media (max-width:480px){.dash-period-nav{width:100%;margin-left:0;justify-content:center;}}
+
+/* Kalender-Widget dafür, identisch zu den Kopien in chart_editor.css,
+   entity_detail.css, cleanup.css und table_editor.css (siehe
+   static/js/calendar-picker.js). Hier statt in einer Seiten-Datei, weil
+   zwei Seiten die Leiste tragen. */
+.cal-wrap{position:relative;display:inline-block;}
+.calendar-popover{
+  position:absolute;top:calc(100% + 6px);left:0;z-index:40;width:260px;
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  box-shadow:var(--shadow);padding:10px;text-align:left;
+}
+.calendar-header{display:flex;align-items:center;gap:4px;margin-bottom:8px;}
+.calendar-header .navbtn{flex:none;}
+.calendar-month-select,.calendar-year-select{
+  font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;color:var(--ink);
+  padding:5px 4px;border-radius:6px;border:1px solid var(--border);background:var(--surface);
+}
+.calendar-month-select{flex:1.4;min-width:0;}
+.calendar-year-select{flex:1;min-width:0;}
+.calendar-weekdays,.calendar-grid{display:grid;grid-template-columns:repeat(7, 1fr);}
+.calendar-weekdays{margin-bottom:4px;}
+.calendar-weekdays span{text-align:center;font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);font-family:var(--font-mono);}
+.calendar-day{
+  height:32px;box-sizing:border-box;border:none;border-radius:6px;font-size:calc(12px * var(--font-scale, 1));background:transparent;color:var(--ink);
+  cursor:pointer;font-family:inherit;font-variant-numeric:tabular-nums;
+}
+.calendar-day:hover:not(:disabled){background:var(--surface-alt);}
+.calendar-day.blank{visibility:hidden;cursor:default;}
+.calendar-day.out-of-range{color:var(--ink-faint);opacity:.3;}
+.calendar-day.no-data{color:var(--ink-faint);text-decoration:line-through;opacity:.55;}
+.calendar-day.has-data{color:var(--ink);font-weight:600;}
+.calendar-day:disabled{cursor:default;}
+.calendar-loading{margin:8px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);text-align:center;}
+.calendar-today-btn{width:100%;margin-top:8px;text-align:center;}
+
 /* data-tooltip-fixed: dieselbe Optik wie [data-tooltip]::after unten, aber
    JS-positioniert (dashboard-tiles.js setupFixedTooltips()) statt per
    ::after/position:absolute — für Abweichungs-Tooltips innerhalb scrollender/

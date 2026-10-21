@@ -2742,7 +2742,15 @@
     "Namen: {n}": "Names: {n}",
     "Stand blieb danach niedrig.": "The reading stayed low afterwards.",
     "Die meisten Rückgänge sehen nach einem planmäßigen Reset aus. Setzt sich der Zähler von selbst zurück, erlaube die Rückgänge in der Konfiguration des Zählers.": "Most decreases look like a scheduled reset. If the counter resets on its own, allow the decreases in the counter’s configuration.",
-    "Konfiguration öffnen": "Open configuration"
+    "Konfiguration öffnen": "Open configuration",
+    "Zeitraum-Navigation": "Period navigation",
+    "Blendet über den Kacheln eine Stichtag-Leiste ein. Damit springt das ganze Dashboard auf einen anderen Tag: Jede Kachel zeigt ihren Zeitraum, der diesen Tag enthält. Kacheln mit festem Zeitraum bleiben unverändert.": "Shows a reference-date bar above the tiles. It moves the whole dashboard to another day: each tile shows its period that contains this day. Tiles with a fixed period stay unchanged.",
+    "Stichtag": "Reference date",
+    "Zu einem bestimmten Tag springen": "Jump to a specific day",
+    "Schrittweite": "Step",
+    "Rückblick": "Looking back",
+    "Jede Kachel zeigt ihren Zeitraum, der diesen Tag enthält. Kacheln mit festem Zeitraum bleiben unverändert, die automatische Aktualisierung pausiert.": "Each tile shows its period that contains this day. Tiles with a fixed period stay unchanged; automatic refresh is paused.",
+    "Zurück zu heute": "Back to today"
   },
   "js": {
     "Langzeit": "Long-term",
@@ -3249,6 +3257,8 @@
     "Freitag": "Friday",
     "Samstag": "Saturday",
     "Sonntag": "Sunday",
-    "Wochentag": "Weekday"
+    "Wochentag": "Weekday",
+    "Speichern der Zeitraum-Navigation fehlgeschlagen.": "Saving the period navigation failed.",
+    "Stand {zeit}": "As of {zeit}"
   }
 }

@@ -184,6 +184,10 @@
   // Kacheln anfasst, die noch nie geladen wurden (Platzhalter außerhalb des
   // Sichtbereichs beim ersten Laden der Seite).
   const renderedTiles = new Set();
+  // Stichtag der Zeitraum-Navigation (dashboard-period-nav.js, nur wenn am
+  // Dashboard eingeschaltet), null = heute. Der Server rechnet ihn je Kachel
+  // in deren Periode um (chart_period.stichtag_window()).
+  const stichtag = () => window.DashboardStichtag || null;
   let refreshTimer = null;
   // 60s — schneller als sinnvoll wäre unnötige Serverlast für Daten, die sich
   // i. d. R. erst nach mehreren Minuten sichtbar ändern; deutlich langsamer
@@ -491,6 +495,8 @@
       entity_ids: entityIds.join(','), range, offset: String(offset), continuous: String(continuous),
       raw: String(timeline),
     });
+    // Ein fester Zeitraum bleibt fest, der Stichtag gilt nur für die übrigen.
+    if (!el.dataset.periodAnchor && stichtag()) params.set('at', stichtag());
     const compare = tileCompare(el, {range, continuous, entityIds, chartType, resolutionPreset, stacked});
     if (compare) {
       params.set('compare', 'true');
@@ -1496,7 +1502,7 @@
     const base = el.closest('#dashboard-grid')?.dataset.appRoot || '';
     let values, allValues, windowStarts, windowEnds, isCurrent, elapsedSeconds;
     try {
-      ({values, windowStarts, windowEnds, isCurrent, elapsedSeconds} = await TableCompute.computeValues(base, visibleCols, allRows));
+      ({values, windowStarts, windowEnds, isCurrent, elapsedSeconds} = await TableCompute.computeValues(base, visibleCols, allRows, {at: stichtag()}));
       allValues = values;
       values = values.map(colValues => visibleRowIndexes.map(i => colValues[i]));
     } catch (e) {
@@ -1808,8 +1814,8 @@
   // Tag" und nicht t("größter Messwert"). Die Bucket-Größe kommt vom Server
   // (bucket_label), damit hier keine zweite Tabelle mit den Auflösungen des
   // Speichers entsteht, die still veralten könnte.
-  function tileMetricTooltip(el, metric, serie) {
-    const fenster = (TILE_RANGE_WINDOW[el.dataset.range] || TILE_RANGE_WINDOW.day)[
+  function tileMetricTooltip(el, metric, serie, stichtagFenster = null) {
+    const fenster = stichtagFenster || (TILE_RANGE_WINDOW[el.dataset.range] || TILE_RANGE_WINDOW.day)[
       el.dataset.continuous === 'true' ? 1 : 0
     ];
     const bucket = serie && serie.bucket_label;
@@ -1895,6 +1901,7 @@
       resolution: erste.dataset.sparklineResolution || 'raw',
       stats: tileNeedsAggregates(erste) ? 'true' : 'false',
     });
+    if (stichtag()) params.set('at', stichtag());
     // MAX_MULTI_QUERY_ENTITIES (25, siehe limits.py) — ein großes Dashboard
     // überschreitet das sonst und bekäme statt Daten eine 413.
     for (let i = 0; i < tiles.length; i += 25) {
@@ -1915,9 +1922,12 @@
         continue;  // Netzwerkfehler: der servergerenderte Platzhalter bleibt stehen
       }
       const nachId = new Map((daten.series || []).map(s => [s.entity_id, s]));
+      // Mit Stichtag passt "heute seit Mitternacht" im Kennzahlen-Tooltip
+      // nicht mehr — dann das tatsächliche Fenster.
+      const fenster = stichtag() ? stichtagWindowText(daten.window_start, daten.window_end) : null;
       stueck.forEach(el => {
         const serie = nachId.get(el.dataset.entityId);
-        if (serie) applyEntityTile(el, serie);
+        if (serie) applyEntityTile(el, serie, fenster);
       });
     }
   }
@@ -1931,7 +1941,19 @@
   // Sparkline-Kurve). Der servergerenderte Anfangszustand (siehe
   // _dashboard_tiles_context() in main.py) bleibt als Platzhalter stehen,
   // falls der Fetch fehlschlägt oder keine Daten liefert.
-  function applyEntityTile(el, serie) {
+  // "21.10.2025" bzw. "01.10.2025 – 31.10.2025" für ein [Anfang, Ende)-Fenster
+  // in Server-Sekunden.
+  function stichtagWindowText(start, end) {
+    if (start == null || end == null) return null;
+    const tag = sec => {
+      const p = window.ServerTime.parts(sec);
+      return `${String(p.day).padStart(2, '0')}.${String(p.month).padStart(2, '0')}.${p.year}`;
+    };
+    const von = tag(start), bis = tag(end - 1);
+    return von === bis ? von : `${von} – ${bis}`;
+  }
+
+  function applyEntityTile(el, serie, stichtagFenster = null) {
     const primary = el.dataset.primaryMetric || 'last';
     const dezimal = el.dataset.decimals === 'auto' ? null : parseInt(el.dataset.decimals, 10);
     const istSchalter = el.dataset.isSwitch === 'true';
@@ -1955,7 +1977,14 @@
     const ageEl = el.querySelector('.dtile-entity-age');
     const secondsAgo = serie.last_ts == null ? null : Date.now() / 1000 - serie.last_ts;
     if (ageEl) {
-      ageEl.textContent = secondsAgo == null ? t('nie') : t('vor {dauer}', {dauer: NumberFormat.fmtDuration(secondsAgo)});
+      // Im Rückblick wäre "vor 1 Jahr" wahr, aber nutzlos — dann der Zeitpunkt.
+      ageEl.textContent = serie.last_ts == null
+        ? t('nie')
+        : (stichtag()
+            ? t('Stand {zeit}', {zeit: new Date(serie.last_ts * 1000).toLocaleString(LOCALE, window.ServerTime.withZone({
+              day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+            }))})
+            : t('vor {dauer}', {dauer: NumberFormat.fmtDuration(secondsAgo)}));
     }
     // Nur der Kartenrahmen zeigt "veraltet" an (siehe .dtile-entity.is-warn/
     // is-stale), der Wert bleibt immer schwarz. Die Schwellen kommen je Kachel
@@ -1967,7 +1996,8 @@
     if (tileEl) {
       const warnAfter = parseFloat(el.dataset.staleWarnAfter);
       const staleAfter = parseFloat(el.dataset.staleStaleAfter);
-      const mark = secondsAgo != null && !Number.isNaN(warnAfter) && !Number.isNaN(staleAfter);
+      // Im Rückblick ist jeder Wert "alt" — markiert wird nur die Gegenwart.
+      const mark = !stichtag() && secondsAgo != null && !Number.isNaN(warnAfter) && !Number.isNaN(staleAfter);
       tileEl.classList.toggle('is-warn', mark && secondsAgo > warnAfter && secondsAgo <= staleAfter);
       tileEl.classList.toggle('is-stale', mark && secondsAgo > staleAfter);
     }
@@ -1986,7 +2016,7 @@
       // data-tooltip-fixed statt data-tooltip: .dtile-body hat
       // overflow:hidden, ein ::after-Tooltip würde am Kachelrand
       // abgeschnitten (siehe fixed-tooltip.js).
-      statEl.setAttribute('data-tooltip-fixed', tileMetricTooltip(el, metric, serie));
+      statEl.setAttribute('data-tooltip-fixed', tileMetricTooltip(el, metric, serie, stichtagFenster));
     });
 
     const sparklineEl = el.querySelector('.dtile-entity-sparkline');
@@ -2043,18 +2073,28 @@
   // Läuft auch im Hintergrund weiter (der Browser drosselt Intervalle
   // inaktiver Tabs ohnehin selbst), die visibilityState-Prüfung im Tick
   // spart zusätzlich die Server-Anfragen selbst, nicht nur deren Timing.
+  function rerenderTiles() {
+    renderedTiles.forEach(el => {
+      if (!el.isConnected) { renderedTiles.delete(el); return; }
+      if (el.classList.contains('dtile-entity-body')) renderEntityTile(el);
+      else if (el.dataset.columns != null) renderTableTile(el);
+      else renderTile(el);
+    });
+  }
+
+  // Ein Rückblick (Stichtag in der Vergangenheit) ändert sich nicht mehr —
+  // dort pausiert der Auto-Refresh, siehe Hinweis über den Kacheln.
   function setupAutoRefresh() {
     if (refreshTimer) clearInterval(refreshTimer);
     refreshTimer = setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
-      renderedTiles.forEach(el => {
-        if (!el.isConnected) { renderedTiles.delete(el); return; }
-        if (el.classList.contains('dtile-entity-body')) renderEntityTile(el);
-        else if (el.dataset.columns != null) renderTableTile(el);
-        else renderTile(el);
-      });
+      if (document.visibilityState !== 'visible' || stichtag()) return;
+      rerenderTiles();
     }, DASHBOARD_REFRESH_INTERVAL_MS);
   }
+
+  // Neuer Stichtag: sichtbare Kacheln sofort neu laden. Noch nie gezeichnete
+  // lesen ihn, sobald sie in den Sichtbereich kommen.
+  window.addEventListener('dashboard-stichtag', rerenderTiles);
 
   function setupSizePickers() {
     const grid = document.getElementById('dashboard-grid');
