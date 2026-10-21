@@ -1546,6 +1546,7 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
 .dash-period-banner-back{
   font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;
   text-decoration:underline;text-underline-offset:2px;
+  margin-left:auto;  /* rechts, unter der Datumsleiste, zu der die Aktion gehört */
 }
 .dash-period-banner-back:hover{color:var(--ink);}
 @media (max-width:480px){.dash-period-banner-paused{display:none;}}
