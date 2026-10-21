@@ -435,7 +435,7 @@ function selectBrush() {
         // gespeichert, wie das Ein-/Ausblenden von Serien im Chart-Editor.
         hiddenStates: [],
         stateLog: CHART_OPTIONS.state_log !== false,
-        stateLogShown: STATE_LOG_PAGE,
+        stateLogPage: 0,
         stateLogDays: {},
         // Zeile im Wechsel-Protokoll, deren Band gerade hervorgehoben ist.
         stateHot: null,
@@ -704,7 +704,12 @@ function selectBrush() {
         // man sie öffnet (stateLogDays hält nur die eigenen Umschaltungen).
         get stateLogGroups() {
           const rows = this.stateLogRows;
-          if (['hour', 'day'].includes(this.range)) return {multiDay: false, groups: [{key: 'all', segs: rows, open: true}]};
+          if (['hour', 'day'].includes(this.range)) {
+            // Kein Tag, den man zerschneiden könnte: einfach seitenweise.
+            const groups = [];
+            for (let i = 0; i < rows.length; i += STATE_LOG_PAGE) groups.push({key: `all${i}`, segs: rows.slice(i, i + STATE_LOG_PAGE), open: true});
+            return {multiDay: false, groups: groups.length ? groups : [{key: 'all', segs: [], open: true}]};
+          }
           const byDay = new Map();
           rows.forEach(seg => {
             const key = new Date(seg.s * 1000).toDateString();
@@ -716,16 +721,33 @@ function selectBrush() {
           }));
           return {multiDay: true, groups};
         },
-        // Zeilen, die tatsächlich ausgeklappt sind — nur sie zählen für
-        // "Weitere laden", ein geschlossener Tag verbraucht kein Kontingent.
-        get stateLogVisibleRows() {
-          return this.stateLogGroups.groups.filter(g => g.open).flatMap(g => g.segs);
+        // Seiten zu je höchstens STATE_LOG_PAGE ausgeklappten Zeilen. Ein Tag
+        // wird nie getrennt: er kommt ganz auf eine Seite, ein größerer Tag
+        // bekommt eine eigene. Zugeklappte Tage kosten nichts.
+        get stateLogPages() {
+          const pages = [];
+          let cur = null, used = 0;
+          this.stateLogGroups.groups.forEach(g => {
+            const cost = g.open ? g.segs.length : 0;
+            if (!cur || (used > 0 && used + cost > STATE_LOG_PAGE)) {
+              cur = [];
+              used = 0;
+              pages.push(cur);
+            }
+            cur.push(g);
+            used += cost;
+          });
+          return pages;
+        },
+        get stateLogPageNo() {
+          return Math.min(this.stateLogPage, Math.max(this.stateLogPages.length - 1, 0));
         },
         // Protokoll-Einträge: Tageskopf (mit Mini-Leiste der Zusammensetzung)
         // und darunter die Abschnitte als Zeitspanne mit Dauerbalken,
-        // begrenzt auf stateLogShown Zeilen.
+        // nur die aktuelle Seite.
         get stateLogItems() {
-          const {multiDay, groups} = this.stateLogGroups;
+          const {multiDay} = this.stateLogGroups;
+          const groups = this.stateLogPages[this.stateLogPageNo] || [];
           const longest = this.stateLogRows.reduce((m, seg) => Math.max(m, seg.e - seg.s), 1);
           const mkRow = seg => ({
             type: 'row', id: `r${seg.key}`, seg,
@@ -733,7 +755,6 @@ function selectBrush() {
             bar: `width:${Math.max((seg.e - seg.s) / longest * 100, 1.5)}%;${stateSwatchStyle(seg.idx)}`,
           });
           const items = [];
-          let left = this.stateLogShown;
           groups.forEach(g => {
             if (multiDay) {
               const total = g.segs.reduce((sum, seg) => sum + (seg.e - seg.s), 0) || 1;
@@ -746,11 +767,7 @@ function selectBrush() {
               });
             }
             if (!g.open) return;
-            for (const seg of g.segs) {
-              if (left <= 0) break;
-              items.push(mkRow(seg));
-              left -= 1;
-            }
+            g.segs.forEach(seg => items.push(mkRow(seg)));
           });
           return items;
         },
@@ -808,15 +825,14 @@ function selectBrush() {
           const seg = key == null ? null : this.stateSegments.find(x => x.key === key);
           chartInstance.setOption({series: [{id: 'main'}, {id: 'hl', data: seg ? [[0, seg.s * 1000, seg.e * 1000]] : []}]});
         },
-        // Klick auf ein Band: zur Zeile springen (nachladen, falls sie hinter
-        // den bisher gezeigten Einträgen liegt).
+        // Klick auf ein Band: zur Zeile springen (auf deren Seite blättern).
         focusStateRow(key) {
           if (!this.stateLog) this.stateLog = true;
           const group = this.stateLogGroups.groups.find(g => g.segs.some(seg => seg.key === key));
           if (!group) return;
           if (!group.open) this.stateLogDays = {...this.stateLogDays, [group.key]: true};
-          const pos = this.stateLogVisibleRows.findIndex(seg => seg.key === key);
-          if (pos >= this.stateLogShown) this.stateLogShown = Math.ceil((pos + 1) / STATE_LOG_PAGE) * STATE_LOG_PAGE;
+          const page = this.stateLogPages.findIndex(pg => pg.some(g => g.segs.some(seg => seg.key === key)));
+          if (page >= 0) this.stateLogPage = page;
           this.stateHot = key;
           this.$nextTick(() => {
             const row = document.querySelector(`.state-log [data-key="${key}"]`);
@@ -1046,7 +1062,7 @@ function selectBrush() {
           this.compareWindowEnd = data.compare_window_end ?? null;
           this.aggregationType = data.aggregation_type;
           this.states = data.states || [];
-          this.stateLogShown = STATE_LOG_PAGE;
+          this.stateLogPage = 0;
           this.stateLogDays = {};
           this.windowStart = data.window_start;
           this.windowEnd = data.window_end;

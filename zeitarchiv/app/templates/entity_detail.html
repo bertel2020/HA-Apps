@@ -479,8 +479,13 @@
               </template>
               <p class="hint" x-show="!stateLogRows.length">{{ _("Keine Wechsel in diesem Ausschnitt.") }}</p>
             </div>
-            <button type="button" class="btn state-log-more" x-show="stateLogShown < stateLogVisibleRows.length"
-                    @click="stateLogShown += 25" x-text="t('Weitere {n} laden', {n: Math.min(25, stateLogVisibleRows.length - stateLogShown)})"></button>
+            <div class="state-log-pager" x-show="stateLogPages.length > 1">
+              <button type="button" class="btn" :disabled="stateLogPageNo === 0" @click="stateLogPage = stateLogPageNo - 1"
+                      aria-label="{{ _('Vorherige Seite') }}">‹</button>
+              <span x-text="t('Seite {n} von {total}', {n: stateLogPageNo + 1, total: stateLogPages.length})"></span>
+              <button type="button" class="btn" :disabled="stateLogPageNo >= stateLogPages.length - 1" @click="stateLogPage = stateLogPageNo + 1"
+                      aria-label="{{ _('Nächste Seite') }}">›</button>
+            </div>
           </div>
         </div>
       </div>

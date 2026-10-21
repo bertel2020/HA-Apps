@@ -3307,7 +3307,7 @@
     "Wechsel-Protokoll · {count} im Ausschnitt": "Change log · {count} in section",
     "längster Abschnitt {dauer} ({zustand})": "longest section {dauer} ({zustand})",
     "läuft": "ongoing",
-    "Weitere {n} laden": "Load {n} more",
+    "Seite {n} von {total}": "Page {n} of {total}",
     "nicht verfügbar": "unavailable",
     "nicht verfügbar {dauer}": "unavailable {dauer}",
     "{count} Wechsel": "{count} changes",

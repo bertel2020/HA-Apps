@@ -154,7 +154,6 @@
 .state-panel{display:flex;flex-direction:column;gap:10px;margin-top:12px;}
 .state-kpis{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
 .state-panel .chart-legend{margin-top:0;}
-.state-panel .chart-legend-table-wrap{max-width:36rem;}
 .state-legend-row{cursor:pointer;}
 .state-legend-row:hover td{background:var(--surface-alt);}
 .state-legend-row.inactive td{opacity:.45;}
@@ -185,5 +184,5 @@
 .state-log-row{grid-template-columns:6.4rem minmax(0,1fr) auto;}
 .state-log-bar{display:none;}
 }
-.state-log-more{align-self:flex-start;margin-top:10px;}
+.state-log-pager{display:flex;align-items:center;gap:12px;margin-top:10px;color:var(--ink-muted);font-variant-numeric:tabular-nums;}
 @media (prefers-reduced-motion:reduce){.state-log-caret,.state-log-day-caret{transition:none;}}
