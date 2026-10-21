@@ -450,7 +450,7 @@
                     </label>
                   </template>
                 </div>
-                <div class="menu-row" x-show="chartStats && !hasState">
+                <div class="menu-row" x-show="chartStats">
                   <span class="menu-row-label">{{ _("Legenden-Stil") }}</span>
                   <div class="seg">
                     <button :class="{active: legendStyle === 'chips'}" @click="legendStyle = 'chips'">{{ _("Chips") }}</button>
@@ -583,7 +583,7 @@
              keine sinnvollen Einträge (zwei eigenständige Jahresserien statt
              einer gedämpften Vergleichs-Nebenserie), deshalb zusätzlich
              ausgeblendet statt nur per hasData. -->
-        <div class="chart-legend" x-show="hasData && !yearsCompareActive && !multiYearActive && (legendStyle === 'chips' || !chartStats || hasState)">
+        <div class="chart-legend" x-show="hasData && !yearsCompareActive && !multiYearActive && (legendStyle === 'chips' || !chartStats)">
           <template x-for="stat in seriesStats" :key="stat.entityId">
             <button type="button" class="chart-legend-item" :class="{inactive: legendHiddenIds.includes(stat.entityId)}"
                     @click="toggleLegendItem(stat.entityId, stat.name)"
@@ -655,6 +655,32 @@
         <!-- Der Soll-/Laufsummen-Balkenvergleich (yearsCompareActive) hat seine
              eigene Tabelle direkt darunter (yearsSeriesStats): eine Zeile je
              Entität und Jahr, nicht klickbar wie die Chips dort. -->
+        {# Zustände: eine Zeile je Entität und Zustand (Dauer, Anteil, Wechsel)
+           statt Min/Max/Ø über Zustandsindizes — wie die Tabelle der Entitätsseite. #}
+        <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && chartStats && hasState && legendStyle === 'table'">
+          <table class="dt compact chart-legend-table state-legend-table">
+            <thead>
+              <tr>
+                <th class="legend-name-col">{{ _("Entität") }}</th>
+                <th>{{ _("Zustand") }}</th>
+                <th>{{ _("Dauer") }}</th>
+                <th>{{ _("Anteil") }}</th>
+                <th>{{ _("Wechsel") }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="row in stateTableRows" :key="row.key">
+                <tr class="state-legend-row" :title="row.raw">
+                  <td class="legend-name-col" x-text="row.name"></td>
+                  <td><span class="dot state-dot" :style="row.swatch"></span> <span x-text="row.label"></span></td>
+                  <td x-text="row.duration"></td>
+                  <td x-text="row.share"></td>
+                  <td x-text="row.entries"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
         <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && chartStats && !hasState && legendStyle === 'table' && !yearsCompareActive && !multiYearActive">
           <table class="dt compact chart-legend-table">
             <thead>

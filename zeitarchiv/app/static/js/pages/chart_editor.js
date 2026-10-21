@@ -804,6 +804,19 @@
             sum: hasSum ? (values.length ? sumFormatted : '—') : null,
           };
         },
+        // Tabellen-Legende bei Zuständen: eine Zeile je Entität und Zustand.
+        get stateTableRows() {
+          return this.seriesStats.filter(st => st.isState).flatMap(st => st.stateRows.map(row => ({
+            key: `${st.entityId}:${row.idx}`,
+            name: st.name,
+            label: row.label,
+            raw: row.raw,
+            swatch: row.swatch,
+            duration: NumberFormat.fmtDuration(row.seconds),
+            share: StateEntities.fmtShare(row.share),
+            entries: row.entries.toLocaleString(window.ZA_FORMAT),
+          })));
+        },
         // Dauer und Anteil je Zustand einer Zustands-Serie im Zeitraum — für die
         // Legende je Zeile und den Donut. Rohwechsel (Zeitstrahl, bis zur
         // Woche) und Server-Anteile (ab dem Monat) ergeben dieselbe Form.
