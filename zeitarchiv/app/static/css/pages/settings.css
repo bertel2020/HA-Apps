@@ -105,7 +105,7 @@
   /* Der Formularkopf endet vor "Nutzung"; wie bei #storage-index-form trennt die Linie
      deshalb erst hier, und die Zeile "Anwesenheit" rückt von der Liste ab. */
   #ki-settings-form + .settings-subsection{margin-top:24px;padding-top:20px;border-top:1px solid var(--border);}
-  .ki-scope .ki-entity-list + .settings-compact-list{margin-top:14px;}
+  .ki-scope .settings-compact-list + .ki-entity-list{margin-top:10px;}
   .ki-copy-row{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;}
   .ki-copy-row .ki-copy-text{flex:1;min-width:200px;}
   .ki-scope .ki-entity-list{margin:8px 0 0;}
@@ -114,6 +114,18 @@
      alles darunter betrifft nur den eingeschalteten Zugriff. Wie beim Umfang per :has() am
      verdeckten Feld, damit es ohne Neuladen mitgeht. Die Auswahl bleibt im Formular. */
   #ki-form:has(#ki-enabled-input[value="0"]) .ki-dependent{display:none;}
+  /* Einklappbare Blöcke (Einrichtung, Hinweise, Aufschlüsselung): der Titel ist der Schalter,
+     der Chevron zeigt den Zustand. Native <details>, damit es ohne Skript und auch nach
+     einem htmx-Austausch funktioniert. */
+  .ki-fold > summary{list-style:none;display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;}
+  .ki-fold > summary::-webkit-details-marker{display:none;}
+  .ki-fold > summary::after{content:"";margin-left:auto;margin-right:4px;width:8px;height:8px;flex:none;
+    border-right:1.5px solid var(--ink-muted);border-bottom:1.5px solid var(--ink-muted);transform:rotate(45deg) translateY(-2px);transition:transform .15s;}
+  .ki-fold[open] > summary::after{transform:rotate(225deg) translateY(-2px);}
+  .ki-fold[open] > summary{margin-bottom:8px;}
+  .ki-fold > summary.hint{display:inline-flex;margin:8px 0 0;}
+  .ki-fold > summary.hint::after{margin-left:8px;}
+  .ki-tag{font-size:calc(11px * var(--font-scale, 1));font-weight:500;color:var(--accent-line);background:var(--accent-line-soft);border-radius:6px;padding:1px 8px;}
   .ki-tool-chips{display:flex;flex-wrap:wrap;gap:6px;}
   .ki-entity-list .search{width:100%;box-sizing:border-box;margin-bottom:6px;}
   .ki-entity-rows{max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);}

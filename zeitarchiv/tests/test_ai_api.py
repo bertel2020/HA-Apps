@@ -560,7 +560,7 @@ def test_settings_form_saves_tools_and_notes_and_shows_usage(client) -> None:
         assert access.instructions == "Wärmepumpe = WP"
         ai_usage.USAGE.record(app_index, "get_summary", "admin")
         page = client.get("/settings/ai").text
-        assert "Aufrufe gesamt" in page and "Mit Administratorkonto" in page
+        assert "1 Aufruf" in page and "Mit Administratorkonto" in page
     finally:
         ai_settings.save(
             app_index, enabled=False, scope="all", entities=[], exclude_presence=True,

@@ -44,6 +44,20 @@
           </div>
         </span>
       </div>
+      <div class="settings-compact-row">
+        <div class="settings-compact-row-text">
+          <div class="settings-compact-label">{{ _("Anwesenheit ausschließen") }} {{ hint_button(_('Anwesenheit ausschließen')) }}</div>
+          {% call hint_body('settings-compact-hint') %}{{ _("Personen und Geräte-Tracker bleiben für die KI unsichtbar. Verbrauchsverläufe in Stundenauflösung können trotzdem verraten, wann jemand zu Hause ist; wer das nicht möchte, schränkt die Entitäten oben ein.") }}{% endcall %}
+        </div>
+        <span class="dd-picker-wrap">
+          <button type="button" class="btn btn-sm" id="ki-presence-btn" onclick="toggleDDPicker('ki-presence')">{{ _("An") if ai_access.exclude_presence else _("Aus") }} ▾</button>
+          <input type="hidden" name="exclude_presence" id="ki-presence-input" value="{{ '1' if ai_access.exclude_presence else '0' }}">
+          <div class="dd-picker-popover" id="ki-presence-popover">
+            <div class="dd-picker-row" onclick="selectDDOption('ki-presence', '1', '{{ _('An') }}')">{{ _("An") }}</div>
+            <div class="dd-picker-row" onclick="selectDDOption('ki-presence', '0', '{{ _('Aus') }}')">{{ _("Aus") }}</div>
+          </div>
+        </span>
+      </div>
     </div>
 
     <div class="ki-entity-list">
@@ -66,22 +80,6 @@
       </div>
     </div>
 
-    <div class="settings-compact-list">
-      <div class="settings-compact-row">
-        <div class="settings-compact-row-text">
-          <div class="settings-compact-label">{{ _("Anwesenheit ausschließen") }} {{ hint_button(_('Anwesenheit ausschließen')) }}</div>
-          {% call hint_body('settings-compact-hint') %}{{ _("Personen und Geräte-Tracker bleiben für die KI unsichtbar. Verbrauchsverläufe in Stundenauflösung können trotzdem verraten, wann jemand zu Hause ist; wer das nicht möchte, schränkt die Entitäten oben ein.") }}{% endcall %}
-        </div>
-        <span class="dd-picker-wrap">
-          <button type="button" class="btn btn-sm" id="ki-presence-btn" onclick="toggleDDPicker('ki-presence')">{{ _("An") if ai_access.exclude_presence else _("Aus") }} ▾</button>
-          <input type="hidden" name="exclude_presence" id="ki-presence-input" value="{{ '1' if ai_access.exclude_presence else '0' }}">
-          <div class="dd-picker-popover" id="ki-presence-popover">
-            <div class="dd-picker-row" onclick="selectDDOption('ki-presence', '1', '{{ _('An') }}')">{{ _("An") }}</div>
-            <div class="dd-picker-row" onclick="selectDDOption('ki-presence', '0', '{{ _('Aus') }}')">{{ _("Aus") }}</div>
-          </div>
-        </span>
-      </div>
-    </div>
   </div>
 
   <div class="settings-subsection ki-tools ki-dependent">
@@ -98,11 +96,15 @@
   </div>
 
   <div class="settings-subsection ki-notes ki-dependent">
-    <h3 class="settings-subsection-title">{{ _("Hinweise für das Modell") }} {{ hint_button(_('Hinweise für das Modell')) }}</h3>
-    {% call hint_body() %}{{ _("Optional, zum Beispiel Strompreis, Geräte oder Besonderheiten deines Hauses. Der Text geht an die KI mit, jedes Mal wenn sie das Archiv durchsucht.") }}{% endcall %}
-    <textarea name="instructions" rows="4" maxlength="{{ ai_instructions_max }}" class="ki-notes-input"
-              placeholder="{{ _('z. B. Die Wärmepumpe heißt „WP“. Der Zähler im Keller ist der Hauptzähler.') }}">{{ ai_access.instructions }}</textarea>
-    <p class="hint hint-status">{{ _("Höchstens {max} Zeichen.", max=ai_instructions_max) }}</p>
+    <details class="ki-fold"{% if ai_access.instructions %} open{% endif %}>
+      <summary class="settings-subsection-title">{{ _("Hinweise für das Modell") }}
+        <span class="ki-tag" id="ki-notes-tag" data-empty="{{ _('noch leer') }}" data-filled="{{ _('ausgefüllt') }}">{{ _("ausgefüllt") if ai_access.instructions else _("noch leer") }}</span>
+      </summary>
+      <p class="hint hint-status">{{ _("Optional, zum Beispiel Strompreis, Geräte oder Besonderheiten deines Hauses. Der Text geht an die KI mit, jedes Mal wenn sie das Archiv durchsucht.") }}</p>
+      <textarea name="instructions" rows="3" maxlength="{{ ai_instructions_max }}" class="ki-notes-input" oninput="kiNotesTag(this)"
+                placeholder="{{ _('z. B. Die Wärmepumpe heißt „WP“. Der Zähler im Keller ist der Hauptzähler.') }}">{{ ai_access.instructions }}</textarea>
+      <p class="hint hint-status">{{ _("Höchstens {max} Zeichen.", max=ai_instructions_max) }}</p>
+    </details>
   </div>
 
   {% if ai_saved %}<p class="save-status" id="ki-save-status">{{ _("✓ Gespeichert") }}</p>{% else %}<p class="save-status" id="ki-save-status" hidden></p>{% endif %}
@@ -114,69 +116,72 @@
   <div class="settings-compact-list">
     <div class="settings-compact-row">
       <span class="settings-compact-label">{{ _("Zuletzt genutzt") }}</span>
-      <span class="settings-compact-value">{{ ai_usage.last_used or _("Noch nie") }}</span>
+      <span class="settings-compact-value">{{ ai_usage.last_used or _("Noch nie") }} · {{ _("1 Aufruf") if ai_usage.total == 1 else _("{count} Aufrufe", count=ai_usage.total) }}</span>
     </div>
-    <div class="settings-compact-row">
-      <span class="settings-compact-label">{{ _("Aufrufe gesamt") }}</span>
-      <span class="settings-compact-value">{{ ai_usage.total }}</span>
-    </div>
-    {% for item in ai_usage.by_tool if item.count %}
-    <div class="settings-compact-row">
-      <span class="settings-compact-label">{{ item.title }}</span>
-      <span class="settings-compact-value">{{ item.count }}</span>
-    </div>
-    {% endfor %}
-    {% if ai_usage.total %}
-    <div class="settings-compact-row">
-      <span class="settings-compact-label">{{ _("Mit Administratorkonto") }}</span>
-      <span class="settings-compact-value">{{ ai_usage.admin }}</span>
-    </div>
-    <div class="settings-compact-row">
-      <span class="settings-compact-label">{{ _("Mit Benutzerkonto ohne Administratorrechte") }}</span>
-      <span class="settings-compact-value">{{ ai_usage.user }}</span>
-    </div>
-    {% if ai_usage.unknown %}
-    <div class="settings-compact-row">
-      <span class="settings-compact-label">{{ _("Konto unbekannt") }}</span>
-      <span class="settings-compact-value">{{ ai_usage.unknown }}</span>
-    </div>
-    {% endif %}
-    {% endif %}
   </div>
+  {% if ai_usage.total %}
+  <details class="ki-fold ki-usage-detail">
+    <summary class="hint hint-status">{{ _("Aufschlüsselung") }}</summary>
+    <div class="settings-compact-list">
+      {% for item in ai_usage.by_tool if item.count %}
+      <div class="settings-compact-row">
+        <span class="settings-compact-label">{{ item.title }}</span>
+        <span class="settings-compact-value">{{ item.count }}</span>
+      </div>
+      {% endfor %}
+      <div class="settings-compact-row">
+        <span class="settings-compact-label">{{ _("Mit Administratorkonto") }}</span>
+        <span class="settings-compact-value">{{ ai_usage.admin }}</span>
+      </div>
+      <div class="settings-compact-row">
+        <span class="settings-compact-label">{{ _("Mit Benutzerkonto ohne Administratorrechte") }}</span>
+        <span class="settings-compact-value">{{ ai_usage.user }}</span>
+      </div>
+      {% if ai_usage.unknown %}
+      <div class="settings-compact-row">
+        <span class="settings-compact-label">{{ _("Konto unbekannt") }}</span>
+        <span class="settings-compact-value">{{ ai_usage.unknown }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </details>
+  {% endif %}
   {% if ai_usage.admin %}
   <p class="hint hint-status">{{ _("Zugriffe mit Administratorkonto sind normal, wenn die Adresse mit der API-ID verwendet wird: Der Client sieht dann nur die Zeitarchiv-Werkzeuge. Verwende nicht die allgemeine Adresse /api/mcp mit den Voreinstellungen.") }}</p>
   {% endif %}
 </div>
 
 <div class="settings-subsection ki-help ki-dependent">
-  <h3 class="settings-subsection-title">{{ _("Einrichtung") }} {{ hint_button(_('Einrichtung')) }}</h3>
-  {% call hint_body() %}{{ _("Zeitarchiv wird über Home Assistants „Model Context Protocol Server“ angeboten. Claude, ChatGPT und andere Clients verbinden sich mit diesem. Dafür muss Home Assistant von außen über HTTPS erreichbar sein (zum Beispiel über Nabu Casa); Claude Code und lokale Modelle kommen auch ohne aus.") }}{% endcall %}
-  {% if not ai_api_ids %}
-  <p class="hint hint-status">{{ _("Die Integration hat sich noch nicht gemeldet. Sie braucht eine Version mit KI-Zugriff und muss nach dem Einschalten neu laden.") }}</p>
-  {% endif %}
-  <ol class="ki-steps">
-    <li>{{ _("In Home Assistant die Integration „Model Context Protocol Server“ hinzufügen und die Voreinstellungen lassen.") }}</li>
-    <li>{{ _("Im Client diese Adresse eintragen:") }}
-      {% if ai_api_ids %}
-        {% for api_id in ai_api_ids %}<code class="ki-url">https://&lt;{{ _("Adresse von Home Assistant") }}&gt;/api/mcp/{{ api_id }}</code>{% endfor %}
-      {% else %}
-        <code class="ki-url">https://&lt;{{ _("Adresse von Home Assistant") }}&gt;/api/mcp/zeitarchiv_&lt;…&gt;</code>
-      {% endif %}
-    </li>
-    <li>{{ _("Bei der Anmeldung mit dem eigenen Home-Assistant-Konto anmelden. Mit dieser Adresse sieht der Client nur die Zeitarchiv-Werkzeuge, nicht die Steuerung von Home Assistant.") }}</li>
-  </ol>
-  <p class="hint hint-warn"><strong>{{ _("Nicht empfohlen:") }}</strong> {{ _("die allgemeine Adresse /api/mcp mit den Voreinstellungen. Dann ist auch die Steuerung (Assist) dabei, und das Modell kann Geräte schalten.") }}</p>
-  <p class="hint hint-warn">{{ _("Zugriff beenden: oben ausschalten und im Home-Assistant-Profil unter „Sicherheit“ den Zugriffstoken widerrufen. Dieser Token kann mehr, als der Client über MCP sieht.") }}</p>
-
-  <h4 class="ki-subhead">{{ _("Text zum Kopieren") }} {{ hint_button(_('Text zum Kopieren')) }}</h4>
-  {% call hint_body() %}{{ _("Optional, für die Projekt-Anweisung in Claude oder die eigenen Anweisungen in ChatGPT. Hilft, wenn neben Zeitarchiv auch die Werkzeuge von Home Assistant aktiv sind.") }}{% endcall %}
-  <div class="ki-copy-row">
-    <code class="ki-copy-text" id="ki-instruction">{{ ai_instruction }}</code>
-    <button type="button" class="btn" onclick="copyKiInstruction(this)" data-done="{{ _('In Zwischenablage kopiert.') }}">{{ _("Kopieren") }}</button>
-  </div>
-
-  <h4 class="ki-subhead">{{ _("Beispielfragen") }}</h4>
-  <ul class="ki-questions">
-    {% for question in ai_questions %}<li>{{ question }}</li>{% endfor %}
-  </ul>
+  <details class="ki-fold"{% if not ai_api_ids %} open{% endif %}>
+    <summary class="settings-subsection-title">{{ _("Einrichtung") }} <span class="ki-tag">{{ _("3 Schritte") }}</span></summary>
+    <p class="hint hint-status">{{ _("Zeitarchiv wird über Home Assistants „Model Context Protocol Server“ angeboten. Claude, ChatGPT und andere Clients verbinden sich mit diesem. Dafür muss Home Assistant von außen über HTTPS erreichbar sein (zum Beispiel über Nabu Casa); Claude Code und lokale Modelle kommen auch ohne aus.") }}</p>
+    {% if not ai_api_ids %}
+    <p class="hint hint-status">{{ _("Die Integration hat sich noch nicht gemeldet. Sie braucht eine Version mit KI-Zugriff und muss nach dem Einschalten neu laden.") }}</p>
+    {% endif %}
+    <ol class="ki-steps">
+      <li>{{ _("In Home Assistant die Integration „Model Context Protocol Server“ hinzufügen und die Voreinstellungen lassen.") }}</li>
+      <li>{{ _("Im Client diese Adresse eintragen:") }}
+        {% if ai_api_ids %}
+          {% for api_id in ai_api_ids %}<code class="ki-url">https://&lt;{{ _("Adresse von Home Assistant") }}&gt;/api/mcp/{{ api_id }}</code>{% endfor %}
+        {% else %}
+          <code class="ki-url">https://&lt;{{ _("Adresse von Home Assistant") }}&gt;/api/mcp/zeitarchiv_&lt;…&gt;</code>
+        {% endif %}
+      </li>
+      <li>{{ _("Bei der Anmeldung mit dem eigenen Home-Assistant-Konto anmelden. Mit dieser Adresse sieht der Client nur die Zeitarchiv-Werkzeuge, nicht die Steuerung von Home Assistant.") }}</li>
+    </ol>
+    <p class="hint hint-warn"><strong>{{ _("Nicht empfohlen:") }}</strong> {{ _("die allgemeine Adresse /api/mcp mit den Voreinstellungen. Dann ist auch die Steuerung (Assist) dabei, und das Modell kann Geräte schalten.") }}</p>
+    <p class="hint hint-warn">{{ _("Zugriff beenden: oben ausschalten und im Home-Assistant-Profil unter „Sicherheit“ den Zugriffstoken widerrufen. Dieser Token kann mehr, als der Client über MCP sieht.") }}</p>
+  
+    <h4 class="ki-subhead">{{ _("Text zum Kopieren") }} {{ hint_button(_('Text zum Kopieren')) }}</h4>
+    {% call hint_body() %}{{ _("Optional, für die Projekt-Anweisung in Claude oder die eigenen Anweisungen in ChatGPT. Hilft, wenn neben Zeitarchiv auch die Werkzeuge von Home Assistant aktiv sind.") }}{% endcall %}
+    <div class="ki-copy-row">
+      <code class="ki-copy-text" id="ki-instruction">{{ ai_instruction }}</code>
+      <button type="button" class="btn" onclick="copyKiInstruction(this)" data-done="{{ _('In Zwischenablage kopiert.') }}">{{ _("Kopieren") }}</button>
+    </div>
+  
+    <h4 class="ki-subhead">{{ _("Beispielfragen") }}</h4>
+    <ul class="ki-questions">
+      {% for question in ai_questions %}<li>{{ question }}</li>{% endfor %}
+    </ul>
+  </details>
 </div>

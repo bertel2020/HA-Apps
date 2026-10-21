@@ -44,6 +44,11 @@
         row.hidden = query !== '' && !row.dataset.search.includes(query);
       });
     }
+    // Marke am Titel "Hinweise für das Modell": leer oder ausgefüllt, auch bei zugeklapptem Block.
+    function kiNotesTag(textarea) {
+      const tag = document.getElementById('ki-notes-tag');
+      tag.textContent = textarea.value.trim() ? tag.dataset.filled : tag.dataset.empty;
+    }
     function copyKiInstruction(button) {
       const text = document.getElementById('ki-instruction').textContent.trim();
       const done = () => {
