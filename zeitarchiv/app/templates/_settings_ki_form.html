@@ -5,7 +5,8 @@
 {% from "_hints.html" import hint_button, hint_body %}
 {# Speichert wie die übrigen Bereiche bei jeder Änderung. Die Antwort ist das ganze
    Formular; hx-select nimmt nur die Statuszeile heraus, damit weder Textfeld noch
-   Filter noch Scrollposition der Liste zurückgesetzt werden. #}
+   Filter noch Scrollposition der Liste zurückgesetzt werden. Das Filterfeld hält
+   sein change-Event zurück (onchange), damit es kein Speichern auslöst. #}
 <form id="ki-settings-form" hx-post="settings/ai" hx-trigger="change" hx-target="#ki-save-status"
       hx-select="#ki-save-status" hx-swap="outerHTML">
   <div class="settings-compact-list">
@@ -62,7 +63,7 @@
 
     <div class="ki-entity-list">
       <input type="search" class="search" autocomplete="off" placeholder="{{ _('Entitäten filtern …') }}"
-             oninput="filterKiEntities(this)" aria-label="{{ _('Entitäten filtern …') }}">
+             oninput="filterKiEntities(this)" onchange="event.stopPropagation()" aria-label="{{ _('Entitäten filtern …') }}">
       <div class="ki-entity-rows">
         {% for entity in ai_entities %}
         <label class="ki-entity-row" data-search="{{ (entity.label ~ ' ' ~ entity.entity_id)|lower }}">
