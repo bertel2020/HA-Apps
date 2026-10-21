@@ -304,7 +304,19 @@ class ImportService:
             )] = entry
 
 
-    def _load_symcon_names(self) -> dict[str, dict[str, str | None]]:
+    def _symcon_associations(self, variable_id: str) -> dict[int, str] | None:
+        """Code → Name aus dem Profil der Symcon-Variable (aus der hochgeladenen
+        settings.json), None ohne Profil — Voraussetzung für eine Zustands-Entität
+        als Ziel (siehe symcon_import.profile_state_rows())."""
+        states = self._load_symcon_names().get(variable_id, {}).get("states")
+        if not isinstance(states, dict) or not states:
+            return None
+        try:
+            return {int(code): str(name) for code, name in states.items()}
+        except (TypeError, ValueError):
+            return None
+
+    def _load_symcon_names(self) -> dict[str, dict]:
         """Lädt die zuletzt hochgeladene ID→{name, parent, unit}-Zuordnung (siehe
         self.deps.symcon_names_path) — leeres dict, falls noch keine settings.json importiert
         wurde oder die Datei nicht lesbar ist (z. B. manuell gelöscht). Normalisiert
@@ -320,13 +332,14 @@ class ImportService:
             return {}
         if not isinstance(data, dict):
             return {}
-        result: dict[str, dict[str, str | None]] = {}
+        result: dict[str, dict] = {}
         for key, value in data.items():
             if isinstance(value, dict):
                 result[key] = {
                     "name": value.get("name"),
                     "parent": value.get("parent"),
                     "unit": value.get("unit"),
+                    "states": value.get("states") if isinstance(value.get("states"), dict) else {},
                 }
             elif isinstance(value, str):
                 result[key] = {"name": value, "parent": None, "unit": None}
@@ -335,7 +348,7 @@ class ImportService:
 
 
     def _symcon_import_rows(self,
-        variables: list[symcon_import.SymconVariable], names: dict[str, dict[str, str | None]]
+        variables: list[symcon_import.SymconVariable], names: dict[str, dict]
     ) -> list[dict]:
         rows = []
         for v in variables:
@@ -356,6 +369,7 @@ class ImportService:
                     "symcon_name": info.get("name"),
                     "symcon_parent": info.get("parent"),
                     "symcon_unit": info.get("unit"),
+                    "symcon_states": info.get("states") or {},
                     "readable": v.readable,
                     "error": v.error,
                     # Als Zahl an Jinja weitergeben: import.html formatiert den
@@ -437,9 +451,7 @@ class ImportService:
                 entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
                 row["unit"] or "",
             )
-            # Zustands-Entitäten fehlen: Symcon liefert keinen Text, siehe
-            # symcon_import._refuse_state_target().
-            for row in self.deps.index.list_entities() if row["aggregation_type"] != "state"
+            for row in self.deps.index.list_entities()
         ]
         names = self._load_symcon_names()
         return {
@@ -893,7 +905,8 @@ class ImportService:
                     self._import_progress.current_variable = variable.variable_id
                 try:
                     plan = symcon_import.plan_import(
-                        self.deps.data_dir, self.deps.index, variable, target_entity_id, self.deps.tz, factor=factor
+                        self.deps.data_dir, self.deps.index, variable, target_entity_id, self.deps.tz, factor=factor,
+                        associations=self._symcon_associations(variable.variable_id),
                     )
                     total_months += len(plan.months_to_import) + len(plan.months_to_merge)
                 except ValueError:
@@ -925,18 +938,17 @@ class ImportService:
                         self.deps.tz,
                         on_month_done=on_month_done,
                         factor=factor,
+                        associations=self._symcon_associations(variable.variable_id),
                     )
                     with self._import_progress.lock:
                         self._import_progress.results.append(result)
-                except ValueError:
+                except ValueError as exc:
                     logger.warning(
-                        "Symcon-Import: Ziel-Entität nicht gefunden · Variable=%s · Ziel=%s",
-                        variable.variable_id, target_entity_id,
+                        "Symcon-Import: Ziel nicht möglich · Variable=%s · Ziel=%s · %s",
+                        variable.variable_id, target_entity_id, exc,
                     )
                     with self._import_progress.lock:
-                        self._import_progress.errors.append(
-                            tr("{variable_id} → {target_entity_id}: Entität nicht gefunden", variable_id=variable.variable_id, target_entity_id=target_entity_id)
-                        )
+                        self._import_progress.errors.append(f"{variable.variable_id} → {target_entity_id}: {exc}")
             return None
 
         def coordinated_import_worker() -> None:
@@ -1116,10 +1128,11 @@ class ImportService:
                                 target_entity_id,
                                 self.deps.tz,
                                 factor=factor,
+                                associations=self._symcon_associations(variable.variable_id),
                             )
                         )
-                    except ValueError:
-                        errors.append(tr("{variable_id} → {target_entity_id}: Entität nicht gefunden", variable_id=variable.variable_id, target_entity_id=target_entity_id))
+                    except ValueError as exc:
+                        errors.append(f"{variable.variable_id} → {target_entity_id}: {exc}")
                 self._dry_run_progress.advance(len(mapped), "")
                 return {"plans": plans, "errors": errors}
 
@@ -1182,7 +1195,7 @@ class ImportService:
                 entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
                 row["unit"] or "",
             )
-            for row in entity_rows if row["aggregation_type"] != "state"
+            for row in entity_rows
         ]
         # Eigene, reichere Optionsliste fürs Ziel-Entität-Feld (entityPicker(),
         # siehe _csv_import_section.html) — dieselbe Form wie table_editor.html/

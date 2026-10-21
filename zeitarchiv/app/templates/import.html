@@ -129,7 +129,7 @@
             {% endif %}
             <td class="period-cell">{% if row.period_start %}{{ row.period_start }} &ndash; {{ row.period_end }}{% else %}—{% endif %}</td>
             <td{% if row.preview != "—" %} data-tooltip="{{ _('Min · Max: {preview}', preview=row.preview) }}"{% endif %}>{{ row.row_count | format_int }}</td>
-            <td>{{ row.symcon_unit or "—" }}</td>
+            <td>{% if row.symcon_states %}<span class="symcon-states" title="{{ row.symcon_states.values() | join(', ') }}">{{ _("{n} Zustände", n=(row.symcon_states | length)) }}</span>{% else %}{{ row.symcon_unit or "—" }}{% endif %}</td>
             <td>
               {% if row.readable %}
               <span class="map-picker entity-tooltip-host">

@@ -821,8 +821,15 @@ verworfen.
   Wertspalte der Zustand als Text (`charging`, `heat` …). Die Vorschau nennt
   neue Zustände und Zeilen über der Grenze von 50, ohne etwas anzulegen.
   Aufeinanderfolgende gleiche Zustände werden nur einmal gespeichert.
-  Symcon und VictoriaMetrics liefern keinen Text und lehnen Zustands-Entitäten
-  als Ziel ab. Der **CSV-Export** schreibt den Zustand als Text in die Spalte
+  Der **Symcon-Import** kann Integer-Variablen mit Profil in eine Zustands-
+  Entität übernehmen (zum Beispiel eine Betriebsart mit „Aus“, „Komfort“ …):
+  Dafür muss die optionale `settings.json` hochgeladen sein, aus der die App
+  die Namen des Profils liest. Jede Zahl wird zum Namen und der Name zu einem
+  Zustand der Entität; passt er zu Text oder Übersetzung eines vorhandenen
+  Zustands, wird dieser genommen, sonst entsteht ein neuer. Zahlen ohne Namen
+  im Profil werden übersprungen, die Vorschau nennt sie. Variablen ohne Profil
+  mit Namen und VictoriaMetrics lehnen Zustands-Entitäten als Ziel ab. Der
+  **CSV-Export** schreibt den Zustand als Text in die Spalte
   `state` (nur roh, ohne Auflösung), sodass sich die Datei wieder einlesen
   lässt.
 

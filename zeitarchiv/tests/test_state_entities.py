@@ -298,6 +298,68 @@ def test_csv_dry_run_counts_rows_beyond_the_state_limit(setup) -> None:
     assert mapper.refused == 1 and mapper.new_states == []
 
 
+def test_symcon_profile_names_become_states_of_integer_variables() -> None:
+    from app.storage import symcon_import
+
+    settings = json.dumps({
+        "objects": {
+            "ID1": {"name": "Betriebsart", "parentID": 0, "type": 2,
+                    "data": {"type": 1, "profile": "", "customProfile": "Mode"}},
+            "ID2": {"name": "Temperatur", "parentID": 0, "type": 2,
+                    "data": {"type": 2, "profile": "~Temperature", "customProfile": ""}},
+            "ID3": {"name": "Zähler", "parentID": 0, "type": 2,
+                    "data": {"type": 1, "profile": "Plain", "customProfile": ""}},
+        },
+        "profiles": {
+            "Mode": {"associations": [{"name": "Aus", "value": 0}, {"name": "Komfort", "value": 3}, {"name": "", "value": 9}]},
+            "Plain": {"associations": []},
+        },
+    })
+    names = symcon_import.extract_variable_names(settings)
+    assert names["1"]["states"] == {"0": "Aus", "3": "Komfort"}
+    assert "states" not in names["2"] and "states" not in names["3"]
+
+
+def _symcon_variable(tmp: Path, lines: list[str]):
+    from app.storage import symcon_import
+
+    path = tmp / "4711.csv"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return symcon_import.SymconVariable(variable_id="4711", files=[path], row_count=len(lines))
+
+
+def test_symcon_integer_codes_go_through_the_profile_into_a_state_entity(setup) -> None:
+    from app.storage import symcon_import
+
+    tmp, index, service = setup
+    service.ingest(_state("off", BASE_TS, label="Aus"))
+    t = int(BASE_TS) - 40 * 86400
+    variable = _symcon_variable(tmp, [f"{t},0", f"{t + 60},0", f"{t + 120},3", f"{t + 180},5", f"{t + 240},2"])
+    associations = {0: "Aus", 2: "Winter", 3: "Komfort"}
+
+    plan = symcon_import.plan_import(tmp, index, variable, ENTITY, TZ, associations=associations)
+    # Aus passt über die Übersetzung auf "off"; 5 hat keinen Namen im Profil; die
+    # Wiederholung von 0 fällt zusammen. Die Vorschau legt nichts an.
+    assert plan.rows_to_import == 3 and plan.unmapped_rows == 1
+    assert plan.new_states == ["Komfort", "Winter"] or plan.new_states == ["Winter", "Komfort"]
+    assert [row["text"] for row in index.get_state_map(ENTITY)] == ["off"]
+
+    symcon_import.import_variable(tmp, index, variable, ENTITY, TZ, associations=associations)
+    assert sorted(row["text"] for row in index.get_state_map(ENTITY)) == ["Komfort", "Winter", "off"]
+
+
+def test_symcon_variable_without_profile_names_cannot_fill_a_state_entity(setup) -> None:
+    from app.storage import symcon_import
+
+    tmp, index, service = setup
+    service.ingest(_state("off", BASE_TS))
+    variable = _symcon_variable(tmp, [f"{int(BASE_TS) - 86400},1"])
+    with pytest.raises(ValueError):
+        symcon_import.plan_import(tmp, index, variable, ENTITY, TZ)
+    with pytest.raises(ValueError):
+        symcon_import.import_variable(tmp, index, variable, ENTITY, TZ)
+
+
 def test_export_writes_the_raw_text_of_a_state_entity(setup) -> None:
     from app import export_data
     from app.storage.coordinator import StorageCoordinator
