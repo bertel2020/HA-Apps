@@ -11,8 +11,16 @@
   Zustand und einem Wechsel-Protokoll; Ausfälle erscheinen als „nicht
   verfügbar“. Auch der Import aus dem Home-Assistant-Verlauf übernimmt sie.
   Die Demo-Daten enthalten drei Beispiele (Saugroboter, Waschprogramm,
-  Heizungsbetrieb). Charts, Tabellen und Dashboard-Kacheln unterstützen
-  Zustände noch nicht.
+  Heizungsbetrieb). Ab dem Zeitraum „Monat“ zeigt die Verlaufsansicht die
+  Anteile je Tag, Monat oder Jahr als Balken; umschalten lässt sich auf
+  Zeitstrahl oder Wechsel. Im Chart-Editor erscheinen mehrere Zustände als
+  Zeilen eines gemeinsamen Zeitstrahls oder als Donuts nebeneinander.
+  Dashboard-Kacheln zeigen den aktuellen Zustand mit „seit“ und den letzten
+  24 Stunden als Streifen, breite Kacheln die Anteile der letzten 7 Tage,
+  wahlweise als Donut. Werden Werte verworfen, weil der Typ nicht passt oder
+  eine Entität mehr als 50 Zustände liefert, erscheint ein Hinweis, mit der
+  passenden Integration auch als Reparatur in Home Assistant.
+  Vergleichstabellen unterstützen Zustände noch nicht.
 - Lichter, Ventilatoren, Automationen, Skripte, Fernbedienungen, Sirenen,
   Luftbefeuchter, Updates und Kalender werden jetzt wie Schalter archiviert
   (an/aus) – mit Zeitstrahl und Einschaltdauer. Bisher kamen sie gar nicht in
@@ -37,8 +45,16 @@
   them as a coloured timeline with duration and share per state and a change
   log; outages appear as "unavailable". The import from the Home Assistant
   history takes them over as well. The demo data contains three examples
-  (robot vacuum, washing programme, heating operation). Charts, tables and
-  dashboard tiles do not support states yet.
+  (robot vacuum, washing programme, heating operation). From the "Month"
+  period on, the history view shows the shares per day, month or year as
+  bars; you can switch to timeline or changes. In the chart editor, several
+  states appear as rows of a shared timeline or as donuts side by side.
+  Dashboard tiles show the current state with "for" and the last 24 hours as
+  a strip, wide tiles the shares of the last 7 days, optionally as a donut.
+  When values are discarded because the type does not match or an entity
+  reports more than 50 states, a notice appears, with the matching
+  integration also as a repair in Home Assistant. Comparison tables do not
+  support states yet.
 - Lights, fans, automations, scripts, remotes, sirens, humidifiers, updates
   and calendars are now archived like switches (on/off) – with timeline and
   on-time. Previously they never reached the app. This also applies to the

@@ -89,6 +89,21 @@
           <div class="dtile-size-preview" aria-live="polite">{{ tile.grid_cols }}×{{ tile.grid_rows }}</div>
         </div>
 
+        {% if tile.is_state %}
+        {# Zustands-Kachel (ROADMAP 1.29): Streifen der letzten 24 h (ab zwei
+           Spalten Anteile der letzten 7 Tage) oder Donut über den Zeitraum. #}
+        <div class="dtile-settings-section">
+          <div class="dtile-decimals-picker-head">{{ _("Darstellung") }}</div>
+          <div class="dtile-choice-row dtile-state-view-row" role="group" aria-label="{{ _('Darstellung wählen') }}">
+            <button type="button" class="dtile-choice-cell dtile-state-view-cell{% if tile.state_view == 'strip' %} is-selected{% endif %}"
+                    draggable="false" data-state-view="strip">{{ _("Streifen") }}</button>
+            <button type="button" class="dtile-choice-cell dtile-state-view-cell{% if tile.state_view == 'donut' %} is-selected{% endif %}"
+                    draggable="false" data-state-view="donut">{{ _("Donut") }}</button>
+          </div>
+          <p class="dtile-settings-hint">{{ _("Der Streifen zeigt die letzten 24 Stunden, ab zwei Spalten die Anteile der letzten 7 Tage. Der Donut zeigt die Anteile im Zeitraum.") }}</p>
+        </div>
+        {% endif %}
+
         {# Zeitraum, Hauptwert und Kennzahlen-Zeile — bewusst ein Abschnitt
            und ein Endpunkt (/dashboard/entity-metrics): die vier Werte hängen
            voneinander ab, der Hauptwert fällt aus der Zeile heraus. #}
@@ -111,8 +126,10 @@
                     draggable="false" data-continuous="true"
                     title="{{ _('Festes Fenster relativ zu jetzt — „Tag“ heißt die letzten 24 Stunden') }}">{{ _("Rollierend") }}</button>
           </div>
-          <p class="dtile-settings-hint">{{ _("Gilt für Kennzahlen und Sparkline.") }}</p>
+          <p class="dtile-settings-hint">{{ _("Gilt für den Donut.") if tile.is_state else _("Gilt für Kennzahlen und Sparkline.") }}</p>
 
+          {# Zustände haben keine Kennzahlen (siehe _tile_available_metrics()). #}
+          <div{% if tile.is_state %} hidden{% endif %}>
           <div class="dtile-decimals-picker-head dtile-choice-head-gap">{{ _("Hauptwert") }}</div>
           <div class="dtile-choice-row dtile-primary-row" role="group" aria-label="{{ _('Hauptwert wählen') }}">
             <button type="button" class="dtile-choice-cell dtile-primary-cell{% if tile.primary_metric == 'last' %} is-selected{% endif %}"
@@ -140,18 +157,19 @@
                     {% if gesperrt %}disabled title="{{ _('Steht schon als Hauptwert') if value == tile.primary_metric else _('Für diese Entität keine sinnvolle Kennzahl') }}"{% endif %}>{{ label }}</button>
             {% endfor %}
           </div>
+          </div>
         </div>
 
         <div class="dtile-settings-section">
           <label class="menu-row dtile-sparkline-row">
-            <span class="menu-row-label">{{ _("Sparkline") }}</span>
+            <span class="menu-row-label">{{ _("Verlauf") if tile.is_state else _("Sparkline") }}</span>
             <span class="menu-toggle">
               <input type="checkbox" class="dtile-sparkline-checkbox" {% if tile.show_sparkline %}checked{% endif %}>
               <span class="track"><span class="thumb"></span></span>
             </span>
           </label>
           <label class="menu-row dtile-show-age-row">
-            <span class="menu-row-label">{{ _("Letzte Aktualisierung") }}</span>
+            <span class="menu-row-label">{{ _("Seit wann") if tile.is_state else _("Letzte Aktualisierung") }}</span>
             <span class="menu-toggle">
               <input type="checkbox" class="dtile-show-age-checkbox" {% if tile.show_age %}checked{% endif %}>
               <span class="track"><span class="thumb"></span></span>
@@ -166,7 +184,7 @@
           </label>
         </div>
 
-        <div class="dtile-settings-section">
+        <div class="dtile-settings-section"{% if tile.is_state %} hidden{% endif %}>
           <div class="dtile-decimals-picker-head">{{ _("Sparkline-Auflösung") }}</div>
           <div class="dtile-sparkline-resolution-row" role="group" aria-label="{{ _('Sparkline-Auflösung wählen') }}">
             {% for value, label in [('raw', _('Roh')), ('5min', '5 Min'), ('15min', '15 Min'), ('30min', '30 Min'), ('1h', '1 Std')] %}
@@ -176,7 +194,7 @@
           </div>
         </div>
 
-        <div class="dtile-settings-section">
+        <div class="dtile-settings-section"{% if tile.is_state %} hidden{% endif %}>
           <div class="dtile-decimals-picker-head">{{ _("Als veraltet markieren") }}</div>
           <div class="dtile-stale-mode-row" role="group" aria-label="{{ _('Veraltet-Schwelle wählen') }}">
             {% for value, label, hint in [('standard', _('Standard'), _('Gelb nach 15 Minuten, rot nach 1 Stunde')), ('daily', _('Täglich'), _('Gelb nach 26 Stunden, rot nach 48 Stunden — für Tageswerte')), ('rare', _('Selten'), _('Gelb nach 3 Tagen, rot nach 7 Tagen — für Zähler, die nur bei Aktivität melden')), ('off', _('Aus'), _('Nie als veraltet markieren'))] %}
@@ -186,7 +204,7 @@
           </div>
         </div>
 
-        <div class="dtile-settings-section">
+        <div class="dtile-settings-section"{% if tile.is_state %} hidden{% endif %}>
           <div class="dtile-decimals-picker-head">{{ _("Nachkommastellen") }}</div>
           <div class="dtile-decimals-row" role="group" aria-label="{{ _('Nachkommastellen wählen') }}">
             {% for value, label in [('auto', _('Auto')), ('0', '0'), ('1', '1'), ('2', '2'), ('3', '3')] %}

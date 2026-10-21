@@ -276,10 +276,22 @@
       : `<span class="dot" style="background:${item.color};"></span>`;
   }
 
+  // Zustands-Entitäten (ROADMAP 1.29): statt Min/Max über Indizes die
+  // Zustände der Zeile — Farbe, Name und (mit Statistik) Dauer · Anteil.
+  function stateLegendValues(item, showStats) {
+    return `<span class="values state-legend-values">${item.states.map(row =>
+      `<span title="${escapeHtml(row.raw)}"><span class="dot state-dot" style="${row.swatch}"></span> ${escapeHtml(row.label)}`
+      + (showStats ? ` <strong>${escapeHtml(row.text)}</strong>` : '') + '</span>').join('')}</span>`;
+  }
+
   function renderLegendChips(items, legendMetrics, showStats, hiddenSet) {
     return items.map(item => {
       // "+N Jahre" (Langzeit-Kachel): nur ein Hinweis, kein Serien-Umschalter.
       if (item.more) return `<span class="chart-legend-item is-more">${escapeHtml(item.more)}</span>`;
+      if (item.states) {
+        return `<span class="chart-legend-item static"><span class="name">${escapeHtml(item.name)}</span>`
+             + `${stateLegendValues(item, showStats)}</span>`;
+      }
       let values = '';
       if (showStats) {
         const parts = [];
@@ -307,6 +319,10 @@
     const rows = items.filter(item => !item.more).map(item => {
       const cells = cols.map(key => `<td>${escapeHtml(key === 'sum' && item.sum === null ? '—' : item[key])}</td>`).join('');
       const inactive = hiddenSet.has(item.name) ? ' inactive' : '';
+      if (item.states) {
+        return `<tr class="chart-legend-table-row static"><td class="legend-name-col"><span class="name">${escapeHtml(item.name)}</span>`
+             + `${stateLegendValues(item, showStats)}</td>${cells}</tr>`;
+      }
       return `<tr class="chart-legend-table-row${inactive}" data-series="${escapeHtml(item.name)}" role="button" tabindex="0">`
            + `<td class="legend-name-col"><span class="legend-name-cell">`
            + legendSwatch(item)
@@ -524,6 +540,9 @@
     // Kachelhöhe gemessen und die Legende schiebt ihn erst beim nächsten
     // Resize-Event auf seine endgültige Höhe.
     const statsItem = (s, points, name, color) => {
+      if (s.aggregation_type === 'state') {
+        return {name, color, states: stateRows(s, data.window_end), last: '—', min: '—', max: '—', average: '—', sum: null};
+      }
       const values = (points || []).map(p => p.value).filter(Number.isFinite);
       const minima = (points || []).map(p => Number.isFinite(p.min) ? p.min : p.value).filter(Number.isFinite);
       const maxima = (points || []).map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
@@ -667,6 +686,10 @@
     }
     if (timeline) {
       renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface, colorIndexFor);
+      return;
+    }
+    if (donut && series.some(s => s.aggregation_type === 'state')) {
+      renderTileStateDonuts(chart, series, entityNames, data.window_end, style, surface);
       return;
     }
     if (donut) {
@@ -1346,10 +1369,35 @@
   // Zeilen-Beschriftung (der Name steht schon in der Kachel-Legende, siehe
   // renderTile()) — bei mehreren Zeilen in einer kleinen Kachel wäre dafür
   // ohnehin kaum Platz.
+  // Dauer und Anteil je Zustand einer Zustands-Serie — für Legende und
+  // Donut. Rohwechsel (bis zur Woche, Zeitstrahl) und Server-Anteile (ab dem
+  // Monat) ergeben dieselbe Form; dieselbe Rechnung wie stateRowsFor() in
+  // pages/chart_editor.js.
+  function stateRows(s, windowEnd) {
+    const buckets = s.chart_type === 'shares'
+      ? StateEntities.bucketsFromShares(s.points || [])
+      : StateEntities.bucketsFromSegments(StateEntities.segments(s.points || [], windowEnd), () => 0, () => Infinity);
+    return StateEntities.totals(buckets, s.states).map(row => ({
+      ...row,
+      label: StateEntities.label(s.states, row.idx),
+      raw: StateEntities.raw(s.states, row.idx),
+      swatch: StateEntities.swatchStyle(row.idx),
+      text: `${NumberFormat.fmtDuration(row.seconds)} · ${StateEntities.fmtShare(row.share)}`,
+    }));
+  }
+
   function renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface, colorIndexFor) {
     const categories = series.map(s => entityNames[s.entity_id] || s.friendly_name);
     const items = [];
+    const pattern = StateEntities.unavailablePattern();
     series.forEach((s, catIndex) => {
+      // Zustände: ein Band je Abschnitt, Farbe nach Zustand (wie im Chart-Editor).
+      if (s.aggregation_type === 'state') {
+        for (const seg of StateEntities.segments(s.points || [], data.window_end)) {
+          items.push([catIndex, seg.s * 1000, seg.e * 1000, StateEntities.fill(seg.idx, pattern), seg.idx]);
+        }
+        return;
+      }
       const color = PALETTE[colorIndexFor(s.entity_id) % PALETTE.length];
       const points = s.points || [];
       for (let i = 0; i < points.length; i++) {
@@ -1392,10 +1440,13 @@
         borderColor,
         textStyle: {color: style.getPropertyValue('--ink-muted').trim(), fontFamily: style.getPropertyValue('--font-mono'), fontSize: scaledFont(12)},
         formatter: p => {
-          const [catIndex, startMs, endMs] = p.value;
+          const [catIndex, startMs, endMs, , idx] = p.value;
           const pad = n => String(n).padStart(2, '0');
           const fmtTime = ms => { const t = window.ServerTime.parts(ms / 1000); return `${pad(t.hour)}:${pad(t.minute)}`; };
-          return `${categories[catIndex]}<br>${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
+          const span = `${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
+          const s = series[catIndex];
+          if (!s || s.aggregation_type !== 'state') return `${categories[catIndex]}<br>${span}`;
+          return `${categories[catIndex]}<br><strong>${escapeHtml(StateEntities.label(s.states, idx))}</strong><br>${span}`;
         },
         appendToBody: true,
       },
@@ -1407,7 +1458,7 @@
           const end = api.coord([api.value(2), categoryIndex]);
           const height = api.size([0, 1])[1] * 0.6;
           const rectShape = echarts.graphic.clipRectByRect(
-            {x: start[0], y: start[1] - height / 2, width: end[0] - start[0], height},
+            {x: start[0], y: start[1] - height / 2, width: Math.max(end[0] - start[0], api.value(4) != null ? 1 : 0), height},
             {x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height}
           );
           return rectShape && {type: 'rect', shape: rectShape, style: {fill: api.value(3)}};
@@ -1430,6 +1481,37 @@
   // .edash-share-donut (energiedashboard.js) — label:show:false, weil die
   // Namen schon in der .dtile-legend-Zeile stehen (renderTile() baut sie VOR
   // diesem Zweig, siehe renderLegend()-Aufruf dort, unverändert wiederverwendet).
+  // Zustände: ein Donut je Zustands-Entität nebeneinander, wie
+  // renderStateDonuts() in pages/chart_editor.js.
+  function renderTileStateDonuts(chart, series, entityNames, windowEnd, style, surface) {
+    const rows = series.filter(s => s.aggregation_type === 'state');
+    const width = 100 / Math.max(rows.length, 1);
+    const pattern = StateEntities.unavailablePattern();
+    chart.setOption({
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: surface,
+        textStyle: {color: style.getPropertyValue('--ink-muted').trim(), fontFamily: style.getPropertyValue('--font-mono'), fontSize: scaledFont(12)},
+        appendToBody: true,
+      },
+      series: rows.map((s, k) => ({
+        type: 'pie',
+        radius: rows.length > 1 ? ['36%', '60%'] : ['52%', '85%'],
+        center: [`${width * k + width / 2}%`, '50%'],
+        label: {show: false},
+        labelLine: {show: false},
+        itemStyle: {borderColor: surface, borderWidth: 2},
+        tooltip: {
+          formatter: p => `${escapeHtml(entityNames[s.entity_id] || s.friendly_name)}<br>${p.marker} <strong>${escapeHtml(p.name)}</strong><br>`
+            + `${NumberFormat.fmtDuration(p.value)} (${fmtCompactNumber(p.percent, 1)} %)`,
+        },
+        data: stateRows(s, windowEnd).map(row => ({
+          name: row.label, value: row.seconds, itemStyle: {color: StateEntities.fill(row.idx, pattern)},
+        })),
+      })),
+    }, true);
+  }
+
   function renderTileDonut(chart, series, entityNames, colorIndexFor, aggregation, effectiveDecimals, style, surface, chartId) {
     const data = series.map(s => {
       const values = (s.points || []).map(p => p.value).filter(Number.isFinite);
@@ -1963,7 +2045,103 @@
     return von === bis ? von : `${von} – ${bis}`;
   }
 
+  // ---- Zustands-Kachel (ROADMAP 1.29) --------------------------------
+  // Aktueller Zustand mit Farbfeld, "seit", und darunter je nach Größe und
+  // Darstellung (data-state-view): 1×1 der Streifen der letzten 24 h, ab zwei
+  // Spalten die Anteile der letzten 7 Tage, oder der Donut über den Zeitraum
+  // der Kachel mit dem aktuellen Zustand in der Mitte.
+  function stateStripHtml(st) {
+    const a = st.strip_start, b = st.strip_end;
+    const span = Math.max(b - a, 1);
+    const segs = StateEntities.segments(st.strip, b).filter(seg => seg.e > a);
+    const parts = segs.map(seg => {
+      const left = (Math.max(seg.s, a) - a) / span * 100;
+      const width = (seg.e - Math.max(seg.s, a)) / span * 100;
+      const label = escapeHtml(StateEntities.label(st.states, seg.idx));
+      return `<i style="left:${left.toFixed(2)}%;width:${Math.max(width, 0.4).toFixed(2)}%;${StateEntities.swatchStyle(seg.idx)}" title="${label}"></i>`;
+    });
+    return `<div class="dtile-state-strip">${parts.join('')}</div>`
+      + `<div class="dtile-state-axis"><span>${t('−24 h')}</span><span>${t('jetzt')}</span></div>`;
+  }
+
+  function stateDaysHtml(st) {
+    const order = st.states.map(x => x.idx);
+    const rows = st.days.map(day => {
+      const total = day.states.reduce((sum, [, seconds]) => sum + seconds, 0) || 1;
+      const bars = [...day.states]
+        .sort((x, y) => order.indexOf(x[0]) - order.indexOf(y[0]))
+        .map(([idx, seconds]) => `<i style="width:${(seconds / total * 100).toFixed(2)}%;${StateEntities.swatchStyle(idx)}"`
+          + ` title="${escapeHtml(StateEntities.label(st.states, idx))} · ${NumberFormat.fmtDuration(seconds)}"></i>`)
+        .join('');
+      const weekday = new Date(day.ts * 1000).toLocaleDateString(LOCALE, {weekday: 'short'});
+      return `<div class="dtile-state-day"><span>${escapeHtml(weekday)}</span><div class="dtile-state-bar">${bars}</div></div>`;
+    });
+    return `<div class="dtile-state-days">${rows.join('')}</div>`;
+  }
+
+  function stateLegendHtml(st) {
+    const total = st.durations.reduce((sum, [, seconds]) => sum + seconds, 0) || 1;
+    return `<div class="dtile-state-legend">${st.durations
+      .filter(([, seconds]) => seconds / total >= 0.01)
+      .map(([idx, seconds]) => `<span><span class="state-dot" style="${StateEntities.swatchStyle(idx)}"></span>`
+        + `${escapeHtml(StateEntities.label(st.states, idx))} ${StateEntities.fmtShare(seconds / total * 100)}</span>`)
+      .join('')}</div>`;
+  }
+
+  function renderStateDonut(container, st) {
+    container.innerHTML = '<div class="dtile-state-donut"><div class="dtile-state-donut-chart"></div>'
+      + `<div class="dtile-state-donut-center"><b>${escapeHtml(StateEntities.label(st.states, st.idx))}</b>`
+      + `<span>${t('jetzt')}</span></div></div>${stateLegendHtml(st)}`;
+    const chartEl = container.querySelector('.dtile-state-donut-chart');
+    const style = getComputedStyle(document.body);
+    const pattern = StateEntities.unavailablePattern();
+    const chart = echarts.init(chartEl);
+    chart.setOption({
+      animation: false,
+      tooltip: {
+        trigger: 'item', appendToBody: true,
+        backgroundColor: style.getPropertyValue('--surface').trim(),
+        textStyle: {color: style.getPropertyValue('--ink-muted').trim(), fontSize: scaledFont(12)},
+        formatter: p => `${p.marker} <strong>${escapeHtml(p.name)}</strong><br>${NumberFormat.fmtDuration(p.value)} (${fmtCompactNumber(p.percent, 1)} %)`,
+      },
+      series: [{
+        type: 'pie', radius: ['62%', '88%'], center: ['50%', '50%'],
+        label: {show: false}, labelLine: {show: false},
+        itemStyle: {borderColor: style.getPropertyValue('--surface').trim(), borderWidth: 2},
+        data: st.durations.map(([idx, seconds]) => ({
+          name: StateEntities.label(st.states, idx), value: seconds, itemStyle: {color: StateEntities.fill(idx, pattern)},
+        })),
+      }],
+    });
+  }
+
+  function applyStateTile(el, serie) {
+    const st = serie.state;
+    const numberEl = el.querySelector('.dtile-entity-number');
+    if (numberEl) {
+      numberEl.textContent = StateEntities.label(st.states, st.idx);
+      // Rohwert im Tooltip, wie überall bei Zuständen.
+      numberEl.title = StateEntities.raw(st.states, st.idx);
+    }
+    const swatchEl = el.querySelector('.dtile-state-swatch');
+    if (swatchEl) swatchEl.setAttribute('style', StateEntities.swatchStyle(st.idx));
+    const ageEl = el.querySelector('.dtile-entity-age');
+    if (ageEl) {
+      ageEl.textContent = st.since == null
+        ? ''
+        : t('seit {dauer}', {dauer: NumberFormat.fmtDuration(Date.now() / 1000 - st.since)});
+    }
+    const visualEl = el.querySelector('.dtile-state-visual');
+    if (!visualEl) return;
+    const instance = echarts.getInstanceByDom(visualEl.querySelector('.dtile-state-donut-chart') || visualEl);
+    if (instance) instance.dispose();
+    if (el.dataset.stateView === 'donut') { renderStateDonut(visualEl, st); return; }
+    const wide = parseInt(el.closest('.dtile')?.dataset.gridCols || '1', 10) >= 2;
+    visualEl.innerHTML = wide ? stateDaysHtml(st) : stateStripHtml(st);
+  }
+
   function applyEntityTile(el, serie, stichtagFenster = null) {
+    if (serie.state) { applyStateTile(el, serie); return; }
     const primary = el.dataset.primaryMetric || 'last';
     const dezimal = el.dataset.decimals === 'auto' ? null : parseInt(el.dataset.decimals, 10);
     const istSchalter = el.dataset.isSwitch === 'true';
@@ -2133,6 +2311,8 @@
       const sparklineResolutionCells = Array.from(control.querySelectorAll('.dtile-sparkline-resolution-cell'));
       const showAgeCheckbox = control.querySelector('.dtile-show-age-checkbox');
       const staleModeCells = Array.from(control.querySelectorAll('.dtile-stale-mode-cell'));
+      // Nur bei Zustands-Kacheln (ROADMAP 1.29): Streifen oder Donut.
+      const stateViewCells = Array.from(control.querySelectorAll('.dtile-state-view-cell'));
       const showPeriodCheckbox = control.querySelector('.dtile-show-period-checkbox');
       const legendCheckbox = control.querySelector('.dtile-legend-checkbox');
       const dtileBody = tile.querySelector('.dtile-body');
@@ -2210,6 +2390,9 @@
             if (tableBody) await renderTableTile(tableBody);
             // Langzeit-Kachel: 1×1 zeichnet nur das angezeigte Jahr und den Ø.
             if (dtileBody?.dataset.longtermActive === 'true') await renderTile(dtileBody);
+            // Zustands-Kachel: ab zwei Spalten Anteile je Tag statt Streifen.
+            const stateBody = tile.querySelector('.dtile-entity-body[data-is-state="true"]');
+            if (stateBody) await renderEntityTile(stateBody);
             const chart = instances.get(tile.dataset.itemId);
             requestAnimationFrame(() => chart && chart.resize());
           } catch (e) {
@@ -2307,6 +2490,30 @@
             }
           } catch (e) {
             trigger.title = t('Sparkline-Auflösung konnte nicht gespeichert werden');
+          }
+        });
+      });
+
+      stateViewCells.forEach(cell => {
+        cell.addEventListener('click', async () => {
+          const stateView = cell.dataset.stateView;
+          try {
+            const response = await fetch(`${base}/dashboard/entity-state-view`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                dashboard_id: dashboardId, pin_id: parseInt(tile.dataset.itemId, 10), state_view: stateView,
+              }),
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            stateViewCells.forEach(option => option.classList.toggle('is-selected', option === cell));
+            const entityBody = tile.querySelector('.dtile-entity-body');
+            if (entityBody) {
+              entityBody.dataset.stateView = stateView;
+              await renderEntityTile(entityBody);
+            }
+          } catch (e) {
+            trigger.title = t('Darstellung konnte nicht gespeichert werden');
           }
         });
       });

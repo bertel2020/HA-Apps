@@ -2283,3 +2283,32 @@ footer{margin-top:20px;font-family:var(--font-mono);font-size:calc(11px * var(--
 .confirm-overlay::backdrop{background:rgba(0,0,0,.4);}
 .confirm-message{margin:0;font-family:var(--font-display);font-size:calc(14px * var(--font-scale, 1));line-height:1.55;color:var(--ink);white-space:pre-line;}
 .confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+
+/* Zustands-Entitäten (ROADMAP 1.29): Farbfeld je Zustand und die Legende pro
+   Zeile (Chart-Editor, Dashboard-Kacheln) — je Zustand Farbe, Name und mit
+   "Statistik in Legende" Dauer · Anteil. Die Farbe selbst kommt inline aus
+   state-entities.js (swatchStyle). */
+.state-dot{display:inline-block;width:10px;height:10px;border-radius:3px;flex:none;vertical-align:-1px;}
+.state-legend-values{display:inline-flex;flex-wrap:wrap;gap:4px 12px;}
+.state-legend-values > span{white-space:nowrap;}
+
+/* Zustands-Kachel (Werte-Kachel einer Zustands-Entität, dashboard-tiles.js
+   applyStateTile()): Farbfeld neben dem Zustand, Streifen der letzten 24 h,
+   Anteile je Tag (ab zwei Spalten) oder Donut mit Zustand in der Mitte.
+   Steht hier statt in dashboard_detail.css, weil die Kacheln auch auf der
+   Entitäten-Seite (entities.css) erscheinen. */
+.dtile-state-swatch{width:14px;height:14px;border-radius:4px;align-self:center;margin-right:6px;}
+.dtile-state-strip{position:relative;height:14px;border-radius:4px;overflow:hidden;background:var(--surface-alt);}
+.dtile-state-strip i{position:absolute;top:0;bottom:0;}
+.dtile-state-axis{display:flex;justify-content:space-between;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);margin-top:2px;}
+.dtile-state-days{display:flex;flex-direction:column;gap:3px;}
+.dtile-state-day{display:grid;grid-template-columns:2.4em minmax(0,1fr);align-items:center;gap:6px;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
+.dtile-state-bar{display:flex;height:9px;border-radius:3px;overflow:hidden;background:var(--surface-alt);}
+.dtile-state-bar i{display:block;height:100%;}
+.dtile-state-donut{position:relative;height:110px;}
+.dtile-state-donut-chart{position:absolute;inset:0;}
+.dtile-state-donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;text-align:center;}
+.dtile-state-donut-center b{font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dtile-state-donut-center span{font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
+.dtile-state-legend{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);margin-top:4px;}
+.dtile-state-legend > span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}

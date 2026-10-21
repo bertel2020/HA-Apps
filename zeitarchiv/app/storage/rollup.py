@@ -12,6 +12,8 @@ Bucket-Größen exakt nach den zwei Tabellen aus Konzept Abschnitt 05:
 Daraus folgen die persistierten Rollup-Stufen:
   Zähler:          tag.parquet (bedient Woche+Monat), monat.parquet (Jahr), jahr.parquet (Dekade)
   Standard/Binär:  stunde.parquet (bedient Woche+Monat), monat.parquet (Jahr+Dekade)
+  Zustand:         stunde.parquet und monat.parquet wie Binär, aber im Langformat
+                   (eine Zeile je Bucket und darin vorkommendem Zustand)
 """
 
 from __future__ import annotations
@@ -31,14 +33,10 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
+from .index import STATE_TYPE
 from .paths import entity_dir
 
-FINE_LEVEL = {"counter": "tag", "standard": "stunde", "switch": "stunde"}
-# Zustands-Entitäten (Typ "state") haben vorerst KEINE Rollups — Abfragen
-# lesen bei ihnen die Rohdaten (query.query_series → query_raw_series). Die Dauer je
-# Zustand als eigene Rollup-Stufe folgt in ROADMAP 1.29 Phase 2; bis dahin
-# sind alle schreibenden Einstiege hier für diesen Typ ein No-op.
-NO_ROLLUP_TYPES = {"state"}
+FINE_LEVEL = {"counter": "tag", "standard": "stunde", "switch": "stunde", STATE_TYPE: "stunde"}
 
 
 @dataclass(frozen=True)
@@ -48,6 +46,24 @@ class FineRow:
     min_value: float | None = None
     max_value: float | None = None
     on_seconds: float | None = None  # Schalter: Einschaltdauer in Sekunden
+    # Zustand: Index -> (Sekunden in diesem Zustand, wie oft er im Bucket begann).
+    # Die Summe der Begin-Zähler ergibt die Wechsel (ROADMAP 1.29).
+    states: dict[int, tuple[float, int]] | None = None
+
+
+def merge_state_rows(rows: list[FineRow], bucket_start: float) -> FineRow:
+    """Fasst Zustands-Zeilen zu einem gröberen Bucket zusammen — Sekunden und
+    Begin-Zähler addieren sich je Zustand."""
+    merged: dict[int, list] = {}
+    for row in rows:
+        for idx, (seconds, entries) in (row.states or {}).items():
+            acc = merged.setdefault(idx, [0.0, 0])
+            acc[0] += seconds
+            acc[1] += entries
+    return FineRow(
+        bucket_start=bucket_start,
+        states={idx: (seconds, entries) for idx, (seconds, entries) in sorted(merged.items())},
+    )
 
 
 def rollup_dir(data_dir: Path, entity_id: str) -> Path:
@@ -152,6 +168,7 @@ def compute_fine_rollup(
     tz: ZoneInfo,
     boundary_value: float | None,
     window_end_ts: float,
+    window_start_ts: float | None = None,
 ) -> tuple[list[FineRow], float | None]:
     """Verdichtet sortierte (ts, value)-Rohzeilen auf benannte Buckets (tag/stunde/monat/jahr).
 
@@ -166,6 +183,7 @@ def compute_fine_rollup(
         boundary_value,
         window_end_ts,
         bucket_next_fn=_named_bucket_next(level),
+        window_start_ts=window_start_ts,
     )
 
 
@@ -176,6 +194,7 @@ def compute_fine_rollup_with_key(
     boundary_value: float | None,
     window_end_ts: float,
     bucket_next_fn=None,
+    window_start_ts: float | None = None,
 ) -> tuple[list[FineRow], float | None]:
     """Wie compute_fine_rollup, aber mit einer frei wählbaren Bucket-Funktion —
     genutzt von query.py für die Sekunden-genauen Stunde/Tag-Ansichten.
@@ -185,7 +204,17 @@ def compute_fine_rollup_with_key(
     (z. B. ein Regensensor, der stundenlang unverändert meldet), muss korrekt auf
     alle betroffenen Buckets aufgeteilt werden statt komplett im Start-Bucket zu
     landen — sonst zeigt ein einzelner 5-Minuten-Bucket z. B. 3000 Sekunden "an".
+
+    window_start_ts gilt nur für Zustände: boundary_value ist dort der Zustand,
+    der beim Fensteranfang schon galt, und reicht von window_start_ts bis zum
+    ersten Wechsel im Fenster. Ohne ihn fehlte jedem Monat die Zeit bis zu
+    seinem ersten Wechsel, und ein Monat ganz ohne Wechsel bliebe leer.
     """
+    if aggregation_type == STATE_TYPE:
+        return _compute_state_rollup(
+            rows, bucket_key_fn, boundary_value, window_start_ts, window_end_ts, bucket_next_fn
+        ), (rows[-1][1] if rows else boundary_value)
+
     if not rows:
         return [], boundary_value
 
@@ -249,7 +278,63 @@ def compute_fine_rollup_with_key(
     raise ValueError(tr("Unbekannter Aggregationstyp: {aggregation_type}", aggregation_type=aggregation_type))
 
 
+def _compute_state_rollup(
+    rows: list[tuple[float, float]],
+    bucket_key_fn,
+    boundary_value: float | None,
+    window_start_ts: float | None,
+    window_end_ts: float,
+    bucket_next_fn,
+) -> list[FineRow]:
+    """Dauer je Zustand und Bucket — die Verallgemeinerung von on_seconds.
+
+    Ein Abschnitt zählt nur dort als Beginn, wo der Zustand tatsächlich
+    wechselt: der vom Fensteranfang übernommene Zustand ist keiner, und ein
+    doppelt gemeldeter gleicher Zustand (Import, Neustart von HA) auch nicht.
+    """
+    if bucket_next_fn is None:
+        raise ValueError(tr("bucket_next_fn wird für Zustands-Entitäten benötigt"))
+    segments = list(rows)
+    if boundary_value is not None and window_start_ts is not None and (
+        not segments or segments[0][0] > window_start_ts
+    ):
+        segments.insert(0, (window_start_ts, boundary_value))
+    acc: dict[datetime, dict[int, list]] = {}
+    previous = boundary_value
+    for i, (ts, value) in enumerate(segments):
+        idx = int(round(value))
+        interval_end = segments[i + 1][0] if i + 1 < len(segments) else window_end_ts
+        if previous is None or int(round(previous)) != idx:
+            acc.setdefault(bucket_key_fn(ts), {}).setdefault(idx, [0.0, 0])[1] += 1
+        previous = value
+        current = ts
+        while current < interval_end:
+            bucket_start = bucket_key_fn(current)
+            segment_end = min(interval_end, bucket_next_fn(bucket_start).timestamp())
+            acc.setdefault(bucket_start, {}).setdefault(idx, [0.0, 0])[0] += max(0.0, segment_end - current)
+            current = segment_end
+    return [
+        FineRow(
+            bucket_start=key.timestamp(),
+            states={idx: (seconds, entries) for idx, (seconds, entries) in sorted(per_state.items())},
+        )
+        for key, per_state in sorted(acc.items())
+    ]
+
+
+_STATE_SCHEMA = pa.schema(
+    [
+        ("bucket_start", pa.float64()),
+        ("idx", pa.int32()),
+        ("seconds", pa.float64()),
+        ("entries", pa.int32()),
+    ]
+)
+
+
 def _fine_schema(aggregation_type: str) -> pa.Schema:
+    if aggregation_type == STATE_TYPE:
+        return _STATE_SCHEMA
     if aggregation_type == "counter":
         return pa.schema([("bucket_start", pa.float64()), ("value", pa.float64())])
     if aggregation_type == "standard":
@@ -265,6 +350,24 @@ def _fine_schema(aggregation_type: str) -> pa.Schema:
 
 
 def _fine_rows_to_table(rows: list[FineRow], aggregation_type: str) -> pa.Table:
+    if aggregation_type == STATE_TYPE:
+        # Langformat: die Zahl der Zustände ist je Entität verschieden und kann
+        # wachsen — mit einer Spalte je Zustand müsste jede Datei bei einem
+        # neuen Zustand neu geschrieben werden (ROADMAP 1.29, Speicherung).
+        flat = [
+            (row.bucket_start, idx, seconds, entries)
+            for row in rows
+            for idx, (seconds, entries) in sorted((row.states or {}).items())
+        ]
+        return pa.table(
+            {
+                "bucket_start": [r[0] for r in flat],
+                "idx": [r[1] for r in flat],
+                "seconds": [r[2] for r in flat],
+                "entries": [r[3] for r in flat],
+            },
+            schema=_STATE_SCHEMA,
+        )
     if aggregation_type == "counter":
         return pa.table(
             {"bucket_start": [r.bucket_start for r in rows], "value": [r.value for r in rows]},
@@ -324,6 +427,8 @@ def _append_table(path: Path, new_rows: pa.Table, segment_key: str) -> None:
 
 
 def _aggregate_fine_to_month(rows: list[FineRow], aggregation_type: str, month_start_ts: float) -> FineRow:
+    if aggregation_type == STATE_TYPE:
+        return merge_state_rows(rows, month_start_ts)
     if aggregation_type == "counter":
         return FineRow(bucket_start=month_start_ts, value=sum(r.value or 0.0 for r in rows))
     if aggregation_type == "standard":
@@ -367,14 +472,14 @@ def append_completed_month(
     unverändert). Grundlage für die wochentagsweise Aggregation im
     Tageslastprofil bei Energiedashboard-Rollen (siehe energiedashboard_routes.py).
     """
-    if aggregation_type in NO_ROLLUP_TYPES:
-        return
     level = FINE_LEVEL[aggregation_type]
     rows_raw = sorted(zip(month_table.column("ts").to_pylist(), month_table.column("value").to_pylist()))
 
+    # Zähler: Bezugswert für das erste Delta. Zustand: der Zustand, der beim
+    # Monatsanfang schon galt (siehe compute_fine_rollup_with_key).
     boundary_value = (
         last_value_before_month(data_dir, entity_id, year, month)
-        if aggregation_type == "counter"
+        if aggregation_type in ("counter", STATE_TYPE)
         else None
     )
 
@@ -383,7 +488,8 @@ def append_completed_month(
     month_end = datetime(year, month, days_in_month, 23, 59, 59, tzinfo=tz) + timedelta(seconds=1)
 
     fine_rows, _ = compute_fine_rollup(
-        rows_raw, aggregation_type, level, tz, boundary_value, month_end.timestamp()
+        rows_raw, aggregation_type, level, tz, boundary_value, month_end.timestamp(),
+        window_start_ts=month_start.timestamp(),
     )
     if fine_rows:
         _append_table(
@@ -556,8 +662,6 @@ def remove_month(
     """Entfernt alle Rollup-Zeilen eines Monats ohne Ersatz — für den seltenen
     Fall, dass nach einem Archiv-Purge (cleanup.py) kein Rohwert des Monats
     mehr übrig ist (der komplette Monat war weich gelöscht)."""
-    if aggregation_type in NO_ROLLUP_TYPES:
-        return
     level = FINE_LEVEL[aggregation_type]
     _remove_rows_for_month(rollup_path(data_dir, entity_id, level), tz, year, month)
     if aggregation_type == "counter" and hourly_rollup and level != "stunde":
@@ -604,8 +708,6 @@ def rebuild_entity_rollups(
     Backfill, wenn eine Entität nachträglich einer Energiedashboard-Rolle
     zugeordnet wird (siehe energiedashboard_routes.py).
     """
-    if aggregation_type in NO_ROLLUP_TYPES:
-        return
     archive_dir = entity_dir(data_dir, "archive", entity_id)
     (data_dir / "rollup").mkdir(parents=True, exist_ok=True)
     staging_root = Path(

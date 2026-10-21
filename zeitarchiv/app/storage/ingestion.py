@@ -25,6 +25,8 @@ from .index import (
     STATE_UNAVAILABLE_INDEX,
     STATE_UNAVAILABLE_TEXTS,
     Index,
+    STATE_REJECTION_LIMIT,
+    STATE_REJECTION_TYPE_MISMATCH,
     StateTypeMismatch,
     resolution_seconds,
     should_accept_value,
@@ -222,6 +224,9 @@ class IngestionService:
         self._completion_lock = threading.Lock()
         self._completions_since_prune = 0
         self._duplicate_ratio_events: deque[float] = deque()
+        # Wann eine verworfene Zustands-Meldung je (Grund, Entität) zuletzt in
+        # den Index geschrieben wurde — siehe _record_state_rejection().
+        self._state_rejection_written: dict[str, float] = {}
 
     def record_duplicate_ratio_event(self) -> None:
         """Merkt ein Vorkommen einer hohen Duplikatquote im Ingest-Batch
@@ -351,7 +356,20 @@ class IngestionService:
             return float(STATE_UNAVAILABLE_INDEX)
         return 0.0
 
+    def _record_state_rejection(self, entity_id: str, reason: str) -> None:
+        """Für den Repair-Hinweis merken, gedrosselt auf einmal je zehn
+        Minuten je Entität und Grund — eine fehlkonfigurierte Entität kann im
+        Sekundentakt melden, und jede Meldung wäre sonst ein Schreibzugriff
+        auf den Index."""
+        now = time.time()
+        key = f"{reason}:{entity_id}"
+        if now - self._state_rejection_written.get(key, 0.0) < 600:
+            return
+        self._state_rejection_written[key] = now
+        self._index.record_state_rejection(entity_id, reason, now)
+
     def _log_state_mismatch(self, event: IngestEvent) -> None:
+        self._record_state_rejection(event.entity_id, STATE_REJECTION_TYPE_MISMATCH)
         log_rate_limited(
             logger,
             logging.WARNING,
@@ -426,6 +444,7 @@ class IngestionService:
                 event.entity_id, event.state.strip(), event.state_label, event.ts
             )
             if idx is None:
+                self._record_state_rejection(event.entity_id, STATE_REJECTION_LIMIT)
                 log_rate_limited(
                     logger,
                     logging.WARNING,

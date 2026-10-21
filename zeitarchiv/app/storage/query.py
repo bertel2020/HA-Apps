@@ -441,6 +441,8 @@ def _rollup_rows_from_table(table) -> list[rollup.FineRow]:
     rollup.append_completed_month().
     """
     columns = table.column_names
+    if "idx" in columns:
+        return _state_rows_from_table(table)
     present = [col for col in ("value", "min_value", "max_value", "on_seconds") if col in columns]
     bucket_starts = table.column("bucket_start").to_pylist()
     values_by_col = {col: table.column(col).to_pylist() for col in present}
@@ -451,6 +453,23 @@ def _rollup_rows_from_table(table) -> list[rollup.FineRow]:
             kwargs[col] = values_by_col[col][i]
         rows.append(rollup.FineRow(**kwargs))
     return rows
+
+
+def _state_rows_from_table(table) -> list[rollup.FineRow]:
+    """Langformat der Zustands-Rollups (eine Zeile je Bucket und Zustand)
+    zurück zu einer FineRow je Bucket."""
+    grouped: dict[float, dict[int, tuple[float, int]]] = {}
+    for bucket_start, idx, seconds, entries in zip(
+        table.column("bucket_start").to_pylist(),
+        table.column("idx").to_pylist(),
+        table.column("seconds").to_pylist(),
+        table.column("entries").to_pylist(),
+    ):
+        grouped.setdefault(bucket_start, {})[idx] = (seconds or 0.0, entries or 0)
+    return [
+        rollup.FineRow(bucket_start=bucket_start, states=states)
+        for bucket_start, states in sorted(grouped.items())
+    ]
 
 
 def _read_rollup_rows(
@@ -919,10 +938,15 @@ def query_series(
 
     aggregation_type = entity["aggregation_type"]
     if aggregation_type == STATE_TYPE:
-        # Zustands-Entitäten haben (noch) keine Rollups, und ein Mittelwert
-        # oder eine Summe über Zustandsindizes ergäbe keinen Sinn — sie
-        # bekommen in jedem Zeitraum die Rohwechsel (ROADMAP 1.29 Phase 1).
-        return query_raw_series(data_dir, index, entity_id, range_key, tz, now, offset, continuous)
+        # Ein Mittelwert oder eine Summe über Zustandsindizes ergäbe keinen
+        # Sinn. Bis zur Woche zeichnet die Oberfläche die einzelnen Wechsel als
+        # Zeitstrahl, ab dem Monat die Dauer je Zustand als Anteile
+        # (ROADMAP 1.29: ein Jahr Zeitstrahl wären zehntausende Rechtecke).
+        if range_key in STATE_TIMELINE_RANGES:
+            return query_raw_series(data_dir, index, entity_id, range_key, tz, now, offset, continuous)
+        return query_state_shares(
+            data_dir, index, entity_id, range_key, tz, now, offset, continuous, read_cache
+        )
     resolved_chart_type = _resolved_chart_type(aggregation_type, chart_type)
     now_local = now.astimezone(tz)
     # "Gleicher Zeitpunkt"-Vergleich (Vergleichstabelle): wie viel von der
@@ -1119,6 +1143,198 @@ def query_previous_years(
     return out
 
 
+# Zeiträume, in denen eine Zustands-Entität ihre einzelnen Wechsel bekommt;
+# darüber Anteile je Bucket (query_state_shares).
+STATE_TIMELINE_RANGES = ("hour", "day", "week")
+
+# Bucket der Anteils-Balken je Zeitraum: ein Balken je Tag, Monat bzw. Jahr.
+STATE_SHARE_LEVEL = {"hour": "stunde", "day": "stunde", "week": "tag", "month": "tag", "year": "monat", "decade": "jahr"}
+
+
+def _state_completed_rows(
+    data_dir: Path, entity_id: str, start: datetime, end: datetime, tz: ZoneInfo,
+    use_month_level: bool, read_cache: QueryReadCache | None,
+) -> list[rollup.FineRow]:
+    """Abgeschlossene Zustands-Rollups für [start, end).
+
+    Ganze Monate kommen bei Jahr/Dekade aus monat.parquet, angeschnittene
+    (rollierendes Fenster) und alle übrigen Zeiträume aus den Stunden — ein
+    Jahrzehnt aus Stunden wären rund 90.000 Buckets je Zustand."""
+    if end <= start:
+        return []
+    if not use_month_level:
+        return _read_rollup_rows(data_dir, entity_id, "stunde", start.timestamp(), end.timestamp(), read_cache)
+    month_key = rollup.named_bucket_key(tz, "monat")
+    month_next = rollup.named_bucket_next(tz, "monat")
+    first_full = month_key(start.timestamp())
+    if first_full < start:
+        first_full = month_next(first_full)
+    last_full_end = month_key(end.timestamp())
+    if last_full_end <= first_full:
+        return _read_rollup_rows(data_dir, entity_id, "stunde", start.timestamp(), end.timestamp(), read_cache)
+    return (
+        _read_rollup_rows(data_dir, entity_id, "stunde", start.timestamp(), first_full.timestamp(), read_cache)
+        + _read_rollup_rows(data_dir, entity_id, "monat", first_full.timestamp(), last_full_end.timestamp(), read_cache)
+        + _read_rollup_rows(data_dir, entity_id, "stunde", last_full_end.timestamp(), end.timestamp(), read_cache)
+    )
+
+
+def query_state_shares(
+    data_dir: Path,
+    index: Index,
+    entity_id: str,
+    range_key: str,
+    tz: ZoneInfo,
+    now: datetime,
+    offset: int = 0,
+    continuous: bool = False,
+    read_cache: QueryReadCache | None = None,
+) -> dict:
+    """Dauer je Zustand und Bucket für die Anteils-Balken einer Zustands-Entität.
+
+    Abgeschlossene Monate aus den Rollups, der laufende Monat live aus dem Hot
+    Buffer — dieselbe Aufteilung wie bei den übrigen Typen, nur mit eigener
+    Verdichtung, weil ein Bucket hier eine Verteilung ist und kein Wert.
+
+    Jeder Punkt trägt ``states`` als Liste ``[idx, sekunden, beginne]``;
+    ``value`` ist die erfasste Zeit des Buckets (Summe der Sekunden). Ein
+    Bucket, aus dem gar nichts vorliegt, obwohl die Entität vorher schon einen
+    Zustand hatte, bekommt diesen Zustand über die volle Länge: dort gab es
+    einfach keinen Wechsel, und ohne Wechsel entsteht kein Archivmonat.
+    """
+    if range_key not in RANGE_KEYS:
+        raise ValueError(tr("Unbekannter Zeitraum: {range_key}", range_key=range_key))
+    entity = index.get_entity(entity_id)
+    if entity is None:
+        return _missing_entity_result(entity_id, range_key, tz, now, offset, continuous)
+    now_local = now.astimezone(tz)
+    window_start, window_end, period_end = _window(range_key, now_local, offset, continuous)
+    level = STATE_SHARE_LEVEL[range_key]
+    key_fn = rollup.named_bucket_key(tz, level)
+    next_fn = rollup.named_bucket_next(tz, level)
+    current_month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    completed_end = min(window_end, current_month_start)
+    rows = _state_completed_rows(
+        data_dir, entity_id, window_start, completed_end, tz, range_key in ("year", "decade"), read_cache
+    )
+    live_start = max(window_start, current_month_start)
+    if live_start < window_end:
+        hot = _read_hot_rows_filtered(
+            data_dir, entity_id, index, now_local.timestamp(), live_start.timestamp(), window_end.timestamp(), tz,
+            read_cache,
+        )
+        boundary = _boundary_value(data_dir, entity_id, live_start.timestamp(), tz, read_cache)
+        live, _ = rollup.compute_fine_rollup_with_key(
+            hot, STATE_TYPE, key_fn, boundary, window_end.timestamp(),
+            bucket_next_fn=next_fn, window_start_ts=live_start.timestamp(),
+        )
+        rows += live
+
+    grouped: dict[float, list[rollup.FineRow]] = {}
+    for row in rows:
+        grouped.setdefault(key_fn(row.bucket_start).timestamp(), []).append(row)
+    buckets = {start: rollup.merge_state_rows(group, start) for start, group in grouped.items()}
+
+    # Lücken ohne jeden Rollup füllen (siehe Docstring) — nur im
+    # abgeschlossenen Teil und erst ab dem ersten Wert der Entität. Der
+    # laufende Monat hat keine: dort trägt der Randwert bis zum ersten Wechsel.
+    first_ts = entity["first_ts"]
+    if first_ts is not None:
+        carried: float | None = None
+        cursor = key_fn(max(window_start.timestamp(), first_ts))
+        limit = completed_end
+        while cursor < limit:
+            bucket_end = next_fn(cursor)
+            start_ts = cursor.timestamp()
+            if start_ts in buckets:
+                carried = None
+            else:
+                if carried is None:
+                    carried = _boundary_value(data_dir, entity_id, max(start_ts, first_ts), tz, read_cache)
+                if carried is not None:
+                    span_start = max(start_ts, window_start.timestamp(), first_ts)
+                    span_end = min(bucket_end.timestamp(), limit.timestamp())
+                    if span_end > span_start:
+                        buckets[start_ts] = rollup.FineRow(
+                            bucket_start=start_ts, states={int(round(carried)): (span_end - span_start, 0)}
+                        )
+            cursor = bucket_end
+
+    points = []
+    for start_ts in sorted(buckets):
+        states = buckets[start_ts].states or {}
+        points.append({
+            "ts": start_ts,
+            "value": sum(seconds for seconds, _entries in states.values()),
+            "min": None,
+            "max": None,
+            "states": [[idx, seconds, entries] for idx, (seconds, entries) in sorted(states.items())],
+        })
+    return {
+        "entity_id": entity_id,
+        "aggregation_type": STATE_TYPE,
+        "chart_type": "shares",
+        "bucket": level,
+        "points": points,
+        "window_start": window_start.timestamp(),
+        "window_end": window_end.timestamp(),
+        "period_end": period_end.timestamp(),
+        "is_current": offset == 0,
+        "elapsed_seconds": None,
+        "states": state_legend(index, entity_id),
+    }
+
+
+def state_durations(result: dict) -> dict[int, float]:
+    """Sekunden je Zustand aus einer Antwort von query_series() — egal ob sie
+    Rohwechsel (bis zur Woche) oder Anteile je Bucket (ab dem Monat) trägt."""
+    totals: dict[int, float] = {}
+    points = result.get("points") or []
+    if result.get("chart_type") == "shares":
+        for point in points:
+            for idx, seconds, _entries in point["states"]:
+                totals[idx] = totals.get(idx, 0.0) + seconds
+        return totals
+    end = result.get("window_end") or 0.0
+    for i, point in enumerate(points):
+        if point["value"] is None:
+            continue
+        stop = points[i + 1]["ts"] if i + 1 < len(points) else end
+        if stop > point["ts"]:
+            idx = int(round(point["value"]))
+            totals[idx] = totals.get(idx, 0.0) + (stop - point["ts"])
+    return totals
+
+
+def state_since(data_dir: Path, index: Index, entity_id: str, tz: ZoneInfo, now: datetime) -> float | None:
+    """Seit wann der aktuelle Zustand gilt — für "seit 2 h 14 min" auf der
+    Kachel. Gesucht wird in wachsenden Fenstern rückwärts, weil der letzte
+    Wechsel meist Minuten, manchmal aber Wochen zurückliegt; ohne Wechsel im
+    größten Fenster gilt der älteste gelesene Wert."""
+    entity = index.get_entity(entity_id)
+    if entity is None or entity["first_ts"] is None:
+        return None
+    now_ts = now.timestamp()
+    earliest = None
+    for days in (1, 7, 31, 366):
+        start_ts = max(now_ts - days * 86400, entity["first_ts"])
+        rows = list(cleanup.iter_raw_rows(
+            data_dir, index, entity_id, start_ts, now_ts, tz, now=now.astimezone(tz), max_rows=MAX_RAW_QUERY_POINTS,
+        ))
+        if rows:
+            current = int(round(rows[-1][1]))
+            since = rows[-1][0]
+            for ts, value in reversed(rows):
+                if int(round(value)) != current:
+                    return since
+                since = ts
+            earliest = since
+        if start_ts <= entity["first_ts"]:
+            break
+    return earliest
+
+
 def query_raw_series(
     data_dir: Path,
     index: Index,
@@ -1183,6 +1399,17 @@ def query_raw_series(
         result["chart_type"] = "timeline"
         result["states"] = state_legend(index, entity_id)
     return result
+
+
+def state_text(index: Index, entity_id: str, value: float) -> str:
+    """Anzeigetext eines Zustandsindex: HA-Übersetzung, sonst Rohwert."""
+    idx = int(round(value))
+    if idx == STATE_UNAVAILABLE_INDEX:
+        return tr("nicht verfügbar")
+    for row in index.get_state_map(entity_id):
+        if row["idx"] == idx:
+            return row["label"] or row["text"]
+    return str(idx)
 
 
 def state_legend(index: Index, entity_id: str) -> list[dict]:

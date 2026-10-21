@@ -1963,6 +1963,7 @@
     "Unbekanntes Bucket-Level: {level}": "Unknown bucket level: {level}",
     "Unbekannter Aggregationstyp: {aggregation_type}": "Unknown aggregation type: {aggregation_type}",
     "bucket_next_fn wird für Schalter-Entitäten benötigt": "bucket_next_fn is required for switch entities",
+    "bucket_next_fn wird für Zustands-Entitäten benötigt": "bucket_next_fn is required for state entities",
     "ZIP enthält zu viele Einträge (maximal {max_members})": "ZIP contains too many entries (maximum {max_members})",
     "Entpackte ZIP-Größe überschreitet das erlaubte Limit": "Unpacked ZIP size exceeds the permitted limit",
     "ZIP-Kompressionsverhältnis ist nicht zulässig": "ZIP compression ratio is not permitted",
@@ -2758,7 +2759,6 @@
     "Für Zustände nicht verfügbar: Eine rückwirkende Verdichtung könnte einen echten Zustandswechsel wegkomprimieren.": "Not available for states: a retroactive compaction could compress away a real state change.",
     "Verdichten ist für Zustände nicht verfügbar": "Compaction is not available for states",
     "Zustands-Entitäten können nicht zusammengeführt werden.": "State entities cannot be merged.",
-    "Alle bearbeiten im Reiter „Werte bearbeiten“": "Edit all in the “Edit values” tab",
     "Keine Wechsel in diesem Ausschnitt.": "No changes in this section.",
     "Rohwert": "Raw value",
     "Wechsel": "Changes",
@@ -2780,7 +2780,18 @@
     "Pflegeleicht": "Easy care",
     "Kurz 30": "Quick 30",
     "Leerlauf": "Idle",
-    "Heizen": "Heating"
+    "Heizen": "Heating",
+    "Anteile": "Shares",
+    "Ungültige Darstellung": "Invalid display mode",
+    "Streifen": "Strip",
+    "Darstellung wählen": "Choose display",
+    "Der Streifen zeigt die letzten 24 Stunden, ab zwei Spalten die Anteile der letzten 7 Tage. Der Donut zeigt die Anteile im Zeitraum.": "The strip shows the last 24 hours, from two columns on the shares of the last 7 days. The donut shows the shares in the period.",
+    "Gilt für den Donut.": "Applies to the donut.",
+    "Seit wann": "Since when",
+    "Werte verworfen: Typ passt nicht": "Values discarded: type does not match",
+    "Diese Entitäten liefern Text statt Zahlen oder umgekehrt. Der erste Wert legt den Typ fest, abweichende Werte werden nicht gespeichert: {entities}.": "These entities report text instead of numbers or vice versa. The first value sets the type, values that differ are not stored: {entities}.",
+    "Zustände verworfen: Obergrenze erreicht": "States discarded: limit reached",
+    "Diese Entitäten haben schon {limit} verschiedene Zustände, neue werden nicht mehr gespeichert: {entities}. Meist steckt Freitext dahinter (Adresse, Versionsnummer), der sich nicht als Zustand eignet.": "These entities already have {limit} different states, new ones are no longer stored: {entities}. Usually this is free text (an address, a version number) that does not work as a state."
   },
   "js": {
     "Langzeit": "Long-term",
@@ -3302,6 +3313,14 @@
     "{count} Wechsel": "{count} changes",
     "{date} · 1 Abschnitt": "{date} · 1 section",
     "{date} · {count} Abschnitte": "{date} · {count} sections",
-    "Neuer Zustand": "New state"
+    "Neuer Zustand": "New state",
+    "1 Beginn": "1 start",
+    "{count} Beginne": "{count} starts",
+    "Ein Klick auf einen Balken öffnet diesen Zeitraum.": "Click a bar to open that period.",
+    "jetzt": "now",
+    "seit {dauer}": "for {dauer}",
+    "−24 h": "−24 h",
+    "Nicht gezeigt: {names} — Zustands-Entitäten lassen sich nur zusammen mit Schaltern oder anderen Zuständen darstellen.": "Not shown: {names} — state entities can only be shown together with switches or other states.",
+    "Darstellung konnte nicht gespeichert werden": "Display could not be saved"
   }
 }

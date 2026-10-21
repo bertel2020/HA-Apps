@@ -331,39 +331,20 @@ function selectBrush() {
       return {start, end};
     }
 
-    // Zustands-Entitäten (Typ "state", ROADMAP 1.29): Farbe je Zustandsindex
-    // aus der festen Chart-Palette, "nicht verfügbar" (-1) grau schraffiert.
-    // Der Index ist stabil, also auch die Farbe eines Zustands.
-    const STATE_UNAVAILABLE = -1;
-    function stateColor(idx) {
-      const css = getComputedStyle(document.body);
-      return idx === STATE_UNAVAILABLE
-        ? css.getPropertyValue('--ink-faint').trim()
-        : css.getPropertyValue(`--chart-${(idx % 8) + 1}`).trim();
-    }
-    function stateSwatchStyle(idx) {
-      const color = stateColor(idx);
-      return idx === STATE_UNAVAILABLE
-        ? `background:repeating-linear-gradient(135deg, ${color} 0 2px, transparent 2px 5px);border:1px solid ${color}`
-        : `background:${color}`;
-    }
-    // Schraffur für das Band "nicht verfügbar" — ECharts nimmt ein Canvas als
-    // Füllmuster. Bei jedem Zeichnen neu, damit es dem aktuellen Farbschema folgt.
-    function unavailablePattern() {
-      const css = getComputedStyle(document.body);
-      const c = document.createElement('canvas');
-      c.width = c.height = 8;
-      const x = c.getContext('2d');
-      x.fillStyle = css.getPropertyValue('--surface-alt').trim();
-      x.fillRect(0, 0, 8, 8);
-      x.strokeStyle = css.getPropertyValue('--ink-faint').trim();
-      x.lineWidth = 1.6;
-      x.beginPath();
-      x.moveTo(-2, 10); x.lineTo(10, -2); x.moveTo(6, 10); x.lineTo(10, 6); x.moveTo(-2, 2); x.lineTo(2, -2);
-      x.stroke();
-      return {image: c, repeat: 'repeat'};
-    }
+    // Zustands-Entitäten (Typ "state", ROADMAP 1.29): Farben, Abschnitte und
+    // Buckets aus state-entities.js — Chart-Editor und Kacheln nutzen dieselben.
+    const STATE_UNAVAILABLE = StateEntities.UNAVAILABLE;
+    const stateColor = StateEntities.color;
+    const stateSwatchStyle = StateEntities.swatchStyle;
+    const unavailablePattern = StateEntities.unavailablePattern;
     const STATE_LOG_PAGE = 25;
+    // Darstellung je Zeitraum, solange niemand umschaltet: bis zur Woche der
+    // Zeitstrahl, ab dem Monat die Anteile (ROADMAP 1.29 — ein Jahr Zeitstrahl
+    // wären zehntausende Rechtecke, und die Frage dort ist "wie lange", nicht
+    // "wann genau").
+    const stateModeFor = range => (StateEntities.SERVER_SHARE_RANGES.includes(range) ? 'shares' : 'timeline');
+    // Klick auf einen Balken öffnet den Zeitraum darunter.
+    const STATE_DRILL = {week: 'day', month: 'day', year: 'month', decade: 'year', day: 'hour'};
 
     function entityChart() {
       return {
@@ -416,6 +397,14 @@ function selectBrush() {
         // Zuordnung Index → Text aus /api/query ({idx, text, label}), nur bei
         // Zustands-Entitäten gefüllt; "nicht verfügbar" steht zuletzt.
         states: [],
+        // Zeitstrahl, Anteile oder Wechsel je Bucket. Nicht gespeichert: der
+        // Zeitraum bestimmt den Ausgangspunkt (stateModeFor), umgeschaltet
+        // wird für den Moment.
+        stateMode: stateModeFor(INITIAL_RANGE || 'day'),
+        // Anteile je Bucket vom Server (chart_type "shares"), nur ab dem Monat.
+        // points bleiben die Rohwechsel — Protokoll und längster Abschnitt
+        // brauchen sie in jedem Zeitraum.
+        sharePoints: [],
         // Per Klick auf die Legende ausgeblendete Zustände — bewusst nicht
         // gespeichert, wie das Ein-/Ausblenden von Serien im Chart-Editor.
         hiddenStates: [],
@@ -522,7 +511,11 @@ function selectBrush() {
         // sondern um Sichtbarkeit (Begründung bei seiner dataZoom-Angabe in
         // renderTimeline()), und die Zahl der Segmente sagt darüber nichts.
         get zoomAvailable() {
+          if (this.isState) return this.stateMode === 'timeline';
           return this.chartType === 'timeline' || this.points.length > ZOOM_MIN_POINTS;
+        },
+        get chartIsTimeline() {
+          return this.isState ? this.stateMode === 'timeline' : this.chartType === 'timeline';
         },
         // Steht dauerhaft unter dem Chart, weil er zwei Dinge auf einmal sagt,
         // von denen das erste ein Datenzustand ist: WIE VIELE Punkte gerade
@@ -534,6 +527,9 @@ function selectBrush() {
         // Grund, und der steht hier.
         get zoomHint() {
           const geste = t('mit Strg und Mausrad zoomen, mit Umschalt einen Bereich aufziehen, am Telefon mit zwei Fingern');
+          if (this.isState && this.stateMode !== 'timeline') {
+            return t('Ein Klick auf einen Balken öffnet diesen Zeitraum.');
+          }
           if (this.isState) {
             return t('Kurze Zustände sind schmaler als ein Bildpunkt — {geste}.', {geste});
           }
@@ -587,17 +583,18 @@ function selectBrush() {
         // zum Fensterende (bei der laufenden Periode: jetzt).
         get stateSegments() {
           if (!this.isState) return [];
-          const end = this.windowEnd ?? 0;
-          const out = [];
-          this.points.forEach((p, i) => {
-            const e = i + 1 < this.points.length ? this.points[i + 1].ts : end;
-            if (!(e > p.ts)) return;
-            const idx = Math.round(p.value);
-            const last = out[out.length - 1];
-            if (last && last.idx === idx && last.e === p.ts) last.e = e;
-            else out.push({s: p.ts, e, idx, key: p.ts});
-          });
-          return out;
+          return StateEntities.segments(this.points, this.windowEnd);
+        },
+        // Buckets für Anteile/Wechsel: ab dem Monat vom Server (exakt aus den
+        // Rollups, auch wo die Rohwerte gekappt wären), darunter aus den
+        // Rohwechseln im Browser.
+        get stateBuckets() {
+          if (!this.isState) return [];
+          if (StateEntities.SERVER_SHARE_RANGES.includes(this.range)) {
+            return StateEntities.bucketsFromShares(this.sharePoints);
+          }
+          const [bucketStart, bucketNext] = StateEntities.RANGE_BUCKETS[this.range]();
+          return StateEntities.bucketsFromSegments(this.stateSegments, bucketStart, bucketNext);
         },
         // Bezugsfenster für Legende, Kennzahlen und Protokoll: der gezoomte
         // Ausschnitt, sonst der ganze Zeitraum (ROADMAP 1.29: Zoom grenzt alles
@@ -607,6 +604,25 @@ function selectBrush() {
           return {a: this.windowStart ?? 0, b: this.windowEnd ?? 0};
         },
         get stateSummary() {
+          // Ohne Zoom ab dem Monat aus den Server-Buckets: die Rohwechsel eines
+          // Jahrzehnts können gekappt sein, die Rollups nicht. Der längste
+          // Abschnitt kommt weiter aus den Rohwechseln, das Rollup kennt ihn nicht.
+          if (this.sharePoints.length && !this.zoomRange) {
+            const rows = StateEntities.totals(this.stateBuckets, this.states);
+            let longest = null;
+            for (const seg of this.stateSegments) {
+              if (seg.idx !== STATE_UNAVAILABLE && (!longest || seg.e - seg.s > longest.seconds)) {
+                longest = {idx: seg.idx, seconds: seg.e - seg.s};
+              }
+            }
+            const na = rows.find(row => row.idx === STATE_UNAVAILABLE);
+            return {
+              rows,
+              changes: rows.reduce((sum, row) => sum + row.entries, 0),
+              longest,
+              unavailable: na ? na.seconds : 0,
+            };
+          }
           const {a, b} = this.stateWindow;
           const total = Math.max(b - a, 1);
           const seconds = new Map();
@@ -694,9 +710,12 @@ function selectBrush() {
           return st ? st.text : '';
         },
         stateSwatch(idx) { return stateSwatchStyle(idx); },
-        stateShare(row) {
-          const digits = row.share < 1 ? 1 : 0;
-          return `${row.share.toLocaleString(LOCALE, {minimumFractionDigits: digits, maximumFractionDigits: digits})} %`;
+        stateShare(row) { return StateEntities.fmtShare(row.share); },
+        setStateMode(mode) {
+          if (mode === this.stateMode) return;
+          this.stateMode = mode;
+          this.zoomRange = null;
+          this.render();
         },
         fmtStateDuration(seconds) { return NumberFormat.fmtDuration(seconds); },
         fmtStateTime(ts) {
@@ -712,7 +731,7 @@ function selectBrush() {
         // Hover über eine Protokollzeile: Band im Zeitstrahl einrahmen.
         highlightState(key) {
           this.stateHot = key;
-          if (!chartInstance || this.chartType !== 'timeline') return;
+          if (!chartInstance || !this.chartIsTimeline) return;
           const seg = key == null ? null : this.stateSegments.find(x => x.key === key);
           chartInstance.setOption({series: [{id: 'main'}, {id: 'hl', data: seg ? [[0, seg.s * 1000, seg.e * 1000]] : []}]});
         },
@@ -770,6 +789,7 @@ function selectBrush() {
           // jedem Zeitraum — sonst kämen gebucketete Daten, bis man auf
           // Balken und zurück schaltet.
           this.raw = this.chartType === 'timeline';
+          if (this.isState) this.stateMode = stateModeFor(key);
           this.offset = nextOffset;
           this.continuous = false;
           this.load();
@@ -928,9 +948,20 @@ function selectBrush() {
           // und Archiv, und im Normalfall (Entität ohne offene Markierungen)
           // wäre der Ertrag eine leere Liste.
           if (this.showMarked) params.set('marked', 'true');
-          const res = await fetch(`${BASE}/api/query?${params}`);
+          // Zustände ab dem Monat: zusätzlich die Anteile je Bucket, parallel
+          // zu den Rohwechseln (raw bleibt bei Zuständen immer true).
+          const shareParams = new URLSearchParams(params);
+          shareParams.set('raw', 'false');
+          shareParams.delete('marked');
+          const wantShares = this.isState && StateEntities.SERVER_SHARE_RANGES.includes(this.range);
+          const [res, shareRes] = await Promise.all([
+            fetch(`${BASE}/api/query?${params}`),
+            wantShares ? fetch(`${BASE}/api/query?${shareParams}`) : Promise.resolve(null),
+          ]);
           const data = await res.json();
+          const shareData = shareRes ? await shareRes.json() : null;
           if (requestId !== this._requestId) return; // eine neuere Anfrage ist schon unterwegs/angekommen
+          this.sharePoints = shareData && shareData.chart_type === 'shares' ? shareData.points : [];
           this.points = data.points || [];
           this.comparePoints = data.compare_points || [];
           this.compareWindowStart = data.compare_window_start ?? null;
@@ -957,6 +988,7 @@ function selectBrush() {
             // Handler auf derselben Instanz.
             chartInstance.on('click', (p) => {
               if (this.isState && p.seriesId === 'main') this.focusStateRow(p.value[4]);
+              else if (this.isState && String(p.seriesId).startsWith('state-')) this.drillState(p.dataIndex);
             });
             chartInstance.on('mouseover', (p) => {
               if (this.isState && p.seriesId === 'main') this.stateHot = p.value[4];
@@ -1049,6 +1081,10 @@ function selectBrush() {
           };
           const tooltipBucketSeconds = detectResolutionSeconds(this.points);
 
+          if (this.isState && this.stateMode !== 'timeline') {
+            this.renderStateBars(fmt);
+            return;
+          }
           if (this.chartType === 'timeline') {
             this.renderTimeline(fmt);
             return;
@@ -1492,6 +1528,106 @@ function selectBrush() {
             toolbox: {show: false},
           };
           chartInstance.setOption(option, true);
+          chartInstance.resize();
+        },
+
+        // Bucket-Anfänge der gezeigten Periode — auch die ohne Daten, damit die
+        // Achse den ganzen Monat bzw. das ganze Jahr zeigt.
+        get stateBucketStarts() {
+          if (this.windowStart == null || this.periodEnd == null) return [];
+          return StateEntities.bucketStarts(this.range, this.windowStart, this.periodEnd);
+        },
+        // Klick auf einen Balken: diesen Tag/Monat/dieses Jahr öffnen.
+        drillState(dataIndex) {
+          const next = STATE_DRILL[this.range];
+          const ts = this.stateBucketStarts[dataIndex];
+          if (!next || ts == null) return;
+          // setRange() übersetzt den Anker in den Offset der neuen Stufe; eine
+          // Sekunde nach dem Bucket-Anfang, damit er sicher darin liegt.
+          this._rangeAnchorMs = (ts + 1) * 1000;
+          this.setRange(next);
+        },
+        // Anteile (gestapelt auf 100 %) oder Wechsel (Beginne je Zustand) je
+        // Bucket. Ausgeblendete Zustände fehlen, die Anteile verteilen sich dann
+        // auf die sichtbaren (ROADMAP 1.29).
+        renderStateBars(fmt) {
+          const shares = this.stateMode === 'shares';
+          const starts = this.stateBucketStarts;
+          const [bucketStart] = StateEntities.RANGE_BUCKETS[this.range]();
+          const byStart = new Map(this.stateBuckets.map(b => [bucketStart(b.ts + 1), b]));
+          const visible = idx => !this.hiddenStates.includes(idx);
+          const order = this.states.map(st => st.idx).filter(idx => visible(idx)
+            && this.stateBuckets.some(b => b.states.has(idx)));
+          const totalOf = bucket => {
+            let sum = 0;
+            if (bucket) for (const [idx, v] of bucket.states) if (visible(idx)) sum += v.seconds;
+            return sum;
+          };
+          const pattern = unavailablePattern();
+          const fmtBucket = ts => {
+            const d = new Date(ts * 1000);
+            if (this.range === 'hour') return d.toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
+            if (this.range === 'day') return d.toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
+            if (this.range === 'week') return d.toLocaleDateString(LOCALE, {weekday: 'short', day: '2-digit', month: '2-digit'});
+            return fmt(ts);
+          };
+          const series = order.map(idx => ({
+            id: `state-${idx}`,
+            name: this.stateLabel(idx),
+            type: 'bar',
+            stack: 'states',
+            barCategoryGap: '20%',
+            itemStyle: {color: StateEntities.fill(idx, pattern)},
+            emphasis: {focus: 'none'},
+            data: starts.map(ts => {
+              const bucket = byStart.get(ts);
+              const v = bucket && bucket.states.get(idx);
+              if (!v) return null;
+              if (!shares) return v.entries || null;
+              const total = totalOf(bucket);
+              return total > 0 && v.seconds > 0 ? v.seconds / total * 100 : null;
+            }),
+          }));
+          const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
+          const css = getComputedStyle(document.body);
+          chartInstance.setOption({
+            textStyle: {
+              fontFamily: css.getPropertyValue('--font-mono'),
+              color: css.getPropertyValue('--ink-muted'),
+              fontSize: Math.round(12 * uiFontScale * 10) / 10,
+            },
+            grid: {left: 10, right: 20, top: 24, bottom: 40, containLabel: true},
+            xAxis: {
+              type: 'category',
+              data: starts.map(fmtBucket),
+              axisTick: {alignWithLabel: true},
+              axisLabel: {hideOverlap: true},
+            },
+            yAxis: shares
+              ? {type: 'value', max: 100, axisLabel: {formatter: v => `${v} %`}, splitLine: {lineStyle: {color: css.getPropertyValue('--border')}}}
+              : {type: 'value', minInterval: 1, splitLine: {lineStyle: {color: css.getPropertyValue('--border')}}},
+            tooltip: {
+              trigger: 'axis',
+              axisPointer: {type: 'shadow'},
+              appendToBody: true,
+              formatter: items => {
+                const ts = starts[items[0]?.dataIndex];
+                const bucket = byStart.get(ts);
+                if (!bucket) return escapeHtml(fmtBucket(ts));
+                const lines = order.filter(idx => bucket.states.has(idx)).map(idx => {
+                  const v = bucket.states.get(idx);
+                  const total = totalOf(bucket);
+                  const value = shares
+                    ? `${NumberFormat.fmtDuration(v.seconds)} · ${StateEntities.fmtShare(total ? v.seconds / total * 100 : 0)}`
+                    : (v.entries === 1 ? t('1 Beginn') : t('{count} Beginne', {count: v.entries.toLocaleString(LOCALE)}));
+                  return `<span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:2px;${stateSwatchStyle(idx)}"></span> ${escapeHtml(this.stateLabel(idx))} <strong>${value}</strong>`;
+                });
+                return `${escapeHtml(fmtBucket(ts))}<br>${lines.join('<br>')}`;
+              },
+            },
+            series,
+            toolbox: {show: false},
+          }, true);
           chartInstance.resize();
         },
 

@@ -3655,6 +3655,7 @@ _TILE_RANGE_LABELS = {
 _TILE_METRIC_LABELS = {"last": "", "min": N_("Min"), "avg": "Ø", "max": N_("Max"), "sum": "Σ"}
 
 
+
 def _tile_metric_labels(aggregation_type: str | None) -> dict[str, str]:
     """Die Kürzel für einen Entitätstyp — genau eines hängt davon ab.
 
@@ -3690,6 +3691,10 @@ def _tile_available_metrics(aggregation_type: str | None) -> list[str]:
         return ["sum"]
     if aggregation_type == "counter":
         return ["min", "avg", "max", "sum"]
+    if aggregation_type == "state":
+        # Zustände: keine Kennzahl über Indizes — die Kachel zeigt Zustand,
+        # "seit" und Anteile (ROADMAP 1.29).
+        return []
     return ["min", "avg", "max"]
 
 
@@ -3835,6 +3840,7 @@ def _dashboard_tiles_context(
             if e is None:
                 continue
             is_switch = e["aggregation_type"] == "switch"
+            is_state = e["aggregation_type"] == "state"
             # Kachel-Override hat Vorrang vor der entity-eigenen Einstellung,
             # "auto" (Feld-Default) bedeutet ausdrücklich "entity-eigenen Wert
             # übernehmen" statt selbst "auto" an format_value() zu reichen.
@@ -3850,6 +3856,10 @@ def _dashboard_tiles_context(
                 value_text = "–"
             elif e["last_value"] is None:
                 value_text = "–"
+            elif is_state:
+                # Zustands-Entität: der Text des aktuellen Zustands, wie überall
+                # die HA-Übersetzung vor dem Rohwert (ROADMAP 1.29).
+                value_text = query_mod.state_text(index, e["entity_id"], e["last_value"])
             elif is_switch:
                 # Momentaner Zustand — anders als der chart-eigene
                 # display_mode='time' (Summe der Einschaltdauer über einen
@@ -3866,7 +3876,9 @@ def _dashboard_tiles_context(
             # Heuristik. Nur der Kartenrahmen zeigt das an (siehe
             # .dtile-entity.is-warn/is-stale), der Wert selbst bleibt immer
             # schwarz.
-            stale_mode = p["stale_mode"]
+            # Zustände werden nur beim Wechsel gespeichert — ein seit Tagen
+            # unveränderter Zustand ist kein veralteter Wert.
+            stale_mode = "off" if is_state else p["stale_mode"]
             staleness = staleness_for(seconds_ago, stale_mode)
             stale_limits = stale_thresholds(stale_mode)
             tiles.append({
@@ -3881,8 +3893,9 @@ def _dashboard_tiles_context(
                 # als "name" oben (mit friendly_name-Fallback) soll das Feld
                 # leer bleiben, solange kein eigener Titel gesetzt ist.
                 "custom_title": p["title"] or "",
-                "value_text": value_text, "unit": "" if is_switch else (e["unit"] or ""),
-                "is_switch": is_switch, "decimals": effective_decimals,
+                "value_text": value_text, "unit": "" if is_switch or is_state else (e["unit"] or ""),
+                "is_switch": is_switch, "is_state": is_state, "decimals": effective_decimals,
+                "state_view": p["state_view"] if is_state else "strip",
                 "age_text": tr("vor {format_uptime}", format_uptime=format_uptime(seconds_ago)) if seconds_ago is not None else tr("nie"),
                 "staleness": staleness,
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
@@ -4222,6 +4235,25 @@ def dashboard_entity_show_age(body: _ShowAgeDashboardTileBody) -> dict:
     if not index.set_dashboard_entity_pin_show_age(body.dashboard_id, body.pin_id, body.show_age):
         raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
     return {"ok": True, "show_age": body.show_age}
+
+
+class _StateViewDashboardTileBody(BaseModel):
+    dashboard_id: int = 1
+    pin_id: int
+    state_view: str
+
+
+@app.post("/dashboard/entity-state-view")
+def dashboard_entity_state_view(body: _StateViewDashboardTileBody) -> dict:
+    """Darstellung einer Zustands-Kachel: Streifen oder Donut (ROADMAP 1.29)."""
+    _require_dashboard_unlocked(body.dashboard_id)
+    try:
+        updated = index.set_dashboard_entity_pin_state_view(body.dashboard_id, body.pin_id, body.state_view)
+    except ValueError as err:
+        raise HTTPException(status_code=422, detail=str(err)) from err
+    if not updated:
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
+    return {"ok": True, "state_view": body.state_view}
 
 
 class _StaleModeDashboardTileBody(BaseModel):

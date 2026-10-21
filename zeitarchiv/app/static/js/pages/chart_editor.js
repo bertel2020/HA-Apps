@@ -662,6 +662,9 @@
         // Bearbeiten-Modus zu starten statt erst über "Anpassen" umschalten
         // zu müssen.
         editing: !CHART_ID || new URLSearchParams(location.search).has('edit'),
+        // Zustands-Entitäten, die wegen gemischter Zahlen-Entitäten nicht
+        // gezeichnet werden (siehe load()).
+        droppedStateIds: [],
         loading: false,
         saving: false,
         savedMessage: '',
@@ -720,10 +723,13 @@
         // weiter unten, statt eines eigenen canGoHorizontal-Getters: die Zeile
         // ist jetzt immer sichtbar, "Horizontal" schaltet den dafür nötigen
         // Ranking-Vergleich (Auflösung "Voll") selbst mit ein.
-        // Nur wenn ALLE geladenen Serien Schalter sind, macht ein
+        // Nur wenn ALLE geladenen Serien Schalter oder Zustände sind, macht ein
         // gemeinsamer Zeitstrahl (eine Zeile je Entität) Sinn — siehe
         // timeline-Kommentar oben.
-        get allSwitch() { return this.series.length > 0 && this.series.every(s => s.aggregation_type === 'switch'); },
+        get allSwitch() { return this.series.length > 0 && this.series.every(s => ['switch', 'state'].includes(s.aggregation_type)); },
+        // Zustands-Entitäten (ROADMAP 1.29) gibt es nur als Zeitstrahl oder
+        // Donut — eine Linie aus Zustandsindizes hätte keine Aussage.
+        get hasState() { return this.series.some(s => s.aggregation_type === 'state'); },
         get resolutionOptions() {
           const labels = RESOLUTION_LABELS[this.range] || RESOLUTION_LABELS.day;
           const options = [
@@ -798,6 +804,21 @@
             sum: hasSum ? (values.length ? sumFormatted : '—') : null,
           };
         },
+        // Dauer und Anteil je Zustand einer Zustands-Serie im Zeitraum — für die
+        // Legende je Zeile und den Donut. Rohwechsel (Zeitstrahl, bis zur
+        // Woche) und Server-Anteile (ab dem Monat) ergeben dieselbe Form.
+        stateRowsFor(s) {
+          const buckets = s.chart_type === 'shares'
+            ? StateEntities.bucketsFromShares(s.points)
+            : StateEntities.bucketsFromSegments(StateEntities.segments(s.points, this.windowEnd), () => 0, () => Infinity);
+          return StateEntities.totals(buckets, s.states).map(row => ({
+            ...row,
+            label: StateEntities.label(s.states, row.idx),
+            raw: StateEntities.raw(s.states, row.idx),
+            swatch: StateEntities.swatchStyle(row.idx),
+            text: `${NumberFormat.fmtDuration(row.seconds)} · ${StateEntities.fmtShare(row.share)}`,
+          }));
+        },
         // Summe der Vergleichsperiode „bis zum gleichen Tag“ (bzw. zur gleichen Uhrzeit), solange
         // die aktuelle Periode läuft. Nur wenn sie sich von der Gesamtsumme daneben unterscheidet —
         // beim Vorjahr ist das Fenster ohnehin schon gekappt, und zwei gleiche Zahlen wären Lärm.
@@ -827,8 +848,12 @@
             return {
               entityId: s.entity_id,
               name: this.entityNames[s.entity_id] || s.friendly_name,
+              isState: s.aggregation_type === 'state',
+              stateRows: s.aggregation_type === 'state' ? this.stateRowsFor(s) : [],
               color: PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length],
               ...this.seriesStatsFor(s, s.points, this.windowEnd),
+              // Min/Max/Ø über Zustandsindizes sind keine Aussage.
+              ...(s.aggregation_type === 'state' ? {last: '—', min: '—', max: '—', average: '—', sum: null} : {}),
               compare,
             };
           });
@@ -1426,6 +1451,13 @@
             // falls raw noch aktiv war: this.series enthält dann noch die
             // alten Rohpunkte, nicht die passenden Bucket-Werte.
             if (this.raw) { this.raw = false; this.load(); return; }
+          } else if (this.hasState) {
+            // Zurück zum Zeitverlauf: bei Zuständen ist das der Zeitstrahl
+            // (Rohübergänge). Ein bloßes render() fiele auf Linie/Balken über
+            // Zustandsindizes zurück und bliebe leer — load() setzt
+            // timeline/raw selbst (siehe dort) und holt die Rohdaten neu.
+            this.load();
+            return;
           }
           this.render();
         },
@@ -1464,12 +1496,25 @@
           const res = await fetch(`${BASE}/api/query-multi?${params}`);
           const data = await res.json();
           if (requestId !== this._requestId) return;
-          this.series = data.series || [];
+          // Zustands- und Zahlen-Entitäten in einem Chart mischen ist nicht
+          // vorgesehen (ROADMAP 1.29, Mockup): die Zustände fallen dann heraus
+          // und ein Hinweis nennt sie, statt Indizes als Linie zu zeichnen.
+          const loaded = data.series || [];
+          const numeric = loaded.some(s => s.aggregation_type && !['switch', 'state'].includes(s.aggregation_type));
+          this.droppedStateIds = numeric ? loaded.filter(s => s.aggregation_type === 'state').map(s => s.entity_id) : [];
+          this.series = loaded.filter(s => !this.droppedStateIds.includes(s.entity_id));
           // Entitäten-Auswahl kann sich geändert haben, seit "Zeitstrahl"
           // aktiviert wurde (z. B. eine Nicht-Schalter-Entität ergänzt) —
           // dann fällt die Ansicht automatisch auf Linie/Balken zurück statt
           // einen inzwischen unpassenden Zeitstrahl weiterzuzeigen.
           if (this.timeline && !this.allSwitch) this.timeline = false;
+          // Mit Zustands-Entitäten gibt es außer dem Donut nur den Zeitstrahl.
+          if (this.hasState && !this.timeline && !this.donut) {
+            this.timeline = true;
+            this.raw = true;
+            this.loading = false;
+            return this.load();
+          }
           // Standard für reine Schalter-Charts: Zeitstrahl. Die Serien kamen
           // ohne Rohwerte, deshalb einmal neu laden.
           if (!this.typeChosen && !this.timeline && !this.donut && this.allSwitch) {
@@ -2106,7 +2151,18 @@
           const categories = this.series.map(s => this.entityNames[s.entity_id] || s.friendly_name);
           const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
           const data = [];
+          const pattern = StateEntities.unavailablePattern();
           this.series.forEach((s, catIndex) => {
+            // Zustände: ein Band je Abschnitt, Farbe nach Zustand — jede Zeile
+            // mit ihrer eigenen Farbfolge ab --chart-1 (ROADMAP 1.29), also
+            // dieselben Farben wie auf der Entitätsseite. Fünftes/sechstes
+            // Element: Zustandsindex und Serienindex für den Tooltip.
+            if (s.aggregation_type === 'state') {
+              for (const seg of StateEntities.segments(s.points, this.windowEnd)) {
+                data.push([catIndex, seg.s * 1000, seg.e * 1000, StateEntities.fill(seg.idx, pattern), seg.idx]);
+              }
+              return;
+            }
             const color = PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length];
             const points = s.points;
             for (let i = 0; i < points.length; i++) {
@@ -2155,10 +2211,17 @@
             tooltip: {
               trigger: 'item',
               formatter: p => {
-                const [catIndex, startMs, endMs] = p.value;
+                const [catIndex, startMs, endMs, , idx] = p.value;
                 const pad = n => String(n).padStart(2, '0');
                 const fmtTime = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
-                return `${categories[catIndex]}<br>${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
+                const span = `${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
+                const s = this.series[catIndex];
+                if (!s || s.aggregation_type !== 'state') return `${categories[catIndex]}<br>${span}`;
+                // Angezeigt wird die Übersetzung, der Rohwert steht daneben.
+                const name = StateEntities.label(s.states, idx);
+                const raw = StateEntities.raw(s.states, idx);
+                const rawPart = raw && raw !== name ? ` <span style="opacity:.6">${escapeHtml(raw)}</span>` : '';
+                return `${categories[catIndex]}<br><strong>${escapeHtml(name)}</strong>${rawPart}<br>${span}`;
               },
               appendToBody: true,
             },
@@ -2170,7 +2233,9 @@
                 const end = api.coord([api.value(2), categoryIndex]);
                 const height = api.size([0, 1])[1] * 0.6;
                 const rectShape = echarts.graphic.clipRectByRect(
-                  {x: start[0], y: start[1] - height / 2, width: end[0] - start[0], height},
+                  // Zustände mindestens 1 px breit, wie auf der Entitätsseite:
+                  // ein Zustand von Sekunden bleibt als Strich sichtbar.
+                  {x: start[0], y: start[1] - height / 2, width: Math.max(end[0] - start[0], api.value(4) != null ? 1 : 0), height},
                   {x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height}
                 );
                 // Farbe als eigenes Datenfeld statt itemStyle je Datenpunkt —
@@ -2509,8 +2574,58 @@
           if (this.donutAggregation === 'last') return values[values.length - 1];
           return values.reduce((sum, v) => sum + v, 0);
         },
+        // Zustände: ein Donut je Entität nebeneinander, Anteile je Zustand
+        // (Mockup "Chart-Editor mit mehreren Zustands-Entitäten"). Schalter
+        // daneben fallen hier heraus — ihr Donut ist ein Anteil am Ganzen
+        // über Entitäten, das lässt sich nicht in dieselbe Reihe stellen.
+        renderStateDonuts() {
+          const css = getComputedStyle(document.body);
+          const surface = css.getPropertyValue('--surface');
+          const inkFaint = css.getPropertyValue('--ink-faint');
+          const pattern = StateEntities.unavailablePattern();
+          const rows = this.series.filter(s => s.aggregation_type === 'state' && !this.legendHiddenIds.includes(s.entity_id));
+          const width = 100 / Math.max(rows.length, 1);
+          chartInstance.setOption({
+            toolbox: toolboxOption(this.exportFilename, surface, inkFaint),
+            tooltip: {trigger: 'item', appendToBody: true},
+            series: rows.map((s, k) => ({
+              type: 'pie',
+              radius: ['38%', '62%'],
+              center: [`${width * k + width / 2}%`, '45%'],
+              avoidLabelOverlap: true,
+              label: {show: false},
+              labelLine: {show: false},
+              itemStyle: {borderColor: surface, borderWidth: 2},
+              tooltip: {
+                formatter: p => {
+                  const raw = StateEntities.raw(s.states, p.data.idx);
+                  const rawPart = raw && raw !== p.name ? ` <span style="opacity:.6">${escapeHtml(raw)}</span>` : '';
+                  const name = escapeHtml(this.entityNames[s.entity_id] || s.friendly_name);
+                  return `${name}<br>${p.marker} <strong>${escapeHtml(p.name)}</strong>${rawPart}<br>${NumberFormat.fmtDuration(p.value)} (${fmtNum(p.percent, 1)} %)`;
+                },
+              },
+              data: this.stateRowsFor(s).map(row => ({
+                name: row.label, value: row.seconds, idx: row.idx,
+                itemStyle: {color: StateEntities.fill(row.idx, pattern)},
+              })),
+            })),
+            graphic: rows.map((s, k) => ({
+              type: 'text',
+              left: `${width * k + width / 2}%`,
+              top: '86%',
+              style: {
+                text: this.entityNames[s.entity_id] || s.friendly_name,
+                fill: css.getPropertyValue('--ink-muted').trim(),
+                font: `12px ${css.getPropertyValue('--font-sans').trim() || 'sans-serif'}`,
+                align: 'center',
+              },
+            })),
+          }, true);
+          chartInstance.resize();
+        },
         renderDonut() {
           if (!chartInstance) chartInstance = echarts.init(document.getElementById('chart'));
+          if (this.hasState) { this.renderStateDonuts(); return; }
           const surface = getComputedStyle(document.body).getPropertyValue('--surface');
           const inkFaint = getComputedStyle(document.body).getPropertyValue('--ink-faint');
           const data = this.series.map(s => ({
@@ -2568,7 +2683,16 @@
         exportCsv() {
           const csvEscape = s => `"${String(s).replace(/"/g, '""')}"`;
           const lines = [];
-          if (this.donut) {
+          if (this.donut && this.hasState) {
+            // Zustände: eine Zeile je Entität und Zustand, mit Text statt Index.
+            lines.push([t('Entität'), t('Zustand'), t('Dauer'), t('Anteil')].map(csvEscape).join(';'));
+            this.series.filter(s => s.aggregation_type === 'state').forEach(s => {
+              const name = this.entityNames[s.entity_id] || s.friendly_name;
+              this.stateRowsFor(s).forEach(row => {
+                lines.push([name, row.label, NumberFormat.fmtDuration(row.seconds), StateEntities.fmtShare(row.share)].map(csvEscape).join(';'));
+              });
+            });
+          } else if (this.donut) {
             lines.push([t('Entität'), t('Wert')].map(csvEscape).join(';'));
             this.series.forEach(s => {
               const name = this.entityNames[s.entity_id] || s.friendly_name;
@@ -2585,6 +2709,10 @@
               const row = [new Date(ts * 1000).toLocaleString(LOCALE)];
               this.series.forEach(s => {
                 const p = s.points.find(pt => pt.ts === ts);
+                if (s.aggregation_type === 'state') {
+                  row.push(p && Number.isFinite(p.value) ? StateEntities.label(s.states, Math.round(p.value)) : '');
+                  return;
+                }
                 row.push(p && Number.isFinite(p.value) ? fmtNum(p.value, this.effectiveDecimals(s)) : '');
               });
               lines.push(row.map(csvEscape).join(';'));

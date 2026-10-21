@@ -39,11 +39,15 @@ def test_generation_writes_state_entities(tmp_path: Path, language: str) -> None
             mapping = index.get_state_map(entity_id)
             assert [row["text"] for row in mapping] == [raw for raw, _label in demo.states]
             assert [row["label"] for row in mapping] == [translate(label, language) for _raw, label in demo.states]
-            result = query.query_series(tmp_path, index, entity_id, "month", TZ, now)
+            result = query.query_raw_series(tmp_path, index, entity_id, "month", TZ, now)
             values = {p["value"] for p in result["points"]}
             assert values, entity_id
             allowed = {float(i) for i in range(len(demo.states))} | {float(STATE_UNAVAILABLE_INDEX)}
             assert values <= allowed, (entity_id, values - allowed)
+            # Die Anteile kommen für den archivierten Vormonat aus den Rollups.
+            shares = query.query_series(tmp_path, index, entity_id, "year", TZ, now)
+            assert shares["chart_type"] == "shares"
+            assert {idx for p in shares["points"] for idx, _s, _e in p["states"]} <= {int(v) for v in allowed}
             # Die Heizung steht im Sommer durchgehend auf "Aus" — ein
             # zweimonatiger Lauf im August hätte dort nur einen Zustand.
             if demo.entity_id != "sensor.demo_heizung_betrieb":

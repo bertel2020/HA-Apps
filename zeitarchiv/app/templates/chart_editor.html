@@ -163,7 +163,7 @@
                      Fenster überhaupt abgefragt wird (rollierend vs.
                      kalendarisch), nicht seine Feinheit — bleibt für den Donut
                      genauso eine echte Wahl wie im Zeitverlauf. -->
-                <div class="menu-row" x-show="!donut">
+                <div class="menu-row" x-show="!donut && !timeline">
                   <span class="menu-row-label">{{ _("Auflösung") }}
                     <span class="menu-note" x-show="!raw && resolutionPreset === 'auto' && autoResolutionLabel" x-text="'≈ ' + autoResolutionLabel"></span>
                   </span>
@@ -262,7 +262,9 @@
                     <button :class="{active: donutAggregation === 'last'}" @click="donutAggregation = 'last'; render()">{{ _("Letzter Wert") }}</button>
                   </div>
                 </div>
-                <label class="menu-row" x-show="allSwitch && !donut">
+                {# Mit Zustands-Entitäten gibt es nur Zeitstrahl oder Donut
+                   (load()), der Schalter hätte dort nichts umzuschalten. #}
+                <label class="menu-row" x-show="allSwitch && !hasState && !donut">
                   <span class="menu-row-label">{{ _("Zeitstrahl") }}
                     <span class="menu-note" x-show="compare">{{ _("nicht bei aktivem Vergleich") }}</span>
                   </span>
@@ -353,7 +355,7 @@
                      Bedingung bliebe "Ausrichtung" dann fälschlich
                      ausgeblendet, obwohl der Chart längst im Ranking-
                      Vergleich steht, für den sie gedacht ist. -->
-                <div class="menu-row menu-row-stack" x-show="!donut && !(stacked && canStack)">
+                <div class="menu-row menu-row-stack" x-show="!donut && !timeline && !(stacked && canStack)">
                   <span class="menu-row-label">{{ _("Ausrichtung") }}
                     <span class="menu-note" x-show="compare">{{ _("Horizontal nicht bei aktivem Vergleich") }}</span>
                   </span>
@@ -369,7 +371,7 @@
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
-                <label class="menu-row" x-show="!donut">
+                <label class="menu-row" x-show="!donut && !timeline">
                   <span class="menu-row-label">{{ _("Dynamische Y-Achse") }}</span>
                   <span class="menu-toggle">
                     <!-- Bei Auflösung "Tag" (singleBucket, s. render()) sinnlos
@@ -382,7 +384,7 @@
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
-                <div class="menu-row menu-row-stack">
+                <div class="menu-row menu-row-stack" x-show="!timeline && !hasState">
                   <span class="menu-row-label">{{ _("Nachkommastellen") }}</span>
                   <div class="seg">
                     <button :class="{active: decimals === 'auto'}" @click="decimals = 'auto'; render()">{{ _("Auto") }}</button>
@@ -405,7 +407,7 @@
                      fremden Segment und würde als Segmentgrenze
                      missverstanden. Dieselbe Konvention wie "Rollierend"
                      bei Auflösung "Tag" weiter oben. -->
-                <label class="menu-row" x-show="!donut">
+                <label class="menu-row" x-show="!donut && !timeline">
                   <span class="menu-row-label">{{ _("Durchschnittslinie") }}
                     <span class="menu-note" x-show="stacked && canStack">{{ _("nicht im gestapelten Modus") }}</span>
                   </span>
@@ -438,7 +440,7 @@
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
-                <div class="menu-row legend-metrics-row" x-show="chartStats">
+                <div class="menu-row legend-metrics-row" x-show="chartStats && !hasState">
                   <template x-for="metric in legendMetricOptions" :key="metric.value">
                     {# Siehe entity_detail.html: .filter-chip ist der app-weite
                        Standard für Chip-Mehrfachauswahl. #}
@@ -448,7 +450,7 @@
                     </label>
                   </template>
                 </div>
-                <div class="menu-row" x-show="chartStats">
+                <div class="menu-row" x-show="chartStats && !hasState">
                   <span class="menu-row-label">{{ _("Legenden-Stil") }}</span>
                   <div class="seg">
                     <button :class="{active: legendStyle === 'chips'}" @click="legendStyle = 'chips'">{{ _("Chips") }}</button>
@@ -563,6 +565,10 @@
         <div class="card">
           <div id="chart" x-show="hasData"></div>
           <div class="empty" x-show="!hasData" x-text="loading ? t('Lädt …') : (selectedCount === 0 ? t('Bitte mindestens eine Entität auswählen.') : t('Keine Daten für diesen Zeitraum.'))"></div>
+          {# Zustands- und Zahlen-Entitäten zusammen sind nicht vorgesehen
+             (ROADMAP 1.29) — die Zustände fallen heraus, und das steht hier. #}
+          <p class="hint hint-status" x-show="droppedStateIds.length" x-cloak
+             x-text="t('Nicht gezeigt: {names} — Zustands-Entitäten lassen sich nur zusammen mit Schaltern oder anderen Zuständen darstellen.', {names: droppedStateIds.map(id => entityNames[id] || labelFor(id)).join(', ')})"></p>
         </div>
         <!-- Ersetzt ECharts' eigene Legende komplett (dort per legend.show:false
              stummgeschaltet, siehe render()) — ein Klick auf einen Chip
@@ -577,14 +583,21 @@
              keine sinnvollen Einträge (zwei eigenständige Jahresserien statt
              einer gedämpften Vergleichs-Nebenserie), deshalb zusätzlich
              ausgeblendet statt nur per hasData. -->
-        <div class="chart-legend" x-show="hasData && !yearsCompareActive && !multiYearActive && (legendStyle === 'chips' || !chartStats)">
+        <div class="chart-legend" x-show="hasData && !yearsCompareActive && !multiYearActive && (legendStyle === 'chips' || !chartStats || hasState)">
           <template x-for="stat in seriesStats" :key="stat.entityId">
             <button type="button" class="chart-legend-item" :class="{inactive: legendHiddenIds.includes(stat.entityId)}"
                     @click="toggleLegendItem(stat.entityId, stat.name)"
                     @mouseenter="highlightDonutSlice(stat.name)" @mouseleave="unhighlightDonutSlice(stat.name)">
-              <span class="dot" :style="{background: stat.color}"></span>
+              <span class="dot" :style="{background: stat.color}" x-show="!stat.isState"></span>
               <span class="name" x-text="stat.name"></span>
-              <span class="values" x-show="chartStats">
+              {# Zustände: die Legende steht pro Zeile — Farbe, Name, Dauer
+                 und Anteil je Zustand statt Min/Max über Indizes. #}
+              <span class="values state-legend-values" x-show="stat.isState">
+                <template x-for="row in stat.stateRows" :key="row.idx">
+                  <span :title="row.raw"><span class="dot state-dot" :style="row.swatch"></span> <span x-text="row.label"></span><strong x-show="chartStats" x-text="' ' + row.text"></strong></span>
+                </template>
+              </span>
+              <span class="values" x-show="chartStats && !stat.isState">
                 <span x-show="legendMetrics.includes('last')">{{ _('Aktuell <strong x-text="stat.last"></strong>') }}</span>
                 <span x-show="legendMetrics.includes('min')">{{ _('Min <strong x-text="stat.min"></strong>') }}</span>
                 <span x-show="legendMetrics.includes('max')">{{ _('Max <strong x-text="stat.max"></strong>') }}</span>
@@ -642,7 +655,7 @@
         <!-- Der Soll-/Laufsummen-Balkenvergleich (yearsCompareActive) hat seine
              eigene Tabelle direkt darunter (yearsSeriesStats): eine Zeile je
              Entität und Jahr, nicht klickbar wie die Chips dort. -->
-        <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && chartStats && legendStyle === 'table' && !yearsCompareActive && !multiYearActive">
+        <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && chartStats && !hasState && legendStyle === 'table' && !yearsCompareActive && !multiYearActive">
           <table class="dt compact chart-legend-table">
             <thead>
               <tr>
@@ -661,8 +674,13 @@
                     @mouseenter="highlightDonutSlice(stat.name)" @mouseleave="unhighlightDonutSlice(stat.name)">
                   <td class="legend-name-col">
                     <span class="legend-name-cell">
-                      <span class="dot" :style="{background: stat.color}"></span>
+                      <span class="dot" :style="{background: stat.color}" x-show="!stat.isState"></span>
                       <span x-text="stat.name"></span>
+                    </span>
+                    <span class="legend-compare-label state-legend-values" x-show="stat.isState">
+                      <template x-for="row in stat.stateRows" :key="row.idx">
+                        <span :title="row.raw"><span class="dot state-dot" :style="row.swatch"></span> <span x-text="row.label + ' ' + row.text"></span></span>
+                      </template>
                     </span>
                     <!-- Gedämpfte Unterzeile statt einer zweiten Tabellenzeile —
                          x-for erzeugt pro Iteration genau ein Wurzelelement
@@ -857,6 +875,7 @@
        Entitätsseite. -->
   <script src="{{ asset('js/period-navigation.js') }}"></script>
   <script src="{{ asset('js/calendar-picker.js') }}"></script>
+  <script src="{{ asset('js/state-entities.js') }}"></script>
   <script>
     const BASE = {{ app_root | tojson }};
     const CHART_ID = {{ chart_id | tojson }};

@@ -175,9 +175,19 @@
             <div class="menu-divider"></div>
             <div class="menu-section-label">{{ _("Darstellung") }}</div>
             {% if aggregation_type == 'state' %}
-            {# Zustands-Entitäten: immer Zeitstrahl, die Legende trägt Dauer
-               und Anteil je Zustand. Punkte, Nachkommastellen, Y-Achse und
-               Durchschnitt rechnen mit Zahlen und entfallen. #}
+            {# Zustands-Entitäten: Zeitstrahl, Anteile oder Wechsel je Bucket;
+               die Legende trägt Dauer und Anteil je Zustand. Punkte,
+               Nachkommastellen, Y-Achse und Durchschnitt rechnen mit Zahlen
+               und entfallen. Die Wahl wird nicht gespeichert: ab dem Monat
+               springt die Ansicht von selbst auf Anteile (setRange()). #}
+            <div class="menu-row menu-row-stack">
+              <span class="menu-row-label">{{ _("Diagrammtyp") }}</span>
+              <div class="seg">
+                <button :class="{active: stateMode === 'timeline'}" @click="setStateMode('timeline')">{{ _("Zeitstrahl") }}</button>
+                <button :class="{active: stateMode === 'shares'}" @click="setStateMode('shares')">{{ _("Anteile") }}</button>
+                <button :class="{active: stateMode === 'changes'}" @click="setStateMode('changes')">{{ _("Wechsel") }}</button>
+              </div>
+            </div>
             <div class="menu-row">
               <span class="menu-row-label">{{ _("Legenden-Stil") }}</span>
               <div class="seg">
@@ -324,7 +334,7 @@
          nicht auf die Karte samt ihrer je nach Breite unterschiedlichen
          Polsterung. #}
       <div class="chart-wrap" x-show="points.length">
-        <div id="chart" :style="chartType === 'timeline' ? 'height:150px;' : ''"></div>
+        <div id="chart" :style="chartIsTimeline ? 'height:150px;' : ''"></div>
         {# Statisch "active": der Chip existiert nur, wenn es einen Ausschnitt
            gibt — ein deaktivierter Zustand wäre unerreichbar. Aus demselben
            Grund keine feste Mindestbreite mehr: die wechselnde Beschriftung
@@ -431,7 +441,6 @@
               <span class="state-log-caret" aria-hidden="true">▾</span>
               <span x-text="stateLogTitle"></span>
             </button>
-            <a class="state-log-link" href="{{ app_root }}/entities/{{ entity_id }}/cleanup">{{ _("Alle bearbeiten im Reiter „Werte bearbeiten“") }} &rarr;</a>
           </div>
           <div x-show="stateLog">
             <div class="state-log-list" @mouseleave="highlightState(null)">
@@ -478,6 +487,7 @@
   <script src="{{ asset('js/period-navigation.js') }}"></script>
   <script src="{{ asset('js/dynamic-back-link.js') }}"></script>
   <script src="{{ asset('js/menu-popover-clamp.js') }}"></script>
+  <script src="{{ asset('js/state-entities.js') }}"></script>
   <script>
     const ENTITY_ID = {{ entity_id | tojson }};
     const DISPLAY_NAME = {{ display_name | tojson }};

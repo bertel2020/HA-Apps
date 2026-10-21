@@ -9,7 +9,8 @@ entity_states. Geprüft wird, was davon dauerhaft gelten muss:
 - Der erste Wert legt den Typ fest; ein Wechsel zwischen Zahl und Text wird
   verworfen, nicht migriert.
 - "unavailable"/"unknown" zählen nur bei einer bestehenden Zustands-Entität.
-- Zustands-Entitäten haben keine Rollups, Abfragen liefern die Rohwechsel.
+- Bis zur Woche liefern Abfragen die Rohwechsel (die Anteile ab dem Monat
+  prüft test_state_shares.py).
 """
 
 from __future__ import annotations
@@ -183,7 +184,7 @@ def test_query_returns_raw_changes_with_the_legend(setup) -> None:
     service.ingest(_state("cleaning", BASE_TS + 3600, label="Saugen"))
     now = datetime(2026, 10, 20, 12, 0, tzinfo=TZ)
 
-    for range_key in ("day", "week", "month", "year"):
+    for range_key in ("day", "week"):
         result = query.query_series(tmp, index, ENTITY, range_key, TZ, now)
         assert result["chart_type"] == "timeline"
         assert [p["value"] for p in result["points"]][-2:] == [0.0, 1.0]
@@ -194,7 +195,7 @@ def test_query_returns_raw_changes_with_the_legend(setup) -> None:
     ]
 
 
-def test_month_rotation_archives_with_mapping_and_writes_no_rollups(setup) -> None:
+def test_month_rotation_archives_with_mapping_and_writes_rollups(setup) -> None:
     tmp, index, service = setup
     september = datetime(2026, 9, 30, 22, 0, tzinfo=TZ).timestamp()
     service.ingest(_state("charging", september))
@@ -207,7 +208,7 @@ def test_month_rotation_archives_with_mapping_and_writes_no_rollups(setup) -> No
     metadata = pq.read_schema(archive).metadata
     mapping = json.loads(metadata[rotate.STATE_MAP_METADATA_KEY.encode()])
     assert mapping == {"0": "charging", "1": "cleaning", "-1": "unavailable"}
-    assert not entity_dir(tmp, "rollup", ENTITY).exists()
+    assert entity_dir(tmp, "rollup", ENTITY).exists()
 
 
 # --- Recorder-Import ------------------------------------------------------

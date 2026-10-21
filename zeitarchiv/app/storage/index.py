@@ -59,6 +59,14 @@ STATE_IGNORED_TEXTS = {"none", ""}
 # lassen. Die brauchbaren Entitäten der Bestandsaufnahme hatten 2–7.
 MAX_STATES_PER_ENTITY = 50
 
+# Darstellungen einer Werte-Kachel mit Zustands-Entität (dashboard_pins.state_view).
+STATE_TILE_VIEWS = ("strip", "donut")
+# Verworfene Werte für die Repair-Hinweise (record_state_rejection()): Typ passt
+# nicht (Zahl statt Text oder umgekehrt) bzw. Obergrenze an Zuständen erreicht.
+STATE_REJECTION_TYPE_MISMATCH = "type_mismatch"
+STATE_REJECTION_LIMIT = "state_limit"
+SETTING_STATE_REJECTIONS = "state_rejections"
+
 
 class StateTypeMismatch(ValueError):
     """Eine Entität liefert Text, obwohl sie als Zahl angelegt ist, oder
@@ -712,6 +720,11 @@ CREATE TABLE IF NOT EXISTS dashboard_pins (
     -- als kommagetrennte Teilmenge von min/avg/max/sum in dieser
     -- Reihenfolge. Leer = keine Zeile, also das bisherige Verhalten.
     stats_metrics TEXT NOT NULL DEFAULT '',
+    -- Nur bei Werte-Kacheln einer Zustands-Entität (ROADMAP 1.29): 'strip' =
+    -- aktueller Zustand, "seit" und Streifen der letzten 24 h (ab zwei Spalten
+    -- dazu die Anteile der letzten 7 Tage), 'donut' = Anteile im Zeitraum
+    -- range_key mit dem aktuellen Zustand in der Mitte.
+    state_view TEXT NOT NULL DEFAULT 'strip',
     UNIQUE(dashboard_id, item_type, item_id, item_entity_id)
 );
 
@@ -1463,6 +1476,12 @@ class Index:
         if "stats_metrics" not in dashboard_columns:
             self._conn.execute(
                 "ALTER TABLE dashboard_pins ADD COLUMN stats_metrics TEXT NOT NULL DEFAULT ''"
+            )
+        if "state_view" not in dashboard_columns:
+            # Darstellung einer Zustands-Kachel (ROADMAP 1.29) — 'strip' ist
+            # die Kachel, wie sie eine Zustands-Entität ohne Wahl bekommt.
+            self._conn.execute(
+                "ALTER TABLE dashboard_pins ADD COLUMN state_view TEXT NOT NULL DEFAULT 'strip'"
             )
 
         # Werte-Kacheln: dieselbe Entität sollte bisher nur EIN Mal pro
@@ -2712,7 +2731,7 @@ class Index:
             pins = self._conn.execute(
                 "SELECT item_type, item_id, item_entity_id, position, grid_cols, grid_rows, show_legend, "
                 "show_sparkline, sparkline_resolution, decimals, title, show_age, stale_mode, show_period, "
-                "range_key, continuous, primary_metric, stats_metrics "
+                "range_key, continuous, primary_metric, stats_metrics, state_view "
                 "FROM dashboard_pins WHERE dashboard_id = ? ORDER BY position ASC",
                 (dashboard_id,),
             ).fetchall()
@@ -2720,8 +2739,8 @@ class Index:
                 "INSERT INTO dashboard_pins "
                 "(dashboard_id, item_type, item_id, item_entity_id, position, grid_cols, grid_rows, show_legend, "
                 "show_sparkline, sparkline_resolution, decimals, title, show_age, stale_mode, show_period, "
-                "range_key, continuous, primary_metric, stats_metrics) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "range_key, continuous, primary_metric, stats_metrics, state_view) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                     (
                         new_id, p["item_type"], p["item_id"], p["item_entity_id"], p["position"],
@@ -2729,6 +2748,7 @@ class Index:
                         p["sparkline_resolution"],
                         p["decimals"], p["title"], p["show_age"], p["stale_mode"], p["show_period"],
                         p["range_key"], p["continuous"], p["primary_metric"], p["stats_metrics"],
+                        p["state_view"],
                     )
                     for p in pins
                 ],
@@ -3134,6 +3154,55 @@ class Index:
                 "UPDATE dashboard_pins SET show_age = ? "
                 "WHERE dashboard_id = ? AND item_type = 'entity' AND item_id = ?",
                 (int(show_age), dashboard_id, pin_id),
+            )
+            return cursor.rowcount > 0
+
+    def record_state_rejection(self, entity_id: str, reason: str, ts: float) -> None:
+        """Merkt, dass ein Wert einer Zustands-Entität verworfen wurde —
+        reason ist STATE_REJECTION_TYPE_MISMATCH oder STATE_REJECTION_LIMIT.
+        Grundlage der Repair-Hinweise (notices.state_rejection_notices()).
+        Der Aufrufer drosselt (IngestionService), hier wird jedes Mal
+        geschrieben."""
+        with self._lock, self._conn:
+            row = self._conn.execute(
+                "SELECT value FROM settings WHERE key = ?", (SETTING_STATE_REJECTIONS,)
+            ).fetchone()
+            try:
+                entries = json.loads(row["value"]) if row else {}
+            except (TypeError, ValueError):
+                entries = {}
+            key = f"{reason}:{entity_id}"
+            entry = entries.get(key) or {"entity_id": entity_id, "reason": reason, "first": ts}
+            entry["last"] = ts
+            entries[key] = entry
+            self._conn.execute(
+                "INSERT INTO settings (key, value) VALUES (?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (SETTING_STATE_REJECTIONS, json.dumps(entries)),
+            )
+
+    def state_rejections(self, since: float) -> list[dict]:
+        """Verworfene Zustandswerte, deren letztes Vorkommen nach ``since``
+        liegt, nur für noch vorhandene Entitäten — ältere fallen von selbst
+        heraus, sobald die Entität wieder passt."""
+        try:
+            entries = json.loads(self.get_setting(SETTING_STATE_REJECTIONS, "{}") or "{}")
+        except (TypeError, ValueError):
+            return []
+        return [
+            entry for entry in entries.values()
+            if isinstance(entry, dict) and (entry.get("last") or 0) >= since
+            and self.get_entity(entry.get("entity_id", "")) is not None
+        ]
+
+    def set_dashboard_entity_pin_state_view(self, dashboard_id: int, pin_id: int, state_view: str) -> bool:
+        if state_view not in STATE_TILE_VIEWS:
+            raise ValueError(tr("Ungültige Darstellung"))
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboard_pins SET state_view = ? "
+                "WHERE dashboard_id = ? AND item_type = 'entity' AND item_id = ?",
+                (state_view, dashboard_id, pin_id),
             )
             return cursor.rowcount > 0
 

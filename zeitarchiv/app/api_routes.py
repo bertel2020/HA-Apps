@@ -329,6 +329,42 @@ def _tile_aggregates(result: dict) -> dict[str, float | None]:
     }
 
 
+def _tile_state(
+    deps: "ApiDependencies", entity_id: str, range_key: str, continuous: bool, now: datetime, offset: int,
+    read_cache: query_mod.QueryReadCache,
+) -> dict | None:
+    """Alles, was eine Zustands-Kachel zeigt (ROADMAP 1.29): aktueller Zustand
+    und seit wann, der Streifen der letzten 24 Stunden, die Anteile der
+    letzten sieben Tage (Kachel ab zwei Spalten) und die Dauer je Zustand im
+    gewählten Zeitraum (Donut). Alles in einer Runde, damit eine Kachel
+    keinen zweiten Request braucht."""
+    strip = query_mod.query_raw_series(
+        deps.data_dir, deps.index, entity_id, "day", deps.tz, now, continuous=True,
+    )
+    points = [p for p in strip["points"] if p["value"] is not None]
+    if not points:
+        return None
+    days = query_mod.query_state_shares(
+        deps.data_dir, deps.index, entity_id, "week", deps.tz, now, continuous=True, read_cache=read_cache,
+    )
+    period = query_mod.query_series(
+        deps.data_dir, deps.index, entity_id, range_key, deps.tz, now,
+        offset=offset, continuous=continuous, read_cache=read_cache,
+    )
+    durations = query_mod.state_durations(period)
+    return {
+        "idx": int(round(points[-1]["value"])),
+        "last_ts": points[-1]["ts"],
+        "since": query_mod.state_since(deps.data_dir, deps.index, entity_id, deps.tz, now) if offset == 0 else None,
+        "states": strip.get("states") or query_mod.state_legend(deps.index, entity_id),
+        "strip": [{"ts": p["ts"], "value": p["value"]} for p in points],
+        "strip_start": strip["window_start"],
+        "strip_end": strip["window_end"],
+        "days": [{"ts": p["ts"], "states": p["states"]} for p in days["points"]],
+        "durations": [[idx, seconds] for idx, seconds in sorted(durations.items())],
+    }
+
+
 def _table_comparison_aggregates(result: dict) -> dict[str, float | None] | None:
     """Fairer Vergleichswert für eine abgeschlossene "Vor-"Spalte (Vortag/
     Vorwoche/…): dieselben Punkte wie der jetzt immer vollständige
@@ -719,6 +755,10 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 "chart_type": result["chart_type"],
                 "points": result["points"],
             }
+            # Zustands-Entitäten: Zuordnung Index → Text für Legende, Tooltip
+            # und CSV (die Oberfläche zeigt nie den Index).
+            if result.get("states") is not None:
+                entry["states"] = result["states"]
             if compare and not raw and compare_mode != "longterm":
                 compare_result = query_mod.query_series(
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
@@ -845,11 +885,19 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 if fresh:
                     last_value, last_ts = fresh[-1]["value"], fresh[-1]["ts"]
 
+            state = (
+                _tile_state(deps, entity_id, range, continuous, now, offset, read_cache)
+                if aggregation_type == "state" else None
+            )
+            if state is not None:
+                last_value, last_ts = state["idx"], state["last_ts"]
             series.append({
                 "entity_id": entity_id,
                 "unit": (entity["unit"] if entity else None) or "",
                 "decimals": decimals_to_int(entity["decimals"]) if entity else None,
                 "aggregation_type": aggregation_type,
+                # Nur bei Zustands-Entitäten, siehe _tile_state().
+                "state": state,
                 # Nur bei Zählern gesetzt — dort erklärt der Kachel-Tooltip
                 # damit, worauf sich Min/Ø/Max beziehen ("Ø je Tag").
                 "bucket_label": (

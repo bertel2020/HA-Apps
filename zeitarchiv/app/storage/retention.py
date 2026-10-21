@@ -28,7 +28,7 @@ from .cleanup import remove_deleted_points_for_month
 from .hotbuffer import hot_path, read_rows
 from .index import Index
 from .paths import entity_dir
-from .rollup import NO_ROLLUP_TYPES, drop_rows_in_spans, period_span, rollup_path
+from .rollup import drop_rows_in_spans, period_span, rollup_path
 
 RETENTION_DAYS = {
     "30d": 30,
@@ -38,7 +38,7 @@ RETENTION_DAYS = {
     "5y": 1825,
 }
 
-_FINE_LEVEL = {"counter": "tag", "standard": "stunde", "switch": "stunde"}
+_FINE_LEVEL = {"counter": "tag", "standard": "stunde", "switch": "stunde", "state": "stunde"}
 
 
 def _cutoff_ts(retention: str, now: datetime) -> float | None:
@@ -161,17 +161,16 @@ def enforce_retention_for_entity(
 
     entity = index.get_entity(entity_id)
     aggregation_type = entity["aggregation_type"] if entity else "standard"
-    if aggregation_type not in NO_ROLLUP_TYPES:  # Typ "state" hat keine Rollups
-        fine_level = _FINE_LEVEL[aggregation_type]
-        _prune_rollup_file_by_month(rollup_path(data_dir, entity_id, fine_level), tz, deleted_months)
-        if aggregation_type == "counter" and entity and entity["hourly_rollup"] and fine_level != "stunde":
-            # Zusätzliche Stunden-Stufe (additiv neben tag.parquet geschrieben,
-            # siehe rollup.append_completed_month) muss beim Ablauf der
-            # Aufbewahrungsfrist ebenfalls bereinigt werden, sonst würde sie
-            # unbegrenzt weiterwachsen.
-            _prune_rollup_file_by_month(rollup_path(data_dir, entity_id, "stunde"), tz, deleted_months)
-        _prune_rollup_file_by_month(rollup_path(data_dir, entity_id, "monat"), tz, deleted_months)
-        _prune_year_rollup(data_dir, entity_id, tz, deleted_months)
+    fine_level = _FINE_LEVEL[aggregation_type]
+    _prune_rollup_file_by_month(rollup_path(data_dir, entity_id, fine_level), tz, deleted_months)
+    if aggregation_type == "counter" and entity and entity["hourly_rollup"] and fine_level != "stunde":
+        # Zusätzliche Stunden-Stufe (additiv neben tag.parquet geschrieben,
+        # siehe rollup.append_completed_month) muss beim Ablauf der
+        # Aufbewahrungsfrist ebenfalls bereinigt werden, sonst würde sie
+        # unbegrenzt weiterwachsen.
+        _prune_rollup_file_by_month(rollup_path(data_dir, entity_id, "stunde"), tz, deleted_months)
+    _prune_rollup_file_by_month(rollup_path(data_dir, entity_id, "monat"), tz, deleted_months)
+    _prune_year_rollup(data_dir, entity_id, tz, deleted_months)
     months_deleted = len(deleted_months)
 
     hot_file = hot_path(data_dir, entity_id, now.timestamp(), tz)

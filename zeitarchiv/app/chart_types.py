@@ -11,7 +11,7 @@ from __future__ import annotations
 from .i18n import N_
 
 # "timeline" nur clientseitig erzwingbar, wenn tatsächlich alle Serien
-# Schalter sind (siehe allSwitch-Getter in chart_editor.html) — hier nur
+# Schalter oder Zustände sind (siehe allSwitch-Getter in chart_editor.js) — hier nur
 # generell als gültiger Wert zugelassen, dieselbe Konvention wie
 # ENTITY_CHART_TYPES unten. "donut" ist die dritte, chart-weite
 # Darstellungsart (Optionen-Menü, "Darstellungsart") — ein Anteil je Serie
@@ -37,13 +37,18 @@ CHART_TYPE_LABELS = {
 
 def effective_chart_type(chart: dict, aggregation_types: dict[str, str]) -> str:
     """Löst "auto" zum tatsächlich gezeichneten Typ auf: Besteht das Chart nur
-    aus Schaltern, ist der Zeitstrahl der Standard. "bar" ist die gespeicherte
+    aus Schaltern und Zuständen, ist der Zeitstrahl der Standard. "bar" ist die gespeicherte
     ausdrückliche Wahl "kein Zeitstrahl" (der Editor schreibt es, sobald ein
     reines Schalter-Chart den Zeitstrahl abwählt) und bleibt hier unverändert —
     sonst würde "auto" diese Wahl beim nächsten Laden wieder überstimmen."""
     stored = chart["chart_type"]
     if stored == "auto" and chart["entity_ids"] and all(
-        aggregation_types.get(e) == "switch" for e in chart["entity_ids"]
+        aggregation_types.get(e) in ("switch", "state") for e in chart["entity_ids"]
+    ):
+        return "timeline"
+    # Zustände gibt es nur als Zeitstrahl oder Donut (chart_editor.js load()).
+    if stored != "donut" and any(aggregation_types.get(e) == "state" for e in chart["entity_ids"]) and all(
+        aggregation_types.get(e) in ("switch", "state") for e in chart["entity_ids"]
     ):
         return "timeline"
     return stored
