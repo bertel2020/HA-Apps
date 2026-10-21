@@ -2621,7 +2621,7 @@
             series: rows.map((s, k) => ({
               type: 'pie',
               radius: ['38%', '62%'],
-              center: [`${width * k + width / 2}%`, '45%'],
+              center: [`${width * k + width / 2}%`, rows.length > 1 ? '45%' : '50%'],
               avoidLabelOverlap: true,
               label: {show: false},
               labelLine: {show: false},
@@ -2639,17 +2639,21 @@
                 itemStyle: {color: StateEntities.fill(row.idx, pattern)},
               })),
             })),
-            graphic: rows.map((s, k) => ({
-              type: 'text',
+            // Name unter dem Donut nur, wenn mehrere nebeneinander stehen.
+            // title statt graphic: textAlign 'center' zentriert den Text auf
+            // left, bei graphic setzt left die linke Kante.
+            title: rows.length > 1 ? rows.map((s, k) => ({
+              text: this.entityNames[s.entity_id] || s.friendly_name,
               left: `${width * k + width / 2}%`,
               top: '86%',
-              style: {
-                text: this.entityNames[s.entity_id] || s.friendly_name,
-                fill: css.getPropertyValue('--ink-muted').trim(),
-                font: `12px ${css.getPropertyValue('--font-sans').trim() || 'sans-serif'}`,
-                align: 'center',
+              textAlign: 'center',
+              textStyle: {
+                color: css.getPropertyValue('--ink-muted').trim(),
+                fontFamily: css.getPropertyValue('--font-sans').trim() || 'sans-serif',
+                fontSize: 12,
+                fontWeight: 'normal',
               },
-            })),
+            })) : [],
           }, true);
           chartInstance.resize();
         },
