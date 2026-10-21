@@ -165,7 +165,7 @@
 .state-log-toggle:focus-visible{outline:2px solid var(--accent-line);}
 .state-log-caret{color:var(--ink-faint);transition:transform .15s;display:inline-block;}
 .state-log-toggle[aria-expanded="false"] .state-log-caret{transform:rotate(-90deg);}
-.state-log-list{max-width:40rem;display:flex;flex-direction:column;}
+.state-log-list{display:flex;flex-direction:column;}
 .state-log-day{display:flex;align-items:center;gap:8px;width:100%;font:inherit;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);background:none;border:0;border-top:1px solid var(--border);padding:8px 6px 6px;margin-top:4px;cursor:pointer;text-align:left;}
 .state-log-day:first-child{margin-top:0;}
 .state-log-day:focus-visible{outline:2px solid var(--accent-line);outline-offset:-2px;}
