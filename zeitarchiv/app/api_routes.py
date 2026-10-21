@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field, model_validator
 
-from . import ha_integration
+from . import ai_settings, ha_integration
 from .ai_routes import AiDependencies, create_ai_router
 from .chart_period import stichtag_or_400, stichtag_window
 from .formatting import decimals_to_int, entity_display_name
@@ -485,6 +485,9 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             # so greift eine neue Fähigkeit nach einem App-Update ohne
             # Neustart von Home Assistant.
             "capabilities": list(API_CAPABILITIES),
+            # Zählt jede Änderung am KI-Zugriff hoch: Ändert sich der Wert, holt
+            # die Integration /api/ai/config neu (siehe ai_settings.py).
+            "ai_config_rev": ai_settings.config_rev(deps.index),
         }
 
     @router.post("/api/write")
@@ -1007,5 +1010,6 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
     router.include_router(create_ai_router(AiDependencies(
         data_dir=deps.data_dir, index=deps.index, tz=deps.tz,
         coordinator=deps.coordinator, check_auth=check_auth,
+        collect_notices=deps.collect_notices, latest_backup=deps.latest_backup,
     )))
     return router

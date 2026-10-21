@@ -4,7 +4,7 @@
 
 Zwei Zielgruppen, zwei Erreichbarkeiten (siehe [security.md](security.md)):
 
-- **Öffentlich, Port `8127`** (nur für die Zeitarchiv-Integration): `/api/write`, `/api/health`, `/api/notices`.
+- **Öffentlich, Port `8127`** (nur für die Zeitarchiv-Integration): `/api/write`, `/api/health`, `/api/notices` und `/api/ai/*`.
 - **Nur Ingress, Port `8099`**: alles andere, inklusive `/api/query`,
   `/api/query-multi` und `/api/query-table` — diese sind KEINE öffentliche
   API, sondern werden vom Browser-JS derselben Ingress-Session aufgerufen.
@@ -201,6 +201,35 @@ gleichzeitig abgefragte Spalte desselben Zeitraum-Typs mit Versatz 0 — der
 "Gleiche Zeitpunkt"-Vergleich (z. B. "Vortag bis 14 Uhr" statt ganzer
 Vortag, wenn der aktuelle Tag noch läuft). `table-compute.js` setzt das Flag
 automatisch, `table_editor.html` braucht dafür keine eigene Option.
+
+## `/api/ai/*` — KI-Lesezugriff (Port `8127`)
+
+Lesende Werkzeuge für KI-Clients, die die Integration als LLM-API von Home
+Assistant anbietet (MCP). Alle hinter dem API-Token; implementiert in
+`app/ai_routes.py` und `app/ai_tools.py`.
+
+| Endpunkt | Zweck |
+|---|---|
+| `GET /api/ai/config` | Schalter, `config_rev`, angebotene Werkzeuge mit Titeln und Beschreibungen, API-Prompt. Auch bei ausgeschaltetem Zugriff erreichbar. Der Parameter `api_id` merkt sich die ID der LLM-API für die Einrichtungshilfe. |
+| `POST /api/ai/search_entities` | Name → `entity_id`, Überblick über das Archiv |
+| `POST /api/ai/get_summary` | Kennzahl je Entität für einen Zeitraum |
+| `POST /api/ai/get_series` | Verlauf innerhalb eines Zeitraums (`metric` wählbar) |
+| `POST /api/ai/compare_periods` | Zwei Zeiträume im Vergleich (fair bei laufender Periode) |
+| `POST /api/ai/get_energy_overview` | Energiebilanz mit Kosten; 409 ohne Energiedashboard |
+| `POST /api/ai/get_notices` | Zustand des Archivs |
+
+Der Zeitraum kommt als `period` (`hour` … `decade`) plus `date` (JJJJ-MM-TT,
+irgendein Tag der Periode). Die Kennzahl folgt dem Typ: Zähler `total`, Sensor
+`avg`/`min`/`max` mit `min_at`/`max_at`, Schalter `on_hours`/`on_share`.
+Antworten tragen `as_of`, `coverage`, `marked` und `period_running`.
+Schlüssel, Fehlercodes und Hinweise sind fest Englisch.
+
+Fehler: `{"error": code, "message": …}`. `401` falscher Token, `403`
+`ai_disabled` (Schalter aus), `429` `busy`/`rate_limited` (höchstens 2 gleichzeitig,
+60 je Minute; mit `Retry-After`), `504` `timeout` (nach 20 s). Die Antwort ist auf
+etwa 8.000 Zeichen begrenzt und sagt `truncated`, wenn sie gekürzt wurde.
+`/api/notices` trägt `ai_config_rev`; ändert sich der Wert, holt die Integration
+`/api/ai/config` neu. `/api/health` und `/api/notices` melden die Fähigkeit `"ai"`.
 
 ## Fehlerformate
 

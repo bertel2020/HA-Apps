@@ -65,6 +65,14 @@
           </div>
         </section>
 
+        <section id="ki-zugriff" class="settings-section">
+          <h2 class="settings-section-title">{{ _("KI-Zugriff") }}</h2>
+          <p>{{ _("Lässt Claude, ChatGPT und andere KI-Dienste Fragen zu deinem Archiv beantworten &mdash; über den MCP Server von Home Assistant, nur lesend.") }}</p>
+          <div id="ki-form" hx-get="settings/ai" hx-trigger="load" hx-swap="innerHTML">
+            <p class="hint">{{ _("wird geladen …") }}</p>
+          </div>
+        </section>
+
         <section id="diagnose" class="settings-section">
           <h2 class="settings-section-title">{{ _("Diagnose") }} {{ hint_button(_('Diagnose')) }}</h2>
           {% call hint_body('settings-section-description') %}{{ _("Werkzeuge zur Fehlersuche und Laufzeitinformationen der App.") }}{% endcall %}

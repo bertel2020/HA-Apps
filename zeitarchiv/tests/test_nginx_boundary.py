@@ -29,7 +29,8 @@ NGINX_CONF = ADDON / "nginx.conf"
 PUBLIC_ENDPOINTS = {
     "/api/health", "/api/write", "/api/notices",
     # KI-Lesezugriff (ROADMAP 1.31): hinter Token und Schalter "ai_enabled".
-    "/api/ai/search_entities", "/api/ai/get_summary",
+    "/api/ai/config", "/api/ai/search_entities", "/api/ai/get_summary", "/api/ai/get_series",
+    "/api/ai/compare_periods", "/api/ai/get_energy_overview", "/api/ai/get_notices",
 }
 
 #: Der Ingress-Proxy von Home Assistant, dazu der eigene Container.

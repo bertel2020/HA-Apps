@@ -97,3 +97,23 @@
   @media (max-width:520px){
     .about-card{flex-direction:column;align-items:flex-start;text-align:left;}
   }
+
+  /* Bereich "KI-Zugriff": Die Entitäten-Liste ist nur bei "Alle außer …" und
+     "Nur die gewählten" relevant. :has() blendet sie bei "Alle" aus, ohne Skript;
+     die gewählten Kästchen bleiben im Formular und werden dann ignoriert. */
+  .ki-privacy{margin:6px 0 18px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-alt);}
+  .ki-scope .ki-entity-list{margin:8px 0 0;}
+  .ki-scope:has(input[name="scope"][value="all"]:checked) .ki-entity-list{display:none;}
+  .ki-entity-list .search{width:100%;box-sizing:border-box;margin-bottom:6px;}
+  .ki-entity-rows{max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
+  .ki-entity-row{display:flex;gap:10px;align-items:center;padding:6px 10px;min-width:0;cursor:pointer;}
+  .ki-entity-row[hidden]{display:none;}
+  .ki-entity-row + .ki-entity-row{border-top:1px solid var(--border);}
+  .ki-entity-row .names{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .ki-entity-row .name,.ki-entity-row .id{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ki-entity-row .id{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale,1));color:var(--ink-faint);}
+  .ki-entity-unit{flex:none;color:var(--ink-muted);font-size:calc(12px * var(--font-scale,1));}
+  .ki-steps{margin:8px 0;padding-left:22px;line-height:1.6;}
+  .ki-url,.ki-copy-text{display:block;margin:4px 0;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);font-family:var(--font-mono);font-size:calc(12px * var(--font-scale,1));overflow-wrap:anywhere;}
+  .ki-subhead{margin:18px 0 4px;font-size:calc(13.5px * var(--font-scale,1));}
+  .ki-questions{margin:6px 0 0;padding-left:22px;line-height:1.6;}

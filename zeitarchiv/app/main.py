@@ -135,8 +135,7 @@ from .storage.coordinator import CoordinatorBusy, StorageCoordinator
 from .storage.paths import ENTITY_ID_MAX_LENGTH, ENTITY_ID_PATTERN, validate_entity_id
 from .timezone_config import load_timezone
 from .version import APP_VERSION
-from . import api_routes
-from . import ha_integration
+from . import ai_settings_routes, api_routes, ha_integration
 from .import_routes import ImportDependencies, ImportService
 from .index_optimization import (
     build_index_detail_context,
@@ -410,6 +409,7 @@ i18n.install(templates)
 i18n.set_background_language(lambda: index)
 templates.env.filters["retranslate"] = i18n.retranslate
 app.include_router(i18n.make_router(lambda: index))
+app.include_router(ai_settings_routes.make_router(lambda: index, templates))
 
 
 class RequestLoggingMiddleware:

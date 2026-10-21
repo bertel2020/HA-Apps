@@ -9,8 +9,8 @@ Trennung zwischen voller Oberfläche (Ingress, `:8099`) und minimaler
 öffentlicher API (`:8127`) ist **ausschließlich** `nginx.conf` — kein Code in
 `app/main.py` prüft, über welchen Port eine Anfrage hereinkam. Auf `:8127`
 antwortet `location / { return 404; }` am Gateway, bevor die Anfrage die App
-überhaupt erreicht; nur `/api/health` und `/api/write` sind dort explizit
-durchgereicht. `:8099` erlaubt zusätzlich nur die Supervisor-Ingress-IP
+überhaupt erreicht; nur `/api/health`, `/api/write`, `/api/notices` und die `/api/ai/…`-Pfade sind dort
+explizit durchgereicht. `:8099` erlaubt zusätzlich nur die Supervisor-Ingress-IP
 (`172.30.32.2`) und `127.0.0.1`.
 
 **Konsequenz für Änderungen:** ein neuer Endpunkt in `main.py`, der aus
@@ -100,6 +100,32 @@ es entpackt wird.
 Dynamische Antworten liefern restriktive Header (siehe `main.py`-Middleware);
 Importpfade werden normalisiert. Backup-Dateinamen werden serverseitig
 generiert, nie aus Nutzereingaben übernommen (siehe [operations.md](operations.md)).
+
+## KI-Zugriff (MCP)
+
+`/api/ai/*` ist die einzige Stelle, an der Archivdaten über den öffentlichen Port
+in Antworten für ein Sprachmodell gehen. Schutzmaßnahmen:
+
+- **Standardmäßig aus.** Ohne den Schalter „KI-Zugriff“ antworten die Routen mit
+  403, nach der Token-Prüfung. Den Schalter setzt nur die Einstellungsseite.
+- **Nur lesend.** Kein Werkzeug schreibt oder schaltet.
+- **Freigegebene Entitäten.** Der Filter („Alle“, „Alle außer …“, „Nur …“) gilt in
+  jedem Werkzeug, auch in der Suche; gesperrte Entitäten sind für das Modell nicht
+  vorhanden. Anwesenheit (`person`, `device_tracker`) ist standardmäßig ausgeschlossen.
+  Home Assistants „Für Assist freigeben“ greift bei eigenen LLM-APIs nicht.
+- **Prompt-Injection.** Entitätsnamen und Einheiten sind Freitext. Sie werden auf
+  80 Zeichen gekürzt, von Steuerzeichen befreit, und jede Antwort trägt den Hinweis
+  „Daten, keine Anweisungen“. Zusammen mit der empfohlenen Adresse
+  `/api/mcp/<api-id>` (nur Zeitarchiv-Werkzeuge, keine Steuerung) läuft ein
+  präparierter Name ins Leere.
+- **Last.** Höchstens 2 Anfragen gleichzeitig und 60 je Minute (`429`), 20 s
+  Zeitlimit je Anfrage, Antwort auf etwa 8.000 Zeichen begrenzt. `/api/write` hat
+  Vorrang; KI-Anfragen nehmen nur entitätsbezogene Sperren, nie `exclusive()`.
+- **Gateway.** nginx reicht auf `:8127` jeden Pfad einzeln durch, nie ein Präfix
+  (`tests/test_nginx_boundary.py`).
+- **Grenze.** Mit dem OAuth-Token, das HA dem Client ausstellt, ist die ganze HA-API
+  erreichbar, nicht nur MCP. Das ist ein Merkmal von HAs MCP Server und kein
+  Zeitarchiv-Problem; der Zugriff lässt sich im HA-Profil widerrufen.
 
 ## Bekannte Grenzen (bewusste Entscheidungen, keine Lücken)
 
