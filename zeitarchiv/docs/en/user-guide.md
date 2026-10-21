@@ -873,6 +873,11 @@ Own editor, reachable via **Charts** → new chart or editing an existing one
 
 ### Entities and presentation
 
+- Entities are added through the search field: the match list shows favorites
+  first and can be narrowed with chips by **Type** and **Unit**. Once something
+  is selected, matches with a fitting unit come first ("Fits an existing
+  axis"). Under **Selected** the chosen entities can be renamed, reordered,
+  hidden and removed with ✕.
 - Overlay any number of entities; different units automatically get separate Y
   axes so that, e.g., temperature and humidity remain sensibly readable in one
   chart.

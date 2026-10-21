@@ -27,6 +27,15 @@
   der App an. Das gilt auch für den Import aus dem Home-Assistant-Verlauf; für
   die Live-Übertragung braucht es zusätzlich die passende Integration.
 
+### Geändert
+
+- **Chart-Editor**: Entitäten kommen jetzt über ein Suchfeld dazu statt über
+  eine lange Liste zum Ankreuzen. Die Treffer lassen sich nach Typ und Einheit
+  filtern, Favoriten stehen oben, und Entitäten mit passender Einheit werden
+  vor denen angezeigt, die eine weitere Y-Achse bräuchten. Unter „Ausgewählt“
+  stehen die gewählten Entitäten mit Einheit und lassen sich dort auch
+  entfernen.
+
 ### Behoben
 
 - Auswahlmenüs, deren Knopf weit links steht (z. B. „Lücken-Erkennung“ in der
@@ -60,6 +69,14 @@
   on-time. Previously they never reached the app. This also applies to the
   import from the Home Assistant history; live transfer additionally needs the
   matching integration.
+
+#### Changed
+
+- **Chart editor**: entities are now added through a search field instead of
+  a long list of checkboxes. Matches can be filtered by type and unit,
+  favorites come first, and entities with a fitting unit are listed before
+  those that would need another Y axis. "Selected" lists the chosen entities
+  with their unit, and they can be removed there as well.
 
 #### Fixed
 
