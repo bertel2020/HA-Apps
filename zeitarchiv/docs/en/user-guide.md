@@ -2296,6 +2296,7 @@ sidebar.
 | --- | --- |
 | **Source**: Live / Supervisor history | "Live" reads the limited buffer of the running process — reacts fastest. "Supervisor history" reaches further back but takes somewhat longer to load when opened. |
 | **Level** | Filters the display to a minimum severity (All, Errors, Warnings, Information, Debug). Affects only the presentation — not the application log level itself (see below), which determines what is written at all. |
+| **Area** | Shows only the messages of one topic: AI access, Ingest and API, Maintenance and backup, Import and export, Edit data, HTTP requests or Other. Like the level it only affects the display, including the download, and combines with level and search. The mapping is listed in [logging.md](logging.md#log-page-level-area-and-retention). |
 | **Search log** | Free-text search within the currently loaded lines. |
 | **Refresh now** / **Automatic (15 s)** | Manual or automatic reloading. |
 | **Download** | Downloads the current view as a text file. |
@@ -2316,6 +2317,11 @@ masked before output; write captures and entity traces can nevertheless
 contain entity IDs and measurements and should remain active or saved only as
 long as necessary.
 
+The log is not stored permanently: the live view keeps the last 2,000 entries in
+memory and is empty after the app restarts; the Supervisor history shows only the
+current container start. Entries below the configured level are not recorded at all.
+If you want to look something up later, download it first.
+
 ## Settings in detail
 
 | Area | Contains |
@@ -2324,6 +2330,7 @@ long as necessary.
 | **Archiving** | Default values for newly detected entities (never act retroactively on existing entities): resolution, retention, decimal places, value change filter, gap/outlier detection |
 | **Notices** | Switch the tip display on/off and dialog with all tips (see [Housekeeping](#housekeeping)); overview of muted system notices with remaining duration, individually re-enableable early |
 | **Connection** | Show/regenerate API token, last received value, number of writes and auth errors since start, connected integration version with "last seen" time (notice for outdated or newly available version) |
+| **AI access** | Switch for read-only access by AI services (default Off), scope of the released entities (All, All except the selected, Only the selected) with exclude presence, individually switchable tools, notes for the model, setup guide. Everything saves immediately. Under **Usage**: last use, calls today and in 7 days, rejected calls (access off or tool switched off), breakdown by tool and account kind and **Recent changes** to the release. The counters are kept per day for 90 days and the last 50 changes are stored; the content of the questions, the notes text and entity names are not part of it, and the app does not record who made a change |
 | **Diagnostics** | Record the next write once completely (sensitive raw data, automatic deletion after 60 minutes at the latest); trace a single entity for 15 minutes including ingest result; download diagnostic report; process start and uptime; **Background processes** overview (last run/status of each maintenance scheduler task) |
 | **Reset** | Deletes data permanently — in two levels: **Delete measured values only** (entities, configuration, dashboards and settings are kept) or **Reset everything** (additionally entities, dashboards, saved charts and tables, activity log and settings, as on a fresh installation). The API token, the backup settings and all backup files are kept; the Home Assistant integration recreates entities with the next value. Key figures (entities, records, size) say beforehand what would be deleted. By default **a backup is created first** — if it fails, nothing is deleted. To confirm, you type the word “DELETE”. Not available in demo mode |
 | **Demo data** | Only visible with active demo mode or a leftover demo instance — see the separate section [Demo mode](#demo-mode) |

@@ -123,6 +123,14 @@ in Antworten für ein Sprachmodell gehen. Schutzmaßnahmen:
   Vorrang; KI-Anfragen nehmen nur entitätsbezogene Sperren, nie `exclusive()`.
 - **Gateway.** nginx reicht auf `:8127` jeden Pfad einzeln durch, nie ein Präfix
   (`tests/test_nginx_boundary.py`).
+- **Nachvollziehbarkeit.** Einstellungen → KI-Zugriff zeigt die Nutzung je Tag (90 Tage,
+  nur Zahlen je Werkzeug und Kontoart, nie der Inhalt einer Frage), abgelehnte Aufrufe
+  (Zugriff aus, Werkzeug abgeschaltet) und die letzten 50 Änderungen an der Freigabe
+  ohne Notiztext und Entitätsnamen. Wer eine Änderung vorgenommen hat, erfasst die App
+  nicht. Dazu schreibt sie `event=ai_tool_call`, `ai_tool_rejected` (je Grund und
+  Werkzeug höchstens einmal in fünf Minuten) und `ai_access_changed` ins Protokoll, siehe
+  [logging.md](logging.md#ki-zugriff). Die Zähler werden höchstens einmal je Minute
+  gespeichert (zusätzlich beim Beenden); bei einem Absturz kann bis zu eine Minute fehlen.
 - **Grenze.** Mit dem OAuth-Token, das HA dem Client ausstellt, ist die ganze HA-API
   erreichbar, nicht nur MCP. Das ist ein Merkmal von HAs MCP Server und kein
   Zeitarchiv-Problem; der Zugriff lässt sich im HA-Profil widerrufen.

@@ -230,8 +230,11 @@ man sie trotzdem auf, kommt `403` `tool_disabled`. Die Hinweise des Besitzers st
 Der Kopf `X-Zeitarchiv-Ai-User` (`admin` oder `user`) sagt, mit welchem Konto der Client in
 Home Assistant angemeldet ist; er fließt nur in die Nutzungsanzeige ein, gesperrt wird nichts.
 
+Abgelehnte Aufrufe (`403`) werden je Tag gezählt und in Einstellungen → KI-Zugriff
+angezeigt; Aufrufe gelten als Nutzung nur, wenn sie ein Werkzeug ausgeführt haben.
+
 Fehler: `{"error": code, "message": …}`. `401` falscher Token, `403`
-`ai_disabled` (Schalter aus), `429` `busy`/`rate_limited` (höchstens 2 gleichzeitig,
+`ai_disabled` (Schalter aus) oder `tool_disabled` (Werkzeug abgeschaltet), `429` `busy`/`rate_limited` (höchstens 2 gleichzeitig,
 60 je Minute; mit `Retry-After`), `504` `timeout` (nach 20 s). Die Antwort ist auf
 etwa 8.000 Zeichen begrenzt und sagt `truncated`, wenn sie gekürzt wurde.
 `/api/notices` trägt `ai_config_rev`; ändert sich der Wert, holt die Integration

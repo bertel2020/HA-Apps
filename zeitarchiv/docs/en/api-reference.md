@@ -224,8 +224,11 @@ them anyway gives `403` `tool_disabled`. The owner's notes are part of the confi
 `X-Zeitarchiv-Ai-User` (`admin` or `user`) says which kind of account the client is signed in
 with in Home Assistant; it only feeds the usage display, nothing is blocked.
 
+Rejected calls (`403`) are counted per day and shown in Settings → AI access; a call
+only counts as usage when it ran a tool.
+
 Errors: `{"error": code, "message": …}`. `401` wrong token, `403` `ai_disabled`
-(switch off), `429` `busy`/`rate_limited` (at most 2 at a time, 60 per minute;
+(switch off) or `tool_disabled` (tool switched off), `429` `busy`/`rate_limited` (at most 2 at a time, 60 per minute;
 with `Retry-After`), `504` `timeout` (after 20 s). A response is limited to about
 8,000 characters and says `truncated` if it was shortened. `/api/notices` carries
 `ai_config_rev`; when it changes, the integration re-fetches `/api/ai/config`.

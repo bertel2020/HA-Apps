@@ -2490,6 +2490,7 @@ Home-Assistant-Seitenleiste.
 | --- | --- |
 | **Quelle**: Live / Supervisor-Historie | „Live" liest den begrenzten Puffer des laufenden Prozesses — reagiert am schnellsten. „Supervisor-Historie" reicht weiter zurück, lädt aber beim Öffnen etwas länger. |
 | **Level** | Filtert die Anzeige auf einen Mindest-Schweregrad (Alle, Fehler, Warnungen, Informationen, Debug). Wirkt nur auf die Darstellung — nicht auf das Anwendungs-Loglevel selbst (siehe unten), das bestimmt, was überhaupt geschrieben wird. |
+| **Bereich** | Zeigt nur die Meldungen eines Themas: KI-Zugriff, Aufnahme und API, Wartung und Sicherung, Import und Export, Daten bearbeiten, HTTP-Zugriffe oder Sonstiges. Wirkt wie das Level nur auf die Anzeige, auch auf den Download, und lässt sich mit Level und Suche kombinieren. Die Zuordnung steht in [logging.md](logging.md#logseite-level-bereich-und-aufbewahrung). |
 | **Protokoll durchsuchen** | Freitextsuche innerhalb der aktuell geladenen Zeilen. |
 | **Jetzt aktualisieren** / **Automatisch (15 s)** | Manuelles oder automatisches Nachladen. |
 | **Herunterladen** | Lädt die aktuelle Ansicht als Textdatei herunter. |
@@ -2509,6 +2510,12 @@ Daten. Zugangsdaten werden vor der Ausgabe immer maskiert; Write-Captures und
 Entity-Traces können trotzdem Entity-IDs und Messwerte enthalten und sollten
 nur so lange wie nötig aktiv beziehungsweise gespeichert bleiben.
 
+Das Protokoll wird nicht dauerhaft gespeichert: Die Live-Ansicht hält die letzten
+2.000 Einträge im Arbeitsspeicher und ist nach einem Neustart der App leer; die
+Supervisor-Historie zeigt nur den aktuellen Containerstart. Einträge unterhalb des
+eingestellten Levels werden gar nicht erst aufgenommen. Wer etwas später nachsehen
+will, lädt es vorher herunter.
+
 ## Einstellungen im Detail
 
 | Bereich | Enthält |
@@ -2517,6 +2524,7 @@ nur so lange wie nötig aktiv beziehungsweise gespeichert bleiben.
 | **Archivierung** | Standardwerte für neu erkannte Entitäten (wirken nie rückwirkend auf bestehende Entitäten): Auflösung, Aufbewahrung, Nachkommastellen, Wertänderungsfilter, Lücken-/Ausreißer-Erkennung |
 | **Meldungen** | Tipp-Anzeige an-/ausschalten und Dialog mit allen Tipps (siehe [Housekeeping](#housekeeping)); Übersicht stummgeschalteter Systemmeldungen mit verbleibender Dauer, einzeln vorzeitig wieder aktivierbar |
 | **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start, verbundene Integrationsversion mit Zeitpunkt "zuletzt gesehen" (Hinweis bei veralteter oder neu verfügbarer Version) |
+| **KI-Zugriff** | Schalter für lesenden Zugriff von KI-Diensten (Standard Aus), Umfang der freigegebenen Entitäten (Alle, Alle außer den gewählten, Nur die gewählten) mit Anwesenheit ausschließen, einzeln abschaltbare Werkzeuge, Hinweise für das Modell, Einrichtungsanleitung. Alles speichert sofort. Unter **Nutzung**: letzte Nutzung, Aufrufe heute und in 7 Tagen, abgelehnte Aufrufe (Zugriff aus oder Werkzeug abgeschaltet), Aufschlüsselung nach Werkzeug und Kontoart sowie **Letzte Änderungen** an der Freigabe. Die Zähler gelten je Tag und bleiben 90 Tage erhalten, die letzten 50 Änderungen bleiben gespeichert; Inhalte der Fragen, Notiztext und Entitätsnamen stehen nicht darin, und wer eine Änderung vorgenommen hat, erfasst die App nicht |
 | **Diagnose** | Nächsten Schreibvorgang einmalig vollständig aufzeichnen (sensible Rohdaten, automatische Löschung spätestens nach 60 Minuten); eine einzelne Entität 15 Minuten lang einschließlich Ingest-Ergebnis verfolgen; Diagnosebericht herunterladen; Prozess-Start und -Laufzeit; **Hintergrundprozesse**-Übersicht (letzter Lauf/Status jeder Wartungsplaner-Aufgabe) |
 | **Zurücksetzen** | Löscht Daten endgültig — in zwei Stufen: **Nur Messwerte löschen** (Entitäten, Konfiguration, Dashboards und Einstellungen bleiben) oder **Komplett zurücksetzen** (zusätzlich Entitäten, Dashboards, gespeicherte Charts und Tabellen, Aktivitätsprotokoll und Einstellungen, wie bei einer frischen Installation). Der API-Token, die Backup-Einstellungen und alle Backup-Dateien bleiben erhalten; die Home-Assistant-Integration legt Entitäten mit dem nächsten Wert neu an. Kennzahlen (Entitäten, Datensätze, Größe) nennen vorab, was gelöscht würde. Standardmäßig wird **vorher ein Backup erstellt** — schlägt es fehl, wird nichts gelöscht. Zum Bestätigen tippst du das Wort „LÖSCHEN“ ein. Im Demo-Modus nicht verfügbar |
 | **Demo-Daten** | Nur sichtbar mit aktivem Demo-Modus oder einer liegengebliebenen Demo-Instanz — siehe eigener Abschnitt [Demo-Modus](#demo-modus) |

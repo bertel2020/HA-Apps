@@ -16,6 +16,35 @@ Die Live-Ansicht aktualisiert sich alle 15 Sekunden. Erfolgreiche Abrufe von
 `/api/logs`, `/api/health` und dem Debug-Status erzeugen selbst keine
 Access-Logzeilen. Fehler bleiben sichtbar.
 
+## Logseite: Level, Bereich und Aufbewahrung
+
+Die Logseite filtert nach **Level** und nach **Bereich** (Logger-Gruppe). Beide
+wirken auf Anzeige, Download und Supervisor-Historie und lassen sich mit der Suche
+kombinieren. Die Zuordnung läuft nach Logger-Name; alles Unbekannte fällt in
+„Sonstiges“, ein neuer Logger bleibt also sichtbar.
+
+| Bereich | Logger |
+| --- | --- |
+| KI-Zugriff | `ai_routes`, `ai_settings_routes` |
+| Aufnahme & API | `api_routes`, `storage.ingestion`, `storage.hotbuffer`, `trace` |
+| Wartung & Sicherung | `background`, `housekeeping_routes`, `index_optimization`, `supervisor_stats`, `storage.backup_external` |
+| Import & Export | `import_routes`, `export_routes`, `storage.ha_import`, `storage.ha_statistics`, `storage.vm_import`, `storage.zip_guard` |
+| Daten bearbeiten | `entity_delete_routes`, `marked_values_routes` |
+| HTTP-Zugriffe | `http`, `access` |
+| Sonstiges | alles andere (`main`, `uvicorn`, `currency`, …) |
+
+Sicherung und Aufbewahrung loggen beide aus `background` und bilden daher mit der
+übrigen Wartung einen Bereich. Fortsetzungszeilen (Tracebacks) gehören zum Bereich der
+Zeile davor.
+
+Aufbewahrung: Zeitarchiv schreibt keine eigene Logdatei. Der Ringpuffer hält die
+letzten 2.000 Einträge im Arbeitsspeicher und ist nach einem Neustart leer. Zeilen
+unterhalb des eingestellten Levels werden gar nicht erst gespeichert. Die
+Supervisor-Historie zeigt nur den aktuellen Containerstart (etwa die letzten 2.000 bis
+8.000 Zeilen, höchstens 8 MB). Wie lange der Supervisor Zeilen vorhält, bestimmt Home
+Assistant. Dauerhaft festgehalten werden nur die KI-Zähler und das KI-Änderungsprotokoll
+(siehe unten), im Index statt im Log.
+
 ## Empfohlene Konfiguration
 
 Im Normalbetrieb: Anwendungslevel `warning`, HTTP-Protokoll **Nur
@@ -58,6 +87,19 @@ wiederhergestellte Events, betroffene Entitäten und Pruning. Claims im Zustand
 `processing`, die mindestens fünf Minuten alt sind, werden gesondert gewarnt.
 Der verbindliche Zustand bleibt immer die SQLite-Tabelle `ingested_events`;
 das Log ist ausschließlich die Beobachtungsschicht.
+
+## KI-Zugriff
+
+Alle Meldungen sind `info`, also nur bei Anwendungslevel `info` oder `debug` sichtbar.
+
+| Event | Wann |
+| --- | --- |
+| `ai_tool_call` | ein KI-Werkzeug wurde ausgeführt (Werkzeug, Status, Zahl der Entitäten, Dauer) |
+| `ai_tool_rejected` | Aufruf mit `403` abgelehnt (`reason=ai_disabled` oder `tool_disabled`); je Grund und Werkzeug höchstens einmal in fünf Minuten, sonst mit `unterdrueckte_wiederholungen` |
+| `ai_access_changed` | Freigabe gespeichert (`enabled`, `scope`, Zahl der Entitäten, `exclude_presence`, Zahl abgeschalteter Werkzeuge); nie der Notiztext |
+
+Nutzungszähler (je Tag, 90 Tage) und die letzten 50 Änderungen liegen zusätzlich in den
+Einstellungen des Index und erscheinen unter Einstellungen → KI-Zugriff → Nutzung.
 
 ## Redaction und Diagnosewerkzeuge
 

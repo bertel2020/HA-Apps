@@ -16,6 +16,34 @@ The live view refreshes every 15 seconds. Successful calls of `/api/logs`,
 `/api/health` and the debug status do not themselves produce access log lines.
 Errors remain visible.
 
+## Log page: level, area and retention
+
+The log page filters by **level** and by **area** (logger group). Both apply to the
+display, the download and the Supervisor history, and combine with the search. The
+mapping goes by logger name; anything unknown falls into “Other”, so a new logger stays
+visible.
+
+| Area | Loggers |
+| --- | --- |
+| AI access | `ai_routes`, `ai_settings_routes` |
+| Ingest & API | `api_routes`, `storage.ingestion`, `storage.hotbuffer`, `trace` |
+| Maintenance & backup | `background`, `housekeeping_routes`, `index_optimization`, `supervisor_stats`, `storage.backup_external` |
+| Import & export | `import_routes`, `export_routes`, `storage.ha_import`, `storage.ha_statistics`, `storage.vm_import`, `storage.zip_guard` |
+| Edit data | `entity_delete_routes`, `marked_values_routes` |
+| HTTP requests | `http`, `access` |
+| Other | everything else (`main`, `uvicorn`, `currency`, …) |
+
+Backup and retention both log from `background` and therefore share an area with the
+rest of the maintenance. Continuation lines (tracebacks) belong to the area of the line
+before them.
+
+Retention: Zeitarchiv does not write its own log file. The ring buffer keeps the last
+2,000 entries in memory and is empty after a restart. Lines below the configured level
+are not stored at all. The Supervisor history only shows the current container start
+(roughly the last 2,000 to 8,000 lines, at most 8 MB). How long Supervisor keeps lines
+is up to Home Assistant. Only the AI counters and the AI change log (see below) are
+kept permanently, in the index rather than in the log.
+
 ## Recommended configuration
 
 In normal operation: application level `warning`, HTTP logging **Failed
@@ -58,6 +86,19 @@ events, affected entities and pruning. Claims in state `processing` that are at
 least five minutes old are warned about separately. The authoritative state
 always remains the SQLite table `ingested_events`; the log is exclusively the
 observation layer.
+
+## AI access
+
+All messages are `info`, so they are visible only at application level `info` or `debug`.
+
+| Event | When |
+| --- | --- |
+| `ai_tool_call` | an AI tool ran (tool, status, number of entities, duration) |
+| `ai_tool_rejected` | call rejected with `403` (`reason=ai_disabled` or `tool_disabled`); at most once per five minutes for each reason and tool, otherwise with `unterdrueckte_wiederholungen` |
+| `ai_access_changed` | release saved (`enabled`, `scope`, number of entities, `exclude_presence`, number of tools switched off); never the notes text |
+
+Usage counters (per day, 90 days) and the last 50 changes are also kept in the index
+settings and appear under Settings → AI access → Usage.
 
 ## Redaction and diagnostic tools
 

@@ -65,6 +65,9 @@ app/
   progress.py                              Fortschritt und Registratur laufender Aufträge
   limits.py                                 Zentrale Ressourcen-/Größenlimits
   log_source.py, logging_setup.py            Log-Konfiguration und -Zugriff (Diagnose-Seite)
+  ai_routes.py, ai_tools.py                   KI-Lesezugriff /api/ai/* und seine Werkzeuge
+  ai_settings.py, ai_settings_routes.py       KI-Freigabe: Einstellungen und Einstellungsbereich
+  ai_usage.py, ai_changes.py                   KI-Nutzung je Tag und Änderungsprotokoll
   supervisor_stats.py                         Supervisor-/Prozess-Kennzahlen
   timezone_config.py                           IANA-Zeitzonen-Handling
   version.py                                    Laufzeit-Versionsauskunft

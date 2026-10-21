@@ -116,6 +116,14 @@ answers meant for a language model. Safeguards:
   AI requests take only per-entity locks, never `exclusive()`.
 - **Gateway.** nginx passes each path on `:8127` individually, never a prefix
   (`tests/test_nginx_boundary.py`).
+- **Traceability.** Settings → AI access shows the usage per day (90 days, only counts
+  per tool and account kind, never the content of a question), rejected calls (access
+  off, tool switched off) and the last 50 changes to the release, without the notes
+  text or entity names. The app does not record who made a change. It also writes
+  `event=ai_tool_call`, `ai_tool_rejected` (at most once per five minutes for each
+  reason and tool) and `ai_access_changed` to the log, see
+  [logging.md](logging.md#ai-access). The counters are saved at most once a minute (and
+  when the app stops); after a crash up to a minute can be missing.
 - **Limit.** The OAuth token Home Assistant issues to the client reaches the whole HA
   API, not just MCP. That is a trait of HA's MCP Server and not a Zeitarchiv
   problem; access can be revoked in the HA profile.
