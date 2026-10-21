@@ -33,6 +33,9 @@
              x-init: ein neues, leeres Chart setzt den Fokus gleich ins
              Suchfeld (Trefferliste offen) — nur am Desktop, auf dem Telefon
              klappte sonst beim Öffnen der Seite die Tastatur auf.
+             open = true zusätzlich zum Fokus: @focus feuert nicht, solange
+             das Fenster selbst nicht im Vordergrund ist (Tab im Hintergrund
+             geladen), die Liste bliebe dann trotz Fokus zu.
              data-tooltip-fixed wie früher am Raster: die Trefferliste scrollt,
              ein im Zeilenrahmen positionierter Tooltip würde abgeschnitten
              (siehe fixed-tooltip.js). -->
@@ -41,7 +44,7 @@
           <div class="entity-multi-picker"
                x-data="entityMultiPicker(ENTITY_OPTIONS, () => selectedEntityIds, (id) => toggleEntity(id, true))"
                @click.outside="open = false"
-               x-init="if (editing && !selectedEntityIds.length && matchMedia('(min-width: 641px)').matches) $nextTick(() => $el.querySelector('input').focus())">
+               x-init="if (editing && !selectedEntityIds.length && matchMedia('(min-width: 641px)').matches) $nextTick(() => { $el.querySelector('input').focus(); open = true; })">
             <input type="search" id="entity-picker-search" class="search" autocomplete="off"
                    placeholder="{{ _('Entität hinzufügen …') }}"
                    x-model="search" @focus="open = true" @input="open = true; activeId = ''" @keydown="onKey($event)">
