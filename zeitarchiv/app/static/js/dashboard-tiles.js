@@ -69,7 +69,7 @@
   function tileCompare(el, {range, continuous, entityIds, chartType, resolutionPreset, stacked}) {
     let settings = {};
     try { settings = JSON.parse(el.dataset.compareSettings || '{}') || {}; } catch (e) { settings = {}; }
-    if (!settings.compare || ['timeline', 'donut'].includes(chartType) || resolutionPreset === 'full'
+    if (!settings.compare || ['timeline', 'donut', 'shares', 'changes'].includes(chartType) || resolutionPreset === 'full'
         || (stacked && entityIds.length >= 2)) return null;
     let mode = settings.mode || 'previous';
     const longterm = mode === 'longterm' && range === 'year' && !continuous && entityIds.length === 1;
@@ -527,7 +527,11 @@
       chartEl.innerHTML = '<div class="dtile-loading">' + t('Fehler beim Laden') + '</div>';
       return;
     }
-    const series = data.series || [];
+    // Zustände lassen sich nur unter sich darstellen (wie im Chart-Editor):
+    // steht etwas anderes im Chart, fallen sie heraus.
+    const loaded = data.series || [];
+    const foreign = loaded.some(s => s.aggregation_type && s.aggregation_type !== 'state');
+    const series = foreign ? loaded.filter(s => s.aggregation_type !== 'state') : loaded;
     if (!series.some(s => s.points && s.points.length)) {
       chartEl.innerHTML = '<div class="dtile-loading">' + t('Keine Daten') + '</div>';
       return;
@@ -682,6 +686,10 @@
         entityNames, colorIndexFor, effectiveDecimals, animation, style, borderColor, inkFaint, inkMuted, surface,
         hiddenSet: legendHidden.get(chartId),
       });
+      return;
+    }
+    if (['shares', 'changes'].includes(chartType) && series.some(s => s.aggregation_type === 'state')) {
+      renderTileStateBars(chart, series, entityNames, data, range, chartType, animation);
       return;
     }
     if (timeline) {
@@ -1384,6 +1392,19 @@
       swatch: StateEntities.swatchStyle(row.idx),
       text: `${NumberFormat.fmtDuration(row.seconds)} · ${StateEntities.fmtShare(row.share)}`,
     }));
+  }
+
+  // Anteile oder Wechsel je Zustands-Entität, wie im Chart-Editor.
+  function renderTileStateBars(chart, series, entityNames, data, range, mode, animation) {
+    const rows = series.filter(s => s.aggregation_type === 'state').map(s => ({
+      name: entityNames[s.entity_id] || s.friendly_name,
+      states: s.states,
+      buckets: StateEntities.bucketsForSeries(s, range, data.window_end),
+    }));
+    chart.setOption({
+      ...StateEntities.barPanels(rows, {mode, range, windowStart: data.window_start, periodEnd: data.period_end ?? data.window_end}),
+      animation,
+    }, true);
   }
 
   function renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface, colorIndexFor) {

@@ -244,12 +244,23 @@
                     <span class="menu-note" x-show="compare && allSwitch && !hasState">{{ _("Zeitstrahl und Donut nicht bei aktivem Vergleich") }}</span>
                   </span>
                   <div class="seg">
-                    <button :class="{active: !donut && (hasState || !timeline)}" @click="setDisplayMode('timeseries')">{{ _("Zeitverlauf") }}</button>
-                    {# Wie auf der Entitätsseite ein Knopf im Diagrammtyp, nur bei
-                       Schaltern. Serverseitig nicht möglich (die Serien kennt erst
-                       die Seite), deshalb x-if statt x-show: so greift die
-                       Rahmen-Regel von .seg button:last-child weiter auf dem
-                       tatsächlich letzten Knopf. #}
+                    <template x-if="!hasState">
+                      <button :class="{active: !donut && !timeline}" @click="setDisplayMode('timeseries')">{{ _("Zeitverlauf") }}</button>
+                    </template>
+                    {# Zustände wie auf der Entitätsseite: Zeitstrahl, Anteile
+                       (gestapelt in %) oder Wechsel (Beginne je Zustand), je
+                       Zustands-Entität ein eigenes Diagramm. x-if statt x-show:
+                       x-show blieb in dieser Zeile wirkungslos (die Knöpfe
+                       änderten ihre Sichtbarkeit nach dem Laden nicht). #}
+                    <template x-if="hasState">
+                      <button :class="{active: !donut && stateMode === 'timeline'}" @click="setDisplayMode('timeline')">{{ _("Zeitstrahl") }}</button>
+                    </template>
+                    <template x-if="hasState">
+                      <button :class="{active: !donut && stateMode === 'shares'}" @click="setDisplayMode('shares')">{{ _("Anteile") }}</button>
+                    </template>
+                    <template x-if="hasState">
+                      <button :class="{active: !donut && stateMode === 'changes'}" @click="setDisplayMode('changes')">{{ _("Wechsel") }}</button>
+                    </template>
                     <template x-if="allSwitch && !hasState">
                       <button :class="{active: timeline && !donut}" :disabled="compare" @click="setDisplayMode('timeline')">{{ _("Zeitstrahl") }}</button>
                     </template>

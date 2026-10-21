@@ -16,7 +16,9 @@ from .i18n import N_
 # ENTITY_CHART_TYPES unten. "donut" ist die dritte, chart-weite
 # Darstellungsart (Optionen-Menü, "Darstellungsart") — ein Anteil je Serie
 # statt eines Zeitverlaufs, siehe chart_editor.js renderDonut().
-CHART_EDITOR_CHART_TYPES = {"auto", "bar", "timeline", "donut"}
+# "shares"/"changes": Anteile bzw. Wechsel je Zustands-Entität als gestapelte
+# Balken (nur Charts aus lauter Zuständen), siehe state-entities.js barPanels().
+CHART_EDITOR_CHART_TYPES = {"auto", "bar", "timeline", "donut", "shares", "changes"}
 
 # Entitätsseite (entity_detail.html): zusätzlich "line"/"bar" als ausdrückliche Wahl.
 ENTITY_CHART_TYPES = {"auto", "line", "bar", "timeline"}
@@ -32,6 +34,8 @@ CHART_TYPE_LABELS = {
     "balken": N_("Balken"),
     "gemischt": N_("Linie + Balken"),
     "donut": N_("Donut"),
+    "anteile": N_("Anteile"),
+    "wechsel": N_("Wechsel"),
 }
 
 
@@ -42,12 +46,17 @@ def effective_chart_type(chart: dict, aggregation_types: dict[str, str]) -> str:
     reines Schalter-Chart den Zeitstrahl abwählt) und bleibt hier unverändert —
     sonst würde "auto" diese Wahl beim nächsten Laden wieder überstimmen."""
     stored = chart["chart_type"]
+    # Anteile/Wechsel gibt es nur für Charts aus lauter Zuständen; ein Chart, in
+    # das später etwas anderes kam, wird wie "auto" behandelt, statt Zahlen als
+    # Zustandsbalken zu zeichnen.
+    if stored in ("shares", "changes") and not all(aggregation_types.get(e) == "state" for e in chart["entity_ids"]):
+        stored = "auto"
     if stored == "auto" and chart["entity_ids"] and all(
         aggregation_types.get(e) in ("switch", "state") for e in chart["entity_ids"]
     ):
         return "timeline"
-    # Zustände gibt es nur als Zeitstrahl oder Donut (chart_editor.js load()).
-    if stored != "donut" and any(aggregation_types.get(e) == "state" for e in chart["entity_ids"]) and all(
+    # Zustände gibt es sonst nur als Zeitstrahl oder Donut (chart_editor.js load()).
+    if stored not in ("donut", "shares", "changes") and any(aggregation_types.get(e) == "state" for e in chart["entity_ids"]) and all(
         aggregation_types.get(e) in ("switch", "state") for e in chart["entity_ids"]
     ):
         return "timeline"
@@ -67,6 +76,8 @@ def chart_type_key(chart: dict, aggregation_types: dict[str, str]) -> str:
         return "zeitstrahl"
     if chart_type == "donut":
         return "donut"
+    if chart_type in ("shares", "changes"):
+        return "anteile" if chart_type == "shares" else "wechsel"
     vorhanden = {
         "balken" if aggregation_types.get(entity_id) in ("counter", "switch") else "linie"
         for entity_id in chart["entity_ids"]

@@ -620,7 +620,12 @@
         // CHART_TYPE vorbelegt (persistiert über save(), siehe dort) statt
         // fest false — sonst würde jeder Seitenaufruf die zuletzt für dieses
         // Chart gespeicherte Wahl verwerfen.
-        timeline: CHART_TYPE === 'timeline',
+        timeline: ['timeline', 'shares', 'changes'].includes(CHART_TYPE),
+        // Zustands-Charts: Zeitstrahl, Anteile oder Wechsel je Zustands-Entität
+        // (die Balken-Ansichten laufen über dieselbe timeline-Weiche, damit die
+        // Zeitverlauf-Optionen im Menü ausgeblendet bleiben). Gespeichert als
+        // chart_type "timeline", "shares" oder "changes".
+        stateMode: ['shares', 'changes'].includes(CHART_TYPE) ? CHART_TYPE : 'timeline',
         // Ob die Darstellungsart schon feststeht (gespeichert oder per Klick
         // gewählt). Solange nicht, wird ein reines Schalter-Chart nach dem
         // Laden automatisch zum Zeitstrahl (Standard) — siehe load().
@@ -730,6 +735,9 @@
         // Zustands-Entitäten (ROADMAP 1.29) gibt es nur als Zeitstrahl oder
         // Donut — eine Linie aus Zustandsindizes hätte keine Aussage.
         get hasState() { return this.series.some(s => s.aggregation_type === 'state'); },
+        // Balken-Ansicht der Zustände gewünscht — solange noch keine Serien
+        // geladen sind, gilt der gespeicherte Wunsch (load() prüft ihn danach).
+        get wantsStateBars() { return this.stateMode !== 'timeline' && (this.hasState || !this.series.length); },
         // Zustände stehen nie neben anderen Serien (load() wirft sie sonst
         // heraus): die Legende trägt dann immer Dauer und Anteil, wie auf der
         // Entitätsseite — der Schalter "Statistik in Legende" entfällt,
@@ -1455,9 +1463,19 @@
         // sinnvoll darstellbaren zweiten Wert.
         setDisplayMode(mode) {
           const wasTimeline = this.timeline && !this.donut;
-          const current = this.donut ? 'donut' : (wasTimeline && !this.hasState ? 'timeline' : 'timeseries');
+          const current = this.donut ? 'donut' : (this.hasState ? this.stateMode : (wasTimeline ? 'timeline' : 'timeseries'));
           if (mode === current) return;
           this.typeChosen = true;
+          // Zustände: Zeitstrahl braucht die Rohwechsel, Anteile und Wechsel
+          // kommen ab dem Monat fertig vom Server — beides neu laden.
+          if (this.hasState && ['timeline', 'shares', 'changes'].includes(mode)) {
+            this.donut = false;
+            this.stateMode = mode;
+            this.timeline = true;
+            this.raw = mode === 'timeline';
+            this.load();
+            return;
+          }
           this.donut = mode === 'donut';
           if (mode === 'donut') {
             // render() prüft this.timeline VOR this.donut — ein noch aktiver
@@ -1506,7 +1524,7 @@
           // unabhängig davon, über welchen Code-Pfad load() gerade ausgelöst
           // wurde — Bucket-Werte würde renderTimelineMulti() sonst fälschlich
           // als durchgehende AN-Intervalle statt echter Übergänge zeichnen.
-          if (this.timeline) this.raw = true;
+          if (this.timeline) this.raw = !this.wantsStateBars;
           // "Langzeit" gibt es nur bei Zeitraum "Jahr", kalendarisch und mit
           // genau einer Entität. Ändert sich eins davon (Zeitraum, Rollierend,
           // Entitätenauswahl — alles endet hier in load()), fällt der Vergleich
@@ -1538,10 +1556,20 @@
           // dann fällt die Ansicht automatisch auf Linie/Balken zurück statt
           // einen inzwischen unpassenden Zeitstrahl weiterzuzeigen.
           if (this.timeline && !this.allSwitch) this.timeline = false;
+          // Anteile/Wechsel gibt es nur für Zustände: war das Chart anders
+          // gespeichert (andere Entitäten), zurück zum Zeitstrahl — mit Rohwerten.
+          if (!this.hasState && this.stateMode !== 'timeline') {
+            this.stateMode = 'timeline';
+            if (this.timeline && !this.raw) {
+              this.raw = true;
+              this.loading = false;
+              return this.load();
+            }
+          }
           // Mit Zustands-Entitäten gibt es außer dem Donut nur den Zeitstrahl.
           if (this.hasState && !this.timeline && !this.donut) {
             this.timeline = true;
-            this.raw = true;
+            this.raw = this.stateMode === 'timeline';
             this.loading = false;
             return this.load();
           }
@@ -1566,6 +1594,8 @@
         render() {
           if (!chartInstance) chartInstance = echarts.init(document.getElementById('chart'));
           if (!this.hasData) { chartInstance.clear(); return; }
+          // Nur die Zustands-Balken brauchen mehr Höhe (ein Diagramm je Entität).
+          if (!(this.timeline && this.hasState && this.stateMode !== 'timeline')) document.getElementById('chart').style.height = '';
           // Vorjahresvergleich bei range='year' MIT Soll-Entität ODER
           // Laufsumme bekommt einen eigenen Renderpfad wie Donut/Zeitstrahl
           // (siehe timeline/donut-Zweige unten) statt eines weiteren Zweigs
@@ -1625,6 +1655,10 @@
             return d.toLocaleDateString(LOCALE, {month: 'short', year: 'numeric'});
           };
 
+          if (this.timeline && this.hasState && this.stateMode !== 'timeline') {
+            this.renderStateBarPanels();
+            return;
+          }
           if (this.timeline) {
             this.renderTimelineMulti(fmt);
             return;
@@ -2608,6 +2642,29 @@
         // (Mockup "Chart-Editor mit mehreren Zustands-Entitäten"). Schalter
         // daneben fallen hier heraus — ihr Donut ist ein Anteil am Ganzen
         // über Entitäten, das lässt sich nicht in dieselbe Reihe stellen.
+        // Anteile oder Wechsel je Zustands-Entität (state-entities.js barPanels()).
+        renderStateBarPanels() {
+          if (!chartInstance) chartInstance = echarts.init(document.getElementById('chart'));
+          const css = getComputedStyle(document.body);
+          const rows = this.series
+            .filter(s => s.aggregation_type === 'state' && !this.legendHiddenIds.includes(s.entity_id))
+            .map(s => ({
+              name: this.entityNames[s.entity_id] || s.friendly_name,
+              states: s.states,
+              buckets: StateEntities.bucketsForSeries(s, this.range, this.windowEnd),
+            }));
+          // Ab zwei Entitäten wächst die Höhe mit: sonst wären die Diagramme
+          // zu flach für ihre Achsenbeschriftung.
+          document.getElementById('chart').style.height = rows.length > 1 ? `${Math.max(420, rows.length * 190)}px` : '';
+          chartInstance.resize();
+          chartInstance.setOption({
+            ...StateEntities.barPanels(rows, {
+              mode: this.stateMode, range: this.range, windowStart: this.windowStart, periodEnd: this.periodEnd,
+            }),
+            toolbox: toolboxOption(this.exportFilename, css.getPropertyValue('--surface'), css.getPropertyValue('--ink-faint')),
+          }, true);
+          chartInstance.resize();
+        },
         renderStateDonuts() {
           const css = getComputedStyle(document.body);
           const surface = css.getPropertyValue('--surface');
@@ -2798,7 +2855,7 @@
             chart_stats: this.chartStats,
             legend_metrics: this.legendMetrics,
             legend_style: this.legendStyle,
-            chart_type: this.donut ? 'donut' : (this.timeline ? 'timeline' : (this.allSwitch ? 'bar' : 'auto')),
+            chart_type: this.donut ? 'donut' : (this.timeline ? (this.hasState ? this.stateMode : 'timeline') : (this.allSwitch ? 'bar' : 'auto')),
             decimals: this.decimals,
             show_values: this.showValues,
             average_line: this.averageLine,

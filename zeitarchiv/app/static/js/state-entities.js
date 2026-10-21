@@ -186,6 +186,103 @@ window.StateEntities = (() => {
     }));
   }
 
+  // Buckets einer Zustands-Serie aus /api/query-multi: ab dem Monat kommen
+  // die Anteile als chart_type "shares" vom Server, bis zur Woche die
+  // Rohwechsel, aus denen der Browser die Buckets bildet.
+  function bucketsForSeries(s, range, windowEnd) {
+    if (s.chart_type === 'shares') return bucketsFromShares(s.points || []);
+    const [bucketStart, bucketNext] = RANGE_BUCKETS[range]();
+    return bucketsFromSegments(segments(s.points || [], windowEnd), bucketStart, bucketNext);
+  }
+
+  function bucketLabel(range, ts) {
+    const d = new Date(ts * 1000);
+    const loc = window.ZA_FORMAT;
+    if (range === 'hour' || range === 'day') return d.toLocaleTimeString(loc, {hour: '2-digit', minute: '2-digit'});
+    if (range === 'week') return d.toLocaleDateString(loc, {weekday: 'short', day: '2-digit', month: '2-digit'});
+    if (range === 'month') return d.toLocaleDateString(loc, {day: '2-digit', month: '2-digit'});
+    if (range === 'decade') return d.toLocaleDateString(loc, {year: 'numeric'});
+    return d.toLocaleDateString(loc, {month: 'short', year: 'numeric'});
+  }
+
+  // Anteile (gestapelt auf 100 %) oder Wechsel (Beginne je Zustand) je Bucket,
+  // ein eigenes Diagramm je Zustands-Entität untereinander: Zustandsindizes und
+  // Farben gelten nur innerhalb einer Entität, ein gemeinsamer Stapel wäre
+  // sinnlos. rows: [{name, states, buckets}]. Gibt eine vollständige
+  // ECharts-Option zurück (ohne toolbox); Chart-Editor und Dashboard-Kachel
+  // zeichnen damit dasselbe. Die Entitätsseite hat ihre eigene Fassung mit
+  // Klick-Drilldown und ausblendbaren Zuständen.
+  function barPanels(rows, {mode, range, windowStart, periodEnd}) {
+    const shares = mode === 'shares';
+    const css = getComputedStyle(document.body);
+    const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
+    const muted = css.getPropertyValue('--ink-muted').trim();
+    const lineColor = css.getPropertyValue('--border').trim();
+    const starts = bucketStarts(range, windowStart, periodEnd);
+    const [bucketStart] = RANGE_BUCKETS[range]();
+    const labels = starts.map(ts => bucketLabel(range, ts));
+    const pattern = unavailablePattern();
+    const n = Math.max(rows.length, 1);
+    const slot = 100 / n;
+    const option = {
+      textStyle: {fontFamily: css.getPropertyValue('--font-mono'), color: muted, fontSize: Math.round(12 * scale * 10) / 10},
+      grid: [], xAxis: [], yAxis: [], series: [], title: [],
+    };
+    const panels = rows.map((row, k) => {
+      const byStart = new Map(row.buckets.map(b => [bucketStart(b.ts + 1), b]));
+      const present = new Set(row.buckets.flatMap(b => [...b.states.keys()]));
+      const order = (row.states || []).map(st => st.idx).filter(idx => present.has(idx));
+      for (const idx of present) if (!order.includes(idx)) order.splice(idx === UNAVAILABLE ? order.length : Math.max(order.length - 1, 0), 0, idx);
+      const totalOf = bucket => bucket ? [...bucket.states.values()].reduce((sum, v) => sum + v.seconds, 0) : 0;
+      option.grid.push(n === 1
+        ? {left: 10, right: 20, top: 24, bottom: 40, containLabel: true}
+        : {left: 10, right: 20, top: `${k * slot + 7}%`, height: `${slot - 16}%`, containLabel: true});
+      option.xAxis.push({type: 'category', gridIndex: k, data: labels, axisTick: {alignWithLabel: true}, axisLabel: {hideOverlap: true}});
+      option.yAxis.push(shares
+        ? {type: 'value', gridIndex: k, max: 100, splitNumber: n > 1 ? 2 : 5, axisLabel: {formatter: v => `${v} %`}, splitLine: {lineStyle: {color: lineColor}}}
+        : {type: 'value', gridIndex: k, minInterval: 1, splitNumber: n > 1 ? 2 : 5, splitLine: {lineStyle: {color: lineColor}}});
+      if (n > 1) option.title.push({text: row.name, left: 10, top: `${k * slot + 1}%`, textStyle: {color: muted, fontSize: Math.round(12 * scale * 10) / 10, fontWeight: 'normal'}});
+      for (const idx of order) {
+        option.series.push({
+          id: `${k}:${idx}`, name: label(row.states, idx), type: 'bar', stack: `s${k}`, barCategoryGap: '20%',
+          xAxisIndex: k, yAxisIndex: k,
+          itemStyle: {color: fill(idx, pattern)}, emphasis: {focus: 'none'},
+          data: starts.map(ts => {
+            const bucket = byStart.get(ts);
+            const v = bucket && bucket.states.get(idx);
+            if (!v) return null;
+            if (!shares) return v.entries || null;
+            const total = totalOf(bucket);
+            return total > 0 && v.seconds > 0 ? v.seconds / total * 100 : null;
+          }),
+        });
+      }
+      return {row, byStart, order, totalOf};
+    });
+    option.tooltip = {
+      trigger: 'axis', axisPointer: {type: 'shadow'}, appendToBody: true,
+      formatter: items => {
+        if (!items.length) return '';
+        const k = parseInt(String(items[0].seriesId).split(':')[0], 10);
+        const panel = panels[k];
+        const ts = starts[items[0].dataIndex];
+        const head = `${n > 1 ? `${escapeHtml(panel.row.name)} · ` : ''}${escapeHtml(bucketLabel(range, ts))}`;
+        const bucket = panel.byStart.get(ts);
+        if (!bucket) return head;
+        const total = panel.totalOf(bucket);
+        const lines = panel.order.filter(idx => bucket.states.has(idx)).map(idx => {
+          const v = bucket.states.get(idx);
+          const value = shares
+            ? `${NumberFormat.fmtDuration(v.seconds)} · ${fmtShare(total ? v.seconds / total * 100 : 0)}`
+            : (v.entries === 1 ? t('1 Beginn') : t('{count} Beginne', {count: v.entries.toLocaleString(window.ZA_FORMAT)}));
+          return `<span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:2px;${swatchStyle(idx)}"></span> ${escapeHtml(label(panel.row.states, idx))} <strong>${value}</strong>`;
+        });
+        return `${head}<br>${lines.join('<br>')}`;
+      },
+    };
+    return option;
+  }
+
   function fmtShare(share) {
     const digits = share < 1 ? 1 : 0;
     return `${share.toLocaleString(window.ZA_FORMAT, {minimumFractionDigits: digits, maximumFractionDigits: digits})} %`;
@@ -193,7 +290,7 @@ window.StateEntities = (() => {
 
   return {
     UNAVAILABLE, color, swatchStyle, unavailablePattern, fill, label, raw,
-    segments, bucketsFromSegments, bucketsFromShares, bucketFns, totals, fmtShare,
+    segments, bucketsFromSegments, bucketsFromShares, bucketsForSeries, barPanels, bucketFns, totals, fmtShare,
     RANGE_BUCKETS, SERVER_SHARE_RANGES, bucketStarts,
   };
 })();
