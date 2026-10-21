@@ -151,6 +151,7 @@ from .housekeeping_routes import (
 from .backup_external_routes import BackupExternalDependencies, create_backup_external_router
 from .restore_routes import RestoreDependencies, create_restore_router
 from .export_routes import ExportDependencies, create_export_router
+from .entity_delete_routes import EntityDeleteDependencies, create_entity_delete_router
 from .marked_values_routes import MarkedValuesDependencies, create_marked_values_router
 from .report_routes import ReportDependencies, ReportService
 from .energiedashboard_routes import (
@@ -3061,99 +3062,9 @@ def entity_delete(entity_id: str) -> dict:
     return {"ok": True}
 
 
-@_storage_locked(lambda args: args["entity_ids"])
-def _delete_entities_locked(entity_ids: list[str]) -> dict:
-    deleted: list[str] = []
-    missing: list[str] = []
-    failed: list[dict] = []
-    for entity_id in entity_ids:
-        try:
-            if index.get_entity(entity_id) is None:
-                missing.append(entity_id)
-                continue
-            entity_removal.delete_entity(DATA_DIR, index, entity_id)
-            deleted.append(entity_id)
-        except Exception as exc:  # eine fehlerhafte Entität bricht die übrigen nicht ab
-            logger.exception("Entität %s konnte nicht gelöscht werden", entity_id)
-            failed.append({"entity_id": entity_id, "error": str(exc)})
-    if deleted:
-        _background.invalidate_retention_overview()
-    return {"deleted": deleted, "missing": missing, "failed": failed}
-
-
-@app.post("/entities/delete-selected")
-async def entities_delete_selected(request: Request) -> dict:
-    """Löscht mehrere Entitäten endgültig (Auswahl in der Entitäten-Übersicht)."""
-    entity_ids = list(dict.fromkeys(
-        str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"
-    ))
-    if not entity_ids:
-        raise HTTPException(status_code=400, detail=tr("Keine Entität gewählt"))
-    # Ungültige IDs vorab aussortieren: die Sperre prüft das Format und würde sonst die ganze Anfrage abbrechen.
-    valid: list[str] = []
-    invalid: list[dict] = []
-    for entity_id in entity_ids:
-        try:
-            validate_entity_id(entity_id)
-            valid.append(entity_id)
-        except ValueError as exc:
-            invalid.append({"entity_id": entity_id, "error": str(exc)})
-    result = await run_in_threadpool(_delete_entities_locked, valid) if valid else {"deleted": [], "missing": [], "failed": []}
-    result["failed"] = invalid + result["failed"]
-    return result
-
-
-@app.post("/entities/usage-check")
-async def entities_usage_check(request: Request) -> dict:
-    """Prüft vor dem Löschen, wo die gewählten Entitäten noch verwendet werden (nur lesend)."""
-    entity_ids = [str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"]
-    usages = await run_in_threadpool(entity_usage.find_usages, index, entity_ids)
-    return {"usages": usages, "summary": entity_usage.summarize(usages)}
-
-
-_BACKUP_FINAL_STATES = ("success", "failed", "interrupted", "skipped")
-
-
-@app.get("/entities/backup-status")
-def entities_backup_status(job_id: int | None = None) -> dict:
-    """Stand des Backups für den Löschdialog: Alter des letzten erfolgreichen Laufs und, mit
-    ``job_id``, Fortschritt und Ergebnis genau dieses Laufs."""
-    with _background.backup_progress.lock:
-        running = _background.backup_progress.running
-        done = _background.backup_progress.done
-        total = _background.backup_progress.total
-    last = index.get_last_successful_backup_job()
-    last_ts = last["finished_at"] if last is not None else None
-    result: dict = {
-        "running": running,
-        "percent": int(done / total * 100) if total else 0,
-        "last_success_ts": last_ts,
-        "last_success_text": (
-            f"{format_timestamp(last_ts, TZ)} {format_time(last_ts, TZ)} "
-            f"({tr('vor {format_uptime}', format_uptime=format_uptime(time.time() - last_ts))})"
-            if last_ts else None
-        ),
-        "job": None,
-    }
-    if job_id is not None:
-        for job in index.list_backup_jobs(20):
-            if job["id"] == job_id:
-                result["job"] = {
-                    "status": job["status"], "final": job["status"] in _BACKUP_FINAL_STATES,
-                    "error": job["error"],
-                }
-                break
-    return result
-
-
-@app.post("/entities/backup-start")
-def entities_backup_start() -> dict:
-    """Startet ein Backup vor dem Löschen (oder hängt sich an ein bereits laufendes). Die
-    ``job_id`` gehört dem Lauf, auf dessen Ende der Dialog dann wartet."""
-    _background.run_backup()
-    with _background.backup_progress.lock:
-        job_id = _background.backup_progress.job_id
-    return {"job_id": job_id}
+app.include_router(create_entity_delete_router(EntityDeleteDependencies(
+    index=index, data_dir=DATA_DIR, tz=TZ, coordinator=storage_coordinator, background=_background,
+)))
 
 
 @app.get("/entities/{entity_id}/migrate", response_class=HTMLResponse)

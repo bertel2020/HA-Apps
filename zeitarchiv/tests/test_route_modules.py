@@ -131,6 +131,10 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     # Einheit und gehören in ein eigenes entity_delete_routes.py nach dem Muster der übrigen
     # *_routes.py (Abhängigkeiten: _storage_locked, _background, index). Wer diese Schwelle als
     # Nächstes reißt, schneidet dort, statt die Zahl zu erhöhen.
+    # Am 21. Oktober 2026 so geschehen: Die Zeitraum-Navigation der Dashboards hätte main.py auf
+    # 5.823 Zeilen gebracht, der Löschblock steht jetzt in entity_delete_routes.py (5.734). Die
+    # Schwelle bleibt; der nächste benannte Kandidat sind die Kontext-Bauer der Dashboards
+    # (_dashboard_tiles_context() und Verwandte).
     assert len(main.splitlines()) < 5_810
 
 
