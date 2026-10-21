@@ -825,6 +825,7 @@
     "Tabelle": "Table",
     "Laufsumme": "Running total",
     "Ein": "On",
+    "An": "On",
     "Soll Entität": "Target entity",
     "Aktuell <strong x-text=\"stat.last\"></strong>": "Current <strong x-text=\"stat.last\"></strong>",
     "Min <strong x-text=\"stat.min\"></strong>": "Min <strong x-text=\"stat.min\"></strong>",

@@ -103,7 +103,8 @@
      die gewählten Kästchen bleiben im Formular und werden dann ignoriert. */
   .ki-privacy{margin:6px 0 18px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-alt);}
   .ki-scope .ki-entity-list{margin:8px 0 0;}
-  .ki-scope:has(input[name="scope"][value="all"]:checked) .ki-entity-list{display:none;}
+  .ki-scope:has(input[name="scope"][value="all"]) .ki-entity-list{display:none;}
+  .ki-tool-chips{display:flex;flex-wrap:wrap;gap:6px;}
   .ki-entity-list .search{width:100%;box-sizing:border-box;margin-bottom:6px;}
   .ki-entity-rows{max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
   .ki-entity-row{display:flex;gap:10px;align-items:center;padding:6px 10px;min-width:0;cursor:pointer;}

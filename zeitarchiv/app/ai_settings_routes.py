@@ -72,6 +72,11 @@ def make_router(get_index: Callable[[], Index], templates: Jinja2Templates, tz: 
         return {
             "ai_access": access,
             "ai_scopes": ai_settings.SCOPES,
+            "ai_scope_options": [
+                ("all", tr("Alle")),
+                ("exclude", tr("Alle außer den gewählten")),
+                ("include", tr("Nur die gewählten")),
+            ],
             "ai_saved": saved,
             "ai_entities": [
                 {

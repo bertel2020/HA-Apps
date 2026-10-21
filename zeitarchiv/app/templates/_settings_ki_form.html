@@ -2,29 +2,49 @@
    geladen und speichert über denselben Weg zurück (settings/ai). Die Entitäten-Liste
    ist bewusst eine einfache Kästchenliste mit Filterfeld und kein Picker mit
    Suchtreffern: Hier wird nur ausgewählt, was NICHT oder NUR sichtbar sein soll. #}
-<form id="ki-settings-form" hx-post="settings/ai" hx-target="#ki-form" hx-swap="innerHTML">
-  <label style="display:block;margin:0 0 6px;">
-    <input type="checkbox" name="enabled" value="1" {% if ai_access.enabled %}checked{% endif %}>
-    <strong>{{ _("KI-Zugriff erlauben") }}</strong>
-    <span class="hint" style="display:block;margin:2px 0 0 22px;">{{ _("Aus ist der Standard. Angeschlossene KI-Dienste können dann nur lesen, nie schalten oder ändern.") }}</span>
-  </label>
-  <p class="hint ki-privacy">{{ _("Mit dem Einschalten können Dienste wie Anthropic (Claude) oder OpenAI (ChatGPT) Daten aus deinem Archiv abrufen: die Antworten auf konkrete Fragen, nicht das ganze Archiv. Die Freigabe „Für Assist freigeben“ von Home Assistant gilt hier nicht; maßgeblich ist die Auswahl unten.") }}</p>
+{% from "_hints.html" import hint_button, hint_body %}
+{# Speichert wie die übrigen Bereiche bei jeder Änderung. Die Antwort ist das ganze
+   Formular; hx-select nimmt nur die Statuszeile heraus, damit weder Textfeld noch
+   Filter noch Scrollposition der Liste zurückgesetzt werden. #}
+<form id="ki-settings-form" hx-post="settings/ai" hx-trigger="change" hx-target="#ki-save-status"
+      hx-select="#ki-save-status" hx-swap="outerHTML">
+  <div class="settings-compact-list">
+    <div class="settings-compact-row">
+      <div class="settings-compact-row-text">
+        <div class="settings-compact-label">{{ _("KI-Zugriff erlauben") }} {{ hint_button(_('KI-Zugriff erlauben')) }}</div>
+        {% call hint_body('settings-compact-hint') %}{{ _("Aus ist der Standard. Angeschlossene KI-Dienste können dann nur lesen, nie schalten oder ändern.") }}{% endcall %}
+      </div>
+      <span class="dd-picker-wrap">
+        <button type="button" class="btn btn-sm" id="ki-enabled-btn" onclick="toggleDDPicker('ki-enabled')">{{ _("An") if ai_access.enabled else _("Aus") }} ▾</button>
+        <input type="hidden" name="enabled" id="ki-enabled-input" value="{{ '1' if ai_access.enabled else '0' }}">
+        <div class="dd-picker-popover" id="ki-enabled-popover">
+          <div class="dd-picker-row" onclick="selectDDOption('ki-enabled', '1', '{{ _('An') }}')">{{ _("An") }}</div>
+          <div class="dd-picker-row" onclick="selectDDOption('ki-enabled', '0', '{{ _('Aus') }}')">{{ _("Aus") }}</div>
+        </div>
+      </span>
+    </div>
+  </div>
+  <p class="hint hint-warn ki-privacy">{{ _("Mit dem Einschalten können Dienste wie Anthropic (Claude) oder OpenAI (ChatGPT) Daten aus deinem Archiv abrufen: die Antworten auf konkrete Fragen, nicht das ganze Archiv. Die Freigabe „Für Assist freigeben“ von Home Assistant gilt hier nicht; maßgeblich ist die Auswahl unten.") }}</p>
 
   <div class="settings-subsection ki-scope">
-    <h3 class="settings-subsection-title">{{ _("Freigegebene Entitäten") }}</h3>
-    <p class="hint">{{ _("Gesperrte Entitäten sind für die KI nicht vorhanden, auch nicht in der Suche.") }}</p>
-    <label style="display:block;margin:0 0 8px;">
-      <input type="radio" name="scope" value="all" {% if ai_access.scope == 'all' %}checked{% endif %}>
-      {{ _("Alle") }}
-    </label>
-    <label style="display:block;margin:0 0 8px;">
-      <input type="radio" name="scope" value="exclude" {% if ai_access.scope == 'exclude' %}checked{% endif %}>
-      {{ _("Alle außer den gewählten") }}
-    </label>
-    <label style="display:block;margin:0 0 8px;">
-      <input type="radio" name="scope" value="include" {% if ai_access.scope == 'include' %}checked{% endif %}>
-      {{ _("Nur die gewählten") }}
-    </label>
+    <h3 class="settings-subsection-title">{{ _("Freigegebene Entitäten") }} {{ hint_button(_('Freigegebene Entitäten')) }}</h3>
+    {% call hint_body() %}{{ _("Gesperrte Entitäten sind für die KI nicht vorhanden, auch nicht in der Suche.") }}{% endcall %}
+    <div class="settings-compact-list">
+      <div class="settings-compact-row">
+        <div class="settings-compact-row-text">
+          <div class="settings-compact-label">{{ _("Umfang") }}</div>
+        </div>
+        <span class="dd-picker-wrap">
+          <button type="button" class="btn btn-sm" id="ki-scope-btn" onclick="toggleDDPicker('ki-scope')">{% for k, l in ai_scope_options %}{% if k == ai_access.scope %}{{ l }}{% endif %}{% endfor %} ▾</button>
+          <input type="hidden" name="scope" id="ki-scope-input" value="{{ ai_access.scope }}">
+          <div class="dd-picker-popover" id="ki-scope-popover">
+            {% for key, label in ai_scope_options %}
+            <div class="dd-picker-row" onclick="selectDDOption('ki-scope', '{{ key }}', '{{ label }}')">{{ label }}</div>
+            {% endfor %}
+          </div>
+        </span>
+      </div>
+    </div>
 
     <div class="ki-entity-list">
       <input type="search" class="search" autocomplete="off" placeholder="{{ _('Entitäten filtern …') }}"
@@ -46,41 +66,51 @@
       </div>
     </div>
 
-    <label style="display:block;margin:14px 0 0;">
-      <input type="checkbox" name="exclude_presence" value="1" {% if ai_access.exclude_presence %}checked{% endif %}>
-      {{ _("Anwesenheit ausschließen") }}
-      <span class="hint" style="display:block;margin:2px 0 0 22px;">{{ _("Personen und Geräte-Tracker bleiben für die KI unsichtbar. Verbrauchsverläufe in Stundenauflösung können trotzdem verraten, wann jemand zu Hause ist; wer das nicht möchte, schränkt die Entitäten oben ein.") }}</span>
-    </label>
+    <div class="settings-compact-list">
+      <div class="settings-compact-row">
+        <div class="settings-compact-row-text">
+          <div class="settings-compact-label">{{ _("Anwesenheit ausschließen") }} {{ hint_button(_('Anwesenheit ausschließen')) }}</div>
+          {% call hint_body('settings-compact-hint') %}{{ _("Personen und Geräte-Tracker bleiben für die KI unsichtbar. Verbrauchsverläufe in Stundenauflösung können trotzdem verraten, wann jemand zu Hause ist; wer das nicht möchte, schränkt die Entitäten oben ein.") }}{% endcall %}
+        </div>
+        <span class="dd-picker-wrap">
+          <button type="button" class="btn btn-sm" id="ki-presence-btn" onclick="toggleDDPicker('ki-presence')">{{ _("An") if ai_access.exclude_presence else _("Aus") }} ▾</button>
+          <input type="hidden" name="exclude_presence" id="ki-presence-input" value="{{ '1' if ai_access.exclude_presence else '0' }}">
+          <div class="dd-picker-popover" id="ki-presence-popover">
+            <div class="dd-picker-row" onclick="selectDDOption('ki-presence', '1', '{{ _('An') }}')">{{ _("An") }}</div>
+            <div class="dd-picker-row" onclick="selectDDOption('ki-presence', '0', '{{ _('Aus') }}')">{{ _("Aus") }}</div>
+          </div>
+        </span>
+      </div>
+    </div>
   </div>
 
   <div class="settings-subsection ki-tools">
-    <h3 class="settings-subsection-title">{{ _("Werkzeuge") }}</h3>
-    <p class="hint">{{ _("Abgeschaltete Werkzeuge stehen der KI nicht zur Verfügung. Die Energiebilanz gibt es nur, wenn das Energiedashboard eingerichtet ist.") }}</p>
-    {% for tool in ai_tools %}
-    <label style="display:block;margin:0 0 6px;">
-      <input type="checkbox" name="tool" value="{{ tool.name }}" {% if tool.enabled %}checked{% endif %}>
-      {{ tool.title }}
-    </label>
-    {% endfor %}
+    <h3 class="settings-subsection-title">{{ _("Werkzeuge") }} {{ hint_button(_('Werkzeuge')) }}</h3>
+    {% call hint_body() %}{{ _("Abgeschaltete Werkzeuge stehen der KI nicht zur Verfügung. Die Energiebilanz gibt es nur, wenn das Energiedashboard eingerichtet ist.") }}{% endcall %}
+    <div class="ki-tool-chips">
+      {% for tool in ai_tools %}
+      <label class="filter-chip">
+        <input type="checkbox" name="tool" value="{{ tool.name }}" {% if tool.enabled %}checked{% endif %}>
+        <span>{{ tool.title }}</span>
+      </label>
+      {% endfor %}
+    </div>
   </div>
 
   <div class="settings-subsection ki-notes">
-    <h3 class="settings-subsection-title">{{ _("Hinweise für das Modell") }}</h3>
-    <p class="hint">{{ _("Optional, zum Beispiel Strompreis, Geräte oder Besonderheiten deines Hauses. Der Text geht an die KI mit, jedes Mal wenn sie das Archiv durchsucht.") }}</p>
+    <h3 class="settings-subsection-title">{{ _("Hinweise für das Modell") }} {{ hint_button(_('Hinweise für das Modell')) }}</h3>
+    {% call hint_body() %}{{ _("Optional, zum Beispiel Strompreis, Geräte oder Besonderheiten deines Hauses. Der Text geht an die KI mit, jedes Mal wenn sie das Archiv durchsucht.") }}{% endcall %}
     <textarea name="instructions" rows="4" maxlength="{{ ai_instructions_max }}" class="ki-notes-input"
               placeholder="{{ _('z. B. Die Wärmepumpe heißt „WP“. Der Zähler im Keller ist der Hauptzähler.') }}">{{ ai_access.instructions }}</textarea>
-    <p class="hint">{{ _("Höchstens {max} Zeichen.", max=ai_instructions_max) }}</p>
+    <p class="hint hint-status">{{ _("Höchstens {max} Zeichen.", max=ai_instructions_max) }}</p>
   </div>
 
-  <div class="toolbar" style="margin:16px 0 0;justify-content:flex-end;">
-    {% if ai_saved %}<span class="save-status">{{ _("✓ Gespeichert") }}</span>{% endif %}
-    <button type="submit" class="btn btn-primary">{{ _("Speichern") }}</button>
-  </div>
+  {% if ai_saved %}<p class="save-status" id="ki-save-status">{{ _("✓ Gespeichert") }}</p>{% else %}<p class="save-status" id="ki-save-status" hidden></p>{% endif %}
 </form>
 
 <div class="settings-subsection ki-usage">
-  <h3 class="settings-subsection-title">{{ _("Nutzung") }}</h3>
-  <p class="hint">{{ _("Nur zur Information, seit dem Start der App. Es wird nichts gesperrt.") }}</p>
+  <h3 class="settings-subsection-title">{{ _("Nutzung") }} {{ hint_button(_('Nutzung')) }}</h3>
+  {% call hint_body() %}{{ _("Nur zur Information, seit dem Start der App. Es wird nichts gesperrt.") }}{% endcall %}
   <div class="settings-compact-list">
     <div class="settings-compact-row">
       <span class="settings-compact-label">{{ _("Zuletzt genutzt") }}</span>
@@ -114,15 +144,15 @@
     {% endif %}
   </div>
   {% if ai_usage.admin %}
-  <p class="hint">{{ _("Zugriffe mit Administratorkonto sind normal, wenn die Adresse mit der API-ID verwendet wird: Der Client sieht dann nur die Zeitarchiv-Werkzeuge. Verwende nicht die allgemeine Adresse /api/mcp mit den Voreinstellungen.") }}</p>
+  <p class="hint hint-status">{{ _("Zugriffe mit Administratorkonto sind normal, wenn die Adresse mit der API-ID verwendet wird: Der Client sieht dann nur die Zeitarchiv-Werkzeuge. Verwende nicht die allgemeine Adresse /api/mcp mit den Voreinstellungen.") }}</p>
   {% endif %}
 </div>
 
 <div class="settings-subsection ki-help">
-  <h3 class="settings-subsection-title">{{ _("Einrichtung") }}</h3>
-  <p class="hint">{{ _("Zeitarchiv wird über Home Assistants „Model Context Protocol Server“ angeboten. Claude, ChatGPT und andere Clients verbinden sich mit diesem. Dafür muss Home Assistant von außen über HTTPS erreichbar sein (zum Beispiel über Nabu Casa); Claude Code und lokale Modelle kommen auch ohne aus.") }}</p>
+  <h3 class="settings-subsection-title">{{ _("Einrichtung") }} {{ hint_button(_('Einrichtung')) }}</h3>
+  {% call hint_body() %}{{ _("Zeitarchiv wird über Home Assistants „Model Context Protocol Server“ angeboten. Claude, ChatGPT und andere Clients verbinden sich mit diesem. Dafür muss Home Assistant von außen über HTTPS erreichbar sein (zum Beispiel über Nabu Casa); Claude Code und lokale Modelle kommen auch ohne aus.") }}{% endcall %}
   {% if not ai_api_ids %}
-  <p class="hint">{{ _("Die Integration hat sich noch nicht gemeldet. Sie braucht eine Version mit KI-Zugriff und muss nach dem Einschalten neu laden.") }}</p>
+  <p class="hint hint-status">{{ _("Die Integration hat sich noch nicht gemeldet. Sie braucht eine Version mit KI-Zugriff und muss nach dem Einschalten neu laden.") }}</p>
   {% endif %}
   <ol class="ki-steps">
     <li>{{ _("In Home Assistant die Integration „Model Context Protocol Server“ hinzufügen und die Voreinstellungen lassen.") }}</li>
@@ -135,11 +165,11 @@
     </li>
     <li>{{ _("Bei der Anmeldung mit dem eigenen Home-Assistant-Konto anmelden. Mit dieser Adresse sieht der Client nur die Zeitarchiv-Werkzeuge, nicht die Steuerung von Home Assistant.") }}</li>
   </ol>
-  <p class="hint"><strong>{{ _("Nicht empfohlen:") }}</strong> {{ _("die allgemeine Adresse /api/mcp mit den Voreinstellungen. Dann ist auch die Steuerung (Assist) dabei, und das Modell kann Geräte schalten.") }}</p>
-  <p class="hint">{{ _("Zugriff beenden: oben ausschalten und im Home-Assistant-Profil unter „Sicherheit“ den Zugriffstoken widerrufen. Dieser Token kann mehr, als der Client über MCP sieht.") }}</p>
+  <p class="hint hint-warn"><strong>{{ _("Nicht empfohlen:") }}</strong> {{ _("die allgemeine Adresse /api/mcp mit den Voreinstellungen. Dann ist auch die Steuerung (Assist) dabei, und das Modell kann Geräte schalten.") }}</p>
+  <p class="hint hint-warn">{{ _("Zugriff beenden: oben ausschalten und im Home-Assistant-Profil unter „Sicherheit“ den Zugriffstoken widerrufen. Dieser Token kann mehr, als der Client über MCP sieht.") }}</p>
 
-  <h4 class="ki-subhead">{{ _("Text zum Kopieren") }}</h4>
-  <p class="hint">{{ _("Optional, für die Projekt-Anweisung in Claude oder die eigenen Anweisungen in ChatGPT. Hilft, wenn neben Zeitarchiv auch die Werkzeuge von Home Assistant aktiv sind.") }}</p>
+  <h4 class="ki-subhead">{{ _("Text zum Kopieren") }} {{ hint_button(_('Text zum Kopieren')) }}</h4>
+  {% call hint_body() %}{{ _("Optional, für die Projekt-Anweisung in Claude oder die eigenen Anweisungen in ChatGPT. Hilft, wenn neben Zeitarchiv auch die Werkzeuge von Home Assistant aktiv sind.") }}{% endcall %}
   <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;">
     <code class="ki-copy-text" id="ki-instruction" style="flex:1;min-width:200px;">{{ ai_instruction }}</code>
     <button type="button" class="btn" onclick="copyKiInstruction(this)" data-done="{{ _('In Zwischenablage kopiert.') }}">{{ _("Kopieren") }}</button>
