@@ -26,7 +26,7 @@
   </div>
   <p class="hint hint-warn ki-privacy">{{ _("Mit dem Einschalten können Dienste wie Anthropic (Claude) oder OpenAI (ChatGPT) Daten aus deinem Archiv abrufen: die Antworten auf konkrete Fragen, nicht das ganze Archiv. Die Freigabe „Für Assist freigeben“ von Home Assistant gilt hier nicht; maßgeblich ist die Auswahl unten.") }}</p>
 
-  <div class="settings-subsection ki-scope">
+  <div class="settings-subsection ki-scope ki-dependent">
     <h3 class="settings-subsection-title">{{ _("Freigegebene Entitäten") }} {{ hint_button(_('Freigegebene Entitäten')) }}</h3>
     {% call hint_body() %}{{ _("Gesperrte Entitäten sind für die KI nicht vorhanden, auch nicht in der Suche.") }}{% endcall %}
     <div class="settings-compact-list">
@@ -84,7 +84,7 @@
     </div>
   </div>
 
-  <div class="settings-subsection ki-tools">
+  <div class="settings-subsection ki-tools ki-dependent">
     <h3 class="settings-subsection-title">{{ _("Werkzeuge") }} {{ hint_button(_('Werkzeuge')) }}</h3>
     {% call hint_body() %}{{ _("Abgeschaltete Werkzeuge stehen der KI nicht zur Verfügung. Die Energiebilanz gibt es nur, wenn das Energiedashboard eingerichtet ist.") }}{% endcall %}
     <div class="ki-tool-chips">
@@ -97,7 +97,7 @@
     </div>
   </div>
 
-  <div class="settings-subsection ki-notes">
+  <div class="settings-subsection ki-notes ki-dependent">
     <h3 class="settings-subsection-title">{{ _("Hinweise für das Modell") }} {{ hint_button(_('Hinweise für das Modell')) }}</h3>
     {% call hint_body() %}{{ _("Optional, zum Beispiel Strompreis, Geräte oder Besonderheiten deines Hauses. Der Text geht an die KI mit, jedes Mal wenn sie das Archiv durchsucht.") }}{% endcall %}
     <textarea name="instructions" rows="4" maxlength="{{ ai_instructions_max }}" class="ki-notes-input"
@@ -108,7 +108,7 @@
   {% if ai_saved %}<p class="save-status" id="ki-save-status">{{ _("✓ Gespeichert") }}</p>{% else %}<p class="save-status" id="ki-save-status" hidden></p>{% endif %}
 </form>
 
-<div class="settings-subsection ki-usage">
+<div class="settings-subsection ki-usage ki-dependent">
   <h3 class="settings-subsection-title">{{ _("Nutzung") }} {{ hint_button(_('Nutzung')) }}</h3>
   {% call hint_body() %}{{ _("Nur zur Information, seit dem Start der App. Es wird nichts gesperrt.") }}{% endcall %}
   <div class="settings-compact-list">
@@ -148,7 +148,7 @@
   {% endif %}
 </div>
 
-<div class="settings-subsection ki-help">
+<div class="settings-subsection ki-help ki-dependent">
   <h3 class="settings-subsection-title">{{ _("Einrichtung") }} {{ hint_button(_('Einrichtung')) }}</h3>
   {% call hint_body() %}{{ _("Zeitarchiv wird über Home Assistants „Model Context Protocol Server“ angeboten. Claude, ChatGPT und andere Clients verbinden sich mit diesem. Dafür muss Home Assistant von außen über HTTPS erreichbar sein (zum Beispiel über Nabu Casa); Claude Code und lokale Modelle kommen auch ohne aus.") }}{% endcall %}
   {% if not ai_api_ids %}

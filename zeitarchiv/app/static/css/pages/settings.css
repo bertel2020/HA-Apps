@@ -104,6 +104,10 @@
   .ki-privacy{margin:6px 0 18px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-alt);}
   .ki-scope .ki-entity-list{margin:8px 0 0;}
   .ki-scope:has(input[name="scope"][value="all"]) .ki-entity-list{display:none;}
+  /* Bei "KI-Zugriff erlauben = Aus" bleibt nur der Schalter samt Datenschutzhinweis stehen;
+     alles darunter betrifft nur den eingeschalteten Zugriff. Wie beim Umfang per :has() am
+     verdeckten Feld, damit es ohne Neuladen mitgeht. Die Auswahl bleibt im Formular. */
+  #ki-form:has(#ki-enabled-input[value="0"]) .ki-dependent{display:none;}
   .ki-tool-chips{display:flex;flex-wrap:wrap;gap:6px;}
   .ki-entity-list .search{width:100%;box-sizing:border-box;margin-bottom:6px;}
   .ki-entity-rows{max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
