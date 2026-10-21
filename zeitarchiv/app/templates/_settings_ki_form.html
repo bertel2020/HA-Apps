@@ -170,8 +170,8 @@
 
   <h4 class="ki-subhead">{{ _("Text zum Kopieren") }} {{ hint_button(_('Text zum Kopieren')) }}</h4>
   {% call hint_body() %}{{ _("Optional, für die Projekt-Anweisung in Claude oder die eigenen Anweisungen in ChatGPT. Hilft, wenn neben Zeitarchiv auch die Werkzeuge von Home Assistant aktiv sind.") }}{% endcall %}
-  <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;">
-    <code class="ki-copy-text" id="ki-instruction" style="flex:1;min-width:200px;">{{ ai_instruction }}</code>
+  <div class="ki-copy-row">
+    <code class="ki-copy-text" id="ki-instruction">{{ ai_instruction }}</code>
     <button type="button" class="btn" onclick="copyKiInstruction(this)" data-done="{{ _('In Zwischenablage kopiert.') }}">{{ _("Kopieren") }}</button>
   </div>
 

@@ -101,7 +101,13 @@
   /* Bereich "KI-Zugriff": Die Entitäten-Liste ist nur bei "Alle außer …" und
      "Nur die gewählten" relevant. :has() blendet sie bei "Alle" aus, ohne Skript;
      die gewählten Kästchen bleiben im Formular und werden dann ignoriert. */
-  .ki-privacy{margin:6px 0 18px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-alt);}
+  .ki-privacy{margin:8px 0 20px;}
+  /* Der Formularkopf endet vor "Nutzung"; wie bei #storage-index-form trennt die Linie
+     deshalb erst hier, und die Zeile "Anwesenheit" rückt von der Liste ab. */
+  #ki-settings-form + .settings-subsection{margin-top:24px;padding-top:20px;border-top:1px solid var(--border);}
+  .ki-scope .ki-entity-list + .settings-compact-list{margin-top:14px;}
+  .ki-copy-row{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;}
+  .ki-copy-row .ki-copy-text{flex:1;min-width:200px;}
   .ki-scope .ki-entity-list{margin:8px 0 0;}
   .ki-scope:has(input[name="scope"][value="all"]) .ki-entity-list{display:none;}
   /* Bei "KI-Zugriff erlauben = Aus" bleibt nur der Schalter samt Datenschutzhinweis stehen;
@@ -118,8 +124,8 @@
   .ki-entity-row .name,.ki-entity-row .id{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .ki-entity-row .id{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale,1));color:var(--ink-faint);}
   .ki-entity-unit{flex:none;color:var(--ink-muted);font-size:calc(12px * var(--font-scale,1));}
-  .ki-steps{margin:8px 0;padding-left:22px;line-height:1.6;}
+  .ki-steps{margin:8px 0;padding-left:22px;line-height:1.6;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
   .ki-url,.ki-copy-text{display:block;margin:4px 0;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);font-family:var(--font-mono);font-size:calc(12px * var(--font-scale,1));overflow-wrap:anywhere;}
   .ki-subhead{margin:18px 0 4px;font-size:calc(13.5px * var(--font-scale,1));}
-  .ki-questions{margin:6px 0 0;padding-left:22px;line-height:1.6;}
+  .ki-questions{margin:6px 0 0;padding-left:22px;line-height:1.6;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
   .ki-notes-input{width:100%;box-sizing:border-box;font:inherit;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--ink);resize:vertical;}
