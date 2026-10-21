@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Neu
+
+- Lichter, Ventilatoren, Automationen, Skripte, Fernbedienungen, Sirenen,
+  Luftbefeuchter, Updates und Kalender werden jetzt wie Schalter archiviert
+  (an/aus) – mit Zeitstrahl und Einschaltdauer. Bisher kamen sie gar nicht in
+  der App an. Das gilt auch für den Import aus dem Home-Assistant-Verlauf; für
+  die Live-Übertragung braucht es zusätzlich die passende Integration.
+
 ### Behoben
 
 - Auswahlmenüs, deren Knopf weit links steht (z. B. „Lücken-Erkennung“ in der
@@ -11,6 +19,14 @@
 ---
 
 ### English
+
+#### New
+
+- Lights, fans, automations, scripts, remotes, sirens, humidifiers, updates
+  and calendars are now archived like switches (on/off) – with timeline and
+  on-time. Previously they never reached the app. This also applies to the
+  import from the Home Assistant history; live transfer additionally needs the
+  matching integration.
 
 #### Fixed
 

@@ -52,7 +52,20 @@ logger = logging.getLogger(__name__)
 # Dieselben Domain-/Zustands-Regeln wie custom_components/zeitarchiv/const.py
 # — von dort nicht importierbar, weil das Addon in einem eigenen Python-Prozess
 # ohne Home-Assistant-Paket läuft.
-SWITCH_DOMAINS = {"binary_sensor", "switch", "input_boolean"}
+SWITCH_DOMAINS = {
+    "binary_sensor",
+    "switch",
+    "input_boolean",
+    "light",
+    "fan",
+    "automation",
+    "script",
+    "remote",
+    "siren",
+    "humidifier",
+    "update",
+    "calendar",
+}
 # Anwesenheits-Domains: eigenes State-Vokabular ("home"/"not_home"/Zonenname
 # statt "on"/"off"), werden aber genauso auf 1/0 abgebildet, siehe _parse_state.
 PRESENCE_DOMAINS = {"device_tracker", "person"}

@@ -22,7 +22,21 @@ from pathlib import Path
 from ..staleness import STALE_MODES
 from .paths import validate_entity_id
 
-SWITCH_DOMAINS = {"binary_sensor", "switch", "input_boolean"}
+# Muss mit custom_components/zeitarchiv/const.py übereinstimmen.
+SWITCH_DOMAINS = {
+    "binary_sensor",
+    "switch",
+    "input_boolean",
+    "light",
+    "fan",
+    "automation",
+    "script",
+    "remote",
+    "siren",
+    "humidifier",
+    "update",
+    "calendar",
+}
 # Anwesenheits-Domains (device_tracker/person) — eigenes State-Vokabular
 # ("home"/"not_home"/Zonenname), werden für den Zeitarchiv-Typ aber wie
 # SWITCH_DOMAINS behandelt, siehe ha_import._parse_state()/events.build_event().

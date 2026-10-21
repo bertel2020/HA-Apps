@@ -19,6 +19,9 @@ def test_parse_state_normalizes_switch_domains_to_one_zero() -> None:
     assert ha_import._parse_state("off", "switch") == 0.0
     assert ha_import._parse_state("ON", "input_boolean") == 1.0
     assert ha_import._parse_state("open", "binary_sensor") is None
+    assert ha_import._parse_state("on", "light") == 1.0
+    assert ha_import._parse_state("off", "automation") == 0.0
+    assert ha_import._parse_state("off", "climate") is None
 
 
 def test_parse_state_normalizes_presence_domains_to_one_zero() -> None:

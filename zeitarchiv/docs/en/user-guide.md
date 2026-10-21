@@ -1427,16 +1427,19 @@ and therefore runs only on click.
 
 ### Display mode
 
-Only for switches (`binary_sensor`, `switch`, `input_boolean`, `device_tracker`, `person`):
+Only for switches (see below for which domains count):
 
 - **ON/OFF (raw value)** shows the state as 0/1.
 - **Time (duration)** instead shows the cumulative on-time per period,
   formatted readably (e.g. `1h 29m`) — useful for presence, door and motion
   sensors.
 
-The domains `binary_sensor`, `switch`, `input_boolean`, `device_tracker` and
-`person` count as switches — for the latter two, `home` counts as "on", any
-other state (`not_home` or a named zone) as "off".
+The domains `binary_sensor`, `switch`, `input_boolean`, `light`, `fan`,
+`automation`, `script`, `remote`, `siren`, `humidifier`, `update` and
+`calendar` (state `on`/`off`) as well as `device_tracker` and `person` count
+as switches — for the last two, `home` counts as "on", any other state
+(`not_home` or a named zone) as "off". For `automation`, "on" means enabled,
+not "currently running"; for `update`, "on" means an update is available.
 
 ### What applies retroactively — and what does not
 

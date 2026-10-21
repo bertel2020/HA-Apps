@@ -1538,7 +1538,7 @@ Bestand der Entität und läuft deshalb nur auf Klick.
 
 ### Anzeigemodus
 
-Nur bei Schaltern (`binary_sensor`, `switch`, `input_boolean`, `device_tracker`, `person`):
+Nur bei Schaltern (siehe unten, welche Domains dazugehören):
 
 - **AN/AUS (Rohwert)** zeigt den Zustand als 0/1.
 - **Zeit (Dauer)** zeigt stattdessen die kumulierte Einschaltdauer je Zeitraum,
@@ -1546,8 +1546,12 @@ Nur bei Schaltern (`binary_sensor`, `switch`, `input_boolean`, `device_tracker`,
   Bewegungssensoren.
 
 Als Schalter gelten die Domains `binary_sensor`, `switch`, `input_boolean`,
-`device_tracker` und `person` — bei Letzteren gilt `home` als „an", jeder
-andere Zustand (`not_home` oder eine benannte Zone) als „aus".
+`light`, `fan`, `automation`, `script`, `remote`, `siren`, `humidifier`,
+`update` und `calendar` (Zustand `on`/`off`) sowie `device_tracker` und
+`person` — bei den letzten beiden gilt `home` als „an", jeder andere Zustand
+(`not_home` oder eine benannte Zone) als „aus". Bei `automation` bedeutet
+„an" aktiviert, nicht „läuft gerade"; bei `update` steht „an" für ein
+verfügbares Update.
 
 ### Was rückwirkend wirkt — und was nicht
 
