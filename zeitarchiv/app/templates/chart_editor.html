@@ -431,7 +431,7 @@
                     <button :class="{active: averageStyle === 'rolling'}" @click="averageStyle = 'rolling'; render()">{{ _("Gleitend") }}</button>
                   </div>
                 </div>
-                <label class="menu-row" x-show="!allState">
+                <label class="menu-row" x-show="!hasState">
                   <span class="menu-row-label">{{ _("Statistik in Legende") }}</span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="chartStats" @change="chartStats = !chartStats; render()">
@@ -566,7 +566,7 @@
           {# Zustands- und Zahlen-Entitäten zusammen sind nicht vorgesehen
              (ROADMAP 1.29) — die Zustände fallen heraus, und das steht hier. #}
           <p class="hint hint-status" x-show="droppedStateIds.length" x-cloak
-             x-text="t('Nicht gezeigt: {names} — Zustands-Entitäten lassen sich nur zusammen mit Schaltern oder anderen Zuständen darstellen.', {names: droppedStateIds.map(id => entityNames[id] || labelFor(id)).join(', ')})"></p>
+             x-text="t('Nicht gezeigt: {names} — Zustands-Entitäten lassen sich nur zusammen mit anderen Zuständen darstellen.', {names: droppedStateIds.map(id => entityNames[id] || labelFor(id)).join(', ')})"></p>
         </div>
         <!-- Ersetzt ECharts' eigene Legende komplett (dort per legend.show:false
              stummgeschaltet, siehe render()) — ein Klick auf einen Chip

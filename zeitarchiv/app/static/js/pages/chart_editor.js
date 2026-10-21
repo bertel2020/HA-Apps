@@ -730,11 +730,11 @@
         // Zustands-Entitäten (ROADMAP 1.29) gibt es nur als Zeitstrahl oder
         // Donut — eine Linie aus Zustandsindizes hätte keine Aussage.
         get hasState() { return this.series.some(s => s.aggregation_type === 'state'); },
-        // Nur Zustände im Chart: die Legende trägt dann immer Dauer und Anteil,
-        // wie auf der Entitätsseite — der Schalter "Statistik in Legende"
-        // entfällt, statsShown ersetzt chartStats in der Legende.
-        get allState() { return this.series.length > 0 && this.series.every(s => s.aggregation_type === 'state'); },
-        get statsShown() { return this.chartStats || this.allState; },
+        // Zustände stehen nie neben anderen Serien (load() wirft sie sonst
+        // heraus): die Legende trägt dann immer Dauer und Anteil, wie auf der
+        // Entitätsseite — der Schalter "Statistik in Legende" entfällt,
+        // statsShown ersetzt chartStats in der Legende.
+        get statsShown() { return this.chartStats || this.hasState; },
         get resolutionOptions() {
           const labels = RESOLUTION_LABELS[this.range] || RESOLUTION_LABELS.day;
           const options = [
@@ -1525,12 +1525,13 @@
           const res = await fetch(`${BASE}/api/query-multi?${params}`);
           const data = await res.json();
           if (requestId !== this._requestId) return;
-          // Zustands- und Zahlen-Entitäten in einem Chart mischen ist nicht
-          // vorgesehen (ROADMAP 1.29, Mockup): die Zustände fallen dann heraus
-          // und ein Hinweis nennt sie, statt Indizes als Linie zu zeichnen.
+          // Zustände lassen sich nur unter sich darstellen, auch nicht mit
+          // Schaltern (ROADMAP 1.29): sobald etwas anderes im Chart ist, fallen
+          // die Zustände heraus und ein Hinweis nennt sie, statt Indizes als
+          // Linie zu zeichnen.
           const loaded = data.series || [];
-          const numeric = loaded.some(s => s.aggregation_type && !['switch', 'state'].includes(s.aggregation_type));
-          this.droppedStateIds = numeric ? loaded.filter(s => s.aggregation_type === 'state').map(s => s.entity_id) : [];
+          const foreign = loaded.some(s => s.aggregation_type && s.aggregation_type !== 'state');
+          this.droppedStateIds = foreign ? loaded.filter(s => s.aggregation_type === 'state').map(s => s.entity_id) : [];
           this.series = loaded.filter(s => !this.droppedStateIds.includes(s.entity_id));
           // Entitäten-Auswahl kann sich geändert haben, seit "Zeitstrahl"
           // aktiviert wurde (z. B. eine Nicht-Schalter-Entität ergänzt) —

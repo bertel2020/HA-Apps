@@ -3320,7 +3320,7 @@
     "{count} Abschnitte": "{count} sections",
     "seit {dauer}": "for {dauer}",
     "−24 h": "−24 h",
-    "Nicht gezeigt: {names} — Zustands-Entitäten lassen sich nur zusammen mit Schaltern oder anderen Zuständen darstellen.": "Not shown: {names} — state entities can only be shown together with switches or other states.",
+    "Nicht gezeigt: {names} — Zustands-Entitäten lassen sich nur zusammen mit anderen Zuständen darstellen.": "Not shown: {names} — state entities can only be shown together with other states.",
     "Darstellung konnte nicht gespeichert werden": "Display could not be saved"
   }
 }
