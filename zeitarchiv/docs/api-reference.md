@@ -224,6 +224,12 @@ irgendein Tag der Periode). Die Kennzahl folgt dem Typ: Zähler `total`, Sensor
 Antworten tragen `as_of`, `coverage`, `marked` und `period_running`.
 Schlüssel, Fehlercodes und Hinweise sind fest Englisch.
 
+Abgeschaltete Werkzeuge (Einstellungen → KI-Zugriff) fehlen in `/api/ai/config`; ruft
+man sie trotzdem auf, kommt `403` `tool_disabled`. Die Hinweise des Besitzers stehen im
+`api_prompt` der Konfiguration und als `owner_notes` in der Antwort von `search_entities`.
+Der Kopf `X-Zeitarchiv-Ai-User` (`admin` oder `user`) sagt, mit welchem Konto der Client in
+Home Assistant angemeldet ist; er fließt nur in die Nutzungsanzeige ein, gesperrt wird nichts.
+
 Fehler: `{"error": code, "message": …}`. `401` falscher Token, `403`
 `ai_disabled` (Schalter aus), `429` `busy`/`rate_limited` (höchstens 2 gleichzeitig,
 60 je Minute; mit `Retry-After`), `504` `timeout` (nach 20 s). Die Antwort ist auf

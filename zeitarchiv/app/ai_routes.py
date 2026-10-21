@@ -26,7 +26,7 @@ from fastapi import APIRouter, Header, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from . import ai_settings, ai_tools
+from . import ai_settings, ai_tools, ai_usage
 from .i18n import active_language
 from .route_support import storage_locked
 from .storage.coordinator import StorageCoordinator
@@ -160,6 +160,8 @@ def create_ai_router(deps: AiDependencies) -> APIRouter:
         access = ai_settings.load(deps.index)
         if not access.enabled:
             return error(403, "ai_disabled", "AI access is switched off in Zeitarchiv.")
+        if tool in access.tools_disabled:
+            return error(403, "tool_disabled", "The owner switched this tool off; use another tool or tell the user.")
         if (reason := limiter.acquire()) is not None:
             return error(
                 429, reason,
@@ -173,6 +175,7 @@ def create_ai_router(deps: AiDependencies) -> APIRouter:
             status, body = exc.status, {"error": exc.code, "message": exc.message}
         finally:
             limiter.release()
+        ai_usage.USAGE.record(deps.index, tool, request.headers.get("x-zeitarchiv-ai-user"))
         logger.info(
             "KI-Werkzeug aufgerufen · event=ai_tool_call tool=%s status=%d entities=%d duration_ms=%d",
             tool, status, entity_count, (time.monotonic() - started) * 1000,
@@ -198,7 +201,7 @@ def create_ai_router(deps: AiDependencies) -> APIRouter:
             "enabled": access.enabled,
             "config_rev": ai_settings.config_rev(deps.index),
             "energy_configured": ai_tools._energy_configured(ctx),  # noqa: SLF001
-            "api_prompt": ai_tools.API_PROMPT,
+            "api_prompt": ai_tools.api_prompt(ctx),
             "tools": ai_tools.tool_config(ctx) if access.enabled else [],
         }
 

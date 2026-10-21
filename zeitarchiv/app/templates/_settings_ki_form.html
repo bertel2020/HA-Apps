@@ -53,11 +53,70 @@
     </label>
   </div>
 
+  <div class="settings-subsection ki-tools">
+    <h3 class="settings-subsection-title">{{ _("Werkzeuge") }}</h3>
+    <p class="hint">{{ _("Abgeschaltete Werkzeuge stehen der KI nicht zur Verfügung. Die Energiebilanz gibt es nur, wenn das Energiedashboard eingerichtet ist.") }}</p>
+    {% for tool in ai_tools %}
+    <label style="display:block;margin:0 0 6px;">
+      <input type="checkbox" name="tool" value="{{ tool.name }}" {% if tool.enabled %}checked{% endif %}>
+      {{ tool.title }}
+    </label>
+    {% endfor %}
+  </div>
+
+  <div class="settings-subsection ki-notes">
+    <h3 class="settings-subsection-title">{{ _("Hinweise für das Modell") }}</h3>
+    <p class="hint">{{ _("Optional, zum Beispiel Strompreis, Geräte oder Besonderheiten deines Hauses. Der Text geht an die KI mit, jedes Mal wenn sie das Archiv durchsucht.") }}</p>
+    <textarea name="instructions" rows="4" maxlength="{{ ai_instructions_max }}" class="ki-notes-input"
+              placeholder="{{ _('z. B. Die Wärmepumpe heißt „WP“. Der Zähler im Keller ist der Hauptzähler.') }}">{{ ai_access.instructions }}</textarea>
+    <p class="hint">{{ _("Höchstens {max} Zeichen.", max=ai_instructions_max) }}</p>
+  </div>
+
   <div class="toolbar" style="margin:16px 0 0;justify-content:flex-end;">
     {% if ai_saved %}<span class="save-status">{{ _("✓ Gespeichert") }}</span>{% endif %}
     <button type="submit" class="btn btn-primary">{{ _("Speichern") }}</button>
   </div>
 </form>
+
+<div class="settings-subsection ki-usage">
+  <h3 class="settings-subsection-title">{{ _("Nutzung") }}</h3>
+  <p class="hint">{{ _("Nur zur Information, seit dem Start der App. Es wird nichts gesperrt.") }}</p>
+  <div class="settings-compact-list">
+    <div class="settings-compact-row">
+      <span class="settings-compact-label">{{ _("Zuletzt genutzt") }}</span>
+      <span class="settings-compact-value">{{ ai_usage.last_used or _("Noch nie") }}</span>
+    </div>
+    <div class="settings-compact-row">
+      <span class="settings-compact-label">{{ _("Aufrufe gesamt") }}</span>
+      <span class="settings-compact-value">{{ ai_usage.total }}</span>
+    </div>
+    {% for item in ai_usage.by_tool if item.count %}
+    <div class="settings-compact-row">
+      <span class="settings-compact-label">{{ item.title }}</span>
+      <span class="settings-compact-value">{{ item.count }}</span>
+    </div>
+    {% endfor %}
+    {% if ai_usage.total %}
+    <div class="settings-compact-row">
+      <span class="settings-compact-label">{{ _("Mit Administratorkonto") }}</span>
+      <span class="settings-compact-value">{{ ai_usage.admin }}</span>
+    </div>
+    <div class="settings-compact-row">
+      <span class="settings-compact-label">{{ _("Mit Benutzerkonto ohne Administratorrechte") }}</span>
+      <span class="settings-compact-value">{{ ai_usage.user }}</span>
+    </div>
+    {% if ai_usage.unknown %}
+    <div class="settings-compact-row">
+      <span class="settings-compact-label">{{ _("Konto unbekannt") }}</span>
+      <span class="settings-compact-value">{{ ai_usage.unknown }}</span>
+    </div>
+    {% endif %}
+    {% endif %}
+  </div>
+  {% if ai_usage.admin %}
+  <p class="hint">{{ _("Zugriffe mit Administratorkonto sind normal, wenn die Adresse mit der API-ID verwendet wird: Der Client sieht dann nur die Zeitarchiv-Werkzeuge. Verwende nicht die allgemeine Adresse /api/mcp mit den Voreinstellungen.") }}</p>
+  {% endif %}
+</div>
 
 <div class="settings-subsection ki-help">
   <h3 class="settings-subsection-title">{{ _("Einrichtung") }}</h3>

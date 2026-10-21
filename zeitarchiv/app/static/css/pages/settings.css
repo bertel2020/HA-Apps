@@ -117,3 +117,4 @@
   .ki-url,.ki-copy-text{display:block;margin:4px 0;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);font-family:var(--font-mono);font-size:calc(12px * var(--font-scale,1));overflow-wrap:anywhere;}
   .ki-subhead{margin:18px 0 4px;font-size:calc(13.5px * var(--font-scale,1));}
   .ki-questions{margin:6px 0 0;padding-left:22px;line-height:1.6;}
+  .ki-notes-input{width:100%;box-sizing:border-box;font:inherit;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--ink);resize:vertical;}

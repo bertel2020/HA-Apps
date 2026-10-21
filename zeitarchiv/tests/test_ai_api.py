@@ -17,7 +17,7 @@ try:
     from fastapi import FastAPI
     from starlette.testclient import TestClient
 
-    from app import ai_settings, ai_tools, api_routes, logging_setup
+    from app import ai_settings, ai_tools, ai_usage, api_routes, logging_setup
     from app.storage import hotbuffer
     from app.storage.coordinator import StorageCoordinator
     from app.storage.index import Index
@@ -74,6 +74,13 @@ def anlage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     # Der 401-Test löst "api_auth_failure" aus; log_rate_limited() hielte die
     # Meldung sonst für test_api_observability.py zurück (modulweiter Zustand).
     logging_setup._RATE_LIMIT_STATE.pop("api_auth_failure", None)
+
+
+@pytest.fixture(autouse=True)
+def _fresh_usage():
+    ai_usage.USAGE.reset()
+    yield
+    ai_usage.USAGE.reset()
 
 
 @pytest.fixture
@@ -473,3 +480,89 @@ def test_settings_form_saves_and_unchecked_means_off(client) -> None:
         assert "sensor.weg" in client.get("/settings/ai").text
     finally:
         ai_settings.save(app_index, enabled=False, scope="all", entities=[], exclude_presence=True)
+
+
+# ------------------------------------------------------------ V1.1
+
+
+def test_disabled_tool_is_refused_and_left_out_of_the_config(anlage) -> None:
+    client, index = anlage
+    ai_settings.save(
+        index, enabled=True, scope="all", entities=[], exclude_presence=True, tools_disabled=["get_series"],
+    )
+    refused = client.post(
+        "/api/ai/get_series", json={"entity_ids": ["sensor.temperatur"], "period": "day"}, headers=AUTH,
+    )
+    assert refused.status_code == 403 and refused.json()["error"] == "tool_disabled"
+    assert client.post("/api/ai/get_summary", json={"entity_ids": ["sensor.temperatur"], "period": "day"}, headers=AUTH).status_code == 200
+    names = [tool["app_tool"] for tool in client.get("/api/ai/config", headers=AUTH).json()["tools"]]
+    assert "get_series" not in names and "get_summary" in names
+
+
+def test_saving_the_switch_alone_keeps_tools_and_notes(anlage) -> None:
+    _client, index = anlage
+    ai_settings.save(
+        index, enabled=True, scope="all", entities=[], exclude_presence=True,
+        tools_disabled=["get_notices"], instructions="Die Wärmepumpe heißt WP.",
+    )
+    access = ai_settings.save(index, enabled=False, scope="all", entities=[], exclude_presence=True)
+    assert access.tools_disabled == {"get_notices"} and access.instructions == "Die Wärmepumpe heißt WP."
+
+
+def test_owner_notes_reach_the_model_in_search_and_prompt(anlage) -> None:
+    client, index = anlage
+    ai_settings.save(
+        index, enabled=True, scope="all", entities=[], exclude_presence=True,
+        instructions="Strompreis 30 ct/kWh.\x07",
+    )
+    found = client.post("/api/ai/search_entities", json={}, headers=AUTH).json()
+    assert found["owner_notes"] == "Strompreis 30 ct/kWh."
+    prompt = client.get("/api/ai/config", headers=AUTH).json()["api_prompt"]
+    assert prompt.startswith(ai_tools.API_PROMPT) and "Strompreis 30 ct/kWh." in prompt
+    ai_settings.save(index, enabled=True, scope="all", entities=[], exclude_presence=True, instructions="")
+    assert "owner_notes" not in client.post("/api/ai/search_entities", json={}, headers=AUTH).json()
+
+
+def test_notes_are_cleaned_and_capped() -> None:
+    assert ai_settings.clean_instructions("a\r\nb\x00c\u2028d") == "a\nbcd"
+    assert len(ai_settings.clean_instructions("x" * 5000)) == ai_settings.MAX_INSTRUCTIONS_LENGTH
+
+
+def test_usage_counts_calls_and_the_account_kind(anlage) -> None:
+    client, index = anlage
+    _enable(index)
+    for header in ({"X-Zeitarchiv-Ai-User": "admin"}, {"X-Zeitarchiv-Ai-User": "user"}, {}):
+        client.post("/api/ai/search_entities", json={}, headers={**AUTH, **header})
+    client.post("/api/ai/get_notices", json={}, headers=AUTH)
+    snapshot = ai_usage.USAGE.snapshot(index)
+    assert snapshot["calls"] == {"search_entities": 3, "get_notices": 1}
+    assert snapshot["by_account"] == {"admin": 1, "user": 1, "unknown": 2}
+    assert snapshot["last_used"] is not None
+    assert index.get_setting("ai_last_used") is not None
+    # Abgewiesene Anfragen zählen nicht als Nutzung.
+    ai_usage.USAGE.reset()
+    index.set_setting("ai_enabled", "0")
+    client.post("/api/ai/search_entities", json={}, headers=AUTH)
+    assert ai_usage.USAGE.snapshot(index)["total"] == 0
+
+
+def test_settings_form_saves_tools_and_notes_and_shows_usage(client) -> None:
+    from app.main import index as app_index
+
+    try:
+        saved = client.post("/settings/ai", data={
+            "enabled": "1", "scope": "all", "exclude_presence": "1",
+            "tool": ["search_entities", "get_summary"], "instructions": "Wärmepumpe = WP",
+        })
+        assert saved.status_code == 200 and "Wärmepumpe = WP" in saved.text
+        access = ai_settings.load(app_index)
+        assert access.tools_disabled == {"get_series", "compare_periods", "get_energy_overview", "get_notices"}
+        assert access.instructions == "Wärmepumpe = WP"
+        ai_usage.USAGE.record(app_index, "get_summary", "admin")
+        page = client.get("/settings/ai").text
+        assert "Aufrufe gesamt" in page and "Mit Administratorkonto" in page
+    finally:
+        ai_settings.save(
+            app_index, enabled=False, scope="all", entities=[], exclude_presence=True,
+            tools_disabled=[], instructions="",
+        )

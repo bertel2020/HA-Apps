@@ -24,6 +24,8 @@ SETTING_ENTITY_LIST = "ai_entity_list"
 SETTING_EXCLUDE_PRESENCE = "ai_exclude_presence"
 SETTING_CONFIG_REV = "ai_config_rev"
 SETTING_API_IDS = "ai_api_ids"
+SETTING_TOOLS_DISABLED = "ai_tools_disabled"
+SETTING_INSTRUCTIONS = "ai_instructions"
 
 #: Wer darf gesehen werden: alles, alles außer der Liste, nur die Liste.
 SCOPES = ("all", "exclude", "include")
@@ -31,7 +33,14 @@ SCOPES = ("all", "exclude", "include")
 #: jeder KI-Anfrage gelesen; mehr als das ist kein Auswahlfilter mehr.
 MAX_LIST_ENTITIES = 2000
 
+#: Länge der Hinweise für das Modell. Sie gehen in den API-Prompt und an die
+#: Antwort der Suche und kosten dort jedes Mal Kontext.
+MAX_INSTRUCTIONS_LENGTH = 1000
+
 _API_ID = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
+# Steuerzeichen außer Zeilenumbruch und Tab: Der Text ist die eigene Eingabe des
+# Besitzers, soll aber keine unsichtbaren Zeichen in den Modellkontext tragen.
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f\u2028\u2029]")
 
 
 @dataclass(frozen=True)
@@ -40,6 +49,11 @@ class AiAccess:
     scope: str = "all"
     entities: frozenset[str] = frozenset()
     exclude_presence: bool = True
+    #: Werkzeuge, die der Besitzer abgeschaltet hat (interne Namen ohne Präfix,
+    #: z. B. "get_energy_overview"). Sie stehen nicht in der Liste der Integration.
+    tools_disabled: frozenset[str] = frozenset()
+    #: Freitext des Besitzers für das Modell, z. B. Strompreis, Geräte, Besonderheiten.
+    instructions: str = ""
 
     def allows(self, entity_id: str) -> bool:
         """Ob die KI die Entität sehen darf. Gilt in jedem Werkzeug, auch in
@@ -65,7 +79,23 @@ def load(index: Index) -> AiAccess:
         entities=frozenset(item for item in listed if isinstance(item, str)),
         # Standard an: Wer Anwesenheit freigeben will, entscheidet das bewusst.
         exclude_presence=index.get_setting(SETTING_EXCLUDE_PRESENCE, "1") != "0",
+        tools_disabled=frozenset(_json_list(index.get_setting(SETTING_TOOLS_DISABLED, "[]"))),
+        instructions=index.get_setting(SETTING_INSTRUCTIONS, "") or "",
     )
+
+
+def _json_list(raw: str | None) -> list[str]:
+    try:
+        items = json.loads(raw or "[]")
+    except json.JSONDecodeError:
+        return []
+    return [item for item in items if isinstance(item, str)] if isinstance(items, list) else []
+
+
+def clean_instructions(text: str | None) -> str:
+    """Hinweise für das Modell: Steuerzeichen raus, Zeilenenden vereinheitlicht, gekürzt."""
+    cleaned = _CONTROL.sub("", (text or "").replace("\r\n", "\n").replace("\r", "\n")).strip()
+    return cleaned[:MAX_INSTRUCTIONS_LENGTH]
 
 
 def config_rev(index: Index) -> int:
@@ -77,6 +107,7 @@ def config_rev(index: Index) -> int:
 
 def save(
     index: Index, *, enabled: bool, scope: str, entities: list[str], exclude_presence: bool,
+    tools_disabled: list[str] | None = None, instructions: str | None = None,
 ) -> AiAccess:
     """Speichert die Einstellungen und zählt ``ai_config_rev`` hoch."""
     if scope not in SCOPES:
@@ -86,6 +117,12 @@ def save(
     index.set_setting(SETTING_SCOPE, scope)
     index.set_setting(SETTING_ENTITY_LIST, json.dumps(unique))
     index.set_setting(SETTING_EXCLUDE_PRESENCE, "1" if exclude_presence else "0")
+    # None heißt "unverändert": Aufrufer, die nur den Schalter oder die Auswahl
+    # setzen, überschreiben die V1.1-Einstellungen nicht.
+    if tools_disabled is not None:
+        index.set_setting(SETTING_TOOLS_DISABLED, json.dumps(sorted(set(tools_disabled))))
+    if instructions is not None:
+        index.set_setting(SETTING_INSTRUCTIONS, clean_instructions(instructions))
     index.set_setting(SETTING_CONFIG_REV, str(config_rev(index) + 1))
     return load(index)
 

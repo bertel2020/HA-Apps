@@ -16,9 +16,11 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from . import ai_settings
-from .formatting import entity_display_name
-from .i18n import tr
+from zoneinfo import ZoneInfo
+
+from . import ai_settings, ai_tools, ai_usage
+from .formatting import entity_display_name, format_time, format_timestamp
+from .i18n import active_language, tr
 from .storage.index import Index
 
 
@@ -43,12 +45,29 @@ def _instruction_text() -> str:
     )
 
 
-def make_router(get_index: Callable[[], Index], templates: Jinja2Templates) -> APIRouter:
+def _usage(index: Index, tz: ZoneInfo, language: str) -> dict:
+    snapshot = ai_usage.USAGE.snapshot(index)
+    last = snapshot["last_used"]
+    return {
+        "last_used": f"{format_timestamp(last, tz)} {format_time(last, tz)}" if last else None,
+        "total": snapshot["total"],
+        "by_tool": [
+            {"title": titles[0 if language == "de" else 1].removeprefix("Zeitarchiv: "), "count": snapshot["calls"].get(name, 0)}
+            for name, titles in ai_tools.TOOL_TEXTS.items()
+        ],
+        "admin": snapshot["by_account"]["admin"],
+        "user": snapshot["by_account"]["user"],
+        "unknown": snapshot["by_account"]["unknown"],
+    }
+
+
+def make_router(get_index: Callable[[], Index], templates: Jinja2Templates, tz: ZoneInfo) -> APIRouter:
     router = APIRouter()
 
     def context(request: Request, saved: bool = False) -> dict:
         index = get_index()
         access = ai_settings.load(index)
+        language = active_language()
         rows = index.list_entities()
         return {
             "ai_access": access,
@@ -65,6 +84,16 @@ def make_router(get_index: Callable[[], Index], templates: Jinja2Templates) -> A
             ],
             # Auswahl, die es nicht mehr gibt, bleibt sichtbar statt still zu verschwinden.
             "ai_missing": sorted(access.entities - {row["entity_id"] for row in rows}),
+            "ai_tools": [
+                {
+                    "name": name,
+                    "title": titles[0 if language == "de" else 1].removeprefix("Zeitarchiv: "),
+                    "enabled": name not in access.tools_disabled,
+                }
+                for name, titles in ai_tools.TOOL_TEXTS.items()
+            ],
+            "ai_instructions_max": ai_settings.MAX_INSTRUCTIONS_LENGTH,
+            "ai_usage": _usage(index, tz, language),
             "ai_api_ids": ai_settings.known_api_ids(index),
             "ai_questions": _example_questions(),
             "ai_instruction": _instruction_text(),
@@ -86,6 +115,8 @@ def make_router(get_index: Callable[[], Index], templates: Jinja2Templates) -> A
             scope=scope,
             entities=[str(item) for item in form.getlist("entity")],
             exclude_presence=form.get("exclude_presence") == "1",
+            tools_disabled=[name for name in ai_tools.TOOL_TEXTS if name not in set(form.getlist("tool"))],
+            instructions=str(form.get("instructions", "")),
         )
         return templates.TemplateResponse(request, "_settings_ki_form.html", context(request, saved=True))
 

@@ -273,10 +273,11 @@ def search_entities(
     visible = [row for row in ctx.index.list_entities() if ctx.allows(row["entity_id"])]
     firsts = [row["first_ts"] for row in visible if row["first_ts"]]
     lasts = [row["last_ts"] for row in visible if row["last_ts"]]
-    energy = _energy_configured(ctx)
+    energy = "get_energy_overview" in offered_tools(ctx)
     coverage = f"{len(visible)} shared entities"
     if firsts and lasts:
         coverage += f", data from {_iso(min(firsts), ctx.tz)[:10]} to {_iso(max(lasts), ctx.tz)[:10]}"
+    notes = {"owner_notes": ctx.access.instructions} if ctx.access.instructions else {}
     return _cap_size({
         "as_of": as_of(ctx),
         "orientation": _ORIENTATION.format(
@@ -284,6 +285,9 @@ def search_entities(
             energy=" and an energy overview with costs" if energy else "",
         ),
         "archive": {"entities": len(visible), "energy_dashboard": energy},
+        # Hinweise des Besitzers (z. B. Strompreis, Geräte) kommen hier mit, weil
+        # MCP-Clients den API-Prompt selten abrufen, diese Antwort aber jedes Gespräch.
+        **notes,
         "matches": [
             {
                 **_entity_ref(row),
@@ -793,12 +797,19 @@ TOOL_TEXTS: dict[str, tuple[str, str, str]] = {
 
 
 def offered_tools(ctx: AiToolContext) -> list[str]:
-    """Welche Werkzeuge die Integration anbieten soll. Die Energiebilanz nur,
-    wenn das Energiedashboard eingerichtet ist."""
-    names = list(TOOL_TEXTS)
-    if not _energy_configured(ctx):
+    """Welche Werkzeuge die Integration anbieten soll: nicht die abgeschalteten,
+    und die Energiebilanz nur, wenn das Energiedashboard eingerichtet ist."""
+    names = [name for name in TOOL_TEXTS if name not in ctx.access.tools_disabled]
+    if "get_energy_overview" in names and not _energy_configured(ctx):
         names.remove("get_energy_overview")
     return names
+
+
+def api_prompt(ctx: AiToolContext) -> str:
+    """Der Prompt der LLM-API: der feste Text, danach die Hinweise des Besitzers."""
+    if not ctx.access.instructions:
+        return API_PROMPT
+    return f"{API_PROMPT}\n\nNotes from the owner of this archive:\n{ctx.access.instructions}"
 
 
 def tool_config(ctx: AiToolContext) -> list[dict]:

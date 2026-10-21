@@ -218,6 +218,12 @@ the period). The measure follows the type: counter `total`, sensor
 Responses carry `as_of`, `coverage`, `marked` and `period_running`. Keys, error
 codes and hints are fixed English.
 
+Tools that are switched off (Settings → AI access) are missing from `/api/ai/config`; calling
+them anyway gives `403` `tool_disabled`. The owner's notes are part of the config's
+`api_prompt` and appear as `owner_notes` in the answer of `search_entities`. The header
+`X-Zeitarchiv-Ai-User` (`admin` or `user`) says which kind of account the client is signed in
+with in Home Assistant; it only feeds the usage display, nothing is blocked.
+
 Errors: `{"error": code, "message": …}`. `401` wrong token, `403` `ai_disabled`
 (switch off), `429` `busy`/`rate_limited` (at most 2 at a time, 60 per minute;
 with `Retry-After`), `504` `timeout` (after 20 s). A response is limited to about

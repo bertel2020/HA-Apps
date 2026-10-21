@@ -2829,7 +2829,21 @@
     "Zeitarchiv wird über Home Assistants „Model Context Protocol Server“ angeboten. Claude, ChatGPT und andere Clients verbinden sich mit diesem. Dafür muss Home Assistant von außen über HTTPS erreichbar sein (zum Beispiel über Nabu Casa); Claude Code und lokale Modelle kommen auch ohne aus.": "Zeitarchiv is offered through Home Assistant's “Model Context Protocol Server”. Claude, ChatGPT and other clients connect to that. For this, Home Assistant must be reachable from outside over HTTPS (for example through Nabu Casa); Claude Code and local models work without it.",
     "Zugriff beenden: oben ausschalten und im Home-Assistant-Profil unter „Sicherheit“ den Zugriffstoken widerrufen. Dieser Token kann mehr, als der Client über MCP sieht.": "To end access: switch it off above and revoke the access token under “Security” in your Home Assistant profile. That token can do more than the client sees through MCP.",
     "die allgemeine Adresse /api/mcp mit den Voreinstellungen. Dann ist auch die Steuerung (Assist) dabei, und das Modell kann Geräte schalten.": "the general address /api/mcp with the defaults. Then control (Assist) is included too, and the model can switch devices.",
-    "nicht mehr im Archiv": "no longer in the archive"
+    "nicht mehr im Archiv": "no longer in the archive",
+    "Abgeschaltete Werkzeuge stehen der KI nicht zur Verfügung. Die Energiebilanz gibt es nur, wenn das Energiedashboard eingerichtet ist.": "Tools that are switched off are not available to the AI. The energy overview only exists when the energy dashboard is set up.",
+    "Aufrufe gesamt": "Total calls",
+    "Hinweise für das Modell": "Notes for the model",
+    "Höchstens {max} Zeichen.": "At most {max} characters.",
+    "Konto unbekannt": "Account unknown",
+    "Mit Administratorkonto": "With an administrator account",
+    "Mit Benutzerkonto ohne Administratorrechte": "With a non-administrator account",
+    "Nur zur Information, seit dem Start der App. Es wird nichts gesperrt.": "For information only, since the app started. Nothing is blocked.",
+    "Nutzung": "Usage",
+    "Optional, zum Beispiel Strompreis, Geräte oder Besonderheiten deines Hauses. Der Text geht an die KI mit, jedes Mal wenn sie das Archiv durchsucht.": "Optional, for example electricity price, devices or peculiarities of your home. The text goes to the AI every time it searches the archive.",
+    "Werkzeuge": "Tools",
+    "Zugriffe mit Administratorkonto sind normal, wenn die Adresse mit der API-ID verwendet wird: Der Client sieht dann nur die Zeitarchiv-Werkzeuge. Verwende nicht die allgemeine Adresse /api/mcp mit den Voreinstellungen.": "Access with an administrator account is normal when the address with the API id is used: the client then sees only the Zeitarchiv tools. Do not use the general address /api/mcp with the defaults.",
+    "Zuletzt genutzt": "Last used",
+    "z. B. Die Wärmepumpe heißt „WP“. Der Zähler im Keller ist der Hauptzähler.": "e.g. The heat pump is called “WP”. The meter in the basement is the main meter."
   },
   "js": {
     "Langzeit": "Long-term",

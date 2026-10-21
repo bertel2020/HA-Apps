@@ -409,7 +409,7 @@ i18n.install(templates)
 i18n.set_background_language(lambda: index)
 templates.env.filters["retranslate"] = i18n.retranslate
 app.include_router(i18n.make_router(lambda: index))
-app.include_router(ai_settings_routes.make_router(lambda: index, templates))
+app.include_router(ai_settings_routes.make_router(lambda: index, templates, TZ))
 
 
 class RequestLoggingMiddleware:
