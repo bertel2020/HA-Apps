@@ -154,6 +154,7 @@ def create_ai_router(deps: AiDependencies) -> APIRouter:
         return JSONResponse({"error": code, "message": message}, status_code=status, headers=headers)
 
     def reject(tool: str, reason: str) -> None:
+        ai_usage.USAGE.record_rejected(deps.index, reason, deps.tz)
         # Eine KI, die trotz "Aus" immer wieder fragt, soll das Log nicht fluten.
         log_rate_limited(
             logger, logging.INFO, f"ai_tool_rejected:{reason}:{tool}",
@@ -185,7 +186,7 @@ def create_ai_router(deps: AiDependencies) -> APIRouter:
             status, body = exc.status, {"error": exc.code, "message": exc.message}
         finally:
             limiter.release()
-        ai_usage.USAGE.record(deps.index, tool, request.headers.get("x-zeitarchiv-ai-user"))
+        ai_usage.USAGE.record(deps.index, tool, request.headers.get("x-zeitarchiv-ai-user"), deps.tz)
         logger.info(
             "KI-Werkzeug aufgerufen · event=ai_tool_call tool=%s status=%d entities=%d duration_ms=%d",
             tool, status, entity_count, (time.monotonic() - started) * 1000,

@@ -8,7 +8,7 @@
    Filter noch Scrollposition der Liste zurückgesetzt werden. Das Filterfeld hält
    sein change-Event zurück (onchange), damit es kein Speichern auslöst. #}
 <form id="ki-settings-form" hx-post="settings/ai" hx-trigger="change" hx-target="#ki-save-status"
-      hx-select="#ki-save-status" hx-swap="outerHTML">
+      hx-select="#ki-save-status" hx-select-oob="#ki-changes-count,#ki-changes-list" hx-swap="outerHTML">
   <div class="settings-compact-list">
     <div class="settings-compact-row">
       <div class="settings-compact-row-text">
@@ -113,16 +113,26 @@
 
 <div class="settings-subsection ki-usage ki-dependent">
   <h3 class="settings-subsection-title">{{ _("Nutzung") }} {{ hint_button(_('Nutzung')) }}</h3>
-  {% call hint_body() %}{{ _("Nur zur Information, seit dem Start der App. Es wird nichts gesperrt.") }}{% endcall %}
+  {% call hint_body() %}{{ _("Nur zur Information. Gezählt wird je Tag und 90 Tage lang aufbewahrt, ohne Inhalte der Fragen. Es wird nichts gesperrt.") }}{% endcall %}
   <div class="settings-compact-list">
     <div class="settings-compact-row">
       <span class="settings-compact-label">{{ _("Zuletzt genutzt") }}</span>
       <span class="settings-compact-value">{{ ai_usage.last_used or _("Noch nie") }} · {{ _("1 Aufruf") if ai_usage.total == 1 else _("{count} Aufrufe", count=ai_usage.total) }}</span>
     </div>
+    <div class="settings-compact-row">
+      <span class="settings-compact-label">{{ _("Heute · 7 Tage") }}</span>
+      <span class="settings-compact-value">{{ _("{today} · {week} Aufrufe", today=ai_usage.today, week=ai_usage.week) }}</span>
+    </div>
+    {% if ai_usage.rejected_week %}
+    <div class="settings-compact-row">
+      <span class="settings-compact-label">{{ _("Abgelehnt (7 Tage)") }}</span>
+      <span class="settings-compact-value ki-warn-value">{{ _("1 Aufruf") if ai_usage.rejected_week == 1 else _("{count} Aufrufe", count=ai_usage.rejected_week) }}</span>
+    </div>
+    {% endif %}
   </div>
-  {% if ai_usage.total %}
+  {% if ai_usage.week or ai_usage.rejected_week %}
   <details class="ki-fold ki-usage-detail">
-    <summary class="hint hint-status">{{ _("Aufschlüsselung") }}</summary>
+    <summary class="hint hint-status">{{ _("Aufschlüsselung (7 Tage)") }}</summary>
     <div class="settings-compact-list">
       {% for item in ai_usage.by_tool if item.count %}
       <div class="settings-compact-row">
@@ -144,10 +154,37 @@
         <span class="settings-compact-value">{{ ai_usage.unknown }}</span>
       </div>
       {% endif %}
+      {% if ai_usage.rejected_disabled %}
+      <div class="settings-compact-row">
+        <span class="settings-compact-label">{{ _("Abgelehnt: Zugriff ist aus") }}</span>
+        <span class="settings-compact-value ki-warn-value">{{ ai_usage.rejected_disabled }}</span>
+      </div>
+      {% endif %}
+      {% if ai_usage.rejected_tool %}
+      <div class="settings-compact-row">
+        <span class="settings-compact-label">{{ _("Abgelehnt: Werkzeug abgeschaltet") }}</span>
+        <span class="settings-compact-value ki-warn-value">{{ ai_usage.rejected_tool }}</span>
+      </div>
+      {% endif %}
     </div>
   </details>
   {% endif %}
-  {% if ai_usage.admin %}
+  <details class="ki-fold ki-usage-detail">
+    <summary class="hint hint-status">{{ _("Letzte Änderungen") }} <span class="ki-tag" id="ki-changes-count">{{ ai_changes|length }}</span></summary>
+    <div id="ki-changes-list">
+      {% if ai_changes %}
+      <ul class="ki-changes">
+        {% for change in ai_changes %}
+        <li><span>{{ change.text }}</span><time>{{ change.when }}</time></li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="hint hint-status">{{ _("Noch keine Änderungen aufgezeichnet.") }}</p>
+      {% endif %}
+      <p class="hint hint-status">{{ _("Gespeichert werden die letzten 50 Änderungen. Wer sie vorgenommen hat, erfasst die App nicht.") }}</p>
+    </div>
+  </details>
+{% if ai_usage.admin %}
   <p class="hint hint-status">{{ _("Zugriffe mit Administratorkonto sind normal, wenn die Adresse mit der API-ID verwendet wird: Der Client sieht dann nur die Zeitarchiv-Werkzeuge. Verwende nicht die allgemeine Adresse /api/mcp mit den Voreinstellungen.") }}</p>
   {% endif %}
 </div>

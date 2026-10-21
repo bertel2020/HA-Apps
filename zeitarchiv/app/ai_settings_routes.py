@@ -19,7 +19,7 @@ from fastapi.templating import Jinja2Templates
 
 from zoneinfo import ZoneInfo
 
-from . import ai_settings, ai_tools, ai_usage
+from . import ai_changes, ai_settings, ai_tools, ai_usage
 from .formatting import entity_display_name, format_time, format_timestamp
 from .i18n import active_language, tr
 from .storage.index import Index
@@ -49,11 +49,13 @@ def _instruction_text() -> str:
 
 
 def _usage(index: Index, tz: ZoneInfo, language: str) -> dict:
-    snapshot = ai_usage.USAGE.snapshot(index)
+    snapshot = ai_usage.USAGE.snapshot(index, tz)
     last = snapshot["last_used"]
     return {
         "last_used": f"{format_timestamp(last, tz)} {format_time(last, tz)}" if last else None,
         "total": snapshot["total"],
+        "today": snapshot["today"],
+        "week": snapshot["week"],
         "by_tool": [
             {"title": titles[0 if language == "de" else 1].removeprefix("Zeitarchiv: "), "count": snapshot["calls"].get(name, 0)}
             for name, titles in ai_tools.TOOL_TEXTS.items()
@@ -61,7 +63,48 @@ def _usage(index: Index, tz: ZoneInfo, language: str) -> dict:
         "admin": snapshot["by_account"]["admin"],
         "user": snapshot["by_account"]["user"],
         "unknown": snapshot["by_account"]["unknown"],
+        "rejected_week": snapshot["rejected_week"],
+        "rejected_disabled": snapshot["rejected"].get("ai_disabled", 0),
+        "rejected_tool": snapshot["rejected"].get("tool_disabled", 0),
     }
+
+
+def _entities_text(count: int) -> str:
+    return tr("1 Entität") if count == 1 else tr("{count} Entitäten", count=count)
+
+
+def _change_part_text(part: dict, language: str, scope_labels: dict[str, str]) -> str:
+    kind = part["kind"]
+    if kind == "enabled":
+        return tr("Zugriff An") if part["value"] else tr("Zugriff Aus")
+    if kind == "scope":
+        label = scope_labels.get(part["value"], part["value"])
+        if part["value"] == "all":
+            return tr("Umfang: {label}", label=label)
+        return tr("Umfang: {label} ({entities})", label=label, entities=_entities_text(part["count"]))
+    if kind == "entities":
+        return tr("Auswahl geändert ({entities})", entities=_entities_text(part["count"]))
+    if kind == "presence":
+        return tr("Anwesenheit ausschließen: {state}", state=tr("An") if part["value"] else tr("Aus"))
+    if kind == "tool":
+        titles = ai_tools.TOOL_TEXTS.get(part["value"])
+        title = titles[0 if language == "de" else 1].removeprefix("Zeitarchiv: ") if titles else part["value"]
+        if part["on"]:
+            return tr("Werkzeug „{tool}“ eingeschaltet", tool=title)
+        return tr("Werkzeug „{tool}“ abgeschaltet", tool=title)
+    return tr("Notizen geändert")
+
+
+def _changes(index: Index, tz: ZoneInfo, language: str, scope_labels: dict[str, str]) -> list[dict]:
+    return [
+        {
+            "when": f"{format_timestamp(entry['ts'], tz)} {format_time(entry['ts'], tz)}",
+            "text": " · ".join(
+                _change_part_text(part, language, scope_labels) for part in entry["parts"] if isinstance(part, dict)
+            ),
+        }
+        for entry in ai_changes.load(index)
+    ]
 
 
 def make_router(get_index: Callable[[], Index], templates: Jinja2Templates, tz: ZoneInfo) -> APIRouter:
@@ -72,14 +115,15 @@ def make_router(get_index: Callable[[], Index], templates: Jinja2Templates, tz: 
         access = ai_settings.load(index)
         language = active_language()
         rows = index.list_entities()
+        scope_options = [
+            ("all", tr("Alle")),
+            ("exclude", tr("Alle außer den gewählten")),
+            ("include", tr("Nur die gewählten")),
+        ]
         return {
             "ai_access": access,
             "ai_scopes": ai_settings.SCOPES,
-            "ai_scope_options": [
-                ("all", tr("Alle")),
-                ("exclude", tr("Alle außer den gewählten")),
-                ("include", tr("Nur die gewählten")),
-            ],
+            "ai_scope_options": scope_options,
             "ai_saved": saved,
             "ai_entities": [
                 {
@@ -102,6 +146,7 @@ def make_router(get_index: Callable[[], Index], templates: Jinja2Templates, tz: 
             ],
             "ai_instructions_max": ai_settings.MAX_INSTRUCTIONS_LENGTH,
             "ai_usage": _usage(index, tz, language),
+            "ai_changes": _changes(index, tz, language, dict(scope_options)),
             "ai_api_ids": ai_settings.known_api_ids(index),
             "ai_questions": _example_questions(),
             "ai_instruction": _instruction_text(),
@@ -121,8 +166,10 @@ def make_router(get_index: Callable[[], Index], templates: Jinja2Templates, tz: 
         entities = [str(item) for item in form.getlist("entity")]
         exclude_presence = form.get("exclude_presence") == "1"
         tools_disabled = [name for name in ai_tools.TOOL_TEXTS if name not in set(form.getlist("tool"))]
-        ai_settings.save(
-            get_index(),
+        index = get_index()
+        before = ai_settings.load(index)
+        after = ai_settings.save(
+            index,
             enabled=enabled,
             scope=scope,
             entities=entities,
@@ -130,6 +177,7 @@ def make_router(get_index: Callable[[], Index], templates: Jinja2Templates, tz: 
             tools_disabled=tools_disabled,
             instructions=str(form.get("instructions", "")),
         )
+        ai_changes.record(index, before, after)
         # Ohne den Notiztext: Der ist Freitext des Nutzers und gehört nicht ins Log.
         logger.info(
             "KI-Zugriff geändert · event=ai_access_changed enabled=%s scope=%s entities=%d "

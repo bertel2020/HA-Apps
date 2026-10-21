@@ -84,7 +84,7 @@ from .limits import (
     MAX_ZIP_UPLOAD_BYTES,
 )
 from .log_source import load_log_lines, validate_log_request
-from . import currency, demo_mode, formats, i18n
+from . import ai_usage, currency, demo_mode, formats, i18n
 from .i18n import N_, tr
 from . import supervisor_stats
 from .logging_setup import (
@@ -1698,6 +1698,7 @@ async def _lifespan(_: FastAPI):
     _background.start()
     yield
     _background.stop()
+    ai_usage.USAGE.flush()
 
 
 # Nachträglich statt über FastAPI(lifespan=...) gesetzt: _start_/_stop_

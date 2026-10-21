@@ -551,11 +551,77 @@ def test_usage_counts_calls_and_the_account_kind(anlage) -> None:
     assert snapshot["by_account"] == {"admin": 1, "user": 1, "unknown": 2}
     assert snapshot["last_used"] is not None
     assert index.get_setting("ai_last_used") is not None
-    # Abgewiesene Anfragen zählen nicht als Nutzung.
-    ai_usage.USAGE.reset()
+    # Abgewiesene Anfragen zählen nicht als Nutzung, sondern als abgelehnt.
     index.set_setting("ai_enabled", "0")
     client.post("/api/ai/search_entities", json={}, headers=AUTH)
-    assert ai_usage.USAGE.snapshot(index)["total"] == 0
+    after = ai_usage.USAGE.snapshot(index)
+    assert after["total"] == 4 and after["rejected"] == {"ai_disabled": 1}
+
+
+def test_usage_is_counted_per_day_and_survives_a_restart(anlage) -> None:
+    client, index = anlage
+    _enable(index)
+    ai_settings.save(
+        index, enabled=True, scope="all", entities=[], exclude_presence=True, tools_disabled=["get_series"],
+    )
+    client.post("/api/ai/search_entities", json={}, headers={**AUTH, "X-Zeitarchiv-Ai-User": "admin"})
+    client.post("/api/ai/get_series", json={"entity_ids": ["sensor.temperatur"], "period": "day"}, headers=AUTH)
+    # Neustart: Beim Beenden wird geschrieben, der Prozesszustand ist danach weg;
+    # die Tageswerte kommen aus dem Index.
+    ai_usage.USAGE.flush()
+    ai_usage.USAGE.reset()
+    snapshot = ai_usage.USAGE.snapshot(index, TZ)
+    assert snapshot["today"] == 1 and snapshot["week"] == 1 and snapshot["total"] == 1
+    assert snapshot["by_account"]["admin"] == 1
+    assert snapshot["rejected"] == {"tool_disabled": 1} and snapshot["rejected_week"] == 1
+
+
+def test_usage_window_and_retention(anlage) -> None:
+    _client, index = anlage
+    today = _dt.datetime.now(TZ)
+    old = (today - _dt.timedelta(days=ai_usage.RETENTION_DAYS + 5)).date().isoformat()
+    outside_week = (today - _dt.timedelta(days=20)).date().isoformat()
+    index.set_setting(ai_usage.SETTING_DAILY, json.dumps({
+        old: {"calls": {"get_summary": 9}},
+        outside_week: {"calls": {"get_summary": 4}, "rejected": {"ai_disabled": 2}},
+    }))
+    ai_usage.USAGE.record(index, "search_entities", "admin", TZ)
+    snapshot = ai_usage.USAGE.snapshot(index, TZ)
+    # 20 Tage alt zählt zur Summe, nicht zur Woche; älter als 90 Tage ist verworfen.
+    assert snapshot["total"] == 5 and snapshot["week"] == 1 and snapshot["rejected_week"] == 0
+    assert old not in json.loads(index.get_setting(ai_usage.SETTING_DAILY))
+
+
+def test_change_log_records_only_real_differences(anlage) -> None:
+    _client, index = anlage
+    from app import ai_changes
+
+    before = ai_settings.load(index)
+    after = ai_settings.save(index, enabled=True, scope="include", entities=["sensor.a", "sensor.b"], exclude_presence=False,
+                             tools_disabled=["get_series"], instructions="geheim")
+    assert ai_changes.record(index, before, after, now=100.0)
+    # Derselbe Stand noch einmal (Autosave): kein Eintrag.
+    assert not ai_changes.record(index, after, ai_settings.load(index), now=200.0)
+    entries = ai_changes.load(index)
+    assert len(entries) == 1 and entries[0]["ts"] == 100.0
+    kinds = [part["kind"] for part in entries[0]["parts"]]
+    assert kinds == ["enabled", "scope", "presence", "tool", "notes"]
+    assert "geheim" not in index.get_setting(ai_changes.SETTING_CHANGE_LOG)
+    assert "sensor.a" not in index.get_setting(ai_changes.SETTING_CHANGE_LOG)
+
+
+def test_change_log_keeps_the_newest_fifty(anlage) -> None:
+    _client, index = anlage
+    from app import ai_changes
+
+    state = ai_settings.load(index)
+    for number in range(60):
+        nxt = ai_settings.save(index, enabled=number % 2 == 0, scope="all", entities=[], exclude_presence=True)
+        ai_changes.record(index, state, nxt, now=float(number))
+        state = nxt
+    entries = ai_changes.load(index)
+    assert len(entries) == ai_changes.MAX_ENTRIES
+    assert entries[0]["ts"] == 59.0 and entries[-1]["ts"] == 10.0
 
 
 def test_settings_form_saves_tools_and_notes_and_shows_usage(client) -> None:
@@ -573,6 +639,7 @@ def test_settings_form_saves_tools_and_notes_and_shows_usage(client) -> None:
         ai_usage.USAGE.record(app_index, "get_summary", "admin")
         page = client.get("/settings/ai").text
         assert "1 Aufruf" in page and "Mit Administratorkonto" in page
+        assert "Letzte Änderungen" in page and "abgeschaltet" in page
     finally:
         ai_settings.save(
             app_index, enabled=False, scope="all", entities=[], exclude_presence=True,

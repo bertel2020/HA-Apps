@@ -125,6 +125,11 @@
   .ki-fold[open] > summary{margin-bottom:8px;}
   .ki-fold > summary.hint{display:inline-flex;margin:8px 0 0;}
   .ki-fold > summary.hint::after{margin-left:8px;}
+  .ki-warn-value{color:var(--warning);}
+  .ki-changes{list-style:none;margin:0 0 6px;padding:0;font-size:calc(13px * var(--font-scale, 1));}
+  .ki-changes li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid var(--border);}
+  .ki-changes li:first-child{border-top:0;}
+  .ki-changes time{color:var(--ink-muted);white-space:nowrap;}
   .ki-tag{font-size:calc(11px * var(--font-scale, 1));font-weight:500;color:var(--accent-line);background:var(--accent-line-soft);border-radius:6px;padding:1px 8px;}
   .ki-tool-chips{display:flex;flex-wrap:wrap;gap:6px;}
   .ki-entity-list .search{width:100%;box-sizing:border-box;margin-bottom:6px;}
