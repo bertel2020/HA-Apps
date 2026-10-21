@@ -1494,9 +1494,9 @@ def write_entity(
     # erst NACH dem ersten Aufruf — deshalb erst die abgeschlossenen Monate,
     # dann getrennt der laufende.
     if past_rows:
-        import_rows(data_dir, index, past_rows, entity_id, tz, source_label="demo")
+        import_rows(data_dir, index, past_rows, entity_id, tz, source_label="demo", accepts_state=True)
     if current_rows:
-        import_rows(data_dir, index, current_rows, entity_id, tz, source_label="demo")
+        import_rows(data_dir, index, current_rows, entity_id, tz, source_label="demo", accepts_state=True)
 
 
 # Entity-ID -> Schlüssel in simulate_household()s counter_seed-Dict (siehe

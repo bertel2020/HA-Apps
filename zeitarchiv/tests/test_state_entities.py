@@ -235,6 +235,85 @@ def test_history_import_maps_text_for_state_entities(setup, monkeypatch) -> None
     assert ha_import.state_mapper_for(index, "sensor.unknown_entity") is None
 
 
+# --- CSV, Symcon, Export ---------------------------------------------------
+
+
+def _csv(tmp: Path, text: str) -> Path:
+    path = tmp / "zustaende.csv"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_number_imports_refuse_a_state_entity_but_the_text_sources_accept_it(setup) -> None:
+    from app.storage import symcon_import
+
+    tmp, index, service = setup
+    service.ingest(_state("charging", BASE_TS))
+    rows = [(BASE_TS + 3600, 7.5)]
+    with pytest.raises(ValueError):
+        symcon_import.plan_import_rows(tmp, index, rows, ENTITY, TZ)
+    with pytest.raises(ValueError):
+        symcon_import.import_rows(tmp, index, rows, ENTITY, TZ)
+    assert symcon_import.plan_import_rows(tmp, index, rows, ENTITY, TZ, accepts_state=True).entity_id == ENTITY
+
+
+def test_csv_text_is_mapped_to_state_indexes_and_repeats_collapse(setup) -> None:
+    from app.storage import csv_import
+
+    tmp, index, service = setup
+    service.ingest(_state("charging", BASE_TS))
+    path = _csv(tmp, "ts,state\n"
+                "2026-10-01 06:00:00,charging\n2026-10-01 06:01:00,charging\n"
+                "2026-10-01 07:00:00,mopping\n2026-10-01 08:00:00,unavailable\n2026-10-01 09:00:00,\n")
+    parsed = csv_import.parse_rows(
+        path, ",", True, 0, 1, "iso", "", TZ, state_mapper=ha_import.state_mapper_for(index, ENTITY)
+    )
+    assert [v for _t, v in parsed.rows] == [0.0, 1.0, float(STATE_UNAVAILABLE_INDEX)]
+    assert parsed.skipped == 1
+    assert [row["text"] for row in index.get_state_map(ENTITY)] == ["charging", "mopping"]
+
+
+def test_csv_dry_run_creates_no_states_and_reports_new_ones(setup) -> None:
+    from app.storage import csv_import
+
+    tmp, index, service = setup
+    service.ingest(_state("charging", BASE_TS))
+    path = _csv(tmp, "ts,state\n2026-10-01 06:00:00,charging\n2026-10-01 07:00:00,mopping\n")
+    mapper = ha_import.dry_state_mapper_for(index, ENTITY)
+    parsed = csv_import.parse_rows(path, ",", True, 0, 1, "iso", "", TZ, state_mapper=mapper)
+    assert [v for _t, v in parsed.rows] == [0.0, 1.0]
+    assert mapper.new_states == ["mopping"] and mapper.refused == 0
+    assert [row["text"] for row in index.get_state_map(ENTITY)] == ["charging"]
+    assert ha_import.dry_state_mapper_for(index, "sensor.unknown_entity") is None
+
+
+def test_csv_dry_run_counts_rows_beyond_the_state_limit(setup) -> None:
+    tmp, index, service = setup
+    service.ingest(_state("s0", BASE_TS))
+    for n in range(1, MAX_STATES_PER_ENTITY):
+        index.state_index(ENTITY, f"s{n}", None, BASE_TS)
+    mapper = ha_import.dry_state_mapper_for(index, ENTITY)
+    assert mapper("s3", BASE_TS) == 3.0
+    assert mapper("one-too-many", BASE_TS) is None
+    assert mapper.refused == 1 and mapper.new_states == []
+
+
+def test_export_writes_the_raw_text_of_a_state_entity(setup) -> None:
+    from app import export_data
+    from app.storage.coordinator import StorageCoordinator
+
+    tmp, index, service = setup
+    service.ingest(_state("charging", BASE_TS))
+    service.ingest(_state('say "hi", ok', BASE_TS + 60))
+    service.ingest(_state("unavailable", BASE_TS + 120))
+    out = "".join(export_data.csv_chunks(
+        tmp, index, index.get_entity(ENTITY), None, None, "hour", TZ, StorageCoordinator(), 1000,
+    ))
+    lines = out.strip().split("\r\n")
+    assert lines[0] == "timestamp,unix_ts,state"
+    assert [line.split(",", 2)[2] for line in lines[1:]] == ["charging", '"say ""hi"", ok"', "unavailable"]
+
+
 # --- API -----------------------------------------------------------------
 
 

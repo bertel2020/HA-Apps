@@ -35,6 +35,10 @@ RESOLUTIONS = ("raw", "minute", "hour", "day")
 _BUCKET_SECONDS = {"minute": 60, "hour": 3600, "day": 86400}
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 CSV_HEADER = "timestamp,unix_ts,value\r\n"
+# Zustands-Entitäten: der Rohwert als Text statt der Indexzahl, die nur in der
+# Zuordnung der Entität etwas bedeutet. So lässt sich die Datei auch wieder
+# einlesen (CSV-Import in eine Zustands-Entität).
+STATE_CSV_HEADER = "timestamp,unix_ts,state\r\n"
 _CHUNK_ROWS = 5000
 
 
@@ -182,6 +186,16 @@ def _format_value(value: float, aggregated_mean: bool) -> str:
     return f"{value:.10g}" if aggregated_mean else f"{value}"
 
 
+def _state_cell(texts: dict[int, str], value: float) -> str:
+    """Rohtext eines Zustands, für CSV maskiert (Trennzeichen, Anführungszeichen,
+    Zeilenumbruch). -1 ist "nicht verfügbar", ein unbekannter Index bleibt leer."""
+    idx = int(round(value))
+    text = "unavailable" if idx == -1 else texts.get(idx, "")
+    if any(c in text for c in ',"\r\n'):
+        text = '"' + text.replace('"', '""') + '"'
+    return text
+
+
 def csv_chunks(
     data_dir: Path,
     index: Index,
@@ -196,8 +210,13 @@ def csv_chunks(
     """Die CSV einer Entität in Textblöcken. Hält die Entitätssperre, solange sie
     gelesen wird (wie das Schreiben in archivierten Monaten)."""
     entity_id = entity["entity_id"]
+    is_state = entity["aggregation_type"] == "state"
+    # Zustände gibt es nur roh: eine Summe oder ein Mittel über Indizes sagt nichts.
+    if is_state:
+        resolution = "raw"
     with coordinator.entity(entity_id):
-        yield CSV_HEADER
+        yield STATE_CSV_HEADER if is_state else CSV_HEADER
+        texts = {row["idx"]: row["text"] for row in index.get_state_map(entity_id)} if is_state else {}
         window = entity_window(entity, start_ts, end_ts)
         if window is None:
             return
@@ -217,7 +236,8 @@ def csv_chunks(
                     tr("CSV-Export ist auf {MAX_EXPORT_ROWS} Zeilen begrenzt", MAX_EXPORT_ROWS=max_rows)
                 )
             stamp = datetime.fromtimestamp(ts, tz).strftime("%Y-%m-%d %H:%M:%S")
-            buffer.append(f"{stamp},{ts:.3f},{_format_value(value, mean)}\r\n")
+            cell = _state_cell(texts, value) if is_state else _format_value(value, mean)
+            buffer.append(f"{stamp},{ts:.3f},{cell}\r\n")
             if len(buffer) >= _CHUNK_ROWS:
                 yield "".join(buffer)
                 buffer.clear()

@@ -816,6 +816,15 @@ verworfen.
   auszuwählen; Hinzufügen und Verdichten gibt es für Zustände nicht.
 - Je Entität werden höchstens 50 verschiedene Zustände angenommen, neue
   darüber hinaus verworfen — ein Schutz gegen Sensoren mit freiem Text.
+- **Import und Export:** Der Home-Assistant-Verlauf und der **CSV-Import**
+  können in eine bestehende Zustands-Entität schreiben; bei CSV ist die
+  Wertspalte der Zustand als Text (`charging`, `heat` …). Die Vorschau nennt
+  neue Zustände und Zeilen über der Grenze von 50, ohne etwas anzulegen.
+  Aufeinanderfolgende gleiche Zustände werden nur einmal gespeichert.
+  Symcon und VictoriaMetrics liefern keinen Text und lehnen Zustands-Entitäten
+  als Ziel ab. Der **CSV-Export** schreibt den Zustand als Text in die Spalte
+  `state` (nur roh, ohne Auflösung), sodass sich die Datei wieder einlesen
+  lässt.
 
 Zustände verwenden noch keine Verdichtung: Zeitstrahl und Kennzahlen kommen
 in jedem Zeitraum aus den gespeicherten Wechseln. Charts, Tabellen und

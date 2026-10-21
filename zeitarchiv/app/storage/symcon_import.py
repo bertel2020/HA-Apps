@@ -426,6 +426,11 @@ class ImportPlan:
     # wurden. Beim Symcon-Import immer 0 (dessen Parser zählt das nicht mit).
     skipped_rows: int = 0
     factor: float = 1.0
+    # Nur CSV-Import in eine Zustands-Entität: Texte, die als neuer Zustand
+    # angelegt würden, und Zeilen, die wegen der Obergrenze an Zuständen
+    # entfallen. Im Dry Run wird nichts angelegt (ha_import.DryStateMapper).
+    new_states: list[str] = field(default_factory=list)
+    refused_state_rows: int = 0
 
 
 @dataclass
@@ -660,6 +665,15 @@ def plan_import(
     )
 
 
+def _refuse_state_target(entity, accepts_state: bool) -> None:
+    """Eine Zustands-Entität speichert Indizes, keine Messwerte. Ein Import, der
+    ihr Zahlen unterschiebt, schriebe Indizes, die es in ihrer Zuordnung nicht
+    gibt. Nur Quellen, die Text auf den Index abbilden (Home-Assistant-Verlauf,
+    CSV), setzen accepts_state; Symcon und VictoriaMetrics liefern keinen Text."""
+    if entity["aggregation_type"] == "state" and not accepts_state:
+        raise ValueError(tr("Zustands-Entitäten lassen sich mit diesem Import nicht befüllen."))
+
+
 def plan_import_rows(
     data_dir: Path,
     index: Index,
@@ -670,6 +684,7 @@ def plan_import_rows(
     skipped_rows: int = 0,
     factor: float = 1.0,
     include_existing_months: bool = False,
+    accepts_state: bool = False,
 ) -> ImportPlan:
     """Generischer Dry-Run-Kern: berechnet, was import_rows() für bereits
     geparste (ts, value)-Zeilen tun würde, ohne etwas zu schreiben — von
@@ -681,6 +696,7 @@ def plan_import_rows(
     entity = index.get_entity(entity_id)
     if entity is None:
         raise ValueError(tr("Unbekannte Entität: {entity_id}", entity_id=entity_id))
+    _refuse_state_target(entity, accepts_state)
     by_month = _group_by_month(rows, tz)
     to_import, to_merge, to_update, to_skip = _classify_months(
         data_dir, entity, by_month, tz, include_existing_months
@@ -757,6 +773,7 @@ def import_rows(
     on_month_done: Callable[[str, int], None] | None = None,
     factor: float = 1.0,
     include_existing_months: bool = False,
+    accepts_state: bool = False,
 ) -> ImportResult:
     """Generischer Import-Kern: schreibt bereits geparste (ts, value)-Zeilen in
     eine bestehende Zeitarchiv-Entität — dieselbe Monats-Klassifizierung wie
@@ -769,6 +786,7 @@ def import_rows(
     entity = index.get_entity(entity_id)
     if entity is None:
         raise ValueError(tr("Unbekannte Entität: {entity_id}", entity_id=entity_id))
+    _refuse_state_target(entity, accepts_state)
     aggregation_type = entity["aggregation_type"]
     hourly_rollup = bool(entity["hourly_rollup"])
 

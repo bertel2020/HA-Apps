@@ -437,7 +437,9 @@ class ImportService:
                 entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
                 row["unit"] or "",
             )
-            for row in self.deps.index.list_entities()
+            # Zustands-Entitäten fehlen: Symcon liefert keinen Text, siehe
+            # symcon_import._refuse_state_target().
+            for row in self.deps.index.list_entities() if row["aggregation_type"] != "state"
         ]
         names = self._load_symcon_names()
         return {
@@ -1065,6 +1067,7 @@ class ImportService:
     def _parse_csv_with_progress(
         self, path: Path, delimiter: str, has_header: bool, ts_col: int, value_col: int,
         ts_format: str, custom_pattern: str, phase_label: str,
+        state_mapper=None,
     ) -> csv_import.ParseResult:
         """parse_rows() mit angeschlossener Fortschrittsanzeige.
 
@@ -1081,7 +1084,7 @@ class ImportService:
         self._csv_progress.set_phase(phase_label, csv_import.count_data_rows(path, has_header))
         return csv_import.parse_rows(
             path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, self.deps.tz,
-            on_progress=self._csv_progress.advance,
+            on_progress=self._csv_progress.advance, state_mapper=state_mapper,
         )
 
 
@@ -1179,7 +1182,7 @@ class ImportService:
                 entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
                 row["unit"] or "",
             )
-            for row in entity_rows
+            for row in entity_rows if row["aggregation_type"] != "state"
         ]
         # Eigene, reichere Optionsliste fürs Ziel-Entität-Feld (entityPicker(),
         # siehe _csv_import_section.html) — dieselbe Form wie table_editor.html/
@@ -1874,6 +1877,7 @@ class ImportService:
             source_label=entity_id,
             skipped_rows=history.skipped,
             include_existing_months=include_existing_months,
+            accepts_state=True,
         )
         by_month = symcon_import._group_by_month(history.rows, self.deps.tz)
         current_label = datetime.now(self.deps.tz).strftime("%Y-%m")
@@ -2411,16 +2415,22 @@ class ImportService:
                     # Das Lesen und Sortieren der Datei berührt keinen
                     # Speicherbestand und braucht deshalb keine Sperre — siehe
                     # dieselbe Trennung in import_csv_start().
+                    # Zustands-Entität: Text statt Zahl, in der Vorschau ohne etwas
+                    # anzulegen (DryStateMapper sammelt die neuen Zustände).
+                    dry_mapper = ha_import.dry_state_mapper_for(self.deps.index, entity_id)
                     parsed = self._parse_csv_with_progress(
                         path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern,
-                        phase_label=tr("Datei wird gelesen…"),
+                        phase_label=tr("Datei wird gelesen…"), state_mapper=dry_mapper,
                     )
                     self._csv_progress.set_phase(N_("Vorschau wird berechnet…"))
                     with self.deps.coordinator.entity(entity_id):
                         plan = symcon_import.plan_import_rows(
                             self.deps.data_dir, self.deps.index, parsed.rows, entity_id, self.deps.tz,
-                            source_label=path.name, skipped_rows=parsed.skipped
+                            source_label=path.name, skipped_rows=parsed.skipped, accepts_state=True,
                         )
+                    if dry_mapper is not None:
+                        plan.new_states = dry_mapper.new_states
+                        plan.refused_state_rows = dry_mapper.refused
                     return {"plans": [plan], "errors": []}
 
                 try:
@@ -2545,6 +2555,7 @@ class ImportService:
                     parsed = self._parse_csv_with_progress(
                         path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern,
                         phase_label=tr("Schritt 1/2 · Datei wird gelesen…"),
+                        state_mapper=ha_import.state_mapper_for(self.deps.index, entity_id),
                     )
                     # Zweite Phase ohne Gesamtzahl: Wie viele Monate wirklich
                     # geschrieben werden, entscheidet erst die Klassifizierung
@@ -2572,6 +2583,7 @@ class ImportService:
                             source_label=path.name,
                             skipped_rows=parsed.skipped,
                             on_month_done=lambda label, _anzahl: self._csv_progress.advance(detail=label),
+                            accepts_state=True,
                         )
                         reconciliation_report = self.deps.run_storage_reconciliation(entity_ids=[entity_id], repair=True)
                     results.append(result)
@@ -2782,7 +2794,7 @@ class ImportService:
                             plan = symcon_import.plan_import_rows(
                                 self.deps.data_dir, self.deps.index, history.rows, entity_id, self.deps.tz,
                                 source_label=entity_id, skipped_rows=history.skipped,
-                                include_existing_months=include_existing_months,
+                                include_existing_months=include_existing_months, accepts_state=True,
                             )
                         except ValueError as exc:
                             errors.append(f"{entity_id}: {exc}")
@@ -2971,7 +2983,7 @@ class ImportService:
                             result = symcon_import.import_rows(
                                 self.deps.data_dir, self.deps.index, history.rows, entity_id, self.deps.tz,
                                 source_label=entity_id, skipped_rows=history.skipped,
-                                include_existing_months=include_existing_months,
+                                include_existing_months=include_existing_months, accepts_state=True,
                             )
                         except ValueError as exc:
                             errors.append(f"{entity_id}: {exc}")
