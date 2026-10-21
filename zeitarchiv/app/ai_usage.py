@@ -129,9 +129,13 @@ class AiUsage:
             if index is None or not self._dirty:
                 return
             payload = json.dumps(self._days, separators=(",", ":"))
+            last = self.last_used
             self._dirty = False
             self._persisted_at = time.time()
         index.set_setting(SETTING_DAILY, payload)
+        # Sonst zeigt "zuletzt genutzt" nach dem Neustart den Stand der letzten Schreibpause.
+        if last is not None:
+            index.set_setting(SETTING_LAST_USED, str(last))
 
     def snapshot(self, index: Index, tz: tzinfo | None = None) -> dict:
         today = datetime.now(tz or timezone.utc).date()

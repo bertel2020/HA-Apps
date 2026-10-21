@@ -568,12 +568,25 @@ def test_usage_is_counted_per_day_and_survives_a_restart(anlage) -> None:
     client.post("/api/ai/get_series", json={"entity_ids": ["sensor.temperatur"], "period": "day"}, headers=AUTH)
     # Neustart: Beim Beenden wird geschrieben, der Prozesszustand ist danach weg;
     # die Tageswerte kommen aus dem Index.
+    last = ai_usage.USAGE.last_used
     ai_usage.USAGE.flush()
     ai_usage.USAGE.reset()
     snapshot = ai_usage.USAGE.snapshot(index, TZ)
+    assert snapshot["last_used"] == last
     assert snapshot["today"] == 1 and snapshot["week"] == 1 and snapshot["total"] == 1
     assert snapshot["by_account"]["admin"] == 1
     assert snapshot["rejected"] == {"tool_disabled": 1} and snapshot["rejected_week"] == 1
+
+
+def test_last_used_survives_a_restart_even_within_the_write_pause(anlage) -> None:
+    _client, index = anlage
+    ai_usage.USAGE.record(index, "search_entities", "admin", TZ)
+    ai_usage.USAGE.record(index, "get_summary", "admin", TZ)  # innerhalb der Schreibpause: nur im Speicher
+    last = ai_usage.USAGE.last_used
+    assert float(index.get_setting(ai_usage.SETTING_LAST_USED)) < last
+    ai_usage.USAGE.flush()
+    ai_usage.USAGE.reset()
+    assert ai_usage.USAGE.snapshot(index, TZ)["last_used"] == last
 
 
 def test_usage_window_and_retention(anlage) -> None:
