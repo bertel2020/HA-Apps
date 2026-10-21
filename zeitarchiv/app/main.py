@@ -168,7 +168,9 @@ from . import notices as notices_mod
 from . import version_check
 from .notices import collect_notices
 from .chart_period import calendar_bounds, compare_settings_or_400, period_anchor_or_400
-from .chart_types import CHART_EDITOR_CHART_TYPES, ENTITY_CHART_TYPES, chart_type_label, chart_type_key, effective_chart_type
+from .chart_types import (
+    CHART_EDITOR_CHART_TYPES, ENTITY_CHART_TYPES, chart_type_label, chart_type_key, editor_display_prefill, effective_chart_type,
+)
 from .progress import activity_snapshot, register_source
 
 logger = logging.getLogger(__name__)
@@ -3404,14 +3406,15 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "range_key": chart["range_key"] if chart else prefill.get("range_key", "day"),
         "continuous": chart["continuous"] if chart else prefill.get("continuous", False),
         "resolution_preset": chart["resolution_preset"] if chart else prefill.get("resolution_preset", "auto"),
-        "dynamic_y_axis": chart["dynamic_y_axis"] if chart else True,
-        "chart_stats": chart["chart_stats"] if chart else True,
-        "legend_metrics": chart["legend_metrics"] if chart else ["sum"],
-        "legend_style": chart["legend_style"] if chart else "chips",
-        "chart_type": effective_chart_type(chart, _aggregation_types()) if chart else "auto",
-        "decimals": chart["decimals"] if chart else "auto",
-        "show_values": chart["show_values"] if chart else False, "average_line": chart["average_line"] if chart else False,
-        "area_fill": chart["area_fill"] if chart else True, "show_points": chart["show_points"] if chart else False,
+        "dynamic_y_axis": chart["dynamic_y_axis"] if chart else prefill.get("dynamic_y_axis", True),
+        "chart_stats": chart["chart_stats"] if chart else prefill.get("chart_stats", True),
+        "legend_metrics": chart["legend_metrics"] if chart else prefill.get("legend_metrics", ["sum"]),
+        "legend_style": chart["legend_style"] if chart else prefill.get("legend_style", "chips"),
+        "chart_type": effective_chart_type(chart, _aggregation_types()) if chart else prefill.get("chart_type", "auto"),
+        "decimals": chart["decimals"] if chart else prefill.get("decimals", "auto"),
+        "show_values": chart["show_values"] if chart else prefill.get("show_values", False),
+        "average_line": chart["average_line"] if chart else prefill.get("average_line", False),
+        "area_fill": chart["area_fill"] if chart else True, "show_points": chart["show_points"] if chart else prefill.get("show_points", False),
         "stacked": chart["stacked"] if chart else False,
         "normalize": chart["normalize"] if chart else False,
         "average_style": chart["average_style"] if chart else "flat",
@@ -3461,6 +3464,8 @@ def charts_new(
             "compare_mode": compare_mode if compare_mode in ("previous", "year") else "previous",
             "period_anchor": period_anchor_or_400(anchor),
         }
+        prefill |= editor_display_prefill(
+            request.query_params, _CHART_LEGEND_METRICS, _CHART_LEGEND_STYLES, _ENTITY_CHART_DECIMALS)
     return templates.TemplateResponse(request, "chart_editor.html", _chart_editor_context(None, prefill))
 
 

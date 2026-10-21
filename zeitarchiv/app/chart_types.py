@@ -76,3 +76,27 @@ def chart_type_key(chart: dict, aggregation_types: dict[str, str]) -> str:
 
 def chart_type_label(chart: dict, aggregation_types: dict[str, str]) -> str:
     return CHART_TYPE_LABELS.get(chart_type_key(chart, aggregation_types), "")
+
+
+_FLAGS = ("show_points", "show_values", "dynamic_y_axis", "average_line", "chart_stats")
+
+
+def editor_display_prefill(params, metrics: set[str], styles: set[str], decimals: set[str]) -> dict:
+    """Darstellungsoptionen, die "Als Chart speichern" von der Entitätsseite in
+    den Editor mitgibt. Nur gültige Werte kommen durch: ein fehlender oder
+    kaputter Parameter lässt den Editor bei seinem Standard, statt die Seite
+    mit 400 abzulehnen — der Link ist nur eine Vorbelegung."""
+    out: dict = {}
+    if params.get("chart_type") in CHART_EDITOR_CHART_TYPES:
+        out["chart_type"] = params["chart_type"]
+    if params.get("decimals") in decimals:
+        out["decimals"] = params["decimals"]
+    if params.get("legend_style") in styles:
+        out["legend_style"] = params["legend_style"]
+    chosen = [m for m in params.get("legend_metrics", "").split(",") if m in metrics]
+    if chosen:
+        out["legend_metrics"] = chosen
+    for flag in _FLAGS:
+        if params.get(flag) in ("true", "false"):
+            out[flag] = params[flag] == "true"
+    return out

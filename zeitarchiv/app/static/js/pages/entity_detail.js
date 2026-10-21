@@ -483,6 +483,17 @@ function selectBrush() {
             entity_id: ENTITY_ID, name: DISPLAY_NAME,
             range: this.range, continuous: String(this.continuous),
             compare: String(this.compare), compare_mode: this.compareMode,
+            // Darstellung mitnehmen: sonst fängt der Editor bei Null an und die
+            // Wahl dieser Seite (Legende als Tabelle, Nachkommastellen …) ginge
+            // beim Speichern verloren. Der Editor kennt "line" nicht: eine
+            // Schalter-Entität ohne Zeitstrahl heißt dort "bar", alles andere
+            // bestimmt "auto" je Serie selbst.
+            chart_type: this.chartType === 'timeline' ? 'timeline' : (DEFAULT_CHART_TYPE === 'timeline' ? 'bar' : 'auto'),
+            decimals: this.decimals,
+            show_points: String(this.showPoints), show_values: String(this.showValues),
+            dynamic_y_axis: String(this.dynamicYAxis), average_line: String(this.averageLine),
+            chart_stats: String(this.chartStats), legend_metrics: this.legendMetrics.join(','),
+            legend_style: this.legendStyle,
           });
           // Eine vergangene Periode (z. B. 2025) geht als fester Zeitraum mit:
           // ein Tag darin (Mitte des Fensters) statt des Versatzes, siehe

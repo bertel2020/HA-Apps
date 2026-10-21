@@ -153,6 +153,22 @@ def test_save_as_chart_prefill_carries_the_period(client) -> None:
     assert "const PERIOD_ANCHOR = null;" in plain
 
 
+def test_save_as_chart_prefill_carries_the_display_options(client) -> None:
+    page = client.get(
+        "/charts/new?entity_id=sensor.gibt_es_nicht&legend_style=table&decimals=2&show_points=true"
+        "&legend_metrics=min,max,quatsch&chart_type=timeline"
+    ).text
+    assert 'const LEGEND_STYLE = "table";' in page
+    assert 'const DECIMALS = "2";' in page
+    assert "const SHOW_POINTS = true;" in page
+    assert 'const CHART_TYPE = "timeline";' in page
+    # Ungültige Werte fallen auf den Standard zurück, statt die Seite abzulehnen.
+    bad = client.get("/charts/new?entity_id=sensor.gibt_es_nicht&legend_style=x&decimals=9&chart_type=x")
+    assert bad.status_code == 200
+    assert 'const LEGEND_STYLE = "chips";' in bad.text
+    assert 'const DECIMALS = "auto";' in bad.text
+
+
 def test_choosing_a_comparison_returns_to_the_current_period() -> None:
     """Vorjahr, Langzeit usw. beziehen sich auf die laufende Periode: wer vorher
     zurückgeblättert hatte, landet beim Wählen eines Vergleichs wieder bei
