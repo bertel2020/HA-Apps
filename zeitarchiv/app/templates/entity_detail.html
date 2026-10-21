@@ -442,21 +442,31 @@
             <div class="state-log-list" @mouseleave="highlightState(null)">
               <template x-for="item in stateLogItems" :key="item.id">
                 <div>
-                  <div class="state-log-day" x-show="item.type === 'day'" x-text="item.label"></div>
+                  <template x-if="item.type === 'day'">
+                    <button type="button" class="state-log-day" :aria-expanded="item.open.toString()" @click="toggleLogDay(item.key, item.open)">
+                      <span class="state-log-day-caret" aria-hidden="true">▾</span>
+                      <strong x-text="item.label"></strong>
+                      <span class="state-log-day-count" x-text="item.countLabel"></span>
+                      <span class="state-log-strip" aria-hidden="true">
+                        <template x-for="part in item.strip" :key="part.key"><i :style="part.style"></i></template>
+                      </span>
+                    </button>
+                  </template>
                   <template x-if="item.type === 'row'">
                     <div class="state-log-row" :class="{hot: stateHot === item.seg.key}" :data-key="item.seg.key"
                          :title="`{{ _('Rohwert') }}: ${stateRaw(item.seg.idx)}`" @mouseenter="highlightState(item.seg.key)">
-                      <span class="state-log-time" x-text="fmtStateTime(item.seg.s)"></span>
+                      <span class="state-log-time" x-text="item.span"></span>
                       <span class="state-log-state"><span class="dot state-dot" :style="stateSwatch(item.seg.idx)"></span><span x-text="stateLabel(item.seg.idx)"></span></span>
-                      <span class="state-log-dur" x-text="fmtStateDuration(item.seg.e - item.seg.s) + (stateRunning(item.seg) ? ' · ' + t('läuft') : '')"></span>
+                      <span class="state-log-bar" aria-hidden="true"><i :style="item.bar"></i></span>
+                      <span class="state-log-dur"><span x-text="fmtStateDuration(item.seg.e - item.seg.s)"></span><span class="state-log-running" x-show="stateRunning(item.seg)" x-text="t('läuft')"></span></span>
                     </div>
                   </template>
                 </div>
               </template>
               <p class="hint" x-show="!stateLogRows.length">{{ _("Keine Wechsel in diesem Ausschnitt.") }}</p>
             </div>
-            <button type="button" class="btn state-log-more" x-show="stateLogShown < stateLogRows.length"
-                    @click="stateLogShown += 25" x-text="t('Weitere {n} laden', {n: Math.min(25, stateLogRows.length - stateLogShown)})"></button>
+            <button type="button" class="btn state-log-more" x-show="stateLogShown < stateLogVisibleRows.length"
+                    @click="stateLogShown += 25" x-text="t('Weitere {n} laden', {n: Math.min(25, stateLogVisibleRows.length - stateLogShown)})"></button>
           </div>
         </div>
       </div>

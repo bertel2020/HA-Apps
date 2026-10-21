@@ -420,6 +420,7 @@ function selectBrush() {
         hiddenStates: [],
         stateLog: CHART_OPTIONS.state_log !== false,
         stateLogShown: STATE_LOG_PAGE,
+        stateLogDays: {},
         // Zeile im Wechsel-Protokoll, deren Band gerade hervorgehoben ist.
         stateHot: null,
         windowStart: null,
@@ -670,29 +671,62 @@ function selectBrush() {
             .filter(seg => !this.hiddenStates.includes(seg.idx) && seg.e > a && seg.s < b)
             .reverse();
         },
-        // Protokoll-Einträge mit Tages-Zwischenzeilen ab einem Zeitraum über
-        // einen Tag, begrenzt auf stateLogShown Abschnitte.
-        get stateLogItems() {
+        // Protokoll nach Tagen gruppiert (ab einem Zeitraum über einen Tag), der
+        // jüngste zuerst. Die beiden neuesten Tage sind offen, ältere zu, bis
+        // man sie öffnet (stateLogDays hält nur die eigenen Umschaltungen).
+        get stateLogGroups() {
           const rows = this.stateLogRows;
-          const multiDay = !['hour', 'day'].includes(this.range);
-          const perDay = new Map();
-          const dayKey = ts => new Date(ts * 1000).toDateString();
-          if (multiDay) rows.forEach(seg => perDay.set(dayKey(seg.s), (perDay.get(dayKey(seg.s)) || 0) + 1));
+          if (['hour', 'day'].includes(this.range)) return {multiDay: false, groups: [{key: 'all', segs: rows, open: true}]};
+          const byDay = new Map();
+          rows.forEach(seg => {
+            const key = new Date(seg.s * 1000).toDateString();
+            if (!byDay.has(key)) byDay.set(key, []);
+            byDay.get(key).push(seg);
+          });
+          const groups = [...byDay].map(([key, segs], order) => ({
+            key, segs, open: key in this.stateLogDays ? this.stateLogDays[key] : order < 2,
+          }));
+          return {multiDay: true, groups};
+        },
+        // Zeilen, die tatsächlich ausgeklappt sind — nur sie zählen für
+        // "Weitere laden", ein geschlossener Tag verbraucht kein Kontingent.
+        get stateLogVisibleRows() {
+          return this.stateLogGroups.groups.filter(g => g.open).flatMap(g => g.segs);
+        },
+        // Protokoll-Einträge: Tageskopf (mit Mini-Leiste der Zusammensetzung)
+        // und darunter die Abschnitte als Zeitspanne mit Dauerbalken,
+        // begrenzt auf stateLogShown Zeilen.
+        get stateLogItems() {
+          const {multiDay, groups} = this.stateLogGroups;
+          const longest = this.stateLogRows.reduce((m, seg) => Math.max(m, seg.e - seg.s), 1);
+          const mkRow = seg => ({
+            type: 'row', id: `r${seg.key}`, seg,
+            span: `${this.fmtStateTime(seg.s)} – ${this.stateRunning(seg) ? t('jetzt') : this.fmtStateTime(seg.e)}`,
+            bar: `width:${Math.max((seg.e - seg.s) / longest * 100, 1.5)}%;${stateSwatchStyle(seg.idx)}`,
+          });
           const items = [];
-          let lastDay = null;
-          rows.slice(0, this.stateLogShown).forEach(seg => {
-            const day = dayKey(seg.s);
-            if (multiDay && day !== lastDay) {
-              const count = perDay.get(day);
-              const date = new Date(seg.s * 1000).toLocaleDateString(LOCALE, {weekday: 'short', day: '2-digit', month: '2-digit'});
-              items.push({type: 'day', id: `d${seg.key}`,
-                label: count === 1 ? t('{date} · 1 Abschnitt', {date}) : t('{date} · {count} Abschnitte', {date, count})});
-              lastDay = day;
+          let left = this.stateLogShown;
+          groups.forEach(g => {
+            if (multiDay) {
+              const total = g.segs.reduce((sum, seg) => sum + (seg.e - seg.s), 0) || 1;
+              const count = g.segs.length;
+              items.push({
+                type: 'day', id: `d${g.key}`, key: g.key, open: g.open,
+                label: new Date(g.segs[0].s * 1000).toLocaleDateString(LOCALE, {weekday: 'short', day: '2-digit', month: '2-digit'}),
+                countLabel: count === 1 ? t('1 Abschnitt') : t('{count} Abschnitte', {count}),
+                strip: [...g.segs].reverse().map(seg => ({key: seg.key, style: `width:${(seg.e - seg.s) / total * 100}%;${stateSwatchStyle(seg.idx)}`})),
+              });
             }
-            items.push({type: 'row', id: `r${seg.key}`, seg});
+            if (!g.open) return;
+            for (const seg of g.segs) {
+              if (left <= 0) break;
+              items.push(mkRow(seg));
+              left -= 1;
+            }
           });
           return items;
         },
+        toggleLogDay(key, open) { this.stateLogDays = {...this.stateLogDays, [key]: !open}; },
         get stateLogTitle() {
           const count = this.stateLogRows.length.toLocaleString(LOCALE);
           return this.zoomRange
@@ -750,8 +784,10 @@ function selectBrush() {
         // den bisher gezeigten Einträgen liegt).
         focusStateRow(key) {
           if (!this.stateLog) this.stateLog = true;
-          const pos = this.stateLogRows.findIndex(seg => seg.key === key);
-          if (pos < 0) return;
+          const group = this.stateLogGroups.groups.find(g => g.segs.some(seg => seg.key === key));
+          if (!group) return;
+          if (!group.open) this.stateLogDays = {...this.stateLogDays, [group.key]: true};
+          const pos = this.stateLogVisibleRows.findIndex(seg => seg.key === key);
           if (pos >= this.stateLogShown) this.stateLogShown = Math.ceil((pos + 1) / STATE_LOG_PAGE) * STATE_LOG_PAGE;
           this.stateHot = key;
           this.$nextTick(() => {
@@ -980,6 +1016,7 @@ function selectBrush() {
           this.aggregationType = data.aggregation_type;
           this.states = data.states || [];
           this.stateLogShown = STATE_LOG_PAGE;
+          this.stateLogDays = {};
           this.windowStart = data.window_start;
           this.windowEnd = data.window_end;
           this.periodEnd = data.period_end ?? data.window_end;
