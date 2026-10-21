@@ -1537,8 +1537,8 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
 .dash-period-steps{display:inline-flex;gap:4px;}
 .dash-period-nav .chip{font-size:calc(12px * var(--font-scale, 1));padding:4px 11px;}
 .dash-period-banner{
-  display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;margin:10px 0 12px;padding:3px 12px;
-  background:var(--warning-soft);border-radius:999px;
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:10px 0 12px;padding:4px 12px;
+  background:var(--warning-soft);border-radius:8px;
   color:var(--warning);font-size:calc(12px * var(--font-scale, 1));
 }
 .dash-period-banner strong{font-weight:600;}
