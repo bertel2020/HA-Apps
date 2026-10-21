@@ -210,9 +210,9 @@ window.StateEntities = (() => {
   // Farben gelten nur innerhalb einer Entität, ein gemeinsamer Stapel wäre
   // sinnlos. rows: [{name, states, buckets}]. Gibt eine vollständige
   // ECharts-Option zurück (ohne toolbox); Chart-Editor und Dashboard-Kachel
-  // zeichnen damit dasselbe. Die Entitätsseite hat ihre eigene Fassung mit
-  // Klick-Drilldown und ausblendbaren Zuständen.
-  function barPanels(rows, {mode, range, windowStart, periodEnd}) {
+  // zeichnen damit dasselbe, ebenso die Entitätsseite. hidden: ausgeblendete
+  // Zustandsindizes — sie fehlen, die Anteile verteilen sich auf die übrigen.
+  function barPanels(rows, {mode, range, windowStart, periodEnd, hidden = []}) {
     const shares = mode === 'shares';
     const css = getComputedStyle(document.body);
     const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
@@ -230,10 +230,10 @@ window.StateEntities = (() => {
     };
     const panels = rows.map((row, k) => {
       const byStart = new Map(row.buckets.map(b => [bucketStart(b.ts + 1), b]));
-      const present = new Set(row.buckets.flatMap(b => [...b.states.keys()]));
+      const present = new Set(row.buckets.flatMap(b => [...b.states.keys()]).filter(idx => !hidden.includes(idx)));
       const order = (row.states || []).map(st => st.idx).filter(idx => present.has(idx));
       for (const idx of present) if (!order.includes(idx)) order.splice(idx === UNAVAILABLE ? order.length : Math.max(order.length - 1, 0), 0, idx);
-      const totalOf = bucket => bucket ? [...bucket.states.values()].reduce((sum, v) => sum + v.seconds, 0) : 0;
+      const totalOf = bucket => bucket ? [...bucket.states].reduce((sum, [idx, v]) => sum + (hidden.includes(idx) ? 0 : v.seconds), 0) : 0;
       option.grid.push(n === 1
         ? {left: 10, right: 20, top: 24, bottom: 40, containLabel: true}
         : {left: 10, right: 20, top: `${k * slot + 7}%`, height: `${slot - 16}%`, containLabel: true});

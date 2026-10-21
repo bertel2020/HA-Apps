@@ -1083,7 +1083,7 @@ function selectBrush() {
             // Handler auf derselben Instanz.
             chartInstance.on('click', (p) => {
               if (this.isState && p.seriesId === 'main') this.focusStateRow(p.value[4]);
-              else if (this.isState && String(p.seriesId).startsWith('state-')) this.drillState(p.dataIndex);
+              else if (this.isState && /^\d+:/.test(String(p.seriesId))) this.drillState(p.dataIndex);
             });
             chartInstance.on('mouseover', (p) => {
               if (this.isState && p.seriesId === 'main') this.stateHot = p.value[4];
@@ -1177,7 +1177,7 @@ function selectBrush() {
           const tooltipBucketSeconds = detectResolutionSeconds(this.points);
 
           if (this.isState && this.stateMode !== 'timeline') {
-            this.renderStateBars(fmt);
+            this.renderStateBars();
             return;
           }
           if (this.chartType === 'timeline') {
@@ -1688,85 +1688,13 @@ function selectBrush() {
         },
         // Anteile (gestapelt auf 100 %) oder Wechsel (Beginne je Zustand) je
         // Bucket. Ausgeblendete Zustände fehlen, die Anteile verteilen sich dann
-        // auf die sichtbaren (ROADMAP 1.29).
-        renderStateBars(fmt) {
-          const shares = this.stateMode === 'shares';
-          const starts = this.stateBucketStarts;
-          const [bucketStart] = StateEntities.RANGE_BUCKETS[this.range]();
-          const byStart = new Map(this.stateBuckets.map(b => [bucketStart(b.ts + 1), b]));
-          const visible = idx => !this.hiddenStates.includes(idx);
-          const order = this.states.map(st => st.idx).filter(idx => visible(idx)
-            && this.stateBuckets.some(b => b.states.has(idx)));
-          const totalOf = bucket => {
-            let sum = 0;
-            if (bucket) for (const [idx, v] of bucket.states) if (visible(idx)) sum += v.seconds;
-            return sum;
-          };
-          const pattern = unavailablePattern();
-          const fmtBucket = ts => {
-            const d = new Date(ts * 1000);
-            if (this.range === 'hour') return d.toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
-            if (this.range === 'day') return d.toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
-            if (this.range === 'week') return d.toLocaleDateString(LOCALE, {weekday: 'short', day: '2-digit', month: '2-digit'});
-            return fmt(ts);
-          };
-          const series = order.map(idx => ({
-            id: `state-${idx}`,
-            name: this.stateLabel(idx),
-            type: 'bar',
-            stack: 'states',
-            barCategoryGap: '20%',
-            itemStyle: {color: StateEntities.fill(idx, pattern)},
-            emphasis: {focus: 'none'},
-            data: starts.map(ts => {
-              const bucket = byStart.get(ts);
-              const v = bucket && bucket.states.get(idx);
-              if (!v) return null;
-              if (!shares) return v.entries || null;
-              const total = totalOf(bucket);
-              return total > 0 && v.seconds > 0 ? v.seconds / total * 100 : null;
-            }),
-          }));
-          const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
-          const css = getComputedStyle(document.body);
-          chartInstance.setOption({
-            textStyle: {
-              fontFamily: css.getPropertyValue('--font-mono'),
-              color: css.getPropertyValue('--ink-muted'),
-              fontSize: Math.round(12 * uiFontScale * 10) / 10,
-            },
-            grid: {left: 10, right: 20, top: 24, bottom: 40, containLabel: true},
-            xAxis: {
-              type: 'category',
-              data: starts.map(fmtBucket),
-              axisTick: {alignWithLabel: true},
-              axisLabel: {hideOverlap: true},
-            },
-            yAxis: shares
-              ? {type: 'value', max: 100, axisLabel: {formatter: v => `${v} %`}, splitLine: {lineStyle: {color: css.getPropertyValue('--border')}}}
-              : {type: 'value', minInterval: 1, splitLine: {lineStyle: {color: css.getPropertyValue('--border')}}},
-            tooltip: {
-              trigger: 'axis',
-              axisPointer: {type: 'shadow'},
-              appendToBody: true,
-              formatter: items => {
-                const ts = starts[items[0]?.dataIndex];
-                const bucket = byStart.get(ts);
-                if (!bucket) return escapeHtml(fmtBucket(ts));
-                const lines = order.filter(idx => bucket.states.has(idx)).map(idx => {
-                  const v = bucket.states.get(idx);
-                  const total = totalOf(bucket);
-                  const value = shares
-                    ? `${NumberFormat.fmtDuration(v.seconds)} · ${StateEntities.fmtShare(total ? v.seconds / total * 100 : 0)}`
-                    : (v.entries === 1 ? t('1 Beginn') : t('{count} Beginne', {count: v.entries.toLocaleString(LOCALE)}));
-                  return `<span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:2px;${stateSwatchStyle(idx)}"></span> ${escapeHtml(this.stateLabel(idx))} <strong>${value}</strong>`;
-                });
-                return `${escapeHtml(fmtBucket(ts))}<br>${lines.join('<br>')}`;
-              },
-            },
-            series,
-            toolbox: {show: false},
-          }, true);
+        // auf die sichtbaren (ROADMAP 1.29). Gezeichnet wird in
+        // state-entities.js, gemeinsam mit Chart-Editor und Kacheln.
+        renderStateBars() {
+          chartInstance.setOption(StateEntities.barPanels(
+            [{name: DISPLAY_NAME, states: this.states, buckets: this.stateBuckets}],
+            {mode: this.stateMode, range: this.range, windowStart: this.windowStart, periodEnd: this.periodEnd, hidden: this.hiddenStates}
+          ), true);
           chartInstance.resize();
         },
 
