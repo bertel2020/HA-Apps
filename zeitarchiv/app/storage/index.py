@@ -43,6 +43,28 @@ SWITCH_DOMAINS = {
 PRESENCE_DOMAINS = {"device_tracker", "person"}
 COUNTER_STATE_CLASSES = {"total", "total_increasing"}
 
+# Zustands-Entitäten (Typ "state", ROADMAP 1.29): Text-Zustände werden als
+# Ganzzahl-Index im unveränderten Wert-Feld gespeichert, die Zuordnung
+# Index → Text steht in entity_states. Ein Index wird nie umnummeriert und nie
+# wiederverwendet — nur so bleiben bereits archivierte Monate richtig lesbar.
+STATE_TYPE = "state"
+# Fester Index für "unavailable"/"unknown": Ohne ihn liefe im Zeitstrahl der
+# letzte Zustand über einen Ausfall hinweg weiter. Zählt nicht zur Obergrenze.
+STATE_UNAVAILABLE_INDEX = -1
+STATE_UNAVAILABLE_TEXTS = {"unavailable", "unknown"}
+# Wie IGNORED_STATES der Integration, nur ohne die beiden oben.
+STATE_IGNORED_TEXTS = {"none", ""}
+# Schutz gegen Freitext-Sensoren (Adressen, Versionsnummern …): darüber
+# werden neue Zustände verworfen statt die Zuordnung unbegrenzt wachsen zu
+# lassen. Die brauchbaren Entitäten der Bestandsaufnahme hatten 2–7.
+MAX_STATES_PER_ENTITY = 50
+
+
+class StateTypeMismatch(ValueError):
+    """Eine Entität liefert Text, obwohl sie als Zahl angelegt ist, oder
+    umgekehrt. Der erste Wert legt den Typ fest; ein Wechsel würde die schon
+    gespeicherten Werte umdeuten und wird deshalb abgelehnt statt migriert."""
+
 DEFAULT_RESOLUTION = "raw"
 DEFAULT_RETENTION = "unlimited"
 # Fallback, solange kein "default_*"-Setting existiert (Einstellungen →
@@ -286,7 +308,7 @@ def effective_gap_floor_minutes(resolution: str, value_filter: str) -> int:
 # mit dem Zuwachs eine tragfähige Bezugsgröße und werden deshalb erkannt —
 # gemessen an einem echten Stromzähler trennen sechs Größenordnungen den
 # größten normalen Zuwachs (10,1× Median) vom Ziffernfehler (56.941.875×).
-_OUTLIER_BLIND_AGGREGATION_TYPES = {"switch"}
+_OUTLIER_BLIND_AGGREGATION_TYPES = {"switch", STATE_TYPE}
 
 
 def outlier_detection_applies(aggregation_type: str) -> bool:
@@ -414,6 +436,20 @@ CREATE INDEX IF NOT EXISTS idx_deleted_points_entity_deleted_at
 -- rebuild_entity_rollups() das Rollup still aus den jetzt gröberen Daten neu
 -- berechnet, statt den bestehenden, aus den vollen Rohdaten stammenden Stand
 -- zu behalten.
+-- Zuordnung Index → Text für Zustands-Entitäten (Typ "state"). text ist der
+-- Rohwert aus Home Assistant und der eigentliche Schlüssel; label ist die
+-- zuletzt gemeldete Übersetzung (leer, wenn HA keine kennt) und darf sich
+-- ändern, ohne dass ein Archivwert angefasst werden muss.
+CREATE TABLE IF NOT EXISTS entity_states (
+    entity_id TEXT NOT NULL,
+    idx INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    label TEXT,
+    first_seen REAL NOT NULL,
+    PRIMARY KEY (entity_id, idx),
+    UNIQUE (entity_id, text)
+);
+
 CREATE TABLE IF NOT EXISTS compacted_months (
     entity_id TEXT NOT NULL,
     year INTEGER NOT NULL,
@@ -1531,8 +1567,15 @@ class Index:
         unit: str | None,
         friendly_name: str | None = None,
         on_type_change: Callable[[str, str, bool], None] | None = None,
+        *,
+        state: bool = False,
     ) -> str:
         """Gibt den Aggregationstyp zurück; legt die Entität bei Bedarf neu an.
+
+        ``state=True`` heißt: das Event trägt einen Text-Zustand. Zustands-
+        Entitäten leiten ihren Typ nicht aus Domain/state_class ab, sondern
+        behalten ihn; ein Wechsel zwischen Zahl und Text in beide Richtungen
+        wirft ``StateTypeMismatch`` (der erste Wert legt den Typ fest).
 
         Metadaten werden bei jedem Aufruf nachgezogen. Ändert sich der daraus
         abgeleitete Aggregationstyp, muss ``on_type_change`` zuerst die
@@ -1545,7 +1588,7 @@ class Index:
         ``get_entity()`` würde hier deadlocken (siehe CHANGELOG_INTERNAL.md).
         """
         validate_entity_id(entity_id)
-        aggregation_type = derive_type(domain, state_class)
+        aggregation_type = STATE_TYPE if state else derive_type(domain, state_class)
         with self._lock, self._conn:
             row = self._conn.execute(
                 "SELECT aggregation_type, state_class, friendly_name, unit, hourly_rollup "
@@ -1554,6 +1597,8 @@ class Index:
             ).fetchone()
             if row is not None:
                 old_type = row["aggregation_type"]
+                if STATE_TYPE in (aggregation_type, old_type) and aggregation_type != old_type:
+                    raise StateTypeMismatch(entity_id)
                 if aggregation_type != old_type:
                     if on_type_change is None:
                         raise ValueError(
@@ -1600,6 +1645,12 @@ class Index:
             gap_threshold = default_rows.get("default_gap_threshold", DEFAULT_GAP_THRESHOLD)
             outlier_threshold = default_rows.get("default_outlier_threshold", DEFAULT_OUTLIER_THRESHOLD)
             compact_target = default_rows.get("default_compact_target", DEFAULT_COMPACT_TARGET)
+            if aggregation_type == STATE_TYPE:
+                # Auflösung, Verdichtung und Wertfilter rechnen mit Zahlen
+                # (Mittelwert, Raster, Schwelle) — für einen Zustandsindex
+                # ergäben sie Unsinn. Gesperrt wie bei Schaltern, siehe
+                # formatting.*_BLOCKED_REASONS.
+                resolution, compact_target, value_filter = "raw", "off", "off"
             self._conn.execute(
                 """
                 INSERT INTO entities
@@ -3909,6 +3960,54 @@ class Index:
             (entity_id,),
         ).fetchone()
 
+    def state_index(
+        self, entity_id: str, text: str, label: str | None, ts: float
+    ) -> int | None:
+        """Index des Zustands ``text``; ein neuer Text bekommt den nächsten
+        freien. None, wenn die Entität schon MAX_STATES_PER_ENTITY Zustände
+        hat. Vergabe und Prüfung in einer Transaktion, damit zwei gleichzeitige
+        Events desselben neuen Textes nicht zwei Indizes erzeugen.
+
+        ``label`` (HA-Übersetzung) wird bei jedem Aufruf nachgezogen, wenn es
+        sich geändert hat — etwa nach einem Sprachwechsel in HA."""
+        validate_entity_id(entity_id)
+        label = label or None
+        with self._lock, self._conn:
+            row = self._conn.execute(
+                "SELECT idx, label FROM entity_states WHERE entity_id = ? AND text = ?",
+                (entity_id, text),
+            ).fetchone()
+            if row is not None:
+                if label is not None and label != row["label"]:
+                    self._conn.execute(
+                        "UPDATE entity_states SET label = ? WHERE entity_id = ? AND idx = ?",
+                        (label, entity_id, row["idx"]),
+                    )
+                return int(row["idx"])
+            count, highest = self._conn.execute(
+                "SELECT COUNT(*), MAX(idx) FROM entity_states WHERE entity_id = ? AND idx >= 0",
+                (entity_id,),
+            ).fetchone()
+            if count >= MAX_STATES_PER_ENTITY:
+                return None
+            idx = 0 if highest is None else int(highest) + 1
+            self._conn.execute(
+                "INSERT INTO entity_states (entity_id, idx, text, label, first_seen) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (entity_id, idx, text, label, ts),
+            )
+            return idx
+
+    def get_state_map(self, entity_id: str) -> list[dict]:
+        """Zuordnung der Entität, nach Index sortiert: ``{idx, text, label}``.
+        "nicht verfügbar" (STATE_UNAVAILABLE_INDEX) steht nicht in der Tabelle,
+        die Anzeige ergänzt es selbst."""
+        rows = self._read_conn().execute(
+            "SELECT idx, text, label FROM entity_states WHERE entity_id = ? ORDER BY idx",
+            (entity_id,),
+        ).fetchall()
+        return [{"idx": int(r["idx"]), "text": r["text"], "label": r["label"]} for r in rows]
+
     def set_counter_decreases(self, entity_id: str, mode: str) -> None:
         """"report" oder "allow" — bei "allow" gelten Rückgänge dieses Zählers als normal."""
         if mode not in ("report", "allow"):
@@ -4010,7 +4109,7 @@ class Index:
             for table in (
                 "dashboard_pins", "table_rows", "table_columns", "saved_tables",
                 "saved_charts", "entity_actions", "retention_jobs",
-                "memory_snapshots", "entities",
+                "memory_snapshots", "entities", "entity_states",
             ):
                 self._conn.execute(f"DELETE FROM {table}")  # noqa: S608 — feste Namen
             # Das Default-Dashboard (id 1) ist fest verankert und nicht
@@ -4041,6 +4140,9 @@ class Index:
             )
             self._conn.execute(
                 "DELETE FROM entities WHERE entity_id = ?", (entity_id,)
+            )
+            self._conn.execute(
+                "DELETE FROM entity_states WHERE entity_id = ?", (entity_id,)
             )
             # Werte-Kacheln referenzieren die Entität direkt (kein Chart/keine
             # Tabelle dazwischen) — ohne diese Bereinigung bliebe ein

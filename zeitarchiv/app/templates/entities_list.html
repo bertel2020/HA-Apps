@@ -25,6 +25,7 @@
               <label class="dd-picker-row"><input type="checkbox" name="type" value="standard" onchange="onTypeSpecificChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>{{ _("Standard") }}</span></label>
               <label class="dd-picker-row"><input type="checkbox" name="type" value="counter" onchange="onTypeSpecificChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>{{ _("Zähler") }}</span></label>
               <label class="dd-picker-row"><input type="checkbox" name="type" value="switch" onchange="onTypeSpecificChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>{{ _("Schalter") }}</span></label>
+              <label class="dd-picker-row"><input type="checkbox" name="type" value="state" onchange="onTypeSpecificChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>{{ _("Zustand") }}</span></label>
             </div>
           </span>
           <span id="unit-filter-wrap" class="dd-picker-wrap" style="display:{{ 'inline-block' if 'unit' in visible_columns else 'none' }};">

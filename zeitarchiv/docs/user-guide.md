@@ -693,7 +693,7 @@ Datensätze, Größe, Wertfilter, Lücken-/Ausreißer-Schwelle, Historisch; letz
 ist standardmäßig aus) — die Auswahl
 gilt global fürs ganze Add-on, nicht nur im aktuellen Browser. Sind die
 Spalten **Typ** oder **Einheit** eingeblendet, erscheint daneben ein
-passender Filter (Typ: Standard/Zähler/Schalter, mehrfach wählbar; Einheit:
+passender Filter (Typ: Standard/Zähler/Schalter/Zustand, mehrfach wählbar; Einheit:
 eine der tatsächlich vorkommenden Einheiten). Ein Klick auf eine Zeile öffnet
 die **Verlaufsansicht** dieser einen Entität.
 
@@ -784,6 +784,42 @@ Editor des Charts bzw. der Tabelle heraus.
   gehört zum geladenen Zeitraum, nicht zum gerade sichtbaren Ausschnitt.
 - **Nachkommastellen** übersteuert für diese Ansicht die globale Anzeige-
   Einstellung der Entität (Automatisch oder fest 0–3).
+
+### Zustände
+
+Liefert eine Entität Text statt einer Zahl — etwa ein Thermostat mit
+„Heizen“/„Leerlauf“, ein Saugroboter mit „Laden“/„Saugen“ oder das Programm
+einer Waschmaschine —, archiviert Zeitarchiv sie als **Zustand**. Dafür muss
+die Entität in der Integration **einzeln ausgewählt** sein; über ein Muster
+wie `sensor.*` oder eine Auswahl nach Bereich, Gerät oder Label kommen
+Text-Sensoren bewusst nicht mit (sonst landeten Versionsnummern, Geräte-IDs
+und Ähnliches im Archiv). Der erste Wert legt fest, ob eine Entität Zahlen
+oder Zustände liefert; wechselt sie später, werden die abweichenden Werte
+verworfen.
+
+- Die Verlaufsansicht zeigt einen **Zeitstrahl** mit einer Farbe je Zustand.
+  Fällt die Entität aus (`unavailable`/`unknown`), erscheint der Abschnitt
+  grau schraffiert als „nicht verfügbar“, statt den letzten Zustand
+  fortzuschreiben.
+- Angezeigt wird die Übersetzung aus Home Assistant, wo es eine gibt
+  („Heizen“ für `heat`); der Rohwert steht im Tooltip.
+- Unter dem Zeitstrahl stehen die Zahl der Wechsel, der längste Abschnitt
+  und die Ausfallzeit, darunter die Legende mit **Dauer und Anteil** je
+  Zustand — als Chips oder als Tabelle (Optionen → Legenden-Stil). Ein Klick
+  auf einen Zustand blendet ihn aus.
+- Das **Wechsel-Protokoll** darunter listet die Abschnitte, neueste zuerst
+  (Optionen → Wechsel-Protokoll). Fährt man über eine Zeile, wird das Band im
+  Zeitstrahl eingerahmt; ein Klick auf ein Band springt zur Zeile. Wer
+  hineinzoomt, sieht in Kennzahlen, Legende und Protokoll nur noch den
+  Ausschnitt.
+- Unter **Werte bearbeiten** heißt Korrigieren, einen der bekannten Zustände
+  auszuwählen; Hinzufügen und Verdichten gibt es für Zustände nicht.
+- Je Entität werden höchstens 50 verschiedene Zustände angenommen, neue
+  darüber hinaus verworfen — ein Schutz gegen Sensoren mit freiem Text.
+
+Zustände verwenden noch keine Verdichtung: Zeitstrahl und Kennzahlen kommen
+in jedem Zeitraum aus den gespeicherten Wechseln. Charts, Tabellen und
+Dashboard-Kacheln unterstützen Zustände noch nicht.
 
 ### In einen Ausschnitt hineinzoomen
 

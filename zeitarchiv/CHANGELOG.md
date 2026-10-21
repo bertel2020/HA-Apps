@@ -4,6 +4,13 @@
 
 ### Neu
 
+- **Zustände**: Entitäten, die Text statt einer Zahl liefern (z. B. ein
+  Thermostat mit „Heizen“/„Leerlauf“ oder ein Saugroboter), werden jetzt
+  archiviert, wenn sie in der Integration einzeln ausgewählt sind. Die
+  Verlaufsansicht zeigt sie als farbigen Zeitstrahl mit Dauer und Anteil je
+  Zustand und einem Wechsel-Protokoll; Ausfälle erscheinen als „nicht
+  verfügbar“. Auch der Import aus dem Home-Assistant-Verlauf übernimmt sie.
+  Charts, Tabellen und Dashboard-Kacheln unterstützen Zustände noch nicht.
 - Lichter, Ventilatoren, Automationen, Skripte, Fernbedienungen, Sirenen,
   Luftbefeuchter, Updates und Kalender werden jetzt wie Schalter archiviert
   (an/aus) – mit Zeitstrahl und Einschaltdauer. Bisher kamen sie gar nicht in
@@ -22,6 +29,13 @@
 
 #### New
 
+- **States**: entities that report text instead of a number (e.g. a
+  thermostat with "Heating"/"Idle" or a robot vacuum) are now archived when
+  they are selected individually in the integration. The history view shows
+  them as a coloured timeline with duration and share per state and a change
+  log; outages appear as "unavailable". The import from the Home Assistant
+  history takes them over as well. Charts, tables and dashboard tiles do not
+  support states yet.
 - Lights, fans, automations, scripts, remotes, sirens, humidifiers, updates
   and calendars are now archived like switches (on/off) – with timeline and
   on-time. Previously they never reached the app. This also applies to the

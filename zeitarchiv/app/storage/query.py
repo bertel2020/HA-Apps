@@ -25,7 +25,7 @@ import pyarrow.parquet as pq
 
 from . import cleanup, rollup
 from .hotbuffer import hot_path, read_rows
-from .index import Index, filter_deleted_occurrences
+from .index import STATE_TYPE, STATE_UNAVAILABLE_INDEX, Index, filter_deleted_occurrences
 from .paths import entity_dir
 from ..limits import MAX_COMPARE_YEARS, MAX_RAW_QUERY_POINTS
 
@@ -918,6 +918,11 @@ def query_series(
         return _missing_entity_result(entity_id, range_key, tz, now, offset, continuous, year_over_year, cap_to)
 
     aggregation_type = entity["aggregation_type"]
+    if aggregation_type == STATE_TYPE:
+        # Zustands-Entitäten haben (noch) keine Rollups, und ein Mittelwert
+        # oder eine Summe über Zustandsindizes ergäbe keinen Sinn — sie
+        # bekommen in jedem Zeitraum die Rohwechsel (ROADMAP 1.29 Phase 1).
+        return query_raw_series(data_dir, index, entity_id, range_key, tz, now, offset, continuous)
     resolved_chart_type = _resolved_chart_type(aggregation_type, chart_type)
     now_local = now.astimezone(tz)
     # "Gleicher Zeitpunkt"-Vergleich (Vergleichstabelle): wie viel von der
@@ -1164,7 +1169,7 @@ def query_raw_series(
             {"ts": window_start.timestamp(), "value": boundary_value, "min": None, "max": None},
         )
 
-    return {
+    result = {
         "entity_id": entity_id,
         "aggregation_type": aggregation_type,
         "chart_type": "line",
@@ -1174,3 +1179,16 @@ def query_raw_series(
         "period_end": period_end.timestamp(),
         "is_current": offset == 0,
     }
+    if aggregation_type == STATE_TYPE:
+        result["chart_type"] = "timeline"
+        result["states"] = state_legend(index, entity_id)
+    return result
+
+
+def state_legend(index: Index, entity_id: str) -> list[dict]:
+    """Zuordnung Index → Text einer Zustands-Entität für die Anzeige, nach
+    Index sortiert, "nicht verfügbar" immer zuletzt. ``label`` ist die
+    HA-Übersetzung oder None; die Oberfläche fällt dann auf ``text`` zurück."""
+    legend = index.get_state_map(entity_id)
+    legend.append({"idx": STATE_UNAVAILABLE_INDEX, "text": "unavailable", "label": None})
+    return legend

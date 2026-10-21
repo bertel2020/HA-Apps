@@ -34,6 +34,11 @@ import pyarrow.parquet as pq
 from .paths import entity_dir
 
 FINE_LEVEL = {"counter": "tag", "standard": "stunde", "switch": "stunde"}
+# Zustands-Entitäten (Typ "state") haben vorerst KEINE Rollups — Abfragen
+# lesen bei ihnen die Rohdaten (query.query_series → query_raw_series). Die Dauer je
+# Zustand als eigene Rollup-Stufe folgt in ROADMAP 1.29 Phase 2; bis dahin
+# sind alle schreibenden Einstiege hier für diesen Typ ein No-op.
+NO_ROLLUP_TYPES = {"state"}
 
 
 @dataclass(frozen=True)
@@ -362,6 +367,8 @@ def append_completed_month(
     unverändert). Grundlage für die wochentagsweise Aggregation im
     Tageslastprofil bei Energiedashboard-Rollen (siehe energiedashboard_routes.py).
     """
+    if aggregation_type in NO_ROLLUP_TYPES:
+        return
     level = FINE_LEVEL[aggregation_type]
     rows_raw = sorted(zip(month_table.column("ts").to_pylist(), month_table.column("value").to_pylist()))
 
@@ -549,6 +556,8 @@ def remove_month(
     """Entfernt alle Rollup-Zeilen eines Monats ohne Ersatz — für den seltenen
     Fall, dass nach einem Archiv-Purge (cleanup.py) kein Rohwert des Monats
     mehr übrig ist (der komplette Monat war weich gelöscht)."""
+    if aggregation_type in NO_ROLLUP_TYPES:
+        return
     level = FINE_LEVEL[aggregation_type]
     _remove_rows_for_month(rollup_path(data_dir, entity_id, level), tz, year, month)
     if aggregation_type == "counter" and hourly_rollup and level != "stunde":
@@ -595,6 +604,8 @@ def rebuild_entity_rollups(
     Backfill, wenn eine Entität nachträglich einer Energiedashboard-Rolle
     zugeordnet wird (siehe energiedashboard_routes.py).
     """
+    if aggregation_type in NO_ROLLUP_TYPES:
+        return
     archive_dir = entity_dir(data_dir, "archive", entity_id)
     (data_dir / "rollup").mkdir(parents=True, exist_ok=True)
     staging_root = Path(

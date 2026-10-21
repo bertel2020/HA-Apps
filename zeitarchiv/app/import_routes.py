@@ -1467,6 +1467,18 @@ class ImportService:
         }
 
 
+    def _state_entities(self, entity_ids: list[str]) -> frozenset[str]:
+        """Welche der Entitäten Zustands-Entitäten sind (Typ "state") — für die
+        Verfügbarkeits-Vorschau, die deren Text-Zustände mitzählen soll."""
+        result: set[str] = set()
+        if self.deps.index is None:
+            return frozenset()
+        for entity_id in entity_ids:
+            entity = self.deps.index.get_entity(entity_id)
+            if entity is not None and entity["aggregation_type"] == "state":
+                result.add(entity_id)
+        return frozenset(result)
+
     def _fetch_ha_history(self,
         entity_ids: list[str], start: datetime, end: datetime,
         history_source: str = "raw", period: str = ha_statistics.DEFAULT_PERIOD,
@@ -1496,7 +1508,10 @@ class ImportService:
                     history = ha_statistics.fetch_statistics_rows(entity_id, start, end, period)
                 else:
                     domain = entity_id.split(".", 1)[0]
-                    history = ha_import.fetch_history_rows(entity_id, domain, start, end)
+                    history = ha_import.fetch_history_rows(
+                        entity_id, domain, start, end,
+                        state_mapper=ha_import.state_mapper_for(self.deps.index, entity_id),
+                    )
             except (ha_import.HaApiError, ValueError) as exc:
                 # WARNING statt nur in errors sammeln: das ist bisher die
                 # einzige Stelle, an der ein Fehlschlag beim HA-Abruf
@@ -1688,7 +1703,8 @@ class ImportService:
                 on_entity(nummer, entity_id)
             try:
                 raw_by_entity[entity_id] = ha_import.fetch_history_rows(
-                    entity_id, entity_id.split(".", 1)[0], raw_start, end
+                    entity_id, entity_id.split(".", 1)[0], raw_start, end,
+                    state_mapper=ha_import.state_mapper_for(self.deps.index, entity_id),
                 )
             except (ha_import.HaApiError, ValueError) as exc:
                 raw_by_entity[entity_id] = None
@@ -1759,7 +1775,9 @@ class ImportService:
         errors: list[str] = []
         try:
             domains = {entity_id: entity_id.split(".", 1)[0] for entity_id in entity_ids}
-            raw = ha_import.fetch_availability(domains, raw_start, end)
+            raw = ha_import.fetch_availability(
+                domains, raw_start, end, state_entities=self._state_entities(entity_ids)
+            )
         except ha_import.HaApiError as exc:
             raw = {entity_id: ha_import.EntityAvailability(entity_id) for entity_id in entity_ids}
             errors.append(f"Rohhistorie: {exc}")
@@ -1814,7 +1832,9 @@ class ImportService:
             if history_source == "stats":
                 return ha_statistics.fetch_statistics_availability(entity_ids, start, end, period), None
             domains = {entity_id: entity_id.split(".", 1)[0] for entity_id in entity_ids}
-            return ha_import.fetch_availability(domains, start, end), None
+            return ha_import.fetch_availability(
+                domains, start, end, state_entities=self._state_entities(entity_ids)
+            ), None
         except ha_import.HaApiError as exc:
             logger.warning("%s fehlgeschlagen · Entitäten=%d · %s", label, len(entity_ids), exc)
             return {}, str(exc)

@@ -16,7 +16,7 @@ from typing import Annotated
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from . import ha_integration
 from .chart_period import stichtag_or_400, stichtag_window
@@ -70,6 +70,12 @@ EntityId = Annotated[
 # sondern ein fehlerhafter Client. Dafür ist 422 die richtige Antwort.
 EventText = Annotated[str, Field(max_length=MAX_EVENT_TEXT_LENGTH)]
 
+# Fähigkeiten, die /api/health der Integration meldet. Eine Fähigkeit statt
+# eines Versionsvergleichs: Die Integration muss dann keine App-Version
+# kennen, ab der etwas geht, und eine Fähigkeit lässt sich auch wieder
+# zurücknehmen. "state": /api/write nimmt Text-Zustände (state/state_label).
+API_CAPABILITIES = ("state",)
+
 
 class EventIn(BaseModel):
     event_id: str | None = Field(
@@ -78,10 +84,23 @@ class EventIn(BaseModel):
     entity_id: EntityId
     domain: EventText
     ts: float
-    value: float
+    value: float | None = None
     state_class: EventText | None = None
     unit: EventText | None = None
     friendly_name: EventText | None = None
+    # Text-Zustand statt value (Typ "state"). Ältere Apps ignorieren beide
+    # Felder stillschweigend — die Integration schickt sie deshalb nur, wenn
+    # /api/health die Fähigkeit "state" meldet.
+    state: EventText | None = None
+    state_label: EventText | None = None
+
+    @model_validator(mode="after")
+    def _value_or_state(self) -> "EventIn":
+        # Wie bisher ein fehlendes value: eine Nachricht ohne Messung ist ein
+        # Protokollfehler des Clients, kein Datenzustand (siehe oben).
+        if self.value is None and self.state is None:
+            raise ValueError("value oder state erforderlich")
+        return self
 
 
 class WriteRequest(BaseModel):
@@ -396,7 +415,12 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         except HTTPException as exc:
             exc.detail = {"message": exc.detail, "demo_mode": deps.demo_mode_active}
             raise
-        return {"status": "ok", "version": deps.app_version, "demo_mode": deps.demo_mode_active}
+        return {
+            "status": "ok",
+            "version": deps.app_version,
+            "demo_mode": deps.demo_mode_active,
+            "capabilities": list(API_CAPABILITIES),
+        }
 
     @router.get("/api/notices")
     def notices(
@@ -417,6 +441,11 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             "notices": deps.collect_notices(),
             "latest_backup": deps.latest_backup(),
             "demo_mode": deps.demo_mode_active,
+            # Auch hier, nicht nur in /api/health: Die Integration fragt
+            # /api/health nur beim Start, diesen Endpunkt aber jede Minute —
+            # so greift eine neue Fähigkeit nach einem App-Update ohne
+            # Neustart von Home Assistant.
+            "capabilities": list(API_CAPABILITIES),
         }
 
     @router.post("/api/write")
@@ -462,9 +491,15 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         try:
             for event in payload.events:
                 event_data = event.model_dump()
-                event_id = event.event_id or legacy_event_id(
-                    {key: value for key, value in event_data.items() if key != "event_id"}
-                )
+                # state/state_label nur in den Hash, wenn gesetzt: sonst
+                # änderte sich die Übergangs-ID alter Integrationen ohne
+                # event_id mit diesem Update, und ein Retry über das Update
+                # hinweg würde doppelt gespeichert.
+                event_id = event.event_id or legacy_event_id({
+                    key: value for key, value in event_data.items()
+                    if key != "event_id"
+                    and not (key in ("state", "state_label") and value is None)
+                })
                 result = deps.ingestion.ingest(IngestEvent(event_id=event_id, **{
                     key: value for key, value in event_data.items() if key != "event_id"
                 }), archive_cache)
@@ -472,13 +507,14 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 if trace_active and event.entity_id == trace_entity:
                     trace_logger.debug(
                         "Entity-Trace · event=entity_trace request_id=%s entity_id=%s "
-                        "event_id=%s ts=%s time=%s value=%s unit=%s domain=%s result=%s",
+                        "event_id=%s ts=%s time=%s value=%s state=%r unit=%s domain=%s result=%s",
                         request_id,
                         event.entity_id,
                         event_id[:12],
                         event.ts,
                         datetime.fromtimestamp(event.ts, deps.tz).isoformat(timespec="milliseconds"),
                         event.value,
+                        event.state,
                         event.unit or "—",
                         event.domain,
                         result,

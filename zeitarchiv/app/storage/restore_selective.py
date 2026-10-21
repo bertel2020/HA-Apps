@@ -422,11 +422,16 @@ def _snapshot_entity_db(conn: sqlite3.Connection, entity_id: str) -> dict:
         "compacted_months": [list(r) for r in conn.execute(
             "SELECT year, month, target_resolution, compacted_at FROM compacted_months WHERE entity_id = ?",
             (entity_id,))],
+        # Zuordnung Index → Text (Typ "state"): gehört zu den Dateien, die
+        # Indizes darin sind ohne sie nicht lesbar.
+        "entity_states": [list(r) for r in conn.execute(
+            "SELECT idx, text, label, first_seen FROM entity_states WHERE entity_id = ?",
+            (entity_id,))],
     }
 
 
 def _clear_entity_db(conn: sqlite3.Connection, entity_id: str) -> None:
-    for table in ("deleted_points", "counter_mark_ignored", "compacted_months"):
+    for table in ("deleted_points", "counter_mark_ignored", "compacted_months", "entity_states"):
         conn.execute(f"DELETE FROM {table} WHERE entity_id = ?", (entity_id,))
 
 
@@ -508,7 +513,7 @@ def _swap_entities(
                 _clear_entity_db(conn, entity_id)
                 for table, where in (
                     ("deleted_points", "entity_id"), ("counter_mark_ignored", "entity_id"),
-                    ("compacted_months", "entity_id"),
+                    ("compacted_months", "entity_id"), ("entity_states", "entity_id"),
                 ):
                     if not source.has_table(table):
                         continue
@@ -593,6 +598,12 @@ def _undo_entities(
                             "INSERT OR REPLACE INTO compacted_months "
                             "(entity_id, year, month, target_resolution, compacted_at) VALUES (?, ?, ?, ?, ?)",
                             (entity_id, year, month, target, compacted_at))
+                    # .get(): Rollback-Infos von vor diesem Update kennen den Schlüssel nicht.
+                    for idx, text, label, first_seen in snap.get("entity_states", []):
+                        conn.execute(
+                            "INSERT OR REPLACE INTO entity_states "
+                            "(entity_id, idx, text, label, first_seen) VALUES (?, ?, ?, ?, ?)",
+                            (entity_id, idx, text, label, first_seen))
                     if not snap["existed"]:
                         conn.execute("DELETE FROM entities WHERE entity_id = ?", (entity_id,))
                     else:

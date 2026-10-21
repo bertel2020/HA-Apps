@@ -2751,7 +2751,22 @@
     "Jede Kachel zeigt ihren Zeitraum, der diesen Tag enthält. Kacheln mit festem Zeitraum bleiben unverändert, die automatische Aktualisierung pausiert.": "Each tile shows its period that contains this day. Tiles with a fixed period stay unchanged; automatic refresh is paused.",
     "Zurück zu heute": "Back to today",
     "Rückblick auf": "Looking back at",
-    "Aktualisierung pausiert": "Refresh paused"
+    "Aktualisierung pausiert": "Refresh paused",
+    "Zustand": "State",
+    "Für Zustände nicht verfügbar: Ein Zustand wie „Heizen“ oder „Saugen“ ist kein Messwert, an dem sich ein Vielfaches messen ließe.": "Not available for states: a state such as “Heating” or “Cleaning” is not a measurement that a multiple could be measured against.",
+    "Für Zustände fest auf „Rohdaten“: Ein Zeitfenster könnte sonst einen echten Zustandswechsel verwerfen.": "Fixed to “Raw data” for states: a time window could otherwise discard a real state change.",
+    "Für Zustände nicht verfügbar: Eine rückwirkende Verdichtung könnte einen echten Zustandswechsel wegkomprimieren.": "Not available for states: a retroactive compaction could compress away a real state change.",
+    "Verdichten ist für Zustände nicht verfügbar": "Compaction is not available for states",
+    "Zustands-Entitäten können nicht zusammengeführt werden.": "State entities cannot be merged.",
+    "Alle bearbeiten im Reiter „Werte bearbeiten“": "Edit all in the “Edit values” tab",
+    "Keine Wechsel in diesem Ausschnitt.": "No changes in this section.",
+    "Rohwert": "Raw value",
+    "Wechsel": "Changes",
+    "Wechsel-Protokoll": "Change log",
+    "Weitere 25 laden": "Load 25 more",
+    "Hinzufügen ist für Zustände nicht verfügbar": "Adding is not available for states",
+    "Unbekannter Zustand": "Unknown state",
+    "nicht verfügbar": "unavailable"
   },
   "js": {
     "Langzeit": "Long-term",
@@ -3260,6 +3275,19 @@
     "Sonntag": "Sunday",
     "Wochentag": "Weekday",
     "Speichern der Zeitraum-Navigation fehlgeschlagen.": "Saving the period navigation failed.",
-    "Stand {zeit}": "As of {zeit}"
+    "Stand {zeit}": "As of {zeit}",
+    "Zustand": "State",
+    "1 Wechsel": "1 change",
+    "Kurze Zustände sind schmaler als ein Bildpunkt — {geste}.": "Short states are narrower than a pixel — {geste}.",
+    "Wechsel-Protokoll · {count}": "Change log · {count}",
+    "Wechsel-Protokoll · {count} im Ausschnitt": "Change log · {count} in section",
+    "längster Abschnitt {dauer} ({zustand})": "longest section {dauer} ({zustand})",
+    "läuft": "ongoing",
+    "nicht verfügbar": "unavailable",
+    "nicht verfügbar {dauer}": "unavailable {dauer}",
+    "{count} Wechsel": "{count} changes",
+    "{date} · 1 Abschnitt": "{date} · 1 section",
+    "{date} · {count} Abschnitte": "{date} · {count} sections",
+    "Neuer Zustand": "New state"
   }
 }

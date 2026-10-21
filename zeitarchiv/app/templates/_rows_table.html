@@ -198,7 +198,7 @@
      Grund, überhaupt zu scrollen: als Karte steht jeder Wert einzeln, das
      Vergleichen aufeinanderfolgender Zeitstempel (worum es beim Bereinigen
      geht) ist damit vorbei. #}
-  <table class="dt compact rows-values-table" data-cards="off">
+  <table class="dt compact rows-values-table" data-cards="off"{% if state_options %} data-state-options="{{ state_options | tojson | forceescape }}"{% endif %}>
     {# Breiten stehen in pages/cleanup.css statt inline: unter 640px werden sie
        dort auf auto zurückgenommen, und ein Inline-Style ließe sich nur mit
        !important überschreiben. #}
@@ -226,9 +226,9 @@
       {% endif %}
       <td>{{ row.formatted_ts }}</td>
       {% if mode == 'correct' %}
-      <td class="correct-value-cell" data-ts="{{ row.ts }}" data-old-value="{{ row.value }}">{{ row.formatted_value }}{% if unit %} <span class="value-unit">{{ unit }}</span>{% endif %}</td>
+      <td class="correct-value-cell" data-ts="{{ row.ts }}" data-old-value="{{ row.value }}">{{ row.formatted_value }}{% if row.state_raw %} <span class="value-unit">{{ row.state_raw }}</span>{% elif unit and not state_options %} <span class="value-unit">{{ unit }}</span>{% endif %}</td>
       {% else %}
-      <td>{{ row.formatted_value }}{% if unit %} <span class="value-unit">{{ unit }}</span>{% endif %}</td>
+      <td>{{ row.formatted_value }}{% if row.state_raw %} <span class="value-unit">{{ row.state_raw }}</span>{% elif unit and not state_options %} <span class="value-unit">{{ unit }}</span>{% endif %}</td>
       {% endif %}
       <td>
         {% for flag in row.flags %}{% set verdict = counter_verdicts_map.get(row.ts) if flag.label == _("Zählerrückgang") and counter_verdicts_map else none %}<span class="flag-badge {{ ('verdict-returns' if verdict.returns else ('verdict-stays' if verdict.returns is false else 'verdict-open')) if verdict else ('sev-act' if flag.label in act_labels else 'sev-info') }}" data-tooltip="{{ flag.reason }}{% if verdict %} {{ verdict.note }}{% endif %}">{{ flag.label }}{% if verdict %} · {{ _("Vermutlich Fehlwert") if verdict.returns else (_("Vermutlich Reset") if verdict.returns is false else _("Noch offen")) }}{% endif %}</span>{% if verdict %}<span class="flag-note">{{ verdict.note }}</span>{% endif %}{% endfor %}

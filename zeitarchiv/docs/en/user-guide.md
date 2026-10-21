@@ -642,7 +642,7 @@ ID. Via **Columns ▾**, twelve additional columns can be shown/hidden (type,
 first/last value, resolution, retention, unit, records, size, value filter,
 gap/outlier threshold, Historic; the last one is off by default) — the selection applies globally to the whole add-on,
 not just in the current browser. If the columns **Type** or **Unit** are
-shown, a matching filter appears next to them (type: default/counter/switch,
+shown, a matching filter appears next to them (type: default/counter/switch/state,
 multiple selection possible; unit: one of the units actually occurring). A
 click on a row opens the **history view** of that one entity.
 
@@ -728,6 +728,40 @@ take it out in the editor of the chart or table.
   loaded period, not to the currently visible section.
 - **Decimal places** overrides, for this view, the global display setting of
   the entity (Automatic or fixed 0–3).
+
+### States
+
+If an entity reports text instead of a number — such as a thermostat with
+"Heating"/"Idle", a robot vacuum with "Charging"/"Cleaning" or a washing
+machine's programme —, Zeitarchiv archives it as a **state**. For this the
+entity has to be **selected individually** in the integration; text sensors
+deliberately do not come along via a pattern such as `sensor.*` or a
+selection by area, device or label (otherwise version numbers, device IDs and
+the like would end up in the archive). The first value decides whether an
+entity reports numbers or states; if it changes later, the deviating values
+are discarded.
+
+- The history view shows a **timeline** with one colour per state. If the
+  entity drops out (`unavailable`/`unknown`), the section appears hatched in
+  grey as "unavailable" instead of continuing the last state.
+- The translation from Home Assistant is shown where one exists ("Heating"
+  for `heat`); the raw value is in the tooltip.
+- Below the timeline are the number of changes, the longest section and the
+  unavailable time, followed by the legend with **duration and share** per
+  state — as chips or as a table (Options → Legend style). Clicking a state
+  hides it.
+- The **change log** below lists the sections, newest first (Options →
+  Change log). Hovering over a row frames the band in the timeline; clicking
+  a band jumps to its row. When you zoom in, KPIs, legend and log only cover
+  the section.
+- Under **Edit values**, correcting means choosing one of the known states;
+  adding and compacting are not available for states.
+- At most 50 different states are accepted per entity, new ones beyond that
+  are discarded — a safeguard against sensors with free text.
+
+States do not use compaction yet: timeline and KPIs come from the stored
+changes in every period. Charts, tables and dashboard tiles do not support
+states yet.
 
 ### Zooming into a section
 

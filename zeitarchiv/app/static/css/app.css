@@ -1518,6 +1518,7 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
 .badge.counter{color:var(--accent-bar);border-color:var(--accent-bar);}
 .badge.standard{color:var(--accent-line);border-color:var(--accent-line);}
 .badge.switch{color:var(--ink-muted);}
+.badge.state{color:var(--ink-muted);}
 /* „Historisch“ (entities.historic): gefüllt statt nur umrandet, damit die Kennzeichnung auf der Entitätsseite auffällt. */
 .badge.historic{background:var(--accent-line-soft);color:var(--accent-line);border-color:var(--accent-line);}
 [data-tooltip]{cursor:help;position:relative;}

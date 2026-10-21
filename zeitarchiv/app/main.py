@@ -889,7 +889,7 @@ def entities_view(request: Request) -> HTMLResponse:
     snapshots = index.get_stats_snapshots(time.time() - 24 * 3600)
     type_counts = {row["aggregation_type"]: row["entity_count"] for row in index.get_stats_by_type()}
     type_breakdown = " · ".join(
-        f"{type_counts[key]} {tr(TYPE_LABELS[key])}" for key in ("standard", "counter", "switch") if type_counts.get(key)
+        f"{type_counts[key]} {tr(TYPE_LABELS[key])}" for key in ("standard", "counter", "switch", "state") if type_counts.get(key)
     )
     context = {
         "entity_count": overview["entity_count"],
@@ -2781,7 +2781,7 @@ def _entity_config_context(entity) -> dict:
         "value_filter": entity["value_filter"],
         "ignore_values_mode": "on" if entity["ignore_values_enabled"] else "off",
         "ignore_values": entity["ignore_values"].replace(";", "; "),
-        "ignore_values_blocked": entity["aggregation_type"] == "switch",
+        "ignore_values_blocked": entity["aggregation_type"] in ("switch", "state"),
         "ignore_values_options": list(IGNORE_VALUES_LABELS.items()),
         "gap_threshold": entity["gap_threshold"],
         "outlier_threshold": entity["outlier_threshold"],
@@ -2893,7 +2893,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
     # should_accept_write()-Docstring). Wie beim outlier_threshold oben:
     # ein trotzdem mitgeschickter Wert wird verworfen statt mit HTTP 400
     # abgelehnt, das Feld ist im Formular für Switch deaktiviert.
-    if entity["aggregation_type"] == "switch":
+    if entity["aggregation_type"] in ("switch", "state"):
         resolution = None
         compact_target = None
     if display_mode is not None and display_mode not in DISPLAY_MODE_LABELS:
@@ -2904,7 +2904,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
     # ohne Liste wird "0" vorbelegt, der Hauptfall (Wert 0 beim HA-Start).
     ignore_values_enabled: bool | None = None
     ignore_values_normalized: str | None = None
-    if entity["aggregation_type"] == "switch":
+    if entity["aggregation_type"] in ("switch", "state"):
         ignore_values_mode = None
         ignore_values_text = None
     if ignore_values_text is not None:
@@ -3017,6 +3017,8 @@ class _EntityChartOptionsBody(BaseModel):
     legend_metrics: list[str]
     legend_style: str
     decimals: str
+    # Wechsel-Protokoll unter dem Zeitstrahl (nur Zustands-Entitäten).
+    state_log: bool = True
 
 
 @app.post("/entities/{entity_id}/chart-options")
@@ -3292,6 +3294,9 @@ _ENTITY_CHART_OPTION_DEFAULTS = {
     "legend_metrics": ["last", "min", "max", "average", "sum"],
     "legend_style": "chips",
     "decimals": "auto",
+    # Zustands-Entitäten (ROADMAP 1.29): Wechsel-Protokoll unter dem
+    # Zeitstrahl standardmäßig offen; ohne Wirkung bei allen anderen Typen.
+    "state_log": True,
 }
 _ENTITY_CHART_DECIMALS = {"auto", "0", "1", "2", "3"}
 _ON_OFF_LABELS = {"1": "An", "0": N_("Aus")}
@@ -5199,6 +5204,18 @@ def _rows_fragment(
                 tr("Dieser Monat wurde am {format_timestamp} auf {format_compact_target} verdichtet — angezeigte Zeilen sind bereits zusammengefasst, keine Rohwerte mehr.", format_timestamp=format_timestamp(marker['compacted_at'], TZ), format_compact_target=format_compact_target(marker['target_resolution']))
             )
 
+    # Zustands-Entitäten (ROADMAP 1.29): Text statt Index, Rohwert daneben;
+    # die bekannten Zustände sind zugleich die Auswahl beim Korrigieren.
+    state_options = None
+    if entity["aggregation_type"] == "state":
+        state_options = _state_options(entity_id)
+        by_idx = {option["idx"]: option for option in state_options}
+        for row in display_rows:
+            option = by_idx.get(int(round(row["value"])))
+            if option is not None:
+                row["formatted_value"] = option["label"]
+                row["state_raw"] = option["text"] if option["text"] != option["label"] else None
+
     period_label = _rows_period_label(range_key, offset, window_start, window_end, now)
     first_date = datetime.fromtimestamp(entity["first_ts"], TZ).strftime("%Y-%m-%d") if entity["first_ts"] else None
     last_date = datetime.fromtimestamp(entity["last_ts"], TZ).strftime("%Y-%m-%d") if entity["last_ts"] else None
@@ -5222,6 +5239,7 @@ def _rows_fragment(
         {
             "entity_id": entity_id,
             "rows": display_rows,
+            "state_options": state_options,
             "filter": filter_,
             "mode": mode,
             "range": range_key,
@@ -5297,6 +5315,18 @@ async def delete_rows(request: Request, entity_id: str) -> HTMLResponse:
     return result
 
 
+def _state_options(entity_id: str) -> list[dict]:
+    """Bekannte Zustände einer Zustands-Entität für Anzeige und Korrigieren:
+    ``{idx, text, label}``, label = HA-Übersetzung oder Rohwert."""
+    options = []
+    for item in query_mod.state_legend(index, entity_id):
+        if item["idx"] < 0:
+            options.append({"idx": item["idx"], "text": item["text"], "label": tr("nicht verfügbar")})
+        else:
+            options.append({"idx": item["idx"], "text": item["text"], "label": item["label"] or item["text"]})
+    return options
+
+
 class _AddValueBody(BaseModel):
     ts: float
     value: float
@@ -5310,7 +5340,9 @@ def add_row(entity_id: str, body: _AddValueBody) -> dict:
     Reines JSON statt Formular/htmx-Fragment wie bei /rows/delete: der
     "Hinzufügen"-Reiter zeigt keine Zeilen-Tabelle, die neu geladen werden
     müsste — nur eine Erfolgsmeldung im Formular selbst (siehe cleanup.html)."""
-    _require_entity(entity_id)
+    entity = _require_entity(entity_id)
+    if entity["aggregation_type"] == "state":
+        raise HTTPException(status_code=400, detail=tr("Hinzufügen ist für Zustände nicht verfügbar"))
     now = datetime.now(TZ)
     if body.ts <= 0 or body.ts > now.timestamp() + 3600:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitstempel"))
@@ -5338,7 +5370,11 @@ def correct_row(entity_id: str, body: _CorrectValueBody) -> dict:
     desselben Zeitstempels). Wie /rows/add reines JSON statt htmx-Fragment —
     der Aufrufer (cleanup.html) triggert nach Erfolg selbst ein Neuladen von
     #controls, damit die Tabelle den neuen Wert zeigt."""
-    _require_entity(entity_id)
+    entity = _require_entity(entity_id)
+    if entity["aggregation_type"] == "state" and body.new_value not in {
+        float(option["idx"]) for option in _state_options(entity_id)
+    }:
+        raise HTTPException(status_code=400, detail=tr("Unbekannter Zustand"))
     started_at = time.time()
     changed = cleanup.correct_raw_value(
         DATA_DIR, index, entity_id, body.ts, body.old_value, body.new_value, TZ

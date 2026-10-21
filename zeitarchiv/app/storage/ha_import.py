@@ -34,6 +34,7 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -192,6 +193,39 @@ def _parse_state(state: str, domain: str) -> float | None:
         return None
 
 
+def state_mapper_for(index, entity_id: str) -> Callable[[str, float], float | None] | None:
+    """Wertnormalisierung für eine bestehende Zustands-Entität (Typ "state"):
+    bildet den Text wie der Live-Pfad (ingestion._resolve_state) auf seinen
+    Index ab, "unavailable"/"unknown" auf STATE_UNAVAILABLE_INDEX. None für
+    jede andere Entität — dann gilt weiter _parse_state().
+
+    Der Import legt keine Entitäten an (nur bekannte kommen hier an), der
+    Typ steht also schon fest. Neue Texte bekommen schon beim Abruf ihren
+    Index, auch wenn der Import danach abgebrochen wird: ein Index ist nur
+    reserviert, nicht falsch."""
+    from .index import (
+        STATE_IGNORED_TEXTS,
+        STATE_TYPE,
+        STATE_UNAVAILABLE_INDEX,
+        STATE_UNAVAILABLE_TEXTS,
+    )
+
+    entity = index.get_entity(entity_id) if index is not None else None
+    if entity is None or entity["aggregation_type"] != STATE_TYPE:
+        return None
+
+    def mapper(state: str, ts: float) -> float | None:
+        text = state.strip()
+        if text.lower() in STATE_IGNORED_TEXTS:
+            return None
+        if text.lower() in STATE_UNAVAILABLE_TEXTS:
+            return float(STATE_UNAVAILABLE_INDEX)
+        idx = index.state_index(entity_id, text, None, ts)
+        return None if idx is None else float(idx)
+
+    return mapper
+
+
 def _iso(dt: datetime) -> str:
     return dt.isoformat()
 
@@ -230,6 +264,7 @@ def fetch_history_rows(
     start: datetime,
     end: datetime,
     max_rows: int = MAX_IMPORT_ROWS_PER_ENTITY,
+    state_mapper: Callable[[str, float], float | None] | None = None,
 ) -> HistoryFetchResult:
     """Liest die Recorder-Rohhistorie einer Entität zeitfensterweise über
     GET /api/history/period. Der jeweils erste Punkt eines Fensters kann ein
@@ -267,7 +302,10 @@ def fetch_history_rows(
                 result.skipped += 1
                 _discard(result, tr("Zeitstempel ist ungültig"), entry)
                 continue
-            value = _parse_state(str(entry.get("state")), domain)
+            if state_mapper is not None:
+                value = state_mapper(str(entry.get("state")), ts)
+            else:
+                value = _parse_state(str(entry.get("state")), domain)
             if value is None:
                 result.skipped += 1
                 _discard(result, tr("Zustand ist nicht importierbar"), entry)
@@ -307,7 +345,8 @@ class EntityAvailability:
 
 
 def fetch_availability(
-    entity_domains: dict[str, str], start: datetime, end: datetime
+    entity_domains: dict[str, str], start: datetime, end: datetime,
+    state_entities: frozenset[str] = frozenset(),
 ) -> dict[str, EntityAvailability]:
     """Verfügbarkeits-Vorschau für die Auswahltabelle: EIN gebündelter
     History-Abruf für beliebig viele Entitäten gleichzeitig (HA erlaubt eine
@@ -359,7 +398,12 @@ def fetch_availability(
                         ts = datetime.fromisoformat(str(changed).replace("Z", "+00:00")).timestamp()
                     except ValueError:
                         continue
-                    if _parse_state(str(entry.get("state")), domain) is None:
+                    if entity_id in state_entities:
+                        # Zustands-Entität: jeder Text zählt, nur die
+                        # Platzhalter nicht (Index wird hier nicht vergeben).
+                        if str(entry.get("state")).strip().lower() in IGNORED_STATES:
+                            continue
+                    elif _parse_state(str(entry.get("state")), domain) is None:
                         continue
                     prev = last_ts_by_entity.get(entity_id)
                     if prev is not None and ts <= prev:

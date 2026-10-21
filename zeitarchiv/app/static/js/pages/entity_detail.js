@@ -331,6 +331,40 @@ function selectBrush() {
       return {start, end};
     }
 
+    // Zustands-Entitäten (Typ "state", ROADMAP 1.29): Farbe je Zustandsindex
+    // aus der festen Chart-Palette, "nicht verfügbar" (-1) grau schraffiert.
+    // Der Index ist stabil, also auch die Farbe eines Zustands.
+    const STATE_UNAVAILABLE = -1;
+    function stateColor(idx) {
+      const css = getComputedStyle(document.body);
+      return idx === STATE_UNAVAILABLE
+        ? css.getPropertyValue('--ink-faint').trim()
+        : css.getPropertyValue(`--chart-${(idx % 8) + 1}`).trim();
+    }
+    function stateSwatchStyle(idx) {
+      const color = stateColor(idx);
+      return idx === STATE_UNAVAILABLE
+        ? `background:repeating-linear-gradient(135deg, ${color} 0 2px, transparent 2px 5px);border:1px solid ${color}`
+        : `background:${color}`;
+    }
+    // Schraffur für das Band "nicht verfügbar" — ECharts nimmt ein Canvas als
+    // Füllmuster. Bei jedem Zeichnen neu, damit es dem aktuellen Farbschema folgt.
+    function unavailablePattern() {
+      const css = getComputedStyle(document.body);
+      const c = document.createElement('canvas');
+      c.width = c.height = 8;
+      const x = c.getContext('2d');
+      x.fillStyle = css.getPropertyValue('--surface-alt').trim();
+      x.fillRect(0, 0, 8, 8);
+      x.strokeStyle = css.getPropertyValue('--ink-faint').trim();
+      x.lineWidth = 1.6;
+      x.beginPath();
+      x.moveTo(-2, 10); x.lineTo(10, -2); x.moveTo(6, 10); x.lineTo(10, 6); x.moveTo(-2, 2); x.lineTo(2, -2);
+      x.stroke();
+      return {image: c, repeat: 'repeat'};
+    }
+    const STATE_LOG_PAGE = 25;
+
     function entityChart() {
       return {
         ranges: [
@@ -378,6 +412,17 @@ function selectBrush() {
         compareWindowStart: null,
         compareWindowEnd: null,
         aggregationType: null,
+        isState: IS_STATE,
+        // Zuordnung Index → Text aus /api/query ({idx, text, label}), nur bei
+        // Zustands-Entitäten gefüllt; "nicht verfügbar" steht zuletzt.
+        states: [],
+        // Per Klick auf die Legende ausgeblendete Zustände — bewusst nicht
+        // gespeichert, wie das Ein-/Ausblenden von Serien im Chart-Editor.
+        hiddenStates: [],
+        stateLog: CHART_OPTIONS.state_log !== false,
+        stateLogShown: STATE_LOG_PAGE,
+        // Zeile im Wechsel-Protokoll, deren Band gerade hervorgehoben ist.
+        stateHot: null,
         windowStart: null,
         windowEnd: null,
         // Natürliches, NIE an "jetzt" gedeckeltes Periodenende (vom Server,
@@ -489,6 +534,9 @@ function selectBrush() {
         // Grund, und der steht hier.
         get zoomHint() {
           const geste = t('mit Strg und Mausrad zoomen, mit Umschalt einen Bereich aufziehen, am Telefon mit zwei Fingern');
+          if (this.isState) {
+            return t('Kurze Zustände sind schmaler als ein Bildpunkt — {geste}.', {geste});
+          }
           if (this.chartType === 'timeline') {
             return t('Kurze Schaltvorgänge sind schmaler als ein Bildpunkt — {geste}.', {geste});
           }
@@ -531,6 +579,155 @@ function selectBrush() {
         get markedLabel() {
           if (!this.markedTotal) return t('Keine Markierungen');
           return this.markedTotal === 1 ? t('1 markiert') : t('{count} markiert', {count: this.markedTotal});
+        },
+        // --- Zustands-Entitäten ---------------------------------------------
+        // Abschnitte {s, e, idx, key} in Sekunden über den ganzen geladenen
+        // Zeitraum. key ist der Beginn des Abschnitts und verbindet Band im
+        // Zeitstrahl und Zeile im Protokoll. Der letzte Abschnitt reicht bis
+        // zum Fensterende (bei der laufenden Periode: jetzt).
+        get stateSegments() {
+          if (!this.isState) return [];
+          const end = this.windowEnd ?? 0;
+          const out = [];
+          this.points.forEach((p, i) => {
+            const e = i + 1 < this.points.length ? this.points[i + 1].ts : end;
+            if (!(e > p.ts)) return;
+            const idx = Math.round(p.value);
+            const last = out[out.length - 1];
+            if (last && last.idx === idx && last.e === p.ts) last.e = e;
+            else out.push({s: p.ts, e, idx, key: p.ts});
+          });
+          return out;
+        },
+        // Bezugsfenster für Legende, Kennzahlen und Protokoll: der gezoomte
+        // Ausschnitt, sonst der ganze Zeitraum (ROADMAP 1.29: Zoom grenzt alles
+        // unter dem Chart ein).
+        get stateWindow() {
+          if (this.zoomRange) return {a: this.zoomRange.start / 1000, b: this.zoomRange.end / 1000};
+          return {a: this.windowStart ?? 0, b: this.windowEnd ?? 0};
+        },
+        get stateSummary() {
+          const {a, b} = this.stateWindow;
+          const total = Math.max(b - a, 1);
+          const seconds = new Map();
+          const entries = new Map();
+          let changes = 0;
+          let longest = null;
+          for (const seg of this.stateSegments) {
+            const s = Math.max(seg.s, a);
+            const e = Math.min(seg.e, b);
+            if (!(e > s)) continue;
+            seconds.set(seg.idx, (seconds.get(seg.idx) || 0) + (e - s));
+            if (seg.s >= a) {
+              entries.set(seg.idx, (entries.get(seg.idx) || 0) + 1);
+              changes += 1;
+            }
+            if (seg.idx !== STATE_UNAVAILABLE && (!longest || e - s > longest.seconds)) {
+              longest = {idx: seg.idx, seconds: e - s};
+            }
+          }
+          // Reihenfolge = Index, "nicht verfügbar" zuletzt (ROADMAP 1.29).
+          const order = this.states.map(st => st.idx).filter(idx => seconds.has(idx));
+          return {
+            rows: order.map(idx => ({
+              idx, seconds: seconds.get(idx), share: seconds.get(idx) / total * 100, entries: entries.get(idx) || 0,
+            })),
+            // Der erste Abschnitt im Fenster ist ein Zustand, kein Wechsel.
+            changes: Math.max(changes - 1, 0),
+            longest,
+            unavailable: seconds.get(STATE_UNAVAILABLE) || 0,
+          };
+        },
+        get stateLogRows() {
+          const {a, b} = this.stateWindow;
+          return this.stateSegments
+            .filter(seg => !this.hiddenStates.includes(seg.idx) && seg.e > a && seg.s < b)
+            .reverse();
+        },
+        // Protokoll-Einträge mit Tages-Zwischenzeilen ab einem Zeitraum über
+        // einen Tag, begrenzt auf stateLogShown Abschnitte.
+        get stateLogItems() {
+          const rows = this.stateLogRows;
+          const multiDay = !['hour', 'day'].includes(this.range);
+          const perDay = new Map();
+          const dayKey = ts => new Date(ts * 1000).toDateString();
+          if (multiDay) rows.forEach(seg => perDay.set(dayKey(seg.s), (perDay.get(dayKey(seg.s)) || 0) + 1));
+          const items = [];
+          let lastDay = null;
+          rows.slice(0, this.stateLogShown).forEach(seg => {
+            const day = dayKey(seg.s);
+            if (multiDay && day !== lastDay) {
+              const count = perDay.get(day);
+              const date = new Date(seg.s * 1000).toLocaleDateString(LOCALE, {weekday: 'short', day: '2-digit', month: '2-digit'});
+              items.push({type: 'day', id: `d${seg.key}`,
+                label: count === 1 ? t('{date} · 1 Abschnitt', {date}) : t('{date} · {count} Abschnitte', {date, count})});
+              lastDay = day;
+            }
+            items.push({type: 'row', id: `r${seg.key}`, seg});
+          });
+          return items;
+        },
+        get stateLogTitle() {
+          const count = this.stateLogRows.length.toLocaleString(LOCALE);
+          return this.zoomRange
+            ? t('Wechsel-Protokoll · {count} im Ausschnitt', {count})
+            : t('Wechsel-Protokoll · {count}', {count});
+        },
+        get stateKpiText() {
+          const sum = this.stateSummary;
+          const parts = [sum.changes === 1 ? t('1 Wechsel') : t('{count} Wechsel', {count: sum.changes.toLocaleString(LOCALE)})];
+          if (sum.longest) {
+            parts.push(t('längster Abschnitt {dauer} ({zustand})', {
+              dauer: NumberFormat.fmtDuration(sum.longest.seconds), zustand: this.stateLabel(sum.longest.idx),
+            }));
+          }
+          parts.push(t('nicht verfügbar {dauer}', {dauer: NumberFormat.fmtDuration(sum.unavailable)}));
+          return parts.join(' · ');
+        },
+        stateLabel(idx) {
+          if (idx === STATE_UNAVAILABLE) return t('nicht verfügbar');
+          const st = this.states.find(x => x.idx === idx);
+          return st ? (st.label || st.text) : String(idx);
+        },
+        stateRaw(idx) {
+          const st = this.states.find(x => x.idx === idx);
+          return st ? st.text : '';
+        },
+        stateSwatch(idx) { return stateSwatchStyle(idx); },
+        stateShare(row) {
+          const digits = row.share < 1 ? 1 : 0;
+          return `${row.share.toLocaleString(LOCALE, {minimumFractionDigits: digits, maximumFractionDigits: digits})} %`;
+        },
+        fmtStateDuration(seconds) { return NumberFormat.fmtDuration(seconds); },
+        fmtStateTime(ts) {
+          return new Date(ts * 1000).toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
+        },
+        stateRunning(seg) { return this.isCurrent && seg.e >= (this.windowEnd ?? 0); },
+        toggleState(idx) {
+          const i = this.hiddenStates.indexOf(idx);
+          if (i >= 0) this.hiddenStates.splice(i, 1);
+          else this.hiddenStates.push(idx);
+          this.render();
+        },
+        // Hover über eine Protokollzeile: Band im Zeitstrahl einrahmen.
+        highlightState(key) {
+          this.stateHot = key;
+          if (!chartInstance || this.chartType !== 'timeline') return;
+          const seg = key == null ? null : this.stateSegments.find(x => x.key === key);
+          chartInstance.setOption({series: [{id: 'main'}, {id: 'hl', data: seg ? [[0, seg.s * 1000, seg.e * 1000]] : []}]});
+        },
+        // Klick auf ein Band: zur Zeile springen (nachladen, falls sie hinter
+        // den bisher gezeigten Einträgen liegt).
+        focusStateRow(key) {
+          if (!this.stateLog) this.stateLog = true;
+          const pos = this.stateLogRows.findIndex(seg => seg.key === key);
+          if (pos < 0) return;
+          if (pos >= this.stateLogShown) this.stateLogShown = Math.ceil((pos + 1) / STATE_LOG_PAGE) * STATE_LOG_PAGE;
+          this.stateHot = key;
+          this.$nextTick(() => {
+            const row = document.querySelector(`.state-log [data-key="${key}"]`);
+            if (row) row.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+          });
         },
         toggleMarked() {
           this.showMarked = !this.showMarked;
@@ -604,7 +801,7 @@ function selectBrush() {
                 show_marked: this.showMarked,
                 average_line: this.averageLine,
                 legend_metrics: this.legendMetrics, legend_style: this.legendStyle,
-                decimals: this.decimals,
+                decimals: this.decimals, state_log: this.stateLog,
               }),
             });
           } catch (e) {
@@ -651,6 +848,7 @@ function selectBrush() {
             this.averageLine !== CHART_DEFAULTS.average_line ||
             this.legendStyle !== CHART_DEFAULTS.legend_style ||
             this.decimals !== CHART_DEFAULTS.decimals ||
+            this.stateLog !== (CHART_DEFAULTS.state_log !== false) ||
             JSON.stringify([...this.legendMetrics].sort()) !== JSON.stringify([...CHART_DEFAULTS.legend_metrics].sort())
           );
         },
@@ -738,6 +936,8 @@ function selectBrush() {
           this.compareWindowStart = data.compare_window_start ?? null;
           this.compareWindowEnd = data.compare_window_end ?? null;
           this.aggregationType = data.aggregation_type;
+          this.states = data.states || [];
+          this.stateLogShown = STATE_LOG_PAGE;
           this.windowStart = data.window_start;
           this.windowEnd = data.window_end;
           this.periodEnd = data.period_end ?? data.window_end;
@@ -755,6 +955,13 @@ function selectBrush() {
             // Einmalig bei der Instanzerzeugung registriert, nicht bei jedem
             // Rendern — sonst stapeln sich mit jedem Neuzeichnen weitere
             // Handler auf derselben Instanz.
+            chartInstance.on('click', (p) => {
+              if (this.isState && p.seriesId === 'main') this.focusStateRow(p.value[4]);
+            });
+            chartInstance.on('mouseover', (p) => {
+              if (this.isState && p.seriesId === 'main') this.stateHot = p.value[4];
+            });
+            chartInstance.on('mouseout', () => { if (this.isState) this.stateHot = null; });
             chartInstance.on('dataZoom', () => {
               const [zoom] = chartInstance.getOption().dataZoom || [];
               this.zoomRange = visibleWindow(
@@ -1161,14 +1368,25 @@ function selectBrush() {
         // wäre, um "kein Wert" von "AUS" zu unterscheiden.
         renderTimeline(fmt) {
           const intervals = [];
-          for (let i = 0; i < this.points.length; i++) {
-            const start = this.points[i].ts;
-            const end = i + 1 < this.points.length ? this.points[i + 1].ts : (this.windowEnd ?? start);
-            if (this.points[i].value >= 0.5 && end > start) {
-              intervals.push([0, start * 1000, end * 1000]);
+          if (this.isState) {
+            // Ein Band je Abschnitt, Farbe nach Zustand; ausgeblendete fehlen.
+            // Viertes/fünftes Element: Zustandsindex und Schlüssel der Zeile im
+            // Wechsel-Protokoll.
+            for (const seg of this.stateSegments) {
+              if (!this.hiddenStates.includes(seg.idx)) intervals.push([0, seg.s * 1000, seg.e * 1000, seg.idx, seg.key]);
+            }
+          } else {
+            for (let i = 0; i < this.points.length; i++) {
+              const start = this.points[i].ts;
+              const end = i + 1 < this.points.length ? this.points[i + 1].ts : (this.windowEnd ?? start);
+              if (this.points[i].value >= 0.5 && end > start) {
+                intervals.push([0, start * 1000, end * 1000]);
+              }
             }
           }
           const accent = getComputedStyle(document.body).getPropertyValue('--chart-bar');
+          const naFill = this.isState ? unavailablePattern() : null;
+          const fillFor = idx => (idx === STATE_UNAVAILABLE ? naFill : stateColor(idx));
           const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
           const option = {
             textStyle: {
@@ -1208,11 +1426,18 @@ function selectBrush() {
                   const d = new Date(ms);
                   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
                 };
-                return `${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
+                const span = `${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
+                if (!this.isState) return span;
+                const idx = p.value[3];
+                const raw = this.stateRaw(idx);
+                const name = escapeHtml(this.stateLabel(idx));
+                const rawPart = raw && raw !== this.stateLabel(idx) ? ` <span style="opacity:.6">${escapeHtml(raw)}</span>` : '';
+                return `<strong>${name}</strong>${rawPart}<br>${span}`;
               },
               appendToBody: true,
             },
             series: [{
+              id: 'main',
               type: 'custom',
               renderItem: (params, api) => {
                 const categoryIndex = api.value(0);
@@ -1220,13 +1445,35 @@ function selectBrush() {
                 const end = api.coord([api.value(2), categoryIndex]);
                 const height = api.size([0, 1])[1] * 0.6;
                 const rectShape = echarts.graphic.clipRectByRect(
-                  {x: start[0], y: start[1] - height / 2, width: end[0] - start[0], height},
+                  // Mindestens 1 px: ein Zustand von Sekunden soll als Strich
+                  // sichtbar bleiben statt ganz zu verschwinden.
+                  {x: start[0], y: start[1] - height / 2, width: Math.max(end[0] - start[0], this.isState ? 1 : 0), height},
                   {x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height}
                 );
-                return rectShape && {type: 'rect', shape: rectShape, style: {fill: accent}};
+                return rectShape && {type: 'rect', shape: rectShape, style: {fill: this.isState ? fillFor(api.value(3)) : accent}};
               },
               encode: {x: [1, 2], y: 0},
               data: intervals,
+            }, {
+              // Rahmen um das Band der Protokollzeile unter dem Mauszeiger
+              // (highlightState()); bei Schaltern bleibt die Reihe leer.
+              id: 'hl',
+              type: 'custom',
+              silent: true,
+              z: 10,
+              renderItem: (params, api) => {
+                const start = api.coord([api.value(1), api.value(0)]);
+                const end = api.coord([api.value(2), api.value(0)]);
+                const height = api.size([0, 1])[1] * 0.6 + 8;
+                const rectShape = echarts.graphic.clipRectByRect(
+                  {x: start[0] - 2, y: start[1] - height / 2, width: Math.max(end[0] - start[0], 1) + 4, height},
+                  {x: params.coordSys.x - 3, y: params.coordSys.y, width: params.coordSys.width + 6, height: params.coordSys.height}
+                );
+                const ink = getComputedStyle(document.body).getPropertyValue('--ink').trim();
+                return rectShape && {type: 'rect', shape: {...rectShape, r: 3}, style: {fill: 'transparent', stroke: ink, lineWidth: 2}};
+              },
+              encode: {x: [1, 2], y: 0},
+              data: [],
             }],
             // Der Zeitstrahl bekommt den Zoom IMMER, ohne die Punkt-Schwelle
             // der Linien-/Balken-Ansicht. Grund ist kein Komfort, sondern
