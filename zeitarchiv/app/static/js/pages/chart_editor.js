@@ -1443,24 +1443,25 @@
           else { this.raw = false; }
           this.load();
         },
-        // "Darstellungsart" (Optionen-Menü, oberste Zeile unter
-        // "Darstellung") — Zeitverlauf (bisheriges Linie/Balken/Zeitstrahl,
-        // s. u.) oder Donut (renderDonut()). Reines render() statt load():
-        // der Donut aggregiert dieselben bereits geladenen Punkte nur anders
-        // (wie toggleStacked()), braucht also keine neue Serverabfrage.
-        // Der Donut-Knopf ist disabled, solange compare true ist (Vergleich
-        // hat Vorrang, siehe setCompareMode()) — eine Vorperiode-Nebenserie
-        // ergibt für einen Anteil am Ganzen keinen sinnvoll darstellbaren
-        // zweiten Wert.
+        // "Diagrammtyp" (Optionen-Menü, oberste Zeile unter "Darstellung") —
+        // Zeitverlauf (Linie/Balken je Serie), Zeitstrahl (nur wenn alle
+        // Serien Schalter sind, dieselbe Auswahl wie auf der Entitätsseite)
+        // oder Donut (renderDonut()). Donut braucht keine neue Serverabfrage,
+        // solange keine Rohwerte geladen sind (wie toggleStacked()); Zeitstrahl
+        // und der Rückweg aus ihm schon, denn er erzwingt Rohwerte (siehe
+        // toggleTimeline() für die Begründung). Zeitstrahl und Donut sind
+        // disabled, solange compare true ist (Vergleich hat Vorrang, siehe
+        // setCompareMode()) — eine Vorperiode-Nebenserie ergibt dort keinen
+        // sinnvoll darstellbaren zweiten Wert.
         setDisplayMode(mode) {
-          const wantDonut = mode === 'donut';
-          if (wantDonut === this.donut) return;
+          const wasTimeline = this.timeline && !this.donut;
+          const current = this.donut ? 'donut' : (wasTimeline && !this.hasState ? 'timeline' : 'timeseries');
+          if (mode === current) return;
           this.typeChosen = true;
-          this.donut = wantDonut;
-          if (wantDonut) {
-            // render() prüft this.timeline VOR this.donut (s. o.) — ein noch
-            // aktives Zeitstrahl bliebe sonst trotz gewähltem Donut weiter
-            // sichtbar, obwohl die Darstellungsart-Zeile schon "Donut" zeigt.
+          this.donut = mode === 'donut';
+          if (mode === 'donut') {
+            // render() prüft this.timeline VOR this.donut — ein noch aktiver
+            // Zeitstrahl bliebe sonst trotz gewähltem Donut sichtbar.
             this.timeline = false;
             // renderDonut() summiert/mittelt/liest den letzten Wert der
             // bereits geladenen Punkte direkt — bei Rohwerten (raw=true)
@@ -1469,11 +1470,21 @@
             // falls raw noch aktiv war: this.series enthält dann noch die
             // alten Rohpunkte, nicht die passenden Bucket-Werte.
             if (this.raw) { this.raw = false; this.load(); return; }
+          } else if (mode === 'timeline') {
+            this.timeline = true;
+            this.raw = true;
+            this.load();
+            return;
           } else if (this.hasState) {
             // Zurück zum Zeitverlauf: bei Zuständen ist das der Zeitstrahl
             // (Rohübergänge). Ein bloßes render() fiele auf Linie/Balken über
             // Zustandsindizes zurück und bliebe leer — load() setzt
             // timeline/raw selbst (siehe dort) und holt die Rohdaten neu.
+            this.load();
+            return;
+          } else if (wasTimeline) {
+            this.timeline = false;
+            this.raw = false;
             this.load();
             return;
           }

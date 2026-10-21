@@ -981,7 +981,7 @@ eines bestehenden (Kachelmenü ⋮).
 
 ### Donut statt Zeitverlauf
 
-Über **Darstellungsart** lässt sich ein Chart statt als Zeitverlauf als
+Über **Diagrammtyp** lässt sich ein Chart statt als Zeitverlauf als
 Donut zeigen — ein Anteil je Entität statt einer Zeitachse, etwa um den
 Verbrauchsanteil mehrerer Geräte an einem Gesamtwert zu vergleichen.
 **Aggregation** bestimmt dabei, welcher Wert je Entität die Größe ihres
@@ -1088,7 +1088,7 @@ Verlaufsansicht einer einzelnen Entität.
 
 ### Was wird gespeichert — und was nicht
 
-Entitäten samt Namen/Reihenfolge/Sichtbarkeit, Darstellungsart (samt
+Entitäten samt Namen/Reihenfolge/Sichtbarkeit, Diagrammtyp (samt
 Aggregation bei Donut), Zeitraum samt
 Rollierend-Schalter, Auflösung (samt Ausrichtung beim Ranking-Vergleich),
 dynamische Y-Achse, Werte anzeigen, Durchschnittslinie (samt Flach/Gleitend),

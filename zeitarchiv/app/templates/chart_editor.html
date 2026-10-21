@@ -239,12 +239,21 @@
                      Knöpfe erklären sich selbst, ein Toggle bräuchte einen
                      dritten Satz dafür, wogegen er wirkt. -->
                 <div class="menu-row menu-row-stack">
-                  <span class="menu-row-label">{{ _("Darstellungsart") }}
-                    <span class="menu-note" x-show="compare">{{ _("Donut nicht bei aktivem Vergleich") }}</span>
+                  <span class="menu-row-label">{{ _("Diagrammtyp") }}
+                    <span class="menu-note" x-show="compare && !(allSwitch && !hasState)">{{ _("Donut nicht bei aktivem Vergleich") }}</span>
+                    <span class="menu-note" x-show="compare && allSwitch && !hasState">{{ _("Zeitstrahl und Donut nicht bei aktivem Vergleich") }}</span>
                   </span>
                   <div class="seg">
-                    <button :class="{active: !donut}" @click="setDisplayMode('timeseries')">{{ _("Zeitverlauf") }}</button>
-                    <button :class="{active: donut}" :disabled="compare" @click="setDisplayMode('donut')">{{ _("Donut (Anteile)") }}</button>
+                    <button :class="{active: !donut && (hasState || !timeline)}" @click="setDisplayMode('timeseries')">{{ _("Zeitverlauf") }}</button>
+                    {# Wie auf der Entitätsseite ein Knopf im Diagrammtyp, nur bei
+                       Schaltern. Serverseitig nicht möglich (die Serien kennt erst
+                       die Seite), deshalb x-if statt x-show: so greift die
+                       Rahmen-Regel von .seg button:last-child weiter auf dem
+                       tatsächlich letzten Knopf. #}
+                    <template x-if="allSwitch && !hasState">
+                      <button :class="{active: timeline && !donut}" :disabled="compare" @click="setDisplayMode('timeline')">{{ _("Zeitstrahl") }}</button>
+                    </template>
+                    <button :class="{active: donut}" :disabled="compare" @click="setDisplayMode('donut')">{{ _("Donut") }}</button>
                   </div>
                 </div>
                 <!-- Nur bei aktivem Donut sichtbar — bestimmt, welcher
@@ -262,17 +271,6 @@
                     <button :class="{active: donutAggregation === 'last'}" @click="donutAggregation = 'last'; render()">{{ _("Letzter Wert") }}</button>
                   </div>
                 </div>
-                {# Mit Zustands-Entitäten gibt es nur Zeitstrahl oder Donut
-                   (load()), der Schalter hätte dort nichts umzuschalten. #}
-                <label class="menu-row" x-show="allSwitch && !hasState && !donut">
-                  <span class="menu-row-label">{{ _("Zeitstrahl") }}
-                    <span class="menu-note" x-show="compare">{{ _("nicht bei aktivem Vergleich") }}</span>
-                  </span>
-                  <span class="menu-toggle">
-                    <input type="checkbox" :checked="timeline" :disabled="compare" @change="toggleTimeline()">
-                    <span class="track"><span class="thumb"></span></span>
-                  </span>
-                </label>
                 <label class="menu-row" x-show="hasLineSeries && !donut">
                   <span class="menu-row-label">{{ _("Punkte") }}</span>
                   <span class="menu-toggle">
@@ -427,7 +425,7 @@
                      bleibt die Zeile sichtbar und wirkt weiterhin nur auf die
                      Linien-Serien. -->
                 <div class="menu-row menu-row-stack" x-show="averageLine && !(stacked && canStack) && hasLineSeries && !donut">
-                  <span class="menu-row-label">{{ _("Darstellung") }}</span>
+                  <span class="menu-row-label">{{ _("Linienstil") }}</span>
                   <div class="seg">
                     <button :class="{active: averageStyle === 'flat'}" @click="averageStyle = 'flat'; render()">{{ _("Flach") }}</button>
                     <button :class="{active: averageStyle === 'rolling'}" @click="averageStyle = 'rolling'; render()">{{ _("Gleitend") }}</button>
