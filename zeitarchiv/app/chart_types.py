@@ -78,7 +78,7 @@ def chart_type_label(chart: dict, aggregation_types: dict[str, str]) -> str:
     return CHART_TYPE_LABELS.get(chart_type_key(chart, aggregation_types), "")
 
 
-_FLAGS = ("show_points", "show_values", "dynamic_y_axis", "average_line", "chart_stats")
+_FLAGS = ("show_points", "show_values", "dynamic_y_axis", "average_line", "chart_stats", "area_fill")
 
 
 def editor_display_prefill(params, metrics: set[str], styles: set[str], decimals: set[str]) -> dict:
@@ -93,6 +93,8 @@ def editor_display_prefill(params, metrics: set[str], styles: set[str], decimals
         out["decimals"] = params["decimals"]
     if params.get("legend_style") in styles:
         out["legend_style"] = params["legend_style"]
+    if params.get("average_style") in ("flat", "rolling"):
+        out["average_style"] = params["average_style"]
     chosen = [m for m in params.get("legend_metrics", "").split(",") if m in metrics]
     if chosen:
         out["legend_metrics"] = chosen

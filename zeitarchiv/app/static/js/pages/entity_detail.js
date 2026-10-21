@@ -176,6 +176,20 @@
       return zahlen.reduce((summe, v) => summe + v, 0) / zahlen.length;
     }
 
+    // Gleitender Durchschnitt wie im Chart-Editor (dort mit der Begründung für
+    // die Fensterbreite): zentriertes Fenster, ein Zwölftel der Punkte, 3 bis 60.
+    function movingAverageWindow(pointCount) {
+      return Math.min(60, Math.max(3, Math.round(pointCount / 12)));
+    }
+    function movingAverage(points, windowPoints) {
+      return points.map((p, i) => {
+        const start = Math.max(0, i - Math.floor(windowPoints / 2));
+        const end = Math.min(points.length, i + Math.ceil(windowPoints / 2));
+        const slice = points.slice(start, end).map(q => q.value).filter(Number.isFinite);
+        return {ts: p.ts, value: slice.length ? slice.reduce((s, v) => s + v, 0) / slice.length : null};
+      });
+    }
+
     // Median-Abstand aufeinanderfolgender Zeitstempel — dieselbe Funktion wie
     // in chart_editor.html, hier für den Tooltip-Zeitstempel-Formatter unten.
     function detectResolutionSeconds(points) {
@@ -370,6 +384,8 @@ function selectBrush() {
         dynamicYAxis: CHART_OPTIONS.dynamic_y_axis,
         chartStats: CHART_OPTIONS.chart_stats,
         averageLine: CHART_OPTIONS.average_line,
+        areaFill: CHART_OPTIONS.area_fill,
+        averageStyle: CHART_OPTIONS.average_style,
         legendMetrics: [...CHART_OPTIONS.legend_metrics],
         legendStyle: CHART_OPTIONS.legend_style,
         decimals: CHART_OPTIONS.decimals,
@@ -492,6 +508,7 @@ function selectBrush() {
             decimals: this.decimals,
             show_points: String(this.showPoints), show_values: String(this.showValues),
             dynamic_y_axis: String(this.dynamicYAxis), average_line: String(this.averageLine),
+            area_fill: String(this.areaFill), average_style: this.averageStyle,
             chart_stats: String(this.chartStats), legend_metrics: this.legendMetrics.join(','),
             legend_style: this.legendStyle,
           });
@@ -880,6 +897,7 @@ function selectBrush() {
                 average_line: this.averageLine,
                 legend_metrics: this.legendMetrics, legend_style: this.legendStyle,
                 decimals: this.decimals, state_log: this.stateLog,
+                area_fill: this.areaFill, average_style: this.averageStyle,
               }),
             });
           } catch (e) {
@@ -924,6 +942,8 @@ function selectBrush() {
             this.chartStats !== CHART_DEFAULTS.chart_stats ||
             this.showMarked !== CHART_DEFAULTS.show_marked ||
             this.averageLine !== CHART_DEFAULTS.average_line ||
+            this.areaFill !== CHART_DEFAULTS.area_fill ||
+            this.averageStyle !== CHART_DEFAULTS.average_style ||
             this.legendStyle !== CHART_DEFAULTS.legend_style ||
             this.decimals !== CHART_DEFAULTS.decimals ||
             this.stateLog !== (CHART_DEFAULTS.state_log !== false) ||
@@ -1292,7 +1312,24 @@ function selectBrush() {
           //
           // Der Wert kommt aus denselben Punkten wie die Legende, Zahl und
           // Linie stimmen hier also immer überein.
-          const durchschnitt = this.averageLine ? averageOf(this.points.map(p => p.value)) : null;
+          const rolling = this.averageLine && this.averageStyle === 'rolling' && this.chartType === 'line';
+          const durchschnitt = this.averageLine && !rolling ? averageOf(this.points.map(p => p.value)) : null;
+          if (this.chartType === 'line' && this.areaFill) {
+            series[0].areaStyle = {color: getComputedStyle(document.body).getPropertyValue('--chart-line'), opacity: 0.08};
+          }
+          if (rolling && this.points.length) {
+            // Eigene Serie wie im Chart-Editor, nicht über die Legende schaltbar.
+            series.push({
+              name: t('{name} (Ø gleitend)', {name: DISPLAY_NAME}),
+              type: 'line',
+              data: movingAverage(this.points, movingAverageWindow(this.points.length))
+                .filter(p => p.value !== null).map(p => [p.ts * 1000, p.value]),
+              smooth: true,
+              symbol: 'none',
+              lineStyle: {width: 2.5, color: getComputedStyle(document.body).getPropertyValue('--chart-line')},
+              z: 3,
+            });
+          }
           if (durchschnitt !== null) {
             series[0].markLine = {
               // Wie beim Markierungs-Band: die Linie ist Beiwerk und darf das

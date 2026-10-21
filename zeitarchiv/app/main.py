@@ -24,7 +24,7 @@ from collections import deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -168,9 +168,7 @@ from . import notices as notices_mod
 from . import version_check
 from .notices import collect_notices
 from .chart_period import calendar_bounds, compare_settings_or_400, period_anchor_or_400
-from .chart_types import (
-    CHART_EDITOR_CHART_TYPES, ENTITY_CHART_TYPES, chart_type_label, chart_type_key, editor_display_prefill, effective_chart_type,
-)
+from .chart_types import CHART_EDITOR_CHART_TYPES, ENTITY_CHART_TYPES, chart_type_label, chart_type_key, editor_display_prefill, effective_chart_type
 from .progress import activity_snapshot, register_source
 
 logger = logging.getLogger(__name__)
@@ -3021,6 +3019,8 @@ class _EntityChartOptionsBody(BaseModel):
     decimals: str
     # Wechsel-Protokoll unter dem Zeitstrahl (nur Zustands-Entitäten).
     state_log: bool = True
+    area_fill: bool = True
+    average_style: Literal["flat", "rolling"] = "flat"
 
 
 @app.post("/entities/{entity_id}/chart-options")
@@ -3296,6 +3296,8 @@ _ENTITY_CHART_OPTION_DEFAULTS = {
     "legend_metrics": ["last", "min", "max", "average", "sum"],
     "legend_style": "chips",
     "decimals": "auto",
+    "area_fill": True,  # wie im Chart-Editor und auf Dashboard-Kacheln
+    "average_style": "flat",
     # Zustands-Entitäten (ROADMAP 1.29): Wechsel-Protokoll unter dem
     # Zeitstrahl standardmäßig offen; ohne Wirkung bei allen anderen Typen.
     "state_log": True,
@@ -3414,10 +3416,10 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "decimals": chart["decimals"] if chart else prefill.get("decimals", "auto"),
         "show_values": chart["show_values"] if chart else prefill.get("show_values", False),
         "average_line": chart["average_line"] if chart else prefill.get("average_line", False),
-        "area_fill": chart["area_fill"] if chart else True, "show_points": chart["show_points"] if chart else prefill.get("show_points", False),
+        "area_fill": chart["area_fill"] if chart else prefill.get("area_fill", True), "show_points": chart["show_points"] if chart else prefill.get("show_points", False),
         "stacked": chart["stacked"] if chart else False,
         "normalize": chart["normalize"] if chart else False,
-        "average_style": chart["average_style"] if chart else "flat",
+        "average_style": chart["average_style"] if chart else prefill.get("average_style", "flat"),
         "horizontal": chart["horizontal"] if chart else False,
         "donut_aggregation": chart["donut_aggregation"] if chart else "sum",
         "period_anchor": chart["period_anchor"] if chart else prefill.get("period_anchor"),  # Start des Editors

@@ -237,6 +237,13 @@
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
+            <label class="menu-row" x-show="chartType === 'line'">
+              <span class="menu-row-label">{{ _("Fläche") }}</span>
+              <span class="menu-toggle">
+                <input type="checkbox" :checked="areaFill" @change="areaFill = !areaFill; render(); saveChartOptions()">
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </label>
             <label class="menu-row" x-show="chartType === 'bar'">
               <span class="menu-row-label">{{ _("Werte anzeigen") }}</span>
               <span class="menu-toggle">
@@ -273,6 +280,13 @@
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
+            <div class="menu-row menu-row-stack" x-show="averageLine && chartType === 'line'">
+              <span class="menu-row-label">{{ _("Linienstil") }}</span>
+              <div class="seg">
+                <button :class="{active: averageStyle === 'flat'}" @click="averageStyle = 'flat'; render(); saveChartOptions()">{{ _("Flach") }}</button>
+                <button :class="{active: averageStyle === 'rolling'}" @click="averageStyle = 'rolling'; render(); saveChartOptions()">{{ _("Gleitend") }}</button>
+              </div>
+            </div>
             <label class="menu-row">
               <span class="menu-row-label">{{ _("Statistik in Legende") }}</span>
               <span class="menu-toggle">
