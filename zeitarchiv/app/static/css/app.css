@@ -2000,6 +2000,9 @@ table.dt tbody tr.has-pending-purge:hover td{background:var(--warning-soft);}
 .settings-compact-row-text{min-width:0;}
 .settings-compact-label{font-size:calc(13px * var(--font-scale, 1));color:var(--ink);}
 .settings-compact-hint{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);margin-top:3px;line-height:1.4;}
+/* `.settings-panel p` (margin:0 0 16px) sticht die Klasse oben; der Hinweis steht in einer Zeile mit
+   eigenem Padding und braucht den Absatzabstand nach unten nicht. */
+.settings-panel p.settings-compact-hint{margin-bottom:0;}
 /* Mehrere Bedienelemente einer Einstellungszeile. Sie MÜSSEN umbrechen dürfen:
    .settings-compact-row bricht zwar selbst um, aber eine Gruppe ohne
    flex-wrap ist als Flex-Element nicht schmaler zu bekommen als ihr breitester
