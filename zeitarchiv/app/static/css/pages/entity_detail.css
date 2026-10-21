@@ -155,7 +155,7 @@
 .state-kpis{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
 .state-panel .chart-legend{margin-top:0;}
 .state-dot{display:inline-block;width:10px;height:10px;border-radius:3px;flex:none;vertical-align:-1px;}
-.state-legend-table{max-width:36rem;}
+.state-panel .chart-legend-table-wrap{max-width:36rem;}
 .state-legend-row{cursor:pointer;}
 .state-legend-row:hover td{background:var(--surface-alt);}
 .state-legend-row.inactive td{opacity:.45;}

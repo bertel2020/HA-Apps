@@ -290,8 +290,10 @@
               </div>
             </div>
             {% endif %}
-            <div class="menu-divider"></div>
-            <div class="menu-section-label">{{ _("Aktionen") }}</div>
+            {# Bei Zuständen entfällt "Als Chart speichern"; ohne eigene Optionen
+               bliebe unter "Aktionen" dann nichts stehen. #}
+            <div class="menu-divider"{% if aggregation_type == 'state' %} x-show="hasCustomOptions()"{% endif %}></div>
+            <div class="menu-section-label"{% if aggregation_type == 'state' %} x-show="hasCustomOptions()"{% endif %}>{{ _("Aktionen") }}</div>
             {# "Werte bearbeiten" und "Konfiguration" standen hier einmal daneben.
                Beide sind Seiten, keine Aktionen — sie liegen jetzt in der
                Reiterzeile unter dem Titel (siehe _entity_tabs.html), die
@@ -382,11 +384,9 @@
          Abschnitt und Ausfallzeit, darunter das Wechsel-Protokoll. Alles
          bezieht sich auf den gezoomten Ausschnitt, sonst auf den Zeitraum. #}
       <div class="state-panel" x-show="points.length" x-cloak>
+        {# Der Ausschnitt-Chip oben rechts im Chart setzt den Zoom zurück —
+           kein zweiter hier, der Chip gilt für alles unter dem Chart mit. #}
         <div class="state-kpis">
-          <button type="button" class="chip chip-zoom active" x-show="zoomRange" @click="resetZoom()"
-                  title="{{ _('Gezeigten Ausschnitt zurücksetzen') }}">
-            <span x-text="zoomLabel"></span> <span class="chip-zoom-x" aria-hidden="true">&times;</span>
-          </button>
           <span x-text="stateKpiText"></span>
         </div>
         <div class="chart-legend" x-show="legendStyle === 'chips'">

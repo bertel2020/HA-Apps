@@ -32,7 +32,7 @@ import pyarrow.parquet as pq
 from .i18n import LANGUAGES, SOURCE_LANGUAGE, translate
 from .storage import hotbuffer, reconcile
 from .storage.entity_removal import delete_all_values, delete_entity
-from .storage.index import Index
+from .storage.index import STATE_UNAVAILABLE_INDEX, Index
 from .storage.paths import entity_dir, storage_area_dir
 from .storage.symcon_import import import_rows
 
@@ -54,6 +54,24 @@ class DemoEntity:
     domain: str
     state_class: str | None
     unit: str | None
+    # Zustands-Entität (Typ "state", ROADMAP 1.29): (Rohwert, Anzeigename) je
+    # Zustand, in der Reihenfolge der Indizes. Die Zeilen tragen dann den
+    # Index als Wert, STATE_UNAVAILABLE_INDEX für einen Ausfall.
+    states: tuple[tuple[str, str], ...] | None = None
+
+
+# Zustände der Demo-Zustands-Entitäten. Rohwerte wie Home Assistant sie
+# liefern würde (englisch), Anzeigenamen deutsch als Übersetzung — so zeigt
+# die Demo beides, Text und Rohwert im Tooltip.
+SAUGROBOTER_STATES = (
+    ("docked", "Angedockt"), ("cleaning", "Saugen"), ("mopping", "Wischen"),
+    ("returning", "Rückkehr zur Station"), ("paused", "Pausiert"), ("error", "Fehler"),
+)
+WASCHPROGRAMM_STATES = (
+    ("off", "Aus"), ("cotton_60", "Baumwolle 60"), ("eco_40_60", "Eco 40-60"),
+    ("easy_care", "Pflegeleicht"), ("quick_30", "Kurz 30"), ("finished", "Fertig"),
+)
+HEIZUNG_BETRIEB_STATES = (("off", "Aus"), ("idle", "Leerlauf"), ("heating", "Heizen"))
 
 
 DEMO_ENTITIES = [
@@ -206,6 +224,14 @@ DEMO_ENTITIES = [
                "device_tracker", None, None),
     DemoEntity("binary_sensor.demo_regensensor", "Demo Regensensor",
                "binary_sensor", None, None),
+    # Zustands-Entitäten (Typ "state") — Text-Zustände statt Zahlen, siehe
+    # gen_saugroboter_status()/gen_waschmaschine_programm()/gen_heizung_betrieb().
+    DemoEntity("sensor.demo_saugroboter_status", "Demo Saugroboter Status",
+               "sensor", None, None, states=SAUGROBOTER_STATES),
+    DemoEntity("sensor.demo_waschmaschine_programm", "Demo Waschmaschine Programm",
+               "sensor", None, None, states=WASCHPROGRAMM_STATES),
+    DemoEntity("sensor.demo_heizung_betrieb", "Demo Heizung Betrieb",
+               "sensor", None, None, states=HEIZUNG_BETRIEB_STATES),
     # Migrationstest-Paar (Konzept-Erweiterung "Datensätze migrieren",
     # entity_migration.py) — kein Teil der eigentlichen Haushaltssimulation,
     # sondern gezielt für diese Funktion: eine "alte" Entität, die vor einigen
@@ -1208,6 +1234,90 @@ def gen_presence(start: datetime, end: datetime, rng: random.Random, start_state
     return rows
 
 
+# --- Zustands-Entitäten -------------------------------------------------------
+#
+# Werte sind Zustandsindizes (Position in DemoEntity.states), geschrieben nur
+# bei einem Wechsel — wie die Integration Text-Zustände überträgt.
+
+
+def _state_rows(events: list[Row], start: datetime, end: datetime) -> list[Row]:
+    """Sortiert, kappt auf [start, end) und lässt Wiederholungen desselben
+    Zustands weg."""
+    rows: list[Row] = []
+    for ts, value in sorted(events):
+        if not start.timestamp() <= ts < end.timestamp():
+            continue
+        if rows and rows[-1][1] == value:
+            continue
+        rows.append((ts, value))
+    return rows
+
+
+def gen_saugroboter_status(start: datetime, end: datetime, rng: random.Random) -> list[Row]:
+    """Saugroboter: an Werktagen ein Lauf am Vormittag (niemand zu Hause),
+    samstags manchmal; Saugen, oft Wischen, ab und zu ein Fehler mit Pause,
+    dann Rückkehr zur Station. Selten nachts kurz nicht verfügbar (WLAN)."""
+    docked, cleaning, mopping, returning, paused, error = range(6)
+    events: list[Row] = [(start.timestamp(), float(docked))]
+    day = start.replace(hour=0, minute=0, second=0, microsecond=0)
+    while day < end:
+        weekday = day.weekday()
+        if rng.random() < 0.04:
+            t = (day + timedelta(hours=1 + rng.random() * 4)).timestamp()
+            events += [(t, float(STATE_UNAVAILABLE_INDEX)), (t + (10 + rng.random() * 30) * 60, float(docked))]
+        if weekday < 5 or (weekday == 5 and rng.random() < 0.4):
+            t = (day + timedelta(hours=9.5 + rng.random() * 1.5)).timestamp()
+            events.append((t, float(cleaning)))
+            t += (35 + rng.random() * 35) * 60
+            if rng.random() < 0.12:
+                events.append((t, float(error)))
+                t += (3 + rng.random() * 10) * 60
+                events.append((t, float(paused)))
+                t += (5 + rng.random() * 20) * 60
+                events.append((t, float(cleaning)))
+                t += (5 + rng.random() * 15) * 60
+            if rng.random() < 0.6:
+                events.append((t, float(mopping)))
+                t += (15 + rng.random() * 20) * 60
+            events.append((t, float(returning)))
+            events.append((t + (2 + rng.random() * 4) * 60, float(docked)))
+        day += timedelta(days=1)
+    return _state_rows(events, start, end)
+
+
+def gen_waschmaschine_programm(
+    start: datetime, end: datetime, an_rows: list[Row], rng: random.Random
+) -> list[Row]:
+    """Aus den Waschzyklen der Haushaltssimulation (binary_sensor ..._an)
+    abgeleitet: beim Start ein Programm, beim Ende "Fertig", bis jemand die
+    Tür öffnet (20–120 min) "Aus"."""
+    off, finished = 0, 5
+    programs = (1, 1, 2, 2, 2, 3, 4)  # Baumwolle 60, Eco 40-60, Pflegeleicht, Kurz 30
+    events: list[Row] = [(start.timestamp(), float(off))]
+    next_on = [ts for ts, value in an_rows if value >= 0.5]
+    for ts, value in an_rows:
+        if value >= 0.5:
+            events.append((ts, float(rng.choice(programs))))
+        else:
+            events.append((ts, float(finished)))
+            door = ts + (20 + rng.random() * 100) * 60
+            if not any(ts < on <= door for on in next_on):
+                events.append((door, float(off)))
+    return _state_rows(events, start, end)
+
+
+def gen_heizung_betrieb(start: datetime, end: datetime, heizung_rows: list[Row]) -> list[Row]:
+    """Aus der simulierten Heizleistung abgeleitet: Mai bis September "Aus",
+    sonst "Heizen" bei Leistung, "Leerlauf" ohne."""
+    off, idle, heating = 0, 1, 2
+    events: list[Row] = []
+    for ts, watts in heizung_rows:
+        month = datetime.fromtimestamp(ts, start.tzinfo).month
+        state = off if 5 <= month <= 9 else (heating if watts > 50 else idle)
+        events.append((ts, float(state)))
+    return _state_rows(events, start, end)
+
+
 def month_start(dt: datetime) -> datetime:
     return dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
@@ -1251,7 +1361,7 @@ def inject_data_quality_issues(
     "eingefrorener" Folgewert wäre dort kein realistisches Sensor-Verhalten,
     sondern nur ein Bruch der eigenen Transitions-Logik.
     """
-    if entity.domain != "sensor" or len(rows) < 20:
+    if entity.domain != "sensor" or entity.states is not None or len(rows) < 20:
         return rows
 
     result = list(rows)
@@ -1365,7 +1475,14 @@ def write_entity(
     index.get_or_create_entity(
         entity_id, entity.domain, entity.state_class, entity.unit,
         friendly_name=translate(entity.friendly_name, language),
+        state=entity.states is not None,
     )
+    if entity.states is not None:
+        # Zuordnung vor den Werten anlegen, in der Reihenfolge von
+        # entity.states — die Zeilen tragen genau diese Indizes.
+        first_seen = rows[0][0] if rows else datetime.now(tz).timestamp()
+        for raw, label in entity.states:
+            index.state_index(entity_id, raw, translate(label, language), first_seen)
     current_month_start = month_start(datetime.now(tz)).timestamp()
     past_rows = [r for r in rows if r[0] < current_month_start]
     current_rows = [r for r in rows if r[0] >= current_month_start]
@@ -1766,6 +1883,11 @@ def run_generation(
         "binary_sensor.demo_praesenz_wohnzimmer": gen_presence(start, now, rng, start_state=presence_seed),
         "device_tracker.demo_smartphone": gen_presence(start, now, rng, start_state=device_presence_seed),
         "binary_sensor.demo_regensensor": household["regensensor"],
+        "sensor.demo_saugroboter_status": gen_saugroboter_status(start, now, rng),
+        "sensor.demo_waschmaschine_programm": gen_waschmaschine_programm(
+            start, now, household["waschmaschine_an"], rng,
+        ),
+        "sensor.demo_heizung_betrieb": gen_heizung_betrieb(start, now, household["heizung"]),
         # Kein start_total-Seed für die Neu-Entitäten beider Paare — anders
         # als beim Rest der Demo-Daten werden diese vier Entitäten bei jedem
         # --append-Lauf komplett zurückgesetzt (siehe MIGRATION_TEST_ENTITY_IDS

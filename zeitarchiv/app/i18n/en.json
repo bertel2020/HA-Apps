@@ -2766,7 +2766,21 @@
     "Weitere 25 laden": "Load 25 more",
     "Hinzufügen ist für Zustände nicht verfügbar": "Adding is not available for states",
     "Unbekannter Zustand": "Unknown state",
-    "nicht verfügbar": "unavailable"
+    "nicht verfügbar": "unavailable",
+    "Demo Saugroboter Status": "Demo Robot Vacuum Status",
+    "Demo Waschmaschine Programm": "Demo Washing Machine Programme",
+    "Demo Heizung Betrieb": "Demo Heating Operation",
+    "Angedockt": "Docked",
+    "Saugen": "Cleaning",
+    "Wischen": "Mopping",
+    "Rückkehr zur Station": "Returning to dock",
+    "Pausiert": "Paused",
+    "Baumwolle 60": "Cotton 60",
+    "Eco 40-60": "Eco 40-60",
+    "Pflegeleicht": "Easy care",
+    "Kurz 30": "Quick 30",
+    "Leerlauf": "Idle",
+    "Heizen": "Heating"
   },
   "js": {
     "Langzeit": "Long-term",
