@@ -783,8 +783,6 @@
     "Aktuell angezeigte Chart-Daten als CSV herunterladen": "Download currently displayed chart data as CSV",
     "Anpassen": "Customize",
     "Beliebig viele Entitäten überlagern &mdash; unterschiedliche Einheiten bekommen jeweils eine eigene Y-Achse. Zeigt beim Ansehen immer die aktuellen Daten, kein eingefrorener Schnappschuss.": "Overlay any number of entities &mdash; different units each get their own Y axis. Always shows the current data when viewed, not a frozen snapshot.",
-    "Entität oder Name suchen …": "Search entity or name …",
-    "Angezeigte Namen &amp; Reihenfolge (optional)": "Displayed names &amp; order (optional)",
     "Bestimmt Legenden-, Statistik- und Farbreihenfolge im Chart. Per Ziehen oder über die Pfeile neu anordnen.": "Determines the order of legend, statistics and colors in the chart. Reorder by dragging or with the arrows.",
     "Ziehen zum Verschieben": "Drag to move",
     "Nach oben": "Move up",
@@ -2790,7 +2788,11 @@
     "Werte verworfen: Typ passt nicht": "Values discarded: type does not match",
     "Diese Entitäten liefern Text statt Zahlen oder umgekehrt. Der erste Wert legt den Typ fest, abweichende Werte werden nicht gespeichert: {entities}.": "These entities report text instead of numbers or vice versa. The first value sets the type, values that differ are not stored: {entities}.",
     "Zustände verworfen: Obergrenze erreicht": "States discarded: limit reached",
-    "Diese Entitäten haben schon {limit} verschiedene Zustände, neue werden nicht mehr gespeichert: {entities}. Meist steckt Freitext dahinter (Adresse, Versionsnummer), der sich nicht als Zustand eignet.": "These entities already have {limit} different states, new ones are no longer stored: {entities}. Usually this is free text (an address, a version number) that does not work as a state."
+    "Diese Entitäten haben schon {limit} verschiedene Zustände, neue werden nicht mehr gespeichert: {entities}. Meist steckt Freitext dahinter (Adresse, Versionsnummer), der sich nicht als Zustand eignet.": "These entities already have {limit} different states, new ones are no longer stored: {entities}. Usually this is free text (an address, a version number) that does not work as a state.",
+    "Ausgewählt": "Selected",
+    "Entität hinzufügen …": "Add entity …",
+    "Noch keine Entität gewählt. Oben suchen und hinzufügen, das Chart erscheint sofort.": "No entity selected yet. Search above and add one, the chart appears right away.",
+    "Entfernen": "Remove"
   },
   "js": {
     "Langzeit": "Long-term",
@@ -3321,6 +3323,13 @@
     "seit {dauer}": "for {dauer}",
     "−24 h": "−24 h",
     "Nicht gezeigt: {names} — Zustands-Entitäten lassen sich nur zusammen mit anderen Zuständen darstellen.": "Not shown: {names} — state entities can only be shown together with other states.",
-    "Darstellung konnte nicht gespeichert werden": "Display could not be saved"
+    "Darstellung konnte nicht gespeichert werden": "Display could not be saved",
+    "Favoriten": "Favorites",
+    "Passt zu vorhandener Achse ({units})": "Fits an existing axis ({units})",
+    "Neue Y-Achse": "New Y axis",
+    "Treffer": "Matches",
+    "Alle Entitäten": "All entities",
+    "weniger": "less",
+    "mehr … {n}": "more … {n}"
   }
 }

@@ -4,6 +4,9 @@
     const ENTITY_LABELS = Object.fromEntries(
       ENTITY_OPTIONS.map(opt => [opt.entity_id, opt.label])
     );
+    const ENTITY_UNITS = Object.fromEntries(
+      ENTITY_OPTIONS.map(opt => [opt.entity_id, opt.unit || ''])
+    );
     // Reihenfolge bestimmt sowohl die Checkbox-Liste im Optionen-Menü als auch
     // die Reihenfolge der Werte im Legenden-Chip (siehe Template).
     const LEGEND_METRIC_OPTIONS = [
@@ -71,13 +74,6 @@
       const d = new Date(ms);
       const pad = n => String(n).padStart(2, '0');
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    }
-
-    function filterEntityPicker(value) {
-      const q = value.trim().toLowerCase();
-      document.querySelectorAll('#entity-picker .entity-picker-row').forEach(row => {
-        row.style.display = (!q || row.dataset.search.includes(q)) ? '' : 'none';
-      });
     }
 
     // Auf Modulebene statt lokal in formatPeriodLabel() (wie bis hierhin) —
@@ -678,6 +674,7 @@
         get selectedCount() { return this.selectedEntityIds.length; },
         get legendMetricOptions() { return LEGEND_METRIC_OPTIONS; },
         labelFor(entityId) { return ENTITY_LABELS[entityId] || entityId; },
+        unitFor(entityId) { return ENTITY_UNITS[entityId] || ''; },
         get visibleEntityIds() {
           return this.selectedEntityIds.filter(id => !this.hiddenEntityIds.includes(id));
         },

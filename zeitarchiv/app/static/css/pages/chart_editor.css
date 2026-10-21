@@ -21,24 +21,42 @@
   .chart-title-row-end{align-items:flex-end;}
 
   .entity-picker-field{margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border);}
-  .entity-picker{
-    max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;
-    background:var(--surface);margin-top:8px;
-    /* Mehrspaltig statt einer langen einzelnen Liste — bei vielen Entitäten
-       bleibt die Auswahl so überschaubar, ohne die volle Breite des jetzt
-       einspaltigen Layouts (kein Entitäts-Picker mehr neben dem Chart, siehe
-       settings-layout/settings-nav) ungenutzt zu lassen. */
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
-  }
-  .entity-picker-row{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);cursor:pointer;}
-  .entity-picker-row:hover{background:var(--surface-alt);}
-  /* Die Zeile ist ein Kästchen zum Anklicken, kein Hilfetext — dieselbe
+  /* Entitäten-Wähler (entityMultiPicker in entity-picker.js): Suchfeld,
+     darunter im Fluss — nicht als schwebendes Popover — Filter-Chips und
+     Trefferliste. Im Fluss, damit auf dem Telefon nichts über den Rand
+     ragt und die Liste "Ausgewählt" darunter beim Hinzufügen sichtbar
+     mitwächst. */
+  .entity-multi-picker{margin-top:8px;}
+  .entity-multi-picker > input{width:100%;box-sizing:border-box;}
+  .emp-panel{margin-top:6px;border:1px solid var(--border);border-radius:10px;background:var(--surface);overflow:hidden;}
+  .emp-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:10px 12px 0;}
+  .emp-chips-label{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);min-width:52px;}
+  /* Kleinere .chip-Variante wie .legend-metrics-row (app.css) — in voller
+     Größe nähmen zwei Chip-Reihen mehr Höhe ein als die Treffer selbst. */
+  .emp-chips .chip{padding:4px 10px;font-size:calc(12px * var(--font-scale, 1));}
+  .emp-count{margin-left:5px;opacity:.65;font-weight:400;}
+  /* Ohne Treffer blass statt ausgeblendet — sonst springen die Chips beim
+     Filtern hin und her. */
+  .emp-chip-empty{opacity:.4;}
+  .emp-chip-more{border-style:dashed;}
+  .emp-list{max-height:300px;overflow-y:auto;margin-top:10px;border-top:1px solid var(--border);}
+  .emp-group{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-muted);padding:10px 12px 4px;}
+  .emp-hit{display:flex;align-items:center;gap:10px;padding:7px 12px;cursor:pointer;}
+  .emp-hit:hover,.emp-hit.active{background:var(--surface-alt);}
+  .emp-icon{flex:none;width:14px;text-align:center;color:var(--ink-faint);}
+  .emp-icon.emp-fav{color:var(--accent-line);}
+  .emp-hit .names,.entity-name-default{display:flex;flex-direction:column;min-width:0;flex:1;}
+  .emp-hit .name,.entity-name-default .name{font-size:calc(13px * var(--font-scale, 1));color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .emp-hit .id,.entity-name-default .id{font-size:calc(11px * var(--font-scale, 1));font-family:var(--font-mono);color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .emp-type{flex:none;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);background:var(--surface-alt);border-radius:999px;padding:1px 8px;}
+  .emp-unit,.entity-name-unit{flex:none;min-width:32px;text-align:right;font-size:calc(12px * var(--font-scale, 1));font-family:var(--font-mono);color:var(--ink-muted);}
+  .emp-empty{padding:12px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);}
+  /* Die Zeile ist ein Eintrag zum Anklicken, kein Hilfetext — dieselbe
      Ausnahme wie button[data-tooltip] in app.css. */
-  .entity-picker-row[data-tooltip-fixed]{cursor:pointer;}
-  .entity-picker-row input{margin-top:3px;flex-shrink:0;}
-  .entity-picker-row .names{display:flex;flex-direction:column;min-width:0;}
-  .entity-picker-row .name{font-size:calc(13px * var(--font-scale, 1));color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .entity-picker-row .id{font-size:calc(11px * var(--font-scale, 1));font-family:var(--font-mono);color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .emp-hit[data-tooltip-fixed]{cursor:pointer;}
+  @media(max-width:480px){
+    .emp-type{display:none;}
+  }
 
   .entity-names-field{margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border);}
   /* Eine Karte je Eintrag statt einer nackten Flex-Zeile — dieselbe Bauart
@@ -67,12 +85,28 @@
   .entity-name-dot::after{
     content:'';position:absolute;inset:7px;border-radius:999px;background:var(--dot, var(--ink-faint));
   }
-  .entity-name-default{flex:0 0 200px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .entity-names-count{color:var(--ink-muted);font-weight:400;}
+  .entity-names-empty{margin:8px 0 0;padding:14px;border:1px dashed var(--border);border-radius:10px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
+  .entity-name-default{flex:0 1 240px;}
+  .entity-name-remove{
+    flex:none;background:none;border:none;color:var(--ink-faint);cursor:pointer;
+    padding:2px 4px;font-size:calc(13px * var(--font-scale, 1));line-height:1;
+  }
+  .entity-name-remove:hover{color:var(--danger);}
   .entity-name-row input{
     flex:1;min-width:150px;max-width:260px;font-size:calc(13px * var(--font-scale, 1));padding:6px 9px;border-radius:6px;
     border:1px solid var(--border);background:var(--surface-alt);color:var(--ink);
   }
   .entity-name-row.dragging{opacity:.4;}
+  /* Telefon: Name, Aktionen, Einheit und ✕ in der ersten Zeile, das
+     Namensfeld darunter in voller Breite — nebeneinander blieb vom Namen
+     bei 375px nichts mehr übrig. Nach der Basisregel des
+     Namensfelds, sonst gewinnt deren max-width. */
+  @media(max-width:640px){
+    .entity-name-row{flex-wrap:wrap;row-gap:8px;}
+    .entity-name-default{flex:1 1 0;}
+    .entity-name-row input{order:3;flex:1 1 100%;max-width:none;min-width:0;}
+  }
   /* Auge und Pfeile als EIN Block mit margin-left:auto, nicht einzeln
      rechtsbündig — dieselbe Begründung wie bei .tbl-row-right: mehrere
      auto-Margins würden den freien Platz untereinander aufteilen und eine

@@ -22,40 +22,85 @@
         {% if chart_id %}{% include "_dashboard_usage.html" %}{% endif %}
         <p class="sub" x-show="editing">{{ _("Beliebig viele Entitäten überlagern &mdash; unterschiedliche Einheiten bekommen jeweils eine eigene Y-Achse. Zeigt beim Ansehen immer die aktuellen Daten, kein eingefrorener Schnappschuss.") }}</p>
 
+        <!-- Suchfeld mit aufklappender Trefferliste (entityMultiPicker in
+             entity-picker.js) statt eines Rasters aus Kästchen für alle
+             Entitäten. Hier wird nur hinzugefügt; Anzeigename, Reihenfolge
+             und Entfernen stehen unter "Ausgewählt".
+             @mousedown.prevent an Chips und Treffern: der Fokus bleibt, wo er
+             war — das Suchfeld behält ihn für Tastatur und Weitertippen, und
+             auf dem Telefon klappt die Tastatur durch einen Chip-Tipp nicht
+             erst auf.
+             x-init: ein neues, leeres Chart setzt den Fokus gleich ins
+             Suchfeld (Trefferliste offen) — nur am Desktop, auf dem Telefon
+             klappte sonst beim Öffnen der Seite die Tastatur auf.
+             data-tooltip-fixed wie früher am Raster: die Trefferliste scrollt,
+             ein im Zeilenrahmen positionierter Tooltip würde abgeschnitten
+             (siehe fixed-tooltip.js). -->
         <div class="entity-picker-field" x-show="editing">
-          <label>{{ _("Entitäten") }}</label>
-          <input type="search" class="search" placeholder="{{ _('Entität oder Name suchen …') }}" style="width:100%;" oninput="filterEntityPicker(this.value)">
-          <div class="entity-picker" id="entity-picker">
-            {% for opt in entity_options %}
-            <!-- Name und ID sind hier auf je eine Zeile gekürzt (text-overflow),
-                 in der schmalsten Spalte bleibt von beiden wenig übrig; der
-                 Tooltip zeigt beides vollständig.
-
-                 data-tooltip-fixed statt des .entity-tooltip-Aufbaus aus der
-                 Entitätenliste: die Liste hier scrollt (max-height + overflow-y),
-                 und ein im Zeilenrahmen positionierter Tooltip wird davon
-                 abgeschnitten — in der obersten Zeile war er komplett
-                 unsichtbar, weil er über den oberen Containerrand hinausragt.
-                 FixedTooltip hängt sein Element an document.body, außerhalb
-                 jeder Beschneidung, und klappt nach unten, wenn oben kein
-                 Platz ist. -->
-            <label class="entity-picker-row" data-search="{{ (opt.label ~ ' ' ~ opt.entity_id) | lower }}"
-                   data-tooltip-fixed="{{ opt.label }}&#10;{{ opt.entity_id }}">
-              <input type="checkbox" value="{{ opt.entity_id }}"
-                     {% if opt.entity_id in selected_entity_ids %}checked{% endif %}
-                     @change="toggleEntity('{{ opt.entity_id }}', $event.target.checked)">
-              <span class="names">
-                <span class="name">{{ opt.label }}</span>
-                <span class="id">{{ opt.entity_id }}</span>
-              </span>
-            </label>
-            {% endfor %}
+          <label for="entity-picker-search">{{ _("Entitäten") }}</label>
+          <div class="entity-multi-picker"
+               x-data="entityMultiPicker(ENTITY_OPTIONS, () => selectedEntityIds, (id) => toggleEntity(id, true))"
+               @click.outside="open = false"
+               x-init="if (editing && !selectedEntityIds.length && matchMedia('(min-width: 641px)').matches) $nextTick(() => $el.querySelector('input').focus())">
+            <input type="search" id="entity-picker-search" class="search" autocomplete="off"
+                   placeholder="{{ _('Entität hinzufügen …') }}"
+                   x-model="search" @focus="open = true" @input="open = true; activeId = ''" @keydown="onKey($event)">
+            <div class="emp-panel" x-show="open" x-cloak>
+              <div class="emp-chips">
+                <span class="emp-chips-label">{{ _("Typ") }}</span>
+                <template x-for="c in typeChips()" :key="c.key">
+                  <button type="button" class="chip" :class="{active: typeFilter === c.key, 'emp-chip-empty': !c.count && typeFilter !== c.key}"
+                          @mousedown.prevent @click="toggleType(c.key)">
+                    <span x-text="c.label"></span><span class="emp-count" x-text="c.count"></span>
+                  </button>
+                </template>
+              </div>
+              <div class="emp-chips" x-show="unitChips().length">
+                <span class="emp-chips-label">{{ _("Einheit") }}</span>
+                <template x-for="c in unitChips()" :key="c.unit">
+                  <button type="button" class="chip" :class="{active: unitFilter === c.unit, 'emp-chip-empty': !c.count && unitFilter !== c.unit}"
+                          @mousedown.prevent @click="toggleUnit(c.unit)">
+                    <span x-text="c.unit"></span><span class="emp-count" x-text="c.count"></span>
+                  </button>
+                </template>
+                <button type="button" class="chip emp-chip-more" x-show="hiddenUnitCount() > 0"
+                        @mousedown.prevent @click="allUnits = !allUnits"
+                        x-text="allUnits ? t('weniger') : t('mehr … {n}', {n: hiddenUnitCount()})"></button>
+              </div>
+              <div class="emp-list">
+                <template x-for="row in rows()" :key="row.key">
+                  <div :class="row.header ? 'emp-group' : 'emp-row'">
+                    <template x-if="row.header">
+                      <span x-text="row.header"></span>
+                    </template>
+                    <template x-if="row.opt">
+                      <div class="emp-hit" :class="{active: activeId === row.opt.entity_id}" :data-entity-id="row.opt.entity_id"
+                           :data-tooltip-fixed="row.opt.label + '\n' + row.opt.entity_id"
+                           @mousedown.prevent @click="add(row.opt.entity_id)">
+                        <span class="emp-icon" :class="{'emp-fav': row.opt.is_favorite}" aria-hidden="true" x-text="row.opt.is_favorite ? '★' : '+'"></span>
+                        <span class="names">
+                          <span class="name" x-text="row.opt.label"></span>
+                          <span class="id" x-text="row.opt.entity_id"></span>
+                        </span>
+                        <span class="emp-type" x-text="typeLabel(row.opt.aggregation_type)"></span>
+                        <span class="emp-unit" x-text="row.opt.unit || '–'"></span>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+                <div class="emp-empty" x-show="!rows().length">{{ _("Keine Treffer") }}</div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="entity-names-field" x-show="editing && orderableEntityIds.length > 0">
-          <label>{{ _("Angezeigte Namen &amp; Reihenfolge (optional)") }}</label>
-          <p class="sub" style="margin:4px 0 0;">{{ _("Bestimmt Legenden-, Statistik- und Farbreihenfolge im Chart. Per Ziehen oder über die Pfeile neu anordnen.") }}</p>
+        <!-- Eine Stelle für alles, was eine gewählte Entität betrifft:
+             Anzeigename, Reihenfolge, Ausblenden und Entfernen (✕). Früher
+             stand das Entfernen nur als Kästchen im Auswahlraster darüber. -->
+        <div class="entity-names-field" x-show="editing">
+          <label>{{ _("Ausgewählt") }} <span class="entity-names-count" x-show="orderableEntityIds.length" x-text="'(' + orderableEntityIds.length + ')'"></span></label>
+          <p class="sub" style="margin:4px 0 0;" x-show="orderableEntityIds.length">{{ _("Bestimmt Legenden-, Statistik- und Farbreihenfolge im Chart. Per Ziehen oder über die Pfeile neu anordnen.") }}</p>
+          <p class="entity-names-empty" x-show="!orderableEntityIds.length">{{ _("Noch keine Entität gewählt. Oben suchen und hinzufügen, das Chart erscheint sofort.") }}</p>
           <div class="entity-names-list" id="entity-names-list">
             <!-- orderableEntityIds statt selectedEntityIds: die Soll-Entität
                  (falls gewählt) hat keine eigene Legendenzeile/Reihenfolge —
@@ -78,7 +123,10 @@
                      Legende und Kurve. -->
                 <span class="entity-name-dot" aria-hidden="true"
                       :style="'--dot:var(--chart-' + (colorIndexFor(id) % 8 + 1) + ')'"></span>
-                <span class="entity-name-default" x-text="labelFor(id)"></span>
+                <span class="entity-name-default">
+                  <span class="name" x-text="labelFor(id)"></span>
+                  <span class="id" x-text="id"></span>
+                </span>
                 <input type="text" :placeholder="labelFor(id)" x-model="entityNames[id]" @input="render()">
                 <span class="entity-name-right">
                   <button type="button" class="entity-name-hide" :class="{active: hiddenEntityIds.includes(id)}"
@@ -91,6 +139,9 @@
                     <button type="button" title="{{ _('Nach oben') }}" :disabled="idx === 0" @click="moveEntity(id, -1)">↑</button>
                     <button type="button" title="{{ _('Nach unten') }}" :disabled="idx === orderableEntityIds.length - 1" @click="moveEntity(id, 1)">↓</button>
                   </span>
+                  <span class="entity-name-unit" x-text="unitFor(id) || '–'"></span>
+                  <button type="button" class="entity-name-remove" title="{{ _('Entfernen') }}" aria-label="{{ _('Entfernen') }}"
+                          @click="toggleEntity(id, false)">✕</button>
                 </span>
               </div>
             </template>
@@ -520,8 +571,8 @@
               <!-- Soll Entität ist keine Sonderfunktion, sondern schlicht eine
                    normale Entität (siehe compareSollEntityId-Kommentar in
                    chart_editor.js) — dieses Feld ist nur eine bequemere Art,
-                   sie auszuwählen, als sie in der langen Entitätenliste oben
-                   zu suchen. entityPicker() (entity-picker.js) ist derselbe
+                   sie auszuwählen, als sie oben über die Entitätensuche
+                   hinzuzufügen. entityPicker() (entity-picker.js) ist derselbe
                    App-Standard-Einzel-Entität-Picker wie im CSV-Import/
                    Tabellen-Editor; .soll-entity-picker (chart_editor.css)
                    gibt ihm dieselbe feste Standardbreite wie dort

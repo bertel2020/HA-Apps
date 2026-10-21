@@ -942,6 +942,12 @@ eines bestehenden (Kachelmenü ⋮).
 
 ### Entitäten und Darstellung
 
+- Entitäten kommen über das Suchfeld dazu: die Trefferliste zeigt Favoriten
+  zuerst und lässt sich mit Chips nach **Typ** und **Einheit** eingrenzen.
+  Ist schon etwas gewählt, stehen Treffer mit passender Einheit oben
+  („Passt zu vorhandener Achse"). Unter **Ausgewählt** lassen sich die
+  gewählten Entitäten umbenennen, umsortieren, ausblenden und mit ✕
+  entfernen.
 - Beliebig viele Entitäten überlagern; unterschiedliche Einheiten erhalten
   automatisch getrennte Y-Achsen, sodass z. B. Temperatur und Luftfeuchte
   in einem Chart sinnvoll lesbar bleiben.
