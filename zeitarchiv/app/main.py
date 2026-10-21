@@ -83,7 +83,7 @@ from .limits import (
     MAX_ZIP_UNCOMPRESSED_BYTES,
     MAX_ZIP_UPLOAD_BYTES,
 )
-from .log_source import load_log_lines
+from .log_source import load_log_lines, validate_log_request
 from . import currency, demo_mode, formats, i18n
 from .i18n import N_, tr
 from . import supervisor_stats
@@ -91,6 +91,7 @@ from .logging_setup import (
     ACCESS_LOG_LABELS,
     DEFAULT_ACCESS_LOG_MODE,
     DEFAULT_LOG_LEVEL,
+    LOG_AREA_LABELS,
     LOG_LEVEL_LABELS,
     configure_logging,
     log_http_request,
@@ -1422,19 +1423,10 @@ def logs_view(request: Request) -> HTMLResponse:
         "logs.html",
         {
             "log_filter_options": [("all", tr("Alle")), *LOG_LEVEL_LABELS.items()],
+            "log_area_options": [("all", tr("Alle")), *LOG_AREA_LABELS.items()],
             **_settings_logging_context(),
         },
     )
-
-
-def _validate_log_request(
-    level: str, search: str, limit: int, source: str = "local"
-) -> tuple[str, str, int, str]:
-    if level != "all" and level not in LOG_LEVEL_LABELS:
-        raise HTTPException(status_code=400, detail=tr("Ungültiger Logfilter"))
-    if source not in {"local", "supervisor"}:
-        raise HTTPException(status_code=400, detail=tr("Ungültige Logquelle"))
-    return level, search[:200], max(50, min(limit, 5_000)), source
 
 
 @app.get("/api/logs")
@@ -1442,11 +1434,12 @@ async def api_logs(
     level: str = "all",
     search: str = "",
     source: str = "local",
+    area: str = "all",
     limit: int = Query(default=500, ge=50, le=2_000),
 ) -> dict:
-    level, search, limit, source = _validate_log_request(level, search, limit, source)
+    level, search, limit, source, area = validate_log_request(level, search, limit, source, area)
     result = await run_in_threadpool(
-        lambda: load_log_lines(level=level, search=search, limit=limit, source=source)
+        lambda: load_log_lines(level=level, search=search, limit=limit, source=source, area=area)
     )
     return {
         **result,
@@ -1457,11 +1450,11 @@ async def api_logs(
 
 @app.get("/logs/download", response_class=PlainTextResponse)
 async def logs_download(
-    level: str = "all", search: str = "", source: str = "local"
+    level: str = "all", search: str = "", source: str = "local", area: str = "all"
 ) -> PlainTextResponse:
-    level, search, _, source = _validate_log_request(level, search, 5_000, source)
+    level, search, _, source, area = validate_log_request(level, search, 5_000, source, area)
     result = await run_in_threadpool(
-        lambda: load_log_lines(level=level, search=search, limit=5_000, source=source)
+        lambda: load_log_lines(level=level, search=search, limit=5_000, source=source, area=area)
     )
     content = "\n".join(result["lines"])
     if content:

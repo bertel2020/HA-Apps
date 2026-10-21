@@ -40,6 +40,15 @@
                 {% endfor %}
               </div>
             </span>
+            <span class="dd-picker-wrap">
+              <button type="button" class="btn" id="log-area-btn" onclick="toggleDDPicker('log-area')" aria-label="{{ _('Bereich filtern') }}">{{ _("Bereich: {v1} ▾", v1=log_area_options[0][1]) }}</button>
+              <input type="hidden" id="log-area-input" value="{{ log_area_options[0][0] }}">
+              <div class="dd-picker-popover" id="log-area-popover">
+                {% for key, label in log_area_options %}
+                <div class="dd-picker-row" onclick="selectDDOption('log-area', '{{ key }}', '{{ label }}')">{{ label }}</div>
+                {% endfor %}
+              </div>
+            </span>
             <input id="log-search" class="search" type="search" placeholder="{{ _('Protokoll durchsuchen …') }}" aria-label="{{ _('Protokoll durchsuchen') }}">
             <button type="button" class="btn" id="log-refresh">{{ _("Jetzt aktualisieren") }}</button>
             <label class="checkbox-label"><input type="checkbox" id="log-auto" checked> {{ _("Automatisch (15 s)") }}</label>

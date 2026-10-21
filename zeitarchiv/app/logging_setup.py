@@ -31,6 +31,41 @@ ACCESS_LOG_LABELS = {
     "all": N_("Alle Anfragen"),
 }
 
+# Bereiche für den Filter der Logseite. Zugeordnet wird nach Logger-Name (ohne
+# "app."/"zeitarchiv."-Präfix); alles Unbekannte landet in "other", damit ein
+# neuer Logger nicht unsichtbar wird.
+LOG_AREA_LABELS = {
+    "ai": N_("KI-Zugriff"),
+    "ingest": N_("Aufnahme & API"),
+    "maintenance": N_("Wartung & Sicherung"),
+    "import_export": N_("Import & Export"),
+    "data": N_("Daten bearbeiten"),
+    "http": N_("HTTP-Zugriffe"),
+    "other": N_("Sonstiges"),
+}
+_LOG_AREA_LOGGERS = {
+    "ai": ("ai_routes", "ai_settings_routes"),
+    "ingest": ("api_routes", "storage.ingestion", "storage.hotbuffer", "trace"),
+    "maintenance": (
+        "background", "housekeeping_routes", "index_optimization", "supervisor_stats",
+        "storage.backup_external",
+    ),
+    "import_export": (
+        "import_routes", "export_routes", "storage.ha_import", "storage.ha_statistics",
+        "storage.vm_import", "storage.zip_guard",
+    ),
+    "data": ("entity_delete_routes", "marked_values_routes"),
+    "http": ("http", "access"),
+}
+_LOG_AREA_BY_LOGGER = {name: area for area, names in _LOG_AREA_LOGGERS.items() for name in names}
+
+
+def log_area(logger_name: str) -> str:
+    """Bereich eines Loggers (``app.ai_routes`` und ``ai_routes`` sind gleich)."""
+    name = logger_name.removeprefix("app.").removeprefix("zeitarchiv.")
+    return _LOG_AREA_BY_LOGGER.get(name, "other")
+
+
 DEFAULT_LOG_LEVEL = "warning"
 DEFAULT_ACCESS_LOG_MODE = "errors"
 
@@ -131,7 +166,9 @@ class RingLogHandler(logging.Handler):
         except Exception:
             self.handleError(record)
 
-    def lines(self, *, level: str = "all", search: str = "", limit: int = 500) -> list[str]:
+    def lines(
+        self, *, level: str = "all", search: str = "", limit: int = 500, area: str = "all",
+    ) -> list[str]:
         threshold = _LEVEL_NUMBERS.get(level, 0)
         needle = search.casefold().strip()
         with self._lock:
@@ -139,6 +176,8 @@ class RingLogHandler(logging.Handler):
         result = []
         for entry in entries:
             if threshold and entry["levelno"] < threshold:
+                continue
+            if area != "all" and log_area(entry["logger"]) != area:
                 continue
             timestamp = _iso_timestamp(entry["ts"])
             logger_name = entry["logger"].removeprefix("app.").removeprefix("zeitarchiv.")
@@ -294,5 +333,7 @@ def log_http_request(
         log.info(message, method, path, status, duration_ms, request_field)
 
 
-def local_log_lines(*, level: str = "all", search: str = "", limit: int = 500) -> list[str]:
-    return _RING_HANDLER.lines(level=level, search=search, limit=limit)
+def local_log_lines(
+    *, level: str = "all", search: str = "", limit: int = 500, area: str = "all",
+) -> list[str]:
+    return _RING_HANDLER.lines(level=level, search=search, limit=limit, area=area)
