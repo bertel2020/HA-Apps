@@ -300,18 +300,14 @@
               </div>
             </div>
             {% endif %}
-            {# Bei Zuständen entfällt "Als Chart speichern"; ohne eigene Optionen
-               bliebe unter "Aktionen" dann nichts stehen. #}
-            <div class="menu-divider"{% if aggregation_type == 'state' %} x-show="hasCustomOptions()"{% endif %}></div>
-            <div class="menu-section-label"{% if aggregation_type == 'state' %} x-show="hasCustomOptions()"{% endif %}>{{ _("Aktionen") }}</div>
+            <div class="menu-divider"></div>
+            <div class="menu-section-label">{{ _("Aktionen") }}</div>
             {# "Werte bearbeiten" und "Konfiguration" standen hier einmal daneben.
                Beide sind Seiten, keine Aktionen — sie liegen jetzt in der
                Reiterzeile unter dem Titel (siehe _entity_tabs.html), die
                zugleich zeigt, auf welcher der drei Seiten man gerade ist.
                "Als Chart speichern" bleibt: das tut etwas auf DIESER Seite. #}
-            {% if aggregation_type != 'state' %}
             <a class="menu-row" :href="saveAsChartUrl">{{ _("Als Chart speichern") }} <span class="menu-row-arrow">→</span></a>
-            {% endif %}
             <button type="button" class="menu-row menu-row-reset" x-show="hasCustomOptions()" @click="resetChartOptions()">{{ _("Optionen auf Standard zurücksetzen") }}</button>
           </div>
         </div>
