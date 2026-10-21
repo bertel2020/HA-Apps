@@ -280,7 +280,7 @@ COLOR_MODE_LABELS = {
 # jetzt global für alle Dashboard-Kacheln (Einstellungen → Darstellung), da
 # eine Kachel-für-Kachel-Steuerung in der Praxis kaum genutzt wurde und die
 # Chart-Bearbeitung dafür unnötig überladen hat.
-DASHBOARD_ANIMATION_LABELS = {"1": "An", "0": N_("Aus")}
+DASHBOARD_ANIMATION_LABELS = {"1": N_("An"), "0": N_("Aus")}
 # Steuert, wohin "/" (Ingress-Root — was beim Öffnen von Zeitarchiv über die
 # HA-Sidebar erscheint) weiterleitet. Die Übersicht selbst lebt dafür unter
 # der eigenen URL "/uebersicht" statt weiter unter "/" — die Topnav
@@ -3303,7 +3303,7 @@ _ENTITY_CHART_OPTION_DEFAULTS = {
     "state_log": True,
 }
 _ENTITY_CHART_DECIMALS = {"auto", "0", "1", "2", "3"}
-_ON_OFF_LABELS = {"1": "An", "0": N_("Aus")}
+_ON_OFF_LABELS = {"1": N_("An"), "0": N_("Aus")}
 _ENTITY_LEGEND_STYLE_LABELS = {"chips": N_("Chips"), "table": N_("Tabelle")}
 _ENTITY_LEGEND_METRIC_LABELS = {"last": N_("Aktuell"), "min": N_("Min"), "max": N_("Max"), "average": N_("Durchschnitt"), "sum": N_("Summe")}
 
