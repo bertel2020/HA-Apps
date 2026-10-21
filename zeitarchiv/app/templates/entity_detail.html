@@ -456,7 +456,7 @@
               <p class="hint" x-show="!stateLogRows.length">{{ _("Keine Wechsel in diesem Ausschnitt.") }}</p>
             </div>
             <button type="button" class="btn state-log-more" x-show="stateLogShown < stateLogRows.length"
-                    @click="stateLogShown += 25">{{ _("Weitere 25 laden") }}</button>
+                    @click="stateLogShown += 25" x-text="t('Weitere {n} laden', {n: Math.min(25, stateLogRows.length - stateLogShown)})"></button>
           </div>
         </div>
       </div>
