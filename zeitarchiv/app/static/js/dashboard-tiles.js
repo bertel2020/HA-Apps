@@ -608,8 +608,17 @@
       && parseInt(tileEl?.dataset.gridRows || '1', 10) >= 2;
     renderLegend(el, legend, legendVisible);
 
-    chartEl.innerHTML = '';
     let chart = instances.get(chartId);
+    // Beim Neuzeichnen (Auto-Refresh, Stichtag der Zeitraum-Navigation) wird
+    // die Instanz weiterverwendet — dann darf chartEl NICHT geleert werden:
+    // das entfernte ihr Canvas, und setOption() zeichnete danach ins Leere
+    // (Kachel blieb leer, Legende darunter voll). Geleert und neu gebunden
+    // wird nur ohne intakte Instanz, z. B. nach einem "Keine Daten"-
+    // Platzhalter, der das Canvas ersetzt hat.
+    if (chart && chart.getDom() === chartEl && !chartEl.querySelector('canvas, svg')) {
+      chart.dispose();
+      chart = null;
+    }
     // Ein htmx-Swap von #dashboard-grid (Pin/Unpin/Reorder) ersetzt chartEl
     // durch einen KOMPLETT NEUEN DOM-Knoten, während instances noch die alte
     // ECharts-Instanz unter derselben chartId hält — die zeigt dann auf ein
@@ -623,6 +632,7 @@
       chart = null;
     }
     if (!chart) {
+      chartEl.innerHTML = '';
       chart = echarts.init(chartEl);
       instances.set(chartId, chart);
     }
