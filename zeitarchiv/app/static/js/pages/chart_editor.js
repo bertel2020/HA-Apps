@@ -621,7 +621,11 @@
         // (die Balken-Ansichten laufen über dieselbe timeline-Weiche, damit die
         // Zeitverlauf-Optionen im Menü ausgeblendet bleiben). Gespeichert als
         // chart_type "timeline", "shares" oder "changes".
-        stateMode: ['shares', 'changes'].includes(CHART_TYPE) ? CHART_TYPE : 'timeline',
+        // Ohne gewählte Ansicht ("auto") gilt je Zeitraum der Standard
+        // (StateEntities.defaultMode); eine Wahl (stateChosen) bleibt, auch über
+        // einen Zeitraumwechsel, und wird als chart_type gespeichert.
+        stateMode: ['timeline', 'shares', 'changes'].includes(CHART_TYPE) ? CHART_TYPE : StateEntities.defaultMode(RANGE_KEY),
+        stateChosen: ['timeline', 'shares', 'changes'].includes(CHART_TYPE),
         // Ob die Darstellungsart schon feststeht (gespeichert oder per Klick
         // gewählt). Solange nicht, wird ein reines Schalter-Chart nach dem
         // Laden automatisch zum Zeitstrahl (Standard) — siehe load().
@@ -1284,6 +1288,7 @@
           this._rangeAnchorMs = anchorMs;
           this.offset = PeriodNavigation.offsetForRange(key, anchorMs);
           this.range = key;
+          if (!this.stateChosen) this.stateMode = StateEntities.defaultMode(key);
           // Anders als auf der Entitätsseite bleibt der Vergleich beim
           // Zeitraumwechsel eingeschaltet — ein stehengebliebener
           // "Vorjahres…"-Modus liefe hier also direkt in die nächste Abfrage.
@@ -1461,6 +1466,9 @@
         setDisplayMode(mode) {
           const wasTimeline = this.timeline && !this.donut;
           const current = this.donut ? 'donut' : (this.hasState ? this.stateMode : (wasTimeline ? 'timeline' : 'timeseries'));
+          // Auch ein Klick auf die schon gezeigte Ansicht ist eine Wahl: sie soll
+          // den Zeitraumwechsel überstehen und wird mitgespeichert.
+          if (this.hasState && ['timeline', 'shares', 'changes'].includes(mode)) this.stateChosen = true;
           if (mode === current) return;
           this.typeChosen = true;
           // Zustände: Zeitstrahl braucht die Rohwechsel, Anteile und Wechsel
@@ -2852,7 +2860,7 @@
             chart_stats: this.chartStats,
             legend_metrics: this.legendMetrics,
             legend_style: this.legendStyle,
-            chart_type: this.donut ? 'donut' : (this.timeline ? (this.hasState ? this.stateMode : 'timeline') : (this.allSwitch ? 'bar' : 'auto')),
+            chart_type: this.donut ? 'donut' : (this.timeline ? (this.hasState ? (this.stateChosen ? this.stateMode : 'auto') : 'timeline') : (this.allSwitch ? 'bar' : 'auto')),
             decimals: this.decimals,
             show_values: this.showValues,
             average_line: this.averageLine,

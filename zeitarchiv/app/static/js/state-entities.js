@@ -156,6 +156,10 @@ window.StateEntities = (() => {
   };
   const SERVER_SHARE_RANGES = ['month', 'year', 'decade'];
 
+  // Ansicht, wenn niemand eine gewählt hat: bis zur Woche der Zeitstrahl, ab dem
+  // Monat die Anteile (ein Jahr Zeitstrahl wären tausende Rechtecke).
+  const defaultMode = range => SERVER_SHARE_RANGES.includes(range) ? 'shares' : 'timeline';
+
   // Alle Bucket-Anfänge von start bis (exklusiv) end — damit ein Monat auch
   // dort einen Platz auf der Achse hat, wo (noch) nichts vorliegt.
   function bucketStarts(range, start, end) {
@@ -291,6 +295,6 @@ window.StateEntities = (() => {
   return {
     UNAVAILABLE, color, swatchStyle, unavailablePattern, fill, label, raw,
     segments, bucketsFromSegments, bucketsFromShares, bucketsForSeries, barPanels, bucketFns, totals, fmtShare,
-    RANGE_BUCKETS, SERVER_SHARE_RANGES, bucketStarts,
+    RANGE_BUCKETS, SERVER_SHARE_RANGES, bucketStarts, defaultMode,
   };
 })();

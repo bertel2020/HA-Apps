@@ -51,8 +51,14 @@ def effective_chart_type(chart: dict, aggregation_types: dict[str, str]) -> str:
     # Zustandsbalken zu zeichnen.
     if stored in ("shares", "changes") and not all(aggregation_types.get(e) == "state" for e in chart["entity_ids"]):
         stored = "auto"
-    if stored == "auto" and chart["entity_ids"] and all(
-        aggregation_types.get(e) in ("switch", "state") for e in chart["entity_ids"]
+    ids = chart["entity_ids"]
+    # Nur Zustände und nichts gewählt: "auto" bleibt, die Ansicht hängt vom
+    # Zeitraum ab (Zeitstrahl bis zur Woche, danach Anteile — Editor und Kachel
+    # entscheiden das selbst, state-entities.js defaultMode()).
+    if stored == "auto" and ids and all(aggregation_types.get(e) == "state" for e in ids):
+        return "auto"
+    if stored == "auto" and ids and all(
+        aggregation_types.get(e) in ("switch", "state") for e in ids
     ):
         return "timeline"
     # Zustände gibt es sonst nur als Zeitstrahl oder Donut (chart_editor.js load()).
@@ -72,7 +78,9 @@ def chart_type_key(chart: dict, aggregation_types: dict[str, str]) -> str:
     Ein Chart kann deshalb beides zugleich enthalten. Ein Chart ohne
     Entitäten hat keinen Typ — leere Kennung, Kachel ohne Streifen."""
     chart_type = effective_chart_type(chart, aggregation_types)
-    if chart_type == "timeline":
+    if chart_type == "timeline" or (
+        chart_type == "auto" and chart["entity_ids"] and all(aggregation_types.get(e) == "state" for e in chart["entity_ids"])
+    ):
         return "zeitstrahl"
     if chart_type == "donut":
         return "donut"

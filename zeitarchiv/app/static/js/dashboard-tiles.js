@@ -536,6 +536,10 @@
       chartEl.innerHTML = '<div class="dtile-loading">' + t('Keine Daten') + '</div>';
       return;
     }
+    // Nur Zustände und keine Ansicht gewählt: je Zeitraum der Standard, wie im
+    // Chart-Editor (Zeitstrahl bis zur Woche, danach Anteile).
+    const viewType = chartType === 'auto' && series.every(s => s.aggregation_type === 'state')
+      ? StateEntities.defaultMode(range) : chartType;
     // Dieselbe Farbzuordnung wie echartsSeries weiter unten (PALETTE nach
     // Serienindex) UND dieselbe Kennzahlen-Berechnung wie seriesStats() in
     // chart_editor.html (Min/Max/Ø/Summe/Aktuell) — hier separat gebaut,
@@ -688,11 +692,11 @@
       });
       return;
     }
-    if (['shares', 'changes'].includes(chartType) && series.some(s => s.aggregation_type === 'state')) {
-      renderTileStateBars(chart, series, entityNames, data, range, chartType, animation);
+    if (['shares', 'changes'].includes(viewType) && series.some(s => s.aggregation_type === 'state')) {
+      renderTileStateBars(chart, series, entityNames, data, range, viewType, animation);
       return;
     }
-    if (timeline) {
+    if (timeline || viewType === 'timeline') {
       renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface, colorIndexFor);
       return;
     }
