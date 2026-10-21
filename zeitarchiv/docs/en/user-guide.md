@@ -759,9 +759,58 @@ are discarded.
 - At most 50 different states are accepted per entity, new ones beyond that
   are discarded — a safeguard against sensors with free text.
 
-States do not use compaction yet: timeline and KPIs come from the stored
-changes in every period. Charts, tables and dashboard tiles do not support
-states yet.
+- **Display per period:** The history view offers **Timeline**, **Shares**
+  (stacked bars per day, month or year, as a percentage of time) and
+  **Changes** (how often a state began). As long as you do not choose, it
+  shows the timeline up to a week and the shares from a month on — a timeline
+  across many weeks would no longer be readable. Your choice is kept when you
+  switch the period; only the timeline falls back to shares from a month on.
+  Clicking a bar jumps to the period below it. The choice is not saved, it
+  applies only to the open page.
+- **Marked values:** The **Marked values** option (options menu) draws the
+  sections marked for deletion as bands with a warning edge behind the
+  timeline, see [Seeing marked values](#seeing-marked-values). It does not
+  exist for shares and changes. It is only available on the entity page, not in
+  the chart editor or on tiles.
+
+From the "Month" period on, the shares come from precomputed summaries; up to
+a week they come from the stored changes. Anyone who explicitly chooses the
+timeline over a long period gets the raw changes — with very many changes the
+general limit for raw values applies there.
+
+#### States in charts and on dashboards
+
+- **Chart editor:** State entities are added like other entities, but **only
+  together with other state entities** in the same chart — not even with
+  switches. If you add them next to number or switch entities, the states are
+  removed again with a notice. The **chart type** then offers Timeline,
+  Shares, Changes and Donut:
+  - **Timeline:** one row per entity in a shared timeline.
+  - **Shares** and **Changes:** a separate chart per state entity.
+  - **Donut:** one donut per state entity with the shares of its states; the
+    name is shown above only when there are several entities.
+  - Without an explicit choice the same default as in the history view
+    applies (timeline up to a week, shares from a month on).
+  - The legend style (chips or table) can always be chosen; the table lists
+    entity, state, duration, share and changes. The editor's **CSV export**
+    contains the displayed state names.
+- **Chart tiles** on the dashboard behave like the editor; there too, states
+  drop out when mixed with other series.
+- **Value tile of a state entity:** shows the current state with a colour
+  swatch and "since …". A 1×1 tile adds the last 24 hours as a strip, from
+  two columns on the shares of the last 7 days — optionally as a **donut**
+  over the tile's period. KPIs (average, min/max …), sparkline, decimal places
+  and the stale marker do not exist for states; a state that has not changed
+  for days does not count as stale.
+- **Tables** and comparison tables do not support states yet.
+
+#### Notices for discarded values
+
+If values are discarded because the type does not fit (number instead of text
+or the other way round) or an entity reports more than 50 states, a message
+appears in the **notice center** (bell in the header); it disappears seven
+days after the last occurrence. With the matching integration it also appears
+as a repair in Home Assistant.
 
 ### Zooming into a section
 
@@ -910,6 +959,9 @@ Own editor, reachable via **Charts** → new chart or editing an existing one
   available as in the history view — here as a multi-row presentation with one
   row per entity, so that the ON intervals of several switches can be compared
   directly one below the other.
+- For **state entities** (text instead of a number) there are Timeline,
+  Shares, Changes and Donut; they can only be combined with other state
+  entities, see [States](#states).
 
 ### Donut instead of time series
 

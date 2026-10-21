@@ -833,9 +833,58 @@ verworfen.
   `state` (nur roh, ohne Auflösung), sodass sich die Datei wieder einlesen
   lässt.
 
-Zustände verwenden noch keine Verdichtung: Zeitstrahl und Kennzahlen kommen
-in jedem Zeitraum aus den gespeicherten Wechseln. Charts, Tabellen und
-Dashboard-Kacheln unterstützen Zustände noch nicht.
+- **Darstellung je Zeitraum:** Die Verlaufsansicht bietet **Zeitstrahl**,
+  **Anteile** (gestapelte Balken je Tag, Monat oder Jahr, in Prozent der Zeit)
+  und **Wechsel** (wie oft ein Zustand begonnen hat). Solange du nichts wählst,
+  zeigt sie bis zur Woche den Zeitstrahl und ab dem Monat die Anteile — ein
+  Zeitstrahl über viele Wochen wäre nicht mehr lesbar. Deine Wahl bleibt beim
+  Wechsel des Zeitraums erhalten, nur der Zeitstrahl fällt ab dem Monat auf
+  Anteile zurück. Ein Klick auf einen Balken springt in den Zeitraum darunter.
+  Die Wahl wird nicht gespeichert, sie gilt nur für die offene Seite.
+- **Markierte Werte:** Die Option **Markierte Werte** (Optionen-Menü) legt zur
+  Löschung markierte Abschnitte als Bänder mit Warnrand hinter den Zeitstrahl,
+  siehe [Markierte Werte sehen](#markierte-werte-sehen). Bei Anteilen und
+  Wechsel gibt es sie nicht. Sie steht nur auf der Entitätsseite, nicht im
+  Chart-Editor oder auf Kacheln.
+
+Ab dem Zeitraum „Monat“ kommen die Anteile aus vorberechneten Auswertungen,
+bis zur Woche aus den gespeicherten Wechseln. Wer ausdrücklich den Zeitstrahl
+über einen langen Zeitraum wählt, bekommt die Rohwechsel — bei sehr vielen
+Wechseln greift dort die allgemeine Obergrenze für Rohwerte.
+
+#### Zustände in Charts und auf Dashboards
+
+- **Chart-Editor:** Zustands-Entitäten lassen sich wie andere Entitäten
+  hinzufügen, aber **nur mit anderen Zustands-Entitäten** im selben Chart —
+  auch nicht mit Schaltern. Fügt man sie neben Zahlen- oder Schalter-Entitäten
+  hinzu, werden die Zustände mit einem Hinweis wieder entfernt. Der
+  **Diagrammtyp** bietet dann Zeitstrahl, Anteile, Wechsel und Donut:
+  - **Zeitstrahl:** eine Zeile je Entität in einem gemeinsamen Zeitstrahl.
+  - **Anteile** und **Wechsel:** je Zustands-Entität ein eigenes Diagramm.
+  - **Donut:** je Zustands-Entität ein Donut mit den Anteilen der Zustände;
+    der Name steht nur bei mehreren Entitäten darüber.
+  - Ohne ausdrückliche Wahl gilt dieselbe Voreinstellung wie in der
+    Verlaufsansicht (bis Woche Zeitstrahl, ab Monat Anteile).
+  - Der Legenden-Stil (Chips oder Tabelle) ist immer wählbar; die Tabelle
+    nennt Entität, Zustand, Dauer, Anteil und Wechsel. Der **CSV-Export** des
+    Editors enthält die angezeigten Zustandsnamen.
+- **Chart-Kacheln** im Dashboard verhalten sich wie der Editor; auch dort
+  fallen Zustände heraus, wenn sie mit anderen Serien gemischt sind.
+- **Werte-Kachel einer Zustands-Entität:** zeigt den aktuellen Zustand mit
+  Farbfeld und „seit …“. Eine 1×1-Kachel zeigt dazu die letzten 24 Stunden
+  als Streifen, ab zwei Spalten die Anteile der letzten 7 Tage — wahlweise
+  als **Donut** über den Zeitraum der Kachel. Kennzahlen (Durchschnitt, Min/
+  Max …), Sparkline, Nachkommastellen und die Veraltet-Markierung gibt es bei
+  Zuständen nicht; ein seit Tagen unveränderter Zustand gilt nicht als veraltet.
+- **Tabellen** und Vergleichstabellen unterstützen Zustände noch nicht.
+
+#### Hinweise bei verworfenen Werten
+
+Werden Werte verworfen, weil der Typ nicht passt (Zahl statt Text oder
+umgekehrt) oder eine Entität mehr als 50 Zustände liefert, erscheint im
+**Meldungs-Center** (Glocke in der Kopfzeile) eine Meldung; sie verschwindet sieben Tage nach dem letzten
+Vorkommen. Mit der passenden Integration erscheint sie zusätzlich als
+Reparatur in Home Assistant.
 
 ### In einen Ausschnitt hineinzoomen
 
@@ -1000,6 +1049,9 @@ eines bestehenden (Kachelmenü ⋮).
   steht wie in der Verlaufsansicht ein **Zeitstrahl** zur Verfügung — hier
   als mehrzeilige Darstellung mit einer Zeile je Entität, sodass sich
   AN-Intervalle mehrerer Schalter direkt untereinander vergleichen lassen.
+- Für **Zustands-Entitäten** (Text statt Zahl) gibt es Zeitstrahl, Anteile,
+  Wechsel und Donut; sie lassen sich nur mit anderen Zustands-Entitäten
+  kombinieren, siehe [Zustände](#zustände).
 
 ### Donut statt Zeitverlauf
 
