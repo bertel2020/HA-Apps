@@ -1080,7 +1080,16 @@
       animation,
       textStyle: {fontFamily: style.getPropertyValue('--font-mono')},
       color: PALETTE,
-      grid: {left: 6, right: 6, top: 10, bottom: 20, containLabel: true},
+      // "Werte anzeigen": Die Zahl steht über (horizontal: rechts neben) dem
+      // Balken, und die Y-Achse endet exakt beim Maximalwert. Ohne Rand würde
+      // das Label des höchsten Balkens am Kachelrand abgeschnitten.
+      grid: {
+        left: 6,
+        right: showValues && horizontalActive ? 36 : 6,
+        top: showValues && !horizontalActive && !stackedActive ? 10 + scaledFont(10) + 6 : 10,
+        bottom: 20,
+        containLabel: true,
+      },
       xAxis: singleBucket ? (horizontalActive ? xAxisForHorizontal : categoryAxisObj) : {
         type: 'time',
         min: data.window_start != null ? data.window_start * 1000 : undefined,
