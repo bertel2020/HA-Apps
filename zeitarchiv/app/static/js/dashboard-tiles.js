@@ -2083,7 +2083,7 @@
       const left = (Math.max(seg.s, a) - a) / span * 100;
       const width = (seg.e - Math.max(seg.s, a)) / span * 100;
       const label = escapeHtml(StateEntities.label(st.states, seg.idx));
-      return `<i style="left:${left.toFixed(2)}%;width:${Math.max(width, 0.4).toFixed(2)}%;${StateEntities.swatchStyle(seg.idx)}" title="${label}"></i>`;
+      return `<i style="left:${left.toFixed(2)}%;width:${Math.max(width, 0.4).toFixed(2)}%;${StateEntities.swatchStyle(seg.idx)}" data-tooltip-fixed="${label}"></i>`;
     });
     return `<div class="dtile-state-strip">${parts.join('')}</div>`
       + `<div class="dtile-state-axis"><span>${t('−24 h')}</span><span>${t('jetzt')}</span></div>`;
@@ -2096,7 +2096,7 @@
       const bars = [...day.states]
         .sort((x, y) => order.indexOf(x[0]) - order.indexOf(y[0]))
         .map(([idx, seconds]) => `<i style="width:${(seconds / total * 100).toFixed(2)}%;${StateEntities.swatchStyle(idx)}"`
-          + ` title="${escapeHtml(StateEntities.label(st.states, idx))} · ${NumberFormat.fmtDuration(seconds)}"></i>`)
+          + ` data-tooltip-fixed="${escapeHtml(StateEntities.label(st.states, idx))} · ${NumberFormat.fmtDuration(seconds)}"></i>`)
         .join('');
       const weekday = new Date(day.ts * 1000).toLocaleDateString(LOCALE, {weekday: 'short'});
       return `<div class="dtile-state-day"><span>${escapeHtml(weekday)}</span><div class="dtile-state-bar">${bars}</div></div>`;
@@ -2145,8 +2145,9 @@
     const numberEl = el.querySelector('.dtile-entity-number');
     if (numberEl) {
       numberEl.textContent = StateEntities.label(st.states, st.idx);
-      // Rohwert im Tooltip, wie überall bei Zuständen.
-      numberEl.title = StateEntities.raw(st.states, st.idx);
+      // Rohwert im Tooltip, wie überall bei Zuständen — data-tooltip-fixed
+      // (App-Standard) statt nativem title, siehe fixed-tooltip.js.
+      numberEl.setAttribute('data-tooltip-fixed', StateEntities.raw(st.states, st.idx));
     }
     const swatchEl = el.querySelector('.dtile-state-swatch');
     if (swatchEl) swatchEl.setAttribute('style', StateEntities.swatchStyle(st.idx));
