@@ -193,6 +193,16 @@ def test_stacked_chart_decimal_options_are_centered() -> None:
     assert ".menu-row-stack>.seg{align-self:center;max-width:100%;}" in css
 
 
+def test_state_chart_type_row_fits_the_menu_instead_of_scrolling() -> None:
+    """Fünf Knöpfe in Monospace sind breiter als das Menü: nur diese Zeile füllt die Breite
+    (seg-fit), alle anderen gestapelten Segmente bleiben zentriert."""
+    css = (TEMPLATES_DIR.parent / "static" / "css" / "app.css").read_text(encoding="utf-8")
+    assert ".menu-row.menu-row-stack>.seg.seg-fit{align-self:stretch;}" in css
+    assert "min-width:0" in css.split(".seg.seg-fit button{", 1)[1].split("}", 1)[0]
+    assert 'class="seg seg-fit"' in page_text("entity_detail.html")
+    assert "'seg-fit': hasState" in page_text("chart_editor.html")
+
+
 def _run_all() -> None:
     tests = [obj for name, obj in globals().items() if name.startswith("test_")]
     for test in tests:

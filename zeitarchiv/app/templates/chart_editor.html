@@ -297,7 +297,7 @@
                     <span class="menu-note" x-show="compare && !(allSwitch && !hasState)">{{ _("Donut nicht bei aktivem Vergleich") }}</span>
                     <span class="menu-note" x-show="compare && allSwitch && !hasState">{{ _("Zeitstrahl und Donut nicht bei aktivem Vergleich") }}</span>
                   </span>
-                  <div class="seg">
+                  <div class="seg" :class="{'seg-fit': hasState}">
                     <template x-if="!hasState">
                       <button :class="{active: !donut && !timeline}" @click="setDisplayMode('timeseries')">{{ _("Zeitverlauf") }}</button>
                     </template>

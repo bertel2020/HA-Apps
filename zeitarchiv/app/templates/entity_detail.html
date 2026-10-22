@@ -182,7 +182,7 @@
                springt die Ansicht von selbst auf Anteile (setRange()). #}
             <div class="menu-row menu-row-stack">
               <span class="menu-row-label">{{ _("Diagrammtyp") }}</span>
-              <div class="seg">
+              <div class="seg seg-fit">
                 <button :class="{active: stateMode === 'timeline'}" @click="setStateMode('timeline')">{{ _("Zeitstrahl") }}</button>
                 <button :class="{active: stateMode === 'shares'}" @click="setStateMode('shares')">{{ _("Anteile") }}</button>
                 <button :class="{active: stateMode === 'changes'}" @click="setStateMode('changes')">{{ _("Wechsel") }}</button>
