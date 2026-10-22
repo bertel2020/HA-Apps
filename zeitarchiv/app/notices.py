@@ -126,6 +126,24 @@ _import_leftovers: dict | None = None
 _import_leftovers_checked_at = 0.0
 
 
+def _partial_import_detail(report: dict, source_label: str) -> str:
+    """Meldungstext zu einem teilweise abgeschlossenen Import — mit den Zahlen
+    aus dem Report, damit erkennbar ist, was fehlt, statt blind zu wiederholen.
+    "Label: Zahl" statt Fließtext, damit es keine Singular-/Plural-Fälle gibt."""
+    summary = report.get("summary") or {}
+    parts = []
+    errors = int(summary.get("errors", 0))
+    invalid = int(summary.get("rows_invalid", 0))
+    if errors:
+        parts.append(tr("Fehler: {count}", count=errors))
+    if invalid:
+        parts.append(tr("Nicht importierbare Zeilen: {count}", count=invalid))
+    text = tr("Der letzte {source_label}-Import wurde nur teilweise abgeschlossen.", source_label=source_label)
+    if parts:
+        text += " " + " · ".join(parts) + ". " + tr("Details unter Import → Reports.")
+    return text
+
+
 def refresh_import_leftovers_if_stale(*dirs: Path) -> None:
     """Vom Wartungsplaner aufgerufen. Größe und jüngste Änderungszeit der
     entpackten Import-Quelldaten, beides aus einem Walk."""
@@ -623,7 +641,7 @@ def build_notices(
                 "id": "import.job_failed",
                 "severity": "warn",
                 "title": tr("Import unvollständig"),
-                "detail": tr("Der letzte {source_label}-Import wurde nur teilweise abgeschlossen.", source_label=source_label),
+                "detail": _partial_import_detail(last_report, source_label),
                 "meta": tr("Import"),
                 "link": "/import?tab=reports",
             })
