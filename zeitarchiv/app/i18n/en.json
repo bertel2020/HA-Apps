@@ -3394,6 +3394,7 @@
     "Zustand": "State",
     "1 Wechsel": "1 change",
     "Kurze Zustände sind schmaler als ein Bildpunkt — {geste}.": "Short states are narrower than a pixel — {geste}.",
+    "Jede Spalte zeigt die Anteile der Zustände in dieser Zeitspanne — {geste}, bis die einzelnen Abschnitte sichtbar werden.": "Each column shows the shares of the states in that time span — {geste}, until the individual periods become visible.",
     "Wechsel-Protokoll · {count}": "Change log · {count}",
     "Wechsel-Protokoll · {count} im Ausschnitt": "Change log · {count} in section",
     "längster Abschnitt {dauer} ({zustand})": "longest section {dauer} ({zustand})",

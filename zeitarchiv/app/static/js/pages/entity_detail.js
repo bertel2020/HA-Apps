@@ -237,6 +237,13 @@
     // bei jedem Redraw. Ein normaler Closure-Variable reicht hier, weil es genau
     // eine Chart-Instanz pro Seite gibt.
     let chartInstance = null;
+    // Schichten der verdichteten Spalten des Zeitstrahls, je Element der Serie
+    // 'main' über den Index im sechsten Wert (-1 = ein einzelner Abschnitt).
+    // Außerhalb der Daten, weil ECharts in Werten keine Listen führt.
+    let timelineParts = [];
+    // Abschnitte der Entität, nur neu gebildet wenn sich die Punkte ändern: bei
+    // jedem Zoom-Schritt würde sonst die ganze Liste neu entstehen.
+    let timelineSegs = {points: null, end: null, segs: []};
 
     // Ab wie vielen Punkten ein Zoom überhaupt etwas aufdecken kann: der Chart
     // ist am Desktop rund 900 px breit, bei 200 Punkten hat jeder davon noch
@@ -357,13 +364,14 @@ function selectBrush() {
     // wären zehntausende Rechtecke, und die Frage dort ist "wie lange", nicht
     // "wann genau").
     // Eine selbst gewählte Darstellung (chosen) bleibt beim Zeitraumwechsel
-    // erhalten; nur der Zeitstrahl geht ab dem Monat nicht (siehe oben) und
-    // fällt dort auf den Standard zurück — wer danach wieder in einen kurzen
-    // Zeitraum wechselt, bekommt ihn zurück.
+    // erhalten; nur die Heatmap gibt es erst ab dem Monat und fällt davor auf
+    // den Standard zurück — wer danach wieder in einen langen Zeitraum wechselt,
+    // bekommt sie zurück. Der Zeitstrahl ist ab dem Monat wählbar, weil er dort
+    // verdichtet gezeichnet wird (StateEntities.condenseSegments); nur der
+    // Standard bleibt Anteile.
     const stateModeFor = (range, chosen = null) => {
       const longRange = StateEntities.SERVER_SHARE_RANGES.includes(range);
-      // Zeitstrahl geht ab dem Monat nicht, die Heatmap erst ab dem Monat.
-      if (chosen && !(chosen === 'timeline' && longRange) && !(chosen === 'heatmap' && !longRange)) return chosen;
+      if (chosen && !(chosen === 'heatmap' && !longRange)) return chosen;
       return longRange ? 'shares' : 'timeline';
     };
     // Klick auf einen Balken öffnet den Zeitraum darunter.
@@ -405,6 +413,8 @@ function selectBrush() {
         // gehören dorthin, ein Ausschnitt ist eine Aussage über die letzten
         // dreißig Sekunden.
         zoomRange: null,
+        // Der Zeitstrahl zeigt gerade verdichtete Spalten statt einzelner Abschnitte.
+        tlCondensed: false,
         // Zur Löschung markierte Bereiche: die Werte selbst sind aus points
         // herausgefiltert, hier kommen die betroffenen Zeitabschnitte zurück.
         // markedTotal ist die WAHRE Zahl markierter Werte im Fenster, auch
@@ -586,6 +596,9 @@ function selectBrush() {
           }
           if (this.isState && this.stateMode !== 'timeline') {
             return t('Ein Klick auf einen Balken öffnet diesen Zeitraum.');
+          }
+          if (this.isState && this.tlCondensed) {
+            return t('Jede Spalte zeigt die Anteile der Zustände in dieser Zeitspanne — {geste}, bis die einzelnen Abschnitte sichtbar werden.', {geste});
           }
           if (this.isState) {
             return t('Kurze Zustände sind schmaler als ein Bildpunkt — {geste}.', {geste});
@@ -1135,7 +1148,7 @@ function selectBrush() {
             // Rendern — sonst stapeln sich mit jedem Neuzeichnen weitere
             // Handler auf derselben Instanz.
             chartInstance.on('click', (p) => {
-              if (this.isState && p.seriesId === 'main') this.focusStateRow(p.value[4]);
+              if (this.isState && p.seriesId === 'main' && p.value[4] != null) this.focusStateRow(p.value[4]);
               else if (this.isState && /^\d+:/.test(String(p.seriesId))) this.drillState(p.dataIndex);
             });
             chartInstance.on('mouseover', (p) => {
@@ -1149,6 +1162,11 @@ function selectBrush() {
                 this.windowStart != null ? this.windowStart * 1000 : null,
                 this.periodEnd != null ? this.periodEnd * 1000 - 1000 : null,
               );
+              // Beim Zoomen und Schwenken neu verdichten (ein Bildpunkt ist jetzt
+              // eine andere Zeitspanne); einmal je Bild, nicht je Ereignis.
+              if (this.isState && this.stateMode === 'timeline' && !this._tlFrame) {
+                this._tlFrame = requestAnimationFrame(() => { this._tlFrame = 0; this.updateStateTimeline(); });
+              }
             });
 
             // Umschalt gedrückt = Bereich aufziehen. Die Taste statt eines
@@ -1576,14 +1594,9 @@ function selectBrush() {
         // "wann AN", ohne dass ein zusätzlicher Rahmen um den ganzen Zeitraum nötig
         // wäre, um "kein Wert" von "AUS" zu unterscheiden.
         renderTimeline(fmt) {
-          const intervals = [];
+          let intervals = [];
           if (this.isState) {
-            // Ein Band je Abschnitt, Farbe nach Zustand; ausgeblendete fehlen.
-            // Viertes/fünftes Element: Zustandsindex und Schlüssel der Zeile im
-            // Wechsel-Protokoll.
-            for (const seg of this.stateSegments) {
-              if (!this.hiddenStates.includes(seg.idx)) intervals.push([0, seg.s * 1000, seg.e * 1000, seg.idx, seg.key]);
-            }
+            intervals = this.stateTimelineItems();
           } else {
             for (let i = 0; i < this.points.length; i++) {
               const start = this.points[i].ts;
@@ -1637,6 +1650,7 @@ function selectBrush() {
                 };
                 const span = `${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
                 if (!this.isState) return span;
+                if (p.value[5] >= 0) return this.condensedTooltip(p.value[1], p.value[2], timelineParts[p.value[5]]);
                 const idx = p.value[3];
                 const raw = this.stateRaw(idx);
                 const name = escapeHtml(this.stateLabel(idx));
@@ -1659,6 +1673,18 @@ function selectBrush() {
                   {x: start[0], y: start[1] - height / 2, width: Math.max(end[0] - start[0], this.isState ? 1 : 0), height},
                   {x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height}
                 );
+                // Verdichtete Spalte: die Anteile der Zustände als Schichten.
+                const parts = this.isState && api.value(5) >= 0 ? timelineParts[api.value(5)] : null;
+                if (rectShape && parts) {
+                  return {
+                    type: 'group',
+                    children: StateEntities.stackParts(parts, Math.round(rectShape.height)).map(layer => ({
+                      type: 'rect',
+                      shape: {x: rectShape.x, y: rectShape.y + layer.y, width: rectShape.width, height: layer.h},
+                      style: {fill: fillFor(layer.idx)},
+                    })),
+                  };
+                }
                 return rectShape && {type: 'rect', shape: rectShape, style: {fill: this.isState ? fillFor(api.value(3)) : accent}};
               },
               encode: {x: [1, 2], y: 0},
@@ -1729,6 +1755,60 @@ function selectBrush() {
           };
           chartInstance.setOption(option, true);
           chartInstance.resize();
+        },
+
+        // Elemente der Serie 'main' für den Zeitstrahl einer Zustands-Entität:
+        // [Zeile, Beginn ms, Ende ms, Zustandsindex, Schlüssel im Protokoll,
+        // Index der Schichten oder -1]. Einzelne Abschnitte wie bisher, oder bei
+        // zu vielen für die Breite verdichtete Spalten (StateEntities.shouldCondense).
+        // Merkt sich in tlCondensed, welches von beiden gezeichnet wird.
+        stateTimelineItems(skipRaw = false) {
+          const zoom = this.zoomRange;
+          const a = zoom ? zoom.start / 1000 : this.windowStart;
+          const b = zoom ? zoom.end / 1000 : this.periodEnd;
+          if (timelineSegs.points !== this.points || timelineSegs.end !== this.windowEnd) {
+            timelineSegs = {points: this.points, end: this.windowEnd, segs: this.stateSegments};
+          }
+          const segs = timelineSegs.segs;
+          // Gezeichnet wird die Fläche des Charts ohne Rand und Beschriftung, rund 30 px weniger.
+          const width = Math.max(60, Math.round((chartInstance ? chartInstance.getWidth() : 600) - 30));
+          timelineParts = [];
+          this.tlCondensed = a != null && b != null && b > a && StateEntities.shouldCondense(segs, a, b, width, this.hiddenStates);
+          if (!this.tlCondensed && skipRaw) return null;
+          if (this.tlCondensed) {
+            return StateEntities.condenseSegments(segs, a, b, width, this.hiddenStates).items.map(col => {
+              timelineParts.push(col.parts);
+              const main = col.parts.reduce((best, part) => (part[1] > best[1] ? part : best));
+              return [0, col.s * 1000, col.e * 1000, main[0], null, timelineParts.length - 1];
+            });
+          }
+          const items = [];
+          for (const seg of segs) {
+            if (!this.hiddenStates.includes(seg.idx)) items.push([0, seg.s * 1000, seg.e * 1000, seg.idx, seg.key, -1]);
+          }
+          return items;
+        },
+        // Nach Zoom oder Schwenk die Spalten für den neuen Ausschnitt rechnen. Wird
+        // roh gezeichnet und bleibt es, ist nichts zu tun: ECharts zoomt die
+        // Rechtecke selbst.
+        updateStateTimeline() {
+          if (!chartInstance || !this.isState || this.stateMode !== 'timeline') return;
+          // Roh gezeichnet und weiter roh: die Rohabschnitte gar nicht erst neu bilden.
+          const data = this.stateTimelineItems(!this.tlCondensed);
+          if (!data) return;
+          chartInstance.setOption({series: [{id: 'main', data}]});
+        },
+        // Tooltip über einer verdichteten Spalte: Zeitspanne, Anteile, Beginne.
+        condensedTooltip(startMs, endMs, parts) {
+          const total = parts.reduce((sum, part) => sum + part[1], 0);
+          const stamp = ms => new Date(ms).toLocaleString(LOCALE, {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+          const lines = [...parts].sort((x, y) => y[1] - x[1]).map(([idx, seconds, begins]) => {
+            // Ein Zustand, der vor der Spalte begann, hat hier keinen Beginn: nichts hinschreiben.
+            const begin = begins === 0 ? '' : ` · ${begins === 1 ? t('1 Beginn') : t('{count} Beginne', {count: begins})}`;
+            return `<span class="state-dot" style="${stateSwatchStyle(idx)}"></span> ${escapeHtml(this.stateLabel(idx))} `
+              + `<strong>${NumberFormat.fmtDuration(seconds)}</strong> · ${StateEntities.fmtShare(seconds / total * 100)}${begin}`;
+          });
+          return `${stamp(startMs)} – ${stamp(endMs)}<br>${lines.join('<br>')}`;
         },
 
         // Bucket-Anfänge der gezeigten Periode — auch die ohne Daten, damit die

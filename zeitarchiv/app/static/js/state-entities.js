@@ -436,6 +436,110 @@ window.StateEntities = (() => {
     return option;
   }
 
+  // Pixelverdichtung für den Zeitstrahl über lange Zeiträume (ROADMAP 1.29):
+  // Wo mehr Abschnitte liegen als der Chart Bildpunkte breit ist, sind die meisten
+  // schmaler als ein Bildpunkt, und welcher Zustand sichtbar bleibt, entschiede die
+  // Zeichenreihenfolge. Stattdessen eine Spalte je Bildpunkt mit den Anteilen der
+  // Zustände. Gilt für den ganzen Chart, nicht je Zeile (eine Entität hat ohnehin nur
+  // eine). CONDENSE_MAX_RECTS: auch bei weniger Abschnitten als Bildpunkten wird ab
+  // dieser Zahl verdichtet, bei sehr breiten Charts wird das Zeichnen sonst zäh. Eine
+  // Annahme, noch nicht an echten Beständen gemessen.
+  const CONDENSE_MAX_RECTS = 3000;
+
+  // Abschnitte sind lückenlos nach Beginn sortiert: erster, der nach a noch läuft.
+  function firstOverlap(segs, a) {
+    let lo = 0;
+    let hi = segs.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (segs[mid].e > a) hi = mid; else lo = mid + 1;
+    }
+    return lo;
+  }
+
+  function shouldCondense(segs, a, b, width, hidden = []) {
+    const limit = Math.min(width, CONDENSE_MAX_RECTS);
+    const hide = new Set(hidden);
+    let n = 0;
+    for (let i = firstOverlap(segs, a); i < segs.length && segs[i].s < b; i++) {
+      if (!hide.has(segs[i].idx) && ++n > limit) return true;
+    }
+    return false;
+  }
+
+  // Abschnitte -> Spalten [{s, e, parts: [[idx, Sekunden, Beginne], ...]}] über [a, b)
+  // in `width` Spalten. parts folgt dem Zustandsindex, "nicht verfügbar" zuletzt.
+  // Ausgeblendete Zustände fehlen, die Anteile verteilen sich auf die sichtbaren.
+  // Aufeinanderfolgende Spalten mit demselben einzigen Zustand sind zu einem Streifen
+  // zusammengefasst (parts summiert), das hält die Zahl der Rechtecke klein.
+  function condenseSegments(segs, a, b, width, hidden = []) {
+    const dt = (b - a) / width;
+    const hide = new Set(hidden);
+    const cols = new Map();
+    const add = (c, idx, seconds, begins) => {
+      let col = cols.get(c);
+      if (!col) cols.set(c, col = new Map());
+      const cur = col.get(idx) || [0, 0];
+      cur[0] += seconds;
+      cur[1] += begins;
+      col.set(idx, cur);
+    };
+    for (let i = firstOverlap(segs, a); i < segs.length; i++) {
+      const seg = segs[i];
+      if (seg.s >= b) break;
+      if (hide.has(seg.idx)) continue;
+      const s = Math.max(seg.s, a);
+      const e = Math.min(seg.e, b);
+      if (!(e > s)) continue;
+      const c0 = Math.min(width - 1, Math.floor((s - a) / dt));
+      const c1 = Math.max(c0, Math.min(width - 1, Math.floor((e - a) / dt - 1e-9)));
+      for (let c = c0; c <= c1; c++) {
+        add(c, seg.idx, Math.min(e, a + (c + 1) * dt) - Math.max(s, a + c * dt), c === c0 && seg.s >= a ? 1 : 0);
+      }
+    }
+    const rank = idx => (idx === UNAVAILABLE ? Infinity : idx);
+    const items = [];
+    for (const c of [...cols.keys()].sort((x, y) => x - y)) {
+      const parts = [...cols.get(c)].map(([idx, [seconds, begins]]) => [idx, seconds, begins]).sort((x, y) => rank(x[0]) - rank(y[0]));
+      const s = a + c * dt;
+      const last = items[items.length - 1];
+      if (parts.length === 1 && last && last.parts.length === 1 && last.parts[0][0] === parts[0][0] && s - last.e < 1e-6) {
+        last.e = s + dt;
+        last.parts[0][1] += parts[0][1];
+        last.parts[0][2] += parts[0][2];
+      } else {
+        items.push({s, e: s + dt, parts});
+      }
+    }
+    return {items, dt};
+  }
+
+  // Anteile einer Spalte -> Schichten [{idx, y, h}] in einem Band der Höhe `height`.
+  // Ganze Bildpunkte, damit die Kanten scharf bleiben; ein Zustand ab 1 % ist
+  // mindestens 1 Bildpunkt hoch (die Zeile holt sich das beim größten Zustand).
+  function stackParts(parts, height) {
+    const total = parts.reduce((sum, p) => sum + p[1], 0);
+    if (!(total > 0)) return [];
+    let big = 0;
+    parts.forEach((p, i) => { if (p[1] > parts[big][1]) big = i; });
+    const heights = parts.map(p => p[1] / total * height);
+    let extra = 0;
+    parts.forEach((p, i) => {
+      if (i !== big && p[1] / total >= 0.01 && heights[i] < 1) { extra += 1 - heights[i]; heights[i] = 1; }
+    });
+    heights[big] -= extra;
+    const out = [];
+    let cum = 0;
+    let y = 0;
+    parts.forEach((p, i) => {
+      cum += heights[i];
+      const y1 = i === parts.length - 1 ? height : Math.round(cum);
+      if (y1 > y && heights[i] > 0) out.push({idx: p[0], y, h: y1 - y});
+      if (heights[i] > 0) y = Math.max(y, y1);
+    });
+    return out;
+  }
+
   function fmtShare(share) {
     const digits = share < 1 ? 1 : 0;
     return `${share.toLocaleString(window.ZA_FORMAT, {minimumFractionDigits: digits, maximumFractionDigits: digits})} %`;
@@ -446,5 +550,6 @@ window.StateEntities = (() => {
     segments, bucketsFromSegments, bucketsFromShares, bucketsForSeries, barPanels, bucketFns, totals, fmtShare,
     RANGE_BUCKETS, SERVER_SHARE_RANGES, bucketStarts, defaultMode,
     heatmapStates, heatmapDefault, heatmapIndexFor, heatmapPanels, HEATMAP_MIN_OBSERVATIONS,
+    CONDENSE_MAX_RECTS, shouldCondense, condenseSegments, stackParts,
   };
 })();
