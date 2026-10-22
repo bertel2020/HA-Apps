@@ -477,6 +477,23 @@ def get_summary(
 # ---------------------------------------------------------------- Series
 
 
+#: Einheiten ohne echten Nullpunkt: "von 10 auf 20 °C" sind nicht "100 % mehr".
+_NON_RATIO_UNITS = ("°C", "°F", "K")
+
+
+def _delta_pct(value_a: float, value_b: float, unit: str | None) -> tuple[float | None, str | None]:
+    """Prozentuale Änderung von B nach A, oder None mit Begründung, wo sie in die Irre führt:
+    bei Temperaturen (kein Nullpunkt, −2,3 gegen −0,5 °C wären „−321 %“) und wenn das Vorzeichen
+    wechselt. Ohne Bezugswert (0) gibt es sie ohne Begründung nicht."""
+    if unit in _NON_RATIO_UNITS:
+        return None, "A percentage change is not meaningful for temperatures; use delta."
+    if not value_b:
+        return None, None
+    if value_a and (value_a < 0) != (value_b < 0):
+        return None, "The sign changes between the periods, so a percentage is not meaningful; use delta."
+    return round((value_a - value_b) / abs(value_b) * 100, 1), None
+
+
 def _series_value(kind: str, point: dict, metric: str | None) -> float | None:
     if kind == "switch":
         return point["value"] / 3600
@@ -536,6 +553,8 @@ def get_series(
             ranked = sorted(rows, key=lambda item: item[1])
             entry["lowest"], entry["highest"] = ranked[0], ranked[-1]
         entry["values"] = _measures(kind, window, decimals, ctx.tz)
+        if not entry["values"]:
+            entry["note"] = "No data in this period."
         results.append(entry)
     response = {"as_of": as_of(ctx, real_now), "period": period, "rolling": rolling}
     response.update(_period_fields(period, first, rolling, ctx, level))
@@ -601,7 +620,9 @@ def compare_periods(
         entry["b"] = {"value": value_b, **_quality(ctx, row, b, level, {})}
         if value_a is not None and value_b is not None:
             entry["delta"] = _round(value_a - value_b, 2 if kind == "switch" else decimals)
-            entry["delta_pct"] = round((value_a - value_b) / abs(value_b) * 100, 1) if value_b else None
+            entry["delta_pct"], pct_note = _delta_pct(value_a, value_b, row["unit"])
+            if pct_note:
+                entry["delta_pct_note"] = pct_note
         else:
             entry["note"] = "One of the periods has no data."
         results.append(entry)
@@ -664,6 +685,12 @@ def get_energy_overview(ctx: AiToolContext, period: str, on_date: str | None = N
         {"name": clean_text(item["name"]), "kwh": item["value"], "cost": item.get("kosten")}
         for item in flow.get("verbraucher_breakdown", []) if item.get("level", 0) == 0
     ][:10]
+    # Erzeuger einzeln (Dach-PV, Balkonkraftwerk …): sonst ist "Photovoltaik" nicht von einem
+    # zweiten Erzeuger zu trennen. Wie bei den Verbrauchern nur Name und kWh, keine entity_id.
+    generators = [
+        {"name": clean_text(item["name"]), "kwh": item["value"]}
+        for item in flow.get("erzeuger_breakdown", [])
+    ][:10]
     gaps = kpi.get("kosten_luecke") or []
     response = {
         "as_of": as_of(ctx, real_now),
@@ -681,6 +708,7 @@ def get_energy_overview(ctx: AiToolContext, period: str, on_date: str | None = N
             "note": None if has_prices else "No prices are configured, so costs are unknown (not zero).",
             "gaps": [clean_text(str(gap.get("label", gap) if isinstance(gap, dict) else gap)) for gap in gaps][:5],
         },
+        "generators": generators,
         "top_consumers": consumers,
         "change_vs_previous": {_ENERGY_KPI_KEYS[key]: value for key, value in compare.items() if key in _ENERGY_KPI_KEYS},
         "plausible": (flow.get("quality") or {}).get("plausible"),
@@ -737,7 +765,8 @@ _DATE_RULE = (
 )
 _MEASURE_RULE = (
     "The measure depends on the type: counter gives total consumption, standard gives avg/min/max "
-    "(avg is the mean of the recorded values, not time-weighted; never add averages up), "
+    "(avg is the mean of the per-bucket averages at the stated resolution, e.g. hourly for a day, "
+    "not time-weighted, so another resolution gives a slightly different value; never add averages up), "
     "switch gives on_hours and on_share."
 )
 
@@ -776,13 +805,14 @@ TOOL_TEXTS: dict[str, tuple[str, str, str]] = {
         "last'. A is the period given by period and date, B is chosen by compare_to: previous_year (default), "
         "previous_period, or a date inside any other period. While A is still running, B is cut to the same "
         "elapsed time (same_elapsed), so the comparison is fair; basis says so. Results carry the measure per "
-        "type (counter total, sensor avg, switch on_hours), delta and delta_pct. " + _DATE_RULE + " "
+        "type (counter total, sensor avg, switch on_hours), delta and delta_pct. delta_pct is null, with "
+        "delta_pct_note, for temperatures and when the sign changes: then report delta only. " + _DATE_RULE + " "
         + _QUALITY_RULE + " " + _DATA_RULE,
     ),
     "get_energy_overview": (
         "Zeitarchiv: Energiebilanz", "Zeitarchiv: Energy overview",
         "Energy balance of the household for a day, month or year: generation, consumption, grid import and "
-        "export, self-sufficiency, battery, the largest consumers, and the costs (including what was saved). "
+        "export, self-sufficiency, battery, each generator, the largest consumers, and the costs (including what was saved). "
         "Use it for 'what did electricity cost in 2025', 'how much did the solar system produce'. costs are "
         "null with a note when no prices are configured; they are not zero. Only available when the energy "
         "dashboard is set up. " + _DATE_RULE + " " + _DATA_RULE,

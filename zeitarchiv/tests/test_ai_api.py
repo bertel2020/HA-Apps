@@ -289,6 +289,24 @@ def test_series_rows_and_extremes_by_metric(anlage) -> None:
     assert len(entry["rows"]) <= ai_tools.MAX_SERIES_POINTS
 
 
+def test_series_without_data_says_so_like_the_summary(anlage) -> None:
+    client, index = anlage
+    _enable(index)
+    # Ein Monat ohne jede Messung: leer, aber mit demselben Hinweis wie get_summary.
+    body = client.post(
+        "/api/ai/get_series",
+        json={"entity_ids": ["sensor.temperatur"], "period": "month", "date": "2023-01-15", "metric": "max"},
+        headers=AUTH,
+    ).json()
+    [entry] = body["results"]
+    assert entry["rows"] == [] and entry["values"] == {}
+    assert entry["note"] == "No data in this period."
+    filled = client.post(
+        "/api/ai/get_series", json={"entity_ids": ["sensor.temperatur"], "period": "day"}, headers=AUTH,
+    ).json()["results"][0]
+    assert "note" not in filled
+
+
 def test_series_metric_validation(anlage) -> None:
     client, index = anlage
     _enable(index)
@@ -319,7 +337,24 @@ def test_compare_previous_period_is_cut_to_the_same_elapsed_time(anlage) -> None
     assert body["a"]["period_running"] is True and "same elapsed" in body["basis"]
     assert entry["b"]["value"] == 8.0
     assert entry["delta"] == pytest.approx(entry["a"]["value"] - 8.0, abs=0.001)
-    assert entry["delta_pct"] == pytest.approx(entry["delta"] / 8.0 * 100, abs=0.1)
+    # Temperatur: kein Nullpunkt, deshalb keine Prozentangabe, nur die Differenz.
+    assert entry["delta_pct"] is None and "temperatures" in entry["delta_pct_note"]
+
+
+def test_percentage_change_only_where_it_means_something() -> None:
+    # Zähler und Schalter: gewöhnliche prozentuale Änderung.
+    assert ai_tools._delta_pct(112.0, 100.0, "kWh") == (12.0, None)
+    assert ai_tools._delta_pct(1.5, 3.0, None) == (-50.0, None)
+    # Temperaturen: nie, auch nicht bei gleichem Vorzeichen (−2,3 gegen −0,5 °C waren „−321 %“).
+    pct, note = ai_tools._delta_pct(-2.271, -0.539, "°C")
+    assert pct is None and "temperatures" in note
+    assert ai_tools._delta_pct(20.0, 10.0, "°F")[0] is None
+    # Vorzeichenwechsel: keine Prozentangabe, mit Begründung.
+    pct, note = ai_tools._delta_pct(5.0, -4.0, "W")
+    assert pct is None and "sign" in note
+    # Bezugswert 0: keine Angabe ohne Begründung (wie bisher), aber ein Ergebnis von 0 bleibt eine Zahl.
+    assert ai_tools._delta_pct(5.0, 0.0, "kWh") == (None, None)
+    assert ai_tools._delta_pct(0.0, 4.0, "kWh") == (-100.0, None)
 
 
 def test_compare_accepts_a_date_and_rejects_nonsense(anlage) -> None:
@@ -358,6 +393,10 @@ class _FakeEnergy:
         return {
             "kpi": self.kpi, "green_ratio": 0.5, "quality": {"plausible": True},
             "window_start_ts": _ts(0), "window_end_ts": _ts(24),
+            "erzeuger_breakdown": [
+                {"name": "Dach-PV", "value": 9.0, "entity_id": "sensor.pv"},
+                {"name": "Balkonkraftwerk", "value": 1.0, "entity_id": "sensor.bkw"},
+            ],
             "verbraucher_breakdown": [
                 {"name": "Wärmepumpe", "value": 12.5, "level": 0, "kosten": 3.1},
                 {"name": "Kind", "value": 1.0, "level": 1},
@@ -381,6 +420,8 @@ def test_energy_overview_shapes_costs_and_never_invents_zero(ctx, monkeypatch) -
     assert priced["costs"]["net_cost"] == 2.5 and priced["costs"]["currency"] == "EUR"
     assert priced["costs"]["note"] is None
     assert priced["top_consumers"] == [{"name": "Wärmepumpe", "kwh": 12.5, "cost": 3.1}]
+    # Erzeuger einzeln, ohne entity_id: "Photovoltaik" lässt sich vom zweiten Erzeuger trennen.
+    assert priced["generators"] == [{"name": "Dach-PV", "kwh": 9.0}, {"name": "Balkonkraftwerk", "kwh": 1.0}]
     assert priced["change_vs_previous"] == {"consumption_kwh": {"pct": 4.0, "abs": None}}
 
     unpriced = ai_tools.get_energy_overview(_with(ctx, energy_service=_FakeEnergy({"verbrauch": 8.0})), "day")
@@ -426,6 +467,16 @@ def test_response_is_capped_and_says_so(ctx) -> None:
     assert len(json.dumps(out, ensure_ascii=False)) <= ai_tools.MAX_RESPONSE_CHARS
     assert out["truncated"] is True and "shortened" in out["truncated_note"]
     assert 0 < len(out["matches"]) < 50
+
+
+def test_tool_texts_name_the_basis_of_averages_and_percentages() -> None:
+    texts = {name: text[2] for name, text in ai_tools.TOOL_TEXTS.items()}
+    # Der Mittelwert: Bucket-Mittel auf der genannten Auflösung, nicht zeitgewichtet.
+    assert "per-bucket averages at the stated resolution" in texts["get_summary"]
+    assert "not time-weighted" in texts["get_summary"]
+    # delta_pct kann null sein, das Modell soll dann nur die Differenz nennen.
+    assert "delta_pct is null" in texts["compare_periods"] and "delta_pct_note" in texts["compare_periods"]
+    assert "each generator" in texts["get_energy_overview"]
 
 
 def test_units_note_when_units_differ(anlage) -> None:
