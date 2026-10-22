@@ -1600,6 +1600,15 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
   width:max-content;max-width:min(320px,calc(100vw - 16px));overflow-wrap:anywhere;
   box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none;font-weight:400;z-index:1000;
 }
+/* Chart-Variante: gleiche Optik wie der ECharts-Tooltip (Fläche, Rand,
+   Mono, Farbpunkt, fetter Wert), siehe fixed-tooltip.js. */
+.chart-tooltip-fixed{
+  position:fixed;display:flex;align-items:center;gap:8px;background:var(--surface);color:var(--ink-muted);
+  border:1px solid var(--border);padding:8px 12px;border-radius:4px;
+  font-size:calc(12px * var(--font-scale, 1));font-family:var(--font-mono);white-space:nowrap;
+  box-shadow:0 2px 8px rgba(0,0,0,.15);pointer-events:none;z-index:1000;
+}
+.chart-tooltip-fixed strong{margin-left:12px;color:var(--ink);}
 /* Ein Button bleibt klickbar (Zeigefinger), auch wenn er zusätzlich einen
    Tooltip trägt — sonst würde die generische cursor:help-Regel oben einen
    eindeutig interaktiven Button fälschlich als "nur informativ" ausweisen. */
