@@ -188,6 +188,7 @@
                 <button :class="{active: stateMode === 'changes'}" @click="setStateMode('changes')">{{ _("Wechsel") }}</button>
                 <button :class="{active: stateMode === 'heatmap'}" :disabled="!heatmapAvailable" @click="setStateMode('heatmap')"
                         :title="heatmapAvailable ? '' : t('Die Heatmap gibt es ab dem Zeitraum Monat.')">{{ _("Heatmap") }}</button>
+                <button :class="{active: stateMode === 'donut'}" @click="setStateMode('donut')">{{ _("Donut") }}</button>
               </div>
             </div>
             <div class="menu-row">

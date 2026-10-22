@@ -581,6 +581,9 @@ function selectBrush() {
           if (this.isState && this.stateMode === 'heatmap') {
             return t('Dunkler heißt: öfter in diesem Zustand. Blasse Zellen haben weniger als 3 Beobachtungen.');
           }
+          if (this.isState && this.stateMode === 'donut') {
+            return t('Anteile des gewählten Zeitraums.');
+          }
           if (this.isState && this.stateMode !== 'timeline') {
             return t('Ein Klick auf einen Balken öffnet diesen Zeitraum.');
           }
@@ -1230,6 +1233,10 @@ function selectBrush() {
             this.renderStateHeatmap();
             return;
           }
+          if (this.isState && this.stateMode === 'donut') {
+            this.renderStateDonut();
+            return;
+          }
           if (this.isState && this.stateMode !== 'timeline') {
             this.renderStateBars();
             return;
@@ -1749,6 +1756,40 @@ function selectBrush() {
             [{name: DISPLAY_NAME, states: this.states, buckets: this.stateBuckets}],
             {mode: this.stateMode, range: this.range, windowStart: this.windowStart, periodEnd: this.periodEnd, hidden: this.hiddenStates}
           ), true);
+          chartInstance.resize();
+        },
+
+        // Anteile des ganzen Zeitraums (bzw. des gezoomten Ausschnitts) als Ring:
+        // dieselben Zahlen wie die Legende (stateSummary), ausgeblendete Zustände
+        // fehlen, die Anteile verteilen sich dann auf die sichtbaren.
+        renderStateDonut() {
+          const css = getComputedStyle(document.body);
+          const surface = css.getPropertyValue('--surface');
+          const pattern = StateEntities.unavailablePattern();
+          const rows = this.stateSummary.rows.filter(row => !this.hiddenStates.includes(row.idx));
+          chartInstance.setOption({
+            tooltip: {
+              trigger: 'item',
+              appendToBody: true,
+              formatter: p => {
+                const raw = this.stateRaw(p.data.idx);
+                const rawPart = raw && raw !== p.name ? ` <span style="opacity:.6">${escapeHtml(raw)}</span>` : '';
+                return `${p.marker} <strong>${escapeHtml(p.name)}</strong>${rawPart}<br>${NumberFormat.fmtDuration(p.value)} (${StateEntities.fmtShare(p.percent)})`;
+              },
+            },
+            series: [{
+              type: 'pie',
+              radius: ['52%', '85%'],
+              center: ['50%', '50%'],
+              label: {show: false},
+              labelLine: {show: false},
+              itemStyle: {borderColor: surface, borderWidth: 2},
+              data: rows.map(row => ({
+                name: this.stateLabel(row.idx), value: row.seconds, idx: row.idx,
+                itemStyle: {color: StateEntities.fill(row.idx, pattern)},
+              })),
+            }],
+          }, true);
           chartInstance.resize();
         },
 
