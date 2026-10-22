@@ -1588,7 +1588,12 @@ class ImportService:
         stats = stats or ha_import.HistoryFetchResult()
         bucket_seconds = 86_400 if period == "day" else 3_600
         raw_rows = sorted(raw.rows)
-        stats_rows = sorted(stats.rows)
+        # Zählerstände aus der Statistik tragen den Stempel "Bucket-Ende − 1 s"
+        # (siehe ha_statistics.fetch_statistics_rows). Die Naht-Logik unten
+        # rechnet mit Intervallen ab Bucket-Anfang, deshalb dorthin zurück und
+        # erst beim Ergebnis wieder auf den Messpunkt-Stempel.
+        stamp_shift = bucket_seconds - 1 if stats.bucket_end_stamped else 0
+        stats_rows = sorted((ts - stamp_shift, value) for ts, value in stats.rows)
         cutover_ts: float | None = None
         seam_status = "nur_rohhistorie"
         boundary_anchor: tuple[float, float] | None = None
@@ -1623,6 +1628,8 @@ class ImportService:
             used_stats = []
             used_raw = raw_rows
 
+        used_stats = [(ts + stamp_shift, value) for ts, value in used_stats]
+        stats_rows = [(ts + stamp_shift, value) for ts, value in stats_rows]
         combined_rows = sorted([*used_stats, *used_raw])
         if len(combined_rows) > MAX_IMPORT_ROWS_PER_ENTITY:
             raise ValueError(

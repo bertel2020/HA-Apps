@@ -2139,6 +2139,7 @@
     "Home-Assistant-API lieferte keine gültige JSON-Antwort": "Home Assistant API did not return a valid JSON response",
     "Eintrag ist kein Objekt": "Entry is not an object",
     "Zustand ist nicht importierbar": "State is not importable",
+    "Zustand ist nicht verfügbar": "State is not available",
     "Zeitstempel ist doppelt oder nicht aufsteigend": "Timestamp is duplicate or not ascending",
     "Zeitstempel ist ungültig": "Timestamp is invalid",
     "Home-Assistant-WebSocket-API antwortete nicht rechtzeitig": "Home Assistant WebSocket API did not respond in time",

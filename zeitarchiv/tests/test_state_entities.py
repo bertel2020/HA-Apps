@@ -231,7 +231,9 @@ def test_history_import_maps_text_for_state_entities(setup, monkeypatch) -> None
         state_mapper=mapper,
     )
     assert [value for _ts, value in result.rows] == [0.0, 1.0, float(STATE_UNAVAILABLE_INDEX)]
-    assert result.skipped == 1
+    # Der leere Platzhalter-Zustand ist kein Datenverlust und zählt nicht als übersprungen.
+    assert result.skipped == 0
+    assert [d["state"] for d in result.discarded] == [""]
     assert ha_import.state_mapper_for(index, "sensor.unknown_entity") is None
 
 

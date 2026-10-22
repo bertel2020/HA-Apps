@@ -286,6 +286,9 @@ class HistoryFetchResult:
     # Schnittstelle fest; einfache Rohhistorien-/Statistikabrufe lassen das
     # Dict leer. Die gespeicherten Messreihen bleiben dadurch unverändert.
     source_details: dict[str, object] = field(default_factory=dict)
+    # True, wenn die Zeilen Zählerstände aus der Langzeitstatistik sind und auf
+    # das Bucket-ENDE gestempelt wurden (siehe ha_statistics.fetch_statistics_rows).
+    bucket_end_stamped: bool = False
 
 
 def _discard(result: HistoryFetchResult, reason: str, entry: object) -> None:
@@ -349,6 +352,13 @@ def fetch_history_rows(
             else:
                 value = _parse_state(str(entry.get("state")), domain)
             if value is None:
+                # "unavailable"/"unknown" stehen in jeder HA-Historie (Neustart,
+                # Gerät offline) und sind kein Datenverlust. Als übersprungen
+                # gezählt würde jeder Import als "unvollständig" gelten und die
+                # Meldung auch nach einer Wiederholung nie verschwinden.
+                if str(entry.get("state")).strip().lower() in IGNORED_STATES:
+                    _discard(result, tr("Zustand ist nicht verfügbar"), entry)
+                    continue
                 result.skipped += 1
                 _discard(result, tr("Zustand ist nicht importierbar"), entry)
                 continue

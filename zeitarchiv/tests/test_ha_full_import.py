@@ -63,6 +63,95 @@ def test_full_import_uses_one_half_open_hour_boundary() -> None:
     assert max(ts + 3600 for ts, _ in stats.rows) <= min(ts for ts, _ in combined.rows[2:])
 
 
+def test_full_import_seam_with_counter_stats_stamped_at_bucket_end() -> None:
+    """Zählerstände aus der Statistik tragen "Bucket-Ende − 1 s". Die Naht muss
+    dieselbe Grenze treffen wie bei Bucket-Anfang-Stempeln."""
+    service = _service()
+    hour = datetime(2026, 8, 20, 10, tzinfo=timezone.utc)
+    raw = ha_import.HistoryFetchResult(rows=[
+        ((hour + timedelta(minutes=37)).timestamp(), 10.37),
+        ((hour + timedelta(minutes=50)).timestamp(), 10.50),
+        ((hour + timedelta(hours=1, minutes=5)).timestamp(), 11.05),
+    ])
+    stats = ha_import.HistoryFetchResult(
+        rows=[
+            ((hour - timedelta(hours=1)).timestamp() + 3599, 9.0),
+            (hour.timestamp() + 3599, 10.0),
+        ],
+        bucket_end_stamped=True,
+    )
+
+    combined = service._combine_ha_full_history(
+        raw, stats, hour - timedelta(days=10), hour - timedelta(days=365),
+        hour + timedelta(days=1), stats_supported=True,
+    )
+
+    cutover = (hour + timedelta(hours=1)).timestamp()
+    assert combined.source_details["cutover_ts"] == cutover
+    assert combined.rows == [
+        stats.rows[0], stats.rows[1], (cutover, raw.rows[1][1]), raw.rows[2]
+    ]
+    assert combined.source_details["stats"]["discarded_at_seam"] == 0
+
+
+def test_counter_stats_after_raw_import_do_not_double_the_daily_consumption() -> None:
+    """Regression: Statistik-Stundenwerte (Zählerstand vom Bucket-Ende, früher mit
+    dem Bucket-Anfang gestempelt) zwischen Rohwerte mit anderen Zeitstempeln
+    ließen die Zähler-Differenz jeden Anstieg doppelt zählen (~2x Tagesverbrauch)."""
+    import shutil
+    import tempfile
+
+    import pytest
+    pytest.importorskip("pyarrow")
+    from app.storage import hotbuffer, rollup, symcon_import
+    from app.storage.index import Index
+
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-stats-mix-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.netzbezug"
+        index.get_or_create_entity(entity_id, "sensor", "total_increasing", "kWh")
+        entity = index.get_entity(entity_id)
+
+        now = datetime.now(TZ)
+        day = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        def state_at(moment: datetime) -> float:
+            return 1000.0 + 2.0 * (moment - day).total_seconds() / 3600  # 2 kWh/h
+
+        raw = [
+            ((day + timedelta(seconds=437 * i + 13)).timestamp(),
+             round(state_at(day + timedelta(seconds=437 * i + 13)), 3))
+            for i in range(24 * 3600 // 437)
+        ]
+        # Genau so liefert fetch_statistics_rows jetzt einen Stunden-Bucket.
+        stats = [
+            ((day + timedelta(hours=hour + 1)).timestamp() - 1,
+             round(state_at(day + timedelta(hours=hour + 1)), 3))
+            for hour in range(24)
+        ]
+
+        def day_total() -> float:
+            hot_path = hotbuffer.hot_path(tmp, entity_id, day.timestamp(), TZ)
+            rows = sorted(hotbuffer.read_rows(hot_path))
+            start_ts, end_ts = day.timestamp(), (day + timedelta(days=1)).timestamp()
+            fine, _ = rollup.compute_fine_rollup_with_key(
+                [row for row in rows if start_ts <= row[0] < end_ts],
+                entity["aggregation_type"], rollup.seconds_bucket_key(TZ, 86_400), None, end_ts,
+            )
+            return sum(row.value for row in fine)
+
+        symcon_import.import_rows(tmp, index, raw, entity_id, TZ, source_label="raw")
+        before = day_total()
+        symcon_import.import_rows(tmp, index, stats, entity_id, TZ, source_label="stats")
+
+        assert before == pytest.approx(48.0, abs=0.5)
+        assert day_total() == pytest.approx(48.0, abs=0.5)
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_full_import_never_drops_raw_rows_without_covering_statistic_bucket() -> None:
     service = _service()
     hour = datetime(2026, 8, 20, 10, tzinfo=timezone.utc)
