@@ -963,7 +963,7 @@ button.menu-row{border:none;background:none;width:100%;text-align:left;font-fami
 .menu-row-stack{align-items:stretch;flex-direction:column;gap:6px;}
 .menu-row-stack>.menu-row-label{white-space:nowrap;}
 .menu-row-stack>.seg{align-self:stretch;max-width:100%;}
-.menu-row.menu-row-stack>.seg button{flex:1 1 auto;padding-left:6px;padding-right:6px;}
+.menu-row.menu-row-stack>.seg button{flex:1 1 auto;min-width:0;padding-left:4px;padding-right:4px;font-size:calc(10.5px * var(--font-scale,1));}
 .dtile-entity-picker{display:block;width:100%;}
 .dtile-entity-picker>.btn{width:100%;box-sizing:border-box;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .dtile-entity-picker>.dd-picker-popover{left:0;right:auto;width:100%;box-sizing:border-box;}
