@@ -834,13 +834,22 @@ verworfen.
   lässt.
 
 - **Darstellung je Zeitraum:** Die Verlaufsansicht bietet **Zeitstrahl**,
-  **Anteile** (gestapelte Balken je Tag, Monat oder Jahr, in Prozent der Zeit)
-  und **Wechsel** (wie oft ein Zustand begonnen hat). Solange du nichts wählst,
-  zeigt sie bis zur Woche den Zeitstrahl und ab dem Monat die Anteile — ein
-  Zeitstrahl über viele Wochen wäre nicht mehr lesbar. Deine Wahl bleibt beim
-  Wechsel des Zeitraums erhalten, nur der Zeitstrahl fällt ab dem Monat auf
-  Anteile zurück. Ein Klick auf einen Balken springt in den Zeitraum darunter.
-  Die Wahl wird nicht gespeichert, sie gilt nur für die offene Seite.
+  **Anteile** (gestapelte Balken je Tag, Monat oder Jahr, in Prozent der Zeit),
+  **Wechsel** (wie oft ein Zustand begonnen hat), **Heatmap** und **Donut**.
+  Solange du nichts wählst, zeigt sie bis zur Woche den Zeitstrahl und ab dem
+  Monat die Anteile. Deine Wahl bleibt beim Wechsel des Zeitraums erhalten, nur
+  die Heatmap gibt es erst ab dem Monat und fällt davor auf diese Voreinstellung
+  zurück. Ein Klick auf einen Balken springt in den Zeitraum darunter. Die Wahl
+  wird nicht gespeichert, sie gilt nur für die offene Seite.
+- **Heatmap:** Ein Raster aus Wochentag und Stunde. Jede Zelle zeigt, welchen
+  Anteil der Zeit die Entität in einem Zustand war — je dunkler, desto öfter.
+  Die Legende wählt hier genau einen Zustand statt Zustände auszublenden
+  („nicht verfügbar“ lässt sich nicht wählen). Ohne Wahl wird der Zustand
+  gezeichnet, dessen Anteil im Lauf der Woche am meisten schwankt, nicht der
+  häufigste. Blasse Zellen beruhen auf weniger als drei Beobachtungen.
+- **Donut:** Die Anteile des gewählten Zeitraums (bei gezoomtem Ausschnitt nur
+  dessen) als Ring, in jedem Zeitraum. Ausgeblendete Zustände fehlen, die
+  Anteile verteilen sich auf die übrigen.
 - **Markierte Werte:** Die Option **Markierte Werte** (Optionen-Menü) legt zur
   Löschung markierte Abschnitte als Bänder mit Warnrand hinter den Zeitstrahl,
   siehe [Markierte Werte sehen](#markierte-werte-sehen). Bei Anteilen und
@@ -848,9 +857,19 @@ verworfen.
   Chart-Editor oder auf Kacheln.
 
 Ab dem Zeitraum „Monat“ kommen die Anteile aus vorberechneten Auswertungen,
-bis zur Woche aus den gespeicherten Wechseln. Wer ausdrücklich den Zeitstrahl
-über einen langen Zeitraum wählt, bekommt die Rohwechsel — bei sehr vielen
-Wechseln greift dort die allgemeine Obergrenze für Rohwerte.
+bis zur Woche aus den gespeicherten Wechseln.
+
+Der **Zeitstrahl** lässt sich auch über lange Zeiträume wählen. Liegen im
+sichtbaren Ausschnitt mehr Abschnitte, als der Chart Bildpunkte breit ist,
+wären die meisten schmaler als ein Bildpunkt. Dann zeichnet er statt einzelner
+Bänder eine **Spalte je Bildpunkt**, nach den Anteilen der Zustände geschichtet;
+ein Zustand ab 1 % bleibt sichtbar. Über einer Spalte nennt der Tooltip
+Zeitspanne, Anteile und Zahl der Beginne. Beim Hineinzoomen werden die Spalten
+feiner, bis wieder die einzelnen Abschnitte zu sehen sind; der Hinweis unter
+dem Chart sagt, was gerade gilt. Bei sehr vielen Wechseln greift in Jahr und
+Dekade die allgemeine Obergrenze für Rohwerte. Dann rechnet der Server die
+Spalten aus den Stunden-Auswertungen vor: feiner als eine Stunde sind sie nicht,
+und Zoomen macht sie nur breiter.
 
 #### Zustände in Charts und auf Dashboards
 
@@ -858,9 +877,14 @@ Wechseln greift dort die allgemeine Obergrenze für Rohwerte.
   hinzufügen, aber **nur mit anderen Zustands-Entitäten** im selben Chart —
   auch nicht mit Schaltern. Fügt man sie neben Zahlen- oder Schalter-Entitäten
   hinzu, werden die Zustände mit einem Hinweis wieder entfernt. Der
-  **Diagrammtyp** bietet dann Zeitstrahl, Anteile, Wechsel und Donut:
+  **Diagrammtyp** bietet dann Zeitstrahl, Anteile, Wechsel, Heatmap und Donut:
   - **Zeitstrahl:** eine Zeile je Entität in einem gemeinsamen Zeitstrahl.
   - **Anteile** und **Wechsel:** je Zustands-Entität ein eigenes Diagramm.
+  - **Heatmap:** je Zustands-Entität ein Raster aus Wochentag und Stunde, ab
+    dem Zeitraum „Monat“. Bei mehreren Entitäten steht „Name · Zustand“ über
+    jedem Raster und die Farbskala entfällt. Ein Klick auf einen Zustand in der
+    Legende wählt ihn für diese Entität; er wird mit dem Chart gespeichert. In
+    kürzeren Zeiträumen gilt die Voreinstellung, der Wunsch bleibt erhalten.
   - **Donut:** je Zustands-Entität ein Donut mit den Anteilen der Zustände;
     der Name steht nur bei mehreren Entitäten darüber.
   - Ohne ausdrückliche Wahl gilt dieselbe Voreinstellung wie in der
@@ -869,7 +893,9 @@ Wechseln greift dort die allgemeine Obergrenze für Rohwerte.
     nennt Entität, Zustand, Dauer, Anteil und Wechsel. Der **CSV-Export** des
     Editors enthält die angezeigten Zustandsnamen.
 - **Chart-Kacheln** im Dashboard verhalten sich wie der Editor; auch dort
-  fallen Zustände heraus, wenn sie mit anderen Serien gemischt sind.
+  fallen Zustände heraus, wenn sie mit anderen Serien gemischt sind. Eine
+  Heatmap-Kachel zeigt das Raster kompakt und fällt in Zeiträumen unter dem
+  Monat auf die Voreinstellung zurück.
 - **Werte-Kachel einer Zustands-Entität:** zeigt den aktuellen Zustand mit
   Farbfeld und „seit …“. Eine 1×1-Kachel zeigt dazu die letzten 24 Stunden
   als Streifen, ab zwei Spalten die Anteile der letzten 7 Tage — wahlweise

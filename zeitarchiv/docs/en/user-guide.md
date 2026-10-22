@@ -760,13 +760,20 @@ are discarded.
   are discarded — a safeguard against sensors with free text.
 
 - **Display per period:** The history view offers **Timeline**, **Shares**
-  (stacked bars per day, month or year, as a percentage of time) and
-  **Changes** (how often a state began). As long as you do not choose, it
-  shows the timeline up to a week and the shares from a month on — a timeline
-  across many weeks would no longer be readable. Your choice is kept when you
-  switch the period; only the timeline falls back to shares from a month on.
-  Clicking a bar jumps to the period below it. The choice is not saved, it
-  applies only to the open page.
+  (stacked bars per day, month or year, as a percentage of time), **Changes**
+  (how often a state began), **Heatmap** and **Donut**. As long as you do not
+  choose, it shows the timeline up to a week and the shares from a month on.
+  Your choice is kept when you switch the period; only the heatmap exists from
+  a month on and falls back to that default before. Clicking a bar jumps to the
+  period below it. The choice is not saved, it applies only to the open page.
+- **Heatmap:** A grid of weekday and hour. Each cell shows the share of time the
+  entity spent in one state — the darker, the more often. Here the legend picks
+  exactly one state instead of hiding states ("unavailable" cannot be picked).
+  Without a choice it draws the state whose share varies most over the week,
+  not the most frequent one. Pale cells rest on fewer than three observations.
+- **Donut:** The shares of the chosen period (only of the zoomed section if you
+  zoomed) as a ring, in every period. Hidden states are left out and the shares
+  spread over the rest.
 - **Marked values:** The **Marked values** option (options menu) draws the
   sections marked for deletion as bands with a warning edge behind the
   timeline, see [Seeing marked values](#seeing-marked-values). It does not
@@ -774,9 +781,18 @@ are discarded.
   the chart editor or on tiles.
 
 From the "Month" period on, the shares come from precomputed summaries; up to
-a week they come from the stored changes. Anyone who explicitly chooses the
-timeline over a long period gets the raw changes — with very many changes the
-general limit for raw values applies there.
+a week they come from the stored changes.
+
+The **timeline** can also be chosen over long periods. If the visible section
+holds more periods than the chart is pixels wide, most would be narrower than a
+pixel. It then draws a **column per pixel** instead of single bands, stacked by
+the shares of the states; a state of 1 % or more stays visible. Over a column
+the tooltip names the time span, the shares and the number of starts. Zooming in
+makes the columns finer until the single periods show again; the note below the
+chart says which applies. With very many changes the general limit for raw
+values applies in year and decade. The server then precomputes the columns from
+the hourly summaries: they are not finer than an hour, and zooming only makes
+them wider.
 
 #### States in charts and on dashboards
 
@@ -784,9 +800,14 @@ general limit for raw values applies there.
   together with other state entities** in the same chart — not even with
   switches. If you add them next to number or switch entities, the states are
   removed again with a notice. The **chart type** then offers Timeline,
-  Shares, Changes and Donut:
+  Shares, Changes, Heatmap and Donut:
   - **Timeline:** one row per entity in a shared timeline.
   - **Shares** and **Changes:** a separate chart per state entity.
+  - **Heatmap:** a weekday-and-hour grid per state entity, from the "Month"
+    period on. With several entities "Name · state" is shown above each grid and
+    the colour scale is dropped. Clicking a state in the legend picks it for
+    that entity; it is saved with the chart. In shorter periods the default
+    applies, the choice is kept.
   - **Donut:** one donut per state entity with the shares of its states; the
     name is shown above only when there are several entities.
   - Without an explicit choice the same default as in the history view
@@ -795,7 +816,8 @@ general limit for raw values applies there.
     entity, state, duration, share and changes. The editor's **CSV export**
     contains the displayed state names.
 - **Chart tiles** on the dashboard behave like the editor; there too, states
-  drop out when mixed with other series.
+  drop out when mixed with other series. A heatmap tile shows the grid compactly
+  and falls back to the default in periods shorter than a month.
 - **Value tile of a state entity:** shows the current state with a colour
   swatch and "since …". A 1×1 tile adds the last 24 hours as a strip, from
   two columns on the shares of the last 7 days — optionally as a **donut**

@@ -13,8 +13,11 @@
   Die Demo-Daten enthalten drei Beispiele (Saugroboter, Waschprogramm,
   Heizungsbetrieb). Ab dem Zeitraum „Monat“ zeigt die Verlaufsansicht die
   Anteile je Tag, Monat oder Jahr als Balken; umschalten lässt sich auf
-  Zeitstrahl oder Wechsel. Im Chart-Editor erscheinen mehrere Zustände als
-  Zeilen eines gemeinsamen Zeitstrahls oder als Donuts nebeneinander.
+  Zeitstrahl, Wechsel, Donut oder eine Heatmap (Wochentag × Stunde). Auch über
+  lange Zeiträume bleibt der Zeitstrahl lesbar: Wo mehr Abschnitte liegen, als
+  der Chart Bildpunkte breit ist, zeichnet er je Bildpunkt eine Spalte mit den
+  Anteilen der Zustände. Im Chart-Editor erscheinen mehrere Zustände als
+  Zeilen eines gemeinsamen Zeitstrahls, als Donuts oder als Heatmaps.
   Dashboard-Kacheln zeigen den aktuellen Zustand mit „seit“ und den letzten
   24 Stunden als Streifen, breite Kacheln die Anteile der letzten 7 Tage,
   wahlweise als Donut. Werden Werte verworfen, weil der Typ nicht passt oder
@@ -56,8 +59,11 @@
   history takes them over as well. The demo data contains three examples
   (robot vacuum, washing programme, heating operation). From the "Month"
   period on, the history view shows the shares per day, month or year as
-  bars; you can switch to timeline or changes. In the chart editor, several
-  states appear as rows of a shared timeline or as donuts side by side.
+  bars; you can switch to timeline, changes, donut or a heatmap (weekday ×
+  hour). The timeline stays readable over long periods too: where there are more
+  periods than the chart is pixels wide, it draws a column per pixel with the
+  shares of the states. In the chart editor, several states appear as rows of a
+  shared timeline, as donuts or as heatmaps.
   Dashboard tiles show the current state with "for" and the last 24 hours as
   a strip, wide tiles the shares of the last 7 days, optionally as a donut.
   When values are discarded because the type does not match or an entity
