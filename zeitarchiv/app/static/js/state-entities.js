@@ -561,6 +561,63 @@ window.StateEntities = (() => {
     return out;
   }
 
+  // Zeilen eines gemeinsamen Zeitstrahls (Chart-Editor, Kachel) für Zustands-Serien,
+  // [{catIndex, points, columns, dt, states}] in Zeilen eines Charts. Verdichtet wird
+  // für den ganzen Chart, sobald eine Zeile zu viele Abschnitte für die Breite hat
+  // (siehe shouldCondense); eine Zeile ohne Rohabschnitte, aber mit Spalten vom Server
+  // (Jahr/Dekade, die Rohabfrage brach ab), wird immer aus den Spalten gezeichnet.
+  // Liefert Elemente [Zeile, Beginn ms, Ende ms, Füllung, Zustandsindex, Index der
+  // Schichten oder -1] und die Schichten dazu (außerhalb der Werte, ECharts führt in
+  // Werten keine Listen). Der Aufrufer zeichnet mit condensedShape() und erklärt mit
+  // condensedTooltip().
+  function stateTimelineItems(rows, a, b, windowEnd, width, pattern) {
+    const prepared = rows.map(row => ({row, segs: row.points && row.points.length ? segments(row.points, windowEnd) : []}));
+    const condense = prepared.some(p => p.segs.length && a != null && b != null && b > a && shouldCondense(p.segs, a, b, width));
+    const items = [];
+    const parts = [];
+    for (const {row, segs} of prepared) {
+      const fromColumns = !segs.length && row.columns && row.columns.length;
+      if (condense || fromColumns) {
+        const cols = segs.length ? condenseSegments(segs, a, b, width).items : mergeColumns(row.columns, row.dt);
+        for (const col of cols) {
+          parts.push(col.parts);
+          const main = col.parts.reduce((best, part) => (part[1] > best[1] ? part : best));
+          items.push([row.catIndex, col.s * 1000, col.e * 1000, fill(main[0], pattern), main[0], parts.length - 1]);
+        }
+      } else {
+        for (const seg of segs) items.push([row.catIndex, seg.s * 1000, seg.e * 1000, fill(seg.idx, pattern), seg.idx, -1]);
+      }
+    }
+    return {items, parts, condensed: condense || prepared.some(p => !p.segs.length && p.row.columns && p.row.columns.length)};
+  }
+
+  // Verdichtete Spalte als Schichten in einem Rechteck {x, y, width, height}; fillFor
+  // liefert die Füllung je Zustandsindex.
+  function condensedShape(parts, rect, fillFor) {
+    return {
+      type: 'group',
+      children: stackParts(parts, Math.round(rect.height)).map(layer => ({
+        type: 'rect',
+        shape: {x: rect.x, y: rect.y + layer.y, width: rect.width, height: layer.h},
+        style: {fill: fillFor(layer.idx)},
+      })),
+    };
+  }
+
+  // Tooltip über einer verdichteten Spalte: Zeitspanne, Dauer, Anteil und Beginne je
+  // Zustand. stamp(ms) formatiert einen Zeitpunkt (die Kachel rechnet in Serverzeit),
+  // title ist eine optionale erste Zeile, etwa der Name der Zeile.
+  function condensedTooltip(parts, startMs, endMs, states, stamp, title = '') {
+    const total = parts.reduce((sum, part) => sum + part[1], 0);
+    const lines = [...parts].sort((x, y) => y[1] - x[1]).map(([idx, seconds, begins]) => {
+      // Ein Zustand, der vor der Spalte begann, hat hier keinen Beginn: nichts hinschreiben.
+      const begin = begins === 0 ? '' : ` · ${begins === 1 ? t('1 Beginn') : t('{count} Beginne', {count: begins})}`;
+      return `<span class="state-dot" style="${swatchStyle(idx)}"></span> ${escapeHtml(label(states, idx))} `
+        + `<strong>${NumberFormat.fmtDuration(seconds)}</strong> · ${fmtShare(seconds / total * 100)}${begin}`;
+    });
+    return `${title ? title + '<br>' : ''}${stamp(startMs)} – ${stamp(endMs)}<br>${lines.join('<br>')}`;
+  }
+
   function fmtShare(share) {
     const digits = share < 1 ? 1 : 0;
     return `${share.toLocaleString(window.ZA_FORMAT, {minimumFractionDigits: digits, maximumFractionDigits: digits})} %`;
@@ -572,5 +629,6 @@ window.StateEntities = (() => {
     RANGE_BUCKETS, SERVER_SHARE_RANGES, bucketStarts, defaultMode,
     heatmapStates, heatmapDefault, heatmapIndexFor, heatmapPanels, HEATMAP_MIN_OBSERVATIONS,
     CONDENSE_MAX_RECTS, COLUMN_RANGES, shouldCondense, condenseSegments, mergeColumns, stackParts,
+    stateTimelineItems, condensedShape, condensedTooltip,
   };
 })();

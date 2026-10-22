@@ -735,6 +735,8 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         previous_years: int = 1,
         at: str | None = None,
         heatmap: bool = False,
+        columns: bool = False,
+        px: int = 0,
     ) -> dict:
         # at: Stichtag der Zeitraum-Navigation eines Dashboards — verschiebt
         # Bezugszeitpunkt bzw. Versatz, alles Weitere (Vergleich, Langzeit)
@@ -746,6 +748,10 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             _validate_entity_id_or_400(entity_id)
         if heatmap and range not in query_mod.STATE_HEATMAP_RANGES:
             raise HTTPException(status_code=400, detail=tr("Die Heatmap gibt es erst ab dem Zeitraum Monat"))
+        if columns and range not in query_mod.STATE_COLUMNS_RANGES:
+            raise HTTPException(status_code=400, detail=tr("Die Spalten gibt es nur für Jahr und Dekade"))
+        if columns and px <= 0:
+            raise HTTPException(status_code=400, detail=tr("Die Breite in Bildpunkten fehlt"))
         if previous_years < 0:
             raise HTTPException(status_code=400, detail=tr("Ungültige Anzahl Vergleichsjahre"))
         # Mehrjahresvergleich (compare_mode "longterm", im Chart-Editor
@@ -768,7 +774,13 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             # Heatmap: nur die Zellen der Zustands-Entitäten; alles andere
             # kommt unverändert, die Oberfläche wirft es für die Heatmap ohnehin
             # heraus (Zustände stehen nie neben anderen Serien).
-            if heatmap and entity is not None and entity["aggregation_type"] == query_mod.STATE_TYPE:
+            if columns and entity is not None and entity["aggregation_type"] == query_mod.STATE_TYPE:
+                # Zeitstrahl in Jahr/Dekade: Spalten statt Rohwechseln, die über der Grenze abbrächen.
+                result = query_mod.query_state_columns(
+                    deps.data_dir, deps.index, entity_id, range, deps.tz, now, px,
+                    offset=offset, continuous=continuous,
+                )
+            elif heatmap and entity is not None and entity["aggregation_type"] == query_mod.STATE_TYPE:
                 result = query_mod.query_state_heatmap(
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                     offset=offset, continuous=continuous,
@@ -803,7 +815,10 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 entry["states"] = result["states"]
             if result.get("cells") is not None:
                 entry["cells"] = result["cells"]
-            if compare and not raw and compare_mode != "longterm" and not heatmap:
+            if result.get("columns") is not None:
+                entry["columns"] = result["columns"]
+                entry["dt"] = result["dt"]
+            if compare and not raw and compare_mode != "longterm" and not heatmap and not columns:
                 compare_result = query_mod.query_series(
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                     offset=offset if compare_mode == "year" else offset - 1,

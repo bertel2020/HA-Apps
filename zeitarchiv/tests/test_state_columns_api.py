@@ -56,3 +56,26 @@ def test_query_returns_columns_for_a_state_entity(ingested) -> None:
 ])
 def test_query_refuses_what_has_no_columns(ingested, url) -> None:
     assert ingested.get(url).status_code == 400
+
+
+def test_query_multi_returns_columns_for_state_entities_and_leaves_numbers_alone(ingested) -> None:
+    response = ingested.get(f"/api/query-multi?entity_ids={STATE}&range=year&columns=true&px=600")
+    assert response.status_code == 200, response.text
+    entry = response.json()["series"][0]
+    assert entry["columns"]
+    assert entry["dt"] > 0
+    assert entry["points"] == []
+    assert entry["states"]
+    mixed = ingested.get(f"/api/query-multi?entity_ids={STATE},{NUMBER}&range=year&columns=true&px=600&raw=true")
+    assert mixed.status_code == 200, mixed.text
+    by_id = {s["entity_id"]: s for s in mixed.json()["series"]}
+    assert by_id[STATE]["columns"]
+    assert "columns" not in by_id[NUMBER]
+
+
+@pytest.mark.parametrize("url", [
+    f"/api/query-multi?entity_ids={STATE}&range=month&columns=true&px=600",
+    f"/api/query-multi?entity_ids={STATE}&range=year&columns=true",
+])
+def test_query_multi_refuses_what_has_no_columns(ingested, url) -> None:
+    assert ingested.get(url).status_code == 400

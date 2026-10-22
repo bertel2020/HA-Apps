@@ -1706,16 +1706,7 @@ function selectBrush() {
                 );
                 // Verdichtete Spalte: die Anteile der Zustände als Schichten.
                 const parts = this.isState && api.value(5) >= 0 ? timelineParts[api.value(5)] : null;
-                if (rectShape && parts) {
-                  return {
-                    type: 'group',
-                    children: StateEntities.stackParts(parts, Math.round(rectShape.height)).map(layer => ({
-                      type: 'rect',
-                      shape: {x: rectShape.x, y: rectShape.y + layer.y, width: rectShape.width, height: layer.h},
-                      style: {fill: fillFor(layer.idx)},
-                    })),
-                  };
-                }
+                if (rectShape && parts) return StateEntities.condensedShape(parts, rectShape, fillFor);
                 return rectShape && {type: 'rect', shape: rectShape, style: {fill: this.isState ? fillFor(api.value(3)) : accent}};
               },
               encode: {x: [1, 2], y: 0},
@@ -1840,15 +1831,8 @@ function selectBrush() {
         },
         // Tooltip über einer verdichteten Spalte: Zeitspanne, Anteile, Beginne.
         condensedTooltip(startMs, endMs, parts) {
-          const total = parts.reduce((sum, part) => sum + part[1], 0);
           const stamp = ms => new Date(ms).toLocaleString(LOCALE, {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
-          const lines = [...parts].sort((x, y) => y[1] - x[1]).map(([idx, seconds, begins]) => {
-            // Ein Zustand, der vor der Spalte begann, hat hier keinen Beginn: nichts hinschreiben.
-            const begin = begins === 0 ? '' : ` · ${begins === 1 ? t('1 Beginn') : t('{count} Beginne', {count: begins})}`;
-            return `<span class="state-dot" style="${stateSwatchStyle(idx)}"></span> ${escapeHtml(this.stateLabel(idx))} `
-              + `<strong>${NumberFormat.fmtDuration(seconds)}</strong> · ${StateEntities.fmtShare(seconds / total * 100)}${begin}`;
-          });
-          return `${stamp(startMs)} – ${stamp(endMs)}<br>${lines.join('<br>')}`;
+          return StateEntities.condensedTooltip(parts, startMs, endMs, this.states, stamp);
         },
 
         // Bucket-Anfänge der gezeigten Periode — auch die ohne Daten, damit die

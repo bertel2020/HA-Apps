@@ -19,7 +19,11 @@ SCRIPT = APP_JS / "state-entities.js"
 _RUNNER = r"""
 const [script, code] = process.argv.slice(1);
 const vm = require('vm');
-const ctx = {window: {}, t: s => s};
+const ctx = {
+  window: {}, t: s => s,
+  document: {body: {}},
+  getComputedStyle: () => ({getPropertyValue: name => name}),
+};
 vm.createContext(ctx);
 vm.runInContext(require('fs').readFileSync(script, 'utf8'), ctx);
 const SE = ctx.window.StateEntities;
@@ -151,3 +155,40 @@ def test_server_columns_merge_into_strips_and_respect_hidden_states() -> None:
     assert out["all"][2]["parts"] == [[1, 100, 0]]
     # Ohne Zustand 1: die gemischte Spalte hat nur noch Zustand 0, und alle drei verschmelzen.
     assert out["noOne"] == [{"s": 0, "e": 300, "parts": [[0, 260, 1]]}]
+
+
+def test_a_chart_condenses_all_rows_as_soon_as_one_row_is_too_dense() -> None:
+    out = _run("""
+      const dense = [];
+      for (let i = 0; i < 100; i++) dense.push({ts: i, value: i % 2});
+      const calm = [{ts: 0, value: 0}, {ts: 50, value: 1}];
+      const rows = [
+        {catIndex: 0, points: dense, states: []},
+        {catIndex: 1, points: calm, states: []},
+      ];
+      const roomy = SE.stateTimelineItems(rows, 0, 100, 100, 1000, 'pattern');
+      const tight = SE.stateTimelineItems(rows, 0, 100, 100, 50, 'pattern');
+      return {
+        roomy: {condensed: roomy.condensed, items: roomy.items.length, parts: roomy.parts.length},
+        tight: {condensed: tight.condensed, rowOfCalm: tight.items.filter(i => i[0] === 1).length,
+                allCondensed: tight.items.every(i => i[5] >= 0)},
+      };
+    """)
+    # Breit genug: jeder Abschnitt ein Rechteck, keine Schichten.
+    assert out["roomy"] == {"condensed": False, "items": 102, "parts": 0}
+    # Zu schmal: beide Zeilen verdichtet, auch die ruhige.
+    assert out["tight"]["condensed"] is True
+    assert out["tight"]["allCondensed"] is True
+    assert out["tight"]["rowOfCalm"] >= 1
+
+
+def test_a_row_without_raw_points_is_drawn_from_the_server_columns() -> None:
+    out = _run("""
+      const rows = [{catIndex: 0, points: [], columns: [[0, [[0, 100, 1]]], [100, [[0, 40, 0], [1, 60, 1]]]], dt: 100, states: []}];
+      const result = SE.stateTimelineItems(rows, 0, 200, 200, 1000, 'pattern');
+      return {condensed: result.condensed, items: result.items.map(i => [i[1], i[2], i[4], i[5]]), parts: result.parts};
+    """)
+    assert out["condensed"] is True
+    # Erste Spalte nur Zustand 0, zweite gemischt (Zustand 1 überwiegt).
+    assert out["items"] == [[0, 100000, 0, 0], [100000, 200000, 1, 1]]
+    assert out["parts"][1] == [[0, 40, 0], [1, 60, 1]]

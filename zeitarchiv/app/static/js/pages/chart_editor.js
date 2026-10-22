@@ -440,6 +440,9 @@
     // Bewusst außerhalb von x-data (siehe entity_detail.html: ECharts verlässt
     // sich auf `this` als echtes Objekt, nicht Alpines reaktiven Proxy).
     let chartInstance = null;
+    // Schichten der verdichteten Spalten im Zeitstrahl, je Element über den Index im sechsten Wert
+    // (ECharts führt in Werten keine Listen), siehe renderTimelineMulti().
+    let timelineParts = [];
 
     // Ziehen zum Umsortieren der "Angezeigte Namen"-Liste. Anders als bei den
     // Dashboard-Kacheln (dashboard-tiles.js, setupDragAndDrop() — dort reines
@@ -715,7 +718,7 @@
           else this.hiddenEntityIds.splice(idx, 1);
           this.load();
         },
-        get hasData() { return this.series.some(s => s.points.length > 0); },
+        get hasData() { return this.series.some(s => s.points.length > 0 || (s.columns && s.columns.length > 0)); },
         // "Punkte" markiert einzelne Datenpunkte auf einer Linie — für
         // Balken-Serien (Zähler/Schalter, siehe chart_type-Kommentar bei
         // render()) ohne jede Wirkung, deshalb nur sichtbar, wenn mindestens
@@ -859,9 +862,12 @@
         // Legende je Zeile und den Donut. Rohwechsel (Zeitstrahl, bis zur
         // Woche) und Server-Anteile (ab dem Monat) ergeben dieselbe Form.
         stateRowsFor(s) {
+          // Ohne Rohwechsel (Rohabfrage über der Grenze) aus den Spalten vom Server.
           const buckets = s.chart_type === 'shares'
             ? StateEntities.bucketsFromShares(s.points)
-            : StateEntities.bucketsFromSegments(StateEntities.segments(s.points, this.windowEnd), () => 0, () => Infinity);
+            : (!s.points.length && s.columns
+              ? StateEntities.bucketsFromShares(s.columns.map(([ts, states]) => ({ts, states})))
+              : StateEntities.bucketsFromSegments(StateEntities.segments(s.points, this.windowEnd), () => 0, () => Infinity));
           return StateEntities.totals(buckets, s.states).map(row => ({
             ...row,
             label: StateEntities.label(s.states, row.idx),
@@ -1576,16 +1582,37 @@
           heatmapParams.set('heatmap', 'true');
           heatmapParams.set('compare', 'false');
           const wantHeatmap = this.stateMode === 'heatmap' && this.hasStateOrUnknown;
-          const [res, heatmapRes] = await Promise.all([
+          // Zeitstrahl der Zustände in Jahr/Dekade: zusätzlich Spalten vom Server, so breit
+          // wie der Chart. Sie ersetzen die Rohabschnitte, wenn deren Abfrage über der
+          // Grenze abbricht (sonst bleibt die Verdichtung im Browser exakt).
+          const wantColumns = this.stateMode === 'timeline' && this.raw && this.hasStateOrUnknown
+            && StateEntities.COLUMN_RANGES.includes(this.range);
+          const columnsParams = new URLSearchParams(params);
+          columnsParams.set('columns', 'true');
+          columnsParams.set('compare', 'false');
+          const chartEl = document.getElementById('chart');
+          columnsParams.set('px', String(Math.max(60, Math.round((chartEl ? chartEl.clientWidth : 600) - 30))));
+          const [res, heatmapRes, columnsRes] = await Promise.all([
             fetch(`${BASE}/api/query-multi?${params}`),
             wantHeatmap ? fetch(`${BASE}/api/query-multi?${heatmapParams}`) : Promise.resolve(null),
+            wantColumns ? fetch(`${BASE}/api/query-multi?${columnsParams}`) : Promise.resolve(null),
           ]);
-          const data = await res.json();
+          const columnsData = columnsRes && columnsRes.ok ? await columnsRes.json() : null;
+          // Die Rohabfrage bricht bei zu vielen Wechseln mit einem Fehler ab: dann gilt die
+          // Spaltenantwort (Fenster, Zustandsliste und Spalten je Zustands-Entität).
+          const data = res.ok ? await res.json() : (columnsData || {});
           const heatmapData = heatmapRes ? await heatmapRes.json() : null;
           if (requestId !== this._requestId) return;
           if (heatmapData) {
             const cellsById = new Map((heatmapData.series || []).map(x => [x.entity_id, x.cells]));
             for (const entry of data.series || []) if (cellsById.get(entry.entity_id)) entry.cells = cellsById.get(entry.entity_id);
+          }
+          if (columnsData && data !== columnsData) {
+            const colsById = new Map((columnsData.series || []).filter(x => x.columns).map(x => [x.entity_id, x]));
+            for (const entry of data.series || []) {
+              const cols = colsById.get(entry.entity_id);
+              if (cols) { entry.columns = cols.columns; entry.dt = cols.dt; }
+            }
           }
           // Zustände lassen sich nur unter sich darstellen, auch nicht mit
           // Schaltern (ROADMAP 1.29): sobald etwas anderes im Chart ist, fallen
@@ -2264,17 +2291,23 @@
           const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
           const data = [];
           const pattern = StateEntities.unavailablePattern();
+          // Zustände: ein Band je Abschnitt, Farbe nach Zustand — jede Zeile mit ihrer
+          // eigenen Farbfolge ab --chart-1 (ROADMAP 1.29), also dieselben Farben wie auf
+          // der Entitätsseite. Fünftes/sechstes Element: Zustandsindex und Index der
+          // Schichten einer verdichteten Spalte (-1 = ein einzelner Abschnitt). Wo mehr
+          // Abschnitte liegen als der Chart Bildpunkte breit ist, zeichnet der Zeitstrahl
+          // je Bildpunkt eine Spalte mit den Anteilen (StateEntities.stateTimelineItems).
+          const stateRows = this.series
+            .map((s, catIndex) => ({catIndex, points: s.points, columns: s.columns, dt: s.dt, aggregation_type: s.aggregation_type}))
+            .filter(row => row.aggregation_type === 'state');
+          const width = Math.max(60, Math.round(chartInstance.getWidth() - 30));
+          const stateTimeline = StateEntities.stateTimelineItems(
+            stateRows, this.windowStart, this.periodEnd, this.windowEnd, width, pattern
+          );
+          timelineParts = stateTimeline.parts;
+          data.push(...stateTimeline.items);
           this.series.forEach((s, catIndex) => {
-            // Zustände: ein Band je Abschnitt, Farbe nach Zustand — jede Zeile
-            // mit ihrer eigenen Farbfolge ab --chart-1 (ROADMAP 1.29), also
-            // dieselben Farben wie auf der Entitätsseite. Fünftes/sechstes
-            // Element: Zustandsindex und Serienindex für den Tooltip.
-            if (s.aggregation_type === 'state') {
-              for (const seg of StateEntities.segments(s.points, this.windowEnd)) {
-                data.push([catIndex, seg.s * 1000, seg.e * 1000, StateEntities.fill(seg.idx, pattern), seg.idx]);
-              }
-              return;
-            }
+            if (s.aggregation_type === 'state') return;
             const color = PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length];
             const points = s.points;
             for (let i = 0; i < points.length; i++) {
@@ -2323,12 +2356,16 @@
             tooltip: {
               trigger: 'item',
               formatter: p => {
-                const [catIndex, startMs, endMs, , idx] = p.value;
+                const [catIndex, startMs, endMs, , idx, partsIndex] = p.value;
                 const pad = n => String(n).padStart(2, '0');
                 const fmtTime = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
                 const span = `${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
                 const s = this.series[catIndex];
                 if (!s || s.aggregation_type !== 'state') return `${categories[catIndex]}<br>${span}`;
+                if (partsIndex >= 0) {
+                  const stamp = ms => new Date(ms).toLocaleString(LOCALE, {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+                  return StateEntities.condensedTooltip(timelineParts[partsIndex], startMs, endMs, s.states, stamp, escapeHtml(categories[catIndex]));
+                }
                 // Angezeigt wird die Übersetzung, der Rohwert steht daneben.
                 const name = StateEntities.label(s.states, idx);
                 const raw = StateEntities.raw(s.states, idx);
@@ -2355,6 +2392,10 @@
                 // serienweite itemStyle-Option, nicht das itemStyle jedes
                 // einzelnen Datenpunkts, deshalb hier stattdessen ein
                 // zusätzlicher Wert je Intervall (siehe data-Aufbau oben).
+                // Verdichtete Spalte: die Anteile der Zustände als Schichten.
+                if (rectShape && api.value(5) >= 0) {
+                  return StateEntities.condensedShape(timelineParts[api.value(5)], rectShape, idx => StateEntities.fill(idx, pattern));
+                }
                 return rectShape && {type: 'rect', shape: rectShape, style: {fill: api.value(3)}};
               },
               encode: {x: [1, 2], y: 0},

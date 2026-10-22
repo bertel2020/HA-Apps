@@ -801,7 +801,10 @@ them wider.
   switches. If you add them next to number or switch entities, the states are
   removed again with a notice. The **chart type** then offers Timeline,
   Shares, Changes, Heatmap and Donut:
-  - **Timeline:** one row per entity in a shared timeline.
+  - **Timeline:** one row per entity in a shared timeline. If a row has more
+    periods than the chart is pixels wide, all rows draw a column per pixel
+    with the shares of the states (see above); the tooltip then names the time
+    span, the shares and the starts.
   - **Shares** and **Changes:** a separate chart per state entity.
   - **Heatmap:** a weekday-and-hour grid per state entity, from the "Month"
     period on. With several entities "Name · state" is shown above each grid and
@@ -816,7 +819,8 @@ them wider.
     entity, state, duration, share and changes. The editor's **CSV export**
     contains the displayed state names.
 - **Chart tiles** on the dashboard behave like the editor; there too, states
-  drop out when mixed with other series. A heatmap tile shows the grid compactly
+  drop out when mixed with other series. A timeline also condenses into columns
+  on the tile when it has too many periods for its width. A heatmap tile shows the grid compactly
   and falls back to the default in periods shorter than a month.
 - **Value tile of a state entity:** shows the current state with a colour
   swatch and "since …". A 1×1 tile adds the last 24 hours as a strip, from

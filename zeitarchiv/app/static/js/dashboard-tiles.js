@@ -530,15 +530,31 @@
       const heatmapParams = new URLSearchParams(params);
       heatmapParams.set('heatmap', 'true');
       heatmapParams.delete('compare');
-      const [res, heatmapRes] = await Promise.all([
+      // Zeitstrahl in Jahr/Dekade: zusätzlich Spalten vom Server, so breit wie die Kachel,
+      // wie im Chart-Editor. Sie ersetzen die Rohabschnitte, wenn deren Abfrage abbricht.
+      const wantColumns = timeline && StateEntities.COLUMN_RANGES.includes(range);
+      const columnsParams = new URLSearchParams(params);
+      columnsParams.set('columns', 'true');
+      columnsParams.delete('compare');
+      columnsParams.set('px', String(Math.max(60, Math.round(chartEl.clientWidth - 10))));
+      const [res, heatmapRes, columnsRes] = await Promise.all([
         fetch(`${base}/api/query-multi?${params}`),
         wantHeatmap ? fetch(`${base}/api/query-multi?${heatmapParams}`) : Promise.resolve(null),
+        wantColumns ? fetch(`${base}/api/query-multi?${columnsParams}`) : Promise.resolve(null),
       ]);
-      data = await res.json();
+      const columnsData = columnsRes && columnsRes.ok ? await columnsRes.json() : null;
+      data = res.ok ? await res.json() : (columnsData || {});
       const heatmapData = heatmapRes ? await heatmapRes.json() : null;
       if (heatmapData) {
         const cellsById = new Map((heatmapData.series || []).map(x => [x.entity_id, x.cells]));
         for (const entry of data.series || []) if (cellsById.get(entry.entity_id)) entry.cells = cellsById.get(entry.entity_id);
+      }
+      if (columnsData && data !== columnsData) {
+        const colsById = new Map((columnsData.series || []).filter(x => x.columns).map(x => [x.entity_id, x]));
+        for (const entry of data.series || []) {
+          const cols = colsById.get(entry.entity_id);
+          if (cols) { entry.columns = cols.columns; entry.dt = cols.dt; }
+        }
       }
     } catch (e) {
       chartEl.innerHTML = '<div class="dtile-loading">' + t('Fehler beim Laden') + '</div>';
@@ -549,7 +565,7 @@
     const loaded = data.series || [];
     const foreign = loaded.some(s => s.aggregation_type && s.aggregation_type !== 'state');
     const series = foreign ? loaded.filter(s => s.aggregation_type !== 'state') : loaded;
-    if (!series.some(s => s.points && s.points.length)) {
+    if (!series.some(s => (s.points && s.points.length) || (s.columns && s.columns.length))) {
       chartEl.innerHTML = '<div class="dtile-loading">' + t('Keine Daten') + '</div>';
       return;
     }
@@ -1417,9 +1433,12 @@
   // Monat) ergeben dieselbe Form; dieselbe Rechnung wie stateRowsFor() in
   // pages/chart_editor.js.
   function stateRows(s, windowEnd) {
+    // Ohne Rohwechsel (Rohabfrage über der Grenze) aus den Spalten vom Server.
     const buckets = s.chart_type === 'shares'
       ? StateEntities.bucketsFromShares(s.points || [])
-      : StateEntities.bucketsFromSegments(StateEntities.segments(s.points || [], windowEnd), () => 0, () => Infinity);
+      : (!(s.points || []).length && s.columns
+        ? StateEntities.bucketsFromShares(s.columns.map(([ts, states]) => ({ts, states})))
+        : StateEntities.bucketsFromSegments(StateEntities.segments(s.points || [], windowEnd), () => 0, () => Infinity));
     return StateEntities.totals(buckets, s.states).map(row => ({
       ...row,
       label: StateEntities.label(s.states, row.idx),
@@ -1464,14 +1483,19 @@
     const categories = series.map(s => entityNames[s.entity_id] || s.friendly_name);
     const items = [];
     const pattern = StateEntities.unavailablePattern();
+    // Zustände: ein Band je Abschnitt, Farbe nach Zustand (wie im Chart-Editor), bei
+    // zu vielen Abschnitten für die Breite je Bildpunkt eine Spalte mit den Anteilen.
+    const stateRows = series
+      .map((s, catIndex) => ({catIndex, points: s.points, columns: s.columns, dt: s.dt, aggregation_type: s.aggregation_type}))
+      .filter(row => row.aggregation_type === 'state');
+    const stateTimeline = StateEntities.stateTimelineItems(
+      stateRows, data.window_start, data.period_end ?? data.window_end, data.window_end,
+      Math.max(60, Math.round(chart.getWidth() - 10)), pattern
+    );
+    const timelineParts = stateTimeline.parts;
+    items.push(...stateTimeline.items);
     series.forEach((s, catIndex) => {
-      // Zustände: ein Band je Abschnitt, Farbe nach Zustand (wie im Chart-Editor).
-      if (s.aggregation_type === 'state') {
-        for (const seg of StateEntities.segments(s.points || [], data.window_end)) {
-          items.push([catIndex, seg.s * 1000, seg.e * 1000, StateEntities.fill(seg.idx, pattern), seg.idx]);
-        }
-        return;
-      }
+      if (s.aggregation_type === 'state') return;
       const color = PALETTE[colorIndexFor(s.entity_id) % PALETTE.length];
       const points = s.points || [];
       for (let i = 0; i < points.length; i++) {
@@ -1514,12 +1538,17 @@
         borderColor,
         textStyle: {color: style.getPropertyValue('--ink-muted').trim(), fontFamily: style.getPropertyValue('--font-mono'), fontSize: scaledFont(12)},
         formatter: p => {
-          const [catIndex, startMs, endMs, , idx] = p.value;
+          const [catIndex, startMs, endMs, , idx, partsIndex] = p.value;
           const pad = n => String(n).padStart(2, '0');
           const fmtTime = ms => { const t = window.ServerTime.parts(ms / 1000); return `${pad(t.hour)}:${pad(t.minute)}`; };
           const span = `${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
           const s = series[catIndex];
           if (!s || s.aggregation_type !== 'state') return `${categories[catIndex]}<br>${span}`;
+          if (partsIndex >= 0) {
+            // Spalte über mehrere Tage: Datum dazu, in Serverzeit wie überall auf der Kachel.
+            const stamp = ms => { const t = window.ServerTime.parts(ms / 1000); return `${pad(t.day)}.${pad(t.month)}. ${pad(t.hour)}:${pad(t.minute)}`; };
+            return StateEntities.condensedTooltip(timelineParts[partsIndex], startMs, endMs, s.states, stamp, escapeHtml(categories[catIndex]));
+          }
           return `${categories[catIndex]}<br><strong>${escapeHtml(StateEntities.label(s.states, idx))}</strong><br>${span}`;
         },
         appendToBody: true,
@@ -1535,6 +1564,10 @@
             {x: start[0], y: start[1] - height / 2, width: Math.max(end[0] - start[0], api.value(4) != null ? 1 : 0), height},
             {x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height}
           );
+          // Verdichtete Spalte: die Anteile der Zustände als Schichten.
+          if (rectShape && api.value(5) >= 0) {
+            return StateEntities.condensedShape(timelineParts[api.value(5)], rectShape, idx => StateEntities.fill(idx, pattern));
+          }
           return rectShape && {type: 'rect', shape: rectShape, style: {fill: api.value(3)}};
         },
         encode: {x: [1, 2], y: 0},

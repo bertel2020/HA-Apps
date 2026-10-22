@@ -878,7 +878,10 @@ und Zoomen macht sie nur breiter.
   auch nicht mit Schaltern. Fügt man sie neben Zahlen- oder Schalter-Entitäten
   hinzu, werden die Zustände mit einem Hinweis wieder entfernt. Der
   **Diagrammtyp** bietet dann Zeitstrahl, Anteile, Wechsel, Heatmap und Donut:
-  - **Zeitstrahl:** eine Zeile je Entität in einem gemeinsamen Zeitstrahl.
+  - **Zeitstrahl:** eine Zeile je Entität in einem gemeinsamen Zeitstrahl. Hat
+    eine Zeile mehr Abschnitte, als der Chart Bildpunkte breit ist, zeichnen
+    alle Zeilen je Bildpunkt eine Spalte mit den Anteilen der Zustände (siehe
+    oben); der Tooltip nennt dann Zeitspanne, Anteile und Beginne.
   - **Anteile** und **Wechsel:** je Zustands-Entität ein eigenes Diagramm.
   - **Heatmap:** je Zustands-Entität ein Raster aus Wochentag und Stunde, ab
     dem Zeitraum „Monat“. Bei mehreren Entitäten steht „Name · Zustand“ über
@@ -893,8 +896,9 @@ und Zoomen macht sie nur breiter.
     nennt Entität, Zustand, Dauer, Anteil und Wechsel. Der **CSV-Export** des
     Editors enthält die angezeigten Zustandsnamen.
 - **Chart-Kacheln** im Dashboard verhalten sich wie der Editor; auch dort
-  fallen Zustände heraus, wenn sie mit anderen Serien gemischt sind. Eine
-  Heatmap-Kachel zeigt das Raster kompakt und fällt in Zeiträumen unter dem
+  fallen Zustände heraus, wenn sie mit anderen Serien gemischt sind. Ein
+  Zeitstrahl verdichtet sich auch auf der Kachel zu Spalten, wenn er für ihre
+  Breite zu viele Abschnitte hat. Eine Heatmap-Kachel zeigt das Raster kompakt und fällt in Zeiträumen unter dem
   Monat auf die Voreinstellung zurück.
 - **Werte-Kachel einer Zustands-Entität:** zeigt den aktuellen Zustand mit
   Farbfeld und „seit …“. Eine 1×1-Kachel zeigt dazu die letzten 24 Stunden
