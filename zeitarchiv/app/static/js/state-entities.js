@@ -445,6 +445,8 @@ window.StateEntities = (() => {
   // dieser Zahl verdichtet, bei sehr breiten Charts wird das Zeichnen sonst zäh. Eine
   // Annahme, noch nicht an echten Beständen gemessen.
   const CONDENSE_MAX_RECTS = 3000;
+  // Zeiträume, für die der Server die Spalten vorrechnet (STATE_COLUMNS_RANGES in storage/query.py).
+  const COLUMN_RANGES = ['year', 'decade'];
 
   // Abschnitte sind lückenlos nach Beginn sortiert: erster, der nach a noch läuft.
   function firstOverlap(segs, a) {
@@ -497,21 +499,40 @@ window.StateEntities = (() => {
         add(c, seg.idx, Math.min(e, a + (c + 1) * dt) - Math.max(s, a + c * dt), c === c0 && seg.s >= a ? 1 : 0);
       }
     }
-    const rank = idx => (idx === UNAVAILABLE ? Infinity : idx);
     const items = [];
     for (const c of [...cols.keys()].sort((x, y) => x - y)) {
-      const parts = [...cols.get(c)].map(([idx, [seconds, begins]]) => [idx, seconds, begins]).sort((x, y) => rank(x[0]) - rank(y[0]));
-      const s = a + c * dt;
-      const last = items[items.length - 1];
-      if (parts.length === 1 && last && last.parts.length === 1 && last.parts[0][0] === parts[0][0] && s - last.e < 1e-6) {
-        last.e = s + dt;
-        last.parts[0][1] += parts[0][1];
-        last.parts[0][2] += parts[0][2];
-      } else {
-        items.push({s, e: s + dt, parts});
-      }
+      appendColumn(items, a + c * dt, dt, [...cols.get(c)].map(([idx, [seconds, begins]]) => [idx, seconds, begins]));
     }
     return {items, dt};
+  }
+
+  // Eine Spalte anhängen; folgt auf eine Spalte mit demselben einzigen Zustand
+  // gleich eine weitere, wird es ein Streifen. parts nach Zustandsindex, "nicht
+  // verfügbar" zuletzt.
+  function appendColumn(items, s, dt, parts) {
+    const rank = idx => (idx === UNAVAILABLE ? Infinity : idx);
+    parts.sort((x, y) => rank(x[0]) - rank(y[0]));
+    const last = items[items.length - 1];
+    if (parts.length === 1 && last && last.parts.length === 1 && last.parts[0][0] === parts[0][0] && s - last.e < 1e-6) {
+      last.e = s + dt;
+      last.parts[0][1] += parts[0][1];
+      last.parts[0][2] += parts[0][2];
+    } else {
+      items.push({s, e: s + dt, parts});
+    }
+  }
+
+  // Vom Server vorgerechnete Spalten (query_state_columns) -> dieselbe Form wie
+  // condenseSegments(); ausgeblendete Zustände fehlen, die Anteile verteilen sich auf
+  // die sichtbaren.
+  function mergeColumns(columns, dt, hidden = []) {
+    const hide = new Set(hidden);
+    const items = [];
+    for (const [start, states] of columns) {
+      const parts = states.filter(part => !hide.has(part[0]) && part[1] > 0).map(part => [part[0], part[1], part[2]]);
+      if (parts.length) appendColumn(items, start, dt, parts);
+    }
+    return items;
   }
 
   // Anteile einer Spalte -> Schichten [{idx, y, h}] in einem Band der Höhe `height`.
@@ -550,6 +571,6 @@ window.StateEntities = (() => {
     segments, bucketsFromSegments, bucketsFromShares, bucketsForSeries, barPanels, bucketFns, totals, fmtShare,
     RANGE_BUCKETS, SERVER_SHARE_RANGES, bucketStarts, defaultMode,
     heatmapStates, heatmapDefault, heatmapIndexFor, heatmapPanels, HEATMAP_MIN_OBSERVATIONS,
-    CONDENSE_MAX_RECTS, shouldCondense, condenseSegments, stackParts,
+    CONDENSE_MAX_RECTS, COLUMN_RANGES, shouldCondense, condenseSegments, mergeColumns, stackParts,
   };
 })();

@@ -642,12 +642,18 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         chart_type: str | None = None,
         marked: bool = False,
         heatmap: bool = False,
+        columns: bool = False,
+        px: int = 0,
     ) -> dict:
         _validate_entity_id_or_400(entity_id)
         if chart_type not in (None, "line", "bar"):
             raise HTTPException(status_code=400, detail=tr("Ungültiger Diagrammtyp"))
         if heatmap and range not in query_mod.STATE_HEATMAP_RANGES:
             raise HTTPException(status_code=400, detail=tr("Die Heatmap gibt es erst ab dem Zeitraum Monat"))
+        if columns and range not in query_mod.STATE_COLUMNS_RANGES:
+            raise HTTPException(status_code=400, detail=tr("Die Spalten gibt es nur für Jahr und Dekade"))
+        if columns and px <= 0:
+            raise HTTPException(status_code=400, detail=tr("Die Breite in Bildpunkten fehlt"))
         now = datetime.now(deps.tz)
         # Ein Cache für beide Abfragen dieses Requests: Mit "Vergleichen" wird
         # dieselbe Entität zweimal abgefragt, nur mit verschobenem Fenster —
@@ -660,7 +666,15 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         # für beide Pfade, und ein zweiter Ausgang hätte sie im
         # Rohwert-Modus stillschweigend übersprungen — ausgerechnet dort, wo
         # sie am genauesten sitzen.
-        if heatmap:
+        if columns:
+            entity = deps.index.get_entity(entity_id)
+            if entity is not None and entity["aggregation_type"] != query_mod.STATE_TYPE:
+                raise HTTPException(status_code=400, detail=tr("Die Spalten gibt es nur für Zustands-Entitäten"))
+            result = query_mod.query_state_columns(
+                deps.data_dir, deps.index, entity_id, range, deps.tz, now, px,
+                offset=offset, continuous=continuous, read_cache=read_cache,
+            )
+        elif heatmap:
             entity = deps.index.get_entity(entity_id)
             if entity is not None and entity["aggregation_type"] != query_mod.STATE_TYPE:
                 raise HTTPException(status_code=400, detail=tr("Die Heatmap gibt es nur für Zustands-Entitäten"))
@@ -679,7 +693,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 offset=offset, continuous=continuous, chart_type=chart_type,
                 read_cache=read_cache,
             )
-        if compare and not raw and not heatmap:
+        if compare and not raw and not heatmap and not columns:
             compare_result = query_mod.query_series(
                 deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                 offset=offset if compare_mode == "year" else offset - 1,

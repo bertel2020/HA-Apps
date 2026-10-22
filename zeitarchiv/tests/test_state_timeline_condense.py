@@ -129,3 +129,25 @@ def test_stack_fills_the_band_and_keeps_one_percent_visible() -> None:
     assert sum(layer["h"] for layer in out["thin"]) == 36
     # 3 % von 36 Bildpunkten sind 1,08: bleibt mindestens ein Bildpunkt hoch.
     assert out["thin"][1]["idx"] == 2 and out["thin"][1]["h"] >= 1
+
+
+def test_server_columns_merge_into_strips_and_respect_hidden_states() -> None:
+    out = _run("""
+      // Vier Spalten à 100 s: drei mit demselben einzigen Zustand, eine gemischt.
+      const columns = [
+        [0, [[0, 100, 1]]],
+        [100, [[0, 100, 0]]],
+        [200, [[0, 60, 0], [1, 40, 1]]],
+        [300, [[1, 100, 0]]],
+      ];
+      return {
+        all: SE.mergeColumns(columns, 100),
+        noOne: SE.mergeColumns(columns, 100, [1]),
+      };
+    """)
+    # Die ersten beiden Spalten werden ein Streifen, Beginne und Sekunden summiert.
+    assert out["all"][0] == {"s": 0, "e": 200, "parts": [[0, 200, 1]]}
+    assert out["all"][1]["parts"] == [[0, 60, 0], [1, 40, 1]]
+    assert out["all"][2]["parts"] == [[1, 100, 0]]
+    # Ohne Zustand 1: die gemischte Spalte hat nur noch Zustand 0, und alle drei verschmelzen.
+    assert out["noOne"] == [{"s": 0, "e": 300, "parts": [[0, 260, 1]]}]

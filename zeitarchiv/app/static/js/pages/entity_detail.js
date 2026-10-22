@@ -415,6 +415,12 @@ function selectBrush() {
         zoomRange: null,
         // Der Zeitstrahl zeigt gerade verdichtete Spalten statt einzelner Abschnitte.
         tlCondensed: false,
+        // Spalten vom Server (query_state_columns) für Jahr und Dekade, nur im Zeitstrahl
+        // geladen (null = nicht angefordert); gezeichnet werden sie, wenn die
+        // Rohabschnitte fehlen, weil die Rohabfrage über der Grenze abbrach.
+        stateColumns: null,
+        stateColumnsDt: 0,
+        tlServer: false,
         // Zur Löschung markierte Bereiche: die Werte selbst sind aus points
         // herausgefiltert, hier kommen die betroffenen Zeitabschnitte zurück.
         // markedTotal ist die WAHRE Zahl markierter Werte im Fenster, auch
@@ -597,6 +603,9 @@ function selectBrush() {
           if (this.isState && this.stateMode !== 'timeline') {
             return t('Ein Klick auf einen Balken öffnet diesen Zeitraum.');
           }
+          if (this.isState && this.tlServer) {
+            return t('Jede Spalte zeigt die Anteile der Zustände in dieser Zeitspanne. Die Spalten sind für den ganzen Zeitraum vorgerechnet, Zoomen macht sie nur breiter.');
+          }
           if (this.isState && this.tlCondensed) {
             return t('Jede Spalte zeigt die Anteile der Zustände in dieser Zeitspanne — {geste}, bis die einzelnen Abschnitte sichtbar werden.', {geste});
           }
@@ -651,6 +660,13 @@ function selectBrush() {
         // Zeitraum. key ist der Beginn des Abschnitts und verbindet Band im
         // Zeitstrahl und Zeile im Protokoll. Der letzte Abschnitt reicht bis
         // zum Fensterende (bei der laufenden Periode: jetzt).
+        // Gibt es etwas zu zeichnen? Bei Zuständen auch ohne Rohwechsel: in Jahr und
+        // Dekade bricht die Rohabfrage über der Grenze ab, Anteile und Spalten
+        // kommen trotzdem.
+        get hasData() {
+          return this.points.length > 0
+            || (this.isState && (this.sharePoints.length > 0 || (this.stateColumns || []).length > 0));
+        },
         get stateSegments() {
           if (!this.isState) return [];
           return StateEntities.segments(this.points, this.windowEnd);
@@ -839,6 +855,7 @@ function selectBrush() {
           // Die Heatmap hat eigene Daten; die anderen Ansichten haben ihre
           // schon geladen.
           if (mode === 'heatmap' && this.heatmapCells === null) this.load();
+          else if (mode === 'timeline' && this.stateColumns === null && StateEntities.COLUMN_RANGES.includes(this.range)) this.load();
           else this.render();
         },
         // Heatmap gibt es ab dem Monat (siehe stateModeFor).
@@ -1111,29 +1128,43 @@ function selectBrush() {
           const heatmapParams = new URLSearchParams(shareParams);
           heatmapParams.set('heatmap', 'true');
           heatmapParams.set('compare', 'false');
-          const [res, shareRes, heatmapRes] = await Promise.all([
+          // Zeitstrahl in Jahr/Dekade: zusätzlich Spalten vom Server, so breit wie der Chart.
+          const wantColumns = this.isState && this.stateMode === 'timeline' && StateEntities.COLUMN_RANGES.includes(this.range);
+          const columnsParams = new URLSearchParams(shareParams);
+          columnsParams.set('columns', 'true');
+          columnsParams.set('compare', 'false');
+          const chartEl = document.getElementById('chart');
+          columnsParams.set('px', String(Math.max(60, Math.round((chartEl ? chartEl.clientWidth : 600) - 30))));
+          const [res, shareRes, heatmapRes, columnsRes] = await Promise.all([
             fetch(`${BASE}/api/query?${params}`),
             wantShares ? fetch(`${BASE}/api/query?${shareParams}`) : Promise.resolve(null),
             wantHeatmap ? fetch(`${BASE}/api/query?${heatmapParams}`) : Promise.resolve(null),
+            wantColumns ? fetch(`${BASE}/api/query?${columnsParams}`) : Promise.resolve(null),
           ]);
-          const data = await res.json();
-          const shareData = shareRes ? await shareRes.json() : null;
+          // Die Rohabfrage bricht bei zu vielen Wechseln mit einem Fehler ab: dann ohne Punkte weiter.
+          const data = res.ok ? await res.json() : {};
+          const shareData = shareRes && shareRes.ok ? await shareRes.json() : null;
           const heatmapData = heatmapRes ? await heatmapRes.json() : null;
+          const columnsData = columnsRes && columnsRes.ok ? await columnsRes.json() : null;
           if (requestId !== this._requestId) return; // eine neuere Anfrage ist schon unterwegs/angekommen
           this.sharePoints = shareData && shareData.chart_type === 'shares' ? shareData.points : [];
           this.heatmapCells = heatmapData && heatmapData.chart_type === 'heatmap' ? heatmapData.cells || [] : null;
+          this.stateColumns = columnsData && columnsData.chart_type === 'columns' ? columnsData.columns || [] : null;
+          this.stateColumnsDt = columnsData ? columnsData.dt : 0;
+          // Fenster und Zustandsliste vom Roh-Ergebnis, fehlt es (Abfrage abgebrochen), von den Anteilen oder Spalten.
+          const meta = data.window_start != null ? data : (shareData || columnsData || data);
           this.points = data.points || [];
           this.comparePoints = data.compare_points || [];
           this.compareWindowStart = data.compare_window_start ?? null;
           this.compareWindowEnd = data.compare_window_end ?? null;
-          this.aggregationType = data.aggregation_type;
-          this.states = data.states || [];
+          this.aggregationType = meta.aggregation_type;
+          this.states = meta.states || [];
           this.stateLogPage = 0;
           this.stateLogDays = {};
-          this.windowStart = data.window_start;
-          this.windowEnd = data.window_end;
-          this.periodEnd = data.period_end ?? data.window_end;
-          this.isCurrent = data.is_current;
+          this.windowStart = meta.window_start;
+          this.windowEnd = meta.window_end;
+          this.periodEnd = meta.period_end ?? meta.window_end;
+          this.isCurrent = meta.is_current;
           this.markedRanges = data.marked_ranges || [];
           this.markedTotal = data.marked_total || 0;
           this.loading = false;
@@ -1141,7 +1172,7 @@ function selectBrush() {
         },
 
         render() {
-          if (!this.points.length) return;
+          if (!this.hasData) return;
           if (!chartInstance) {
             chartInstance = echarts.init(document.getElementById('chart'));
             // Einmalig bei der Instanzerzeugung registriert, nicht bei jedem
@@ -1773,14 +1804,23 @@ function selectBrush() {
           // Gezeichnet wird die Fläche des Charts ohne Rand und Beschriftung, rund 30 px weniger.
           const width = Math.max(60, Math.round((chartInstance ? chartInstance.getWidth() : 600) - 30));
           timelineParts = [];
+          const toItem = col => {
+            timelineParts.push(col.parts);
+            const main = col.parts.reduce((best, part) => (part[1] > best[1] ? part : best));
+            return [0, col.s * 1000, col.e * 1000, main[0], null, timelineParts.length - 1];
+          };
+          // Keine Rohabschnitte (Rohabfrage abgebrochen), aber Spalten vom Server: die zeichnen.
+          // Sie sind für den ganzen Zeitraum gerechnet, Zoomen macht sie nur breiter.
+          this.tlServer = !segs.length && !!this.stateColumns && this.stateColumns.length > 0;
+          if (this.tlServer) {
+            this.tlCondensed = true;
+            if (skipRaw) return null;
+            return StateEntities.mergeColumns(this.stateColumns, this.stateColumnsDt, this.hiddenStates).map(toItem);
+          }
           this.tlCondensed = a != null && b != null && b > a && StateEntities.shouldCondense(segs, a, b, width, this.hiddenStates);
           if (!this.tlCondensed && skipRaw) return null;
           if (this.tlCondensed) {
-            return StateEntities.condenseSegments(segs, a, b, width, this.hiddenStates).items.map(col => {
-              timelineParts.push(col.parts);
-              const main = col.parts.reduce((best, part) => (part[1] > best[1] ? part : best));
-              return [0, col.s * 1000, col.e * 1000, main[0], null, timelineParts.length - 1];
-            });
+            return StateEntities.condenseSegments(segs, a, b, width, this.hiddenStates).items.map(toItem);
           }
           const items = [];
           for (const seg of segs) {
@@ -1792,7 +1832,7 @@ function selectBrush() {
         // roh gezeichnet und bleibt es, ist nichts zu tun: ECharts zoomt die
         // Rechtecke selbst.
         updateStateTimeline() {
-          if (!chartInstance || !this.isState || this.stateMode !== 'timeline') return;
+          if (!chartInstance || !this.isState || this.stateMode !== 'timeline' || this.tlServer) return;
           // Roh gezeichnet und weiter roh: die Rohabschnitte gar nicht erst neu bilden.
           const data = this.stateTimelineItems(!this.tlCondensed);
           if (!data) return;

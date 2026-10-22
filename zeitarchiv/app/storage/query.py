@@ -1438,6 +1438,100 @@ def query_state_heatmap(
     }
 
 
+# Zeiträume, für die der Server den Zeitstrahl einer Zustands-Entität in Spalten
+# vorrechnet (Pixelverdichtung, ROADMAP 1.29 Schritt 2): dort können die
+# Rohwechsel über MAX_RAW_QUERY_POINTS liegen, und die Rohabfrage bricht dann ab.
+STATE_COLUMNS_RANGES = ("year", "decade")
+STATE_COLUMNS_MIN = 50
+STATE_COLUMNS_MAX = 2000
+
+
+def query_state_columns(
+    data_dir: Path,
+    index: Index,
+    entity_id: str,
+    range_key: str,
+    tz: ZoneInfo,
+    now: datetime,
+    px: int,
+    offset: int = 0,
+    continuous: bool = False,
+    read_cache: QueryReadCache | None = None,
+) -> dict:
+    """Spalten für den Zeitstrahl einer Zustands-Entität über ein Jahr oder eine
+    Dekade: das Fenster ``[window_start, period_end)`` in ``px`` gleich breite
+    Spalten geteilt, je Spalte die Sekunden und Beginne je Zustand.
+
+    Quelle sind die Stunden-Rollups (wie bei der Heatmap), also höchstens eine
+    Stunde fein: eine Stunde, die über eine Spaltengrenze reicht, wird nach
+    Zeitanteilen auf beide verteilt, ihre Beginne zählen in der Spalte, in der
+    sie anfängt. Schmaler als eine Stunde wird eine Spalte damit nicht genauer,
+    das reicht für Jahr (eine Spalte bei 900 Bildpunkten rund 10 Stunden) und
+    Dekade (rund 4 Tage).
+
+    ``columns`` ist eine Liste ``[beginn, [[idx, sekunden, beginne], …]]``,
+    nur für Spalten mit Daten; ``dt`` die Breite einer Spalte in Sekunden.
+    """
+    if range_key not in STATE_COLUMNS_RANGES:
+        raise ValueError(tr("Unbekannter Zeitraum: {range_key}", range_key=range_key))
+    entity = index.get_entity(entity_id)
+    if entity is None:
+        return _missing_entity_result(entity_id, range_key, tz, now, offset, continuous)
+    px = max(STATE_COLUMNS_MIN, min(STATE_COLUMNS_MAX, int(px)))
+    now_local = now.astimezone(tz)
+    window_start, window_end, period_end = _window(range_key, now_local, offset, continuous)
+    rows = _state_hour_rows(
+        data_dir, index, entity["first_ts"], entity_id, tz, now_local, window_start, window_end, read_cache
+    )
+
+    next_fn = rollup.named_bucket_next(tz, "stunde")
+    start_ts = window_start.timestamp()
+    dt = (period_end.timestamp() - start_ts) / px
+    by_hour: dict[float, list[rollup.FineRow]] = {}
+    for row in rows:
+        by_hour.setdefault(row.bucket_start, []).append(row)
+
+    columns: dict[int, dict[int, list[float]]] = {}
+
+    def add(column: int, idx: int, seconds: float, begins: int) -> None:
+        cell = columns.setdefault(column, {}).setdefault(idx, [0.0, 0])
+        cell[0] += seconds
+        cell[1] += begins
+
+    for hour_start, group in by_hour.items():
+        hour_end = next_fn(datetime.fromtimestamp(hour_start, tz)).timestamp()
+        first = min(px - 1, max(0, int((hour_start - start_ts) // dt)))
+        last = min(px - 1, max(first, int((hour_end - start_ts - 1e-6) // dt)))
+        span = max(hour_end - hour_start, 1.0)
+        for idx, (seconds, entries) in rollup.merge_state_rows(group, hour_start).states.items():
+            if first == last:
+                add(first, idx, seconds, entries)
+                continue
+            for column in range(first, last + 1):
+                overlap = min(hour_end, start_ts + (column + 1) * dt) - max(hour_start, start_ts + column * dt)
+                if overlap > 0:
+                    add(column, idx, seconds * overlap / span, entries if column == first else 0)
+
+    return {
+        "entity_id": entity_id,
+        "aggregation_type": STATE_TYPE,
+        "chart_type": "columns",
+        "bucket": "stunde",
+        "dt": dt,
+        "columns": [
+            [start_ts + column * dt, [[idx, round(cell[0], 1), cell[1]] for idx, cell in sorted(states.items())]]
+            for column, states in sorted(columns.items())
+        ],
+        "points": [],
+        "window_start": start_ts,
+        "window_end": window_end.timestamp(),
+        "period_end": period_end.timestamp(),
+        "is_current": offset == 0,
+        "elapsed_seconds": None,
+        "states": state_legend(index, entity_id),
+    }
+
+
 def state_durations(result: dict) -> dict[int, float]:
     """Sekunden je Zustand aus einer Antwort von query_series() — egal ob sie
     Rohwechsel (bis zur Woche) oder Anteile je Bucket (ab dem Monat) trägt."""

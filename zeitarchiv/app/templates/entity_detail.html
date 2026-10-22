@@ -346,7 +346,7 @@
          existiert nur, damit "oben rechts" sich auf den Chart bezieht und
          nicht auf die Karte samt ihrer je nach Breite unterschiedlichen
          Polsterung. #}
-      <div class="chart-wrap" x-show="points.length">
+      <div class="chart-wrap" x-show="hasData">
         <div id="chart" :style="chartIsTimeline ? 'height:150px;' : ''"></div>
         {# Statisch "active": der Chip existiert nur, wenn es einen Ausschnitt
            gibt — ein deaktivierter Zustand wäre unerreichbar. Aus demselben
@@ -358,7 +358,7 @@
           <span class="chip-zoom-x" aria-hidden="true">&times;</span>
         </button>
       </div>
-      <div class="empty" x-show="!points.length" x-text="loading ? t('Lädt …') : t('Keine Daten für diesen Zeitraum.')"></div>
+      <div class="empty" x-show="!hasData" x-text="loading ? t('Lädt …') : t('Keine Daten für diesen Zeitraum.')"></div>
       <div class="chart-legend" x-show="!isState && points.length && chartStats && legendStyle === 'chips'">
         <span class="chart-legend-item static">
           <span class="dot" :style="{background: `var(--chart-${chartType === 'line' ? 'line' : 'bar'})`}"></span>
@@ -406,7 +406,7 @@
          Zustand — Klick blendet einen Zustand aus —, darüber Wechsel, längster
          Abschnitt und Ausfallzeit, darunter das Wechsel-Protokoll. Alles
          bezieht sich auf den gezoomten Ausschnitt, sonst auf den Zeitraum. #}
-      <div class="state-panel" x-show="points.length" x-cloak>
+      <div class="state-panel" x-show="hasData" x-cloak>
         {# Der Ausschnitt-Chip oben rechts im Chart setzt den Zoom zurück —
            kein zweiter hier, der Chip gilt für alles unter dem Chart mit. #}
         <div class="state-kpis">
@@ -503,7 +503,7 @@
        tut. hint-status statt eines aufklappbaren Hinweises, weil die Punktzahl
        ein Datenzustand ist und kein Hilfetext; siehe "Hinweistexte: drei
        Rollen" in docs/frontend.md. #}
-    <p class="hint hint-status zoom-hint" x-show="points.length" x-text="zoomHint"></p>
+    <p class="hint hint-status zoom-hint" x-show="hasData" x-text="zoomHint"></p>
 
   </div>
 
