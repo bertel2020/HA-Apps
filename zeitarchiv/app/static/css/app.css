@@ -2303,6 +2303,11 @@ footer{margin-top:20px;font-family:var(--font-mono);font-size:calc(11px * var(--
 .state-dot{display:inline-block;width:10px;height:10px;border-radius:3px;flex:none;vertical-align:-1px;}
 .state-legend-values{display:inline-flex;flex-wrap:wrap;gap:4px 12px;}
 .state-legend-values > span{white-space:nowrap;}
+/* Heatmap: ein Zustand je Entität ist der gezeichnete, die übrigen sind wählbar. */
+.state-legend-values > .state-pick{cursor:pointer;border-radius:4px;padding:0 3px;margin:0 -3px;}
+.state-legend-values > .state-pick:hover{background:var(--surface-alt);}
+.state-legend-values > .is-picked{font-weight:600;}
+.state-legend-values > .is-unpicked{opacity:.55;}
 
 /* Zustands-Kachel (Werte-Kachel einer Zustands-Entität, dashboard-tiles.js
    applyStateTile()): Farbfeld neben dem Zustand, Streifen der letzten 24 h,

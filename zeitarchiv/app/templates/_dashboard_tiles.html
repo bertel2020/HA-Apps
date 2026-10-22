@@ -110,6 +110,7 @@
         <a class="dtile-body" href="{{ href_base }}charts/{{ tile.id }}" draggable="false"
            data-period-anchor="{{ tile.period_anchor or '' }}"
            data-compare-settings='{{ tile.compare_settings | default({}) | tojson }}'
+           data-heatmap-states='{{ tile.heatmap_states | default({}) | tojson }}'
            data-entity-ids='{{ tile.entity_ids | tojson }}'
            data-entity-names='{{ tile.entity_names | tojson }}'
           data-hidden-entity-ids='{{ tile.hidden_entity_ids | default([]) | tojson }}'

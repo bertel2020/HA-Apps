@@ -144,6 +144,7 @@ _CHART_FIELD_LABELS = {
     "period_anchor": N_("Zeitraum"),
     "compare_settings": N_("Vergleich"),
     "chart_type": N_("Typ"),
+    "heatmap_states": N_("Typ"),
     "resolution_preset": N_("Auflösung"),
 }
 

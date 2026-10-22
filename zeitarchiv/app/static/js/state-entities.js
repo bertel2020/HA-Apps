@@ -287,6 +287,155 @@ window.StateEntities = (() => {
     return option;
   }
 
+  // --- Heatmap: Wochentag x Stunde (ROADMAP 1.29, Phase 3) ----------------
+  // cells vom Server (chart_type "heatmap"): [wochentag, stunde, beobachtungen,
+  // verfügbare_sekunden, [[idx, sekunden], …]], Montag = 0, Ortszeit.
+  // Eine Zelle zeigt den Anteil eines gewählten Zustands an der verfügbaren
+  // Zeit; "nicht verfügbar" steht in der Liste, zählt aber nicht in den Nenner.
+  const HEATMAP_MIN_OBSERVATIONS = 3;
+
+  // Zustände, die in mindestens einer Zelle vorkommen — "nicht verfügbar" ist
+  // keiner, den man wählen könnte (sein Anteil an der verfügbaren Zeit wäre
+  // sinnlos).
+  function heatmapStates(cells) {
+    const found = new Set();
+    for (const cell of cells) for (const [idx] of cell[4]) if (idx !== UNAVAILABLE) found.add(idx);
+    return found;
+  }
+
+  function heatmapShare(cell, idx) {
+    const available = cell[3];
+    if (!(available > 0)) return null;
+    const entry = cell[4].find(x => x[0] === idx);
+    return entry ? entry[1] / available : 0;
+  }
+
+  // Vorbelegung: der Zustand mit der größten Streuung der Zellanteile, aber
+  // nicht der häufigste. Der ist meist der Ruhezustand ("Aus", "Angedockt"),
+  // fast überall gleich dunkel — und seine Streuung ist die der anderen
+  // zusammen, er gewänne also fast immer. Bei zwei Zuständen sind beide
+  // Spiegelbilder, dort bleibt der seltenere.
+  function heatmapDefault(cells) {
+    const stats = [];
+    for (const idx of heatmapStates(cells)) {
+      const values = cells.map(cell => heatmapShare(cell, idx)).filter(v => v !== null);
+      if (!values.length) continue;
+      const mean = values.reduce((a, b) => a + b, 0) / values.length;
+      const variance = values.reduce((a, b) => a + (b - mean) * (b - mean), 0) / values.length;
+      stats.push({idx, mean, variance});
+    }
+    if (stats.length > 1) {
+      const dominant = stats.reduce((a, b) => (b.mean > a.mean ? b : a));
+      stats.splice(stats.indexOf(dominant), 1);
+    }
+    let best = null;
+    for (const st of stats) if (!best || st.variance > best.variance) best = st;
+    return best ? best.idx : null;
+  }
+
+  // Gezeichneter Zustand einer Entität: der gespeicherte (Rohtext, siehe
+  // saved_charts.heatmap_states), solange er in den Zellen vorkommt, sonst die
+  // Vorbelegung. Der Text statt des Index, weil sich der Index bei einer
+  // Neuzuordnung der Zustände verschieben kann.
+  function heatmapIndexFor(cells, states, rawText) {
+    if (rawText) {
+      const st = (states || []).find(x => x.text === rawText && x.idx !== UNAVAILABLE);
+      if (st && heatmapStates(cells).has(st.idx)) return st.idx;
+    }
+    return heatmapDefault(cells);
+  }
+
+  // Heatmaps untereinander, eine je Zustands-Entität (Zustandsindizes und
+  // Farben gelten nur innerhalb einer Entität). rows: [{name, states, cells,
+  // idx}]. Vollständige ECharts-Option ohne toolbox; Entitätsseite, Chart-
+  // Editor und Dashboard-Kachel zeichnen damit dasselbe. Bei einer Entität
+  // steht die Farbskala unter dem Raster, bei mehreren trägt jeder Titel
+  // Entität und Zustand und die Skala entfällt (dunkler heißt überall: öfter).
+  // compact: Kachel, kleinere Schrift und engere Ränder.
+  function heatmapPanels(rows, {compact = false} = {}) {
+    const css = getComputedStyle(document.body);
+    const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
+    const font = Math.round((compact ? 10 : 12) * scale * 10) / 10;
+    const muted = css.getPropertyValue('--ink-muted').trim();
+    const surface = css.getPropertyValue('--surface').trim();
+    const surfaceAlt = css.getPropertyValue('--surface-alt').trim();
+    const ink = css.getPropertyValue('--ink').trim();
+    const loc = window.ZA_FORMAT;
+    // 1. Januar 2024 war ein Montag.
+    const weekdays = Array.from({length: 7}, (_, d) => new Date(2024, 0, 1 + d).toLocaleDateString(loc, {weekday: 'short'}));
+    const weekdaysLong = Array.from({length: 7}, (_, d) => new Date(2024, 0, 1 + d).toLocaleDateString(loc, {weekday: 'long'}));
+    const hours = Array.from({length: 24}, (_, h) => String(h));
+    const n = Math.max(rows.length, 1);
+    const single = n === 1 && !compact;
+    const slot = 100 / n;
+    const option = {
+      textStyle: {fontFamily: css.getPropertyValue('--font-mono'), color: muted, fontSize: font},
+      grid: [], xAxis: [], yAxis: [], series: [], title: [], visualMap: [],
+    };
+    rows.forEach((row, k) => {
+      const stateName = label(row.states, row.idx);
+      const data = row.cells.map(cell => {
+        const share = heatmapShare(cell, row.idx);
+        const item = {value: [cell[1], cell[0], share === null ? 0 : share * 100, cell[2], cell[3]]};
+        // Wenig Beobachtungen: blass, nicht ausgeblendet — sonst wären kurze
+        // Zeiträume leer.
+        if (cell[2] < HEATMAP_MIN_OBSERVATIONS) item.itemStyle = {opacity: 0.4};
+        return item;
+      });
+      if (single) option.grid.push({left: 10, right: 20, top: 10, bottom: 60, containLabel: true});
+      else if (compact) option.grid.push(n === 1
+        ? {left: 4, right: 6, top: 6, bottom: 4, containLabel: true}
+        : {left: 4, right: 6, top: `${k * slot + 14}%`, height: `${slot - 18}%`, containLabel: true});
+      else option.grid.push({left: 10, right: 20, top: `${k * slot + 7}%`, height: `${slot - 16}%`, containLabel: true});
+      option.xAxis.push({
+        type: 'category', gridIndex: k, data: hours,
+        axisLabel: {interval: compact ? 5 : 2}, axisTick: {show: false}, axisLine: {show: false}, splitArea: {show: false},
+      });
+      option.yAxis.push({
+        type: 'category', gridIndex: k, data: weekdays, inverse: true, axisTick: {show: false}, axisLine: {show: false},
+        // Mehrere Panels in einer Kachel: für die Wochentage ist kein Platz,
+        // ECharts ließe jeden zweiten Namen weg und sie lägen unter dem Titel.
+        axisLabel: {show: !(compact && n > 1)},
+      });
+      if (n > 1) {
+        option.title.push({
+          text: `${row.name} · ${stateName}`, left: 10, top: `${k * slot + 1}%`,
+          textStyle: {color: muted, fontSize: font, fontWeight: 'normal'},
+        });
+      }
+      option.visualMap.push({
+        type: 'continuous', seriesIndex: k, min: 0, max: 100, dimension: 2, calculable: false, orient: 'horizontal',
+        show: single, left: 'center', bottom: 0, itemWidth: 12, itemHeight: 160, text: ['100 %', '0 %'],
+        textStyle: {color: muted}, inRange: {color: [surfaceAlt, color(row.idx)]},
+      });
+      option.series.push({
+        id: `heat:${k}`, type: 'heatmap', xAxisIndex: k, yAxisIndex: k, data,
+        itemStyle: {borderColor: surface, borderWidth: compact ? 1 : 2, borderRadius: compact ? 1 : 2},
+        emphasis: {itemStyle: {borderColor: ink, borderWidth: 2}},
+        label: {show: false},
+      });
+    });
+    option.tooltip = {
+      trigger: 'item', appendToBody: true,
+      formatter: p => {
+        const row = rows[p.seriesIndex] || rows[0];
+        const [hour, weekday, share, count, available] = p.value;
+        const head = `${n > 1 ? `${escapeHtml(row.name)} · ` : ''}${escapeHtml(weekdays[weekday])}, ${hour}–${hour + 1} ${escapeHtml(t('Uhr'))}`;
+        if (!count && !available) return `${head}<br>${escapeHtml(t('keine Daten'))}`;
+        const fewer = count < HEATMAP_MIN_OBSERVATIONS;
+        const num = {count: count.toLocaleString(loc)};
+        let text;
+        if (count === 1) text = fewer ? t('nur 1 Beobachtung') : t('1 Beobachtung');
+        else text = fewer ? t('nur {count} Beobachtungen', num) : t('{count} Beobachtungen', num);
+        return `${head}<br><span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:2px;${swatchStyle(row.idx)}"></span> ` +
+          `${escapeHtml(label(row.states, row.idx))} <strong>${fmtShare(share)}</strong><br>` +
+          `${escapeHtml(t('im Schnitt {duration} je Stunde', {duration: NumberFormat.fmtDuration(share / 100 * 3600)}))}<br>` +
+          `${escapeHtml(text)} · ${escapeHtml(weekdaysLong[weekday])}`;
+      },
+    };
+    return option;
+  }
+
   function fmtShare(share) {
     const digits = share < 1 ? 1 : 0;
     return `${share.toLocaleString(window.ZA_FORMAT, {minimumFractionDigits: digits, maximumFractionDigits: digits})} %`;
@@ -296,5 +445,6 @@ window.StateEntities = (() => {
     UNAVAILABLE, color, swatchStyle, unavailablePattern, fill, label, raw,
     segments, bucketsFromSegments, bucketsFromShares, bucketsForSeries, barPanels, bucketFns, totals, fmtShare,
     RANGE_BUCKETS, SERVER_SHARE_RANGES, bucketStarts, defaultMode,
+    heatmapStates, heatmapDefault, heatmapIndexFor, heatmapPanels, HEATMAP_MIN_OBSERVATIONS,
   };
 })();

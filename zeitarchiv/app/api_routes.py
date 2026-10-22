@@ -641,10 +641,13 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         raw: bool = False,
         chart_type: str | None = None,
         marked: bool = False,
+        heatmap: bool = False,
     ) -> dict:
         _validate_entity_id_or_400(entity_id)
         if chart_type not in (None, "line", "bar"):
             raise HTTPException(status_code=400, detail=tr("Ungültiger Diagrammtyp"))
+        if heatmap and range not in query_mod.STATE_HEATMAP_RANGES:
+            raise HTTPException(status_code=400, detail=tr("Die Heatmap gibt es erst ab dem Zeitraum Monat"))
         now = datetime.now(deps.tz)
         # Ein Cache für beide Abfragen dieses Requests: Mit "Vergleichen" wird
         # dieselbe Entität zweimal abgefragt, nur mit verschobenem Fenster —
@@ -657,7 +660,15 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         # für beide Pfade, und ein zweiter Ausgang hätte sie im
         # Rohwert-Modus stillschweigend übersprungen — ausgerechnet dort, wo
         # sie am genauesten sitzen.
-        if raw:
+        if heatmap:
+            entity = deps.index.get_entity(entity_id)
+            if entity is not None and entity["aggregation_type"] != query_mod.STATE_TYPE:
+                raise HTTPException(status_code=400, detail=tr("Die Heatmap gibt es nur für Zustands-Entitäten"))
+            result = query_mod.query_state_heatmap(
+                deps.data_dir, deps.index, entity_id, range, deps.tz, now,
+                offset=offset, continuous=continuous, read_cache=read_cache,
+            )
+        elif raw:
             result = query_mod.query_raw_series(
                 deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                 offset=offset, continuous=continuous,
@@ -668,7 +679,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 offset=offset, continuous=continuous, chart_type=chart_type,
                 read_cache=read_cache,
             )
-        if compare and not raw:
+        if compare and not raw and not heatmap:
             compare_result = query_mod.query_series(
                 deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                 offset=offset if compare_mode == "year" else offset - 1,
@@ -709,6 +720,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         raw: bool = False,
         previous_years: int = 1,
         at: str | None = None,
+        heatmap: bool = False,
     ) -> dict:
         # at: Stichtag der Zeitraum-Navigation eines Dashboards — verschiebt
         # Bezugszeitpunkt bzw. Versatz, alles Weitere (Vergleich, Langzeit)
@@ -718,6 +730,8 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         ids = limited_multi_entity_ids({"entity_ids": entity_ids})
         for entity_id in ids:
             _validate_entity_id_or_400(entity_id)
+        if heatmap and range not in query_mod.STATE_HEATMAP_RANGES:
+            raise HTTPException(status_code=400, detail=tr("Die Heatmap gibt es erst ab dem Zeitraum Monat"))
         if previous_years < 0:
             raise HTTPException(status_code=400, detail=tr("Ungültige Anzahl Vergleichsjahre"))
         # Mehrjahresvergleich (compare_mode "longterm", im Chart-Editor
@@ -737,7 +751,15 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         is_current = True
         for entity_id in ids:
             entity = deps.index.get_entity(entity_id)
-            if raw:
+            # Heatmap: nur die Zellen der Zustands-Entitäten; alles andere
+            # kommt unverändert, die Oberfläche wirft es für die Heatmap ohnehin
+            # heraus (Zustände stehen nie neben anderen Serien).
+            if heatmap and entity is not None and entity["aggregation_type"] == query_mod.STATE_TYPE:
+                result = query_mod.query_state_heatmap(
+                    deps.data_dir, deps.index, entity_id, range, deps.tz, now,
+                    offset=offset, continuous=continuous,
+                )
+            elif raw:
                 result = query_mod.query_raw_series(
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                     offset=offset, continuous=continuous,
@@ -765,7 +787,9 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             # und CSV (die Oberfläche zeigt nie den Index).
             if result.get("states") is not None:
                 entry["states"] = result["states"]
-            if compare and not raw and compare_mode != "longterm":
+            if result.get("cells") is not None:
+                entry["cells"] = result["cells"]
+            if compare and not raw and compare_mode != "longterm" and not heatmap:
                 compare_result = query_mod.query_series(
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                     offset=offset if compare_mode == "year" else offset - 1,

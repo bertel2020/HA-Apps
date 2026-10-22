@@ -168,7 +168,7 @@ from . import notices as notices_mod
 from . import version_check
 from .notices import collect_notices
 from .chart_period import calendar_bounds, compare_settings_or_400, period_anchor_or_400
-from .chart_types import CHART_EDITOR_CHART_TYPES, ENTITY_CHART_TYPES, chart_type_label, chart_type_key, editor_display_prefill, effective_chart_type
+from .chart_types import CHART_EDITOR_CHART_TYPES, ENTITY_CHART_TYPES, chart_type_label, chart_type_key, editor_display_prefill, effective_chart_type, heatmap_states_clean
 from .progress import activity_snapshot, register_source
 
 logger = logging.getLogger(__name__)
@@ -3428,6 +3428,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "compare": chart["compare_settings"].get("compare", False) if chart else prefill.get("compare", False),
         "compare_mode": chart["compare_settings"].get("mode", "previous") if chart else prefill.get("compare_mode", "previous"),
         "compare_settings": chart["compare_settings"] if chart else {},
+        "heatmap_states": chart["heatmap_states"] if chart else prefill.get("heatmap_states", {}),
     }
 
 
@@ -3490,6 +3491,7 @@ class _SaveChartBody(BaseModel):
     donut_aggregation: str = "sum"
     period_anchor: str | None = None  # fester Zeitraum, siehe chart_period.py
     compare_settings: dict = {}  # Vergleich, siehe chart_period.py
+    heatmap_states: dict[str, str] = {}  # gezeichneter Zustand je Entität der Heatmap
 
 
 def _hidden_for(body: _SaveChartBody) -> list[str]:
@@ -3536,6 +3538,7 @@ def charts_create(body: _SaveChartBody) -> dict:
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
         horizontal=body.horizontal, donut_aggregation=body.donut_aggregation,
         period_anchor=period_anchor_or_400(body.period_anchor), compare_settings=compare_settings_or_400(body.compare_settings),
+        heatmap_states=heatmap_states_clean(body.heatmap_states, body.entity_ids),
     )
     return {"id": chart_id}
 
@@ -3584,6 +3587,7 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
         horizontal=body.horizontal, donut_aggregation=body.donut_aggregation,
         period_anchor=period_anchor_or_400(body.period_anchor), compare_settings=compare_settings_or_400(body.compare_settings),
+        heatmap_states=heatmap_states_clean(body.heatmap_states, body.entity_ids),
     )
     return {"id": chart_id}
 
@@ -3625,6 +3629,7 @@ def charts_duplicate(chart_id: int) -> dict:
         stacked=chart["stacked"], normalize=chart["normalize"], average_style=chart["average_style"],
         horizontal=chart["horizontal"], donut_aggregation=chart["donut_aggregation"],
         period_anchor=chart["period_anchor"], compare_settings=chart["compare_settings"],
+        heatmap_states=chart["heatmap_states"],
     )
     return {"id": new_id}
 
@@ -3820,6 +3825,7 @@ def _dashboard_tiles_context(
                 "stacked": c["stacked"], "normalize": c["normalize"], "average_style": c["average_style"],
                 "horizontal": c["horizontal"], "donut_aggregation": c["donut_aggregation"], "period_anchor": c["period_anchor"],
                 "compare_settings": c["compare_settings"],  # Vergleich wie auf der Chart-Seite
+                "heatmap_states": c["heatmap_states"],  # gezeichneter Zustand je Entität der Heatmap
             })
             groups[-1]["tiles"].append(tiles[-1])
         elif p["item_type"] == "table":

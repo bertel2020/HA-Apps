@@ -362,7 +362,8 @@ function selectBrush() {
     // Zeitraum wechselt, bekommt ihn zurück.
     const stateModeFor = (range, chosen = null) => {
       const longRange = StateEntities.SERVER_SHARE_RANGES.includes(range);
-      if (chosen && !(chosen === 'timeline' && longRange)) return chosen;
+      // Zeitstrahl geht ab dem Monat nicht, die Heatmap erst ab dem Monat.
+      if (chosen && !(chosen === 'timeline' && longRange) && !(chosen === 'heatmap' && !longRange)) return chosen;
       return longRange ? 'shares' : 'timeline';
     };
     // Klick auf einen Balken öffnet den Zeitraum darunter.
@@ -431,6 +432,11 @@ function selectBrush() {
         // points bleiben die Rohwechsel — Protokoll und längster Abschnitt
         // brauchen sie in jedem Zeitraum.
         sharePoints: [],
+        // Heatmap (Wochentag x Stunde) vom Server, nur in der Ansicht "Heatmap";
+        // null = nicht geladen. Der gezeichnete Zustand ist nicht gespeichert:
+        // ohne Wahl der mit der größten Streuung (heatmapActive).
+        heatmapCells: null,
+        heatmapState: null,
         // Per Klick auf die Legende ausgeblendete Zustände — bewusst nicht
         // gespeichert, wie das Ein-/Ausblenden von Serien im Chart-Editor.
         hiddenStates: [],
@@ -512,6 +518,12 @@ function selectBrush() {
             chart_stats: String(this.chartStats), legend_metrics: this.legendMetrics.join(','),
             legend_style: this.legendStyle,
           });
+          // Heatmap: auch der gezeichnete Zustand geht mit (als Rohtext, siehe
+          // saved_charts.heatmap_states), sonst finge der Editor wieder bei der
+          // Vorbelegung an.
+          if (this.isState && this.stateMode === 'heatmap' && this.heatmapActive !== null) {
+            params.set('heatmap_state', StateEntities.raw(this.states, this.heatmapActive));
+          }
           // Eine vergangene Periode (z. B. 2025) geht als fester Zeitraum mit:
           // ein Tag darin (Mitte des Fensters) statt des Versatzes, siehe
           // saved_charts.period_anchor. Die laufende Periode bleibt "immer
@@ -566,6 +578,9 @@ function selectBrush() {
         // Grund, und der steht hier.
         get zoomHint() {
           const geste = t('mit Strg und Mausrad zoomen, mit Umschalt einen Bereich aufziehen, am Telefon mit zwei Fingern');
+          if (this.isState && this.stateMode === 'heatmap') {
+            return t('Dunkler heißt: öfter in diesem Zustand. Blasse Zellen haben weniger als 3 Beobachtungen.');
+          }
           if (this.isState && this.stateMode !== 'timeline') {
             return t('Ein Klick auf einen Balken öffnet diesen Zeitraum.');
           }
@@ -805,6 +820,32 @@ function selectBrush() {
           if (mode === this.stateMode) return;
           this.stateMode = mode;
           this.zoomRange = null;
+          // Die Heatmap hat eigene Daten; die anderen Ansichten haben ihre
+          // schon geladen.
+          if (mode === 'heatmap' && this.heatmapCells === null) this.load();
+          else this.render();
+        },
+        // Heatmap gibt es ab dem Monat (siehe stateModeFor).
+        get heatmapAvailable() { return StateEntities.SERVER_SHARE_RANGES.includes(this.range); },
+        // Gezeichneter Zustand: die Wahl, solange sie in den Zellen vorkommt,
+        // sonst der mit der größten Streuung.
+        get heatmapActive() {
+          if (!this.heatmapCells) return null;
+          if (this.heatmapState !== null && StateEntities.heatmapStates(this.heatmapCells).has(this.heatmapState)) {
+            return this.heatmapState;
+          }
+          return StateEntities.heatmapDefault(this.heatmapCells);
+        },
+        // In der Heatmap wählt die Legende den gezeichneten Zustand (genau
+        // einen, "nicht verfügbar" nicht), sonst blendet sie Zustände aus.
+        chipInactive(idx) {
+          return this.stateMode === 'heatmap' ? idx !== this.heatmapActive : this.hiddenStates.includes(idx);
+        },
+        chipPressed(idx) { return (!this.chipInactive(idx)).toString(); },
+        stateChip(idx) {
+          if (this.stateMode !== 'heatmap') return this.toggleState(idx);
+          if (idx === STATE_UNAVAILABLE) return;
+          this.heatmapState = idx;
           this.render();
         },
         fmtStateDuration(seconds) { return NumberFormat.fmtDuration(seconds); },
@@ -1048,14 +1089,23 @@ function selectBrush() {
           shareParams.set('raw', 'false');
           shareParams.delete('marked');
           const wantShares = this.isState && StateEntities.SERVER_SHARE_RANGES.includes(this.range);
-          const [res, shareRes] = await Promise.all([
+          // Heatmap: zusätzlich Zeit je Wochentag und Stunde. Legende und
+          // Kennzahlen kommen weiter aus den Anteilen.
+          const wantHeatmap = wantShares && this.stateMode === 'heatmap';
+          const heatmapParams = new URLSearchParams(shareParams);
+          heatmapParams.set('heatmap', 'true');
+          heatmapParams.set('compare', 'false');
+          const [res, shareRes, heatmapRes] = await Promise.all([
             fetch(`${BASE}/api/query?${params}`),
             wantShares ? fetch(`${BASE}/api/query?${shareParams}`) : Promise.resolve(null),
+            wantHeatmap ? fetch(`${BASE}/api/query?${heatmapParams}`) : Promise.resolve(null),
           ]);
           const data = await res.json();
           const shareData = shareRes ? await shareRes.json() : null;
+          const heatmapData = heatmapRes ? await heatmapRes.json() : null;
           if (requestId !== this._requestId) return; // eine neuere Anfrage ist schon unterwegs/angekommen
           this.sharePoints = shareData && shareData.chart_type === 'shares' ? shareData.points : [];
+          this.heatmapCells = heatmapData && heatmapData.chart_type === 'heatmap' ? heatmapData.cells || [] : null;
           this.points = data.points || [];
           this.comparePoints = data.compare_points || [];
           this.compareWindowStart = data.compare_window_start ?? null;
@@ -1176,6 +1226,10 @@ function selectBrush() {
           };
           const tooltipBucketSeconds = detectResolutionSeconds(this.points);
 
+          if (this.isState && this.stateMode === 'heatmap') {
+            this.renderStateHeatmap();
+            return;
+          }
           if (this.isState && this.stateMode !== 'timeline') {
             this.renderStateBars();
             return;
@@ -1695,6 +1749,16 @@ function selectBrush() {
             [{name: DISPLAY_NAME, states: this.states, buckets: this.stateBuckets}],
             {mode: this.stateMode, range: this.range, windowStart: this.windowStart, periodEnd: this.periodEnd, hidden: this.hiddenStates}
           ), true);
+          chartInstance.resize();
+        },
+
+        renderStateHeatmap() {
+          const idx = this.heatmapActive;
+          if (idx === null) {
+            chartInstance.clear();
+            return;
+          }
+          chartInstance.setOption(StateEntities.heatmapPanels([{name: DISPLAY_NAME, states: this.states, cells: this.heatmapCells, idx}]), true);
           chartInstance.resize();
         },
 

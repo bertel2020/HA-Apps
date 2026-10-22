@@ -315,6 +315,10 @@
                     <template x-if="hasState">
                       <button :class="{active: !donut && stateMode === 'changes'}" @click="setDisplayMode('changes')">{{ _("Wechsel") }}</button>
                     </template>
+                    <template x-if="hasState">
+                      <button :class="{active: !donut && stateMode === 'heatmap'}" :disabled="!heatmapAvailable" @click="setDisplayMode('heatmap')"
+                              :title="heatmapAvailable ? '' : t('Die Heatmap gibt es ab dem Zeitraum Monat.')">{{ _("Heatmap") }}</button>
+                    </template>
                     <template x-if="allSwitch && !hasState">
                       <button :class="{active: timeline && !donut}" :disabled="compare" @click="setDisplayMode('timeline')">{{ _("Zeitstrahl") }}</button>
                     </template>
@@ -657,7 +661,8 @@
                  und Anteil je Zustand statt Min/Max über Indizes. #}
               <span class="values state-legend-values" x-show="stat.isState">
                 <template x-for="row in stat.stateRows" :key="row.idx">
-                  <span :title="row.raw"><span class="dot state-dot" :style="row.swatch"></span> <span x-text="row.label"></span><strong x-show="statsShown" x-text="' ' + row.text"></strong></span>
+                  <span :title="row.raw" :class="{'state-pick': stateMode === 'heatmap' && row.idx !== -1, 'is-picked': stateMode === 'heatmap' && heatmapChipActive(stat.entityId, row.idx), 'is-unpicked': stateMode === 'heatmap' && !heatmapChipActive(stat.entityId, row.idx)}"
+                        @click.stop="pickHeatmapState(stat.entityId, row.idx)"><span class="dot state-dot" :style="row.swatch"></span> <span x-text="row.label"></span><strong x-show="statsShown" x-text="' ' + row.text"></strong></span>
                 </template>
               </span>
               <span class="values" x-show="chartStats && !stat.isState">
@@ -768,7 +773,8 @@
                     </span>
                     <span class="legend-compare-label state-legend-values" x-show="stat.isState">
                       <template x-for="row in stat.stateRows" :key="row.idx">
-                        <span :title="row.raw"><span class="dot state-dot" :style="row.swatch"></span> <span x-text="row.label + ' ' + row.text"></span></span>
+                        <span :title="row.raw" :class="{'state-pick': stateMode === 'heatmap' && row.idx !== -1, 'is-picked': stateMode === 'heatmap' && heatmapChipActive(stat.entityId, row.idx), 'is-unpicked': stateMode === 'heatmap' && !heatmapChipActive(stat.entityId, row.idx)}"
+                              @click.stop="pickHeatmapState(stat.entityId, row.idx)"><span class="dot state-dot" :style="row.swatch"></span> <span x-text="row.label + ' ' + row.text"></span></span>
                       </template>
                     </span>
                     <!-- Gedämpfte Unterzeile statt einer zweiten Tabellenzeile —
@@ -977,6 +983,8 @@
     const SELECTED_ENTITY_IDS = {{ selected_entity_ids | tojson }};
     const ENTITY_NAMES = {{ entity_names | tojson }};
     const HIDDEN_ENTITY_IDS = {{ hidden_entity_ids | tojson }};
+    // Gezeichneter Zustand je Zustands-Entität der Heatmap (Rohtext).
+    const HEATMAP_STATES = {{ heatmap_states | default({}) | tojson }};
     const ENTITY_OPTIONS = {{ entity_options | tojson }};
     const RESOLUTION_PRESET = {{ resolution_preset | tojson }};
     const DYNAMIC_Y_AXIS = {{ dynamic_y_axis | tojson }};

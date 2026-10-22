@@ -18,7 +18,12 @@ from .i18n import N_
 # statt eines Zeitverlaufs, siehe chart_editor.js renderDonut().
 # "shares"/"changes": Anteile bzw. Wechsel je Zustands-Entität als gestapelte
 # Balken (nur Charts aus lauter Zuständen), siehe state-entities.js barPanels().
-CHART_EDITOR_CHART_TYPES = {"auto", "bar", "timeline", "donut", "shares", "changes"}
+# "heatmap": Zeit je Zustand nach Wochentag und Stunde, ebenfalls nur für
+# Zustände und erst ab dem Zeitraum Monat, siehe state-entities.js heatmapPanels().
+CHART_EDITOR_CHART_TYPES = {"auto", "bar", "timeline", "donut", "shares", "changes", "heatmap"}
+
+# Anteile, Wechsel und Heatmap: die Darstellungen, die es nur für Zustände gibt.
+STATE_VIEW_CHART_TYPES = ("shares", "changes", "heatmap")
 
 # Entitätsseite (entity_detail.html): zusätzlich "line"/"bar" als ausdrückliche Wahl.
 ENTITY_CHART_TYPES = {"auto", "line", "bar", "timeline"}
@@ -36,6 +41,7 @@ CHART_TYPE_LABELS = {
     "donut": N_("Donut"),
     "anteile": N_("Anteile"),
     "wechsel": N_("Wechsel"),
+    "heatmap": N_("Heatmap"),
 }
 
 
@@ -49,7 +55,7 @@ def effective_chart_type(chart: dict, aggregation_types: dict[str, str]) -> str:
     # Anteile/Wechsel gibt es nur für Charts aus lauter Zuständen; ein Chart, in
     # das später etwas anderes kam, wird wie "auto" behandelt, statt Zahlen als
     # Zustandsbalken zu zeichnen.
-    if stored in ("shares", "changes") and not all(aggregation_types.get(e) == "state" for e in chart["entity_ids"]):
+    if stored in STATE_VIEW_CHART_TYPES and not all(aggregation_types.get(e) == "state" for e in chart["entity_ids"]):
         stored = "auto"
     ids = chart["entity_ids"]
     # Nur Zustände und nichts gewählt: "auto" bleibt, die Ansicht hängt vom
@@ -62,7 +68,7 @@ def effective_chart_type(chart: dict, aggregation_types: dict[str, str]) -> str:
     ):
         return "timeline"
     # Zustände gibt es sonst nur als Zeitstrahl oder Donut (chart_editor.js load()).
-    if stored not in ("donut", "shares", "changes") and any(aggregation_types.get(e) == "state" for e in chart["entity_ids"]) and all(
+    if stored not in ("donut", *STATE_VIEW_CHART_TYPES) and any(aggregation_types.get(e) == "state" for e in chart["entity_ids"]) and all(
         aggregation_types.get(e) in ("switch", "state") for e in chart["entity_ids"]
     ):
         return "timeline"
@@ -84,8 +90,8 @@ def chart_type_key(chart: dict, aggregation_types: dict[str, str]) -> str:
         return "zeitstrahl"
     if chart_type == "donut":
         return "donut"
-    if chart_type in ("shares", "changes"):
-        return "anteile" if chart_type == "shares" else "wechsel"
+    if chart_type in STATE_VIEW_CHART_TYPES:
+        return {"shares": "anteile", "changes": "wechsel", "heatmap": "heatmap"}[chart_type]
     vorhanden = {
         "balken" if aggregation_types.get(entity_id) in ("counter", "switch") else "linie"
         for entity_id in chart["entity_ids"]
@@ -120,4 +126,27 @@ def editor_display_prefill(params, metrics: set[str], styles: set[str], decimals
     for flag in _FLAGS:
         if params.get(flag) in ("true", "false"):
             out[flag] = params[flag] == "true"
+    # Gezeichneter Zustand der Heatmap von der Entitätsseite (nur für diese Entität).
+    entity_id = params.get("entity_id", "")
+    out["heatmap_states"] = heatmap_states_clean({entity_id: params.get("heatmap_state", "")}, [entity_id])
     return out
+
+
+# Länge eines Zustandstextes, wie ihn Home Assistant liefert (255 Zeichen
+# Zustandslänge) — darüber ist es kein Zustand.
+_HEATMAP_STATE_MAX_LENGTH = 255
+
+
+def heatmap_states_clean(value: dict | None, entity_ids: list[str]) -> dict[str, str]:
+    """Gezeichneter Zustand je Entität der Heatmap (saved_charts.heatmap_states).
+
+    Nur Einträge zu Entitäten, die im Chart stehen, mit nichtleerem Text: ein
+    Eintrag ohne Entsprechung bliebe sonst stumm mitgespeichert, bis die
+    Entität irgendwann wieder auftaucht. Kein Fehler bei Unpassendem — die
+    Heatmap fällt dann auf ihre Vorbelegung zurück, es geht nichts verloren."""
+    allowed = set(entity_ids)
+    return {
+        entity_id: text
+        for entity_id, text in (value or {}).items()
+        if entity_id in allowed and isinstance(text, str) and 0 < len(text) <= _HEATMAP_STATE_MAX_LENGTH
+    }

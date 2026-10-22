@@ -186,6 +186,8 @@
                 <button :class="{active: stateMode === 'timeline'}" @click="setStateMode('timeline')">{{ _("Zeitstrahl") }}</button>
                 <button :class="{active: stateMode === 'shares'}" @click="setStateMode('shares')">{{ _("Anteile") }}</button>
                 <button :class="{active: stateMode === 'changes'}" @click="setStateMode('changes')">{{ _("Wechsel") }}</button>
+                <button :class="{active: stateMode === 'heatmap'}" :disabled="!heatmapAvailable" @click="setStateMode('heatmap')"
+                        :title="heatmapAvailable ? '' : t('Die Heatmap gibt es ab dem Zeitraum Monat.')">{{ _("Heatmap") }}</button>
               </div>
             </div>
             <div class="menu-row">
@@ -411,8 +413,8 @@
         </div>
         <div class="chart-legend" x-show="legendStyle === 'chips'">
           <template x-for="row in stateSummary.rows" :key="row.idx">
-            <button type="button" class="chart-legend-item" :class="{inactive: hiddenStates.includes(row.idx)}"
-                    :aria-pressed="(!hiddenStates.includes(row.idx)).toString()" @click="toggleState(row.idx)"
+            <button type="button" class="chart-legend-item" :class="{inactive: chipInactive(row.idx)}"
+                    :aria-pressed="chipPressed(row.idx)" @click="stateChip(row.idx)"
                     :title="stateRaw(row.idx)">
               <span class="dot state-dot" :style="stateSwatch(row.idx)"></span>
               <span class="name" x-text="stateLabel(row.idx)"></span>
@@ -432,8 +434,8 @@
             </thead>
             <tbody>
               <template x-for="row in stateSummary.rows" :key="row.idx">
-                <tr class="state-legend-row" :class="{inactive: hiddenStates.includes(row.idx)}" tabindex="0"
-                    @click="toggleState(row.idx)" @keydown.enter.prevent="toggleState(row.idx)" @keydown.space.prevent="toggleState(row.idx)"
+                <tr class="state-legend-row" :class="{inactive: chipInactive(row.idx)}" tabindex="0"
+                    @click="stateChip(row.idx)" @keydown.enter.prevent="stateChip(row.idx)" @keydown.space.prevent="stateChip(row.idx)"
                     :title="stateRaw(row.idx)">
                   <td class="legend-name-col"><span class="dot state-dot" :style="stateSwatch(row.idx)"></span> <span x-text="stateLabel(row.idx)"></span></td>
                   <td x-text="fmtStateDuration(row.seconds)"></td>

@@ -1286,6 +1286,158 @@ def query_state_shares(
     }
 
 
+# Zeiträume der Zustands-Heatmap. In einer Woche gäbe es je Zelle nur eine
+# Beobachtung (ein Wochentag kommt einmal vor), in einem Tag gar keine Wochentage.
+STATE_HEATMAP_RANGES = ("month", "year", "decade")
+
+# Eine Stunde zählt als Beobachtung, wenn mindestens so viele Sekunden davon
+# in einem verfügbaren Zustand liegen. Sonst zählte die angebrochene Stunde am
+# Fensterende (oder eine fast ganz ausgefallene) wie eine volle.
+HEATMAP_MIN_COVERAGE_SECONDS = 1800.0
+
+
+def _state_hour_rows(
+    data_dir: Path, index: Index, first_ts: float | None, entity_id: str, tz: ZoneInfo, now_local: datetime,
+    window_start: datetime, window_end: datetime, read_cache: QueryReadCache | None,
+) -> list[rollup.FineRow]:
+    """Eine Zeile je Stunde und Zustand für [window_start, window_end).
+
+    Abgeschlossene Monate aus stunde.parquet, der laufende live aus dem Hot
+    Buffer. Ein Archivmonat entsteht nur durch einen Wechsel: Monate dazwischen
+    ohne jeden bekommen den vorher geltenden Zustand für jede ihrer Stunden —
+    dieselbe Regel wie bei den Anteilen, nur eben stundenweise. Innerhalb eines
+    Archivmonats verteilt der Rollup einen langen Zustand schon selbst auf alle
+    Stunden, dort ist nichts aufzufüllen.
+    """
+    key_fn = rollup.named_bucket_key(tz, "stunde")
+    next_fn = rollup.named_bucket_next(tz, "stunde")
+    month_key = rollup.named_bucket_key(tz, "monat")
+    month_next = rollup.named_bucket_next(tz, "monat")
+    current_month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    completed_end = min(window_end, current_month_start)
+
+    rows: list[rollup.FineRow] = []
+    if window_start < completed_end:
+        rows += _read_rollup_rows(
+            data_dir, entity_id, "stunde", window_start.timestamp(), completed_end.timestamp(), read_cache
+        )
+    live_start = max(window_start, current_month_start)
+    if live_start < window_end:
+        hot = _read_hot_rows_filtered(
+            data_dir, entity_id, index, now_local.timestamp(), live_start.timestamp(), window_end.timestamp(), tz,
+            read_cache,
+        )
+        boundary = _boundary_value(data_dir, entity_id, live_start.timestamp(), tz, read_cache)
+        live, _ = rollup.compute_fine_rollup_with_key(
+            hot, STATE_TYPE, key_fn, boundary, window_end.timestamp(),
+            bucket_next_fn=next_fn, window_start_ts=live_start.timestamp(),
+        )
+        rows += live
+
+    if first_ts is None:
+        return rows
+    covered = {month_key(row.bucket_start).timestamp() for row in rows}
+    carried: float | None = None
+    cursor = month_key(max(window_start.timestamp(), first_ts))
+    while cursor < completed_end:
+        month_end = month_next(cursor)
+        if cursor.timestamp() in covered:
+            carried = None
+        else:
+            span_start = max(cursor.timestamp(), window_start.timestamp(), first_ts)
+            span_end = min(month_end.timestamp(), completed_end.timestamp())
+            if carried is None:
+                carried = _boundary_value(data_dir, entity_id, span_start, tz, read_cache)
+            if carried is not None and span_end > span_start:
+                idx = int(round(carried))
+                hour = key_fn(span_start)
+                while hour.timestamp() < span_end:
+                    hour_end = next_fn(hour)
+                    seconds = min(hour_end.timestamp(), span_end) - max(hour.timestamp(), span_start)
+                    rows.append(rollup.FineRow(bucket_start=hour.timestamp(), states={idx: (seconds, 0)}))
+                    hour = hour_end
+        cursor = month_end
+    return rows
+
+
+def query_state_heatmap(
+    data_dir: Path,
+    index: Index,
+    entity_id: str,
+    range_key: str,
+    tz: ZoneInfo,
+    now: datetime,
+    offset: int = 0,
+    continuous: bool = False,
+    read_cache: QueryReadCache | None = None,
+) -> dict:
+    """Zeit je Zustand nach Wochentag und Stunde (Ortszeit) für die Heatmap
+    einer Zustands-Entität (ROADMAP 1.29, Phase 3).
+
+    Kein eigener Rollup: stunde.parquet hat Sekunden je Stunde und Zustand,
+    Wochentag und Stunde ergeben sich beim Abfragen. ``cells`` ist eine Liste
+    ``[wochentag, stunde, beobachtungen, verfügbare_sekunden, [[idx, sekunden], …]]``
+    (Montag = 0), nur für Zellen mit Daten. Der Anteil eines Zustands in einer
+    Zelle ist ``sekunden / verfügbare_sekunden``: "nicht verfügbar" steht in
+    der Liste, zählt aber nicht in den Nenner — ein Ausfall soll keine falsche
+    Ruhe vortäuschen.
+
+    Sommer-/Winterzeit: die doppelte Stunde im Herbst zählt doppelt in
+    derselben Zelle, die fehlende im Frühjahr gar nicht; der Nenner folgt den
+    tatsächlich vorhandenen Sekunden. Ein rollierendes Fenster beginnt mitten
+    in einer Stunde; deren angebrochener Anfang fehlt.
+    """
+    if range_key not in STATE_HEATMAP_RANGES:
+        raise ValueError(tr("Unbekannter Zeitraum: {range_key}", range_key=range_key))
+    entity = index.get_entity(entity_id)
+    if entity is None:
+        return _missing_entity_result(entity_id, range_key, tz, now, offset, continuous)
+    now_local = now.astimezone(tz)
+    window_start, window_end, period_end = _window(range_key, now_local, offset, continuous)
+    rows = _state_hour_rows(
+        data_dir, index, entity["first_ts"], entity_id, tz, now_local, window_start, window_end, read_cache
+    )
+
+    by_hour: dict[float, list[rollup.FineRow]] = {}
+    for row in rows:
+        by_hour.setdefault(row.bucket_start, []).append(row)
+    cells: dict[tuple[int, int], dict] = {}
+    for start_ts, group in by_hour.items():
+        local = datetime.fromtimestamp(start_ts, tz)
+        cell = cells.setdefault((local.weekday(), local.hour), {"seconds": {}, "available": 0.0, "n": 0})
+        available = 0.0
+        for idx, (seconds, _entries) in rollup.merge_state_rows(group, start_ts).states.items():
+            cell["seconds"][idx] = cell["seconds"].get(idx, 0.0) + seconds
+            if idx != STATE_UNAVAILABLE_INDEX:
+                available += seconds
+        cell["available"] += available
+        if available >= HEATMAP_MIN_COVERAGE_SECONDS:
+            # Der Rollup-Bucket der Herbst-Umstellung rechnet in Wanduhrzeit
+            # und fasst die beiden 2-Uhr-Stunden zu einem Bucket mit 7200 s
+            # zusammen — der Anteil stimmt, die Zahl der Beobachtungen
+            # folgt deshalb den Sekunden.
+            cell["n"] += max(1, int(available // 3600))
+
+    return {
+        "entity_id": entity_id,
+        "aggregation_type": STATE_TYPE,
+        "chart_type": "heatmap",
+        "bucket": "stunde",
+        "cells": [
+            [weekday, hour, cell["n"], round(cell["available"], 1),
+             [[idx, round(seconds, 1)] for idx, seconds in sorted(cell["seconds"].items())]]
+            for (weekday, hour), cell in sorted(cells.items())
+        ],
+        "points": [],
+        "window_start": window_start.timestamp(),
+        "window_end": window_end.timestamp(),
+        "period_end": period_end.timestamp(),
+        "is_current": offset == 0,
+        "elapsed_seconds": None,
+        "states": state_legend(index, entity_id),
+    }
+
+
 def state_durations(result: dict) -> dict[int, float]:
     """Sekunden je Zustand aus einer Antwort von query_series() — egal ob sie
     Rohwechsel (bis zur Woche) oder Anteile je Bucket (ab dem Monat) trägt."""

@@ -69,7 +69,7 @@
   function tileCompare(el, {range, continuous, entityIds, chartType, resolutionPreset, stacked}) {
     let settings = {};
     try { settings = JSON.parse(el.dataset.compareSettings || '{}') || {}; } catch (e) { settings = {}; }
-    if (!settings.compare || ['timeline', 'donut', 'shares', 'changes'].includes(chartType) || resolutionPreset === 'full'
+    if (!settings.compare || ['timeline', 'donut', 'shares', 'changes', 'heatmap'].includes(chartType) || resolutionPreset === 'full'
         || (stacked && entityIds.length >= 2)) return null;
     let mode = settings.mode || 'previous';
     const longterm = mode === 'longterm' && range === 'year' && !continuous && entityIds.length === 1;
@@ -495,6 +495,9 @@
     // "Ausrichtung" (Optionen-Menü, nur bei Auflösung "Voll") — siehe
     // horizontalActive weiter unten (chart_editor.js-Parität).
     const horizontal = el.dataset.horizontal === 'true';
+    // Gezeichneter Zustand je Zustands-Entität der Heatmap (saved_charts.heatmap_states).
+    let heatmapStates = {};
+    try { heatmapStates = JSON.parse(el.dataset.heatmapStates || '{}') || {}; } catch (e) { heatmapStates = {}; }
     const chartEl = el.querySelector('.dtile-chart');
     if (!chartEl || !entityIds.length) return;
 
@@ -521,8 +524,22 @@
     }
     let data;
     try {
-      const res = await fetch(`${base}/api/query-multi?${params}`);
+      // Heatmap: zusätzlich die Zellen (Wochentag x Stunde), wie im Chart-Editor.
+      // Zu kurze Zeiträume fallen unten auf den Standard zurück.
+      const wantHeatmap = chartType === 'heatmap' && StateEntities.SERVER_SHARE_RANGES.includes(range);
+      const heatmapParams = new URLSearchParams(params);
+      heatmapParams.set('heatmap', 'true');
+      heatmapParams.delete('compare');
+      const [res, heatmapRes] = await Promise.all([
+        fetch(`${base}/api/query-multi?${params}`),
+        wantHeatmap ? fetch(`${base}/api/query-multi?${heatmapParams}`) : Promise.resolve(null),
+      ]);
       data = await res.json();
+      const heatmapData = heatmapRes ? await heatmapRes.json() : null;
+      if (heatmapData) {
+        const cellsById = new Map((heatmapData.series || []).map(x => [x.entity_id, x.cells]));
+        for (const entry of data.series || []) if (cellsById.get(entry.entity_id)) entry.cells = cellsById.get(entry.entity_id);
+      }
     } catch (e) {
       chartEl.innerHTML = '<div class="dtile-loading">' + t('Fehler beim Laden') + '</div>';
       return;
@@ -538,7 +555,8 @@
     }
     // Nur Zustände und keine Ansicht gewählt: je Zeitraum der Standard, wie im
     // Chart-Editor (Zeitstrahl bis zur Woche, danach Anteile).
-    const viewType = chartType === 'auto' && series.every(s => s.aggregation_type === 'state')
+    const heatmapTooShort = chartType === 'heatmap' && !StateEntities.SERVER_SHARE_RANGES.includes(range);
+    const viewType = (chartType === 'auto' || heatmapTooShort) && series.every(s => s.aggregation_type === 'state')
       ? StateEntities.defaultMode(range) : chartType;
     // Dieselbe Farbzuordnung wie echartsSeries weiter unten (PALETTE nach
     // Serienindex) UND dieselbe Kennzahlen-Berechnung wie seriesStats() in
@@ -690,6 +708,10 @@
         entityNames, colorIndexFor, effectiveDecimals, animation, style, borderColor, inkFaint, inkMuted, surface,
         hiddenSet: legendHidden.get(chartId),
       });
+      return;
+    }
+    if (viewType === 'heatmap' && series.some(s => s.aggregation_type === 'state')) {
+      renderTileStateHeatmap(chart, series, entityNames, animation, heatmapStates);
       return;
     }
     if (['shares', 'changes'].includes(viewType) && series.some(s => s.aggregation_type === 'state')) {
@@ -1418,6 +1440,24 @@
       ...StateEntities.barPanels(rows, {mode, range, windowStart: data.window_start, periodEnd: data.period_end ?? data.window_end}),
       animation,
     }, true);
+  }
+
+  // Heatmap je Zustands-Entität, wie im Chart-Editor, nur kompakt.
+  function renderTileStateHeatmap(chart, series, entityNames, animation, heatmapStates) {
+    const rows = series
+      .filter(s => s.aggregation_type === 'state' && s.cells)
+      .map(s => ({
+        name: entityNames[s.entity_id] || s.friendly_name,
+        states: s.states,
+        cells: s.cells,
+        idx: StateEntities.heatmapIndexFor(s.cells, s.states, heatmapStates[s.entity_id]),
+      }))
+      .filter(row => row.idx !== null);
+    if (!rows.length) {
+      chart.clear();
+      return;
+    }
+    chart.setOption({...StateEntities.heatmapPanels(rows, {compact: true}), animation}, true);
   }
 
   function renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface, colorIndexFor) {

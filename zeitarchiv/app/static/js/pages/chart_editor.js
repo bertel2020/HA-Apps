@@ -506,6 +506,16 @@
       });
     }
 
+    // Darstellung der Zustände bei gewähltem chosen (null = keine Wahl: der
+    // Standard je Zeitraum). Die Heatmap gibt es erst ab dem Monat, davor fällt
+    // sie auf den Standard zurück.
+    const stateModeFor = (range, chosen = null) => {
+      if (chosen === 'heatmap') {
+        return StateEntities.SERVER_SHARE_RANGES.includes(range) ? 'heatmap' : StateEntities.defaultMode(range);
+      }
+      return chosen || StateEntities.defaultMode(range);
+    };
+
     function chartEditor() {
       return {
         chartId: CHART_ID,
@@ -616,7 +626,7 @@
         // CHART_TYPE vorbelegt (persistiert über save(), siehe dort) statt
         // fest false — sonst würde jeder Seitenaufruf die zuletzt für dieses
         // Chart gespeicherte Wahl verwerfen.
-        timeline: ['timeline', 'shares', 'changes'].includes(CHART_TYPE),
+        timeline: ['timeline', 'shares', 'changes', 'heatmap'].includes(CHART_TYPE),
         // Zustands-Charts: Zeitstrahl, Anteile oder Wechsel je Zustands-Entität
         // (die Balken-Ansichten laufen über dieselbe timeline-Weiche, damit die
         // Zeitverlauf-Optionen im Menü ausgeblendet bleiben). Gespeichert als
@@ -624,8 +634,17 @@
         // Ohne gewählte Ansicht ("auto") gilt je Zeitraum der Standard
         // (StateEntities.defaultMode); eine Wahl (stateChosen) bleibt, auch über
         // einen Zeitraumwechsel, und wird als chart_type gespeichert.
-        stateMode: ['timeline', 'shares', 'changes'].includes(CHART_TYPE) ? CHART_TYPE : StateEntities.defaultMode(RANGE_KEY),
-        stateChosen: ['timeline', 'shares', 'changes'].includes(CHART_TYPE),
+        // Die Heatmap gibt es erst ab dem Monat. heatmapWanted merkt den Wunsch
+        // (gespeichert oder per Klick), auch wenn der Zeitraum gerade zu kurz
+        // ist und stateMode deshalb auf den Standard zurückfällt — beim
+        // Zurückwechseln kommt sie wieder (stateModeFor()).
+        heatmapWanted: CHART_TYPE === 'heatmap',
+        stateMode: stateModeFor(RANGE_KEY, ['timeline', 'shares', 'changes', 'heatmap'].includes(CHART_TYPE) ? CHART_TYPE : null),
+        stateChosen: ['timeline', 'shares', 'changes', 'heatmap'].includes(CHART_TYPE),
+        // Gezeichneter Zustand je Zustands-Entität der Heatmap: Rohtext, nicht
+        // der Index (siehe saved_charts.heatmap_states). Fehlt er, gilt die
+        // Vorbelegung (StateEntities.heatmapIndexFor()).
+        heatmapStates: {...HEATMAP_STATES},
         // Ob die Darstellungsart schon feststeht (gespeichert oder per Klick
         // gewählt). Solange nicht, wird ein reines Schalter-Chart nach dem
         // Laden automatisch zum Zeitstrahl (Standard) — siehe load().
@@ -736,6 +755,11 @@
         // Zustands-Entitäten (ROADMAP 1.29) gibt es nur als Zeitstrahl oder
         // Donut — eine Linie aus Zustandsindizes hätte keine Aussage.
         get hasState() { return this.series.some(s => s.aggregation_type === 'state'); },
+        // Vor dem ersten Laden ist noch nicht bekannt, ob Zustände im Chart
+        // sind — die Heatmap wird dann trotzdem mit angefragt (der Server
+        // liefert Zellen nur für Zustände, sonst nichts).
+        get heatmapAvailable() { return StateEntities.SERVER_SHARE_RANGES.includes(this.range); },
+        get hasStateOrUnknown() { return this.hasState || !this.series.length; },
         // Balken-Ansicht der Zustände gewünscht — solange noch keine Serien
         // geladen sind, gilt der gespeicherte Wunsch (load() prüft ihn danach).
         get wantsStateBars() { return this.stateMode !== 'timeline' && (this.hasState || !this.series.length); },
@@ -1288,7 +1312,7 @@
           this._rangeAnchorMs = anchorMs;
           this.offset = PeriodNavigation.offsetForRange(key, anchorMs);
           this.range = key;
-          if (!this.stateChosen) this.stateMode = StateEntities.defaultMode(key);
+          this.stateMode = stateModeFor(key, this.stateChosen ? (this.heatmapWanted ? 'heatmap' : this.stateMode) : null);
           // Anders als auf der Entitätsseite bleibt der Vergleich beim
           // Zeitraumwechsel eingeschaltet — ein stehengebliebener
           // "Vorjahres…"-Modus liefe hier also direkt in die nächste Abfrage.
@@ -1468,12 +1492,13 @@
           const current = this.donut ? 'donut' : (this.hasState ? this.stateMode : (wasTimeline ? 'timeline' : 'timeseries'));
           // Auch ein Klick auf die schon gezeigte Ansicht ist eine Wahl: sie soll
           // den Zeitraumwechsel überstehen und wird mitgespeichert.
-          if (this.hasState && ['timeline', 'shares', 'changes'].includes(mode)) this.stateChosen = true;
+          if (this.hasState && ['timeline', 'shares', 'changes', 'heatmap'].includes(mode)) this.stateChosen = true;
+          this.heatmapWanted = mode === 'heatmap';
           if (mode === current) return;
           this.typeChosen = true;
           // Zustände: Zeitstrahl braucht die Rohwechsel, Anteile und Wechsel
           // kommen ab dem Monat fertig vom Server — beides neu laden.
-          if (this.hasState && ['timeline', 'shares', 'changes'].includes(mode)) {
+          if (this.hasState && ['timeline', 'shares', 'changes', 'heatmap'].includes(mode)) {
             this.donut = false;
             this.stateMode = mode;
             this.timeline = true;
@@ -1545,9 +1570,23 @@
             raw: String(this.raw),
           });
           if (this.multiYearRequested) params.set('previous_years', String(this.compareYears));
-          const res = await fetch(`${BASE}/api/query-multi?${params}`);
+          // Heatmap: zusätzlich die Zellen (Wochentag x Stunde); Legende und
+          // Kennzahlen kommen weiter aus den Anteilen derselben Abfrage.
+          const heatmapParams = new URLSearchParams(params);
+          heatmapParams.set('heatmap', 'true');
+          heatmapParams.set('compare', 'false');
+          const wantHeatmap = this.stateMode === 'heatmap' && this.hasStateOrUnknown;
+          const [res, heatmapRes] = await Promise.all([
+            fetch(`${BASE}/api/query-multi?${params}`),
+            wantHeatmap ? fetch(`${BASE}/api/query-multi?${heatmapParams}`) : Promise.resolve(null),
+          ]);
           const data = await res.json();
+          const heatmapData = heatmapRes ? await heatmapRes.json() : null;
           if (requestId !== this._requestId) return;
+          if (heatmapData) {
+            const cellsById = new Map((heatmapData.series || []).map(x => [x.entity_id, x.cells]));
+            for (const entry of data.series || []) if (cellsById.get(entry.entity_id)) entry.cells = cellsById.get(entry.entity_id);
+          }
           // Zustände lassen sich nur unter sich darstellen, auch nicht mit
           // Schaltern (ROADMAP 1.29): sobald etwas anderes im Chart ist, fallen
           // die Zustände heraus und ein Hinweis nennt sie, statt Indizes als
@@ -1660,6 +1699,10 @@
             return d.toLocaleDateString(LOCALE, {month: 'short', year: 'numeric'});
           };
 
+          if (this.timeline && this.hasState && this.stateMode === 'heatmap') {
+            this.renderStateHeatmapPanels();
+            return;
+          }
           if (this.timeline && this.hasState && this.stateMode !== 'timeline') {
             this.renderStateBarPanels();
             return;
@@ -2670,6 +2713,47 @@
           }, true);
           chartInstance.resize();
         },
+        // Heatmap: eine je Zustands-Entität (state-entities.js heatmapPanels()).
+        renderStateHeatmapPanels() {
+          if (!chartInstance) chartInstance = echarts.init(document.getElementById('chart'));
+          const css = getComputedStyle(document.body);
+          const rows = this.heatmapRows;
+          // Ab zwei Entitäten wächst die Höhe mit, wie bei Anteilen/Wechsel.
+          document.getElementById('chart').style.height = rows.length > 1 ? `${Math.max(420, rows.length * 260)}px` : '';
+          chartInstance.resize();
+          chartInstance.setOption({
+            ...StateEntities.heatmapPanels(rows),
+            toolbox: toolboxOption(this.exportFilename, css.getPropertyValue('--surface'), css.getPropertyValue('--ink-faint')),
+          }, true);
+          chartInstance.resize();
+        },
+        // Sichtbare Zustands-Entitäten mit Zellen und gezeichnetem Zustand.
+        get heatmapRows() {
+          return this.series
+            .filter(s => s.aggregation_type === 'state' && s.cells && !this.legendHiddenIds.includes(s.entity_id))
+            .map(s => ({
+              name: this.entityNames[s.entity_id] || s.friendly_name,
+              states: s.states,
+              cells: s.cells,
+              idx: StateEntities.heatmapIndexFor(s.cells, s.states, this.heatmapStates[s.entity_id]),
+            }))
+            .filter(row => row.idx !== null);
+        },
+        // Ob ein Zustand in der Legende der gezeichnete ist (nur in der Heatmap
+        // gibt es überhaupt einen; "nicht verfügbar" ist keiner).
+        heatmapChipActive(entityId, idx) {
+          const s = this.series.find(x => x.entity_id === entityId);
+          if (!s || !s.cells) return false;
+          return StateEntities.heatmapIndexFor(s.cells, s.states, this.heatmapStates[entityId]) === idx;
+        },
+        // Klick auf einen Zustand in der Legende wählt ihn für diese Entität.
+        pickHeatmapState(entityId, idx) {
+          if (this.stateMode !== 'heatmap' || idx === StateEntities.UNAVAILABLE) return;
+          const s = this.series.find(x => x.entity_id === entityId);
+          if (!s) return;
+          this.heatmapStates = {...this.heatmapStates, [entityId]: StateEntities.raw(s.states, idx)};
+          this.render();
+        },
         renderStateDonuts() {
           const css = getComputedStyle(document.body);
           const surface = css.getPropertyValue('--surface');
@@ -2860,7 +2944,8 @@
             chart_stats: this.chartStats,
             legend_metrics: this.legendMetrics,
             legend_style: this.legendStyle,
-            chart_type: this.donut ? 'donut' : (this.timeline ? (this.hasState ? (this.stateChosen ? this.stateMode : 'auto') : 'timeline') : (this.allSwitch ? 'bar' : 'auto')),
+            chart_type: this.donut ? 'donut' : (this.timeline ? (this.hasState ? (this.heatmapWanted ? 'heatmap' : (this.stateChosen ? this.stateMode : 'auto')) : 'timeline') : (this.allSwitch ? 'bar' : 'auto')),
+            heatmap_states: this.heatmapStates,
             decimals: this.decimals,
             show_values: this.showValues,
             average_line: this.averageLine,
