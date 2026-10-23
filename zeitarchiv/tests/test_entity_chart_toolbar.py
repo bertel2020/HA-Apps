@@ -261,7 +261,10 @@ def test_soll_entity_is_excluded_from_the_names_and_order_list() -> None:
     sobald Soll irgendwo dazwischen im rohen Array steht."""
     assert 'x-for="(id, idx) in orderableEntityIds"' in EDITOR_TEMPLATE
     assert "colorIndexFor(id) % 8 + 1" in EDITOR_TEMPLATE
-    assert 'x-show="editing && orderableEntityIds.length > 0"' in EDITOR_TEMPLATE
+    # Die Liste "Ausgewählt" steht immer da; ihr Leer-Hinweis richtet sich
+    # ebenfalls nach orderableEntityIds, eine allein gewählte Soll-Entität
+    # gilt also nicht als Auswahl.
+    assert '<p class="entity-names-empty" x-show="!orderableEntityIds.length">' in EDITOR_TEMPLATE
     getter = EDITOR_JS.split("get orderableEntityIds() {", 1)[1].split("\n        },", 1)[0]
     assert "this.selectedEntityIds.filter(id => id !== this.compareSollEntityId)" in getter
 

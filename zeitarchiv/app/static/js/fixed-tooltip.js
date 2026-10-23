@@ -54,11 +54,33 @@ window.FixedTooltip = (() => {
     return el;
   }
 
+  // Chart-Variante (data-tooltip-dot = Farbfeld-Stil, optional
+  // data-tooltip-value): sieht aus wie der ECharts-Tooltip der Charts —
+  // heller Kasten, Farbpunkt, Name, fetter Wert. Für die Zustands-Kachel,
+  // deren Streifen/Balken sonst wie ein Fremdkörper neben den Charts wirkten.
+  function chartBauen(el, text) {
+    const box = document.createElement('div');
+    box.className = 'chart-tooltip-fixed';
+    const dot = document.createElement('span');
+    dot.className = 'state-dot';
+    dot.setAttribute('style', el.getAttribute('data-tooltip-dot'));
+    const name = document.createElement('span');
+    name.textContent = text;
+    box.append(dot, name);
+    const value = el.getAttribute('data-tooltip-value');
+    if (value) {
+      const strong = document.createElement('strong');
+      strong.textContent = value;
+      box.append(strong);
+    }
+    return box;
+  }
+
   function show(el) {
     const text = el.getAttribute('data-tooltip-fixed');
     if (!text) return;
     target = el;
-    tipEl = bauen(text);
+    tipEl = el.hasAttribute('data-tooltip-dot') ? chartBauen(el, text) : bauen(text);
     document.body.appendChild(tipEl);
     const rect = el.getBoundingClientRect();
     const tipRect = tipEl.getBoundingClientRect();
@@ -80,7 +102,9 @@ window.FixedTooltip = (() => {
       const el = e.target.closest('[data-tooltip-fixed]');
       if (!el || el === target) return;
       hide();
-      timer = setTimeout(() => show(el), 600);
+      // Chart-Tooltips erscheinen wie in ECharts sofort.
+      if (el.hasAttribute('data-tooltip-dot')) show(el);
+      else timer = setTimeout(() => show(el), 600);
     });
     document.body.addEventListener('mouseout', (e) => {
       if (e.target.closest('[data-tooltip-fixed]')) hide();

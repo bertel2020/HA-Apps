@@ -16,6 +16,15 @@
     {% if plan.months_to_skip %}
     <p style="margin:4px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);">{{ _("Übersprungen (Archivdatei existiert bereits): {months_to_skip}", months_to_skip=(plan.months_to_skip | join(', '))) }}</p>
     {% endif %}
+    {% if plan.new_states %}
+    <p style="margin:4px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);">{{ _("Neue Zustände würden angelegt: {states}", states=(plan.new_states | join(', '))) }}</p>
+    {% endif %}
+    {% if plan.unmapped_rows %}
+    <p style="margin:4px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);">{{ _("{rows} Zeile(n) ohne Namen im Profil der Variable übersprungen", rows=(plan.unmapped_rows | format_int)) }}</p>
+    {% endif %}
+    {% if plan.refused_state_rows %}
+    <p style="margin:4px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--danger);">{{ _("{rows} Zeile(n) würden verworfen: mehr Zustände als erlaubt", rows=(plan.refused_state_rows | format_int)) }}</p>
+    {% endif %}
     {% if plan.skipped_rows %}
     <p style="margin:4px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);">{{ _("{skipped_rows} Zeile(n) beim Einlesen übersprungen (nicht als Zeitstempel/Wert lesbar)", skipped_rows=(plan.skipped_rows | format_int)) }}</p>
     {% endif %}

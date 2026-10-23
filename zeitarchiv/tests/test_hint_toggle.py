@@ -68,6 +68,7 @@ def test_the_pages_that_use_buttons_load_the_script() -> None:
             "_settings_storage_index_form.html",
             "_settings_darstellung_form.html",
             "_settings_tips_form.html",
+            "_settings_ki_form.html",
         ],
         "statistik_index.html": ["_statistik_index_body.html"],
         "data_quality.html": [],

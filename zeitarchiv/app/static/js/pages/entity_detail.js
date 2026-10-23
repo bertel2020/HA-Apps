@@ -176,6 +176,20 @@
       return zahlen.reduce((summe, v) => summe + v, 0) / zahlen.length;
     }
 
+    // Gleitender Durchschnitt wie im Chart-Editor (dort mit der Begründung für
+    // die Fensterbreite): zentriertes Fenster, ein Zwölftel der Punkte, 3 bis 60.
+    function movingAverageWindow(pointCount) {
+      return Math.min(60, Math.max(3, Math.round(pointCount / 12)));
+    }
+    function movingAverage(points, windowPoints) {
+      return points.map((p, i) => {
+        const start = Math.max(0, i - Math.floor(windowPoints / 2));
+        const end = Math.min(points.length, i + Math.ceil(windowPoints / 2));
+        const slice = points.slice(start, end).map(q => q.value).filter(Number.isFinite);
+        return {ts: p.ts, value: slice.length ? slice.reduce((s, v) => s + v, 0) / slice.length : null};
+      });
+    }
+
     // Median-Abstand aufeinanderfolgender Zeitstempel — dieselbe Funktion wie
     // in chart_editor.html, hier für den Tooltip-Zeitstempel-Formatter unten.
     function detectResolutionSeconds(points) {
@@ -223,6 +237,13 @@
     // bei jedem Redraw. Ein normaler Closure-Variable reicht hier, weil es genau
     // eine Chart-Instanz pro Seite gibt.
     let chartInstance = null;
+    // Schichten der verdichteten Spalten des Zeitstrahls, je Element der Serie
+    // 'main' über den Index im sechsten Wert (-1 = ein einzelner Abschnitt).
+    // Außerhalb der Daten, weil ECharts in Werten keine Listen führt.
+    let timelineParts = [];
+    // Abschnitte der Entität, nur neu gebildet wenn sich die Punkte ändern: bei
+    // jedem Zoom-Schritt würde sonst die ganze Liste neu entstehen.
+    let timelineSegs = {points: null, end: null, segs: []};
 
     // Ab wie vielen Punkten ein Zoom überhaupt etwas aufdecken kann: der Chart
     // ist am Desktop rund 900 px breit, bei 200 Punkten hat jeder davon noch
@@ -331,6 +352,31 @@ function selectBrush() {
       return {start, end};
     }
 
+    // Zustands-Entitäten (Typ "state", ROADMAP 1.29): Farben, Abschnitte und
+    // Buckets aus state-entities.js — Chart-Editor und Kacheln nutzen dieselben.
+    const STATE_UNAVAILABLE = StateEntities.UNAVAILABLE;
+    const stateColor = StateEntities.color;
+    const stateSwatchStyle = StateEntities.swatchStyle;
+    const unavailablePattern = StateEntities.unavailablePattern;
+    const STATE_LOG_PAGE = 25;
+    // Darstellung je Zeitraum, solange niemand umschaltet: bis zur Woche der
+    // Zeitstrahl, ab dem Monat die Anteile (ROADMAP 1.29 — ein Jahr Zeitstrahl
+    // wären zehntausende Rechtecke, und die Frage dort ist "wie lange", nicht
+    // "wann genau").
+    // Eine selbst gewählte Darstellung (chosen) bleibt beim Zeitraumwechsel
+    // erhalten; nur die Heatmap gibt es erst ab dem Monat und fällt davor auf
+    // den Standard zurück — wer danach wieder in einen langen Zeitraum wechselt,
+    // bekommt sie zurück. Der Zeitstrahl ist ab dem Monat wählbar, weil er dort
+    // verdichtet gezeichnet wird (StateEntities.condenseSegments); nur der
+    // Standard bleibt Anteile.
+    const stateModeFor = (range, chosen = null) => {
+      const longRange = StateEntities.SERVER_SHARE_RANGES.includes(range);
+      if (chosen && !(chosen === 'heatmap' && !longRange)) return chosen;
+      return longRange ? 'shares' : 'timeline';
+    };
+    // Klick auf einen Balken öffnet den Zeitraum darunter.
+    const STATE_DRILL = {week: 'day', month: 'day', year: 'month', decade: 'year', day: 'hour'};
+
     function entityChart() {
       return {
         ranges: [
@@ -347,6 +393,8 @@ function selectBrush() {
         dynamicYAxis: CHART_OPTIONS.dynamic_y_axis,
         chartStats: CHART_OPTIONS.chart_stats,
         averageLine: CHART_OPTIONS.average_line,
+        areaFill: CHART_OPTIONS.area_fill,
+        averageStyle: CHART_OPTIONS.average_style,
         legendMetrics: [...CHART_OPTIONS.legend_metrics],
         legendStyle: CHART_OPTIONS.legend_style,
         decimals: CHART_OPTIONS.decimals,
@@ -365,6 +413,14 @@ function selectBrush() {
         // gehören dorthin, ein Ausschnitt ist eine Aussage über die letzten
         // dreißig Sekunden.
         zoomRange: null,
+        // Der Zeitstrahl zeigt gerade verdichtete Spalten statt einzelner Abschnitte.
+        tlCondensed: false,
+        // Spalten vom Server (query_state_columns) für Jahr und Dekade, nur im Zeitstrahl
+        // geladen (null = nicht angefordert); gezeichnet werden sie, wenn die
+        // Rohabschnitte fehlen, weil die Rohabfrage über der Grenze abbrach.
+        stateColumns: null,
+        stateColumnsDt: 0,
+        tlServer: false,
         // Zur Löschung markierte Bereiche: die Werte selbst sind aus points
         // herausgefiltert, hier kommen die betroffenen Zeitabschnitte zurück.
         // markedTotal ist die WAHRE Zahl markierter Werte im Fenster, auch
@@ -378,6 +434,33 @@ function selectBrush() {
         compareWindowStart: null,
         compareWindowEnd: null,
         aggregationType: null,
+        isState: IS_STATE,
+        // Zuordnung Index → Text aus /api/query ({idx, text, label}), nur bei
+        // Zustands-Entitäten gefüllt; "nicht verfügbar" steht zuletzt.
+        states: [],
+        // Zeitstrahl, Anteile oder Wechsel je Bucket. Nicht gespeichert: der
+        // Zeitraum bestimmt den Ausgangspunkt (stateModeFor), umgeschaltet
+        // wird für den Moment. stateModeChosen merkt die eigene Wahl, damit sie
+        // einen Zeitraumwechsel überlebt.
+        stateMode: stateModeFor(INITIAL_RANGE || 'day'),
+        stateModeChosen: null,
+        // Anteile je Bucket vom Server (chart_type "shares"), nur ab dem Monat.
+        // points bleiben die Rohwechsel — Protokoll und längster Abschnitt
+        // brauchen sie in jedem Zeitraum.
+        sharePoints: [],
+        // Heatmap (Wochentag x Stunde) vom Server, nur in der Ansicht "Heatmap";
+        // null = nicht geladen. Der gezeichnete Zustand ist nicht gespeichert:
+        // ohne Wahl der mit der größten Streuung (heatmapActive).
+        heatmapCells: null,
+        heatmapState: null,
+        // Per Klick auf die Legende ausgeblendete Zustände — bewusst nicht
+        // gespeichert, wie das Ein-/Ausblenden von Serien im Chart-Editor.
+        hiddenStates: [],
+        stateLog: CHART_OPTIONS.state_log !== false,
+        stateLogPage: 0,
+        stateLogDays: {},
+        // Zeile im Wechsel-Protokoll, deren Band gerade hervorgehoben ist.
+        stateHot: null,
         windowStart: null,
         windowEnd: null,
         // Natürliches, NIE an "jetzt" gedeckeltes Periodenende (vom Server,
@@ -438,7 +521,25 @@ function selectBrush() {
             entity_id: ENTITY_ID, name: DISPLAY_NAME,
             range: this.range, continuous: String(this.continuous),
             compare: String(this.compare), compare_mode: this.compareMode,
+            // Darstellung mitnehmen: sonst fängt der Editor bei Null an und die
+            // Wahl dieser Seite (Legende als Tabelle, Nachkommastellen …) ginge
+            // beim Speichern verloren. Der Editor kennt "line" nicht: eine
+            // Schalter-Entität ohne Zeitstrahl heißt dort "bar", alles andere
+            // bestimmt "auto" je Serie selbst.
+            chart_type: this.isState ? this.stateMode : (this.chartType === 'timeline' ? 'timeline' : (DEFAULT_CHART_TYPE === 'timeline' ? 'bar' : 'auto')),
+            decimals: this.decimals,
+            show_points: String(this.showPoints), show_values: String(this.showValues),
+            dynamic_y_axis: String(this.dynamicYAxis), average_line: String(this.averageLine),
+            area_fill: String(this.areaFill), average_style: this.averageStyle,
+            chart_stats: String(this.chartStats), legend_metrics: this.legendMetrics.join(','),
+            legend_style: this.legendStyle,
           });
+          // Heatmap: auch der gezeichnete Zustand geht mit (als Rohtext, siehe
+          // saved_charts.heatmap_states), sonst finge der Editor wieder bei der
+          // Vorbelegung an.
+          if (this.isState && this.stateMode === 'heatmap' && this.heatmapActive !== null) {
+            params.set('heatmap_state', StateEntities.raw(this.states, this.heatmapActive));
+          }
           // Eine vergangene Periode (z. B. 2025) geht als fester Zeitraum mit:
           // ein Tag darin (Mitte des Fensters) statt des Versatzes, siehe
           // saved_charts.period_anchor. Die laufende Periode bleibt "immer
@@ -477,7 +578,11 @@ function selectBrush() {
         // sondern um Sichtbarkeit (Begründung bei seiner dataZoom-Angabe in
         // renderTimeline()), und die Zahl der Segmente sagt darüber nichts.
         get zoomAvailable() {
+          if (this.isState) return this.stateMode === 'timeline';
           return this.chartType === 'timeline' || this.points.length > ZOOM_MIN_POINTS;
+        },
+        get chartIsTimeline() {
+          return this.isState ? this.stateMode === 'timeline' : this.chartType === 'timeline';
         },
         // Steht dauerhaft unter dem Chart, weil er zwei Dinge auf einmal sagt,
         // von denen das erste ein Datenzustand ist: WIE VIELE Punkte gerade
@@ -489,6 +594,24 @@ function selectBrush() {
         // Grund, und der steht hier.
         get zoomHint() {
           const geste = t('mit Strg und Mausrad zoomen, mit Umschalt einen Bereich aufziehen, am Telefon mit zwei Fingern');
+          if (this.isState && this.stateMode === 'heatmap') {
+            return t('Dunkler heißt: öfter in diesem Zustand. Blasse Zellen haben weniger als 3 Beobachtungen.');
+          }
+          if (this.isState && this.stateMode === 'donut') {
+            return t('Anteile des gewählten Zeitraums.');
+          }
+          if (this.isState && this.stateMode !== 'timeline') {
+            return t('Ein Klick auf einen Balken öffnet diesen Zeitraum.');
+          }
+          if (this.isState && this.tlServer) {
+            return t('Jede Spalte zeigt die Anteile der Zustände in dieser Zeitspanne. Die Spalten sind für den ganzen Zeitraum vorgerechnet, Zoomen macht sie nur breiter.');
+          }
+          if (this.isState && this.tlCondensed) {
+            return t('Jede Spalte zeigt die Anteile der Zustände in dieser Zeitspanne — {geste}, bis die einzelnen Abschnitte sichtbar werden.', {geste});
+          }
+          if (this.isState) {
+            return t('Kurze Zustände sind schmaler als ein Bildpunkt — {geste}.', {geste});
+          }
           if (this.chartType === 'timeline') {
             return t('Kurze Schaltvorgänge sind schmaler als ein Bildpunkt — {geste}.', {geste});
           }
@@ -532,6 +655,264 @@ function selectBrush() {
           if (!this.markedTotal) return t('Keine Markierungen');
           return this.markedTotal === 1 ? t('1 markiert') : t('{count} markiert', {count: this.markedTotal});
         },
+        // --- Zustands-Entitäten ---------------------------------------------
+        // Abschnitte {s, e, idx, key} in Sekunden über den ganzen geladenen
+        // Zeitraum. key ist der Beginn des Abschnitts und verbindet Band im
+        // Zeitstrahl und Zeile im Protokoll. Der letzte Abschnitt reicht bis
+        // zum Fensterende (bei der laufenden Periode: jetzt).
+        // Gibt es etwas zu zeichnen? Bei Zuständen auch ohne Rohwechsel: in Jahr und
+        // Dekade bricht die Rohabfrage über der Grenze ab, Anteile und Spalten
+        // kommen trotzdem.
+        get hasData() {
+          return this.points.length > 0
+            || (this.isState && (this.sharePoints.length > 0 || (this.stateColumns || []).length > 0));
+        },
+        get stateSegments() {
+          if (!this.isState) return [];
+          return StateEntities.segments(this.points, this.windowEnd);
+        },
+        // Buckets für Anteile/Wechsel: ab dem Monat vom Server (exakt aus den
+        // Rollups, auch wo die Rohwerte gekappt wären), darunter aus den
+        // Rohwechseln im Browser.
+        get stateBuckets() {
+          if (!this.isState) return [];
+          if (StateEntities.SERVER_SHARE_RANGES.includes(this.range)) {
+            return StateEntities.bucketsFromShares(this.sharePoints);
+          }
+          const [bucketStart, bucketNext] = StateEntities.RANGE_BUCKETS[this.range]();
+          return StateEntities.bucketsFromSegments(this.stateSegments, bucketStart, bucketNext);
+        },
+        // Bezugsfenster für Legende, Kennzahlen und Protokoll: der gezoomte
+        // Ausschnitt, sonst der ganze Zeitraum (ROADMAP 1.29: Zoom grenzt alles
+        // unter dem Chart ein).
+        get stateWindow() {
+          if (this.zoomRange) return {a: this.zoomRange.start / 1000, b: this.zoomRange.end / 1000};
+          return {a: this.windowStart ?? 0, b: this.windowEnd ?? 0};
+        },
+        get stateSummary() {
+          // Ohne Zoom ab dem Monat aus den Server-Buckets: die Rohwechsel eines
+          // Jahrzehnts können gekappt sein, die Rollups nicht. Der längste
+          // Abschnitt kommt weiter aus den Rohwechseln, das Rollup kennt ihn nicht.
+          if (this.sharePoints.length && !this.zoomRange) {
+            const rows = StateEntities.totals(this.stateBuckets, this.states);
+            let longest = null;
+            for (const seg of this.stateSegments) {
+              if (seg.idx !== STATE_UNAVAILABLE && (!longest || seg.e - seg.s > longest.seconds)) {
+                longest = {idx: seg.idx, seconds: seg.e - seg.s};
+              }
+            }
+            const na = rows.find(row => row.idx === STATE_UNAVAILABLE);
+            return {
+              rows,
+              changes: rows.reduce((sum, row) => sum + row.entries, 0),
+              longest,
+              unavailable: na ? na.seconds : 0,
+            };
+          }
+          const {a, b} = this.stateWindow;
+          const total = Math.max(b - a, 1);
+          const seconds = new Map();
+          const entries = new Map();
+          let changes = 0;
+          let longest = null;
+          for (const seg of this.stateSegments) {
+            const s = Math.max(seg.s, a);
+            const e = Math.min(seg.e, b);
+            if (!(e > s)) continue;
+            seconds.set(seg.idx, (seconds.get(seg.idx) || 0) + (e - s));
+            if (seg.s >= a) {
+              entries.set(seg.idx, (entries.get(seg.idx) || 0) + 1);
+              changes += 1;
+            }
+            if (seg.idx !== STATE_UNAVAILABLE && (!longest || e - s > longest.seconds)) {
+              longest = {idx: seg.idx, seconds: e - s};
+            }
+          }
+          // Reihenfolge = Index, "nicht verfügbar" zuletzt (ROADMAP 1.29).
+          const order = this.states.map(st => st.idx).filter(idx => seconds.has(idx));
+          return {
+            rows: order.map(idx => ({
+              idx, seconds: seconds.get(idx), share: seconds.get(idx) / total * 100, entries: entries.get(idx) || 0,
+            })),
+            // Der erste Abschnitt im Fenster ist ein Zustand, kein Wechsel.
+            changes: Math.max(changes - 1, 0),
+            longest,
+            unavailable: seconds.get(STATE_UNAVAILABLE) || 0,
+          };
+        },
+        get stateLogRows() {
+          const {a, b} = this.stateWindow;
+          return this.stateSegments
+            .filter(seg => !this.hiddenStates.includes(seg.idx) && seg.e > a && seg.s < b)
+            .reverse();
+        },
+        // Protokoll nach Tagen gruppiert (ab einem Zeitraum über einen Tag), der
+        // jüngste zuerst. Die beiden neuesten Tage sind offen, ältere zu, bis
+        // man sie öffnet (stateLogDays hält nur die eigenen Umschaltungen).
+        get stateLogGroups() {
+          const rows = this.stateLogRows;
+          if (['hour', 'day'].includes(this.range)) {
+            // Kein Tag, den man zerschneiden könnte: einfach seitenweise.
+            const groups = [];
+            for (let i = 0; i < rows.length; i += STATE_LOG_PAGE) groups.push({key: `all${i}`, segs: rows.slice(i, i + STATE_LOG_PAGE), open: true});
+            return {multiDay: false, groups: groups.length ? groups : [{key: 'all', segs: [], open: true}]};
+          }
+          const byDay = new Map();
+          rows.forEach(seg => {
+            const key = new Date(seg.s * 1000).toDateString();
+            if (!byDay.has(key)) byDay.set(key, []);
+            byDay.get(key).push(seg);
+          });
+          const groups = [...byDay].map(([key, segs], order) => ({
+            key, segs, open: key in this.stateLogDays ? this.stateLogDays[key] : order < 2,
+          }));
+          return {multiDay: true, groups};
+        },
+        // Seiten zu je höchstens STATE_LOG_PAGE ausgeklappten Zeilen. Ein Tag
+        // wird nie getrennt: er kommt ganz auf eine Seite, ein größerer Tag
+        // bekommt eine eigene. Zugeklappte Tage kosten nichts.
+        get stateLogPages() {
+          const pages = [];
+          let cur = null, used = 0;
+          this.stateLogGroups.groups.forEach(g => {
+            const cost = g.open ? g.segs.length : 0;
+            if (!cur || (used > 0 && used + cost > STATE_LOG_PAGE)) {
+              cur = [];
+              used = 0;
+              pages.push(cur);
+            }
+            cur.push(g);
+            used += cost;
+          });
+          return pages;
+        },
+        get stateLogPageNo() {
+          return Math.min(this.stateLogPage, Math.max(this.stateLogPages.length - 1, 0));
+        },
+        // Protokoll-Einträge: Tageskopf (mit Mini-Leiste der Zusammensetzung)
+        // und darunter die Abschnitte als Zeitspanne mit Dauerbalken,
+        // nur die aktuelle Seite.
+        get stateLogItems() {
+          const {multiDay} = this.stateLogGroups;
+          const groups = this.stateLogPages[this.stateLogPageNo] || [];
+          const longest = this.stateLogRows.reduce((m, seg) => Math.max(m, seg.e - seg.s), 1);
+          const mkRow = seg => ({
+            type: 'row', id: `r${seg.key}`, seg,
+            span: `${this.fmtStateTime(seg.s)} – ${this.stateRunning(seg) ? t('jetzt') : this.fmtStateTime(seg.e)}`,
+            bar: `width:${Math.max((seg.e - seg.s) / longest * 100, 1.5)}%;${stateSwatchStyle(seg.idx)}`,
+          });
+          const items = [];
+          groups.forEach(g => {
+            if (multiDay) {
+              const total = g.segs.reduce((sum, seg) => sum + (seg.e - seg.s), 0) || 1;
+              const count = g.segs.length;
+              items.push({
+                type: 'day', id: `d${g.key}`, key: g.key, open: g.open,
+                label: new Date(g.segs[0].s * 1000).toLocaleDateString(LOCALE, {weekday: 'short', day: '2-digit', month: '2-digit'}),
+                countLabel: count === 1 ? t('1 Abschnitt') : t('{count} Abschnitte', {count}),
+                strip: [...g.segs].reverse().map(seg => ({key: seg.key, style: `width:${(seg.e - seg.s) / total * 100}%;${stateSwatchStyle(seg.idx)}`})),
+              });
+            }
+            if (!g.open) return;
+            g.segs.forEach(seg => items.push(mkRow(seg)));
+          });
+          return items;
+        },
+        toggleLogDay(key, open) { this.stateLogDays = {...this.stateLogDays, [key]: !open}; },
+        get stateLogTitle() {
+          const count = this.stateLogRows.length.toLocaleString(LOCALE);
+          return this.zoomRange
+            ? t('Wechsel-Protokoll · {count} im Ausschnitt', {count})
+            : t('Wechsel-Protokoll · {count}', {count});
+        },
+        get stateKpiText() {
+          const sum = this.stateSummary;
+          const parts = [sum.changes === 1 ? t('1 Wechsel') : t('{count} Wechsel', {count: sum.changes.toLocaleString(LOCALE)})];
+          if (sum.longest) {
+            parts.push(t('längster Abschnitt {dauer} ({zustand})', {
+              dauer: NumberFormat.fmtDuration(sum.longest.seconds), zustand: this.stateLabel(sum.longest.idx),
+            }));
+          }
+          parts.push(t('nicht verfügbar {dauer}', {dauer: NumberFormat.fmtDuration(sum.unavailable)}));
+          return parts.join(' · ');
+        },
+        stateLabel(idx) {
+          if (idx === STATE_UNAVAILABLE) return t('nicht verfügbar');
+          const st = this.states.find(x => x.idx === idx);
+          return st ? (st.label || st.text) : String(idx);
+        },
+        stateRaw(idx) {
+          const st = this.states.find(x => x.idx === idx);
+          return st ? st.text : '';
+        },
+        stateSwatch(idx) { return stateSwatchStyle(idx); },
+        stateShare(row) { return StateEntities.fmtShare(row.share); },
+        setStateMode(mode) {
+          this.stateModeChosen = mode;
+          if (mode === this.stateMode) return;
+          this.stateMode = mode;
+          this.zoomRange = null;
+          // Die Heatmap hat eigene Daten; die anderen Ansichten haben ihre
+          // schon geladen.
+          if (mode === 'heatmap' && this.heatmapCells === null) this.load();
+          else if (mode === 'timeline' && this.stateColumns === null && StateEntities.COLUMN_RANGES.includes(this.range)) this.load();
+          else this.render();
+        },
+        // Heatmap gibt es ab dem Monat (siehe stateModeFor).
+        get heatmapAvailable() { return StateEntities.SERVER_SHARE_RANGES.includes(this.range); },
+        // Gezeichneter Zustand: die Wahl, solange sie in den Zellen vorkommt,
+        // sonst der mit der größten Streuung.
+        get heatmapActive() {
+          if (!this.heatmapCells) return null;
+          if (this.heatmapState !== null && StateEntities.heatmapStates(this.heatmapCells).has(this.heatmapState)) {
+            return this.heatmapState;
+          }
+          return StateEntities.heatmapDefault(this.heatmapCells);
+        },
+        // In der Heatmap wählt die Legende den gezeichneten Zustand (genau
+        // einen, "nicht verfügbar" nicht), sonst blendet sie Zustände aus.
+        chipInactive(idx) {
+          return this.stateMode === 'heatmap' ? idx !== this.heatmapActive : this.hiddenStates.includes(idx);
+        },
+        chipPressed(idx) { return (!this.chipInactive(idx)).toString(); },
+        stateChip(idx) {
+          if (this.stateMode !== 'heatmap') return this.toggleState(idx);
+          if (idx === STATE_UNAVAILABLE) return;
+          this.heatmapState = idx;
+          this.render();
+        },
+        fmtStateDuration(seconds) { return NumberFormat.fmtDuration(seconds); },
+        fmtStateTime(ts) {
+          return new Date(ts * 1000).toLocaleTimeString(LOCALE, {hour: '2-digit', minute: '2-digit'});
+        },
+        stateRunning(seg) { return this.isCurrent && seg.e >= (this.windowEnd ?? 0); },
+        toggleState(idx) {
+          const i = this.hiddenStates.indexOf(idx);
+          if (i >= 0) this.hiddenStates.splice(i, 1);
+          else this.hiddenStates.push(idx);
+          this.render();
+        },
+        // Hover über eine Protokollzeile: Band im Zeitstrahl einrahmen.
+        highlightState(key) {
+          this.stateHot = key;
+          if (!chartInstance || !this.chartIsTimeline) return;
+          const seg = key == null ? null : this.stateSegments.find(x => x.key === key);
+          chartInstance.setOption({series: [{id: 'main'}, {id: 'hl', data: seg ? [[0, seg.s * 1000, seg.e * 1000]] : []}]});
+        },
+        // Klick auf ein Band: zur Zeile springen (auf deren Seite blättern).
+        focusStateRow(key) {
+          if (!this.stateLog) this.stateLog = true;
+          const group = this.stateLogGroups.groups.find(g => g.segs.some(seg => seg.key === key));
+          if (!group) return;
+          if (!group.open) this.stateLogDays = {...this.stateLogDays, [group.key]: true};
+          const page = this.stateLogPages.findIndex(pg => pg.some(g => g.segs.some(seg => seg.key === key)));
+          if (page >= 0) this.stateLogPage = page;
+          this.stateHot = key;
+          this.$nextTick(() => {
+            const row = document.querySelector(`.state-log [data-key="${key}"]`);
+            if (row) row.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+          });
+        },
         toggleMarked() {
           this.showMarked = !this.showMarked;
           this.load();
@@ -573,6 +954,7 @@ function selectBrush() {
           // jedem Zeitraum — sonst kämen gebucketete Daten, bis man auf
           // Balken und zurück schaltet.
           this.raw = this.chartType === 'timeline';
+          if (this.isState) this.stateMode = stateModeFor(key, this.stateModeChosen);
           this.offset = nextOffset;
           this.continuous = false;
           this.load();
@@ -604,7 +986,8 @@ function selectBrush() {
                 show_marked: this.showMarked,
                 average_line: this.averageLine,
                 legend_metrics: this.legendMetrics, legend_style: this.legendStyle,
-                decimals: this.decimals,
+                decimals: this.decimals, state_log: this.stateLog,
+                area_fill: this.areaFill, average_style: this.averageStyle,
               }),
             });
           } catch (e) {
@@ -649,8 +1032,11 @@ function selectBrush() {
             this.chartStats !== CHART_DEFAULTS.chart_stats ||
             this.showMarked !== CHART_DEFAULTS.show_marked ||
             this.averageLine !== CHART_DEFAULTS.average_line ||
+            this.areaFill !== CHART_DEFAULTS.area_fill ||
+            this.averageStyle !== CHART_DEFAULTS.average_style ||
             this.legendStyle !== CHART_DEFAULTS.legend_style ||
             this.decimals !== CHART_DEFAULTS.decimals ||
+            this.stateLog !== (CHART_DEFAULTS.state_log !== false) ||
             JSON.stringify([...this.legendMetrics].sort()) !== JSON.stringify([...CHART_DEFAULTS.legend_metrics].sort())
           );
         },
@@ -730,18 +1116,55 @@ function selectBrush() {
           // und Archiv, und im Normalfall (Entität ohne offene Markierungen)
           // wäre der Ertrag eine leere Liste.
           if (this.showMarked) params.set('marked', 'true');
-          const res = await fetch(`${BASE}/api/query?${params}`);
-          const data = await res.json();
+          // Zustände ab dem Monat: zusätzlich die Anteile je Bucket, parallel
+          // zu den Rohwechseln (raw bleibt bei Zuständen immer true).
+          const shareParams = new URLSearchParams(params);
+          shareParams.set('raw', 'false');
+          shareParams.delete('marked');
+          const wantShares = this.isState && StateEntities.SERVER_SHARE_RANGES.includes(this.range);
+          // Heatmap: zusätzlich Zeit je Wochentag und Stunde. Legende und
+          // Kennzahlen kommen weiter aus den Anteilen.
+          const wantHeatmap = wantShares && this.stateMode === 'heatmap';
+          const heatmapParams = new URLSearchParams(shareParams);
+          heatmapParams.set('heatmap', 'true');
+          heatmapParams.set('compare', 'false');
+          // Zeitstrahl in Jahr/Dekade: zusätzlich Spalten vom Server, so breit wie der Chart.
+          const wantColumns = this.isState && this.stateMode === 'timeline' && StateEntities.COLUMN_RANGES.includes(this.range);
+          const columnsParams = new URLSearchParams(shareParams);
+          columnsParams.set('columns', 'true');
+          columnsParams.set('compare', 'false');
+          const chartEl = document.getElementById('chart');
+          columnsParams.set('px', String(Math.max(60, Math.round((chartEl ? chartEl.clientWidth : 600) - 30))));
+          const [res, shareRes, heatmapRes, columnsRes] = await Promise.all([
+            fetch(`${BASE}/api/query?${params}`),
+            wantShares ? fetch(`${BASE}/api/query?${shareParams}`) : Promise.resolve(null),
+            wantHeatmap ? fetch(`${BASE}/api/query?${heatmapParams}`) : Promise.resolve(null),
+            wantColumns ? fetch(`${BASE}/api/query?${columnsParams}`) : Promise.resolve(null),
+          ]);
+          // Die Rohabfrage bricht bei zu vielen Wechseln mit einem Fehler ab: dann ohne Punkte weiter.
+          const data = res.ok ? await res.json() : {};
+          const shareData = shareRes && shareRes.ok ? await shareRes.json() : null;
+          const heatmapData = heatmapRes ? await heatmapRes.json() : null;
+          const columnsData = columnsRes && columnsRes.ok ? await columnsRes.json() : null;
           if (requestId !== this._requestId) return; // eine neuere Anfrage ist schon unterwegs/angekommen
+          this.sharePoints = shareData && shareData.chart_type === 'shares' ? shareData.points : [];
+          this.heatmapCells = heatmapData && heatmapData.chart_type === 'heatmap' ? heatmapData.cells || [] : null;
+          this.stateColumns = columnsData && columnsData.chart_type === 'columns' ? columnsData.columns || [] : null;
+          this.stateColumnsDt = columnsData ? columnsData.dt : 0;
+          // Fenster und Zustandsliste vom Roh-Ergebnis, fehlt es (Abfrage abgebrochen), von den Anteilen oder Spalten.
+          const meta = data.window_start != null ? data : (shareData || columnsData || data);
           this.points = data.points || [];
           this.comparePoints = data.compare_points || [];
           this.compareWindowStart = data.compare_window_start ?? null;
           this.compareWindowEnd = data.compare_window_end ?? null;
-          this.aggregationType = data.aggregation_type;
-          this.windowStart = data.window_start;
-          this.windowEnd = data.window_end;
-          this.periodEnd = data.period_end ?? data.window_end;
-          this.isCurrent = data.is_current;
+          this.aggregationType = meta.aggregation_type;
+          this.states = meta.states || [];
+          this.stateLogPage = 0;
+          this.stateLogDays = {};
+          this.windowStart = meta.window_start;
+          this.windowEnd = meta.window_end;
+          this.periodEnd = meta.period_end ?? meta.window_end;
+          this.isCurrent = meta.is_current;
           this.markedRanges = data.marked_ranges || [];
           this.markedTotal = data.marked_total || 0;
           this.loading = false;
@@ -749,12 +1172,20 @@ function selectBrush() {
         },
 
         render() {
-          if (!this.points.length) return;
+          if (!this.hasData) return;
           if (!chartInstance) {
             chartInstance = echarts.init(document.getElementById('chart'));
             // Einmalig bei der Instanzerzeugung registriert, nicht bei jedem
             // Rendern — sonst stapeln sich mit jedem Neuzeichnen weitere
             // Handler auf derselben Instanz.
+            chartInstance.on('click', (p) => {
+              if (this.isState && p.seriesId === 'main' && p.value[4] != null) this.focusStateRow(p.value[4]);
+              else if (this.isState && /^\d+:/.test(String(p.seriesId))) this.drillState(p.dataIndex);
+            });
+            chartInstance.on('mouseover', (p) => {
+              if (this.isState && p.seriesId === 'main') this.stateHot = p.value[4];
+            });
+            chartInstance.on('mouseout', () => { if (this.isState) this.stateHot = null; });
             chartInstance.on('dataZoom', () => {
               const [zoom] = chartInstance.getOption().dataZoom || [];
               this.zoomRange = visibleWindow(
@@ -762,6 +1193,11 @@ function selectBrush() {
                 this.windowStart != null ? this.windowStart * 1000 : null,
                 this.periodEnd != null ? this.periodEnd * 1000 - 1000 : null,
               );
+              // Beim Zoomen und Schwenken neu verdichten (ein Bildpunkt ist jetzt
+              // eine andere Zeitspanne); einmal je Bild, nicht je Ereignis.
+              if (this.isState && this.stateMode === 'timeline' && !this._tlFrame) {
+                this._tlFrame = requestAnimationFrame(() => { this._tlFrame = 0; this.updateStateTimeline(); });
+              }
             });
 
             // Umschalt gedrückt = Bereich aufziehen. Die Taste statt eines
@@ -842,6 +1278,18 @@ function selectBrush() {
           };
           const tooltipBucketSeconds = detectResolutionSeconds(this.points);
 
+          if (this.isState && this.stateMode === 'heatmap') {
+            this.renderStateHeatmap();
+            return;
+          }
+          if (this.isState && this.stateMode === 'donut') {
+            this.renderStateDonut();
+            return;
+          }
+          if (this.isState && this.stateMode !== 'timeline') {
+            this.renderStateBars();
+            return;
+          }
           if (this.chartType === 'timeline') {
             this.renderTimeline(fmt);
             return;
@@ -990,7 +1438,24 @@ function selectBrush() {
           //
           // Der Wert kommt aus denselben Punkten wie die Legende, Zahl und
           // Linie stimmen hier also immer überein.
-          const durchschnitt = this.averageLine ? averageOf(this.points.map(p => p.value)) : null;
+          const rolling = this.averageLine && this.averageStyle === 'rolling' && this.chartType === 'line';
+          const durchschnitt = this.averageLine && !rolling ? averageOf(this.points.map(p => p.value)) : null;
+          if (this.chartType === 'line' && this.areaFill) {
+            series[0].areaStyle = {color: getComputedStyle(document.body).getPropertyValue('--chart-line'), opacity: 0.08};
+          }
+          if (rolling && this.points.length) {
+            // Eigene Serie wie im Chart-Editor, nicht über die Legende schaltbar.
+            series.push({
+              name: t('{name} (Ø gleitend)', {name: DISPLAY_NAME}),
+              type: 'line',
+              data: movingAverage(this.points, movingAverageWindow(this.points.length))
+                .filter(p => p.value !== null).map(p => [p.ts * 1000, p.value]),
+              smooth: true,
+              symbol: 'none',
+              lineStyle: {width: 2.5, color: getComputedStyle(document.body).getPropertyValue('--chart-line')},
+              z: 3,
+            });
+          }
           if (durchschnitt !== null) {
             series[0].markLine = {
               // Wie beim Markierungs-Band: die Linie ist Beiwerk und darf das
@@ -1160,15 +1625,21 @@ function selectBrush() {
         // "wann AN", ohne dass ein zusätzlicher Rahmen um den ganzen Zeitraum nötig
         // wäre, um "kein Wert" von "AUS" zu unterscheiden.
         renderTimeline(fmt) {
-          const intervals = [];
-          for (let i = 0; i < this.points.length; i++) {
-            const start = this.points[i].ts;
-            const end = i + 1 < this.points.length ? this.points[i + 1].ts : (this.windowEnd ?? start);
-            if (this.points[i].value >= 0.5 && end > start) {
-              intervals.push([0, start * 1000, end * 1000]);
+          let intervals = [];
+          if (this.isState) {
+            intervals = this.stateTimelineItems();
+          } else {
+            for (let i = 0; i < this.points.length; i++) {
+              const start = this.points[i].ts;
+              const end = i + 1 < this.points.length ? this.points[i + 1].ts : (this.windowEnd ?? start);
+              if (this.points[i].value >= 0.5 && end > start) {
+                intervals.push([0, start * 1000, end * 1000]);
+              }
             }
           }
           const accent = getComputedStyle(document.body).getPropertyValue('--chart-bar');
+          const naFill = this.isState ? unavailablePattern() : null;
+          const fillFor = idx => (idx === STATE_UNAVAILABLE ? naFill : stateColor(idx));
           const uiFontScale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-scale')) || 1;
           const option = {
             textStyle: {
@@ -1208,11 +1679,19 @@ function selectBrush() {
                   const d = new Date(ms);
                   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
                 };
-                return `${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
+                const span = `${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
+                if (!this.isState) return span;
+                if (p.value[5] >= 0) return this.condensedTooltip(p.value[1], p.value[2], timelineParts[p.value[5]]);
+                const idx = p.value[3];
+                const raw = this.stateRaw(idx);
+                const name = escapeHtml(this.stateLabel(idx));
+                const rawPart = raw && raw !== this.stateLabel(idx) ? ` <span style="opacity:.6">${escapeHtml(raw)}</span>` : '';
+                return `<strong>${name}</strong>${rawPart}<br>${span}`;
               },
               appendToBody: true,
             },
             series: [{
+              id: 'main',
               type: 'custom',
               renderItem: (params, api) => {
                 const categoryIndex = api.value(0);
@@ -1220,13 +1699,65 @@ function selectBrush() {
                 const end = api.coord([api.value(2), categoryIndex]);
                 const height = api.size([0, 1])[1] * 0.6;
                 const rectShape = echarts.graphic.clipRectByRect(
-                  {x: start[0], y: start[1] - height / 2, width: end[0] - start[0], height},
+                  // Mindestens 1 px: ein Zustand von Sekunden soll als Strich
+                  // sichtbar bleiben statt ganz zu verschwinden.
+                  {x: start[0], y: start[1] - height / 2, width: Math.max(end[0] - start[0], this.isState ? 1 : 0), height},
                   {x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height}
                 );
-                return rectShape && {type: 'rect', shape: rectShape, style: {fill: accent}};
+                // Verdichtete Spalte: die Anteile der Zustände als Schichten.
+                const parts = this.isState && api.value(5) >= 0 ? timelineParts[api.value(5)] : null;
+                if (rectShape && parts) return StateEntities.condensedShape(parts, rectShape, fillFor);
+                return rectShape && {type: 'rect', shape: rectShape, style: {fill: this.isState ? fillFor(api.value(3)) : accent}};
               },
               encode: {x: [1, 2], y: 0},
               data: intervals,
+            }, {
+              // Rahmen um das Band der Protokollzeile unter dem Mauszeiger
+              // (highlightState()); bei Schaltern bleibt die Reihe leer.
+              id: 'hl',
+              type: 'custom',
+              silent: true,
+              z: 10,
+              renderItem: (params, api) => {
+                const start = api.coord([api.value(1), api.value(0)]);
+                const end = api.coord([api.value(2), api.value(0)]);
+                const height = api.size([0, 1])[1] * 0.6 + 8;
+                const rectShape = echarts.graphic.clipRectByRect(
+                  {x: start[0] - 2, y: start[1] - height / 2, width: Math.max(end[0] - start[0], 1) + 4, height},
+                  {x: params.coordSys.x - 3, y: params.coordSys.y, width: params.coordSys.width + 6, height: params.coordSys.height}
+                );
+                const ink = getComputedStyle(document.body).getPropertyValue('--ink').trim();
+                return rectShape && {type: 'rect', shape: {...rectShape, r: 3}, style: {fill: 'transparent', stroke: ink, lineWidth: 2}};
+              },
+              encode: {x: [1, 2], y: 0},
+              data: [],
+            }, {
+              // Zur Löschung markierte Bereiche als senkrechte Bänder hinter dem
+              // Zeitstrahl, wie im Linien-/Balkenpfad (markArea in render()).
+              // Eine eigene Reihe statt markArea: die custom-Reihe des Zeitstrahls
+              // trägt keines. Ohne markierte Werte oder bei ausgeschaltetem
+              // Schalter bleibt sie leer.
+              id: 'marked',
+              type: 'custom',
+              silent: true,
+              z: 1,
+              renderItem: (params, api) => {
+                const start = api.coord([api.value(1), 0]);
+                const end = api.coord([api.value(2), 0]);
+                const rectShape = echarts.graphic.clipRectByRect(
+                  {x: start[0], y: params.coordSys.y, width: Math.max(end[0] - start[0], 3), height: params.coordSys.height},
+                  {x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height}
+                );
+                const css = getComputedStyle(document.body);
+                // Das Band des Zeitstrahls liegt davor und deckt die Mitte ab: der Rand
+                // in Warnfarbe zeigt die Markierung oberhalb und unterhalb davon.
+                return rectShape && {
+                  type: 'rect', shape: rectShape,
+                  style: {fill: css.getPropertyValue('--danger-soft').trim(), stroke: css.getPropertyValue('--danger').trim(), lineWidth: 1},
+                };
+              },
+              encode: {x: [1, 2], y: 0},
+              data: this.showMarked ? this.markedRanges.map(b => [0, b.start * 1000, b.end * 1000]) : [],
             }],
             // Der Zeitstrahl bekommt den Zoom IMMER, ohne die Punkt-Schwelle
             // der Linien-/Balken-Ansicht. Grund ist kein Komfort, sondern
@@ -1245,6 +1776,134 @@ function selectBrush() {
             toolbox: {show: false},
           };
           chartInstance.setOption(option, true);
+          chartInstance.resize();
+        },
+
+        // Elemente der Serie 'main' für den Zeitstrahl einer Zustands-Entität:
+        // [Zeile, Beginn ms, Ende ms, Zustandsindex, Schlüssel im Protokoll,
+        // Index der Schichten oder -1]. Einzelne Abschnitte wie bisher, oder bei
+        // zu vielen für die Breite verdichtete Spalten (StateEntities.shouldCondense).
+        // Merkt sich in tlCondensed, welches von beiden gezeichnet wird.
+        stateTimelineItems(skipRaw = false) {
+          const zoom = this.zoomRange;
+          const a = zoom ? zoom.start / 1000 : this.windowStart;
+          const b = zoom ? zoom.end / 1000 : this.periodEnd;
+          if (timelineSegs.points !== this.points || timelineSegs.end !== this.windowEnd) {
+            timelineSegs = {points: this.points, end: this.windowEnd, segs: this.stateSegments};
+          }
+          const segs = timelineSegs.segs;
+          // Gezeichnet wird die Fläche des Charts ohne Rand und Beschriftung, rund 30 px weniger.
+          const width = Math.max(60, Math.round((chartInstance ? chartInstance.getWidth() : 600) - 30));
+          timelineParts = [];
+          const toItem = col => {
+            timelineParts.push(col.parts);
+            const main = col.parts.reduce((best, part) => (part[1] > best[1] ? part : best));
+            return [0, col.s * 1000, col.e * 1000, main[0], null, timelineParts.length - 1];
+          };
+          // Keine Rohabschnitte (Rohabfrage abgebrochen), aber Spalten vom Server: die zeichnen.
+          // Sie sind für den ganzen Zeitraum gerechnet, Zoomen macht sie nur breiter.
+          this.tlServer = !segs.length && !!this.stateColumns && this.stateColumns.length > 0;
+          if (this.tlServer) {
+            this.tlCondensed = true;
+            if (skipRaw) return null;
+            return StateEntities.mergeColumns(this.stateColumns, this.stateColumnsDt, this.hiddenStates).map(toItem);
+          }
+          this.tlCondensed = a != null && b != null && b > a && StateEntities.shouldCondense(segs, a, b, width, this.hiddenStates);
+          if (!this.tlCondensed && skipRaw) return null;
+          if (this.tlCondensed) {
+            return StateEntities.condenseSegments(segs, a, b, width, this.hiddenStates).items.map(toItem);
+          }
+          const items = [];
+          for (const seg of segs) {
+            if (!this.hiddenStates.includes(seg.idx)) items.push([0, seg.s * 1000, seg.e * 1000, seg.idx, seg.key, -1]);
+          }
+          return items;
+        },
+        // Nach Zoom oder Schwenk die Spalten für den neuen Ausschnitt rechnen. Wird
+        // roh gezeichnet und bleibt es, ist nichts zu tun: ECharts zoomt die
+        // Rechtecke selbst.
+        updateStateTimeline() {
+          if (!chartInstance || !this.isState || this.stateMode !== 'timeline' || this.tlServer) return;
+          // Roh gezeichnet und weiter roh: die Rohabschnitte gar nicht erst neu bilden.
+          const data = this.stateTimelineItems(!this.tlCondensed);
+          if (!data) return;
+          chartInstance.setOption({series: [{id: 'main', data}]});
+        },
+        // Tooltip über einer verdichteten Spalte: Zeitspanne, Anteile, Beginne.
+        condensedTooltip(startMs, endMs, parts) {
+          const stamp = ms => new Date(ms).toLocaleString(LOCALE, {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+          return StateEntities.condensedTooltip(parts, startMs, endMs, this.states, stamp);
+        },
+
+        // Bucket-Anfänge der gezeigten Periode — auch die ohne Daten, damit die
+        // Achse den ganzen Monat bzw. das ganze Jahr zeigt.
+        get stateBucketStarts() {
+          if (this.windowStart == null || this.periodEnd == null) return [];
+          return StateEntities.bucketStarts(this.range, this.windowStart, this.periodEnd);
+        },
+        // Klick auf einen Balken: diesen Tag/Monat/dieses Jahr öffnen.
+        drillState(dataIndex) {
+          const next = STATE_DRILL[this.range];
+          const ts = this.stateBucketStarts[dataIndex];
+          if (!next || ts == null) return;
+          // setRange() übersetzt den Anker in den Offset der neuen Stufe; eine
+          // Sekunde nach dem Bucket-Anfang, damit er sicher darin liegt.
+          this._rangeAnchorMs = (ts + 1) * 1000;
+          this.setRange(next);
+        },
+        // Anteile (gestapelt auf 100 %) oder Wechsel (Beginne je Zustand) je
+        // Bucket. Ausgeblendete Zustände fehlen, die Anteile verteilen sich dann
+        // auf die sichtbaren (ROADMAP 1.29). Gezeichnet wird in
+        // state-entities.js, gemeinsam mit Chart-Editor und Kacheln.
+        renderStateBars() {
+          chartInstance.setOption(StateEntities.barPanels(
+            [{name: DISPLAY_NAME, states: this.states, buckets: this.stateBuckets}],
+            {mode: this.stateMode, range: this.range, windowStart: this.windowStart, periodEnd: this.periodEnd, hidden: this.hiddenStates}
+          ), true);
+          chartInstance.resize();
+        },
+
+        // Anteile des ganzen Zeitraums (bzw. des gezoomten Ausschnitts) als Ring:
+        // dieselben Zahlen wie die Legende (stateSummary), ausgeblendete Zustände
+        // fehlen, die Anteile verteilen sich dann auf die sichtbaren.
+        renderStateDonut() {
+          const css = getComputedStyle(document.body);
+          const surface = css.getPropertyValue('--surface');
+          const pattern = StateEntities.unavailablePattern();
+          const rows = this.stateSummary.rows.filter(row => !this.hiddenStates.includes(row.idx));
+          chartInstance.setOption({
+            tooltip: {
+              trigger: 'item',
+              appendToBody: true,
+              formatter: p => {
+                const raw = this.stateRaw(p.data.idx);
+                const rawPart = raw && raw !== p.name ? ` <span style="opacity:.6">${escapeHtml(raw)}</span>` : '';
+                return `${p.marker} <strong>${escapeHtml(p.name)}</strong>${rawPart}<br>${NumberFormat.fmtDuration(p.value)} (${StateEntities.fmtShare(p.percent)})`;
+              },
+            },
+            series: [{
+              type: 'pie',
+              radius: ['52%', '85%'],
+              center: ['50%', '50%'],
+              label: {show: false},
+              labelLine: {show: false},
+              itemStyle: {borderColor: surface, borderWidth: 2},
+              data: rows.map(row => ({
+                name: this.stateLabel(row.idx), value: row.seconds, idx: row.idx,
+                itemStyle: {color: StateEntities.fill(row.idx, pattern)},
+              })),
+            }],
+          }, true);
+          chartInstance.resize();
+        },
+
+        renderStateHeatmap() {
+          const idx = this.heatmapActive;
+          if (idx === null) {
+            chartInstance.clear();
+            return;
+          }
+          chartInstance.setOption(StateEntities.heatmapPanels([{name: DISPLAY_NAME, states: this.states, cells: this.heatmapCells, idx}]), true);
           chartInstance.resize();
         },
 

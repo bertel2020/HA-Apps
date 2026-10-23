@@ -304,7 +304,19 @@ class ImportService:
             )] = entry
 
 
-    def _load_symcon_names(self) -> dict[str, dict[str, str | None]]:
+    def _symcon_associations(self, variable_id: str) -> dict[int, str] | None:
+        """Code → Name aus dem Profil der Symcon-Variable (aus der hochgeladenen
+        settings.json), None ohne Profil — Voraussetzung für eine Zustands-Entität
+        als Ziel (siehe symcon_import.profile_state_rows())."""
+        states = self._load_symcon_names().get(variable_id, {}).get("states")
+        if not isinstance(states, dict) or not states:
+            return None
+        try:
+            return {int(code): str(name) for code, name in states.items()}
+        except (TypeError, ValueError):
+            return None
+
+    def _load_symcon_names(self) -> dict[str, dict]:
         """Lädt die zuletzt hochgeladene ID→{name, parent, unit}-Zuordnung (siehe
         self.deps.symcon_names_path) — leeres dict, falls noch keine settings.json importiert
         wurde oder die Datei nicht lesbar ist (z. B. manuell gelöscht). Normalisiert
@@ -320,13 +332,14 @@ class ImportService:
             return {}
         if not isinstance(data, dict):
             return {}
-        result: dict[str, dict[str, str | None]] = {}
+        result: dict[str, dict] = {}
         for key, value in data.items():
             if isinstance(value, dict):
                 result[key] = {
                     "name": value.get("name"),
                     "parent": value.get("parent"),
                     "unit": value.get("unit"),
+                    "states": value.get("states") if isinstance(value.get("states"), dict) else {},
                 }
             elif isinstance(value, str):
                 result[key] = {"name": value, "parent": None, "unit": None}
@@ -335,7 +348,7 @@ class ImportService:
 
 
     def _symcon_import_rows(self,
-        variables: list[symcon_import.SymconVariable], names: dict[str, dict[str, str | None]]
+        variables: list[symcon_import.SymconVariable], names: dict[str, dict]
     ) -> list[dict]:
         rows = []
         for v in variables:
@@ -356,6 +369,7 @@ class ImportService:
                     "symcon_name": info.get("name"),
                     "symcon_parent": info.get("parent"),
                     "symcon_unit": info.get("unit"),
+                    "symcon_states": info.get("states") or {},
                     "readable": v.readable,
                     "error": v.error,
                     # Als Zahl an Jinja weitergeben: import.html formatiert den
@@ -891,7 +905,8 @@ class ImportService:
                     self._import_progress.current_variable = variable.variable_id
                 try:
                     plan = symcon_import.plan_import(
-                        self.deps.data_dir, self.deps.index, variable, target_entity_id, self.deps.tz, factor=factor
+                        self.deps.data_dir, self.deps.index, variable, target_entity_id, self.deps.tz, factor=factor,
+                        associations=self._symcon_associations(variable.variable_id),
                     )
                     total_months += len(plan.months_to_import) + len(plan.months_to_merge)
                 except ValueError:
@@ -923,18 +938,17 @@ class ImportService:
                         self.deps.tz,
                         on_month_done=on_month_done,
                         factor=factor,
+                        associations=self._symcon_associations(variable.variable_id),
                     )
                     with self._import_progress.lock:
                         self._import_progress.results.append(result)
-                except ValueError:
+                except ValueError as exc:
                     logger.warning(
-                        "Symcon-Import: Ziel-Entität nicht gefunden · Variable=%s · Ziel=%s",
-                        variable.variable_id, target_entity_id,
+                        "Symcon-Import: Ziel nicht möglich · Variable=%s · Ziel=%s · %s",
+                        variable.variable_id, target_entity_id, exc,
                     )
                     with self._import_progress.lock:
-                        self._import_progress.errors.append(
-                            tr("{variable_id} → {target_entity_id}: Entität nicht gefunden", variable_id=variable.variable_id, target_entity_id=target_entity_id)
-                        )
+                        self._import_progress.errors.append(f"{variable.variable_id} → {target_entity_id}: {exc}")
             return None
 
         def coordinated_import_worker() -> None:
@@ -1065,6 +1079,7 @@ class ImportService:
     def _parse_csv_with_progress(
         self, path: Path, delimiter: str, has_header: bool, ts_col: int, value_col: int,
         ts_format: str, custom_pattern: str, phase_label: str,
+        state_mapper=None,
     ) -> csv_import.ParseResult:
         """parse_rows() mit angeschlossener Fortschrittsanzeige.
 
@@ -1081,7 +1096,7 @@ class ImportService:
         self._csv_progress.set_phase(phase_label, csv_import.count_data_rows(path, has_header))
         return csv_import.parse_rows(
             path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, self.deps.tz,
-            on_progress=self._csv_progress.advance,
+            on_progress=self._csv_progress.advance, state_mapper=state_mapper,
         )
 
 
@@ -1113,10 +1128,11 @@ class ImportService:
                                 target_entity_id,
                                 self.deps.tz,
                                 factor=factor,
+                                associations=self._symcon_associations(variable.variable_id),
                             )
                         )
-                    except ValueError:
-                        errors.append(tr("{variable_id} → {target_entity_id}: Entität nicht gefunden", variable_id=variable.variable_id, target_entity_id=target_entity_id))
+                    except ValueError as exc:
+                        errors.append(f"{variable.variable_id} → {target_entity_id}: {exc}")
                 self._dry_run_progress.advance(len(mapped), "")
                 return {"plans": plans, "errors": errors}
 
@@ -1467,6 +1483,18 @@ class ImportService:
         }
 
 
+    def _state_entities(self, entity_ids: list[str]) -> frozenset[str]:
+        """Welche der Entitäten Zustands-Entitäten sind (Typ "state") — für die
+        Verfügbarkeits-Vorschau, die deren Text-Zustände mitzählen soll."""
+        result: set[str] = set()
+        if self.deps.index is None:
+            return frozenset()
+        for entity_id in entity_ids:
+            entity = self.deps.index.get_entity(entity_id)
+            if entity is not None and entity["aggregation_type"] == "state":
+                result.add(entity_id)
+        return frozenset(result)
+
     def _fetch_ha_history(self,
         entity_ids: list[str], start: datetime, end: datetime,
         history_source: str = "raw", period: str = ha_statistics.DEFAULT_PERIOD,
@@ -1496,7 +1524,10 @@ class ImportService:
                     history = ha_statistics.fetch_statistics_rows(entity_id, start, end, period)
                 else:
                     domain = entity_id.split(".", 1)[0]
-                    history = ha_import.fetch_history_rows(entity_id, domain, start, end)
+                    history = ha_import.fetch_history_rows(
+                        entity_id, domain, start, end,
+                        state_mapper=ha_import.state_mapper_for(self.deps.index, entity_id),
+                    )
             except (ha_import.HaApiError, ValueError) as exc:
                 # WARNING statt nur in errors sammeln: das ist bisher die
                 # einzige Stelle, an der ein Fehlschlag beim HA-Abruf
@@ -1557,7 +1588,12 @@ class ImportService:
         stats = stats or ha_import.HistoryFetchResult()
         bucket_seconds = 86_400 if period == "day" else 3_600
         raw_rows = sorted(raw.rows)
-        stats_rows = sorted(stats.rows)
+        # Zählerstände aus der Statistik tragen den Stempel "Bucket-Ende − 1 s"
+        # (siehe ha_statistics.fetch_statistics_rows). Die Naht-Logik unten
+        # rechnet mit Intervallen ab Bucket-Anfang, deshalb dorthin zurück und
+        # erst beim Ergebnis wieder auf den Messpunkt-Stempel.
+        stamp_shift = bucket_seconds - 1 if stats.bucket_end_stamped else 0
+        stats_rows = sorted((ts - stamp_shift, value) for ts, value in stats.rows)
         cutover_ts: float | None = None
         seam_status = "nur_rohhistorie"
         boundary_anchor: tuple[float, float] | None = None
@@ -1592,6 +1628,8 @@ class ImportService:
             used_stats = []
             used_raw = raw_rows
 
+        used_stats = [(ts + stamp_shift, value) for ts, value in used_stats]
+        stats_rows = [(ts + stamp_shift, value) for ts, value in stats_rows]
         combined_rows = sorted([*used_stats, *used_raw])
         if len(combined_rows) > MAX_IMPORT_ROWS_PER_ENTITY:
             raise ValueError(
@@ -1688,7 +1726,8 @@ class ImportService:
                 on_entity(nummer, entity_id)
             try:
                 raw_by_entity[entity_id] = ha_import.fetch_history_rows(
-                    entity_id, entity_id.split(".", 1)[0], raw_start, end
+                    entity_id, entity_id.split(".", 1)[0], raw_start, end,
+                    state_mapper=ha_import.state_mapper_for(self.deps.index, entity_id),
                 )
             except (ha_import.HaApiError, ValueError) as exc:
                 raw_by_entity[entity_id] = None
@@ -1759,7 +1798,9 @@ class ImportService:
         errors: list[str] = []
         try:
             domains = {entity_id: entity_id.split(".", 1)[0] for entity_id in entity_ids}
-            raw = ha_import.fetch_availability(domains, raw_start, end)
+            raw = ha_import.fetch_availability(
+                domains, raw_start, end, state_entities=self._state_entities(entity_ids)
+            )
         except ha_import.HaApiError as exc:
             raw = {entity_id: ha_import.EntityAvailability(entity_id) for entity_id in entity_ids}
             errors.append(f"Rohhistorie: {exc}")
@@ -1814,7 +1855,9 @@ class ImportService:
             if history_source == "stats":
                 return ha_statistics.fetch_statistics_availability(entity_ids, start, end, period), None
             domains = {entity_id: entity_id.split(".", 1)[0] for entity_id in entity_ids}
-            return ha_import.fetch_availability(domains, start, end), None
+            return ha_import.fetch_availability(
+                domains, start, end, state_entities=self._state_entities(entity_ids)
+            ), None
         except ha_import.HaApiError as exc:
             logger.warning("%s fehlgeschlagen · Entitäten=%d · %s", label, len(entity_ids), exc)
             return {}, str(exc)
@@ -1854,6 +1897,7 @@ class ImportService:
             source_label=entity_id,
             skipped_rows=history.skipped,
             include_existing_months=include_existing_months,
+            accepts_state=True,
         )
         by_month = symcon_import._group_by_month(history.rows, self.deps.tz)
         current_label = datetime.now(self.deps.tz).strftime("%Y-%m")
@@ -2391,16 +2435,22 @@ class ImportService:
                     # Das Lesen und Sortieren der Datei berührt keinen
                     # Speicherbestand und braucht deshalb keine Sperre — siehe
                     # dieselbe Trennung in import_csv_start().
+                    # Zustands-Entität: Text statt Zahl, in der Vorschau ohne etwas
+                    # anzulegen (DryStateMapper sammelt die neuen Zustände).
+                    dry_mapper = ha_import.dry_state_mapper_for(self.deps.index, entity_id)
                     parsed = self._parse_csv_with_progress(
                         path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern,
-                        phase_label=tr("Datei wird gelesen…"),
+                        phase_label=tr("Datei wird gelesen…"), state_mapper=dry_mapper,
                     )
                     self._csv_progress.set_phase(N_("Vorschau wird berechnet…"))
                     with self.deps.coordinator.entity(entity_id):
                         plan = symcon_import.plan_import_rows(
                             self.deps.data_dir, self.deps.index, parsed.rows, entity_id, self.deps.tz,
-                            source_label=path.name, skipped_rows=parsed.skipped
+                            source_label=path.name, skipped_rows=parsed.skipped, accepts_state=True,
                         )
+                    if dry_mapper is not None:
+                        plan.new_states = dry_mapper.new_states
+                        plan.refused_state_rows = dry_mapper.refused
                     return {"plans": [plan], "errors": []}
 
                 try:
@@ -2525,6 +2575,7 @@ class ImportService:
                     parsed = self._parse_csv_with_progress(
                         path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern,
                         phase_label=tr("Schritt 1/2 · Datei wird gelesen…"),
+                        state_mapper=ha_import.state_mapper_for(self.deps.index, entity_id),
                     )
                     # Zweite Phase ohne Gesamtzahl: Wie viele Monate wirklich
                     # geschrieben werden, entscheidet erst die Klassifizierung
@@ -2552,6 +2603,7 @@ class ImportService:
                             source_label=path.name,
                             skipped_rows=parsed.skipped,
                             on_month_done=lambda label, _anzahl: self._csv_progress.advance(detail=label),
+                            accepts_state=True,
                         )
                         reconciliation_report = self.deps.run_storage_reconciliation(entity_ids=[entity_id], repair=True)
                     results.append(result)
@@ -2762,7 +2814,7 @@ class ImportService:
                             plan = symcon_import.plan_import_rows(
                                 self.deps.data_dir, self.deps.index, history.rows, entity_id, self.deps.tz,
                                 source_label=entity_id, skipped_rows=history.skipped,
-                                include_existing_months=include_existing_months,
+                                include_existing_months=include_existing_months, accepts_state=True,
                             )
                         except ValueError as exc:
                             errors.append(f"{entity_id}: {exc}")
@@ -2951,7 +3003,7 @@ class ImportService:
                             result = symcon_import.import_rows(
                                 self.deps.data_dir, self.deps.index, history.rows, entity_id, self.deps.tz,
                                 source_label=entity_id, skipped_rows=history.skipped,
-                                include_existing_months=include_existing_months,
+                                include_existing_months=include_existing_months, accepts_state=True,
                             )
                         except ValueError as exc:
                             errors.append(f"{entity_id}: {exc}")

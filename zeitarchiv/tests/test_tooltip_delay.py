@@ -44,7 +44,9 @@ def test_the_chart_entity_picker_tooltip_escapes_its_scrolling_list() -> None:
     css = (APP / "static/css/app.css").read_text(encoding="utf-8")
 
     assert "fixed-tooltip.js" in editor, "ohne das Skript passiert gar nichts"
-    assert 'data-tooltip-fixed="{{ opt.label }}&#10;{{ opt.entity_id }}"' in editor
+    # Trefferliste des Suchfelds (entityMultiPicker), Name und ID durch einen
+    # Zeilenumbruch getrennt wie früher im Kästchen-Raster.
+    assert ':data-tooltip-fixed="row.opt.label + \'\\n\' + row.opt.entity_id"' in editor
     # Der im Zeilenrahmen positionierte Aufbau würde in der obersten Zeile
     # wieder abgeschnitten.
     assert "entity-tooltip-host" not in editor
@@ -62,4 +64,4 @@ def test_the_chart_entity_picker_tooltip_escapes_its_scrolling_list() -> None:
     assert "el.style.display = 'block';" in skript
     assert ".entity-tooltip.entity-tooltip-floating{position:fixed" in css
     # Die Zeile ist ein Kästchen zum Anklicken, kein Hilfetext.
-    assert ".entity-picker-row[data-tooltip-fixed]{cursor:pointer;}" in editor
+    assert ".emp-hit[data-tooltip-fixed]{cursor:pointer;}" in editor

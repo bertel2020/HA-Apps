@@ -5,6 +5,7 @@
         locked: DASHBOARD.locked,
         preciseMode: DASHBOARD.preciseMode,
         fillGaps: DASHBOARD.fillGaps,
+        periodNav: DASHBOARD.periodNav,
         saving: false,
         savedMessage: '',
 
@@ -36,6 +37,10 @@
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({fill_gaps: this.fillGaps}),
               });
               if (!fillGapsRes.ok) { appAlert(t('Speichern von "Lücken auffüllen" fehlgeschlagen.')); return; }
+              const periodNavRes = await fetch(`${BASE}/dashboards/${this.dashboardId}/period-nav`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({period_nav: this.periodNav}),
+              });
+              if (!periodNavRes.ok) { appAlert(t('Speichern der Zeitraum-Navigation fehlgeschlagen.')); return; }
             }
             window.location.href = this.dashboardId ? `${BASE}/dashboards/${this.dashboardId}` : `${BASE}/dashboards/${data.id}`;
           } finally {

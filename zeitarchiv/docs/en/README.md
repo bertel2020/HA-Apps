@@ -68,6 +68,9 @@ app/
   progress.py                              Progress and registry of running jobs
   limits.py                                 Central resource/size limits
   log_source.py, logging_setup.py            Log configuration and access (diagnostics page)
+  ai_routes.py, ai_tools.py                   Read-only AI access /api/ai/* and its tools
+  ai_settings.py, ai_settings_routes.py       AI release: settings and settings section
+  ai_usage.py, ai_changes.py                   AI usage per day and change log
   supervisor_stats.py                         Supervisor/process metrics
   timezone_config.py                           IANA time zone handling
   version.py                                    Runtime version information

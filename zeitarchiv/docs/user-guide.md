@@ -391,6 +391,15 @@ etwas kommt; er erscheint nur, wenn es tatsächlich etwas zu scrollen gibt.
   wird. **Lücken auffüllen** lässt spätere, kleinere Kacheln freie Lücken
   im Raster füllen statt strikt der Anheft-Reihenfolge zu folgen. Beide
   Schalter sind unabhängig voneinander kombinierbar.
+- **Zeitraum-Navigation** (Dashboard-Editor, Standard aus): blendet rechts in
+  der Titelzeile eine Stichtag-Leiste ein (‹ Datum ›, Kalender, Schrittweite
+  Tag/Woche/Monat/Jahr, "Heute"). Das ganze Dashboard springt damit auf einen
+  anderen Tag: Jede Kachel zeigt die Periode ihres Zeitraums, die diesen Tag
+  enthält — die Monatskachel den ganzen Monat, die Jahreskachel das Jahr,
+  rollierende Fenster ("letzte 24 Std.") enden am Ende des Tages, Werte-Kacheln
+  zeigen den Stand am Ende des Zeitraums. Charts mit festem Zeitraum bleiben
+  unverändert. Im Rückblick pausiert die automatische Aktualisierung. Der Tag
+  steht in der Adresse (`?date=JJJJ-MM-TT`) und wird nicht gespeichert.
   Auf schmalen Displays bleibt die Darstellung auch im Präzisen Modus bewusst
   einspaltig, damit Kacheln lesbar und bedienbar bleiben.
 - **Dashboard fixieren** (Editor, Schalter "Fixiert"): sperrt Umsortieren,
@@ -684,7 +693,7 @@ Datensätze, Größe, Wertfilter, Lücken-/Ausreißer-Schwelle, Historisch; letz
 ist standardmäßig aus) — die Auswahl
 gilt global fürs ganze Add-on, nicht nur im aktuellen Browser. Sind die
 Spalten **Typ** oder **Einheit** eingeblendet, erscheint daneben ein
-passender Filter (Typ: Standard/Zähler/Schalter, mehrfach wählbar; Einheit:
+passender Filter (Typ: Standard/Zähler/Schalter/Zustand, mehrfach wählbar; Einheit:
 eine der tatsächlich vorkommenden Einheiten). Ein Klick auf eine Zeile öffnet
 die **Verlaufsansicht** dieser einen Entität.
 
@@ -775,6 +784,137 @@ Editor des Charts bzw. der Tabelle heraus.
   gehört zum geladenen Zeitraum, nicht zum gerade sichtbaren Ausschnitt.
 - **Nachkommastellen** übersteuert für diese Ansicht die globale Anzeige-
   Einstellung der Entität (Automatisch oder fest 0–3).
+
+### Zustände
+
+Liefert eine Entität Text statt einer Zahl — etwa ein Thermostat mit
+„Heizen“/„Leerlauf“, ein Saugroboter mit „Laden“/„Saugen“ oder das Programm
+einer Waschmaschine —, archiviert Zeitarchiv sie als **Zustand**. Dafür muss
+die Entität in der Integration **einzeln ausgewählt** sein; über ein Muster
+wie `sensor.*` oder eine Auswahl nach Bereich, Gerät oder Label kommen
+Text-Sensoren bewusst nicht mit (sonst landeten Versionsnummern, Geräte-IDs
+und Ähnliches im Archiv). Der erste Wert legt fest, ob eine Entität Zahlen
+oder Zustände liefert; wechselt sie später, werden die abweichenden Werte
+verworfen.
+
+- Die Verlaufsansicht zeigt einen **Zeitstrahl** mit einer Farbe je Zustand.
+  Fällt die Entität aus (`unavailable`/`unknown`), erscheint der Abschnitt
+  grau schraffiert als „nicht verfügbar“, statt den letzten Zustand
+  fortzuschreiben.
+- Angezeigt wird die Übersetzung aus Home Assistant, wo es eine gibt
+  („Heizen“ für `heat`); der Rohwert steht im Tooltip.
+- Unter dem Zeitstrahl stehen die Zahl der Wechsel, der längste Abschnitt
+  und die Ausfallzeit, darunter die Legende mit **Dauer und Anteil** je
+  Zustand — als Chips oder als Tabelle (Optionen → Legenden-Stil). Ein Klick
+  auf einen Zustand blendet ihn aus.
+- Das **Wechsel-Protokoll** darunter listet die Abschnitte, neueste zuerst
+  (Optionen → Wechsel-Protokoll). Fährt man über eine Zeile, wird das Band im
+  Zeitstrahl eingerahmt; ein Klick auf ein Band springt zur Zeile. Wer
+  hineinzoomt, sieht in Kennzahlen, Legende und Protokoll nur noch den
+  Ausschnitt.
+- Unter **Werte bearbeiten** heißt Korrigieren, einen der bekannten Zustände
+  auszuwählen; Hinzufügen und Verdichten gibt es für Zustände nicht.
+- Je Entität werden höchstens 50 verschiedene Zustände angenommen, neue
+  darüber hinaus verworfen — ein Schutz gegen Sensoren mit freiem Text.
+- **Import und Export:** Der Home-Assistant-Verlauf und der **CSV-Import**
+  können in eine bestehende Zustands-Entität schreiben; bei CSV ist die
+  Wertspalte der Zustand als Text (`charging`, `heat` …). Die Vorschau nennt
+  neue Zustände und Zeilen über der Grenze von 50, ohne etwas anzulegen.
+  Aufeinanderfolgende gleiche Zustände werden nur einmal gespeichert.
+  Der **Symcon-Import** kann Integer-Variablen mit Profil in eine Zustands-
+  Entität übernehmen (zum Beispiel eine Betriebsart mit „Aus“, „Komfort“ …):
+  Dafür muss die optionale `settings.json` hochgeladen sein, aus der die App
+  die Namen des Profils liest. Jede Zahl wird zum Namen und der Name zu einem
+  Zustand der Entität; passt er zu Text oder Übersetzung eines vorhandenen
+  Zustands, wird dieser genommen, sonst entsteht ein neuer. Zahlen ohne Namen
+  im Profil werden übersprungen, die Vorschau nennt sie. Variablen ohne Profil
+  mit Namen und VictoriaMetrics lehnen Zustands-Entitäten als Ziel ab. Der
+  **CSV-Export** schreibt den Zustand als Text in die Spalte
+  `state` (nur roh, ohne Auflösung), sodass sich die Datei wieder einlesen
+  lässt.
+
+- **Darstellung je Zeitraum:** Die Verlaufsansicht bietet **Zeitstrahl**,
+  **Anteile** (gestapelte Balken je Tag, Monat oder Jahr, in Prozent der Zeit),
+  **Wechsel** (wie oft ein Zustand begonnen hat), **Heatmap** und **Donut**.
+  Solange du nichts wählst, zeigt sie bis zur Woche den Zeitstrahl und ab dem
+  Monat die Anteile. Deine Wahl bleibt beim Wechsel des Zeitraums erhalten, nur
+  die Heatmap gibt es erst ab dem Monat und fällt davor auf diese Voreinstellung
+  zurück. Ein Klick auf einen Balken springt in den Zeitraum darunter. Die Wahl
+  wird nicht gespeichert, sie gilt nur für die offene Seite.
+- **Heatmap:** Ein Raster aus Wochentag und Stunde. Jede Zelle zeigt, welchen
+  Anteil der Zeit die Entität in einem Zustand war — je dunkler, desto öfter.
+  Die Legende wählt hier genau einen Zustand statt Zustände auszublenden
+  („nicht verfügbar“ lässt sich nicht wählen). Ohne Wahl wird der Zustand
+  gezeichnet, dessen Anteil im Lauf der Woche am meisten schwankt, nicht der
+  häufigste. Blasse Zellen beruhen auf weniger als drei Beobachtungen.
+- **Donut:** Die Anteile des gewählten Zeitraums (bei gezoomtem Ausschnitt nur
+  dessen) als Ring, in jedem Zeitraum. Ausgeblendete Zustände fehlen, die
+  Anteile verteilen sich auf die übrigen.
+- **Markierte Werte:** Die Option **Markierte Werte** (Optionen-Menü) legt zur
+  Löschung markierte Abschnitte als Bänder mit Warnrand hinter den Zeitstrahl,
+  siehe [Markierte Werte sehen](#markierte-werte-sehen). Bei Anteilen und
+  Wechsel gibt es sie nicht. Sie steht nur auf der Entitätsseite, nicht im
+  Chart-Editor oder auf Kacheln.
+
+Ab dem Zeitraum „Monat“ kommen die Anteile aus vorberechneten Auswertungen,
+bis zur Woche aus den gespeicherten Wechseln.
+
+Der **Zeitstrahl** lässt sich auch über lange Zeiträume wählen. Liegen im
+sichtbaren Ausschnitt mehr Abschnitte, als der Chart Bildpunkte breit ist,
+wären die meisten schmaler als ein Bildpunkt. Dann zeichnet er statt einzelner
+Bänder eine **Spalte je Bildpunkt**, nach den Anteilen der Zustände geschichtet;
+ein Zustand ab 1 % bleibt sichtbar. Über einer Spalte nennt der Tooltip
+Zeitspanne, Anteile und Zahl der Beginne. Beim Hineinzoomen werden die Spalten
+feiner, bis wieder die einzelnen Abschnitte zu sehen sind; der Hinweis unter
+dem Chart sagt, was gerade gilt. Bei sehr vielen Wechseln greift in Jahr und
+Dekade die allgemeine Obergrenze für Rohwerte. Dann rechnet der Server die
+Spalten aus den Stunden-Auswertungen vor: feiner als eine Stunde sind sie nicht,
+und Zoomen macht sie nur breiter.
+
+#### Zustände in Charts und auf Dashboards
+
+- **Chart-Editor:** Zustands-Entitäten lassen sich wie andere Entitäten
+  hinzufügen, aber **nur mit anderen Zustands-Entitäten** im selben Chart —
+  auch nicht mit Schaltern. Fügt man sie neben Zahlen- oder Schalter-Entitäten
+  hinzu, werden die Zustände mit einem Hinweis wieder entfernt. Der
+  **Diagrammtyp** bietet dann Zeitstrahl, Anteile, Wechsel, Heatmap und Donut:
+  - **Zeitstrahl:** eine Zeile je Entität in einem gemeinsamen Zeitstrahl. Hat
+    eine Zeile mehr Abschnitte, als der Chart Bildpunkte breit ist, zeichnen
+    alle Zeilen je Bildpunkt eine Spalte mit den Anteilen der Zustände (siehe
+    oben); der Tooltip nennt dann Zeitspanne, Anteile und Beginne.
+  - **Anteile** und **Wechsel:** je Zustands-Entität ein eigenes Diagramm.
+  - **Heatmap:** je Zustands-Entität ein Raster aus Wochentag und Stunde, ab
+    dem Zeitraum „Monat“. Bei mehreren Entitäten steht „Name · Zustand“ über
+    jedem Raster und die Farbskala entfällt. Ein Klick auf einen Zustand in der
+    Legende wählt ihn für diese Entität; er wird mit dem Chart gespeichert. In
+    kürzeren Zeiträumen gilt die Voreinstellung, der Wunsch bleibt erhalten.
+  - **Donut:** je Zustands-Entität ein Donut mit den Anteilen der Zustände;
+    der Name steht nur bei mehreren Entitäten darüber.
+  - Ohne ausdrückliche Wahl gilt dieselbe Voreinstellung wie in der
+    Verlaufsansicht (bis Woche Zeitstrahl, ab Monat Anteile).
+  - Der Legenden-Stil (Chips oder Tabelle) ist immer wählbar; die Tabelle
+    nennt Entität, Zustand, Dauer, Anteil und Wechsel. Der **CSV-Export** des
+    Editors enthält die angezeigten Zustandsnamen.
+- **Chart-Kacheln** im Dashboard verhalten sich wie der Editor; auch dort
+  fallen Zustände heraus, wenn sie mit anderen Serien gemischt sind. Ein
+  Zeitstrahl verdichtet sich auch auf der Kachel zu Spalten, wenn er für ihre
+  Breite zu viele Abschnitte hat. Eine Heatmap-Kachel zeigt das Raster kompakt und fällt in Zeiträumen unter dem
+  Monat auf die Voreinstellung zurück.
+- **Werte-Kachel einer Zustands-Entität:** zeigt den aktuellen Zustand mit
+  Farbfeld und „seit …“. Eine 1×1-Kachel zeigt dazu die letzten 24 Stunden
+  als Streifen, ab zwei Spalten die Anteile der letzten 7 Tage — wahlweise
+  als **Donut** über den Zeitraum der Kachel. Kennzahlen (Durchschnitt, Min/
+  Max …), Sparkline, Nachkommastellen und die Veraltet-Markierung gibt es bei
+  Zuständen nicht; ein seit Tagen unveränderter Zustand gilt nicht als veraltet.
+- **Tabellen** und Vergleichstabellen unterstützen Zustände noch nicht.
+
+#### Hinweise bei verworfenen Werten
+
+Werden Werte verworfen, weil der Typ nicht passt (Zahl statt Text oder
+umgekehrt) oder eine Entität mehr als 50 Zustände liefert, erscheint im
+**Meldungs-Center** (Glocke in der Kopfzeile) eine Meldung; sie verschwindet sieben Tage nach dem letzten
+Vorkommen. Mit der passenden Integration erscheint sie zusätzlich als
+Reparatur in Home Assistant.
 
 ### In einen Ausschnitt hineinzoomen
 
@@ -897,6 +1037,12 @@ eines bestehenden (Kachelmenü ⋮).
 
 ### Entitäten und Darstellung
 
+- Entitäten kommen über das Suchfeld dazu: die Trefferliste zeigt Favoriten
+  zuerst und lässt sich mit Chips nach **Typ** und **Einheit** eingrenzen.
+  Ist schon etwas gewählt, stehen Treffer mit passender Einheit oben
+  („Passt zu vorhandener Achse"). Unter **Ausgewählt** lassen sich die
+  gewählten Entitäten umbenennen, umsortieren, ausblenden und mit ✕
+  entfernen.
 - Beliebig viele Entitäten überlagern; unterschiedliche Einheiten erhalten
   automatisch getrennte Y-Achsen, sodass z. B. Temperatur und Luftfeuchte
   in einem Chart sinnvoll lesbar bleiben.
@@ -933,10 +1079,13 @@ eines bestehenden (Kachelmenü ⋮).
   steht wie in der Verlaufsansicht ein **Zeitstrahl** zur Verfügung — hier
   als mehrzeilige Darstellung mit einer Zeile je Entität, sodass sich
   AN-Intervalle mehrerer Schalter direkt untereinander vergleichen lassen.
+- Für **Zustands-Entitäten** (Text statt Zahl) gibt es Zeitstrahl, Anteile,
+  Wechsel und Donut; sie lassen sich nur mit anderen Zustands-Entitäten
+  kombinieren, siehe [Zustände](#zustände).
 
 ### Donut statt Zeitverlauf
 
-Über **Darstellungsart** lässt sich ein Chart statt als Zeitverlauf als
+Über **Diagrammtyp** lässt sich ein Chart statt als Zeitverlauf als
 Donut zeigen — ein Anteil je Entität statt einer Zeitachse, etwa um den
 Verbrauchsanteil mehrerer Geräte an einem Gesamtwert zu vergleichen.
 **Aggregation** bestimmt dabei, welcher Wert je Entität die Größe ihres
@@ -1043,7 +1192,7 @@ Verlaufsansicht einer einzelnen Entität.
 
 ### Was wird gespeichert — und was nicht
 
-Entitäten samt Namen/Reihenfolge/Sichtbarkeit, Darstellungsart (samt
+Entitäten samt Namen/Reihenfolge/Sichtbarkeit, Diagrammtyp (samt
 Aggregation bei Donut), Zeitraum samt
 Rollierend-Schalter, Auflösung (samt Ausrichtung beim Ranking-Vergleich),
 dynamische Y-Achse, Werte anzeigen, Durchschnittslinie (samt Flach/Gleitend),
@@ -1529,7 +1678,7 @@ Bestand der Entität und läuft deshalb nur auf Klick.
 
 ### Anzeigemodus
 
-Nur bei Schaltern (`binary_sensor`, `switch`, `input_boolean`, `device_tracker`, `person`):
+Nur bei Schaltern (siehe unten, welche Domains dazugehören):
 
 - **AN/AUS (Rohwert)** zeigt den Zustand als 0/1.
 - **Zeit (Dauer)** zeigt stattdessen die kumulierte Einschaltdauer je Zeitraum,
@@ -1537,8 +1686,12 @@ Nur bei Schaltern (`binary_sensor`, `switch`, `input_boolean`, `device_tracker`,
   Bewegungssensoren.
 
 Als Schalter gelten die Domains `binary_sensor`, `switch`, `input_boolean`,
-`device_tracker` und `person` — bei Letzteren gilt `home` als „an", jeder
-andere Zustand (`not_home` oder eine benannte Zone) als „aus".
+`light`, `fan`, `automation`, `script`, `remote`, `siren`, `humidifier`,
+`update` und `calendar` (Zustand `on`/`off`) sowie `device_tracker` und
+`person` — bei den letzten beiden gilt `home` als „an", jeder andere Zustand
+(`not_home` oder eine benannte Zone) als „aus". Bei `automation` bedeutet
+„an" aktiviert, nicht „läuft gerade"; bei `update` steht „an" für ein
+verfügbares Update.
 
 ### Was rückwirkend wirkt — und was nicht
 
@@ -2419,6 +2572,7 @@ Home-Assistant-Seitenleiste.
 | --- | --- |
 | **Quelle**: Live / Supervisor-Historie | „Live" liest den begrenzten Puffer des laufenden Prozesses — reagiert am schnellsten. „Supervisor-Historie" reicht weiter zurück, lädt aber beim Öffnen etwas länger. |
 | **Level** | Filtert die Anzeige auf einen Mindest-Schweregrad (Alle, Fehler, Warnungen, Informationen, Debug). Wirkt nur auf die Darstellung — nicht auf das Anwendungs-Loglevel selbst (siehe unten), das bestimmt, was überhaupt geschrieben wird. |
+| **Bereich** | Zeigt nur die Meldungen eines Themas: KI-Zugriff, Aufnahme und API, Wartung und Sicherung, Import und Export, Daten bearbeiten, HTTP-Zugriffe oder Sonstiges. Wirkt wie das Level nur auf die Anzeige, auch auf den Download, und lässt sich mit Level und Suche kombinieren. Die Zuordnung steht in [logging.md](logging.md#logseite-level-bereich-und-aufbewahrung). |
 | **Protokoll durchsuchen** | Freitextsuche innerhalb der aktuell geladenen Zeilen. |
 | **Jetzt aktualisieren** / **Automatisch (15 s)** | Manuelles oder automatisches Nachladen. |
 | **Herunterladen** | Lädt die aktuelle Ansicht als Textdatei herunter. |
@@ -2438,6 +2592,12 @@ Daten. Zugangsdaten werden vor der Ausgabe immer maskiert; Write-Captures und
 Entity-Traces können trotzdem Entity-IDs und Messwerte enthalten und sollten
 nur so lange wie nötig aktiv beziehungsweise gespeichert bleiben.
 
+Das Protokoll wird nicht dauerhaft gespeichert: Die Live-Ansicht hält die letzten
+2.000 Einträge im Arbeitsspeicher und ist nach einem Neustart der App leer; die
+Supervisor-Historie zeigt nur den aktuellen Containerstart. Einträge unterhalb des
+eingestellten Levels werden gar nicht erst aufgenommen. Wer etwas später nachsehen
+will, lädt es vorher herunter.
+
 ## Einstellungen im Detail
 
 | Bereich | Enthält |
@@ -2446,6 +2606,7 @@ nur so lange wie nötig aktiv beziehungsweise gespeichert bleiben.
 | **Archivierung** | Standardwerte für neu erkannte Entitäten (wirken nie rückwirkend auf bestehende Entitäten): Auflösung, Aufbewahrung, Nachkommastellen, Wertänderungsfilter, Lücken-/Ausreißer-Erkennung |
 | **Meldungen** | Tipp-Anzeige an-/ausschalten und Dialog mit allen Tipps (siehe [Housekeeping](#housekeeping)); Übersicht stummgeschalteter Systemmeldungen mit verbleibender Dauer, einzeln vorzeitig wieder aktivierbar |
 | **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start, verbundene Integrationsversion mit Zeitpunkt "zuletzt gesehen" (Hinweis bei veralteter oder neu verfügbarer Version) |
+| **KI-Zugriff** | Schalter für lesenden Zugriff von KI-Diensten (Standard Aus), Umfang der freigegebenen Entitäten (Alle, Alle außer den gewählten, Nur die gewählten) mit Anwesenheit ausschließen, einzeln abschaltbare Werkzeuge, Hinweise für das Modell, Einrichtungsanleitung. Alles speichert sofort. Unter **Nutzung**: letzte Nutzung, Aufrufe heute und in 7 Tagen, abgelehnte Aufrufe (Zugriff aus oder Werkzeug abgeschaltet), Aufschlüsselung nach Werkzeug und Kontoart sowie **Letzte Änderungen** an der Freigabe. Die Zähler gelten je Tag und bleiben 90 Tage erhalten, die letzten 50 Änderungen bleiben gespeichert; Inhalte der Fragen, Notiztext und Entitätsnamen stehen nicht darin, und wer eine Änderung vorgenommen hat, erfasst die App nicht |
 | **Diagnose** | Nächsten Schreibvorgang einmalig vollständig aufzeichnen (sensible Rohdaten, automatische Löschung spätestens nach 60 Minuten); eine einzelne Entität 15 Minuten lang einschließlich Ingest-Ergebnis verfolgen; Diagnosebericht herunterladen; Prozess-Start und -Laufzeit; **Hintergrundprozesse**-Übersicht (letzter Lauf/Status jeder Wartungsplaner-Aufgabe) |
 | **Zurücksetzen** | Löscht Daten endgültig — in zwei Stufen: **Nur Messwerte löschen** (Entitäten, Konfiguration, Dashboards und Einstellungen bleiben) oder **Komplett zurücksetzen** (zusätzlich Entitäten, Dashboards, gespeicherte Charts und Tabellen, Aktivitätsprotokoll und Einstellungen, wie bei einer frischen Installation). Der API-Token, die Backup-Einstellungen und alle Backup-Dateien bleiben erhalten; die Home-Assistant-Integration legt Entitäten mit dem nächsten Wert neu an. Kennzahlen (Entitäten, Datensätze, Größe) nennen vorab, was gelöscht würde. Standardmäßig wird **vorher ein Backup erstellt** — schlägt es fehl, wird nichts gelöscht. Zum Bestätigen tippst du das Wort „LÖSCHEN“ ein. Im Demo-Modus nicht verfügbar |
 | **Demo-Daten** | Nur sichtbar mit aktivem Demo-Modus oder einer liegengebliebenen Demo-Instanz — siehe eigener Abschnitt [Demo-Modus](#demo-modus) |

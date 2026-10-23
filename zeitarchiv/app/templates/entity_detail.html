@@ -110,6 +110,10 @@
            Platz, und der zweite bricht in die nächste Zeile — die Gruppe wäre
            auseinandergerissen statt zusammengerückt. #}
         <div class="toolbar-right">
+        {# Zustands-Entitäten (Typ "state"): kein Vergleichen — eine
+           Vorperiode als zweiter Zeitstrahl ist in ROADMAP 1.29 nicht
+           vorgesehen. #}
+        {% if aggregation_type != 'state' %}
         <div class="menu-wrap" @click.outside="compareMenuOpen = false">
           <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw" @click="compareMenuOpen = !compareMenuOpen">
             <span x-text="compareButtonLabel"></span> <span class="chevron">▾</span>
@@ -121,6 +125,7 @@
             <button type="button" class="menu-row" :class="{active: compare && compareMode === 'year'}" @click="setCompareMode('year')" x-show="compareYearAvailable" x-text="compareYearLabel"></button>
           </div>
         </div>
+        {% endif %}
         <div class="menu-wrap" @click.outside="optionsMenuOpen = false">
           <button type="button" class="chip menu-btn" :class="{active: optionsMenuOpen}" @click="optionsMenuOpen = !optionsMenuOpen">
             {{ _("Optionen") }} <span class="chevron">▾</span>
@@ -160,7 +165,7 @@
                Abfrage etwas herausgefiltert hat. Für jeden Entitätstyp
                verfügbar: ein senkrechtes Band braucht nur die Zeitachse und
                trifft keine Aussage über den Wert. #}
-            <label class="menu-row">
+            <label class="menu-row"{% if aggregation_type == 'state' %} x-show="stateMode === 'timeline'"{% endif %}>
               <span class="menu-row-label">{{ _("Markierte Werte") }}</span>
               <span class="menu-toggle">
                 <input type="checkbox" :checked="showMarked" @change="toggleMarked()">
@@ -169,6 +174,38 @@
             </label>
             <div class="menu-divider"></div>
             <div class="menu-section-label">{{ _("Darstellung") }}</div>
+            {% if aggregation_type == 'state' %}
+            {# Zustands-Entitäten: Zeitstrahl, Anteile oder Wechsel je Bucket;
+               die Legende trägt Dauer und Anteil je Zustand. Punkte,
+               Nachkommastellen, Y-Achse und Durchschnitt rechnen mit Zahlen
+               und entfallen. Die Wahl wird nicht gespeichert: ab dem Monat
+               springt die Ansicht von selbst auf Anteile (setRange()). #}
+            <div class="menu-row menu-row-stack">
+              <span class="menu-row-label">{{ _("Diagrammtyp") }}</span>
+              <div class="seg seg-fit">
+                <button :class="{active: stateMode === 'timeline'}" @click="setStateMode('timeline')">{{ _("Zeitstrahl") }}</button>
+                <button :class="{active: stateMode === 'shares'}" @click="setStateMode('shares')">{{ _("Anteile") }}</button>
+                <button :class="{active: stateMode === 'changes'}" @click="setStateMode('changes')">{{ _("Wechsel") }}</button>
+                <button :class="{active: stateMode === 'heatmap'}" :disabled="!heatmapAvailable" @click="setStateMode('heatmap')"
+                        :title="heatmapAvailable ? '' : t('Die Heatmap gibt es ab dem Zeitraum Monat.')">{{ _("Heatmap") }}</button>
+                <button :class="{active: stateMode === 'donut'}" @click="setStateMode('donut')">{{ _("Donut") }}</button>
+              </div>
+            </div>
+            <div class="menu-row">
+              <span class="menu-row-label">{{ _("Legenden-Stil") }}</span>
+              <div class="seg">
+                <button :class="{active: legendStyle === 'chips'}" @click="legendStyle = 'chips'; saveChartOptions()">{{ _("Chips") }}</button>
+                <button :class="{active: legendStyle === 'table'}" @click="legendStyle = 'table'; saveChartOptions()">{{ _("Tabelle") }}</button>
+              </div>
+            </div>
+            <label class="menu-row">
+              <span class="menu-row-label">{{ _("Wechsel-Protokoll") }}</span>
+              <span class="menu-toggle">
+                <input type="checkbox" :checked="stateLog" @change="stateLog = !stateLog; saveChartOptions()">
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </label>
+            {% else %}
             <div class="menu-row menu-row-stack">
               <span class="menu-row-label">{{ _("Diagrammtyp") }}</span>
               <div class="seg">
@@ -200,6 +237,13 @@
               <span class="menu-row-label">{{ _("Punkte") }}</span>
               <span class="menu-toggle">
                 <input type="checkbox" :checked="showPoints" @change="showPoints = !showPoints; render(); saveChartOptions()">
+                <span class="track"><span class="thumb"></span></span>
+              </span>
+            </label>
+            <label class="menu-row" x-show="chartType === 'line'">
+              <span class="menu-row-label">{{ _("Fläche") }}</span>
+              <span class="menu-toggle">
+                <input type="checkbox" :checked="areaFill" @change="areaFill = !areaFill; render(); saveChartOptions()">
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
@@ -239,6 +283,13 @@
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
+            <div class="menu-row menu-row-stack" x-show="averageLine && chartType === 'line'">
+              <span class="menu-row-label">{{ _("Linienstil") }}</span>
+              <div class="seg">
+                <button :class="{active: averageStyle === 'flat'}" @click="averageStyle = 'flat'; render(); saveChartOptions()">{{ _("Flach") }}</button>
+                <button :class="{active: averageStyle === 'rolling'}" @click="averageStyle = 'rolling'; render(); saveChartOptions()">{{ _("Gleitend") }}</button>
+              </div>
+            </div>
             <label class="menu-row">
               <span class="menu-row-label">{{ _("Statistik in Legende") }}</span>
               <span class="menu-toggle">
@@ -265,6 +316,7 @@
                 <button :class="{active: legendStyle === 'table'}" @click="legendStyle = 'table'; saveChartOptions()">{{ _("Tabelle") }}</button>
               </div>
             </div>
+            {% endif %}
             <div class="menu-divider"></div>
             <div class="menu-section-label">{{ _("Aktionen") }}</div>
             {# "Werte bearbeiten" und "Konfiguration" standen hier einmal daneben.
@@ -294,8 +346,8 @@
          existiert nur, damit "oben rechts" sich auf den Chart bezieht und
          nicht auf die Karte samt ihrer je nach Breite unterschiedlichen
          Polsterung. #}
-      <div class="chart-wrap" x-show="points.length">
-        <div id="chart" :style="chartType === 'timeline' ? 'height:150px;' : ''"></div>
+      <div class="chart-wrap" x-show="hasData">
+        <div id="chart" :style="chartIsTimeline ? 'height:150px;' : ''"></div>
         {# Statisch "active": der Chip existiert nur, wenn es einen Ausschnitt
            gibt — ein deaktivierter Zustand wäre unerreichbar. Aus demselben
            Grund keine feste Mindestbreite mehr: die wechselnde Beschriftung
@@ -306,8 +358,8 @@
           <span class="chip-zoom-x" aria-hidden="true">&times;</span>
         </button>
       </div>
-      <div class="empty" x-show="!points.length" x-text="loading ? t('Lädt …') : t('Keine Daten für diesen Zeitraum.')"></div>
-      <div class="chart-legend" x-show="points.length && chartStats && legendStyle === 'chips'">
+      <div class="empty" x-show="!hasData" x-text="loading ? t('Lädt …') : t('Keine Daten für diesen Zeitraum.')"></div>
+      <div class="chart-legend" x-show="!isState && points.length && chartStats && legendStyle === 'chips'">
         <span class="chart-legend-item static">
           <span class="dot" :style="{background: `var(--chart-${chartType === 'line' ? 'line' : 'bar'})`}"></span>
           <span class="name">{{ display_name }}</span>
@@ -320,7 +372,7 @@
           </span>
         </span>
       </div>
-      <div class="tbl-wrap chart-legend-table-wrap" x-show="points.length && chartStats && legendStyle === 'table'">
+      <div class="tbl-wrap chart-legend-table-wrap" x-show="!isState && points.length && chartStats && legendStyle === 'table'">
         <table class="dt compact chart-legend-table">
           <thead>
             <tr>
@@ -349,6 +401,98 @@
           </tbody>
         </table>
       </div>
+      {% if aggregation_type == 'state' %}
+      {# Zustands-Entitäten (ROADMAP 1.29): Legende mit Dauer und Anteil je
+         Zustand — Klick blendet einen Zustand aus —, darüber Wechsel, längster
+         Abschnitt und Ausfallzeit, darunter das Wechsel-Protokoll. Alles
+         bezieht sich auf den gezoomten Ausschnitt, sonst auf den Zeitraum. #}
+      <div class="state-panel" x-show="hasData" x-cloak>
+        {# Der Ausschnitt-Chip oben rechts im Chart setzt den Zoom zurück —
+           kein zweiter hier, der Chip gilt für alles unter dem Chart mit. #}
+        <div class="state-kpis">
+          <span x-text="stateKpiText"></span>
+        </div>
+        <div class="chart-legend" x-show="legendStyle === 'chips'">
+          <template x-for="row in stateSummary.rows" :key="row.idx">
+            <button type="button" class="chart-legend-item" :class="{inactive: chipInactive(row.idx)}"
+                    :aria-pressed="chipPressed(row.idx)" @click="stateChip(row.idx)"
+                    :title="stateRaw(row.idx)">
+              <span class="dot state-dot" :style="stateSwatch(row.idx)"></span>
+              <span class="name" x-text="stateLabel(row.idx)"></span>
+              <span class="values" x-text="`${fmtStateDuration(row.seconds)} · ${stateShare(row)}`"></span>
+            </button>
+          </template>
+        </div>
+        <div class="tbl-wrap chart-legend-table-wrap" x-show="legendStyle === 'table'">
+          <table class="dt compact chart-legend-table state-legend-table">
+            <thead>
+              <tr>
+                <th class="legend-name-col">{{ _("Zustand") }}</th>
+                <th>{{ _("Dauer") }}</th>
+                <th>{{ _("Anteil") }}</th>
+                <th>{{ _("Wechsel") }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="row in stateSummary.rows" :key="row.idx">
+                <tr class="state-legend-row" :class="{inactive: chipInactive(row.idx)}" tabindex="0"
+                    @click="stateChip(row.idx)" @keydown.enter.prevent="stateChip(row.idx)" @keydown.space.prevent="stateChip(row.idx)"
+                    :title="stateRaw(row.idx)">
+                  <td class="legend-name-col"><span class="dot state-dot" :style="stateSwatch(row.idx)"></span> <span x-text="stateLabel(row.idx)"></span></td>
+                  <td x-text="fmtStateDuration(row.seconds)"></td>
+                  <td x-text="stateShare(row)"></td>
+                  <td x-text="row.entries.toLocaleString(window.ZA_FORMAT)"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <div class="state-log">
+          <div class="state-log-head">
+            <button type="button" class="state-log-toggle" :aria-expanded="stateLog.toString()"
+                    @click="stateLog = !stateLog; saveChartOptions()">
+              <span class="state-log-caret" aria-hidden="true">▾</span>
+              <span x-text="stateLogTitle"></span>
+            </button>
+          </div>
+          <div x-show="stateLog">
+            <div class="state-log-list" @mouseleave="highlightState(null)">
+              <template x-for="item in stateLogItems" :key="item.id">
+                <div>
+                  <template x-if="item.type === 'day'">
+                    <button type="button" class="state-log-day" :aria-expanded="item.open.toString()" @click="toggleLogDay(item.key, item.open)">
+                      <span class="state-log-day-caret" aria-hidden="true">▾</span>
+                      <strong x-text="item.label"></strong>
+                      <span class="state-log-day-count" x-text="item.countLabel"></span>
+                      <span class="state-log-strip" aria-hidden="true">
+                        <template x-for="part in item.strip" :key="part.key"><i :style="part.style"></i></template>
+                      </span>
+                    </button>
+                  </template>
+                  <template x-if="item.type === 'row'">
+                    <div class="state-log-row" :class="{hot: stateHot === item.seg.key}" :data-key="item.seg.key"
+                         :title="`{{ _('Rohwert') }}: ${stateRaw(item.seg.idx)}`" @mouseenter="highlightState(item.seg.key)">
+                      <span class="state-log-time" x-text="item.span"></span>
+                      <span class="state-log-state"><span class="dot state-dot" :style="stateSwatch(item.seg.idx)"></span><span x-text="stateLabel(item.seg.idx)"></span></span>
+                      <span class="state-log-bar" aria-hidden="true"><i :style="item.bar"></i></span>
+                      <span class="state-log-dur"><span x-text="fmtStateDuration(item.seg.e - item.seg.s)"></span><span class="state-log-running" x-show="stateRunning(item.seg)" x-text="t('läuft')"></span></span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+              <p class="hint" x-show="!stateLogRows.length">{{ _("Keine Wechsel in diesem Ausschnitt.") }}</p>
+            </div>
+            <div class="state-log-pager" x-show="stateLogPages.length > 1">
+              <button type="button" class="btn" :disabled="stateLogPageNo === 0" @click="stateLogPage = stateLogPageNo - 1"
+                      aria-label="{{ _('Vorherige Seite') }}">‹</button>
+              <span x-text="t('Seite {n} von {total}', {n: stateLogPageNo + 1, total: stateLogPages.length})"></span>
+              <button type="button" class="btn" :disabled="stateLogPageNo >= stateLogPages.length - 1" @click="stateLogPage = stateLogPageNo + 1"
+                      aria-label="{{ _('Nächste Seite') }}">›</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
     </div>
 
     {# Unter der Karte, nicht darin: er beantwortet die Frage, die der graue
@@ -359,7 +503,7 @@
        tut. hint-status statt eines aufklappbaren Hinweises, weil die Punktzahl
        ein Datenzustand ist und kein Hilfetext; siehe "Hinweistexte: drei
        Rollen" in docs/frontend.md. #}
-    <p class="hint hint-status zoom-hint" x-show="points.length" x-text="zoomHint"></p>
+    <p class="hint hint-status zoom-hint" x-show="hasData" x-text="zoomHint"></p>
 
   </div>
 
@@ -371,6 +515,7 @@
   <script src="{{ asset('js/period-navigation.js') }}"></script>
   <script src="{{ asset('js/dynamic-back-link.js') }}"></script>
   <script src="{{ asset('js/menu-popover-clamp.js') }}"></script>
+  <script src="{{ asset('js/state-entities.js') }}"></script>
   <script>
     const ENTITY_ID = {{ entity_id | tojson }};
     const DISPLAY_NAME = {{ display_name | tojson }};
@@ -405,7 +550,8 @@
     // zurücksetzen" (Aktionen) nur zeigt, wenn es dafür tatsächlich etwas zu
     // tun gibt.
     const CHART_DEFAULTS = {{ entity_chart_defaults | tojson }};
-    const DEFAULT_CHART_TYPE = {{ ('timeline' if aggregation_type == 'switch' else 'bar' if aggregation_type == 'counter' else 'line') | tojson }};
+    const DEFAULT_CHART_TYPE = {{ ('timeline' if aggregation_type in ('switch', 'state') else 'bar' if aggregation_type == 'counter' else 'line') | tojson }};
+    const IS_STATE = {{ (aggregation_type == 'state') | tojson }};
     // Nur bei Schalter-Entitäten (binary_sensor/switch/input_boolean) im
     // Konfigurationsbereich umschaltbar (Konzept: Anzeigemodus) — steuert, ob
     // die Bucket-Werte (on_seconds) als Dauer (h/m) statt als Rohsekunden

@@ -20,7 +20,7 @@ def test_tile_carries_the_saved_comparison() -> None:
 def test_tile_requests_the_comparison_like_the_editor() -> None:
     fn = TILES_JS.split("  function tileCompare(", 1)[1].split("\n  }\n", 1)[0]
     # Dieselben Sperren wie der Vergleichs-Knopf im Editor.
-    assert "['timeline', 'donut'].includes(chartType) || resolutionPreset === 'full'" in fn
+    assert "['timeline', 'donut', 'shares', 'changes', 'heatmap'].includes(chartType) || resolutionPreset === 'full'" in fn
     assert "mode === 'longterm' && range === 'year' && !continuous && entityIds.length === 1" in fn
     assert "yearsCompare: mode === 'previous' && range === 'year' && (cumsum || !!target)" in fn
     assert "params.set('compare_mode', compare.mode);" in TILES_JS

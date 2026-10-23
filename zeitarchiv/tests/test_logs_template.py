@@ -21,6 +21,12 @@ def test_logs_page_uses_text_content_for_untrusted_log_lines() -> None:
     assert "15000" in source
 
 
+def test_logs_page_offers_an_area_filter_that_is_sent_to_the_api() -> None:
+    page = page_text("logs.html")
+    assert 'id="log-area-input"' in page and "toggleDDPicker('log-area')" in page
+    assert "area: area.value" in page
+
+
 def test_logs_search_uses_shared_search_field_style() -> None:
     source = page_text("logs.html")
     assert 'id="log-search" class="search" type="search"' in source

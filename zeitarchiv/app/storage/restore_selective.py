@@ -144,6 +144,7 @@ _CHART_FIELD_LABELS = {
     "period_anchor": N_("Zeitraum"),
     "compare_settings": N_("Vergleich"),
     "chart_type": N_("Typ"),
+    "heatmap_states": N_("Typ"),
     "resolution_preset": N_("Auflösung"),
 }
 
@@ -422,11 +423,16 @@ def _snapshot_entity_db(conn: sqlite3.Connection, entity_id: str) -> dict:
         "compacted_months": [list(r) for r in conn.execute(
             "SELECT year, month, target_resolution, compacted_at FROM compacted_months WHERE entity_id = ?",
             (entity_id,))],
+        # Zuordnung Index → Text (Typ "state"): gehört zu den Dateien, die
+        # Indizes darin sind ohne sie nicht lesbar.
+        "entity_states": [list(r) for r in conn.execute(
+            "SELECT idx, text, label, first_seen FROM entity_states WHERE entity_id = ?",
+            (entity_id,))],
     }
 
 
 def _clear_entity_db(conn: sqlite3.Connection, entity_id: str) -> None:
-    for table in ("deleted_points", "counter_mark_ignored", "compacted_months"):
+    for table in ("deleted_points", "counter_mark_ignored", "compacted_months", "entity_states"):
         conn.execute(f"DELETE FROM {table} WHERE entity_id = ?", (entity_id,))
 
 
@@ -508,7 +514,7 @@ def _swap_entities(
                 _clear_entity_db(conn, entity_id)
                 for table, where in (
                     ("deleted_points", "entity_id"), ("counter_mark_ignored", "entity_id"),
-                    ("compacted_months", "entity_id"),
+                    ("compacted_months", "entity_id"), ("entity_states", "entity_id"),
                 ):
                     if not source.has_table(table):
                         continue
@@ -593,6 +599,12 @@ def _undo_entities(
                             "INSERT OR REPLACE INTO compacted_months "
                             "(entity_id, year, month, target_resolution, compacted_at) VALUES (?, ?, ?, ?, ?)",
                             (entity_id, year, month, target, compacted_at))
+                    # .get(): Rollback-Infos von vor diesem Update kennen den Schlüssel nicht.
+                    for idx, text, label, first_seen in snap.get("entity_states", []):
+                        conn.execute(
+                            "INSERT OR REPLACE INTO entity_states "
+                            "(entity_id, idx, text, label, first_seen) VALUES (?, ?, ?, ?, ?)",
+                            (entity_id, idx, text, label, first_seen))
                     if not snap["existed"]:
                         conn.execute("DELETE FROM entities WHERE entity_id = ?", (entity_id,))
                     else:
@@ -741,7 +753,7 @@ def load_settings_overview(source: BackupSource, index: Index, data_dir: Path) -
             parts = []
             if pins != cur_pins:
                 parts.append(tr("Kacheln {a} → {b}", a=len(cur_pins), b=len(pins)))
-            if any(row.get(k) != cur.get(k) for k in ("precise_mode", "fill_gaps")):
+            if any(row.get(k) != cur.get(k) for k in ("precise_mode", "fill_gaps", "period_nav")):
                 parts.append(tr("Einstellungen"))
             status = "diff" if parts else "same"
             detail = " · ".join(parts) if parts else tr("Kacheln: {n}", n=n_pins)
@@ -987,8 +999,8 @@ def apply_settings(
                 journal.append({"op": "replace_children", "table": "dashboard_pins", "col": "dashboard_id",
                                 "val": cur["id"], "rows": _rows(conn, "SELECT * FROM dashboard_pins WHERE dashboard_id = ?", (cur["id"],))})
                 conn.execute("DELETE FROM dashboard_pins WHERE dashboard_id = ?", (cur["id"],))
-                conn.execute("UPDATE dashboards SET precise_mode = ?, fill_gaps = ? WHERE id = ?",
-                             (row.get("precise_mode", 0), row.get("fill_gaps", 0), cur["id"]))
+                conn.execute("UPDATE dashboards SET precise_mode = ?, fill_gaps = ?, period_nav = ? WHERE id = ?",
+                             (row.get("precise_mode", 0), row.get("fill_gaps", 0), row.get("period_nav", 0), cur["id"]))
                 skipped_pins += copy_pins(item["id"], cur["id"])
 
             b_entities = {r["entity_id"]: r for r in _rows(bconn, "SELECT * FROM entities")}

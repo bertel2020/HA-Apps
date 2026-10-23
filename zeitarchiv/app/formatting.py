@@ -157,7 +157,7 @@ def decimals_to_int(value: str | None) -> int | None:
 # Anzeige-Übersetzungen für die intern (englisch) gespeicherten Werte — die
 # gespeicherten Werte selbst bleiben stabile Schlüssel (Sortierung, Filter-URLs,
 # interne Logik in rollup.py/query.py), nur die Darstellung wird eingedeutscht.
-TYPE_LABELS = {"standard": N_("Standard"), "counter": N_("Zähler"), "switch": N_("Schalter")}
+TYPE_LABELS = {"standard": N_("Standard"), "counter": N_("Zähler"), "switch": N_("Schalter"), "state": N_("Zustand")}
 RESOLUTION_LABELS = {
     "raw": N_("Rohdaten"),
     "30s": N_("30 Sek."),
@@ -254,6 +254,9 @@ OUTLIER_BLOCKED_REASONS = {
     "switch": (
         N_("Für Schalter nicht verfügbar: Bei Werten, die nur AN oder AUS sein können, gibt es keine übliche Schwankung, an der sich ein Vielfaches messen ließe — die Erkennung würde nie etwas markieren.")
     ),
+    "state": (
+        N_("Für Zustände nicht verfügbar: Ein Zustand wie „Heizen“ oder „Saugen“ ist kein Messwert, an dem sich ein Vielfaches messen ließe.")
+    ),
 }
 # Warum die Auflösung für diesen Typ fest auf "Rohdaten" steht — die Bedingung
 # selbst steht in main.py (update_entity_config). Anders als bei
@@ -264,12 +267,18 @@ RESOLUTION_BLOCKED_REASONS = {
     "switch": (
         N_("Für Schalter fest auf „Rohdaten“: Ein Zeitfenster könnte sonst einen echten Zustandswechsel (AN/AUS) verwerfen.")
     ),
+    "state": (
+        N_("Für Zustände fest auf „Rohdaten“: Ein Zeitfenster könnte sonst einen echten Zustandswechsel verwerfen.")
+    ),
 }
 # Aus demselben Grund wie RESOLUTION_BLOCKED_REASONS: eine rückwirkende
 # Verdichtung könnte einen echten Zustandswechsel wegkomprimieren.
 COMPACT_TARGET_BLOCKED_REASONS = {
     "switch": (
         N_("Für Schalter nicht verfügbar: Eine rückwirkende Verdichtung könnte einen echten Zustandswechsel (AN/AUS) wegkomprimieren.")
+    ),
+    "state": (
+        N_("Für Zustände nicht verfügbar: Eine rückwirkende Verdichtung könnte einen echten Zustandswechsel wegkomprimieren.")
     ),
 }
 BACKUP_SCHEDULE_LABELS = {

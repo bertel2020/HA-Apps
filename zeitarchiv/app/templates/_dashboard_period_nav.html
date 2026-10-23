@@ -1,0 +1,44 @@
+<!-- Zeitraum-Navigation eines Dashboards (Einstellung im Dashboard-Editor):
+     Stichtag-Leiste und Rückblick-Hinweis, beide am Alpine-Store
+     "dashStichtag" (static/js/dashboard-period-nav.js). Zwei Makros, weil die
+     Leiste in der Titelzeile steht, der Hinweis aber eine eigene Zeile über
+     den Kacheln braucht. Außerhalb von _dashboard_tiles.html, damit ein
+     htmx-Tausch des Rasters (Anheften, Umsortieren) den Stichtag nicht
+     zurücksetzt. Der Kalender ist derselbe wie im Chart-Editor, über das
+     ganze Archiv (calendar_first/last_date). -->
+{% macro nav() %}
+<div class="dash-period-nav" role="group" aria-label="{{ _('Stichtag') }}" x-data>
+  <button type="button" class="btn navbtn" @click="$store.dashStichtag.go(-1)" :disabled="!$store.dashStichtag.canGoBack" aria-label="{{ _('Vorheriger Zeitraum') }}">‹</button>
+  <span class="cal-wrap" x-data='calendarPicker(null, {{ app_root | tojson }}, {{ calendar_first_date | tojson }}, {{ calendar_last_date | tojson }})'>
+    <!-- Beim Öffnen den Monat des Stichtags zeigen statt des letzten Archivmonats. -->
+    <button type="button" class="period-label" :class="{'is-past': !$store.dashStichtag.isToday}"
+            @click="toggle(); if (open) { year = +$store.dashStichtag.current.slice(0, 4); month = +$store.dashStichtag.current.slice(5, 7); }"
+            title="{{ _('Zu einem bestimmten Tag springen') }}" x-text="$store.dashStichtag.label"></button>
+    {% include "_calendar_popover.html" %}
+  </span>
+  <button type="button" class="btn navbtn" @click="$store.dashStichtag.go(1)" :disabled="$store.dashStichtag.isToday" aria-label="{{ _('Nächster Zeitraum') }}">›</button>
+  <span class="dash-period-steps" role="group" aria-label="{{ _('Schrittweite') }}">
+    <template x-for="s in $store.dashStichtag.steps" :key="s.key">
+      <button type="button" class="chip" :class="{active: $store.dashStichtag.step === s.key}" :aria-pressed="$store.dashStichtag.step === s.key"
+              @click="$store.dashStichtag.step = s.key" x-text="s.label"></button>
+    </template>
+  </span>
+  <button type="button" class="chip now-chip" x-show="!$store.dashStichtag.isToday" x-cloak @click="$store.dashStichtag.set(null)">{{ _("Heute") }}</button>
+</div>
+{% endmacro %}
+
+{% macro banner() %}
+<!-- Bewusst nur eine schmale Zeile: die Erklärung steht im Tooltip und im
+     Hinweis des Editors, hier reicht, DASS es ein Rückblick ist. -->
+<div class="dash-period-banner" role="status" x-data x-show="!$store.dashStichtag.isToday" x-cloak
+     title="{{ _('Jede Kachel zeigt ihren Zeitraum, der diesen Tag enthält. Kacheln mit festem Zeitraum bleiben unverändert, die automatische Aktualisierung pausiert.') }}">
+  <span>{{ _("Rückblick auf") }} <strong x-text="$store.dashStichtag.label"></strong></span>
+  <span class="dash-period-banner-paused"><span class="dash-period-banner-sep" aria-hidden="true">·</span> {{ _("Aktualisierung pausiert") }}</span>
+  <button type="button" class="dash-period-banner-back" @click="$store.dashStichtag.set(null)">{{ _("Zurück zu heute") }}</button>
+</div>
+{% endmacro %}
+
+{% macro assets() %}
+<script src="{{ asset('js/calendar-picker.js') }}"></script>
+<script src="{{ asset('js/dashboard-period-nav.js') }}" data-first-date="{{ calendar_first_date or '' }}"></script>
+{% endmacro %}

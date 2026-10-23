@@ -929,6 +929,17 @@ die Liste im Panel sagt ohnehin, was.
   Opt-in-Klasse `.tooltip-lines` (`white-space:pre-line`) plus echte `\n` im
   Attributwert — die App-weite Basisregel rendert sonst `white-space:normal`
   und Zeilenumbrüche fallen zu Leerzeichen zusammen.
+- **`entity-picker.js`**: zwei Entitäten-Wähler. `entityPicker()` wählt
+  genau eine Entität per Knopf und durchsuchbarem Popover (Tabellen-Editor,
+  CSV-Import, Energiedashboard-Rollen, Soll-Feld im Chart-Editor), optional
+  eingegrenzt nach Einheit oder Zählertyp. `entityMultiPicker()` (Chart-
+  Editor) ist ein Suchfeld mit Trefferliste im Fluss für mehrere Entitäten:
+  Filter-Chips nach Typ und Einheit mit Trefferzahl, Favoriten oben, bei
+  vorhandener Auswahl Treffer mit passender Einheit vor denen für eine neue
+  Y-Achse. Er wählt nur aus; die Auswahl selbst (Reihenfolge, Namen,
+  Entfernen) lebt in der umgebenden Komponente und kommt per Getter herein.
+  Beide erwarten Optionen der Form `{entity_id, label, unit,
+  aggregation_type}`, die Mehrfach-Variante zusätzlich `is_favorite`.
 - **`group-picker.js`** (Energiedashboard, Verbraucher-Gruppen): durchsuchbares
   Dropdown ohne feste Optionsliste — bestehenden Eintrag auswählen oder per
   Freitext einen neuen erzeugen (wie Tags/Labels in Home Assistant), analog zu

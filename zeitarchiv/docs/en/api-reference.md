@@ -4,7 +4,7 @@
 
 Two audiences, two reachabilities (see [security.md](security.md)):
 
-- **Public, port `8127`** (only for the Zeitarchiv integration): `/api/write`, `/api/health`, `/api/notices`.
+- **Public, port `8127`** (only for the Zeitarchiv integration): `/api/write`, `/api/health`, `/api/notices` and `/api/ai/*`.
 - **Ingress only, port `8099`**: everything else, including `/api/query`,
   `/api/query-multi` and `/api/query-table` — these are NOT a public API but
   are called by the browser JS of the same Ingress session. No SemVer stability
@@ -160,6 +160,14 @@ first, years without any value are left out. `cut_points` is only set in the
 current year (`offset=0`) and holds each previous year up to the same day,
 otherwise `null`.
 
+`at` (`YYYY-MM-DD`, optional): reference date of a dashboard's period
+navigation. Calendar ranges move to the period that contains this day (on top
+of `offset`, complete, not cut at that day), rolling ones end at the end of
+the day. Today or later changes nothing, any other format → `400`. The same
+field exists for `/api/query-table` (in the body, for all columns; table
+columns are always calendar-based) and `/api/entity-stats` (where `last` is
+then the state at the end of the window).
+
 ## `POST /api/query-table` (Ingress-internal)
 
 Loads all periods of a comparison table in one shared request (at most 25
@@ -187,6 +195,44 @@ of the same period type with offset 0 — the "same point in time" comparison
 (e.g. "previous day until 2 pm" instead of the whole previous day, while the
 current day is still running). `table-compute.js` sets the flag automatically,
 `table_editor.html` needs no option of its own for it.
+
+## `/api/ai/*` — read-only AI access (port `8127`)
+
+Read-only tools for AI clients, offered by the integration as a Home Assistant
+LLM API (MCP). All behind the API token; implemented in `app/ai_routes.py` and
+`app/ai_tools.py`.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/ai/config` | Switch, `config_rev`, offered tools with titles and descriptions, API prompt. Reachable while access is off. The `api_id` parameter remembers the LLM API's id for the setup help. |
+| `POST /api/ai/search_entities` | Name → `entity_id`, overview of the archive |
+| `POST /api/ai/get_summary` | One measure per entity for a period |
+| `POST /api/ai/get_series` | Course inside a period (`metric` selectable) |
+| `POST /api/ai/compare_periods` | Two periods compared (fair while a period is running) |
+| `POST /api/ai/get_energy_overview` | Energy balance with costs; 409 without an energy dashboard |
+| `POST /api/ai/get_notices` | Health of the archive |
+
+The period is `period` (`hour` … `decade`) plus `date` (YYYY-MM-DD, any day in
+the period). The measure follows the type: counter `total`, sensor
+`avg`/`min`/`max` with `min_at`/`max_at`, switch `on_hours`/`on_share`.
+Responses carry `as_of`, `coverage`, `marked` and `period_running`. Keys, error
+codes and hints are fixed English.
+
+Tools that are switched off (Settings → AI access) are missing from `/api/ai/config`; calling
+them anyway gives `403` `tool_disabled`. The owner's notes are part of the config's
+`api_prompt` and appear as `owner_notes` in the answer of `search_entities`. The header
+`X-Zeitarchiv-Ai-User` (`admin` or `user`) says which kind of account the client is signed in
+with in Home Assistant; it only feeds the usage display, nothing is blocked.
+
+Rejected calls (`403`) are counted per day and shown in Settings → AI access; a call
+only counts as usage when it ran a tool.
+
+Errors: `{"error": code, "message": …}`. `401` wrong token, `403` `ai_disabled`
+(switch off) or `tool_disabled` (tool switched off), `429` `busy`/`rate_limited` (at most 2 at a time, 60 per minute;
+with `Retry-After`), `504` `timeout` (after 20 s). A response is limited to about
+8,000 characters and says `truncated` if it was shortened. `/api/notices` carries
+`ai_config_rev`; when it changes, the integration re-fetches `/api/ai/config`.
+`/api/health` and `/api/notices` announce the capability `"ai"`.
 
 ## Error formats
 

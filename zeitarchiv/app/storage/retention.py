@@ -38,7 +38,7 @@ RETENTION_DAYS = {
     "5y": 1825,
 }
 
-_FINE_LEVEL = {"counter": "tag", "standard": "stunde", "switch": "stunde"}
+_FINE_LEVEL = {"counter": "tag", "standard": "stunde", "switch": "stunde", "state": "stunde"}
 
 
 def _cutoff_ts(retention: str, now: datetime) -> float | None:

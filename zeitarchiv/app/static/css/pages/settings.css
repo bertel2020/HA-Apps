@@ -97,3 +97,52 @@
   @media (max-width:520px){
     .about-card{flex-direction:column;align-items:flex-start;text-align:left;}
   }
+
+  /* Bereich "KI-Zugriff": Die Entitäten-Liste ist nur bei "Alle außer …" und
+     "Nur die gewählten" relevant. :has() blendet sie bei "Alle" aus, ohne Skript;
+     die gewählten Kästchen bleiben im Formular und werden dann ignoriert. */
+  .ki-privacy{margin:8px 0 20px;}
+  /* Der Formularkopf endet vor "Nutzung"; wie bei #storage-index-form trennt die Linie
+     deshalb erst hier, und die Zeile "Anwesenheit" rückt von der Liste ab. */
+  #ki-settings-form + .settings-subsection{margin-top:24px;padding-top:20px;border-top:1px solid var(--border);}
+  .ki-scope .settings-compact-list + .ki-entity-list{margin-top:10px;}
+  .ki-copy-row{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;}
+  .ki-copy-row .ki-copy-text{flex:1;min-width:200px;}
+  .ki-scope .ki-entity-list{margin:8px 0 0;}
+  .ki-scope:has(input[name="scope"][value="all"]) .ki-entity-list{display:none;}
+  /* Bei "KI-Zugriff erlauben = Aus" bleibt nur der Schalter samt Datenschutzhinweis stehen;
+     alles darunter betrifft nur den eingeschalteten Zugriff. Wie beim Umfang per :has() am
+     verdeckten Feld, damit es ohne Neuladen mitgeht. Die Auswahl bleibt im Formular. */
+  #ki-form:has(#ki-enabled-input[value="0"]) .ki-dependent{display:none;}
+  /* Einklappbare Blöcke (Einrichtung, Hinweise, Aufschlüsselung): der Titel ist der Schalter,
+     der Chevron zeigt den Zustand. Native <details>, damit es ohne Skript und auch nach
+     einem htmx-Austausch funktioniert. */
+  .ki-fold > summary{list-style:none;display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;}
+  .ki-fold > summary::-webkit-details-marker{display:none;}
+  .ki-fold > summary::after{content:"";margin-left:auto;margin-right:4px;width:8px;height:8px;flex:none;
+    border-right:1.5px solid var(--ink-muted);border-bottom:1.5px solid var(--ink-muted);transform:rotate(45deg) translateY(-2px);transition:transform .15s;}
+  .ki-fold[open] > summary::after{transform:rotate(225deg) translateY(-2px);}
+  .ki-fold[open] > summary{margin-bottom:8px;}
+  .ki-fold > summary.hint{display:inline-flex;margin:8px 0 0;}
+  .ki-fold > summary.hint::after{margin-left:8px;}
+  .ki-warn-value{color:var(--warning);}
+  .ki-changes{list-style:none;margin:0 0 6px;padding:0;font-size:calc(13px * var(--font-scale, 1));}
+  .ki-changes li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-top:1px solid var(--border);}
+  .ki-changes li:first-child{border-top:0;}
+  .ki-changes time{color:var(--ink-muted);white-space:nowrap;}
+  .ki-tag{font-size:calc(11px * var(--font-scale, 1));font-weight:500;color:var(--accent-line);background:var(--accent-line-soft);border-radius:6px;padding:1px 8px;}
+  .ki-tool-chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .ki-entity-list .search{width:100%;box-sizing:border-box;margin-bottom:6px;}
+  .ki-entity-rows{max-height:280px;overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
+  .ki-entity-row{display:flex;gap:10px;align-items:center;padding:6px 10px;min-width:0;cursor:pointer;}
+  .ki-entity-row[hidden]{display:none;}
+  .ki-entity-row + .ki-entity-row{border-top:1px solid var(--border);}
+  .ki-entity-row .names{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .ki-entity-row .name,.ki-entity-row .id{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ki-entity-row .id{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale,1));color:var(--ink-faint);}
+  .ki-entity-unit{flex:none;color:var(--ink-muted);font-size:calc(12px * var(--font-scale,1));}
+  .ki-steps{margin:8px 0;padding-left:22px;line-height:1.6;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  .ki-url,.ki-copy-text{display:block;margin:4px 0;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);font-family:var(--font-mono);font-size:calc(12px * var(--font-scale,1));overflow-wrap:anywhere;}
+  .ki-subhead{margin:18px 0 4px;font-size:calc(13.5px * var(--font-scale,1));}
+  .ki-questions{margin:6px 0 0;padding-left:22px;line-height:1.6;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  .ki-notes-input{width:100%;box-sizing:border-box;font:inherit;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--ink);resize:vertical;}

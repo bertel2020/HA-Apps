@@ -4,7 +4,7 @@
 
 Zwei Zielgruppen, zwei Erreichbarkeiten (siehe [security.md](security.md)):
 
-- **Öffentlich, Port `8127`** (nur für die Zeitarchiv-Integration): `/api/write`, `/api/health`, `/api/notices`.
+- **Öffentlich, Port `8127`** (nur für die Zeitarchiv-Integration): `/api/write`, `/api/health`, `/api/notices` und `/api/ai/*`.
 - **Nur Ingress, Port `8099`**: alles andere, inklusive `/api/query`,
   `/api/query-multi` und `/api/query-table` — diese sind KEINE öffentliche
   API, sondern werden vom Browser-JS derselben Ingress-Session aufgerufen.
@@ -166,6 +166,14 @@ der Vergleich. Statt `compare_points` trägt der Eintrag dann `years`:
 fehlen. `cut_points` ist nur im laufenden Jahr (`offset=0`) gesetzt und
 enthält jedes Vorjahr bis zum gleichen Tag, sonst `null`.
 
+`at` (`JJJJ-MM-TT`, optional): Stichtag der Zeitraum-Navigation eines
+Dashboards. Kalendarische Zeiträume wandern auf die Periode, die diesen Tag
+enthält (zusätzlich zu `offset`, vollständig, nicht am Tag gekappt),
+rollierende enden am Ende des Tages. Heute oder später ändert nichts, ein
+anderes Format → `400`. Dasselbe Feld kennen `/api/query-table` (im Body, für
+alle Spalten; Tabellenspalten sind immer kalendarisch) und
+`/api/entity-stats` (dort ist `last` dann der Stand am Ende des Fensters).
+
 ## `POST /api/query-table` (Ingress-intern)
 
 Lädt alle Zeiträume einer Vergleichstabelle in einer gemeinsamen Anfrage
@@ -193,6 +201,44 @@ gleichzeitig abgefragte Spalte desselben Zeitraum-Typs mit Versatz 0 — der
 "Gleiche Zeitpunkt"-Vergleich (z. B. "Vortag bis 14 Uhr" statt ganzer
 Vortag, wenn der aktuelle Tag noch läuft). `table-compute.js` setzt das Flag
 automatisch, `table_editor.html` braucht dafür keine eigene Option.
+
+## `/api/ai/*` — KI-Lesezugriff (Port `8127`)
+
+Lesende Werkzeuge für KI-Clients, die die Integration als LLM-API von Home
+Assistant anbietet (MCP). Alle hinter dem API-Token; implementiert in
+`app/ai_routes.py` und `app/ai_tools.py`.
+
+| Endpunkt | Zweck |
+|---|---|
+| `GET /api/ai/config` | Schalter, `config_rev`, angebotene Werkzeuge mit Titeln und Beschreibungen, API-Prompt. Auch bei ausgeschaltetem Zugriff erreichbar. Der Parameter `api_id` merkt sich die ID der LLM-API für die Einrichtungshilfe. |
+| `POST /api/ai/search_entities` | Name → `entity_id`, Überblick über das Archiv |
+| `POST /api/ai/get_summary` | Kennzahl je Entität für einen Zeitraum |
+| `POST /api/ai/get_series` | Verlauf innerhalb eines Zeitraums (`metric` wählbar) |
+| `POST /api/ai/compare_periods` | Zwei Zeiträume im Vergleich (fair bei laufender Periode) |
+| `POST /api/ai/get_energy_overview` | Energiebilanz mit Kosten; 409 ohne Energiedashboard |
+| `POST /api/ai/get_notices` | Zustand des Archivs |
+
+Der Zeitraum kommt als `period` (`hour` … `decade`) plus `date` (JJJJ-MM-TT,
+irgendein Tag der Periode). Die Kennzahl folgt dem Typ: Zähler `total`, Sensor
+`avg`/`min`/`max` mit `min_at`/`max_at`, Schalter `on_hours`/`on_share`.
+Antworten tragen `as_of`, `coverage`, `marked` und `period_running`.
+Schlüssel, Fehlercodes und Hinweise sind fest Englisch.
+
+Abgeschaltete Werkzeuge (Einstellungen → KI-Zugriff) fehlen in `/api/ai/config`; ruft
+man sie trotzdem auf, kommt `403` `tool_disabled`. Die Hinweise des Besitzers stehen im
+`api_prompt` der Konfiguration und als `owner_notes` in der Antwort von `search_entities`.
+Der Kopf `X-Zeitarchiv-Ai-User` (`admin` oder `user`) sagt, mit welchem Konto der Client in
+Home Assistant angemeldet ist; er fließt nur in die Nutzungsanzeige ein, gesperrt wird nichts.
+
+Abgelehnte Aufrufe (`403`) werden je Tag gezählt und in Einstellungen → KI-Zugriff
+angezeigt; Aufrufe gelten als Nutzung nur, wenn sie ein Werkzeug ausgeführt haben.
+
+Fehler: `{"error": code, "message": …}`. `401` falscher Token, `403`
+`ai_disabled` (Schalter aus) oder `tool_disabled` (Werkzeug abgeschaltet), `429` `busy`/`rate_limited` (höchstens 2 gleichzeitig,
+60 je Minute; mit `Retry-After`), `504` `timeout` (nach 20 s). Die Antwort ist auf
+etwa 8.000 Zeichen begrenzt und sagt `truncated`, wenn sie gekürzt wurde.
+`/api/notices` trägt `ai_config_rev`; ändert sich der Wert, holt die Integration
+`/api/ai/config` neu. `/api/health` und `/api/notices` melden die Fähigkeit `"ai"`.
 
 ## Fehlerformate
 

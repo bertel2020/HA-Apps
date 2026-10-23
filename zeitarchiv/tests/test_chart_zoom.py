@@ -98,7 +98,7 @@ def test_the_hint_under_the_chart_says_whether_zooming_is_possible() -> None:
     Info-Knopf, weil die Punktzahl ein Datenzustand ist und keine Erklärung
     (siehe "Hinweistexte: drei Rollen" in docs/frontend.md).
     """
-    assert 'class="hint hint-status zoom-hint" x-show="points.length" x-text="zoomHint"' in ENTITY
+    assert 'class="hint hint-status zoom-hint" x-show="hasData" x-text="zoomHint"' in ENTITY
     assert "get zoomHint()" in ENTITY
     assert "alle einzeln sichtbar" in ENTITY
     assert "mit Strg und Mausrad zoomen" in ENTITY

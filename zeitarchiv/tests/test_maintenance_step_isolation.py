@@ -160,7 +160,10 @@ def test_recovery_is_logged_once_and_resets_the_state(dienst, monkeypatch, caplo
     import app.background as background
 
     monkeypatch.setattr(background.time, "monotonic", lambda: 1000.0)
-    with caplog.at_level(logging.INFO):
+    # Mit dem Logger-Namen: setzt ein vorher importiertes app.main den Level von
+    # "app" (logging_setup), reicht caplog.at_level() am Root-Logger nicht, und
+    # die INFO-Meldung "recovered" fehlt — der Test war nur in Teilläufen rot.
+    with caplog.at_level(logging.INFO, logger="app.background"):
         _schritt(dienst, "backup_schedule", RuntimeError("kaputt"))
         _schritt(dienst, "backup_schedule", RuntimeError("kaputt"))
         _schritt(dienst, "backup_schedule")

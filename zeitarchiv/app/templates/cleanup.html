@@ -42,8 +42,10 @@
     <div class="edit-tabs">
       <button type="button" :class="{active: tab === 'cleanup'}" @click="setTab('cleanup')">{{ _("Bereinigen") }}</button>
       <button type="button" :class="{active: tab === 'correct'}" @click="setTab('correct')">{{ _("Korrigieren") }}</button>
+      {% if aggregation_type != 'state' %}
       <button type="button" :class="{active: tab === 'add'}" @click="setTab('add')">{{ _("Hinzufügen") }}</button>
-      {% if aggregation_type != 'switch' %}
+      {% endif %}
+      {% if aggregation_type not in ('switch', 'state') %}
       <button type="button" :class="{active: tab === 'compact'}" @click="setTab('compact')">{{ _("Verdichten") }}</button>
       {% endif %}
       <button type="button" :class="{active: tab === 'marked'}" @click="setTab('marked')">{{ _("Markiert") }} (<span id="marked-tab-count">{{ marked_count | format_int }}</span>)</button>
@@ -79,7 +81,7 @@
       <p class="add-value-status" id="add-value-status"></p>
     </div>
 
-    {% if aggregation_type != 'switch' %}
+    {% if aggregation_type not in ('switch', 'state') %}
     <div x-show="tab === 'compact'" x-cloak class="add-value-card">
       <p class="sub" style="margin-top:12px;">{{ _("Verdichtet bereits archivierte Monate rückwirkend auf ein gröberes Zeitraster — unabhängig von der laufenden Auflösung. Nicht umkehrbar.") }}</p>
       <div class="add-value-row">

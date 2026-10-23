@@ -180,11 +180,40 @@ def _profile_unit(entry: dict, profiles: dict) -> str | None:
     return None
 
 
-def extract_variable_names(raw: bytes | str) -> dict[str, dict[str, str | None]]:
+def _profile_states(entry: dict, profiles: dict) -> dict[str, str]:
+    """Code → Text aus dem Variablenprofil einer Integer-Variable. Symcon legt
+    Zustände (Betriebsart, Modus …) als ganze Zahl mit einem Profil an, dessen
+    "associations" jedem Wert einen Namen geben; im db-Ordner steht nur die
+    Zahl. Eine eigene Profil-Zuordnung (customProfile) hat Vorrang vor dem
+    Standardprofil. Leer, wenn die Variable kein Integer ist oder das Profil
+    keine Namen trägt (Messprofile wie ~Temperature)."""
+    data = entry.get("data")
+    if not isinstance(data, dict) or data.get("type") != 1:
+        return {}
+    name = next(
+        (n.strip() for n in (data.get("customProfile"), data.get("profile")) if isinstance(n, str) and n.strip()),
+        "",
+    )
+    profile = profiles.get(name) if name else None
+    associations = profile.get("associations") if isinstance(profile, dict) else None
+    if not isinstance(associations, list):
+        return {}
+    states: dict[str, str] = {}
+    for assoc in associations:
+        if not isinstance(assoc, dict) or not isinstance(assoc.get("name"), str) or not assoc["name"].strip():
+            continue
+        value = assoc.get("value")
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and float(value).is_integer():
+            states[str(int(value))] = assoc["name"].strip()
+    return states
+
+
+def extract_variable_names(raw: bytes | str) -> dict[str, dict]:
     """Baut aus einer hochgeladenen settings.json (Symcons Objektbaum-Export,
-    Konzept "Offene Punkte") eine Variablen-ID → {name, parent, unit}-Zuordnung
-    — rein informativ für den Import-Assistenten, beeinflusst Zuordnung/Import
-    selbst nicht. Der db-Ordner allein hat keine Metadaten (siehe
+    Konzept "Offene Punkte") eine Variablen-ID → {name, parent, unit, states}-
+    Zuordnung. Name, Elternobjekt und Einheit sind rein informativ; "states"
+    (Code → Text aus dem Variablenprofil, siehe _profile_states()) macht eine
+    Integer-Variable zur möglichen Quelle für eine Zustands-Entität. Der db-Ordner allein hat keine Metadaten (siehe
     Moduldocstring); dieser Zusatz-Upload ist deshalb komplett optional.
 
     "parent" ist der Klarname des direkten übergeordneten Objekts (aus dessen
@@ -229,7 +258,7 @@ def extract_variable_names(raw: bytes | str) -> dict[str, dict[str, str | None]]
         parent_name = parent.get("name")
         return parent_name.strip() if isinstance(parent_name, str) and parent_name.strip() else None
 
-    result: dict[str, dict[str, str | None]] = {}
+    result: dict[str, dict] = {}
     for key, entry in objects.items():
         match = _SETTINGS_ID_RE.match(key)
         if not match or not isinstance(entry, dict):
@@ -241,6 +270,10 @@ def extract_variable_names(raw: bytes | str) -> dict[str, dict[str, str | None]]
                 "parent": _parent_name(entry),
                 "unit": _profile_unit(entry, profiles),
             }
+            # Nur wenn das Profil Namen trägt — die meisten Variablen haben keine.
+            states = _profile_states(entry, profiles)
+            if states:
+                result[match.group(1)]["states"] = states
     return result
 
 # Plausibilitätsgrenzen für Zeitstempel — alles außerhalb ist mit hoher
@@ -426,6 +459,14 @@ class ImportPlan:
     # wurden. Beim Symcon-Import immer 0 (dessen Parser zählt das nicht mit).
     skipped_rows: int = 0
     factor: float = 1.0
+    # Nur Symcon-Import in eine Zustands-Entität: Zeilen, deren Zahl im Profil
+    # keinen Namen hat und die deshalb entfallen.
+    unmapped_rows: int = 0
+    # Nur CSV-Import in eine Zustands-Entität: Texte, die als neuer Zustand
+    # angelegt würden, und Zeilen, die wegen der Obergrenze an Zuständen
+    # entfallen. Im Dry Run wird nichts angelegt (ha_import.DryStateMapper).
+    new_states: list[str] = field(default_factory=list)
+    refused_state_rows: int = 0
 
 
 @dataclass
@@ -636,6 +677,53 @@ def _group_by_month(
     return by_month
 
 
+def profile_state_rows(
+    index: Index,
+    entity_id: str,
+    variable: SymconVariable,
+    associations: dict[int, str] | None,
+    dry: bool,
+):
+    """Zeilen einer Integer-Variable mit Profil für eine Zustands-Entität: jede
+    Zahl wird über das Profil zum Namen und der Name auf den Index der Entität.
+    None, wenn das Ziel keine Zustands-Entität ist (dann gilt der normale Weg).
+
+    Ein Name wird zuerst gegen Text UND Übersetzung der vorhandenen Zustände
+    gehalten (ohne Groß-/Kleinschreibung): HA liefert "heat" mit dem Namen
+    "Heizen", Symcon heißt dieselbe Stufe vielleicht "Heizen" — dann landen
+    beide im selben Zustand statt in zwei. Nur Namen, die vorkommen, legen
+    einen Zustand an (nicht jede Stufe des Profils). Aufeinanderfolgende gleiche
+    Zustände bleiben einmal stehen. Rückgabe: (Zeilen, Mapper, Zeilen ohne
+    Profil-Eintrag)."""
+    from . import ha_import
+
+    entity = index.get_entity(entity_id)
+    if entity is None or entity["aggregation_type"] != "state":
+        return None
+    if not associations:
+        raise ValueError(tr("Die Symcon-Variable hat kein Profil mit Namen, eine Zustands-Entität braucht Text."))
+    known: dict[str, str] = {}
+    for row in index.get_state_map(entity_id):
+        known[row["text"].lower()] = row["text"]
+        if row["label"]:
+            known.setdefault(row["label"].lower(), row["text"])
+    mapper = ha_import.dry_state_mapper_for(index, entity_id) if dry else ha_import.state_mapper_for(index, entity_id)
+    rows: list[tuple[float, float]] = []
+    unmapped = 0
+    for ts, value in raw_rows(variable):
+        name = associations.get(int(round(value))) if math.isfinite(value) else None
+        if name is None:
+            unmapped += 1
+            continue
+        idx = mapper(known.get(name.lower(), name), ts)
+        if idx is None:
+            unmapped += 1
+            continue
+        if not rows or rows[-1][1] != idx:
+            rows.append((ts, idx))
+    return rows, mapper, unmapped
+
+
 def plan_import(
     data_dir: Path,
     index: Index,
@@ -643,11 +731,25 @@ def plan_import(
     entity_id: str,
     tz: ZoneInfo,
     factor: float = 1.0,
+    associations: dict[int, str] | None = None,
 ) -> ImportPlan:
     """Dry Run: berechnet, was import_variable() tun würde, ohne etwas zu
     schreiben (Konzept Abschnitt 03) — beliebig oft wiederholbar. Dünner
     Wrapper um plan_import_rows() (siehe dort) — liest nur die Rohdaten aus
-    den Symcon-CSV-Dateien der Variable ein."""
+    den Symcon-CSV-Dateien der Variable ein. Ziel eine Zustands-Entität:
+    ``associations`` (Profil der Variable) übersetzt die Zahlen in Zustände,
+    ohne etwas anzulegen (siehe profile_state_rows())."""
+    states = profile_state_rows(index, entity_id, variable, associations, dry=True)
+    if states is not None:
+        rows, mapper, unmapped = states
+        plan = plan_import_rows(
+            data_dir, index, rows, entity_id, tz,
+            source_label=variable.variable_id, skipped_rows=variable.skipped_rows, accepts_state=True,
+        )
+        plan.new_states = mapper.new_states
+        plan.refused_state_rows = mapper.refused
+        plan.unmapped_rows = unmapped - mapper.refused
+        return plan
     return plan_import_rows(
         data_dir,
         index,
@@ -660,6 +762,15 @@ def plan_import(
     )
 
 
+def _refuse_state_target(entity, accepts_state: bool) -> None:
+    """Eine Zustands-Entität speichert Indizes, keine Messwerte. Ein Import, der
+    ihr Zahlen unterschiebt, schriebe Indizes, die es in ihrer Zuordnung nicht
+    gibt. Nur Quellen, die Text auf den Index abbilden (Home-Assistant-Verlauf,
+    CSV), setzen accepts_state; Symcon und VictoriaMetrics liefern keinen Text."""
+    if entity["aggregation_type"] == "state" and not accepts_state:
+        raise ValueError(tr("Zustands-Entitäten lassen sich mit diesem Import nicht befüllen."))
+
+
 def plan_import_rows(
     data_dir: Path,
     index: Index,
@@ -670,6 +781,7 @@ def plan_import_rows(
     skipped_rows: int = 0,
     factor: float = 1.0,
     include_existing_months: bool = False,
+    accepts_state: bool = False,
 ) -> ImportPlan:
     """Generischer Dry-Run-Kern: berechnet, was import_rows() für bereits
     geparste (ts, value)-Zeilen tun würde, ohne etwas zu schreiben — von
@@ -681,6 +793,7 @@ def plan_import_rows(
     entity = index.get_entity(entity_id)
     if entity is None:
         raise ValueError(tr("Unbekannte Entität: {entity_id}", entity_id=entity_id))
+    _refuse_state_target(entity, accepts_state)
     by_month = _group_by_month(rows, tz)
     to_import, to_merge, to_update, to_skip = _classify_months(
         data_dir, entity, by_month, tz, include_existing_months
@@ -729,10 +842,19 @@ def import_variable(
     tz: ZoneInfo,
     on_month_done: Callable[[str, int], None] | None = None,
     factor: float = 1.0,
+    associations: dict[int, str] | None = None,
 ) -> ImportResult:
     """Importiert die Rohdaten einer Symcon-Variable in eine bestehende
     Zeitarchiv-Entität — dünner Wrapper um import_rows() (siehe dort), liest
-    nur die Rohdaten aus den Symcon-CSV-Dateien der Variable ein."""
+    nur die Rohdaten aus den Symcon-CSV-Dateien der Variable ein. Zustands-
+    Entität als Ziel: wie bei plan_import() über das Profil der Variable."""
+    states = profile_state_rows(index, entity_id, variable, associations, dry=False)
+    if states is not None:
+        return import_rows(
+            data_dir, index, states[0], entity_id, tz,
+            source_label=variable.variable_id, skipped_rows=variable.skipped_rows,
+            on_month_done=on_month_done, accepts_state=True,
+        )
     return import_rows(
         data_dir,
         index,
@@ -757,6 +879,7 @@ def import_rows(
     on_month_done: Callable[[str, int], None] | None = None,
     factor: float = 1.0,
     include_existing_months: bool = False,
+    accepts_state: bool = False,
 ) -> ImportResult:
     """Generischer Import-Kern: schreibt bereits geparste (ts, value)-Zeilen in
     eine bestehende Zeitarchiv-Entität — dieselbe Monats-Klassifizierung wie
@@ -769,6 +892,7 @@ def import_rows(
     entity = index.get_entity(entity_id)
     if entity is None:
         raise ValueError(tr("Unbekannte Entität: {entity_id}", entity_id=entity_id))
+    _refuse_state_target(entity, accepts_state)
     aggregation_type = entity["aggregation_type"]
     hourly_rollup = bool(entity["hourly_rollup"])
 

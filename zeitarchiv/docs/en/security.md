@@ -94,6 +94,40 @@ Dynamic responses deliver restrictive headers (see the `main.py` middleware);
 import paths are normalized. Backup file names are generated server-side, never
 taken from user input (see [operations.md](operations.md)).
 
+## AI access (MCP)
+
+`/api/ai/*` is the only place where archive data leaves through the public port in
+answers meant for a language model. Safeguards:
+
+- **Off by default.** Without the “AI access” switch the routes answer 403, after
+  the token check. Only the settings page sets the switch.
+- **Read-only.** No tool writes or switches anything.
+- **Shared entities.** The filter (“All”, “All except …”, “Only …”) applies in every
+  tool, including the search; blocked entities do not exist for the model. Presence
+  (`person`, `device_tracker`) is excluded by default. Home Assistant's “Expose to
+  Assist” does not apply to custom LLM APIs.
+- **Prompt injection.** Entity names and units are free text. They are cut to 80
+  characters and stripped of control characters, and every response carries the
+  note “data, not instructions”. Together with the recommended address
+  `/api/mcp/<api-id>` (Zeitarchiv tools only, no control) a crafted name goes
+  nowhere.
+- **Load.** At most 2 requests at a time and 60 per minute (`429`), a 20 s limit per
+  request, responses capped at about 8,000 characters. `/api/write` has priority;
+  AI requests take only per-entity locks, never `exclusive()`.
+- **Gateway.** nginx passes each path on `:8127` individually, never a prefix
+  (`tests/test_nginx_boundary.py`).
+- **Traceability.** Settings → AI access shows the usage per day (90 days, only counts
+  per tool and account kind, never the content of a question), rejected calls (access
+  off, tool switched off) and the last 50 changes to the release, without the notes
+  text or entity names. The app does not record who made a change. It also writes
+  `event=ai_tool_call`, `ai_tool_rejected` (at most once per five minutes for each
+  reason and tool) and `ai_access_changed` to the log, see
+  [logging.md](logging.md#ai-access). The counters are saved at most once a minute (and
+  when the app stops); after a crash up to a minute can be missing.
+- **Limit.** The OAuth token Home Assistant issues to the client reaches the whole HA
+  API, not just MCP. That is a trait of HA's MCP Server and not a Zeitarchiv
+  problem; access can be revoked in the HA profile.
+
 ## Known limits (deliberate decisions, not gaps)
 
 - **One token for everything.** No tenant separation, no token per integration

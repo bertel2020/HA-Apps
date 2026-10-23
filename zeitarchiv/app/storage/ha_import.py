@@ -34,6 +34,7 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -52,7 +53,20 @@ logger = logging.getLogger(__name__)
 # Dieselben Domain-/Zustands-Regeln wie custom_components/zeitarchiv/const.py
 # — von dort nicht importierbar, weil das Addon in einem eigenen Python-Prozess
 # ohne Home-Assistant-Paket läuft.
-SWITCH_DOMAINS = {"binary_sensor", "switch", "input_boolean"}
+SWITCH_DOMAINS = {
+    "binary_sensor",
+    "switch",
+    "input_boolean",
+    "light",
+    "fan",
+    "automation",
+    "script",
+    "remote",
+    "siren",
+    "humidifier",
+    "update",
+    "calendar",
+}
 # Anwesenheits-Domains: eigenes State-Vokabular ("home"/"not_home"/Zonenname
 # statt "on"/"off"), werden aber genauso auf 1/0 abgebildet, siehe _parse_state.
 PRESENCE_DOMAINS = {"device_tracker", "person"}
@@ -199,6 +213,81 @@ def _parse_state(state: str, domain: str) -> float | None:
         return None
 
 
+def state_mapper_for(index, entity_id: str) -> Callable[[str, float], float | None] | None:
+    """Wertnormalisierung für eine bestehende Zustands-Entität (Typ "state"):
+    bildet den Text wie der Live-Pfad (ingestion._resolve_state) auf seinen
+    Index ab, "unavailable"/"unknown" auf STATE_UNAVAILABLE_INDEX. None für
+    jede andere Entität — dann gilt weiter _parse_state().
+
+    Der Import legt keine Entitäten an (nur bekannte kommen hier an), der
+    Typ steht also schon fest. Neue Texte bekommen schon beim Abruf ihren
+    Index, auch wenn der Import danach abgebrochen wird: ein Index ist nur
+    reserviert, nicht falsch."""
+    from .index import (
+        STATE_IGNORED_TEXTS,
+        STATE_TYPE,
+        STATE_UNAVAILABLE_INDEX,
+        STATE_UNAVAILABLE_TEXTS,
+    )
+
+    entity = index.get_entity(entity_id) if index is not None else None
+    if entity is None or entity["aggregation_type"] != STATE_TYPE:
+        return None
+
+    def mapper(state: str, ts: float) -> float | None:
+        text = state.strip()
+        if text.lower() in STATE_IGNORED_TEXTS:
+            return None
+        if text.lower() in STATE_UNAVAILABLE_TEXTS:
+            return float(STATE_UNAVAILABLE_INDEX)
+        idx = index.state_index(entity_id, text, None, ts)
+        return None if idx is None else float(idx)
+
+    return mapper
+
+
+class DryStateMapper:
+    """Wie state_mapper_for(), legt aber nichts an: für die Vorschau des
+    CSV-Imports. Unbekannte Texte bekommen einen vorläufigen Index oberhalb der
+    vorhandenen und werden in new_states gesammelt; wo die Obergrenze erreicht
+    wäre, zählt refused. Der echte Lauf vergibt die Indizes erst beim Schreiben."""
+
+    def __init__(self, index, entity_id: str) -> None:
+        from .index import MAX_STATES_PER_ENTITY
+
+        self._limit = MAX_STATES_PER_ENTITY
+        self._known = {row["text"]: row["idx"] for row in index.get_state_map(entity_id)}
+        self._next = max(self._known.values(), default=-1) + 1
+        self.new_states: list[str] = []
+        self.refused = 0
+
+    def __call__(self, state: str, ts: float) -> float | None:
+        from .index import STATE_IGNORED_TEXTS, STATE_UNAVAILABLE_INDEX, STATE_UNAVAILABLE_TEXTS
+
+        text = state.strip()
+        if text.lower() in STATE_IGNORED_TEXTS:
+            return None
+        if text.lower() in STATE_UNAVAILABLE_TEXTS:
+            return float(STATE_UNAVAILABLE_INDEX)
+        if text not in self._known:
+            if len(self._known) >= self._limit:
+                self.refused += 1
+                return None
+            self._known[text] = self._next
+            self._next += 1
+            self.new_states.append(text)
+        return float(self._known[text])
+
+
+def dry_state_mapper_for(index, entity_id: str) -> DryStateMapper | None:
+    from .index import STATE_TYPE
+
+    entity = index.get_entity(entity_id) if index is not None else None
+    if entity is None or entity["aggregation_type"] != STATE_TYPE:
+        return None
+    return DryStateMapper(index, entity_id)
+
+
 def _iso(dt: datetime) -> str:
     return dt.isoformat()
 
@@ -217,6 +306,9 @@ class HistoryFetchResult:
     # Schnittstelle fest; einfache Rohhistorien-/Statistikabrufe lassen das
     # Dict leer. Die gespeicherten Messreihen bleiben dadurch unverändert.
     source_details: dict[str, object] = field(default_factory=dict)
+    # True, wenn die Zeilen Zählerstände aus der Langzeitstatistik sind und auf
+    # das Bucket-ENDE gestempelt wurden (siehe ha_statistics.fetch_statistics_rows).
+    bucket_end_stamped: bool = False
 
 
 def _discard(result: HistoryFetchResult, reason: str, entry: object) -> None:
@@ -237,6 +329,7 @@ def fetch_history_rows(
     start: datetime,
     end: datetime,
     max_rows: int = MAX_IMPORT_ROWS_PER_ENTITY,
+    state_mapper: Callable[[str, float], float | None] | None = None,
 ) -> HistoryFetchResult:
     """Liest die Recorder-Rohhistorie einer Entität zeitfensterweise über
     GET /api/history/period. Der jeweils erste Punkt eines Fensters kann ein
@@ -274,8 +367,18 @@ def fetch_history_rows(
                 result.skipped += 1
                 _discard(result, tr("Zeitstempel ist ungültig"), entry)
                 continue
-            value = _parse_state(str(entry.get("state")), domain)
+            if state_mapper is not None:
+                value = state_mapper(str(entry.get("state")), ts)
+            else:
+                value = _parse_state(str(entry.get("state")), domain)
             if value is None:
+                # "unavailable"/"unknown" stehen in jeder HA-Historie (Neustart,
+                # Gerät offline) und sind kein Datenverlust. Als übersprungen
+                # gezählt würde jeder Import als "unvollständig" gelten und die
+                # Meldung auch nach einer Wiederholung nie verschwinden.
+                if str(entry.get("state")).strip().lower() in IGNORED_STATES:
+                    _discard(result, tr("Zustand ist nicht verfügbar"), entry)
+                    continue
                 result.skipped += 1
                 _discard(result, tr("Zustand ist nicht importierbar"), entry)
                 continue
@@ -314,7 +417,8 @@ class EntityAvailability:
 
 
 def fetch_availability(
-    entity_domains: dict[str, str], start: datetime, end: datetime
+    entity_domains: dict[str, str], start: datetime, end: datetime,
+    state_entities: frozenset[str] = frozenset(),
 ) -> dict[str, EntityAvailability]:
     """Verfügbarkeits-Vorschau für die Auswahltabelle: EIN gebündelter
     History-Abruf für beliebig viele Entitäten gleichzeitig (HA erlaubt eine
@@ -366,7 +470,12 @@ def fetch_availability(
                         ts = datetime.fromisoformat(str(changed).replace("Z", "+00:00")).timestamp()
                     except ValueError:
                         continue
-                    if _parse_state(str(entry.get("state")), domain) is None:
+                    if entity_id in state_entities:
+                        # Zustands-Entität: jeder Text zählt, nur die
+                        # Platzhalter nicht (Index wird hier nicht vergeben).
+                        if str(entry.get("state")).strip().lower() in IGNORED_STATES:
+                            continue
+                    elif _parse_state(str(entry.get("state")), domain) is None:
                         continue
                     prev = last_ts_by_entity.get(entity_id)
                     if prev is not None and ts <= prev:

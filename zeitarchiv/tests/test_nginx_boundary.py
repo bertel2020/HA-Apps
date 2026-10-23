@@ -3,7 +3,7 @@
 Das Sicherheitsmodell der App liegt fast vollständig in dieser einen
 Konfigurationsdatei: Uvicorn lauscht nur auf 127.0.0.1, der Ingress-Port ist
 auf den Supervisor beschränkt, und der nach außen veröffentlichte Port 8127
-lässt genau drei Endpunkte durch. Die Anwendung selbst hat dahinter keine
+lässt genau die Endpunkte der Integration (und des KI-Zugriffs) durch. Die Anwendung selbst hat dahinter keine
 zweite Verteidigungslinie — weder die Oberfläche noch die Query-Endpunkte
 prüfen ein Token, und auf einer der Seiten steht der API-Token im Klartext.
 
@@ -26,7 +26,12 @@ NGINX_CONF = ADDON / "nginx.conf"
 #: Was Port 8127 nach außen anbieten darf. Bewusst hier und nicht aus der Datei
 #: abgeleitet — sonst würde der Test jede Erweiterung mitmachen, statt sie zu
 #: melden. Wer hier etwas hinzufügt, trifft eine Sicherheitsentscheidung.
-PUBLIC_ENDPOINTS = {"/api/health", "/api/write", "/api/notices"}
+PUBLIC_ENDPOINTS = {
+    "/api/health", "/api/write", "/api/notices",
+    # KI-Lesezugriff (ROADMAP 1.31): hinter Token und Schalter "ai_enabled".
+    "/api/ai/config", "/api/ai/search_entities", "/api/ai/get_summary", "/api/ai/get_series",
+    "/api/ai/compare_periods", "/api/ai/get_energy_overview", "/api/ai/get_notices",
+}
 
 #: Der Ingress-Proxy von Home Assistant, dazu der eigene Container.
 INGRESS_CLIENTS = {"172.30.32.2", "127.0.0.1"}
@@ -59,7 +64,7 @@ def _conf() -> dict[str, str]:
     return blocks
 
 
-def test_the_public_port_only_exposes_the_three_integration_endpoints() -> None:
+def test_the_public_port_only_exposes_the_listed_endpoints() -> None:
     """Port 8127 ist der einzige nach außen veröffentlichte Port (config.yaml)
     und ausschließlich für die Zeitarchiv-Integration bestimmt. Alles, was hier
     zusätzlich durchgelassen würde, stünde ohne Authentifizierung im Netz."""

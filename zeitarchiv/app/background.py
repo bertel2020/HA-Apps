@@ -1050,7 +1050,7 @@ class BackgroundService:
         cutoff_month += 1
         cutoff_ts = datetime(cutoff_year, cutoff_month, 1, tzinfo=self.tz).timestamp()
         for entity in self.index.list_entities():
-            if entity["aggregation_type"] == "switch" or entity["compact_target"] == "off":
+            if entity["aggregation_type"] in ("switch", "state") or entity["compact_target"] == "off":
                 continue
             entity_id = entity["entity_id"]
             started_at = time.time()

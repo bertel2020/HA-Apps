@@ -773,6 +773,8 @@ button.dd-picker-clear{
   max-height:min(360px, 60vh);overflow-y:auto;
 }
 .dd-picker-popover.open{display:block;}
+/* Gesetzt von toggleDDPicker(), wenn das rechtsbündige Popover links aus dem Fenster ragte. */
+.dd-picker-popover.dd-picker-popover-left{left:0;right:auto;}
 /* Housekeeping → Aktivität: die Filter-Optionen tragen teils lange
    Entitätsnamen ("Demo Balkonkraftwerk Ladeleistung") — die Standardbreite
    ließ sie umbrechen. Nur diese vier, nicht global: die meisten anderen
@@ -961,6 +963,11 @@ button.menu-row{border:none;background:none;width:100%;text-align:left;font-fami
 .menu-row-stack{align-items:stretch;flex-direction:column;gap:6px;}
 .menu-row-stack>.menu-row-label{white-space:nowrap;}
 .menu-row-stack>.seg{align-self:center;max-width:100%;}
+/* Diagrammtyp der Zustände: fünf Knöpfe in Monospace sind breiter als das Menü und
+   scrollten sonst still nach rechts ("Heatmap"/"Donut" abgeschnitten). Das Segment füllt
+   die Zeile, die Knöpfe teilen sich den Platz und sind etwas kleiner. */
+.menu-row.menu-row-stack>.seg.seg-fit{align-self:stretch;}
+.menu-row.menu-row-stack>.seg.seg-fit button{flex:1 1 auto;min-width:0;padding-left:4px;padding-right:4px;font-size:calc(10.5px * var(--font-scale,1));}
 .dtile-entity-picker{display:block;width:100%;}
 .dtile-entity-picker>.btn{width:100%;box-sizing:border-box;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .dtile-entity-picker>.dd-picker-popover{left:0;right:auto;width:100%;box-sizing:border-box;}
@@ -1516,9 +1523,75 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
 .badge.counter{color:var(--accent-bar);border-color:var(--accent-bar);}
 .badge.standard{color:var(--accent-line);border-color:var(--accent-line);}
 .badge.switch{color:var(--ink-muted);}
+.badge.state{color:var(--ink-muted);}
 /* „Historisch“ (entities.historic): gefüllt statt nur umrandet, damit die Kennzeichnung auf der Entitätsseite auffällt. */
 .badge.historic{background:var(--accent-line-soft);color:var(--accent-line);border-color:var(--accent-line);}
 [data-tooltip]{cursor:help;position:relative;}
+/* Zeitraum-Navigation eines Dashboards (_dashboard_period_nav.html, auf
+   dashboard_detail.html und der Übersicht). Dieselbe Bauart wie
+   .chart-nav im Chart-Editor (‹ Anzeige ›, Kalender, Chips), rechts in der
+   Titelzeile; auf schmalen Bildschirmen eine eigene Zeile. */
+.dash-title-row,.dashboard-head{flex-wrap:wrap;row-gap:8px;}
+.dash-period-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto;align-self:center;}
+.dash-period-nav .period-label{
+  font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);
+  min-width:130px;text-align:center;white-space:nowrap;
+  background:none;border:none;padding:4px 6px;cursor:pointer;border-radius:6px;
+}
+.dash-period-nav .period-label:hover{color:var(--accent-line);}
+.dash-period-nav .period-label.is-past{color:var(--accent-line);font-weight:600;}
+.dash-period-steps{display:inline-flex;gap:4px;}
+.dash-period-nav .chip{font-size:calc(12px * var(--font-scale, 1));padding:4px 11px;}
+.dash-period-banner{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:10px 0 12px;padding:4px 12px;
+  background:var(--warning-soft);border-radius:8px;
+  color:var(--warning);font-size:calc(12px * var(--font-scale, 1));
+}
+.dash-period-banner strong{font-weight:600;}
+.dash-period-banner-sep{opacity:.6;}
+.dash-period-banner-back{
+  font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;
+  text-decoration:underline;text-underline-offset:2px;
+  margin-left:auto;  /* rechts, unter der Datumsleiste, zu der die Aktion gehört */
+}
+.dash-period-banner-back:hover{color:var(--ink);}
+@media (max-width:480px){.dash-period-banner-paused{display:none;}}
+@media (max-width:480px){.dash-period-nav{width:100%;margin-left:0;justify-content:center;}}
+
+/* Kalender-Widget dafür, identisch zu den Kopien in chart_editor.css,
+   entity_detail.css, cleanup.css und table_editor.css (siehe
+   static/js/calendar-picker.js). Hier statt in einer Seiten-Datei, weil
+   zwei Seiten die Leiste tragen. */
+.cal-wrap{position:relative;display:inline-block;}
+.calendar-popover{
+  position:absolute;top:calc(100% + 6px);left:0;z-index:40;width:260px;
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  box-shadow:var(--shadow);padding:10px;text-align:left;
+}
+.calendar-header{display:flex;align-items:center;gap:4px;margin-bottom:8px;}
+.calendar-header .navbtn{flex:none;}
+.calendar-month-select,.calendar-year-select{
+  font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;color:var(--ink);
+  padding:5px 4px;border-radius:6px;border:1px solid var(--border);background:var(--surface);
+}
+.calendar-month-select{flex:1.4;min-width:0;}
+.calendar-year-select{flex:1;min-width:0;}
+.calendar-weekdays,.calendar-grid{display:grid;grid-template-columns:repeat(7, 1fr);}
+.calendar-weekdays{margin-bottom:4px;}
+.calendar-weekdays span{text-align:center;font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);font-family:var(--font-mono);}
+.calendar-day{
+  height:32px;box-sizing:border-box;border:none;border-radius:6px;font-size:calc(12px * var(--font-scale, 1));background:transparent;color:var(--ink);
+  cursor:pointer;font-family:inherit;font-variant-numeric:tabular-nums;
+}
+.calendar-day:hover:not(:disabled){background:var(--surface-alt);}
+.calendar-day.blank{visibility:hidden;cursor:default;}
+.calendar-day.out-of-range{color:var(--ink-faint);opacity:.3;}
+.calendar-day.no-data{color:var(--ink-faint);text-decoration:line-through;opacity:.55;}
+.calendar-day.has-data{color:var(--ink);font-weight:600;}
+.calendar-day:disabled{cursor:default;}
+.calendar-loading{margin:8px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);text-align:center;}
+.calendar-today-btn{width:100%;margin-top:8px;text-align:center;}
+
 /* data-tooltip-fixed: dieselbe Optik wie [data-tooltip]::after unten, aber
    JS-positioniert (dashboard-tiles.js setupFixedTooltips()) statt per
    ::after/position:absolute — für Abweichungs-Tooltips innerhalb scrollender/
@@ -1532,6 +1605,15 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
   width:max-content;max-width:min(320px,calc(100vw - 16px));overflow-wrap:anywhere;
   box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none;font-weight:400;z-index:1000;
 }
+/* Chart-Variante: gleiche Optik wie der ECharts-Tooltip (Fläche, Rand,
+   Mono, Farbpunkt, fetter Wert), siehe fixed-tooltip.js. */
+.chart-tooltip-fixed{
+  position:fixed;display:flex;align-items:center;gap:8px;background:var(--surface);color:var(--ink-muted);
+  border:1px solid var(--border);padding:8px 12px;border-radius:4px;
+  font-size:calc(12px * var(--font-scale, 1));font-family:var(--font-mono);white-space:nowrap;
+  box-shadow:0 2px 8px rgba(0,0,0,.15);pointer-events:none;z-index:1000;
+}
+.chart-tooltip-fixed strong{margin-left:12px;color:var(--ink);}
 /* Ein Button bleibt klickbar (Zeigefinger), auch wenn er zusätzlich einen
    Tooltip trägt — sonst würde die generische cursor:help-Regel oben einen
    eindeutig interaktiven Button fälschlich als "nur informativ" ausweisen. */
@@ -1932,6 +2014,9 @@ table.dt tbody tr.has-pending-purge:hover td{background:var(--warning-soft);}
 .settings-compact-row-text{min-width:0;}
 .settings-compact-label{font-size:calc(13px * var(--font-scale, 1));color:var(--ink);}
 .settings-compact-hint{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);margin-top:3px;line-height:1.4;}
+/* `.settings-panel p` (margin:0 0 16px) sticht die Klasse oben; der Hinweis steht in einer Zeile mit
+   eigenem Padding und braucht den Absatzabstand nach unten nicht. */
+.settings-panel p.settings-compact-hint{margin-bottom:0;}
 /* Mehrere Bedienelemente einer Einstellungszeile. Sie MÜSSEN umbrechen dürfen:
    .settings-compact-row bricht zwar selbst um, aber eine Gruppe ohne
    flex-wrap ist als Flex-Element nicht schmaler zu bekommen als ihr breitester
@@ -2215,3 +2300,37 @@ footer{margin-top:20px;font-family:var(--font-mono);font-size:calc(11px * var(--
 .confirm-overlay::backdrop{background:rgba(0,0,0,.4);}
 .confirm-message{margin:0;font-family:var(--font-display);font-size:calc(14px * var(--font-scale, 1));line-height:1.55;color:var(--ink);white-space:pre-line;}
 .confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+
+/* Zustands-Entitäten (ROADMAP 1.29): Farbfeld je Zustand und die Legende pro
+   Zeile (Chart-Editor, Dashboard-Kacheln) — je Zustand Farbe, Name und mit
+   "Statistik in Legende" Dauer · Anteil. Die Farbe selbst kommt inline aus
+   state-entities.js (swatchStyle). */
+.state-dot{display:inline-block;width:10px;height:10px;border-radius:3px;flex:none;vertical-align:-1px;}
+.state-legend-values{display:inline-flex;flex-wrap:wrap;gap:4px 12px;}
+.state-legend-values > span{white-space:nowrap;}
+/* Heatmap: ein Zustand je Entität ist der gezeichnete, die übrigen sind wählbar. */
+.state-legend-values > .state-pick{cursor:pointer;border-radius:4px;padding:0 3px;margin:0 -3px;}
+.state-legend-values > .state-pick:hover{background:var(--surface-alt);}
+.state-legend-values > .is-picked{font-weight:600;}
+.state-legend-values > .is-unpicked{opacity:.55;}
+
+/* Zustands-Kachel (Werte-Kachel einer Zustands-Entität, dashboard-tiles.js
+   applyStateTile()): Farbfeld neben dem Zustand, Streifen der letzten 24 h,
+   Anteile je Tag (ab zwei Spalten) oder Donut mit Zustand in der Mitte.
+   Steht hier statt in dashboard_detail.css, weil die Kacheln auch auf der
+   Entitäten-Seite (entities.css) erscheinen. */
+.dtile-state-swatch{width:14px;height:14px;border-radius:4px;align-self:center;margin-right:6px;}
+.dtile-state-strip{position:relative;height:14px;border-radius:4px;overflow:hidden;background:var(--surface-alt);}
+.dtile-state-strip i{position:absolute;top:0;bottom:0;}
+.dtile-state-axis{display:flex;justify-content:space-between;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);margin-top:2px;}
+.dtile-state-days{display:flex;flex-direction:column;gap:3px;}
+.dtile-state-day{display:grid;grid-template-columns:2.4em minmax(0,1fr);align-items:center;gap:6px;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
+.dtile-state-bar{display:flex;height:9px;border-radius:3px;overflow:hidden;background:var(--surface-alt);}
+.dtile-state-bar i{display:block;height:100%;}
+.dtile-state-donut{position:relative;height:110px;}
+.dtile-state-donut-chart{position:absolute;inset:0;}
+.dtile-state-donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;text-align:center;}
+.dtile-state-donut-center b{font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dtile-state-donut-center span{font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
+.dtile-state-legend{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);margin-top:4px;}
+.dtile-state-legend > span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}

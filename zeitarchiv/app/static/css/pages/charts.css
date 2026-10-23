@@ -88,6 +88,11 @@
   .chart-card.is-typ-donut::before{
     background:linear-gradient(90deg, var(--chart-5), color-mix(in srgb, var(--chart-5) 35%, transparent));
   }
+  .chart-card.is-typ-anteile::before,
+  .chart-card.is-typ-wechsel::before,
+  .chart-card.is-typ-heatmap::before{
+    background:linear-gradient(90deg, var(--chart-3), color-mix(in srgb, var(--chart-3) 35%, transparent));
+  }
   .chart-grid-add{display:flex;align-items:center;justify-content:center;min-height:96px;border-style:dashed;text-decoration:none;}
   .chart-grid-add-btn{
     display:flex;align-items:center;justify-content:center;

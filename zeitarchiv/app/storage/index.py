@@ -22,12 +22,56 @@ from pathlib import Path
 from ..staleness import STALE_MODES
 from .paths import validate_entity_id
 
-SWITCH_DOMAINS = {"binary_sensor", "switch", "input_boolean"}
+# Muss mit custom_components/zeitarchiv/const.py übereinstimmen.
+SWITCH_DOMAINS = {
+    "binary_sensor",
+    "switch",
+    "input_boolean",
+    "light",
+    "fan",
+    "automation",
+    "script",
+    "remote",
+    "siren",
+    "humidifier",
+    "update",
+    "calendar",
+}
 # Anwesenheits-Domains (device_tracker/person) — eigenes State-Vokabular
 # ("home"/"not_home"/Zonenname), werden für den Zeitarchiv-Typ aber wie
 # SWITCH_DOMAINS behandelt, siehe ha_import._parse_state()/events.build_event().
 PRESENCE_DOMAINS = {"device_tracker", "person"}
 COUNTER_STATE_CLASSES = {"total", "total_increasing"}
+
+# Zustands-Entitäten (Typ "state", ROADMAP 1.29): Text-Zustände werden als
+# Ganzzahl-Index im unveränderten Wert-Feld gespeichert, die Zuordnung
+# Index → Text steht in entity_states. Ein Index wird nie umnummeriert und nie
+# wiederverwendet — nur so bleiben bereits archivierte Monate richtig lesbar.
+STATE_TYPE = "state"
+# Fester Index für "unavailable"/"unknown": Ohne ihn liefe im Zeitstrahl der
+# letzte Zustand über einen Ausfall hinweg weiter. Zählt nicht zur Obergrenze.
+STATE_UNAVAILABLE_INDEX = -1
+STATE_UNAVAILABLE_TEXTS = {"unavailable", "unknown"}
+# Wie IGNORED_STATES der Integration, nur ohne die beiden oben.
+STATE_IGNORED_TEXTS = {"none", ""}
+# Schutz gegen Freitext-Sensoren (Adressen, Versionsnummern …): darüber
+# werden neue Zustände verworfen statt die Zuordnung unbegrenzt wachsen zu
+# lassen. Die brauchbaren Entitäten der Bestandsaufnahme hatten 2–7.
+MAX_STATES_PER_ENTITY = 50
+
+# Darstellungen einer Werte-Kachel mit Zustands-Entität (dashboard_pins.state_view).
+STATE_TILE_VIEWS = ("strip", "donut")
+# Verworfene Werte für die Repair-Hinweise (record_state_rejection()): Typ passt
+# nicht (Zahl statt Text oder umgekehrt) bzw. Obergrenze an Zuständen erreicht.
+STATE_REJECTION_TYPE_MISMATCH = "type_mismatch"
+STATE_REJECTION_LIMIT = "state_limit"
+SETTING_STATE_REJECTIONS = "state_rejections"
+
+
+class StateTypeMismatch(ValueError):
+    """Eine Entität liefert Text, obwohl sie als Zahl angelegt ist, oder
+    umgekehrt. Der erste Wert legt den Typ fest; ein Wechsel würde die schon
+    gespeicherten Werte umdeuten und wird deshalb abgelehnt statt migriert."""
 
 DEFAULT_RESOLUTION = "raw"
 DEFAULT_RETENTION = "unlimited"
@@ -272,7 +316,7 @@ def effective_gap_floor_minutes(resolution: str, value_filter: str) -> int:
 # mit dem Zuwachs eine tragfähige Bezugsgröße und werden deshalb erkannt —
 # gemessen an einem echten Stromzähler trennen sechs Größenordnungen den
 # größten normalen Zuwachs (10,1× Median) vom Ziffernfehler (56.941.875×).
-_OUTLIER_BLIND_AGGREGATION_TYPES = {"switch"}
+_OUTLIER_BLIND_AGGREGATION_TYPES = {"switch", STATE_TYPE}
 
 
 def outlier_detection_applies(aggregation_type: str) -> bool:
@@ -400,6 +444,20 @@ CREATE INDEX IF NOT EXISTS idx_deleted_points_entity_deleted_at
 -- rebuild_entity_rollups() das Rollup still aus den jetzt gröberen Daten neu
 -- berechnet, statt den bestehenden, aus den vollen Rohdaten stammenden Stand
 -- zu behalten.
+-- Zuordnung Index → Text für Zustands-Entitäten (Typ "state"). text ist der
+-- Rohwert aus Home Assistant und der eigentliche Schlüssel; label ist die
+-- zuletzt gemeldete Übersetzung (leer, wenn HA keine kennt) und darf sich
+-- ändern, ohne dass ein Archivwert angefasst werden muss.
+CREATE TABLE IF NOT EXISTS entity_states (
+    entity_id TEXT NOT NULL,
+    idx INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    label TEXT,
+    first_seen REAL NOT NULL,
+    PRIMARY KEY (entity_id, idx),
+    UNIQUE (entity_id, text)
+);
+
 CREATE TABLE IF NOT EXISTS compacted_months (
     entity_id TEXT NOT NULL,
     year INTEGER NOT NULL,
@@ -590,7 +648,8 @@ CREATE TABLE IF NOT EXISTS dashboards (
     locked INTEGER NOT NULL DEFAULT 0,
     is_favorite INTEGER NOT NULL DEFAULT 0,
     precise_mode INTEGER NOT NULL DEFAULT 0,
-    fill_gaps INTEGER NOT NULL DEFAULT 0
+    fill_gaps INTEGER NOT NULL DEFAULT 0,
+    period_nav INTEGER NOT NULL DEFAULT 0
 );
 
 -- dashboard_id verweist auf dashboards.id — mehrere, unabhängige Dashboards
@@ -661,6 +720,11 @@ CREATE TABLE IF NOT EXISTS dashboard_pins (
     -- als kommagetrennte Teilmenge von min/avg/max/sum in dieser
     -- Reihenfolge. Leer = keine Zeile, also das bisherige Verhalten.
     stats_metrics TEXT NOT NULL DEFAULT '',
+    -- Nur bei Werte-Kacheln einer Zustands-Entität (ROADMAP 1.29): 'strip' =
+    -- aktueller Zustand, "seit" und Streifen der letzten 24 h (ab zwei Spalten
+    -- dazu die Anteile der letzten 7 Tage), 'donut' = Anteile im Zeitraum
+    -- range_key mit dem aktuellen Zustand in der Mitte.
+    state_view TEXT NOT NULL DEFAULT 'strip',
     UNIQUE(dashboard_id, item_type, item_id, item_entity_id)
 );
 
@@ -1224,6 +1288,13 @@ class Index:
             # beim nächsten Öffnen wieder "Aus" war. Aufbau siehe
             # compare_settings_or_400() in chart_period.py; '{}' = kein Vergleich.
             self._conn.execute("ALTER TABLE saved_charts ADD COLUMN compare_settings TEXT NOT NULL DEFAULT '{}'")
+        if "heatmap_states" not in sc_columns:
+            # Gezeichneter Zustand je Zustands-Entität der Heatmap (ROADMAP
+            # 1.29) als JSON {entity_id: Rohtext des Zustands}. Der Text statt
+            # des Index: der Index ist nur innerhalb der Zuordnung einer
+            # Entität gültig und verschiebt sich, wenn sie neu zugeordnet
+            # wird. '{}' = überall die Vorbelegung (größte Streuung).
+            self._conn.execute("ALTER TABLE saved_charts ADD COLUMN heatmap_states TEXT NOT NULL DEFAULT '{}'")
 
         if self._conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='saved_tables'").fetchone()[0]:
             st_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(saved_tables)")}
@@ -1413,6 +1484,12 @@ class Index:
             self._conn.execute(
                 "ALTER TABLE dashboard_pins ADD COLUMN stats_metrics TEXT NOT NULL DEFAULT ''"
             )
+        if "state_view" not in dashboard_columns:
+            # Darstellung einer Zustands-Kachel (ROADMAP 1.29) — 'strip' ist
+            # die Kachel, wie sie eine Zustands-Entität ohne Wahl bekommt.
+            self._conn.execute(
+                "ALTER TABLE dashboard_pins ADD COLUMN state_view TEXT NOT NULL DEFAULT 'strip'"
+            )
 
         # Werte-Kacheln: dieselbe Entität sollte bisher nur EIN Mal pro
         # Dashboard angeheftet werden können — item_id trug für sie immer den
@@ -1456,6 +1533,10 @@ class Index:
             # is-dense) — Standard aus, damit bestehende Dashboards ihre
             # heutige strikte Reihenfolge-Anordnung nicht ungefragt ändern.
             self._conn.execute("ALTER TABLE dashboards ADD COLUMN fill_gaps INTEGER NOT NULL DEFAULT 0")
+        if "period_nav" not in dashboards_columns:
+            # Zeitraum-Navigation (Stichtag-Leiste über den Kacheln) — Standard
+            # aus, damit kein bestehendes Dashboard ungefragt eine Leiste bekommt.
+            self._conn.execute("ALTER TABLE dashboards ADD COLUMN period_nav INTEGER NOT NULL DEFAULT 0")
 
         # Einmalige Anlage des migrierten Default-Dashboards ("Übersicht", fest
         # verankert an id=1, siehe dashboard_pins-Migration oben) — nur beim
@@ -1512,8 +1593,15 @@ class Index:
         unit: str | None,
         friendly_name: str | None = None,
         on_type_change: Callable[[str, str, bool], None] | None = None,
+        *,
+        state: bool = False,
     ) -> str:
         """Gibt den Aggregationstyp zurück; legt die Entität bei Bedarf neu an.
+
+        ``state=True`` heißt: das Event trägt einen Text-Zustand. Zustands-
+        Entitäten leiten ihren Typ nicht aus Domain/state_class ab, sondern
+        behalten ihn; ein Wechsel zwischen Zahl und Text in beide Richtungen
+        wirft ``StateTypeMismatch`` (der erste Wert legt den Typ fest).
 
         Metadaten werden bei jedem Aufruf nachgezogen. Ändert sich der daraus
         abgeleitete Aggregationstyp, muss ``on_type_change`` zuerst die
@@ -1526,7 +1614,7 @@ class Index:
         ``get_entity()`` würde hier deadlocken (siehe CHANGELOG_INTERNAL.md).
         """
         validate_entity_id(entity_id)
-        aggregation_type = derive_type(domain, state_class)
+        aggregation_type = STATE_TYPE if state else derive_type(domain, state_class)
         with self._lock, self._conn:
             row = self._conn.execute(
                 "SELECT aggregation_type, state_class, friendly_name, unit, hourly_rollup "
@@ -1535,6 +1623,8 @@ class Index:
             ).fetchone()
             if row is not None:
                 old_type = row["aggregation_type"]
+                if STATE_TYPE in (aggregation_type, old_type) and aggregation_type != old_type:
+                    raise StateTypeMismatch(entity_id)
                 if aggregation_type != old_type:
                     if on_type_change is None:
                         raise ValueError(
@@ -1581,6 +1671,12 @@ class Index:
             gap_threshold = default_rows.get("default_gap_threshold", DEFAULT_GAP_THRESHOLD)
             outlier_threshold = default_rows.get("default_outlier_threshold", DEFAULT_OUTLIER_THRESHOLD)
             compact_target = default_rows.get("default_compact_target", DEFAULT_COMPACT_TARGET)
+            if aggregation_type == STATE_TYPE:
+                # Auflösung, Verdichtung und Wertfilter rechnen mit Zahlen
+                # (Mittelwert, Raster, Schwelle) — für einen Zustandsindex
+                # ergäben sie Unsinn. Gesperrt wie bei Schaltern, siehe
+                # formatting.*_BLOCKED_REASONS.
+                resolution, compact_target, value_filter = "raw", "off", "off"
             self._conn.execute(
                 """
                 INSERT INTO entities
@@ -2344,6 +2440,7 @@ class Index:
         donut_aggregation: str = "sum",
         period_anchor: str | None = None,
         compare_settings: dict | None = None,
+        heatmap_states: dict | None = None,
     ) -> int:
         now = time.time()
         with self._lock, self._conn:
@@ -2355,8 +2452,8 @@ class Index:
                 "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
                 "chart_type, decimals, show_values, average_line, area_fill, show_points, stacked, normalize, "
                 "average_style, horizontal, donut_aggregation, period_anchor, compare_settings, "
-                "created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "heatmap_states, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -2366,7 +2463,7 @@ class Index:
                     legend_style, chart_type, decimals, int(show_values),
                     int(average_line), int(area_fill), int(show_points), int(stacked), int(normalize),
                     average_style, int(horizontal), donut_aggregation, period_anchor,
-                    json.dumps(compare_settings or {}), now, now,
+                    json.dumps(compare_settings or {}), json.dumps(heatmap_states or {}), now, now,
                 ),
             )
             return cur.lastrowid
@@ -2399,6 +2496,7 @@ class Index:
         donut_aggregation: str = "sum",
         period_anchor: str | None = None,
         compare_settings: dict | None = None,
+        heatmap_states: dict | None = None,
     ) -> None:
         with self._lock, self._conn:
             self._ensure_valid_name_locked("saved_charts", name, exclude_id=chart_id)
@@ -2409,7 +2507,7 @@ class Index:
                 "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, decimals = ?, "
                 "show_values = ?, average_line = ?, area_fill = ?, show_points = ?, stacked = ?, normalize = ?, "
                 "average_style = ?, horizontal = ?, donut_aggregation = ?, period_anchor = ?, "
-                "compare_settings = ?, updated_at = ? WHERE id = ?",
+                "compare_settings = ?, heatmap_states = ?, updated_at = ? WHERE id = ?",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -2419,7 +2517,7 @@ class Index:
                     legend_style, chart_type, decimals, int(show_values),
                     int(average_line), int(area_fill), int(show_points), int(stacked), int(normalize),
                     average_style, int(horizontal), donut_aggregation, period_anchor,
-                    json.dumps(compare_settings or {}), time.time(), chart_id,
+                    json.dumps(compare_settings or {}), json.dumps(heatmap_states or {}), time.time(), chart_id,
                 ),
             )
 
@@ -2445,6 +2543,7 @@ class Index:
         d["donut_aggregation"] = d.get("donut_aggregation") or "sum"
         d["period_anchor"] = d.get("period_anchor") or None
         d["compare_settings"] = json.loads(d["compare_settings"]) if d.get("compare_settings") else {}
+        d["heatmap_states"] = json.loads(d["heatmap_states"]) if d.get("heatmap_states") else {}
         d["entity_names"] = json.loads(d["entity_names"]) if d.get("entity_names") else {}
         d["hidden_entity_ids"] = (
             json.loads(d["hidden_entity_ids"]) if d.get("hidden_entity_ids") else []
@@ -2614,6 +2713,13 @@ class Index:
             )
             return cursor.rowcount > 0
 
+    def set_dashboard_period_nav(self, dashboard_id: int, period_nav: bool) -> bool:
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboards SET period_nav = ? WHERE id = ?", (1 if period_nav else 0, dashboard_id)
+            )
+            return cursor.rowcount > 0
+
     def duplicate_dashboard(self, dashboard_id: int) -> int | None:
         """Kopiert Name UND angeheftete Kacheln (dashboard_pins) auf ein neues
         Dashboard. Weder is_default noch locked noch is_favorite werden
@@ -2635,7 +2741,7 @@ class Index:
             pins = self._conn.execute(
                 "SELECT item_type, item_id, item_entity_id, position, grid_cols, grid_rows, show_legend, "
                 "show_sparkline, sparkline_resolution, decimals, title, show_age, stale_mode, show_period, "
-                "range_key, continuous, primary_metric, stats_metrics "
+                "range_key, continuous, primary_metric, stats_metrics, state_view "
                 "FROM dashboard_pins WHERE dashboard_id = ? ORDER BY position ASC",
                 (dashboard_id,),
             ).fetchall()
@@ -2643,8 +2749,8 @@ class Index:
                 "INSERT INTO dashboard_pins "
                 "(dashboard_id, item_type, item_id, item_entity_id, position, grid_cols, grid_rows, show_legend, "
                 "show_sparkline, sparkline_resolution, decimals, title, show_age, stale_mode, show_period, "
-                "range_key, continuous, primary_metric, stats_metrics) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "range_key, continuous, primary_metric, stats_metrics, state_view) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [
                     (
                         new_id, p["item_type"], p["item_id"], p["item_entity_id"], p["position"],
@@ -2652,6 +2758,7 @@ class Index:
                         p["sparkline_resolution"],
                         p["decimals"], p["title"], p["show_age"], p["stale_mode"], p["show_period"],
                         p["range_key"], p["continuous"], p["primary_metric"], p["stats_metrics"],
+                        p["state_view"],
                     )
                     for p in pins
                 ],
@@ -3057,6 +3164,55 @@ class Index:
                 "UPDATE dashboard_pins SET show_age = ? "
                 "WHERE dashboard_id = ? AND item_type = 'entity' AND item_id = ?",
                 (int(show_age), dashboard_id, pin_id),
+            )
+            return cursor.rowcount > 0
+
+    def record_state_rejection(self, entity_id: str, reason: str, ts: float) -> None:
+        """Merkt, dass ein Wert einer Zustands-Entität verworfen wurde —
+        reason ist STATE_REJECTION_TYPE_MISMATCH oder STATE_REJECTION_LIMIT.
+        Grundlage der Repair-Hinweise (notices.state_rejection_notices()).
+        Der Aufrufer drosselt (IngestionService), hier wird jedes Mal
+        geschrieben."""
+        with self._lock, self._conn:
+            row = self._conn.execute(
+                "SELECT value FROM settings WHERE key = ?", (SETTING_STATE_REJECTIONS,)
+            ).fetchone()
+            try:
+                entries = json.loads(row["value"]) if row else {}
+            except (TypeError, ValueError):
+                entries = {}
+            key = f"{reason}:{entity_id}"
+            entry = entries.get(key) or {"entity_id": entity_id, "reason": reason, "first": ts}
+            entry["last"] = ts
+            entries[key] = entry
+            self._conn.execute(
+                "INSERT INTO settings (key, value) VALUES (?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (SETTING_STATE_REJECTIONS, json.dumps(entries)),
+            )
+
+    def state_rejections(self, since: float) -> list[dict]:
+        """Verworfene Zustandswerte, deren letztes Vorkommen nach ``since``
+        liegt, nur für noch vorhandene Entitäten — ältere fallen von selbst
+        heraus, sobald die Entität wieder passt."""
+        try:
+            entries = json.loads(self.get_setting(SETTING_STATE_REJECTIONS, "{}") or "{}")
+        except (TypeError, ValueError):
+            return []
+        return [
+            entry for entry in entries.values()
+            if isinstance(entry, dict) and (entry.get("last") or 0) >= since
+            and self.get_entity(entry.get("entity_id", "")) is not None
+        ]
+
+    def set_dashboard_entity_pin_state_view(self, dashboard_id: int, pin_id: int, state_view: str) -> bool:
+        if state_view not in STATE_TILE_VIEWS:
+            raise ValueError(tr("Ungültige Darstellung"))
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboard_pins SET state_view = ? "
+                "WHERE dashboard_id = ? AND item_type = 'entity' AND item_id = ?",
+                (state_view, dashboard_id, pin_id),
             )
             return cursor.rowcount > 0
 
@@ -3883,6 +4039,54 @@ class Index:
             (entity_id,),
         ).fetchone()
 
+    def state_index(
+        self, entity_id: str, text: str, label: str | None, ts: float
+    ) -> int | None:
+        """Index des Zustands ``text``; ein neuer Text bekommt den nächsten
+        freien. None, wenn die Entität schon MAX_STATES_PER_ENTITY Zustände
+        hat. Vergabe und Prüfung in einer Transaktion, damit zwei gleichzeitige
+        Events desselben neuen Textes nicht zwei Indizes erzeugen.
+
+        ``label`` (HA-Übersetzung) wird bei jedem Aufruf nachgezogen, wenn es
+        sich geändert hat — etwa nach einem Sprachwechsel in HA."""
+        validate_entity_id(entity_id)
+        label = label or None
+        with self._lock, self._conn:
+            row = self._conn.execute(
+                "SELECT idx, label FROM entity_states WHERE entity_id = ? AND text = ?",
+                (entity_id, text),
+            ).fetchone()
+            if row is not None:
+                if label is not None and label != row["label"]:
+                    self._conn.execute(
+                        "UPDATE entity_states SET label = ? WHERE entity_id = ? AND idx = ?",
+                        (label, entity_id, row["idx"]),
+                    )
+                return int(row["idx"])
+            count, highest = self._conn.execute(
+                "SELECT COUNT(*), MAX(idx) FROM entity_states WHERE entity_id = ? AND idx >= 0",
+                (entity_id,),
+            ).fetchone()
+            if count >= MAX_STATES_PER_ENTITY:
+                return None
+            idx = 0 if highest is None else int(highest) + 1
+            self._conn.execute(
+                "INSERT INTO entity_states (entity_id, idx, text, label, first_seen) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (entity_id, idx, text, label, ts),
+            )
+            return idx
+
+    def get_state_map(self, entity_id: str) -> list[dict]:
+        """Zuordnung der Entität, nach Index sortiert: ``{idx, text, label}``.
+        "nicht verfügbar" (STATE_UNAVAILABLE_INDEX) steht nicht in der Tabelle,
+        die Anzeige ergänzt es selbst."""
+        rows = self._read_conn().execute(
+            "SELECT idx, text, label FROM entity_states WHERE entity_id = ? ORDER BY idx",
+            (entity_id,),
+        ).fetchall()
+        return [{"idx": int(r["idx"]), "text": r["text"], "label": r["label"]} for r in rows]
+
     def set_counter_decreases(self, entity_id: str, mode: str) -> None:
         """"report" oder "allow" — bei "allow" gelten Rückgänge dieses Zählers als normal."""
         if mode not in ("report", "allow"):
@@ -3984,7 +4188,7 @@ class Index:
             for table in (
                 "dashboard_pins", "table_rows", "table_columns", "saved_tables",
                 "saved_charts", "entity_actions", "retention_jobs",
-                "memory_snapshots", "entities",
+                "memory_snapshots", "entities", "entity_states",
             ):
                 self._conn.execute(f"DELETE FROM {table}")  # noqa: S608 — feste Namen
             # Das Default-Dashboard (id 1) ist fest verankert und nicht
@@ -3992,7 +4196,7 @@ class Index:
             self._conn.execute("DELETE FROM dashboards WHERE id != 1")
             self._conn.execute(
                 "UPDATE dashboards SET name = 'Übersicht', position = 0, is_default = 1, "
-                "locked = 0, is_favorite = 0, precise_mode = 0, fill_gaps = 0 WHERE id = 1"
+                "locked = 0, is_favorite = 0, precise_mode = 0, fill_gaps = 0, period_nav = 0 WHERE id = 1"
             )
             if keep_setting_prefixes:
                 clause = " AND ".join("key NOT LIKE ?" for _ in keep_setting_prefixes)
@@ -4015,6 +4219,9 @@ class Index:
             )
             self._conn.execute(
                 "DELETE FROM entities WHERE entity_id = ?", (entity_id,)
+            )
+            self._conn.execute(
+                "DELETE FROM entity_states WHERE entity_id = ?", (entity_id,)
             )
             # Werte-Kacheln referenzieren die Entität direkt (kein Chart/keine
             # Tabelle dazwischen) — ohne diese Bereinigung bliebe ein

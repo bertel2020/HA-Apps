@@ -215,7 +215,32 @@ def test_fetch_statistics_rows_parses_sorts_and_counts_skipped(monkeypatch) -> N
     result = ha_statistics.fetch_statistics_rows("sensor.temp", start, end, "hour")
 
     assert [value for _, value in result.rows] == [20.0, 22.0]
-    assert result.skipped == 1
+    # Ein Bucket ohne Wert ist eine Lücke in HA, kein Importfehler.
+    assert result.skipped == 0
+    assert [d["reason"] for d in result.discarded] == ["Statistik enthält weder Mittelwert noch Zählerstand"]
+    assert result.bucket_end_stamped is False
+
+
+def test_fetch_statistics_rows_stamps_counter_state_at_bucket_end_minus_one_second(monkeypatch) -> None:
+    """HA liefert "start" = Bucket-Anfang, "state" = Zählerstand am Bucket-Ende.
+    Ein Zählerwert am Anfangs-Zeitpunkt läge neben der Zählerkurve."""
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    end = start + timedelta(hours=2)
+
+    monkeypatch.setattr(ha_statistics, "_ws_call", lambda commands: [{
+        "id": 1, "type": "result", "success": True,
+        "result": {"sensor.energie": [
+            {"start": int(start.timestamp() * 1000), "state": 11.0},
+            {"start": int((start + timedelta(hours=1)).timestamp() * 1000), "state": 12.0},
+        ]},
+    }])
+    result = ha_statistics.fetch_statistics_rows("sensor.energie", start, end, "hour")
+
+    assert result.rows == [
+        (start.timestamp() + 3599, 11.0),
+        ((start + timedelta(hours=1)).timestamp() + 3599, 12.0),
+    ]
+    assert result.bucket_end_stamped is True
 
 
 def test_fetch_statistics_rows_chunks_long_ranges(monkeypatch) -> None:

@@ -69,7 +69,7 @@
   function tileCompare(el, {range, continuous, entityIds, chartType, resolutionPreset, stacked}) {
     let settings = {};
     try { settings = JSON.parse(el.dataset.compareSettings || '{}') || {}; } catch (e) { settings = {}; }
-    if (!settings.compare || ['timeline', 'donut'].includes(chartType) || resolutionPreset === 'full'
+    if (!settings.compare || ['timeline', 'donut', 'shares', 'changes', 'heatmap'].includes(chartType) || resolutionPreset === 'full'
         || (stacked && entityIds.length >= 2)) return null;
     let mode = settings.mode || 'previous';
     const longterm = mode === 'longterm' && range === 'year' && !continuous && entityIds.length === 1;
@@ -184,6 +184,10 @@
   // Kacheln anfasst, die noch nie geladen wurden (Platzhalter außerhalb des
   // Sichtbereichs beim ersten Laden der Seite).
   const renderedTiles = new Set();
+  // Stichtag der Zeitraum-Navigation (dashboard-period-nav.js, nur wenn am
+  // Dashboard eingeschaltet), null = heute. Der Server rechnet ihn je Kachel
+  // in deren Periode um (chart_period.stichtag_window()).
+  const stichtag = () => window.DashboardStichtag || null;
   let refreshTimer = null;
   // 60s — schneller als sinnvoll wäre unnötige Serverlast für Daten, die sich
   // i. d. R. erst nach mehreren Minuten sichtbar ändern; deutlich langsamer
@@ -272,10 +276,22 @@
       : `<span class="dot" style="background:${item.color};"></span>`;
   }
 
+  // Zustands-Entitäten (ROADMAP 1.29): statt Min/Max über Indizes die
+  // Zustände der Zeile — Farbe, Name und (mit Statistik) Dauer · Anteil.
+  function stateLegendValues(item, showStats) {
+    return `<span class="values state-legend-values">${item.states.map(row =>
+      `<span title="${escapeHtml(row.raw)}"><span class="dot state-dot" style="${row.swatch}"></span> ${escapeHtml(row.label)}`
+      + (showStats ? ` <strong>${escapeHtml(row.text)}</strong>` : '') + '</span>').join('')}</span>`;
+  }
+
   function renderLegendChips(items, legendMetrics, showStats, hiddenSet) {
     return items.map(item => {
       // "+N Jahre" (Langzeit-Kachel): nur ein Hinweis, kein Serien-Umschalter.
       if (item.more) return `<span class="chart-legend-item is-more">${escapeHtml(item.more)}</span>`;
+      if (item.states) {
+        return `<span class="chart-legend-item static"><span class="name">${escapeHtml(item.name)}</span>`
+             + `${stateLegendValues(item, showStats)}</span>`;
+      }
       let values = '';
       if (showStats) {
         const parts = [];
@@ -303,6 +319,10 @@
     const rows = items.filter(item => !item.more).map(item => {
       const cells = cols.map(key => `<td>${escapeHtml(key === 'sum' && item.sum === null ? '—' : item[key])}</td>`).join('');
       const inactive = hiddenSet.has(item.name) ? ' inactive' : '';
+      if (item.states) {
+        return `<tr class="chart-legend-table-row static"><td class="legend-name-col"><span class="name">${escapeHtml(item.name)}</span>`
+             + `${stateLegendValues(item, showStats)}</td>${cells}</tr>`;
+      }
       return `<tr class="chart-legend-table-row${inactive}" data-series="${escapeHtml(item.name)}" role="button" tabindex="0">`
            + `<td class="legend-name-col"><span class="legend-name-cell">`
            + legendSwatch(item)
@@ -475,6 +495,9 @@
     // "Ausrichtung" (Optionen-Menü, nur bei Auflösung "Voll") — siehe
     // horizontalActive weiter unten (chart_editor.js-Parität).
     const horizontal = el.dataset.horizontal === 'true';
+    // Gezeichneter Zustand je Zustands-Entität der Heatmap (saved_charts.heatmap_states).
+    let heatmapStates = {};
+    try { heatmapStates = JSON.parse(el.dataset.heatmapStates || '{}') || {}; } catch (e) { heatmapStates = {}; }
     const chartEl = el.querySelector('.dtile-chart');
     if (!chartEl || !entityIds.length) return;
 
@@ -491,6 +514,8 @@
       entity_ids: entityIds.join(','), range, offset: String(offset), continuous: String(continuous),
       raw: String(timeline),
     });
+    // Ein fester Zeitraum bleibt fest, der Stichtag gilt nur für die übrigen.
+    if (!el.dataset.periodAnchor && stichtag()) params.set('at', stichtag());
     const compare = tileCompare(el, {range, continuous, entityIds, chartType, resolutionPreset, stacked});
     if (compare) {
       params.set('compare', 'true');
@@ -499,17 +524,56 @@
     }
     let data;
     try {
-      const res = await fetch(`${base}/api/query-multi?${params}`);
-      data = await res.json();
+      // Heatmap: zusätzlich die Zellen (Wochentag x Stunde), wie im Chart-Editor.
+      // Zu kurze Zeiträume fallen unten auf den Standard zurück.
+      const wantHeatmap = chartType === 'heatmap' && StateEntities.SERVER_SHARE_RANGES.includes(range);
+      const heatmapParams = new URLSearchParams(params);
+      heatmapParams.set('heatmap', 'true');
+      heatmapParams.delete('compare');
+      // Zeitstrahl in Jahr/Dekade: zusätzlich Spalten vom Server, so breit wie die Kachel,
+      // wie im Chart-Editor. Sie ersetzen die Rohabschnitte, wenn deren Abfrage abbricht.
+      const wantColumns = timeline && StateEntities.COLUMN_RANGES.includes(range);
+      const columnsParams = new URLSearchParams(params);
+      columnsParams.set('columns', 'true');
+      columnsParams.delete('compare');
+      columnsParams.set('px', String(Math.max(60, Math.round(chartEl.clientWidth - 10))));
+      const [res, heatmapRes, columnsRes] = await Promise.all([
+        fetch(`${base}/api/query-multi?${params}`),
+        wantHeatmap ? fetch(`${base}/api/query-multi?${heatmapParams}`) : Promise.resolve(null),
+        wantColumns ? fetch(`${base}/api/query-multi?${columnsParams}`) : Promise.resolve(null),
+      ]);
+      const columnsData = columnsRes && columnsRes.ok ? await columnsRes.json() : null;
+      data = res.ok ? await res.json() : (columnsData || {});
+      const heatmapData = heatmapRes ? await heatmapRes.json() : null;
+      if (heatmapData) {
+        const cellsById = new Map((heatmapData.series || []).map(x => [x.entity_id, x.cells]));
+        for (const entry of data.series || []) if (cellsById.get(entry.entity_id)) entry.cells = cellsById.get(entry.entity_id);
+      }
+      if (columnsData && data !== columnsData) {
+        const colsById = new Map((columnsData.series || []).filter(x => x.columns).map(x => [x.entity_id, x]));
+        for (const entry of data.series || []) {
+          const cols = colsById.get(entry.entity_id);
+          if (cols) { entry.columns = cols.columns; entry.dt = cols.dt; }
+        }
+      }
     } catch (e) {
       chartEl.innerHTML = '<div class="dtile-loading">' + t('Fehler beim Laden') + '</div>';
       return;
     }
-    const series = data.series || [];
-    if (!series.some(s => s.points && s.points.length)) {
+    // Zustände lassen sich nur unter sich darstellen (wie im Chart-Editor):
+    // steht etwas anderes im Chart, fallen sie heraus.
+    const loaded = data.series || [];
+    const foreign = loaded.some(s => s.aggregation_type && s.aggregation_type !== 'state');
+    const series = foreign ? loaded.filter(s => s.aggregation_type !== 'state') : loaded;
+    if (!series.some(s => (s.points && s.points.length) || (s.columns && s.columns.length))) {
       chartEl.innerHTML = '<div class="dtile-loading">' + t('Keine Daten') + '</div>';
       return;
     }
+    // Nur Zustände und keine Ansicht gewählt: je Zeitraum der Standard, wie im
+    // Chart-Editor (Zeitstrahl bis zur Woche, danach Anteile).
+    const heatmapTooShort = chartType === 'heatmap' && !StateEntities.SERVER_SHARE_RANGES.includes(range);
+    const viewType = (chartType === 'auto' || heatmapTooShort) && series.every(s => s.aggregation_type === 'state')
+      ? StateEntities.defaultMode(range) : chartType;
     // Dieselbe Farbzuordnung wie echartsSeries weiter unten (PALETTE nach
     // Serienindex) UND dieselbe Kennzahlen-Berechnung wie seriesStats() in
     // chart_editor.html (Min/Max/Ø/Summe/Aktuell) — hier separat gebaut,
@@ -518,6 +582,9 @@
     // Kachelhöhe gemessen und die Legende schiebt ihn erst beim nächsten
     // Resize-Event auf seine endgültige Höhe.
     const statsItem = (s, points, name, color) => {
+      if (s.aggregation_type === 'state') {
+        return {name, color, states: stateRows(s, data.window_end), last: '—', min: '—', max: '—', average: '—', sum: null};
+      }
       const values = (points || []).map(p => p.value).filter(Number.isFinite);
       const minima = (points || []).map(p => Number.isFinite(p.min) ? p.min : p.value).filter(Number.isFinite);
       const maxima = (points || []).map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
@@ -602,8 +669,17 @@
       && parseInt(tileEl?.dataset.gridRows || '1', 10) >= 2;
     renderLegend(el, legend, legendVisible);
 
-    chartEl.innerHTML = '';
     let chart = instances.get(chartId);
+    // Beim Neuzeichnen (Auto-Refresh, Stichtag der Zeitraum-Navigation) wird
+    // die Instanz weiterverwendet — dann darf chartEl NICHT geleert werden:
+    // das entfernte ihr Canvas, und setOption() zeichnete danach ins Leere
+    // (Kachel blieb leer, Legende darunter voll). Geleert und neu gebunden
+    // wird nur ohne intakte Instanz, z. B. nach einem "Keine Daten"-
+    // Platzhalter, der das Canvas ersetzt hat.
+    if (chart && chart.getDom() === chartEl && !chartEl.querySelector('canvas, svg')) {
+      chart.dispose();
+      chart = null;
+    }
     // Ein htmx-Swap von #dashboard-grid (Pin/Unpin/Reorder) ersetzt chartEl
     // durch einen KOMPLETT NEUEN DOM-Knoten, während instances noch die alte
     // ECharts-Instanz unter derselben chartId hält — die zeigt dann auf ein
@@ -617,6 +693,7 @@
       chart = null;
     }
     if (!chart) {
+      chartEl.innerHTML = '';
       chart = echarts.init(chartEl);
       instances.set(chartId, chart);
     }
@@ -649,8 +726,20 @@
       });
       return;
     }
-    if (timeline) {
+    if (viewType === 'heatmap' && series.some(s => s.aggregation_type === 'state')) {
+      renderTileStateHeatmap(chart, series, entityNames, animation, heatmapStates);
+      return;
+    }
+    if (['shares', 'changes'].includes(viewType) && series.some(s => s.aggregation_type === 'state')) {
+      renderTileStateBars(chart, series, entityNames, data, range, viewType, animation);
+      return;
+    }
+    if (timeline || viewType === 'timeline') {
       renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface, colorIndexFor);
+      return;
+    }
+    if (donut && series.some(s => s.aggregation_type === 'state')) {
+      renderTileStateDonuts(chart, series, entityNames, data.window_end, style, surface);
       return;
     }
     if (donut) {
@@ -1029,7 +1118,16 @@
       animation,
       textStyle: {fontFamily: style.getPropertyValue('--font-mono')},
       color: PALETTE,
-      grid: {left: 6, right: 6, top: 10, bottom: 20, containLabel: true},
+      // "Werte anzeigen": Die Zahl steht über (horizontal: rechts neben) dem
+      // Balken, und die Y-Achse endet exakt beim Maximalwert. Ohne Rand würde
+      // das Label des höchsten Balkens am Kachelrand abgeschnitten.
+      grid: {
+        left: 6,
+        right: showValues && horizontalActive ? 36 : 6,
+        top: showValues && !horizontalActive && !stackedActive ? 10 + scaledFont(10) + 6 : 10,
+        bottom: 20,
+        containLabel: true,
+      },
       xAxis: singleBucket ? (horizontalActive ? xAxisForHorizontal : categoryAxisObj) : {
         type: 'time',
         min: data.window_start != null ? data.window_start * 1000 : undefined,
@@ -1330,10 +1428,74 @@
   // Zeilen-Beschriftung (der Name steht schon in der Kachel-Legende, siehe
   // renderTile()) — bei mehreren Zeilen in einer kleinen Kachel wäre dafür
   // ohnehin kaum Platz.
+  // Dauer und Anteil je Zustand einer Zustands-Serie — für Legende und
+  // Donut. Rohwechsel (bis zur Woche, Zeitstrahl) und Server-Anteile (ab dem
+  // Monat) ergeben dieselbe Form; dieselbe Rechnung wie stateRowsFor() in
+  // pages/chart_editor.js.
+  function stateRows(s, windowEnd) {
+    // Ohne Rohwechsel (Rohabfrage über der Grenze) aus den Spalten vom Server.
+    const buckets = s.chart_type === 'shares'
+      ? StateEntities.bucketsFromShares(s.points || [])
+      : (!(s.points || []).length && s.columns
+        ? StateEntities.bucketsFromShares(s.columns.map(([ts, states]) => ({ts, states})))
+        : StateEntities.bucketsFromSegments(StateEntities.segments(s.points || [], windowEnd), () => 0, () => Infinity));
+    return StateEntities.totals(buckets, s.states).map(row => ({
+      ...row,
+      label: StateEntities.label(s.states, row.idx),
+      raw: StateEntities.raw(s.states, row.idx),
+      swatch: StateEntities.swatchStyle(row.idx),
+      text: `${NumberFormat.fmtDuration(row.seconds)} · ${StateEntities.fmtShare(row.share)}`,
+    }));
+  }
+
+  // Anteile oder Wechsel je Zustands-Entität, wie im Chart-Editor.
+  function renderTileStateBars(chart, series, entityNames, data, range, mode, animation) {
+    const rows = series.filter(s => s.aggregation_type === 'state').map(s => ({
+      name: entityNames[s.entity_id] || s.friendly_name,
+      states: s.states,
+      buckets: StateEntities.bucketsForSeries(s, range, data.window_end),
+    }));
+    chart.setOption({
+      ...StateEntities.barPanels(rows, {mode, range, windowStart: data.window_start, periodEnd: data.period_end ?? data.window_end}),
+      animation,
+    }, true);
+  }
+
+  // Heatmap je Zustands-Entität, wie im Chart-Editor, nur kompakt.
+  function renderTileStateHeatmap(chart, series, entityNames, animation, heatmapStates) {
+    const rows = series
+      .filter(s => s.aggregation_type === 'state' && s.cells)
+      .map(s => ({
+        name: entityNames[s.entity_id] || s.friendly_name,
+        states: s.states,
+        cells: s.cells,
+        idx: StateEntities.heatmapIndexFor(s.cells, s.states, heatmapStates[s.entity_id]),
+      }))
+      .filter(row => row.idx !== null);
+    if (!rows.length) {
+      chart.clear();
+      return;
+    }
+    chart.setOption({...StateEntities.heatmapPanels(rows, {compact: true}), animation}, true);
+  }
+
   function renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface, colorIndexFor) {
     const categories = series.map(s => entityNames[s.entity_id] || s.friendly_name);
     const items = [];
+    const pattern = StateEntities.unavailablePattern();
+    // Zustände: ein Band je Abschnitt, Farbe nach Zustand (wie im Chart-Editor), bei
+    // zu vielen Abschnitten für die Breite je Bildpunkt eine Spalte mit den Anteilen.
+    const stateRows = series
+      .map((s, catIndex) => ({catIndex, points: s.points, columns: s.columns, dt: s.dt, aggregation_type: s.aggregation_type}))
+      .filter(row => row.aggregation_type === 'state');
+    const stateTimeline = StateEntities.stateTimelineItems(
+      stateRows, data.window_start, data.period_end ?? data.window_end, data.window_end,
+      Math.max(60, Math.round(chart.getWidth() - 10)), pattern
+    );
+    const timelineParts = stateTimeline.parts;
+    items.push(...stateTimeline.items);
     series.forEach((s, catIndex) => {
+      if (s.aggregation_type === 'state') return;
       const color = PALETTE[colorIndexFor(s.entity_id) % PALETTE.length];
       const points = s.points || [];
       for (let i = 0; i < points.length; i++) {
@@ -1376,10 +1538,18 @@
         borderColor,
         textStyle: {color: style.getPropertyValue('--ink-muted').trim(), fontFamily: style.getPropertyValue('--font-mono'), fontSize: scaledFont(12)},
         formatter: p => {
-          const [catIndex, startMs, endMs] = p.value;
+          const [catIndex, startMs, endMs, , idx, partsIndex] = p.value;
           const pad = n => String(n).padStart(2, '0');
           const fmtTime = ms => { const t = window.ServerTime.parts(ms / 1000); return `${pad(t.hour)}:${pad(t.minute)}`; };
-          return `${categories[catIndex]}<br>${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
+          const span = `${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
+          const s = series[catIndex];
+          if (!s || s.aggregation_type !== 'state') return `${categories[catIndex]}<br>${span}`;
+          if (partsIndex >= 0) {
+            // Spalte über mehrere Tage: Datum dazu, in Serverzeit wie überall auf der Kachel.
+            const stamp = ms => { const t = window.ServerTime.parts(ms / 1000); return `${pad(t.day)}.${pad(t.month)}. ${pad(t.hour)}:${pad(t.minute)}`; };
+            return StateEntities.condensedTooltip(timelineParts[partsIndex], startMs, endMs, s.states, stamp, escapeHtml(categories[catIndex]));
+          }
+          return `${categories[catIndex]}<br><strong>${escapeHtml(StateEntities.label(s.states, idx))}</strong><br>${span}`;
         },
         appendToBody: true,
       },
@@ -1391,9 +1561,13 @@
           const end = api.coord([api.value(2), categoryIndex]);
           const height = api.size([0, 1])[1] * 0.6;
           const rectShape = echarts.graphic.clipRectByRect(
-            {x: start[0], y: start[1] - height / 2, width: end[0] - start[0], height},
+            {x: start[0], y: start[1] - height / 2, width: Math.max(end[0] - start[0], api.value(4) != null ? 1 : 0), height},
             {x: params.coordSys.x, y: params.coordSys.y, width: params.coordSys.width, height: params.coordSys.height}
           );
+          // Verdichtete Spalte: die Anteile der Zustände als Schichten.
+          if (rectShape && api.value(5) >= 0) {
+            return StateEntities.condensedShape(timelineParts[api.value(5)], rectShape, idx => StateEntities.fill(idx, pattern));
+          }
           return rectShape && {type: 'rect', shape: rectShape, style: {fill: api.value(3)}};
         },
         encode: {x: [1, 2], y: 0},
@@ -1414,6 +1588,37 @@
   // .edash-share-donut (energiedashboard.js) — label:show:false, weil die
   // Namen schon in der .dtile-legend-Zeile stehen (renderTile() baut sie VOR
   // diesem Zweig, siehe renderLegend()-Aufruf dort, unverändert wiederverwendet).
+  // Zustände: ein Donut je Zustands-Entität nebeneinander, wie
+  // renderStateDonuts() in pages/chart_editor.js.
+  function renderTileStateDonuts(chart, series, entityNames, windowEnd, style, surface) {
+    const rows = series.filter(s => s.aggregation_type === 'state');
+    const width = 100 / Math.max(rows.length, 1);
+    const pattern = StateEntities.unavailablePattern();
+    chart.setOption({
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: surface,
+        textStyle: {color: style.getPropertyValue('--ink-muted').trim(), fontFamily: style.getPropertyValue('--font-mono'), fontSize: scaledFont(12)},
+        appendToBody: true,
+      },
+      series: rows.map((s, k) => ({
+        type: 'pie',
+        radius: rows.length > 1 ? ['36%', '60%'] : ['52%', '85%'],
+        center: [`${width * k + width / 2}%`, '50%'],
+        label: {show: false},
+        labelLine: {show: false},
+        itemStyle: {borderColor: surface, borderWidth: 2},
+        tooltip: {
+          formatter: p => `${escapeHtml(entityNames[s.entity_id] || s.friendly_name)}<br>${p.marker} <strong>${escapeHtml(p.name)}</strong><br>`
+            + `${NumberFormat.fmtDuration(p.value)} (${fmtCompactNumber(p.percent, 1)} %)`,
+        },
+        data: stateRows(s, windowEnd).map(row => ({
+          name: row.label, value: row.seconds, itemStyle: {color: StateEntities.fill(row.idx, pattern)},
+        })),
+      })),
+    }, true);
+  }
+
   function renderTileDonut(chart, series, entityNames, colorIndexFor, aggregation, effectiveDecimals, style, surface, chartId) {
     const data = series.map(s => {
       const values = (s.points || []).map(p => p.value).filter(Number.isFinite);
@@ -1496,7 +1701,7 @@
     const base = el.closest('#dashboard-grid')?.dataset.appRoot || '';
     let values, allValues, windowStarts, windowEnds, isCurrent, elapsedSeconds;
     try {
-      ({values, windowStarts, windowEnds, isCurrent, elapsedSeconds} = await TableCompute.computeValues(base, visibleCols, allRows));
+      ({values, windowStarts, windowEnds, isCurrent, elapsedSeconds} = await TableCompute.computeValues(base, visibleCols, allRows, {at: stichtag()}));
       allValues = values;
       values = values.map(colValues => visibleRowIndexes.map(i => colValues[i]));
     } catch (e) {
@@ -1808,8 +2013,8 @@
   // Tag" und nicht t("größter Messwert"). Die Bucket-Größe kommt vom Server
   // (bucket_label), damit hier keine zweite Tabelle mit den Auflösungen des
   // Speichers entsteht, die still veralten könnte.
-  function tileMetricTooltip(el, metric, serie) {
-    const fenster = (TILE_RANGE_WINDOW[el.dataset.range] || TILE_RANGE_WINDOW.day)[
+  function tileMetricTooltip(el, metric, serie, stichtagFenster = null) {
+    const fenster = stichtagFenster || (TILE_RANGE_WINDOW[el.dataset.range] || TILE_RANGE_WINDOW.day)[
       el.dataset.continuous === 'true' ? 1 : 0
     ];
     const bucket = serie && serie.bucket_label;
@@ -1895,6 +2100,7 @@
       resolution: erste.dataset.sparklineResolution || 'raw',
       stats: tileNeedsAggregates(erste) ? 'true' : 'false',
     });
+    if (stichtag()) params.set('at', stichtag());
     // MAX_MULTI_QUERY_ENTITIES (25, siehe limits.py) — ein großes Dashboard
     // überschreitet das sonst und bekäme statt Daten eine 413.
     for (let i = 0; i < tiles.length; i += 25) {
@@ -1915,9 +2121,12 @@
         continue;  // Netzwerkfehler: der servergerenderte Platzhalter bleibt stehen
       }
       const nachId = new Map((daten.series || []).map(s => [s.entity_id, s]));
+      // Mit Stichtag passt "heute seit Mitternacht" im Kennzahlen-Tooltip
+      // nicht mehr — dann das tatsächliche Fenster.
+      const fenster = stichtag() ? stichtagWindowText(daten.window_start, daten.window_end) : null;
       stueck.forEach(el => {
         const serie = nachId.get(el.dataset.entityId);
-        if (serie) applyEntityTile(el, serie);
+        if (serie) applyEntityTile(el, serie, fenster);
       });
     }
   }
@@ -1931,7 +2140,118 @@
   // Sparkline-Kurve). Der servergerenderte Anfangszustand (siehe
   // _dashboard_tiles_context() in main.py) bleibt als Platzhalter stehen,
   // falls der Fetch fehlschlägt oder keine Daten liefert.
-  function applyEntityTile(el, serie) {
+  // "21.10.2025" bzw. "01.10.2025 – 31.10.2025" für ein [Anfang, Ende)-Fenster
+  // in Server-Sekunden.
+  function stichtagWindowText(start, end) {
+    if (start == null || end == null) return null;
+    const tag = sec => {
+      const p = window.ServerTime.parts(sec);
+      return `${String(p.day).padStart(2, '0')}.${String(p.month).padStart(2, '0')}.${p.year}`;
+    };
+    const von = tag(start), bis = tag(end - 1);
+    return von === bis ? von : `${von} – ${bis}`;
+  }
+
+  // ---- Zustands-Kachel (ROADMAP 1.29) --------------------------------
+  // Aktueller Zustand mit Farbfeld, "seit", und darunter je nach Größe und
+  // Darstellung (data-state-view): 1×1 der Streifen der letzten 24 h, ab zwei
+  // Spalten die Anteile der letzten 7 Tage, oder der Donut über den Zeitraum
+  // der Kachel mit dem aktuellen Zustand in der Mitte.
+  function stateStripHtml(st) {
+    const a = st.strip_start, b = st.strip_end;
+    const span = Math.max(b - a, 1);
+    const segs = StateEntities.segments(st.strip, b).filter(seg => seg.e > a);
+    const parts = segs.map(seg => {
+      const left = (Math.max(seg.s, a) - a) / span * 100;
+      const width = (seg.e - Math.max(seg.s, a)) / span * 100;
+      const label = escapeHtml(StateEntities.label(st.states, seg.idx));
+      return `<i style="left:${left.toFixed(2)}%;width:${Math.max(width, 0.4).toFixed(2)}%;${StateEntities.swatchStyle(seg.idx)}" data-tooltip-fixed="${label}" data-tooltip-dot="${StateEntities.swatchStyle(seg.idx)}"></i>`;
+    });
+    return `<div class="dtile-state-strip">${parts.join('')}</div>`
+      + `<div class="dtile-state-axis"><span>${t('−24 h')}</span><span>${t('jetzt')}</span></div>`;
+  }
+
+  function stateDaysHtml(st) {
+    const order = st.states.map(x => x.idx);
+    const rows = st.days.map(day => {
+      const total = day.states.reduce((sum, [, seconds]) => sum + seconds, 0) || 1;
+      const bars = [...day.states]
+        .sort((x, y) => order.indexOf(x[0]) - order.indexOf(y[0]))
+        .map(([idx, seconds]) => `<i style="width:${(seconds / total * 100).toFixed(2)}%;${StateEntities.swatchStyle(idx)}"`
+          + ` data-tooltip-fixed="${escapeHtml(StateEntities.label(st.states, idx))}"`
+          + ` data-tooltip-dot="${StateEntities.swatchStyle(idx)}" data-tooltip-value="${NumberFormat.fmtDuration(seconds)}"></i>`)
+        .join('');
+      const weekday = new Date(day.ts * 1000).toLocaleDateString(LOCALE, {weekday: 'short'});
+      return `<div class="dtile-state-day"><span>${escapeHtml(weekday)}</span><div class="dtile-state-bar">${bars}</div></div>`;
+    });
+    return `<div class="dtile-state-days">${rows.join('')}</div>`;
+  }
+
+  function stateLegendHtml(st) {
+    const total = st.durations.reduce((sum, [, seconds]) => sum + seconds, 0) || 1;
+    return `<div class="dtile-state-legend">${st.durations
+      .filter(([, seconds]) => seconds / total >= 0.01)
+      .map(([idx, seconds]) => `<span><span class="state-dot" style="${StateEntities.swatchStyle(idx)}"></span>`
+        + `${escapeHtml(StateEntities.label(st.states, idx))} ${StateEntities.fmtShare(seconds / total * 100)}</span>`)
+      .join('')}</div>`;
+  }
+
+  function renderStateDonut(container, st) {
+    container.innerHTML = '<div class="dtile-state-donut"><div class="dtile-state-donut-chart"></div>'
+      + `<div class="dtile-state-donut-center"><b>${escapeHtml(StateEntities.label(st.states, st.idx))}</b>`
+      + `<span>${t('jetzt')}</span></div></div>${stateLegendHtml(st)}`;
+    const chartEl = container.querySelector('.dtile-state-donut-chart');
+    const style = getComputedStyle(document.body);
+    const pattern = StateEntities.unavailablePattern();
+    const chart = echarts.init(chartEl);
+    chart.setOption({
+      animation: false,
+      tooltip: {
+        trigger: 'item', appendToBody: true,
+        backgroundColor: style.getPropertyValue('--surface').trim(),
+        textStyle: {color: style.getPropertyValue('--ink-muted').trim(), fontSize: scaledFont(12)},
+        formatter: p => `${p.marker} <strong>${escapeHtml(p.name)}</strong><br>${NumberFormat.fmtDuration(p.value)} (${fmtCompactNumber(p.percent, 1)} %)`,
+      },
+      series: [{
+        type: 'pie', radius: ['62%', '88%'], center: ['50%', '50%'],
+        label: {show: false}, labelLine: {show: false},
+        itemStyle: {borderColor: style.getPropertyValue('--surface').trim(), borderWidth: 2},
+        data: st.durations.map(([idx, seconds]) => ({
+          name: StateEntities.label(st.states, idx), value: seconds, itemStyle: {color: StateEntities.fill(idx, pattern)},
+        })),
+      }],
+    });
+  }
+
+  function applyStateTile(el, serie) {
+    const st = serie.state;
+    const numberEl = el.querySelector('.dtile-entity-number');
+    if (numberEl) {
+      numberEl.textContent = StateEntities.label(st.states, st.idx);
+      // Rohwert im Tooltip, wie überall bei Zuständen — data-tooltip-fixed
+      // (App-Standard) statt nativem title, siehe fixed-tooltip.js.
+      numberEl.setAttribute('data-tooltip-fixed', StateEntities.raw(st.states, st.idx));
+      numberEl.setAttribute('data-tooltip-dot', StateEntities.swatchStyle(st.idx));
+    }
+    const swatchEl = el.querySelector('.dtile-state-swatch');
+    if (swatchEl) swatchEl.setAttribute('style', StateEntities.swatchStyle(st.idx));
+    const ageEl = el.querySelector('.dtile-entity-age');
+    if (ageEl) {
+      ageEl.textContent = st.since == null
+        ? ''
+        : t('seit {dauer}', {dauer: NumberFormat.fmtDuration(Date.now() / 1000 - st.since)});
+    }
+    const visualEl = el.querySelector('.dtile-state-visual');
+    if (!visualEl) return;
+    const instance = echarts.getInstanceByDom(visualEl.querySelector('.dtile-state-donut-chart') || visualEl);
+    if (instance) instance.dispose();
+    if (el.dataset.stateView === 'donut') { renderStateDonut(visualEl, st); return; }
+    const wide = parseInt(el.closest('.dtile')?.dataset.gridCols || '1', 10) >= 2;
+    visualEl.innerHTML = wide ? stateDaysHtml(st) : stateStripHtml(st);
+  }
+
+  function applyEntityTile(el, serie, stichtagFenster = null) {
+    if (serie.state) { applyStateTile(el, serie); return; }
     const primary = el.dataset.primaryMetric || 'last';
     const dezimal = el.dataset.decimals === 'auto' ? null : parseInt(el.dataset.decimals, 10);
     const istSchalter = el.dataset.isSwitch === 'true';
@@ -1955,7 +2275,14 @@
     const ageEl = el.querySelector('.dtile-entity-age');
     const secondsAgo = serie.last_ts == null ? null : Date.now() / 1000 - serie.last_ts;
     if (ageEl) {
-      ageEl.textContent = secondsAgo == null ? t('nie') : t('vor {dauer}', {dauer: NumberFormat.fmtDuration(secondsAgo)});
+      // Im Rückblick wäre "vor 1 Jahr" wahr, aber nutzlos — dann der Zeitpunkt.
+      ageEl.textContent = serie.last_ts == null
+        ? t('nie')
+        : (stichtag()
+            ? t('Stand {zeit}', {zeit: new Date(serie.last_ts * 1000).toLocaleString(LOCALE, window.ServerTime.withZone({
+              day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+            }))})
+            : t('vor {dauer}', {dauer: NumberFormat.fmtDuration(secondsAgo)}));
     }
     // Nur der Kartenrahmen zeigt "veraltet" an (siehe .dtile-entity.is-warn/
     // is-stale), der Wert bleibt immer schwarz. Die Schwellen kommen je Kachel
@@ -1967,7 +2294,8 @@
     if (tileEl) {
       const warnAfter = parseFloat(el.dataset.staleWarnAfter);
       const staleAfter = parseFloat(el.dataset.staleStaleAfter);
-      const mark = secondsAgo != null && !Number.isNaN(warnAfter) && !Number.isNaN(staleAfter);
+      // Im Rückblick ist jeder Wert "alt" — markiert wird nur die Gegenwart.
+      const mark = !stichtag() && secondsAgo != null && !Number.isNaN(warnAfter) && !Number.isNaN(staleAfter);
       tileEl.classList.toggle('is-warn', mark && secondsAgo > warnAfter && secondsAgo <= staleAfter);
       tileEl.classList.toggle('is-stale', mark && secondsAgo > staleAfter);
     }
@@ -1986,7 +2314,7 @@
       // data-tooltip-fixed statt data-tooltip: .dtile-body hat
       // overflow:hidden, ein ::after-Tooltip würde am Kachelrand
       // abgeschnitten (siehe fixed-tooltip.js).
-      statEl.setAttribute('data-tooltip-fixed', tileMetricTooltip(el, metric, serie));
+      statEl.setAttribute('data-tooltip-fixed', tileMetricTooltip(el, metric, serie, stichtagFenster));
     });
 
     const sparklineEl = el.querySelector('.dtile-entity-sparkline');
@@ -2043,18 +2371,28 @@
   // Läuft auch im Hintergrund weiter (der Browser drosselt Intervalle
   // inaktiver Tabs ohnehin selbst), die visibilityState-Prüfung im Tick
   // spart zusätzlich die Server-Anfragen selbst, nicht nur deren Timing.
+  function rerenderTiles() {
+    renderedTiles.forEach(el => {
+      if (!el.isConnected) { renderedTiles.delete(el); return; }
+      if (el.classList.contains('dtile-entity-body')) renderEntityTile(el);
+      else if (el.dataset.columns != null) renderTableTile(el);
+      else renderTile(el);
+    });
+  }
+
+  // Ein Rückblick (Stichtag in der Vergangenheit) ändert sich nicht mehr —
+  // dort pausiert der Auto-Refresh, siehe Hinweis über den Kacheln.
   function setupAutoRefresh() {
     if (refreshTimer) clearInterval(refreshTimer);
     refreshTimer = setInterval(() => {
-      if (document.visibilityState !== 'visible') return;
-      renderedTiles.forEach(el => {
-        if (!el.isConnected) { renderedTiles.delete(el); return; }
-        if (el.classList.contains('dtile-entity-body')) renderEntityTile(el);
-        else if (el.dataset.columns != null) renderTableTile(el);
-        else renderTile(el);
-      });
+      if (document.visibilityState !== 'visible' || stichtag()) return;
+      rerenderTiles();
     }, DASHBOARD_REFRESH_INTERVAL_MS);
   }
+
+  // Neuer Stichtag: sichtbare Kacheln sofort neu laden. Noch nie gezeichnete
+  // lesen ihn, sobald sie in den Sichtbereich kommen.
+  window.addEventListener('dashboard-stichtag', rerenderTiles);
 
   function setupSizePickers() {
     const grid = document.getElementById('dashboard-grid');
@@ -2083,6 +2421,8 @@
       const sparklineResolutionCells = Array.from(control.querySelectorAll('.dtile-sparkline-resolution-cell'));
       const showAgeCheckbox = control.querySelector('.dtile-show-age-checkbox');
       const staleModeCells = Array.from(control.querySelectorAll('.dtile-stale-mode-cell'));
+      // Nur bei Zustands-Kacheln (ROADMAP 1.29): Streifen oder Donut.
+      const stateViewCells = Array.from(control.querySelectorAll('.dtile-state-view-cell'));
       const showPeriodCheckbox = control.querySelector('.dtile-show-period-checkbox');
       const legendCheckbox = control.querySelector('.dtile-legend-checkbox');
       const dtileBody = tile.querySelector('.dtile-body');
@@ -2160,6 +2500,9 @@
             if (tableBody) await renderTableTile(tableBody);
             // Langzeit-Kachel: 1×1 zeichnet nur das angezeigte Jahr und den Ø.
             if (dtileBody?.dataset.longtermActive === 'true') await renderTile(dtileBody);
+            // Zustands-Kachel: ab zwei Spalten Anteile je Tag statt Streifen.
+            const stateBody = tile.querySelector('.dtile-entity-body[data-is-state="true"]');
+            if (stateBody) await renderEntityTile(stateBody);
             const chart = instances.get(tile.dataset.itemId);
             requestAnimationFrame(() => chart && chart.resize());
           } catch (e) {
@@ -2257,6 +2600,30 @@
             }
           } catch (e) {
             trigger.title = t('Sparkline-Auflösung konnte nicht gespeichert werden');
+          }
+        });
+      });
+
+      stateViewCells.forEach(cell => {
+        cell.addEventListener('click', async () => {
+          const stateView = cell.dataset.stateView;
+          try {
+            const response = await fetch(`${base}/dashboard/entity-state-view`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                dashboard_id: dashboardId, pin_id: parseInt(tile.dataset.itemId, 10), state_view: stateView,
+              }),
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            stateViewCells.forEach(option => option.classList.toggle('is-selected', option === cell));
+            const entityBody = tile.querySelector('.dtile-entity-body');
+            if (entityBody) {
+              entityBody.dataset.stateView = stateView;
+              await renderEntityTile(entityBody);
+            }
+          } catch (e) {
+            trigger.title = t('Darstellung konnte nicht gespeichert werden');
           }
         });
       });

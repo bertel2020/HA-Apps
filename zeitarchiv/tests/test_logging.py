@@ -12,8 +12,10 @@ from app import log_source
 from app.logging_setup import (
     DEFAULT_ACCESS_LOG_MODE,
     DEFAULT_LOG_LEVEL,
+    LOG_AREA_LABELS,
     configure_logging,
     local_log_lines,
+    log_area,
     log_http_request,
     log_rate_limited,
     redact_log_text,
@@ -149,6 +151,50 @@ def test_local_log_source_never_calls_supervisor(monkeypatch) -> None:
     result = log_source.load_log_lines(source="local", search="local-source-test")
     assert result["fallback"] is False
     assert any("local-source-test" in line for line in result["lines"])
+
+
+def test_log_areas_map_by_logger_name_and_unknown_ones_fall_into_other() -> None:
+    assert log_area("app.ai_routes") == log_area("ai_routes") == "ai"
+    assert log_area("app.storage.ingestion") == "ingest"
+    assert log_area("zeitarchiv.access") == "http"
+    assert log_area("uvicorn.error") == "other"
+    assert log_area("app.ein_neues_modul") == "other"
+    assert set(LOG_AREA_LABELS) >= {log_area(name) for name in ("app.background", "app.import_routes", "app.main")}
+
+
+def test_local_log_area_filter_keeps_only_that_area() -> None:
+    configure_logging("debug", "off")
+    logging.getLogger("app.ai_routes").warning("area-test-ai")
+    logging.getLogger("app.background").warning("area-test-wartung")
+    ai = local_log_lines(search="area-test-", area="ai", limit=50)
+    assert any("area-test-ai" in line for line in ai)
+    assert not any("area-test-wartung" in line for line in ai)
+    assert any("area-test-wartung" in line for line in local_log_lines(search="area-test-", area="maintenance", limit=50))
+    assert len(local_log_lines(search="area-test-", area="all", limit=50)) >= 2
+
+
+def test_external_filter_inherits_area_for_continuations_and_combines_with_level() -> None:
+    text = (
+        "2026-10-21T22:00:00  INFO     app.ai_routes  KI-Aufruf\n"
+        "2026-10-21T22:00:01  ERROR    app.ai_routes  kaputt\n"
+        "  traceback detail\n"
+        "2026-10-21T22:00:02  ERROR    app.background  Wartung kaputt\n"
+    )
+    assert filter_external_log_text(text, area="ai", limit=50) == text.splitlines()[:3]
+    assert filter_external_log_text(text, area="ai", level="error", limit=50) == text.splitlines()[1:3]
+    assert filter_external_log_text(text, area="other", limit=50) == []
+
+
+def test_log_request_rejects_unknown_area() -> None:
+    from fastapi import HTTPException
+
+    assert log_source.validate_log_request("all", "x", 500, "local", "ai")[4] == "ai"
+    try:
+        log_source.validate_log_request("all", "x", 500, "local", "gibtsnicht")
+    except HTTPException as exc:
+        assert exc.status_code == 400
+    else:
+        raise AssertionError("unbekannter Bereich muss abgelehnt werden")
 
 
 def _run_all() -> None:

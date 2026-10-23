@@ -79,6 +79,12 @@ def _require_entities(index: Index, source_entity_id: str, target_entity_id: str
         raise ValueError(tr("Unbekannte Quell-Entität: {source_entity_id}", source_entity_id=source_entity_id))
     if target is None:
         raise ValueError(tr("Unbekannte Ziel-Entität: {target_entity_id}", target_entity_id=target_entity_id))
+    if source["aggregation_type"] == "state" or target["aggregation_type"] == "state":
+        # Beide Entitäten haben eigene Zuordnungen Index → Text; ein
+        # Zusammenführen müsste die Indizes der Quelle umschreiben.
+        raise IncompatibleTypesError(
+            tr("Zustands-Entitäten können nicht zusammengeführt werden.")
+        )
     if source["aggregation_type"] != target["aggregation_type"]:
         raise IncompatibleTypesError(
             tr("Quelle ({aggregation_type}) und Ziel ({aggregation_type2}) sind unterschiedliche Zähltypen und können nicht zusammengeführt werden.", aggregation_type=source['aggregation_type'], aggregation_type2=target['aggregation_type'])

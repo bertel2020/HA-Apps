@@ -16,9 +16,11 @@ from typing import Annotated
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-from . import ha_integration
+from . import ai_settings, ha_integration
+from .ai_routes import AiDependencies, create_ai_router
+from .chart_period import stichtag_or_400, stichtag_window
 from .formatting import decimals_to_int, entity_display_name
 from .limits import (
     MAX_EVENT_TEXT_LENGTH,
@@ -69,6 +71,14 @@ EntityId = Annotated[
 # sondern ein fehlerhafter Client. Dafür ist 422 die richtige Antwort.
 EventText = Annotated[str, Field(max_length=MAX_EVENT_TEXT_LENGTH)]
 
+# Fähigkeiten, die /api/health der Integration meldet. Eine Fähigkeit statt
+# eines Versionsvergleichs: Die Integration muss dann keine App-Version
+# kennen, ab der etwas geht, und eine Fähigkeit lässt sich auch wieder
+# zurücknehmen. "state": /api/write nimmt Text-Zustände (state/state_label).
+# "ai": /api/ai/* existiert (ROADMAP 1.31); ob der Zugriff eingeschaltet ist,
+# sagt erst die Antwort dort (403 = aus).
+API_CAPABILITIES = ("state", "ai")
+
 
 class EventIn(BaseModel):
     event_id: str | None = Field(
@@ -77,10 +87,23 @@ class EventIn(BaseModel):
     entity_id: EntityId
     domain: EventText
     ts: float
-    value: float
+    value: float | None = None
     state_class: EventText | None = None
     unit: EventText | None = None
     friendly_name: EventText | None = None
+    # Text-Zustand statt value (Typ "state"). Ältere Apps ignorieren beide
+    # Felder stillschweigend — die Integration schickt sie deshalb nur, wenn
+    # /api/health die Fähigkeit "state" meldet.
+    state: EventText | None = None
+    state_label: EventText | None = None
+
+    @model_validator(mode="after")
+    def _value_or_state(self) -> "EventIn":
+        # Wie bisher ein fehlendes value: eine Nachricht ohne Messung ist ein
+        # Protokollfehler des Clients, kein Datenzustand (siehe oben).
+        if self.value is None and self.state is None:
+            raise ValueError("value oder state erforderlich")
+        return self
 
 
 class WriteRequest(BaseModel):
@@ -101,6 +124,9 @@ class TableQueryRequest(BaseModel):
 
     entity_ids: list[EntityId] = Field(min_length=1, max_length=MAX_MULTI_QUERY_ENTITIES)
     columns: list[TableQueryColumn] = Field(min_length=1, max_length=100)
+    # Stichtag der Zeitraum-Navigation eines Dashboards (JJJJ-MM-TT), siehe
+    # chart_period.stichtag_window(). None = heute.
+    at: str | None = None
 
 
 @dataclass
@@ -306,6 +332,42 @@ def _tile_aggregates(result: dict) -> dict[str, float | None]:
     }
 
 
+def _tile_state(
+    deps: "ApiDependencies", entity_id: str, range_key: str, continuous: bool, now: datetime, offset: int,
+    read_cache: query_mod.QueryReadCache,
+) -> dict | None:
+    """Alles, was eine Zustands-Kachel zeigt (ROADMAP 1.29): aktueller Zustand
+    und seit wann, der Streifen der letzten 24 Stunden, die Anteile der
+    letzten sieben Tage (Kachel ab zwei Spalten) und die Dauer je Zustand im
+    gewählten Zeitraum (Donut). Alles in einer Runde, damit eine Kachel
+    keinen zweiten Request braucht."""
+    strip = query_mod.query_raw_series(
+        deps.data_dir, deps.index, entity_id, "day", deps.tz, now, continuous=True,
+    )
+    points = [p for p in strip["points"] if p["value"] is not None]
+    if not points:
+        return None
+    days = query_mod.query_state_shares(
+        deps.data_dir, deps.index, entity_id, "week", deps.tz, now, continuous=True, read_cache=read_cache,
+    )
+    period = query_mod.query_series(
+        deps.data_dir, deps.index, entity_id, range_key, deps.tz, now,
+        offset=offset, continuous=continuous, read_cache=read_cache,
+    )
+    durations = query_mod.state_durations(period)
+    return {
+        "idx": int(round(points[-1]["value"])),
+        "last_ts": points[-1]["ts"],
+        "since": query_mod.state_since(deps.data_dir, deps.index, entity_id, deps.tz, now) if offset == 0 else None,
+        "states": strip.get("states") or query_mod.state_legend(deps.index, entity_id),
+        "strip": [{"ts": p["ts"], "value": p["value"]} for p in points],
+        "strip_start": strip["window_start"],
+        "strip_end": strip["window_end"],
+        "days": [{"ts": p["ts"], "states": p["states"]} for p in days["points"]],
+        "durations": [[idx, seconds] for idx, seconds in sorted(durations.items())],
+    }
+
+
 def _table_comparison_aggregates(result: dict) -> dict[str, float | None] | None:
     """Fairer Vergleichswert für eine abgeschlossene "Vor-"Spalte (Vortag/
     Vorwoche/…): dieselben Punkte wie der jetzt immer vollständige
@@ -392,7 +454,12 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         except HTTPException as exc:
             exc.detail = {"message": exc.detail, "demo_mode": deps.demo_mode_active}
             raise
-        return {"status": "ok", "version": deps.app_version, "demo_mode": deps.demo_mode_active}
+        return {
+            "status": "ok",
+            "version": deps.app_version,
+            "demo_mode": deps.demo_mode_active,
+            "capabilities": list(API_CAPABILITIES),
+        }
 
     @router.get("/api/notices")
     def notices(
@@ -413,6 +480,14 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             "notices": deps.collect_notices(),
             "latest_backup": deps.latest_backup(),
             "demo_mode": deps.demo_mode_active,
+            # Auch hier, nicht nur in /api/health: Die Integration fragt
+            # /api/health nur beim Start, diesen Endpunkt aber jede Minute —
+            # so greift eine neue Fähigkeit nach einem App-Update ohne
+            # Neustart von Home Assistant.
+            "capabilities": list(API_CAPABILITIES),
+            # Zählt jede Änderung am KI-Zugriff hoch: Ändert sich der Wert, holt
+            # die Integration /api/ai/config neu (siehe ai_settings.py).
+            "ai_config_rev": ai_settings.config_rev(deps.index),
         }
 
     @router.post("/api/write")
@@ -458,9 +533,15 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         try:
             for event in payload.events:
                 event_data = event.model_dump()
-                event_id = event.event_id or legacy_event_id(
-                    {key: value for key, value in event_data.items() if key != "event_id"}
-                )
+                # state/state_label nur in den Hash, wenn gesetzt: sonst
+                # änderte sich die Übergangs-ID alter Integrationen ohne
+                # event_id mit diesem Update, und ein Retry über das Update
+                # hinweg würde doppelt gespeichert.
+                event_id = event.event_id or legacy_event_id({
+                    key: value for key, value in event_data.items()
+                    if key != "event_id"
+                    and not (key in ("state", "state_label") and value is None)
+                })
                 result = deps.ingestion.ingest(IngestEvent(event_id=event_id, **{
                     key: value for key, value in event_data.items() if key != "event_id"
                 }), archive_cache)
@@ -468,13 +549,14 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 if trace_active and event.entity_id == trace_entity:
                     trace_logger.debug(
                         "Entity-Trace · event=entity_trace request_id=%s entity_id=%s "
-                        "event_id=%s ts=%s time=%s value=%s unit=%s domain=%s result=%s",
+                        "event_id=%s ts=%s time=%s value=%s state=%r unit=%s domain=%s result=%s",
                         request_id,
                         event.entity_id,
                         event_id[:12],
                         event.ts,
                         datetime.fromtimestamp(event.ts, deps.tz).isoformat(timespec="milliseconds"),
                         event.value,
+                        event.state,
                         event.unit or "—",
                         event.domain,
                         result,
@@ -559,10 +641,19 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         raw: bool = False,
         chart_type: str | None = None,
         marked: bool = False,
+        heatmap: bool = False,
+        columns: bool = False,
+        px: int = 0,
     ) -> dict:
         _validate_entity_id_or_400(entity_id)
         if chart_type not in (None, "line", "bar"):
             raise HTTPException(status_code=400, detail=tr("Ungültiger Diagrammtyp"))
+        if heatmap and range not in query_mod.STATE_HEATMAP_RANGES:
+            raise HTTPException(status_code=400, detail=tr("Die Heatmap gibt es erst ab dem Zeitraum Monat"))
+        if columns and range not in query_mod.STATE_COLUMNS_RANGES:
+            raise HTTPException(status_code=400, detail=tr("Die Spalten gibt es nur für Jahr und Dekade"))
+        if columns and px <= 0:
+            raise HTTPException(status_code=400, detail=tr("Die Breite in Bildpunkten fehlt"))
         now = datetime.now(deps.tz)
         # Ein Cache für beide Abfragen dieses Requests: Mit "Vergleichen" wird
         # dieselbe Entität zweimal abgefragt, nur mit verschobenem Fenster —
@@ -575,7 +666,23 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         # für beide Pfade, und ein zweiter Ausgang hätte sie im
         # Rohwert-Modus stillschweigend übersprungen — ausgerechnet dort, wo
         # sie am genauesten sitzen.
-        if raw:
+        if columns:
+            entity = deps.index.get_entity(entity_id)
+            if entity is not None and entity["aggregation_type"] != query_mod.STATE_TYPE:
+                raise HTTPException(status_code=400, detail=tr("Die Spalten gibt es nur für Zustands-Entitäten"))
+            result = query_mod.query_state_columns(
+                deps.data_dir, deps.index, entity_id, range, deps.tz, now, px,
+                offset=offset, continuous=continuous, read_cache=read_cache,
+            )
+        elif heatmap:
+            entity = deps.index.get_entity(entity_id)
+            if entity is not None and entity["aggregation_type"] != query_mod.STATE_TYPE:
+                raise HTTPException(status_code=400, detail=tr("Die Heatmap gibt es nur für Zustands-Entitäten"))
+            result = query_mod.query_state_heatmap(
+                deps.data_dir, deps.index, entity_id, range, deps.tz, now,
+                offset=offset, continuous=continuous, read_cache=read_cache,
+            )
+        elif raw:
             result = query_mod.query_raw_series(
                 deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                 offset=offset, continuous=continuous,
@@ -586,7 +693,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 offset=offset, continuous=continuous, chart_type=chart_type,
                 read_cache=read_cache,
             )
-        if compare and not raw:
+        if compare and not raw and not heatmap and not columns:
             compare_result = query_mod.query_series(
                 deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                 offset=offset if compare_mode == "year" else offset - 1,
@@ -626,11 +733,25 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         compare_mode: str = "previous",
         raw: bool = False,
         previous_years: int = 1,
+        at: str | None = None,
+        heatmap: bool = False,
+        columns: bool = False,
+        px: int = 0,
     ) -> dict:
-        now = datetime.now(deps.tz)
+        # at: Stichtag der Zeitraum-Navigation eines Dashboards — verschiebt
+        # Bezugszeitpunkt bzw. Versatz, alles Weitere (Vergleich, Langzeit)
+        # rechnet unverändert relativ dazu.
+        now, shift = stichtag_window(range, continuous, stichtag_or_400(at), datetime.now(deps.tz))
+        offset += shift
         ids = limited_multi_entity_ids({"entity_ids": entity_ids})
         for entity_id in ids:
             _validate_entity_id_or_400(entity_id)
+        if heatmap and range not in query_mod.STATE_HEATMAP_RANGES:
+            raise HTTPException(status_code=400, detail=tr("Die Heatmap gibt es erst ab dem Zeitraum Monat"))
+        if columns and range not in query_mod.STATE_COLUMNS_RANGES:
+            raise HTTPException(status_code=400, detail=tr("Die Spalten gibt es nur für Jahr und Dekade"))
+        if columns and px <= 0:
+            raise HTTPException(status_code=400, detail=tr("Die Breite in Bildpunkten fehlt"))
         if previous_years < 0:
             raise HTTPException(status_code=400, detail=tr("Ungültige Anzahl Vergleichsjahre"))
         # Mehrjahresvergleich (compare_mode "longterm", im Chart-Editor
@@ -650,7 +771,21 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         is_current = True
         for entity_id in ids:
             entity = deps.index.get_entity(entity_id)
-            if raw:
+            # Heatmap: nur die Zellen der Zustands-Entitäten; alles andere
+            # kommt unverändert, die Oberfläche wirft es für die Heatmap ohnehin
+            # heraus (Zustände stehen nie neben anderen Serien).
+            if columns and entity is not None and entity["aggregation_type"] == query_mod.STATE_TYPE:
+                # Zeitstrahl in Jahr/Dekade: Spalten statt Rohwechseln, die über der Grenze abbrächen.
+                result = query_mod.query_state_columns(
+                    deps.data_dir, deps.index, entity_id, range, deps.tz, now, px,
+                    offset=offset, continuous=continuous,
+                )
+            elif heatmap and entity is not None and entity["aggregation_type"] == query_mod.STATE_TYPE:
+                result = query_mod.query_state_heatmap(
+                    deps.data_dir, deps.index, entity_id, range, deps.tz, now,
+                    offset=offset, continuous=continuous,
+                )
+            elif raw:
                 result = query_mod.query_raw_series(
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                     offset=offset, continuous=continuous,
@@ -674,7 +809,16 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 "chart_type": result["chart_type"],
                 "points": result["points"],
             }
-            if compare and not raw and compare_mode != "longterm":
+            # Zustands-Entitäten: Zuordnung Index → Text für Legende, Tooltip
+            # und CSV (die Oberfläche zeigt nie den Index).
+            if result.get("states") is not None:
+                entry["states"] = result["states"]
+            if result.get("cells") is not None:
+                entry["cells"] = result["cells"]
+            if result.get("columns") is not None:
+                entry["columns"] = result["columns"]
+                entry["dt"] = result["dt"]
+            if compare and not raw and compare_mode != "longterm" and not heatmap and not columns:
                 compare_result = query_mod.query_series(
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                     offset=offset if compare_mode == "year" else offset - 1,
@@ -717,6 +861,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         continuous: bool = False,
         resolution: str = "raw",
         stats: bool = False,
+        at: str | None = None,
     ) -> dict:
         """Alles, was eine Werte-Kachel anzeigt, in einer Runde — für mehrere
         Kacheln gleichzeitig.
@@ -742,7 +887,8 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         for entity_id in ids:
             _validate_entity_id_or_400(entity_id)
 
-        now = datetime.now(deps.tz)
+        # at: Stichtag der Zeitraum-Navigation, siehe api_query_multi().
+        now, offset = stichtag_window(range, continuous, stichtag_or_400(at), datetime.now(deps.tz))
         read_cache = query_mod.QueryReadCache()
         # Rohwerte liefern zwei Dinge auf einmal: die Sparkline-Punkte und den
         # aktuellen Wert samt Alter. Jenseits einer Woche gibt es sie nicht,
@@ -760,7 +906,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             if raw_capable:
                 raw = query_mod.query_raw_series(
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
-                    continuous=continuous,
+                    offset=offset, continuous=continuous,
                 )
                 points = _resample_sparkline(
                     [p for p in raw["points"] if p["value"] is not None], resolution
@@ -772,7 +918,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             if stats or not raw_capable:
                 bucketed = query_mod.query_series(
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
-                    continuous=continuous, read_cache=read_cache,
+                    offset=offset, continuous=continuous, read_cache=read_cache,
                 )
                 if stats:
                     aggregates = _tile_aggregates(bucketed)
@@ -789,18 +935,28 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 # Wert" muss deshalb immer aus Rohwerten kommen. Rollierend,
                 # damit die Kachel nicht kurz nach Mitternacht ohne Wert
                 # dasteht, nur weil der Kalendertag noch fast leer ist.
+                # Mit Stichtag: der Stand am Ende des gezeigten Zeitraums.
+                recent_now = now if offset == 0 else datetime.fromtimestamp(window_end, deps.tz)
                 recent = query_mod.query_raw_series(
-                    deps.data_dir, deps.index, entity_id, "day", deps.tz, now, continuous=True,
+                    deps.data_dir, deps.index, entity_id, "day", deps.tz, recent_now, continuous=True,
                 )
                 fresh = [p for p in recent["points"] if p["value"] is not None]
                 if fresh:
                     last_value, last_ts = fresh[-1]["value"], fresh[-1]["ts"]
 
+            state = (
+                _tile_state(deps, entity_id, range, continuous, now, offset, read_cache)
+                if aggregation_type == "state" else None
+            )
+            if state is not None:
+                last_value, last_ts = state["idx"], state["last_ts"]
             series.append({
                 "entity_id": entity_id,
                 "unit": (entity["unit"] if entity else None) or "",
                 "decimals": decimals_to_int(entity["decimals"]) if entity else None,
                 "aggregation_type": aggregation_type,
+                # Nur bei Zustands-Entitäten, siehe _tile_state().
+                "state": state,
                 # Nur bei Zählern gesetzt — dort erklärt der Kachel-Tooltip
                 # damit, worauf sich Min/Ø/Max beziehen ("Ø je Tag").
                 "bucket_label": (
@@ -843,10 +999,14 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             if column.range_key not in query_mod.RANGE_KEYS:
                 raise HTTPException(status_code=400, detail=tr("Ungültiger Tabellenzeitraum"))
 
-        now = datetime.now(deps.tz)
+        real_now = datetime.now(deps.tz)
+        stichtag = stichtag_or_400(body.at)
         read_cache = query_mod.QueryReadCache()
         column_results = []
         for column in body.columns:
+            # Tabellenspalten sind immer kalendarisch, der Stichtag verschiebt
+            # also nur den Versatz (siehe chart_period.stichtag_window()).
+            now, shift = stichtag_window(column.range_key, False, stichtag, real_now)
             series = []
             window_start = window_end = period_end = elapsed_seconds = None
             is_current = True
@@ -859,7 +1019,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     column.range_key,
                     deps.tz,
                     now,
-                    offset=column.offset,
+                    offset=column.offset + shift,
                     year_over_year=column.year_over_year,
                     read_cache=read_cache,
                     same_elapsed=column.same_elapsed,
@@ -900,4 +1060,9 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             })
         return {"columns": column_results}
 
+    router.include_router(create_ai_router(AiDependencies(
+        data_dir=deps.data_dir, index=deps.index, tz=deps.tz,
+        coordinator=deps.coordinator, check_auth=check_auth,
+        collect_notices=deps.collect_notices, latest_backup=deps.latest_backup,
+    )))
     return router

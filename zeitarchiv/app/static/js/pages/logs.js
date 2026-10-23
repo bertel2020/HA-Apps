@@ -41,6 +41,7 @@
       const status = document.getElementById('log-status');
       const sourceMode = document.getElementById('log-source-mode');
       const level = document.getElementById('log-filter-input');
+      const area = document.getElementById('log-area-input');
       const search = document.getElementById('log-search');
       const auto = document.getElementById('log-auto');
       const download = document.getElementById('log-download');
@@ -48,7 +49,7 @@
       let searchTimer = null;
 
       function params() {
-        const query = new URLSearchParams({level: level.value, search: search.value, source: sourceMode.value});
+        const query = new URLSearchParams({level: level.value, area: area.value, search: search.value, source: sourceMode.value});
         return query;
       }
 
@@ -76,6 +77,7 @@
       document.getElementById('log-refresh').addEventListener('click', refreshLogs);
       sourceMode.addEventListener('change', refreshLogs);
       level.addEventListener('change', refreshLogs);
+      area.addEventListener('change', refreshLogs);
       search.addEventListener('input', () => {
         clearTimeout(searchTimer);
         searchTimer = setTimeout(refreshLogs, 250);

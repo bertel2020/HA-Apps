@@ -54,6 +54,17 @@
         </div>
         {% call hint_body() %}{{ _("Spätere, kleinere Kacheln rutschen in freie Lücken statt strikt der Anheft-Reihenfolge zu folgen.") }}{% endcall %}
       </div>
+
+      <div class="field">
+        <div class="field-switch-row">
+          <span class="menu-toggle">
+            <input type="checkbox" id="dash-period-nav" x-model="periodNav">
+            <span class="track"><span class="thumb"></span></span>
+          </span>
+          <label for="dash-period-nav">{{ _("Zeitraum-Navigation") }} {{ hint_button(_('Zeitraum-Navigation')) }}</label>
+        </div>
+        {% call hint_body() %}{{ _("Blendet über den Kacheln eine Stichtag-Leiste ein. Damit springt das ganze Dashboard auf einen anderen Tag: Jede Kachel zeigt ihren Zeitraum, der diesen Tag enthält. Kacheln mit festem Zeitraum bleiben unverändert.") }}{% endcall %}
+      </div>
       {% endif %}
 
       <div class="save-row">
@@ -81,6 +92,7 @@
       locked: {{ 'true' if dashboard and dashboard.locked else 'false' }},
       preciseMode: {{ 'true' if dashboard and dashboard.precise_mode else 'false' }},
       fillGaps: {{ 'true' if dashboard and dashboard.fill_gaps else 'false' }},
+      periodNav: {{ 'true' if dashboard and dashboard.period_nav else 'false' }},
     };
   </script>
   <script src="{{ asset('js/pages/dashboard_editor.js') }}"></script>

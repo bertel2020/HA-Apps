@@ -1523,6 +1523,8 @@ def _compactable_months(
 def _validate_compaction_target(entity: dict, target_resolution: str) -> int:
     if entity["aggregation_type"] == "switch":
         raise CompactionError(tr("Verdichten ist für Schalter nicht verfügbar"))
+    if entity["aggregation_type"] == "state":
+        raise CompactionError(tr("Verdichten ist für Zustände nicht verfügbar"))
     interval = resolution_seconds(target_resolution)
     if interval is None:
         raise CompactionError(tr("Ungültiges Verdichtungsziel: {target_resolution}", target_resolution=target_resolution))

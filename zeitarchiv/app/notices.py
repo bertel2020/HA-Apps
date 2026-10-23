@@ -46,7 +46,12 @@ from .report_routes import SOURCE_LABELS
 from .storage import cleanup
 from .route_support import dir_size_and_newest_mtime
 from .storage import import_reports
-from .storage.index import should_raise_gap_threshold
+from .storage.index import (
+    MAX_STATES_PER_ENTITY,
+    STATE_REJECTION_LIMIT,
+    STATE_REJECTION_TYPE_MISMATCH,
+    should_raise_gap_threshold,
+)
 from .version import APP_VERSION
 
 MUTABLE_SEVERITIES = {"info", "warn"}
@@ -121,6 +126,24 @@ _import_leftovers: dict | None = None
 _import_leftovers_checked_at = 0.0
 
 
+def _partial_import_detail(report: dict, source_label: str) -> str:
+    """Meldungstext zu einem teilweise abgeschlossenen Import — mit den Zahlen
+    aus dem Report, damit erkennbar ist, was fehlt, statt blind zu wiederholen.
+    "Label: Zahl" statt Fließtext, damit es keine Singular-/Plural-Fälle gibt."""
+    summary = report.get("summary") or {}
+    parts = []
+    errors = int(summary.get("errors", 0))
+    invalid = int(summary.get("rows_invalid", 0))
+    if errors:
+        parts.append(tr("Fehler: {count}", count=errors))
+    if invalid:
+        parts.append(tr("Nicht importierbare Zeilen: {count}", count=invalid))
+    text = tr("Der letzte {source_label}-Import wurde nur teilweise abgeschlossen.", source_label=source_label)
+    if parts:
+        text += " " + " · ".join(parts) + ". " + tr("Details unter Import → Reports.")
+    return text
+
+
 def refresh_import_leftovers_if_stale(*dirs: Path) -> None:
     """Vom Wartungsplaner aufgerufen. Größe und jüngste Änderungszeit der
     entpackten Import-Quelldaten, beides aus einem Walk."""
@@ -192,6 +215,59 @@ def gap_threshold_conflicts(index) -> list[dict]:
             "suggested_gap_label": GAP_THRESHOLD_LABELS.get(suggested_gap, suggested_gap),
         })
     return rows
+
+
+# Wie lange ein verworfener Zustandswert als Hinweis stehen bleibt — eine Woche
+# nach dem letzten Vorkommen gilt die Entität als wieder passend.
+STATE_REJECTION_NOTICE_SECONDS = 7 * 86400
+# Mehr Entity-IDs würden die Meldung (und die Repair-Karte in HA) unlesbar machen.
+_STATE_REJECTION_MAX_LISTED = 5
+
+
+def state_rejection_notices(index, now: float | None = None) -> list[dict]:
+    """Zustands-Entitäten mit verworfenen Werten (ROADMAP 1.29): Typ passt
+    nicht mehr (der erste Wert legt ihn fest) oder die Obergrenze an
+    verschiedenen Zuständen ist erreicht. Je Grund eine Meldung, die
+    Integration macht daraus eine Repair-Karte (repairs.py dort)."""
+    since = (now or time.time()) - STATE_REJECTION_NOTICE_SECONDS
+    by_reason: dict[str, list[str]] = {}
+    for entry in index.state_rejections(since):
+        by_reason.setdefault(entry["reason"], []).append(entry["entity_id"])
+    def listed(reason: str) -> tuple[list[str], str]:
+        entity_ids = sorted(by_reason.get(reason, []))
+        text = ", ".join(entity_ids[:_STATE_REJECTION_MAX_LISTED])
+        if len(entity_ids) > _STATE_REJECTION_MAX_LISTED:
+            text += f" (+{len(entity_ids) - _STATE_REJECTION_MAX_LISTED})"
+        return entity_ids, text
+
+    notices = []
+    mismatch_ids, mismatch_text = listed(STATE_REJECTION_TYPE_MISMATCH)
+    if mismatch_ids:
+        notices.append({
+            "id": "entities.state_type_mismatch",
+            "severity": "warn",
+            "title": tr("Werte verworfen: Typ passt nicht"),
+            "detail": tr(
+                "Diese Entitäten liefern Text statt Zahlen oder umgekehrt. Der erste Wert legt den Typ fest, abweichende Werte werden nicht gespeichert: {entities}.",
+                entities=mismatch_text,
+            ),
+            "meta": tr("Entitäten"),
+            "link": f"/entities/{mismatch_ids[0]}" if len(mismatch_ids) == 1 else "/entities",
+        })
+    limit_ids, limit_text = listed(STATE_REJECTION_LIMIT)
+    if limit_ids:
+        notices.append({
+            "id": "entities.state_limit_reached",
+            "severity": "warn",
+            "title": tr("Zustände verworfen: Obergrenze erreicht"),
+            "detail": tr(
+                "Diese Entitäten haben schon {limit} verschiedene Zustände, neue werden nicht mehr gespeichert: {entities}. Meist steckt Freitext dahinter (Adresse, Versionsnummer), der sich nicht als Zustand eignet.",
+                limit=MAX_STATES_PER_ENTITY, entities=limit_text,
+            ),
+            "meta": tr("Entitäten"),
+            "link": f"/entities/{limit_ids[0]}" if len(limit_ids) == 1 else "/entities",
+        })
+    return notices
 
 
 def build_notices(
@@ -565,7 +641,7 @@ def build_notices(
                 "id": "import.job_failed",
                 "severity": "warn",
                 "title": tr("Import unvollständig"),
-                "detail": tr("Der letzte {source_label}-Import wurde nur teilweise abgeschlossen.", source_label=source_label),
+                "detail": _partial_import_detail(last_report, source_label),
                 "meta": tr("Import"),
                 "link": "/import?tab=reports",
             })
@@ -576,6 +652,8 @@ def build_notices(
     # die die Automatik nicht rückwirkend anfasst — Details siehe
     # gap_threshold_conflicts() oben (auch Grundlage für Housekeeping →
     # Konfiguration).
+    notices.extend(state_rejection_notices(index))
+
     conflict_count = len(gap_threshold_conflicts(index))
     if conflict_count:
         notices.append({

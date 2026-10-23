@@ -8,6 +8,7 @@ siehe rollup.py) — Bucket-Größe/Aggregationsfunktion hängen vom Typ ab.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -18,8 +19,11 @@ import pyarrow.parquet as pq
 
 from . import rollup
 from .hotbuffer import find_stale_hot_files, iter_records
-from .index import Index
+from .index import STATE_TYPE, STATE_UNAVAILABLE_INDEX, Index
 from .paths import entity_dir
+
+# Schlüssel des Parquet-Metadatums mit der Zuordnung Index → Text (Typ "state").
+STATE_MAP_METADATA_KEY = "zeitarchiv.states"
 
 def rotate_month_file(
     hot_csv_path: Path, data_dir: Path, entity_id: str, index: Index, tz: ZoneInfo
@@ -72,12 +76,24 @@ def rotate_month_file(
     archive_dir.mkdir(parents=True, exist_ok=True)
     archive_path = archive_dir / f"{year_month}.parquet"
 
+    entity_row = index.get_entity(entity_id)
+    aggregation_type = entity_row["aggregation_type"] if entity_row else "standard"
+    if aggregation_type == STATE_TYPE:
+        # Die Zuordnung Index → Text zusätzlich in die Datei: SQLite bleibt
+        # die maßgebliche Quelle, aber so ist ein Archivmonat auch ohne den
+        # Index lesbar (kaputter Index, Auswertung mit fremden Werkzeugen).
+        # Spätere Umschreibungen der Datei (Purge, Verdichtung) übernehmen
+        # das Metadatum nicht — dafür reicht dieser Stand nicht aus, er ist
+        # eine Absicherung, keine zweite Wahrheit.
+        mapping = {str(row["idx"]): row["text"] for row in index.get_state_map(entity_id)}
+        mapping[str(STATE_UNAVAILABLE_INDEX)] = "unavailable"
+        table = table.replace_schema_metadata(
+            {STATE_MAP_METADATA_KEY: json.dumps(mapping, ensure_ascii=False)}
+        )
     pq.write_table(table, archive_path, compression="zstd")
     index.add_size_bytes(entity_id, archive_path.stat().st_size)
     hot_csv_path.unlink()
 
-    entity_row = index.get_entity(entity_id)
-    aggregation_type = entity_row["aggregation_type"] if entity_row else "standard"
     hourly_rollup = bool(entity_row["hourly_rollup"]) if entity_row else False
     rollup.append_completed_month(
         data_dir, entity_id, aggregation_type, table, year, month, tz, hourly_rollup=hourly_rollup

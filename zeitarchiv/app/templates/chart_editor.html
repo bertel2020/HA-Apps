@@ -22,40 +22,88 @@
         {% if chart_id %}{% include "_dashboard_usage.html" %}{% endif %}
         <p class="sub" x-show="editing">{{ _("Beliebig viele Entitäten überlagern &mdash; unterschiedliche Einheiten bekommen jeweils eine eigene Y-Achse. Zeigt beim Ansehen immer die aktuellen Daten, kein eingefrorener Schnappschuss.") }}</p>
 
+        <!-- Suchfeld mit aufklappender Trefferliste (entityMultiPicker in
+             entity-picker.js) statt eines Rasters aus Kästchen für alle
+             Entitäten. Hier wird nur hinzugefügt; Anzeigename, Reihenfolge
+             und Entfernen stehen unter "Ausgewählt".
+             @mousedown.prevent an Chips und Treffern: der Fokus bleibt, wo er
+             war — das Suchfeld behält ihn für Tastatur und Weitertippen, und
+             auf dem Telefon klappt die Tastatur durch einen Chip-Tipp nicht
+             erst auf.
+             x-init: ein neues, leeres Chart setzt den Fokus gleich ins
+             Suchfeld (Trefferliste offen) — nur am Desktop, auf dem Telefon
+             klappte sonst beim Öffnen der Seite die Tastatur auf.
+             open = true zusätzlich zum Fokus: @focus feuert nicht, solange
+             das Fenster selbst nicht im Vordergrund ist (Tab im Hintergrund
+             geladen), die Liste bliebe dann trotz Fokus zu.
+             data-tooltip-fixed wie früher am Raster: die Trefferliste scrollt,
+             ein im Zeilenrahmen positionierter Tooltip würde abgeschnitten
+             (siehe fixed-tooltip.js). -->
         <div class="entity-picker-field" x-show="editing">
-          <label>{{ _("Entitäten") }}</label>
-          <input type="search" class="search" placeholder="{{ _('Entität oder Name suchen …') }}" style="width:100%;" oninput="filterEntityPicker(this.value)">
-          <div class="entity-picker" id="entity-picker">
-            {% for opt in entity_options %}
-            <!-- Name und ID sind hier auf je eine Zeile gekürzt (text-overflow),
-                 in der schmalsten Spalte bleibt von beiden wenig übrig; der
-                 Tooltip zeigt beides vollständig.
-
-                 data-tooltip-fixed statt des .entity-tooltip-Aufbaus aus der
-                 Entitätenliste: die Liste hier scrollt (max-height + overflow-y),
-                 und ein im Zeilenrahmen positionierter Tooltip wird davon
-                 abgeschnitten — in der obersten Zeile war er komplett
-                 unsichtbar, weil er über den oberen Containerrand hinausragt.
-                 FixedTooltip hängt sein Element an document.body, außerhalb
-                 jeder Beschneidung, und klappt nach unten, wenn oben kein
-                 Platz ist. -->
-            <label class="entity-picker-row" data-search="{{ (opt.label ~ ' ' ~ opt.entity_id) | lower }}"
-                   data-tooltip-fixed="{{ opt.label }}&#10;{{ opt.entity_id }}">
-              <input type="checkbox" value="{{ opt.entity_id }}"
-                     {% if opt.entity_id in selected_entity_ids %}checked{% endif %}
-                     @change="toggleEntity('{{ opt.entity_id }}', $event.target.checked)">
-              <span class="names">
-                <span class="name">{{ opt.label }}</span>
-                <span class="id">{{ opt.entity_id }}</span>
-              </span>
-            </label>
-            {% endfor %}
+          <label for="entity-picker-search">{{ _("Entitäten") }}</label>
+          <div class="entity-multi-picker"
+               x-data="entityMultiPicker(ENTITY_OPTIONS, () => selectedEntityIds, (id) => toggleEntity(id, true))"
+               @click.outside="open = false"
+               x-init="if (editing && !selectedEntityIds.length && matchMedia('(min-width: 641px)').matches) $nextTick(() => { $el.querySelector('input').focus(); open = true; })">
+            <input type="search" id="entity-picker-search" class="search" autocomplete="off"
+                   placeholder="{{ _('Entität hinzufügen …') }}"
+                   x-model="search" @focus="open = true" @input="open = true; activeId = ''" @keydown="onKey($event)">
+            <div class="emp-panel" x-show="open" x-cloak>
+              <div class="emp-chips">
+                <span class="emp-chips-label">{{ _("Typ") }}</span>
+                <template x-for="c in typeChips()" :key="c.key">
+                  <button type="button" class="chip" :class="{active: typeFilter === c.key, 'emp-chip-empty': !c.count && typeFilter !== c.key}"
+                          @mousedown.prevent @click="toggleType(c.key)">
+                    <span x-text="c.label"></span><span class="emp-count" x-text="c.count"></span>
+                  </button>
+                </template>
+              </div>
+              <div class="emp-chips" x-show="unitChips().length">
+                <span class="emp-chips-label">{{ _("Einheit") }}</span>
+                <template x-for="c in unitChips()" :key="c.unit">
+                  <button type="button" class="chip" :class="{active: unitFilter === c.unit, 'emp-chip-empty': !c.count && unitFilter !== c.unit}"
+                          @mousedown.prevent @click="toggleUnit(c.unit)">
+                    <span x-text="c.unit"></span><span class="emp-count" x-text="c.count"></span>
+                  </button>
+                </template>
+                <button type="button" class="chip emp-chip-more" x-show="hiddenUnitCount() > 0"
+                        @mousedown.prevent @click="allUnits = !allUnits"
+                        x-text="allUnits ? t('weniger') : t('mehr … {n}', {n: hiddenUnitCount()})"></button>
+              </div>
+              <div class="emp-list">
+                <template x-for="row in rows()" :key="row.key">
+                  <div :class="row.header ? 'emp-group' : 'emp-row'">
+                    <template x-if="row.header">
+                      <span x-text="row.header"></span>
+                    </template>
+                    <template x-if="row.opt">
+                      <div class="emp-hit" :class="{active: activeId === row.opt.entity_id}" :data-entity-id="row.opt.entity_id"
+                           :data-tooltip-fixed="row.opt.label + '\n' + row.opt.entity_id"
+                           @mousedown.prevent @click="add(row.opt.entity_id)">
+                        <span class="emp-icon" :class="{'emp-fav': row.opt.is_favorite}" aria-hidden="true" x-text="row.opt.is_favorite ? '★' : '+'"></span>
+                        <span class="names">
+                          <span class="name" x-text="row.opt.label"></span>
+                          <span class="id" x-text="row.opt.entity_id"></span>
+                        </span>
+                        <span class="emp-type" x-text="typeLabel(row.opt.aggregation_type)"></span>
+                        <span class="emp-unit" x-text="row.opt.unit || '–'"></span>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+                <div class="emp-empty" x-show="!rows().length">{{ _("Keine Treffer") }}</div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="entity-names-field" x-show="editing && orderableEntityIds.length > 0">
-          <label>{{ _("Angezeigte Namen &amp; Reihenfolge (optional)") }}</label>
-          <p class="sub" style="margin:4px 0 0;">{{ _("Bestimmt Legenden-, Statistik- und Farbreihenfolge im Chart. Per Ziehen oder über die Pfeile neu anordnen.") }}</p>
+        <!-- Eine Stelle für alles, was eine gewählte Entität betrifft:
+             Anzeigename, Reihenfolge, Ausblenden und Entfernen (✕). Früher
+             stand das Entfernen nur als Kästchen im Auswahlraster darüber. -->
+        <div class="entity-names-field" x-show="editing">
+          <label>{{ _("Ausgewählt") }} <span class="entity-names-count" x-show="orderableEntityIds.length" x-text="'(' + orderableEntityIds.length + ')'"></span></label>
+          <p class="sub" style="margin:4px 0 0;" x-show="orderableEntityIds.length">{{ _("Bestimmt Legenden-, Statistik- und Farbreihenfolge im Chart. Per Ziehen oder über die Pfeile neu anordnen.") }}</p>
+          <p class="entity-names-empty" x-show="!orderableEntityIds.length">{{ _("Noch keine Entität gewählt. Oben suchen und hinzufügen, das Chart erscheint sofort.") }}</p>
           <div class="entity-names-list" id="entity-names-list">
             <!-- orderableEntityIds statt selectedEntityIds: die Soll-Entität
                  (falls gewählt) hat keine eigene Legendenzeile/Reihenfolge —
@@ -78,7 +126,10 @@
                      Legende und Kurve. -->
                 <span class="entity-name-dot" aria-hidden="true"
                       :style="'--dot:var(--chart-' + (colorIndexFor(id) % 8 + 1) + ')'"></span>
-                <span class="entity-name-default" x-text="labelFor(id)"></span>
+                <span class="entity-name-default">
+                  <span class="name" x-text="labelFor(id)"></span>
+                  <span class="id" x-text="id"></span>
+                </span>
                 <input type="text" :placeholder="labelFor(id)" x-model="entityNames[id]" @input="render()">
                 <span class="entity-name-right">
                   <button type="button" class="entity-name-hide" :class="{active: hiddenEntityIds.includes(id)}"
@@ -91,6 +142,9 @@
                     <button type="button" title="{{ _('Nach oben') }}" :disabled="idx === 0" @click="moveEntity(id, -1)">↑</button>
                     <button type="button" title="{{ _('Nach unten') }}" :disabled="idx === orderableEntityIds.length - 1" @click="moveEntity(id, 1)">↓</button>
                   </span>
+                  <span class="entity-name-unit" x-text="unitFor(id) || '–'"></span>
+                  <button type="button" class="entity-name-remove" title="{{ _('Entfernen') }}" aria-label="{{ _('Entfernen') }}"
+                          @click="toggleEntity(id, false)">✕</button>
                 </span>
               </div>
             </template>
@@ -163,7 +217,7 @@
                      Fenster überhaupt abgefragt wird (rollierend vs.
                      kalendarisch), nicht seine Feinheit — bleibt für den Donut
                      genauso eine echte Wahl wie im Zeitverlauf. -->
-                <div class="menu-row" x-show="!donut">
+                <div class="menu-row" x-show="!donut && !timeline">
                   <span class="menu-row-label">{{ _("Auflösung") }}
                     <span class="menu-note" x-show="!raw && resolutionPreset === 'auto' && autoResolutionLabel" x-text="'≈ ' + autoResolutionLabel"></span>
                   </span>
@@ -239,12 +293,36 @@
                      Knöpfe erklären sich selbst, ein Toggle bräuchte einen
                      dritten Satz dafür, wogegen er wirkt. -->
                 <div class="menu-row menu-row-stack">
-                  <span class="menu-row-label">{{ _("Darstellungsart") }}
-                    <span class="menu-note" x-show="compare">{{ _("Donut nicht bei aktivem Vergleich") }}</span>
+                  <span class="menu-row-label">{{ _("Diagrammtyp") }}
+                    <span class="menu-note" x-show="compare && !(allSwitch && !hasState)">{{ _("Donut nicht bei aktivem Vergleich") }}</span>
+                    <span class="menu-note" x-show="compare && allSwitch && !hasState">{{ _("Zeitstrahl und Donut nicht bei aktivem Vergleich") }}</span>
                   </span>
-                  <div class="seg">
-                    <button :class="{active: !donut}" @click="setDisplayMode('timeseries')">{{ _("Zeitverlauf") }}</button>
-                    <button :class="{active: donut}" :disabled="compare" @click="setDisplayMode('donut')">{{ _("Donut (Anteile)") }}</button>
+                  <div class="seg" :class="{'seg-fit': hasState}">
+                    <template x-if="!hasState">
+                      <button :class="{active: !donut && !timeline}" @click="setDisplayMode('timeseries')">{{ _("Zeitverlauf") }}</button>
+                    </template>
+                    {# Zustände wie auf der Entitätsseite: Zeitstrahl, Anteile
+                       (gestapelt in %) oder Wechsel (Beginne je Zustand), je
+                       Zustands-Entität ein eigenes Diagramm. x-if statt x-show:
+                       x-show blieb in dieser Zeile wirkungslos (die Knöpfe
+                       änderten ihre Sichtbarkeit nach dem Laden nicht). #}
+                    <template x-if="hasState">
+                      <button :class="{active: !donut && stateMode === 'timeline'}" @click="setDisplayMode('timeline')">{{ _("Zeitstrahl") }}</button>
+                    </template>
+                    <template x-if="hasState">
+                      <button :class="{active: !donut && stateMode === 'shares'}" @click="setDisplayMode('shares')">{{ _("Anteile") }}</button>
+                    </template>
+                    <template x-if="hasState">
+                      <button :class="{active: !donut && stateMode === 'changes'}" @click="setDisplayMode('changes')">{{ _("Wechsel") }}</button>
+                    </template>
+                    <template x-if="hasState">
+                      <button :class="{active: !donut && stateMode === 'heatmap'}" :disabled="!heatmapAvailable" @click="setDisplayMode('heatmap')"
+                              :title="heatmapAvailable ? '' : t('Die Heatmap gibt es ab dem Zeitraum Monat.')">{{ _("Heatmap") }}</button>
+                    </template>
+                    <template x-if="allSwitch && !hasState">
+                      <button :class="{active: timeline && !donut}" :disabled="compare" @click="setDisplayMode('timeline')">{{ _("Zeitstrahl") }}</button>
+                    </template>
+                    <button :class="{active: donut}" :disabled="compare" @click="setDisplayMode('donut')">{{ _("Donut") }}</button>
                   </div>
                 </div>
                 <!-- Nur bei aktivem Donut sichtbar — bestimmt, welcher
@@ -262,15 +340,6 @@
                     <button :class="{active: donutAggregation === 'last'}" @click="donutAggregation = 'last'; render()">{{ _("Letzter Wert") }}</button>
                   </div>
                 </div>
-                <label class="menu-row" x-show="allSwitch && !donut">
-                  <span class="menu-row-label">{{ _("Zeitstrahl") }}
-                    <span class="menu-note" x-show="compare">{{ _("nicht bei aktivem Vergleich") }}</span>
-                  </span>
-                  <span class="menu-toggle">
-                    <input type="checkbox" :checked="timeline" :disabled="compare" @change="toggleTimeline()">
-                    <span class="track"><span class="thumb"></span></span>
-                  </span>
-                </label>
                 <label class="menu-row" x-show="hasLineSeries && !donut">
                   <span class="menu-row-label">{{ _("Punkte") }}</span>
                   <span class="menu-toggle">
@@ -353,7 +422,7 @@
                      Bedingung bliebe "Ausrichtung" dann fälschlich
                      ausgeblendet, obwohl der Chart längst im Ranking-
                      Vergleich steht, für den sie gedacht ist. -->
-                <div class="menu-row menu-row-stack" x-show="!donut && !(stacked && canStack)">
+                <div class="menu-row menu-row-stack" x-show="!donut && !timeline && !(stacked && canStack)">
                   <span class="menu-row-label">{{ _("Ausrichtung") }}
                     <span class="menu-note" x-show="compare">{{ _("Horizontal nicht bei aktivem Vergleich") }}</span>
                   </span>
@@ -369,7 +438,17 @@
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
-                <label class="menu-row" x-show="!donut">
+                <div class="menu-row menu-row-stack" x-show="!timeline && !hasState">
+                  <span class="menu-row-label">{{ _("Nachkommastellen") }}</span>
+                  <div class="seg">
+                    <button :class="{active: decimals === 'auto'}" @click="decimals = 'auto'; render()">{{ _("Auto") }}</button>
+                    <button :class="{active: decimals === '0'}" @click="decimals = '0'; render()">0</button>
+                    <button :class="{active: decimals === '1'}" @click="decimals = '1'; render()">1</button>
+                    <button :class="{active: decimals === '2'}" @click="decimals = '2'; render()">2</button>
+                    <button :class="{active: decimals === '3'}" @click="decimals = '3'; render()">3</button>
+                  </div>
+                </div>
+                <label class="menu-row" x-show="!donut && !timeline">
                   <span class="menu-row-label">{{ _("Dynamische Y-Achse") }}</span>
                   <span class="menu-toggle">
                     <!-- Bei Auflösung "Tag" (singleBucket, s. render()) sinnlos
@@ -382,16 +461,6 @@
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
-                <div class="menu-row menu-row-stack">
-                  <span class="menu-row-label">{{ _("Nachkommastellen") }}</span>
-                  <div class="seg">
-                    <button :class="{active: decimals === 'auto'}" @click="decimals = 'auto'; render()">{{ _("Auto") }}</button>
-                    <button :class="{active: decimals === '0'}" @click="decimals = '0'; render()">0</button>
-                    <button :class="{active: decimals === '1'}" @click="decimals = '1'; render()">1</button>
-                    <button :class="{active: decimals === '2'}" @click="decimals = '2'; render()">2</button>
-                    <button :class="{active: decimals === '3'}" @click="decimals = '3'; render()">3</button>
-                  </div>
-                </div>
                 {# Eigene Zeile, ausdrücklich NICHT an "Statistik in Legende"
                    gehängt: die Legende nennt die Zahl, die Linie zeigt, wo sie
                    im Bild liegt. Das eine will man oft ohne das andere — und
@@ -405,7 +474,7 @@
                      fremden Segment und würde als Segmentgrenze
                      missverstanden. Dieselbe Konvention wie "Rollierend"
                      bei Auflösung "Tag" weiter oben. -->
-                <label class="menu-row" x-show="!donut">
+                <label class="menu-row" x-show="!donut && !timeline">
                   <span class="menu-row-label">{{ _("Durchschnittslinie") }}
                     <span class="menu-note" x-show="stacked && canStack">{{ _("nicht im gestapelten Modus") }}</span>
                   </span>
@@ -425,20 +494,20 @@
                      bleibt die Zeile sichtbar und wirkt weiterhin nur auf die
                      Linien-Serien. -->
                 <div class="menu-row menu-row-stack" x-show="averageLine && !(stacked && canStack) && hasLineSeries && !donut">
-                  <span class="menu-row-label">{{ _("Darstellung") }}</span>
+                  <span class="menu-row-label">{{ _("Linienstil") }}</span>
                   <div class="seg">
                     <button :class="{active: averageStyle === 'flat'}" @click="averageStyle = 'flat'; render()">{{ _("Flach") }}</button>
                     <button :class="{active: averageStyle === 'rolling'}" @click="averageStyle = 'rolling'; render()">{{ _("Gleitend") }}</button>
                   </div>
                 </div>
-                <label class="menu-row">
+                <label class="menu-row" x-show="!hasState">
                   <span class="menu-row-label">{{ _("Statistik in Legende") }}</span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="chartStats" @change="chartStats = !chartStats; render()">
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
-                <div class="menu-row legend-metrics-row" x-show="chartStats">
+                <div class="menu-row legend-metrics-row" x-show="chartStats && !hasState">
                   <template x-for="metric in legendMetricOptions" :key="metric.value">
                     {# Siehe entity_detail.html: .filter-chip ist der app-weite
                        Standard für Chip-Mehrfachauswahl. #}
@@ -448,7 +517,7 @@
                     </label>
                   </template>
                 </div>
-                <div class="menu-row" x-show="chartStats">
+                <div class="menu-row" x-show="statsShown">
                   <span class="menu-row-label">{{ _("Legenden-Stil") }}</span>
                   <div class="seg">
                     <button :class="{active: legendStyle === 'chips'}" @click="legendStyle = 'chips'">{{ _("Chips") }}</button>
@@ -509,8 +578,8 @@
               <!-- Soll Entität ist keine Sonderfunktion, sondern schlicht eine
                    normale Entität (siehe compareSollEntityId-Kommentar in
                    chart_editor.js) — dieses Feld ist nur eine bequemere Art,
-                   sie auszuwählen, als sie in der langen Entitätenliste oben
-                   zu suchen. entityPicker() (entity-picker.js) ist derselbe
+                   sie auszuwählen, als sie oben über die Entitätensuche
+                   hinzuzufügen. entityPicker() (entity-picker.js) ist derselbe
                    App-Standard-Einzel-Entität-Picker wie im CSV-Import/
                    Tabellen-Editor; .soll-entity-picker (chart_editor.css)
                    gibt ihm dieselbe feste Standardbreite wie dort
@@ -563,6 +632,10 @@
         <div class="card">
           <div id="chart" x-show="hasData"></div>
           <div class="empty" x-show="!hasData" x-text="loading ? t('Lädt …') : (selectedCount === 0 ? t('Bitte mindestens eine Entität auswählen.') : t('Keine Daten für diesen Zeitraum.'))"></div>
+          {# Zustands- und Zahlen-Entitäten zusammen sind nicht vorgesehen
+             (ROADMAP 1.29) — die Zustände fallen heraus, und das steht hier. #}
+          <p class="hint hint-status" x-show="droppedStateIds.length" x-cloak
+             x-text="t('Nicht gezeigt: {names} — Zustands-Entitäten lassen sich nur zusammen mit anderen Zuständen darstellen.', {names: droppedStateIds.map(id => entityNames[id] || labelFor(id)).join(', ')})"></p>
         </div>
         <!-- Ersetzt ECharts' eigene Legende komplett (dort per legend.show:false
              stummgeschaltet, siehe render()) — ein Klick auf einen Chip
@@ -577,14 +650,22 @@
              keine sinnvollen Einträge (zwei eigenständige Jahresserien statt
              einer gedämpften Vergleichs-Nebenserie), deshalb zusätzlich
              ausgeblendet statt nur per hasData. -->
-        <div class="chart-legend" x-show="hasData && !yearsCompareActive && !multiYearActive && (legendStyle === 'chips' || !chartStats)">
+        <div class="chart-legend" x-show="hasData && !yearsCompareActive && !multiYearActive && (legendStyle === 'chips' || !statsShown)">
           <template x-for="stat in seriesStats" :key="stat.entityId">
             <button type="button" class="chart-legend-item" :class="{inactive: legendHiddenIds.includes(stat.entityId)}"
                     @click="toggleLegendItem(stat.entityId, stat.name)"
                     @mouseenter="highlightDonutSlice(stat.name)" @mouseleave="unhighlightDonutSlice(stat.name)">
-              <span class="dot" :style="{background: stat.color}"></span>
+              <span class="dot" :style="{background: stat.color}" x-show="!stat.isState"></span>
               <span class="name" x-text="stat.name"></span>
-              <span class="values" x-show="chartStats">
+              {# Zustände: die Legende steht pro Zeile — Farbe, Name, Dauer
+                 und Anteil je Zustand statt Min/Max über Indizes. #}
+              <span class="values state-legend-values" x-show="stat.isState">
+                <template x-for="row in stat.stateRows" :key="row.idx">
+                  <span :title="row.raw" :class="{'state-pick': stateMode === 'heatmap' && row.idx !== -1, 'is-picked': stateMode === 'heatmap' && heatmapChipActive(stat.entityId, row.idx), 'is-unpicked': stateMode === 'heatmap' && !heatmapChipActive(stat.entityId, row.idx)}"
+                        @click.stop="pickHeatmapState(stat.entityId, row.idx)"><span class="dot state-dot" :style="row.swatch"></span> <span x-text="row.label"></span><strong x-show="statsShown" x-text="' ' + row.text"></strong></span>
+                </template>
+              </span>
+              <span class="values" x-show="chartStats && !stat.isState">
                 <span x-show="legendMetrics.includes('last')">{{ _('Aktuell <strong x-text="stat.last"></strong>') }}</span>
                 <span x-show="legendMetrics.includes('min')">{{ _('Min <strong x-text="stat.min"></strong>') }}</span>
                 <span x-show="legendMetrics.includes('max')">{{ _('Max <strong x-text="stat.max"></strong>') }}</span>
@@ -642,7 +723,33 @@
         <!-- Der Soll-/Laufsummen-Balkenvergleich (yearsCompareActive) hat seine
              eigene Tabelle direkt darunter (yearsSeriesStats): eine Zeile je
              Entität und Jahr, nicht klickbar wie die Chips dort. -->
-        <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && chartStats && legendStyle === 'table' && !yearsCompareActive && !multiYearActive">
+        {# Zustände: eine Zeile je Entität und Zustand (Dauer, Anteil, Wechsel)
+           statt Min/Max/Ø über Zustandsindizes — wie die Tabelle der Entitätsseite. #}
+        <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && statsShown && hasState && legendStyle === 'table'">
+          <table class="dt compact chart-legend-table state-legend-table">
+            <thead>
+              <tr>
+                <th class="legend-name-col">{{ _("Entität") }}</th>
+                <th>{{ _("Zustand") }}</th>
+                <th>{{ _("Dauer") }}</th>
+                <th>{{ _("Anteil") }}</th>
+                <th>{{ _("Wechsel") }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="row in stateTableRows" :key="row.key">
+                <tr class="state-legend-row" :title="row.raw">
+                  <td class="legend-name-col" x-text="row.name"></td>
+                  <td><span class="dot state-dot" :style="row.swatch"></span> <span x-text="row.label"></span></td>
+                  <td x-text="row.duration"></td>
+                  <td x-text="row.share"></td>
+                  <td x-text="row.entries"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && chartStats && !hasState && legendStyle === 'table' && !yearsCompareActive && !multiYearActive">
           <table class="dt compact chart-legend-table">
             <thead>
               <tr>
@@ -661,8 +768,14 @@
                     @mouseenter="highlightDonutSlice(stat.name)" @mouseleave="unhighlightDonutSlice(stat.name)">
                   <td class="legend-name-col">
                     <span class="legend-name-cell">
-                      <span class="dot" :style="{background: stat.color}"></span>
+                      <span class="dot" :style="{background: stat.color}" x-show="!stat.isState"></span>
                       <span x-text="stat.name"></span>
+                    </span>
+                    <span class="legend-compare-label state-legend-values" x-show="stat.isState">
+                      <template x-for="row in stat.stateRows" :key="row.idx">
+                        <span :title="row.raw" :class="{'state-pick': stateMode === 'heatmap' && row.idx !== -1, 'is-picked': stateMode === 'heatmap' && heatmapChipActive(stat.entityId, row.idx), 'is-unpicked': stateMode === 'heatmap' && !heatmapChipActive(stat.entityId, row.idx)}"
+                              @click.stop="pickHeatmapState(stat.entityId, row.idx)"><span class="dot state-dot" :style="row.swatch"></span> <span x-text="row.label + ' ' + row.text"></span></span>
+                      </template>
                     </span>
                     <!-- Gedämpfte Unterzeile statt einer zweiten Tabellenzeile —
                          x-for erzeugt pro Iteration genau ein Wurzelelement
@@ -857,6 +970,7 @@
        Entitätsseite. -->
   <script src="{{ asset('js/period-navigation.js') }}"></script>
   <script src="{{ asset('js/calendar-picker.js') }}"></script>
+  <script src="{{ asset('js/state-entities.js') }}"></script>
   <script>
     const BASE = {{ app_root | tojson }};
     const CHART_ID = {{ chart_id | tojson }};
@@ -869,6 +983,8 @@
     const SELECTED_ENTITY_IDS = {{ selected_entity_ids | tojson }};
     const ENTITY_NAMES = {{ entity_names | tojson }};
     const HIDDEN_ENTITY_IDS = {{ hidden_entity_ids | tojson }};
+    // Gezeichneter Zustand je Zustands-Entität der Heatmap (Rohtext).
+    const HEATMAP_STATES = {{ heatmap_states | default({}) | tojson }};
     const ENTITY_OPTIONS = {{ entity_options | tojson }};
     const RESOLUTION_PRESET = {{ resolution_preset | tojson }};
     const DYNAMIC_Y_AXIS = {{ dynamic_y_axis | tojson }};

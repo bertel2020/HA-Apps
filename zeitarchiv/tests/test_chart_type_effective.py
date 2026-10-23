@@ -23,3 +23,15 @@ def test_explicit_choices_are_kept():
     assert effective_chart_type(_chart("bar", "s1"), TYPES) == "bar"
     assert effective_chart_type(_chart("donut", "s1"), TYPES) == "donut"
     assert effective_chart_type(_chart("timeline", "m1"), TYPES) == "timeline"
+
+
+def test_auto_with_only_states_stays_auto_so_the_range_decides():
+    """Zeitstrahl bis zur Woche, danach Anteile: das entscheiden Editor und
+    Kachel je Zeitraum, deshalb löst der Server "auto" hier nicht auf."""
+    types = {**TYPES, "z1": "state", "z2": "state"}
+    assert effective_chart_type(_chart("auto", "z1", "z2"), types) == "auto"
+    # Mit einem Schalter dabei fallen die Zustände heraus, es bleibt der Zeitstrahl.
+    assert effective_chart_type(_chart("auto", "z1", "s1"), types) == "timeline"
+    # Eine Wahl bleibt; Anteile in einem Chart mit anderen Entitäten nicht.
+    assert effective_chart_type(_chart("shares", "z1", "z2"), types) == "shares"
+    assert effective_chart_type(_chart("shares", "z1", "s1"), types) == "timeline"

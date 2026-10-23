@@ -36,6 +36,38 @@
       el.dataset.masked = masked ? 'false' : 'true';
       btn.textContent = masked ? t('Verbergen') : t('Anzeigen');
     }
+    // Filterfeld über der Kästchenliste im Bereich "KI-Zugriff": blendet nur aus,
+    // die Auswahl selbst bleibt erhalten und wird mit abgeschickt.
+    function filterKiEntities(input) {
+      const query = input.value.trim().toLowerCase();
+      input.closest('.ki-entity-list').querySelectorAll('.ki-entity-row[data-search]').forEach((row) => {
+        row.hidden = query !== '' && !row.dataset.search.includes(query);
+      });
+    }
+    // Marke am Titel "Hinweise für das Modell": leer oder ausgefüllt, auch bei zugeklapptem Block.
+    function kiNotesTag(textarea) {
+      const tag = document.getElementById('ki-notes-tag');
+      tag.textContent = textarea.value.trim() ? tag.dataset.filled : tag.dataset.empty;
+    }
+    function copyKiInstruction(button) {
+      const text = document.getElementById('ki-instruction').textContent.trim();
+      const done = () => {
+        const label = button.textContent;
+        button.textContent = button.dataset.done;
+        setTimeout(() => { button.textContent = label; }, 2500);
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done);
+        return;
+      }
+      // Wie copyToken(): ohne HTTPS gibt es navigator.clipboard nicht.
+      const temp = document.createElement('textarea');
+      temp.value = text;
+      document.body.appendChild(temp);
+      temp.select();
+      try { document.execCommand('copy'); done(); } catch (err) { /* markieren und manuell kopieren */ }
+      document.body.removeChild(temp);
+    }
     function copyToken() {
       const el = document.getElementById('token-value');
       const status = document.getElementById('token-copy-status');

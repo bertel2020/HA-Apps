@@ -147,6 +147,7 @@ def test_the_client_class_toggle_follows_the_rendered_thresholds() -> None:
       const classes = new Set();
       const tileEl = {{classList: {{toggle: (c, on) => on ? classes.add(c) : classes.delete(c)}}}};
       const el = {{closest: () => tileEl, dataset: {{staleWarnAfter: warn, staleStaleAfter: stale}}}};
+      const stichtag = () => null;  // kein Rückblick (Zeitraum-Navigation)
       {block}
       return [...classes].sort().join(',');
     }}

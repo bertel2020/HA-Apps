@@ -19,6 +19,11 @@ function toggleDDPicker(prefix) {
   // sichtbar zu machen — 'center' zog sonst auch die ganze Seite mit, wenn
   // die aktive Zeile weit unten in einer langen Liste stand.
   if (opening) {
+    // Das Popover hängt rechtsbündig am Auslöser (app.css). Steht ein schmaler
+    // Auslöser weit links, ragte es links aus dem Fenster und die Zeilen wären
+    // abgeschnitten — dann stattdessen linksbündig andocken.
+    popover.classList.remove('dd-picker-popover-left');
+    if (popover.getBoundingClientRect().left < 0) popover.classList.add('dd-picker-popover-left');
     popover.querySelector('.dd-picker-row.active')?.scrollIntoView({block: 'nearest', inline: 'nearest'});
   }
 }

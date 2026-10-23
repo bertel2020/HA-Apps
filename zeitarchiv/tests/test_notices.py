@@ -612,3 +612,47 @@ def test_gap_threshold_conflicts_returns_row_details_for_housekeeping() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+
+
+def _partial_import_notice(errors: list[str], skipped_rows: int) -> dict:
+    from datetime import datetime, timezone
+
+    from app.storage import import_reports
+
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
+    try:
+        db_path = tmp / "index.sqlite"
+        index = Index(db_path)
+        import_reports.create(
+            tmp, source_type="ha", started_at=datetime.now(timezone.utc), source={}, configuration={},
+            results=[{"entity_id": "sensor.a", "rows_imported": 5, "skipped_rows": skipped_rows}],
+            errors=errors,
+        )
+        notices = build_notices(
+            index, db_path, TZ,
+            purge_totals={"removable_rows": 0, "entities_affected": 0},
+            storage_reconcile=None,
+            stale_entity_count=0,
+            scheduler_last_tick=time.time(),
+            reconcile_last_tick=time.time(),
+            reconcile_in_progress=False,
+        )
+        index.close()
+        return next(n for n in notices if n["id"] == "import.job_failed")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_partial_import_notice_names_what_is_missing() -> None:
+    notice = _partial_import_notice(errors=["sensor.b: Zeitüberschreitung"], skipped_rows=14)
+    assert notice["title"] == "Import unvollständig"
+    assert notice["detail"] == (
+        "Der letzte Home Assistant-Import wurde nur teilweise abgeschlossen. "
+        "Fehler: 1 · Nicht importierbare Zeilen: 14. Details unter Import → Reports."
+    )
+
+
+def test_partial_import_notice_omits_zero_counts() -> None:
+    notice = _partial_import_notice(errors=[], skipped_rows=3)
+    assert "Fehler" not in notice["detail"]
+    assert "Nicht importierbare Zeilen: 3" in notice["detail"]

@@ -1,5 +1,148 @@
 # Changelog
 
+## 1.9.0 - 2026-10-22
+
+### Neu
+
+- **Zustände**: Entitäten, die Text statt einer Zahl liefern (z. B. ein
+  Thermostat mit „Heizen“/„Leerlauf“ oder ein Saugroboter), werden jetzt
+  archiviert, wenn sie in der Integration einzeln ausgewählt sind. Die
+  Verlaufsansicht zeigt sie als farbigen Zeitstrahl mit Dauer und Anteil je
+  Zustand und einem Wechsel-Protokoll; Ausfälle erscheinen als „nicht
+  verfügbar“. Auch der Import aus dem Home-Assistant-Verlauf übernimmt sie.
+  Die Demo-Daten enthalten drei Beispiele (Saugroboter, Waschprogramm,
+  Heizungsbetrieb). Ab dem Zeitraum „Monat“ zeigt die Verlaufsansicht die
+  Anteile je Tag, Monat oder Jahr als Balken; umschalten lässt sich auf
+  Zeitstrahl, Wechsel, Donut oder eine Heatmap (Wochentag × Stunde). Auch über
+  lange Zeiträume bleibt der Zeitstrahl lesbar: Wo mehr Abschnitte liegen, als
+  der Chart Bildpunkte breit ist, zeichnet er je Bildpunkt eine Spalte mit den
+  Anteilen der Zustände. Im Chart-Editor erscheinen mehrere Zustände als
+  Zeilen eines gemeinsamen Zeitstrahls, als Donuts oder als Heatmaps.
+  Dashboard-Kacheln zeigen den aktuellen Zustand mit „seit“ und den letzten
+  24 Stunden als Streifen, breite Kacheln die Anteile der letzten 7 Tage,
+  wahlweise als Donut. Werden Werte verworfen, weil der Typ nicht passt oder
+  eine Entität mehr als 50 Zustände liefert, erscheint ein Hinweis, mit der
+  passenden Integration auch als Reparatur in Home Assistant.
+  CSV-Import und -Export übernehmen den Text der Zustände; der Symcon-Import
+  kann Variablen mit Profil in Zustände übertragen.
+  Vergleichstabellen unterstützen Zustände noch nicht.
+- Lichter, Ventilatoren, Automationen, Skripte, Fernbedienungen, Sirenen,
+  Luftbefeuchter, Updates und Kalender werden jetzt wie Schalter archiviert
+  (an/aus) – mit Zeitstrahl und Einschaltdauer. Bisher kamen sie gar nicht in
+  der App an. Das gilt auch für den Import aus dem Home-Assistant-Verlauf; für
+  die Live-Übertragung braucht es zusätzlich die passende Integration.
+- **KI-Zugriff**: Claude, ChatGPT oder der Gesprächsagent von Home Assistant
+  können Fragen zum Archiv beantworten, etwa „Wie war der Stromverbrauch im
+  Juli gegenüber dem Vorjahr?“. Der Zugriff läuft über den MCP Server von Home
+  Assistant, ist rein lesend und standardmäßig aus. Unter Einstellungen → KI-Zugriff
+  legst du fest, ob alle Entitäten oder nur eine Auswahl sichtbar sind, ob
+  Anwesenheit ausgeschlossen wird und welche Werkzeuge die KI nutzen darf; dazu
+  kommen eigene Hinweise für das Modell. Die Seite zeigt die Nutzung je Tag,
+  abgelehnte Aufrufe und einen Verlauf der Änderungen. Voraussetzung ist die
+  passende Version der Integration. Das Protokoll lässt sich nach Bereich filtern.
+- **Dashboards**: Mit dem neuen Schalter „Zeitraum-Navigation“ im Dashboard-Editor
+  erscheint in der Titelzeile eine Datumsleiste mit Kalender und Schrittweite
+  (Tag, Woche, Monat, Jahr). Alle Kacheln zeigen dann die Periode, die den
+  gewählten Tag enthält; ein Hinweis erinnert daran, dass es ein Rückblick ist.
+
+### Geändert
+
+- **Chart-Editor**: Entitäten kommen jetzt über ein Suchfeld dazu statt über
+  eine lange Liste zum Ankreuzen. Die Treffer lassen sich nach Typ und Einheit
+  filtern, Favoriten stehen oben, und Entitäten mit passender Einheit werden
+  vor denen angezeigt, die eine weitere Y-Achse bräuchten. Unter „Ausgewählt“
+  stehen die gewählten Entitäten mit Einheit und lassen sich dort auch
+  entfernen.
+- **Verbraucheranteile**: Gruppen und Zwischenzähler sind standardmäßig
+  zugeklappt, damit die oberste Ebene im Blick bleibt.
+- Die Meldung „Import unvollständig“ nennt jetzt, was fehlt (Fehler und nicht
+  importierbare Zeilen) und verweist auf die Reports.
+
+### Behoben
+
+- Chart-Kacheln blieben nach einem Datumswechsel oder der automatischen
+  Aktualisierung leer, obwohl die Legende Werte zeigte.
+- Auf Kacheln fehlte oben die Zahl des höchsten Balkens.
+- Beim Import aus dem Home-Assistant-Verlauf konnten Tageswerte von Zählern
+  doppelt erscheinen. Bereits falsch importierte Daten bleiben bestehen:
+  Entität leeren und neu importieren.
+- Die Warnung „Import unvollständig“ blieb dauerhaft stehen, weil nicht
+  verfügbare Zustände wie Fehler gezählt wurden.
+- Auswahlmenüs, deren Knopf weit links steht (z. B. „Lücken-Erkennung“ in der
+  Konfiguration einer Entität), ragen nicht mehr links aus dem Fenster und sind
+  wieder vollständig lesbar.
+
+---
+
+### English
+
+#### New
+
+- **States**: entities that report text instead of a number (e.g. a
+  thermostat with "Heating"/"Idle" or a robot vacuum) are now archived when
+  they are selected individually in the integration. The history view shows
+  them as a coloured timeline with duration and share per state and a change
+  log; outages appear as "unavailable". The import from the Home Assistant
+  history takes them over as well. The demo data contains three examples
+  (robot vacuum, washing programme, heating operation). From the "Month"
+  period on, the history view shows the shares per day, month or year as
+  bars; you can switch to timeline, changes, donut or a heatmap (weekday ×
+  hour). The timeline stays readable over long periods too: where there are more
+  periods than the chart is pixels wide, it draws a column per pixel with the
+  shares of the states. In the chart editor, several states appear as rows of a
+  shared timeline, as donuts or as heatmaps.
+  Dashboard tiles show the current state with "for" and the last 24 hours as
+  a strip, wide tiles the shares of the last 7 days, optionally as a donut.
+  When values are discarded because the type does not match or an entity
+  reports more than 50 states, a notice appears, with the matching
+  integration also as a repair in Home Assistant. Comparison tables do not
+  CSV import and export carry the text of states; the Symcon import can
+  turn variables with a profile into states.
+  support states yet.
+- Lights, fans, automations, scripts, remotes, sirens, humidifiers, updates
+  and calendars are now archived like switches (on/off) – with timeline and
+  on-time. Previously they never reached the app. This also applies to the
+  import from the Home Assistant history; live transfer additionally needs the
+  matching integration.
+- **AI access**: Claude, ChatGPT or Home Assistant's conversation agent can
+  answer questions about the archive, such as "How did electricity use in July
+  compare to last year?". Access goes through Home Assistant's MCP server, is
+  read-only and off by default. Under Settings → AI access you choose whether all
+  entities or only a selection are visible, whether presence is excluded and
+  which tools the AI may use; you can also add your own notes for the model.
+  The page shows usage per day, rejected calls and a history of changes. This
+  needs the matching version of the integration. The log can be filtered by area.
+- **Dashboards**: the new "Period navigation" switch in the dashboard editor
+  adds a date bar with calendar and step size (day, week, month, year) to the
+  title row. All tiles then show the period containing the chosen day; a notice
+  reminds you that you are looking back.
+
+#### Changed
+
+- **Chart editor**: entities are now added through a search field instead of
+  a long list of checkboxes. Matches can be filtered by type and unit,
+  favorites come first, and entities with a fitting unit are listed before
+  those that would need another Y axis. "Selected" lists the chosen entities
+  with their unit, and they can be removed there as well.
+- **Consumer shares**: groups and sub-meters are collapsed by default so the
+  top level stays in view.
+- The "Import incomplete" notice now says what is missing (errors and rows that
+  could not be imported) and points to the reports.
+
+#### Fixed
+
+- Chart tiles stayed empty after a date change or the automatic refresh,
+  although the legend showed values.
+- The number above the tallest bar was cut off on tiles.
+- Importing from the Home Assistant history could show doubled daily values for
+  counters. Data that was already imported wrongly stays as it is: clear the
+  entity and import again.
+- The "Import incomplete" warning stayed forever because unavailable states were
+  counted as errors.
+- Dropdown menus whose button sits far to the left (e.g. "Gap detection" in an
+  entity's configuration) no longer extend past the left edge of the window and
+  are fully readable again.
+
 ## 1.8.0 - 2026-10-19
 
 ### Neu

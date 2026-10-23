@@ -914,6 +914,17 @@ anyway.
   `.tooltip-lines` (`white-space:pre-line`) plus real `\n` in the attribute
   value — the app-wide base rule otherwise renders `white-space:normal` and line
   breaks collapse into spaces.
+- **`entity-picker.js`**: two entity pickers. `entityPicker()` picks exactly
+  one entity via a button and a searchable popover (table editor, CSV import,
+  energy dashboard roles, target field in the chart editor), optionally
+  narrowed by unit or counter type. `entityMultiPicker()` (chart editor) is a
+  search field with an in-flow match list for several entities: filter chips
+  by type and unit with match counts, favorites first, and with an existing
+  selection, matches with a fitting unit before those needing a new Y axis. It
+  only picks; the selection itself (order, names, removal) lives in the
+  surrounding component and comes in through a getter. Both expect options of
+  the form `{entity_id, label, unit, aggregation_type}`, the multi variant also
+  `is_favorite`.
 - **`group-picker.js`** (energy dashboard, consumer groups): searchable dropdown
   without a fixed option list — select an existing entry or create a new one via
   free text (like tags/labels in Home Assistant), analogous to

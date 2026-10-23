@@ -223,6 +223,7 @@ def parse_rows(
     tz: ZoneInfo,
     max_rows: int = MAX_IMPORT_ROWS_PER_ENTITY,
     on_progress: Callable[[int], None] | None = None,
+    state_mapper: Callable[[str, float], float | None] | None = None,
 ) -> ParseResult:
     """Liest die Rohdaten mit der gewählten Spalten-/Format-Zuordnung ein.
     Jede Zeile, die sich nicht plausibel als (Zeitstempel, Wert) lesen lässt
@@ -232,7 +233,13 @@ def parse_rows(
     ``on_progress`` bekommt alle PROGRESS_EVERY_ROWS gelesenen Zeilen die
     bisherige Gesamtzahl GELESENER Zeilen (nicht nur der übernommenen) —
     sonst liefe der Balken bei einer Datei mit vielen übersprungenen Zeilen
-    gegen eine Gesamtzahl, die er nie erreichen kann."""
+    gegen eine Gesamtzahl, die er nie erreichen kann.
+
+    ``state_mapper`` (Ziel ist eine Zustands-Entität): die Wertspalte ist dann
+    Text und wird auf den Index abgebildet (ha_import.state_mapper_for()).
+    Aufeinanderfolgende gleiche Zustände bleiben nur einmal stehen — der
+    Live-Pfad schreibt auch nur Wechsel, und eine Probe pro Minute mit
+    "charging" wären sonst tausende Zeilen ohne Aussage."""
     result = ParseResult()
     max_col = max(ts_col, value_col)
     gelesen = 0
@@ -248,7 +255,10 @@ def parse_rows(
                 result.skipped += 1
                 continue
             ts = _parse_timestamp(line[ts_col], ts_format, custom_pattern, tz)
-            value = _parse_value(line[value_col])
+            value = (
+                _parse_value(line[value_col]) if state_mapper is None or ts is None
+                else state_mapper(line[value_col], ts)
+            )
             if ts is None or value is None:
                 result.skipped += 1
                 continue
@@ -260,4 +270,8 @@ def parse_rows(
     if on_progress is not None:
         on_progress(gelesen)
     result.rows.sort()
+    if state_mapper is not None:
+        result.rows = [
+            row for i, row in enumerate(result.rows) if i == 0 or row[1] != result.rows[i - 1][1]
+        ]
     return result

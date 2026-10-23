@@ -148,3 +148,41 @@
        (kein Ziel wie links/rechts). */
     .nav{width:100%;justify-content:center;}
   }
+
+/* Zustands-Entitäten (ROADMAP 1.29): Kennzahlzeile, Legende und
+   Wechsel-Protokoll unter dem Zeitstrahl, in derselben Karte. */
+.state-panel{display:flex;flex-direction:column;gap:10px;margin-top:12px;}
+.state-kpis{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+.state-panel .chart-legend{margin-top:0;}
+.state-legend-row{cursor:pointer;}
+.state-legend-row:hover td{background:var(--surface-alt);}
+.state-legend-row.inactive td{opacity:.45;}
+.state-legend-row:focus-visible{outline:2px solid var(--accent-line);outline-offset:-2px;}
+.state-log{border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:6px;}
+.state-log-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 12px;}
+.state-log-toggle{font:inherit;font-weight:600;color:var(--ink);background:none;border:0;padding:2px 4px;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-align:left;}
+.state-log-toggle:focus-visible{outline:2px solid var(--accent-line);}
+.state-log-caret{color:var(--ink-faint);transition:transform .15s;display:inline-block;}
+.state-log-toggle[aria-expanded="false"] .state-log-caret{transform:rotate(-90deg);}
+.state-log-list{display:flex;flex-direction:column;}
+.state-log-day{display:flex;align-items:center;gap:8px;width:100%;font:inherit;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);background:none;border:0;border-top:1px solid var(--border);padding:8px 6px 6px;margin-top:4px;cursor:pointer;text-align:left;}
+.state-log-day:first-child{margin-top:0;}
+.state-log-day:focus-visible{outline:2px solid var(--accent-line);outline-offset:-2px;}
+.state-log-day-caret{color:var(--ink-faint);transition:transform .15s;display:inline-block;}
+.state-log-day[aria-expanded="false"] .state-log-day-caret{transform:rotate(-90deg);}
+.state-log-day-count{color:var(--ink-muted);white-space:nowrap;}
+.state-log-strip{flex:1;display:flex;gap:1px;height:8px;min-width:40px;border-radius:4px;overflow:hidden;}
+.state-log-strip i{display:block;height:100%;min-width:2px;}
+.state-log-row{display:grid;grid-template-columns:7rem 8.5rem minmax(0,1fr) 4.5rem;gap:10px;align-items:center;padding:4px 6px;border-radius:6px;font-size:calc(13px * var(--font-scale, 1));}
+.state-log-row:hover,.state-log-row.hot{background:var(--accent-line-soft);}
+.state-log-time{font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;}
+.state-log-state{display:inline-flex;align-items:center;gap:6px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.state-log-bar i{display:block;height:6px;border-radius:3px;min-width:3px;}
+.state-log-dur{color:var(--ink-muted);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;}
+.state-log-running{display:inline;margin-left:6px;font-size:calc(11px * var(--font-scale, 1));color:var(--accent-line);}
+@media (max-width:480px){
+.state-log-row{grid-template-columns:6.4rem minmax(0,1fr) auto;}
+.state-log-bar{display:none;}
+}
+.state-log-pager{display:flex;align-items:center;gap:12px;margin-top:10px;color:var(--ink-muted);font-variant-numeric:tabular-nums;}
+@media (prefers-reduced-motion:reduce){.state-log-caret,.state-log-day-caret{transition:none;}}

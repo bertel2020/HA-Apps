@@ -19,6 +19,9 @@ def test_parse_state_normalizes_switch_domains_to_one_zero() -> None:
     assert ha_import._parse_state("off", "switch") == 0.0
     assert ha_import._parse_state("ON", "input_boolean") == 1.0
     assert ha_import._parse_state("open", "binary_sensor") is None
+    assert ha_import._parse_state("on", "light") == 1.0
+    assert ha_import._parse_state("off", "automation") == 0.0
+    assert ha_import._parse_state("off", "climate") is None
 
 
 def test_parse_state_normalizes_presence_domains_to_one_zero() -> None:
@@ -93,14 +96,35 @@ def test_fetch_history_rows_skips_non_numeric_and_counts_them(monkeypatch) -> No
         "_get",
         lambda path, params=None: [[
             {"state": "20.0", "last_changed": start.isoformat()},
-            {"state": "unavailable", "last_changed": (start + timedelta(minutes=1)).isoformat()},
+            {"state": "kaputt", "last_changed": (start + timedelta(minutes=1)).isoformat()},
         ]],
     )
     result = ha_import.fetch_history_rows("sensor.temp", "sensor", start, end)
     assert [v for _, v in result.rows] == [20.0]
     assert result.skipped == 1
     assert result.discarded[0]["reason"] == "Zustand ist nicht importierbar"
-    assert result.discarded[0]["state"] == "unavailable"
+    assert result.discarded[0]["state"] == "kaputt"
+
+
+def test_fetch_history_rows_unavailable_is_discarded_but_not_counted_as_skipped(monkeypatch) -> None:
+    """unavailable/unknown sind kein Datenverlust: sonst gilt jeder Import als
+    "unvollständig" und die Meldung verschwindet auch nach einer Wiederholung nie."""
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1)
+
+    monkeypatch.setattr(
+        ha_import,
+        "_get",
+        lambda path, params=None: [[
+            {"state": "20.0", "last_changed": start.isoformat()},
+            {"state": "unavailable", "last_changed": (start + timedelta(minutes=1)).isoformat()},
+            {"state": "unknown", "last_changed": (start + timedelta(minutes=2)).isoformat()},
+        ]],
+    )
+    result = ha_import.fetch_history_rows("sensor.temp", "sensor", start, end)
+    assert [v for _, v in result.rows] == [20.0]
+    assert result.skipped == 0
+    assert [d["reason"] for d in result.discarded] == ["Zustand ist nicht verfügbar"] * 2
 
 
 def test_fetch_history_rows_enforces_max_rows(monkeypatch) -> None:

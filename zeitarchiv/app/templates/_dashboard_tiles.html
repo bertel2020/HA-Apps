@@ -110,6 +110,7 @@
         <a class="dtile-body" href="{{ href_base }}charts/{{ tile.id }}" draggable="false"
            data-period-anchor="{{ tile.period_anchor or '' }}"
            data-compare-settings='{{ tile.compare_settings | default({}) | tojson }}'
+           data-heatmap-states='{{ tile.heatmap_states | default({}) | tojson }}'
            data-entity-ids='{{ tile.entity_ids | tojson }}'
            data-entity-names='{{ tile.entity_names | tojson }}'
           data-hidden-entity-ids='{{ tile.hidden_entity_ids | default([]) | tojson }}'
@@ -206,6 +207,7 @@
         {% if not dashboard_locked %}{% include "_dashboard_tile_menu.html" %}{% endif %}
         <a class="dtile-body dtile-entity-body" href="{{ href_base }}entities/{{ tile.entity_id }}" draggable="false"
            data-entity-id="{{ tile.entity_id }}" data-is-switch="{{ 'true' if tile.is_switch else 'false' }}"
+           data-is-state="{{ 'true' if tile.is_state else 'false' }}" data-state-view="{{ tile.state_view }}"
            data-decimals="{{ tile.decimals }}" data-show-sparkline="{{ 'true' if tile.show_sparkline else 'false' }}"
            data-show-age="{{ 'true' if tile.show_age else 'false' }}"
            data-stale-warn-after="{{ tile.stale_warn_after }}" data-stale-stale-after="{{ tile.stale_stale_after }}"
@@ -221,6 +223,7 @@
                  sonst wäre "16,8 °C" nicht von einem Momentanwert zu
                  unterscheiden. #}
               {% if tile.primary_label %}<span class="dtile-entity-metric">{{ tile.primary_label }}</span>{% endif %}
+              {% if tile.is_state %}<span class="state-dot dtile-state-swatch"></span>{% endif %}
               <span class="dtile-entity-number">{{ tile.value_text }}</span>
               {% if tile.unit %}<span class="dtile-entity-unit">{{ tile.unit }}</span>{% endif %}
             </span>
@@ -256,7 +259,10 @@
           </div>
           {% endif %}
           {% if tile.show_sparkline %}
-          <div class="dtile-entity-sparkline"><div class="dtile-loading">&hellip;</div></div>
+          {# Bei Zustands-Entitäten statt der Sparkline: Streifen der letzten
+             24 h, ab zwei Spalten die Anteile der letzten 7 Tage, oder der
+             Donut (state_view) — applyStateTile() in dashboard-tiles.js. #}
+          <div class="dtile-entity-sparkline{{ ' dtile-state-visual' if tile.is_state else '' }}"><div class="dtile-loading">&hellip;</div></div>
           {% endif %}
         </a>
       </div>

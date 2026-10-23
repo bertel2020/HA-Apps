@@ -359,6 +359,15 @@ something to scroll.
   pinning order. Both switches can be combined independently of each other. On
   narrow displays the presentation deliberately stays single-column even in
   Precise mode so that tiles remain readable and usable.
+- **Period navigation** (dashboard editor, off by default): shows a
+  reference-date bar on the right of the title row (‹ date ›, calendar, step
+  Day/Week/Month/Year, "Today"). It moves the whole dashboard to another day:
+  each tile shows the period of its own range that contains this day — the
+  month tile the whole month, the year tile the year, rolling windows
+  ("last 24 h") end at the end of that day, value tiles show the state at the
+  end of the period. Charts with a fixed period stay unchanged. While looking
+  back, automatic refresh is paused. The day is part of the address
+  (`?date=YYYY-MM-DD`) and is not saved.
 - **Lock dashboard** (editor, "Locked" switch): blocks rearranging, resizing
   and removing tiles on the view itself — protects against accidental moving
   on, for example, a permanently displayed wall tablet. Renaming and deleting
@@ -633,7 +642,7 @@ ID. Via **Columns ▾**, twelve additional columns can be shown/hidden (type,
 first/last value, resolution, retention, unit, records, size, value filter,
 gap/outlier threshold, Historic; the last one is off by default) — the selection applies globally to the whole add-on,
 not just in the current browser. If the columns **Type** or **Unit** are
-shown, a matching filter appears next to them (type: default/counter/switch,
+shown, a matching filter appears next to them (type: default/counter/switch/state,
 multiple selection possible; unit: one of the units actually occurring). A
 click on a row opens the **history view** of that one entity.
 
@@ -719,6 +728,115 @@ take it out in the editor of the chart or table.
   loaded period, not to the currently visible section.
 - **Decimal places** overrides, for this view, the global display setting of
   the entity (Automatic or fixed 0–3).
+
+### States
+
+If an entity reports text instead of a number — such as a thermostat with
+"Heating"/"Idle", a robot vacuum with "Charging"/"Cleaning" or a washing
+machine's programme —, Zeitarchiv archives it as a **state**. For this the
+entity has to be **selected individually** in the integration; text sensors
+deliberately do not come along via a pattern such as `sensor.*` or a
+selection by area, device or label (otherwise version numbers, device IDs and
+the like would end up in the archive). The first value decides whether an
+entity reports numbers or states; if it changes later, the deviating values
+are discarded.
+
+- The history view shows a **timeline** with one colour per state. If the
+  entity drops out (`unavailable`/`unknown`), the section appears hatched in
+  grey as "unavailable" instead of continuing the last state.
+- The translation from Home Assistant is shown where one exists ("Heating"
+  for `heat`); the raw value is in the tooltip.
+- Below the timeline are the number of changes, the longest section and the
+  unavailable time, followed by the legend with **duration and share** per
+  state — as chips or as a table (Options → Legend style). Clicking a state
+  hides it.
+- The **change log** below lists the sections, newest first (Options →
+  Change log). Hovering over a row frames the band in the timeline; clicking
+  a band jumps to its row. When you zoom in, KPIs, legend and log only cover
+  the section.
+- Under **Edit values**, correcting means choosing one of the known states;
+  adding and compacting are not available for states.
+- At most 50 different states are accepted per entity, new ones beyond that
+  are discarded — a safeguard against sensors with free text.
+
+- **Display per period:** The history view offers **Timeline**, **Shares**
+  (stacked bars per day, month or year, as a percentage of time), **Changes**
+  (how often a state began), **Heatmap** and **Donut**. As long as you do not
+  choose, it shows the timeline up to a week and the shares from a month on.
+  Your choice is kept when you switch the period; only the heatmap exists from
+  a month on and falls back to that default before. Clicking a bar jumps to the
+  period below it. The choice is not saved, it applies only to the open page.
+- **Heatmap:** A grid of weekday and hour. Each cell shows the share of time the
+  entity spent in one state — the darker, the more often. Here the legend picks
+  exactly one state instead of hiding states ("unavailable" cannot be picked).
+  Without a choice it draws the state whose share varies most over the week,
+  not the most frequent one. Pale cells rest on fewer than three observations.
+- **Donut:** The shares of the chosen period (only of the zoomed section if you
+  zoomed) as a ring, in every period. Hidden states are left out and the shares
+  spread over the rest.
+- **Marked values:** The **Marked values** option (options menu) draws the
+  sections marked for deletion as bands with a warning edge behind the
+  timeline, see [Seeing marked values](#seeing-marked-values). It does not
+  exist for shares and changes. It is only available on the entity page, not in
+  the chart editor or on tiles.
+
+From the "Month" period on, the shares come from precomputed summaries; up to
+a week they come from the stored changes.
+
+The **timeline** can also be chosen over long periods. If the visible section
+holds more periods than the chart is pixels wide, most would be narrower than a
+pixel. It then draws a **column per pixel** instead of single bands, stacked by
+the shares of the states; a state of 1 % or more stays visible. Over a column
+the tooltip names the time span, the shares and the number of starts. Zooming in
+makes the columns finer until the single periods show again; the note below the
+chart says which applies. With very many changes the general limit for raw
+values applies in year and decade. The server then precomputes the columns from
+the hourly summaries: they are not finer than an hour, and zooming only makes
+them wider.
+
+#### States in charts and on dashboards
+
+- **Chart editor:** State entities are added like other entities, but **only
+  together with other state entities** in the same chart — not even with
+  switches. If you add them next to number or switch entities, the states are
+  removed again with a notice. The **chart type** then offers Timeline,
+  Shares, Changes, Heatmap and Donut:
+  - **Timeline:** one row per entity in a shared timeline. If a row has more
+    periods than the chart is pixels wide, all rows draw a column per pixel
+    with the shares of the states (see above); the tooltip then names the time
+    span, the shares and the starts.
+  - **Shares** and **Changes:** a separate chart per state entity.
+  - **Heatmap:** a weekday-and-hour grid per state entity, from the "Month"
+    period on. With several entities "Name · state" is shown above each grid and
+    the colour scale is dropped. Clicking a state in the legend picks it for
+    that entity; it is saved with the chart. In shorter periods the default
+    applies, the choice is kept.
+  - **Donut:** one donut per state entity with the shares of its states; the
+    name is shown above only when there are several entities.
+  - Without an explicit choice the same default as in the history view
+    applies (timeline up to a week, shares from a month on).
+  - The legend style (chips or table) can always be chosen; the table lists
+    entity, state, duration, share and changes. The editor's **CSV export**
+    contains the displayed state names.
+- **Chart tiles** on the dashboard behave like the editor; there too, states
+  drop out when mixed with other series. A timeline also condenses into columns
+  on the tile when it has too many periods for its width. A heatmap tile shows the grid compactly
+  and falls back to the default in periods shorter than a month.
+- **Value tile of a state entity:** shows the current state with a colour
+  swatch and "since …". A 1×1 tile adds the last 24 hours as a strip, from
+  two columns on the shares of the last 7 days — optionally as a **donut**
+  over the tile's period. KPIs (average, min/max …), sparkline, decimal places
+  and the stale marker do not exist for states; a state that has not changed
+  for days does not count as stale.
+- **Tables** and comparison tables do not support states yet.
+
+#### Notices for discarded values
+
+If values are discarded because the type does not fit (number instead of text
+or the other way round) or an entity reports more than 50 states, a message
+appears in the **notice center** (bell in the header); it disappears seven
+days after the last occurrence. With the matching integration it also appears
+as a repair in Home Assistant.
 
 ### Zooming into a section
 
@@ -830,6 +948,11 @@ Own editor, reachable via **Charts** → new chart or editing an existing one
 
 ### Entities and presentation
 
+- Entities are added through the search field: the match list shows favorites
+  first and can be narrowed with chips by **Type** and **Unit**. Once something
+  is selected, matches with a fitting unit come first ("Fits an existing
+  axis"). Under **Selected** the chosen entities can be renamed, reordered,
+  hidden and removed with ✕.
 - Overlay any number of entities; different units automatically get separate Y
   axes so that, e.g., temperature and humidity remain sensibly readable in one
   chart.
@@ -862,6 +985,9 @@ Own editor, reachable via **Charts** → new chart or editing an existing one
   available as in the history view — here as a multi-row presentation with one
   row per entity, so that the ON intervals of several switches can be compared
   directly one below the other.
+- For **state entities** (text instead of a number) there are Timeline,
+  Shares, Changes and Donut; they can only be combined with other state
+  entities, see [States](#states).
 
 ### Donut instead of time series
 
@@ -1418,16 +1544,19 @@ and therefore runs only on click.
 
 ### Display mode
 
-Only for switches (`binary_sensor`, `switch`, `input_boolean`, `device_tracker`, `person`):
+Only for switches (see below for which domains count):
 
 - **ON/OFF (raw value)** shows the state as 0/1.
 - **Time (duration)** instead shows the cumulative on-time per period,
   formatted readably (e.g. `1h 29m`) — useful for presence, door and motion
   sensors.
 
-The domains `binary_sensor`, `switch`, `input_boolean`, `device_tracker` and
-`person` count as switches — for the latter two, `home` counts as "on", any
-other state (`not_home` or a named zone) as "off".
+The domains `binary_sensor`, `switch`, `input_boolean`, `light`, `fan`,
+`automation`, `script`, `remote`, `siren`, `humidifier`, `update` and
+`calendar` (state `on`/`off`) as well as `device_tracker` and `person` count
+as switches — for the last two, `home` counts as "on", any other state
+(`not_home` or a named zone) as "off". For `automation`, "on" means enabled,
+not "currently running"; for `update`, "on" means an update is available.
 
 ### What applies retroactively — and what does not
 
@@ -2245,6 +2374,7 @@ sidebar.
 | --- | --- |
 | **Source**: Live / Supervisor history | "Live" reads the limited buffer of the running process — reacts fastest. "Supervisor history" reaches further back but takes somewhat longer to load when opened. |
 | **Level** | Filters the display to a minimum severity (All, Errors, Warnings, Information, Debug). Affects only the presentation — not the application log level itself (see below), which determines what is written at all. |
+| **Area** | Shows only the messages of one topic: AI access, Ingest and API, Maintenance and backup, Import and export, Edit data, HTTP requests or Other. Like the level it only affects the display, including the download, and combines with level and search. The mapping is listed in [logging.md](logging.md#log-page-level-area-and-retention). |
 | **Search log** | Free-text search within the currently loaded lines. |
 | **Refresh now** / **Automatic (15 s)** | Manual or automatic reloading. |
 | **Download** | Downloads the current view as a text file. |
@@ -2265,6 +2395,11 @@ masked before output; write captures and entity traces can nevertheless
 contain entity IDs and measurements and should remain active or saved only as
 long as necessary.
 
+The log is not stored permanently: the live view keeps the last 2,000 entries in
+memory and is empty after the app restarts; the Supervisor history shows only the
+current container start. Entries below the configured level are not recorded at all.
+If you want to look something up later, download it first.
+
 ## Settings in detail
 
 | Area | Contains |
@@ -2273,6 +2408,7 @@ long as necessary.
 | **Archiving** | Default values for newly detected entities (never act retroactively on existing entities): resolution, retention, decimal places, value change filter, gap/outlier detection |
 | **Notices** | Switch the tip display on/off and dialog with all tips (see [Housekeeping](#housekeeping)); overview of muted system notices with remaining duration, individually re-enableable early |
 | **Connection** | Show/regenerate API token, last received value, number of writes and auth errors since start, connected integration version with "last seen" time (notice for outdated or newly available version) |
+| **AI access** | Switch for read-only access by AI services (default Off), scope of the released entities (All, All except the selected, Only the selected) with exclude presence, individually switchable tools, notes for the model, setup guide. Everything saves immediately. Under **Usage**: last use, calls today and in 7 days, rejected calls (access off or tool switched off), breakdown by tool and account kind and **Recent changes** to the release. The counters are kept per day for 90 days and the last 50 changes are stored; the content of the questions, the notes text and entity names are not part of it, and the app does not record who made a change |
 | **Diagnostics** | Record the next write once completely (sensitive raw data, automatic deletion after 60 minutes at the latest); trace a single entity for 15 minutes including ingest result; download diagnostic report; process start and uptime; **Background processes** overview (last run/status of each maintenance scheduler task) |
 | **Reset** | Deletes data permanently — in two levels: **Delete measured values only** (entities, configuration, dashboards and settings are kept) or **Reset everything** (additionally entities, dashboards, saved charts and tables, activity log and settings, as on a fresh installation). The API token, the backup settings and all backup files are kept; the Home Assistant integration recreates entities with the next value. Key figures (entities, records, size) say beforehand what would be deleted. By default **a backup is created first** — if it fails, nothing is deleted. To confirm, you type the word “DELETE”. Not available in demo mode |
 | **Demo data** | Only visible with active demo mode or a leftover demo instance — see the separate section [Demo mode](#demo-mode) |

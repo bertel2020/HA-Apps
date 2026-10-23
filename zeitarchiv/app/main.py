@@ -24,7 +24,7 @@ from collections import deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -83,14 +83,15 @@ from .limits import (
     MAX_ZIP_UNCOMPRESSED_BYTES,
     MAX_ZIP_UPLOAD_BYTES,
 )
-from .log_source import load_log_lines
-from . import currency, demo_mode, formats, i18n
+from .log_source import load_log_lines, validate_log_request
+from . import ai_usage, currency, demo_mode, formats, i18n
 from .i18n import N_, tr
 from . import supervisor_stats
 from .logging_setup import (
     ACCESS_LOG_LABELS,
     DEFAULT_ACCESS_LOG_MODE,
     DEFAULT_LOG_LEVEL,
+    LOG_AREA_LABELS,
     LOG_LEVEL_LABELS,
     configure_logging,
     log_http_request,
@@ -135,8 +136,7 @@ from .storage.coordinator import CoordinatorBusy, StorageCoordinator
 from .storage.paths import ENTITY_ID_MAX_LENGTH, ENTITY_ID_PATTERN, validate_entity_id
 from .timezone_config import load_timezone
 from .version import APP_VERSION
-from . import api_routes
-from . import ha_integration
+from . import ai_settings_routes, api_routes, ha_integration
 from .import_routes import ImportDependencies, ImportService
 from .index_optimization import (
     build_index_detail_context,
@@ -151,6 +151,7 @@ from .housekeeping_routes import (
 from .backup_external_routes import BackupExternalDependencies, create_backup_external_router
 from .restore_routes import RestoreDependencies, create_restore_router
 from .export_routes import ExportDependencies, create_export_router
+from .entity_delete_routes import EntityDeleteDependencies, create_entity_delete_router
 from .marked_values_routes import MarkedValuesDependencies, create_marked_values_router
 from .report_routes import ReportDependencies, ReportService
 from .energiedashboard_routes import (
@@ -167,7 +168,7 @@ from . import notices as notices_mod
 from . import version_check
 from .notices import collect_notices
 from .chart_period import calendar_bounds, compare_settings_or_400, period_anchor_or_400
-from .chart_types import CHART_EDITOR_CHART_TYPES, ENTITY_CHART_TYPES, chart_type_label, chart_type_key, effective_chart_type
+from .chart_types import CHART_EDITOR_CHART_TYPES, ENTITY_CHART_TYPES, chart_type_label, chart_type_key, editor_display_prefill, effective_chart_type, heatmap_states_clean
 from .progress import activity_snapshot, register_source
 
 logger = logging.getLogger(__name__)
@@ -280,7 +281,7 @@ COLOR_MODE_LABELS = {
 # jetzt global für alle Dashboard-Kacheln (Einstellungen → Darstellung), da
 # eine Kachel-für-Kachel-Steuerung in der Praxis kaum genutzt wurde und die
 # Chart-Bearbeitung dafür unnötig überladen hat.
-DASHBOARD_ANIMATION_LABELS = {"1": "An", "0": N_("Aus")}
+DASHBOARD_ANIMATION_LABELS = {"1": N_("An"), "0": N_("Aus")}
 # Steuert, wohin "/" (Ingress-Root — was beim Öffnen von Zeitarchiv über die
 # HA-Sidebar erscheint) weiterleitet. Die Übersicht selbst lebt dafür unter
 # der eigenen URL "/uebersicht" statt weiter unter "/" — die Topnav
@@ -409,6 +410,7 @@ i18n.install(templates)
 i18n.set_background_language(lambda: index)
 templates.env.filters["retranslate"] = i18n.retranslate
 app.include_router(i18n.make_router(lambda: index))
+app.include_router(ai_settings_routes.make_router(lambda: index, templates, TZ))
 
 
 class RequestLoggingMiddleware:
@@ -888,7 +890,7 @@ def entities_view(request: Request) -> HTMLResponse:
     snapshots = index.get_stats_snapshots(time.time() - 24 * 3600)
     type_counts = {row["aggregation_type"]: row["entity_count"] for row in index.get_stats_by_type()}
     type_breakdown = " · ".join(
-        f"{type_counts[key]} {tr(TYPE_LABELS[key])}" for key in ("standard", "counter", "switch") if type_counts.get(key)
+        f"{type_counts[key]} {tr(TYPE_LABELS[key])}" for key in ("standard", "counter", "switch", "state") if type_counts.get(key)
     )
     context = {
         "entity_count": overview["entity_count"],
@@ -1421,19 +1423,10 @@ def logs_view(request: Request) -> HTMLResponse:
         "logs.html",
         {
             "log_filter_options": [("all", tr("Alle")), *LOG_LEVEL_LABELS.items()],
+            "log_area_options": [("all", tr("Alle")), *LOG_AREA_LABELS.items()],
             **_settings_logging_context(),
         },
     )
-
-
-def _validate_log_request(
-    level: str, search: str, limit: int, source: str = "local"
-) -> tuple[str, str, int, str]:
-    if level != "all" and level not in LOG_LEVEL_LABELS:
-        raise HTTPException(status_code=400, detail=tr("Ungültiger Logfilter"))
-    if source not in {"local", "supervisor"}:
-        raise HTTPException(status_code=400, detail=tr("Ungültige Logquelle"))
-    return level, search[:200], max(50, min(limit, 5_000)), source
 
 
 @app.get("/api/logs")
@@ -1441,11 +1434,12 @@ async def api_logs(
     level: str = "all",
     search: str = "",
     source: str = "local",
+    area: str = "all",
     limit: int = Query(default=500, ge=50, le=2_000),
 ) -> dict:
-    level, search, limit, source = _validate_log_request(level, search, limit, source)
+    level, search, limit, source, area = validate_log_request(level, search, limit, source, area)
     result = await run_in_threadpool(
-        lambda: load_log_lines(level=level, search=search, limit=limit, source=source)
+        lambda: load_log_lines(level=level, search=search, limit=limit, source=source, area=area)
     )
     return {
         **result,
@@ -1456,11 +1450,11 @@ async def api_logs(
 
 @app.get("/logs/download", response_class=PlainTextResponse)
 async def logs_download(
-    level: str = "all", search: str = "", source: str = "local"
+    level: str = "all", search: str = "", source: str = "local", area: str = "all"
 ) -> PlainTextResponse:
-    level, search, _, source = _validate_log_request(level, search, 5_000, source)
+    level, search, _, source, area = validate_log_request(level, search, 5_000, source, area)
     result = await run_in_threadpool(
-        lambda: load_log_lines(level=level, search=search, limit=5_000, source=source)
+        lambda: load_log_lines(level=level, search=search, limit=5_000, source=source, area=area)
     )
     content = "\n".join(result["lines"])
     if content:
@@ -1704,6 +1698,7 @@ async def _lifespan(_: FastAPI):
     _background.start()
     yield
     _background.stop()
+    ai_usage.USAGE.flush()
 
 
 # Nachträglich statt über FastAPI(lifespan=...) gesetzt: _start_/_stop_
@@ -2780,7 +2775,7 @@ def _entity_config_context(entity) -> dict:
         "value_filter": entity["value_filter"],
         "ignore_values_mode": "on" if entity["ignore_values_enabled"] else "off",
         "ignore_values": entity["ignore_values"].replace(";", "; "),
-        "ignore_values_blocked": entity["aggregation_type"] == "switch",
+        "ignore_values_blocked": entity["aggregation_type"] in ("switch", "state"),
         "ignore_values_options": list(IGNORE_VALUES_LABELS.items()),
         "gap_threshold": entity["gap_threshold"],
         "outlier_threshold": entity["outlier_threshold"],
@@ -2892,7 +2887,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
     # should_accept_write()-Docstring). Wie beim outlier_threshold oben:
     # ein trotzdem mitgeschickter Wert wird verworfen statt mit HTTP 400
     # abgelehnt, das Feld ist im Formular für Switch deaktiviert.
-    if entity["aggregation_type"] == "switch":
+    if entity["aggregation_type"] in ("switch", "state"):
         resolution = None
         compact_target = None
     if display_mode is not None and display_mode not in DISPLAY_MODE_LABELS:
@@ -2903,7 +2898,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
     # ohne Liste wird "0" vorbelegt, der Hauptfall (Wert 0 beim HA-Start).
     ignore_values_enabled: bool | None = None
     ignore_values_normalized: str | None = None
-    if entity["aggregation_type"] == "switch":
+    if entity["aggregation_type"] in ("switch", "state"):
         ignore_values_mode = None
         ignore_values_text = None
     if ignore_values_text is not None:
@@ -3016,6 +3011,10 @@ class _EntityChartOptionsBody(BaseModel):
     legend_metrics: list[str]
     legend_style: str
     decimals: str
+    # Wechsel-Protokoll unter dem Zeitstrahl (nur Zustands-Entitäten).
+    state_log: bool = True
+    area_fill: bool = True
+    average_style: Literal["flat", "rolling"] = "flat"
 
 
 @app.post("/entities/{entity_id}/chart-options")
@@ -3061,99 +3060,9 @@ def entity_delete(entity_id: str) -> dict:
     return {"ok": True}
 
 
-@_storage_locked(lambda args: args["entity_ids"])
-def _delete_entities_locked(entity_ids: list[str]) -> dict:
-    deleted: list[str] = []
-    missing: list[str] = []
-    failed: list[dict] = []
-    for entity_id in entity_ids:
-        try:
-            if index.get_entity(entity_id) is None:
-                missing.append(entity_id)
-                continue
-            entity_removal.delete_entity(DATA_DIR, index, entity_id)
-            deleted.append(entity_id)
-        except Exception as exc:  # eine fehlerhafte Entität bricht die übrigen nicht ab
-            logger.exception("Entität %s konnte nicht gelöscht werden", entity_id)
-            failed.append({"entity_id": entity_id, "error": str(exc)})
-    if deleted:
-        _background.invalidate_retention_overview()
-    return {"deleted": deleted, "missing": missing, "failed": failed}
-
-
-@app.post("/entities/delete-selected")
-async def entities_delete_selected(request: Request) -> dict:
-    """Löscht mehrere Entitäten endgültig (Auswahl in der Entitäten-Übersicht)."""
-    entity_ids = list(dict.fromkeys(
-        str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"
-    ))
-    if not entity_ids:
-        raise HTTPException(status_code=400, detail=tr("Keine Entität gewählt"))
-    # Ungültige IDs vorab aussortieren: die Sperre prüft das Format und würde sonst die ganze Anfrage abbrechen.
-    valid: list[str] = []
-    invalid: list[dict] = []
-    for entity_id in entity_ids:
-        try:
-            validate_entity_id(entity_id)
-            valid.append(entity_id)
-        except ValueError as exc:
-            invalid.append({"entity_id": entity_id, "error": str(exc)})
-    result = await run_in_threadpool(_delete_entities_locked, valid) if valid else {"deleted": [], "missing": [], "failed": []}
-    result["failed"] = invalid + result["failed"]
-    return result
-
-
-@app.post("/entities/usage-check")
-async def entities_usage_check(request: Request) -> dict:
-    """Prüft vor dem Löschen, wo die gewählten Entitäten noch verwendet werden (nur lesend)."""
-    entity_ids = [str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"]
-    usages = await run_in_threadpool(entity_usage.find_usages, index, entity_ids)
-    return {"usages": usages, "summary": entity_usage.summarize(usages)}
-
-
-_BACKUP_FINAL_STATES = ("success", "failed", "interrupted", "skipped")
-
-
-@app.get("/entities/backup-status")
-def entities_backup_status(job_id: int | None = None) -> dict:
-    """Stand des Backups für den Löschdialog: Alter des letzten erfolgreichen Laufs und, mit
-    ``job_id``, Fortschritt und Ergebnis genau dieses Laufs."""
-    with _background.backup_progress.lock:
-        running = _background.backup_progress.running
-        done = _background.backup_progress.done
-        total = _background.backup_progress.total
-    last = index.get_last_successful_backup_job()
-    last_ts = last["finished_at"] if last is not None else None
-    result: dict = {
-        "running": running,
-        "percent": int(done / total * 100) if total else 0,
-        "last_success_ts": last_ts,
-        "last_success_text": (
-            f"{format_timestamp(last_ts, TZ)} {format_time(last_ts, TZ)} "
-            f"({tr('vor {format_uptime}', format_uptime=format_uptime(time.time() - last_ts))})"
-            if last_ts else None
-        ),
-        "job": None,
-    }
-    if job_id is not None:
-        for job in index.list_backup_jobs(20):
-            if job["id"] == job_id:
-                result["job"] = {
-                    "status": job["status"], "final": job["status"] in _BACKUP_FINAL_STATES,
-                    "error": job["error"],
-                }
-                break
-    return result
-
-
-@app.post("/entities/backup-start")
-def entities_backup_start() -> dict:
-    """Startet ein Backup vor dem Löschen (oder hängt sich an ein bereits laufendes). Die
-    ``job_id`` gehört dem Lauf, auf dessen Ende der Dialog dann wartet."""
-    _background.run_backup()
-    with _background.backup_progress.lock:
-        job_id = _background.backup_progress.job_id
-    return {"job_id": job_id}
+app.include_router(create_entity_delete_router(EntityDeleteDependencies(
+    index=index, data_dir=DATA_DIR, tz=TZ, coordinator=storage_coordinator, background=_background,
+)))
 
 
 @app.get("/entities/{entity_id}/migrate", response_class=HTMLResponse)
@@ -3381,9 +3290,14 @@ _ENTITY_CHART_OPTION_DEFAULTS = {
     "legend_metrics": ["last", "min", "max", "average", "sum"],
     "legend_style": "chips",
     "decimals": "auto",
+    "area_fill": True,  # wie im Chart-Editor und auf Dashboard-Kacheln
+    "average_style": "flat",
+    # Zustands-Entitäten (ROADMAP 1.29): Wechsel-Protokoll unter dem
+    # Zeitstrahl standardmäßig offen; ohne Wirkung bei allen anderen Typen.
+    "state_log": True,
 }
 _ENTITY_CHART_DECIMALS = {"auto", "0", "1", "2", "3"}
-_ON_OFF_LABELS = {"1": "An", "0": N_("Aus")}
+_ON_OFF_LABELS = {"1": N_("An"), "0": N_("Aus")}
 _ENTITY_LEGEND_STYLE_LABELS = {"chips": N_("Chips"), "table": N_("Tabelle")}
 _ENTITY_LEGEND_METRIC_LABELS = {"last": N_("Aktuell"), "min": N_("Min"), "max": N_("Max"), "average": N_("Durchschnitt"), "sum": N_("Summe")}
 
@@ -3475,8 +3389,8 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
     rows = index.list_entities()
     entity_options = [
         {
-            "entity_id": row["entity_id"],
-            "label": row["friendly_name"] or row["entity_id"],
+            "entity_id": row["entity_id"], "label": row["friendly_name"] or row["entity_id"], "unit": row["unit"] or "",
+            "aggregation_type": row["aggregation_type"], "is_favorite": bool(row["is_favorite"]),  # entityMultiPicker
         }
         for row in rows
     ]
@@ -3488,17 +3402,18 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "range_key": chart["range_key"] if chart else prefill.get("range_key", "day"),
         "continuous": chart["continuous"] if chart else prefill.get("continuous", False),
         "resolution_preset": chart["resolution_preset"] if chart else prefill.get("resolution_preset", "auto"),
-        "dynamic_y_axis": chart["dynamic_y_axis"] if chart else True,
-        "chart_stats": chart["chart_stats"] if chart else True,
-        "legend_metrics": chart["legend_metrics"] if chart else ["sum"],
-        "legend_style": chart["legend_style"] if chart else "chips",
-        "chart_type": effective_chart_type(chart, _aggregation_types()) if chart else "auto",
-        "decimals": chart["decimals"] if chart else "auto",
-        "show_values": chart["show_values"] if chart else False, "average_line": chart["average_line"] if chart else False,
-        "area_fill": chart["area_fill"] if chart else True, "show_points": chart["show_points"] if chart else False,
+        "dynamic_y_axis": chart["dynamic_y_axis"] if chart else prefill.get("dynamic_y_axis", True),
+        "chart_stats": chart["chart_stats"] if chart else prefill.get("chart_stats", True),
+        "legend_metrics": chart["legend_metrics"] if chart else prefill.get("legend_metrics", ["sum"]),
+        "legend_style": chart["legend_style"] if chart else prefill.get("legend_style", "chips"),
+        "chart_type": effective_chart_type(chart, _aggregation_types()) if chart else prefill.get("chart_type", "auto"),
+        "decimals": chart["decimals"] if chart else prefill.get("decimals", "auto"),
+        "show_values": chart["show_values"] if chart else prefill.get("show_values", False),
+        "average_line": chart["average_line"] if chart else prefill.get("average_line", False),
+        "area_fill": chart["area_fill"] if chart else prefill.get("area_fill", True), "show_points": chart["show_points"] if chart else prefill.get("show_points", False),
         "stacked": chart["stacked"] if chart else False,
         "normalize": chart["normalize"] if chart else False,
-        "average_style": chart["average_style"] if chart else "flat",
+        "average_style": chart["average_style"] if chart else prefill.get("average_style", "flat"),
         "horizontal": chart["horizontal"] if chart else False,
         "donut_aggregation": chart["donut_aggregation"] if chart else "sum",
         "period_anchor": chart["period_anchor"] if chart else prefill.get("period_anchor"),  # Start des Editors
@@ -3513,6 +3428,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "compare": chart["compare_settings"].get("compare", False) if chart else prefill.get("compare", False),
         "compare_mode": chart["compare_settings"].get("mode", "previous") if chart else prefill.get("compare_mode", "previous"),
         "compare_settings": chart["compare_settings"] if chart else {},
+        "heatmap_states": chart["heatmap_states"] if chart else prefill.get("heatmap_states", {}),
     }
 
 
@@ -3545,6 +3461,8 @@ def charts_new(
             "compare_mode": compare_mode if compare_mode in ("previous", "year") else "previous",
             "period_anchor": period_anchor_or_400(anchor),
         }
+        prefill |= editor_display_prefill(
+            request.query_params, _CHART_LEGEND_METRICS, _CHART_LEGEND_STYLES, _ENTITY_CHART_DECIMALS)
     return templates.TemplateResponse(request, "chart_editor.html", _chart_editor_context(None, prefill))
 
 
@@ -3573,6 +3491,7 @@ class _SaveChartBody(BaseModel):
     donut_aggregation: str = "sum"
     period_anchor: str | None = None  # fester Zeitraum, siehe chart_period.py
     compare_settings: dict = {}  # Vergleich, siehe chart_period.py
+    heatmap_states: dict[str, str] = {}  # gezeichneter Zustand je Entität der Heatmap
 
 
 def _hidden_for(body: _SaveChartBody) -> list[str]:
@@ -3619,6 +3538,7 @@ def charts_create(body: _SaveChartBody) -> dict:
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
         horizontal=body.horizontal, donut_aggregation=body.donut_aggregation,
         period_anchor=period_anchor_or_400(body.period_anchor), compare_settings=compare_settings_or_400(body.compare_settings),
+        heatmap_states=heatmap_states_clean(body.heatmap_states, body.entity_ids),
     )
     return {"id": chart_id}
 
@@ -3667,6 +3587,7 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
         horizontal=body.horizontal, donut_aggregation=body.donut_aggregation,
         period_anchor=period_anchor_or_400(body.period_anchor), compare_settings=compare_settings_or_400(body.compare_settings),
+        heatmap_states=heatmap_states_clean(body.heatmap_states, body.entity_ids),
     )
     return {"id": chart_id}
 
@@ -3708,6 +3629,7 @@ def charts_duplicate(chart_id: int) -> dict:
         stacked=chart["stacked"], normalize=chart["normalize"], average_style=chart["average_style"],
         horizontal=chart["horizontal"], donut_aggregation=chart["donut_aggregation"],
         period_anchor=chart["period_anchor"], compare_settings=chart["compare_settings"],
+        heatmap_states=chart["heatmap_states"],
     )
     return {"id": new_id}
 
@@ -3737,6 +3659,7 @@ _TILE_RANGE_LABELS = {
 # "last" trägt bewusst keins: der aktuelle Wert ist der Normalfall und braucht
 # keine Erklärung.
 _TILE_METRIC_LABELS = {"last": "", "min": N_("Min"), "avg": "Ø", "max": N_("Max"), "sum": "Σ"}
+
 
 
 def _tile_metric_labels(aggregation_type: str | None) -> dict[str, str]:
@@ -3774,6 +3697,10 @@ def _tile_available_metrics(aggregation_type: str | None) -> list[str]:
         return ["sum"]
     if aggregation_type == "counter":
         return ["min", "avg", "max", "sum"]
+    if aggregation_type == "state":
+        # Zustände: keine Kennzahl über Indizes — die Kachel zeigt Zustand,
+        # "seit" und Anteile (ROADMAP 1.29).
+        return []
     return ["min", "avg", "max"]
 
 
@@ -3898,6 +3825,7 @@ def _dashboard_tiles_context(
                 "stacked": c["stacked"], "normalize": c["normalize"], "average_style": c["average_style"],
                 "horizontal": c["horizontal"], "donut_aggregation": c["donut_aggregation"], "period_anchor": c["period_anchor"],
                 "compare_settings": c["compare_settings"],  # Vergleich wie auf der Chart-Seite
+                "heatmap_states": c["heatmap_states"],  # gezeichneter Zustand je Entität der Heatmap
             })
             groups[-1]["tiles"].append(tiles[-1])
         elif p["item_type"] == "table":
@@ -3919,6 +3847,7 @@ def _dashboard_tiles_context(
             if e is None:
                 continue
             is_switch = e["aggregation_type"] == "switch"
+            is_state = e["aggregation_type"] == "state"
             # Kachel-Override hat Vorrang vor der entity-eigenen Einstellung,
             # "auto" (Feld-Default) bedeutet ausdrücklich "entity-eigenen Wert
             # übernehmen" statt selbst "auto" an format_value() zu reichen.
@@ -3934,6 +3863,10 @@ def _dashboard_tiles_context(
                 value_text = "–"
             elif e["last_value"] is None:
                 value_text = "–"
+            elif is_state:
+                # Zustands-Entität: der Text des aktuellen Zustands, wie überall
+                # die HA-Übersetzung vor dem Rohwert (ROADMAP 1.29).
+                value_text = query_mod.state_text(index, e["entity_id"], e["last_value"])
             elif is_switch:
                 # Momentaner Zustand — anders als der chart-eigene
                 # display_mode='time' (Summe der Einschaltdauer über einen
@@ -3950,7 +3883,9 @@ def _dashboard_tiles_context(
             # Heuristik. Nur der Kartenrahmen zeigt das an (siehe
             # .dtile-entity.is-warn/is-stale), der Wert selbst bleibt immer
             # schwarz.
-            stale_mode = p["stale_mode"]
+            # Zustände werden nur beim Wechsel gespeichert — ein seit Tagen
+            # unveränderter Zustand ist kein veralteter Wert.
+            stale_mode = "off" if is_state else p["stale_mode"]
             staleness = staleness_for(seconds_ago, stale_mode)
             stale_limits = stale_thresholds(stale_mode)
             tiles.append({
@@ -3965,8 +3900,9 @@ def _dashboard_tiles_context(
                 # als "name" oben (mit friendly_name-Fallback) soll das Feld
                 # leer bleiben, solange kein eigener Titel gesetzt ist.
                 "custom_title": p["title"] or "",
-                "value_text": value_text, "unit": "" if is_switch else (e["unit"] or ""),
-                "is_switch": is_switch, "decimals": effective_decimals,
+                "value_text": value_text, "unit": "" if is_switch or is_state else (e["unit"] or ""),
+                "is_switch": is_switch, "is_state": is_state, "decimals": effective_decimals,
+                "state_view": p["state_view"] if is_state else "strip",
                 "age_text": tr("vor {format_uptime}", format_uptime=format_uptime(seconds_ago)) if seconds_ago is not None else tr("nie"),
                 "staleness": staleness,
                 "grid_cols": p["grid_cols"], "grid_rows": p["grid_rows"],
@@ -3992,6 +3928,7 @@ def _dashboard_tiles_context(
     dashboard_locked = bool(dashboard["locked"]) if dashboard else False
     dashboard_precise = bool(dashboard["precise_mode"]) if dashboard else False
     dashboard_fill_gaps = bool(dashboard["fill_gaps"]) if dashboard else False
+    entity_rows = index.list_entities()
     all_entities = [
         {
             "entity_id": row["entity_id"],
@@ -3999,7 +3936,7 @@ def _dashboard_tiles_context(
             "ha_name": row["friendly_name"] or row["entity_id"],
             "is_custom": bool(row["custom_name"]),
         }
-        for row in index.list_entities()
+        for row in entity_rows
     ]
     return {
         "dashboard_id": dashboard_id,
@@ -4011,6 +3948,9 @@ def _dashboard_tiles_context(
         # Lücken auffüllen: grid-auto-flow: dense (.dashboard-grid.is-dense) —
         # unabhängig vom Präzisen Modus, beide lassen sich frei kombinieren.
         "dashboard_fill_gaps": dashboard_fill_gaps,
+        # Zeitraum-Navigation: Stichtag-Leiste über den Kacheln (_dashboard_period_nav.html),
+        # der Kalender reicht über das ganze Archiv wie im Chart-Editor.
+        "dashboard_period_nav": bool(dashboard["period_nav"]) if dashboard else False, **calendar_bounds(entity_rows, TZ),
         "groups": groups,
         "auto_open_pin_id": auto_open_pin_id,
         # "pinned" ist rein informativ (Hinweis im Picker) — eine bereits
@@ -4304,6 +4244,25 @@ def dashboard_entity_show_age(body: _ShowAgeDashboardTileBody) -> dict:
     return {"ok": True, "show_age": body.show_age}
 
 
+class _StateViewDashboardTileBody(BaseModel):
+    dashboard_id: int = 1
+    pin_id: int
+    state_view: str
+
+
+@app.post("/dashboard/entity-state-view")
+def dashboard_entity_state_view(body: _StateViewDashboardTileBody) -> dict:
+    """Darstellung einer Zustands-Kachel: Streifen oder Donut (ROADMAP 1.29)."""
+    _require_dashboard_unlocked(body.dashboard_id)
+    try:
+        updated = index.set_dashboard_entity_pin_state_view(body.dashboard_id, body.pin_id, body.state_view)
+    except ValueError as err:
+        raise HTTPException(status_code=422, detail=str(err)) from err
+    if not updated:
+        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
+    return {"ok": True, "state_view": body.state_view}
+
+
 class _StaleModeDashboardTileBody(BaseModel):
     dashboard_id: int = 1
     pin_id: int
@@ -4562,6 +4521,17 @@ def dashboards_fill_gaps(dashboard_id: int, body: _DashboardFillGapsBody) -> dic
     if not index.set_dashboard_fill_gaps(dashboard_id, body.fill_gaps):
         raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
     return {"ok": True, "fill_gaps": body.fill_gaps}
+
+
+class _DashboardPeriodNavBody(BaseModel):
+    period_nav: bool
+
+
+@app.post("/dashboards/{dashboard_id}/period-nav")
+def dashboards_period_nav(dashboard_id: int, body: _DashboardPeriodNavBody) -> dict:
+    if not index.set_dashboard_period_nav(dashboard_id, body.period_nav):
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
+    return {"ok": True, "period_nav": body.period_nav}
 
 
 @app.post("/dashboards/{dashboard_id}/delete")
@@ -5273,6 +5243,18 @@ def _rows_fragment(
                 tr("Dieser Monat wurde am {format_timestamp} auf {format_compact_target} verdichtet — angezeigte Zeilen sind bereits zusammengefasst, keine Rohwerte mehr.", format_timestamp=format_timestamp(marker['compacted_at'], TZ), format_compact_target=format_compact_target(marker['target_resolution']))
             )
 
+    # Zustands-Entitäten (ROADMAP 1.29): Text statt Index, Rohwert daneben;
+    # die bekannten Zustände sind zugleich die Auswahl beim Korrigieren.
+    state_options = None
+    if entity["aggregation_type"] == "state":
+        state_options = _state_options(entity_id)
+        by_idx = {option["idx"]: option for option in state_options}
+        for row in display_rows:
+            option = by_idx.get(int(round(row["value"])))
+            if option is not None:
+                row["formatted_value"] = option["label"]
+                row["state_raw"] = option["text"] if option["text"] != option["label"] else None
+
     period_label = _rows_period_label(range_key, offset, window_start, window_end, now)
     first_date = datetime.fromtimestamp(entity["first_ts"], TZ).strftime("%Y-%m-%d") if entity["first_ts"] else None
     last_date = datetime.fromtimestamp(entity["last_ts"], TZ).strftime("%Y-%m-%d") if entity["last_ts"] else None
@@ -5296,6 +5278,7 @@ def _rows_fragment(
         {
             "entity_id": entity_id,
             "rows": display_rows,
+            "state_options": state_options,
             "filter": filter_,
             "mode": mode,
             "range": range_key,
@@ -5371,6 +5354,18 @@ async def delete_rows(request: Request, entity_id: str) -> HTMLResponse:
     return result
 
 
+def _state_options(entity_id: str) -> list[dict]:
+    """Bekannte Zustände einer Zustands-Entität für Anzeige und Korrigieren:
+    ``{idx, text, label}``, label = HA-Übersetzung oder Rohwert."""
+    options = []
+    for item in query_mod.state_legend(index, entity_id):
+        if item["idx"] < 0:
+            options.append({"idx": item["idx"], "text": item["text"], "label": tr("nicht verfügbar")})
+        else:
+            options.append({"idx": item["idx"], "text": item["text"], "label": item["label"] or item["text"]})
+    return options
+
+
 class _AddValueBody(BaseModel):
     ts: float
     value: float
@@ -5384,7 +5379,9 @@ def add_row(entity_id: str, body: _AddValueBody) -> dict:
     Reines JSON statt Formular/htmx-Fragment wie bei /rows/delete: der
     "Hinzufügen"-Reiter zeigt keine Zeilen-Tabelle, die neu geladen werden
     müsste — nur eine Erfolgsmeldung im Formular selbst (siehe cleanup.html)."""
-    _require_entity(entity_id)
+    entity = _require_entity(entity_id)
+    if entity["aggregation_type"] == "state":
+        raise HTTPException(status_code=400, detail=tr("Hinzufügen ist für Zustände nicht verfügbar"))
     now = datetime.now(TZ)
     if body.ts <= 0 or body.ts > now.timestamp() + 3600:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitstempel"))
@@ -5412,7 +5409,11 @@ def correct_row(entity_id: str, body: _CorrectValueBody) -> dict:
     desselben Zeitstempels). Wie /rows/add reines JSON statt htmx-Fragment —
     der Aufrufer (cleanup.html) triggert nach Erfolg selbst ein Neuladen von
     #controls, damit die Tabelle den neuen Wert zeigt."""
-    _require_entity(entity_id)
+    entity = _require_entity(entity_id)
+    if entity["aggregation_type"] == "state" and body.new_value not in {
+        float(option["idx"]) for option in _state_options(entity_id)
+    }:
+        raise HTTPException(status_code=400, detail=tr("Unbekannter Zustand"))
     started_at = time.time()
     changed = cleanup.correct_raw_value(
         DATA_DIR, index, entity_id, body.ts, body.old_value, body.new_value, TZ

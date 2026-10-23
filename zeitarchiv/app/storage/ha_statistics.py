@@ -71,6 +71,7 @@ MAX_MESSAGES_PER_CALL = 2000
 
 PERIODS = {"hour": N_("Stundenwerte"), "day": N_("Tageswerte")}
 DEFAULT_PERIOD = "hour"
+PERIOD_SECONDS = {"hour": 3_600, "day": 86_400}
 
 
 @dataclass
@@ -241,6 +242,11 @@ def _statistic_value(entry: dict) -> float | None:
     return None
 
 
+def _has_state(entry: dict) -> bool:
+    state = entry.get("state")
+    return isinstance(state, (int, float)) and math.isfinite(state)
+
+
 def _bucket_ts(entry: dict) -> float | None:
     """"start" ist in aktuellen HA-Versionen ein Unix-Zeitstempel in
     Millisekunden (int/float); ältere WS-API-Antworten lieferten dafür eine
@@ -319,7 +325,8 @@ def fetch_statistics_rows(
                 continue
             value = _statistic_value(entry)
             if value is None:
-                result.skipped += 1
+                # Ein Bucket ohne Wert (Gerät die ganze Stunde offline) ist eine
+                # Lücke in HA selbst, kein Importfehler — siehe ha_import.
                 result.discarded.append({
                     "reason": tr("Statistik enthält weder Mittelwert noch Zählerstand"),
                     "start": entry.get("start"),
@@ -327,6 +334,15 @@ def fetch_statistics_rows(
                     "state": entry.get("state"),
                 })
                 continue
+            # HA liefert "start" als Bucket-Anfang, aber "state" ist der
+            # Zählerstand am Bucket-ENDE. Ein Zählerwert am Anfangs-Zeitpunkt
+            # liegt nicht auf der Zählerkurve und zickzackt mit anderen Zeilen
+            # (Rohwerte, Live-Daten, ein früherer Import): die Differenzbildung
+            # zählt jeden Anstieg doppelt. Eine Sekunde vor dem Bucket-Ende ist
+            # ein echter Messpunkt und bleibt trotzdem im richtigen Bucket.
+            state_stamped = _has_state(entry)
+            if state_stamped:
+                ts += PERIOD_SECONDS.get(period, PERIOD_SECONDS[DEFAULT_PERIOD]) - 1
             if ts in seen_timestamps:
                 result.discarded.append({
                     "reason": tr("Statistik-Zeitstempel ist doppelt"),
@@ -337,6 +353,8 @@ def fetch_statistics_rows(
                 continue
             seen_timestamps.add(ts)
             result.rows.append((ts, value))
+            if state_stamped:
+                result.bucket_end_stamped = True
             if len(result.rows) > max_rows:
                 raise ValueError(
                     tr("HA-Langzeitstatistik enthält mehr als {limit} Datenpunkte", limit=f"{max_rows:,}".replace(",", "."))

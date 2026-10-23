@@ -24,12 +24,14 @@ def test_settings_main_areas_are_second_level_sections() -> None:
     # existiert im gerenderten HTML aber nur mit aktivem Demo-Modus/liegen-
     # gebliebenen Demo-Daten (siehe demo_mode.current_demo_state()) — der
     # Abschnitts-Tag selbst steht trotzdem immer im Template-Quelltext.
+    # ki-zugriff (ROADMAP 1.31) steht zwischen Verbindung und Diagnose.
     source = template_text("settings.html")
     section_ids = (
         "darstellung",
         "archivierung",
         "meldungen",
         "verbindung",
+        "ki-zugriff",
         "diagnose",
         "demo-daten",
         "zuruecksetzen",

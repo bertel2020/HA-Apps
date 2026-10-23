@@ -9,7 +9,7 @@ weiterwandern würde.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
@@ -67,3 +67,45 @@ def compare_settings_or_400(value: dict | None) -> dict:
         "compare": bool(value.get("compare", False)), "mode": mode, "years": years,
         "average": bool(value.get("average", True)), "cumsum": bool(value.get("cumsum", False)), "target": target,
     }
+
+
+def stichtag_or_400(value: str | None) -> date | None:
+    """Stichtag der Zeitraum-Navigation eines Dashboards (JJJJ-MM-TT) oder None
+    (heute). Dieselbe Strenge wie period_anchor_or_400()."""
+    anchor = period_anchor_or_400(value)
+    return date.fromisoformat(anchor) if anchor else None
+
+
+def stichtag_window(range_key: str, continuous: bool, stichtag: date | None, now: datetime) -> tuple[datetime, int]:
+    """Übersetzt den Stichtag eines Dashboards in das, was query_series()
+    versteht: (Bezugszeitpunkt, zusätzlicher Perioden-Versatz).
+
+    Kalendarische Zeiträume bekommen die Periode, die den Stichtag enthält —
+    vollständig, nicht am Stichtag gekappt: wer auf den Oktober 2025 blickt,
+    will den ganzen Monat sehen. Das ist dieselbe Umrechnung wie
+    PeriodNavigation.offsetForRange() für einen festen Zeitraum (Mittag als
+    Anker), nur serverseitig, damit Charts, Tabellen und Werte-Kacheln
+    dieselbe Regel teilen. Rollierende Fenster ("letzte 24 h") haben keine
+    Periode, die den Tag enthalten könnte — sie enden am Ende des Stichtags.
+    Ein Stichtag heute oder in der Zukunft ändert nichts."""
+    if stichtag is None or stichtag >= now.date():
+        return now, 0
+    if continuous:
+        return datetime.combine(stichtag + timedelta(days=1), time.min, tzinfo=now.tzinfo), 0
+    today = now.date()
+    if range_key == "hour":
+        hour_now = now.replace(tzinfo=None, minute=0, second=0, microsecond=0)
+        shift = (datetime.combine(stichtag, time(12)) - hour_now) // timedelta(hours=1)
+    elif range_key == "day":
+        shift = (stichtag - today).days
+    elif range_key == "week":
+        shift = ((stichtag - timedelta(days=stichtag.weekday())) - (today - timedelta(days=today.weekday()))).days // 7
+    elif range_key == "month":
+        shift = (stichtag.year * 12 + stichtag.month) - (today.year * 12 + today.month)
+    elif range_key == "year":
+        shift = stichtag.year - today.year
+    elif range_key == "decade":
+        shift = stichtag.year // 10 - today.year // 10
+    else:
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
+    return now, min(shift, 0)

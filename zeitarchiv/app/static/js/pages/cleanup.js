@@ -193,10 +193,26 @@
       cell.replaceChildren();
       const wrapper = document.createElement('span');
       wrapper.className = 'correct-inline';
-      const input = document.createElement('input');
-      input.type = 'number';
-      input.step = 'any';
-      input.value = oldValue;
+      // Zustands-Entitäten (ROADMAP 1.29): Auswahl aus den bekannten Zuständen
+      // statt einer Zahl — der gespeicherte Wert ist ihr Index.
+      const stateOptions = cell.closest('table').dataset.stateOptions;
+      let input;
+      if (stateOptions) {
+        input = document.createElement('select');
+        input.setAttribute('aria-label', t('Neuer Zustand'));
+        for (const option of JSON.parse(stateOptions)) {
+          const el = document.createElement('option');
+          el.value = String(option.idx);
+          el.textContent = option.label === option.text ? option.label : `${option.label} (${option.text})`;
+          el.selected = Number(option.idx) === Math.round(Number(oldValue));
+          input.append(el);
+        }
+      } else {
+        input = document.createElement('input');
+        input.type = 'number';
+        input.step = 'any';
+        input.value = oldValue;
+      }
       const confirm = document.createElement('button');
       confirm.type = 'button';
       confirm.className = 'correct-confirm';
@@ -216,7 +232,7 @@
 
     async function confirmCorrect(btn) {
       const cell = btn.closest('.correct-value-cell');
-      const input = cell.querySelector('input');
+      const input = cell.querySelector('input, select');
       const newValue = parseFloat(input.value);
       if (Number.isNaN(newValue)) { input.focus(); return; }
       btn.disabled = true;
