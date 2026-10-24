@@ -109,18 +109,18 @@
     <div class="section-title">{{ _("Kennzahlen im Überblick") }}</div>
     <div class="kpi-grid">
       <div class="kpi">
-        <div class="kpi-accent" style="background:var(--chart-3);"></div>
+        <div class="kpi-accent" style="background:var(--energy-solar);"></div>
         <div class="kpi-head">
-          <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="var(--chart-3)" opacity=".85"/><g stroke="var(--chart-3)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="var(--energy-solar)" opacity=".85"/><g stroke="var(--energy-solar)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg>
           <div class="kpi-label">{{ _("Erzeugung") }}</div>
         </div>
         <div class="kpi-value">{{ _("{erzeugung} kWh", erzeugung=(current.kpi.erzeugung | format_value(1))) }}</div>
         {{ kpi_delta(kpi_compare.erzeugung) }}
       </div>
       <div class="kpi">
-        <div class="kpi-accent" style="background:var(--chart-1);"></div>
+        <div class="kpi-accent" style="background:var(--energy-grid);"></div>
         <div class="kpi-head">
-          <svg width="15" height="10" viewBox="0 0 28 18" aria-hidden="true"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--chart-1)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--chart-1)"/><path d="M15 5 L20 9 L15 13" stroke="var(--chart-1)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
+          <svg width="15" height="10" viewBox="0 0 28 18" aria-hidden="true"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--energy-grid)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--energy-grid)"/><path d="M15 5 L20 9 L15 13" stroke="var(--energy-grid)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
           <div class="kpi-label">{{ config.netzbezug_name or _("Netzbezug") }}</div>
         </div>
         <div class="kpi-value">{{ _("{netzbezug} kWh", netzbezug=(current.kpi.netzbezug | format_value(1))) }}</div>
@@ -136,9 +136,9 @@
         {{ kpi_delta(kpi_compare.verbrauch, invert=true) }}
       </div>
       <div class="kpi">
-        <div class="kpi-accent" style="background:var(--chart-2);"></div>
+        <div class="kpi-accent" style="background:var(--energy-export);"></div>
         <div class="kpi-head">
-          <svg width="15" height="10" viewBox="0 0 28 18" aria-hidden="true"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--chart-2)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--chart-2)"/><path d="M13 5 L8 9 L13 13" stroke="var(--chart-2)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
+          <svg width="15" height="10" viewBox="0 0 28 18" aria-hidden="true"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--energy-export)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--energy-export)"/><path d="M13 5 L8 9 L13 13" stroke="var(--energy-export)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
           <div class="kpi-label">{{ config.einspeisung_name or _("Einspeisung") }}</div>
         </div>
         <div class="kpi-value">{{ _("{einspeisung} kWh", einspeisung=(current.kpi.einspeisung | format_value(1))) }}</div>
@@ -159,9 +159,9 @@
       {% endif %}
       {% if current.kpi.eigenverbrauch is not none %}
       <div class="kpi">
-        <div class="kpi-accent" style="background:var(--chart-3);"></div>
+        <div class="kpi-accent" style="background:var(--energy-solar);"></div>
         <div class="kpi-head">
-          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--border)" stroke-width="2.2"/><path d="M12 3 A9 9 0 0 1 19.6 16.5 L12 12 Z" fill="var(--chart-3)" opacity=".85"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--border)" stroke-width="2.2"/><path d="M12 3 A9 9 0 0 1 19.6 16.5 L12 12 Z" fill="var(--energy-solar)" opacity=".85"/></svg>
           <div class="kpi-label">{{ _("Eigenverbrauch") }}</div>
         </div>
         <div class="kpi-value">{{ current.kpi.eigenverbrauch | format_value(0) }} %</div>
@@ -176,15 +176,15 @@
   {% if detail_charts %}
   <div class="section">
     <div class="section-title">{{ _("Erzeugung &amp; Verbrauch im Detail") }}</div>
-    {{ detail_chart(_("Stromertrag"), detail_charts.stromertrag, "--chart-3", _("Eigenverbrauch"), "--chart-2", config.einspeisung_name or _("Einspeisung")) }}
-    {{ detail_chart(_("Verbrauch"), detail_charts.verbrauch, "--chart-1", config.netzbezug_name or _("Netzbezug"), "--chart-3", _("Eigenversorgung")) }}
+    {{ detail_chart(_("Stromertrag"), detail_charts.stromertrag, "--energy-solar", _("Eigenverbrauch"), "--energy-export", config.einspeisung_name or _("Einspeisung")) }}
+    {{ detail_chart(_("Verbrauch"), detail_charts.verbrauch, "--energy-grid", config.netzbezug_name or _("Netzbezug"), "--energy-solar", _("Eigenversorgung")) }}
   </div>
   {% endif %}
 
   {% if current.kpi.speicher_laden is not none or current.kpi.speicher_entladen is not none or current.kpi.speicher_soc is not none %}
   <div class="section">
     <div class="section-title">
-      <span class="section-title-icon"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="17" height="10" rx="2.5" fill="none" stroke="var(--chart-4)" stroke-width="2"/><rect x="20" y="10" width="2.5" height="4" rx="1" fill="var(--chart-4)"/><rect x="4.5" y="9.5" width="9" height="5" rx="1" fill="var(--chart-4)" opacity=".6"/></svg></span>
+      <span class="section-title-icon"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="17" height="10" rx="2.5" fill="none" stroke="var(--energy-battery-in)" stroke-width="2"/><rect x="20" y="10" width="2.5" height="4" rx="1" fill="var(--energy-battery-in)"/><rect x="4.5" y="9.5" width="9" height="5" rx="1" fill="var(--energy-battery-in)" opacity=".6"/></svg></span>
       {{ _("Speicher") }}
     </div>
     <div class="stat-card">
@@ -275,7 +275,7 @@
   {% set erz_total = current.erzeuger_breakdown | sum(attribute="value") %}
   <div class="section">
     <div class="section-title">
-      <span class="section-title-icon"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="var(--chart-3)" opacity=".85"/><g stroke="var(--chart-3)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg></span>
+      <span class="section-title-icon"><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="var(--energy-solar)" opacity=".85"/><g stroke="var(--energy-solar)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg></span>
       {{ _("Erzeuger") }}
     </div>
     <table class="report-table value-table">
@@ -374,17 +374,17 @@
           <td>
             <span class="records-label">
               {%- if row.role == "erzeugung" -%}
-              <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="var(--chart-3)" opacity=".85"/><g stroke="var(--chart-3)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="var(--energy-solar)" opacity=".85"/><g stroke="var(--energy-solar)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg>
               {%- elif row.role == "netzbezug" -%}
-              <svg width="15" height="10" viewBox="0 0 28 18" aria-hidden="true"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--chart-1)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--chart-1)"/><path d="M15 5 L20 9 L15 13" stroke="var(--chart-1)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
+              <svg width="15" height="10" viewBox="0 0 28 18" aria-hidden="true"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--energy-grid)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--energy-grid)"/><path d="M15 5 L20 9 L15 13" stroke="var(--energy-grid)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
               {%- elif row.role == "verbrauch" -%}
               <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><g stroke="var(--chart-7)" stroke-width="2" fill="none" stroke-linecap="round" opacity=".5"><path d="M6 12 H12"/><path d="M12 12 L19 5"/><path d="M12 12 L19 19"/></g><circle cx="4" cy="12" r="3" fill="var(--chart-7)"/><circle cx="20.5" cy="5" r="2.3" fill="var(--chart-7)" opacity=".8"/><circle cx="20.5" cy="19" r="2.3" fill="var(--chart-7)" opacity=".8"/></svg>
               {%- elif row.role == "einspeisung" -%}
-              <svg width="15" height="10" viewBox="0 0 28 18" aria-hidden="true"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--chart-2)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--chart-2)"/><path d="M13 5 L8 9 L13 13" stroke="var(--chart-2)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
+              <svg width="15" height="10" viewBox="0 0 28 18" aria-hidden="true"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--energy-export)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--energy-export)"/><path d="M13 5 L8 9 L13 13" stroke="var(--energy-export)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg>
               {%- elif row.role == "autarkie" -%}
               <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--chart-1)" stroke-width="2.2"/><path d="M8 12l3 3 5-6" stroke="var(--chart-1)" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
               {%- elif row.role == "eigenverbrauch" -%}
-              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--border)" stroke-width="2.2"/><path d="M12 3 A9 9 0 0 1 19.6 16.5 L12 12 Z" fill="var(--chart-3)" opacity=".85"/></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--border)" stroke-width="2.2"/><path d="M12 3 A9 9 0 0 1 19.6 16.5 L12 12 Z" fill="var(--energy-solar)" opacity=".85"/></svg>
               {%- endif -%}
               {{ row.label }}
             </span>
