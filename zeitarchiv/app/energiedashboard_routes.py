@@ -1727,6 +1727,7 @@ class EnergieDashboardService:
             gruppe = (verbraucher.get("gruppe") or "").strip() or None
             if gruppe and gruppen_mitglieder.get(gruppe, 0) < 2:
                 gruppe = None
+            anomalien_vorher = len(anomalien)
             series, val, display_val, node = build_row(verbraucher, name, gruppe, blend=gruppe is None)
             kinder = kinder_je_zaehler.get(entity_id, [])
             kind_eintraege: list[dict] = []
@@ -1735,6 +1736,7 @@ class EnergieDashboardService:
                 # nur er selbst (unten verbraucher_sum += val), die Kinder sind Aufschlüsselung.
                 # Der Rest ist Zähler minus Geräte, je Bucket auf 0 gekappt wie die Grundlast.
                 kinder_summe = 0.0
+                kinder_mehrverbrauch = 0.0
                 kinder_serien: list[dict[float, float]] = []
                 for kind in kinder:
                     kind_name = self._display_name(kind["entity_id"], kind.get("name", ""))
@@ -1748,6 +1750,17 @@ class EnergieDashboardService:
                     verbraucher_series_by_name[kind_name] = kind_series
                     kinder_summe += kind_display
                     kinder_serien.append(kind_series)
+                    if kind_node.get("anomaly"):
+                        kinder_mehrverbrauch += kind_display - kind_node["anomaly_baseline"]
+                # Der Zwischenzähler enthält seine Geräte: steigt eines davon, steigt er mit.
+                # Erklären die auffälligen Geräte mindestens die Hälfte seines eigenen
+                # Mehrverbrauchs, ist es EIN Befund (das Gerät), nicht zwei. Die Hälfte statt
+                # "alles", weil der Zähler auch durch den Rest ohne eigenen Sensor steigen
+                # kann — das bliebe sonst unsichtbar. Der Sankey-Knoten behält seine Färbung.
+                if len(anomalien) > anomalien_vorher and anomalien[anomalien_vorher]["name"] == name:
+                    eigener = anomalien[anomalien_vorher]
+                    if kinder_mehrverbrauch >= (eigener["value"] - eigener["baseline"]) / 2:
+                        del anomalien[anomalien_vorher]
                 if kinder_summe > display_val + 0.05:
                     zaehler_ueberschreitung.append((name, round(kinder_summe, 2), round(display_val, 2)))
                     display_val = kinder_summe
