@@ -1184,7 +1184,7 @@ class ImportService:
         has_header: bool | None = None,
         ts_col: int | None = None,
         value_col: int | None = None,
-        ts_format: str = "unix_s",
+        ts_format: str | None = None,
         custom_pattern: str = "",
         entity_id: str = "",
     ) -> dict:
@@ -1231,6 +1231,14 @@ class ImportService:
             csv_import.sniff_has_header(path, resolved_delimiter) if has_header is None else has_header
         )
         prev = csv_import.preview(path, resolved_delimiter, resolved_has_header)
+        # Wie bei Trennzeichen/Kopfzeile: nur der erste Aufruf nach dem Upload rät.
+        ts_format_detected = False
+        if ts_format is None:
+            guessed = csv_import.sniff_ts_format(
+                path, resolved_delimiter, resolved_has_header, ts_col if ts_col is not None else 0
+            )
+            ts_format_detected = guessed is not None
+            ts_format = guessed or "unix_s"
         default_value_col = 1 if len(prev.columns) > 1 else 0
         return {
             **base,
@@ -1250,6 +1258,7 @@ class ImportService:
                 ts_format, custom_pattern, self.deps.tz,
             ),
             "ts_format": ts_format,
+            "ts_format_detected": ts_format_detected,
             "custom_pattern": custom_pattern,
             "entity_id": entity_id,
         }

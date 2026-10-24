@@ -9,6 +9,7 @@
   Zählerrücksetzungen und bei auffällig hohem Verbrauch führt der Name zur
   Entitätsansicht im gewählten Zeitraum.
 - **CSV-Import, Vorschau**: Unter der Rohdaten-Tabelle zeigt eine zweite Tabelle, wie der Import Zeitstempel und Wert jeder Vorschauzeile liest. Nicht lesbare Zellen sind rot, mehrdeutige Zahlen wie „1.572“ gelb markiert. Ändert man Spalte, Zeitformat oder Muster, aktualisiert sie sich sofort.
+- **CSV-Import, Zeitformat**: Das Zeitformat wird beim Hochladen aus den ersten Zeilen erkannt (Unix, ISO 8601, TT.MM.JJJJ, auch mit Uhrzeit) und ist als Auswahl verfügbar. Ein eigenes Muster ist für Daten wie 15.01.2026 nicht mehr nötig.
 
 ### Geändert
 
@@ -60,6 +61,7 @@
   unusually high consumption the name leads to the entity view for the selected
   period.
 - **CSV import, preview**: below the raw table, a second table shows how the import reads the timestamp and value of each preview row. Unreadable cells are red, ambiguous numbers such as “1.572” yellow. It updates immediately when you change a column, the time format or the pattern.
+- **CSV import, time format**: the time format is detected from the first rows when uploading (Unix, ISO 8601, DD.MM.YYYY, also with time) and is available as a choice. A custom pattern is no longer needed for dates such as 15.01.2026.
 
 #### Changed
 

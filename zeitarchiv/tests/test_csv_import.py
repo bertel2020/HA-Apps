@@ -196,6 +196,38 @@ def test_parse_rows_skips_malformed_lines_instead_of_failing_the_whole_file() ->
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_sniff_ts_format_picks_the_first_format_that_reads_every_cell() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-test-"))
+    try:
+        cases = {
+            "unix_s": "1700000000;1\n1700000060;2\n",
+            "unix_ms": "1700000000000;1\n1700000060000;2\n",
+            "iso": "2026-01-15 10:00:00;1\n2026-01-16;2\n",
+            "de_date": "15.01.2026;1\n15.02.2026;2\n",
+            "de_datetime": "15.01.2026 14:30;1\n15.02.2026 08:00;2\n",
+            "de_datetime_s": "15.01.2026 14:30:05;1\n",
+            None: "kaputt;1\n15.02.2026;2\n",
+        }
+        for expected, text in cases.items():
+            path = tmp / "f.csv"
+            _write(path, text)
+            assert csv_import.sniff_ts_format(path, ";", False, 0) == expected, expected
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_parse_rows_reads_the_german_date_presets() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-test-"))
+    try:
+        path = tmp / "de.csv"
+        _write(path, "15.01.2026;84,1\n15.02.2026;156,5\n")
+        result = csv_import.parse_rows(path, ";", False, 0, 1, "de_date", "", TZ)
+        assert [v for _, v in result.rows] == [84.1, 156.5]
+        assert result.rows[0][0] == datetime(2026, 1, 15, tzinfo=TZ).timestamp()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_describe_sample_shows_how_each_cell_is_read() -> None:
     rows = [["15.01.2026", "84,1"], ["15.02.2026", "1.572"], ["15.13.2026", "abc"], ["15.04.2026"]]
     result = csv_import.describe_sample(rows, 0, 1, "custom", "%d.%m.%Y", TZ)

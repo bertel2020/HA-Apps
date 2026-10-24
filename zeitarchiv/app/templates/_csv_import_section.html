@@ -86,6 +86,7 @@
       <label>{{ _("Zeitstempel-Format") }}</label>
       <span class="dd-picker-wrap">
         <button type="button" class="btn" id="ts-format-btn" onclick="toggleDDPicker('ts-format')">{% for v, l in ts_format_options %}{% if v == ts_format %}{{ l }}{% endif %}{% endfor %} ▾</button>
+        {% if ts_format_detected %}<span class="hint2" data-tooltip="{{ _('Aus den ersten Zeilen der Datei erkannt. Bei Bedarf ändern.') }}">{{ _("erkannt") }}</span>{% endif %}
         <input type="hidden" name="ts_format" id="ts-format-input" value="{{ ts_format }}"
                hx-post="import/csv/preview" hx-include="#csv-form" hx-target="#csv-section" hx-swap="outerHTML">
         <div class="dd-picker-popover" id="ts-format-popover">

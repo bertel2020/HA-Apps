@@ -194,11 +194,11 @@
       <strong class="callout-title">{{ _("So funktioniert der Import einer CSV-Datei:") }}</strong>
       <ol class="import-steps">
         <li>{{ _("Eine CSV-Datei hochladen und Trennzeichen sowie vorhandene Kopfzeile festlegen.") }}</li>
-        <li>{{ _("Zeitstempel- und Wertspalte auswählen und das Zeitformat angeben: Unix-Sekunden, Unix-Millisekunden, ISO 8601 oder ein eigenes Muster.") }}</li>
+        <li>{{ _("Zeitstempel- und Wertspalte auswählen und das Zeitformat prüfen (es wird aus der Datei erkannt): Unix-Sekunden, Unix-Millisekunden, ISO 8601, TT.MM.JJJJ oder ein eigenes Muster.") }}</li>
         <li>{{ _("Eine vorhandene Home-Assistant-Entität als Ziel wählen, die Vorschau prüfen und den Import starten.") }}</li>
       </ol>
       <p class="symcon-import-note">{{ _("Bestehende Monatsarchive bleiben unverändert; im laufenden Hot Buffer werden nur fehlende Zeitstempel ergänzt. Die hochgeladene CSV-Datei bleibt bis „Quelldaten löschen“ gespeichert.") }}</p>
-      <p class="symcon-import-note">{{ _("Zahlen dürfen Dezimalkomma und Tausenderpunkt enthalten (1.572,4). Ist die Ziel-Entität ein Zähler, erwartet der Import laufende Zählerstände (84,1 · 240,6 · 1.132,0 …), keine Monatssummen; der Verlauf zeigt dann die Differenz zum Vorwert. Für Datumsangaben wie 15.01.2026 das eigene Muster %d.%m.%Y wählen.") }}</p>
+      <p class="symcon-import-note">{{ _("Zahlen dürfen Dezimalkomma und Tausenderpunkt enthalten (1.572,4). Ist die Ziel-Entität ein Zähler, erwartet der Import laufende Zählerstände (84,1 · 240,6 · 1.132,0 …), keine Monatssummen; der Verlauf zeigt dann die Differenz zum Vorwert.") }}</p>
     </div>
     {% include "_csv_import_section.html" %}
     </div>

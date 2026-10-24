@@ -29,7 +29,18 @@ TIMESTAMP_FORMATS = {
     "unix_s": N_("Unix-Zeitstempel (Sekunden)"),
     "unix_ms": N_("Unix-Zeitstempel (Millisekunden)"),
     "iso": N_("ISO 8601 (z. B. 2024-01-31 10:00:00)"),
+    "de_date": N_("TT.MM.JJJJ (z. B. 15.01.2026)"),
+    "de_datetime": N_("TT.MM.JJJJ hh:mm (z. B. 15.01.2026 14:30)"),
+    "de_datetime_s": N_("TT.MM.JJJJ hh:mm:ss (z. B. 15.01.2026 14:30:05)"),
     "custom": N_("Eigenes Format …"),
+}
+
+#: Fertige Formate als strptime-Muster; alles andere in TIMESTAMP_FORMATS wird
+#: gesondert gelesen (Unix, ISO) oder kommt vom Nutzer ("custom").
+PRESET_PATTERNS = {
+    "de_date": "%d.%m.%Y",
+    "de_datetime": "%d.%m.%Y %H:%M",
+    "de_datetime_s": "%d.%m.%Y %H:%M:%S",
 }
 
 DELIMITERS = {",": N_("Komma (,)"), ";": N_("Semikolon (;)"), "\t": N_("Tab")}
@@ -176,12 +187,50 @@ def _parse_timestamp(raw: str, ts_format: str, custom_pattern: str, tz: ZoneInfo
             return None
     else:
         try:
-            dt = datetime.strptime(raw, custom_pattern)
+            dt = datetime.strptime(raw, PRESET_PATTERNS.get(ts_format, custom_pattern))
         except ValueError:
             return None
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=tz)
     return dt.timestamp()
+
+
+#: Reihenfolge der Erkennung: das erste Format, das ALLE Probezellen liest, gewinnt.
+#: Unix steht vorn und prüft die Ziffernzahl, weil float() sonst jede Zahl akzeptiert.
+_DETECT_ORDER = ("unix_s", "unix_ms", "iso", "de_datetime_s", "de_datetime", "de_date")
+_UNIX_S = re.compile(r"^\d{9,10}(\.\d+)?$")
+_UNIX_MS = re.compile(r"^\d{12,13}$")
+DETECT_SAMPLE_CELLS = 20
+
+
+def sniff_ts_format(path: Path, delimiter: str, has_header: bool, ts_col: int) -> str | None:
+    """Rät das Zeitformat der Zeitstempel-Spalte aus den ersten Zellen.
+
+    None, wenn keines der bekannten Formate alle Zellen liest — dann bleibt es
+    bei der Voreinstellung und die Nutzerin wählt selbst."""
+    cells: list[str] = []
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.reader(f, delimiter=delimiter)
+        if has_header:
+            next(reader, None)
+        for row in reader:
+            if ts_col < len(row) and row[ts_col].strip():
+                cells.append(row[ts_col].strip())
+                if len(cells) >= DETECT_SAMPLE_CELLS:
+                    break
+    if not cells:
+        return None
+    utc = ZoneInfo("UTC")
+    for candidate in _DETECT_ORDER:
+        if candidate == "unix_s":
+            ok = all(_UNIX_S.match(c) for c in cells)
+        elif candidate == "unix_ms":
+            ok = all(_UNIX_MS.match(c) for c in cells)
+        else:
+            ok = all(_parse_timestamp(c, candidate, "", utc) is not None for c in cells)
+        if ok:
+            return candidate
+    return None
 
 
 _AMBIGUOUS_THOUSANDS = re.compile(r"^[+-]?\d{1,3}[.,]\d{3}$")
