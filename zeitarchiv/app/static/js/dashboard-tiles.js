@@ -141,18 +141,31 @@
     });
   }
 
+  // Ein rollierendes Fenster beginnt nicht an einer Tagesgrenze (z. B. 14:39).
+  // Stunden- und Tagesbuckets, die daran hingen, lägen neben den Achsen-Ticks
+  // (lokale Mitternacht). Deshalb auf die lokale Mitternacht abrunden, sofern
+  // die Bucket-Breite den Tag teilt; "full" bleibt am Fensteranfang, damit alle
+  // Punkte in Bucket 0 fallen. Gleiche Funktion in chart_editor.js.
+  function bucketAnchor(windowStart, seconds, preset) {
+    if (preset === 'full' || seconds < 3600 || 86400 % seconds !== 0) return windowStart;
+    const midnight = new Date(windowStart * 1000);
+    midnight.setHours(0, 0, 0, 0);
+    return midnight.getTime() / 1000;
+  }
+
   function resamplePoints(points, range, preset, aggregationType, windowStart) {
     const seconds = RESOLUTION_SECONDS[range] && RESOLUTION_SECONDS[range][preset];
     if (!seconds || !points.length || windowStart == null) return points;
+    const anchor = bucketAnchor(windowStart, seconds, preset);
     const groups = new Map();
     points.forEach(point => {
-      const bucket = Math.floor((point.ts - windowStart) / seconds);
+      const bucket = Math.floor((point.ts - anchor) / seconds);
       const values = groups.get(bucket) || [];
       if (Number.isFinite(point.value)) values.push(point.value);
       groups.set(bucket, values);
     });
     return Array.from(groups.entries()).sort((a, b) => a[0] - b[0]).map(([bucket, values]) => ({
-      ts: windowStart + bucket * seconds,
+      ts: anchor + bucket * seconds,
       value: aggregationType === 'standard'
         ? values.reduce((sum, value) => sum + value, 0) / values.length
         : values.reduce((sum, value) => sum + value, 0),

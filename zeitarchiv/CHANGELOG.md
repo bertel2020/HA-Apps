@@ -29,6 +29,13 @@
   türkis (Entladen). Sie gelten in allen Farbschemata gleich, im Dunkelmodus
   ist nur die Einspeisung etwas heller.
 
+### Behoben
+
+- **Rollierende Zeiträume**: Bei grober oder mittlerer Auflösung (z. B. „Woche“
+  mit Tagesbalken) saßen die Balken neben der Achsenbeschriftung, weil sie am
+  Beginn des Fensters (z. B. 14:39 Uhr) statt an Mitternacht ausgerichtet
+  wurden. Charts und Kacheln richten sie jetzt an der Tagesgrenze aus.
+
 ---
 
 ### English
@@ -58,6 +65,13 @@
   solar orange, grid import blue, export purple, storage pink (charging) and
   teal (discharging). They are the same in every color scheme; in dark mode
   only the export color is slightly lighter.
+
+#### Fixed
+
+- **Rolling periods**: with coarse or medium resolution (e.g. “Week” with daily
+  bars) the bars sat next to the axis labels because they were aligned to the
+  start of the window (e.g. 2:39 pm) instead of midnight. Charts and tiles now
+  align them to the day boundary.
 
 ## 1.9.0 - 2026-10-22
 
