@@ -84,7 +84,7 @@ def test_gradient_extended_to_remaining_three_cards_with_role_colors() -> None:
     Deko-Klasse (siehe Empfehlung im Mockup)."""
     assert ".edash-verbraucher-card{" in DASHBOARD_HTML
     assert ".edash-tageslast-card{" in DASHBOARD_HTML
-    assert "var(--chart-4)" in DASHBOARD_HTML.split("\n  .edash-ring-card{")[1][:200]
+    assert "var(--energy-battery-in)" in DASHBOARD_HTML.split("\n  .edash-ring-card{")[1][:200]
     assert "var(--chart-7)" in DASHBOARD_HTML.split(".edash-verbraucher-card{")[1][:200]
     assert "var(--chart-7)" in DASHBOARD_HTML.split(".edash-tageslast-card{")[1][:200]
     # edash-span2 entfiel mit der Versorgungsanteile-Einführung: die Karte
