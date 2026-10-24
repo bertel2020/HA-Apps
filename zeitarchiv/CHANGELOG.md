@@ -8,13 +8,11 @@
   sich die betroffenen Entitäten jetzt anklicken: bei erkannten
   Zählerrücksetzungen und bei auffällig hohem Verbrauch führt der Name zur
   Entitätsansicht im gewählten Zeitraum.
-- **CSV-Import**: Der Import ist verständlicher und kommt mit mehr Dateien zurecht.
-  - **Vorschau**: Eine zweite Tabelle zeigt, wie Zeitstempel und Wert jeder Zeile gelesen werden. Nicht lesbare Zellen sind rot, mehrdeutige Zahlen wie „1.572“ gelb markiert. Übersprungene Zeilen nennt die Vorschau mit Zeilennummer und Grund.
+- **CSV-Import**: Der Import liest mehr Dateien ohne Handarbeit.
+  - **Vorschau „gelesen als“**: Eine zweite Tabelle zeigt, wie Zeitstempel und Wert jeder Zeile gelesen werden. Nicht lesbare Zellen sind rot, mehrdeutige Zahlen wie „1.572“ gelb markiert.
   - **Zeitformat**: Wird beim Hochladen aus den ersten Zeilen erkannt (Unix, ISO 8601, TT.MM.JJJJ, auch mit Uhrzeit) und steht als Auswahl bereit. Ein eigenes Muster ist für Daten wie 15.01.2026 nicht mehr nötig.
-  - **Zähler**: Liegen Werte unter ihrem Vorgänger, warnt die Vorschau, dass der Verlauf dort 0 zeigt. Dasselbe gilt für den ersten Wert, der keinen Vorgänger hat; die Vorschau nennt den Ausweg (eine Zeile mit dem Startwert davor).
-  - **Summen je Zeitraum**: Die neue Option „Werte sind Summen je Zeitraum“ bildet aus Monats- oder Tageswerten die Laufsumme und speichert sie als Zählerstand, ohne die Datei vorher umzurechnen.
+  - **Summen je Zeitraum**: Die Option „Werte sind Summen je Zeitraum“ bildet aus Monats- oder Tageswerten die Laufsumme und speichert sie als Zählerstand, ohne die Datei vorher umzurechnen.
   - **Mehrere Spalten**: Eine Datei mit mehreren Wertspalten (z. B. PV-Erzeugung, Netzbezug, Einspeisung) lässt sich in einem Durchgang importieren. Über „+ Weitere Spalte …“ ordnest du jeder Spalte eine eigene Entität zu.
-  - **Zahlen**: Tausenderpunkt („1.572,4“, wie Excel exportiert) und Tausenderkomma („1,572.4“) werden gelesen. Bisher wurden solche Zeilen ohne Hinweis übersprungen.
 
 ### Geändert
 
@@ -35,6 +33,10 @@
   Solar orange, Netzbezug blau, Einspeisung violett, Speicher rosa (Laden) und
   türkis (Entladen). Sie gelten in allen Farbschemata gleich, im Dunkelmodus
   ist nur die Einspeisung etwas heller.
+- **CSV-Import, Vorschau**: Der Probelauf ist aussagekräftiger.
+  - Übersprungene Zeilen werden mit Zeilennummer und Grund genannt (Zeitstempel passt nicht zum Format, Wert keine Zahl, zu wenige Spalten).
+  - Liegen bei einem Zähler Werte unter ihrem Vorgänger, warnt die Vorschau, dass der Verlauf dort 0 zeigt. Dasselbe gilt für den ersten Wert, der keinen Vorgänger hat; sie nennt den Ausweg (eine Zeile mit dem Startwert davor).
+  - Der Hinweistext erklärt, dass Zähler laufende Zählerstände erwarten.
 
 ### Behoben
 
@@ -50,6 +52,7 @@
 - **Tabellen**: Im Spalten-Editor ist der Platzhalter des Felds
   „Gruppen-Beschriftung“ nicht mehr abgeschnitten; der Hinweis, dass die
   Gruppe mehrere Spalten überspannt, steht jetzt im Tooltip der Feldbezeichnung.
+- **CSV-Import**: Zahlen mit Tausenderpunkt („1.572,4“, wie Excel sie exportiert) oder Tausenderkomma („1,572.4“) werden gelesen. Bisher wurden solche Zeilen ohne Hinweis übersprungen.
 
 ---
 
@@ -61,13 +64,11 @@
   affected entities are now clickable: for detected counter resets and for
   unusually high consumption the name leads to the entity view for the selected
   period.
-- **CSV import**: the import is easier to follow and copes with more files.
-  - **Preview**: a second table shows how the timestamp and value of each row are read. Unreadable cells are red, ambiguous numbers such as “1.572” yellow. Skipped rows are listed with line number and reason.
+- **CSV import**: the import reads more files without manual work.
+  - **Preview “read as”**: a second table shows how the timestamp and value of each row are read. Unreadable cells are red, ambiguous numbers such as “1.572” yellow.
   - **Time format**: detected from the first rows when uploading (Unix, ISO 8601, DD.MM.YYYY, also with time) and available as a choice. A custom pattern is no longer needed for dates such as 15.01.2026.
-  - **Counters**: if values are below their predecessor, the preview warns that the history shows 0 there. The same applies to the first value, which has no predecessor; the preview names the way out (a row with the start value before it).
-  - **Totals per period**: the new option “Values are totals per period” builds the running sum of monthly or daily values and stores it as a meter reading, without recalculating the file first.
+  - **Totals per period**: the option “Values are totals per period” builds the running sum of monthly or daily values and stores it as a meter reading, without recalculating the file first.
   - **Several columns**: a file with several value columns (e.g. PV generation, grid import, feed-in) can be imported in one go. With “+ Import another column …” you assign each column its own entity.
-  - **Numbers**: a thousands separator (“1.572,4” as exported by Excel, or “1,572.4”) is now read. Previously such rows were skipped without notice.
 
 #### Changed
 
@@ -87,6 +88,10 @@
   solar orange, grid import blue, export purple, storage pink (charging) and
   teal (discharging). They are the same in every color scheme; in dark mode
   only the export color is slightly lighter.
+- **CSV import, preview**: the dry run is more informative.
+  - Skipped rows are listed with line number and reason (timestamp does not match the format, value is not a number, too few columns).
+  - If values of a counter are below their predecessor, the preview warns that the history shows 0 there. The same applies to the first value, which has no predecessor; it names the way out (a row with the start value before it).
+  - The help text explains that counters expect running meter readings.
 
 #### Fixed
 
@@ -101,6 +106,7 @@
 - **Tables**: in the column editor the placeholder of the “Group label” field is
   no longer cut off; the note that the group spans several columns is now in
   the tooltip of the field label.
+- **CSV import**: numbers with a thousands separator (“1.572,4” as exported by Excel, or “1,572.4”) are now read. Previously such rows were skipped without notice.
 
 ## 1.9.0 - 2026-10-22
 
