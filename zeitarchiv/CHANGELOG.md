@@ -8,11 +8,13 @@
   sich die betroffenen Entitäten jetzt anklicken: bei erkannten
   Zählerrücksetzungen und bei auffällig hohem Verbrauch führt der Name zur
   Entitätsansicht im gewählten Zeitraum.
-- **CSV-Import, Vorschau**: Unter der Rohdaten-Tabelle zeigt eine zweite Tabelle, wie der Import Zeitstempel und Wert jeder Vorschauzeile liest. Nicht lesbare Zellen sind rot, mehrdeutige Zahlen wie „1.572“ gelb markiert. Ändert man Spalte, Zeitformat oder Muster, aktualisiert sie sich sofort.
-- **CSV-Import, Zeitformat**: Das Zeitformat wird beim Hochladen aus den ersten Zeilen erkannt (Unix, ISO 8601, TT.MM.JJJJ, auch mit Uhrzeit) und ist als Auswahl verfügbar. Ein eigenes Muster ist für Daten wie 15.01.2026 nicht mehr nötig.
-- **CSV-Import, Summen**: Neue Option „Werte sind Summen je Zeitraum“: Der Import bildet aus Monats- oder Tageswerten die Laufsumme und speichert sie als Zählerstand. Damit lassen sich Erträge pro Monat in eine Zähler-Entität importieren, ohne die Datei vorher umzurechnen.
-- **CSV-Import, Zähler**: Die Vorschau weist darauf hin, wenn der erste importierte Wert keinen Vorgänger hat und der Verlauf dort deshalb 0 zeigt, und nennt den Ausweg (eine Zeile mit dem Startwert davor).
-- **CSV-Import, mehrere Spalten**: Eine Datei mit mehreren Wertspalten (z. B. PV-Erzeugung, Netzbezug, Einspeisung) lässt sich in einem Durchgang importieren: Über „+ Weitere Spalte …“ ordnest du jeder Spalte eine eigene Entität zu. Vorschau und Importbericht zeigen jede Spalte einzeln.
+- **CSV-Import**: Der Import ist verständlicher und kommt mit mehr Dateien zurecht.
+  - **Vorschau**: Eine zweite Tabelle zeigt, wie Zeitstempel und Wert jeder Zeile gelesen werden. Nicht lesbare Zellen sind rot, mehrdeutige Zahlen wie „1.572“ gelb markiert. Übersprungene Zeilen nennt die Vorschau mit Zeilennummer und Grund.
+  - **Zeitformat**: Wird beim Hochladen aus den ersten Zeilen erkannt (Unix, ISO 8601, TT.MM.JJJJ, auch mit Uhrzeit) und steht als Auswahl bereit. Ein eigenes Muster ist für Daten wie 15.01.2026 nicht mehr nötig.
+  - **Zähler**: Liegen Werte unter ihrem Vorgänger, warnt die Vorschau, dass der Verlauf dort 0 zeigt. Dasselbe gilt für den ersten Wert, der keinen Vorgänger hat; die Vorschau nennt den Ausweg (eine Zeile mit dem Startwert davor).
+  - **Summen je Zeitraum**: Die neue Option „Werte sind Summen je Zeitraum“ bildet aus Monats- oder Tageswerten die Laufsumme und speichert sie als Zählerstand, ohne die Datei vorher umzurechnen.
+  - **Mehrere Spalten**: Eine Datei mit mehreren Wertspalten (z. B. PV-Erzeugung, Netzbezug, Einspeisung) lässt sich in einem Durchgang importieren. Über „+ Weitere Spalte …“ ordnest du jeder Spalte eine eigene Entität zu.
+  - **Zahlen**: Tausenderpunkt („1.572,4“, wie Excel exportiert) und Tausenderkomma („1,572.4“) werden gelesen. Bisher wurden solche Zeilen ohne Hinweis übersprungen.
 
 ### Geändert
 
@@ -33,11 +35,6 @@
   Solar orange, Netzbezug blau, Einspeisung violett, Speicher rosa (Laden) und
   türkis (Entladen). Sie gelten in allen Farbschemata gleich, im Dunkelmodus
   ist nur die Einspeisung etwas heller.
-- **CSV-Import, Vorschau**: Übersprungene Zeilen werden jetzt mit Zeilennummer und
-  Grund genannt (Zeitstempel passt nicht zum Format, Wert keine Zahl, zu wenige
-  Spalten). Ist das Ziel ein Zähler und liegen Werte unter ihrem Vorgänger,
-  warnt die Vorschau davor, dass der Verlauf dort 0 zeigt. Der Hinweistext nennt
-  außerdem, dass bei Zählern laufende Zählerstände erwartet werden.
 
 ### Behoben
 
@@ -53,9 +50,6 @@
 - **Tabellen**: Im Spalten-Editor ist der Platzhalter des Felds
   „Gruppen-Beschriftung“ nicht mehr abgeschnitten; der Hinweis, dass die
   Gruppe mehrere Spalten überspannt, steht jetzt im Tooltip der Feldbezeichnung.
-- **CSV-Import**: Zahlen mit Tausenderpunkt (z. B. „1.572,4“, wie Excel sie
-  exportiert) oder Tausenderkomma („1,572.4“) werden jetzt gelesen. Bisher
-  wurden solche Zeilen ohne Hinweis übersprungen.
 
 ---
 
@@ -67,11 +61,13 @@
   affected entities are now clickable: for detected counter resets and for
   unusually high consumption the name leads to the entity view for the selected
   period.
-- **CSV import, preview**: below the raw table, a second table shows how the import reads the timestamp and value of each preview row. Unreadable cells are red, ambiguous numbers such as “1.572” yellow. It updates immediately when you change a column, the time format or the pattern.
-- **CSV import, time format**: the time format is detected from the first rows when uploading (Unix, ISO 8601, DD.MM.YYYY, also with time) and is available as a choice. A custom pattern is no longer needed for dates such as 15.01.2026.
-- **CSV import, totals**: new option “Values are totals per period”: the import builds the running sum of monthly or daily values and stores it as a meter reading. This lets you import yields per month into a counter entity without recalculating the file first.
-- **CSV import, counters**: the preview points out when the first imported value has no predecessor, so the history shows 0 there, and names the way out (a row with the start value before it).
-- **CSV import, several columns**: a file with several value columns (e.g. PV generation, grid import, feed-in) can be imported in one go: with “+ Import another column …” you assign each column its own entity. The preview and the import report list each column separately.
+- **CSV import**: the import is easier to follow and copes with more files.
+  - **Preview**: a second table shows how the timestamp and value of each row are read. Unreadable cells are red, ambiguous numbers such as “1.572” yellow. Skipped rows are listed with line number and reason.
+  - **Time format**: detected from the first rows when uploading (Unix, ISO 8601, DD.MM.YYYY, also with time) and available as a choice. A custom pattern is no longer needed for dates such as 15.01.2026.
+  - **Counters**: if values are below their predecessor, the preview warns that the history shows 0 there. The same applies to the first value, which has no predecessor; the preview names the way out (a row with the start value before it).
+  - **Totals per period**: the new option “Values are totals per period” builds the running sum of monthly or daily values and stores it as a meter reading, without recalculating the file first.
+  - **Several columns**: a file with several value columns (e.g. PV generation, grid import, feed-in) can be imported in one go. With “+ Import another column …” you assign each column its own entity.
+  - **Numbers**: a thousands separator (“1.572,4” as exported by Excel, or “1,572.4”) is now read. Previously such rows were skipped without notice.
 
 #### Changed
 
@@ -91,11 +87,6 @@
   solar orange, grid import blue, export purple, storage pink (charging) and
   teal (discharging). They are the same in every color scheme; in dark mode
   only the export color is slightly lighter.
-- **CSV import, preview**: skipped rows are now listed with line number and
-  reason (timestamp does not match the format, value is not a number, too few
-  columns). If the target is a counter and values are below their predecessor,
-  the preview warns that the history shows 0 there. The help text also states
-  that counters expect running meter readings.
 
 #### Fixed
 
@@ -110,9 +101,6 @@
 - **Tables**: in the column editor the placeholder of the “Group label” field is
   no longer cut off; the note that the group spans several columns is now in
   the tooltip of the field label.
-- **CSV import**: numbers with a thousands separator (e.g. “1.572,4” as
-  exported by Excel, or “1,572.4”) are now read. Previously such rows were
-  skipped without notice.
 
 ## 1.9.0 - 2026-10-22
 
