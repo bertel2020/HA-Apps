@@ -109,6 +109,12 @@
      Zeile (justify-content:space-between) — statt in .csv-config: die
      Ziel-Entität ist die letzte Entscheidung vor der Ausführung, nicht Teil
      der reinen Dateiformat-/Spalten-Zuordnung darüber. #}
+  <label class="csv-cumulate" style="display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:calc(13px * var(--font-scale, 1));">
+    <input type="checkbox" name="cumulate"{% if cumulate %} checked{% endif %}
+           hx-post="import/csv/preview" hx-include="#csv-form" hx-target="#csv-section" hx-swap="outerHTML">
+    <span>{{ _("Werte sind Summen je Zeitraum (z. B. Monatserträge) — als laufenden Zählerstand speichern") }}</span>
+  </label>
+
   <div class="csv-action-row">
     <div class="field">
       <label>{{ _("Entität") }}</label>

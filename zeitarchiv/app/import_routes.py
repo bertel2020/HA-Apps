@@ -1079,7 +1079,7 @@ class ImportService:
     def _parse_csv_with_progress(
         self, path: Path, delimiter: str, has_header: bool, ts_col: int, value_col: int,
         ts_format: str, custom_pattern: str, phase_label: str,
-        state_mapper=None,
+        state_mapper=None, cumulate: bool = False,
     ) -> csv_import.ParseResult:
         """parse_rows() mit angeschlossener Fortschrittsanzeige.
 
@@ -1096,7 +1096,7 @@ class ImportService:
         self._csv_progress.set_phase(phase_label, csv_import.count_data_rows(path, has_header))
         return csv_import.parse_rows(
             path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, self.deps.tz,
-            on_progress=self._csv_progress.advance, state_mapper=state_mapper,
+            on_progress=self._csv_progress.advance, state_mapper=state_mapper, cumulate=cumulate,
         )
 
 
@@ -1187,6 +1187,7 @@ class ImportService:
         ts_format: str | None = None,
         custom_pattern: str = "",
         entity_id: str = "",
+        cumulate: bool = False,
     ) -> dict:
         entity_rows = self.deps.index.list_entities()
         entity_options = [
@@ -1261,7 +1262,14 @@ class ImportService:
             "ts_format_detected": ts_format_detected,
             "custom_pattern": custom_pattern,
             "entity_id": entity_id,
+            "cumulate": cumulate,
         }
+
+
+
+    @staticmethod
+    def _csv_cumulate(form) -> bool:
+        return form.get("cumulate") == "on"
 
 
 
@@ -2408,6 +2416,7 @@ class ImportService:
             gelesen/geschrieben wird."""
             form = await request.form()
             delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, entity_id = self._csv_form_params(form)
+            cumulate = self._csv_cumulate(form)
             def preview_locked() -> dict:
                 with self.deps.coordinator.exclusive():
                     return self._csv_import_context(
@@ -2418,6 +2427,7 @@ class ImportService:
                         ts_format=ts_format,
                         custom_pattern=custom_pattern,
                         entity_id=entity_id,
+                        cumulate=cumulate,
                     )
 
             ctx = await run_in_threadpool(preview_locked)
@@ -2438,6 +2448,7 @@ class ImportService:
             der Import darunter."""
             form = await request.form()
             delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, entity_id = self._csv_form_params(form)
+            cumulate = self._csv_cumulate(form)
             plans: list[symcon_import.ImportPlan] = []
             errors: list[str] = []
             if not entity_id:
@@ -2455,7 +2466,7 @@ class ImportService:
                     dry_mapper = ha_import.dry_state_mapper_for(self.deps.index, entity_id)
                     parsed = self._parse_csv_with_progress(
                         path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern,
-                        phase_label=tr("Datei wird gelesen…"), state_mapper=dry_mapper,
+                        phase_label=tr("Datei wird gelesen…"), state_mapper=dry_mapper, cumulate=cumulate,
                     )
                     self._csv_progress.set_phase(N_("Vorschau wird berechnet…"))
                     with self.deps.coordinator.entity(entity_id):
@@ -2526,6 +2537,7 @@ class ImportService:
             started_at = datetime.now(timezone.utc)
             form = await request.form()
             delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, entity_id = self._csv_form_params(form)
+            cumulate = self._csv_cumulate(form)
             source_path = self._csv_uploaded_path()
             if not entity_id:
                 # Kein Auftrag, keine Anzeige: Das ist ein Formularfehler, der
@@ -2565,6 +2577,7 @@ class ImportService:
                             "has_header": has_header,
                             "timestamp_column": ts_col,
                             "value_column": value_col,
+                            "cumulate": cumulate,
                             "timestamp_format": ts_format,
                             "custom_pattern": custom_pattern if ts_format == "custom" else "",
                             "entity_id": entity_id,
@@ -2592,6 +2605,7 @@ class ImportService:
                         path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern,
                         phase_label=tr("Schritt 1/2 · Datei wird gelesen…"),
                         state_mapper=ha_import.state_mapper_for(self.deps.index, entity_id),
+                        cumulate=cumulate,
                     )
                     # Zweite Phase ohne Gesamtzahl: Wie viele Monate wirklich
                     # geschrieben werden, entscheidet erst die Klassifizierung

@@ -228,6 +228,22 @@ def test_parse_rows_reads_the_german_date_presets() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_parse_rows_cumulate_turns_period_totals_into_running_meter_readings() -> None:
+    """Monatssummen als laufender Zählerstand: der Verlauf rechnet daraus wieder
+    die Monatswerte, und kein Wert liegt mehr unter seinem Vorgänger."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-test-"))
+    try:
+        path = tmp / "m.csv"
+        # bewusst unsortiert: summiert wird nach Zeit, nicht nach Dateireihenfolge
+        _write(path, "15.02.2026;72,5\n15.01.2026;84,1\n15.03.2026;734,7\n")
+        result = csv_import.parse_rows(path, ";", False, 0, 1, "de_date", "", TZ, cumulate=True)
+        assert [round(v, 1) for _, v in result.rows] == [84.1, 156.6, 891.3]
+        plain = csv_import.parse_rows(path, ";", False, 0, 1, "de_date", "", TZ)
+        assert [v for _, v in plain.rows] == [84.1, 72.5, 734.7]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_describe_sample_shows_how_each_cell_is_read() -> None:
     rows = [["15.01.2026", "84,1"], ["15.02.2026", "1.572"], ["15.13.2026", "abc"], ["15.04.2026"]]
     result = csv_import.describe_sample(rows, 0, 1, "custom", "%d.%m.%Y", TZ)

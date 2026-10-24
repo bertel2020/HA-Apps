@@ -329,6 +329,7 @@ def parse_rows(
     max_rows: int = MAX_IMPORT_ROWS_PER_ENTITY,
     on_progress: Callable[[int], None] | None = None,
     state_mapper: Callable[[str, float], float | None] | None = None,
+    cumulate: bool = False,
 ) -> ParseResult:
     """Liest die Rohdaten mit der gewählten Spalten-/Format-Zuordnung ein.
     Jede Zeile, die sich nicht plausibel als (Zeitstempel, Wert) lesen lässt
@@ -344,7 +345,11 @@ def parse_rows(
     Text und wird auf den Index abgebildet (ha_import.state_mapper_for()).
     Aufeinanderfolgende gleiche Zustände bleiben nur einmal stehen — der
     Live-Pfad schreibt auch nur Wechsel, und eine Probe pro Minute mit
-    "charging" wären sonst tausende Zeilen ohne Aussage."""
+    "charging" wären sonst tausende Zeilen ohne Aussage.
+
+    ``cumulate``: Die Werte sind Summen je Zeitraum (Monatsertrag), das Ziel
+    aber ein Zähler, der laufende Stände erwartet. Nach dem Sortieren wird die
+    Laufsumme gebildet; der Verlauf rechnet daraus wieder die Differenzen."""
     result = ParseResult()
     max_col = max(ts_col, value_col)
     gelesen = 0
@@ -380,6 +385,11 @@ def parse_rows(
     if on_progress is not None:
         on_progress(gelesen)
     result.rows.sort()
+    if cumulate and state_mapper is None:
+        total = 0.0
+        for i, (ts, value) in enumerate(result.rows):
+            total += value
+            result.rows[i] = (ts, total)
     if state_mapper is not None:
         result.rows = [
             row for i, row in enumerate(result.rows) if i == 0 or row[1] != result.rows[i - 1][1]
