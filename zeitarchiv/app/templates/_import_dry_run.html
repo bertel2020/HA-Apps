@@ -28,6 +28,16 @@
     {% if plan.skipped_rows %}
     <p style="margin:4px 0 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);">{{ _("{skipped_rows} Zeile(n) beim Einlesen übersprungen (nicht als Zeitstempel/Wert lesbar)", skipped_rows=(plan.skipped_rows | format_int)) }}</p>
     {% endif %}
+    {% if plan.skipped_examples %}
+    <ul style="margin:4px 0 0;padding-left:18px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);">
+      {% for line_num, reason, raw in plan.skipped_examples %}
+      <li>{% if reason == "timestamp" %}{{ _("Zeile {line}: Zeitstempel „{raw}“ passt nicht zum gewählten Format", line=line_num, raw=raw) }}{% elif reason == "value" %}{{ _("Zeile {line}: Wert „{raw}“ ist keine Zahl", line=line_num, raw=raw) }}{% else %}{{ _("Zeile {line}: zu wenige Spalten („{raw}“)", line=line_num, raw=raw) }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if plan.counter_decreases %}
+    <p style="margin:6px 0 0;padding:8px 10px;border-radius:8px;background:var(--warning-soft);font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);">{{ _("{count} Wert(e) liegen unter ihrem Vorgänger ({months}). Bei einem Zähler gilt das als Zählerrückgang, der Verlauf zeigt dort 0. Sind es Monatssummen statt laufender Zählerstände, vorher in der Datei aufsummieren.", count=(plan.counter_decreases | format_int), months=(plan.counter_decrease_months | join(", "))) }}</p>
+    {% endif %}
   </div>
   {% endfor %}
 

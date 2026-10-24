@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import shutil
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -193,6 +194,37 @@ def test_parse_rows_skips_malformed_lines_instead_of_failing_the_whole_file() ->
         assert result.skipped == 3
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_parse_rows_records_first_skipped_lines_with_reason() -> None:
+    """Die Vorschau soll nennen, WELCHE Zeile woran scheitert, nicht nur eine Zahl."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-test-"))
+    try:
+        path = tmp / "bad.csv"
+        _write(path, "ts;wert\n15.01.2026;1\nkaputt;2\n15.03.2026;abc\n15.04.2026\n15.05.2026;x\n")
+        result = csv_import.parse_rows(path, ";", True, 0, 1, "custom", "%d.%m.%Y", TZ)
+        assert len(result.rows) == 1
+        assert result.skipped == 4
+        # Zeilennummern zählen die Kopfzeile mit; nur die ersten drei werden gemerkt.
+        assert result.skipped_examples == [
+            (3, "timestamp", "kaputt"),
+            (4, "value", "abc"),
+            (5, "columns", "15.04.2026"),
+        ]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_counter_decreases_names_months_of_values_below_their_predecessor() -> None:
+    from app.storage import symcon_import
+
+    def ts(month: int) -> float:
+        return datetime(2026, month, 1, tzinfo=TZ).timestamp()
+
+    rows = [(ts(1), 84.0), (ts(2), 156.5), (ts(3), 891.2), (ts(4), 800.0), (ts(5), 900.0), (ts(6), 10.0)]
+    assert symcon_import._counter_decreases(rows, TZ) == (2, ["2026-04", "2026-06"])
+    assert symcon_import._counter_decreases(rows[:3], TZ) == (0, [])
+    assert symcon_import._counter_decreases([], TZ) == (0, [])
 
 
 def test_parse_rows_sorts_output_by_timestamp() -> None:

@@ -188,6 +188,11 @@ def _parse_timestamp(raw: str, ts_format: str, custom_pattern: str, tz: ZoneInfo
 class ParseResult:
     rows: list[tuple[float, float]] = field(default_factory=list)
     skipped: int = 0
+    #: Die ersten übersprungenen Zeilen als (Zeilennummer in der Datei, Grund,
+    #: Rohtext der Zelle) — Grund ist "columns", "timestamp" oder "value". Nur
+    #: für die Vorschau: ohne sie steht dort nur eine Zahl, und wer ein falsches
+    #: Zeitformat gewählt hat, sieht nicht, woran es liegt.
+    skipped_examples: list[tuple[int, str, str]] = field(default_factory=list)
 
 
 #: Wie oft parse_rows() den Fortschritt meldet. 50.000 Zeilen sind bei
@@ -195,6 +200,14 @@ class ParseResult:
 #: die alle 500 ms abgefragt wird, und selten genug, dass der Rückruf selbst
 #: nicht ins Gewicht fällt.
 PROGRESS_EVERY_ROWS = 50_000
+
+#: Wie viele übersprungene Zeilen als Beispiel festgehalten werden.
+SKIPPED_EXAMPLES = 3
+
+
+def _note_skipped(result: ParseResult, line_num: int, reason: str, raw: str) -> None:
+    if len(result.skipped_examples) < SKIPPED_EXAMPLES:
+        result.skipped_examples.append((line_num, reason, raw.strip()[:40]))
 
 
 def count_data_rows(path: Path, has_header: bool) -> int:
@@ -264,6 +277,7 @@ def parse_rows(
                 on_progress(gelesen)
             if len(line) <= max_col:
                 result.skipped += 1
+                _note_skipped(result, reader.line_num, "columns", ",".join(line))
                 continue
             ts = _parse_timestamp(line[ts_col], ts_format, custom_pattern, tz)
             value = (
@@ -272,6 +286,10 @@ def parse_rows(
             )
             if ts is None or value is None:
                 result.skipped += 1
+                if ts is None:
+                    _note_skipped(result, reader.line_num, "timestamp", line[ts_col])
+                else:
+                    _note_skipped(result, reader.line_num, "value", line[value_col])
                 continue
             result.rows.append((ts, value))
             if len(result.rows) > max_rows:

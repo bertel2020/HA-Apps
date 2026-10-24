@@ -2447,6 +2447,7 @@ class ImportService:
                         plan = symcon_import.plan_import_rows(
                             self.deps.data_dir, self.deps.index, parsed.rows, entity_id, self.deps.tz,
                             source_label=path.name, skipped_rows=parsed.skipped, accepts_state=True,
+                            skipped_examples=parsed.skipped_examples,
                         )
                     if dry_mapper is not None:
                         plan.new_states = dry_mapper.new_states

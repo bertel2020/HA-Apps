@@ -28,6 +28,11 @@
   Solar orange, Netzbezug blau, Einspeisung violett, Speicher rosa (Laden) und
   türkis (Entladen). Sie gelten in allen Farbschemata gleich, im Dunkelmodus
   ist nur die Einspeisung etwas heller.
+- **CSV-Import, Vorschau**: Übersprungene Zeilen werden jetzt mit Zeilennummer und
+  Grund genannt (Zeitstempel passt nicht zum Format, Wert keine Zahl, zu wenige
+  Spalten). Ist das Ziel ein Zähler und liegen Werte unter ihrem Vorgänger,
+  warnt die Vorschau davor, dass der Verlauf dort 0 zeigt. Der Hinweistext nennt
+  außerdem, dass bei Zählern laufende Zählerstände erwartet werden.
 
 ### Behoben
 
@@ -72,6 +77,11 @@
   solar orange, grid import blue, export purple, storage pink (charging) and
   teal (discharging). They are the same in every color scheme; in dark mode
   only the export color is slightly lighter.
+- **CSV import, preview**: skipped rows are now listed with line number and
+  reason (timestamp does not match the format, value is not a number, too few
+  columns). If the target is a counter and values are below their predecessor,
+  the preview warns that the history shows 0 there. The help text also states
+  that counters expect running meter readings.
 
 #### Fixed
 
