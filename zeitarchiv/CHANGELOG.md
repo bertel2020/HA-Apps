@@ -14,6 +14,11 @@
 - **Datenqualität**: Bei einem Fund heißt die Zeile jetzt „Zählerrücksetzung
   erkannt“ statt „Keine Zählerrücksetzungen“, und die Überschrift lautet
   „Datenqualität: Hinweise“ statt „Prüfung fehlgeschlagen“.
+- **Auffälligkeiten, Vergleich**: Im Zeitraum „Tag“ wird mit dem gleichen
+  Wochentag der letzten drei Wochen verglichen, bei „Stunde“ mit derselben
+  Stunde der letzten drei Tage (bisher mit den drei Zeiträumen direkt davor).
+  Der Dialog nennt die Vergleichsbasis und weist darauf hin, dass die laufende
+  Periode noch nicht vollständig ist.
 - **Auffälligkeiten**: Ein Verbrauch gilt erst als auffällig, wenn er außer über
   der Prozentschwelle auch mindestens 0,1 kWh über dem Vergleichswert liegt.
   Steigt ein Zwischenzähler wegen eines auffälligen Geräts dahinter, wird nur
@@ -40,6 +45,10 @@
 - **Data quality**: when something is found, the row now reads “Counter reset
   detected” instead of “No counter resets”, and the heading is “Data quality:
   notices” instead of “check failed”.
+- **Anomalies, comparison**: for “Day” the comparison uses the same weekday of
+  the last three weeks, for “Hour” the same hour of the last three days
+  (previously the three periods directly before). The dialog states the basis
+  and notes that the current period is not complete yet.
 - **Anomalies**: consumption only counts as unusual if, besides exceeding the
   percentage threshold, it is also at least 0.1 kWh above the comparison value.
   If a sub-meter rises because of an unusual device behind it, only the device
