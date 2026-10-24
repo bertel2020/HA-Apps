@@ -181,6 +181,14 @@ ANOMALIE_SCHWELLE_LABELS = {"off": N_("Aus"), "25": "25 %", "50": "50 %", "100":
 # normalen Lauf als "Anomalie" markiert wird.
 ANOMALIE_BASELINE_PERIODS = 3
 
+# Abstand der Vergleichsperioden in Einheiten des angezeigten Zeitraums. Bei
+# "Tag" ist es der gleiche Wochentag der Vorwochen (Sa gegen die letzten drei
+# Sa, nicht gegen Do/Fr/Fr), bei "Stunde" dieselbe Uhrzeit der Vortage (Mittag
+# gegen die letzten drei Mittage, nicht gegen die drei Stunden davor). Monat
+# und Jahr haben keinen so ausgeprägten Rhythmus und vergleichen mit dem
+# Unmittelbar-davor.
+ANOMALIE_BASELINE_STEP = {"hour": 24, "day": 7}
+
 # Mindestabstand zum Vergleichswert in kWh, ab dem eine Überschreitung der
 # Prozentschwelle als Auffälligkeit gilt. Ohne ihn wäre ein Gerät, das von
 # 0,05 auf 0,12 kWh steigt, "+140 %" und würde bei vielen kleinen Verbrauchern
@@ -1578,13 +1586,14 @@ class EnergieDashboardService:
         # Vergleichsperioden EINMAL bestimmen statt je Verbraucher: die
         # Zeitstempel hängen nur an range_key/offset, nicht an der Entität.
         anomalie_coarser = _COARSER_RANGE.get(range_key)
+        anomalie_step = ANOMALIE_BASELINE_STEP.get(range_key, 1)
         anomalie_starts: list[float] = []
         anomalie_coarse_offsets: list[int] = []
         if anomalie_active:
             now_local = now.astimezone(self.deps.tz)
             for i in range(1, ANOMALIE_BASELINE_PERIODS + 1):
                 period_start, _pw_end, _pp_end = query_mod._window(  # noqa: SLF001 — siehe Modul-Docstring
-                    range_key, now_local, offset - i,
+                    range_key, now_local, offset - i * anomalie_step,
                 )
                 anomalie_starts.append(period_start.timestamp())
             if anomalie_coarser:
@@ -1592,7 +1601,9 @@ class EnergieDashboardService:
                 # eines — an einer Monats-/Jahresgrenze zwei (die letzten drei
                 # Tage am 2. eines Monats liegen in zwei Monaten).
                 for start in anomalie_starts:
-                    for coarse_offset in range(0, -(ANOMALIE_BASELINE_PERIODS + 4), -1):
+                    # Bei "Stunde" liegt der Vergleich bis zu drei Tage zurück, dazu der Versatz
+                    # der angezeigten Stunde selbst — das grobe Fenster muss so weit reichen.
+                    for coarse_offset in range(0, -(ANOMALIE_BASELINE_PERIODS + 4 + (abs(offset) // anomalie_step if anomalie_step > 1 else 0)), -1):
                         cw_start, cw_end, _cp_end = query_mod._window(  # noqa: SLF001
                             anomalie_coarser, now_local, coarse_offset,
                         )
@@ -1602,7 +1613,7 @@ class EnergieDashboardService:
                             break
 
         def _anomaly_baseline(entity_id: str) -> float | None:
-            """Mittel der letzten ANOMALIE_BASELINE_PERIODS Perioden.
+            """Mittel der letzten ANOMALIE_BASELINE_PERIODS Vergleichsperioden (Abstand: ANOMALIE_BASELINE_STEP).
 
             Aus einer (selten zwei) gröberen Abfrage abgelesen statt je Periode
             einzeln gestellt — gemessen 15 % eines Requests für einen Wert, der
@@ -1624,7 +1635,7 @@ class EnergieDashboardService:
                 # kennt) — dann wie bisher je Periode einzeln, langsamer aber
                 # korrekt.
                 values = [
-                    self._series_total(self._entity_series(entity_id, range_key, offset - i, now, read_cache)[0])
+                    self._series_total(self._entity_series(entity_id, range_key, offset - i * anomalie_step, now, read_cache)[0])
                     for i in range(1, ANOMALIE_BASELINE_PERIODS + 1)
                 ]
                 return sum(values) / len(values) if values else None
