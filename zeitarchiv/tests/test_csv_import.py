@@ -161,6 +161,21 @@ def test_parse_rows_accepts_german_decimal_comma_and_bool_synonyms() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_parse_value_reads_thousands_separators_in_both_conventions() -> None:
+    """Excel exportiert deutsch "1.572,4", englisch "1,572.4" — vorher fielen beide
+    als unlesbar durch und wurden still übersprungen."""
+    assert csv_import._parse_value("1.572,4") == 1572.4
+    assert csv_import._parse_value("1,572.4") == 1572.4
+    assert csv_import._parse_value("1.234.567,8") == 1234567.8
+    assert csv_import._parse_value("1,234,567") == 1234567.0
+    assert csv_import._parse_value("-1.572,4") == -1572.4
+    # Unverändert: Einzeltrenner bleibt Dezimaltrenner, kaputte Gruppen bleiben unlesbar.
+    assert csv_import._parse_value("1572,4") == 1572.4
+    assert csv_import._parse_value("1.5") == 1.5
+    assert csv_import._parse_value("1,2,3") is None
+    assert csv_import._parse_value("12.34,5") is None
+
+
 def test_parse_rows_skips_malformed_lines_instead_of_failing_the_whole_file() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-test-"))
     try:

@@ -16,6 +16,7 @@ from ..i18n import N_, tr
 
 import csv
 import math
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -32,6 +33,9 @@ TIMESTAMP_FORMATS = {
 }
 
 DELIMITERS = {",": N_("Komma (,)"), ";": N_("Semikolon (;)"), "\t": N_("Tab")}
+
+_THOUSANDS_DE = re.compile(r"^[+-]?\d{1,3}(\.\d{3})+(,\d+)?$")
+_THOUSANDS_EN = re.compile(r"^[+-]?\d{1,3}(,\d{3})+(\.\d+)?$")
 
 _BOOL_VALUES = {"true": 1.0, "false": 0.0, "wahr": 1.0, "falsch": 0.0}
 
@@ -139,6 +143,13 @@ def _parse_value(raw: str) -> float | None:
             return value if math.isfinite(value) else None
         except ValueError:
             pass
+    # Tausendertrennzeichen: nur mit lückenlosen Dreiergruppen, damit "1.572,4"
+    # (Excel, deutsch) und "1,572.4" (englisch) gelesen werden, ein Text wie
+    # "1,2,3" aber weiter als unlesbar zählt.
+    if _THOUSANDS_DE.match(raw):
+        return float(raw.replace(".", "").replace(",", "."))
+    if _THOUSANDS_EN.match(raw):
+        return float(raw.replace(",", ""))
     return _BOOL_VALUES.get(raw.lower())
 
 

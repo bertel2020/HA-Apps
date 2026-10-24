@@ -39,6 +39,9 @@
 - **Tabellen**: Im Spalten-Editor ist der Platzhalter des Felds
   „Gruppen-Beschriftung“ nicht mehr abgeschnitten; der Hinweis, dass die
   Gruppe mehrere Spalten überspannt, steht jetzt im Tooltip der Feldbezeichnung.
+- **CSV-Import**: Zahlen mit Tausenderpunkt (z. B. „1.572,4“, wie Excel sie
+  exportiert) oder Tausenderkomma („1,572.4“) werden jetzt gelesen. Bisher
+  wurden solche Zeilen ohne Hinweis übersprungen.
 
 ---
 
@@ -79,6 +82,9 @@
 - **Tables**: in the column editor the placeholder of the “Group label” field is
   no longer cut off; the note that the group spans several columns is now in
   the tooltip of the field label.
+- **CSV import**: numbers with a thousands separator (e.g. “1.572,4” as
+  exported by Excel, or “1,572.4”) are now read. Previously such rows were
+  skipped without notice.
 
 ## 1.9.0 - 2026-10-22
 
