@@ -196,6 +196,17 @@ def test_parse_rows_skips_malformed_lines_instead_of_failing_the_whole_file() ->
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_describe_sample_shows_how_each_cell_is_read() -> None:
+    rows = [["15.01.2026", "84,1"], ["15.02.2026", "1.572"], ["15.13.2026", "abc"], ["15.04.2026"]]
+    result = csv_import.describe_sample(rows, 0, 1, "custom", "%d.%m.%Y", TZ)
+    assert result[0] == {"ts": "15.01.2026 00:00", "value": "84,1", "ambiguous": False}
+    # Ein Trenner vor drei Ziffern: gelesen als Dezimal, aber als mehrdeutig markiert.
+    assert result[1] == {"ts": "15.02.2026 00:00", "value": "1,572", "ambiguous": True}
+    assert result[2] == {"ts": None, "value": None, "ambiguous": False}
+    # Zu kurze Zeile: fehlende Zelle gilt als unlesbar, ohne Ausnahme.
+    assert result[3] == {"ts": "15.04.2026 00:00", "value": None, "ambiguous": False}
+
+
 def test_parse_rows_records_first_skipped_lines_with_reason() -> None:
     """Die Vorschau soll nennen, WELCHE Zeile woran scheitert, nicht nur eine Zahl."""
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-test-"))

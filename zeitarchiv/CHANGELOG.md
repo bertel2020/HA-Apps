@@ -8,6 +8,7 @@
   sich die betroffenen Entitäten jetzt anklicken: bei erkannten
   Zählerrücksetzungen und bei auffällig hohem Verbrauch führt der Name zur
   Entitätsansicht im gewählten Zeitraum.
+- **CSV-Import, Vorschau**: Unter der Rohdaten-Tabelle zeigt eine zweite Tabelle, wie der Import Zeitstempel und Wert jeder Vorschauzeile liest. Nicht lesbare Zellen sind rot, mehrdeutige Zahlen wie „1.572“ gelb markiert. Ändert man Spalte, Zeitformat oder Muster, aktualisiert sie sich sofort.
 
 ### Geändert
 
@@ -58,6 +59,7 @@
   affected entities are now clickable: for detected counter resets and for
   unusually high consumption the name leads to the entity view for the selected
   period.
+- **CSV import, preview**: below the raw table, a second table shows how the import reads the timestamp and value of each preview row. Unreadable cells are red, ambiguous numbers such as “1.572” yellow. It updates immediately when you change a column, the time format or the pattern.
 
 #### Changed
 

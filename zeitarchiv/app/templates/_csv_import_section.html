@@ -60,7 +60,8 @@
       <label>{{ _("Zeitstempel-Spalte") }}</label>
       <span class="dd-picker-wrap">
         <button type="button" class="btn" id="ts-col-btn" onclick="toggleDDPicker('ts-col')">{% for col in columns %}{% if loop.index0 == ts_col %}{{ col }}{% endif %}{% endfor %} ▾</button>
-        <input type="hidden" name="ts_col" id="ts-col-input" value="{{ ts_col }}">
+        <input type="hidden" name="ts_col" id="ts-col-input" value="{{ ts_col }}"
+               hx-post="import/csv/preview" hx-include="#csv-form" hx-target="#csv-section" hx-swap="outerHTML">
         <div class="dd-picker-popover" id="ts-col-popover">
           {% for col in columns %}
           <div class="dd-picker-row" data-label="{{ col }}" onclick="selectDDOption('ts-col', '{{ loop.index0 }}', this.dataset.label)">{{ col }}</div>
@@ -72,7 +73,8 @@
       <label>{{ _("Wert-Spalte") }}</label>
       <span class="dd-picker-wrap">
         <button type="button" class="btn" id="value-col-btn" onclick="toggleDDPicker('value-col')">{% for col in columns %}{% if loop.index0 == value_col %}{{ col }}{% endif %}{% endfor %} ▾</button>
-        <input type="hidden" name="value_col" id="value-col-input" value="{{ value_col }}">
+        <input type="hidden" name="value_col" id="value-col-input" value="{{ value_col }}"
+               hx-post="import/csv/preview" hx-include="#csv-form" hx-target="#csv-section" hx-swap="outerHTML">
         <div class="dd-picker-popover" id="value-col-popover">
           {% for col in columns %}
           <div class="dd-picker-row" data-label="{{ col }}" onclick="selectDDOption('value-col', '{{ loop.index0 }}', this.dataset.label)">{{ col }}</div>
@@ -84,7 +86,8 @@
       <label>{{ _("Zeitstempel-Format") }}</label>
       <span class="dd-picker-wrap">
         <button type="button" class="btn" id="ts-format-btn" onclick="toggleDDPicker('ts-format')">{% for v, l in ts_format_options %}{% if v == ts_format %}{{ l }}{% endif %}{% endfor %} ▾</button>
-        <input type="hidden" name="ts_format" id="ts-format-input" value="{{ ts_format }}">
+        <input type="hidden" name="ts_format" id="ts-format-input" value="{{ ts_format }}"
+               hx-post="import/csv/preview" hx-include="#csv-form" hx-target="#csv-section" hx-swap="outerHTML">
         <div class="dd-picker-popover" id="ts-format-popover">
           {% for value, label in ts_format_options %}
           <div class="dd-picker-row" onclick="selectDDOption('ts-format', '{{ value }}', '{{ label }}'); toggleCustomTsPattern('{{ value }}');">{{ label }}</div>
@@ -94,7 +97,8 @@
     </div>
     <div class="field" id="custom-ts-pattern-field" style="{{ '' if ts_format == 'custom' else 'display:none;' }}">
       <label>{{ _("Eigenes Format (strptime, z. B. %d.%m.%Y %H:%M:%S)") }}</label>
-      <input type="text" name="custom_pattern" class="map-input" value="{{ custom_pattern }}" placeholder="%d.%m.%Y %H:%M:%S">
+      <input type="text" name="custom_pattern" class="map-input" value="{{ custom_pattern }}" placeholder="%d.%m.%Y %H:%M:%S"
+             hx-post="import/csv/preview" hx-trigger="change" hx-include="#csv-form" hx-target="#csv-section" hx-swap="outerHTML">
     </div>
     {% endif %}
   </div>
@@ -159,6 +163,20 @@
       <tr>{% for col in columns %}<th>{{ col }}</th>{% endfor %}</tr>
       {% for sample_row in sample_rows %}
       <tr>{% for cell in sample_row %}<td class="mono">{{ cell }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </table>
+  </div>
+  {# Wie der Import die gewählten Spalten liest: Zeitstempel und Wert je
+     Vorschauzeile. Gelb = mehrdeutige Zahl ("1.572"), rot = nicht lesbar
+     (die Zeile würde übersprungen). #}
+  <div class="tbl-wrap" style="margin:0 0 14px;">
+    <table class="dt compact">
+      <tr><th>{{ _("Zeitstempel gelesen als") }}</th><th>{{ _("Wert gelesen als") }}</th></tr>
+      {% for r in read_as %}
+      <tr>
+        <td class="mono"{% if r.ts is none %} style="background:var(--danger-soft);color:var(--danger);"{% endif %}>{{ r.ts if r.ts is not none else _("nicht lesbar") }}</td>
+        <td class="mono"{% if r.value is none %} style="background:var(--danger-soft);color:var(--danger);"{% elif r.ambiguous %} style="background:var(--warning-soft);color:var(--warning);"{% endif %}>{{ r.value if r.value is not none else _("nicht lesbar") }}{% if r.ambiguous %} <span class="hint2" data-tooltip="{{ _('Ein Trenner vor drei Ziffern kann Dezimal- oder Tausenderpunkt sein. Der Import liest ihn als Dezimaltrenner.') }}">{{ _("mehrdeutig") }}</span>{% endif %}</td>
+      </tr>
       {% endfor %}
     </table>
   </div>

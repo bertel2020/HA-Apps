@@ -184,6 +184,38 @@ def _parse_timestamp(raw: str, ts_format: str, custom_pattern: str, tz: ZoneInfo
     return dt.timestamp()
 
 
+_AMBIGUOUS_THOUSANDS = re.compile(r"^[+-]?\d{1,3}[.,]\d{3}$")
+
+
+def describe_sample(
+    sample_rows: list[list[str]], ts_col: int, value_col: int,
+    ts_format: str, custom_pattern: str, tz: ZoneInfo,
+) -> list[dict]:
+    """Zeigt je Vorschauzeile, WIE der Import Zeitstempel und Wert lesen würde.
+
+    Die Rohtabelle allein verrät nicht, ob "1.572" als 1,572 oder 1572 gilt
+    oder ob das Zeitformat passt; erst der Dry Run sagte es, und auch dort nur
+    als Zahl übersprungener Zeilen. ``ambiguous`` markiert Werte mit genau einem
+    Trenner vor drei Ziffern ("1.572", "1,572"): sie lassen sich als Dezimal-
+    ODER Tausendertrenner lesen, der Import nimmt Dezimal."""
+    out = []
+    for row in sample_rows:
+        raw_ts = row[ts_col] if ts_col < len(row) else ""
+        raw_value = row[value_col] if value_col < len(row) else ""
+        ts = _parse_timestamp(raw_ts, ts_format, custom_pattern, tz)
+        value = _parse_value(raw_value)
+        out.append({
+            "ts": datetime.fromtimestamp(ts, tz).strftime("%d.%m.%Y %H:%M") if ts is not None else None,
+            "value": _format_number(value) if value is not None else None,
+            "ambiguous": value is not None and bool(_AMBIGUOUS_THOUSANDS.match(raw_value.strip())),
+        })
+    return out
+
+
+def _format_number(value: float) -> str:
+    return f"{value:.6f}".rstrip("0").rstrip(".").replace(".", ",")
+
+
 @dataclass
 class ParseResult:
     rows: list[tuple[float, float]] = field(default_factory=list)

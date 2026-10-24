@@ -1243,6 +1243,12 @@ class ImportService:
             "total_lines": prev.total_lines,
             "ts_col": ts_col if ts_col is not None else 0,
             "value_col": value_col if value_col is not None else default_value_col,
+            "read_as": csv_import.describe_sample(
+                prev.sample_rows,
+                ts_col if ts_col is not None else 0,
+                value_col if value_col is not None else default_value_col,
+                ts_format, custom_pattern, self.deps.tz,
+            ),
             "ts_format": ts_format,
             "custom_pattern": custom_pattern,
             "entity_id": entity_id,
