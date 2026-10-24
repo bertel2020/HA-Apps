@@ -196,6 +196,33 @@ def test_parse_rows_skips_malformed_lines_instead_of_failing_the_whole_file() ->
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+class _Form(dict):
+    """Minimaler Ersatz für starlette FormData: nur get/getlist."""
+
+    def getlist(self, key: str) -> list[str]:
+        value = self.get(key, [])
+        return value if isinstance(value, list) else [value]
+
+
+def test_csv_pairs_collects_columns_and_rejects_missing_or_repeated_entities() -> None:
+    from app.import_routes import ImportService
+
+    form = _Form({"extra_col": ["2", "x"], "extra_entity": ["sensor.b", " sensor.c "]})
+    extras = ImportService._csv_extra_mappings(form)
+    # Unlesbare Spalte fällt auf 0 zurück, Leerzeichen der Entität werden entfernt.
+    assert extras == [{"col": 2, "entity_id": "sensor.b"}, {"col": 0, "entity_id": "sensor.c"}]
+    pairs, error = ImportService._csv_pairs(1, "sensor.a", extras)
+    assert error is None
+    assert pairs == [(1, "sensor.a"), (2, "sensor.b"), (0, "sensor.c")]
+
+    # Einzelne Zuordnung ohne Entität: die bekannte Meldung bleibt.
+    assert ImportService._csv_pairs(1, "", [])[1] == "Bitte eine Ziel-Entität auswählen."
+    # Zusätzliche Zeile ohne Entität (gerade hinzugefügt, nichts gewählt).
+    assert ImportService._csv_pairs(1, "sensor.a", [{"col": 2, "entity_id": ""}])[1] is not None
+    # Dieselbe Entität zweimal würde sich selbst überschreiben.
+    assert ImportService._csv_pairs(1, "sensor.a", [{"col": 2, "entity_id": "sensor.a"}])[1] is not None
+
+
 def test_sniff_ts_format_picks_the_first_format_that_reads_every_cell() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-test-"))
     try:

@@ -198,7 +198,7 @@
         <li>{{ _("Eine vorhandene Home-Assistant-Entität als Ziel wählen, die Vorschau prüfen und den Import starten.") }}</li>
       </ol>
       <p class="symcon-import-note">{{ _("Bestehende Monatsarchive bleiben unverändert; im laufenden Hot Buffer werden nur fehlende Zeitstempel ergänzt. Die hochgeladene CSV-Datei bleibt bis „Quelldaten löschen“ gespeichert.") }}</p>
-      <p class="symcon-import-note">{{ _("Zahlen dürfen Dezimalkomma und Tausenderpunkt enthalten (1.572,4). Ist die Ziel-Entität ein Zähler, erwartet der Import laufende Zählerstände (84,1 · 240,6 · 1.132,0 …), keine Monatssummen (dafür gibt es die Option „Werte sind Summen je Zeitraum“); der Verlauf zeigt dann die Differenz zum Vorwert.") }}</p>
+      <p class="symcon-import-note">{{ _("Zahlen dürfen Dezimalkomma und Tausenderpunkt enthalten (1.572,4). Ist die Ziel-Entität ein Zähler, erwartet der Import laufende Zählerstände (84,1 · 240,6 · 1.132,0 …), keine Monatssummen (dafür gibt es die Option „Werte sind Summen je Zeitraum“); der Verlauf zeigt dann die Differenz zum Vorwert. Mehrere Spalten derselben Datei lassen sich über „+ Weitere Spalte …“ in verschiedene Entitäten importieren.") }}</p>
     </div>
     {% include "_csv_import_section.html" %}
     </div>

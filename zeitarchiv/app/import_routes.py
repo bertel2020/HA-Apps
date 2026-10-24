@@ -125,6 +125,14 @@ VM_RANGE_PRESET_DAYS = {"30d": 30, "90d": 90, "365d": 365}
 VM_MAX_RANGE_DAYS = 3650
 
 
+def _csv_source_label(path: Path, columns: list[str], col: int, pair_count: int) -> str:
+    """Quelle im Plan/Bericht; bei mehreren Spalten mit dem Spaltennamen, damit
+    die Zeilen der Vorschau unterscheidbar sind."""
+    if pair_count == 1:
+        return path.name
+    return f"{path.name} · {columns[col] if col < len(columns) else col}"
+
+
 class _ScanCache:
     """Cache für das Ergebnis von scan_source() (Konzept Abschnitt 04) — ohne
     das würde JEDER Seitenaufruf von /import (und jeder Dry-Run-/Import-Klick)
@@ -1188,6 +1196,7 @@ class ImportService:
         custom_pattern: str = "",
         entity_id: str = "",
         cumulate: bool = False,
+        extra_mappings: list[dict] | None = None,
     ) -> dict:
         entity_rows = self.deps.index.list_entities()
         entity_options = [
@@ -1263,6 +1272,7 @@ class ImportService:
             "custom_pattern": custom_pattern,
             "entity_id": entity_id,
             "cumulate": cumulate,
+            "extra_mappings": extra_mappings or [],
         }
 
 
@@ -1270,6 +1280,42 @@ class ImportService:
     @staticmethod
     def _csv_cumulate(form) -> bool:
         return form.get("cumulate") == "on"
+
+
+
+    @staticmethod
+    def _csv_extra_mappings(form) -> list[dict]:
+        """Weitere Zuordnungen "Spalte → Entität" neben der ersten (value_col/
+        entity_id). Leere Entitäten bleiben stehen: in der Vorschau ist das eine
+        gerade hinzugefügte Zeile; Dry Run und Import weisen sie über
+        _csv_pairs() ab."""
+        cols = form.getlist("extra_col")
+        entities = form.getlist("extra_entity")
+        mappings = []
+        for i, entity in enumerate(entities):
+            try:
+                col = int(cols[i])
+            except (IndexError, TypeError, ValueError):
+                col = 0
+            mappings.append({"col": col, "entity_id": str(entity).strip()})
+        return mappings
+
+
+
+    @staticmethod
+    def _csv_pairs(
+        value_col: int, entity_id: str, extra_mappings: list[dict]
+    ) -> tuple[list[tuple[int, str]], str | None]:
+        """Alle (Spalte, Entität)-Paare für Dry Run/Import oder eine Fehlermeldung."""
+        if not extra_mappings and not entity_id:
+            return [], tr("Bitte eine Ziel-Entität auswählen.")
+        pairs = [(value_col, entity_id)] + [(m["col"], m["entity_id"]) for m in extra_mappings]
+        if any(not entity for _, entity in pairs):
+            return [], tr("Bitte für jede Spalte eine Ziel-Entität auswählen.")
+        entities = [entity for _, entity in pairs]
+        if len(set(entities)) != len(entities):
+            return [], tr("Jede Ziel-Entität darf nur einmal vorkommen.")
+        return pairs, None
 
 
 
@@ -2417,6 +2463,12 @@ class ImportService:
             form = await request.form()
             delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, entity_id = self._csv_form_params(form)
             cumulate = self._csv_cumulate(form)
+            extra_mappings = self._csv_extra_mappings(form)
+            if form.get("add_extra"):
+                extra_mappings.append({"col": min(value_col + 1, 99), "entity_id": ""})
+            remove = form.get("remove_extra")
+            if remove is not None and str(remove).isdigit() and int(remove) < len(extra_mappings):
+                del extra_mappings[int(remove)]
             def preview_locked() -> dict:
                 with self.deps.coordinator.exclusive():
                     return self._csv_import_context(
@@ -2428,6 +2480,7 @@ class ImportService:
                         custom_pattern=custom_pattern,
                         entity_id=entity_id,
                         cumulate=cumulate,
+                        extra_mappings=extra_mappings,
                     )
 
             ctx = await run_in_threadpool(preview_locked)
@@ -2449,36 +2502,42 @@ class ImportService:
             form = await request.form()
             delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, entity_id = self._csv_form_params(form)
             cumulate = self._csv_cumulate(form)
+            pairs, pair_error = self._csv_pairs(value_col, entity_id, self._csv_extra_mappings(form))
             plans: list[symcon_import.ImportPlan] = []
             errors: list[str] = []
-            if not entity_id:
-                errors.append(tr("Bitte eine Ziel-Entität auswählen."))
+            if pair_error:
+                errors.append(pair_error)
             else:
                 def plan_csv_locked() -> dict:
                     path = self._csv_uploaded_path()
                     if path is None:
                         return {"plans": [], "errors": [tr("Keine CSV-Datei hochgeladen.")]}
-                    # Das Lesen und Sortieren der Datei berührt keinen
-                    # Speicherbestand und braucht deshalb keine Sperre — siehe
-                    # dieselbe Trennung in import_csv_start().
-                    # Zustands-Entität: Text statt Zahl, in der Vorschau ohne etwas
-                    # anzulegen (DryStateMapper sammelt die neuen Zustände).
-                    dry_mapper = ha_import.dry_state_mapper_for(self.deps.index, entity_id)
-                    parsed = self._parse_csv_with_progress(
-                        path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern,
-                        phase_label=tr("Datei wird gelesen…"), state_mapper=dry_mapper, cumulate=cumulate,
-                    )
-                    self._csv_progress.set_phase(N_("Vorschau wird berechnet…"))
-                    with self.deps.coordinator.entity(entity_id):
-                        plan = symcon_import.plan_import_rows(
-                            self.deps.data_dir, self.deps.index, parsed.rows, entity_id, self.deps.tz,
-                            source_label=path.name, skipped_rows=parsed.skipped, accepts_state=True,
-                            skipped_examples=parsed.skipped_examples,
+                    columns = csv_import.preview(path, delimiter, has_header).columns
+                    planned: list[symcon_import.ImportPlan] = []
+                    for col, target in pairs:
+                        # Das Lesen und Sortieren der Datei berührt keinen
+                        # Speicherbestand und braucht deshalb keine Sperre — siehe
+                        # dieselbe Trennung in import_csv_start().
+                        # Zustands-Entität: Text statt Zahl, in der Vorschau ohne etwas
+                        # anzulegen (DryStateMapper sammelt die neuen Zustände).
+                        dry_mapper = ha_import.dry_state_mapper_for(self.deps.index, target)
+                        parsed = self._parse_csv_with_progress(
+                            path, delimiter, has_header, ts_col, col, ts_format, custom_pattern,
+                            phase_label=tr("Datei wird gelesen…"), state_mapper=dry_mapper, cumulate=cumulate,
                         )
-                    if dry_mapper is not None:
-                        plan.new_states = dry_mapper.new_states
-                        plan.refused_state_rows = dry_mapper.refused
-                    return {"plans": [plan], "errors": []}
+                        self._csv_progress.set_phase(N_("Vorschau wird berechnet…"))
+                        with self.deps.coordinator.entity(target):
+                            plan = symcon_import.plan_import_rows(
+                                self.deps.data_dir, self.deps.index, parsed.rows, target, self.deps.tz,
+                                source_label=_csv_source_label(path, columns, col, len(pairs)),
+                                skipped_rows=parsed.skipped, accepts_state=True,
+                                skipped_examples=parsed.skipped_examples,
+                            )
+                        if dry_mapper is not None:
+                            plan.new_states = dry_mapper.new_states
+                            plan.refused_state_rows = dry_mapper.refused
+                        planned.append(plan)
+                    return {"plans": planned, "errors": []}
 
                 try:
                     self._csv_progress.start(plan_csv_locked, logger, kind="dry-run")
@@ -2539,14 +2598,16 @@ class ImportService:
             delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, entity_id = self._csv_form_params(form)
             cumulate = self._csv_cumulate(form)
             source_path = self._csv_uploaded_path()
-            if not entity_id:
+            extra_mappings = self._csv_extra_mappings(form)
+            pairs, pair_error = self._csv_pairs(value_col, entity_id, extra_mappings)
+            if pair_error:
                 # Kein Auftrag, keine Anzeige: Das ist ein Formularfehler, der
                 # sofort beantwortet gehört, nicht ein Lauf, der scheitert.
                 return self.deps.templates.TemplateResponse(
                     request, "_import_result.html",
-                    {"results": [], "errors": [tr("Bitte eine Ziel-Entität auswählen.")]},
+                    {"results": [], "errors": [pair_error]},
                 )
-            logger.info("CSV-Import gestartet · Ziel=%s", entity_id)
+            logger.info("CSV-Import gestartet · Ziel=%s", ", ".join(target for _, target in pairs))
 
             def write_csv_report(
                 results: list[symcon_import.ImportResult],
@@ -2578,6 +2639,9 @@ class ImportService:
                             "timestamp_column": ts_col,
                             "value_column": value_col,
                             "cumulate": cumulate,
+                            "extra_mappings": [
+                                {"value_column": m["col"], "entity_id": m["entity_id"]} for m in extra_mappings
+                            ],
                             "timestamp_format": ts_format,
                             "custom_pattern": custom_pattern if ts_format == "custom" else "",
                             "entity_id": entity_id,
@@ -2601,54 +2665,57 @@ class ImportService:
                     # er mit unter der Sperre (ZG-25). Derselbe Schnitt wie beim
                     # Home-Assistant-Import darunter, der seinen Netzwerk-Fetch
                     # ebenfalls davor legt.
-                    parsed = self._parse_csv_with_progress(
-                        path, delimiter, has_header, ts_col, value_col, ts_format, custom_pattern,
-                        phase_label=tr("Schritt 1/2 · Datei wird gelesen…"),
-                        state_mapper=ha_import.state_mapper_for(self.deps.index, entity_id),
-                        cumulate=cumulate,
-                    )
-                    # Zweite Phase ohne Gesamtzahl: Wie viele Monate wirklich
-                    # geschrieben werden, entscheidet erst die Klassifizierung
-                    # in import_rows() (bestehende Archivmonate werden
-                    # übersprungen). Die Zahl der Monate IN den gelesenen Daten
-                    # wäre eine Obergrenze — ein Balken, der nie 100 % erreicht,
-                    # ist schlechter als gar keiner.
-                    self._csv_progress.set_phase(N_("Schritt 2/2 · Werte werden geschrieben…"), unit=N_("Monate"))
-                    # Entitätssperre statt exclusive(): dieser Import schreibt
-                    # genau eine Entität — Archiv, Rollups, Hot Buffer und
-                    # Indexzeilen gehören alle ihr. Die globale Sperre hielt für
-                    # die gesamte Dauer auch jede andere Entität an, also auch
-                    # die laufende Aufnahme aus Home Assistant. Die Vorschau
-                    # nebenan (import_csv_dry_run) macht es längst so, und der
-                    # Live-Schreibpfad ebenfalls (siehe ZA-003 in
-                    # CODE_REVIEW.md: "Jeder Schreibvorgang verwendet
-                    # ausschließlich die Sperre seiner Entität").
-                    with self.deps.coordinator.entity(entity_id):
-                        result = symcon_import.import_rows(
-                            self.deps.data_dir,
-                            self.deps.index,
-                            parsed.rows,
-                            entity_id,
-                            self.deps.tz,
-                            source_label=path.name,
-                            skipped_rows=parsed.skipped,
-                            on_month_done=lambda label, _anzahl: self._csv_progress.advance(detail=label),
-                            accepts_state=True,
+                    columns = csv_import.preview(path, delimiter, has_header).columns
+                    for col, target in pairs:
+                        parsed = self._parse_csv_with_progress(
+                            path, delimiter, has_header, ts_col, col, ts_format, custom_pattern,
+                            phase_label=tr("Schritt 1/2 · Datei wird gelesen…"),
+                            state_mapper=ha_import.state_mapper_for(self.deps.index, target),
+                            cumulate=cumulate,
                         )
-                        reconciliation_report = self.deps.run_storage_reconciliation(entity_ids=[entity_id], repair=True)
-                    results.append(result)
-                    logger.info(
-                        "CSV-Import abgeschlossen · Ziel=%s · Zeilen importiert=%d · Zeilen zusammengeführt=%d",
-                        entity_id, result.rows_imported, result.rows_merged,
-                    )
-                    # Wie bei HA (siehe _fetch_ha_history): eine hohe
-                    # Übersprungen-Quote deutet eher auf falsch gewählte
-                    # Spalten/Format als auf normale Datenlücken hin.
-                    if result.skipped_rows > 0 and result.skipped_rows >= result.rows_imported + result.rows_merged:
-                        logger.warning(
-                            "CSV-Import: %d Zeile(n) übersprungen (nicht als Zeitstempel/Wert lesbar) · Ziel=%s",
-                            result.skipped_rows, entity_id,
+                        # Zweite Phase ohne Gesamtzahl: Wie viele Monate wirklich
+                        # geschrieben werden, entscheidet erst die Klassifizierung
+                        # in import_rows() (bestehende Archivmonate werden
+                        # übersprungen). Die Zahl der Monate IN den gelesenen Daten
+                        # wäre eine Obergrenze — ein Balken, der nie 100 % erreicht,
+                        # ist schlechter als gar keiner.
+                        self._csv_progress.set_phase(N_("Schritt 2/2 · Werte werden geschrieben…"), unit=N_("Monate"))
+                        # Entitätssperre statt exclusive(): dieser Import schreibt
+                        # je Durchgang genau eine Entität — Archiv, Rollups, Hot Buffer und
+                        # Indexzeilen gehören alle ihr. Die globale Sperre hielt für
+                        # die gesamte Dauer auch jede andere Entität an, also auch
+                        # die laufende Aufnahme aus Home Assistant. Die Vorschau
+                        # nebenan (import_csv_dry_run) macht es längst so, und der
+                        # Live-Schreibpfad ebenfalls (siehe ZA-003 in
+                        # CODE_REVIEW.md: "Jeder Schreibvorgang verwendet
+                        # ausschließlich die Sperre seiner Entität"). Mehrere Spalten
+                        # laufen nacheinander, nie gleichzeitig.
+                        with self.deps.coordinator.entity(target):
+                            result = symcon_import.import_rows(
+                                self.deps.data_dir,
+                                self.deps.index,
+                                parsed.rows,
+                                target,
+                                self.deps.tz,
+                                source_label=_csv_source_label(path, columns, col, len(pairs)),
+                                skipped_rows=parsed.skipped,
+                                on_month_done=lambda label, _anzahl: self._csv_progress.advance(detail=label),
+                                accepts_state=True,
+                            )
+                            reconciliation_report = self.deps.run_storage_reconciliation(entity_ids=[target], repair=True)
+                        results.append(result)
+                        logger.info(
+                            "CSV-Import abgeschlossen · Ziel=%s · Zeilen importiert=%d · Zeilen zusammengeführt=%d",
+                            target, result.rows_imported, result.rows_merged,
                         )
+                        # Wie bei HA (siehe _fetch_ha_history): eine hohe
+                        # Übersprungen-Quote deutet eher auf falsch gewählte
+                        # Spalten/Format als auf normale Datenlücken hin.
+                        if result.skipped_rows > 0 and result.skipped_rows >= result.rows_imported + result.rows_merged:
+                            logger.warning(
+                                "CSV-Import: %d Zeile(n) übersprungen (nicht als Zeitstempel/Wert lesbar) · Ziel=%s",
+                                result.skipped_rows, target,
+                            )
                 except ValueError as exc:
                     errors.append(str(exc))
                 except Exception as exc:  # noqa: BLE001 — landet als Text im Ergebnis
