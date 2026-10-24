@@ -31,10 +31,14 @@
 
 ### Behoben
 
-- **Rollierende Zeiträume**: Bei grober oder mittlerer Auflösung (z. B. „Woche“
-  mit Tagesbalken) saßen die Balken neben der Achsenbeschriftung, weil sie am
-  Beginn des Fensters (z. B. 14:39 Uhr) statt an Mitternacht ausgerichtet
-  wurden. Charts und Kacheln richten sie jetzt an der Tagesgrenze aus.
+- **Rollierende Zeiträume**: Bei einer Auflösung ab einer Stunde (z. B. „1 Tag“
+  oder „6 Stunden“ im Zeitraum „Woche“) saßen die Balken neben der
+  Achsenbeschriftung, weil sie am Beginn des Fensters (z. B. 14:39 Uhr) statt
+  an Mitternacht ausgerichtet wurden. Charts und Kacheln richten sie jetzt an
+  der Tagesgrenze aus.
+- **Tabellen**: Im Spalten-Editor ist der Platzhalter des Felds
+  „Gruppen-Beschriftung“ nicht mehr abgeschnitten; der Hinweis, dass die
+  Gruppe mehrere Spalten überspannt, steht jetzt im Tooltip der Feldbezeichnung.
 
 ---
 
@@ -68,10 +72,13 @@
 
 #### Fixed
 
-- **Rolling periods**: with coarse or medium resolution (e.g. “Week” with daily
-  bars) the bars sat next to the axis labels because they were aligned to the
-  start of the window (e.g. 2:39 pm) instead of midnight. Charts and tiles now
-  align them to the day boundary.
+- **Rolling periods**: with a resolution of one hour or more (e.g. “1 day” or
+  “6 hours” in the “Week” period) the bars sat next to the axis labels because
+  they were aligned to the start of the window (e.g. 2:39 pm) instead of
+  midnight. Charts and tiles now align them to the day boundary.
+- **Tables**: in the column editor the placeholder of the “Group label” field is
+  no longer cut off; the note that the group spans several columns is now in
+  the tooltip of the field label.
 
 ## 1.9.0 - 2026-10-22
 
