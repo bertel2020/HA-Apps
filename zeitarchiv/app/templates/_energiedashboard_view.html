@@ -444,7 +444,7 @@
         <span class="edash-cost-warn-wrap" x-show="costGaps().length" :title="costGapHint()" role="img" :aria-label="costGapHint()"><svg class="edash-cost-warn" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><line x1="12" y1="10" x2="12" y2="14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1.1" fill="currentColor"/></svg></span>
       </div>
       <div class="edash-hero-item edash-hero-prognose" x-show="kpi.prognose_rest_heute != null || kpi.prognose_morgen != null">
-        <svg width="16" height="13" viewBox="0 0 26 20"><circle cx="7.5" cy="6.5" r="3.4" fill="var(--chart-3)" opacity=".8"/><path d="M6 17h13a4 4 0 0 0 .4-7.98A6.2 6.2 0 0 0 7.5 9.3A4 4 0 0 0 6 17Z" fill="var(--surface)" stroke="var(--chart-3)" stroke-width="1.6"/></svg>
+        <svg width="16" height="13" viewBox="0 0 26 20"><circle cx="7.5" cy="6.5" r="3.4" fill="var(--energy-solar)" opacity=".8"/><path d="M6 17h13a4 4 0 0 0 .4-7.98A6.2 6.2 0 0 0 7.5 9.3A4 4 0 0 0 6 17Z" fill="var(--surface)" stroke="var(--energy-solar)" stroke-width="1.6"/></svg>
         {# "Prognose:" steht als eigenes Element VOR den beiden Werten, nicht
            mehr im "noch ..."-Text — dadurch bleibt die Beschriftung auch dann
            stehen, wenn nur ein Morgen-Wert zugeordnet ist (vorher verschwand
@@ -482,9 +482,9 @@
          {% if single_erzeuger_id %}:href="`{{ app_root }}/entities/{{ single_erzeuger_id }}?range=${range}&offset=${offset}`"
          {% elif erzeuger_list|length > 1 %}@click="$refs.erzeugerPickerDialog.showModal()"
          {% endif %}>
-        <div class="edash-kpi-accent" style="background:var(--chart-3);"></div>
+        <div class="edash-kpi-accent" style="background:var(--energy-solar);"></div>
         <div class="edash-kpi-head">
-          <span class="edash-kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="var(--chart-3)" opacity=".85"/><g stroke="var(--chart-3)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg></span>
+          <span class="edash-kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="var(--energy-solar)" opacity=".85"/><g stroke="var(--energy-solar)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg></span>
           <div class="edash-kpi-label">{{ _("Erzeugung") }}</div>
         </div>
         <div class="edash-kpi-val" x-text="fmt(kpi.erzeugung, 1) + ' kWh'"></div>
@@ -493,9 +493,9 @@
       </a>
       <a class="edash-kpi"
          {% if config.netzbezug %}:href="`{{ app_root }}/entities/{{ config.netzbezug }}?range=${range}&offset=${offset}`"{% endif %}>
-        <div class="edash-kpi-accent" style="background:var(--chart-1);"></div>
+        <div class="edash-kpi-accent" style="background:var(--energy-grid);"></div>
         <div class="edash-kpi-head">
-          <span class="edash-kpi-icon"><svg width="15" height="10" viewBox="0 0 28 18"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--chart-1)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--chart-1)"/><path d="M15 5 L20 9 L15 13" stroke="var(--chart-1)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
+          <span class="edash-kpi-icon"><svg width="15" height="10" viewBox="0 0 28 18"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--energy-grid)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--energy-grid)"/><path d="M15 5 L20 9 L15 13" stroke="var(--energy-grid)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
           <div class="edash-kpi-label">{{ config.netzbezug_name or _("Netzbezug") }}</div>
         </div>
         <div class="edash-kpi-val" x-text="fmt(kpi.netzbezug, 1) + ' kWh'"></div>
@@ -518,9 +518,9 @@
       </a>
       <a class="edash-kpi"
          {% if config.einspeisung %}:href="`{{ app_root }}/entities/{{ config.einspeisung }}?range=${range}&offset=${offset}`"{% endif %}>
-        <div class="edash-kpi-accent" style="background:var(--chart-2);"></div>
+        <div class="edash-kpi-accent" style="background:var(--energy-export);"></div>
         <div class="edash-kpi-head">
-          <span class="edash-kpi-icon"><svg width="15" height="10" viewBox="0 0 28 18"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--chart-2)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--chart-2)"/><path d="M13 5 L8 9 L13 13" stroke="var(--chart-2)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
+          <span class="edash-kpi-icon"><svg width="15" height="10" viewBox="0 0 28 18"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--energy-export)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--energy-export)"/><path d="M13 5 L8 9 L13 13" stroke="var(--energy-export)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
           <div class="edash-kpi-label">{{ config.einspeisung_name or _("Einspeisung") }}</div>
         </div>
         <div class="edash-kpi-val" x-text="fmt(kpi.einspeisung, 1) + ' kWh'"></div>
@@ -532,9 +532,9 @@
          {% if single_speicher_id %}:href="`{{ app_root }}/entities/{{ single_speicher_id }}?range=${range}&offset=${offset}`"
          {% elif speicher_link_entities|length > 1 %}@click="$refs.speicherPickerDialog.showModal()"
          {% endif %}>
-        <div class="edash-kpi-accent" style="background:var(--chart-4);"></div>
+        <div class="edash-kpi-accent" style="background:var(--energy-battery-in);"></div>
         <div class="edash-kpi-head">
-          <span class="edash-kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24"><rect x="2" y="7" width="17" height="10" rx="2.5" fill="none" stroke="var(--chart-4)" stroke-width="2"/><rect x="20" y="10" width="2.5" height="4" rx="1" fill="var(--chart-4)"/><rect x="4.5" y="9.5" width="9" height="5" rx="1" fill="var(--chart-4)" opacity=".6"/></svg></span>
+          <span class="edash-kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24"><rect x="2" y="7" width="17" height="10" rx="2.5" fill="none" stroke="var(--energy-battery-in)" stroke-width="2"/><rect x="20" y="10" width="2.5" height="4" rx="1" fill="var(--energy-battery-in)"/><rect x="4.5" y="9.5" width="9" height="5" rx="1" fill="var(--energy-battery-in)" opacity=".6"/></svg></span>
           <div class="edash-kpi-label">{{ _("Speicher") }}</div>
         </div>
         <div class="edash-kpi-val" x-text="fmt(kpi.speicher_netto, 1) + ' kWh'"></div>
@@ -698,8 +698,8 @@
           <svg viewBox="0 0 100 100" class="edash-ring-svg">
             <defs>
               <linearGradient id="edash-grad-eigenverbrauch" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style="stop-color:var(--chart-3);stop-opacity:.45"/>
-                <stop offset="100%" style="stop-color:var(--chart-3);stop-opacity:1"/>
+                <stop offset="0%" style="stop-color:var(--energy-solar);stop-opacity:.45"/>
+                <stop offset="100%" style="stop-color:var(--energy-solar);stop-opacity:1"/>
               </linearGradient>
             </defs>
             <circle cx="50" cy="50" r="42" fill="none" stroke="var(--border)" stroke-width="10"/>
@@ -714,8 +714,8 @@
           <svg viewBox="0 0 100 100" class="edash-ring-svg">
             <defs>
               <linearGradient id="edash-grad-soc" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style="stop-color:var(--chart-4);stop-opacity:.45"/>
-                <stop offset="100%" style="stop-color:var(--chart-4);stop-opacity:1"/>
+                <stop offset="0%" style="stop-color:var(--energy-battery-in);stop-opacity:.45"/>
+                <stop offset="100%" style="stop-color:var(--energy-battery-in);stop-opacity:1"/>
               </linearGradient>
             </defs>
             <circle cx="50" cy="50" r="42" fill="none" stroke="var(--border)" stroke-width="10"/>
