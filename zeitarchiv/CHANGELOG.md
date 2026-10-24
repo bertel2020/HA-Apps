@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Neu
+
+- **Energiedashboard**: Im Dialog „Bilanz, Datenqualität & Auffälligkeiten“ lassen
+  sich die betroffenen Entitäten jetzt anklicken: bei erkannten
+  Zählerrücksetzungen und bei auffällig hohem Verbrauch führt der Name zur
+  Entitätsansicht im gewählten Zeitraum.
+
 ### Geändert
 
 - **Energiefluss-Farben**: Sankey, Legende, Kennzahlen, Energiebericht und die
@@ -13,6 +20,13 @@
 ---
 
 ### English
+
+#### New
+
+- **Energy dashboard**: in the “Balance, data quality & anomalies” dialog the
+  affected entities are now clickable: for detected counter resets and for
+  unusually high consumption the name leads to the entity view for the selected
+  period.
 
 #### Changed
 
