@@ -172,8 +172,9 @@ def test_speicher_kachel_verlinkt_ebenfalls() -> None:
 def test_kpi_links_carry_current_range_and_offset() -> None:
     # 5 KPI-Kacheln (Erzeugung/Verbrauch/Netzbezug/Einspeisung/Speicher) + je
     # ein Link pro Zeile in den drei Auswahlfenstern (Erzeuger-/Verbraucher-/
-    # Speicher-Liste).
-    assert _VIEW_TEMPLATE.count("?range=${range}&offset=${offset}`") == 8
+    # Speicher-Liste), dazu im Qualitätsdialog der Entitätslink der
+    # Zählerrücksetzungen und der Auffälligkeiten.
+    assert _VIEW_TEMPLATE.count("?range=${range}&offset=${offset}`") == 10
 
 
 def test_multiple_erzeuger_verbraucher_or_speicher_open_a_picker_dialog_instead_of_no_link() -> None:

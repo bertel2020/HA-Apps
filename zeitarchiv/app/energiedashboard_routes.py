@@ -1155,17 +1155,18 @@ class EnergieDashboardService:
     def _check_counter_resets(
         self, entity_roles: list[tuple[str, str]], window_start_ts: float, window_end_ts: float,
         now: datetime, read_cache: query_mod.QueryReadCache,
-    ) -> tuple[list[str], bool]:
+    ) -> tuple[list[tuple[str, str]], bool]:
         """Rohwerte je Rolle im Fenster auf abnehmende Zählerstände prüfen
         (Reset/Zählertausch/Neustart der Integration). rollup.py behandelt
         das für die Summenbildung bereits transparent (Delta wird dort auf 0
         gekappt, siehe compute_fine_rollup_with_key), verwirft die
         Information dabei aber — hier unabhängig davon, rein für die
-        Anzeige. Gibt zusätzlich zurück, ob wirklich JEDE Rolle geprüft
+        Anzeige. Betroffene Rollen kommen als (Label, entity_id) zurück, damit die
+        Anzeige zur Entität verlinken kann. Gibt zusätzlich zurück, ob wirklich JEDE Rolle geprüft
         werden konnte (False, wenn eine Prüfung wegen zu vieler Rohwerte
         abgebrochen wurde — dann lieber ehrlich "nicht geprüft" zeigen, als
         einen falschen "unauffällig"-Status vorzutäuschen)."""
-        reset_labels: list[str] = []
+        reset_hits: list[tuple[str, str]] = []
         fully_checked = True
         for entity_id, label in entity_roles:
             try:
@@ -1180,10 +1181,10 @@ class EnergieDashboardService:
             previous_value = None
             for _ts, value in rows:
                 if previous_value is not None and value < previous_value - 0.001:
-                    reset_labels.append(label)
+                    reset_hits.append((label, entity_id))
                     break
                 previous_value = value
-        return reset_labels, fully_checked
+        return reset_hits, fully_checked
 
     def _grundpreis_zustand(
         self, entity_id: str, window_start: datetime, window_end: datetime, now: datetime,
@@ -1706,7 +1707,7 @@ class EnergieDashboardService:
                     node["anomaly_baseline"] = round(baseline, 3)
                     if not gruppe:
                         anomalien.append({
-                            "name": name, "value": round(display_val, 3),
+                            "name": name, "entity_id": entity_id, "value": round(display_val, 3),
                             "baseline": round(baseline, 3), "pct": pct,
                         })
             add_stale_issue(name, stale)
@@ -2239,12 +2240,12 @@ class EnergieDashboardService:
         if continuous or skip_quality:
             entity_roles: list[tuple[str, str]] = []
             metadata = {"unit_issues": [], "type_issues": [], "duplicate_labels": []}
-            reset_labels: list[str] = []
+            reset_hits: list[tuple[str, str]] = []
             resets_fully_checked = True
         else:
             entity_roles = self._config_entity_roles(config)
             metadata = self._check_entity_metadata(entity_roles)
-            reset_labels, resets_fully_checked = self._check_counter_resets(
+            reset_hits, resets_fully_checked = self._check_counter_resets(
                 entity_roles, window_start.timestamp(), window_end.timestamp(), now, read_cache
             )
 
@@ -2378,10 +2379,13 @@ class EnergieDashboardService:
             },
             {
                 "label": tr("Keine Zählerrücksetzungen"),
-                "ok": not reset_labels,
+                "ok": not reset_hits,
+                # Die betroffenen Rollen stehen nicht im Text, sondern als
+                # "links" daneben: die Anzeige verlinkt sie zur Entitätsansicht.
+                "links": [{"label": label, "entity_id": entity_id} for label, entity_id in reset_hits],
                 "detail": (
-                    tr("Abnehmender Zählerstand erkannt (Reset/Tausch?): ") + ", ".join(reset_labels)
-                    if reset_labels
+                    tr("Abnehmender Zählerstand erkannt (Reset/Tausch?): ")
+                    if reset_hits
                     else (
                         tr("Keine abnehmenden Zählerstände im Zeitraum.")
                         if resets_fully_checked
