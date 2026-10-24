@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Geändert
+
+- **Energiefluss-Farben**: Sankey, Legende, Kennzahlen, Energiebericht und die
+  Abschnitte der Einrichtung nutzen jetzt die Farben aus Home Assistant:
+  Solar orange, Netzbezug blau, Einspeisung violett, Speicher rosa (Laden) und
+  türkis (Entladen). Sie gelten in allen Farbschemata gleich, im Dunkelmodus
+  ist nur die Einspeisung etwas heller.
+
+---
+
+### English
+
+#### Changed
+
+- **Energy flow colors**: the Sankey, its legend, the key figures, the energy
+  report and the sections of the setup now use the colors from Home Assistant:
+  solar orange, grid import blue, export purple, storage pink (charging) and
+  teal (discharging). They are the same in every color scheme; in dark mode
+  only the export color is slightly lighter.
+
 ## 1.9.0 - 2026-10-22
 
 ### Neu
