@@ -2400,13 +2400,13 @@ class EnergieDashboardService:
                 ),
             },
             {
-                "label": tr("Keine Zählerrücksetzungen"),
+                "label": tr("Zählerrücksetzung erkannt") if reset_hits else tr("Keine Zählerrücksetzungen"),
                 "ok": not reset_hits,
                 # Die betroffenen Rollen stehen nicht im Text, sondern als
                 # "links" daneben: die Anzeige verlinkt sie zur Entitätsansicht.
                 "links": [{"label": label, "entity_id": entity_id} for label, entity_id in reset_hits],
                 "detail": (
-                    tr("Abnehmender Zählerstand erkannt (Reset/Tausch?): ")
+                    tr("Zählerstand ist gesunken (Reset oder Tausch?): ")
                     if reset_hits
                     else (
                         tr("Keine abnehmenden Zählerstände im Zeitraum.")

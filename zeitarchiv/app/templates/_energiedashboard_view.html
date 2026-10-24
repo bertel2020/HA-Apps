@@ -110,7 +110,7 @@
     <div class="edash-quality-row" :class="{'is-warn': !otherChecksOk}">
       <div class="edash-quality-icon" x-text="otherChecksOk ? '✓' : '!'"></div>
       <div>
-        <strong x-text="(otherChecksOk ? t('Datenqualität einwandfrei') : t('Datenqualität: Prüfung fehlgeschlagen'))"></strong>
+        <strong x-text="(otherChecksOk ? t('Datenqualität einwandfrei') : t('Datenqualität: Hinweise'))"></strong>
         <p class="hint hint-status" style="margin:0;" x-show="otherChecksOk" x-text="t('Alle {count} Prüfungen unauffällig.', {count: otherChecks.length})"></p>
       </div>
     </div>
