@@ -475,6 +475,10 @@ class ImportPlan:
     # Typisch, wenn Monatssummen statt laufender Zählerstände importiert werden.
     counter_decreases: int = 0
     counter_decrease_months: list[str] = field(default_factory=list)
+    # Ziel ist ein Zähler und der früheste importierte Wert liegt vor allen
+    # vorhandenen Daten: er hat keinen Vorgänger, der Verlauf zeigt dort 0.
+    # Monat ("JJJJ-MM") dieses ersten Werts, sonst leer.
+    counter_first_month: str = ""
 
 
 @dataclass
@@ -846,6 +850,7 @@ def plan_import_rows(
         skipped_examples=skipped_examples or [],
         counter_decreases=decreases,
         counter_decrease_months=decrease_months,
+        counter_first_month=_counter_first_month(rows, entity, tz),
     )
 
 
@@ -866,6 +871,17 @@ def _counter_decreases(rows: list[tuple[float, float]], tz: ZoneInfo) -> tuple[i
                 months.append(label)
         previous = value
     return count, months
+
+
+def _counter_first_month(rows: list[tuple[float, float]], entity, tz: ZoneInfo) -> str:
+    """Monat des frühesten Werts, wenn er bei einem Zähler keinen Vorgänger hat."""
+    if not rows or entity["aggregation_type"] != "counter":
+        return ""
+    first = min(ts for ts, _ in rows)
+    existing = entity["first_ts"]
+    if existing is not None and existing <= first:
+        return ""
+    return datetime.fromtimestamp(first, tz).strftime("%Y-%m")
 
 
 def import_variable(

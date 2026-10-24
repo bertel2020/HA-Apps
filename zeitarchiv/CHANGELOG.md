@@ -11,6 +11,7 @@
 - **CSV-Import, Vorschau**: Unter der Rohdaten-Tabelle zeigt eine zweite Tabelle, wie der Import Zeitstempel und Wert jeder Vorschauzeile liest. Nicht lesbare Zellen sind rot, mehrdeutige Zahlen wie „1.572“ gelb markiert. Ändert man Spalte, Zeitformat oder Muster, aktualisiert sie sich sofort.
 - **CSV-Import, Zeitformat**: Das Zeitformat wird beim Hochladen aus den ersten Zeilen erkannt (Unix, ISO 8601, TT.MM.JJJJ, auch mit Uhrzeit) und ist als Auswahl verfügbar. Ein eigenes Muster ist für Daten wie 15.01.2026 nicht mehr nötig.
 - **CSV-Import, Summen**: Neue Option „Werte sind Summen je Zeitraum“: Der Import bildet aus Monats- oder Tageswerten die Laufsumme und speichert sie als Zählerstand. Damit lassen sich Erträge pro Monat in eine Zähler-Entität importieren, ohne die Datei vorher umzurechnen.
+- **CSV-Import, Zähler**: Die Vorschau weist darauf hin, wenn der erste importierte Wert keinen Vorgänger hat und der Verlauf dort deshalb 0 zeigt, und nennt den Ausweg (eine Zeile mit dem Startwert davor).
 
 ### Geändert
 
@@ -64,6 +65,7 @@
 - **CSV import, preview**: below the raw table, a second table shows how the import reads the timestamp and value of each preview row. Unreadable cells are red, ambiguous numbers such as “1.572” yellow. It updates immediately when you change a column, the time format or the pattern.
 - **CSV import, time format**: the time format is detected from the first rows when uploading (Unix, ISO 8601, DD.MM.YYYY, also with time) and is available as a choice. A custom pattern is no longer needed for dates such as 15.01.2026.
 - **CSV import, totals**: new option “Values are totals per period”: the import builds the running sum of monthly or daily values and stores it as a meter reading. This lets you import yields per month into a counter entity without recalculating the file first.
+- **CSV import, counters**: the preview points out when the first imported value has no predecessor, so the history shows 0 there, and names the way out (a row with the start value before it).
 
 #### Changed
 

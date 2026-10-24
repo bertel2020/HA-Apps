@@ -274,6 +274,22 @@ def test_parse_rows_records_first_skipped_lines_with_reason() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_counter_first_month_only_when_the_first_value_has_no_predecessor() -> None:
+    from app.storage import symcon_import
+
+    jan = datetime(2026, 1, 15, tzinfo=TZ).timestamp()
+    feb = datetime(2026, 2, 15, tzinfo=TZ).timestamp()
+    rows = [(feb, 2.0), (jan, 1.0)]
+    counter = {"aggregation_type": "counter", "first_ts": None}
+    assert symcon_import._counter_first_month(rows, counter, TZ) == "2026-01"
+    # Vorhandene Daten liegen früher: der erste importierte Wert hat einen Vorgänger.
+    assert symcon_import._counter_first_month(rows, {**counter, "first_ts": jan - 1}, TZ) == ""
+    # Vorhandene Daten beginnen später: der importierte Wert wird der erste.
+    assert symcon_import._counter_first_month(rows, {**counter, "first_ts": feb}, TZ) == "2026-01"
+    assert symcon_import._counter_first_month(rows, {**counter, "aggregation_type": "standard"}, TZ) == ""
+    assert symcon_import._counter_first_month([], counter, TZ) == ""
+
+
 def test_counter_decreases_names_months_of_values_below_their_predecessor() -> None:
     from app.storage import symcon_import
 
