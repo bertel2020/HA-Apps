@@ -41,6 +41,10 @@
 
 ### Behoben
 
+- **Zählerrückgänge**: „Fehlwert-Rückgänge markieren“ in der Bereinigung einer
+  Entität markiert jetzt alle zurückkehrenden Rückgänge im gewählten Zeitraum
+  (z. B. „Gesamt“), nicht mehr nur die der letzten 30 Tage.
+
 - **Rollierende Zeiträume**: Bei einer Auflösung ab einer Stunde (z. B. „1 Tag“
   oder „6 Stunden“ im Zeitraum „Woche“) saßen die Balken neben der
   Achsenbeschriftung, weil sie am Beginn des Fensters (z. B. 14:39 Uhr) statt
@@ -94,6 +98,10 @@
   that counters expect running meter readings.
 
 #### Fixed
+
+- **Counter decreases**: “Mark bad-value decreases” in an entity’s cleanup now
+  marks all returning decreases in the selected period (e.g. “All”), no longer
+  only those of the last 30 days.
 
 - **Rolling periods**: with a resolution of one hour or more (e.g. “1 day” or
   “6 hours” in the “Week” period) the bars sat next to the axis labels because

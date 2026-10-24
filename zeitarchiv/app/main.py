@@ -5719,11 +5719,16 @@ async def repetitions_delete(request: Request, entity_id: str) -> HTMLResponse:
 
 @app.post("/entities/{entity_id}/rows/counter-returning-delete", response_class=HTMLResponse)
 async def counter_returning_delete(request: Request, entity_id: str) -> HTMLResponse:
-    _require_entity(entity_id)  # markiert die zurückkehrenden Rückgänge (counter_bulk)
+    entity = _require_entity(entity_id)
     args = _rows_form_common(await request.form())
+    _filter, range_key, offset = args[:3]
+    offset = 0 if range_key == "all" else min(offset, 0)
+    window_start, window_end = cleanup_stats.rows_window(range_key, offset, datetime.now(TZ), entity["first_ts"], TZ)
     def run() -> HTMLResponse:
         with storage_coordinator.entity(entity_id):
-            n = counter_bulk.mark_entity_returning(DATA_DIR, index, TZ, entity_id)
+            n = counter_bulk.mark_entity_returning(
+                DATA_DIR, index, TZ, entity_id, (window_start.timestamp(), window_end.timestamp())
+            )
             n and _background.invalidate_purge_preview()
             return _rows_fragment(request, entity_id, *args, deleted_count=n or None)
     return await run_in_threadpool(run)
