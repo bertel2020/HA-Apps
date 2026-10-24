@@ -152,6 +152,10 @@
         </li>
       </template>
     </ul>
+    {# Vergleichsbasis offenlegen: wogegen verglichen wird, hängt vom Zeitraum ab
+       (siehe ANOMALIE_BASELINE_STEP), und die laufende Periode ist erst am Ende
+       voll — ohne den Hinweis wirkt eine spät erscheinende Auffälligkeit wie ein Fehler. #}
+    <p class="hint hint-status" style="margin:8px 0 0;" x-text="({hour: t('Verglichen wird mit derselben Stunde der letzten drei Tage.'), day: t('Verglichen wird mit dem gleichen Wochentag der letzten drei Wochen.'), month: t('Verglichen wird mit den letzten drei Monaten.'), year: t('Verglichen wird mit den letzten drei Jahren.')})[range] + (offset === 0 ? ' ' + t('Die laufende Periode ist noch nicht vollständig, Auffälligkeiten können daher erst später erscheinen.') : '')"></p>
   </dialog>
   {% endif %}
 
