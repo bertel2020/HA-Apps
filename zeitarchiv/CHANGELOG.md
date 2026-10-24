@@ -11,6 +11,10 @@
 
 ### Geändert
 
+- **Auffälligkeiten**: Ein Verbrauch gilt erst als auffällig, wenn er außer über
+  der Prozentschwelle auch mindestens 0,1 kWh über dem Vergleichswert liegt.
+  Steigt ein Zwischenzähler wegen eines auffälligen Geräts dahinter, wird nur
+  das Gerät gemeldet statt beider.
 - **Energiefluss-Farben**: Sankey, Legende, Kennzahlen, Energiebericht und die
   Abschnitte der Einrichtung nutzen jetzt die Farben aus Home Assistant:
   Solar orange, Netzbezug blau, Einspeisung violett, Speicher rosa (Laden) und
@@ -30,6 +34,10 @@
 
 #### Changed
 
+- **Anomalies**: consumption only counts as unusual if, besides exceeding the
+  percentage threshold, it is also at least 0.1 kWh above the comparison value.
+  If a sub-meter rises because of an unusual device behind it, only the device
+  is reported instead of both.
 - **Energy flow colors**: the Sankey, its legend, the key figures, the energy
   report and the sections of the setup now use the colors from Home Assistant:
   solar orange, grid import blue, export purple, storage pink (charging) and
