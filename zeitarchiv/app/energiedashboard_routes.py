@@ -181,6 +181,12 @@ ANOMALIE_SCHWELLE_LABELS = {"off": N_("Aus"), "25": "25 %", "50": "50 %", "100":
 # normalen Lauf als "Anomalie" markiert wird.
 ANOMALIE_BASELINE_PERIODS = 3
 
+# Mindestabstand zum Vergleichswert in kWh, ab dem eine Überschreitung der
+# Prozentschwelle als Auffälligkeit gilt. Ohne ihn wäre ein Gerät, das von
+# 0,05 auf 0,12 kWh steigt, "+140 %" und würde bei vielen kleinen Verbrauchern
+# ständig anschlagen — ein Prozentwert allein sagt nichts über die Größe.
+ANOMALIE_MIN_ABSTAND_KWH = 0.1
+
 
 def _empty_config() -> dict:
     return {
@@ -1700,7 +1706,7 @@ class EnergieDashboardService:
                 baseline = _anomaly_baseline(entity_id)
                 if gruppe and baseline is not None:
                     gruppen_baseline_totals[gruppe] = gruppen_baseline_totals.get(gruppe, 0.0) + baseline
-                if baseline and display_val > baseline * anomalie_factor:
+                if baseline and display_val > baseline * anomalie_factor and display_val - baseline >= ANOMALIE_MIN_ABSTAND_KWH:
                     pct = round((display_val / baseline - 1) * 100)
                     node["anomaly"] = True
                     node["anomaly_pct"] = pct
@@ -1816,7 +1822,10 @@ class EnergieDashboardService:
             gruppe_node = {"name": gruppe_name, "role": "sink", "blend": True, "value": round(total, 3)}
             if anomalie_active:
                 gruppe_baseline = gruppen_baseline_totals.get(gruppe_name)
-                if gruppe_baseline and total > gruppe_baseline * anomalie_factor:
+                if (
+                    gruppe_baseline and total > gruppe_baseline * anomalie_factor
+                    and total - gruppe_baseline >= ANOMALIE_MIN_ABSTAND_KWH
+                ):
                     pct = round((total / gruppe_baseline - 1) * 100)
                     gruppe_node["anomaly"] = True
                     gruppe_node["anomaly_pct"] = pct

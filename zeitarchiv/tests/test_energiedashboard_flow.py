@@ -957,6 +957,22 @@ def test_anomalie_feuert_im_testaufbau_ueberhaupt(monkeypatch, tmp: Path) -> Non
         a.close()
 
 
+def test_anomalie_braucht_mindestabstand_zum_vergleichswert(monkeypatch, tmp: Path) -> None:
+    """40 kWh gegen 10 kWh überschreiten die Prozentschwelle weit; liegt der
+    Mindestabstand aber über den 30 kWh Differenz, ist es keine Auffälligkeit
+    (weder im Knoten noch in der Liste)."""
+    a, config = _anomalie_anlage(tmp)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    monkeypatch.setattr(ed, "ANOMALIE_MIN_ABSTAND_KWH", 31.0)
+    try:
+        flow = a.service.compute_flow(config, "month", -1)
+        knoten = next(n for n in flow["nodes"] if n["name"] == "Gerät")
+        assert not knoten.get("anomaly")
+        assert flow["anomalien"] == []
+    finally:
+        a.close()
+
+
 @pytest.mark.parametrize("range_key", ["hour", "day", "month", "year"])
 def test_baseline_ueber_groebere_abfrage_ergibt_dieselben_werte(monkeypatch, tmp: Path, range_key) -> None:
     """Der eigentliche Nachweis: die Abkürzung über eine gröbere Abfrage muss
