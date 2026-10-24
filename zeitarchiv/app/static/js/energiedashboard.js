@@ -44,18 +44,15 @@
   // ein Hell/Dunkel- oder Farbschema-Wechsel ändert die Werte sonst nicht in
   // den bereits gecachten Strings hier.
   function colors() {
-    const storage = cssVar('--chart-4');
     return {
-      pv: cssVar('--chart-3'),
-      grid: cssVar('--chart-1'),
-      storage,
-      // Entladung heller als Ladung (statt derselben Farbe für beide
-      // Richtungen) — sonst liest sich der Speicher-Fluss im Sankey nicht
-      // als "rein" vs. "raus", nur als ein einziger ununterscheidbarer
-      // Block. Blend statt zweitem --chart-Token, damit die Verwandtschaft
-      // zur Speicherfarbe (Legende) erhalten bleibt.
-      storageOut: blendColors(storage, '#ffffff', 0.55),
-      exportColor: cssVar('--chart-2'),
+      pv: cssVar('--energy-solar'),
+      grid: cssVar('--energy-grid'),
+      storage: cssVar('--energy-battery-in'),
+      // Entladung in eigener Farbe (HA-Konvention: Batterie rein rosa, raus
+      // türkis) — sonst liest sich der Speicher-Fluss im Sankey nicht als
+      // "rein" vs. "raus", nur als ein einziger Block.
+      storageOut: cssVar('--energy-battery-out'),
+      exportColor: cssVar('--energy-export'),
       use: cssVar('--ink-faint'),
       bus: cssVar('--border-strong'),
       ink: cssVar('--ink'),
