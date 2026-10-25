@@ -6,9 +6,9 @@
 {% block content %}
   <div class="page">
     <h1>{{ _("Entitäten") }}</h1>
-    <p class="sub">{{ _("Was die Zeitarchiv-Integration archiviert, auf welchem Weg es in die Auswahl kam und was sich daran geändert hat.") }}
-      · <a href="{{ app_root }}/selection">{{ _("Entitäten vorschlagen →") }}</a></p>
+    <p class="sub">{{ _("Was die Zeitarchiv-Integration archiviert, auf welchem Weg es in die Auswahl kam und was sich daran geändert hat.") }}</p>
     {% with active = 'auswahl' %}{% include "_entities_tabs.html" %}{% endwith %}
+    <p class="ov-suggest"><a class="btn primary" href="{{ app_root }}/selection">{{ _("Entitäten vorschlagen") }}</a></p>
 
     {% if job %}
     <div class="ov-job ov-job-{{ job.status }}" id="ov-job" role="status" aria-live="polite"
@@ -45,12 +45,12 @@
 
         <form method="get" action="{{ app_root }}/selection/overview" class="ov-search" role="search">
           <input type="hidden" name="filter" value="{{ table.filter }}">
-          <input type="search" name="q" value="{{ table.query }}" placeholder="{{ _('Entität suchen …') }}" aria-label="{{ _('Entität suchen') }}">
+          <input type="search" class="search" name="q" value="{{ table.query }}" placeholder="{{ _('Entität suchen …') }}" aria-label="{{ _('Entität suchen') }}">
           <button type="submit" class="btn">{{ _("Suchen") }}</button>
         </form>
 
         <nav class="ov-chips" aria-label="{{ _('Nach Herkunft filtern') }}">
-          {% for key, text in filters %}
+          {% for key, text in filters if key == "alle" or table.counts[key] or table.filter == key %}
           <a class="chip{{ ' active' if table.filter == key }}" href="{{ app_root }}/selection/overview?{{ {'filter': key, 'q': table.query}|urlencode }}"
              {% if table.filter == key %}aria-current="true"{% endif %}>{{ text }} <span class="ov-chip-n">{{ table.counts[key] }}</span></a>
           {% endfor %}
@@ -82,10 +82,10 @@
             {% for row in table.rows %}
             <tr>
               <td class="ov-col-check">{% if (row.removable and can_apply) or (can_change and (row.excludable or row.includable)) %}<input type="checkbox" class="ov-check" name="ids" value="{{ row.entity_id }}" aria-label="{{ _('{name} markieren', name=row.name) }}">{% endif %}</td>
-              <td><span class="ov-name">{{ row.name }}</span><span class="ov-id">{{ row.entity_id }}</span></td>
+              <td><span class="ov-name">{{ row.name }}</span><span class="ov-id" title="{{ row.entity_id }}">{{ row.entity_id }}</span></td>
               <td><span class="ov-badges">{% for badge in row.badges %}<span class="ov-badge ov-badge-{{ badge.kind }}">{{ badge.text }}</span>{% endfor %}</span></td>
               <td>{% if row.status == "archived" %}{{ _("archiviert") }}{% elif row.status == "excluded" %}{{ _("ausgeschlossen") }}{% elif row.status == "drifted" %}{{ _("nicht mehr ausgewählt") }}{% else %}{{ _("noch keine Werte") }}{% endif %}</td>
-              <td>{{ row.since or "–" }}</td>
+              <td class="ov-since">{% if row.since %}{% set parts = row.since.split(" ", 1) %}{{ parts[0] }}{% if parts|length > 1 %}<span class="ov-since-t">{{ parts[1] }}</span>{% endif %}{% else %}–{% endif %}</td>
               <td class="ov-col-actions">
                 <details class="ov-menu">
                   <summary class="btn btn-sm" aria-label="{{ _('Aktionen für {name}', name=row.name) }}">⋯</summary>

@@ -2978,7 +2978,6 @@
     "Entfernen lassen sich Einträge des Assistenten und von Hand gewählte Einzel-IDs.": "Entries from the assistant and manually chosen single IDs can be removed.",
     "Entfernen …": "Remove …",
     "Entitäten anzeigen": "Show entities",
-    "Entitäten vorschlagen →": "Suggest entities →",
     "Fehlgeschlagen.": "Failed.",
     "Gaszähler ({state_class})": "Gas meter ({state_class})",
     "Gehört nicht zu diesem Thema: {entity_id}": "Not part of this topic: {entity_id}",

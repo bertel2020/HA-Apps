@@ -19,7 +19,7 @@
     <form method="get" action="{{ app_root }}/selection" class="sel-search" role="search">
       <label for="sel-q" class="sel-search-label">{{ _("Was willst du archivieren?") }}</label>
       <span class="sel-search-row">
-        <input type="search" id="sel-q" name="q" value="{{ query }}" maxlength="100"
+        <input type="search" class="search" id="sel-q" name="q" value="{{ query }}" maxlength="100"
                placeholder="{{ _('z. B. Strom, Heizung, Wetter oder ein Gerätename') }}">
         <button type="submit" class="btn">{{ _("Suchen") }}</button>
       </span>
@@ -30,7 +30,7 @@
 
     <nav class="sel-tiles" aria-label="{{ _('Themen') }}">
       {% for tile in tiles %}
-      <a class="sel-tile{{ ' on' if tile.topic == topic }}" href="{{ app_root }}/selection?topic={{ tile.topic }}"
+      <a class="sel-tile{{ ' on' if tile.topic == topic }}{{ ' is-empty' if not tile.counts.found and tile.topic != topic }}" href="{{ app_root }}/selection?topic={{ tile.topic }}"
          {% if tile.topic == topic %}aria-current="true"{% endif %}>
         <span class="sel-tile-name">{{ tile.label }}{% if tile.sensitive %} <span class="sel-badge sel-badge-warn">{{ _("sensibel") }}</span>{% endif %}</span>
         <span class="sel-tile-count"><b>{{ tile.counts.recommended }}</b> {{ _("empfohlen") }} · {{ tile.counts.found }} {{ _("gefunden") }}</span>

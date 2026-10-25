@@ -6,6 +6,7 @@
   .ov-none{color:var(--ink-muted);font-size:calc(14px * var(--font-scale, 1));}
   .ov-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start;}
   .ov-main,.ov-side{min-width:0;}
+  .ov-suggest{margin:0 0 16px;}
   .ov-h{margin:0 0 10px;}
   .ov-n{font-size:calc(13px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);margin-left:6px;}
 
@@ -17,6 +18,7 @@
 
   .ov-search{display:flex;gap:8px;margin:0 0 10px;}
   .ov-search input[type=search]{flex:1 1 auto;min-width:0;}
+  .ov-search .btn{min-height:36px;}
   .ov-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;}
   .ov-chips .chip{text-decoration:none;}
   .ov-chip-n{opacity:.75;font-variant-numeric:tabular-nums;margin-left:2px;}
@@ -28,7 +30,10 @@
   .ov-col-check input{width:17px;height:17px;margin:0;accent-color:var(--accent-line);}
   .ov-col-actions{width:48px;text-align:right;}
   .ov-name{display:block;font-weight:500;color:var(--ink);}
-  .ov-id{display:block;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);overflow-wrap:anywhere;}
+  .ov-id{display:block;max-width:280px;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ov-since{white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .ov-since-t{display:block;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
+  .ov-patterns .ov-menu-note{white-space:nowrap;}
   .ov-tl-details .ov-id{display:inline;}
   .ov-badges{display:flex;flex-wrap:wrap;gap:4px;}
   .ov-badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:calc(11.5px * var(--font-scale, 1));font-weight:500;background:var(--surface-alt);color:var(--ink-muted);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;}
@@ -72,7 +77,7 @@
   .ov-patterns form{margin:0;}
   .ov-job a{color:var(--accent-line);}
 
-  @media (max-width:900px){
+  @media (max-width:1100px){
     .ov-layout{grid-template-columns:minmax(0,1fr);}
   }
   /* Schmal: jede Zeile als Karte (Kästchen | Entität | Menü, darunter Herkunft und Status). */
