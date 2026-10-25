@@ -1,6 +1,7 @@
 {
   "app": {
     "Ungültiger Vergleich": "Invalid comparison",
+    "Ø Strompreis Netzbezug": "Avg. grid price",
     "Zurück zu jetzt": "Back to now",
     "Langzeit": "Long-term",
     "Jahre": "Years",
@@ -3694,6 +3695,7 @@
     "CSV herunterladen": "Download CSV",
     "Weiter": "Next",
     "Preis fehlt für {anteil} % der Energie": "Price missing for {anteil} % of the energy",
+    "Preis je {stufe} gerechnet, bei wechselndem Tarif ungenau": "Price applied per {stufe}, inaccurate with a changing tariff",
     "Wert fehlt für {anteil} % des Zeitraums": "Value missing for {anteil} % of the period",
     "{monat} / Monat, {tage} Tage": "{monat} / month, {tage} days",
     "nicht vollständig": "incomplete",

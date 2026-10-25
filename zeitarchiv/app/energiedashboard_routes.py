@@ -2266,6 +2266,19 @@ class EnergieDashboardService:
                 {"key": schluessel, "label": anzeige, "menge": menge, "anteil": anteil, "einheit": einheit}
             )
 
+        # Ø-Preis je kWh nur bei einer Preis-Entität: Mit festem Preis wäre er
+        # nur der eingegebene Wert, erst bei wechselndem Tarif sagt er etwas.
+        # Energie ohne Preis zählt nicht mit, sonst käme ein zu niedriger Preis heraus.
+        netzbezug_avg_price = None
+        if netzbezug_cost is not None and kosten.get("preis_netzbezug"):
+            ohne_preis = next((e["menge"] for e in kosten_luecke if e["key"] == "netzbezug"), 0.0)
+            mit_preis = netzbezug_val - ohne_preis
+            if mit_preis > 0:
+                netzbezug_avg_price = round(netzbezug_cost / mit_preis, 4)
+        # Der Preis gilt je Bucket; was ein Bucket umfasst, steht in BAR_RESOLUTION.
+        # Daraus erkennt die Kachel, ob die Kosten stundengenau sind (sonst Hinweis).
+        kosten_aufloesung = query_mod.BAR_RESOLUTION.get(range_key) if netzbezug_cost is not None else None
+
         # Metadaten-/Zählerrückgang-Prüfungen nur für die tatsächlich
         # angezeigte Periode — energiedashboard_data ruft compute_flow()
         # zusätzlich zweimal mit continuous=True nur für den rollierenden
@@ -2499,6 +2512,8 @@ class EnergieDashboardService:
                 "autarkie": autarkie,
                 "eigenverbrauch": eigenverbrauch,
                 "netzbezug_cost": netzbezug_cost,
+                "netzbezug_avg_price": netzbezug_avg_price,
+                "kosten_aufloesung": kosten_aufloesung,
                 "einspeisung_revenue": einspeisung_revenue,
                 "vermiedene_kosten": vermiedene_kosten,
                 "eigenverbrauch_verguetung": eigenverbrauch_verguetung,

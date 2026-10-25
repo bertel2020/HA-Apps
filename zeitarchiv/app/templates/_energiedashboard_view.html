@@ -221,6 +221,11 @@
         <div class="edash-kpi-val" x-text="fmtCurrency(kpi.netzbezug_cost)"></div>
         <div class="edash-kpi-gap" x-show="costGap('netzbezug')" x-text="t('Preis fehlt für {anteil} % der Energie', {anteil: costGap('netzbezug')?.anteil})"></div>
       </div>
+      <div class="edash-kpi" x-show="kpi.netzbezug_avg_price != null">
+        <div class="edash-kpi-label">{{ _("Ø Strompreis Netzbezug") }}</div>
+        <div class="edash-kpi-val" x-text="fmtCurrency(kpi.netzbezug_avg_price, 3) + ' /kWh'"></div>
+        <div class="edash-kpi-sub" x-show="costResolutionHint()" x-text="costResolutionHint()"></div>
+      </div>
       {# Der Grundpreis steht als eigene Kachel neben dem Arbeitspreis: Er hängt an der Zeit, nicht an der Energie, und würde den Preis je kWh sonst verfälschen. #}
       <div class="edash-kpi" :class="{'is-gap': costGap('grundpreis')}" x-show="kpi.grundpreis_cost != null || costGap('grundpreis')">
         <div class="edash-kpi-label">{{ _("Grundpreis") }}</div>

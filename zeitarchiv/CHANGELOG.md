@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Neu
+
+- **Energiedashboard, Kostenanalyse**: Wenn der Netzbezug-Preis aus einer Entität
+  kommt (zum Beispiel ein dynamischer Tarif), zeigt eine neue Kachel den
+  durchschnittlichen Strompreis je kWh. Energie ohne Preis zählt nicht mit. Wird
+  der Preis nur je Tag, Monat oder Jahr verrechnet, steht ein Hinweis dabei, dass
+  die Kosten bei wechselndem Tarif ungenau sein können.
+
 ### Behoben
 
 - **Energiedashboard**: Als „historisch“ markierte Entitäten lösen im Status
@@ -11,6 +19,14 @@
 ---
 
 ### English
+
+#### New
+
+- **Energy dashboard, cost analysis**: When the grid price comes from an entity
+  (for example a dynamic tariff), a new tile shows the average electricity price
+  per kWh. Energy without a price is not counted. If the price is only applied per
+  day, month or year, a note says the costs can be inaccurate with a changing
+  tariff.
 
 #### Fixed
 

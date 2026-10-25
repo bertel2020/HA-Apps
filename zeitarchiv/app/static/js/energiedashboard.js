@@ -470,13 +470,23 @@
       // Preis-Sensoren werden als Währung/kWh vorausgesetzt (siehe Hinweistext im
       // Setup); die Währung kommt aus der Einstellung (window.ZA_CURRENCY, siehe
       // i18n.js) — es wird nichts umgerechnet, nur Symbol und Stellung ändern sich.
-      fmtCurrency(value) {
+      fmtCurrency(value, digits = 2) {
         if (value == null) return '—';
         const c = window.ZA_CURRENCY;
         const sign = Math.round(value * 100) < 0 ? '-' : '';
-        const number = this.fmt(Math.abs(value), 2);
+        const number = this.fmt(Math.abs(value), digits);
         if (c.position === 'after') return `${sign}${number} ${c.symbol}`;
         return `${sign}${c.symbol}${c.spaced ? ' ' : ''}${number}`;
+      },
+
+      // Kosten sind nur dann stundengenau, wenn der Preis je Stunde verrechnet wird;
+      // bei Tages-, Monats- oder Jahresbuckets gilt ein Preis für den ganzen Bucket.
+      costResolutionHint() {
+        const a = this.kpi.kosten_aufloesung;
+        if (this.kpi.netzbezug_avg_price == null || !a || a === 'stunde') return '';
+        return t('Preis je {stufe} gerechnet, bei wechselndem Tarif ungenau', {
+          stufe: {tag: t('Tag'), monat: t('Monat'), jahr: t('Jahr')}[a] || a,
+        });
       },
 
       // Alltags-Vergleich für "Vermiedenes CO2" — bewusst nur eine grobe

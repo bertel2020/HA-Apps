@@ -254,3 +254,43 @@ def test_a_rarely_changing_helper_keeps_its_value_for_the_whole_running_month(mo
         assert min(serie) == _ts(-120)
     finally:
         a.close()
+
+
+# --- Ø-Preis Netzbezug (Kostenanalyse) -------------------------------------
+
+def test_avg_price_is_cost_divided_by_grid_energy_with_price_entity(monkeypatch, tmp: Path) -> None:
+    from test_energiedashboard_flow import _preis_anlage
+
+    a, config = _preis_anlage(tmp, versatz_minuten=0, takt_minuten=60)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        kpi = a.service.compute_flow(config, "day", -1)["kpi"]
+        # 6 kWh × 0,30 € = 1,80 € → 0,30 €/kWh; Tag = stündliche Buckets
+        assert kpi["netzbezug_avg_price"] == pytest.approx(0.30, abs=0.0005)
+        assert kpi["kosten_aufloesung"] == "stunde"
+    finally:
+        a.close()
+
+
+def test_avg_price_missing_when_no_energy_has_a_price(monkeypatch, tmp: Path) -> None:
+    a, config = _preis_anlage_mit_ende(tmp, letzte_stunde=3)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        kpi = a.service.compute_flow(config, "day", -1)["kpi"]
+        # Der Sensor verstummt um 3 Uhr, der ganze Netzbezug liegt danach: keine Energie
+        # mit Preis, also kein Durchschnitt (statt 0 €/kWh aus 0 € Kosten).
+        assert kpi["netzbezug_avg_price"] is None
+    finally:
+        a.close()
+
+
+def test_avg_price_missing_with_fixed_price(monkeypatch, tmp: Path) -> None:
+    a, config = _beispielanlage(tmp)
+    config["kosten"] = {"preis_netzbezug_fixed": 0.30}
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        kpi = a.service.compute_flow(config, "day", -1)["kpi"]
+        assert kpi["netzbezug_cost"] == pytest.approx(1.80, abs=0.01)
+        assert kpi["netzbezug_avg_price"] is None
+    finally:
+        a.close()
