@@ -6,7 +6,8 @@ Katalog der Integration entgegen und gibt ihr die Aufträge (``GET
 /api/selection/jobs``, ``POST /api/selection/ack``); er wird von
 ``api_routes.create_api_router`` eingehängt (dort liegt ``check_auth``).
 ``make_router`` liefert die Seiten für die Oberfläche (Ingress) und wird in
-main.py eingehängt; die schreibenden Formulare liegen in selection_ui_routes.py.
+main.py eingehängt; die schreibenden Formulare liegen in selection_ui_routes.py und
+(Phase 2: Ausschließen, Wieder aufnehmen, Muster) selection_change_routes.py.
 
 Besitzer: Die App merkt sich im Katalog die ``entry_id`` des zuletzt sendenden
 Eintrags (Header ``X-Zeitarchiv-Entry-Id``). Nur er bekommt Aufträge; ein Aufruf
@@ -25,10 +26,12 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
-from . import selection_catalog, selection_jobs, selection_suggest
+from . import selection_catalog, selection_jobs, selection_patterns, selection_search, selection_suggest
 from .formatting import format_time, format_timestamp
+from .i18n import N_
+from .selection_change_routes import make_change_router
 from .selection_topics import TOPIC_INFO
-from .selection_ui_routes import make_ui_router
+from .selection_ui_routes import make_ui_router, view_result
 from .storage.index import Index
 
 logger = logging.getLogger(__name__)
@@ -42,6 +45,9 @@ class CatalogRequest(BaseModel):
     label: Any = None
     log: list[Any] | None = Field(default=None, max_length=1000)
     ledger_count: Any = None
+    # Phase 2: die Include-Muster der Integration. Wer das Feld schickt, kennt auch die
+    # neuen Aufträge (Ausschließen, Wieder aufnehmen, Muster).
+    patterns: list[Any] | None = Field(default=None, max_length=1000)
 
 
 class AckRequest(BaseModel):
@@ -79,9 +85,10 @@ def create_catalog_router(
         """Nimmt den Entitäten-Katalog der Integration an und ersetzt den vorigen."""
         check_auth(authorization, request.headers.get("x-request-id", "-"), x_zeitarchiv_integration_version)
         phase1 = "log" in body.model_fields_set or "ledger_count" in body.model_fields_set
+        phase2 = "patterns" in body.model_fields_set and body.patterns is not None
         count = selection_catalog.save(
             data_dir, body.entities, label=body.label, log=body.log, ledger_count=body.ledger_count,
-            entry_id=x_zeitarchiv_entry_id, phase1=phase1,
+            entry_id=x_zeitarchiv_entry_id, phase1=phase1 or phase2, patterns=body.patterns, phase2=phase2,
         )
         logger.info("Entitäten-Katalog empfangen · event=catalog_received entities=%d", count)
         return {"ok": True, "count": count}
@@ -132,32 +139,68 @@ def topic_tiles(entities: list[dict[str, Any]], archived: set[str]) -> list[dict
     return tiles
 
 
+#: Das Pseudo-Thema der Suche: nie „sensibel“, ein Hinweis kommt aus den Treffern.
+SEARCH_INFO = {"label": N_("Suche"), "sensitive": False}
+
+
+def take_unexcludable(result: dict[str, Any]) -> list[dict[str, Any]]:
+    """Nimmt die Zeilen, deren Ausschluss sich aufheben lässt, aus den Gruppen heraus:
+    sie stehen auf der Seite als eigene Gruppe „Ausschluss aufheben und übernehmen“."""
+    taken: list[dict[str, Any]] = []
+    for section in ("recommended", "more"):
+        for group in result[section]:
+            taken.extend(row for row in group["rows"] if row["unexcludable"])
+            group["rows"] = [row for row in group["rows"] if not row["unexcludable"]]
+        result[section] = [group for group in result[section] if group["rows"]]
+    for row in taken:
+        row["checked"] = False
+    return sorted(taken, key=lambda row: (row["name"].lower(), row["entity_id"]))
+
+
 def make_router(get_index: Callable[[], Index], templates: Jinja2Templates, data_dir: Path, tz) -> APIRouter:
     router = APIRouter()
 
     @router.get("/selection", response_class=HTMLResponse)
-    def selection_page(request: Request, topic: str = "energie") -> HTMLResponse:
-        """Vorschläge zu einem Thema, berechnet aus dem zuletzt empfangenen Katalog."""
-        if topic not in selection_suggest.TOPICS:
+    def selection_page(request: Request, topic: str = "energie", q: str = "") -> HTMLResponse:
+        """Vorschläge zu einem Thema oder zu einer Freitext-Eingabe (``q``), berechnet aus
+        dem zuletzt empfangenen Katalog. Trifft die Eingabe ein Synonym, zeigt die Seite
+        das Thema („Verstanden als …“), sonst die Treffer der Volltextsuche."""
+        query = selection_search.clean_query(q)
+        understood = selection_search.understood_topic(query) if query else None
+        if understood:
+            topic = understood
+        elif query:
+            topic = selection_search.SEARCH_TOPIC
+        elif topic not in selection_suggest.TOPICS:
             topic = selection_suggest.TOPICS[0]
+        is_search = topic == selection_search.SEARCH_TOPIC
         catalog = selection_catalog.load(data_dir)
         result = tiles = received = None
+        patterns: list[dict[str, Any]] = []
+        unexclude: list[dict[str, Any]] = []
         counts = {"new": 0, "archived": 0, "selected": 0, "excluded": 0, "text": 0}
+        can_change = bool(catalog and catalog.get("phase1") and catalog.get("phase2"))
         if catalog is not None:
             archived = {entity["entity_id"] for entity in get_index().list_entities()}
-            result = selection_suggest.suggest(topic, catalog["entities"], archived)
+            result = view_result(topic, query, catalog["entities"], archived)
             tiles = topic_tiles(catalog["entities"], archived)
             received = f"{format_timestamp(catalog['received_ts'], tz)} {format_time(catalog['received_ts'], tz)}"
-            for section in ("recommended", "more"):
-                for group in result[section]:
-                    for row in group["rows"]:
-                        counts[row["status"]] += 1
-                        counts["text"] += row["status"] == "new" and row["text"]
+            for row in selection_patterns.view_rows(result):
+                counts[row["status"]] += 1
+                counts["text"] += row["status"] == "new" and row["text"]
+            patterns = selection_patterns.candidates(
+                selection_patterns.view_rows(result), catalog["entities"], archived,
+                {item["pattern"] for item in catalog.get("patterns") or ()},
+            )
+            if can_change:
+                unexclude = take_unexcludable(result)
         return templates.TemplateResponse(request, "selection.html", {
-            "topic": topic, "topic_info": TOPIC_INFO[topic], "result": result, "received": received,
-            "tiles": tiles, "counts": counts, "can_apply": bool(catalog and catalog.get("phase1")),
-            "max_ids": selection_jobs.MAX_IDS,
+            "topic": topic, "topic_info": SEARCH_INFO if is_search else TOPIC_INFO[topic], "result": result,
+            "received": received, "tiles": tiles, "counts": counts, "can_apply": bool(catalog and catalog.get("phase1")),
+            "can_change": can_change, "max_ids": selection_jobs.MAX_IDS, "query": query, "is_search": is_search,
+            "understood": understood, "patterns": patterns, "unexclude": unexclude,
         })
 
     router.include_router(make_ui_router(get_index, templates, data_dir, tz))
+    router.include_router(make_change_router(get_index, templates, data_dir, tz))
     return router

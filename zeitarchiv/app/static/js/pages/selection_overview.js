@@ -3,7 +3,8 @@
 //  1. Nach dem Übernehmen fragt die Seite den Stand des Auftrags ab, solange er
 //     auf die Integration wartet, und lädt neu, sobald er sich ändert
 //     („wartet auf die Integration“ → „aktiv“). Höchstens 30 Minuten lang.
-//  2. „Auswahl entfernen …“ ist gesperrt, solange kein Kästchen markiert ist.
+//  2. Die Knöpfe der Massenleiste (Entfernen, Ausschließen, Wieder aufnehmen)
+//     sind gesperrt, solange kein Kästchen markiert ist.
 (function () {
   'use strict';
   const banner = document.getElementById('ov-job');
@@ -26,8 +27,10 @@
   const form = document.getElementById('ov-bulk');
   const submit = document.getElementById('ov-bulk-submit');
   if (form && submit && !submit.disabled) {
+    const buttons = form.querySelectorAll('.ov-bulk-btn');
     const update = () => {
-      submit.disabled = !form.querySelector('input.ov-check:checked');
+      const none = !form.querySelector('input.ov-check:checked');
+      buttons.forEach((button) => { button.disabled = none; });
     };
     form.addEventListener('change', update);
     update();

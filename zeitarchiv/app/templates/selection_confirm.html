@@ -13,12 +13,14 @@
 
     {% elif kind == "apply" %}
     <h1>{{ _("Auswahl übernehmen?") }}</h1>
-    <p class="sub">{{ _("Thema {topic}: {count} Entitäten kommen neu in die Auswahl der Zeitarchiv-Integration.", topic=topic_text, count=ids|length) }}</p>
+    <p class="sub">{% if is_search %}{{ _("Suche „{query}“: {count} Entitäten kommen neu in die Auswahl der Zeitarchiv-Integration.", query=q, count=count) }}{% else %}{{ _("Thema {topic}: {count} Entitäten kommen neu in die Auswahl der Zeitarchiv-Integration.", topic=topic_text, count=count) }}{% endif %}</p>
     <form method="post" action="{{ app_root }}/selection/apply" class="settings-panel">
       <input type="hidden" name="topic" value="{{ topic }}">
+      {% if is_search %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
       <input type="hidden" name="mode" value="{{ mode }}">
       <input type="hidden" name="confirmed" value="1">
       {% for entity_id in ids %}<input type="hidden" name="entity_id" value="{{ entity_id }}">{% endfor %}
+      {% for entity_id in unexclude %}<input type="hidden" name="unexclude_id" value="{{ entity_id }}">{% endfor %}
       <ul>
         <li>{% if mode == "label" %}{{ _("Übernommen über das Label „Zeitarchiv“ in Home Assistant, ohne Neustart der Integration.") }}{% else %}{{ _("Übernommen als Einzel-IDs in den Optionen der Integration; sie lädt dafür einmal neu.") }}{% endif %}</li>
         {% if text_count %}<li>{{ _("{count} davon sind Textentitäten und gehen als Einzel-ID.", count=text_count) }}</li>{% endif %}
@@ -27,11 +29,17 @@
       </ul>
       {% if high_rate %}<p class="hint hint-warn">{{ _("{count} davon ändern sich sehr oft (z. B. Leistung) und erzeugen viele Daten.", count=high_rate) }}</p>{% endif %}
       {% if sensitive %}<p class="hint hint-warn">{{ _("Anwesenheit ist sensibel: das Archiv zeigt später lückenlos, wann jemand zu Hause war. Nur übernehmen, wenn alle Betroffenen einverstanden sind.") }}</p>{% endif %}
+      {% if unexclude %}
+      <p class="hint hint-warn">{{ _("Für {count} davon wird der Ausschluss aufgehoben. Sie stehen heute als Einzel-ID in den Ausschlüssen der Integration:", count=unexclude|length) }}</p>
+      <ul>{% for name in unexclude_names %}<li>{{ name }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if names %}
       <details>
         <summary>{{ _("Entitäten anzeigen") }}</summary>
         <ul>{% for name in names %}<li>{{ name }}</li>{% endfor %}</ul>
         {% if more %}<p>{{ _("… und {count} weitere", count=more) }}</p>{% endif %}
       </details>
+      {% endif %}
       <p>
         <button type="submit" class="btn primary">{{ _("Übernehmen") }}</button>
         <a class="btn" href="{{ back }}">{{ _("Abbrechen") }}</a>
@@ -56,6 +64,7 @@
       <label class="filter-chip"><input type="checkbox" name="confirm_manual" value="1"><span>{{ _("Ja, auch die von Hand gewählten entfernen") }}</span></label>
       {% endif %}
       {% if still_count %}<p class="hint hint-warn">{{ _("{count} davon bleiben trotzdem ausgewählt, weil ein Muster, Bereich, Gerät oder Label sie erfasst. Das lässt sich nur in Home Assistant ändern.", count=still_count) }}</p>{% endif %}
+      {% if skipped %}<p class="hint">{{ _("{count} markierte Zeilen passen nicht zu dieser Aktion und bleiben unverändert.", count=skipped) }}</p>{% endif %}
       <p>
         <button type="submit" class="btn btn-danger">{{ _("Entfernen") }}</button>
         <a class="btn" href="{{ back }}">{{ _("Abbrechen") }}</a>
@@ -68,11 +77,88 @@
     <form method="post" action="{{ app_root }}/selection/undo" class="settings-panel">
       <input type="hidden" name="target" value="{{ target }}">
       <input type="hidden" name="confirmed" value="1">
-      <p>{% if plan.action == "remove" %}{{ _("{count} Entitäten werden wieder aus der Auswahl entfernt.", count=plan.entity_ids|length) }}{% else %}{{ _("{count} Entitäten kommen wieder in die Auswahl, auf demselben Weg wie vorher.", count=plan.entity_ids|length) }}{% endif %}</p>
-      <ul>{% for name in names %}<li>{{ name }}</li>{% endfor %}</ul>
+      <p>{% if plan.action == "remove" %}{{ _("{count} Entitäten werden wieder aus der Auswahl entfernt.", count=count) }}{% elif plan.action == "add" %}{{ _("{count} Entitäten kommen wieder in die Auswahl, auf demselben Weg wie vorher.", count=count) }}{% elif plan.action == "exclude" %}{{ _("{count} Entitäten werden wieder ausgeschlossen.", count=count) }}{% elif plan.action == "include" %}{{ _("Für {count} Entitäten wird der Ausschluss wieder aufgehoben.", count=count) }}{% elif plan.action == "remove_patterns" %}{{ _("Diese Muster werden wieder entfernt:") }}{% else %}{{ _("Diese Muster kommen wieder in die Auswahl:") }}{% endif %}</p>
+      <ul>{% for name in names %}<li>{% if plan.patterns %}<code>{{ name }}</code>{% else %}{{ name }}{% endif %}</li>{% endfor %}</ul>
       {% if more %}<p>{{ _("… und {count} weitere", count=more) }}</p>{% endif %}
       <p>
         <button type="submit" class="btn primary">{{ _("Rückgängig machen") }}</button>
+        <a class="btn" href="{{ back }}">{{ _("Abbrechen") }}</a>
+      </p>
+    </form>
+    {% elif kind == "exclude" %}
+    <h1>{{ _("Ausschließen?") }}</h1>
+    <p class="sub">{{ _("{count} Entitäten kommen in die Ausschlüsse der Integration und werden nicht mehr archiviert, egal auf welchem Weg sie ausgewählt sind. Bereits archivierte Daten bleiben erhalten.", count=ids|length) }}</p>
+    <form method="post" action="{{ app_root }}/selection/exclude" class="settings-panel">
+      <input type="hidden" name="confirmed" value="1">
+      {% if one %}<input type="hidden" name="one" value="{{ one }}">{% else %}{% for entity_id in ids %}<input type="hidden" name="ids" value="{{ entity_id }}">{% endfor %}{% endif %}
+      <ul>{% for name in names %}<li>{{ name }}</li>{% endfor %}</ul>
+      {% if more %}<p>{{ _("… und {count} weitere", count=more) }}</p>{% endif %}
+      {% if held_count %}<p class="hint">{{ _("{count} davon sind über ein Muster, einen Bereich, ein Gerät oder ein Label ausgewählt. Der Ausschluss gilt trotzdem; die Auswahl in Home Assistant bleibt sonst, wie sie ist.", count=held_count) }}</p>{% endif %}
+      {% if manual_count %}
+      <p class="hint hint-warn">{{ _("Von Hand in Home Assistant gewählt: {count}. Der Ausschluss setzt sich über diese Wahl hinweg.", count=manual_count) }}</p>
+      {% if manual_missing %}<p class="hint hint-warn" role="alert">{{ _("Bitte bestätige, dass auch die von Hand gewählten Entitäten ausgeschlossen werden sollen.") }}</p>{% endif %}
+      <label class="filter-chip"><input type="checkbox" name="confirm_manual" value="1"><span>{{ _("Ja, auch die von Hand gewählten ausschließen") }}</span></label>
+      {% endif %}
+      {% if skipped %}<p class="hint">{{ _("{count} markierte Zeilen passen nicht zu dieser Aktion und bleiben unverändert.", count=skipped) }}</p>{% endif %}
+      <p>
+        <button type="submit" class="btn btn-danger">{{ _("Ausschließen") }}</button>
+        <a class="btn" href="{{ back }}">{{ _("Abbrechen") }}</a>
+      </p>
+    </form>
+
+    {% elif kind == "include" %}
+    <h1>{{ _("Wieder aufnehmen?") }}</h1>
+    <p class="sub">{{ _("Für {count} Entitäten wird der Ausschluss aufgehoben. Archiviert werden sie danach, wenn sie auf einem Weg ausgewählt sind.", count=ids|length) }}</p>
+    <form method="post" action="{{ app_root }}/selection/include" class="settings-panel">
+      <input type="hidden" name="confirmed" value="1">
+      {% if one %}<input type="hidden" name="one" value="{{ one }}">{% else %}{% for entity_id in ids %}<input type="hidden" name="ids" value="{{ entity_id }}">{% endfor %}{% endif %}
+      <ul>{% for name in names %}<li>{{ name }}</li>{% endfor %}</ul>
+      {% if more %}<p>{{ _("… und {count} weitere", count=more) }}</p>{% endif %}
+      {% if blocked_count %}<p class="hint hint-warn">{{ _("{count} davon passen zusätzlich auf ein Ausschlussmuster und bleiben ausgeschlossen. Das Muster ändert man in Home Assistant.", count=blocked_count) }}</p>{% endif %}
+      {% if skipped %}<p class="hint">{{ _("{count} markierte Zeilen passen nicht zu dieser Aktion und bleiben unverändert.", count=skipped) }}</p>{% endif %}
+      <p>
+        <button type="submit" class="btn primary">{{ _("Wieder aufnehmen") }}</button>
+        <a class="btn" href="{{ back }}">{{ _("Abbrechen") }}</a>
+      </p>
+    </form>
+
+    {% elif kind == "pattern_add" %}
+    <h1>{{ _("Muster übernehmen?") }}</h1>
+    <p class="sub">{{ _("Das Muster {pattern} kommt in die Auswahl der Zeitarchiv-Integration.", pattern=pattern) }}</p>
+    <form method="post" action="{{ app_root }}/selection/patterns" class="settings-panel">
+      <input type="hidden" name="pattern" value="{{ pattern }}">
+      <input type="hidden" name="topic" value="{{ topic }}">
+      {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+      <input type="hidden" name="confirmed" value="1">
+      <p><code>{{ pattern }}</code></p>
+      <ul>
+        <li>{{ _("{total} passende Entitäten", total=preview.total) }}: {{ _("{count} neu", count=preview.new) }} · {{ _("{count} schon archiviert oder ausgewählt", count=preview.archived) }} · {{ _("{count} ausgeschlossen", count=preview.excluded) }}</li>
+        <li>{{ _("Neue Entitäten, die später zum Muster passen, werden automatisch archiviert.") }}</li>
+        <li>{{ _("Textentitäten werden von Mustern nie erfasst.") }}{% if preview.text %} {{ _("Hier betrifft das {count}.", count=preview.text) }}{% endif %}</li>
+        <li>{{ _("Übernommen in den Optionen der Integration; sie lädt dafür einmal neu. Rückgängig geht im Verlauf.") }}</li>
+      </ul>
+      {% if preview.outside %}<p class="hint hint-warn">{{ _("Davon nicht in dieser Ansicht: {count}", count=preview.outside) }}</p>{% endif %}
+      {% if preview.high_rate %}<p class="hint hint-warn">{{ _("{count} davon ändern sich sehr oft (z. B. Leistung) und erzeugen viele Daten.", count=preview.high_rate) }}</p>{% endif %}
+      <details>
+        <summary>{{ _("Beispiele") }}</summary>
+        <ul>{% for example in preview.examples %}<li>{{ example.name }} <code>{{ example.entity_id }}</code>{% if not example.in_view %} · {{ _("nicht in dieser Ansicht") }}{% endif %}</li>{% endfor %}</ul>
+      </details>
+      <p>
+        <button type="submit" class="btn primary">{{ _("Muster übernehmen") }}</button>
+        <a class="btn" href="{{ back }}">{{ _("Abbrechen") }}</a>
+      </p>
+    </form>
+
+    {% elif kind == "pattern_remove" %}
+    <h1>{{ _("Muster entfernen?") }}</h1>
+    <p class="sub">{{ _("Das Muster {pattern} wird aus der Auswahl der Zeitarchiv-Integration entfernt. Bereits archivierte Daten bleiben erhalten.", pattern=pattern) }}</p>
+    <form method="post" action="{{ app_root }}/selection/patterns/remove" class="settings-panel">
+      <input type="hidden" name="pattern" value="{{ pattern }}">
+      <input type="hidden" name="confirmed" value="1">
+      <p><code>{{ pattern }}</code> · {{ _("{count} Treffer", count=item.count) }}</p>
+      <p class="hint">{{ _("Entitäten, die nur über dieses Muster ausgewählt sind, werden danach nicht mehr archiviert.") }}</p>
+      <p>
+        <button type="submit" class="btn btn-danger">{{ _("Muster entfernen") }}</button>
         <a class="btn" href="{{ back }}">{{ _("Abbrechen") }}</a>
       </p>
     </form>

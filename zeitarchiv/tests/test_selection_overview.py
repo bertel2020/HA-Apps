@@ -148,7 +148,8 @@ def test_undo_rules() -> None:
 
 def test_undo_plan_reverses_the_action_on_the_same_way() -> None:
     add_plan = selection_overview.undo_plan(_log("a"))
-    assert add_plan == {"action": "remove", "mode": "auto", "entity_ids": ["sensor.a"], "force_ids": [], "topic": "energie"}
+    assert add_plan == {"action": "remove", "mode": "auto", "entity_ids": ["sensor.a"], "force_ids": [], "topic": "energie",
+                        "patterns": []}
     removed = _log("r", action="remove", mode=None, source="manual_ui", results={
         "sensor.a": {"result": "ok", "mode": "label"}, "sensor.b": {"result": "ok", "mode": "ids"}})
     plan = selection_overview.undo_plan(removed)

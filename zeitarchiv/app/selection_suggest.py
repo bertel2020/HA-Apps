@@ -111,7 +111,11 @@ def suggest_energy(entities: Iterable[dict[str, Any]], archived: Collection[str]
 
 def suggestion(row: dict[str, Any], reason: str, archived: Collection[str], *, high_rate: bool = False) -> dict[str, Any]:
     """Eine Vorschlagszeile. ``text``: der Zustand ist reiner Text, die Entität geht nur
-    als Einzel-ID in die Auswahl (ein Label wirkt für sie nicht)."""
+    als Einzel-ID in die Auswahl (ein Label wirkt für sie nicht). ``unexcludable``: nur als
+    Einzel-ID ausgeschlossen, der Ausschluss lässt sich beim Übernehmen aufheben (Phase 2);
+    ein Ausschluss über ein Muster bleibt gesperrt."""
+    excluded_by = row.get("excluded_by") or ()
+    status = _status(row, archived)
     return {
         "entity_id": row["entity_id"],
         "name": row.get("name") or row["entity_id"],
@@ -119,9 +123,11 @@ def suggestion(row: dict[str, Any], reason: str, archived: Collection[str], *, h
         "kind": _kind(row),
         "reason": reason,
         "group": _group_key(row),
-        "status": _status(row, archived),
+        "status": status,
         "high_rate": high_rate,
         "text": bool(row.get("text")),
+        "unexcludable": status == "excluded" and bool(excluded_by)
+        and all(way.get("type") == "entity" for way in excluded_by),
     }
 
 

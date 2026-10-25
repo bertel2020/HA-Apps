@@ -65,6 +65,13 @@
   .ov-tl-details ul{margin:4px 0 0;padding-left:16px;}
   .ov-tl-item form{margin-top:8px;}
 
+  /* Phase 2: Muster in Monospace, Mustertabelle, Link im Auftragsbanner. */
+  .ov-pattern{font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));color:var(--ink);overflow-wrap:anywhere;}
+  .ov-patterns-h{margin-top:24px;}
+  .ov-patterns td{vertical-align:middle;}
+  .ov-patterns form{margin:0;}
+  .ov-job a{color:var(--accent-line);}
+
   @media (max-width:900px){
     .ov-layout{grid-template-columns:minmax(0,1fr);}
   }
@@ -78,4 +85,10 @@
     .ov-table td.ov-col-actions{grid-column:3;grid-row:1;}
     .ov-menu-pop{width:min(280px,calc(100vw - 48px));}
     .ov-search{flex-wrap:wrap;}
+    .ov-patterns thead{display:none;}
+    .ov-patterns,.ov-patterns tbody{display:block;}
+    .ov-patterns tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;padding:10px 4px;border-bottom:1px solid var(--border);}
+    .ov-patterns td{display:block;padding:0;border:0;}
+    .ov-patterns td:nth-child(2),.ov-patterns td:nth-child(3){grid-column:1;font-size:calc(12.5px * var(--font-scale, 1));}
+    .ov-patterns td.ov-col-actions{grid-column:2;grid-row:1;}
   }

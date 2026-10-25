@@ -10,6 +10,11 @@ die Integration nur, wenn sich etwas geändert hat.
 Ablage wie der Katalog als JSON-Datei im Datenverzeichnis, atomar ersetzt und
 hinter einer Sperre (Routen laufen in Threads). Offene Aufträge bleiben alle,
 beendete höchstens ``KEEP_FINISHED``.
+
+Phase 2: zusätzlich ``exclude``/``include`` (Ausschluss setzen und aufheben),
+``add`` mit ``unexclude_ids`` (Ausschluss aufheben und übernehmen) und
+``add_patterns``/``remove_patterns`` (Include-Muster). Musteraufträge tragen ihre
+Muster in ``patterns`` und keine Entitäts-IDs; ihre Ergebnisse stehen je Musterstring.
 """
 
 from __future__ import annotations
@@ -25,17 +30,19 @@ from pathlib import Path
 from typing import Any
 
 from .i18n import tr
-from .selection_catalog import RESULTS, valid_entity_id
+from .selection_catalog import clean_result, valid_entity_id, valid_pattern
 
 FILENAME = "selection_jobs.json"
 
 MAX_IDS = 200
+MAX_PATTERNS = 20
 TTL_SECONDS = 24 * 3600
 KEEP_FINISHED = 200
 MAX_MESSAGE = 300
 
 SOURCES = ("assistant", "manual_ui", "undo")
-ACTIONS = ("add", "remove")
+ACTIONS = ("add", "remove", "exclude", "include", "add_patterns", "remove_patterns")
+PATTERN_ACTIONS = ("add_patterns", "remove_patterns")
 ADD_MODES = ("label", "ids")
 ACK_STATUSES = ("applied", "partial", "failed")
 FINISHED = (*ACK_STATUSES, "expired")
@@ -43,6 +50,7 @@ FINISHED = (*ACK_STATUSES, "expired")
 #: Felder, die die Integration bekommt (der Vertrag); der Rest ist Buchführung der App.
 PUBLIC_FIELDS = (
     "id", "created_ts", "expires_ts", "source", "action", "mode", "topic", "entity_ids", "undo_of", "force_ids",
+    "unexclude_ids", "patterns",
 )
 
 _LOCK = threading.Lock()
@@ -104,7 +112,10 @@ def _load_expired(data_dir: Path, now: float | None) -> dict[str, Any]:
 
 
 def public(job: dict[str, Any]) -> dict[str, Any]:
-    return {field: job.get(field) for field in PUBLIC_FIELDS}
+    out = {field: job.get(field) for field in PUBLIC_FIELDS}
+    for field in ("unexclude_ids", "patterns"):  # Aufträge aus Phase 1 kennen sie nicht
+        out[field] = list(out[field] or [])
+    return out
 
 
 def rev(data_dir: Path, now: float | None = None) -> int:
@@ -139,22 +150,50 @@ def create(
     topic: str | None = None,
     undo_of: str | None = None,
     force_ids: Iterable[str] = (),
+    unexclude_ids: Iterable[str] = (),
+    patterns: Iterable[str] = (),
     entry_id: str | None = None,
     now: float | None = None,
 ) -> dict[str, Any]:
-    """Prüft und legt einen Auftrag an; ``JobError`` mit lesbarem Text bei ungültigen Angaben."""
+    """Prüft und legt einen Auftrag an; ``JobError`` mit lesbarem Text bei ungültigen Angaben.
+
+    ``unexclude_ids`` nur bei ``add`` und nur als Teilmenge von ``entity_ids``;
+    ``patterns`` nur (und dann Pflicht) bei Musteraufträgen, die keine IDs tragen."""
     if source not in SOURCES or action not in ACTIONS:
         raise JobError(tr("Unbekannte Art von Auftrag."))
     if action == "add" and mode not in ADD_MODES:
         raise JobError(tr("Unbekannter Modus für das Hinzufügen."))
     ids = list(dict.fromkeys(entity_ids))
-    if not ids:
-        raise JobError(tr("Keine Entität ausgewählt."))
-    if len(ids) > MAX_IDS:
-        raise JobError(tr("Höchstens {max} Entitäten je Auftrag.", max=MAX_IDS))
-    invalid = [eid for eid in ids if not valid_entity_id(eid)]
-    if invalid:
-        raise JobError(tr("Ungültige Entitäts-ID: {entity_id}", entity_id=str(invalid[0])[:80]))
+    unexclude = list(dict.fromkeys(unexclude_ids))
+    pattern_list = list(dict.fromkeys(patterns))
+    if action in PATTERN_ACTIONS:
+        if ids:
+            raise JobError(tr("Ein Musterauftrag trägt keine Entitäten."))
+        if not pattern_list:
+            raise JobError(tr("Kein Muster angegeben."))
+        if len(pattern_list) > MAX_PATTERNS:
+            raise JobError(tr("Höchstens {max} Muster je Auftrag.", max=MAX_PATTERNS))
+        wrong = [value for value in pattern_list if not valid_pattern(value)]
+        if wrong:
+            raise JobError(tr("Ungültiges Muster: {pattern}", pattern=str(wrong[0])[:80]))
+    else:
+        if pattern_list:
+            raise JobError(tr("Muster gehören nur in einen Musterauftrag."))
+        if not ids:
+            raise JobError(tr("Keine Entität ausgewählt."))
+        if len(ids) > MAX_IDS:
+            raise JobError(tr("Höchstens {max} Entitäten je Auftrag.", max=MAX_IDS))
+        invalid = [eid for eid in ids if not valid_entity_id(eid)]
+        if invalid:
+            raise JobError(tr("Ungültige Entitäts-ID: {entity_id}", entity_id=str(invalid[0])[:80]))
+    if unexclude and (action != "add" or any(eid not in ids for eid in unexclude)):
+        raise JobError(tr("Ausschluss aufheben geht nur für Entitäten, die hinzugefügt werden."))
+    if action == "add":
+        job_mode = mode
+    elif action == "add_patterns":
+        job_mode = "ids"  # die Muster liegen in den Optionen der Integration
+    else:
+        job_mode = "auto"
     now = time.time() if now is None else now
     job = {
         "id": uuid.uuid4().hex,
@@ -162,11 +201,13 @@ def create(
         "expires_ts": now + TTL_SECONDS,
         "source": source,
         "action": action,
-        "mode": mode if action == "add" else "auto",
+        "mode": job_mode,
         "topic": (topic or None) and str(topic)[:40],
         "entity_ids": ids,
         "undo_of": undo_of,
         "force_ids": [eid for eid in dict.fromkeys(force_ids) if eid in ids] if action == "add" else [],
+        "unexclude_ids": unexclude,
+        "patterns": pattern_list,
         "entry_id": entry_id,
         "status": "pending",
         "results": {},
@@ -221,12 +262,14 @@ def ack(
             if expired:
                 _write(data_dir, data)
             return True
-        allowed = set(job["entity_ids"])
+        # Ergebnisse je ID, bei Musteraufträgen je Musterstring; unbekannte Werte gelten als Fehler.
+        allowed = set(job["entity_ids"]) | set(job.get("patterns") or ())
         cleaned: dict[str, dict[str, Any]] = {}
-        for entity_id, item in (results.items() if isinstance(results, dict) else ()):
-            if entity_id in allowed and isinstance(item, dict) and item.get("result") in RESULTS:
+        for key, item in (results.items() if isinstance(results, dict) else ()):
+            result = clean_result(item.get("result")) if isinstance(item, dict) else None
+            if key in allowed and result is not None:
                 mode = item.get("mode") if item.get("mode") in ADD_MODES else None
-                cleaned[entity_id] = {"result": item["result"], "mode": mode}
+                cleaned[key] = {"result": result, "mode": mode}
         job.update({
             "status": status, "results": cleaned, "finished_ts": now,
             "message": message.strip()[:MAX_MESSAGE] or None if isinstance(message, str) else None,

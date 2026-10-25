@@ -86,7 +86,8 @@ def test_ack_is_idempotent_and_cleans_the_results(tmp_path: Path) -> None:
     rev = selection_jobs.rev(tmp_path)
     stored = selection_jobs.get(tmp_path, job["id"])
     assert stored["status"] == "partial" and stored["message"] == "Teilweise"
-    assert stored["results"] == {"sensor.a": {"result": "ok", "mode": "label"}}
+    # Phase 2: unbekannte Ergebniswerte gelten als Fehler, statt wegzufallen.
+    assert stored["results"] == {"sensor.a": {"result": "ok", "mode": "label"}, "sensor.b": {"result": "error", "mode": None}}
     assert selection_jobs.ack(tmp_path, job["id"], "failed") is True
     assert selection_jobs.get(tmp_path, job["id"])["status"] == "partial"
     assert selection_jobs.rev(tmp_path) == rev

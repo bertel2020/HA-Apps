@@ -5,6 +5,10 @@ Reine Funktionen über Katalog (Spiegel der Integration) und Aufträgen der App;
 die Routen in selection_ui_routes.py setzen nur zusammen. Die Herkunft rechnet
 die Integration (``origin``, ``via``, ``drifted``); hier wird sie nur gelesen,
 gefiltert und in Wörter gefasst.
+
+Phase 2: Ausschließen und Wieder aufnehmen je Zeile und als Massenaktion, Muster
+des Assistenten (``via`` mit ``assistant``) und die neuen Verlaufsaktionen samt
+Rückgängig (``exclude``↔``include``, ``add_patterns``↔``remove_patterns``).
 """
 
 from __future__ import annotations
@@ -61,9 +65,14 @@ def in_table(row: dict[str, Any]) -> bool:
     return bool(row.get("selected") or row.get("excluded") or row.get("drifted") or row.get("origin"))
 
 
+def assistant_patterns(row: dict[str, Any]) -> list[str]:
+    """Muster des Assistenten, über die die Entität in der Auswahl ist (Phase 2)."""
+    return [way["value"] for way in _ways(row, "pattern") if way.get("assistant")]
+
+
 def matches_filter(row: dict[str, Any], key: str, managed_label: str | None = None) -> bool:
     if key == "zeitarchiv":
-        return row.get("origin") == "assistant"
+        return row.get("origin") == "assistant" or bool(assistant_patterns(row))
     if key == "manuell":
         return row.get("origin") == "manual"
     if key in _WAY_FOR_FILTER:
@@ -83,8 +92,33 @@ def manual_single_id(row: dict[str, Any]) -> bool:
 def removable(row: dict[str, Any]) -> bool:
     """Entfernbar ist eine Entität des Assistenten (Ledger) oder eine von Hand gewählte
     Einzel-ID. Was nur über Muster, Bereich, Gerät oder ein fremdes Label drin ist,
-    ändert man in Home Assistant (Ausschließen kommt mit Phase 2)."""
+    lässt sich nur ausschließen (``excludable``) oder in Home Assistant ändern."""
     return row.get("origin") == "assistant" or bool(row.get("drifted")) or manual_single_id(row)
+
+
+def excludable(row: dict[str, Any]) -> bool:
+    """Ausschließen geht für alles, was ausgewählt und noch nicht ausgeschlossen ist,
+    auf welchem Weg auch immer (Phase 2)."""
+    return bool(row.get("selected")) and not row.get("excluded")
+
+
+def excluded_patterns(row: dict[str, Any]) -> list[str]:
+    return [way["value"] for way in row.get("excluded_by") or () if way.get("type") == "pattern" and way.get("value")]
+
+
+def includable(row: dict[str, Any]) -> bool:
+    """Wieder aufnehmen hebt nur einen Ausschluss als Einzel-ID auf; ein Ausschlussmuster
+    ändert man in Home Assistant (dann meldet die Integration ``blocked``)."""
+    return bool(row.get("excluded")) and any(way.get("type") == "entity" for way in row.get("excluded_by") or ())
+
+
+def held_by_ha(row: dict[str, Any], managed_label: str | None = None) -> list[str]:
+    """Wege außerhalb des Assistenten (Muster, Bereich, Gerät, fremdes Label), über die die
+    Entität ausgewählt bleibt, solange sie nicht ausgeschlossen ist — für die Hinweise."""
+    return [
+        kind for kind in ("pattern", "area", "device", "label")
+        if any(not way.get("assistant") for way in _foreign_ways(row, kind, managed_label))
+    ]
 
 
 def badges(row: dict[str, Any], managed_label: str | None = None) -> list[dict[str, str]]:
@@ -101,6 +135,8 @@ def badges(row: dict[str, Any], managed_label: str | None = None) -> list[dict[s
             out.insert(0, {"kind": "assistant", "text": tr("Zeitarchiv · {topic}", topic=topic) if topic else tr("Zeitarchiv")})
         elif kind == "entity" and row.get("origin") != "assistant":
             out.append({"kind": "manual", "text": tr("Manuell in HA")})
+        elif kind == "pattern" and way.get("assistant"):
+            out.insert(0, {"kind": "assistant", "text": tr("Zeitarchiv-Muster: {value}", value=way["value"])})
         elif kind == "pattern":
             out.append({"kind": "way", "text": tr("Muster: {value}", value=way["value"])})
         elif kind == "area":
@@ -135,6 +171,8 @@ def explain(row: dict[str, Any], managed_label: str | None = None) -> list[str]:
                 lines.append(tr("Vom Zeitarchiv-Assistenten als Einzel-ID hinzugefügt."))
             else:
                 lines.append(tr("Vom Zeitarchiv-Assistenten über das Label hinzugefügt."))
+        elif kind == "pattern" and way.get("assistant"):
+            lines.append(tr("Passt auf das Muster „{value}“, das der Zeitarchiv-Assistent hinzugefügt hat.", value=way["value"]))
         elif kind == "pattern":
             lines.append(tr("Passt auf das Muster „{value}“.", value=way["value"]))
         elif kind == "area":
@@ -196,6 +234,8 @@ def table(
             "added_ts": row.get("added_ts"), "removable": removable(row), "manual": manual_single_id(row),
             "assistant": row.get("origin") == "assistant" or bool(row.get("drifted")),
             "only_in_ha": not removable(row) and bool(row.get("selected")),
+            "excludable": excludable(row), "includable": includable(row),
+            "excluded_patterns": excluded_patterns(row), "held_by_ha": held_by_ha(row, managed_label),
         })
     return {
         "rows": items, "counts": counts, "filter": filter_key, "query": query.strip()[:100],
@@ -208,6 +248,7 @@ def table(
 SOURCE_TEXT = {
     "assistant": N_("Zeitarchiv-Assistent"),
     "manual_ui": N_("In Zeitarchiv entfernt"),
+    "manual_ui_change": N_("In Zeitarchiv geändert"),
     "manual_ha": N_("In HA geändert"),
     "undo": N_("Rückgängig gemacht"),
 }
@@ -225,8 +266,24 @@ RESULT_TEXT = {
     "excluded": N_("ausgeschlossen"),
     "blocked": N_("gesperrt"),
     "unsupported": N_("nur in HA änderbar"),
+    "invalid": N_("ungültig"),
+    "too_many": N_("zu viele Muster"),
     "error": N_("Fehler"),
 }
+ACTION_TEXT = {
+    "add": N_("Hinzufügen"),
+    "remove": N_("Entfernen"),
+    "exclude": N_("Ausschließen"),
+    "include": N_("Wieder aufnehmen"),
+    "add_patterns": N_("Muster hinzufügen"),
+    "remove_patterns": N_("Muster entfernen"),
+}
+#: Gegenaktion für Rückgängig; Muster bleiben Muster, Ausschlüsse Ausschlüsse.
+UNDO_ACTION = {
+    "add": "remove", "remove": "add", "exclude": "include", "include": "exclude",
+    "add_patterns": "remove_patterns", "remove_patterns": "add_patterns",
+}
+PATTERN_ACTIONS = ("add_patterns", "remove_patterns")
 
 
 def _summary(entry: dict[str, Any]) -> str:
@@ -238,13 +295,28 @@ def _summary(entry: dict[str, Any]) -> str:
         if entry.get("mode") == "ids":
             return tr("{count} hinzugefügt (Einzel-IDs)", count=count)
         return tr("{count} hinzugefügt (Label)", count=count)
+    if entry.get("action") == "exclude":
+        return tr("Ausgeschlossen: {count}", count=count)
+    if entry.get("action") == "include":
+        return tr("Wieder aufgenommen: {count}", count=count)
+    if entry.get("action") == "add_patterns":
+        return tr("Muster hinzugefügt")
+    if entry.get("action") == "remove_patterns":
+        return tr("Muster entfernt")
     return tr("{count} entfernt", count=count)
+
+
+def _source_text(entry: dict[str, Any]) -> str:
+    source = entry.get("source")
+    if source == "manual_ui" and entry.get("action") != "remove":
+        source = "manual_ui_change"
+    return tr(str(SOURCE_TEXT.get(source, source or "")))
 
 
 def _undo_blocked(entry: dict[str, Any], undo_targets: set[str]) -> bool:
     return (
         entry.get("source") == "manual_ha"
-        or entry.get("action") not in {"add", "remove"}
+        or entry.get("action") not in UNDO_ACTION
         or entry.get("status") not in {"applied", "partial"}
         or bool(entry.get("undone_by"))
         or entry["id"] in undo_targets
@@ -253,10 +325,10 @@ def _undo_blocked(entry: dict[str, Any], undo_targets: set[str]) -> bool:
 
 
 def undo_ids(entry: dict[str, Any]) -> list[str]:
-    """IDs, die ein Rückgängig betrifft: nur die tatsächlich geänderten (Ergebnis ``ok``).
-    Ohne Ergebnisse je ID gelten alle gespeicherten IDs."""
+    """IDs (bei Musteraktionen: Muster), die ein Rückgängig betrifft: nur die tatsächlich
+    geänderten (Ergebnis ``ok``). Ohne Ergebnisse gelten alle gespeicherten."""
     results = entry.get("results") or {}
-    ids = entry.get("entity_ids") or []
+    ids = (entry.get("patterns") if entry.get("action") in PATTERN_ACTIONS else entry.get("entity_ids")) or []
     if not results:
         return list(ids)
     return [eid for eid in ids if (results.get(eid) or {}).get("result") == "ok"]
@@ -283,7 +355,8 @@ def timeline(catalog: dict[str, Any] | None, jobs: list[dict[str, Any]]) -> list
         entry = {
             "id": job["id"], "ts": job.get("created_ts") or 0, "source": job.get("source"),
             "action": job.get("action"), "mode": job.get("mode"), "topic": job.get("topic"),
-            "entity_ids": list(job.get("entity_ids") or [])[:50], "count": len(job.get("entity_ids") or ()),
+            "entity_ids": list(job.get("entity_ids") or [])[:50], "patterns": list(job.get("patterns") or []),
+            "count": len(job.get("entity_ids") or ()) or len(job.get("patterns") or ()),
             "status": status, "results": job.get("results") or {}, "undo_of": job.get("undo_of"),
             "undone_by": None, "ha_detail": None, "message": job.get("message"),
             "expires_ts": job.get("expires_ts"),
@@ -292,14 +365,16 @@ def timeline(catalog: dict[str, Any] | None, jobs: list[dict[str, Any]]) -> list
         items.append({**entry, "origin": "job"})
     items.sort(key=lambda item: item.get("ts") or 0, reverse=True)
     for item in items[:TIMELINE_LIMIT]:
-        item["source_text"] = tr(str(SOURCE_TEXT.get(item.get("source"), item.get("source") or "")))
+        item.setdefault("patterns", [])
+        item["source_text"] = _source_text(item)
         item["status_text"] = tr(str(STATUS_TEXT.get(item.get("status"), item.get("status") or "")))
         item["summary"] = _summary(item)
         item["topic_text"] = topic_label(item.get("topic")) if item.get("topic") else ""
+        keys = item["patterns"] if item.get("action") in PATTERN_ACTIONS else item.get("entity_ids") or []
         item["details"] = [
             {"entity_id": eid, "result": tr(str(RESULT_TEXT[(item["results"].get(eid) or {})["result"]]))
              if (item["results"].get(eid) or {}).get("result") in RESULT_TEXT else ""}
-            for eid in item.get("entity_ids") or []
+            for eid in keys
         ]
     return items[:TIMELINE_LIMIT]
 
@@ -311,11 +386,21 @@ def find_undo_source(catalog: dict[str, Any] | None, jobs: list[dict[str, Any]],
 
 def undo_plan(entry: dict[str, Any]) -> dict[str, Any]:
     """Gegenauftrag zu einem Eintrag: Hinzufügen wird Entfernen, Entfernen wird wieder
-    Hinzufügen, und zwar im selben Weg wie vorher (Einzel-IDs bleiben Einzel-IDs)."""
+    Hinzufügen, und zwar im selben Weg wie vorher (Einzel-IDs bleiben Einzel-IDs);
+    Ausschließen ↔ Wieder aufnehmen, Muster hinzufügen ↔ Muster entfernen."""
     ids = undo_ids(entry)
-    if entry.get("action") == "add":
-        return {"action": "remove", "mode": "auto", "entity_ids": ids, "force_ids": [], "topic": entry.get("topic")}
+    action = entry.get("action")
+    topic = entry.get("topic")
+    if action in PATTERN_ACTIONS:
+        counter = UNDO_ACTION[action]
+        return {"action": counter, "mode": "ids" if counter == "add_patterns" else "auto", "entity_ids": [],
+                "force_ids": [], "topic": topic, "patterns": ids}
+    if action in {"exclude", "include"}:
+        return {"action": UNDO_ACTION[action], "mode": "auto", "entity_ids": ids, "force_ids": [], "topic": topic,
+                "patterns": []}
+    if action == "add":
+        return {"action": "remove", "mode": "auto", "entity_ids": ids, "force_ids": [], "topic": topic, "patterns": []}
     results = entry.get("results") or {}
     force = [eid for eid in ids if (results.get(eid) or {}).get("mode") == "ids"]
     mode = "label" if any((results.get(eid) or {}).get("mode") == "label" for eid in ids) else "ids"
-    return {"action": "add", "mode": mode, "entity_ids": ids, "force_ids": force, "topic": entry.get("topic")}
+    return {"action": "add", "mode": mode, "entity_ids": ids, "force_ids": force, "topic": topic, "patterns": []}
