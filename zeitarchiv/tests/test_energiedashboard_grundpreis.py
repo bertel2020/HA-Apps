@@ -254,3 +254,140 @@ def test_a_rarely_changing_helper_keeps_its_value_for_the_whole_running_month(mo
         assert min(serie) == _ts(-120)
     finally:
         a.close()
+
+
+# --- Ø-Preis Netzbezug (Kostenanalyse) -------------------------------------
+
+def test_avg_price_is_cost_divided_by_grid_energy_with_price_entity(monkeypatch, tmp: Path) -> None:
+    from test_energiedashboard_flow import _preis_anlage
+
+    a, config = _preis_anlage(tmp, versatz_minuten=0, takt_minuten=60)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        kpi = a.service.compute_flow(config, "day", -1)["kpi"]
+        # 6 kWh × 0,30 € = 1,80 € → 0,30 €/kWh; Tag = stündliche Buckets
+        assert kpi["netzbezug_avg_price"] == pytest.approx(0.30, abs=0.0005)
+        assert kpi["kosten_aufloesung"] == "stunde"
+    finally:
+        a.close()
+
+
+def test_avg_price_missing_when_no_energy_has_a_price(monkeypatch, tmp: Path) -> None:
+    a, config = _preis_anlage_mit_ende(tmp, letzte_stunde=3)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        kpi = a.service.compute_flow(config, "day", -1)["kpi"]
+        # Der Sensor verstummt um 3 Uhr, der ganze Netzbezug liegt danach: keine Energie
+        # mit Preis, also kein Durchschnitt (statt 0 €/kWh aus 0 € Kosten).
+        assert kpi["netzbezug_avg_price"] is None
+    finally:
+        a.close()
+
+
+def test_avg_price_missing_with_fixed_price(monkeypatch, tmp: Path) -> None:
+    a, config = _beispielanlage(tmp)
+    config["kosten"] = {"preis_netzbezug_fixed": 0.30}
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        kpi = a.service.compute_flow(config, "day", -1)["kpi"]
+        assert kpi["netzbezug_cost"] == pytest.approx(1.80, abs=0.01)
+        assert kpi["netzbezug_avg_price"] is None
+    finally:
+        a.close()
+
+
+# --- Stündliche Kostenrechnung bei Monatsansicht -----------------------------
+
+def _tarif_anlage(tmp: Path, hourly_rollup: bool):
+    """Netzbezug 3 kWh um 12 Uhr und 3 kWh um 23 Uhr; Preis 0,10 € bis 12 Uhr,
+    danach 0,50 €. Der Preis zu Tagesbeginn (0,10) gälte bei Tagesbuckets für alles."""
+    from test_energiedashboard_flow import _Anlage
+
+    a = _Anlage(tmp)
+    a.zaehler("sensor.netz", (0, 100.0), (11, 100.0), (12, 103.0), (13, 103.0), (23, 106.0))
+    a.index.get_or_create_entity("sensor.preis", "sensor", "measurement", "EUR/kWh")
+    for i in range(24 * 4):
+        ts = _ts(i * 0.25)
+        preis = 0.10 if i * 0.25 < 12 else 0.50
+        hotbuffer.append(tmp, "sensor.preis", ts, preis, TZ)
+        a.index.record_write("sensor.preis", ts)
+    if hourly_rollup:
+        a.index.set_entity_hourly_rollup("sensor.netz", True)
+    config = ed._empty_config()
+    config.update({"netzbezug": "sensor.netz"})
+    config["kosten"] = {"preis_netzbezug": "sensor.preis"}
+    return a, config
+
+
+def test_month_costs_use_hourly_prices_when_the_hourly_stage_exists(monkeypatch, tmp: Path) -> None:
+    a, config = _tarif_anlage(tmp, hourly_rollup=True)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        kpi = a.service.compute_flow(config, "month", 0)["kpi"]
+        assert kpi["netzbezug_cost"] == pytest.approx(3.0, abs=0.01)
+        assert kpi["netzbezug_avg_price"] == pytest.approx(0.50, abs=0.001)
+        assert kpi["kosten_aufloesung"] == "stunde"
+    finally:
+        a.close()
+
+
+def test_month_costs_fall_back_to_buckets_without_the_hourly_stage(monkeypatch, tmp: Path) -> None:
+    a, config = _tarif_anlage(tmp, hourly_rollup=False)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        kpi = a.service.compute_flow(config, "month", 0)["kpi"]
+        # Preis zu Beginn des Tagesbuckets (0,10) für alle 6 kWh: der bekannte Fehler.
+        assert kpi["netzbezug_cost"] == pytest.approx(0.60, abs=0.01)
+        assert kpi["kosten_aufloesung"] == "tag"
+    finally:
+        a.close()
+
+
+def _tarif_anlage_voll(tmp: Path, hourly_rollup: bool):
+    """Wie _tarif_anlage, dazu Erzeuger, Einspeisung und ein Verbraucher.
+
+    PV 4 kWh um 12 Uhr und 4 kWh um 23 Uhr, Einspeisung 1 kWh um 12 Uhr:
+    Eigenverbrauch 7 kWh. Verbraucher 2 kWh um 12 Uhr (teuer) und 2 kWh um 23 Uhr.
+    """
+    a, config = _tarif_anlage(tmp, hourly_rollup)
+    a.zaehler("sensor.pv", (0, 500.0), (11, 500.0), (12, 504.0), (13, 504.0), (23, 508.0))
+    a.zaehler("sensor.einspeisung", (0, 50.0), (11, 50.0), (12, 51.0), (13, 51.0), (23, 51.0))
+    a.zaehler("sensor.waschmaschine", (0, 10.0), (11, 10.0), (12, 12.0), (13, 12.0), (23, 14.0))
+    if hourly_rollup:
+        for eid in ("sensor.pv", "sensor.einspeisung", "sensor.waschmaschine"):
+            a.index.set_entity_hourly_rollup(eid, True)
+    config.update({
+        "einspeisung": "sensor.einspeisung",
+        "erzeuger": [{"entity_id": "sensor.pv", "name": "PV"}],
+        "verbraucher": [{"entity_id": "sensor.waschmaschine", "name": "Waschmaschine"}],
+    })
+    config["kosten"]["preis_eigenverbrauch"] = "sensor.preis"
+    return a, config
+
+
+def test_self_consumption_and_consumer_costs_use_hourly_prices(monkeypatch, tmp: Path) -> None:
+    a, config = _tarif_anlage_voll(tmp, hourly_rollup=True)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "month", 0)
+        kpi = flow["kpi"]
+        # Eigenverbrauch 3 kWh (12 Uhr, 0,50 €) + 4 kWh (23 Uhr, 0,50 €)
+        assert kpi["vermiedene_kosten"] == pytest.approx(3.5, abs=0.01)
+        assert kpi["eigenverbrauch_verguetung"] == pytest.approx(3.5, abs=0.01)
+        zeile = next(r for r in flow["verbraucher_breakdown"] if r["name"] == "Waschmaschine")
+        assert zeile["kosten"] == pytest.approx(2.0, abs=0.01)  # 4 kWh × 0,50 €
+    finally:
+        a.close()
+
+
+def test_self_consumption_and_consumer_costs_fall_back_without_hourly_stage(monkeypatch, tmp: Path) -> None:
+    a, config = _tarif_anlage_voll(tmp, hourly_rollup=False)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "month", 0)
+        # Preis zu Tagesbeginn 0,10 € für alles
+        assert flow["kpi"]["vermiedene_kosten"] == pytest.approx(0.70, abs=0.01)
+        zeile = next(r for r in flow["verbraucher_breakdown"] if r["name"] == "Waschmaschine")
+        assert zeile["kosten"] == pytest.approx(0.40, abs=0.01)
+    finally:
+        a.close()

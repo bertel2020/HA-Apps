@@ -68,8 +68,8 @@
                       </template>
                     </div>
                   </span>
-                  <span class="tbl-field-label">{{ _("Gruppen-Beschriftung (optional)") }}</span>
-                  <input type="text" placeholder="{{ _('z. B. „2025“ — überspannt mehrere Spalten') }}" maxlength="30" x-model="col.group_label">
+                  <span class="tbl-field-label" data-tooltip="{{ _('Überspannt mehrere Spalten') }}">{{ _("Gruppen-Beschriftung (optional)") }}</span>
+                  <input type="text" placeholder="{{ _('z. B. „2025“') }}" maxlength="30" x-model="col.group_label">
                   <span class="tbl-field-label">{{ _("Zeitraum-Typ") }}</span>
                   <!-- x-data lokal statt col.xxx: .tbl-columns scrollt horizontal
                        (overflow-x:auto), was rechnerisch auch overflow-y:auto

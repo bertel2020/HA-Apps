@@ -467,6 +467,18 @@ class ImportPlan:
     # entfallen. Im Dry Run wird nichts angelegt (ha_import.DryStateMapper).
     new_states: list[str] = field(default_factory=list)
     refused_state_rows: int = 0
+    # Nur CSV-Import: die ersten übersprungenen Zeilen (Zeile, Grund, Rohtext),
+    # siehe csv_import.ParseResult.skipped_examples.
+    skipped_examples: list[tuple[int, str, str]] = field(default_factory=list)
+    # Ziel ist ein Zähler und ein Wert liegt unter seinem Vorgänger: der Verlauf
+    # rechnet Differenzen, so ein Wert zählt dort als Zählerrückgang (Differenz 0).
+    # Typisch, wenn Monatssummen statt laufender Zählerstände importiert werden.
+    counter_decreases: int = 0
+    counter_decrease_months: list[str] = field(default_factory=list)
+    # Ziel ist ein Zähler und der früheste importierte Wert liegt vor allen
+    # vorhandenen Daten: er hat keinen Vorgänger, der Verlauf zeigt dort 0.
+    # Monat ("JJJJ-MM") dieses ersten Werts, sonst leer.
+    counter_first_month: str = ""
 
 
 @dataclass
@@ -782,6 +794,7 @@ def plan_import_rows(
     factor: float = 1.0,
     include_existing_months: bool = False,
     accepts_state: bool = False,
+    skipped_examples: list[tuple[int, str, str]] | None = None,
 ) -> ImportPlan:
     """Generischer Dry-Run-Kern: berechnet, was import_rows() für bereits
     geparste (ts, value)-Zeilen tun würde, ohne etwas zu schreiben — von
@@ -817,6 +830,9 @@ def plan_import_rows(
                     data_dir, entity_id, label, month_rows, tz
                 )
             )
+    decreases, decrease_months = (
+        _counter_decreases(rows, tz) if entity["aggregation_type"] == "counter" else (0, [])
+    )
     return ImportPlan(
         entity_id=entity_id,
         variable_id=source_label,
@@ -831,7 +847,41 @@ def plan_import_rows(
         rows_to_recover=rows_to_recover,
         skipped_rows=skipped_rows,
         factor=factor,
+        skipped_examples=skipped_examples or [],
+        counter_decreases=decreases,
+        counter_decrease_months=decrease_months,
+        counter_first_month=_counter_first_month(rows, entity, tz),
     )
+
+
+#: Wie viele Monate die Zählerwarnung beim Namen nennt.
+COUNTER_DECREASE_MONTHS_SHOWN = 6
+
+
+def _counter_decreases(rows: list[tuple[float, float]], tz: ZoneInfo) -> tuple[int, list[str]]:
+    """Zählt Werte, die unter ihrem Vorgänger liegen, und nennt die ersten Monate."""
+    count = 0
+    months: list[str] = []
+    previous: float | None = None
+    for ts, value in sorted(rows):
+        if previous is not None and value < previous:
+            count += 1
+            label = datetime.fromtimestamp(ts, tz).strftime("%Y-%m")
+            if label not in months and len(months) < COUNTER_DECREASE_MONTHS_SHOWN:
+                months.append(label)
+        previous = value
+    return count, months
+
+
+def _counter_first_month(rows: list[tuple[float, float]], entity, tz: ZoneInfo) -> str:
+    """Monat des frühesten Werts, wenn er bei einem Zähler keinen Vorgänger hat."""
+    if not rows or entity["aggregation_type"] != "counter":
+        return ""
+    first = min(ts for ts, _ in rows)
+    existing = entity["first_ts"]
+    if existing is not None and existing <= first:
+        return ""
+    return datetime.fromtimestamp(first, tz).strftime("%Y-%m")
 
 
 def import_variable(

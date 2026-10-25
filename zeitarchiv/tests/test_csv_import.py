@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import shutil
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -161,6 +162,21 @@ def test_parse_rows_accepts_german_decimal_comma_and_bool_synonyms() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_parse_value_reads_thousands_separators_in_both_conventions() -> None:
+    """Excel exportiert deutsch "1.572,4", englisch "1,572.4" — vorher fielen beide
+    als unlesbar durch und wurden still übersprungen."""
+    assert csv_import._parse_value("1.572,4") == 1572.4
+    assert csv_import._parse_value("1,572.4") == 1572.4
+    assert csv_import._parse_value("1.234.567,8") == 1234567.8
+    assert csv_import._parse_value("1,234,567") == 1234567.0
+    assert csv_import._parse_value("-1.572,4") == -1572.4
+    # Unverändert: Einzeltrenner bleibt Dezimaltrenner, kaputte Gruppen bleiben unlesbar.
+    assert csv_import._parse_value("1572,4") == 1572.4
+    assert csv_import._parse_value("1.5") == 1.5
+    assert csv_import._parse_value("1,2,3") is None
+    assert csv_import._parse_value("12.34,5") is None
+
+
 def test_parse_rows_skips_malformed_lines_instead_of_failing_the_whole_file() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-test-"))
     try:
@@ -178,6 +194,139 @@ def test_parse_rows_skips_malformed_lines_instead_of_failing_the_whole_file() ->
         assert result.skipped == 3
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+class _Form(dict):
+    """Minimaler Ersatz für starlette FormData: nur get/getlist."""
+
+    def getlist(self, key: str) -> list[str]:
+        value = self.get(key, [])
+        return value if isinstance(value, list) else [value]
+
+
+def test_csv_pairs_collects_columns_and_rejects_missing_or_repeated_entities() -> None:
+    from app.import_routes import ImportService
+
+    form = _Form({"extra_col": ["2", "x"], "extra_entity": ["sensor.b", " sensor.c "]})
+    extras = ImportService._csv_extra_mappings(form)
+    # Unlesbare Spalte fällt auf 0 zurück, Leerzeichen der Entität werden entfernt.
+    assert extras == [{"col": 2, "entity_id": "sensor.b"}, {"col": 0, "entity_id": "sensor.c"}]
+    pairs, error = ImportService._csv_pairs(1, "sensor.a", extras)
+    assert error is None
+    assert pairs == [(1, "sensor.a"), (2, "sensor.b"), (0, "sensor.c")]
+
+    # Einzelne Zuordnung ohne Entität: die bekannte Meldung bleibt.
+    assert ImportService._csv_pairs(1, "", [])[1] == "Bitte eine Ziel-Entität auswählen."
+    # Zusätzliche Zeile ohne Entität (gerade hinzugefügt, nichts gewählt).
+    assert ImportService._csv_pairs(1, "sensor.a", [{"col": 2, "entity_id": ""}])[1] is not None
+    # Dieselbe Entität zweimal würde sich selbst überschreiben.
+    assert ImportService._csv_pairs(1, "sensor.a", [{"col": 2, "entity_id": "sensor.a"}])[1] is not None
+
+
+def test_sniff_ts_format_picks_the_first_format_that_reads_every_cell() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-test-"))
+    try:
+        cases = {
+            "unix_s": "1700000000;1\n1700000060;2\n",
+            "unix_ms": "1700000000000;1\n1700000060000;2\n",
+            "iso": "2026-01-15 10:00:00;1\n2026-01-16;2\n",
+            "de_date": "15.01.2026;1\n15.02.2026;2\n",
+            "de_datetime": "15.01.2026 14:30;1\n15.02.2026 08:00;2\n",
+            "de_datetime_s": "15.01.2026 14:30:05;1\n",
+            None: "kaputt;1\n15.02.2026;2\n",
+        }
+        for expected, text in cases.items():
+            path = tmp / "f.csv"
+            _write(path, text)
+            assert csv_import.sniff_ts_format(path, ";", False, 0) == expected, expected
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_parse_rows_reads_the_german_date_presets() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-test-"))
+    try:
+        path = tmp / "de.csv"
+        _write(path, "15.01.2026;84,1\n15.02.2026;156,5\n")
+        result = csv_import.parse_rows(path, ";", False, 0, 1, "de_date", "", TZ)
+        assert [v for _, v in result.rows] == [84.1, 156.5]
+        assert result.rows[0][0] == datetime(2026, 1, 15, tzinfo=TZ).timestamp()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_parse_rows_cumulate_turns_period_totals_into_running_meter_readings() -> None:
+    """Monatssummen als laufender Zählerstand: der Verlauf rechnet daraus wieder
+    die Monatswerte, und kein Wert liegt mehr unter seinem Vorgänger."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-test-"))
+    try:
+        path = tmp / "m.csv"
+        # bewusst unsortiert: summiert wird nach Zeit, nicht nach Dateireihenfolge
+        _write(path, "15.02.2026;72,5\n15.01.2026;84,1\n15.03.2026;734,7\n")
+        result = csv_import.parse_rows(path, ";", False, 0, 1, "de_date", "", TZ, cumulate=True)
+        assert [round(v, 1) for _, v in result.rows] == [84.1, 156.6, 891.3]
+        plain = csv_import.parse_rows(path, ";", False, 0, 1, "de_date", "", TZ)
+        assert [v for _, v in plain.rows] == [84.1, 72.5, 734.7]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_describe_sample_shows_how_each_cell_is_read() -> None:
+    rows = [["15.01.2026", "84,1"], ["15.02.2026", "1.572"], ["15.13.2026", "abc"], ["15.04.2026"]]
+    result = csv_import.describe_sample(rows, 0, 1, "custom", "%d.%m.%Y", TZ)
+    assert result[0] == {"ts": "15.01.2026 00:00", "value": "84,1", "ambiguous": False}
+    # Ein Trenner vor drei Ziffern: gelesen als Dezimal, aber als mehrdeutig markiert.
+    assert result[1] == {"ts": "15.02.2026 00:00", "value": "1,572", "ambiguous": True}
+    assert result[2] == {"ts": None, "value": None, "ambiguous": False}
+    # Zu kurze Zeile: fehlende Zelle gilt als unlesbar, ohne Ausnahme.
+    assert result[3] == {"ts": "15.04.2026 00:00", "value": None, "ambiguous": False}
+
+
+def test_parse_rows_records_first_skipped_lines_with_reason() -> None:
+    """Die Vorschau soll nennen, WELCHE Zeile woran scheitert, nicht nur eine Zahl."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-test-"))
+    try:
+        path = tmp / "bad.csv"
+        _write(path, "ts;wert\n15.01.2026;1\nkaputt;2\n15.03.2026;abc\n15.04.2026\n15.05.2026;x\n")
+        result = csv_import.parse_rows(path, ";", True, 0, 1, "custom", "%d.%m.%Y", TZ)
+        assert len(result.rows) == 1
+        assert result.skipped == 4
+        # Zeilennummern zählen die Kopfzeile mit; nur die ersten drei werden gemerkt.
+        assert result.skipped_examples == [
+            (3, "timestamp", "kaputt"),
+            (4, "value", "abc"),
+            (5, "columns", "15.04.2026"),
+        ]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_counter_first_month_only_when_the_first_value_has_no_predecessor() -> None:
+    from app.storage import symcon_import
+
+    jan = datetime(2026, 1, 15, tzinfo=TZ).timestamp()
+    feb = datetime(2026, 2, 15, tzinfo=TZ).timestamp()
+    rows = [(feb, 2.0), (jan, 1.0)]
+    counter = {"aggregation_type": "counter", "first_ts": None}
+    assert symcon_import._counter_first_month(rows, counter, TZ) == "2026-01"
+    # Vorhandene Daten liegen früher: der erste importierte Wert hat einen Vorgänger.
+    assert symcon_import._counter_first_month(rows, {**counter, "first_ts": jan - 1}, TZ) == ""
+    # Vorhandene Daten beginnen später: der importierte Wert wird der erste.
+    assert symcon_import._counter_first_month(rows, {**counter, "first_ts": feb}, TZ) == "2026-01"
+    assert symcon_import._counter_first_month(rows, {**counter, "aggregation_type": "standard"}, TZ) == ""
+    assert symcon_import._counter_first_month([], counter, TZ) == ""
+
+
+def test_counter_decreases_names_months_of_values_below_their_predecessor() -> None:
+    from app.storage import symcon_import
+
+    def ts(month: int) -> float:
+        return datetime(2026, month, 1, tzinfo=TZ).timestamp()
+
+    rows = [(ts(1), 84.0), (ts(2), 156.5), (ts(3), 891.2), (ts(4), 800.0), (ts(5), 900.0), (ts(6), 10.0)]
+    assert symcon_import._counter_decreases(rows, TZ) == (2, ["2026-04", "2026-06"])
+    assert symcon_import._counter_decreases(rows[:3], TZ) == (0, [])
+    assert symcon_import._counter_decreases([], TZ) == (0, [])
 
 
 def test_parse_rows_sorts_output_by_timestamp() -> None:

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{# Statusseite eines Auftrags des Auswahl-Assistenten (ROADMAP 1.33, Phase 2). Dieselbe
+   Adresse liefert der kleinen Statusabfrage JSON (selection_ui_routes.job_status). #}
+{% block title %}{{ _("Zeitarchiv — Auftrag") }}{% endblock %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ asset('css/pages/selection_job.css') }}">
+{% endblock %}
+{% block content %}
+  <div class="page">
+    <p class="crumb"><a href="{{ app_root }}/entities">{{ _("Entitäten") }}</a> / <a href="{{ app_root }}/selection/overview">{{ _("Auswahl & Verlauf") }}</a></p>
+    <h1>{{ _("Auftrag: {action}", action=action_text) }}</h1>
+    <p class="sub">
+      <span class="job-badge job-badge-{{ job.status }}">{{ status_text }}</span>
+      {% if topic_text %} · {{ topic_text }}{% endif %}
+      · {{ _("angelegt {when}", when=created) }}{% if finished %} · {{ _("beendet {when}", when=finished) }}{% endif %}
+    </p>
+
+    {% if import_hint %}
+    <div class="job-import" role="note">
+      {{ _("Neu archivierte Entitäten beginnen mit dem aktuellen Wert. Den bisherigen Verlauf kannst du aus Home Assistant nachladen.") }}
+      <a href="{{ app_root }}/import?tab=ha">{{ _("Verlauf aus Home Assistant nachladen →") }}</a>
+    </div>
+    {% endif %}
+
+    {% if job.message %}<p class="job-note">{{ job.message }}</p>{% endif %}
+
+    <div class="settings-panel">
+      {% if details %}
+      <ul class="job-details">
+        {% for detail in details %}
+        <li>{% if pattern_job %}<code class="job-mono">{{ detail.key }}</code>{% else %}<span class="job-mono">{{ detail.key }}</span>{% endif %}{% if detail.result %} · {{ detail.result }}{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      <p><a class="btn" href="{{ app_root }}/selection/overview">{{ _("Zu Auswahl & Verlauf") }}</a></p>
+    </div>
+  </div>
+{% endblock %}

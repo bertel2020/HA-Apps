@@ -901,7 +901,7 @@ def test_zeitstempel_aus_der_zukunft_gilt_als_abgelaufen(monkeypatch, tmp: Path)
 # --- Auffälligkeiten-Baseline ----------------------------------------------
 
 
-def _anomalie_anlage(tmp: Path) -> tuple[_Anlage, dict]:
+def _anomalie_anlage(tmp: Path, kind_feb: float | None = None) -> tuple[_Anlage, dict]:
     """Ein Verbraucher, dessen Verbrauch im ANGEZEIGTEN Monat deutlich über den
     drei Vormonaten liegt — nur dann feuert die Auffälligkeit, nur dann steht
     überhaupt eine Baseline im Ergebnis, und nur dann fällt ein falsch gelesener
@@ -916,30 +916,37 @@ def _anomalie_anlage(tmp: Path) -> tuple[_Anlage, dict]:
     Anders als die übrigen Fixtures hier reicht der Hot Buffer nicht: eine
     Monatsabfrage liest abgeschlossene Tage aus dem Rollup. Die Monate werden
     deshalb wie in test_query.py als archivierte Monate samt Rollup angelegt.
+
+    Mit ``kind_feb`` hängt hinter dem Gerät (dann ein Zwischenzähler) ein Kind,
+    das in den Vormonaten je 5 kWh und im Februar ``kind_feb`` kWh verbraucht.
     """
     a = _Anlage(tmp)
     a.zaehler("sensor.netz", (0, 0.0), (23, 100.0))
     a.index.get_or_create_entity("sensor.geraet", "sensor", "total_increasing", "kWh")
     # (Jahr, Monat, Zählerstand am Monatsanfang, Verbrauch im Monat)
-    monate = [(2023, 11, 0.0, 10.0), (2023, 12, 10.0, 10.0),
-              (2024, 1, 20.0, 10.0), (2024, 2, 30.0, 40.0)]
-    archiv = tmp / "archive" / "sensor.geraet"
-    archiv.mkdir(parents=True, exist_ok=True)
-    for jahr, monat, start, menge in monate:
-        erster = _dt.datetime(jahr, monat, 1, 6, tzinfo=TZ)
-        letzter = _dt.datetime(jahr, monat, 28, 18, tzinfo=TZ)
-        tabelle = pa.table({
-            "ts": [erster.timestamp(), letzter.timestamp()],
-            "value": [start, start + menge],
-        })
-        pq.write_table(tabelle, archiv / f"{jahr}-{monat:02d}.parquet")
-        rollup.append_completed_month(tmp, "sensor.geraet", "counter", tabelle, jahr, monat, TZ)
-        a.index.record_write("sensor.geraet", letzter.timestamp())
+    entitaeten = {"sensor.geraet": [10.0, 10.0, 10.0, 40.0]}
+    verbraucher = [{"entity_id": "sensor.geraet", "name": "Gerät"}]
+    if kind_feb is not None:
+        a.index.get_or_create_entity("sensor.kind", "sensor", "total_increasing", "kWh")
+        entitaeten["sensor.kind"] = [5.0, 5.0, 5.0, kind_feb]
+        verbraucher.append({"entity_id": "sensor.kind", "name": "Kind", "parent": "sensor.geraet"})
+    for entity_id, mengen in entitaeten.items():
+        archiv = tmp / "archive" / entity_id
+        archiv.mkdir(parents=True, exist_ok=True)
+        start = 0.0
+        for (jahr, monat), menge in zip([(2023, 11), (2023, 12), (2024, 1), (2024, 2)], mengen, strict=True):
+            erster = _dt.datetime(jahr, monat, 1, 6, tzinfo=TZ)
+            letzter = _dt.datetime(jahr, monat, 28, 18, tzinfo=TZ)
+            tabelle = pa.table({
+                "ts": [erster.timestamp(), letzter.timestamp()],
+                "value": [start, start + menge],
+            })
+            pq.write_table(tabelle, archiv / f"{jahr}-{monat:02d}.parquet")
+            rollup.append_completed_month(tmp, entity_id, "counter", tabelle, jahr, monat, TZ)
+            a.index.record_write(entity_id, letzter.timestamp())
+            start += menge
     config = ed._empty_config()
-    config.update({
-        "netzbezug": "sensor.netz", "hub_name": "Haus",
-        "verbraucher": [{"entity_id": "sensor.geraet", "name": "Gerät"}],
-    })
+    config.update({"netzbezug": "sensor.netz", "hub_name": "Haus", "verbraucher": verbraucher})
     return a, config
 
 
@@ -953,6 +960,46 @@ def test_anomalie_feuert_im_testaufbau_ueberhaupt(monkeypatch, tmp: Path) -> Non
         knoten = next(n for n in flow["nodes"] if n["name"] == "Gerät")
         assert knoten.get("anomaly") is True, "Testaufbau löst keine Auffälligkeit aus"
         assert knoten["anomaly_baseline"] == pytest.approx(10.0)
+    finally:
+        a.close()
+
+
+def test_anomalie_braucht_mindestabstand_zum_vergleichswert(monkeypatch, tmp: Path) -> None:
+    """40 kWh gegen 10 kWh überschreiten die Prozentschwelle weit; liegt der
+    Mindestabstand aber über den 30 kWh Differenz, ist es keine Auffälligkeit
+    (weder im Knoten noch in der Liste)."""
+    a, config = _anomalie_anlage(tmp)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    monkeypatch.setattr(ed, "ANOMALIE_MIN_ABSTAND_KWH", 31.0)
+    try:
+        flow = a.service.compute_flow(config, "month", -1)
+        knoten = next(n for n in flow["nodes"] if n["name"] == "Gerät")
+        assert not knoten.get("anomaly")
+        assert flow["anomalien"] == []
+    finally:
+        a.close()
+
+
+def test_zwischenzaehler_wird_nicht_zusaetzlich_zum_auffaelligen_kind_gemeldet(monkeypatch, tmp: Path) -> None:
+    """Das Kind erklärt den Mehrverbrauch des Zählers (30 von 30 kWh): ein Befund."""
+    a, config = _anomalie_anlage(tmp, kind_feb=35.0)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "month", -1)
+        assert [x["name"] for x in flow["anomalien"]] == ["Kind"]
+        zaehler = next(n for n in flow["nodes"] if n["name"] == "Gerät")
+        assert zaehler.get("anomaly") is True  # der Sankey-Knoten bleibt gefärbt
+    finally:
+        a.close()
+
+
+def test_zwischenzaehler_bleibt_gemeldet_wenn_kind_ihn_nicht_erklaert(monkeypatch, tmp: Path) -> None:
+    """Das Kind liegt im Rahmen (7 gegen 5 kWh), der Mehrverbrauch kommt woanders her."""
+    a, config = _anomalie_anlage(tmp, kind_feb=7.0)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "month", -1)
+        assert [x["name"] for x in flow["anomalien"]] == ["Gerät"]
     finally:
         a.close()
 

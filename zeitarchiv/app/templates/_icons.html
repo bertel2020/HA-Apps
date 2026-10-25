@@ -4,3 +4,38 @@
 {% macro custom_name_icon(title='App-eigener Anzeigename (weicht vom HA-Namen ab)') -%}
 <span class="custom-name-icon" data-tooltip="{{ title }}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.59 3.24L3 3v6.59a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.82 0l6.59-6.59a2 2 0 0 0 0-2.82Z"/><circle cx="7.5" cy="7.5" r="1"/></svg></span>
 {%- endmacro %}
+
+{# Symbole der Themen des Auswahl-Assistenten (selection.html), im Stil der übrigen
+   Linien-Icons der App. Unbekanntes Thema: Lupe. #}
+{% macro topic_icon(topic) -%}
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+{%- if topic == "energie" %}<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>
+{%- elif topic == "wetter" %}<path d="M12 2v2M4.93 4.93l1.41 1.41M20 12h2M19.07 4.93l-1.41 1.41M15.95 12.65a4 4 0 0 0-5.93-4.13M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"/>
+{%- elif topic == "klima" %}<path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>
+{%- elif topic == "assistent" %}<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/><path d="M5 3v4M3 5h4M19 17v4M17 19h4"/>
+{%- elif topic == "luftqualitaet" %}<path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2M9.6 4.6A2 2 0 1 1 11 8H2M12.6 19.4A2 2 0 1 0 14 16H2"/>
+{%- elif topic == "batterien" %}<rect x="2" y="7" width="16" height="10" rx="2"/><path d="M22 11v2M6 11v2M10 11v2"/>
+{%- elif topic == "system" %}<rect x="2" y="3" width="20" height="8" rx="2"/><rect x="2" y="13" width="20" height="8" rx="2"/><path d="M6 7h.01M6 17h.01"/>
+{%- elif topic == "tueren_fenster" %}<path d="M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14M2 20h20"/><path d="M14 12v.01"/>
+{%- elif topic == "wasser_gas" %}<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>
+{%- elif topic == "netzwerk" %}<path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0"/><path d="M12 20h.01"/>
+{%- elif topic == "anwesenheit" %}<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+{%- else %}<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>
+{%- endif %}</svg>
+{%- endmacro %}
+
+{# Symbole der Verlaufsaktionen in „Auswahl & Verlauf“ (selection_overview.html):
+   hinzugefügt, entfernt, ausgeschlossen, wieder aufgenommen, Muster, in HA
+   geändert, rückgängig gemacht. Unbekannte Aktion: Punkt. #}
+{% macro history_icon(kind) -%}
+<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+{%- if kind == "add" %}<path d="M12 5v14M5 12h14"/>
+{%- elif kind == "remove" %}<path d="M5 12h14"/>
+{%- elif kind == "exclude" %}<circle cx="12" cy="12" r="8"/><path d="m6.4 6.4 11.2 11.2"/>
+{%- elif kind == "include" %}<path d="M20 6 9 17l-5-5"/>
+{%- elif kind in ("add_patterns", "remove_patterns") %}<path d="M12 4v16M5.1 8l13.8 8M5.1 16l13.8-8"/>
+{%- elif kind == "ha" %}<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>
+{%- elif kind == "undo" %}<path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/>
+{%- else %}<circle cx="12" cy="12" r="3"/>
+{%- endif %}</svg>
+{%- endmacro %}

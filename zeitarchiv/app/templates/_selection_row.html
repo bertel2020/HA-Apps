@@ -1,0 +1,21 @@
+{# Eine Vorschlagszeile. `unex`: Ausschluss (nur Einzel-ID) aufheben und übernehmen —
+   eigenes Feld `unexclude_id`, nie vorangehakt (ROADMAP 1.33, Phase 2). #}
+{% set unex = row.unexcludable and can_change %}
+{% set locked = (row.status != "new" and not unex) or not can_apply %}
+<label class="sel-row{{ ' is-locked' if locked }}">
+  <input type="checkbox" class="sel-check" name="{{ 'unexclude_id' if unex else 'entity_id' }}" value="{{ row.entity_id }}"
+         {% if row.checked and not locked and not unex %}checked{% endif %} {% if locked %}disabled{% endif %}>
+  <span class="sel-main">
+    <span class="sel-name">{{ row.name }}</span>
+    <span class="sel-id">{{ row.entity_id }}</span>
+    <span class="sel-reason">{{ row.reason }}{% if row.high_rate %} · {{ _("hohe Änderungsrate") }}{% endif %}</span>
+  </span>
+  <span class="sel-kind">{{ row.kind }}{% if row.unit %} · {{ row.unit }}{% endif %}</span>
+  {% if row.text %}<span class="sel-badge sel-badge-muted" title="{{ _('Der Zustand ist Text; solche Entitäten gehen nur als Einzel-ID, nicht über das Label.') }}">{{ _("nur als Einzel-ID") }}</span>{% endif %}
+  {% if row.status == "archived" %}<span class="sel-badge sel-badge-muted">{{ _("archiviert") }}</span>
+  {% elif row.status == "selected" %}<span class="sel-badge sel-badge-warn">{{ _("ausgewählt") }}</span>
+  {% elif unex %}<span class="sel-badge sel-badge-bad" title="{{ _('Als Einzel-ID ausgeschlossen. Markieren hebt den Ausschluss beim Übernehmen auf.') }}">{{ _("ausgeschlossen") }}</span>
+  {% elif row.status == "excluded" and row.unexcludable %}<span class="sel-badge sel-badge-bad" title="{{ _('Steht in den Ausschlüssen der Integration. Ausschluss aufheben geht in Home Assistant.') }}">{{ _("ausgeschlossen") }}</span>
+  {% elif row.status == "excluded" %}<span class="sel-badge sel-badge-bad" title="{{ _('Über ein Ausschlussmuster ausgeschlossen. Das lässt sich nur in Home Assistant ändern.') }}">{{ _("ausgeschlossen") }}</span>
+  {% else %}<span class="sel-badge sel-badge-new">{{ _("neu") }}</span>{% endif %}
+</label>

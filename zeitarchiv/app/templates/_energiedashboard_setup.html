@@ -445,10 +445,10 @@
       <div class="edash-item-grid">
         <button type="button" class="edash-item-tile"
                 @click="draft.netzbezug = netzbezug; draft.netzbezugName = netzbezugName; activePopup = 'netzbezug'; openEdashDialog('edash-dlg-netzbezug')">
-          <div class="edash-item-accent" style="background:var(--chart-1);"></div>
+          <div class="edash-item-accent" style="background:var(--energy-grid);"></div>
           <div class="edash-item-body">
             <div class="edash-item-head">
-              <span class="edash-item-glyph"><svg width="18" height="12" viewBox="0 0 28 18" aria-hidden="true"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--chart-1)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--chart-1)"/><path d="M15 5 L20 9 L15 13" stroke="var(--chart-1)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
+              <span class="edash-item-glyph"><svg width="18" height="12" viewBox="0 0 28 18" aria-hidden="true"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--energy-grid)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--energy-grid)"/><path d="M15 5 L20 9 L15 13" stroke="var(--energy-grid)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
               <span class="edash-item-name" x-text="netzbezugName || t('Netzbezug')"></span>
               <span class="edash-item-req">{{ _("Pflicht") }}</span>
             </div>
@@ -459,10 +459,10 @@
         </button>
         <button type="button" class="edash-item-tile"
                 @click="draft.einspeisung = einspeisung; draft.einspeisungName = einspeisungName; activePopup = 'einspeisung'; openEdashDialog('edash-dlg-einspeisung')">
-          <div class="edash-item-accent" style="background:var(--chart-2);"></div>
+          <div class="edash-item-accent" style="background:var(--energy-export);"></div>
           <div class="edash-item-body">
             <div class="edash-item-head">
-              <span class="edash-item-glyph"><svg width="18" height="12" viewBox="0 0 28 18" aria-hidden="true"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--chart-2)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--chart-2)"/><path d="M13 5 L8 9 L13 13" stroke="var(--chart-2)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
+              <span class="edash-item-glyph"><svg width="18" height="12" viewBox="0 0 28 18" aria-hidden="true"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--energy-export)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--energy-export)"/><path d="M13 5 L8 9 L13 13" stroke="var(--energy-export)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
               <span class="edash-item-name" x-text="einspeisungName || t('Einspeisung')"></span>
             </div>
             <div class="edash-item-bottom">
@@ -472,7 +472,7 @@
         </button>
       </div>
 
-      <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--chart-1)" id="edash-dlg-netzbezug" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
+      <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--energy-grid)" id="edash-dlg-netzbezug" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
         <div class="detail-dialog-header">
           <h2>{{ _("Netzbezug") }}</h2>
           <button type="button" class="btn" onclick="document.getElementById('edash-dlg-netzbezug').close()" aria-label="{{ _('Schließen') }}">✕</button>
@@ -493,7 +493,7 @@
           </div>
         </template>
       </dialog>
-      <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--chart-2)" id="edash-dlg-einspeisung" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
+      <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--energy-export)" id="edash-dlg-einspeisung" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
         <div class="detail-dialog-header">
           <h2>{{ _("Einspeisung") }}</h2>
           <button type="button" class="btn" onclick="document.getElementById('edash-dlg-einspeisung').close()" aria-label="{{ _('Schließen') }}">✕</button>
@@ -538,12 +538,12 @@
             <button type="button" class="edash-item-tile" :class="{'is-drag-over': dragList === erzeuger && dragOverIdx === idx && dragIdx !== idx}"
                     @dragover.prevent="dragOver(erzeuger, idx)" @drop.prevent="dragDrop(erzeuger, idx)"
                     @click="draftRow = {...row}; activePopup = row._key; openEdashDialog('edash-dlg-erz-' + row._key)">
-              <div class="edash-item-accent" style="background:var(--chart-3);"></div>
+              <div class="edash-item-accent" style="background:var(--energy-solar);"></div>
               <div class="edash-item-body">
                 <div class="edash-item-head">
                   <span class="edash-drag-handle" draggable="true" title="{{ _('Ziehen zum Sortieren') }}" @click.stop
                         @dragstart="dragStart(erzeuger, idx)" @dragend="dragEnd()">⠿</span>
-                  <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="var(--chart-3)" opacity=".85"/><g stroke="var(--chart-3)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg></span>
+                  <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="var(--energy-solar)" opacity=".85"/><g stroke="var(--energy-solar)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg></span>
                   <span class="edash-item-name" x-text="row.name || (row.entity_id ? nameFor(row.entity_id) : t('Erzeuger'))"></span>
                 </div>
                 <div class="edash-item-bottom">
@@ -551,7 +551,7 @@
                 </div>
               </div>
             </button>
-            <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--chart-3)" :id="'edash-dlg-erz-' + row._key" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
+            <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--energy-solar)" :id="'edash-dlg-erz-' + row._key" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
               <div class="detail-dialog-header">
                 <h2>{{ _("Erzeuger") }}</h2>
                 <button type="button" class="btn" @click="$el.closest('dialog').close()" aria-label="{{ _('Schließen') }}">✕</button>
@@ -602,12 +602,12 @@
             <button type="button" class="edash-item-tile" :class="{'is-drag-over': dragList === speicher && dragOverIdx === idx && dragIdx !== idx}"
                     @dragover.prevent="dragOver(speicher, idx)" @drop.prevent="dragDrop(speicher, idx)"
                     @click="draftRow = {...row}; activePopup = row._key; openEdashDialog('edash-dlg-sp-' + row._key)">
-              <div class="edash-item-accent" style="background:var(--chart-4);"></div>
+              <div class="edash-item-accent" style="background:var(--energy-battery-in);"></div>
               <div class="edash-item-body">
                 <div class="edash-item-head">
                   <span class="edash-drag-handle" draggable="true" title="{{ _('Ziehen zum Sortieren') }}" @click.stop
                         @dragstart="dragStart(speicher, idx)" @dragend="dragEnd()">⠿</span>
-                  <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="17" height="10" rx="2.5" fill="none" stroke="var(--chart-4)" stroke-width="2"/><rect x="20" y="10" width="2.5" height="4" rx="1" fill="var(--chart-4)"/><rect x="4.5" y="9.5" width="9" height="5" rx="1" fill="var(--chart-4)" opacity=".6"/></svg></span>
+                  <span class="edash-item-glyph"><svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="17" height="10" rx="2.5" fill="none" stroke="var(--energy-battery-in)" stroke-width="2"/><rect x="20" y="10" width="2.5" height="4" rx="1" fill="var(--energy-battery-in)"/><rect x="4.5" y="9.5" width="9" height="5" rx="1" fill="var(--energy-battery-in)" opacity=".6"/></svg></span>
                   <span class="edash-item-name" x-text="row.name || t('Speicher')"></span>
                 </div>
                 <div class="edash-item-bottom">
@@ -617,7 +617,7 @@
                 </div>
               </div>
             </button>
-            <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--chart-4)" :id="'edash-dlg-sp-' + row._key" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
+            <dialog class="detail-dialog edash-item-dialog" style="--dialog-accent:var(--energy-battery-in)" :id="'edash-dlg-sp-' + row._key" @click="if ($event.target === $el) $el.close()" @close="activePopup = null">
               <div class="detail-dialog-header">
                 <h2>{{ _("Speicher") }}</h2>
                 <button type="button" class="btn" @click="$el.closest('dialog').close()" aria-label="{{ _('Schließen') }}">✕</button>

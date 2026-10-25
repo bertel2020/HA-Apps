@@ -16,6 +16,7 @@ from ..i18n import N_, tr
 
 import csv
 import math
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -28,10 +29,24 @@ TIMESTAMP_FORMATS = {
     "unix_s": N_("Unix-Zeitstempel (Sekunden)"),
     "unix_ms": N_("Unix-Zeitstempel (Millisekunden)"),
     "iso": N_("ISO 8601 (z. B. 2024-01-31 10:00:00)"),
+    "de_date": N_("TT.MM.JJJJ (z. B. 15.01.2026)"),
+    "de_datetime": N_("TT.MM.JJJJ hh:mm (z. B. 15.01.2026 14:30)"),
+    "de_datetime_s": N_("TT.MM.JJJJ hh:mm:ss (z. B. 15.01.2026 14:30:05)"),
     "custom": N_("Eigenes Format …"),
 }
 
+#: Fertige Formate als strptime-Muster; alles andere in TIMESTAMP_FORMATS wird
+#: gesondert gelesen (Unix, ISO) oder kommt vom Nutzer ("custom").
+PRESET_PATTERNS = {
+    "de_date": "%d.%m.%Y",
+    "de_datetime": "%d.%m.%Y %H:%M",
+    "de_datetime_s": "%d.%m.%Y %H:%M:%S",
+}
+
 DELIMITERS = {",": N_("Komma (,)"), ";": N_("Semikolon (;)"), "\t": N_("Tab")}
+
+_THOUSANDS_DE = re.compile(r"^[+-]?\d{1,3}(\.\d{3})+(,\d+)?$")
+_THOUSANDS_EN = re.compile(r"^[+-]?\d{1,3}(,\d{3})+(\.\d+)?$")
 
 _BOOL_VALUES = {"true": 1.0, "false": 0.0, "wahr": 1.0, "falsch": 0.0}
 
@@ -139,6 +154,13 @@ def _parse_value(raw: str) -> float | None:
             return value if math.isfinite(value) else None
         except ValueError:
             pass
+    # Tausendertrennzeichen: nur mit lückenlosen Dreiergruppen, damit "1.572,4"
+    # (Excel, deutsch) und "1,572.4" (englisch) gelesen werden, ein Text wie
+    # "1,2,3" aber weiter als unlesbar zählt.
+    if _THOUSANDS_DE.match(raw):
+        return float(raw.replace(".", "").replace(",", "."))
+    if _THOUSANDS_EN.match(raw):
+        return float(raw.replace(",", ""))
     return _BOOL_VALUES.get(raw.lower())
 
 
@@ -165,7 +187,7 @@ def _parse_timestamp(raw: str, ts_format: str, custom_pattern: str, tz: ZoneInfo
             return None
     else:
         try:
-            dt = datetime.strptime(raw, custom_pattern)
+            dt = datetime.strptime(raw, PRESET_PATTERNS.get(ts_format, custom_pattern))
         except ValueError:
             return None
     if dt.tzinfo is None:
@@ -173,10 +195,85 @@ def _parse_timestamp(raw: str, ts_format: str, custom_pattern: str, tz: ZoneInfo
     return dt.timestamp()
 
 
+#: Reihenfolge der Erkennung: das erste Format, das ALLE Probezellen liest, gewinnt.
+#: Unix steht vorn und prüft die Ziffernzahl, weil float() sonst jede Zahl akzeptiert.
+_DETECT_ORDER = ("unix_s", "unix_ms", "iso", "de_datetime_s", "de_datetime", "de_date")
+_UNIX_S = re.compile(r"^\d{9,10}(\.\d+)?$")
+_UNIX_MS = re.compile(r"^\d{12,13}$")
+DETECT_SAMPLE_CELLS = 20
+
+
+def sniff_ts_format(path: Path, delimiter: str, has_header: bool, ts_col: int) -> str | None:
+    """Rät das Zeitformat der Zeitstempel-Spalte aus den ersten Zellen.
+
+    None, wenn keines der bekannten Formate alle Zellen liest — dann bleibt es
+    bei der Voreinstellung und die Nutzerin wählt selbst."""
+    cells: list[str] = []
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.reader(f, delimiter=delimiter)
+        if has_header:
+            next(reader, None)
+        for row in reader:
+            if ts_col < len(row) and row[ts_col].strip():
+                cells.append(row[ts_col].strip())
+                if len(cells) >= DETECT_SAMPLE_CELLS:
+                    break
+    if not cells:
+        return None
+    utc = ZoneInfo("UTC")
+    for candidate in _DETECT_ORDER:
+        if candidate == "unix_s":
+            ok = all(_UNIX_S.match(c) for c in cells)
+        elif candidate == "unix_ms":
+            ok = all(_UNIX_MS.match(c) for c in cells)
+        else:
+            ok = all(_parse_timestamp(c, candidate, "", utc) is not None for c in cells)
+        if ok:
+            return candidate
+    return None
+
+
+_AMBIGUOUS_THOUSANDS = re.compile(r"^[+-]?\d{1,3}[.,]\d{3}$")
+
+
+def describe_sample(
+    sample_rows: list[list[str]], ts_col: int, value_col: int,
+    ts_format: str, custom_pattern: str, tz: ZoneInfo,
+) -> list[dict]:
+    """Zeigt je Vorschauzeile, WIE der Import Zeitstempel und Wert lesen würde.
+
+    Die Rohtabelle allein verrät nicht, ob "1.572" als 1,572 oder 1572 gilt
+    oder ob das Zeitformat passt; erst der Dry Run sagte es, und auch dort nur
+    als Zahl übersprungener Zeilen. ``ambiguous`` markiert Werte mit genau einem
+    Trenner vor drei Ziffern ("1.572", "1,572"): sie lassen sich als Dezimal-
+    ODER Tausendertrenner lesen, der Import nimmt Dezimal."""
+    out = []
+    for row in sample_rows:
+        raw_ts = row[ts_col] if ts_col < len(row) else ""
+        raw_value = row[value_col] if value_col < len(row) else ""
+        ts = _parse_timestamp(raw_ts, ts_format, custom_pattern, tz)
+        value = _parse_value(raw_value)
+        out.append({
+            "ts": datetime.fromtimestamp(ts, tz).strftime("%d.%m.%Y %H:%M") if ts is not None else None,
+            "value": _format_number(value) if value is not None else None,
+            "ambiguous": value is not None and bool(_AMBIGUOUS_THOUSANDS.match(raw_value.strip())),
+        })
+    return out
+
+
+def _format_number(value: float) -> str:
+    return f"{value:.6f}".rstrip("0").rstrip(".").replace(".", ",")
+
+
 @dataclass
 class ParseResult:
     rows: list[tuple[float, float]] = field(default_factory=list)
     skipped: int = 0
+    #: Die ersten übersprungenen Zeilen als (Zeilennummer in der Datei, Grund,
+    #: Rohtext der Zelle) — Grund ist "columns", "timestamp" oder "value". Nur
+    #: für die Vorschau: ohne sie steht dort nur eine Zahl, und wer ein falsches
+    #: Zeitformat gewählt hat, sieht nicht, woran es liegt.
+    skipped_examples: list[tuple[int, str, str]] = field(default_factory=list)
 
 
 #: Wie oft parse_rows() den Fortschritt meldet. 50.000 Zeilen sind bei
@@ -184,6 +281,14 @@ class ParseResult:
 #: die alle 500 ms abgefragt wird, und selten genug, dass der Rückruf selbst
 #: nicht ins Gewicht fällt.
 PROGRESS_EVERY_ROWS = 50_000
+
+#: Wie viele übersprungene Zeilen als Beispiel festgehalten werden.
+SKIPPED_EXAMPLES = 3
+
+
+def _note_skipped(result: ParseResult, line_num: int, reason: str, raw: str) -> None:
+    if len(result.skipped_examples) < SKIPPED_EXAMPLES:
+        result.skipped_examples.append((line_num, reason, raw.strip()[:40]))
 
 
 def count_data_rows(path: Path, has_header: bool) -> int:
@@ -224,6 +329,7 @@ def parse_rows(
     max_rows: int = MAX_IMPORT_ROWS_PER_ENTITY,
     on_progress: Callable[[int], None] | None = None,
     state_mapper: Callable[[str, float], float | None] | None = None,
+    cumulate: bool = False,
 ) -> ParseResult:
     """Liest die Rohdaten mit der gewählten Spalten-/Format-Zuordnung ein.
     Jede Zeile, die sich nicht plausibel als (Zeitstempel, Wert) lesen lässt
@@ -239,7 +345,11 @@ def parse_rows(
     Text und wird auf den Index abgebildet (ha_import.state_mapper_for()).
     Aufeinanderfolgende gleiche Zustände bleiben nur einmal stehen — der
     Live-Pfad schreibt auch nur Wechsel, und eine Probe pro Minute mit
-    "charging" wären sonst tausende Zeilen ohne Aussage."""
+    "charging" wären sonst tausende Zeilen ohne Aussage.
+
+    ``cumulate``: Die Werte sind Summen je Zeitraum (Monatsertrag), das Ziel
+    aber ein Zähler, der laufende Stände erwartet. Nach dem Sortieren wird die
+    Laufsumme gebildet; der Verlauf rechnet daraus wieder die Differenzen."""
     result = ParseResult()
     max_col = max(ts_col, value_col)
     gelesen = 0
@@ -253,6 +363,7 @@ def parse_rows(
                 on_progress(gelesen)
             if len(line) <= max_col:
                 result.skipped += 1
+                _note_skipped(result, reader.line_num, "columns", ",".join(line))
                 continue
             ts = _parse_timestamp(line[ts_col], ts_format, custom_pattern, tz)
             value = (
@@ -261,6 +372,10 @@ def parse_rows(
             )
             if ts is None or value is None:
                 result.skipped += 1
+                if ts is None:
+                    _note_skipped(result, reader.line_num, "timestamp", line[ts_col])
+                else:
+                    _note_skipped(result, reader.line_num, "value", line[value_col])
                 continue
             result.rows.append((ts, value))
             if len(result.rows) > max_rows:
@@ -270,6 +385,11 @@ def parse_rows(
     if on_progress is not None:
         on_progress(gelesen)
     result.rows.sort()
+    if cumulate and state_mapper is None:
+        total = 0.0
+        for i, (ts, value) in enumerate(result.rows):
+            total += value
+            result.rows[i] = (ts, total)
     if state_mapper is not None:
         result.rows = [
             row for i, row in enumerate(result.rows) if i == 0 or row[1] != result.rows[i - 1][1]

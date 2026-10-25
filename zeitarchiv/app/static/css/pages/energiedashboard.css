@@ -130,7 +130,7 @@
      dem Titel, wo es klar als "immer aktuell" statt "diese Periode" liest. */
   .edash-soc-now{display:flex;align-items:center;gap:5px;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;}
   .edash-soc-now strong{color:var(--ink);font-weight:600;}
-  .edash-soc-now-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--chart-4);flex:none;}
+  .edash-soc-now-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--energy-battery-in);flex:none;}
   @media(max-width:820px){.edash-grid{grid-template-columns:repeat(2,1fr);}.edash-card.edash-span3,.edash-card.edash-ring-card,.edash-share-row{grid-column:span 2;}}
   @media(max-width:560px){
     .edash-grid{grid-template-columns:1fr;}
@@ -404,8 +404,8 @@
 
   /* Netzenergiebilanz: divergierender Balken (Referenz-Screenshot des
      Nutzers) — Füllung startet an der Mitte (0) und wächst nach rechts
-     (Netto-Bezug, --chart-1 wie Netzbezug im Sankey) oder links (Netto-
-     Einspeisung, --chart-2 wie Einspeisung im Sankey), Skala/Position
+     (Netto-Bezug, --energy-grid wie Netzbezug im Sankey) oder links (Netto-
+     Einspeisung, --energy-export wie Einspeisung im Sankey), Skala/Position
      werden per netBalanceFillStyle() in energiedashboard.js berechnet. */
   .edash-netbalance{margin:2px 0 14px;}
   .edash-netbalance-label{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);margin-bottom:6px;font-variant-numeric:tabular-nums;}
@@ -415,7 +415,7 @@
      eines harten Sprungs — left UND width animieren, weil sich bei einem
      Vorzeichenwechsel (Bezug <-> Einspeisung) beide gleichzeitig ändern. */
   .edash-netbalance-fill{position:absolute;top:0;height:100%;transition:left .35s ease,width .35s ease;}
-  /* Bewusst NICHT --chart-1/--chart-2 (Netzbezug/Einspeisung-Farbe im Sankey)
+  /* Bewusst NICHT --energy-grid/--energy-export (Netzbezug/Einspeisung-Farbe im Sankey)
      — hier geht es um eine Bewertung (kostet dich vs. bringt dir was), nicht
      um die 5-Wege-Rollenunterscheidung. --danger/--positive sind dediziert
      semantisch (rot=schlecht/kostet, grün=gut/lohnt sich) und in allen
@@ -446,14 +446,14 @@
      .edash-span3 allgemein, das auch die Tageslastprofil-Karte trägt. */
   .edash-flow-card{
     background:
-      radial-gradient(140% 100% at 0% 0%, color-mix(in srgb, var(--chart-3) 5%, transparent), transparent 55%),
-      radial-gradient(140% 100% at 100% 100%, color-mix(in srgb, var(--chart-1) 5%, transparent), transparent 55%),
+      radial-gradient(140% 100% at 0% 0%, color-mix(in srgb, var(--energy-solar) 5%, transparent), transparent 55%),
+      radial-gradient(140% 100% at 100% 100%, color-mix(in srgb, var(--energy-grid) 5%, transparent), transparent 55%),
       var(--surface);
   }
   /* Derselbe kaum wahrnehmbare Eck-Verlauf wie .edash-flow-card oben, jetzt
      auch auf den übrigen drei Dashboard-Karten — bewusst DREI eigene Regeln
      statt einer gemeinsamen Klasse: jede Karte bekommt EXAKT die Rollenfarbe
-     ihres eigenen Inhalts (Speicher-Ring = --chart-4 wie die Speicher-KPI-
+     ihres eigenen Inhalts (Speicher-Ring = --energy-battery-in wie die Speicher-KPI-
      Kachel, Verbraucheranteile/Tageslastprofil = --chart-7 wie die
      Verbrauch-KPI-Kachel, beide zeigen Verbrauchsdaten). Eine geteilte
      "irgendein Verlauf"-Klasse würde die Farbe zur reinen Deko machen —
@@ -464,7 +464,7 @@
      nicht wie eine einzige, versehentlich wiederholte Deko wirken. */
   .edash-ring-card{
     background:
-      radial-gradient(140% 100% at 0% 0%, color-mix(in srgb, var(--chart-4) 5%, transparent), transparent 55%),
+      radial-gradient(140% 100% at 0% 0%, color-mix(in srgb, var(--energy-battery-in) 5%, transparent), transparent 55%),
       var(--surface);
   }
   .edash-verbraucher-card{
@@ -770,12 +770,12 @@
 
   /* Bereichs-Einfärbung passend zur Rollen-Farblegende ("04 Datenquellen" im
      Mockup, vom Nutzer nochmal explizit als Referenz-Screenshot bestätigt):
-     Netzbezug=--chart-1, Netzeinspeisung=--chart-2, Erzeuger=--chart-3,
-     Speicher=--chart-4, Verbraucher=--chart-7 — dieselben Tokens, die auch
+     Netzbezug=--energy-grid, Netzeinspeisung=--energy-export, Erzeuger=
+     --energy-solar, Speicher=--energy-battery-in, Verbraucher=--chart-7 — dieselben Tokens, die auch
      colorForNode() im Sankey verwendet (energiedashboard.js), damit Sankey-
      Farbe und Konfig-Bereich zusammenpassen. "Netz" fasst Netzbezug UND
      Einspeisung in einem Formularbereich zusammen und wird daher einfarbig
-     nach der Pflichtrolle (Netzbezug/--chart-1) eingefärbt. Allgemein und
+     nach der Pflichtrolle (Netzbezug/--energy-grid) eingefärbt. Allgemein und
      Kosten bleiben bewusst ungefärbt — keine natürliche Rollen-Farbe. 8%/32%
      statt vorher 5%/25%, weil die schwächere Tönung im Browser kaum als
      Farbe wahrnehmbar war, eher wie ein Rendering-Unterschied wirkte. */
@@ -796,16 +796,16 @@
      Farbe, die gleiche Ecke ergibt dadurch einen ruhigen Rhythmus statt
      Wiederholung. */
   .edash-section-netz{
-    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--chart-1) 18%, transparent), color-mix(in srgb, var(--chart-1) 6%, transparent) 70%), var(--surface);
-    border-color:color-mix(in srgb, var(--chart-1) 32%, var(--border));
+    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--energy-grid) 18%, transparent), color-mix(in srgb, var(--energy-grid) 6%, transparent) 70%), var(--surface);
+    border-color:color-mix(in srgb, var(--energy-grid) 32%, var(--border));
   }
   .edash-section-erzeuger{
-    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--chart-3) 18%, transparent), color-mix(in srgb, var(--chart-3) 6%, transparent) 70%), var(--surface);
-    border-color:color-mix(in srgb, var(--chart-3) 32%, var(--border));
+    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--energy-solar) 18%, transparent), color-mix(in srgb, var(--energy-solar) 6%, transparent) 70%), var(--surface);
+    border-color:color-mix(in srgb, var(--energy-solar) 32%, var(--border));
   }
   .edash-section-speicher{
-    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--chart-4) 18%, transparent), color-mix(in srgb, var(--chart-4) 6%, transparent) 70%), var(--surface);
-    border-color:color-mix(in srgb, var(--chart-4) 32%, var(--border));
+    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--energy-battery-in) 18%, transparent), color-mix(in srgb, var(--energy-battery-in) 6%, transparent) 70%), var(--surface);
+    border-color:color-mix(in srgb, var(--energy-battery-in) 32%, var(--border));
   }
   .edash-section-verbraucher{
     background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--chart-7) 18%, transparent), color-mix(in srgb, var(--chart-7) 6%, transparent) 70%), var(--surface);
@@ -837,7 +837,9 @@
      30% wären es 35 Abstand, aber fast das Doppelte an Farbmenge, und der
      Abschnitt sähe wie ein dunkles Banner aus.
      Der Weg dahin, damit ihn niemand rückgängig "verbessert": ein eigener
-     Buntton scheidet praktisch aus. Rollenbelegt sind --chart-1/2/3/4/7,
+     Buntton scheidet praktisch aus. Rollenbelegt waren --chart-1/2/3/4/7
+     (seither liegen die Flussrollen auf den --energy-*-Tokens, Allgemein
+     bleibt aus denselben Gründen neutral),
      --accent-line ist im Standard-Schema mit --chart-1 identisch (Allgemein
      sähe aus wie Netz), --chart-8 fällt seit der Neutral-Korrektur mit
      --ink-faint zusammen (nachgemessener Abstand 0-2). Von den freien

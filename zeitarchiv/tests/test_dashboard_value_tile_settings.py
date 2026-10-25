@@ -245,7 +245,7 @@ def test_old_database_without_metric_columns_migrates_to_the_previous_behaviour(
 def test_primary_metric_is_dropped_from_the_stats_row() -> None:
     """Derselbe Wert zweimal auf einer Kachel wäre nur Rauschen: ist Ø der
     Hauptwert, zeigt die Zeile darunter nur noch Min und Max."""
-    from app.main import _tile_metric_context
+    from app.dashboard_tiles import tile_metric_context as _tile_metric_context
 
     kontext = _tile_metric_context({
         "range_key": "month", "continuous": 0,
@@ -259,7 +259,7 @@ def test_the_period_is_shown_exactly_once_per_tile() -> None:
     """In der Kennzahlen-Zeile, wenn es sie gibt — sonst im Wert-Bereich an
     der Stelle des Alters. Bei einem aggregierten Hauptwert sagt das Alter des
     letzten Rohpunkts ohnehin nichts über einen Monatsdurchschnitt."""
-    from app.main import _tile_metric_context
+    from app.dashboard_tiles import tile_metric_context as _tile_metric_context
 
     nur_hauptwert = _tile_metric_context({
         "range_key": "month", "continuous": 0, "primary_metric": "avg", "stats_metrics": "",
@@ -282,7 +282,7 @@ def test_rolling_periods_are_labelled_with_the_actual_window() -> None:
     """"30 Tage" statt "Monat rollierend": _window() rechnet dort genau 30
     Tage, keinen Kalendermonat. Das Etikett macht die Vereinfachung sichtbar,
     statt sie unter dem Wort "Monat" zu verstecken."""
-    from app.main import _tile_metric_context
+    from app.dashboard_tiles import tile_metric_context as _tile_metric_context
 
     def label(range_key, continuous):
         return _tile_metric_context({
@@ -300,7 +300,7 @@ def test_rolling_periods_are_labelled_with_the_actual_window() -> None:
 def test_a_corrupt_stored_value_falls_back_instead_of_breaking_the_page() -> None:
     """Ein von Hand verbogener Datenbankwert soll die Dashboard-Seite nicht
     mit einem KeyError abschießen — die Kachel fällt auf den Standard zurück."""
-    from app.main import _tile_metric_context
+    from app.dashboard_tiles import tile_metric_context as _tile_metric_context
 
     kontext = _tile_metric_context({
         "range_key": "jahrzehnt", "continuous": 0,
@@ -316,7 +316,7 @@ def test_the_label_tables_in_python_and_javascript_agree() -> None:
     Anzeige, der Browser beschriftet nach einer Änderung im Kachelmenü neu.
     Driften sie auseinander, zeigt dieselbe Kachel je nach Weg einen anderen
     Zeitraum an — ohne dass irgendwo etwas fehlschlägt."""
-    from app.main import _TILE_METRIC_LABELS, _TILE_RANGE_LABELS
+    from app.dashboard_tiles import TILE_METRIC_LABELS as _TILE_METRIC_LABELS, TILE_RANGE_LABELS as _TILE_RANGE_LABELS
 
     script = (
         (APP / "static/js/dashboard-tiles.js")
@@ -332,7 +332,7 @@ def test_the_label_tables_in_python_and_javascript_agree() -> None:
 def test_metrics_that_make_no_sense_for_the_entity_type_are_not_offered() -> None:
     """Dieselbe Regel wie in der Chart-Legende und in _tile_aggregates():
     Summe nur bei Zählern und Schaltern, Min/Max nicht bei Schaltern."""
-    from app.main import _tile_available_metrics
+    from app.dashboard_tiles import tile_available_metrics as _tile_available_metrics
 
     assert _tile_available_metrics("standard") == ["min", "avg", "max"]
     assert _tile_available_metrics("counter") == ["min", "avg", "max", "sum"]
@@ -344,7 +344,7 @@ def test_switching_the_entity_drops_metrics_it_cannot_show(tmp_path: Path) -> No
     """Ein Entitätswechsel lässt die gespeicherten Kennzahlen stehen. Ein Σ,
     das für einen Zähler gesetzt wurde, darf danach nicht als "–" auf einer
     Messwert-Kachel kleben bleiben."""
-    from app.main import _tile_metric_context
+    from app.dashboard_tiles import tile_metric_context as _tile_metric_context
 
     kontext = _tile_metric_context(
         {"range_key": "day", "continuous": 0, "primary_metric": "last",
@@ -427,7 +427,7 @@ def test_a_counters_sum_is_called_a_growth_not_a_sigma() -> None:
     """„Σ 6,496 kWh" ist rechnerisch richtig und beschreibt einen Tagesertrag
     trotzdem falsch. Beim Schalter bleibt Σ: dort summiert die Kennzahl
     Einschaltdauer, das ist kein Zuwachs eines Standes."""
-    from app.main import _tile_metric_labels
+    from app.dashboard_tiles import tile_metric_labels as _tile_metric_labels
 
     assert _tile_metric_labels("counter")["sum"] == "+"
     assert _tile_metric_labels("switch")["sum"] == "Σ"

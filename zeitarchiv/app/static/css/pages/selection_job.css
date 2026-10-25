@@ -1,0 +1,11 @@
+  /* Statusseite eines Auftrags des Auswahl-Assistenten (ROADMAP 1.33, Phase 2).
+     Nur Farben und Maße der App-Variablen. */
+  .job-badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:calc(12px * var(--font-scale, 1));font-weight:500;background:var(--surface-alt);color:var(--ink-muted);}
+  .job-badge-applied{background:var(--accent-line-soft);color:var(--accent-line);}
+  .job-badge-pending,.job-badge-partial,.job-badge-expired{background:var(--warning-soft);color:var(--warning);}
+  .job-badge-failed{background:var(--danger-soft);color:var(--danger);}
+  .job-import{margin:0 0 16px;padding:10px 14px;border:1px solid var(--accent-line);border-radius:8px;background:var(--accent-line-soft);color:var(--ink);font-size:calc(13.5px * var(--font-scale, 1));}
+  .job-import a{color:var(--accent-line);font-weight:500;}
+  .job-note{margin:0 0 14px;padding:10px 14px;border:1px solid var(--warning);border-radius:8px;background:var(--warning-soft);font-size:calc(13px * var(--font-scale, 1));}
+  .job-details{margin:0 0 12px;padding-left:18px;font-size:calc(13px * var(--font-scale, 1));}
+  .job-mono{font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));overflow-wrap:anywhere;}

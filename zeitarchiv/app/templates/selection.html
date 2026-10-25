@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% from "_icons.html" import topic_icon %}
+{% block title %}{{ _("Zeitarchiv — Auswahl-Assistent") }}{% endblock %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ asset('css/pages/selection.css') }}">
+{% endblock %}
+{% block content %}
+  <div class="page">
+    <p class="sel-crumb"><a href="{{ app_root }}/entities">{{ _("Entitäten") }}</a> / {{ _("Auswahl-Assistent") }}</p>
+    <h1>{{ _("Auswahl-Assistent") }}</h1>
+    <p class="sub">{{ _("Zeitarchiv prüft, was es in deinem Home Assistant gibt, und schlägt passende Entitäten zum Archivieren vor. Übernommen wird erst nach einer Bestätigung; die Integration setzt die Änderung innerhalb etwa einer Minute um.") }}
+      · <a href="{{ app_root }}/selection/overview">{{ _("Auswahl & Verlauf →") }}</a></p>
+
+    {% if result is none %}
+    <div class="settings-panel sel-empty">
+      <p><b>{{ _("Noch kein Katalog empfangen.") }}</b></p>
+      <p>{{ _("Die Zeitarchiv-Integration schickt ihn automatisch, sobald sie verbunden ist (höchstens alle zehn Minuten). Ist die Integration älter, muss sie zuerst aktualisiert werden.") }}</p>
+    </div>
+    {% else %}
+    <form method="get" action="{{ app_root }}/selection" class="sel-search" role="search">
+      <label for="sel-q" class="sel-search-label">{{ _("Was willst du archivieren?") }}</label>
+      <span class="sel-search-row">
+        <input type="search" class="search" id="sel-q" name="q" value="{{ query }}" maxlength="100"
+               placeholder="{{ _('z. B. Strom, Heizung, Wetter oder ein Gerätename') }}">
+        <button type="submit" class="btn">{{ _("Suchen") }}</button>
+      </span>
+    </form>
+    {% if understood %}
+    <p class="sel-understood">{{ _("Verstanden als: {topic}", topic=topic_info.label) }} · <a href="{{ app_root }}/selection?topic={{ topic }}">{{ _("Eingabe verwerfen") }}</a></p>
+    {% endif %}
+
+    <nav class="sel-tiles" aria-label="{{ _('Themen') }}">
+      {% for tile in tiles %}
+      <a class="sel-tile{{ ' on' if tile.topic == topic }}{{ ' is-empty' if not tile.counts.found and tile.topic != topic }}" href="{{ app_root }}/selection?topic={{ tile.topic }}"
+         {% if tile.topic == topic %}aria-current="true"{% endif %}>
+        <span class="sel-tile-icon">{{ topic_icon(tile.topic) }}</span>
+        <span class="sel-tile-text">
+          <span class="sel-tile-name">{{ tile.label }}{% if tile.sensitive %} <span class="sel-badge sel-badge-warn">{{ _("sensibel") }}</span>{% endif %}</span>
+          <span class="sel-tile-count"><b>{{ tile.counts.found }}</b> {{ _("gefunden") }}</span>
+          <span class="sel-tile-count"><b>{{ tile.counts.recommended }}</b> {{ _("empfohlen") }}</span>
+        </span>
+      </a>
+      {% endfor %}
+    </nav>
+
+    <p class="sel-meta">{{ _("Katalog von {received} · nur Metadaten, keine Messwerte", received=received) }}</p>
+
+    {% if is_search %}
+    <h2 class="sel-search-h">{{ _("Suche: „{query}“", query=query) }} <span class="sel-n">{{ result.counts.found }}</span></h2>
+    {% if result.truncated %}<p class="sel-meta">{{ _("Es gibt {count} weitere Treffer. Bitte die Suche genauer fassen.", count=result.truncated) }}</p>{% endif %}
+    {% if result.presence %}<p class="sel-note">{{ _("Unter den Treffern sind Anwesenheits-Entitäten. Das Archiv zeigt später lückenlos, wann jemand zu Hause war. Nur übernehmen, wenn alle Betroffenen einverstanden sind.") }}</p>{% endif %}
+    {% endif %}
+    {% if topic_info.sensitive %}
+    <p class="sel-note">{% if topic_info.note %}{{ _(topic_info.note) }}{% else %}{{ _("Anwesenheit ist sensibel: das Archiv zeigt später lückenlos, wann jemand zu Hause war. Nur übernehmen, wenn alle Betroffenen einverstanden sind.") }}{% endif %}</p>
+    {% endif %}
+    {% if not can_apply %}
+    <p class="sel-note">{{ _("Zum Übernehmen braucht es eine neuere Version der Zeitarchiv-Integration. Bis dahin zeigt diese Seite die Vorschläge nur an.") }}</p>
+    {% endif %}
+
+    <form method="post" action="{{ app_root }}/selection/apply" id="sel-form" data-max="{{ max_ids }}">
+      <input type="hidden" name="topic" value="{{ topic }}">
+      {% if is_search %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+
+      {% if is_search %}
+      {% if result.more %}
+      <div class="settings-panel sel-list">
+        {% for group in result.more %}
+        <div class="sel-group">{{ group.name }}</div>
+        {% for row in group.rows %}
+        {% include "_selection_row.html" %}
+        {% endfor %}
+        {% endfor %}
+      </div>
+      {% elif not unexclude %}
+      <p class="sel-none">{{ _("Nichts gefunden. Alle Begriffe müssen in Name, ID, Gerät, Bereich oder Plattform vorkommen.") }}</p>
+      {% endif %}
+      {% else %}
+      <h2>{{ _("Empfohlen") }} <span class="sel-n">{{ result.recommended|map(attribute='rows')|map('length')|sum }}</span></h2>
+      {% if result.recommended %}
+      <div class="settings-panel sel-list">
+        {% for group in result.recommended %}
+        <div class="sel-group">{{ group.name }}</div>
+        {% for row in group.rows %}
+        {% include "_selection_row.html" %}
+        {% endfor %}
+        {% endfor %}
+      </div>
+      {% elif topic == "energie" %}
+      <p class="sel-none">{{ _("Keine Quellen aus dem Energie-Dashboard gefunden. Ist es in Home Assistant eingerichtet?") }}</p>
+      {% else %}
+      <p class="sel-none">{{ _("Zu diesem Thema gibt es keine eindeutigen Treffer.") }}</p>
+      {% endif %}
+
+      {% if result.more %}
+      <h2>{{ _("Weitere Treffer") }} <span class="sel-n">{{ result.more|map(attribute='rows')|map('length')|sum }}</span></h2>
+      <div class="settings-panel sel-list">
+        {% for group in result.more %}
+        <div class="sel-group">{{ group.name }}</div>
+        {% for row in group.rows %}
+        {% include "_selection_row.html" %}
+        {% endfor %}
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% endif %}
+
+      {% if unexclude %}
+      <h2>{{ _("Ausschluss aufheben und übernehmen") }} <span class="sel-n">{{ unexclude|length }}</span></h2>
+      <p class="sel-meta">{{ _("Diese Treffer stehen als Einzel-ID in den Ausschlüssen der Integration. Markieren hebt den Ausschluss beim Übernehmen auf; die Bestätigung nennt sie noch einmal.") }}</p>
+      <div class="settings-panel sel-list">
+        {% for row in unexclude %}
+        {% include "_selection_row.html" %}
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if result.counts.derived %}
+      <p class="sel-meta">{{ _("{count} Tages-, Monats- und Jahreszähler werden nicht vorgeschlagen. Sie lassen sich aus dem Gesamtzähler ableiten.", count=result.counts.derived) }}</p>
+      {% endif %}
+
+      {% if result.recommended or result.more or unexclude %}
+      {# Eine Zeile: links was markiert ist (Zähler + Hinweis), rechts wie und los. #}
+      <div class="sel-footer">
+        <div class="sel-footer-info">
+          <p class="sel-footer-counts">
+            <span class="sel-footer-marked"><b id="sel-checked">{{ result.counts.recommended_new if can_apply else 0 }}</b> {{ _("markiert") }}</span>
+            <span class="sel-footer-stats">
+              <span><b>{{ counts.new }}</b> {{ _("neu") }}</span>
+              <span><b>{{ counts.archived + counts.selected }}</b> {{ _("schon archiviert oder ausgewählt") }}</span>
+              <span><b>{{ counts.excluded }}</b> {{ _("ausgeschlossen") }}</span>
+            </span>
+          </p>
+          <p class="sel-footer-hint">{{ _("Textentitäten gehen immer als Einzel-ID.") }}{% if counts.text %} {{ _("Hier betrifft das {count}.", count=counts.text) }}{% endif %}
+            {{ _("Höchstens {max} je Übernahme.", max=max_ids) }}</p>
+        </div>
+        <fieldset class="sel-mode">
+          <legend>{{ _("Übernehmen als") }}</legend>
+          <span class="sel-seg">
+            <label><input type="radio" name="mode" value="label" checked><span>{{ _("Label „Zeitarchiv“ (Standard)") }}</span></label>
+            <label><input type="radio" name="mode" value="ids"><span>{{ _("Einzel-IDs") }}</span></label>
+          </span>
+        </fieldset>
+        <button type="submit" class="btn primary" id="sel-submit" {% if not can_apply %}disabled{% endif %}>{{ _("Übernehmen …") }}</button>
+      </div>
+      {% endif %}
+    </form>
+
+    {% if patterns %}
+    <section class="sel-patterns" aria-labelledby="sel-patterns-h">
+      <h2 id="sel-patterns-h">{{ _("Muster-Vorschläge") }} <span class="sel-n">{{ patterns|length }}</span></h2>
+      <p class="sel-meta">{{ _("Ein Muster erfasst jede Entität mit passender ID, auch spätere: sie werden automatisch archiviert. Textentitäten werden von Mustern nie erfasst.") }}</p>
+      {% if not can_change %}<p class="sel-note">{{ _("Muster übernehmen braucht eine neuere Version der Zeitarchiv-Integration.") }}</p>{% endif %}
+      <div class="sel-pattern-list">
+        {% for item in patterns %}
+        <article class="sel-pattern{{ ' is-active' if item.active }}">
+          <div class="sel-pattern-head">
+            <code class="sel-mono sel-pattern-code">{{ item.pattern }}</code>
+            {% if item.active %}<span class="sel-badge sel-badge-new">{{ _("schon aktiv") }}</span>
+            {% else %}
+            <form method="post" action="{{ app_root }}/selection/patterns" class="sel-pattern-action">
+              <input type="hidden" name="pattern" value="{{ item.pattern }}">
+              <input type="hidden" name="topic" value="{{ topic }}">
+              {% if is_search %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+              <button type="submit" class="btn sel-pattern-btn" {% if not can_change %}disabled{% endif %}>{{ _("Muster übernehmen …") }}</button>
+            </form>
+            {% endif %}
+          </div>
+          <dl class="sel-pattern-stats">
+            <div><dt>{{ _("passend") }}</dt><dd>{{ item.total }}</dd></div>
+            <div class="is-new{{ ' is-zero' if not item.new }}"><dt>{{ _("neu") }}</dt><dd>{{ item.new }}</dd></div>
+            <div{% if not item.archived %} class="is-zero"{% endif %}><dt>{{ _("schon archiviert oder ausgewählt") }}</dt><dd>{{ item.archived }}</dd></div>
+            <div{% if not item.excluded %} class="is-zero"{% endif %}><dt>{{ _("ausgeschlossen") }}</dt><dd>{{ item.excluded }}</dd></div>
+          </dl>
+          {% if item.high_rate or item.outside or item.text %}
+          <div class="sel-pattern-notes">
+            {% if item.high_rate %}<p class="hint hint-warn sel-pattern-warn">{{ _("{count} davon ändern sich sehr oft (z. B. Leistung) und erzeugen viele Daten.", count=item.high_rate) }}</p>{% endif %}
+            {% if item.outside %}<p class="hint hint-status">{{ _("Davon nicht in dieser Ansicht: {count}", count=item.outside) }}</p>{% endif %}
+            {% if item.text %}<p class="hint hint-status">{{ _("{count} passende Textentitäten erfasst das Muster nicht.", count=item.text) }}</p>{% endif %}
+          </div>
+          {% endif %}
+          <details class="sel-pattern-examples">
+            <summary>{{ _("Beispiele") }} <span class="sel-n">{{ item.examples|length }}</span></summary>
+            <ul>{% for example in item.examples %}<li><span class="sel-name">{{ example.name }}</span> <span class="sel-id">{{ example.entity_id }}</span>{% if not example.in_view %} <span class="sel-badge sel-badge-muted">{{ _("nicht in dieser Ansicht") }}</span>{% endif %}</li>{% endfor %}</ul>
+          </details>
+        </article>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+    {% endif %}
+  </div>
+  <script src="{{ asset('js/pages/selection.js') }}"></script>
+{% endblock %}

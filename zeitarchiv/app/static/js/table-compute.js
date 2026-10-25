@@ -402,15 +402,25 @@ window.TableCompute = (() => {
           // wie sectionMemberCells() in table_editor.html, hier nur über den
           // Index statt uid. Absichtlich ohne Formel-/andere Summenzeilen,
           // sonst würde ein bereits aufsummierter Wert doppelt gezählt.
-          let sectionStart = 0;
-          for (let j = ri - 1; j >= 0; j--) {
-            if (rows[j].row_type === 'separator') { sectionStart = j + 1; break; }
-          }
-          const memberCells = [];
-          for (let j = sectionStart; j < ri; j++) {
-            if (rows[j].row_type !== 'entity' && rows[j].row_type !== 'group') continue;
-            const cell = values[ci][j];
-            if (cell && cell.value != null) memberCells.push(cell);
+          // Steht die Summenzeile direkt UNTER einer Trennlinie (Abschnitt ohne
+          // eigene Entität-/Gruppen-Zeile), ist sie eine Ergebniszeile für den
+          // Abschnitt darüber — sonst bliebe sie leer.
+          let sectionEnd = ri;
+          let memberCells = [];
+          while (true) {
+            let sectionStart = 0;
+            for (let j = sectionEnd - 1; j >= 0; j--) {
+              if (rows[j].row_type === 'separator') { sectionStart = j + 1; break; }
+            }
+            const hasMembers = rows.slice(sectionStart, sectionEnd)
+              .some(r => r.row_type === 'entity' || r.row_type === 'group');
+            if (!hasMembers && sectionStart > 0) { sectionEnd = sectionStart - 1; continue; }
+            for (let j = sectionStart; j < sectionEnd; j++) {
+              if (rows[j].row_type !== 'entity' && rows[j].row_type !== 'group') continue;
+              const cell = values[ci][j];
+              if (cell && cell.value != null) memberCells.push(cell);
+            }
+            break;
           }
           if (!memberCells.length) { values[ci][ri] = null; return; }
           const total = memberCells.reduce((a, c) => a + c.value, 0);

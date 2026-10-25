@@ -21,14 +21,18 @@ from .storage.index import Index
 
 
 def returning_timestamps(
-    data_dir: Path, index: Index, tz: ZoneInfo, entity_id: str, now: datetime | None = None
+    data_dir: Path, index: Index, tz: ZoneInfo, entity_id: str, now: datetime | None = None,
+    window: tuple[float, float] | None = None,
 ) -> list[float]:
-    """Zeitstempel der Rückgänge eines Zählers, die zurückkehren — im selben Fenster und mit
-    denselben Regeln wie die Erkennung (scan_counter_decreases)."""
+    """Zeitstempel der Rückgänge eines Zählers, die zurückkehren — mit denselben Regeln wie
+    die Erkennung (scan_counter_decreases). Ohne ``window`` gilt deren Fenster (die letzten
+    COUNTER_WINDOW_DAYS Tage), sonst der übergebene Zeitraum (Start, Ende als Zeitstempel)."""
     now = now or datetime.now(tz)
-    window_start = now.timestamp() - cleanup.COUNTER_WINDOW_DAYS * 86400
+    window_start, window_end = window or (
+        now.timestamp() - cleanup.COUNTER_WINDOW_DAYS * 86400, now.timestamp()
+    )
     decreases = cleanup.classify_counter_decreases(
-        cleanup.iter_raw_rows(data_dir, index, entity_id, window_start, now.timestamp(), tz, now=now), tz
+        cleanup.iter_raw_rows(data_dir, index, entity_id, window_start, window_end, tz, now=now), tz
     )
     return [item["ts"] for item in decreases if item["returns"]]
 
@@ -66,12 +70,15 @@ def mark_returning(data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | N
     return {"batch_at": batch_at, "entities": marked, "values": sum(marked.values())}
 
 
-def mark_entity_returning(data_dir: Path, index: Index, tz: ZoneInfo, entity_id: str) -> int:
-    """Wie mark_returning, aber nur für einen Zähler (Bereinigungsansicht der Entität, Filter
-    „Zählerrückgänge“). Rückgänge, die niedrig bleiben (Reset, Zählerwechsel), bleiben unberührt.
-    Liefert die Anzahl markierter Werte."""
+def mark_entity_returning(
+    data_dir: Path, index: Index, tz: ZoneInfo, entity_id: str, window: tuple[float, float]
+) -> int:
+    """Wie mark_returning, aber nur für einen Zähler und den gewählten Zeitraum der
+    Bereinigungsansicht (Filter „Zählerrückgänge“) — nicht nur für die letzten 30 Tage, sonst
+    bliebe alles Ältere trotz Anzeige unberührt. Rückgänge, die niedrig bleiben (Reset,
+    Zählerwechsel), bleiben unberührt. Liefert die Anzahl markierter Werte."""
     before = index.get_counter_decrease_snapshot()
-    timestamps = returning_timestamps(data_dir, index, tz, entity_id)
+    timestamps = returning_timestamps(data_dir, index, tz, entity_id, window=window)
     if timestamps:
         cleanup.soft_delete(index, entity_id, timestamps, source="counter_bulk")
         refresh_snapshot(data_dir, index, tz, before, {entity_id})

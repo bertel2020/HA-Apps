@@ -138,4 +138,5 @@ def test_reconciliation_runs_after_restore_startup_and_both_import_paths() -> No
     # Symcon-/CSV-Import (Reconciliation nach Import) leben seit der Extraktion
     # in import_routes.py (siehe test_route_modules.py), nicht mehr in main.py.
     assert "entity_ids=sorted({target for _, target, _ in mapped}), repair=True" in import_routes
-    assert "self.deps.run_storage_reconciliation(entity_ids=[entity_id], repair=True)" in import_routes
+    # CSV-Import: je Zielentität nach ihrem Schreibdurchgang (mehrere Spalten möglich).
+    assert "self.deps.run_storage_reconciliation(entity_ids=[target], repair=True)" in import_routes

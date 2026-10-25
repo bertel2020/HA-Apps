@@ -31,7 +31,7 @@ also genau die Dateien, die auch eine echte Instanz anlegen würde.
 
 Die Tabellen unten nennen die deutschen `entity_id`s; mit `--language en` heißen sie wie der englische Name (`sensor.demo_gesamtwirkleistung` → `sensor.demo_total_active_power`).
 
-69 Entitäten, thematisch ein einzelner Haushalt mit Dach-PV-Anlage
+77 Entitäten, thematisch ein einzelner Haushalt mit Dach-PV-Anlage
 (inkl. Ertrags-Prognose), Wallbox, einem zusätzlichen Balkonkraftwerk mit
 eigenem Speicher, einem größeren Heimspeicher an der Dachanlage und der
 Netz-CO2-Intensität, alle mit dem Präfix `demo_` in der Entity-ID (leicht
@@ -74,6 +74,7 @@ wiederzuerkennen und gezielt löschbar):
 | `sensor.demo_pv_ertrag` | Zähler (`total_increasing`) | kWh | Monoton steigend, exakte Integration der PV-Leistung über die Zeit |
 | `sensor.demo_pv_prognose_rest_heute` | Standard | kWh | Wie ein Forecast.Solar-Sensor: geschätzter Rest-Ertrag der Dachanlage bis Sonnenuntergang, einmal morgens grob geschätzt (mit Schätzfehler, nicht exaktem Vorauswissen) und sinkt über den Tag mit dem tatsächlich eingefahrenen Ertrag Richtung 0 |
 | `sensor.demo_pv_prognose_morgen` | Standard | kWh | Tagesprognose für morgen, einmal pro Kalendertag neu geschätzt (Fortschreibung der Bewölkung + eigene Unsicherheit), bleibt über den Tag konstant — wird am nächsten Tag zur Basis von `pv_prognose_rest_heute` |
+| `sensor.demo_strompreis_dynamisch` | Standard | EUR/kWh | Wie ein Tibber-/aWATTar-Sensor: alle 15 Minuten ein neuer Endpreis (Börsenanteil plus 0,17 € Netzentgelte und Abgaben), Spitzen morgens und abends, Mittagstal, im Winter teurer, am Wochenende etwas billiger, vereinzelt teure Tage. Hängt nur an Uhrzeit und Datum, nicht an der Simulation, und lässt sich deshalb rückwirkend erzeugen. Zum Testen der Kostenrechnung im Energiedashboard als Netzbezug-Preis zuordnen (Währung/kWh) |
 | `sensor.demo_stromzaehler_bezug` | Zähler (`total_increasing`) | kWh | Monoton steigend, nur wenn Gesamtwirkleistung > PV-Leistung |
 | `sensor.demo_stromzaehler_einspeisung` | Zähler (`total_increasing`) | kWh | Monoton steigend, nur wenn PV-Leistung > Gesamtwirkleistung |
 | `sensor.demo_balkonkraftwerk_pv_leistung` | Standard | W | Eigenes, kleineres Zweitsystem (Steckersolargerät): Modul-Rohleistung bis 950 W, fest gekappt auf 800 W Wechselrichter-Ausgang; eigenes Tagesfenster (morgenärmer, südwestlich wirkend) statt Kopie der Dachanlage |
@@ -221,7 +222,7 @@ cd addon
 .venv/bin/python3 scripts/generate_demo_data.py --data-dir /pfad/zum/datenverzeichnis
 ```
 
-Erzeugt mit den Standardwerten 6 Monate Historie für alle 69 Demo-
+Erzeugt mit den Standardwerten 6 Monate Historie für alle 77 Demo-
 Entitäten in einem frischen (oder leeren) Zielverzeichnis.
 
 Weitere Beispiele:
@@ -293,7 +294,7 @@ Fall dringend empfohlen.
 
 ## Demo-Daten neu erzeugen (`--clean`)
 
-`--clean` bereinigt vor dem Neuschreiben die Werte aller 69 `demo_*`-
+`--clean` bereinigt vor dem Neuschreiben die Werte aller 77 `demo_*`-
 Entitäten — wie **Housekeeping → Speicherplatz** in der App, nur für alle
 Demo-Entitäten auf einmal, ohne die App zu öffnen. Bewusst
 `delete_all_values()` statt `delete_entity()`: die Entitäten selbst bleiben
@@ -384,3 +385,10 @@ Monate an Daten neu zu berechnen:
   startet `pv_prognose_rest_heute` mit einer frischen Tagesschätzung statt
   exakt dort weiterzumachen, wo der letzte Lauf aufgehört hat. Kosmetischer
   Sprung, kein Zählersprung.
+- `sensor.demo_strompreis_dynamisch` fehlt in Demo-Instanzen, die vor dieser
+  Entität angelegt wurden. Ein `--append`-Lauf (bzw. „Jetzt ergänzen“ im
+  Demo-Modus) erzeugt den Preisverlauf deshalb rückwirkend ab dem Beginn der
+  übrigen Historie, auch wenn sonst nichts zu ergänzen wäre. Die Reihe hängt nur
+  an Zeitstempel und Datum und passt daher nahtlos an spätere Läufe an. Die
+  Zuordnung als Netzbezug-Preis im Energiedashboard legt die Demo nicht an,
+  die trägst du in der Einrichtung selbst ein.

@@ -31,7 +31,7 @@ the files that a real instance would create too.
 
 The tables below list the German `entity_id`s; with `--language en` they follow the English name (`sensor.demo_gesamtwirkleistung` → `sensor.demo_total_active_power`).
 
-69 entities, thematically a single household with rooftop PV system (including
+77 entities, thematically a single household with rooftop PV system (including
 yield forecast), wallbox, an additional balcony power plant with its own
 storage, a larger home battery on the rooftop system and the grid CO2
 intensity, all with the prefix `demo_` in the entity ID (easy to recognize and
@@ -74,6 +74,7 @@ selectively deletable):
 | `sensor.demo_pv_ertrag` | Counter (`total_increasing`) | kWh | Monotonically rising, exact integration of the PV power over time |
 | `sensor.demo_pv_prognose_rest_heute` | Standard | kWh | Like a Forecast.Solar sensor: estimated remaining yield of the rooftop system until sunset, roughly estimated once in the morning (with estimation error, not exact foreknowledge) and falls over the day toward 0 with the yield actually collected |
 | `sensor.demo_pv_prognose_morgen` | Standard | kWh | Daily forecast for tomorrow, re-estimated once per calendar day (continuation of cloud cover + own uncertainty), stays constant over the day — becomes the basis of `pv_prognose_rest_heute` the next day |
+| `sensor.demo_strompreis_dynamisch` | Standard | EUR/kWh | Like a Tibber/aWATTar sensor: a new final price every 15 minutes (market part plus 0.17 € grid fees and levies), peaks in the morning and evening, a midday dip, dearer in winter, slightly cheaper on weekends, a few expensive days. Depends only on time and date, not on the simulation, so it can be generated retroactively. To test the cost calculation in the energy dashboard, assign it as the grid import price (currency/kWh) |
 | `sensor.demo_stromzaehler_bezug` | Counter (`total_increasing`) | kWh | Monotonically rising, only when total active power > PV power |
 | `sensor.demo_stromzaehler_einspeisung` | Counter (`total_increasing`) | kWh | Monotonically rising, only when PV power > total active power |
 | `sensor.demo_balkonkraftwerk_pv_leistung` | Standard | W | Own, smaller secondary system (plug-in solar device): raw module power up to 950 W, hard-capped at 800 W inverter output; own daily window (weaker mornings, acting south-westerly) instead of a copy of the rooftop system |
@@ -215,7 +216,7 @@ cd addon
 .venv/bin/python3 scripts/generate_demo_data.py --data-dir /path/to/data-directory
 ```
 
-With the default values, generates 6 months of history for all 69 demo entities
+With the default values, generates 6 months of history for all 77 demo entities
 in a fresh (or empty) target directory.
 
 More examples:
@@ -285,7 +286,7 @@ directly at the add-on data path, then start the add-on again. A prior backup
 
 ## Regenerating demo data (`--clean`)
 
-Before rewriting, `--clean` cleans the values of all 69 `demo_*` entities — like
+Before rewriting, `--clean` cleans the values of all 77 `demo_*` entities — like
 **Housekeeping → Storage** in the app, just for all demo entities at once,
 without opening the app. Deliberately `delete_all_values()` instead of
 `delete_entity()`: the entities themselves remain in the index continuously
@@ -371,3 +372,10 @@ the current date, without recalculating months of data on every run:
   `pv_prognose_rest_heute` starts with a fresh daily estimate instead of
   continuing exactly where the last run left off. Cosmetic jump, not a counter
   jump.
+- `sensor.demo_strompreis_dynamisch` is missing in demo instances created
+  before this entity existed. An `--append` run (or “Supplement now” in demo mode)
+  therefore generates the price history retroactively from the start of the
+  remaining history, even if there is otherwise nothing to add. The series
+  depends only on timestamp and date, so it joins later runs seamlessly. The demo
+  does not set up the assignment as grid import price in the energy dashboard;
+  you enter that in the setup yourself.

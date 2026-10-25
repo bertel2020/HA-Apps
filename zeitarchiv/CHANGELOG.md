@@ -1,5 +1,228 @@
 # Changelog
 
+## 1.11.1 - 2026-10-25
+
+### Behoben
+
+- **Tabellen**: Eine Summenzeile direkt unter einer Trennlinie blieb leer. Sie
+  summiert jetzt in diesem Fall den Abschnitt darüber.
+
+---
+
+### English
+
+#### Fixed
+
+- **Tables**: A sum row placed directly below a separator stayed empty. In this
+  case it now sums the section above.
+
+## 1.11.0 - 2026-10-25
+
+### Neu
+
+- **Auswahl-Assistent**: Unter Entitäten → „Auswahl & Verlauf“ sagst du, was du
+  archivieren möchtest, zum Beispiel Energie oder Wetter, und Zeitarchiv schlägt
+  passende Entitäten aus deinem Home Assistant vor, jeweils mit Begründung und
+  einer Bestätigung vor jeder Änderung.
+  - **Themen und Suche**: Energie, Wetter, Temperatur & Klima, Luftqualität,
+    Wasser & Gas, Netzwerk, Batterien, System & Server sowie die als sensibel
+    gekennzeichneten Themen Türen & Fenster und Anwesenheit. Alternativ findet
+    eine Suche passende Entitäten, etwa zu „Strom“ oder einem Gerätenamen.
+  - **Muster**: Zu einem Thema schlägt der Assistent Muster wie
+    `sensor.shelly_plug_*` vor und zeigt vorab, wie viele Entitäten sie erfassen.
+  - **Übernehmen**: Standard ist das Label „Zeitarchiv“ in Home Assistant,
+    alternativ Einzel-IDs. Die Integration setzt die Änderung innerhalb etwa
+    einer Minute um; bereits archivierte Daten bleiben unverändert.
+- **Auswahl & Verlauf**: Ein neuer Reiter auf der Entitäten-Seite zeigt, auf
+  welchem Weg jede Entität in die Auswahl kam (Assistent, von Hand in Home
+  Assistant, Muster, Bereich, Gerät oder Label), mit Filter und Suche, dazu den
+  Verlauf aller Änderungen. Einträge lassen sich entfernen, ausschließen und
+  wieder aufnehmen, auch mehrere auf einmal; Aktionen des Assistenten lassen sich
+  rückgängig machen.
+- Der Assistent braucht die Zeitarchiv-Integration ab 1.2.0. Mit einer
+  älteren zeigt die App die Vorschläge nur an.
+- **Energiedashboard, Kostenanalyse**: Wenn der Netzbezug-Preis aus einer Entität
+  kommt (zum Beispiel ein dynamischer Tarif), zeigt eine neue Kachel den
+  durchschnittlichen Strompreis je kWh. Energie ohne Preis zählt nicht mit. Wird
+  der Preis nur je Tag, Monat oder Jahr verrechnet, steht ein Hinweis dabei, dass
+  die Kosten bei wechselndem Tarif ungenau sein können.
+- **Energiedashboard, Kosten bei dynamischem Tarif**: Netzbezug, Einspeise-Erlös,
+  Eigenverbrauch, Kosten je Verbraucher und CO₂ werden bei Woche, Monat und Jahr
+  jetzt stundengenau gerechnet, wenn der Preis eine Entität ist und die Zähler
+  Stundenwerte haben. Bisher galt der Preis vom
+  Beginn des Tages bzw. Monats für alles, was darin bezogen wurde. Das konnte die
+  Kosten bei einem Tarif mit Tages- oder Stundenpreisen deutlich zu niedrig oder
+  zu hoch zeigen. Fehlen die Stundenwerte noch (direkt nach dem Einrichten), gilt
+  weiter der bisherige Preis je Tag, mit Hinweis.
+- **Demo-Daten**: Neue Entität `sensor.demo_strompreis_dynamisch` mit einem
+  dynamischen Strompreis (alle 15 Minuten ein neuer Preis), zum Ausprobieren der
+  Kostenrechnung im Energiedashboard. Eine bestehende Demo bekommt den Verlauf mit
+  „Jetzt ergänzen“ rückwirkend.
+
+### Behoben
+
+- **Energiedashboard**: Als „historisch“ markierte Entitäten lösen im Status
+  „Sensorwerte aktuell“ keine Meldung „Veraltet“ mehr aus, denn sie liefern
+  bewusst keine neuen Werte mehr.
+
+---
+
+### English
+
+#### New
+
+- **Selection assistant**: Under Entities → “Selection & history” you tell it
+  what you want to archive, for example energy or weather, and Zeitarchiv
+  suggests matching entities from your Home Assistant, each with a reason and a
+  confirmation before any change.
+  - **Topics and search**: Energy, Weather, Temperature & climate, Air quality,
+    Water & gas, Network, Batteries, System & server, plus the topics Doors &
+    windows and Presence, which are marked as sensitive. Alternatively, a search
+    finds matching entities, for example for “power” or a device name.
+  - **Patterns**: For a topic the assistant suggests patterns such as
+    `sensor.shelly_plug_*` and shows beforehand how many entities they cover.
+  - **Applying**: The default is the label “Zeitarchiv” in Home Assistant,
+    alternatively individual IDs. The integration applies the change within about
+    a minute; data that is already archived stays unchanged.
+- **Selection & history**: A new tab on the Entities page shows how each entity
+  got into the selection (assistant, by hand in Home Assistant, pattern, area,
+  device or label), with filter and search, plus the history of all changes.
+  Entries can be removed, excluded and included again, also several at once;
+  actions of the assistant can be undone.
+- The assistant needs the Zeitarchiv integration 1.2.0 or later. With an older
+  one the app only shows the suggestions.
+- **Energy dashboard, cost analysis**: When the grid price comes from an entity
+  (for example a dynamic tariff), a new tile shows the average electricity price
+  per kWh. Energy without a price is not counted. If the price is only applied per
+  day, month or year, a note says the costs can be inaccurate with a changing
+  tariff.
+- **Energy dashboard, costs with a dynamic tariff**: Grid import, feed-in
+  revenue, self-consumption, costs per consumer and CO₂ are now calculated hour
+  by hour for week, month and year when the price is an entity and the meters
+  have hourly values. Before, the price from the start
+  of the day or month applied to everything drawn in it, which could show the
+  costs far too low or too high with a day-time or hourly tariff. While the hourly
+  values are still missing (right after setup), the previous price per day
+  applies, with a note.
+- **Demo data**: New entity `sensor.demo_strompreis_dynamisch` with a dynamic
+  electricity price (a new price every 15 minutes), for trying out the cost
+  calculation in the energy dashboard. An existing demo gets the history
+  retroactively with “Supplement now”.
+
+#### Fixed
+
+- **Energy dashboard**: entities marked as “historic” no longer trigger a
+  “Stale” message in the “Sensor values up to date” status, since they
+  intentionally no longer receive new values.
+
+## 1.10.0 - 2026-10-24
+
+### Neu
+
+- **Energiedashboard**: Im Dialog „Bilanz, Datenqualität & Auffälligkeiten“ lassen
+  sich die betroffenen Entitäten jetzt anklicken: bei erkannten
+  Zählerrücksetzungen und bei auffällig hohem Verbrauch führt der Name zur
+  Entitätsansicht im gewählten Zeitraum.
+- **CSV-Import**: Der Import liest mehr Dateien ohne Handarbeit.
+  - **Vorschau „gelesen als“**: Eine zweite Tabelle zeigt, wie Zeitstempel und Wert jeder Zeile gelesen werden. Nicht lesbare Zellen sind rot, mehrdeutige Zahlen wie „1.572“ gelb markiert.
+  - **Zeitformat**: Wird beim Hochladen aus den ersten Zeilen erkannt (Unix, ISO 8601, TT.MM.JJJJ, auch mit Uhrzeit) und steht als Auswahl bereit. Ein eigenes Muster ist für Daten wie 15.01.2026 nicht mehr nötig.
+  - **Summen je Zeitraum**: Die Option „Werte sind Summen je Zeitraum“ bildet aus Monats- oder Tageswerten die Laufsumme und speichert sie als Zählerstand, ohne die Datei vorher umzurechnen.
+  - **Mehrere Spalten**: Eine Datei mit mehreren Wertspalten (z. B. PV-Erzeugung, Netzbezug, Einspeisung) lässt sich in einem Durchgang importieren. Über „+ Weitere Spalte …“ ordnest du jeder Spalte eine eigene Entität zu.
+
+### Geändert
+
+- **Datenqualität**: Bei einem Fund heißt die Zeile jetzt „Zählerrücksetzung
+  erkannt“ statt „Keine Zählerrücksetzungen“, und die Überschrift lautet
+  „Datenqualität: Hinweise“ statt „Prüfung fehlgeschlagen“.
+- **Auffälligkeiten, Vergleich**: Im Zeitraum „Tag“ wird mit dem gleichen
+  Wochentag der letzten drei Wochen verglichen, bei „Stunde“ mit derselben
+  Stunde der letzten drei Tage (bisher mit den drei Zeiträumen direkt davor).
+  Der Dialog nennt die Vergleichsbasis und weist darauf hin, dass die laufende
+  Periode noch nicht vollständig ist.
+- **Auffälligkeiten**: Ein Verbrauch gilt erst als auffällig, wenn er außer über
+  der Prozentschwelle auch mindestens 0,1 kWh über dem Vergleichswert liegt.
+  Steigt ein Zwischenzähler wegen eines auffälligen Geräts dahinter, wird nur
+  das Gerät gemeldet statt beider.
+- **Energiefluss-Farben**: Sankey, Legende, Kennzahlen, Energiebericht und die
+  Abschnitte der Einrichtung nutzen jetzt die Farben aus Home Assistant:
+  Solar orange, Netzbezug blau, Einspeisung violett, Speicher rosa (Laden) und
+  türkis (Entladen). Sie gelten in allen Farbschemata gleich, im Dunkelmodus
+  ist nur die Einspeisung etwas heller.
+- **CSV-Import, Vorschau**: Der Probelauf ist aussagekräftiger.
+  - Übersprungene Zeilen werden mit Zeilennummer und Grund genannt (Zeitstempel passt nicht zum Format, Wert keine Zahl, zu wenige Spalten).
+  - Liegen bei einem Zähler Werte unter ihrem Vorgänger, warnt die Vorschau, dass der Verlauf dort 0 zeigt. Dasselbe gilt für den ersten Wert, der keinen Vorgänger hat; sie nennt den Ausweg (eine Zeile mit dem Startwert davor).
+  - Der Hinweistext erklärt, dass Zähler laufende Zählerstände erwarten.
+
+### Behoben
+
+- **Zählerrückgänge**: „Fehlwert-Rückgänge markieren“ in der Bereinigung einer
+  Entität markiert jetzt alle zurückkehrenden Rückgänge im gewählten Zeitraum
+  (z. B. „Gesamt“), nicht mehr nur die der letzten 30 Tage.
+
+- **Rollierende Zeiträume**: Bei einer Auflösung ab einer Stunde (z. B. „1 Tag“
+  oder „6 Stunden“ im Zeitraum „Woche“) saßen die Balken neben der
+  Achsenbeschriftung, weil sie am Beginn des Fensters (z. B. 14:39 Uhr) statt
+  an Mitternacht ausgerichtet wurden. Charts und Kacheln richten sie jetzt an
+  der Tagesgrenze aus.
+- **Tabellen**: Im Spalten-Editor ist der Platzhalter des Felds
+  „Gruppen-Beschriftung“ nicht mehr abgeschnitten; der Hinweis, dass die
+  Gruppe mehrere Spalten überspannt, steht jetzt im Tooltip der Feldbezeichnung.
+- **CSV-Import**: Zahlen mit Tausenderpunkt („1.572,4“, wie Excel sie exportiert) oder Tausenderkomma („1,572.4“) werden gelesen. Bisher wurden solche Zeilen ohne Hinweis übersprungen.
+
+---
+
+### English
+
+#### New
+
+- **Energy dashboard**: in the “Balance, data quality & anomalies” dialog the
+  affected entities are now clickable: for detected counter resets and for
+  unusually high consumption the name leads to the entity view for the selected
+  period.
+- **CSV import**: the import reads more files without manual work.
+  - **Preview “read as”**: a second table shows how the timestamp and value of each row are read. Unreadable cells are red, ambiguous numbers such as “1.572” yellow.
+  - **Time format**: detected from the first rows when uploading (Unix, ISO 8601, DD.MM.YYYY, also with time) and available as a choice. A custom pattern is no longer needed for dates such as 15.01.2026.
+  - **Totals per period**: the option “Values are totals per period” builds the running sum of monthly or daily values and stores it as a meter reading, without recalculating the file first.
+  - **Several columns**: a file with several value columns (e.g. PV generation, grid import, feed-in) can be imported in one go. With “+ Import another column …” you assign each column its own entity.
+
+#### Changed
+
+- **Data quality**: when something is found, the row now reads “Counter reset
+  detected” instead of “No counter resets”, and the heading is “Data quality:
+  notices” instead of “check failed”.
+- **Anomalies, comparison**: for “Day” the comparison uses the same weekday of
+  the last three weeks, for “Hour” the same hour of the last three days
+  (previously the three periods directly before). The dialog states the basis
+  and notes that the current period is not complete yet.
+- **Anomalies**: consumption only counts as unusual if, besides exceeding the
+  percentage threshold, it is also at least 0.1 kWh above the comparison value.
+  If a sub-meter rises because of an unusual device behind it, only the device
+  is reported instead of both.
+- **Energy flow colors**: the Sankey, its legend, the key figures, the energy
+  report and the sections of the setup now use the colors from Home Assistant:
+  solar orange, grid import blue, export purple, storage pink (charging) and
+  teal (discharging). They are the same in every color scheme; in dark mode
+  only the export color is slightly lighter.
+- **CSV import, preview**: the dry run is more informative.
+  - Skipped rows are listed with line number and reason (timestamp does not match the format, value is not a number, too few columns).
+  - If values of a counter are below their predecessor, the preview warns that the history shows 0 there. The same applies to the first value, which has no predecessor; it names the way out (a row with the start value before it).
+  - The help text explains that counters expect running meter readings.
+
+#### Fixed
+
+- **Counter decreases**: “Mark bad-value decreases” in an entity’s cleanup now
+  marks all returning decreases in the selected period (e.g. “All”), no longer
+  only those of the last 30 days.
+
+- **Rolling periods**: with a resolution of one hour or more (e.g. “1 day” or
+  “6 hours” in the “Week” period) the bars sat next to the axis labels because
+  they were aligned to the start of the window (e.g. 2:39 pm) instead of
+  midnight. Charts and tiles now align them to the day boundary.
+- **Tables**: in the column editor the placeholder of the “Group label” field is
+  no longer cut off; the note that the group spans several columns is now in
+  the tooltip of the field label.
+- **CSV import**: numbers with a thousands separator (“1.572,4” as exported by Excel, or “1,572.4”) are now read. Previously such rows were skipped without notice.
+
 ## 1.9.0 - 2026-10-22
 
 ### Neu

@@ -8,6 +8,9 @@ import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import pyarrow as pa
+import pyarrow.parquet as pq
+
 from app import counter_bulk
 from app.storage import cleanup, hotbuffer
 from app.storage.index import Index
@@ -162,3 +165,26 @@ def test_the_cleanup_page_shows_the_verdict_in_the_badge(client) -> None:
         assert '<tr class="flag-act">' in html
     finally:
         index.set_counter_decrease_snapshot([])
+
+
+def test_the_entity_marking_covers_the_chosen_range_not_only_the_last_30_days(tmp_path) -> None:
+    index = Index(tmp_path / "index.sqlite")
+    now = datetime.now(TZ)
+    base = datetime(now.year - 1, 6, 10, 12, tzinfo=TZ).timestamp()
+    index.get_or_create_entity("sensor.alt", "sensor", "total_increasing", "kWh")
+    archive_dir = cleanup.entity_dir(tmp_path, "archive", "sensor.alt")
+    archive_dir.mkdir(parents=True)
+    pq.write_table(
+        pa.table({
+            "ts": [base + i * 300 for i in range(5)],
+            "value": [100.0, 101.0, 0.0, 101.5, 102.0],
+        }),
+        archive_dir / f"{now.year - 1}-06.parquet",
+    )
+
+    assert counter_bulk.returning_timestamps(tmp_path, index, TZ, "sensor.alt", now=now) == []
+
+    window = (base - 3600, now.timestamp())
+    assert counter_bulk.mark_entity_returning(tmp_path, index, TZ, "sensor.alt", window) == 1
+    assert index.get_deleted_counts("sensor.alt", base, base + 3600) == {base + 2 * 300: 1}
+    index.close()

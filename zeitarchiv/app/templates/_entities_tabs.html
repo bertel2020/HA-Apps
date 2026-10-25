@@ -1,0 +1,14 @@
+{# Reiter der Entitäten-Seite (ROADMAP 1.33): die Liste der archivierten
+   Entitäten (entities_list.html) und „Auswahl & Verlauf“
+   (selection_overview.html). Optik aus app.css (.entity-tabs), damit beide
+   Seiten dieselbe Zeile ohne eigene Regeln tragen.
+
+   Aufrufer setzen `active` auf 'liste' oder 'auswahl'. #}
+<nav class="entity-tabs" aria-label="{{ _('Ansichten der Entitäten') }}">
+  <a class="entity-tab{{ ' is-active' if active == 'liste' }}"
+     href="{{ app_root }}/entities"
+     {% if active == 'liste' %}aria-current="page"{% endif %}>{{ _("Liste") }}</a>
+  <a class="entity-tab{{ ' is-active' if active == 'auswahl' }}"
+     href="{{ app_root }}/selection/overview"
+     {% if active == 'auswahl' %}aria-current="page"{% endif %}>{{ _("Auswahl & Verlauf") }}</a>
+</nav>

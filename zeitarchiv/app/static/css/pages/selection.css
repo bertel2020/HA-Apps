@@ -1,0 +1,127 @@
+  /* Entitäten vorschlagen (ROADMAP 1.33). Nur Farben und Maße der App-Variablen. */
+  .settings-panel{min-width:0;}
+  .sel-crumb{margin:0 0 6px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  .sel-crumb a{color:var(--accent-line);text-decoration:none;}
+  .sel-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin:16px 0 8px;}
+  .sel-tile{display:flex;align-items:center;gap:12px;padding:14px 18px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--ink);text-decoration:none;min-width:0;}
+  .sel-tile.on{border:2px solid var(--accent-line);background:var(--accent-line-soft);padding:13px 17px;}
+  .sel-tile-name{font-weight:600;font-size:calc(16px * var(--font-scale, 1));}
+  .sel-tile-count{font-size:calc(14px * var(--font-scale, 1));color:var(--ink-muted);}
+  .sel-tile-icon{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;background:var(--accent-line-soft);color:var(--accent-line);}
+  .sel-tile.on .sel-tile-icon{background:var(--accent-line);color:var(--accent-contrast);}
+  .sel-tile-text{display:flex;flex-direction:column;gap:1px;min-width:0;}
+  .sel-tile.is-empty{opacity:.55;}
+  .sel-meta{margin:6px 0 18px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  .sel-n{font-size:calc(13px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);margin-left:6px;}
+  .sel-none{color:var(--ink-muted);font-size:calc(14px * var(--font-scale, 1));}
+  .sel-empty p{margin:0 0 8px;}
+  .sel-list{padding:0;overflow:hidden;margin-bottom:22px;}
+  .sel-group{padding:9px 16px;background:var(--surface-alt);border-bottom:1px solid var(--border);font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--accent-line);}
+  .sel-row{display:flex;align-items:flex-start;gap:14px;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;}
+  .sel-row.is-locked{cursor:default;}
+  .sel-row.is-locked .sel-main{opacity:.75;}
+  .sel-check{flex:0 0 auto;width:18px;height:18px;margin:2px 0 0;accent-color:var(--accent-line);}
+  .sel-row:last-child{border-bottom:0;}
+  .sel-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;}
+  .sel-name{font-weight:500;font-size:calc(14px * var(--font-scale, 1));}
+  .sel-id{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);overflow-wrap:break-word;hyphens:auto;}
+  .sel-reason{font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  .sel-kind{flex:0 0 auto;margin-top:3px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;}
+  .sel-badge{flex:0 0 auto;margin-top:1px;min-width:88px;text-align:center;padding:3px 8px;border-radius:5px;font-size:calc(12px * var(--font-scale, 1));font-weight:500;}
+  .sel-badge-new{background:var(--accent-line-soft);color:var(--accent-line);}
+  .sel-badge-muted{background:var(--surface-alt);color:var(--ink-muted);}
+  .sel-badge-warn{background:var(--warning-soft);color:var(--warning);}
+  .sel-badge-bad{background:var(--danger-soft);color:var(--danger);}
+  .sel-tile-name .sel-badge{min-width:0;margin-left:6px;vertical-align:middle;}
+  .sel-note{margin:0 0 16px;padding:10px 14px;border:1px solid var(--warning);border-radius:8px;background:var(--warning-soft);color:var(--ink);font-size:calc(13px * var(--font-scale, 1));}
+  /* Fußleiste: klebt beim Scrollen am unteren Rand, damit Zähler und Knopf
+     auch bei langen Listen sichtbar bleiben. Eine Zeile: links was markiert
+     ist (Zähler, darunter der Hinweis), rechts wie (Segment, Beschriftung
+     klein darüber) und los (Knopf), alle an der Unterkante ausgerichtet. Wird es zu eng, rutschen Segment und
+     Knopf gemeinsam in eine zweite Zeile, rechtsbündig. */
+  .sel-footer{position:sticky;bottom:0;z-index:2;display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 20px;margin:8px 0 0;padding:12px 16px;border:1px solid var(--border-strong);border-radius:12px;background:var(--surface);box-shadow:var(--shadow);}
+  .sel-footer-info{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:3px;}
+  .sel-footer-counts{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 16px;margin:0;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  /* Die drei Bestandszahlen brechen nur gemeinsam um: ist es zu eng, steht
+     „markiert“ allein oben und die übrigen geschlossen darunter. */
+  .sel-footer-stats{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:calc(12.5px * var(--font-scale, 1));}
+  .sel-footer-counts b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums;}
+  .sel-footer-marked{color:var(--ink);font-weight:500;}
+  .sel-footer-marked b{font-family:var(--font-display);font-size:calc(17px * var(--font-scale, 1));font-weight:700;color:var(--accent-line);}
+  .sel-footer-hint{margin:0;font-size:calc(12px * var(--font-scale, 1));line-height:1.45;color:var(--ink-faint);}
+  .sel-mode{display:flex;flex-direction:column;align-items:flex-start;gap:3px;margin:0 0 0 auto;padding:0;border:0;min-width:0;}
+  .sel-mode legend{float:left;padding:0;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);white-space:nowrap;}
+  /* Segment-Schalter aus zwei Radioknöpfen — dieselbe Leiste wie .seg-toggle
+     (Import) und .seg (Entität), nur mit echten Formularfeldern statt Knöpfen. */
+  .sel-seg{display:inline-flex;max-width:100%;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+  .sel-seg label{position:relative;display:flex;min-width:0;}
+  .sel-seg label + label{border-left:1px solid var(--border);}
+  .sel-seg input{position:absolute;opacity:0;pointer-events:none;}
+  .sel-seg span{flex:1 1 auto;padding:7px 12px;font-size:calc(13px * var(--font-scale, 1));line-height:1.4;background:var(--surface-alt);color:var(--ink);cursor:pointer;white-space:nowrap;text-align:center;}
+  .sel-seg label:hover input:not(:checked) + span{background:var(--surface);}
+  .sel-seg input:checked + span{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+  .sel-seg input:focus-visible + span{outline:2px solid var(--accent-line);outline-offset:-2px;}
+  .sel-seg input:checked:focus-visible + span{outline-color:var(--accent-contrast);}
+  #sel-submit{flex:0 0 auto;min-height:36px;}
+  /* Phase 2: Freitext, Muster-Vorschläge. */
+  .sel-search{display:flex;flex-direction:column;gap:6px;margin:14px 0 4px;max-width:640px;}
+  .sel-search-label{font-weight:600;font-size:calc(15px * var(--font-scale, 1));color:var(--ink);}
+  .sel-search-row{display:flex;gap:8px;}
+  .sel-search-row input[type=search]{flex:1 1 auto;min-width:0;}
+  .sel-search-row .btn{min-height:36px;}
+  .sel-understood{margin:6px 0 0;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  .sel-understood a{color:var(--accent-line);}
+  .sel-search-h{margin-top:4px;}
+  .sel-mono{font-family:var(--font-mono);font-size:calc(13px * var(--font-scale, 1));overflow-wrap:anywhere;}
+  .sel-patterns{margin-top:32px;}
+  .sel-patterns h2{margin-bottom:4px;}
+  .sel-patterns > .sel-meta{margin:0 0 14px;max-width:760px;}
+  /* Muster-Karten: Kopf mit Muster und Aktion, darunter die Kennzahlen als
+     kleine Kacheln (wie .stat, nur kompakter), Hinweise, eingeklappte Beispiele. */
+  .sel-pattern-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:14px;}
+  .sel-pattern{display:flex;flex-direction:column;gap:12px;min-width:0;padding:16px 18px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--shadow);}
+  .sel-pattern.is-active{border-color:var(--accent-line);}
+  .sel-pattern p{margin:0;}
+  .sel-pattern-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;}
+  .sel-pattern-code{flex:0 1 auto;min-width:0;padding:4px 9px;border-radius:6px;background:var(--surface-alt);color:var(--ink);font-size:calc(14px * var(--font-scale, 1));font-weight:500;}
+  .sel-pattern-head .sel-badge{min-width:0;}
+  .sel-pattern-action{flex:0 0 auto;margin:0;}
+  .sel-pattern-btn{color:var(--accent-line);border-color:var(--accent-line);background:var(--surface);font-weight:600;}
+  .sel-pattern-btn:hover:not(:disabled){background:var(--accent-line-soft);border-color:var(--accent-line);}
+  .sel-pattern-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0;}
+  .sel-pattern-stats > div{display:flex;flex-direction:column-reverse;justify-content:flex-end;gap:2px;min-width:0;padding:8px 10px;border-radius:8px;background:var(--surface-alt);}
+  .sel-pattern-stats dt{font-size:calc(11.5px * var(--font-scale, 1));line-height:1.3;color:var(--ink-muted);overflow-wrap:break-word;hyphens:auto;}
+  .sel-pattern-stats dd{margin:0;font-family:var(--font-display);font-size:calc(18px * var(--font-scale, 1));font-weight:700;line-height:1.2;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .sel-pattern-stats .is-new{background:var(--accent-line-soft);}
+  .sel-pattern-stats .is-new dd,.sel-pattern-stats .is-new dt{color:var(--accent-line);}
+  .sel-pattern-stats .is-zero dd{color:var(--ink-faint);}
+  .sel-pattern-notes{display:flex;flex-direction:column;gap:4px;}
+  .sel-pattern-notes .hint{margin:0;}
+  /* Viele Daten, aber kein Verlust: Kante in --warning wie .hint-warn-strong,
+     die app-weit für nicht umkehrbare Folgen reserviert ist (test_hint_roles). */
+  .sel-pattern-notes .sel-pattern-warn{color:var(--ink-muted);border-left:3px solid var(--warning);padding:2px 0 2px 11px;}
+  .sel-pattern-examples{border-top:1px solid var(--border);padding-top:10px;font-size:calc(13px * var(--font-scale, 1));}
+  .sel-pattern-examples summary{cursor:pointer;color:var(--accent-line);font-weight:500;}
+  .sel-pattern-examples summary .sel-n{margin-left:4px;}
+  .sel-pattern-examples ul{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;}
+  .sel-pattern-examples li{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;min-width:0;}
+  .sel-pattern-examples .sel-name{font-size:calc(13px * var(--font-scale, 1));}
+  .sel-pattern-examples .sel-badge{min-width:0;padding:1px 6px;font-size:calc(11px * var(--font-scale, 1));}
+  @media (max-width:640px){
+    .sel-search-row{flex-wrap:wrap;}
+    /* Telefon: Info oben, darunter das Segment über die ganze Breite (zwei
+       gleich breite Hälften), dann der Knopf über die ganze Breite. */
+    .sel-footer{gap:10px;padding:10px 12px;}
+    .sel-footer-info{flex-basis:100%;}
+    .sel-mode{flex:1 1 100%;align-items:stretch;margin:0;}
+    .sel-seg{display:flex;width:100%;}
+    .sel-seg label{flex:1 1 0;}
+    .sel-seg span{padding:6px 8px;white-space:normal;font-size:calc(12.5px * var(--font-scale, 1));}
+    #sel-submit{width:100%;}
+    .sel-pattern{padding:14px;}
+    .sel-pattern-stats{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .sel-pattern-action,.sel-pattern-btn{width:100%;}
+    .sel-row{flex-wrap:wrap;gap:6px 10px;}
+    .sel-main{flex-basis:100%;}
+    .sel-tile{min-width:0;flex:1 1 100%;}
+  }
