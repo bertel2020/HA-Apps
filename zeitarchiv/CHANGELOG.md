@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.11.0 - 2026-10-25
 
 ### Neu
 
@@ -23,8 +23,8 @@
   Verlauf aller Änderungen. Einträge lassen sich entfernen, ausschließen und
   wieder aufnehmen, auch mehrere auf einmal; Aktionen des Assistenten lassen sich
   rückgängig machen.
-- Der Assistent braucht eine neuere Version der Zeitarchiv-Integration. Mit der
-  bisherigen zeigt die App die Vorschläge nur an.
+- Der Assistent braucht die Zeitarchiv-Integration ab 1.2.0. Mit einer
+  älteren zeigt die App die Vorschläge nur an.
 - **Energiedashboard, Kostenanalyse**: Wenn der Netzbezug-Preis aus einer Entität
   kommt (zum Beispiel ein dynamischer Tarif), zeigt eine neue Kachel den
   durchschnittlichen Strompreis je kWh. Energie ohne Preis zählt nicht mit. Wird
@@ -73,8 +73,8 @@
   device or label), with filter and search, plus the history of all changes.
   Entries can be removed, excluded and included again, also several at once;
   actions of the assistant can be undone.
-- The assistant needs a newer version of the Zeitarchiv integration. With the
-  current one the app only shows the suggestions.
+- The assistant needs the Zeitarchiv integration 1.2.0 or later. With an older
+  one the app only shows the suggestions.
 - **Energy dashboard, cost analysis**: When the grid price comes from an entity
   (for example a dynamic tariff), a new tile shows the average electricity price
   per kWh. Energy without a price is not counted. If the price is only applied per
