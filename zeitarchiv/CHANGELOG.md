@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.11.1 - 2026-10-25
+
+### Behoben
+
+- **Tabellen**: Eine Summenzeile direkt unter einer Trennlinie blieb leer. Sie
+  summiert jetzt in diesem Fall den Abschnitt darüber.
+
+---
+
+### English
+
+#### Fixed
+
+- **Tables**: A sum row placed directly below a separator stayed empty. In this
+  case it now sums the section above.
+
 ## 1.11.0 - 2026-10-25
 
 ### Neu
