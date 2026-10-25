@@ -341,3 +341,53 @@ def test_month_costs_fall_back_to_buckets_without_the_hourly_stage(monkeypatch, 
         assert kpi["kosten_aufloesung"] == "tag"
     finally:
         a.close()
+
+
+def _tarif_anlage_voll(tmp: Path, hourly_rollup: bool):
+    """Wie _tarif_anlage, dazu Erzeuger, Einspeisung und ein Verbraucher.
+
+    PV 4 kWh um 12 Uhr und 4 kWh um 23 Uhr, Einspeisung 1 kWh um 12 Uhr:
+    Eigenverbrauch 7 kWh. Verbraucher 2 kWh um 12 Uhr (teuer) und 2 kWh um 23 Uhr.
+    """
+    a, config = _tarif_anlage(tmp, hourly_rollup)
+    a.zaehler("sensor.pv", (0, 500.0), (11, 500.0), (12, 504.0), (13, 504.0), (23, 508.0))
+    a.zaehler("sensor.einspeisung", (0, 50.0), (11, 50.0), (12, 51.0), (13, 51.0), (23, 51.0))
+    a.zaehler("sensor.waschmaschine", (0, 10.0), (11, 10.0), (12, 12.0), (13, 12.0), (23, 14.0))
+    if hourly_rollup:
+        for eid in ("sensor.pv", "sensor.einspeisung", "sensor.waschmaschine"):
+            a.index.set_entity_hourly_rollup(eid, True)
+    config.update({
+        "einspeisung": "sensor.einspeisung",
+        "erzeuger": [{"entity_id": "sensor.pv", "name": "PV"}],
+        "verbraucher": [{"entity_id": "sensor.waschmaschine", "name": "Waschmaschine"}],
+    })
+    config["kosten"]["preis_eigenverbrauch"] = "sensor.preis"
+    return a, config
+
+
+def test_self_consumption_and_consumer_costs_use_hourly_prices(monkeypatch, tmp: Path) -> None:
+    a, config = _tarif_anlage_voll(tmp, hourly_rollup=True)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "month", 0)
+        kpi = flow["kpi"]
+        # Eigenverbrauch 3 kWh (12 Uhr, 0,50 €) + 4 kWh (23 Uhr, 0,50 €)
+        assert kpi["vermiedene_kosten"] == pytest.approx(3.5, abs=0.01)
+        assert kpi["eigenverbrauch_verguetung"] == pytest.approx(3.5, abs=0.01)
+        zeile = next(r for r in flow["verbraucher_breakdown"] if r["name"] == "Waschmaschine")
+        assert zeile["kosten"] == pytest.approx(2.0, abs=0.01)  # 4 kWh × 0,50 €
+    finally:
+        a.close()
+
+
+def test_self_consumption_and_consumer_costs_fall_back_without_hourly_stage(monkeypatch, tmp: Path) -> None:
+    a, config = _tarif_anlage_voll(tmp, hourly_rollup=False)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "month", 0)
+        # Preis zu Tagesbeginn 0,10 € für alles
+        assert flow["kpi"]["vermiedene_kosten"] == pytest.approx(0.70, abs=0.01)
+        zeile = next(r for r in flow["verbraucher_breakdown"] if r["name"] == "Waschmaschine")
+        assert zeile["kosten"] == pytest.approx(0.40, abs=0.01)
+    finally:
+        a.close()

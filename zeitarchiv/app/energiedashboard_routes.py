@@ -1283,49 +1283,63 @@ class EnergieDashboardService:
         stale_labels: list[str] = []
         factor_gap_entries: list[tuple[str, float, int, str]] = []
 
-        def hourly_cost_inputs(
-            energy_entity_id: str | None, price_entity_id: str, energy_series: dict[float, float]
-        ) -> tuple[dict[float, float], dict[float, float]] | None:
-            """(Energie je Stunde, Preis je Stunde) für die Kostenrechnung, oder None.
+        hourly_energy_cache: dict[str, dict[float, float] | None] = {}
+        hourly_price_cache: dict[str, dict[float, float]] = {}
+
+        def hourly_of(entity_id: str | None) -> dict[float, float] | None:
+            """Stundenreihe eines Zählers für die Kostenrechnung, oder None.
 
             Mit Buckets von Tag oder Monat gälte ein Preis für alles, was darin
             verbraucht wurde (gemessen: bei einem Tagestarif 23 bis 29 % zu
-            niedrig). Die Stundenreihe von Energie und Preis rechnet je Stunde.
-            None heißt: mit den Buckets des Zeitraums weiterrechnen, weil die
-            Stundenstufe fehlt (frisch eingerichtet, Nachtrag läuft) oder die
-            Summe der Stunden nicht zur Bucket-Summe passt.
+            niedrig). None heißt: mit den Buckets des Zeitraums weiterrechnen,
+            weil die Stundenstufe fehlt (frisch eingerichtet, Nachtrag läuft)
+            oder die Summe der Stunden nicht zur Bucket-Summe passt.
             """
-            if not energy_entity_id or continuous or query_mod.BAR_RESOLUTION.get(range_key) == "stunde":
+            if not entity_id or continuous or query_mod.BAR_RESOLUTION.get(range_key) == "stunde":
                 return None
-            energy_entity = self.deps.index.get_entity(energy_entity_id)
-            price_entity = self.deps.index.get_entity(price_entity_id)
-            if (
-                energy_entity is None or energy_entity["aggregation_type"] != "counter"
-                or not energy_entity["hourly_rollup"]
-                or price_entity is None or price_entity["aggregation_type"] != "standard"
-            ):
+            if entity_id in hourly_energy_cache:
+                return hourly_energy_cache[entity_id]
+            hourly_energy_cache[entity_id] = None
+            entity = self.deps.index.get_entity(entity_id)
+            if entity is None or entity["aggregation_type"] != "counter" or not entity["hourly_rollup"]:
                 return None
             energy_hourly = query_mod.query_hourly_counter_series(
-                self.deps.data_dir, self.deps.index, energy_entity_id, window_start, window_end,
+                self.deps.data_dir, self.deps.index, entity_id, window_start, window_end,
                 self.deps.tz, now, read_cache,
             )
-            price_hourly = query_mod.query_hourly_counter_series(
-                self.deps.data_dir, self.deps.index, price_entity_id, window_start, window_end,
-                self.deps.tz, now, read_cache, aggregation_type="standard",
-            )
-            if not energy_hourly or not price_hourly:
+            if not energy_hourly:
                 return None
-            erwartet = sum(energy_series.values())
+            erwartet = sum(entity_series(entity_id)[0].values())
             stuendlich = sum(energy_hourly.values())
             if abs(erwartet - stuendlich) > max(0.05, 0.02 * abs(erwartet)):
-                # Sonst widerspräche die Kostenzeile der Netzbezug-Kennzahl daneben.
+                # Sonst widerspräche die Kostenzeile der Kennzahl daneben.
                 logger.warning(
                     "Stundenreihe von %s weicht von der Bucket-Summe ab (%.3f gegen %.3f kWh), "
                     "Kosten werden mit den Buckets des Zeitraums gerechnet",
-                    energy_entity_id, stuendlich, erwartet,
+                    entity_id, stuendlich, erwartet,
                 )
                 return None
-            return energy_hourly, price_hourly
+            hourly_energy_cache[entity_id] = energy_hourly
+            return energy_hourly
+
+        def hourly_price(price_entity_id: str) -> dict[float, float]:
+            if price_entity_id not in hourly_price_cache:
+                price_entity = self.deps.index.get_entity(price_entity_id)
+                hourly_price_cache[price_entity_id] = (
+                    query_mod.query_hourly_counter_series(
+                        self.deps.data_dir, self.deps.index, price_entity_id, window_start, window_end,
+                        self.deps.tz, now, read_cache, aggregation_type="standard",
+                    )
+                    if price_entity is not None and price_entity["aggregation_type"] == "standard"
+                    else {}
+                )
+            return hourly_price_cache[price_entity_id]
+
+        def hourly_merge(parts: list[dict[float, float] | None], factors: list[float] | None = None) -> dict[float, float] | None:
+            """Summe von Stundenreihen; None, sobald eine davon fehlt."""
+            if not parts or any(part is None for part in parts):
+                return None
+            return self._series_merge(*parts, factors=factors)
 
         def _carry_limit(entity_id: str, stuetzstellen: list[float]) -> float | None:
             """Wie lange ein Faktorwert fortgeschrieben werden darf, in Sekunden.
@@ -1711,6 +1725,10 @@ class EnergieDashboardService:
         # Kosten-Spalte in der Verbraucheranteile-Tabelle — Name als Schlüssel
         # statt Index, weil verbraucher_breakdown weiter unten sortiert wird.
         verbraucher_series_by_name: dict[str, dict[float, float]] = {}
+        # Woraus sich die Serie einer Zeile zusammensetzt, damit die Kosten sie aus
+        # Stundenreihen nachbauen können: ("entity", id), ("rest", id, [Kind-ids]),
+        # ("group", [Namen]) oder ("grundlast",).
+        verbraucher_rezept: dict[str, tuple] = {}
         gruppen_totals: dict[str, float] = {}
         gruppen_baseline_totals: dict[str, float] = {}
         # Eine Gruppe mit nur EINEM Mitglied ist keine Gruppierung, sondern eine
@@ -1790,6 +1808,7 @@ class EnergieDashboardService:
                 gruppe = None
             anomalien_vorher = len(anomalien)
             series, val, display_val, node = build_row(verbraucher, name, gruppe, blend=gruppe is None)
+            verbraucher_rezept[name] = ("entity", entity_id)
             kinder = kinder_je_zaehler.get(entity_id, [])
             kind_eintraege: list[dict] = []
             if kinder:
@@ -1809,6 +1828,7 @@ class EnergieDashboardService:
                     })
                     nodes.append(kind_node)
                     verbraucher_series_by_name[kind_name] = kind_series
+                    verbraucher_rezept[kind_name] = ("entity", kind["entity_id"])
                     kinder_summe += kind_display
                     kinder_serien.append(kind_series)
                     if kind_node.get("anomaly"):
@@ -1843,6 +1863,7 @@ class EnergieDashboardService:
                         "name": rest_name, "value": round(rest, 3), "parent": name, "rest": True,
                     })
                 verbraucher_series_by_name[rest_name] = rest_series
+                verbraucher_rezept[rest_name] = ("rest", entity_id, [kind["entity_id"] for kind in kinder])
             nodes.append(node)
             if gruppe:
                 links.append({"source": gruppe, "target": name, "value": display_val})
@@ -1872,6 +1893,7 @@ class EnergieDashboardService:
             # (verbraucher_series_by_name) die Gruppenzeile bucket-genau bewertet.
             grouped_values: dict[str, float] = {}
             grouped_series: dict[str, list[dict[float, float]]] = {}
+            grouped_members: dict[str, list[str]] = {}
             grouped_order: list[str] = []
             for item in verbraucher_breakdown:
                 gruppe_name = item.get("gruppe")
@@ -1880,12 +1902,15 @@ class EnergieDashboardService:
                 if gruppe_name not in grouped_values:
                     grouped_values[gruppe_name] = 0.0
                     grouped_series[gruppe_name] = []
+                    grouped_members[gruppe_name] = []
                     grouped_order.append(gruppe_name)
                 grouped_values[gruppe_name] += item["value"]
                 grouped_series[gruppe_name].append(verbraucher_series_by_name.get(item["name"], {}))
+                grouped_members[gruppe_name].append(item["name"])
                 item["parent"] = gruppe_name
             for gruppe_name in grouped_order:
                 verbraucher_series_by_name[gruppe_name] = self._series_merge(*grouped_series[gruppe_name])
+                verbraucher_rezept[gruppe_name] = ("group", grouped_members[gruppe_name])
                 verbraucher_breakdown.append(
                     {"name": gruppe_name, "value": round(grouped_values[gruppe_name], 3), "kind": "group"}
                 )
@@ -2057,6 +2082,7 @@ class EnergieDashboardService:
         )
         grundlast_series_clamped = {ts: max(v, 0.0) for ts, v in grundlast_series.items()}
         verbraucher_series_by_name["Grundlast"] = grundlast_series_clamped
+        verbraucher_rezept["Grundlast"] = ("grundlast",)
         verbrauch_series = self._series_merge(verbraucher_total_series, grundlast_series_clamped)
         speicher_netto_series = self._series_merge(
             speicher_laden_series, speicher_entladen_series, factors=[1.0, -1.0]
@@ -2076,6 +2102,7 @@ class EnergieDashboardService:
         kosten = config.get("kosten") or {}
         co2 = config.get("co2") or {}
         stunden_gerechnet: set[str] = set()
+        netzbezug_stuendlich = False
         netzbezug_cost = None
         einspeisung_revenue = None
         vermiedene_kosten = None
@@ -2085,12 +2112,61 @@ class EnergieDashboardService:
         co2_ausstoss = None
         co2_vermieden = None
         if not (continuous or skip_quality):
+            erzeuger_ids = [erz["entity_id"] for erz in (config.get("erzeuger") or []) if erz.get("entity_id")]
+            speicher_cfg = config.get("speicher") or []
+            top_verbraucher_ids = [
+                row["entity_id"] for row in verbraucher_rows if row.get("entity_id") and row["entity_id"] not in kind_ids
+            ]
+
+            def hourly_pv_eigenverbrauch() -> dict[float, float] | None:
+                # Wie pv_eigenverbrauch_series unten, nur je Stunde gekappt.
+                erzeugung = hourly_merge([hourly_of(eid) for eid in erzeuger_ids])
+                einspeisung = hourly_of(config.get("einspeisung")) if config.get("einspeisung") else {}
+                if erzeugung is None or einspeisung is None:
+                    return None
+                diff = self._series_merge(erzeugung, einspeisung, factors=[1.0, -1.0])
+                return {ts: max(v, 0.0) for ts, v in diff.items()}
+
+            def hourly_grundlast() -> dict[float, float] | None:
+                def ids(key: str) -> list[dict[float, float] | None]:
+                    return [hourly_of(sp[key]) for sp in speicher_cfg if sp.get(key)]
+
+                einspeisung = hourly_of(config.get("einspeisung")) if config.get("einspeisung") else {}
+                parts = [
+                    hourly_of(config.get("netzbezug")) if config.get("netzbezug") else {},
+                    hourly_merge([hourly_of(eid) for eid in erzeuger_ids]) if erzeuger_ids else {},
+                    hourly_merge(ids("entladen_entity_id")) if ids("entladen_entity_id") else {},
+                    hourly_merge([hourly_of(eid) for eid in top_verbraucher_ids]) if top_verbraucher_ids else {},
+                    einspeisung,
+                    hourly_merge(ids("laden_entity_id")) if ids("laden_entity_id") else {},
+                ]
+                if any(part is None for part in parts):
+                    return None
+                diff = self._series_merge(*parts, factors=[1.0, 1.0, 1.0, -1.0, -1.0, -1.0])
+                return {ts: max(v, 0.0) for ts, v in diff.items()}
+
+            def hourly_consumer(name: str) -> dict[float, float] | None:
+                rezept = verbraucher_rezept.get(name)
+                if rezept is None:
+                    return None
+                if rezept[0] == "entity":
+                    return hourly_of(rezept[1])
+                if rezept[0] == "rest":
+                    teile = hourly_merge(
+                        [hourly_of(rezept[1])] + [hourly_of(kid) for kid in rezept[2]],
+                        [1.0] + [-1.0] * len(rezept[2]),
+                    )
+                    return None if teile is None else {ts: max(v, 0.0) for ts, v in teile.items()}
+                if rezept[0] == "group":
+                    return hourly_merge([hourly_consumer(member) for member in rezept[1]])
+                return hourly_grundlast()
+
             def _bucket_factor(
                 energy_series: dict[float, float],
                 factor_entity_id: str | None,
                 fixed_factor: float | None,
                 label: str,
-                energy_entity_id: str | None = None,
+                hourly_energy: Callable[[], dict[float, float] | None] | None = None,
             ) -> float | None:
                 # Gemeinsame bucket-weise Faktor×Energie-Rechnung für Kosten
                 # (€/kWh) UND CO2 (g/kWh) — Entität hat Vorrang vor dem festen
@@ -2108,9 +2184,10 @@ class EnergieDashboardService:
                     add_stale_issue(label, stale and not _gap_detection_off(factor_entity_id))
                     if not factor_series:
                         return None
-                    stundenreihen = hourly_cost_inputs(energy_entity_id, factor_entity_id, energy_series)
-                    if stundenreihen is not None:
-                        energy_series, factor_series = stundenreihen
+                    stunden_energie = hourly_energy() if hourly_energy else None
+                    stunden_preis = hourly_price(factor_entity_id) if stunden_energie else {}
+                    if stunden_energie and stunden_preis:
+                        energy_series, factor_series = stunden_energie, stunden_preis
                         stunden_gerechnet.add(label)
                     # Der Faktor wird als ZUSTAND ausgewertet, nicht über
                     # Schlüsselgleichheit: es gilt der letzte Preis bzw. die
@@ -2153,13 +2230,15 @@ class EnergieDashboardService:
 
             netzbezug_cost = _bucket_factor(
                 netzbezug_series, kosten.get("preis_netzbezug"), kosten.get("preis_netzbezug_fixed"), "Preis Netzbezug",
-                config.get("netzbezug"),
+                lambda: hourly_of(config.get("netzbezug")),
             )
+            netzbezug_stuendlich = "Preis Netzbezug" in stunden_gerechnet
+            stunden_gerechnet.clear()
             if netzbezug_cost is not None:
                 netzbezug_cost = round(netzbezug_cost, 2)
             einspeisung_revenue = _bucket_factor(
                 einspeisung_series, kosten.get("preis_einspeisung"), kosten.get("preis_einspeisung_fixed"), "Preis Einspeisung",
-                config.get("einspeisung"),
+                lambda: hourly_of(config.get("einspeisung")),
             )
             if einspeisung_revenue is not None:
                 einspeisung_revenue = round(einspeisung_revenue, 2)
@@ -2186,6 +2265,7 @@ class EnergieDashboardService:
                     kosten.get("preis_netzbezug"),
                     kosten.get("preis_netzbezug_fixed"),
                     "Preis Netzbezug",
+                    hourly_pv_eigenverbrauch,
                 )
                 if vermiedene_kosten is not None:
                     vermiedene_kosten = round(vermiedene_kosten, 2)
@@ -2205,6 +2285,7 @@ class EnergieDashboardService:
                     kosten.get("preis_eigenverbrauch"),
                     kosten.get("preis_eigenverbrauch_fixed"),
                     tr("Vergütung Eigenverbrauch"),
+                    hourly_pv_eigenverbrauch,
                 )
                 if eigenverbrauch_verguetung is not None:
                     eigenverbrauch_verguetung = round(eigenverbrauch_verguetung, 2)
@@ -2261,10 +2342,12 @@ class EnergieDashboardService:
             # Zwischengröße, falls hier später noch weitergerechnet wird.
             if co2.get("faktor_netzbezug_entity") or co2.get("faktor_netzbezug_fixed") is not None:
                 co2_ausstoss_g = _bucket_factor(
-                    netzbezug_series, co2.get("faktor_netzbezug_entity"), co2.get("faktor_netzbezug_fixed"), "CO2-Faktor Netzbezug"
+                    netzbezug_series, co2.get("faktor_netzbezug_entity"), co2.get("faktor_netzbezug_fixed"), "CO2-Faktor Netzbezug",
+                    lambda: hourly_of(config.get("netzbezug")),
                 )
                 co2_vermieden_g = _bucket_factor(
-                    pv_eigenverbrauch_series, co2.get("faktor_netzbezug_entity"), co2.get("faktor_netzbezug_fixed"), "CO2-Faktor Netzbezug"
+                    pv_eigenverbrauch_series, co2.get("faktor_netzbezug_entity"), co2.get("faktor_netzbezug_fixed"), "CO2-Faktor Netzbezug",
+                    hourly_pv_eigenverbrauch,
                 )
                 co2_ausstoss = round(co2_ausstoss_g / 1000.0, 2) if co2_ausstoss_g is not None else None
                 co2_vermieden = round(co2_vermieden_g / 1000.0, 2) if co2_vermieden_g is not None else None
@@ -2283,7 +2366,8 @@ class EnergieDashboardService:
                     if series is None:
                         continue
                     item_kosten = _bucket_factor(
-                        series, kosten.get("preis_netzbezug"), kosten.get("preis_netzbezug_fixed"), "Preis Netzbezug"
+                        series, kosten.get("preis_netzbezug"), kosten.get("preis_netzbezug_fixed"), "Preis Netzbezug",
+                        lambda name=item["name"]: hourly_consumer(name),
                     )
                     item["kosten"] = round(item_kosten, 2) if item_kosten is not None else None
         # Eigenverbrauchsvergütung fließt hier mit ein (echter Geldfluss wie
@@ -2333,7 +2417,7 @@ class EnergieDashboardService:
         # Der Preis gilt je Bucket; was ein Bucket umfasst, steht in BAR_RESOLUTION.
         # Daraus erkennt die Kachel, ob die Kosten stundengenau sind (sonst Hinweis).
         kosten_aufloesung = query_mod.BAR_RESOLUTION.get(range_key) if netzbezug_cost is not None else None
-        if "Preis Netzbezug" in stunden_gerechnet:
+        if netzbezug_stuendlich:
             kosten_aufloesung = "stunde"
 
         # Metadaten-/Zählerrückgang-Prüfungen nur für die tatsächlich
