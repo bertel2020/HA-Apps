@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Behoben
+
+- **Energiedashboard**: Als „historisch“ markierte Entitäten lösen im Status
+  „Sensorwerte aktuell“ keine Meldung „Veraltet“ mehr aus, denn sie liefern
+  bewusst keine neuen Werte mehr.
+
+---
+
+### English
+
+#### Fixed
+
+- **Energy dashboard**: entities marked as “historic” no longer trigger a
+  “Stale” message in the “Sensor values up to date” status, since they
+  intentionally no longer receive new values.
+
 ## 1.10.0 - 2026-10-24
 
 ### Neu

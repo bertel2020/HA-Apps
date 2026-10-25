@@ -617,6 +617,9 @@ class EnergieDashboardService:
         stale = True
         if entity is not None and entity["last_ts"]:
             stale = (now.timestamp() - entity["last_ts"]) > STALE_SECONDS
+        # Als „historisch“ markierte Entitäten liefern bewusst nie mehr neue Werte.
+        if entity is not None and entity["historic"]:
+            stale = False
         read_cache.memo[memo_key] = (series, stale)
         return series, stale
 
