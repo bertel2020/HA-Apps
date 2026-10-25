@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icons.html" import topic_icon %}
 {% block title %}{{ _("Zeitarchiv — Entitäten vorschlagen") }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/selection.css') }}">
@@ -32,8 +33,11 @@
       {% for tile in tiles %}
       <a class="sel-tile{{ ' on' if tile.topic == topic }}{{ ' is-empty' if not tile.counts.found and tile.topic != topic }}" href="{{ app_root }}/selection?topic={{ tile.topic }}"
          {% if tile.topic == topic %}aria-current="true"{% endif %}>
-        <span class="sel-tile-name">{{ tile.label }}{% if tile.sensitive %} <span class="sel-badge sel-badge-warn">{{ _("sensibel") }}</span>{% endif %}</span>
-        <span class="sel-tile-count"><b>{{ tile.counts.recommended }}</b> {{ _("empfohlen") }} · {{ tile.counts.found }} {{ _("gefunden") }}</span>
+        <span class="sel-tile-icon">{{ topic_icon(tile.topic) }}</span>
+        <span class="sel-tile-text">
+          <span class="sel-tile-name">{{ tile.label }}{% if tile.sensitive %} <span class="sel-badge sel-badge-warn">{{ _("sensibel") }}</span>{% endif %}</span>
+          <span class="sel-tile-count"><b>{{ tile.counts.recommended }}</b> {{ _("empfohlen") }} · {{ tile.counts.found }} {{ _("gefunden") }}</span>
+        </span>
       </a>
       {% endfor %}
     </nav>
