@@ -13,7 +13,10 @@
   .sel-empty p{margin:0 0 8px;}
   .sel-list{padding:0;overflow:hidden;margin-bottom:22px;}
   .sel-group{padding:9px 16px;background:var(--surface-alt);border-bottom:1px solid var(--border);font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--accent-line);}
-  .sel-row{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--border);}
+  .sel-row{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;}
+  .sel-row.is-locked{cursor:default;}
+  .sel-row.is-locked .sel-main{opacity:.75;}
+  .sel-check{flex:0 0 auto;width:18px;height:18px;margin:0;accent-color:var(--accent-line);}
   .sel-row:last-child{border-bottom:0;}
   .sel-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;}
   .sel-name{font-weight:500;font-size:calc(14px * var(--font-scale, 1));}
@@ -25,7 +28,20 @@
   .sel-badge-muted{background:var(--surface-alt);color:var(--ink-muted);}
   .sel-badge-warn{background:var(--warning-soft);color:var(--warning);}
   .sel-badge-bad{background:var(--danger-soft);color:var(--danger);}
+  .sel-tile-name .sel-badge{min-width:0;margin-left:6px;vertical-align:middle;}
+  .sel-note{margin:0 0 16px;padding:10px 14px;border:1px solid var(--warning);border-radius:8px;background:var(--warning-soft);color:var(--ink);font-size:calc(13px * var(--font-scale, 1));}
+  /* Fußleiste: klebt beim Scrollen am unteren Rand, damit Zähler und Knopf
+     auch bei langen Listen sichtbar bleiben. */
+  .sel-footer{position:sticky;bottom:0;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;margin:8px 0 0;padding:12px 16px;border:1px solid var(--border-strong);border-radius:10px;background:var(--surface);box-shadow:var(--shadow);}
+  .sel-footer-counts{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  .sel-footer-counts b{color:var(--ink);}
+  .sel-mode{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0;padding:0;border:0;}
+  .sel-mode legend{float:left;margin-right:6px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  .sel-footer-hint{flex:1 1 220px;margin:0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
+  #sel-submit{margin-left:auto;}
   @media (max-width:640px){
+    .sel-footer{padding:10px 12px;}
+    #sel-submit{margin-left:0;width:100%;}
     .sel-row{flex-wrap:wrap;gap:6px 10px;}
     .sel-main{flex-basis:100%;}
     .sel-tile{min-width:0;flex:1 1 100%;}

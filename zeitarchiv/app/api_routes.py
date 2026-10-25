@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field, model_validator
 
-from . import ai_settings, ha_integration
+from . import ai_settings, ha_integration, selection_jobs
 from .ai_routes import AiDependencies, create_ai_router
 from .selection_routes import create_catalog_router
 from .chart_period import stichtag_or_400, stichtag_window
@@ -78,7 +78,7 @@ EventText = Annotated[str, Field(max_length=MAX_EVENT_TEXT_LENGTH)]
 # zurücknehmen. "state": /api/write nimmt Text-Zustände (state/state_label).
 # "ai": /api/ai/* existiert (ROADMAP 1.31); ob der Zugriff eingeschaltet ist,
 # sagt erst die Antwort dort (403 = aus).
-API_CAPABILITIES = ("state", "ai", "catalog")
+API_CAPABILITIES = ("state", "ai", "catalog", "selection")
 
 
 class EventIn(BaseModel):
@@ -489,6 +489,9 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             # Zählt jede Änderung am KI-Zugriff hoch: Ändert sich der Wert, holt
             # die Integration /api/ai/config neu (siehe ai_settings.py).
             "ai_config_rev": ai_settings.config_rev(deps.index),
+            # Dasselbe für die Aufträge des Auswahl-Assistenten (ROADMAP 1.33):
+            # ändert sich der Wert, holt die Integration /api/selection/jobs.
+            "selection_rev": selection_jobs.rev(deps.data_dir),
         }
 
     @router.post("/api/write")

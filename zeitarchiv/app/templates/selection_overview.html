@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}{{ _("Zeitarchiv — Auswahl & Verlauf") }}{% endblock %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ asset('css/pages/selection_overview.css') }}">
+{% endblock %}
+{% block content %}
+  <div class="page">
+    <h1>{{ _("Entitäten") }}</h1>
+    <p class="sub">{{ _("Was die Zeitarchiv-Integration archiviert, auf welchem Weg es in die Auswahl kam und was sich daran geändert hat.") }}
+      · <a href="{{ app_root }}/selection">{{ _("Entitäten vorschlagen →") }}</a></p>
+    {% with active = 'auswahl' %}{% include "_entities_tabs.html" %}{% endwith %}
+
+    {% if job %}
+    <div class="ov-job ov-job-{{ job.status }}" id="ov-job" role="status" aria-live="polite"
+         data-status="{{ job.status }}" data-status-url="{{ app_root }}/selection/jobs/{{ job.id }}/status">
+      {% if job.status == "pending" %}
+      <b>{{ _("Wartet auf die Integration.") }}</b> {{ _("Der Auftrag liegt bereit; die Integration holt ihn innerhalb etwa einer Minute ab. Diese Anzeige aktualisiert sich von selbst.") }}
+      {% elif job.status == "applied" %}
+      <b>{{ _("Aktiv.") }}</b> {{ _("Die Integration hat den Auftrag übernommen.") }}
+      {% elif job.status == "partial" %}
+      <b>{{ _("Teilweise übernommen.") }}</b> {{ _("Einzelheiten stehen im Verlauf.") }}
+      {% elif job.status == "failed" %}
+      <b>{{ _("Fehlgeschlagen.") }}</b> {{ _("Einzelheiten stehen im Verlauf.") }}
+      {% else %}
+      <b>{{ _("Abgelaufen.") }}</b> {{ _("Die Integration hat den Auftrag nicht innerhalb von 24 Stunden abgeholt.") }}
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if catalog is none %}
+    <div class="settings-panel ov-empty">
+      <p><b>{{ _("Noch kein Katalog empfangen.") }}</b></p>
+      <p>{{ _("Die Zeitarchiv-Integration schickt ihn automatisch, sobald sie verbunden ist (höchstens alle zehn Minuten). Ist die Integration älter, muss sie zuerst aktualisiert werden.") }}</p>
+    </div>
+    {% else %}
+    {% if not can_apply %}
+    <p class="ov-note">{{ _("Zum Ändern braucht es eine neuere Version der Zeitarchiv-Integration. Bis dahin zeigt diese Seite die Auswahl nur an.") }}</p>
+    {% endif %}
+    <p class="ov-meta">{{ _("Stand der Integration: {received}", received=received) }}{% if label %} · {{ _("Label des Assistenten: {name}", name=label.name) }}{% endif %}</p>
+
+    <div class="ov-layout">
+      <section class="ov-main" aria-labelledby="ov-table-h">
+        <h2 id="ov-table-h" class="ov-h">{{ _("Auswahl") }} <span class="ov-n">{{ table.counts.alle }}</span></h2>
+
+        <form method="get" action="{{ app_root }}/selection/overview" class="ov-search" role="search">
+          <input type="hidden" name="filter" value="{{ table.filter }}">
+          <input type="search" name="q" value="{{ table.query }}" placeholder="{{ _('Entität suchen …') }}" aria-label="{{ _('Entität suchen') }}">
+          <button type="submit" class="btn">{{ _("Suchen") }}</button>
+        </form>
+
+        <nav class="ov-chips" aria-label="{{ _('Nach Herkunft filtern') }}">
+          {% for key, text in filters %}
+          <a class="chip{{ ' active' if table.filter == key }}" href="{{ app_root }}/selection/overview?{{ {'filter': key, 'q': table.query}|urlencode }}"
+             {% if table.filter == key %}aria-current="true"{% endif %}>{{ text }} <span class="ov-chip-n">{{ table.counts[key] }}</span></a>
+          {% endfor %}
+        </nav>
+
+        <form method="post" action="{{ app_root }}/selection/remove" id="ov-bulk">
+          <div class="ov-bulkbar">
+            <button type="submit" class="btn btn-sm btn-danger" id="ov-bulk-submit" {% if not can_apply %}disabled{% endif %}>{{ _("Auswahl entfernen …") }}</button>
+            <span class="ov-bulk-hint">{{ _("Entfernen lassen sich Einträge des Assistenten und von Hand gewählte Einzel-IDs.") }}</span>
+          </div>
+          {% if table.rows %}
+          <div class="tbl-wrap">
+          <table class="dt ov-table" data-cards="off">
+            <thead><tr>
+              <th class="ov-col-check"></th>
+              <th>{{ _("Entität") }}</th>
+              <th>{{ _("Herkunft") }}</th>
+              <th>{{ _("Status") }}</th>
+              <th>{{ _("Seit") }}</th>
+              <th class="ov-col-actions"></th>
+            </tr></thead>
+            <tbody>
+            {% for row in table.rows %}
+            <tr>
+              <td class="ov-col-check">{% if row.removable and can_apply %}<input type="checkbox" class="ov-check" name="ids" value="{{ row.entity_id }}" aria-label="{{ _('{name} markieren', name=row.name) }}">{% endif %}</td>
+              <td><span class="ov-name">{{ row.name }}</span><span class="ov-id">{{ row.entity_id }}</span></td>
+              <td><span class="ov-badges">{% for badge in row.badges %}<span class="ov-badge ov-badge-{{ badge.kind }}">{{ badge.text }}</span>{% endfor %}</span></td>
+              <td>{% if row.status == "archived" %}{{ _("archiviert") }}{% elif row.status == "excluded" %}{{ _("ausgeschlossen") }}{% elif row.status == "drifted" %}{{ _("nicht mehr ausgewählt") }}{% else %}{{ _("noch keine Werte") }}{% endif %}</td>
+              <td>{{ row.since or "–" }}</td>
+              <td class="ov-col-actions">
+                <details class="ov-menu">
+                  <summary class="btn btn-sm" aria-label="{{ _('Aktionen für {name}', name=row.name) }}">⋯</summary>
+                  <div class="ov-menu-pop">
+                    {% if row.removable and can_apply %}
+                    <button type="submit" class="btn btn-sm btn-danger" name="one" value="{{ row.entity_id }}">{% if row.manual %}{{ _("Aus Auswahl entfernen …") }}{% else %}{{ _("Entfernen …") }}{% endif %}</button>
+                    {% endif %}
+                    <p class="ov-menu-h">{{ _("Warum ist das drin?") }}</p>
+                    <ul class="ov-explain">{% for line in row.explain %}<li>{{ line }}</li>{% endfor %}</ul>
+                    {% if row.only_in_ha %}
+                    <p class="ov-menu-note">{{ _("Muster, Bereich, Gerät und Label ändert man in Home Assistant (Zeitarchiv-Integration, Optionen). Ausschließen von hier aus kommt später.") }}</p>
+                    {% endif %}
+                    {% if row.status == "archived" %}<a href="{{ app_root }}/entities/{{ row.entity_id }}">{{ _("Verlauf der Entität →") }}</a>{% endif %}
+                  </div>
+                </details>
+              </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          </div>
+          {% else %}
+          <p class="ov-none">{{ _("Keine Entitäten für diesen Filter.") }}</p>
+          {% endif %}
+        </form>
+
+        {% if table.pages > 1 %}
+        <nav class="pager" aria-label="{{ _('Seiten') }}">
+          {% if table.page > 1 %}<a class="btn navbtn" href="{{ app_root }}/selection/overview?{{ {'filter': table.filter, 'q': table.query, 'page': table.page - 1}|urlencode }}" aria-label="{{ _('Vorherige Seite') }}">‹</a>{% endif %}
+          <span class="pager-page">{{ _("Seite {page} von {pages}", page=table.page, pages=table.pages) }}</span>
+          {% if table.page < table.pages %}<a class="btn navbtn" href="{{ app_root }}/selection/overview?{{ {'filter': table.filter, 'q': table.query, 'page': table.page + 1}|urlencode }}" aria-label="{{ _('Nächste Seite') }}">›</a>{% endif %}
+        </nav>
+        {% endif %}
+      </section>
+
+      <aside class="ov-side" aria-labelledby="ov-tl-h">
+        <h2 id="ov-tl-h" class="ov-h">{{ _("Verlauf") }}</h2>
+        {% if timeline %}
+        <ol class="ov-tl">
+          {% for item in timeline %}
+          <li class="ov-tl-item ov-tl-{{ item.status }}">
+            <div class="ov-tl-head">
+              <span class="ov-tl-source">{{ item.source_text }}</span>
+              <span class="ov-badge ov-badge-status-{{ item.status }}">{{ item.status_text }}</span>
+            </div>
+            <div class="ov-tl-summary">{{ item.summary }}{% if item.topic_text %} · {{ item.topic_text }}{% endif %}</div>
+            <time class="ov-tl-when">{{ item.when }}</time>
+            {% if item.undone_by %}<div class="ov-tl-note">{{ _("Wurde rückgängig gemacht.") }}</div>{% endif %}
+            {% if item.message %}<div class="ov-tl-note">{{ item.message }}</div>{% endif %}
+            {% if item.details %}
+            <details class="ov-tl-details">
+              <summary>{{ _("Einzelheiten") }}</summary>
+              <ul>{% for detail in item.details %}<li><span class="ov-id">{{ detail.entity_id }}</span>{% if detail.result %} · {{ detail.result }}{% endif %}</li>{% endfor %}</ul>
+            </details>
+            {% endif %}
+            {% if item.undoable and can_apply %}
+            <form method="post" action="{{ app_root }}/selection/undo">
+              <input type="hidden" name="target" value="{{ item.id }}">
+              <button type="submit" class="btn btn-sm">{{ _("Rückgängig …") }}</button>
+            </form>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ol>
+        {% else %}
+        <p class="ov-none">{{ _("Noch keine Änderungen.") }}</p>
+        {% endif %}
+      </aside>
+    </div>
+    {% endif %}
+  </div>
+  <script src="{{ asset('js/pages/selection_overview.js') }}"></script>
+{% endblock %}

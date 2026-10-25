@@ -8,6 +8,7 @@
   <div class="page">
     <h1>{{ _("Entitäten") }}</h1>
     <p class="sub">{{ _("Alle archivierten Entitäten — durchsuchen, filtern, je Entität zum Verlauf oder zur Konfiguration springen.") }}</p>
+    {% with active = 'liste' %}{% include "_entities_tabs.html" %}{% endwith %}
 
     <p class="sub"><a class="btn" href="{{ app_root }}/selection">{{ _("Entitäten vorschlagen") }}</a></p>
 

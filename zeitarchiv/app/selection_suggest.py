@@ -2,7 +2,8 @@
 
 Reine Funktionen über dem Katalog der Integration, ohne Zugriff auf Index oder
 Dateien: sie sind so ohne App testbar und später auch für ein MCP-Werkzeug
-wiederverwendbar. Phase 0 kennt nur das Thema „Energie“.
+wiederverwendbar. „Energie“ steht hier, die übrigen Themen in
+``selection_topics.py`` (gleiche Zeilenform, gleiche Gruppierung).
 
 Rangfolge für Energie:
 
@@ -22,7 +23,7 @@ from typing import Any
 
 from .i18n import tr
 
-TOPICS = ("energie",)
+TOPICS = ("energie", "wetter", "klima", "wasser_gas", "netzwerk", "anwesenheit")
 
 #: Rollen aus dem Energie-Dashboard, die zum Thema „Energie“ gehören
 #: (Gas und Wasser bekommen später ein eigenes Thema).
@@ -63,6 +64,8 @@ def _status(row: dict[str, Any], archived: Collection[str]) -> str:
 
 
 def _kind(row: dict[str, Any]) -> str:
+    if row.get("text"):
+        return tr("Text")
     return tr("Zähler") if row.get("state_class") in _TOTAL_CLASSES else tr("Standard")
 
 
@@ -102,18 +105,33 @@ def suggest_energy(entities: Iterable[dict[str, Any]], archived: Collection[str]
             continue
         if row.get("entity_category") == "diagnostic" and bucket is recommended and role not in _ENERGY_ROLES:
             bucket = more
-        bucket.append({
-            "entity_id": row["entity_id"],
-            "name": row.get("name") or row["entity_id"],
-            "unit": row.get("unit"),
-            "kind": _kind(row),
-            "reason": reason,
-            "group": _group_key(row),
-            "status": _status(row, archived),
-            "high_rate": power or role == "grid_power",
-        })
+        bucket.append(suggestion(row, reason, archived, high_rate=power or role == "grid_power"))
+    return result("energie", recommended, more, derived)
+
+
+def suggestion(row: dict[str, Any], reason: str, archived: Collection[str], *, high_rate: bool = False) -> dict[str, Any]:
+    """Eine Vorschlagszeile. ``text``: der Zustand ist reiner Text, die Entität geht nur
+    als Einzel-ID in die Auswahl (ein Label wirkt für sie nicht)."""
     return {
-        "topic": "energie",
+        "entity_id": row["entity_id"],
+        "name": row.get("name") or row["entity_id"],
+        "unit": row.get("unit"),
+        "kind": _kind(row),
+        "reason": reason,
+        "group": _group_key(row),
+        "status": _status(row, archived),
+        "high_rate": high_rate,
+        "text": bool(row.get("text")),
+    }
+
+
+def result(topic: str, recommended: list[dict], more: list[dict], derived: int) -> dict[str, Any]:
+    for row in recommended:
+        row["checked"] = row["status"] == "new"
+    for row in more:
+        row["checked"] = False
+    return {
+        "topic": topic,
         "recommended": _grouped(recommended),
         "more": _grouped(more),
         "counts": {
@@ -141,4 +159,9 @@ def _grouped(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def suggest(topic: str, entities: Iterable[dict[str, Any]], archived: Collection[str] = ()) -> dict[str, Any]:
     if topic == "energie":
         return suggest_energy(entities, archived)
+    if topic in TOPICS:
+        # Erst hier: selection_topics nutzt die Helfer dieses Moduls.
+        from . import selection_topics
+
+        return selection_topics.suggest_topic(topic, entities, archived)
     raise ValueError(f"Unbekanntes Thema: {topic}")

@@ -30,6 +30,9 @@ PUBLIC_ENDPOINTS = {
     "/api/health", "/api/write", "/api/notices",
     # Entitäten-Katalog der Integration (ROADMAP 1.33): Token-geschützt, nur Metadaten.
     "/api/catalog",
+    # Aufträge des Auswahl-Assistenten (ROADMAP 1.33, Phase 1): Token-geschützt,
+    # nur der Besitzer-Eintrag des Katalogs bekommt welche.
+    "/api/selection/jobs", "/api/selection/ack",
     # KI-Lesezugriff (ROADMAP 1.31): hinter Token und Schalter "ai_enabled".
     "/api/ai/config", "/api/ai/search_entities", "/api/ai/get_summary", "/api/ai/get_series",
     "/api/ai/compare_periods", "/api/ai/get_energy_overview", "/api/ai/get_notices",

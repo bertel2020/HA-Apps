@@ -1,0 +1,81 @@
+  /* Auswahl & Verlauf (ROADMAP 1.33). Nur Farben und Maße der App-Variablen.
+     Links die Tabelle, rechts die Zeitleiste; schmal untereinander. */
+  .ov-meta{margin:0 0 14px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  .ov-note{margin:0 0 14px;padding:10px 14px;border:1px solid var(--warning);border-radius:8px;background:var(--warning-soft);color:var(--ink);font-size:calc(13px * var(--font-scale, 1));}
+  .ov-empty p{margin:0 0 8px;}
+  .ov-none{color:var(--ink-muted);font-size:calc(14px * var(--font-scale, 1));}
+  .ov-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start;}
+  .ov-main,.ov-side{min-width:0;}
+  .ov-h{margin:0 0 10px;}
+  .ov-n{font-size:calc(13px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);margin-left:6px;}
+
+  .ov-job{margin:0 0 16px;padding:10px 14px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);font-size:calc(13.5px * var(--font-scale, 1));color:var(--ink);}
+  .ov-job-pending{border-color:var(--warning);background:var(--warning-soft);}
+  .ov-job-applied{border-color:var(--accent-line);background:var(--accent-line-soft);}
+  .ov-job-partial,.ov-job-expired{border-color:var(--warning);background:var(--warning-soft);}
+  .ov-job-failed{border-color:var(--danger);background:var(--danger-soft);}
+
+  .ov-search{display:flex;gap:8px;margin:0 0 10px;}
+  .ov-search input[type=search]{flex:1 1 auto;min-width:0;}
+  .ov-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;}
+  .ov-chips .chip{text-decoration:none;}
+  .ov-chip-n{opacity:.75;font-variant-numeric:tabular-nums;margin-left:2px;}
+  .ov-bulkbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0 0 8px;}
+  .ov-bulk-hint{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
+
+  .ov-table td{vertical-align:middle;}
+  .ov-col-check{width:28px;}
+  .ov-col-check input{width:17px;height:17px;margin:0;accent-color:var(--accent-line);}
+  .ov-col-actions{width:48px;text-align:right;}
+  .ov-name{display:block;font-weight:500;color:var(--ink);}
+  .ov-id{display:block;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);overflow-wrap:anywhere;}
+  .ov-tl-details .ov-id{display:inline;}
+  .ov-badges{display:flex;flex-wrap:wrap;gap:4px;}
+  .ov-badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:calc(11.5px * var(--font-scale, 1));font-weight:500;background:var(--surface-alt);color:var(--ink-muted);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;}
+  .ov-badge-assistant{background:var(--accent-line-soft);color:var(--accent-line);}
+  .ov-badge-manual{background:var(--accent-bar-soft);color:var(--accent-bar);}
+  .ov-badge-excluded,.ov-badge-status-failed{background:var(--danger-soft);color:var(--danger);}
+  .ov-badge-drifted,.ov-badge-status-pending,.ov-badge-status-partial,.ov-badge-status-expired{background:var(--warning-soft);color:var(--warning);}
+  .ov-badge-status-applied{background:var(--accent-line-soft);color:var(--accent-line);}
+
+  /* Zeilenmenü: <details> statt eigenem Skript, schließt per Klick auf ⋯. */
+  .ov-menu{position:relative;display:inline-block;}
+  .ov-menu summary{list-style:none;cursor:pointer;min-width:32px;text-align:center;}
+  .ov-menu summary::-webkit-details-marker{display:none;}
+  .ov-menu-pop{position:absolute;right:0;top:calc(100% + 4px);z-index:5;width:280px;padding:12px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);box-shadow:var(--shadow);text-align:left;color:var(--ink);}
+  .ov-menu-pop .btn{margin:0 0 10px;}
+  .ov-menu-h{margin:0 0 4px;font-weight:600;font-size:calc(13px * var(--font-scale, 1));}
+  .ov-explain{margin:0 0 8px;padding-left:18px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
+  .ov-menu-note{margin:0 0 8px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
+  .ov-menu-pop a{color:var(--accent-line);font-size:calc(13px * var(--font-scale, 1));}
+
+  .ov-tl{list-style:none;margin:0;padding:0 0 0 14px;border-left:2px solid var(--border);}
+  .ov-tl-item{position:relative;margin:0 0 14px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);}
+  .ov-tl-item::before{content:"";position:absolute;left:-21px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--border-strong);border:2px solid var(--bg);}
+  .ov-tl-applied::before{background:var(--accent-line);}
+  .ov-tl-pending::before,.ov-tl-partial::before,.ov-tl-expired::before{background:var(--warning);}
+  .ov-tl-failed::before{background:var(--danger);}
+  .ov-tl-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 8px;}
+  .ov-tl-source{font-weight:600;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);}
+  .ov-tl-summary{margin-top:3px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  .ov-tl-when{display:block;margin-top:2px;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
+  .ov-tl-note{margin-top:4px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
+  .ov-tl-details{margin-top:6px;font-size:calc(12px * var(--font-scale, 1));}
+  .ov-tl-details summary{cursor:pointer;color:var(--accent-line);}
+  .ov-tl-details ul{margin:4px 0 0;padding-left:16px;}
+  .ov-tl-item form{margin-top:8px;}
+
+  @media (max-width:900px){
+    .ov-layout{grid-template-columns:minmax(0,1fr);}
+  }
+  /* Schmal: jede Zeile als Karte (Kästchen | Entität | Menü, darunter Herkunft und Status). */
+  @media (max-width:640px){
+    .ov-table thead{display:none;}
+    .ov-table,.ov-table tbody{display:block;}
+    .ov-table tr{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:4px 8px;padding:10px 4px;border-bottom:1px solid var(--border);}
+    .ov-table td{display:block;padding:0;border:0;}
+    .ov-table td:nth-child(3),.ov-table td:nth-child(4),.ov-table td:nth-child(5){grid-column:2 / 4;font-size:calc(12.5px * var(--font-scale, 1));}
+    .ov-table td.ov-col-actions{grid-column:3;grid-row:1;}
+    .ov-menu-pop{width:min(280px,calc(100vw - 48px));}
+    .ov-search{flex-wrap:wrap;}
+  }

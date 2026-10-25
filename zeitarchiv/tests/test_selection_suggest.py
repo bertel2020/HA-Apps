@@ -107,7 +107,8 @@ def test_catalog_cleaning_drops_invalid_rows_and_unknown_fields(tmp_path) -> Non
     assert rows == [{
         "entity_id": "sensor.gut", "domain": "sensor", "name": "Gut", "device_class": None, "state_class": None,
         "unit": None, "platform": None, "device": None, "area": None, "entity_category": None,
-        "energy_role": None, "hidden": False, "selected": True, "excluded": False,
+        "energy_role": None, "hidden": False, "selected": True, "excluded": False, "text": False,
+        "drifted": False, "via": [], "excluded_by": [], "origin": None, "topic": None, "added_ts": None,
     }]
 
 

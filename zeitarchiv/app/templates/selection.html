@@ -7,7 +7,8 @@
   <div class="page">
     <p class="sel-crumb"><a href="{{ app_root }}/entities">{{ _("Entitäten") }}</a> / {{ _("Vorschlagen") }}</p>
     <h1>{{ _("Entitäten vorschlagen") }}</h1>
-    <p class="sub">{{ _("Zeitarchiv prüft, was es in deinem Home Assistant gibt, und schlägt passende Entitäten zum Archivieren vor. Diese Ansicht zeigt die Vorschläge nur an, übernommen wird hier noch nichts.") }}</p>
+    <p class="sub">{{ _("Zeitarchiv prüft, was es in deinem Home Assistant gibt, und schlägt passende Entitäten zum Archivieren vor. Übernommen wird erst nach einer Bestätigung; die Integration setzt die Änderung innerhalb etwa einer Minute um.") }}
+      · <a href="{{ app_root }}/selection/overview">{{ _("Auswahl & Verlauf →") }}</a></p>
 
     {% if result is none %}
     <div class="settings-panel sel-empty">
@@ -15,44 +16,80 @@
       <p>{{ _("Die Zeitarchiv-Integration schickt ihn automatisch, sobald sie verbunden ist (höchstens alle zehn Minuten). Ist die Integration älter, muss sie zuerst aktualisiert werden.") }}</p>
     </div>
     {% else %}
-    <div class="sel-tiles" role="list">
-      <a class="sel-tile on" role="listitem" href="{{ app_root }}/selection?topic=energie" aria-current="true">
-        <span class="sel-tile-name">{{ _("Energie") }}</span>
-        <span class="sel-tile-count"><b>{{ result.counts.recommended }}</b> {{ _("empfohlen") }} · {{ result.counts.found }} {{ _("gefunden") }}</span>
+    <nav class="sel-tiles" aria-label="{{ _('Themen') }}">
+      {% for tile in tiles %}
+      <a class="sel-tile{{ ' on' if tile.topic == topic }}" href="{{ app_root }}/selection?topic={{ tile.topic }}"
+         {% if tile.topic == topic %}aria-current="true"{% endif %}>
+        <span class="sel-tile-name">{{ tile.label }}{% if tile.sensitive %} <span class="sel-badge sel-badge-warn">{{ _("sensibel") }}</span>{% endif %}</span>
+        <span class="sel-tile-count"><b>{{ tile.counts.recommended }}</b> {{ _("empfohlen") }} · {{ tile.counts.found }} {{ _("gefunden") }}</span>
       </a>
-    </div>
+      {% endfor %}
+    </nav>
 
     <p class="sel-meta">{{ _("Katalog von {received} · nur Metadaten, keine Messwerte", received=received) }}</p>
 
-    <h2>{{ _("Empfohlen") }} <span class="sel-n">{{ result.counts.recommended }}</span></h2>
-    {% if result.recommended %}
-    <div class="settings-panel sel-list">
-      {% for group in result.recommended %}
-      <div class="sel-group">{{ group.name }}</div>
-      {% for row in group.rows %}
-      {% include "_selection_row.html" %}
-      {% endfor %}
-      {% endfor %}
-    </div>
-    {% else %}
-    <p class="sel-none">{{ _("Keine Quellen aus dem Energie-Dashboard gefunden. Ist es in Home Assistant eingerichtet?") }}</p>
+    {% if topic_info.sensitive %}
+    <p class="sel-note">{{ _("Anwesenheit ist sensibel: das Archiv zeigt später lückenlos, wann jemand zu Hause war. Nur übernehmen, wenn alle Betroffenen einverstanden sind.") }}</p>
+    {% endif %}
+    {% if not can_apply %}
+    <p class="sel-note">{{ _("Zum Übernehmen braucht es eine neuere Version der Zeitarchiv-Integration. Bis dahin zeigt diese Seite die Vorschläge nur an.") }}</p>
     {% endif %}
 
-    {% if result.more %}
-    <h2>{{ _("Weitere Treffer") }} <span class="sel-n">{{ result.counts.more }}</span></h2>
-    <div class="settings-panel sel-list">
-      {% for group in result.more %}
-      <div class="sel-group">{{ group.name }}</div>
-      {% for row in group.rows %}
-      {% include "_selection_row.html" %}
-      {% endfor %}
-      {% endfor %}
-    </div>
-    {% endif %}
+    <form method="post" action="{{ app_root }}/selection/apply" id="sel-form" data-max="{{ max_ids }}">
+      <input type="hidden" name="topic" value="{{ topic }}">
 
-    {% if result.counts.derived %}
-    <p class="sel-meta">{{ _("{count} Tages-, Monats- und Jahreszähler werden nicht vorgeschlagen. Sie lassen sich aus dem Gesamtzähler ableiten.", count=result.counts.derived) }}</p>
-    {% endif %}
+      <h2>{{ _("Empfohlen") }} <span class="sel-n">{{ result.counts.recommended }}</span></h2>
+      {% if result.recommended %}
+      <div class="settings-panel sel-list">
+        {% for group in result.recommended %}
+        <div class="sel-group">{{ group.name }}</div>
+        {% for row in group.rows %}
+        {% include "_selection_row.html" %}
+        {% endfor %}
+        {% endfor %}
+      </div>
+      {% elif topic == "energie" %}
+      <p class="sel-none">{{ _("Keine Quellen aus dem Energie-Dashboard gefunden. Ist es in Home Assistant eingerichtet?") }}</p>
+      {% else %}
+      <p class="sel-none">{{ _("Zu diesem Thema gibt es keine eindeutigen Treffer.") }}</p>
+      {% endif %}
+
+      {% if result.more %}
+      <h2>{{ _("Weitere Treffer") }} <span class="sel-n">{{ result.counts.more }}</span></h2>
+      <div class="settings-panel sel-list">
+        {% for group in result.more %}
+        <div class="sel-group">{{ group.name }}</div>
+        {% for row in group.rows %}
+        {% include "_selection_row.html" %}
+        {% endfor %}
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if result.counts.derived %}
+      <p class="sel-meta">{{ _("{count} Tages-, Monats- und Jahreszähler werden nicht vorgeschlagen. Sie lassen sich aus dem Gesamtzähler ableiten.", count=result.counts.derived) }}</p>
+      {% endif %}
+
+      {% if result.recommended or result.more %}
+      <div class="sel-footer">
+        <p class="sel-footer-counts">
+          <span><b id="sel-checked">{{ result.counts.recommended_new if can_apply else 0 }}</b> {{ _("markiert") }}</span>
+          <span>{{ _("{count} neu", count=counts.new) }}</span>
+          <span>{{ _("{count} schon archiviert oder ausgewählt", count=counts.archived + counts.selected) }}</span>
+          <span>{{ _("{count} ausgeschlossen", count=counts.excluded) }}</span>
+        </p>
+        <fieldset class="sel-mode">
+          <legend>{{ _("Übernehmen als") }}</legend>
+          <label class="filter-chip"><input type="radio" name="mode" value="label" checked><span>{{ _("Label „Zeitarchiv“ (Standard)") }}</span></label>
+          <label class="filter-chip"><input type="radio" name="mode" value="ids"><span>{{ _("Einzel-IDs") }}</span></label>
+        </fieldset>
+        <p class="sel-footer-hint">{{ _("Textentitäten gehen immer als Einzel-ID.") }}{% if counts.text %} {{ _("Hier betrifft das {count}.", count=counts.text) }}{% endif %}
+          {{ _("Höchstens {max} je Übernahme.", max=max_ids) }}</p>
+        <button type="submit" class="btn primary" id="sel-submit" {% if not can_apply %}disabled{% endif %}>{{ _("Übernehmen …") }}</button>
+      </div>
+      {% endif %}
+    </form>
     {% endif %}
   </div>
+  <script src="{{ asset('js/pages/selection.js') }}"></script>
 {% endblock %}
