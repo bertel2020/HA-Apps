@@ -1,0 +1,12 @@
+<div class="sel-row">
+  <div class="sel-main">
+    <span class="sel-name">{{ row.name }}</span>
+    <span class="sel-id">{{ row.entity_id }}</span>
+    <span class="sel-reason">{{ row.reason }}{% if row.high_rate %} · {{ _("hohe Änderungsrate") }}{% endif %}</span>
+  </div>
+  <span class="sel-kind">{{ row.kind }}{% if row.unit %} · {{ row.unit }}{% endif %}</span>
+  {% if row.status == "archived" %}<span class="sel-badge sel-badge-muted">{{ _("archiviert") }}</span>
+  {% elif row.status == "selected" %}<span class="sel-badge sel-badge-warn">{{ _("ausgewählt") }}</span>
+  {% elif row.status == "excluded" %}<span class="sel-badge sel-badge-bad">{{ _("ausgeschlossen") }}</span>
+  {% else %}<span class="sel-badge sel-badge-new">{{ _("neu") }}</span>{% endif %}
+</div>

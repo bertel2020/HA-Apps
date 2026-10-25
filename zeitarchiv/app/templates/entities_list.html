@@ -9,6 +9,8 @@
     <h1>{{ _("Entitäten") }}</h1>
     <p class="sub">{{ _("Alle archivierten Entitäten — durchsuchen, filtern, je Entität zum Verlauf oder zur Konfiguration springen.") }}</p>
 
+    <p class="sub"><a class="btn" href="{{ app_root }}/selection">{{ _("Entitäten vorschlagen") }}</a></p>
+
     <div class="settings-panel" id="entities-panel">
 
         <div id="controls" hx-trigger="load, change from:#controls, keyup delay:300ms from:[name=search]"

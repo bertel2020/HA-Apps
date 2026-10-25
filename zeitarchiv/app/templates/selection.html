@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ _("Zeitarchiv — Entitäten vorschlagen") }}{% endblock %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ asset('css/pages/selection.css') }}">
+{% endblock %}
+{% block content %}
+  <div class="page">
+    <p class="sel-crumb"><a href="{{ app_root }}/entities">{{ _("Entitäten") }}</a> / {{ _("Vorschlagen") }}</p>
+    <h1>{{ _("Entitäten vorschlagen") }}</h1>
+    <p class="sub">{{ _("Zeitarchiv prüft, was es in deinem Home Assistant gibt, und schlägt passende Entitäten zum Archivieren vor. Diese Ansicht zeigt die Vorschläge nur an, übernommen wird hier noch nichts.") }}</p>
+
+    {% if result is none %}
+    <div class="settings-panel sel-empty">
+      <p><b>{{ _("Noch kein Katalog empfangen.") }}</b></p>
+      <p>{{ _("Die Zeitarchiv-Integration schickt ihn automatisch, sobald sie verbunden ist (höchstens alle zehn Minuten). Ist die Integration älter, muss sie zuerst aktualisiert werden.") }}</p>
+    </div>
+    {% else %}
+    <div class="sel-tiles" role="list">
+      <a class="sel-tile on" role="listitem" href="{{ app_root }}/selection?topic=energie" aria-current="true">
+        <span class="sel-tile-name">{{ _("Energie") }}</span>
+        <span class="sel-tile-count"><b>{{ result.counts.recommended }}</b> {{ _("empfohlen") }} · {{ result.counts.found }} {{ _("gefunden") }}</span>
+      </a>
+    </div>
+
+    <p class="sel-meta">{{ _("Katalog von {received} · nur Metadaten, keine Messwerte", received=received) }}</p>
+
+    <h2>{{ _("Empfohlen") }} <span class="sel-n">{{ result.counts.recommended }}</span></h2>
+    {% if result.recommended %}
+    <div class="settings-panel sel-list">
+      {% for group in result.recommended %}
+      <div class="sel-group">{{ group.name }}</div>
+      {% for row in group.rows %}
+      {% include "_selection_row.html" %}
+      {% endfor %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="sel-none">{{ _("Keine Quellen aus dem Energie-Dashboard gefunden. Ist es in Home Assistant eingerichtet?") }}</p>
+    {% endif %}
+
+    {% if result.more %}
+    <h2>{{ _("Weitere Treffer") }} <span class="sel-n">{{ result.counts.more }}</span></h2>
+    <div class="settings-panel sel-list">
+      {% for group in result.more %}
+      <div class="sel-group">{{ group.name }}</div>
+      {% for row in group.rows %}
+      {% include "_selection_row.html" %}
+      {% endfor %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if result.counts.derived %}
+    <p class="sel-meta">{{ _("{count} Tages-, Monats- und Jahreszähler werden nicht vorgeschlagen. Sie lassen sich aus dem Gesamtzähler ableiten.", count=result.counts.derived) }}</p>
+    {% endif %}
+    {% endif %}
+  </div>
+{% endblock %}
