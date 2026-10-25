@@ -164,6 +164,8 @@ DEMO_ENTITIES = [
                "sensor", "measurement", "kWh"),
     DemoEntity("sensor.demo_co2_intensitaet", "Demo CO2-Intensität Netz",
                "sensor", "measurement", "g/kWh"),
+    DemoEntity("sensor.demo_strompreis_dynamisch", "Demo Strompreis dynamisch",
+               "sensor", "measurement", "EUR/kWh"),
     DemoEntity("sensor.demo_stromzaehler_bezug", "Demo Stromzähler Bezug",
                "sensor", "total_increasing", "kWh"),
     DemoEntity("sensor.demo_stromzaehler_einspeisung", "Demo Stromzähler Einspeisung",
@@ -639,6 +641,50 @@ def gen_co2_intensity(dt: datetime, weather: WeatherContext, rng: random.Random)
     renewables_effect = -55.0 * (weather.cloud_factor(dt) - 0.5) - 1.3 * (weather.wind_base(dt) - 10.0)
     value = base + midday_dip + evening_peak + renewables_effect + rng.uniform(-12, 12)
     return round(max(80.0, min(650.0, value)), 1)
+
+
+# --- Dynamischer Strompreis ---------------------------------------------------
+#
+# Wie ein Tibber-/aWATTar-/Tarif-Helfer: alle 15 Minuten ein neuer Endpreis in
+# EUR/kWh (Börsenanteil plus Netzentgelte und Abgaben). Der Wert hängt nur an
+# der Uhrzeit, dem Kalendertag und dem Zeitstempel (jeweils eigener, fest
+# gesetzter Zufallsgenerator), nicht an der laufenden Simulation. Dadurch lässt
+# sich die Reihe jederzeit für beliebige Zeiträume erzeugen, auch rückwirkend für
+# eine Demo, die ohne diese Entität gestartet wurde, und alte wie neue Abschnitte
+# passen aneinander.
+DYNAMIC_PRICE_ENTITY_ID = "sensor.demo_strompreis_dynamisch"
+DYNAMIC_PRICE_SLOT_SECONDS = 15 * 60
+DYNAMIC_PRICE_SURCHARGE = 0.17  # Netzentgelte, Steuern, Umlagen
+
+
+def dynamic_price_at(ts: float, tz: ZoneInfo) -> float:
+    dt = datetime.fromtimestamp(ts, tz)
+    hour = dt.hour + dt.minute / 60
+
+    def bump(center: float, width: float) -> float:
+        return math.exp(-((hour - center) ** 2) / (2 * width ** 2))
+
+    day_rng = random.Random(dt.date().toordinal() * 7919)
+    season = 0.03 * math.cos(2 * math.pi * (dt.timetuple().tm_yday - 15) / 365)  # Winter teurer
+    level = day_rng.uniform(-0.04, 0.05) + season
+    if day_rng.random() < 0.05:
+        level += 0.12  # windstille Dunkelflaute
+    if dt.weekday() >= 5:
+        level -= 0.015
+    shape = 0.05 * bump(8, 1.5) + 0.09 * bump(19, 2.0) - 0.07 * bump(13, 3.0) - 0.03 * bump(3, 2.5)
+    noise = random.Random(int(ts)).uniform(-0.012, 0.012)
+    return round(max(0.12, 0.10 + level + shape + noise + DYNAMIC_PRICE_SURCHARGE), 4)
+
+
+def gen_dynamic_price(start: datetime, end: datetime, tz: ZoneInfo) -> list[Row]:
+    """Ein Wert je 15-Minuten-Raster zwischen start (einschließlich) und end."""
+    first = math.ceil(start.timestamp() / DYNAMIC_PRICE_SLOT_SECONDS) * DYNAMIC_PRICE_SLOT_SECONDS
+    rows: list[Row] = []
+    ts = float(first)
+    while ts < end.timestamp():
+        rows.append((ts, dynamic_price_at(ts, tz)))
+        ts += DYNAMIC_PRICE_SLOT_SECONDS
+    return rows
 
 
 # --- Balkonkraftwerk mit Speicher --------------------------------------------
@@ -1363,6 +1409,8 @@ def inject_data_quality_issues(
     """
     if entity.domain != "sensor" or entity.states is not None or len(rows) < 20:
         return rows
+    if entity.entity_id == DYNAMIC_PRICE_ENTITY_ID:
+        return rows  # ein Tarif-Helfer liefert keine Duplikate und kein Einfrieren
 
     result = list(rows)
 
@@ -1740,6 +1788,7 @@ def run_generation(
     heim_online_seed = 0.0
 
     fell_back_to_full_history = False
+    price_backfill_start: datetime | None = None
     if append:
         anchor = index.get_entity(localized_id(APPEND_ANCHOR_ENTITY_ID, language))
         if anchor is None or anchor["last_ts"] is None:
@@ -1756,6 +1805,29 @@ def run_generation(
             # nach Zeitstempel), so entsteht aber gar nicht erst unnötig viel
             # verworfene Redundanz.
             start = datetime.fromtimestamp(anchor["last_ts"], tz) + timedelta(minutes=CONTINUOUS_STEP_MINUTES)
+            # Eine Demo, die vor dieser Entität angelegt wurde, bekommt ihren Preisverlauf
+            # rückwirkend ab dem Beginn der übrigen Historie. Die übrigen Reihen laufen
+            # unverändert weiter (sie hängen an Zählerständen und Füllständen).
+            price_entity = index.get_entity(localized_id(DYNAMIC_PRICE_ENTITY_ID, language))
+            if price_entity is None or price_entity["last_ts"] is None:
+                price_backfill_start = (
+                    datetime.fromtimestamp(anchor["first_ts"], tz) if anchor["first_ts"] is not None
+                    else now - timedelta(days=months * 30)
+                )
+            if start >= now and price_backfill_start is not None:
+                price_entity_def = next(e for e in DEMO_ENTITIES if e.entity_id == DYNAMIC_PRICE_ENTITY_ID)
+                price_rows = gen_dynamic_price(price_backfill_start, now, tz)
+                write_entity(data_dir, index, tz, price_entity_def, price_rows, language)
+                report = reconcile.audit_storage_metadata(
+                    data_dir, index, tz, entity_ids=[localized_id(DYNAMIC_PRICE_ENTITY_ID, language)], repair=True,
+                )
+                if on_entity is not None:
+                    on_entity(1, localized_id(DYNAMIC_PRICE_ENTITY_ID, language), len(price_rows))
+                return GenerationResult(
+                    entity_count=1, rows_written=len(price_rows), cleaned_count=cleaned_count,
+                    start=price_backfill_start, now=now,
+                    mismatches_repaired=len(report["mismatches"]), entities_checked=report["entities_checked"],
+                )
             if start >= now:
                 return GenerationResult(
                     entity_count=0, rows_written=0, cleaned_count=cleaned_count,
@@ -1851,6 +1923,7 @@ def run_generation(
         "sensor.demo_pv_prognose_rest_heute": household["pv_prognose_rest_heute"],
         "sensor.demo_pv_prognose_morgen": household["pv_prognose_morgen"],
         "sensor.demo_co2_intensitaet": household["co2_intensitaet"],
+        DYNAMIC_PRICE_ENTITY_ID: gen_dynamic_price(price_backfill_start or start, now, tz),
         "sensor.demo_stromzaehler_bezug": household["stromzaehler_bezug"],
         "sensor.demo_stromzaehler_einspeisung": household["stromzaehler_einspeisung"],
         "sensor.demo_balkonkraftwerk_pv_leistung": household["balkon_pv"],

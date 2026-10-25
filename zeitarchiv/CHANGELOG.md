@@ -38,6 +38,10 @@
   Kosten bei einem Tarif mit Tages- oder Stundenpreisen deutlich zu niedrig oder
   zu hoch zeigen. Fehlen die Stundenwerte noch (direkt nach dem Einrichten), gilt
   weiter der bisherige Preis je Tag, mit Hinweis.
+- **Demo-Daten**: Neue Entität `sensor.demo_strompreis_dynamisch` mit einem
+  dynamischen Strompreis (alle 15 Minuten ein neuer Preis), zum Ausprobieren der
+  Kostenrechnung im Energiedashboard. Eine bestehende Demo bekommt den Verlauf mit
+  „Jetzt ergänzen“ rückwirkend.
 
 ### Behoben
 
@@ -84,6 +88,10 @@
   costs far too low or too high with a day-time or hourly tariff. While the hourly
   values are still missing (right after setup), the previous price per day
   applies, with a note.
+- **Demo data**: New entity `sensor.demo_strompreis_dynamisch` with a dynamic
+  electricity price (a new price every 15 minutes), for trying out the cost
+  calculation in the energy dashboard. An existing demo gets the history
+  retroactively with “Supplement now”.
 
 #### Fixed
 
