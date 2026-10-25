@@ -2906,9 +2906,6 @@
     "Zugriffe mit Administratorkonto sind normal, wenn die Adresse mit der API-ID verwendet wird: Der Client sieht dann nur die Zeitarchiv-Werkzeuge. Verwende nicht die allgemeine Adresse /api/mcp mit den Voreinstellungen.": "Access with an administrator account is normal when the address with the API id is used: the client then sees only the Zeitarchiv tools. Do not use the general address /api/mcp with the defaults.",
     "Zuletzt genutzt": "Last used",
     "z. B. Die Wärmepumpe heißt „WP“. Der Zähler im Keller ist der Hauptzähler.": "e.g. The heat pump is called “WP”. The meter in the basement is the main meter.",
-    "Zeitarchiv — Entitäten vorschlagen": "Zeitarchiv — Suggest entities",
-    "Vorschlagen": "Suggest",
-    "Entitäten vorschlagen": "Suggest entities",
     "Noch kein Katalog empfangen.": "No catalog received yet.",
     "Die Zeitarchiv-Integration schickt ihn automatisch, sobald sie verbunden ist (höchstens alle zehn Minuten). Ist die Integration älter, muss sie zuerst aktualisiert werden.": "The Zeitarchiv integration sends it automatically once it is connected (at most every ten minutes). If the integration is older, it has to be updated first.",
     "Energie": "Energy",
@@ -3153,7 +3150,6 @@
     "Jede Aktion gilt nur für die markierten Zeilen, zu denen sie passt; die Bestätigung nennt den Rest. Höchstens 200 je Auftrag.": "Each action only applies to the marked rows it fits; the confirmation names the rest. At most 200 per job.",
     "Kein Muster angegeben.": "No pattern given.",
     "Kein Treffer dieser Suche: {entity_id}": "Not a match of this search: {entity_id}",
-    "Keine Muster in der Auswahl. Vorschläge gibt es unter „Entitäten vorschlagen“.": "No patterns in the selection. Suggestions are under “Suggest entities”.",
     "Keine der markierten Entitäten passt zu dieser Aktion.": "None of the marked entities fits this action.",
     "Muster entfernen": "Remove pattern",
     "Muster entfernen …": "Remove pattern …",
@@ -3233,7 +3229,12 @@
     "Fensterkontakt": "Window contact",
     "Öffnungsmelder": "Opening sensor",
     "Garagentor": "Garage door",
-    "Türschloss": "Door lock"
+    "Türschloss": "Door lock",
+    "Zeitarchiv — Auswahl-Assistent": "Zeitarchiv — Selection assistant",
+    "Auswahl-Assistent": "Selection assistant",
+    "Assistent starten": "Start assistant",
+    "Sag, was dich interessiert, zum Beispiel Energie oder Wetter. Zeitarchiv prüft dein Home Assistant und schlägt passende Entitäten vor.": "Tell it what you are interested in, for example energy or weather. Zeitarchiv checks your Home Assistant and suggests matching entities.",
+    "Keine Muster in der Auswahl. Vorschläge gibt es im Auswahl-Assistenten.": "No patterns in the selection. Suggestions are in the selection assistant."
   },
   "js": {
     "Langzeit": "Long-term",

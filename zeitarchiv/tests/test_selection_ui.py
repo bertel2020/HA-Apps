@@ -220,10 +220,11 @@ def test_undo_creates_a_counter_job_once(client, catalog) -> None:
 def test_pages_render_in_english(client, catalog, german_again) -> None:
     client.post("/settings/language", data={"language": "en"})
     suggest = client.get("/selection?topic=energie").text
-    assert "Suggest entities" in suggest and "Temperature & climate" in suggest
+    assert "Selection assistant" in suggest and "Temperature & climate" in suggest
     assert "Text entities are always added as a single ID." in suggest
     overview = client.get("/selection/overview").text
     assert "Selection & history" in overview and "Why is this included?" in overview
+    assert "Start assistant" in overview
     assert "Changed in HA" in overview and "Zeitarchiv · Energy" in overview
     confirm = client.post("/selection/remove", data={"one": "sensor.ui_hand"}).text
     assert "Remove from the selection?" in confirm and "Chosen by hand: 1" in confirm

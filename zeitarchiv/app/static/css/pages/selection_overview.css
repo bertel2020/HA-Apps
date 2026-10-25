@@ -6,7 +6,12 @@
   .ov-none{color:var(--ink-muted);font-size:calc(14px * var(--font-scale, 1));}
   .ov-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start;}
   .ov-main,.ov-side{min-width:0;}
-  .ov-suggest{margin:0 0 16px;}
+  .ov-assist{display:flex;align-items:center;gap:16px;margin:0 0 18px;padding:16px 20px;border:1px solid var(--accent-line);border-radius:12px;background:var(--accent-line-soft);}
+  .ov-assist-icon{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:12px;background:var(--accent-line);color:var(--accent-contrast);}
+  .ov-assist-icon svg{width:26px;height:26px;}
+  .ov-assist-text{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:calc(14px * var(--font-scale, 1));color:var(--ink-muted);}
+  .ov-assist-title{font-size:calc(16px * var(--font-scale, 1));color:var(--ink);}
+  .ov-assist-btn{flex:0 0 auto;white-space:nowrap;}
   .ov-h{margin:0 0 10px;}
   .ov-n{font-size:calc(13px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);margin-left:6px;}
 
@@ -90,6 +95,9 @@
     .ov-table td.ov-col-actions{grid-column:3;grid-row:1;}
     .ov-menu-pop{width:min(280px,calc(100vw - 48px));}
     .ov-search{flex-wrap:wrap;}
+    .ov-assist{flex-wrap:wrap;padding:14px;}
+    .ov-assist-text{flex-basis:calc(100% - 64px);}
+    .ov-assist-btn{flex:1 1 100%;text-align:center;}
     .ov-patterns thead{display:none;}
     .ov-patterns,.ov-patterns tbody{display:block;}
     .ov-patterns tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;padding:10px 4px;border-bottom:1px solid var(--border);}

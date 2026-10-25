@@ -1,4 +1,4 @@
-// Entitäten vorschlagen (ROADMAP 1.33): zählt die markierten Kästchen in der
+// Auswahl-Assistent (ROADMAP 1.33): zählt die markierten Kästchen in der
 // Fußleiste mit und sperrt „Übernehmen …“, solange nichts oder zu viel markiert
 // ist. Alles Übrige (Bestätigung, Prüfung, Auftrag) macht der Server; ohne
 // dieses Skript funktioniert die Seite genauso, nur ohne Live-Zähler.

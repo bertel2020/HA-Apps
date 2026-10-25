@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_icons.html" import topic_icon %}
 {% block title %}{{ _("Zeitarchiv — Auswahl & Verlauf") }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/selection_overview.css') }}">
@@ -8,7 +9,14 @@
     <h1>{{ _("Entitäten") }}</h1>
     <p class="sub">{{ _("Was die Zeitarchiv-Integration archiviert, auf welchem Weg es in die Auswahl kam und was sich daran geändert hat.") }}</p>
     {% with active = 'auswahl' %}{% include "_entities_tabs.html" %}{% endwith %}
-    <p class="ov-suggest"><a class="btn primary" href="{{ app_root }}/selection">{{ _("Entitäten vorschlagen") }}</a></p>
+    <section class="ov-assist" aria-labelledby="ov-assist-h">
+      <span class="ov-assist-icon">{{ topic_icon("assistent") }}</span>
+      <span class="ov-assist-text">
+        <b class="ov-assist-title" id="ov-assist-h">{{ _("Auswahl-Assistent") }}</b>
+        <span>{{ _("Sag, was dich interessiert, zum Beispiel Energie oder Wetter. Zeitarchiv prüft dein Home Assistant und schlägt passende Entitäten vor.") }}</span>
+      </span>
+      <a class="btn primary ov-assist-btn" href="{{ app_root }}/selection">{{ _("Assistent starten") }}</a>
+    </section>
 
     {% if job %}
     <div class="ov-job ov-job-{{ job.status }}" id="ov-job" role="status" aria-live="polite"
@@ -159,7 +167,7 @@
         </div>
         <p class="ov-bulk-hint">{{ _("Von Hand eingetragene Muster ändert man in Home Assistant (Zeitarchiv-Integration, Optionen). Textentitäten werden von Mustern nie erfasst.") }}</p>
         {% else %}
-        <p class="ov-none">{{ _("Keine Muster in der Auswahl. Vorschläge gibt es unter „Entitäten vorschlagen“.") }}</p>
+        <p class="ov-none">{{ _("Keine Muster in der Auswahl. Vorschläge gibt es im Auswahl-Assistenten.") }}</p>
         {% endif %}
         {% endif %}
       </section>

@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% from "_icons.html" import topic_icon %}
-{% block title %}{{ _("Zeitarchiv — Entitäten vorschlagen") }}{% endblock %}
+{% block title %}{{ _("Zeitarchiv — Auswahl-Assistent") }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/selection.css') }}">
 {% endblock %}
 {% block content %}
   <div class="page">
-    <p class="sel-crumb"><a href="{{ app_root }}/entities">{{ _("Entitäten") }}</a> / {{ _("Vorschlagen") }}</p>
-    <h1>{{ _("Entitäten vorschlagen") }}</h1>
+    <p class="sel-crumb"><a href="{{ app_root }}/entities">{{ _("Entitäten") }}</a> / {{ _("Auswahl-Assistent") }}</p>
+    <h1>{{ _("Auswahl-Assistent") }}</h1>
     <p class="sub">{{ _("Zeitarchiv prüft, was es in deinem Home Assistant gibt, und schlägt passende Entitäten zum Archivieren vor. Übernommen wird erst nach einer Bestätigung; die Integration setzt die Änderung innerhalb etwa einer Minute um.") }}
       · <a href="{{ app_root }}/selection/overview">{{ _("Auswahl & Verlauf →") }}</a></p>
 

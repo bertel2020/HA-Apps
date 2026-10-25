@@ -78,7 +78,7 @@
   .sel-patterns > .sel-meta{margin:0 0 14px;max-width:760px;}
   /* Muster-Karten: Kopf mit Muster und Aktion, darunter die Kennzahlen als
      kleine Kacheln (wie .stat, nur kompakter), Hinweise, eingeklappte Beispiele. */
-  .sel-pattern-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,520px),1fr));gap:14px;}
+  .sel-pattern-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:14px;}
   .sel-pattern{display:flex;flex-direction:column;gap:12px;min-width:0;padding:16px 18px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--shadow);}
   .sel-pattern.is-active{border-color:var(--accent-line);}
   .sel-pattern p{margin:0;}
