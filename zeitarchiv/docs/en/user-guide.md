@@ -458,6 +458,15 @@ changes, the dashboard recalculates the past with the new value too. The
 energy price is entered in cents (or pence, rappen) per kWh, the standing
 charge in the currency itself **per month**.
 
+**Dynamic tariff and average price.** If the energy price is an entity, the cost
+analysis also shows the **average electricity price** per kWh (costs ÷ grid
+import, energy without a price is not counted). For week, month and year the
+dashboard calculates grid import and feed-in **hour by hour** as soon as the
+hourly values of the meter exist. Right after setup these are filled in
+retroactively; until then a price per day or month applies, and the tile says
+so. Consumer costs, the self-consumption payment and CO₂ still use the price at
+the start of the period section.
+
 **Standing charge.** The dashboard converts the monthly amount to the selected
 period day by day (monthly value × 12 ÷ 365 per day; a running period only
 counts the time elapsed so far). With a helper, its last value applies until

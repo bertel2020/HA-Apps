@@ -694,6 +694,7 @@ def query_hourly_counter_series(
     tz: ZoneInfo,
     now_local: datetime,
     read_cache: QueryReadCache | None = None,
+    aggregation_type: str = "counter",
 ) -> dict[float, float]:
     """(Bucket-Zeitstempel -> Stunden-Delta) einer Zähler-Entität über ein
     beliebig langes Fenster (mehrere Monate/ein Jahr), aus der zusätzlichen
@@ -707,7 +708,10 @@ def query_hourly_counter_series(
     Nur für Zähler mit gesetztem entities.hourly_rollup sinnvoll — ohne
     Rollup-Datei liefert der abgeschlossene Teil einfach nichts (kein
     Fehler), Aufrufer (energiedashboard_routes.py) filtert die Rolle
-    entsprechend vorher."""
+    entsprechend vorher.
+
+    aggregation_type="standard": Stundenmittel eines Messwerts (z. B. Strompreis);
+    die Stufe stunde.parquet gibt es dort ohnehin für jede Entität (FINE_LEVEL)."""
     current_month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     completed_end = min(window_end, current_month_start)
@@ -722,13 +726,20 @@ def query_hourly_counter_series(
             data_dir, entity_id, index, now_local.timestamp(), live_start.timestamp(), window_end.timestamp(), tz,
             read_cache,
         )
-        boundary = _boundary_value(data_dir, entity_id, live_start.timestamp(), tz, read_cache)
+        boundary = (
+            _boundary_value(data_dir, entity_id, live_start.timestamp(), tz, read_cache)
+            if aggregation_type == "counter"
+            else None
+        )
         key_fn = rollup.named_bucket_key(tz, "stunde")
         next_fn = rollup.named_bucket_next(tz, "stunde")
         live, _ = rollup.compute_fine_rollup_with_key(
-            rows, "counter", key_fn, boundary, window_end.timestamp(), bucket_next_fn=next_fn
+            rows, aggregation_type, key_fn, boundary, window_end.timestamp(), bucket_next_fn=next_fn
         )
 
+    if aggregation_type != "counter":
+        # Eine Stunde ohne Messwert ist kein Wert 0 (bei einem Preis wäre das gratis).
+        return {row.bucket_start: row.value for row in completed + live if row.value is not None}
     return {row.bucket_start: (row.value or 0.0) for row in completed + live}
 
 

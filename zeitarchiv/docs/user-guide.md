@@ -496,6 +496,15 @@ der Tarif, rechnet das Dashboard auch die Vergangenheit mit dem neuen Wert.
 Der Arbeitspreis wird in Cent (bzw. Pence, Rappen) je kWh eingegeben, der
 Grundpreis in der Währung selbst **pro Monat**.
 
+**Dynamischer Tarif und Ø-Preis.** Ist der Arbeitspreis eine Entität, zeigt die
+Kostenanalyse zusätzlich den **durchschnittlichen Strompreis** je kWh (Kosten ÷
+Netzbezug, Energie ohne Preis zählt nicht mit). Bei Woche, Monat und Jahr
+rechnet das Dashboard Netzbezug und Einspeisung **stundengenau**, sobald die
+Stundenwerte des Zählers vorliegen. Direkt nach dem Einrichten wird das
+nachgetragen; bis dahin gilt ein Preis je Tag bzw. Monat, und die Kachel sagt
+das dazu. Verbrauch je Verbraucher, Eigenverbrauchsvergütung und CO₂ rechnen
+weiterhin mit dem Preis zu Beginn des Zeitraumabschnitts.
+
 **Grundpreis.** Das Dashboard rechnet den Monatsbetrag tageweise auf den
 gewählten Zeitraum um (Monatswert × 12 ÷ 365 je Tag; ein laufender Zeitraum
 zählt nur die bisher vergangene Zeit). Bei einem Helfer gilt sein letzter Wert

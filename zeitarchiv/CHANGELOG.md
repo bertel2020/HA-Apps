@@ -30,6 +30,13 @@
   durchschnittlichen Strompreis je kWh. Energie ohne Preis zählt nicht mit. Wird
   der Preis nur je Tag, Monat oder Jahr verrechnet, steht ein Hinweis dabei, dass
   die Kosten bei wechselndem Tarif ungenau sein können.
+- **Energiedashboard, Kosten bei dynamischem Tarif**: Netzbezug und Einspeise-Erlös
+  werden bei Woche, Monat und Jahr jetzt stundengenau gerechnet, wenn der Preis
+  eine Entität ist und der Zähler Stundenwerte hat. Bisher galt der Preis vom
+  Beginn des Tages bzw. Monats für alles, was darin bezogen wurde. Das konnte die
+  Kosten bei einem Tarif mit Tages- oder Stundenpreisen deutlich zu niedrig oder
+  zu hoch zeigen. Fehlen die Stundenwerte noch (direkt nach dem Einrichten), gilt
+  weiter der bisherige Preis je Tag, mit Hinweis.
 
 ### Behoben
 
@@ -68,6 +75,13 @@
   per kWh. Energy without a price is not counted. If the price is only applied per
   day, month or year, a note says the costs can be inaccurate with a changing
   tariff.
+- **Energy dashboard, costs with a dynamic tariff**: Grid import and feed-in
+  revenue are now calculated hour by hour for week, month and year when the price
+  is an entity and the meter has hourly values. Before, the price from the start
+  of the day or month applied to everything drawn in it, which could show the
+  costs far too low or too high with a day-time or hourly tariff. While the hourly
+  values are still missing (right after setup), the previous price per day
+  applies, with a note.
 
 #### Fixed
 

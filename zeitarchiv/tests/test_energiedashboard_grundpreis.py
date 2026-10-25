@@ -294,3 +294,50 @@ def test_avg_price_missing_with_fixed_price(monkeypatch, tmp: Path) -> None:
         assert kpi["netzbezug_avg_price"] is None
     finally:
         a.close()
+
+
+# --- Stündliche Kostenrechnung bei Monatsansicht -----------------------------
+
+def _tarif_anlage(tmp: Path, hourly_rollup: bool):
+    """Netzbezug 3 kWh um 12 Uhr und 3 kWh um 23 Uhr; Preis 0,10 € bis 12 Uhr,
+    danach 0,50 €. Der Preis zu Tagesbeginn (0,10) gälte bei Tagesbuckets für alles."""
+    from test_energiedashboard_flow import _Anlage
+
+    a = _Anlage(tmp)
+    a.zaehler("sensor.netz", (0, 100.0), (11, 100.0), (12, 103.0), (13, 103.0), (23, 106.0))
+    a.index.get_or_create_entity("sensor.preis", "sensor", "measurement", "EUR/kWh")
+    for i in range(24 * 4):
+        ts = _ts(i * 0.25)
+        preis = 0.10 if i * 0.25 < 12 else 0.50
+        hotbuffer.append(tmp, "sensor.preis", ts, preis, TZ)
+        a.index.record_write("sensor.preis", ts)
+    if hourly_rollup:
+        a.index.set_entity_hourly_rollup("sensor.netz", True)
+    config = ed._empty_config()
+    config.update({"netzbezug": "sensor.netz"})
+    config["kosten"] = {"preis_netzbezug": "sensor.preis"}
+    return a, config
+
+
+def test_month_costs_use_hourly_prices_when_the_hourly_stage_exists(monkeypatch, tmp: Path) -> None:
+    a, config = _tarif_anlage(tmp, hourly_rollup=True)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        kpi = a.service.compute_flow(config, "month", 0)["kpi"]
+        assert kpi["netzbezug_cost"] == pytest.approx(3.0, abs=0.01)
+        assert kpi["netzbezug_avg_price"] == pytest.approx(0.50, abs=0.001)
+        assert kpi["kosten_aufloesung"] == "stunde"
+    finally:
+        a.close()
+
+
+def test_month_costs_fall_back_to_buckets_without_the_hourly_stage(monkeypatch, tmp: Path) -> None:
+    a, config = _tarif_anlage(tmp, hourly_rollup=False)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        kpi = a.service.compute_flow(config, "month", 0)["kpi"]
+        # Preis zu Beginn des Tagesbuckets (0,10) für alle 6 kWh: der bekannte Fehler.
+        assert kpi["netzbezug_cost"] == pytest.approx(0.60, abs=0.01)
+        assert kpi["kosten_aufloesung"] == "tag"
+    finally:
+        a.close()

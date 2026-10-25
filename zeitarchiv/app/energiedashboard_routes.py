@@ -22,6 +22,7 @@ from .i18n import N_, tr
 import bisect
 import calendar
 import json
+import logging
 import statistics
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -41,6 +42,8 @@ from .storage import cleanup as cleanup_mod
 from .storage import query as query_mod
 from .storage import rollup as rollup_mod
 from .storage.index import Index
+
+logger = logging.getLogger(__name__)
 
 SETTING_ENABLED = "energiedashboard_enabled"
 SETTING_CONFIG = "energiedashboard_config"
@@ -1280,6 +1283,50 @@ class EnergieDashboardService:
         stale_labels: list[str] = []
         factor_gap_entries: list[tuple[str, float, int, str]] = []
 
+        def hourly_cost_inputs(
+            energy_entity_id: str | None, price_entity_id: str, energy_series: dict[float, float]
+        ) -> tuple[dict[float, float], dict[float, float]] | None:
+            """(Energie je Stunde, Preis je Stunde) für die Kostenrechnung, oder None.
+
+            Mit Buckets von Tag oder Monat gälte ein Preis für alles, was darin
+            verbraucht wurde (gemessen: bei einem Tagestarif 23 bis 29 % zu
+            niedrig). Die Stundenreihe von Energie und Preis rechnet je Stunde.
+            None heißt: mit den Buckets des Zeitraums weiterrechnen, weil die
+            Stundenstufe fehlt (frisch eingerichtet, Nachtrag läuft) oder die
+            Summe der Stunden nicht zur Bucket-Summe passt.
+            """
+            if not energy_entity_id or continuous or query_mod.BAR_RESOLUTION.get(range_key) == "stunde":
+                return None
+            energy_entity = self.deps.index.get_entity(energy_entity_id)
+            price_entity = self.deps.index.get_entity(price_entity_id)
+            if (
+                energy_entity is None or energy_entity["aggregation_type"] != "counter"
+                or not energy_entity["hourly_rollup"]
+                or price_entity is None or price_entity["aggregation_type"] != "standard"
+            ):
+                return None
+            energy_hourly = query_mod.query_hourly_counter_series(
+                self.deps.data_dir, self.deps.index, energy_entity_id, window_start, window_end,
+                self.deps.tz, now, read_cache,
+            )
+            price_hourly = query_mod.query_hourly_counter_series(
+                self.deps.data_dir, self.deps.index, price_entity_id, window_start, window_end,
+                self.deps.tz, now, read_cache, aggregation_type="standard",
+            )
+            if not energy_hourly or not price_hourly:
+                return None
+            erwartet = sum(energy_series.values())
+            stuendlich = sum(energy_hourly.values())
+            if abs(erwartet - stuendlich) > max(0.05, 0.02 * abs(erwartet)):
+                # Sonst widerspräche die Kostenzeile der Netzbezug-Kennzahl daneben.
+                logger.warning(
+                    "Stundenreihe von %s weicht von der Bucket-Summe ab (%.3f gegen %.3f kWh), "
+                    "Kosten werden mit den Buckets des Zeitraums gerechnet",
+                    energy_entity_id, stuendlich, erwartet,
+                )
+                return None
+            return energy_hourly, price_hourly
+
         def _carry_limit(entity_id: str, stuetzstellen: list[float]) -> float | None:
             """Wie lange ein Faktorwert fortgeschrieben werden darf, in Sekunden.
 
@@ -2028,6 +2075,7 @@ class EnergieDashboardService:
         # Vergleichs-/Heatmap-Hilfsaufrufe.
         kosten = config.get("kosten") or {}
         co2 = config.get("co2") or {}
+        stunden_gerechnet: set[str] = set()
         netzbezug_cost = None
         einspeisung_revenue = None
         vermiedene_kosten = None
@@ -2042,6 +2090,7 @@ class EnergieDashboardService:
                 factor_entity_id: str | None,
                 fixed_factor: float | None,
                 label: str,
+                energy_entity_id: str | None = None,
             ) -> float | None:
                 # Gemeinsame bucket-weise Faktor×Energie-Rechnung für Kosten
                 # (€/kWh) UND CO2 (g/kWh) — Entität hat Vorrang vor dem festen
@@ -2059,6 +2108,10 @@ class EnergieDashboardService:
                     add_stale_issue(label, stale and not _gap_detection_off(factor_entity_id))
                     if not factor_series:
                         return None
+                    stundenreihen = hourly_cost_inputs(energy_entity_id, factor_entity_id, energy_series)
+                    if stundenreihen is not None:
+                        energy_series, factor_series = stundenreihen
+                        stunden_gerechnet.add(label)
                     # Der Faktor wird als ZUSTAND ausgewertet, nicht über
                     # Schlüsselgleichheit: es gilt der letzte Preis bzw. die
                     # letzte CO2-Intensität, die zum Bucket-Beginn bekannt war.
@@ -2099,12 +2152,14 @@ class EnergieDashboardService:
                 return None
 
             netzbezug_cost = _bucket_factor(
-                netzbezug_series, kosten.get("preis_netzbezug"), kosten.get("preis_netzbezug_fixed"), "Preis Netzbezug"
+                netzbezug_series, kosten.get("preis_netzbezug"), kosten.get("preis_netzbezug_fixed"), "Preis Netzbezug",
+                config.get("netzbezug"),
             )
             if netzbezug_cost is not None:
                 netzbezug_cost = round(netzbezug_cost, 2)
             einspeisung_revenue = _bucket_factor(
-                einspeisung_series, kosten.get("preis_einspeisung"), kosten.get("preis_einspeisung_fixed"), "Preis Einspeisung"
+                einspeisung_series, kosten.get("preis_einspeisung"), kosten.get("preis_einspeisung_fixed"), "Preis Einspeisung",
+                config.get("einspeisung"),
             )
             if einspeisung_revenue is not None:
                 einspeisung_revenue = round(einspeisung_revenue, 2)
@@ -2278,6 +2333,8 @@ class EnergieDashboardService:
         # Der Preis gilt je Bucket; was ein Bucket umfasst, steht in BAR_RESOLUTION.
         # Daraus erkennt die Kachel, ob die Kosten stundengenau sind (sonst Hinweis).
         kosten_aufloesung = query_mod.BAR_RESOLUTION.get(range_key) if netzbezug_cost is not None else None
+        if "Preis Netzbezug" in stunden_gerechnet:
+            kosten_aufloesung = "stunde"
 
         # Metadaten-/Zählerrückgang-Prüfungen nur für die tatsächlich
         # angezeigte Periode — energiedashboard_data ruft compute_flow()
