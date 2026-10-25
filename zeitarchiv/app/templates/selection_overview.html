@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_icons.html" import topic_icon %}
+{% from "_icons.html" import topic_icon, history_icon %}
 {% block title %}{{ _("Zeitarchiv — Auswahl & Verlauf") }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/selection_overview.css') }}">
@@ -65,35 +65,47 @@
         </nav>
 
         <form method="post" action="{{ app_root }}/selection/remove" id="ov-bulk">
-          <div class="ov-bulkbar">
-            <button type="submit" class="btn btn-sm btn-danger ov-bulk-btn" id="ov-bulk-submit" {% if not can_apply %}disabled{% endif %}>{{ _("Auswahl entfernen …") }}</button>
+          {# Auswahlleiste: eine Einheit aus Zähler, Aktionen und Hinweis. Ohne Skript
+             steht alles da; das Skript setzt data-empty, solange nichts markiert ist,
+             dann bleibt nur eine ruhige Zeile mit dem Zähler und einem kurzen Hinweis. #}
+          <div class="ov-bulkbar" id="ov-bulkbar" role="group" aria-label="{{ _('Markierte Zeilen') }}">
+            <span class="ov-bulk-count"><b id="ov-bulk-n">0</b> {{ _("markiert") }}</span>
+            <span class="ov-bulk-idle">{{ _("Kästchen markieren, um mehrere Zeilen auf einmal zu ändern.") }}</span>
+            <span class="ov-bulk-actions">
+              <button type="submit" class="btn btn-sm btn-danger ov-bulk-btn" id="ov-bulk-submit" {% if not can_apply %}disabled{% endif %}>{{ _("Auswahl entfernen …") }}</button>
+              {% if can_change %}
+              <button type="submit" class="btn btn-sm ov-bulk-btn" formaction="{{ app_root }}/selection/exclude">{{ _("Ausschließen …") }}</button>
+              <button type="submit" class="btn btn-sm ov-bulk-btn" formaction="{{ app_root }}/selection/include">{{ _("Wieder aufnehmen …") }}</button>
+              {% endif %}
+            </span>
             {% if can_change %}
-            <button type="submit" class="btn btn-sm ov-bulk-btn" formaction="{{ app_root }}/selection/exclude">{{ _("Ausschließen …") }}</button>
-            <button type="submit" class="btn btn-sm ov-bulk-btn" formaction="{{ app_root }}/selection/include">{{ _("Wieder aufnehmen …") }}</button>
             <span class="ov-bulk-hint">{{ _("Jede Aktion gilt nur für die markierten Zeilen, zu denen sie passt; die Bestätigung nennt den Rest. Höchstens 200 je Auftrag.") }}</span>
             {% else %}
             <span class="ov-bulk-hint">{{ _("Entfernen lassen sich Einträge des Assistenten und von Hand gewählte Einzel-IDs.") }}</span>
             {% endif %}
           </div>
           {% if table.rows %}
-          <div class="tbl-wrap">
+          <div class="tbl-wrap ov-table-wrap">
           <table class="dt ov-table" data-cards="off">
             <thead><tr>
               <th class="ov-col-check"></th>
-              <th>{{ _("Entität") }}</th>
-              <th>{{ _("Herkunft") }}</th>
-              <th>{{ _("Status") }}</th>
-              <th>{{ _("Seit") }}</th>
+              <th class="ov-col-entity">{{ _("Entität") }}</th>
+              <th class="ov-col-origin">{{ _("Herkunft") }}</th>
+              <th class="ov-col-state">{{ _("Status") }}</th>
               <th class="ov-col-actions"></th>
             </tr></thead>
             <tbody>
             {% for row in table.rows %}
-            <tr>
+            {# „Ausgeschlossen“ steht in der Statusspalte; in der Herkunft nur die Wege. #}
+            {% set origin = row.badges|rejectattr("kind", "equalto", "excluded")|list %}
+            <tr class="ov-row-{{ row.status }}">
               <td class="ov-col-check">{% if (row.removable and can_apply) or (can_change and (row.excludable or row.includable)) %}<input type="checkbox" class="ov-check" name="ids" value="{{ row.entity_id }}" aria-label="{{ _('{name} markieren', name=row.name) }}">{% endif %}</td>
-              <td><span class="ov-name">{{ row.name }}</span><span class="ov-id" title="{{ row.entity_id }}">{{ row.entity_id }}</span></td>
-              <td><span class="ov-badges">{% for badge in row.badges %}<span class="ov-badge ov-badge-{{ badge.kind }}">{{ badge.text }}</span>{% endfor %}</span></td>
-              <td>{% if row.status == "archived" %}{{ _("archiviert") }}{% elif row.status == "excluded" %}{{ _("ausgeschlossen") }}{% elif row.status == "drifted" %}{{ _("nicht mehr ausgewählt") }}{% else %}{{ _("noch keine Werte") }}{% endif %}</td>
-              <td class="ov-since">{% if row.since %}{% set parts = row.since.split(" ", 1) %}{{ parts[0] }}{% if parts|length > 1 %}<span class="ov-since-t">{{ parts[1] }}</span>{% endif %}{% else %}–{% endif %}</td>
+              <td class="ov-col-entity"><span class="ov-name">{{ row.name }}</span><span class="ov-id" title="{{ row.entity_id }}">{{ row.entity_id }}</span></td>
+              <td class="ov-col-origin{{ ' is-empty' if not origin }}">{% if origin %}<span class="ov-badges">{% for badge in origin %}<span class="ov-badge ov-badge-{{ badge.kind }}">{{ badge.text }}</span>{% endfor %}</span>{% else %}<span class="ov-faint">–</span>{% endif %}</td>
+              <td class="ov-col-state">
+                <span class="ov-state ov-state-{{ row.status }}">{% if row.status == "archived" %}{{ _("archiviert") }}{% elif row.status == "excluded" %}{{ _("ausgeschlossen") }}{% elif row.status == "drifted" %}{{ _("nicht mehr ausgewählt") }}{% else %}{{ _("noch keine Werte") }}{% endif %}</span>
+                {% if row.since %}<span class="ov-since">{{ _("seit {date}", date=row.since) }}</span>{% endif %}
+              </td>
               <td class="ov-col-actions">
                 <details class="ov-menu">
                   <summary class="btn btn-sm" aria-label="{{ _('Aktionen für {name}', name=row.name) }}">⋯</summary>
@@ -139,36 +151,38 @@
         {% endif %}
 
         {% if catalog.phase2 %}
-        <h2 class="ov-h ov-patterns-h" id="ov-patterns-h">{{ _("Muster") }} <span class="ov-n">{{ patterns|length }}</span></h2>
+        {# Muster als Karten wie die Muster-Vorschläge im Assistenten (selection.html):
+           Kopf mit Muster und Aktion, darunter Kennzahl-Kacheln. #}
+        <section class="ov-patterns" aria-labelledby="ov-patterns-h">
+        <h2 class="ov-h" id="ov-patterns-h">{{ _("Muster") }} <span class="ov-n">{{ patterns|length }}</span></h2>
         {% if patterns %}
-        <div class="tbl-wrap">
-        <table class="dt ov-patterns" data-cards="off" aria-labelledby="ov-patterns-h">
-          <thead><tr><th>{{ _("Muster") }}</th><th>{{ _("Herkunft") }}</th><th>{{ _("Treffer") }}</th><th class="ov-col-actions"></th></tr></thead>
-          <tbody>
+        <p class="ov-sec-meta">{{ _("Von Hand eingetragene Muster ändert man in Home Assistant (Zeitarchiv-Integration, Optionen). Textentitäten werden von Mustern nie erfasst.") }}</p>
+        <div class="ov-pattern-list">
           {% for item in patterns %}
-          <tr>
-            <td><code class="ov-pattern">{{ item.pattern }}</code></td>
-            <td>{% if item.origin == "assistant" %}<span class="ov-badge ov-badge-assistant">{% if item.topic_text %}{{ _("Zeitarchiv · {topic}", topic=item.topic_text) }}{% else %}{{ _("Zeitarchiv") }}{% endif %}</span>{% if item.since %} <span class="ov-tl-when">{{ item.since }}</span>{% endif %}{% else %}<span class="ov-badge ov-badge-manual">{{ _("Manuell in HA") }}</span>{% endif %}</td>
-            <td>{{ item.count }}</td>
-            <td class="ov-col-actions">
+          <article class="ov-pattern-card{{ ' is-assistant' if item.origin == 'assistant' }}">
+            <div class="ov-pattern-head">
+              <code class="ov-pattern ov-pattern-code">{{ item.pattern }}</code>
               {% if item.origin == "assistant" and can_change %}
-              <form method="post" action="{{ app_root }}/selection/patterns/remove">
+              <form method="post" action="{{ app_root }}/selection/patterns/remove" class="ov-pattern-action">
                 <input type="hidden" name="pattern" value="{{ item.pattern }}">
                 <button type="submit" class="btn btn-sm btn-danger">{{ _("Muster entfernen …") }}</button>
               </form>
               {% elif item.origin != "assistant" %}
-              <span class="ov-menu-note">{{ _("in HA ändern") }}</span>
+              <span class="ov-pattern-note">{{ _("in HA ändern") }}</span>
               {% endif %}
-            </td>
-          </tr>
+            </div>
+            <dl class="ov-pattern-stats">
+              <div class="is-count{{ ' is-zero' if not item.count }}"><dt>{{ _("Treffer") }}</dt><dd>{{ item.count }}</dd></div>
+              <div class="is-text"><dt>{{ _("Herkunft") }}</dt><dd>{% if item.origin == "assistant" %}<span class="ov-badge ov-badge-assistant">{% if item.topic_text %}{{ _("Zeitarchiv · {topic}", topic=item.topic_text) }}{% else %}{{ _("Zeitarchiv") }}{% endif %}</span>{% else %}<span class="ov-badge ov-badge-manual">{{ _("Manuell in HA") }}</span>{% endif %}</dd></div>
+              <div class="is-text{{ ' is-zero' if not item.since }}"><dt>{{ _("Seit") }}</dt><dd>{% if item.since %}{% set parts = item.since.split(" ", 1) %}{{ parts[0] }}{% if parts|length > 1 %} <small>{{ parts[1] }}</small>{% endif %}{% else %}–{% endif %}</dd></div>
+            </dl>
+          </article>
           {% endfor %}
-          </tbody>
-        </table>
         </div>
-        <p class="ov-bulk-hint">{{ _("Von Hand eingetragene Muster ändert man in Home Assistant (Zeitarchiv-Integration, Optionen). Textentitäten werden von Mustern nie erfasst.") }}</p>
         {% else %}
         <p class="ov-none">{{ _("Keine Muster in der Auswahl. Vorschläge gibt es im Auswahl-Assistenten.") }}</p>
         {% endif %}
+        </section>
         {% endif %}
       </section>
 
@@ -177,27 +191,32 @@
         {% if timeline %}
         <ol class="ov-tl">
           {% for item in timeline %}
-          <li class="ov-tl-item ov-tl-{{ item.status }}">
+          {# Symbol je Aktion; Änderungen in HA und Rückgängig haben ein eigenes. #}
+          {% set kind = "ha" if item.source == "manual_ha" or item.action == "change" else ("undo" if item.source == "undo" else item.action) %}
+          <li class="ov-tl-item ov-tl-{{ item.status }}{{ ' is-undone' if item.undone_by }}">
+            <span class="ov-tl-icon">{{ history_icon(kind) }}</span>
             <div class="ov-tl-head">
               <span class="ov-tl-source">{{ item.source_text }}</span>
               <span class="ov-badge ov-badge-status-{{ item.status }}">{{ item.status_text }}</span>
             </div>
             <div class="ov-tl-summary">{{ item.summary }}{% for pattern in item.patterns %} <code class="ov-pattern">{{ pattern }}</code>{% endfor %}{% if item.topic_text %} · {{ item.topic_text }}{% endif %}</div>
-            <time class="ov-tl-when">{{ item.when }}</time>
             {% if item.undone_by %}<div class="ov-tl-note">{{ _("Wurde rückgängig gemacht.") }}</div>{% endif %}
             {% if item.message %}<div class="ov-tl-note">{{ item.message }}</div>{% endif %}
-            {% if item.details %}
-            <details class="ov-tl-details">
-              <summary>{{ _("Einzelheiten") }}</summary>
-              <ul>{% for detail in item.details %}<li><span class="ov-id">{{ detail.entity_id }}</span>{% if detail.result %} · {{ detail.result }}{% endif %}</li>{% endfor %}</ul>
-            </details>
-            {% endif %}
-            {% if item.undoable and can_apply %}
-            <form method="post" action="{{ app_root }}/selection/undo">
-              <input type="hidden" name="target" value="{{ item.id }}">
-              <button type="submit" class="btn btn-sm">{{ _("Rückgängig …") }}</button>
-            </form>
-            {% endif %}
+            <div class="ov-tl-foot">
+              <time class="ov-tl-when">{{ item.when }}</time>
+              {% if item.details %}
+              <details class="ov-tl-details">
+                <summary>{{ _("Einzelheiten") }} <span class="ov-n">{{ item.details|length }}</span></summary>
+                <ul>{% for detail in item.details %}<li><span class="ov-id">{{ detail.entity_id }}</span>{% if detail.result %} · {{ detail.result }}{% endif %}</li>{% endfor %}</ul>
+              </details>
+              {% endif %}
+              {% if item.undoable and can_apply %}
+              <form method="post" action="{{ app_root }}/selection/undo" class="ov-tl-undo">
+                <input type="hidden" name="target" value="{{ item.id }}">
+                <button type="submit" class="btn btn-sm">{{ _("Rückgängig …") }}</button>
+              </form>
+              {% endif %}
+            </div>
           </li>
           {% endfor %}
         </ol>

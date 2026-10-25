@@ -4,7 +4,8 @@
   .ov-note{margin:0 0 14px;padding:10px 14px;border:1px solid var(--warning);border-radius:8px;background:var(--warning-soft);color:var(--ink);font-size:calc(13px * var(--font-scale, 1));}
   .ov-empty p{margin:0 0 8px;}
   .ov-none{color:var(--ink-muted);font-size:calc(14px * var(--font-scale, 1));}
-  .ov-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;align-items:start;}
+  .ov-faint{color:var(--ink-faint);}
+  .ov-layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-items:start;}
   .ov-main,.ov-side{min-width:0;}
   .ov-assist{display:flex;align-items:center;gap:16px;margin:0 0 18px;padding:16px 20px;border:1px solid var(--accent-line);border-radius:12px;background:var(--accent-line-soft);}
   .ov-assist-icon{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:12px;background:var(--accent-line);color:var(--accent-contrast);}
@@ -14,12 +15,14 @@
   .ov-assist-btn{flex:0 0 auto;white-space:nowrap;}
   .ov-h{margin:0 0 10px;}
   .ov-n{font-size:calc(13px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);margin-left:6px;}
+  .ov-sec-meta{margin:-4px 0 12px;max-width:760px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
 
   .ov-job{margin:0 0 16px;padding:10px 14px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);font-size:calc(13.5px * var(--font-scale, 1));color:var(--ink);}
   .ov-job-pending{border-color:var(--warning);background:var(--warning-soft);}
   .ov-job-applied{border-color:var(--accent-line);background:var(--accent-line-soft);}
   .ov-job-partial,.ov-job-expired{border-color:var(--warning);background:var(--warning-soft);}
   .ov-job-failed{border-color:var(--danger);background:var(--danger-soft);}
+  .ov-job a{color:var(--accent-line);}
 
   .ov-search{display:flex;gap:8px;margin:0 0 10px;}
   .ov-search input[type=search]{flex:1 1 auto;min-width:0;}
@@ -27,81 +30,148 @@
   .ov-chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;}
   .ov-chips .chip{text-decoration:none;}
   .ov-chip-n{opacity:.75;font-variant-numeric:tabular-nums;margin-left:2px;}
-  .ov-bulkbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0 0 8px;}
-  .ov-bulk-hint{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
 
-  .ov-table td{vertical-align:middle;}
-  .ov-col-check{width:28px;}
-  .ov-col-check input{width:17px;height:17px;margin:0;accent-color:var(--accent-line);}
-  .ov-col-actions{width:48px;text-align:right;}
+  /* Auswahlleiste: Zähler, Aktionen und Hinweis als eine Einheit (wie
+     .dq-bulkbar). Ohne Skript steht alles da; mit Skript und ohne Markierung
+     (data-empty) nur Zähler und kurzer Hinweis, ruhig in Flächenfarbe. */
+  .ov-bulkbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;min-height:46px;margin:0 0 10px;padding:7px 12px;border:1px solid var(--accent-line);border-radius:10px;background:var(--accent-line-soft);font-size:calc(13px * var(--font-scale, 1));}
+  .ov-bulk-count{flex:0 0 auto;color:var(--ink);font-weight:500;white-space:nowrap;}
+  .ov-bulk-count b{font-family:var(--font-display);font-size:calc(16px * var(--font-scale, 1));font-weight:700;color:var(--accent-line);font-variant-numeric:tabular-nums;}
+  .ov-bulk-actions{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto;}
+  .ov-bulk-hint{flex:1 1 100%;font-size:calc(12px * var(--font-scale, 1));line-height:1.45;color:var(--ink-muted);}
+  .ov-bulk-idle{display:none;flex:1 1 auto;min-width:0;color:var(--ink-faint);font-size:calc(12.5px * var(--font-scale, 1));}
+  .ov-bulkbar:not([data-live]) .ov-bulk-count{display:none;}
+  .ov-bulkbar[data-empty]{border-color:var(--border);background:var(--surface);}
+  .ov-bulkbar[data-empty] .ov-bulk-count{color:var(--ink-muted);}
+  .ov-bulkbar[data-empty] .ov-bulk-count b{color:var(--ink-faint);}
+  .ov-bulkbar[data-empty] .ov-bulk-actions,.ov-bulkbar[data-empty] .ov-bulk-hint{display:none;}
+  .ov-bulkbar[data-empty] .ov-bulk-idle{display:block;}
+
+  /* Tabelle: Entität bekommt den Platz, Herkunft und Status schmaler, Kästchen
+     und Menü mittig zur zweizeiligen Entität. Das Menü (<details>) darf über die
+     Tabelle hinausragen, daher kein Überlauf-Abschneiden am Rahmen. */
+  .tbl-wrap.ov-table-wrap{overflow:visible;background-image:none;}
+  table.dt.ov-table td{vertical-align:middle;padding-top:7px;padding-bottom:7px;}
+  table.dt.ov-table tbody tr:last-child td:first-child{border-bottom-left-radius:12px;}
+  table.dt.ov-table tbody tr:last-child td:last-child{border-bottom-right-radius:12px;}
+  .ov-col-check{width:20px;padding-right:0!important;}
+  .ov-col-check input{display:block;width:17px;height:17px;margin:0;accent-color:var(--accent-line);cursor:pointer;}
+  .ov-col-origin{width:32%;}
+  .ov-col-state{width:170px;}
+  .ov-col-actions{width:44px;text-align:right;}
   .ov-name{display:block;font-weight:500;color:var(--ink);}
-  .ov-id{display:block;max-width:280px;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .ov-since{white-space:nowrap;font-variant-numeric:tabular-nums;}
-  .ov-since-t{display:block;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
-  .ov-patterns .ov-menu-note{white-space:nowrap;}
+  .ov-id{display:block;max-width:100%;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ov-col-entity{max-width:0;}
   .ov-tl-details .ov-id{display:inline;}
   .ov-badges{display:flex;flex-wrap:wrap;gap:4px;}
-  .ov-badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:calc(11.5px * var(--font-scale, 1));font-weight:500;background:var(--surface-alt);color:var(--ink-muted);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;}
+  .ov-badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:calc(11.5px * var(--font-scale, 1));font-weight:500;background:var(--surface-alt);color:var(--ink-muted);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;}
   .ov-badge-assistant{background:var(--accent-line-soft);color:var(--accent-line);}
   .ov-badge-manual{background:var(--accent-bar-soft);color:var(--accent-bar);}
   .ov-badge-excluded,.ov-badge-status-failed{background:var(--danger-soft);color:var(--danger);}
   .ov-badge-drifted,.ov-badge-status-pending,.ov-badge-status-partial,.ov-badge-status-expired{background:var(--warning-soft);color:var(--warning);}
   .ov-badge-status-applied{background:var(--accent-line-soft);color:var(--accent-line);}
 
+  /* Status: Punkt + Wort, darunter klein „seit …“. Der Normalfall „noch keine
+     Werte“ bleibt leise (hohler Punkt), Abweichungen tragen Farbe. */
+  .ov-state{display:inline-flex;align-items:center;gap:7px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);white-space:nowrap;}
+  .ov-state::before{content:"";flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--ink-faint);}
+  .ov-state-waiting{color:var(--ink-muted);}
+  .ov-state-waiting::before{background:transparent;box-shadow:inset 0 0 0 1.5px var(--ink-faint);}
+  .ov-state-archived::before{background:var(--accent-line);}
+  .ov-state-excluded{color:var(--danger);}
+  .ov-state-excluded::before{background:var(--danger);}
+  .ov-state-drifted{color:var(--warning);}
+  .ov-state-drifted::before{background:var(--warning);}
+  .ov-since{display:block;margin:1px 0 0 15px;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);font-variant-numeric:tabular-nums;white-space:nowrap;}
+
   /* Zeilenmenü: <details> statt eigenem Skript, schließt per Klick auf ⋯. */
   .ov-menu{position:relative;display:inline-block;}
   .ov-menu summary{list-style:none;cursor:pointer;min-width:32px;text-align:center;}
   .ov-menu summary::-webkit-details-marker{display:none;}
-  .ov-menu-pop{position:absolute;right:0;top:calc(100% + 4px);z-index:5;width:280px;padding:12px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);box-shadow:var(--shadow);text-align:left;color:var(--ink);}
+  .ov-menu[open] summary{background:var(--surface);border-color:var(--border-strong);}
+  .ov-menu-pop{position:absolute;right:0;top:calc(100% + 4px);z-index:5;width:280px;padding:12px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);box-shadow:var(--shadow);text-align:left;color:var(--ink);white-space:normal;}
   .ov-menu-pop .btn{margin:0 0 10px;}
   .ov-menu-h{margin:0 0 4px;font-weight:600;font-size:calc(13px * var(--font-scale, 1));}
   .ov-explain{margin:0 0 8px;padding-left:18px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
   .ov-menu-note{margin:0 0 8px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
   .ov-menu-pop a{color:var(--accent-line);font-size:calc(13px * var(--font-scale, 1));}
 
-  .ov-tl{list-style:none;margin:0;padding:0 0 0 14px;border-left:2px solid var(--border);}
-  .ov-tl-item{position:relative;margin:0 0 14px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);}
-  .ov-tl-item::before{content:"";position:absolute;left:-21px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--border-strong);border:2px solid var(--bg);}
-  .ov-tl-applied::before{background:var(--accent-line);}
-  .ov-tl-pending::before,.ov-tl-partial::before,.ov-tl-expired::before{background:var(--warning);}
-  .ov-tl-failed::before{background:var(--danger);}
-  .ov-tl-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 8px;}
-  .ov-tl-source{font-weight:600;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);}
-  .ov-tl-summary{margin-top:3px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
-  .ov-tl-when{display:block;margin-top:2px;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
-  .ov-tl-note{margin-top:4px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
-  .ov-tl-details{margin-top:6px;font-size:calc(12px * var(--font-scale, 1));}
-  .ov-tl-details summary{cursor:pointer;color:var(--accent-line);}
-  .ov-tl-details ul{margin:4px 0 0;padding-left:16px;}
-  .ov-tl-item form{margin-top:8px;}
-
-  /* Phase 2: Muster in Monospace, Mustertabelle, Link im Auftragsbanner. */
+  /* Muster: Karten wie die Muster-Vorschläge im Assistenten (.sel-pattern),
+     Kennzahlen als kleine Kacheln. */
   .ov-pattern{font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));color:var(--ink);overflow-wrap:anywhere;}
-  .ov-patterns-h{margin-top:24px;}
-  .ov-patterns td{vertical-align:middle;}
-  .ov-patterns form{margin:0;}
-  .ov-job a{color:var(--accent-line);}
+  .ov-patterns{margin-top:28px;}
+  .ov-patterns .ov-h{margin-bottom:8px;}
+  .ov-pattern-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:12px;}
+  .ov-pattern-card{display:flex;flex-direction:column;gap:10px;min-width:0;padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--shadow);}
+  .ov-pattern-card.is-assistant{border-color:var(--accent-line);}
+  .ov-pattern-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;}
+  .ov-pattern-code{flex:0 1 auto;min-width:0;padding:4px 9px;border-radius:6px;background:var(--surface-alt);font-size:calc(14px * var(--font-scale, 1));font-weight:500;}
+  .ov-pattern-action{flex:0 0 auto;margin:0;}
+  .ov-pattern-note{flex:0 0 auto;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);white-space:nowrap;}
+  .ov-pattern-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0;}
+  .ov-pattern-stats > div{display:flex;flex-direction:column-reverse;justify-content:flex-end;gap:2px;min-width:0;padding:8px 10px;border-radius:8px;background:var(--surface-alt);}
+  .ov-pattern-stats dt{font-size:calc(11.5px * var(--font-scale, 1));line-height:1.3;color:var(--ink-muted);}
+  .ov-pattern-stats dd{margin:0;min-width:0;font-family:var(--font-display);font-size:calc(18px * var(--font-scale, 1));font-weight:700;line-height:1.2;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .ov-pattern-stats .is-text dd{font-size:calc(13px * var(--font-scale, 1));font-weight:500;line-height:1.5;}
+  .ov-pattern-stats dd small{display:block;font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:var(--ink-faint);}
+  .ov-pattern-stats .is-count{background:var(--accent-line-soft);}
+  .ov-pattern-stats .is-count dd,.ov-pattern-stats .is-count dt{color:var(--accent-line);}
+  .ov-pattern-stats .is-zero dd{color:var(--ink-faint);}
+  .ov-pattern-stats .ov-badge{background:var(--surface);white-space:normal;overflow-wrap:anywhere;}
+
+  /* Verlauf: Zeitleiste mit Symbol je Aktion auf der Linie (Farbe = Stand des
+     Auftrags), kompakte Karten, Fußzeile mit Zeit, Einzelheiten, Rückgängig. */
+  .ov-tl{list-style:none;margin:0 0 0 12px;padding:0 0 0 22px;border-left:2px solid var(--border);}
+  .ov-tl-item{position:relative;margin:0 0 10px;padding:9px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
+  .ov-tl-item:last-child{margin-bottom:0;}
+  .ov-tl-icon{position:absolute;left:-36px;top:8px;display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--surface);border:2px solid var(--border-strong);color:var(--ink-muted);box-shadow:0 0 0 3px var(--bg);}
+  .ov-tl-applied .ov-tl-icon{border-color:var(--accent-line);color:var(--accent-line);background:var(--accent-line-soft);}
+  .ov-tl-pending .ov-tl-icon,.ov-tl-partial .ov-tl-icon,.ov-tl-expired .ov-tl-icon{border-color:var(--warning);color:var(--warning);background:var(--warning-soft);}
+  .ov-tl-failed .ov-tl-icon{border-color:var(--danger);color:var(--danger);background:var(--danger-soft);}
+  .ov-tl-item.is-undone{background:var(--surface-alt);}
+  .ov-tl-item.is-undone .ov-tl-summary{text-decoration:line-through;text-decoration-color:var(--ink-faint);}
+  .ov-tl-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:2px 8px;}
+  .ov-tl-source{font-weight:600;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);}
+  .ov-tl-head .ov-badge{padding:1px 6px;font-size:calc(11px * var(--font-scale, 1));}
+  .ov-tl-summary{margin-top:2px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  .ov-tl-note{margin-top:3px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
+  .ov-tl-foot{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin-top:6px;}
+  .ov-tl-when{font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
+  .ov-tl-details{font-size:calc(12px * var(--font-scale, 1));}
+  .ov-tl-details summary{cursor:pointer;color:var(--accent-line);}
+  .ov-tl-details summary .ov-n{margin-left:2px;font-size:inherit;}
+  .ov-tl-details[open]{order:3;flex:1 1 100%;}
+  .ov-tl-details ul{margin:4px 0 0;padding-left:16px;color:var(--ink-muted);}
+  .ov-tl-undo{margin:0 0 0 auto;}
+  .ov-tl-undo .btn{padding-top:3px;padding-bottom:3px;}
 
   @media (max-width:1100px){
     .ov-layout{grid-template-columns:minmax(0,1fr);}
+    .ov-side{margin-top:8px;}
   }
-  /* Schmal: jede Zeile als Karte (Kästchen | Entität | Menü, darunter Herkunft und Status). */
+  /* Schmal: jede Zeile als Karte (Kästchen | Entität | Menü, darunter Herkunft
+     und Status nebeneinander). */
   @media (max-width:640px){
+    .tbl-wrap.ov-table-wrap{border:0;background-color:transparent;}
     .ov-table thead{display:none;}
     .ov-table,.ov-table tbody{display:block;}
-    .ov-table tr{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:4px 8px;padding:10px 4px;border-bottom:1px solid var(--border);}
-    .ov-table td{display:block;padding:0;border:0;}
-    .ov-table td:nth-child(3),.ov-table td:nth-child(4),.ov-table td:nth-child(5){grid-column:2 / 4;font-size:calc(12.5px * var(--font-scale, 1));}
+    .ov-table tr{display:grid;grid-template-columns:20px minmax(0,1fr) auto;align-items:center;gap:6px 10px;margin:0 0 8px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
+    table.dt.ov-table td{display:block;width:auto;max-width:none;padding:0;border:0;}
+    table.dt.ov-table tbody tr:hover td{background:transparent;}
+    .ov-table td.ov-col-check{grid-column:1;grid-row:1;}
+    .ov-table td.ov-col-entity{grid-column:2;grid-row:1;}
     .ov-table td.ov-col-actions{grid-column:3;grid-row:1;}
+    .ov-table td.ov-col-origin,.ov-table td.ov-col-state{grid-column:2 / 4;}
+    .ov-table td.ov-col-origin.is-empty{display:none;}
+    .ov-table td.ov-col-state{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;}
+    .ov-since{display:inline;margin:0;}
+    .ov-id{white-space:normal;overflow-wrap:anywhere;}
     .ov-menu-pop{width:min(280px,calc(100vw - 48px));}
+    .ov-bulk-actions{margin-left:0;}
     .ov-search{flex-wrap:wrap;}
     .ov-assist{flex-wrap:wrap;padding:14px;}
     .ov-assist-text{flex-basis:calc(100% - 64px);}
     .ov-assist-btn{flex:1 1 100%;text-align:center;}
-    .ov-patterns thead{display:none;}
-    .ov-patterns,.ov-patterns tbody{display:block;}
-    .ov-patterns tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;padding:10px 4px;border-bottom:1px solid var(--border);}
-    .ov-patterns td{display:block;padding:0;border:0;}
-    .ov-patterns td:nth-child(2),.ov-patterns td:nth-child(3){grid-column:1;font-size:calc(12.5px * var(--font-scale, 1));}
-    .ov-patterns td.ov-col-actions{grid-column:2;grid-row:1;}
+    .ov-pattern-card{padding:12px 14px;}
+    .ov-pattern-action,.ov-pattern-action .btn{width:100%;}
   }

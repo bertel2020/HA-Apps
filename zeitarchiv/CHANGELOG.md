@@ -4,6 +4,27 @@
 
 ### Neu
 
+- **Auswahl-Assistent**: Unter Entitäten → „Auswahl & Verlauf“ sagst du, was du
+  archivieren möchtest, zum Beispiel Energie oder Wetter, und Zeitarchiv schlägt
+  passende Entitäten aus deinem Home Assistant vor, jeweils mit Begründung und
+  einer Bestätigung vor jeder Änderung.
+  - **Themen und Suche**: Energie, Wetter, Temperatur & Klima, Luftqualität,
+    Wasser & Gas, Netzwerk, Batterien, System & Server sowie die als sensibel
+    gekennzeichneten Themen Türen & Fenster und Anwesenheit. Alternativ findet
+    eine Suche passende Entitäten, etwa zu „Strom“ oder einem Gerätenamen.
+  - **Muster**: Zu einem Thema schlägt der Assistent Muster wie
+    `sensor.shelly_plug_*` vor und zeigt vorab, wie viele Entitäten sie erfassen.
+  - **Übernehmen**: Standard ist das Label „Zeitarchiv“ in Home Assistant,
+    alternativ Einzel-IDs. Die Integration setzt die Änderung innerhalb etwa
+    einer Minute um; bereits archivierte Daten bleiben unverändert.
+- **Auswahl & Verlauf**: Ein neuer Reiter auf der Entitäten-Seite zeigt, auf
+  welchem Weg jede Entität in die Auswahl kam (Assistent, von Hand in Home
+  Assistant, Muster, Bereich, Gerät oder Label), mit Filter und Suche, dazu den
+  Verlauf aller Änderungen. Einträge lassen sich entfernen, ausschließen und
+  wieder aufnehmen, auch mehrere auf einmal; Aktionen des Assistenten lassen sich
+  rückgängig machen.
+- Der Assistent braucht eine neuere Version der Zeitarchiv-Integration. Mit der
+  bisherigen zeigt die App die Vorschläge nur an.
 - **Energiedashboard, Kostenanalyse**: Wenn der Netzbezug-Preis aus einer Entität
   kommt (zum Beispiel ein dynamischer Tarif), zeigt eine neue Kachel den
   durchschnittlichen Strompreis je kWh. Energie ohne Preis zählt nicht mit. Wird
@@ -22,6 +43,26 @@
 
 #### New
 
+- **Selection assistant**: Under Entities → “Selection & history” you tell it
+  what you want to archive, for example energy or weather, and Zeitarchiv
+  suggests matching entities from your Home Assistant, each with a reason and a
+  confirmation before any change.
+  - **Topics and search**: Energy, Weather, Temperature & climate, Air quality,
+    Water & gas, Network, Batteries, System & server, plus the topics Doors &
+    windows and Presence, which are marked as sensitive. Alternatively, a search
+    finds matching entities, for example for “power” or a device name.
+  - **Patterns**: For a topic the assistant suggests patterns such as
+    `sensor.shelly_plug_*` and shows beforehand how many entities they cover.
+  - **Applying**: The default is the label “Zeitarchiv” in Home Assistant,
+    alternatively individual IDs. The integration applies the change within about
+    a minute; data that is already archived stays unchanged.
+- **Selection & history**: A new tab on the Entities page shows how each entity
+  got into the selection (assistant, by hand in Home Assistant, pattern, area,
+  device or label), with filter and search, plus the history of all changes.
+  Entries can be removed, excluded and included again, also several at once;
+  actions of the assistant can be undone.
+- The assistant needs a newer version of the Zeitarchiv integration. With the
+  current one the app only shows the suggestions.
 - **Energy dashboard, cost analysis**: When the grid price comes from an entity
   (for example a dynamic tariff), a new tile shows the average electricity price
   per kWh. Energy without a price is not counted. If the price is only applied per
