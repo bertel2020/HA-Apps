@@ -23,7 +23,10 @@ from typing import Any
 
 from .i18n import tr
 
-TOPICS = ("energie", "wetter", "klima", "wasser_gas", "netzwerk", "anwesenheit")
+TOPICS = (
+    "energie", "wetter", "klima", "luftqualitaet", "wasser_gas", "netzwerk", "batterien", "system", "tueren_fenster",
+    "anwesenheit",
+)
 
 #: Rollen aus dem Energie-Dashboard, die zum Thema „Energie“ gehören
 #: (Gas und Wasser bekommen später ein eigenes Thema).

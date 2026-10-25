@@ -141,6 +141,8 @@ def test_old_catalog_files_get_the_phase2_defaults(tmp_path: Path) -> None:
     ("Strom", "energie"), ("  solar   PV ", "energie"), ("Photovoltaik", "energie"), ("heizung", "klima"),
     ("Luftfeuchte", "klima"), ("weather", "wetter"), ("Zähler", "wasser_gas"), ("WLAN", "netzwerk"),
     ("presence", "anwesenheit"), ("Temperatur & Klima", "klima"),
+    ("CO2", "luftqualitaet"), ("Feinstaub", "luftqualitaet"), ("Batterie", "batterien"), ("akku", "batterien"),
+    ("CPU", "system"), ("Festplatte", "system"), ("Fenster", "tueren_fenster"), ("Tür", "tueren_fenster"),
     ("strom küche", None), ("strom wetter", None), ("stromzähler", None), ("", None),
 ])
 def test_synonyms_pick_a_topic_only_when_every_term_agrees(query, topic) -> None:

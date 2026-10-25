@@ -24,10 +24,15 @@ def _rows(topic, catalog, archived=()):
     return rec, more, result
 
 
-def test_all_six_topics_are_known_and_have_a_label() -> None:
-    assert selection_suggest.TOPICS == ("energie", "wetter", "klima", "wasser_gas", "netzwerk", "anwesenheit")
+def test_all_topics_are_known_and_have_a_label() -> None:
+    assert selection_suggest.TOPICS == (
+        "energie", "wetter", "klima", "luftqualitaet", "wasser_gas", "netzwerk", "batterien", "system", "tueren_fenster",
+        "anwesenheit",
+    )
     assert set(selection_topics.TOPIC_INFO) == set(selection_suggest.TOPICS)
     assert selection_topics.TOPIC_INFO["anwesenheit"]["sensitive"] is True
+    assert selection_topics.TOPIC_INFO["tueren_fenster"]["sensitive"] is True
+    assert selection_topics.TOPIC_INFO["tueren_fenster"]["note"]
     assert selection_topics.topic_label("klima") == "Temperatur & Klima"
     assert selection_topics.topic_label("unbekannt") == "unbekannt"
 
@@ -83,8 +88,9 @@ def test_room_climate_excludes_outdoor_and_device_temperatures() -> None:
         _row("sensor.aussen", "Außen", device_class="temperature"),
         _row("sensor.pm25", device_class="pm25"),
     ])
-    assert set(rec) == {"sensor.wohnzimmer_temp", "sensor.bad_feuchte", "sensor.co2", "climate.heizung"}
-    assert "sensor.cpu_temp" in more and "sensor.pm25" in more
+    assert set(rec) == {"sensor.wohnzimmer_temp", "sensor.bad_feuchte", "climate.heizung"}
+    assert "sensor.cpu_temp" in more
+    assert "sensor.co2" not in rec and "sensor.co2" not in more and "sensor.pm25" not in more  # Thema „Luftqualität“
     assert "sensor.aussen" not in rec and "sensor.aussen" not in more
 
 
@@ -179,3 +185,56 @@ def test_rows_are_grouped_by_device() -> None:
     ])
     groups = {group["name"]: [row["entity_id"] for row in group["rows"]] for group in result["recommended"]}
     assert groups == {"Thermo": ["sensor.a", "sensor.b"], "Andere": ["sensor.c"]}
+
+
+# ---- Luftqualität, Batterien, System & Server, Türen & Fenster ---------------------------
+
+def test_air_quality_recommends_co2_particles_and_voc_and_lists_pollutants_as_more() -> None:
+    rec, more, _ = _rows("luftqualitaet", [
+        _row("sensor.co2", "Büro CO2", device_class="carbon_dioxide"),
+        _row("sensor.pm", "Feinstaub", device_class="pm25"),
+        _row("sensor.voc", "VOC", device_class="volatile_organic_compounds"),
+        _row("sensor.ozon", "Ozon", device_class="ozone"),
+        _row("sensor.temp", "Raum", device_class="temperature"),
+    ])
+    assert set(rec) == {"sensor.co2", "sensor.pm", "sensor.voc"}
+    assert set(more) == {"sensor.ozon"}
+
+
+def test_batteries_stay_recommended_although_they_are_diagnostic_entities() -> None:
+    rec, more, _ = _rows("batterien", [
+        _row("sensor.fenster_batterie", "Fenster", device_class="battery", unit="%", entity_category="diagnostic"),
+        _row("binary_sensor.rauchmelder_batterie", "Rauchmelder", device_class="battery"),
+        _row("sensor.ladung", "Akku Staubsauger", unit="%"),
+        _row("sensor.temp", "Raum", device_class="temperature"),
+    ])
+    assert set(rec) == {"sensor.fenster_batterie", "binary_sensor.rauchmelder_batterie"}
+    assert set(more) == {"sensor.ladung"}
+
+
+def test_system_topic_uses_the_monitoring_platforms_and_keeps_device_temperatures_out_of_the_room_climate() -> None:
+    rows = [
+        _row("sensor.processor_use", "Prozessorauslastung", platform="systemmonitor", unit="%"),
+        _row("sensor.processor_temperature", "Prozessortemperatur", platform="systemmonitor", device_class="temperature"),
+        _row("sensor.last_boot", "Letzter Start", platform="systemmonitor", device_class="timestamp"),
+        _row("sensor.irgendwas", "Etwas", platform="systemmonitor", unit="kg"),
+        _row("sensor.raum", "Raum", device_class="temperature"),
+    ]
+    rec, more, _ = _rows("system", rows)
+    assert set(rec) == {"sensor.processor_use", "sensor.processor_temperature"}
+    assert set(more) == {"sensor.last_boot", "sensor.irgendwas"}
+    klima_rec, klima_more, _ = _rows("klima", rows)
+    assert "sensor.processor_temperature" not in klima_rec and "sensor.processor_temperature" not in klima_more
+
+
+def test_doors_and_windows_are_recommended_and_locks_are_more() -> None:
+    rec, more, _ = _rows("tueren_fenster", [
+        _row("binary_sensor.haustuer", "Haustür", device_class="door"),
+        _row("binary_sensor.bad_fenster", "Bad", device_class="window"),
+        _row("binary_sensor.garage", "Garage", device_class="garage_door"),
+        _row("lock.haustuer", "Haustür Schloss", text=True),
+        _row("binary_sensor.bewegung", "Flur", device_class="motion"),
+    ])
+    assert rec["binary_sensor.haustuer"]["reason"] == "Türkontakt"
+    assert set(rec) == {"binary_sensor.haustuer", "binary_sensor.bad_fenster", "binary_sensor.garage"}
+    assert set(more) == {"lock.haustuer"}

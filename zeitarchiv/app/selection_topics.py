@@ -26,10 +26,21 @@ TOPIC_INFO: dict[str, dict[str, Any]] = {
     "energie": {"label": N_("Energie"), "sensitive": False},
     "wetter": {"label": N_("Wetter"), "sensitive": False},
     "klima": {"label": N_("Temperatur & Klima"), "sensitive": False},
+    "luftqualitaet": {"label": N_("Luftqualität"), "sensitive": False},
     "wasser_gas": {"label": N_("Wasser & Gas"), "sensitive": False},
     "netzwerk": {"label": N_("Netzwerk"), "sensitive": False},
+    "batterien": {"label": N_("Batterien"), "sensitive": False},
+    "system": {"label": N_("System & Server"), "sensitive": False},
+    "tueren_fenster": {
+        "label": N_("Türen & Fenster"), "sensitive": True,
+        "note": N_("Türen und Fenster sind sensibel: das Archiv zeigt später lückenlos, wann jemand kam oder ging. Nur übernehmen, wenn alle Betroffenen einverstanden sind."),
+    },
     "anwesenheit": {"label": N_("Anwesenheit"), "sensitive": True},
 }
+
+#: Themen, deren Entitäten fast immer als „Diagnose“ geführt werden (Batteriestand, Systemwerte):
+#: sie bleiben trotzdem empfohlen.
+_DIAGNOSTIC_OK = frozenset({"batterien", "system"})
 
 RECOMMENDED, MORE, DERIVED = "recommended", "more", "derived"
 
@@ -55,6 +66,16 @@ NETWORK_PLATFORMS = frozenset({
     "mikrotik", "tplink_omada", "tplink_router", "openwrt", "luci", "vodafone_station", "glances", "pi_hole",
     "adguard", "nmap_tracker", "keenetic_ndms2", "ubus", "opnsense", "pfsense", "starlink",
 })
+#: Integrationen, die den Rechner oder Server selbst überwachen.
+SYSTEM_PLATFORMS = frozenset({
+    "systemmonitor", "hassio", "uptime", "cpuspeed", "proxmoxve", "synology_dsm", "qnap", "unraid", "truenas",
+    "docker", "portainer", "dwd_weather_warnings_system", "command_line_system", "raspberry_pi", "rpi_power",
+})
+_SYSTEM_NAME = re.compile(
+    r"(cpu|prozessor|processor|arbeitsspeicher|memory|\bram\b|swap|festplatte|disk|speicherplatz|auslastung|load\b|uptime|laufzeit)",
+    re.IGNORECASE,
+)
+_BATTERY_NAME = re.compile(r"(batterie|battery|akku\b)", re.IGNORECASE)
 _SPEED_PLATFORMS = frozenset({"speedtestdotnet", "fastdotcom"})
 _NETWORK_NAME = re.compile(r"(wlan|wifi|wi-fi|lan\b|router|internet|dsl|download|upload|ping|latenz|latency)", re.IGNORECASE)
 
@@ -117,15 +138,78 @@ def rule_klima(row: dict[str, Any]) -> tuple[str, str] | str | None:
     if row.get("platform") in WEATHER_PLATFORMS or (dc in {"temperature", "humidity"} and is_outdoor(row)):
         return None  # gehört zum Thema „Wetter“
     if dc == "temperature":
+        if row.get("platform") in SYSTEM_PLATFORMS:
+            return None  # gehört zum Thema „System & Server“
         if _DEVICE_TEMP.search(_hint_text(row)):
             return tr("Gerätetemperatur, kaum für das Raumklima"), MORE
         return tr("Raumtemperatur"), RECOMMENDED
     if dc == "humidity":
         return tr("Luftfeuchtigkeit"), RECOMMENDED
+    return None
+
+
+def rule_luftqualitaet(row: dict[str, Any]) -> tuple[str, str] | str | None:
+    if row["domain"] != "sensor":
+        return None
+    dc = row.get("device_class")
     if dc in {"carbon_dioxide", "co2"}:
         return tr("CO₂-Gehalt der Luft"), RECOMMENDED
-    if dc in {"volatile_organic_compounds", "volatile_organic_compounds_parts", "pm25", "pm10", "pm1", "aqi"}:
-        return tr("Luftqualität"), MORE
+    if dc in {"pm25", "pm10", "pm1"}:
+        return tr("Feinstaub"), RECOMMENDED
+    if dc in {"volatile_organic_compounds", "volatile_organic_compounds_parts"}:
+        return tr("Flüchtige organische Verbindungen (VOC)"), RECOMMENDED
+    if dc == "aqi":
+        return tr("Luftqualitätsindex"), RECOMMENDED
+    if dc in {"nitrogen_dioxide", "nitrogen_monoxide", "ozone", "sulphur_dioxide", "carbon_monoxide"}:
+        return tr("Schadstoff in der Luft"), MORE
+    if re.search(r"\bradon\b", _hint_text(row), re.IGNORECASE):
+        return tr("Radon"), MORE
+    return None
+
+
+def rule_batterien(row: dict[str, Any]) -> tuple[str, str] | str | None:
+    domain, dc = row["domain"], row.get("device_class")
+    if dc == "battery" and domain == "sensor":
+        return tr("Batteriestand eines Geräts"), RECOMMENDED
+    if dc == "battery" and domain == "binary_sensor":
+        return tr("Batterie schwach (ja/nein)"), RECOMMENDED
+    if domain == "sensor" and row.get("unit") == "%" and _BATTERY_NAME.search(_hint_text(row)):
+        return tr("Name deutet auf eine Batterie"), MORE
+    return None
+
+
+def rule_system(row: dict[str, Any]) -> tuple[str, str] | str | None:
+    if row["domain"] != "sensor":
+        return None
+    dc, platform = row.get("device_class"), row.get("platform")
+    named = bool(_SYSTEM_NAME.search(_hint_text(row)))
+    if platform in SYSTEM_PLATFORMS:
+        if dc == "timestamp":
+            return tr("Zeitpunkt des Starts oder Neustarts"), MORE
+        if dc in {"date", "enum"}:
+            return None
+        if dc == "temperature":
+            return tr("Prozessor- oder Gerätetemperatur"), RECOMMENDED
+        if row.get("unit") == "%" or named:
+            return tr("Auslastung oder Belegung"), RECOMMENDED
+        return tr("Weiterer Wert der Systemüberwachung ({platform})", platform=platform), MORE
+    if named and row.get("unit") == "%":
+        return tr("Name deutet auf Systemauslastung"), MORE
+    return None
+
+
+_OPENING_REASONS = {
+    "door": N_("Türkontakt"), "window": N_("Fensterkontakt"), "opening": N_("Öffnungsmelder"),
+    "garage_door": N_("Garagentor"),
+}
+
+
+def rule_tueren_fenster(row: dict[str, Any]) -> tuple[str, str] | str | None:
+    domain, dc = row["domain"], row.get("device_class")
+    if domain == "binary_sensor" and dc in _OPENING_REASONS:
+        return tr(_OPENING_REASONS[dc]), RECOMMENDED
+    if domain == "lock":
+        return tr("Türschloss"), MORE
     return None
 
 
@@ -193,8 +277,12 @@ def rule_anwesenheit(row: dict[str, Any]) -> tuple[str, str] | str | None:
 RULES: dict[str, Rule] = {
     "wetter": rule_wetter,
     "klima": rule_klima,
+    "luftqualitaet": rule_luftqualitaet,
     "wasser_gas": rule_wasser_gas,
     "netzwerk": rule_netzwerk,
+    "batterien": rule_batterien,
+    "system": rule_system,
+    "tueren_fenster": rule_tueren_fenster,
     "anwesenheit": rule_anwesenheit,
 }
 
@@ -217,7 +305,7 @@ def suggest_topic(topic: str, entities: Iterable[dict[str, Any]], archived: Coll
             derived += 1
             continue
         reason, bucket = verdict
-        if bucket == RECOMMENDED and row.get("entity_category") == "diagnostic":
+        if bucket == RECOMMENDED and row.get("entity_category") == "diagnostic" and topic not in _DIAGNOSTIC_OK:
             bucket = MORE
         high_rate = row.get("device_class") in _HIGH_RATE or (row["domain"] == "binary_sensor" and row.get("device_class") == "motion")
         (recommended if bucket == RECOMMENDED else more).append(suggestion(row, reason, archived, high_rate=high_rate))

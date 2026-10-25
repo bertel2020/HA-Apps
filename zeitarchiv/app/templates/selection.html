@@ -50,7 +50,7 @@
     {% if result.presence %}<p class="sel-note">{{ _("Unter den Treffern sind Anwesenheits-Entitäten. Das Archiv zeigt später lückenlos, wann jemand zu Hause war. Nur übernehmen, wenn alle Betroffenen einverstanden sind.") }}</p>{% endif %}
     {% endif %}
     {% if topic_info.sensitive %}
-    <p class="sel-note">{{ _("Anwesenheit ist sensibel: das Archiv zeigt später lückenlos, wann jemand zu Hause war. Nur übernehmen, wenn alle Betroffenen einverstanden sind.") }}</p>
+    <p class="sel-note">{% if topic_info.note %}{{ _(topic_info.note) }}{% else %}{{ _("Anwesenheit ist sensibel: das Archiv zeigt später lückenlos, wann jemand zu Hause war. Nur übernehmen, wenn alle Betroffenen einverstanden sind.") }}{% endif %}</p>
     {% endif %}
     {% if not can_apply %}
     <p class="sel-note">{{ _("Zum Übernehmen braucht es eine neuere Version der Zeitarchiv-Integration. Bis dahin zeigt diese Seite die Vorschläge nur an.") }}</p>

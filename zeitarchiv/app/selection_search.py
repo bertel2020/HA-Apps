@@ -29,13 +29,25 @@ MAX_QUERY = 100
 #: Begriff → Thema. Nur ganze Begriffe zählen, keine Teilwörter.
 SYNONYMS: dict[str, str] = {
     **dict.fromkeys((
-        "energie", "energy", "strom", "stromverbrauch", "solar", "pv", "photovoltaik", "akku", "batterie",
-        "battery", "verbrauch", "electricity", "power", "leistung", "kwh",
+        "energie", "energy", "strom", "stromverbrauch", "solar", "pv", "photovoltaik",
+        "verbrauch", "electricity", "power", "leistung", "kwh",
     ), "energie"),
     **dict.fromkeys((
         "temperatur", "temperature", "heizung", "heating", "klima", "climate", "thermostat", "luftfeuchte",
         "luftfeuchtigkeit", "humidity", "raumklima",
     ), "klima"),
+    **dict.fromkeys((
+        "luftqualität", "luftqualitaet", "luft", "co2", "feinstaub", "pm25", "pm10", "voc", "aqi", "airquality", "radon",
+    ), "luftqualitaet"),
+    **dict.fromkeys((
+        "batterie", "batterien", "batteriestand", "akku", "akkus", "battery", "batteries", "ladestand",
+    ), "batterien"),
+    **dict.fromkeys((
+        "system", "server", "cpu", "prozessor", "arbeitsspeicher", "ram", "memory", "festplatte", "disk", "uptime",
+    ), "system"),
+    **dict.fromkeys((
+        "tür", "tuer", "türen", "tueren", "fenster", "window", "door", "kontakt", "öffnungsmelder", "garagentor",
+    ), "tueren_fenster"),
     **dict.fromkeys(("wetter", "weather", "regen", "rain", "wind", "niederschlag"), "wetter"),
     **dict.fromkeys(("wasser", "water", "gas", "zähler", "zaehler", "meter"), "wasser_gas"),
     **dict.fromkeys(("router", "netzwerk", "network", "wlan", "wifi", "ping", "internet"), "netzwerk"),

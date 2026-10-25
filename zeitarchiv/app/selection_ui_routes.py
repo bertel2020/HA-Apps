@@ -200,6 +200,7 @@ def make_ui_router(get_index: Callable[[], Index], templates: Jinja2Templates, d
                 "skipped": skipped, "text_count": len(force_ids),
                 "high_rate": sum(1 for eid in ids if candidates[eid]["high_rate"]),
                 "sensitive": sensitive, "back": back,
+                "note": None if is_search else TOPIC_INFO[topic].get("note"),
             })
         return pages.create(
             request, back, source="assistant", action="add", mode=mode, topic=None if is_search else topic,
