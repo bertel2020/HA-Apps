@@ -13,8 +13,8 @@ TILES_JS = (APP / "static" / "js" / "dashboard-tiles.js").read_text(encoding="ut
 def test_tile_carries_the_saved_comparison() -> None:
     tiles_tpl = (TEMPLATES / "_dashboard_tiles.html").read_text(encoding="utf-8")
     assert "data-compare-settings='{{ tile.compare_settings | default({}) | tojson }}'" in tiles_tpl
-    main = (APP / "main.py").read_text(encoding="utf-8")
-    assert '"compare_settings": c["compare_settings"],' in main
+    tiles = (APP / "dashboard_tiles.py").read_text(encoding="utf-8")
+    assert '"compare_settings": c["compare_settings"],' in tiles
 
 
 def test_tile_requests_the_comparison_like_the_editor() -> None:

@@ -135,6 +135,9 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     # 5.823 Zeilen gebracht, der Löschblock steht jetzt in entity_delete_routes.py (5.734). Die
     # Schwelle bleibt; der nächste benannte Kandidat sind die Kontext-Bauer der Dashboards
     # (_dashboard_tiles_context() und Verwandte).
+    # Am 25. Oktober 2026 genommen: Die Kontext-Bauer der Kacheln stehen in dashboard_tiles.py,
+    # main.py fiel auf 5.487 (der Entitäts-Assistent hatte es auf 5.815 gebracht). Die Schwelle
+    # blieb unangetastet und hat jetzt rund 320 Zeilen Luft.
     assert len(main.splitlines()) < 5_810
 
 
