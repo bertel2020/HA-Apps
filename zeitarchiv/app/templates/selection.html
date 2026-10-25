@@ -36,7 +36,8 @@
         <span class="sel-tile-icon">{{ topic_icon(tile.topic) }}</span>
         <span class="sel-tile-text">
           <span class="sel-tile-name">{{ tile.label }}{% if tile.sensitive %} <span class="sel-badge sel-badge-warn">{{ _("sensibel") }}</span>{% endif %}</span>
-          <span class="sel-tile-count"><b>{{ tile.counts.recommended }}</b> {{ _("empfohlen") }} · {{ tile.counts.found }} {{ _("gefunden") }}</span>
+          <span class="sel-tile-count"><b>{{ tile.counts.found }}</b> {{ _("gefunden") }}</span>
+          <span class="sel-tile-count"><b>{{ tile.counts.recommended }}</b> {{ _("empfohlen") }}</span>
         </span>
       </a>
       {% endfor %}
@@ -119,20 +120,27 @@
       {% endif %}
 
       {% if result.recommended or result.more or unexclude %}
+      {# Eine Zeile: links was markiert ist (Zähler + Hinweis), rechts wie und los. #}
       <div class="sel-footer">
-        <p class="sel-footer-counts">
-          <span><b id="sel-checked">{{ result.counts.recommended_new if can_apply else 0 }}</b> {{ _("markiert") }}</span>
-          <span>{{ _("{count} neu", count=counts.new) }}</span>
-          <span>{{ _("{count} schon archiviert oder ausgewählt", count=counts.archived + counts.selected) }}</span>
-          <span>{{ _("{count} ausgeschlossen", count=counts.excluded) }}</span>
-        </p>
+        <div class="sel-footer-info">
+          <p class="sel-footer-counts">
+            <span class="sel-footer-marked"><b id="sel-checked">{{ result.counts.recommended_new if can_apply else 0 }}</b> {{ _("markiert") }}</span>
+            <span class="sel-footer-stats">
+              <span><b>{{ counts.new }}</b> {{ _("neu") }}</span>
+              <span><b>{{ counts.archived + counts.selected }}</b> {{ _("schon archiviert oder ausgewählt") }}</span>
+              <span><b>{{ counts.excluded }}</b> {{ _("ausgeschlossen") }}</span>
+            </span>
+          </p>
+          <p class="sel-footer-hint">{{ _("Textentitäten gehen immer als Einzel-ID.") }}{% if counts.text %} {{ _("Hier betrifft das {count}.", count=counts.text) }}{% endif %}
+            {{ _("Höchstens {max} je Übernahme.", max=max_ids) }}</p>
+        </div>
         <fieldset class="sel-mode">
           <legend>{{ _("Übernehmen als") }}</legend>
-          <label class="filter-chip"><input type="radio" name="mode" value="label" checked><span>{{ _("Label „Zeitarchiv“ (Standard)") }}</span></label>
-          <label class="filter-chip"><input type="radio" name="mode" value="ids"><span>{{ _("Einzel-IDs") }}</span></label>
+          <span class="sel-seg">
+            <label><input type="radio" name="mode" value="label" checked><span>{{ _("Label „Zeitarchiv“ (Standard)") }}</span></label>
+            <label><input type="radio" name="mode" value="ids"><span>{{ _("Einzel-IDs") }}</span></label>
+          </span>
         </fieldset>
-        <p class="sel-footer-hint">{{ _("Textentitäten gehen immer als Einzel-ID.") }}{% if counts.text %} {{ _("Hier betrifft das {count}.", count=counts.text) }}{% endif %}
-          {{ _("Höchstens {max} je Übernahme.", max=max_ids) }}</p>
         <button type="submit" class="btn primary" id="sel-submit" {% if not can_apply %}disabled{% endif %}>{{ _("Übernehmen …") }}</button>
       </div>
       {% endif %}
@@ -141,37 +149,41 @@
     {% if patterns %}
     <section class="sel-patterns" aria-labelledby="sel-patterns-h">
       <h2 id="sel-patterns-h">{{ _("Muster-Vorschläge") }} <span class="sel-n">{{ patterns|length }}</span></h2>
-      <p class="sel-meta">{{ _("Ein Muster erfasst alle Entitäten, deren ID dazu passt. Neue Entitäten, die später zum Muster passen, werden automatisch archiviert. Textentitäten werden von Mustern nie erfasst.") }}</p>
+      <p class="sel-meta">{{ _("Ein Muster erfasst jede Entität mit passender ID, auch spätere: sie werden automatisch archiviert. Textentitäten werden von Mustern nie erfasst.") }}</p>
       {% if not can_change %}<p class="sel-note">{{ _("Muster übernehmen braucht eine neuere Version der Zeitarchiv-Integration.") }}</p>{% endif %}
       <div class="sel-pattern-list">
         {% for item in patterns %}
-        <div class="settings-panel sel-pattern{{ ' is-active' if item.active }}">
+        <article class="sel-pattern{{ ' is-active' if item.active }}">
           <div class="sel-pattern-head">
-            <code class="sel-mono">{{ item.pattern }}</code>
-            {% if item.active %}<span class="sel-badge sel-badge-new">{{ _("schon aktiv") }}</span>{% endif %}
+            <code class="sel-mono sel-pattern-code">{{ item.pattern }}</code>
+            {% if item.active %}<span class="sel-badge sel-badge-new">{{ _("schon aktiv") }}</span>
+            {% else %}
+            <form method="post" action="{{ app_root }}/selection/patterns" class="sel-pattern-action">
+              <input type="hidden" name="pattern" value="{{ item.pattern }}">
+              <input type="hidden" name="topic" value="{{ topic }}">
+              {% if is_search %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
+              <button type="submit" class="btn sel-pattern-btn" {% if not can_change %}disabled{% endif %}>{{ _("Muster übernehmen …") }}</button>
+            </form>
+            {% endif %}
           </div>
-          <p class="sel-pattern-counts">
-            {{ _("{total} passende Entitäten", total=item.total) }} ·
-            {{ _("{count} neu", count=item.new) }} ·
-            {{ _("{count} schon archiviert oder ausgewählt", count=item.archived) }} ·
-            {{ _("{count} ausgeschlossen", count=item.excluded) }}
-          </p>
-          {% if item.outside %}<p class="hint hint-warn">{{ _("Davon nicht in dieser Ansicht: {count}", count=item.outside) }}</p>{% endif %}
-          {% if item.high_rate %}<p class="hint hint-warn">{{ _("{count} davon ändern sich sehr oft (z. B. Leistung) und erzeugen viele Daten.", count=item.high_rate) }}</p>{% endif %}
-          {% if item.text %}<p class="sel-meta">{{ _("{count} passende Textentitäten erfasst das Muster nicht.", count=item.text) }}</p>{% endif %}
-          <details class="sel-pattern-examples">
-            <summary>{{ _("Beispiele") }}</summary>
-            <ul>{% for example in item.examples %}<li>{{ example.name }} <span class="sel-id">{{ example.entity_id }}</span>{% if not example.in_view %} · {{ _("nicht in dieser Ansicht") }}{% endif %}</li>{% endfor %}</ul>
-          </details>
-          {% if not item.active %}
-          <form method="post" action="{{ app_root }}/selection/patterns">
-            <input type="hidden" name="pattern" value="{{ item.pattern }}">
-            <input type="hidden" name="topic" value="{{ topic }}">
-            {% if is_search %}<input type="hidden" name="q" value="{{ query }}">{% endif %}
-            <button type="submit" class="btn btn-sm" {% if not can_change %}disabled{% endif %}>{{ _("Muster übernehmen …") }}</button>
-          </form>
+          <dl class="sel-pattern-stats">
+            <div><dt>{{ _("passend") }}</dt><dd>{{ item.total }}</dd></div>
+            <div class="is-new{{ ' is-zero' if not item.new }}"><dt>{{ _("neu") }}</dt><dd>{{ item.new }}</dd></div>
+            <div{% if not item.archived %} class="is-zero"{% endif %}><dt>{{ _("schon archiviert oder ausgewählt") }}</dt><dd>{{ item.archived }}</dd></div>
+            <div{% if not item.excluded %} class="is-zero"{% endif %}><dt>{{ _("ausgeschlossen") }}</dt><dd>{{ item.excluded }}</dd></div>
+          </dl>
+          {% if item.high_rate or item.outside or item.text %}
+          <div class="sel-pattern-notes">
+            {% if item.high_rate %}<p class="hint hint-warn sel-pattern-warn">{{ _("{count} davon ändern sich sehr oft (z. B. Leistung) und erzeugen viele Daten.", count=item.high_rate) }}</p>{% endif %}
+            {% if item.outside %}<p class="hint hint-status">{{ _("Davon nicht in dieser Ansicht: {count}", count=item.outside) }}</p>{% endif %}
+            {% if item.text %}<p class="hint hint-status">{{ _("{count} passende Textentitäten erfasst das Muster nicht.", count=item.text) }}</p>{% endif %}
+          </div>
           {% endif %}
-        </div>
+          <details class="sel-pattern-examples">
+            <summary>{{ _("Beispiele") }} <span class="sel-n">{{ item.examples|length }}</span></summary>
+            <ul>{% for example in item.examples %}<li><span class="sel-name">{{ example.name }}</span> <span class="sel-id">{{ example.entity_id }}</span>{% if not example.in_view %} <span class="sel-badge sel-badge-muted">{{ _("nicht in dieser Ansicht") }}</span>{% endif %}</li>{% endfor %}</ul>
+          </details>
+        </article>
         {% endfor %}
       </div>
     </section>
