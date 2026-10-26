@@ -223,7 +223,7 @@
       </div>
       <div class="edash-kpi" x-show="kpi.netzbezug_avg_price != null">
         <div class="edash-kpi-label">{{ _("Ø Strompreis Netzbezug") }}</div>
-        <div class="edash-kpi-val" x-text="fmtCurrency(kpi.netzbezug_avg_price, 3)"></div>
+        <div class="edash-kpi-val" x-text="fmtSubunitPrice(kpi.netzbezug_avg_price)"></div>
         <div class="edash-kpi-sub">{{ _("je kWh") }}</div>
         <div class="edash-kpi-gap" x-show="costResolutionHint()" x-text="costResolutionHint()"></div>
       </div>

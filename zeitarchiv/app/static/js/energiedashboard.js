@@ -479,6 +479,13 @@
         return `${sign}${c.symbol}${c.spaced ? ' ' : ''}${number}`;
       },
 
+      // Strompreis je kWh in der Untereinheit (Ct, p, ¢, Rp): so wird er üblicherweise genannt und
+      // eingegeben, und die Kachel bleibt schmal.
+      fmtSubunitPrice(value) {
+        if (value == null) return '—';
+        return this.fmt(value * 100, 1) + ' ' + (window.ZA_CURRENCY.short || '');
+      },
+
       // Kosten sind nur dann stundengenau, wenn der Preis je Stunde verrechnet wird;
       // bei Tages-, Monats- oder Jahresbuckets gilt ein Preis für den ganzen Bucket.
       costResolutionHint() {

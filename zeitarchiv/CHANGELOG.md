@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased
+
+### Geändert
+
+- **Energiedashboard, Ø Strompreis**: Die Kachel zeigt den Preis in der
+  Untereinheit, zum Beispiel „28,8 Ct“ je kWh, so wie du den festen Preis
+  eingibst.
+
+### Behoben
+
+- **Energiedashboard, Preis-Entitäten**: Liefert eine Preis-Entität Cent je kWh
+  (Einheit „ct/kWh“), erkennt die App das jetzt an der Einheit und rechnet richtig
+  um. Bisher wurden die Kosten hundertfach zu hoch angezeigt. Der Hinweistext im
+  Setup sagt jetzt, dass eine Entität Euro oder Cent je kWh liefern darf.
+- **Energiedashboard, fehlender Preisverlauf**: Hat die Preis-Entität in einem
+  Zeitraum keinen einzigen Wert (zum Beispiel in Monaten vor ihrer Einrichtung),
+  zeigt die Kostenanalyse jetzt „Preis fehlt für 100 %“. Bisher fehlten die
+  Netzbezug-Kosten still, und nur der Grundpreis stand als Kosten da.
+
+---
+
+### English
+
+#### Changed
+
+- **Energy dashboard, average price**: The tile shows the price in the subunit,
+  for example “28.8 ct” per kWh, the way you enter the fixed price.
+
+#### Fixed
+
+- **Energy dashboard, price entities**: If a price entity delivers cents per kWh
+  (unit “ct/kWh”), the app now recognises that from the unit and converts it
+  correctly. Before, the costs were shown a hundred times too high. The setup hint
+  now says an entity may deliver euros or cents per kWh.
+- **Energy dashboard, missing price history**: If the price entity has no value at
+  all in a period (for example in months before it was set up), the cost analysis
+  now shows “Price missing for 100 %”. Before, the grid import costs were silently
+  missing and only the base price showed up as costs.
+
 ## 1.11.1 - 2026-10-25
 
 ### Behoben
