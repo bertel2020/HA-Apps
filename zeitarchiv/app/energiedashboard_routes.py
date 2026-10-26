@@ -45,6 +45,18 @@ from .storage.index import Index
 
 logger = logging.getLogger(__name__)
 
+# Preis-Entitäten liefern meist Euro je kWh, manche (Tarif-Templates) Cent je kWh. Die Einheit
+# der Entität entscheidet; gerechnet wird intern immer in der Währung selbst.
+_CENT_PRICE_UNITS = frozenset({
+    "ct/kwh", "cent/kwh", "c/kwh", "¢/kwh", "p/kwh", "pence/kwh", "rp/kwh", "rappen/kwh", "öre/kwh",
+})
+
+
+def _price_unit_scale(unit: str | None) -> float:
+    """0,01 für Einheiten wie "ct/kWh", sonst 1,0 (Währung je kWh, unbekannte Einheit)."""
+    normalized = "".join((unit or "").lower().replace("·", "").replace(".", "").split())
+    return 0.01 if normalized in _CENT_PRICE_UNITS else 1.0
+
 SETTING_ENABLED = "energiedashboard_enabled"
 SETTING_CONFIG = "energiedashboard_config"
 # Ab dieser Version reist ein "schema_version"-Feld im SETTING_CONFIG-JSON
@@ -1325,11 +1337,15 @@ class EnergieDashboardService:
         def hourly_price(price_entity_id: str) -> dict[float, float]:
             if price_entity_id not in hourly_price_cache:
                 price_entity = self.deps.index.get_entity(price_entity_id)
+                scale = _price_unit_scale(price_entity["unit"]) if price_entity is not None else 1.0
                 hourly_price_cache[price_entity_id] = (
-                    query_mod.query_hourly_counter_series(
-                        self.deps.data_dir, self.deps.index, price_entity_id, window_start, window_end,
-                        self.deps.tz, now, read_cache, aggregation_type="standard",
-                    )
+                    {
+                        ts: value * scale
+                        for ts, value in query_mod.query_hourly_counter_series(
+                            self.deps.data_dir, self.deps.index, price_entity_id, window_start, window_end,
+                            self.deps.tz, now, read_cache, aggregation_type="standard",
+                        ).items()
+                    }
                     if price_entity is not None and price_entity["aggregation_type"] == "standard"
                     else {}
                 )
@@ -2183,7 +2199,18 @@ class EnergieDashboardService:
                     # Tagen nichts gesendet hat, ist dann kein Zeichen für einen Ausfall.
                     add_stale_issue(label, stale and not _gap_detection_off(factor_entity_id))
                     if not factor_series:
-                        return None
+                        # Ohne einen einzigen Wert in diesem Zeitraum gälte sonst "Kosten 0" bzw. gar keine
+                        # Zeile, und nichts weist darauf hin. Bei den Preisen als Lücke melden (100 %).
+                        gesamt = sum(energy_series.values())
+                        if gesamt <= 0 or label.startswith("CO2"):
+                            add_factor_gap(label, gesamt, gesamt)
+                            return None
+                        add_factor_gap(label, gesamt, gesamt)
+                        return 0.0
+                    factor_entity = self.deps.index.get_entity(factor_entity_id)
+                    scale = _price_unit_scale(factor_entity["unit"]) if factor_entity is not None else 1.0
+                    if scale != 1.0:
+                        factor_series = {ts: value * scale for ts, value in factor_series.items()}
                     stunden_energie = hourly_energy() if hourly_energy else None
                     stunden_preis = hourly_price(factor_entity_id) if stunden_energie else {}
                     if stunden_energie and stunden_preis:

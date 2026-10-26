@@ -298,17 +298,17 @@ def test_avg_price_missing_with_fixed_price(monkeypatch, tmp: Path) -> None:
 
 # --- Stündliche Kostenrechnung bei Monatsansicht -----------------------------
 
-def _tarif_anlage(tmp: Path, hourly_rollup: bool):
+def _tarif_anlage(tmp: Path, hourly_rollup: bool, preis_faktor: float = 1.0, einheit: str = "EUR/kWh"):
     """Netzbezug 3 kWh um 12 Uhr und 3 kWh um 23 Uhr; Preis 0,10 € bis 12 Uhr,
     danach 0,50 €. Der Preis zu Tagesbeginn (0,10) gälte bei Tagesbuckets für alles."""
     from test_energiedashboard_flow import _Anlage
 
     a = _Anlage(tmp)
     a.zaehler("sensor.netz", (0, 100.0), (11, 100.0), (12, 103.0), (13, 103.0), (23, 106.0))
-    a.index.get_or_create_entity("sensor.preis", "sensor", "measurement", "EUR/kWh")
+    a.index.get_or_create_entity("sensor.preis", "sensor", "measurement", einheit)
     for i in range(24 * 4):
         ts = _ts(i * 0.25)
-        preis = 0.10 if i * 0.25 < 12 else 0.50
+        preis = (0.10 if i * 0.25 < 12 else 0.50) * preis_faktor
         hotbuffer.append(tmp, "sensor.preis", ts, preis, TZ)
         a.index.record_write("sensor.preis", ts)
     if hourly_rollup:
@@ -389,5 +389,51 @@ def test_self_consumption_and_consumer_costs_fall_back_without_hourly_stage(monk
         assert flow["kpi"]["vermiedene_kosten"] == pytest.approx(0.70, abs=0.01)
         zeile = next(r for r in flow["verbraucher_breakdown"] if r["name"] == "Waschmaschine")
         assert zeile["kosten"] == pytest.approx(0.40, abs=0.01)
+    finally:
+        a.close()
+
+
+# --- Einheit der Preis-Entität und fehlender Preisverlauf ----------------------
+
+def test_price_unit_scale_recognises_cent_units() -> None:
+    from app.energiedashboard_routes import _price_unit_scale
+
+    for unit in ("ct/kWh", "Cent/kWh", "c/kWh", "¢/kWh", "p/kWh", "Rp/kWh", "ct / kWh", "ct./kWh"):
+        assert _price_unit_scale(unit) == 0.01, unit
+    for unit in ("€/kWh", "EUR/kWh", "$/kWh", "g/kWh", "", None):
+        assert _price_unit_scale(unit) == 1.0, unit
+
+
+def test_cent_price_entity_gives_the_same_costs_as_a_euro_entity(monkeypatch, tmp: Path) -> None:
+    a, config = _tarif_anlage(tmp, hourly_rollup=True, preis_faktor=100.0, einheit="ct/kWh")
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        kpi = a.service.compute_flow(config, "month", 0)["kpi"]
+        assert kpi["netzbezug_cost"] == pytest.approx(3.0, abs=0.01)
+        assert kpi["netzbezug_avg_price"] == pytest.approx(0.50, abs=0.001)
+    finally:
+        a.close()
+
+
+def test_cent_price_entity_is_converted_in_the_bucket_path_too(monkeypatch, tmp: Path) -> None:
+    a, config = _tarif_anlage(tmp, hourly_rollup=False, preis_faktor=100.0, einheit="ct/kWh")
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        kpi = a.service.compute_flow(config, "month", 0)["kpi"]
+        assert kpi["netzbezug_cost"] == pytest.approx(0.60, abs=0.01)  # wie beim Euro-Preis ohne Stundenstufe
+    finally:
+        a.close()
+
+
+def test_price_entity_without_values_is_reported_as_a_gap(monkeypatch, tmp: Path) -> None:
+    a, config = _tarif_anlage(tmp, hourly_rollup=True)
+    config["kosten"] = {"preis_netzbezug": "sensor.preis_leer"}
+    a.index.get_or_create_entity("sensor.preis_leer", "sensor", "measurement", "EUR/kWh")
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        kpi = a.service.compute_flow(config, "month", 0)["kpi"]
+        assert kpi["netzbezug_cost"] == 0.0
+        luecke = next(e for e in kpi["kosten_luecke"] if e["key"] == "netzbezug")
+        assert luecke["anteil"] == 100
     finally:
         a.close()
