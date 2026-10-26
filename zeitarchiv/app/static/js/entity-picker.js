@@ -164,10 +164,14 @@ function entityMultiPicker(options, getSelectedFn, onAddFn) {
     // Chip zeigt, wie viele Treffer er zum aktuellen Suchtext liefern würde.
     available() {
       const selected = new Set(this.selected());
-      const q = this.search.trim().toLowerCase();
-      return this.options.filter(
-        (o) => !selected.has(o.entity_id) && (!q || (o.label + ' ' + o.entity_id).toLowerCase().includes(q))
-      );
+      // Leerzeichen trennt Suchbegriffe (wie in Home Assistant): jeder Begriff
+      // muss vorkommen, die Reihenfolge ist egal.
+      const terms = this.search.toLowerCase().split(/\s+/).filter(Boolean);
+      return this.options.filter((o) => {
+        if (selected.has(o.entity_id)) return false;
+        const hay = (o.label + ' ' + o.entity_id).toLowerCase();
+        return terms.every((term) => hay.includes(term));
+      });
     },
     // Nur Typen, die es überhaupt gibt — ein "Zustand"-Chip ohne eine
     // einzige Zustands-Entität wäre ein toter Knopf.
@@ -249,7 +253,6 @@ function entityMultiPicker(options, getSelectedFn, onAddFn) {
     // Die Liste bleibt offen und der Filter stehen, damit sich mehrere
     // Entitäten nacheinander aus derselben Auswahl übernehmen lassen.
     add(id) {
-      this.search = '';
       this.activeId = '';
       if (typeof onAddFn === 'function') onAddFn(id);
     },
