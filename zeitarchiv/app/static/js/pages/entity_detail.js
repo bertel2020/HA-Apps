@@ -1487,7 +1487,9 @@ function selectBrush() {
             // Werten (z. B. "0.0347 kWh" bei kleinen Zähler-Deltas) nicht immer aus
             // und schnitt die führende Ziffer links ab, was wie eine falsche/
             // unplausible Skala aussah, obwohl nur die Beschriftung geclippt war.
-            grid: {left: 10, right: 20, top: (UNIT || DURATION_DISPLAY) ? 36 : 20, bottom: this.compare ? 64 : 40, containLabel: true},
+            // containLabel misst die breiteste Beschriftung etwas zu knapp: bei „24,782 ct/kWh“ (drei
+            // Nachkommastellen plus Einheit) fehlte links eine Ziffer. 24 statt 10 gibt den nötigen Rand.
+            grid: {left: 24, right: 20, top: (UNIT || DURATION_DISPLAY) ? 36 : 20, bottom: this.compare ? 64 : 40, containLabel: true},
             // min/max explizit auf das Abfragefenster fixiert, statt ECharts
             // per Default auf den tatsächlichen Datenbereich auto-fitten zu
             // lassen — sonst hört die Achse (und damit sichtbar der Chart) beim
