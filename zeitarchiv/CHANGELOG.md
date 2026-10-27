@@ -10,6 +10,10 @@
 - **Energie-Dashboard**: In der englischen Oberfläche erschienen im Sankey-Diagramm
   und in der Lastprofil-Heatmap noch deutsche Beschriftungen („Grundlast“,
   „(Ladung)“, „(Entladung)“, Wochentage „Mo“/„Di“/…). Sie werden jetzt übersetzt.
+- **Rollierende Zeiträume**: Der erste, angeschnittene Tagesbalken ragte links
+  über die y-Achse und verdeckte deren Beschriftung. Die Achse beginnt jetzt
+  etwas früher, sodass der Balken ganz im Diagramm liegt (Chart-Editor und
+  Kacheln).
 
 ---
 
@@ -23,6 +27,9 @@
 - **Energy dashboard**: In the English interface the Sankey chart and the load
   profile heatmap still showed German labels (“Grundlast”, “(Ladung)”,
   “(Entladung)”, weekdays “Mo”/“Di”/…). They are now translated.
+- **Rolling periods**: the first, partial daily bar stuck out to the left over
+  the y-axis and covered its labels. The axis now starts slightly earlier so the
+  bar sits fully inside the chart (chart editor and tiles).
 
 ## 1.11.2 - 2026-10-26
 

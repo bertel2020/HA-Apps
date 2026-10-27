@@ -153,6 +153,24 @@
     return midnight.getTime() / 1000;
   }
 
+  // Beginnt ein rollierendes Fenster mitten im Tag, liegt der erste Bucket
+  // (Mitternacht) vor dem Achsenanfang: der Balken ragt über die y-Achse und
+  // verdeckt deren Beschriftung. Die Achse beginnt dann eine halbe
+  // Bucket-Breite vor dem ersten Balken, sodass er ganz im Diagramm liegt.
+  // Gleiche Funktion in chart_editor.js.
+  function axisMinForBars(seriesList, windowStartMs) {
+    if (windowStartMs == null) return undefined;
+    let min = windowStartMs;
+    seriesList.filter(s => s.type === 'bar' && s.data && s.data.length > 1).forEach(s => {
+      const xs = s.data.map(p => p[0]).filter(Number.isFinite).sort((a, b) => a - b);
+      if (xs.length < 2 || xs[0] >= windowStartMs) return;
+      let step = Infinity;
+      for (let i = 1; i < xs.length; i++) if (xs[i] > xs[i - 1]) step = Math.min(step, xs[i] - xs[i - 1]);
+      if (Number.isFinite(step)) min = Math.min(min, xs[0] - step / 2);
+    });
+    return min;
+  }
+
   function resamplePoints(points, range, preset, aggregationType, windowStart) {
     const seconds = RESOLUTION_SECONDS[range] && RESOLUTION_SECONDS[range][preset];
     if (!seconds || !points.length || windowStart == null) return points;
@@ -1143,7 +1161,7 @@
       },
       xAxis: singleBucket ? (horizontalActive ? xAxisForHorizontal : categoryAxisObj) : {
         type: 'time',
-        min: data.window_start != null ? data.window_start * 1000 : undefined,
+        min: axisMinForBars(echartsSeries, data.window_start != null ? data.window_start * 1000 : null),
         // period_end statt window_end: eine laufende Periode (z. B. Woche)
         // zeigt so bis zur vollen Kalendergrenze (Sonntag), auch für die noch
         // datenlose Zukunft — window_end (an "jetzt" gedeckelt) bleibt nur für
