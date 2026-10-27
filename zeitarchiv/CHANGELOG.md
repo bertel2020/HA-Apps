@@ -7,6 +7,9 @@
 - **Entitätsansicht und Chart-Editor**: Im Diagramm fehlte bei langen
   Beschriftungen der y-Achse links eine Ziffer („4,782 ct/kWh“ statt „24,782
   ct/kWh“). Der Rand ist jetzt groß genug.
+- **Energie-Dashboard**: In der englischen Oberfläche erschienen im Sankey-Diagramm
+  und in der Lastprofil-Heatmap noch deutsche Beschriftungen („Grundlast“,
+  „(Ladung)“, „(Entladung)“, Wochentage „Mo“/„Di“/…). Sie werden jetzt übersetzt.
 
 ---
 
@@ -17,6 +20,9 @@
 - **Entity view and chart editor**: In the chart, long y-axis labels lost a digit
   on the left (“4,782 ct/kWh” instead of “24,782 ct/kWh”). The margin is now large
   enough.
+- **Energy dashboard**: In the English interface the Sankey chart and the load
+  profile heatmap still showed German labels (“Grundlast”, “(Ladung)”,
+  “(Entladung)”, weekdays “Mo”/“Di”/…). They are now translated.
 
 ## 1.11.2 - 2026-10-26
 

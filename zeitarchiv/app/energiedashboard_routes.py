@@ -156,7 +156,7 @@ _FINER_RANGE = {"month": "day", "year": "month"}
 _COARSER_RANGE = {"hour": "day", "month": "year"}
 
 # Tageslastprofil-Heatmap: datetime.weekday() liefert 0=Montag.
-_WEEKDAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+_WEEKDAY_LABELS = [N_("Mo"), N_("Di"), N_("Mi"), N_("Do"), N_("Fr"), N_("Sa"), N_("So")]
 HEATMAP_DAYS = 7
 
 # Energiebericht, "Erzeugung & Verbrauch im Detail": feste abstrakte
@@ -461,9 +461,9 @@ def _speicher_link_entities(config: dict) -> list[dict]:
     for sp in config.get("speicher") or []:
         sp_name = sp.get("name") or tr("Speicher")
         if sp.get("laden_entity_id"):
-            entities.append({"entity_id": sp["laden_entity_id"], "name": f"{sp_name} (Ladung)"})
+            entities.append({"entity_id": sp["laden_entity_id"], "name": tr("{name} (Ladung)", name=sp_name)})
         if sp.get("entladen_entity_id"):
-            entities.append({"entity_id": sp["entladen_entity_id"], "name": f"{sp_name} (Entladung)"})
+            entities.append({"entity_id": sp["entladen_entity_id"], "name": tr("{name} (Entladung)", name=sp_name)})
     return entities
 
 
@@ -1158,9 +1158,9 @@ class EnergieDashboardService:
         for sp in config.get("speicher") or []:
             sp_name = sp.get("name") or tr("Speicher")
             if sp.get("laden_entity_id"):
-                roles.append((sp["laden_entity_id"], f"{sp_name} (Ladung)"))
+                roles.append((sp["laden_entity_id"], tr("{name} (Ladung)", name=sp_name)))
             if sp.get("entladen_entity_id"):
-                roles.append((sp["entladen_entity_id"], f"{sp_name} (Entladung)"))
+                roles.append((sp["entladen_entity_id"], tr("{name} (Entladung)", name=sp_name)))
         return roles
 
     def _check_entity_metadata(self, entity_roles: list[tuple[str, str]]) -> dict:
@@ -1492,7 +1492,7 @@ class EnergieDashboardService:
                 sp_entladen_series, stale = entity_series(sp["entladen_entity_id"])
                 sp_entladen_val = self._series_total(sp_entladen_series)
                 speicher_entladen_series_list.append(sp_entladen_series)
-                label = f"{sp_name} (Entladung)"
+                label = tr("{name} (Entladung)", name=sp_name)
                 nodes.append({
                     "name": label, "entity_id": sp["entladen_entity_id"], "role": "source",
                     "kind": "storage_out",
@@ -1505,7 +1505,7 @@ class EnergieDashboardService:
                 sp_laden_series, stale = entity_series(sp["laden_entity_id"])
                 sp_laden_val = self._series_total(sp_laden_series)
                 speicher_laden_series_list.append(sp_laden_series)
-                add_stale_issue(f"{sp_name} (Ladung)", stale)
+                add_stale_issue(tr("{name} (Ladung)", name=sp_name), stale)
             speicher_entladen_val += sp_entladen_val
             speicher_laden_val += sp_laden_val
             speicher_entry = {
@@ -1971,7 +1971,7 @@ class EnergieDashboardService:
             if not sp.get("laden_entity_id"):
                 continue
             sp_name = sp.get("name") or tr("Speicher")
-            label = f"{sp_name} (Ladung)"
+            label = tr("{name} (Ladung)", name=sp_name)
             nodes.append({
                 "name": label, "entity_id": sp["laden_entity_id"], "role": "sink",
                 "kind": "storage_in",
@@ -1986,8 +1986,8 @@ class EnergieDashboardService:
         grundlast = bus_in - verbraucher_sum - einspeisung_val - speicher_laden_val
         grundlast_negative = grundlast < -0.01
         grundlast_display = max(grundlast, 0.0)
-        nodes.append({"name": "Grundlast", "role": "sink", "blend": True, "value": round(grundlast_display, 3)})
-        links.append({"source": hub_name, "target": "Grundlast", "value": round(grundlast_display, 3)})
+        nodes.append({"name": tr("Grundlast"), "role": "sink", "blend": True, "value": round(grundlast_display, 3)})
+        links.append({"source": hub_name, "target": tr("Grundlast"), "value": round(grundlast_display, 3)})
 
         nodes.insert(0, {"name": hub_name, "role": "bus", "value": round(max(bus_in, 0.0), 3)})
 
@@ -2024,7 +2024,7 @@ class EnergieDashboardService:
         # Verbraucheranteile: dieselben Verbraucher-Werte wie im Sankey, plus
         # Grundlast als gleichwertiger Eintrag (beide zusammen ergeben immer
         # genau die Verbrauch-KPI-Summe) — sortiert nach Anteil, größter zuerst.
-        verbraucher_breakdown.append({"name": "Grundlast", "value": round(grundlast_display, 3)})
+        verbraucher_breakdown.append({"name": tr("Grundlast"), "value": round(grundlast_display, 3)})
         for item in verbraucher_breakdown:
             item["share"] = round(item["value"] / verbrauch_total * 100, 1) if verbrauch_total > 0 else None
         # Oberste Ebene nach Wert; darunter (eingerückt per "level") die Mitglieder einer Gruppe nach Wert,
@@ -2097,8 +2097,8 @@ class EnergieDashboardService:
             factors=[1.0, -1.0, -1.0, -1.0],
         )
         grundlast_series_clamped = {ts: max(v, 0.0) for ts, v in grundlast_series.items()}
-        verbraucher_series_by_name["Grundlast"] = grundlast_series_clamped
-        verbraucher_rezept["Grundlast"] = ("grundlast",)
+        verbraucher_series_by_name[tr("Grundlast")] = grundlast_series_clamped
+        verbraucher_rezept[tr("Grundlast")] = ("grundlast",)
         verbrauch_series = self._series_merge(verbraucher_total_series, grundlast_series_clamped)
         speicher_netto_series = self._series_merge(
             speicher_laden_series, speicher_entladen_series, factors=[1.0, -1.0]
@@ -3013,7 +3013,7 @@ class EnergieDashboardService:
             while len(hourly) < 24:
                 hourly.append(None)
             day_local = datetime.fromtimestamp(flow["window_start_ts"], self.deps.tz)
-            rows.append({"label": _WEEKDAY_LABELS[day_local.weekday()], "hours": hourly})
+            rows.append({"label": tr(_WEEKDAY_LABELS[day_local.weekday()]), "hours": hourly})
         rows.reverse()  # älteste Tag zuerst
         return {"rows": rows, "max_value": round(max_value, 3)}
 
@@ -3108,7 +3108,7 @@ class EnergieDashboardService:
                 avg = round(sum(values) / len(values), 3)
                 hours.append(avg)
                 max_value = max(max_value, avg)
-            rows.append({"label": _WEEKDAY_LABELS[weekday], "hours": hours})
+            rows.append({"label": tr(_WEEKDAY_LABELS[weekday]), "hours": hours})
 
         return {"rows": rows, "max_value": round(max_value, 3)}
 
