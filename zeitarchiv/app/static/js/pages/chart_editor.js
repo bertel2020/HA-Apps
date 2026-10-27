@@ -2188,7 +2188,9 @@
             // (siehe legend weiter unten), nicht mehr im Chart selbst. top um
             // 8px erhöht (20→28), damit das toolbox-Icon (oben rechts, s. o.)
             // nicht mit der obersten Y-Achsen-Beschriftung kollidiert.
-            grid: {left: 10, right: 10, top: 28, bottom: 40, containLabel: true},
+            // left 24 statt 10: containLabel misst die breiteste Beschriftung etwas zu knapp, bei langen
+            // Werten (z. B. „25,000 ct/kWh“) fehlte links eine Ziffer (siehe entity_detail.js).
+            grid: {left: 24, right: 10, top: 28, bottom: 40, containLabel: true},
             // min/max explizit auf das Abfragefenster fixiert, statt ECharts
             // per Default auf den tatsächlichen Datenbereich auto-fitten zu
             // lassen — sonst hört die Achse (und damit sichtbar der Chart) beim
@@ -2343,7 +2345,7 @@
               fontSize: Math.round(12 * uiFontScale * 10) / 10,
             },
             // top um 8px erhöht (16→24), Begründung wie in render().
-            grid: {left: 10, right: 20, top: 24, bottom: 40, containLabel: true},
+            grid: {left: 24, right: 20, top: 24, bottom: 40, containLabel: true},
             xAxis: {
               type: 'time',
               min: this.windowStart != null ? this.windowStart * 1000 : undefined,
@@ -2617,7 +2619,7 @@
             // wurde am Kartenrand abgeschnitten — gemessen mit aktiver
             // Laufsumme bei zwei Einheiten gleichzeitig.
             grid: {
-              left: visibleAxisCount > 1 ? 20 : 10,
+              left: visibleAxisCount > 1 ? 34 : 24,
               right: visibleAxisCount > 1 ? 40 : 24,
               top: 36, bottom: 40, containLabel: true,
             },
@@ -2680,7 +2682,7 @@
               color: style.getPropertyValue('--ink-muted'),
               fontSize: Math.round(12 * uiFontScale * 10) / 10,
             },
-            grid: {left: 10, right: 24, top: 36, bottom: 40, containLabel: true},
+            grid: {left: 24, right: 24, top: 36, bottom: 40, containLabel: true},
             xAxis: {type: 'category', data: MONTHS},
             yAxis: {
               type: 'value',

@@ -4,9 +4,9 @@
 
 ### Behoben
 
-- **Entitätsansicht**: Im Diagramm fehlte bei langen Beschriftungen der y-Achse
-  links eine Ziffer („4,782 ct/kWh“ statt „24,782 ct/kWh“). Der Rand ist jetzt
-  groß genug.
+- **Entitätsansicht und Chart-Editor**: Im Diagramm fehlte bei langen
+  Beschriftungen der y-Achse links eine Ziffer („4,782 ct/kWh“ statt „24,782
+  ct/kWh“). Der Rand ist jetzt groß genug.
 
 ---
 
@@ -14,8 +14,9 @@
 
 #### Fixed
 
-- **Entity view**: In the chart, long y-axis labels lost a digit on the left (“4,782
-  ct/kWh” instead of “24,782 ct/kWh”). The margin is now large enough.
+- **Entity view and chart editor**: In the chart, long y-axis labels lost a digit
+  on the left (“4,782 ct/kWh” instead of “24,782 ct/kWh”). The margin is now large
+  enough.
 
 ## 1.11.2 - 2026-10-26
 
