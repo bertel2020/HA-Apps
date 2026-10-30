@@ -971,6 +971,9 @@
     // genau ein Element je Durchlauf, die Trendlinie ist aber eine
     // ZUSÄTZLICHE, eigenständige Serie (siehe showRollingAverage unten).
     const rollingSeries = [];
+    // Linien-Serien, deren Tooltip-Zeile auch ohne eigenen Punkt am Cursor
+    // erscheint (tooltip-hold.js, gleiche Regel wie chart_editor.js).
+    const holdSeries = [];
     const echartsSeries = series.map((s, i) => {
       const color = colorFor(s.entity_id);
       const displayName = entityNames[s.entity_id] || s.friendly_name;
@@ -1104,6 +1107,9 @@
           z: 3,
         });
       }
+      if (s.chart_type === 'line' && !singleBucket && !horizontalActive) {
+        holdSeries.push({seriesIndex: i, name: displayName, color, data: lineData});
+      }
       return cfg;
     });
     echartsSeries.push(...rollingSeries);
@@ -1219,7 +1225,14 @@
         textStyle: {color: inkMuted, fontFamily: style.getPropertyValue('--font-mono'), fontSize: scaledFont(12)},
         formatter: (allParams) => {
           // Auffüll-Punkte gestapelter Serien (padStackedSeries) haben keinen Wert.
-          const params = allParams.filter(p => p.data[1] != null);
+          // Danach jede sichtbare Linien-Serie mit ihrem letzten bekannten Wert
+          // (tooltip-hold.js), auch ohne eigenen Punkt am Cursor.
+          const legendState = chart.getOption().legend?.[0]?.selected || {};
+          const params = TooltipHold.complete(
+            allParams.filter(p => p.data[1] != null),
+            holdSeries,
+            name => legendState[name] !== false
+          );
           if (!params.length) return '';
           // Bei singleBucket ist axisValue jetzt der Entitätsname (eigene
           // Kategorie je Entität, s. o.), keine Zeitangabe mehr — die
@@ -1244,7 +1257,8 @@
               : '';
             return `<div style="display:flex;justify-content:space-between;gap:14px;">`
                  + `<span>${p.marker}${p.seriesName}</span>`
-                 + `<strong style="margin-left:8px;">${value}${extra}</strong></div>`;
+                 + `<span style="margin-left:8px;text-align:right;"><strong>${value}${extra}</strong>`
+                 + `${TooltipHold.note(p, inkFaint, ms => fmtTooltipTimestamp(ms, tooltipBucketSeconds))}</span></div>`;
           }).join('');
           return header ? `<div style="margin-bottom:4px;color:${inkFaint};">${header}</div>${rows}` : rows;
         },

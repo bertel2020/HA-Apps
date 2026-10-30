@@ -1962,6 +1962,9 @@
           // Zähler zeigen Bucket-Summen, ein Schalter eine Einschaltdauer je
           // Bucket — beides liest sich als Balken natürlicher als als Linie.
           const echartsSeries = [];
+          // Linien-Serien, deren Tooltip-Zeile auch dann erscheint, wenn die
+          // Serie am Cursor keinen eigenen Punkt hat (siehe tooltip-hold.js).
+          const holdSeries = [];
           // Für legend.selected unten — nur die Hauptserie ist über die
           // eigene Legende (siehe HTML-Template) umschaltbar, nicht die
           // Vergleichs-Nebenserie (die folgt dem "Vergleichen"-Menü als
@@ -2138,6 +2141,9 @@
                 data: [horizontalActive ? {xAxis: durchschnitt} : {yAxis: durchschnitt}],
               };
             }
+            if (chartType === 'line' && !singleBucket && !horizontalActive) {
+              holdSeries.push({seriesIndex: echartsSeries.length, name: displayName, color, data: mainData});
+            }
             echartsSeries.push(main);
             if (showRollingAverage) {
               const windowPoints = movingAverageWindow(mainPoints.length);
@@ -2303,29 +2309,42 @@
               // App, siehe dashboard-tiles.js/entity_detail.html).
               formatter: allParams => {
                 // Auffüll-Punkte gestapelter Serien (padStackedSeries) haben keinen Wert.
-                const params = allParams.filter(p => p.data[1] != null);
+                // Danach jede sichtbare Linien-Serie mit ihrem letzten bekannten Wert
+                // (tooltip-hold.js) — auch wenn sie am Cursor keinen eigenen Punkt hat.
+                const legendState = chartInstance.getOption().legend?.[0]?.selected || {};
+                const params = TooltipHold.complete(
+                  allParams.filter(p => p.data[1] != null),
+                  holdSeries,
+                  name => legendState[name] !== false
+                );
                 if (!params.length) return '';
                 const times = params.map(p => fmtTooltipTimestamp(p.data[2], tooltipBucketSeconds));
-                const sameTime = times.every(t => t === times[0]);
+                // Veraltete Zeilen (holdAgeMs) tragen ihren Zeitpunkt selbst und
+                // zählen für die gemeinsame Kopfzeile nicht mit.
+                const freshIndexes = params.map((p, i) => i).filter(i => !params[i].holdAgeMs);
+                const sameTime = freshIndexes.every(i => times[i] === times[freshIndexes[0]]);
                 // 100%-Normierung: zeigt IMMER beides — Anteil und
                 // Original-Absolutwert in Klammern (data[6]/[7]/[8], siehe
                 // mainData oben) — sonst verliert der Tooltip genau die Zahl,
                 // die die Normierung aus dem Balken selbst entfernt.
-                const row = p => {
+                const faint = 'var(--ink-faint)';
+                const row = (p, withStamp) => {
                   const [, , , , , , absValue, absUnit, absDecimals] = p.data;
                   const extra = absValue != null
-                    ? ` <span style="color:var(--ink-faint);">(${fmtNum(absValue, absDecimals)}${absUnit ? ' ' + absUnit : ''})</span>`
+                    ? ` <span style="color:${faint};">(${fmtNum(absValue, absDecimals)}${absUnit ? ' ' + absUnit : ''})</span>`
                     : '';
                   return `<div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:4px;">`
                        + `<span>${p.marker}${p.seriesName}</span>`
-                       + `<strong style="margin-left:8px;">${formatPointValue(p.data)}${extra}</strong></div>`;
+                       + `<span style="margin-left:8px;text-align:right;"><strong>${formatPointValue(p.data)}${extra}</strong>`
+                       + `${TooltipHold.note(p, faint, withStamp ? ms => fmtTooltipTimestamp(ms, tooltipBucketSeconds) : null)}</span></div>`;
                 };
                 if (sameTime) {
-                  return `<div style="font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);margin-bottom:4px;">${times[0]}</div>`
-                       + params.map(row).join('');
+                  const header = freshIndexes.length ? times[freshIndexes[0]] : times[0];
+                  return `<div style="font-size:calc(11px * var(--font-scale, 1));color:${faint};margin-bottom:4px;">${header}</div>`
+                       + params.map(p => row(p, true)).join('');
                 }
                 return params.map((p, i) =>
-                  `<div style="font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);margin-bottom:2px;">${times[i]}</div>${row(p)}`
+                  `<div style="font-size:calc(11px * var(--font-scale, 1));color:${faint};margin-bottom:2px;">${times[i]}</div>${row(p, false)}`
                 ).join('');
               },
               appendToBody: true,

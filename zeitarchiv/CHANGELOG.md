@@ -18,6 +18,15 @@
   rechnen auf den Summen weiter, die Summenzeile addiert die Summen ihrer
   Zeilen. Die Spalte gibt es auch in Dashboard-Kacheln und im CSV-Export.
 
+### Geändert
+
+- **Chart-Tooltip**: Beim Überfahren eines Diagramms mit mehreren Linien zeigt
+  der Tooltip jetzt immer alle sichtbaren Entitäten, jeweils mit ihrem letzten
+  bekannten Wert zu diesem Zeitpunkt. Bisher fehlten Entitäten, die dort keinen
+  eigenen Messwert hatten. Ist ein Wert merklich älter als die übrigen, steht
+  darunter sein Zeitpunkt und das Alter, zum Beispiel „10:30 · vor 5m“. Gilt im
+  Chart-Editor und in Dashboard-Kacheln.
+
 ### Behoben
 
 - **Entitätsansicht und Chart-Editor**: Im Diagramm fehlte bei langen
@@ -50,6 +59,15 @@
   Formula rows continue to calculate on the sums, and the sum row adds up the
   sums of its rows. The column is also available in dashboard tiles and the
   CSV export.
+
+#### Changed
+
+- **Chart tooltip**: When you hover a chart with several lines, the tooltip now
+  always shows all visible entities, each with its last known value at that
+  point in time. Before, entities without a reading of their own there were
+  missing. If a value is noticeably older than the others, its time and age
+  appear below it, for example “10:30 · 5m ago”. Applies in the chart editor and
+  in dashboard tiles.
 
 #### Fixed
 
