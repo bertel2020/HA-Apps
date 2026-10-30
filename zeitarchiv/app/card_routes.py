@@ -9,7 +9,9 @@ eines gespeicherten Charts.
 ``GET /api/card/entities`` listet die archivierten Entitäten, die die Karte ohne
 gespeichertes Chart zeigen kann (Auswahl im Editor).
 ``GET /api/card/series?entity_ids=…&period=…&style=…`` baut dasselbe wie ``chart`` für
-frei gewählte Entitäten, ohne dass ein Chart gespeichert sein muss. ``spec`` trägt dieselben Werte wie die
+frei gewählte Entitäten, ohne dass ein Chart gespeichert sein muss.
+``GET /api/card/spark?entity_id=…&range=…`` liefert eine kurze Reihe für die Sparkline unter
+einer Kachelkarte (höchstens ``SPARK_MAX_POINTS`` Punkte). ``spec`` trägt dieselben Werte wie die
 ``data-*``-Attribute einer Dashboard-Kachel (``_dashboard_tiles.html``), nur als
 Wörterbuch, damit die Karte ``ChartTileRender.readSpec`` unverändert nutzen kann.
 
@@ -58,6 +60,10 @@ STYLES = ("auto", "stacked", "percent")
 
 #: Entitäten je Karte ohne gespeichertes Chart (wie im Chart-Editor, MAX_MULTI_QUERY_ENTITIES).
 MAX_SERIES_ENTITIES = 10
+
+#: Zeiträume der Sparkline (fortlaufend, wie im Chart-Editor) und die Höchstzahl ihrer Punkte.
+SPARK_RANGES = {"24h": ("day", True), "7d": ("week", True), "30d": ("month", True)}
+SPARK_MAX_POINTS = 60
 
 #: Arten, die die Karte nicht zeichnet.
 UNSUPPORTED_TYPES = ("state", "switch")
@@ -124,6 +130,21 @@ def ad_hoc_chart(entity_ids: list[str], period: str, style: str) -> dict:
         "average_line": False, "average_style": "flat", "area_fill": True, "show_points": False,
         "stacked": style in ("stacked", "percent"), "normalize": style == "percent", "horizontal": False,
     }
+
+
+def spark_points(points: list[dict], aggregation_type: str, limit: int = SPARK_MAX_POINTS) -> list[list[float]]:
+    """Höchstens ``limit`` Punkte [Zeitstempel, Wert]: aufeinanderfolgende Punkte werden zu einem
+    zusammengefasst (Zähler als Summe, sonst Mittelwert), der Zeitstempel ist der des ersten."""
+    values = [(p["ts"], p["value"]) for p in points if isinstance(p.get("value"), (int, float))]
+    if len(values) <= limit:
+        return [[ts, value] for ts, value in values]
+    size = -(-len(values) // limit)  # aufgerundet
+    out = []
+    for start in range(0, len(values), size):
+        chunk = values[start:start + size]
+        total = sum(value for _, value in chunk)
+        out.append([chunk[0][0], total if aggregation_type == "counter" else total / len(chunk)])
+    return out
 
 
 def create_card_router(
@@ -227,6 +248,48 @@ def create_card_router(
             if row["aggregation_type"] not in UNSUPPORTED_TYPES
         ]
         return {"spec_version": SPEC_VERSION, "entities": entities}
+
+    @router.get("/api/card/spark")
+    def card_spark(
+        request: Request,
+        entity_id: str,
+        range: str = "24h",  # noqa: A002 - Name des Query-Parameters
+        authorization: str | None = Header(default=None),
+        x_zeitarchiv_integration_version: str | None = Header(default=None),
+    ) -> dict:
+        """Kurze Reihe einer Entität für die Sparkline unter einer Kachelkarte."""
+        check_auth(authorization, request.headers.get("x-request-id", "-"), x_zeitarchiv_integration_version)
+        try:
+            validate_entity_id(entity_id)
+        except ValueError as err:
+            raise HTTPException(status_code=400, detail=str(err)) from None
+        if range not in SPARK_RANGES:
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
+        entity = index.get_entity(entity_id)
+        if entity is None:
+            raise HTTPException(status_code=404, detail=tr("Entität nicht gefunden"))
+        result = {
+            "spec_version": SPEC_VERSION, "entity_id": entity_id, "range": range,
+            "supported": entity["aggregation_type"] not in UNSUPPORTED_TYPES, "unit": entity["unit"],
+            "aggregation_type": entity["aggregation_type"], "points": [], "app_link": app_link(),
+        }
+        if not result["supported"]:
+            return result
+        if not slots.acquire(blocking=False):
+            raise HTTPException(status_code=429, detail=tr("Zu viele gleichzeitige Abfragen"))
+        try:
+            range_key, continuous = SPARK_RANGES[range]
+            data = query_multi(
+                entity_ids=entity_id, range=range_key, offset=0, continuous=continuous, year_over_year=False,
+                compare=False, compare_mode="previous", raw=False, previous_years=1, at=None,
+                heatmap=False, columns=False, px=0,
+            )
+        finally:
+            slots.release()
+        series = (data.get("series") or [{}])[0]
+        result["points"] = spark_points(series.get("points") or [], entity["aggregation_type"])
+        result["decimals"] = series.get("decimals")
+        return result
 
     @router.get("/api/card/series")
     def card_series(

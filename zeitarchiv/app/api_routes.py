@@ -81,8 +81,9 @@ EventText = Annotated[str, Field(max_length=MAX_EVENT_TEXT_LENGTH)]
 # sagt erst die Antwort dort (403 = aus).
 # "cards": /api/card/items und /api/card/chart existieren, gespeicherte Charts für
 # die Lovelace-Karte. "card_series": /api/card/entities und /api/card/series, die
-# Karte ohne gespeichertes Chart.
-API_CAPABILITIES = ("state", "ai", "catalog", "selection", "cards", "card_series")
+# Karte ohne gespeichertes Chart. "card_spark": /api/card/spark, die Sparkline unter
+# einer Kachelkarte.
+API_CAPABILITIES = ("state", "ai", "catalog", "selection", "cards", "card_series", "card_spark")
 
 
 class EventIn(BaseModel):

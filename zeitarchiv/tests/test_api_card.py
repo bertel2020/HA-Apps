@@ -12,7 +12,7 @@ from starlette.testclient import TestClient
 
 from _paths import APP, template_text
 from app.api_routes import API_CAPABILITIES
-from app.card_routes import MAX_CONCURRENT_QUERIES, MAX_SERIES_ENTITIES, PERIODS, SPEC_VERSION, STYLES, ad_hoc_chart, chart_spec, create_card_router
+from app.card_routes import MAX_CONCURRENT_QUERIES, MAX_SERIES_ENTITIES, PERIODS, SPARK_MAX_POINTS, SPARK_RANGES, SPEC_VERSION, STYLES, ad_hoc_chart, chart_spec, create_card_router, spark_points
 
 
 def _chart(chart_id: int, entity_ids: list[str], **overrides) -> dict:
@@ -43,7 +43,9 @@ class _FakeIndex:
         return self.charts.get(chart_id)
 
     def get_entity(self, entity_id: str):
-        return {"entity_id": entity_id} if entity_id in self.types else None
+        if entity_id not in self.types:
+            return None
+        return {"entity_id": entity_id, "aggregation_type": self.types[entity_id], "unit": "kWh"}
 
 
 TYPES = {"sensor.a": "standard", "sensor.b": "counter", "switch.c": "switch", "select.d": "state"}
@@ -69,7 +71,7 @@ AUTH = {"Authorization": "Bearer geheim"}
 
 
 def test_the_capabilities_are_announced() -> None:
-    assert {"cards", "card_series"} <= set(API_CAPABILITIES)
+    assert {"cards", "card_series", "card_spark"} <= set(API_CAPABILITIES)
 
 
 def test_both_routes_need_the_token() -> None:
@@ -290,4 +292,78 @@ def test_a_series_of_states_comes_without_data() -> None:
 def test_the_new_routes_need_the_token() -> None:
     client, calls = _client([])
     assert client.get("/api/card/series", params={"entity_ids": "sensor.a"}).status_code == 401
+    assert calls == []
+
+
+# --- Sparkline ---------------------------------------------------------------------------------
+
+
+def _points(count: int, start: int = 1000) -> list[dict]:
+    return [{"ts": start + 60 * n, "value": float(n), "min": None, "max": None} for n in range(count)]
+
+
+def test_a_short_series_is_kept_as_it_is() -> None:
+    assert spark_points(_points(5), "standard") == [[1000 + 60 * n, float(n)] for n in range(5)]
+    assert spark_points([{"ts": 1, "value": None}, {"ts": 2, "value": 3.0}], "standard") == [[2, 3.0]]
+
+
+def test_a_long_series_is_reduced_to_the_limit() -> None:
+    points = _points(500)
+    reduced = spark_points(points, "standard")
+    assert 0 < len(reduced) <= SPARK_MAX_POINTS
+    assert reduced[0][0] == 1000                                   # Zeitstempel des ersten Punkts je Gruppe
+    assert [ts for ts, _ in reduced] == sorted(ts for ts, _ in reduced)
+    # Mittelwert für Messwerte, Summe für Zähler: die Summe aller Punkte bleibt erhalten.
+    group = -(-500 // SPARK_MAX_POINTS)
+    assert reduced[0][1] == sum(range(group)) / group
+    assert sum(value for _, value in spark_points(points, "counter")) == sum(range(500))
+
+
+def _spark_query(**kwargs) -> dict:
+    _spark_query.calls.append(kwargs)
+    return {"series": [{"entity_id": kwargs["entity_ids"], "decimals": 1, "points": _points(200)}]}
+
+
+def _spark_client():
+    _spark_query.calls = []
+    client, _ = _client([], query_multi=_spark_query, app_link=lambda: "/hassio/ingress/x_zeitarchiv")
+    return client, _spark_query.calls
+
+
+def test_a_spark_asks_the_same_query_as_the_chart_for_one_entity() -> None:
+    client, calls = _spark_client()
+    body = client.get("/api/card/spark", params={"entity_id": "sensor.a", "range": "7d"}, headers=AUTH).json()
+    assert body["supported"] is True and body["unit"] == "kWh" and body["decimals"] == 1
+    assert body["app_link"] == "/hassio/ingress/x_zeitarchiv"
+    assert 0 < len(body["points"]) <= SPARK_MAX_POINTS
+    assert (calls[0]["entity_ids"], calls[0]["range"], calls[0]["continuous"]) == ("sensor.a", "week", True)
+    assert {key: SPARK_RANGES[key] for key in SPARK_RANGES} == {"24h": ("day", True), "7d": ("week", True), "30d": ("month", True)}
+
+
+def test_a_spark_of_a_switch_comes_without_points() -> None:
+    client, calls = _spark_client()
+    body = client.get("/api/card/spark", params={"entity_id": "switch.c"}, headers=AUTH).json()
+    assert body["supported"] is False and body["points"] == []
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("params", "status"),
+    [
+        ({"entity_id": "sensor.a/../b"}, 400),
+        ({"entity_id": "sensor.a,sensor.b"}, 400),
+        ({"entity_id": "sensor.a", "range": "1y"}, 400),
+        ({"entity_id": "sensor.unbekannt"}, 404),
+        ({}, 422),
+    ],
+)
+def test_a_spark_takes_one_known_entity_and_a_known_range(params: dict, status: int) -> None:
+    client, calls = _spark_client()
+    assert client.get("/api/card/spark", params=params, headers=AUTH).status_code == status
+    assert calls == []
+
+
+def test_a_spark_needs_the_token() -> None:
+    client, calls = _spark_client()
+    assert client.get("/api/card/spark", params={"entity_id": "sensor.a"}).status_code == 401
     assert calls == []

@@ -38,7 +38,7 @@ PUBLIC_ENDPOINTS = {
     "/api/ai/compare_periods", "/api/ai/get_energy_overview", "/api/ai/get_notices",
     # Gespeicherte Charts für die Lovelace-Karte: hinter Token, die Chart-ID ist ein
     # Query-Parameter, damit je Route ein exaktes location genügt.
-    "/api/card/items", "/api/card/chart", "/api/card/entities", "/api/card/series",
+    "/api/card/items", "/api/card/chart", "/api/card/entities", "/api/card/series", "/api/card/spark",
 }
 
 #: Der Ingress-Proxy von Home Assistant, dazu der eigene Container.
