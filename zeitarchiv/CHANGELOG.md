@@ -4,6 +4,11 @@
 
 ### Neu
 
+- **Lovelace-Karte (App-Seite)**: Die App liefert jetzt die Daten für die neue
+  Zeitarchiv-Karte der Integration: gespeicherte Charts und Tabellen,
+  Entitäten direkt und Sparklines. Die Karte braucht die passende Version
+  der Integration; mit einer älteren App meldet sie „App zu alt“.
+
 - **Chart-Editor, Serienfarben**: Unter **Ausgewählt** öffnet ein Klick auf den
   Farbpunkt einer Serie die Farbwahl: „Auto“ wie bisher, eine der acht
   Palettenfarben oder eine eigene Farbe. Die Wahl gilt im Chart und in allen
@@ -17,12 +22,6 @@
   Durchschnitt, Minimum, Maximum und Zuständen steht „–“. Formelzeilen
   rechnen auf den Summen weiter, die Summenzeile addiert die Summen ihrer
   Zeilen. Die Spalte gibt es auch in Dashboard-Kacheln und im CSV-Export.
-
-- **Lovelace-Karte (App-Seite)**: Die App liefert jetzt die Daten für die neue
-  Zeitarchiv-Karte der Integration: gespeicherte Charts und Tabellen,
-  Entitäten direkt und Sparklines. Die Karte ist nur für
-  Administratoren gedacht und braucht die passende Version der Integration;
-  mit einer älteren App meldet sie „App zu alt“.
 
 ### Geändert
 
@@ -64,6 +63,11 @@
 
 #### New
 
+- **Lovelace card (app side)**: The app now provides the data for the new
+  Zeitarchiv card of the integration: saved charts and tables, entities
+  directly and sparklines. The card needs the matching version of the
+  integration; with an older app it reports “App too old”.
+
 - **Chart editor, series colors**: Under **Selected**, clicking a series' color
   dot opens the color picker: “Auto” as before, one of the eight palette
   colors, or a custom color. The choice applies in the chart and in all
@@ -77,12 +81,6 @@
   Formula rows continue to calculate on the sums, and the sum row adds up the
   sums of its rows. The column is also available in dashboard tiles and the
   CSV export.
-
-- **Lovelace card (app side)**: The app now provides the data for the new
-  Zeitarchiv card of the integration: saved charts and tables, entities
-  directly and sparklines. The card is meant for administrators only
-  and needs the matching version of the integration; with an older app it
-  reports “App too old”.
 
 #### Changed
 
