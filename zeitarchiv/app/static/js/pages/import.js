@@ -312,7 +312,9 @@
           if (xhr.status === 200) {
             pollUploadProgress();
           } else {
-            let message = t('ZIP konnte nicht verarbeitet werden.');
+            // Ohne JSON-"detail" (z. B. 413/502 von einem Proxy) wäre der Statuscode
+            // sonst der einzige Hinweis auf die Ursache.
+            let message = `${t('ZIP konnte nicht verarbeitet werden.')} (HTTP ${xhr.status}${xhr.statusText ? ' ' + xhr.statusText : ''})`;
             try { message = JSON.parse(xhr.responseText).detail || message; } catch (e) {}
             appendUploadError(uploadArea, message);
           }
