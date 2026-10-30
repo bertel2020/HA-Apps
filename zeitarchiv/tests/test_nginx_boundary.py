@@ -36,6 +36,9 @@ PUBLIC_ENDPOINTS = {
     # KI-Lesezugriff (ROADMAP 1.31): hinter Token und Schalter "ai_enabled".
     "/api/ai/config", "/api/ai/search_entities", "/api/ai/get_summary", "/api/ai/get_series",
     "/api/ai/compare_periods", "/api/ai/get_energy_overview", "/api/ai/get_notices",
+    # Gespeicherte Charts für die Lovelace-Karte: hinter Token, die Chart-ID ist ein
+    # Query-Parameter, damit je Route ein exaktes location genügt.
+    "/api/card/items", "/api/card/chart",
 }
 
 #: Der Ingress-Proxy von Home Assistant, dazu der eigene Container.

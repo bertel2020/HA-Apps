@@ -2460,6 +2460,7 @@
     "Welcher Zeitraum?": "Which period?",
     "Wie fein?": "How fine?",
     "Zu viele Entitäten ausgewählt": "Too many entities selected",
+    "Zu viele gleichzeitige Abfragen": "Too many simultaneous requests",
     "{name} auswählen": "Select {name}",
     "Aufbewahrung am Ziel": "Retention at the target",
     "Backups liegen nur lokal auf diesem Gerät und gehen bei einem Geräteausfall mit verloren &mdash; die App sichert nicht extern. Für zusätzlichen Schutz die Dateien unten herunterladen und z. B. auf einem NAS ablegen, oder unten ein externes Ziel einrichten.": "Backups are stored locally on this device only and are lost if the device fails &mdash; the app does not back up externally. For extra protection, download the files below and store them e.g. on a NAS, or set up an external target below.",
