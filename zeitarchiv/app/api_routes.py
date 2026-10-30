@@ -79,9 +79,10 @@ EventText = Annotated[str, Field(max_length=MAX_EVENT_TEXT_LENGTH)]
 # zurücknehmen. "state": /api/write nimmt Text-Zustände (state/state_label).
 # "ai": /api/ai/* existiert (ROADMAP 1.31); ob der Zugriff eingeschaltet ist,
 # sagt erst die Antwort dort (403 = aus).
-# "cards": /api/card/* existiert, gespeicherte Charts für die
-# Lovelace-Karte.
-API_CAPABILITIES = ("state", "ai", "catalog", "selection", "cards")
+# "cards": /api/card/items und /api/card/chart existieren, gespeicherte Charts für
+# die Lovelace-Karte. "card_series": /api/card/entities und /api/card/series, die
+# Karte ohne gespeichertes Chart.
+API_CAPABILITIES = ("state", "ai", "catalog", "selection", "cards", "card_series")
 
 
 class EventIn(BaseModel):

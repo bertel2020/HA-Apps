@@ -6,12 +6,13 @@ import json
 import re
 import threading
 
+import pytest
 from fastapi import FastAPI, HTTPException
 from starlette.testclient import TestClient
 
 from _paths import APP, template_text
 from app.api_routes import API_CAPABILITIES
-from app.card_routes import MAX_CONCURRENT_QUERIES, SPEC_VERSION, chart_spec, create_card_router
+from app.card_routes import MAX_CONCURRENT_QUERIES, MAX_SERIES_ENTITIES, PERIODS, SPEC_VERSION, STYLES, ad_hoc_chart, chart_spec, create_card_router
 
 
 def _chart(chart_id: int, entity_ids: list[str], **overrides) -> dict:
@@ -41,6 +42,9 @@ class _FakeIndex:
     def get_saved_chart(self, chart_id: int) -> dict | None:
         return self.charts.get(chart_id)
 
+    def get_entity(self, entity_id: str):
+        return {"entity_id": entity_id} if entity_id in self.types else None
+
 
 TYPES = {"sensor.a": "standard", "sensor.b": "counter", "switch.c": "switch", "select.d": "state"}
 
@@ -64,8 +68,8 @@ def _client(charts: list[dict], query_multi=None, app_link=lambda: None) -> tupl
 AUTH = {"Authorization": "Bearer geheim"}
 
 
-def test_the_capability_is_announced() -> None:
-    assert "cards" in API_CAPABILITIES
+def test_the_capabilities_are_announced() -> None:
+    assert {"cards", "card_series"} <= set(API_CAPABILITIES)
 
 
 def test_both_routes_need_the_token() -> None:
@@ -222,3 +226,68 @@ def test_the_app_reports_its_page_in_home_assistant() -> None:
     # Ohne Supervisor gibt es keinen Link, das Feld bleibt trotzdem da.
     client, _ = _client([_chart(1, ["sensor.a"])])
     assert client.get("/api/card/items", headers=AUTH).json()["app_link"] is None
+
+
+# --- Karte ohne gespeichertes Chart ----------------------------------------------------------
+
+
+def test_the_entity_list_leaves_out_what_the_card_cannot_draw() -> None:
+    client, _ = _client([])
+    assert client.get("/api/card/entities").status_code == 401
+    entities = client.get("/api/card/entities", headers=AUTH).json()["entities"]
+    assert {item["entity_id"] for item in entities} == {"sensor.a", "sensor.b"}
+    assert {"entity_id": "sensor.b", "aggregation_type": "counter"} in entities
+
+
+def test_a_series_is_built_for_the_chosen_entities_and_period() -> None:
+    client, calls = _client([])
+    body = client.get(
+        "/api/card/series", params={"entity_ids": "sensor.a,sensor.b,sensor.a", "period": "7d", "style": "percent"}, headers=AUTH,
+    ).json()
+    assert body["supported"] is True and body["id"] is None and body["name"] is None
+    assert json.loads(body["spec"]["entityIds"]) == ["sensor.a", "sensor.b"]  # doppelte fallen weg
+    assert (body["spec"]["range"], body["spec"]["continuous"]) == ("week", "true")
+    assert (body["spec"]["stacked"], body["spec"]["normalize"]) == ("true", "true")
+    assert calls[0]["entity_ids"] == "sensor.a,sensor.b" and calls[0]["range"] == "week" and calls[0]["continuous"] is True
+
+
+def test_every_period_and_style_has_a_meaning() -> None:
+    for period in PERIODS:
+        for style in STYLES:
+            chart = ad_hoc_chart(["sensor.a"], period, style)
+            assert chart["range_key"] in {"day", "week", "month", "year"}
+            assert chart["stacked"] is (style != "auto") and chart["normalize"] is (style == "percent")
+    # Alles, was chart_spec liest, steht im Ad-hoc-Chart.
+    assert set(chart_spec(ad_hoc_chart(["sensor.a"], "month", "auto"), "auto"))
+
+
+@pytest.mark.parametrize(
+    ("params", "status"),
+    [
+        ({"entity_ids": ""}, 400),
+        ({"entity_ids": ",,"}, 400),
+        ({"entity_ids": ",".join(f"sensor.x{n}" for n in range(MAX_SERIES_ENTITIES + 1))}, 400),
+        ({"entity_ids": "sensor.a/../b"}, 400),
+        ({"entity_ids": "sensor.a", "period": "jahrzehnt"}, 400),
+        ({"entity_ids": "sensor.a", "style": "bunt"}, 400),
+        ({"entity_ids": "sensor.unbekannt"}, 404),
+        ({}, 422),
+    ],
+)
+def test_a_series_asks_for_known_entities_and_known_words_only(params: dict, status: int) -> None:
+    client, calls = _client([])
+    assert client.get("/api/card/series", params=params, headers=AUTH).status_code == status
+    assert calls == []
+
+
+def test_a_series_of_states_comes_without_data() -> None:
+    client, calls = _client([])
+    body = client.get("/api/card/series", params={"entity_ids": "sensor.a,switch.c"}, headers=AUTH).json()
+    assert body["supported"] is False and body["data"] is None
+    assert calls == []
+
+
+def test_the_new_routes_need_the_token() -> None:
+    client, calls = _client([])
+    assert client.get("/api/card/series", params={"entity_ids": "sensor.a"}).status_code == 401
+    assert calls == []
