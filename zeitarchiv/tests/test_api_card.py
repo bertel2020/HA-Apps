@@ -137,10 +137,70 @@ def test_a_supported_chart_runs_the_same_query_as_the_tile() -> None:
     }]
 
 
-def test_a_fixed_period_beats_the_requested_day() -> None:
-    client, calls = _client([_chart(1, ["sensor.a"], period_anchor="2025-03-01")])
+def test_a_fixed_period_becomes_an_offset_like_on_the_tile() -> None:
+    """Die Kachel rechnet den festen Zeitraum in einen Versatz um (PeriodNavigation.offsetForRange) und
+    gibt dann keinen Stichtag mit; der Stichtag einer Navigation gilt nur ohne festen Zeitraum."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    today = datetime.now(ZoneInfo("Europe/Berlin"))
+    expected = (2025 * 12 + 3) - (today.year * 12 + today.month)
+    client, calls = _client([_chart(1, ["sensor.a"], period_anchor="2025-03-01", range_key="month")])
     client.get("/api/card/chart", params={"id": 1, "at": "2026-10-01"}, headers=AUTH)
-    assert calls[0]["at"] == "2025-03-01"
+    assert (calls[0]["at"], calls[0]["offset"]) == (None, expected)
+    # Auch bei fortlaufenden Charts wie auf der Kachel: kalendarischer Versatz, nicht "Ende des Stichtags".
+    client, calls = _client([_chart(2, ["sensor.a"], period_anchor="2025-03-01", range_key="month", continuous=True)])
+    client.get("/api/card/chart", params={"id": 2}, headers=AUTH)
+    assert (calls[0]["at"], calls[0]["offset"], calls[0]["continuous"]) == (None, expected, True)
+    # Ohne festen Zeitraum bleibt der Stichtag der Anfrage, der Versatz ist 0.
+    client, calls = _client([_chart(3, ["sensor.a"])])
+    client.get("/api/card/chart", params={"id": 3, "at": "2026-10-01"}, headers=AUTH)
+    assert (calls[0]["at"], calls[0]["offset"]) == ("2026-10-01", 0)
+
+
+def test_the_python_offset_of_a_fixed_period_equals_the_one_of_the_renderer() -> None:
+    import itertools
+    import os
+    import subprocess
+    from datetime import date, datetime
+    from zoneinfo import ZoneInfo
+
+    from app.card_routes import anchor_offset
+
+    tz = ZoneInfo("Europe/Berlin")
+    now = datetime(2026, 10, 30, 14, 0, tzinfo=tz)
+    anchors = ["2026-10-30", "2026-10-29", "2026-10-26", "2026-10-25", "2026-10-01", "2026-03-29", "2026-01-01",
+               "2025-12-31", "2025-03-01", "2020-06-15", "2016-02-29", "2026-11-15", "2027-05-01"]
+    ranges = ["hour", "day", "week", "month", "year", "decade"]
+    code = (
+        "const PN = require(process.argv[1]); const cases = JSON.parse(require('fs').readFileSync(0, 'utf8'));"
+        "console.log(JSON.stringify(cases.map(([r, a]) => { const [y, m, d] = a.split('-').map(Number);"
+        f"return PN.offsetForRange(r, new Date(y, m - 1, d, 12).getTime(), {int(now.timestamp() * 1000)}); }})));"
+    )
+    cases = [[r, a] for r, a in itertools.product(ranges, anchors)]
+    run = subprocess.run(
+        ["node", "-e", code, str(APP / "static/js/period-navigation.js")], input=json.dumps(cases),
+        check=True, capture_output=True, text=True, env={**os.environ, "TZ": "Europe/Berlin"},
+    )
+    for (range_key, anchor), js in zip(cases, json.loads(run.stdout), strict=True):
+        assert anchor_offset(range_key, date.fromisoformat(anchor), now) == js, (range_key, anchor)
+
+
+def test_too_many_raw_changes_fall_back_to_the_columns_in_a_year() -> None:
+    from app.storage.cleanup import ResultLimitExceeded
+
+    def query(**kwargs) -> dict:
+        if kwargs["columns"]:
+            return {"series": [{"entity_id": "select.d", "columns": [[1, {"a": 5}]], "dt": 3600, "points": []}]}
+        raise ResultLimitExceeded("zu viele")
+
+    client, _ = _client([_chart(1, ["select.d"], chart_type="timeline", range_key="year")], query_multi=query)
+    body = client.get("/api/card/chart", params={"id": 1, "px": 500}, headers=AUTH).json()
+    assert body["data"]["series"][0]["columns"] == [[1, {"a": 5}]]
+    # Ohne Spalten (Tag, Woche, Monat) gibt es keinen Ersatz: die App antwortet wie bei der Oberfläche.
+    client, _ = _client([_chart(2, ["select.d"], chart_type="timeline", range_key="day")], query_multi=query)
+    with pytest.raises(ResultLimitExceeded):
+        client.get("/api/card/chart", params={"id": 2}, headers=AUTH)
 
 
 def test_the_spec_is_what_a_tile_reads_from_its_dataset() -> None:
@@ -282,8 +342,9 @@ def test_every_period_and_style_has_a_meaning() -> None:
             chart = ad_hoc_chart(["sensor.a"], period, style)
             assert chart["range_key"] in {"day", "week", "month", "year"}
             assert chart["stacked"] is (style != "auto") and chart["normalize"] is (style == "percent")
-    # Alles, was chart_spec liest, steht im Ad-hoc-Chart.
-    assert set(chart_spec(ad_hoc_chart(["sensor.a"], "month", "auto"), "auto"))
+    # Alles, was chart_spec liest, steht im Ad-hoc-Chart (ein fehlender Schlüssel wäre ein KeyError).
+    spec = chart_spec(ad_hoc_chart(["sensor.a"], "month", "auto"), "auto")
+    assert spec["range"] == "month" and spec["compareSettings"] == ""
 
 
 @pytest.mark.parametrize(
@@ -484,12 +545,12 @@ def test_a_timeline_asks_for_raw_values() -> None:
 
 def test_a_timeline_over_a_year_also_asks_for_columns_as_wide_as_the_card() -> None:
     body, calls = _recorded(_chart(1, ["select.d"], chart_type="timeline", range_key="year"), px=500)
-    assert [(c["raw"], c["columns"], c["px"]) for c in calls] == [(True, False, 0), (False, True, 490)]
+    assert sorted((c["raw"], c["columns"], c["px"]) for c in calls) == [(False, True, 490), (True, False, 0)]
     series = body["data"]["series"][0]
     assert series["columns"] == [[1, {"a": 5}]] and series["dt"] == 3600
     # Eine winzige Breite wird nicht schmaler als 60 Bildpunkte.
     _, calls = _recorded(_chart(1, ["select.d"], chart_type="timeline", range_key="decade"), px=10)
-    assert calls[1]["px"] == 60
+    assert max(c["px"] for c in calls) == 60
 
 
 def test_a_heatmap_gets_its_cells_only_where_the_range_allows_it() -> None:

@@ -33,12 +33,16 @@ from __future__ import annotations
 import json
 import threading
 from collections.abc import Callable
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 
 from .chart_types import effective_chart_type
 from .i18n import tr
+from .chart_period import stichtag_or_400, stichtag_window
 from .storage import query as query_mod
+from .storage.cleanup import ResultLimitExceeded
 from .storage.index import Index
 from .storage.paths import validate_entity_id
 
@@ -148,6 +152,16 @@ def tile_compare(chart: dict, chart_type: str, entity_ids: list[str]) -> dict | 
     }
 
 
+def anchor_offset(range_key: str, anchor: date, now: datetime) -> int:
+    """Versatz in Perioden für einen festen Zeitraum, wie ``PeriodNavigation.offsetForRange()`` ihn aus
+    dem Mittag des Ankertags rechnet (ein Test hält beide gleich). Nie in die Zukunft. Die Stunde ist der
+    einzige Zeitraum, bei dem schon der Mittag des heutigen Tags eine frühere Periode ist."""
+    if range_key == "hour":
+        hour_now = now.replace(tzinfo=None, minute=0, second=0, microsecond=0)
+        return min(0, (datetime.combine(anchor, time(12)) - hour_now) // timedelta(hours=1))
+    return stichtag_window(range_key, False, anchor, now)[1]
+
+
 def is_supported(chart: dict, chart_type: str, aggregation_types: dict[str, str]) -> bool:
     """Ob die Karte dieses Chart zeichnet (aggregation_types bleibt für spätere Einschränkungen)."""
     return chart_type in SUPPORTED_CHART_TYPES and bool(chart["entity_ids"])
@@ -228,33 +242,47 @@ def create_card_router(
         Jahr und Dekade zusätzlich die Spalten in der Breite der Zeichenfläche."""
         compare = tile_compare(chart, chart_type, visible)
         range_key = chart["range_key"]
+        anchor = chart["period_anchor"]
+        if anchor:
+            # Ein fester Zeitraum wird wie auf der Kachel in einen Versatz umgerechnet (kalendarisch, auch
+            # bei fortlaufenden Charts); der Stichtag einer Navigation gilt dann nicht.
+            offset = anchor_offset(range_key, stichtag_or_400(anchor), datetime.now(ZoneInfo(time_zone)))
+            at = None
+        else:
+            offset = 0
         base = {
-            "entity_ids": ",".join(visible), "range": range_key, "offset": 0, "continuous": chart["continuous"],
-            "year_over_year": False,
-            # Ein fester Zeitraum bleibt fest, der Stichtag gilt nur für die übrigen.
-            "at": chart["period_anchor"] or at,
+            "entity_ids": ",".join(visible), "range": range_key, "offset": offset, "continuous": chart["continuous"],
+            "year_over_year": False, "at": at,
         }
-        timeline = chart_type == "timeline"
-        data = query_multi(
-            **base, compare=compare is not None, compare_mode=compare["mode"] if compare else "previous",
-            raw=timeline, previous_years=compare["years"] if compare and compare["longterm"] else 1,
-            heatmap=False, columns=False, px=0,
-        )
         plain = {"compare": False, "compare_mode": "previous", "raw": False, "previous_years": 1}
+        timeline = chart_type == "timeline"
+        columns_data = None
+        if timeline and range_key in query_mod.STATE_COLUMNS_RANGES:
+            columns_data = query_multi(**base, **plain, heatmap=False, columns=True, px=max(60, px - 10))
+        try:
+            data = query_multi(
+                **base, compare=compare is not None, compare_mode=compare["mode"] if compare else "previous",
+                raw=timeline, previous_years=compare["years"] if compare and compare["longterm"] else 1,
+                heatmap=False, columns=False, px=0,
+            )
+        except ResultLimitExceeded:
+            # Zu viele Rohwechsel (die App antwortet sonst mit 413): in Jahr und Dekade tragen die Spalten
+            # die Darstellung allein, wie auf der Kachel; sonst gibt es nichts zu zeichnen.
+            if columns_data is None:
+                raise
+            return columns_data
+        if columns_data is not None:
+            by_id = {item["entity_id"]: item for item in columns_data.get("series", []) if item.get("columns")}
+            for entry in data.get("series", []):
+                if entry["entity_id"] in by_id:
+                    entry["columns"] = by_id[entry["entity_id"]]["columns"]
+                    entry["dt"] = by_id[entry["entity_id"]].get("dt")
         if chart_type == "heatmap" and range_key in query_mod.STATE_HEATMAP_RANGES:
             heat = query_multi(**base, **plain, heatmap=True, columns=False, px=0)
             cells = {item["entity_id"]: item.get("cells") for item in heat.get("series", [])}
             for entry in data.get("series", []):
                 if cells.get(entry["entity_id"]):
                     entry["cells"] = cells[entry["entity_id"]]
-        if timeline and range_key in query_mod.STATE_COLUMNS_RANGES:
-            columns = query_multi(**{**base}, compare=False, compare_mode="previous", raw=False, previous_years=1,
-                                  heatmap=False, columns=True, px=max(60, px - 10))
-            by_id = {item["entity_id"]: item for item in columns.get("series", []) if item.get("columns")}
-            for entry in data.get("series", []):
-                if entry["entity_id"] in by_id:
-                    entry["columns"] = by_id[entry["entity_id"]]["columns"]
-                    entry["dt"] = by_id[entry["entity_id"]].get("dt")
         return data
 
     def answer(chart: dict, at: str | None, px: int = 0) -> dict:
