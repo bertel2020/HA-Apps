@@ -2332,7 +2332,7 @@ footer{margin-top:20px;font-family:var(--font-mono);font-size:calc(11px * var(--
 .dtile-state-strip i{position:absolute;top:0;bottom:0;}
 .dtile-state-axis{display:flex;justify-content:space-between;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);margin-top:2px;}
 .dtile-state-days{display:flex;flex-direction:column;gap:3px;}
-.dtile-state-day{display:grid;grid-template-columns:2.4em minmax(0,1fr);align-items:center;gap:6px;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
+.dtile-state-day{display:grid;grid-template-columns:2.4em minmax(0,1fr);align-items:center;gap:6px;font-size:calc(11px * var(--font-scale, 1));line-height:12px;color:var(--ink-faint);}
 .dtile-state-bar{display:flex;height:9px;border-radius:3px;overflow:hidden;background:var(--surface-alt);}
 .dtile-state-bar i{display:block;height:100%;}
 .dtile-state-donut{position:relative;height:110px;}
