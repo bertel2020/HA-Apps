@@ -18,6 +18,12 @@
   rechnen auf den Summen weiter, die Summenzeile addiert die Summen ihrer
   Zeilen. Die Spalte gibt es auch in Dashboard-Kacheln und im CSV-Export.
 
+- **Lovelace-Karte (App-Seite)**: Die App liefert jetzt die Daten für die neue
+  Zeitarchiv-Karte der Integration: gespeicherte Charts und Tabellen,
+  Entitäten direkt und kleine Verlaufsstreifen. Die Karte ist nur für
+  Administratoren gedacht und braucht die passende Version der Integration;
+  mit einer älteren App meldet sie „App zu alt“.
+
 ### Geändert
 
 - **Chart-Tooltip**: Beim Überfahren eines Diagramms mit mehreren Linien oder
@@ -29,6 +35,10 @@
   „10:30 · vor 5m“. Gilt im Chart-Editor und in Dashboard-Kacheln.
 
 ### Behoben
+
+- **Diagramm-Tooltips**: Namen und Einheiten von Entitäten werden im Tooltip
+  jetzt maskiert. Bisher hätte ein Anzeigename mit HTML-Code beim Überfahren
+  ausgeführt werden können.
 
 - **Entitätsansicht und Chart-Editor**: Im Diagramm fehlte bei langen
   Beschriftungen der y-Achse links eine Ziffer („4,782 ct/kWh“ statt „24,782
@@ -68,6 +78,12 @@
   sums of its rows. The column is also available in dashboard tiles and the
   CSV export.
 
+- **Lovelace card (app side)**: The app now provides the data for the new
+  Zeitarchiv card of the integration: saved charts and tables, entities
+  directly and small trend strips. The card is meant for administrators only
+  and needs the matching version of the integration; with an older app it
+  reports “App too old”.
+
 #### Changed
 
 - **Chart tooltip**: When you hover a chart with several lines or bars, the
@@ -78,6 +94,10 @@
   example “10:30 · 5m ago”. Applies in the chart editor and in dashboard tiles.
 
 #### Fixed
+
+- **Chart tooltips**: Entity names and units are now escaped in the tooltip.
+  Before, a display name containing HTML code could have been executed when
+  hovering.
 
 - **Entity view and chart editor**: In the chart, long y-axis labels lost a digit
   on the left (“4,782 ct/kWh” instead of “24,782 ct/kWh”). The margin is now large
