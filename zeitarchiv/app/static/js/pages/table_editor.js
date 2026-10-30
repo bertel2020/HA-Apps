@@ -831,6 +831,7 @@
           const bySums = {};
           this.rows.forEach((row, ri) => { bySums[row.uid] = sums[ri]; });
           this.rowSums = bySums;
+          this.$nextTick(() => this.syncColumnNumberPositions());
           this.sumOverlapping = TableCompute.sumOverlap(
             cols, this.columns.map(c => (this.windowStarts[c.uid] ?? null)), this.columns.map(c => (this.windowEnds[c.uid] ?? null)));
         },
@@ -1042,6 +1043,13 @@
           // jedem Wechsel auf "editing" wird der Container neu erzeugt (der
           // dragBound-Marker geht dabei verloren), deshalb hier neu binden,
           // nicht nur einmalig beim ersten Laden.
+          // Die Σ-Spalte verschiebt die Zeitspalten, ohne die Tabellenbreite zu
+          // ändern — der ResizeObserver unten meldet dann nichts, die
+          // Nummern über den Spalten (1, 2, 3 …) müssen also ausdrücklich
+          // neu gemessen werden.
+          ['style.show_row_sum', 'style.row_sum_position', 'style.row_sum_label'].forEach(path => {
+            this.$watch(path, () => this.$nextTick(() => this.syncColumnNumberPositions()));
+          });
           this.$watch('editing', v => {
             if (v) this.$nextTick(() => { setupColumnDrag(); setupRowDrag(); this.syncLetterPositions(); this.syncColumnNumberPositions(); });
           });

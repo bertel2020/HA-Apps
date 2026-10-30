@@ -99,3 +99,8 @@ def test_sum_column_is_rendered_left_or_right_in_editor_and_tile() -> None:
 
 def test_csv_export_contains_the_sum_column() -> None:
     assert "csvEscape(this.sumLabel())" in EDITOR_JS
+
+
+def test_column_numbers_are_remeasured_when_the_sum_column_moves_the_columns() -> None:
+    assert "'style.show_row_sum', 'style.row_sum_position', 'style.row_sum_label'" in EDITOR_JS
+    assert "this.$nextTick(() => this.syncColumnNumberPositions());" in EDITOR_JS
