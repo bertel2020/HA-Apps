@@ -20,7 +20,7 @@
 
 - **Lovelace-Karte (App-Seite)**: Die App liefert jetzt die Daten für die neue
   Zeitarchiv-Karte der Integration: gespeicherte Charts und Tabellen,
-  Entitäten direkt und kleine Verlaufsstreifen. Die Karte ist nur für
+  Entitäten direkt und Sparklines. Die Karte ist nur für
   Administratoren gedacht und braucht die passende Version der Integration;
   mit einer älteren App meldet sie „App zu alt“.
 
@@ -80,7 +80,7 @@
 
 - **Lovelace card (app side)**: The app now provides the data for the new
   Zeitarchiv card of the integration: saved charts and tables, entities
-  directly and small trend strips. The card is meant for administrators only
+  directly and sparklines. The card is meant for administrators only
   and needs the matching version of the integration; with an older app it
   reports “App too old”.
 
