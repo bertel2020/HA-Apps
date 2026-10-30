@@ -5,9 +5,9 @@ mit Ø; eine 1×1-Kachel zeichnet nur das angezeigte Jahr und den Ø."""
 
 from __future__ import annotations
 
-from _paths import APP, TEMPLATES
+from _paths import APP, TEMPLATES, tile_js
 
-TILES_JS = (APP / "static" / "js" / "dashboard-tiles.js").read_text(encoding="utf-8")
+TILES_JS = tile_js()
 
 
 def test_tile_carries_the_saved_comparison() -> None:

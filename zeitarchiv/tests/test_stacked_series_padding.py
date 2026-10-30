@@ -16,7 +16,7 @@ import pytest
 
 from _paths import APP
 
-FILES = ["static/js/pages/chart_editor.js", "static/js/dashboard-tiles.js"]
+FILES = ["static/js/pages/chart_editor.js", "static/js/chart-tile-render.js"]
 
 
 def _pad(path: str, series: list[dict]) -> list[dict]:

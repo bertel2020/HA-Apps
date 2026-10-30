@@ -5,10 +5,10 @@ Speichern heraus — nach dem Wiederöffnen war er aus, und die Dashboard-Kachel
 zeichnete nie Punkte. Jetzt ein gespeichertes Chart-Feld, Default AUS.
 """
 
-from _paths import APP, template_text
+from _paths import APP, template_text, tile_js
 
 EDITOR_JS = (APP / "static/js/pages/chart_editor.js").read_text(encoding="utf-8")
-TILES_JS = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+TILES_JS = tile_js()
 TILES_TEMPLATE = template_text("_dashboard_tiles.html")
 
 
@@ -44,6 +44,6 @@ def test_the_dashboard_tile_gets_the_option_from_its_chart(client) -> None:
 def test_editor_and_tile_use_the_option() -> None:
     assert "showPoints: SHOW_POINTS" in EDITOR_JS
     assert "show_points: this.showPoints" in EDITOR_JS
-    assert "el.dataset.showPoints === 'true'" in TILES_JS
+    assert "ds.showPoints === 'true'" in TILES_JS
     assert "if (!showPoints) cfg.symbol = 'none'" in TILES_JS
     assert 'data-show-points="{{' in TILES_TEMPLATE

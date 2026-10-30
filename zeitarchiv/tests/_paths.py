@@ -44,6 +44,19 @@ if str(ADDON) not in sys.path:
     sys.path.insert(0, str(ADDON))
 
 
+def tile_js() -> str:
+    """Quelltext der Dashboard-Kacheln: Darstellung (chart-tile-render.js) plus Kachel-Hülle.
+
+    Die Chart-Darstellung wurde aus dashboard-tiles.js herausgelöst (Phase 0 der
+    Lovelace-Karte). Quelltext-Tests, die eine Zeichenregel der Kachel prüfen,
+    meinen beide Dateien zusammen.
+    """
+    return "\n".join(
+        (APP_JS / name).read_text(encoding="utf-8")
+        for name in ("chart-tile-render.js", "dashboard-tiles.js")
+    )
+
+
 def german(text: str) -> str:
     """Template-Quelltext mit den `_()`-Aufrufen wieder als deutscher Klartext.
 

@@ -1,12 +1,12 @@
 """Regressionstests für geglättete Linien ohne künstliche Randlücken."""
 
 
-from _paths import APP, DOCS, page_text, template_text
+from _paths import DOCS, page_text, template_text, tile_js
 
 
 ENTITY = page_text("entity_detail.html")
 EDITOR = page_text("chart_editor.html")
-DASHBOARD = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+DASHBOARD = tile_js()
 
 
 def test_all_line_chart_renderers_use_smooth_lines() -> None:

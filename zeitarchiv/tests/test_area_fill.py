@@ -8,11 +8,11 @@ show_values, Default AN (nicht 0 wie bei jenen): das entspricht dem bisherigen,
 unveränderten Kachel-Verhalten.
 """
 
-from _paths import APP, template_text
+from _paths import APP, template_text, tile_js
 
 EDITOR_TEMPLATE = template_text("chart_editor.html")
 EDITOR_JS = (APP / "static/js/pages/chart_editor.js").read_text(encoding="utf-8")
-TILES_JS = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+TILES_JS = tile_js()
 TILES_TEMPLATE = template_text("_dashboard_tiles.html")
 
 
@@ -92,6 +92,6 @@ def test_chart_editor_gates_areastyle_on_the_option() -> None:
 
 
 def test_dashboard_tile_gates_areastyle_on_the_option() -> None:
-    assert "el.dataset.areaFill !== 'false'" in TILES_JS
+    assert "ds.areaFill !== 'false'" in TILES_JS
     assert "if (areaFill) cfg.areaStyle" in TILES_JS
     assert 'data-area-fill="{{' in TILES_TEMPLATE

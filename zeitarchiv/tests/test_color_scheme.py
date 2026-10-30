@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from _paths import APP_CSS, APP_JS, TEMPLATES, page_text, template_text
+from _paths import APP_CSS, TEMPLATES, page_text, template_text, tile_js
 
 
 
@@ -80,7 +80,7 @@ def test_all_full_pages_receive_the_persisted_color_scheme() -> None:
 
 def test_home_assistant_scheme_has_light_dark_and_chart_tokens() -> None:
     css = CSS.read_text(encoding="utf-8")
-    dashboard_script = (APP_JS / "dashboard-tiles.js").read_text(encoding="utf-8")
+    dashboard_script = tile_js()
     chart_template = page_text("chart_editor.html")
     assert ':root[data-color-scheme="home_assistant"]' in css
     assert "--accent-line:#006787" in css

@@ -4,7 +4,7 @@ und der feste Zeitraum eines gespeicherten Charts (saved_charts.period_anchor)."
 
 from __future__ import annotations
 
-from _paths import APP, TEMPLATES
+from _paths import APP, TEMPLATES, tile_js
 
 EDITOR_JS = (APP / "static" / "js" / "pages" / "chart_editor.js").read_text(encoding="utf-8")
 EDITOR_TEMPLATE = (TEMPLATES / "chart_editor.html").read_text(encoding="utf-8")
@@ -83,7 +83,7 @@ def test_entity_page_passes_a_past_period_to_save_as_chart() -> None:
 def test_dashboard_tile_shows_the_fixed_period() -> None:
     tiles_tpl = (TEMPLATES / "_dashboard_tiles.html").read_text(encoding="utf-8")
     assert 'data-period-anchor="{{ tile.period_anchor or \'\' }}"' in tiles_tpl
-    tiles_js = (APP / "static" / "js" / "dashboard-tiles.js").read_text(encoding="utf-8")
+    tiles_js = tile_js()
     assert "offset = PeriodNavigation.offsetForRange(range, new Date(y, m - 1, d, 12).getTime());" in tiles_js
     assert "offset: String(offset)" in tiles_js
     for page in ("dashboard_detail.html", "entities.html"):

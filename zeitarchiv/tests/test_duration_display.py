@@ -10,9 +10,9 @@ Achse mit unitlosen Nicht-Dauer-Serien teilen und zeigte dort rohe Sekunden
 statt "1h 30m".
 """
 
-from _paths import APP
+from _paths import APP, tile_js
 
-TILES_JS = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+TILES_JS = tile_js()
 EDITOR_JS = (APP / "static/js/pages/chart_editor.js").read_text(encoding="utf-8")
 
 

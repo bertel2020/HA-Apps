@@ -6,7 +6,7 @@ nicht an „Statistik in Legende" gekoppelt: die Legende nennt die Zahl, die
 Linie zeigt, wo sie im Bild liegt.
 """
 
-from _paths import APP, template_text
+from _paths import APP, template_text, tile_js
 
 DETAIL_TEMPLATE = template_text("entity_detail.html")
 EDITOR_TEMPLATE = template_text("chart_editor.html")
@@ -155,10 +155,10 @@ def test_the_tile_averages_the_drawn_points_without_the_hold_point() -> None:
     """Der Linien-Zweig hängt bis window_end einen Halte-Punkt an, der den
     letzten Wert wiederholt. Über lineData zu mitteln zählte ihn doppelt —
     deshalb eine eigene Werteliste je Zweig."""
-    tiles = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+    tiles = tile_js()
     assert "const averageOf = values =>" in tiles
     assert not _nutzt_echarts_average(tiles)
-    assert "el.dataset.averageLine === 'true'" in tiles
+    assert "ds.averageLine === 'true'" in tiles
     assert "averageOf(prepared[i].averageValues)" in tiles
     assert "averageValues = displayPoints.map(p => p.value);" in tiles
     assert "averageValues: [aggregate]," in tiles

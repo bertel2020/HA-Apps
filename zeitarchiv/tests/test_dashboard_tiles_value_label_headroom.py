@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import re
 
-from _paths import APP_JS
+from _paths import tile_js
 
 
-SOURCE = (APP_JS / "dashboard-tiles.js").read_text(encoding="utf-8")
+SOURCE = tile_js()
 
 
 def _main_grid() -> str:
