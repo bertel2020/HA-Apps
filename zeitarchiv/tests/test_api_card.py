@@ -12,7 +12,7 @@ from starlette.testclient import TestClient
 
 from _paths import APP, template_text
 from app.api_routes import API_CAPABILITIES
-from app.card_routes import MAX_CONCURRENT_QUERIES, MAX_SERIES_ENTITIES, PERIODS, SPARK_MAX_POINTS, SPARK_RANGES, SPEC_VERSION, STYLES, ad_hoc_chart, chart_spec, create_card_router, spark_points
+from app.card_routes import MAX_CONCURRENT_QUERIES, MAX_SERIES_ENTITIES, PERIODS, SPARK_MAX_POINTS, SPARK_RANGES, SPEC_VERSION, STYLES, ad_hoc_chart, chart_spec, create_card_router, spark_points, tile_compare
 
 
 def _chart(chart_id: int, entity_ids: list[str], **overrides) -> dict:
@@ -123,7 +123,7 @@ def test_a_supported_chart_runs_the_same_query_as_the_tile() -> None:
     assert body["env"] == {"timezone": "Europe/Berlin"}
     assert calls == [{
         "entity_ids": "sensor.a,sensor.b", "range": "month", "offset": 0, "continuous": True,
-        "year_over_year": False, "compare": False, "compare_mode": "previous", "raw": False,
+        "year_over_year": False, "compare": True, "compare_mode": "previous", "raw": False,
         "previous_years": 1, "at": "2026-10-01", "heatmap": False, "columns": False, "px": 0,
     }]
 
@@ -140,8 +140,8 @@ def test_the_spec_is_what_a_tile_reads_from_its_dataset() -> None:
     assert json.loads(spec["entityNames"]) == {"sensor.a": "Strom"}
     assert spec["stacked"] == "true" and spec["normalize"] == "false"
     assert spec["decimals"] == "auto" and spec["animation"] == "false"
-    # Der Vergleich kommt in dieser Fassung nicht mit, auch wenn das Chart ihn gespeichert hat.
-    assert spec["compareSettings"] == ""
+    assert json.loads(spec["compareSettings"]) == {"compare": True}
+    assert chart_spec(_chart(2, ["sensor.a"], compare_settings={}), "auto")["compareSettings"] == ""
     assert all(isinstance(value, str) for value in spec.values())
 
 
@@ -367,3 +367,62 @@ def test_a_spark_needs_the_token() -> None:
     client, calls = _spark_client()
     assert client.get("/api/card/spark", params={"entity_id": "sensor.a"}).status_code == 401
     assert calls == []
+
+
+# --- Vergleich ---------------------------------------------------------------------------------
+
+
+def _js_tile_compare(cases: list[dict]) -> list:
+    """tileCompare() aus chart-tile-render.js, für viele Fälle in einem node-Lauf."""
+    import subprocess
+
+    source = (APP / "static/js/chart-tile-render.js").read_text(encoding="utf-8")
+    start = source.index("const COMPARE_YEAR_RANGES")
+    end = source.index("  // Durchschnitt der gezeichneten Werte")
+    code = f"{source[start:end]}; const cases = JSON.parse(require('fs').readFileSync(0, 'utf8')); console.log(JSON.stringify(cases.map(c => tileCompare(c))));"
+    run = subprocess.run(["node", "-e", code], input=json.dumps(cases), check=True, capture_output=True, text=True)
+    return json.loads(run.stdout)
+
+
+def test_the_python_compare_rule_equals_the_one_of_the_renderer() -> None:
+    """Server und Karte müssen denselben Vergleich meinen: Der Server fragt ihn ab, die Karte
+    zeichnet ihn. Beide Regeln laufen hier über dieselbe Fälle-Matrix."""
+    import itertools
+
+    cases, charts = [], []
+    ids_options = (["sensor.a"], ["sensor.a", "sensor.b"])
+    settings_options = (
+        {}, {"compare": False},
+        {"compare": True}, {"compare": True, "mode": "year"}, {"compare": True, "mode": "longterm"},
+        {"compare": True, "mode": "longterm", "years": 0, "average": False},
+        {"compare": True, "mode": "previous", "cumsum": True}, {"compare": True, "target": "sensor.a"},
+        {"compare": True, "target": "sensor.fremd"}, {"compare": True, "mode": "previous", "target": "sensor.b", "cumsum": True},
+    )
+    for ids, settings, range_key, continuous, chart_type, preset, stacked in itertools.product(
+        ids_options, settings_options, ("hour", "day", "week", "month", "year", "decade"), (False, True),
+        ("auto", "bar", "donut", "timeline", "heatmap"), ("auto", "full"), (False, True),
+    ):
+        chart = _chart(1, ids, compare_settings=settings, range_key=range_key, continuous=continuous,
+                       resolution_preset=preset, stacked=stacked)
+        charts.append((chart, chart_type, ids))
+        cases.append({
+            "compareSettings": json.dumps(settings) if settings else "", "range": range_key, "continuous": continuous,
+            "entityIds": ids, "chartType": chart_type, "resolutionPreset": preset, "stacked": stacked,
+        })
+    expected = _js_tile_compare(cases)
+    assert len(expected) == len(charts) > 1000
+    assert any(item is None for item in expected) and any(item and item["longterm"] for item in expected)
+    assert any(item and item["yearsCompare"] for item in expected)
+    for (chart, chart_type, ids), js in zip(charts, expected, strict=True):
+        assert tile_compare(chart, chart_type, ids) == js, (chart["compare_settings"], chart["range_key"], chart_type)
+
+
+def test_a_chart_with_a_comparison_asks_the_query_for_it() -> None:
+    chart = _chart(1, ["sensor.a"], range_key="year", compare_settings={"compare": True, "mode": "longterm", "years": 3})
+    client, calls = _client([chart])
+    client.get("/api/card/chart", params={"id": 1}, headers=AUTH)
+    assert (calls[0]["compare"], calls[0]["compare_mode"], calls[0]["previous_years"]) == (True, "longterm", 3)
+    plain = _chart(2, ["sensor.a"], compare_settings={})
+    client, calls = _client([plain])
+    client.get("/api/card/chart", params={"id": 2}, headers=AUTH)
+    assert (calls[0]["compare"], calls[0]["compare_mode"], calls[0]["previous_years"]) == (False, "previous", 1)

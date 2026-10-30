@@ -21,9 +21,8 @@ Chart-ID ist ein Query-Parameter, damit nginx je Route ein exaktes ``location =`
 behält. Die Abfrage selbst läuft über denselben Handler wie die Oberfläche
 (``query_multi``), eine zweite Berechnung gibt es nicht.
 
-Der Umfang der ersten Version ist bewusst klein: Zahlen-Charts ohne Vergleich.
-Zustände, Zeitstrahl, Donut, Anteile, Wechsel und Heatmap kommen mit
-``supported: false`` und ohne Daten, die Karte zeigt dafür einen Platzhalter.
+Was die Karte nicht zeichnet, kommt mit ``supported: false`` und ohne Daten, sie zeigt
+dafür einen Platzhalter.
 """
 
 from __future__ import annotations
@@ -82,15 +81,14 @@ def chart_spec(chart: dict, chart_type: str) -> dict[str, str]:
     """Die Einstellungen eines Charts so, wie ``el.dataset`` sie für eine Kachel
     liefert (alles Zeichenketten, Listen und Wörterbücher als JSON).
 
-    Nicht enthalten: Legende und Kachelgröße, die gibt es in der Karte nicht.
-    ``compareSettings`` ist leer, der Vergleich kommt nicht mit (siehe oben)."""
+    Nicht enthalten: Legende und Kachelgröße, die gibt es in der Karte nicht."""
     return {
         "entityIds": json.dumps(chart["entity_ids"]),
         "entityNames": json.dumps(chart["entity_names"]),
         "hiddenEntityIds": json.dumps(chart["hidden_entity_ids"]),
         "seriesColors": json.dumps(chart["series_colors"]),
         "heatmapStates": json.dumps(chart["heatmap_states"]),
-        "compareSettings": "",
+        "compareSettings": json.dumps(chart["compare_settings"]) if chart["compare_settings"] else "",
         "periodAnchor": chart["period_anchor"] or "",
         "range": chart["range_key"],
         "continuous": _flag(chart["continuous"]),
@@ -108,6 +106,38 @@ def chart_spec(chart: dict, chart_type: str) -> dict[str, str]:
         "normalize": _flag(chart["normalize"]),
         "horizontal": _flag(chart["horizontal"]),
         "animation": "false",
+    }
+
+
+#: Darstellungen, in denen ein Vergleich nicht gilt (wie tileCompare() in chart-tile-render.js).
+NO_COMPARE_TYPES = ("timeline", "donut", "shares", "changes", "heatmap")
+COMPARE_YEAR_RANGES = ("hour", "day", "week", "month")
+
+
+def tile_compare(chart: dict, chart_type: str, entity_ids: list[str]) -> dict | None:
+    """Welcher Vergleich für dieses Chart gilt, oder None: dieselbe Regel wie ``tileCompare()`` in
+    chart-tile-render.js (ein Test hält beide gleich). ``entity_ids`` sind die sichtbaren Entitäten."""
+    settings = chart["compare_settings"] or {}
+    if (
+        not settings.get("compare") or chart_type in NO_COMPARE_TYPES or chart["resolution_preset"] == "full"
+        or (chart["stacked"] and len(entity_ids) >= 2)
+    ):
+        return None
+    mode = settings.get("mode") or "previous"
+    range_key, continuous = chart["range_key"], chart["continuous"]
+    longterm = mode == "longterm" and range_key == "year" and not continuous and len(entity_ids) == 1
+    if mode == "longterm" and not longterm:
+        mode = "previous"
+    if mode == "year" and range_key not in COMPARE_YEAR_RANGES:
+        mode = "previous"
+    target = settings.get("target") if settings.get("target") in entity_ids else ""
+    cumsum = bool(settings.get("cumsum"))
+    years = settings.get("years")
+    return {
+        "mode": mode, "longterm": longterm, "target": target, "cumsum": cumsum,
+        "years": 5 if years is None else years,
+        "average": True if settings.get("average") is None else settings["average"],
+        "yearsCompare": mode == "previous" and range_key == "year" and (cumsum or bool(target)),
     }
 
 
@@ -184,10 +214,12 @@ def create_card_router(
         if not slots.acquire(blocking=False):
             raise HTTPException(status_code=429, detail=tr("Zu viele gleichzeitige Abfragen"))
         try:
+            compare = tile_compare(chart, chart_type, visible)
             result["data"] = query_multi(
                 entity_ids=",".join(visible), range=chart["range_key"], offset=0,
-                continuous=chart["continuous"], year_over_year=False, compare=False,
-                compare_mode="previous", raw=False, previous_years=1,
+                continuous=chart["continuous"], year_over_year=False, compare=compare is not None,
+                compare_mode=compare["mode"] if compare else "previous", raw=False,
+                previous_years=compare["years"] if compare and compare["longterm"] else 1,
                 # Ein fester Zeitraum bleibt fest, der Stichtag gilt nur für die übrigen.
                 at=chart["period_anchor"] or at, heatmap=False, columns=False, px=0,
             )
