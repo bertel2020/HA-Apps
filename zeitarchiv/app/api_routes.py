@@ -82,8 +82,8 @@ EventText = Annotated[str, Field(max_length=MAX_EVENT_TEXT_LENGTH)]
 # "cards": /api/card/items und /api/card/chart existieren, gespeicherte Charts für
 # die Lovelace-Karte. "card_series": /api/card/entities und /api/card/series, die
 # Karte ohne gespeichertes Chart. "card_spark": /api/card/spark, die Sparkline unter
-# einer Kachelkarte.
-API_CAPABILITIES = ("state", "ai", "catalog", "selection", "cards", "card_series", "card_spark")
+# einer Kachelkarte. "card_table": /api/card/table, gespeicherte Tabellen.
+API_CAPABILITIES = ("state", "ai", "catalog", "selection", "cards", "card_series", "card_spark", "card_table")
 
 
 class EventIn(BaseModel):
@@ -1075,5 +1075,8 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         collect_notices=deps.collect_notices, latest_backup=deps.latest_backup,
     )))
     router.include_router(create_catalog_router(deps.data_dir, check_auth))
-    router.include_router(create_card_router(deps.index, str(deps.tz), check_auth, api_query_multi, supervisor_stats.panel_link))
+    router.include_router(create_card_router(
+        deps.index, str(deps.tz), check_auth, api_query_multi, supervisor_stats.panel_link,
+        lambda body: api_query_table(TableQueryRequest(**body)),
+    ))
     return router

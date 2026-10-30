@@ -12,7 +12,7 @@ from starlette.testclient import TestClient
 
 from _paths import APP, template_text
 from app.api_routes import API_CAPABILITIES
-from app.card_routes import MAX_CONCURRENT_QUERIES, MAX_SERIES_ENTITIES, PERIODS, SPARK_MAX_POINTS, SPARK_RANGES, SPEC_VERSION, STYLES, ad_hoc_chart, chart_spec, create_card_router, spark_points, tile_compare
+from app.card_routes import MAX_CONCURRENT_QUERIES, MAX_SERIES_ENTITIES, PERIODS, SPARK_MAX_POINTS, SPARK_RANGES, SPEC_VERSION, STYLES, ad_hoc_chart, chart_spec, create_card_router, spark_points, table_query_body, tile_compare
 
 
 def _chart(chart_id: int, entity_ids: list[str], **overrides) -> dict:
@@ -42,6 +42,14 @@ class _FakeIndex:
     def get_saved_chart(self, chart_id: int) -> dict | None:
         return self.charts.get(chart_id)
 
+    tables: dict = {}
+
+    def list_saved_tables(self) -> list[dict]:
+        return [{"id": t["id"], "name": t["name"], "column_count": len(t["columns"]), "row_count": len(t["rows"])} for t in self.tables.values()]
+
+    def get_saved_table(self, table_id: int):
+        return self.tables.get(table_id)
+
     def get_entity(self, entity_id: str):
         if entity_id not in self.types:
             return None
@@ -51,7 +59,7 @@ class _FakeIndex:
 TYPES = {"sensor.a": "standard", "sensor.b": "counter", "switch.c": "switch", "select.d": "state"}
 
 
-def _client(charts: list[dict], query_multi=None, app_link=lambda: None) -> tuple[TestClient, list[dict]]:
+def _client(charts: list[dict], query_multi=None, app_link=lambda: None, tables=None, query_table=None) -> tuple[TestClient, list[dict]]:
     calls: list[dict] = []
 
     def default_query(**kwargs) -> dict:
@@ -63,7 +71,9 @@ def _client(charts: list[dict], query_multi=None, app_link=lambda: None) -> tupl
             raise HTTPException(status_code=401, detail="nein")
 
     app = FastAPI()
-    app.include_router(create_card_router(_FakeIndex(charts, TYPES), "Europe/Berlin", check_auth, query_multi or default_query, app_link))
+    index = _FakeIndex(charts, TYPES)
+    index.tables = {t["id"]: t for t in (tables or [])}
+    app.include_router(create_card_router(index, "Europe/Berlin", check_auth, query_multi or default_query, app_link, query_table))
     return TestClient(app), calls
 
 
@@ -218,6 +228,20 @@ def test_the_real_app_serves_a_saved_chart_with_its_token(client) -> None:
     assert body["supported"] is True
     assert body["data"]["series"][0]["entity_id"] == "sensor.card_probe"
     assert json.loads(body["spec"]["entityIds"]) == ["sensor.card_probe"]
+
+    # Eine gespeicherte Tabelle: Aufbau und die Antwort von /api/query-table für ihre Spalten.
+    table_id = index.create_saved_table(
+        "Karte-Tabelle",
+        [{"label": "Heute", "range_key": "day", "offset": 0, "year_over_year": False},
+         {"label": "Gestern", "range_key": "day", "offset": -1, "year_over_year": False}],
+        [{"label": "Probe", "row_type": "entity", "entity_ids": ["sensor.card_probe"], "formula": "", "bold": False}],
+    )
+    tables = client.get("/api/card/items", headers=headers).json()["tables"]
+    assert {"id": table_id, "name": "Karte-Tabelle", "kind": "table", "column_count": 2, "row_count": 1} in tables
+    table = client.get("/api/card/table", params={"id": table_id}, headers=headers).json()
+    assert [c["label"] for c in table["table"]["columns"]] == ["Heute", "Gestern"]
+    assert len(table["query"]["columns"]) == 2
+    assert table["query"]["columns"][0]["series"][0]["entity_id"] == "sensor.card_probe"
 
 
 def test_the_app_reports_its_page_in_home_assistant() -> None:
@@ -498,3 +522,111 @@ def test_the_ranges_of_the_extra_queries_equal_those_of_the_renderer() -> None:
     columns = re.search(r"const COLUMN_RANGES = (\[[^\]]*\])", source).group(1)
     run = subprocess.run(["node", "-e", f"console.log(JSON.stringify([{share}, {columns}]))"], check=True, capture_output=True, text=True)
     assert [tuple(item) for item in json.loads(run.stdout)] == [query_mod.STATE_HEATMAP_RANGES, query_mod.STATE_COLUMNS_RANGES]
+
+
+# --- Tabellen ----------------------------------------------------------------------------------
+
+
+def _table(table_id: int = 1, **over) -> dict:
+    table = {
+        "id": table_id, "name": f"Tabelle {table_id}", "style": {"zebra": True},
+        "columns": [
+            {"label": "Heute", "range_key": "day", "offset": 0, "year_over_year": False, "decimals": "auto", "hidden": False},
+            {"label": "Gestern", "range_key": "day", "offset": -1, "year_over_year": False, "decimals": "auto", "hidden": False},
+            {"label": "Verborgen", "range_key": "week", "offset": 0, "year_over_year": False, "decimals": "auto", "hidden": True},
+        ],
+        "rows": [
+            {"label": "A", "row_type": "entity", "entity_ids": ["sensor.a"]},
+            {"label": "Gruppe", "row_type": "group", "entity_ids": ["sensor.a", "sensor.b"]},
+            {"label": "Formel", "row_type": "formula", "entity_ids": [], "formula": "A+B"},
+            {"label": "", "row_type": "separator", "entity_ids": []},
+        ],
+    }
+    table.update(over)
+    return table
+
+
+def _js_query_body(cases: list[dict]) -> list:
+    import subprocess
+
+    source = (APP / "static/js/table-compute.js").read_text(encoding="utf-8")
+    start = source.index("  function queryBody(")
+    end = source.index("  // Die Abfrage der Oberfläche")
+    code = f"{source[start:end]}; const cases = JSON.parse(require('fs').readFileSync(0, 'utf8')); console.log(JSON.stringify(cases.map(c => queryBody(c.columns, c.rows, c.at))));"
+    run = subprocess.run(["node", "-e", code], input=json.dumps(cases), check=True, capture_output=True, text=True)
+    return json.loads(run.stdout)
+
+
+def test_the_python_query_body_equals_the_one_of_table_compute() -> None:
+    import itertools
+
+    def column(range_key, offset, yoy):
+        return {"label": "x", "range_key": range_key, "offset": offset, "year_over_year": yoy}
+
+    column_sets = [
+        [column("day", 0, False), column("day", -1, False)],
+        [column("day", -1, False)],
+        [column("month", 0, False), column("month", -1, False), column("month", -12, True), column("year", 0, False)],
+        [column("week", 0, True), column("week", -1, False)],
+        [column("day", 0, True), column("day", -1, False)],
+        [],
+    ]
+    row_sets = [
+        [{"row_type": "entity", "entity_ids": ["sensor.a"]}],
+        [{"row_type": "group", "entity_ids": ["sensor.a", "sensor.b"]}, {"row_type": "entity", "entity_ids": ["sensor.b", "sensor.c"]}],
+        [{"row_type": "formula", "entity_ids": []}, {"row_type": "separator", "entity_ids": []}],
+        [{"row_type": "summary", "entity_ids": []}],
+        [],
+    ]
+    cases = [{"columns": c, "rows": r, "at": at} for c, r, at in itertools.product(column_sets, row_sets, (None, "2026-10-01"))]
+    expected = _js_query_body(cases)
+    assert len(expected) == len(cases) and any(item is None for item in expected) and any(item for item in expected)
+    assert any(c["same_elapsed"] for item in expected if item for c in item["columns"])
+    for case, js in zip(cases, expected, strict=True):
+        assert table_query_body(case["columns"], case["rows"], case["at"]) == js, case
+
+
+def _table_client(tables, query_table=None):
+    calls = []
+
+    def fake(body: dict) -> dict:
+        calls.append(body)
+        return {"columns": [{"series": [], "window_start": 1} for _ in body["columns"]]}
+
+    client, _ = _client([], tables=tables, query_table=query_table or fake)
+    return client, calls
+
+
+def test_items_list_the_saved_tables_apart_from_the_charts() -> None:
+    client, _ = _table_client([_table(1), _table(2)])
+    body = client.get("/api/card/items", headers=AUTH).json()
+    assert body["items"] == []
+    assert body["tables"] == [
+        {"id": 1, "name": "Tabelle 1", "kind": "table", "column_count": 3, "row_count": 4},
+        {"id": 2, "name": "Tabelle 2", "kind": "table", "column_count": 3, "row_count": 4},
+    ]
+
+
+def test_a_table_comes_with_its_structure_and_the_query_of_its_visible_columns() -> None:
+    client, calls = _table_client([_table(1)])
+    body = client.get("/api/card/table", params={"id": 1}, headers=AUTH).json()
+    assert body["table"]["style"] == {"zebra": True} and len(body["table"]["columns"]) == 3 and len(body["table"]["rows"]) == 4
+    # Die ausgeblendete Spalte wird nicht abgefragt (die Kachel fragt sie auch nicht), die Zeilen alle.
+    assert [c["range_key"] for c in calls[0]["columns"]] == ["day", "day"]
+    assert calls[0]["entity_ids"] == ["sensor.a", "sensor.b"]
+    assert calls[0]["columns"][1]["same_elapsed"] is True
+    assert len(body["query"]["columns"]) == 2 and body["env"] == {"timezone": "Europe/Berlin"}
+
+
+def test_a_table_without_entities_asks_nothing() -> None:
+    client, calls = _table_client([_table(1, rows=[{"label": "F", "row_type": "formula", "entity_ids": [], "formula": "1"}])])
+    body = client.get("/api/card/table", params={"id": 1}, headers=AUTH).json()
+    assert body["query"] == {"columns": []} and calls == []
+
+
+def test_an_unknown_table_is_a_404_and_the_token_is_needed() -> None:
+    client, calls = _table_client([_table(1)])
+    assert client.get("/api/card/table", params={"id": 9}, headers=AUTH).status_code == 404
+    assert client.get("/api/card/table", params={"id": 1}).status_code == 401
+    assert client.get("/api/card/table", params={"id": "x"}, headers=AUTH).status_code == 422
+    assert calls == []

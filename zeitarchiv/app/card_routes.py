@@ -10,6 +10,9 @@ eines gespeicherten Charts.
 gespeichertes Chart zeigen kann (Auswahl im Editor).
 ``GET /api/card/series?entity_ids=…&period=…&style=…`` baut dasselbe wie ``chart`` für
 frei gewählte Entitäten, ohne dass ein Chart gespeichert sein muss.
+``GET /api/card/table?id=N`` liefert Aufbau (``table``) und fertige Abfrage (``query``) einer
+gespeicherten Vergleichstabelle; die Karte rechnet daraus mit table-compute.js dieselben Zellen wie
+die Kachel.
 ``GET /api/card/spark?entity_id=…&range=…`` liefert eine kurze Reihe für die Sparkline unter
 einer Kachelkarte (höchstens ``SPARK_MAX_POINTS`` Punkte). ``spec`` trägt dieselben Werte wie die
 ``data-*``-Attribute einer Dashboard-Kachel (``_dashboard_tiles.html``), nur als
@@ -179,12 +182,39 @@ def spark_points(points: list[dict], aggregation_type: str, limit: int = SPARK_M
     return out
 
 
+def table_query_body(columns: list[dict], rows: list[dict], at: str | None = None) -> dict | None:
+    """Der Körper der Abfrage an /api/query-table für eine Tabelle: dieselbe Regel wie ``queryBody()``
+    in table-compute.js (ein Test hält beide gleich). ``columns`` sind die sichtbaren Spalten; ohne
+    Entität-/Gruppen-Zeile gibt es nichts zu fragen (None)."""
+    entity_ids = list(dict.fromkeys(
+        entity_id for row in rows if row["row_type"] in ("entity", "group") for entity_id in row["entity_ids"]
+    ))
+    if not entity_ids:
+        return None
+
+    def base_column(other: dict) -> bool:
+        return not other.get("year_over_year") and (other.get("offset") or 0) == 0
+
+    def column(col: dict) -> dict:
+        offset = col.get("offset") or 0
+        same = not at and offset < 0 and not col.get("year_over_year") and any(
+            other["range_key"] == col["range_key"] and base_column(other) for other in columns
+        )
+        return {
+            "range_key": col["range_key"], "offset": offset, "year_over_year": bool(col.get("year_over_year")),
+            "same_elapsed": same,
+        }
+
+    return {"entity_ids": entity_ids, "at": at, "columns": [column(col) for col in columns]}
+
+
 def create_card_router(
     index: Index,
     time_zone: str,
     check_auth: Callable[..., None],
     query_multi: Callable[..., dict],
     app_link: Callable[[], str | None] = lambda: None,
+    query_table: Callable[[dict], dict] | None = None,
 ) -> APIRouter:
     router = APIRouter()
     slots = threading.BoundedSemaphore(MAX_CONCURRENT_QUERIES)
@@ -275,7 +305,11 @@ def create_card_router(
                 "chart_type": chart_type,
                 "supported": is_supported(chart, chart_type, types),
             })
-        return {"spec_version": SPEC_VERSION, "items": items, "app_link": app_link()}
+        tables = [
+            {"id": row["id"], "name": row["name"], "kind": "table", "column_count": row["column_count"], "row_count": row["row_count"]}
+            for row in index.list_saved_tables()
+        ]
+        return {"spec_version": SPEC_VERSION, "items": items, "tables": tables, "app_link": app_link()}
 
     @router.get("/api/card/chart")
     def card_chart(
@@ -295,6 +329,36 @@ def create_card_router(
         if chart is None:
             raise HTTPException(status_code=404, detail=tr("Chart nicht gefunden"))
         return answer(chart, at, px)
+
+    @router.get("/api/card/table")
+    def card_table(
+        request: Request,
+        id: int,
+        at: str | None = None,
+        authorization: str | None = Header(default=None),
+        x_zeitarchiv_integration_version: str | None = Header(default=None),
+    ) -> dict:
+        """Aufbau und fertige Abfrage einer gespeicherten Vergleichstabelle."""
+        check_auth(authorization, request.headers.get("x-request-id", "-"), x_zeitarchiv_integration_version)
+        table = index.get_saved_table(id)
+        if table is None:
+            raise HTTPException(status_code=404, detail=tr("Tabelle nicht gefunden"))
+        result = {
+            "spec_version": SPEC_VERSION, "id": table["id"], "name": table["name"],
+            "table": {"columns": table["columns"], "rows": table["rows"], "style": table["style"]},
+            "env": {"timezone": time_zone}, "app_link": app_link(), "query": {"columns": []},
+        }
+        visible = [col for col in table["columns"] if not col.get("hidden")]
+        body = table_query_body(visible, table["rows"], at)
+        if body is None or query_table is None:
+            return result
+        if not slots.acquire(blocking=False):
+            raise HTTPException(status_code=429, detail=tr("Zu viele gleichzeitige Abfragen"))
+        try:
+            result["query"] = query_table(body)
+        finally:
+            slots.release()
+        return result
 
     @router.get("/api/card/entities")
     def card_entities(
