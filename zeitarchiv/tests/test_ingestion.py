@@ -385,6 +385,9 @@ def test_standard_entity_never_skips_but_collapses_closed_windows() -> None:
         assert resolved_event_id is None
         # Der neue Wert selbst ist noch unaufgelöst (eigenes offenes Fenster).
         assert records[1] == (third.ts, third.value, "event-3", None, None)
+        # Der Index zählt die zusammengefassten Zeilen nicht mehr mit — sonst
+        # meldet der Speicherabgleich dafür eine Abweichung.
+        assert index.get_entity(first.entity_id)["row_count"] == len(records)
     finally:
         index.close()
         shutil.rmtree(tmp, ignore_errors=True)

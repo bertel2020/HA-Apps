@@ -8,6 +8,9 @@
   }
   #config-form .field{margin:0;min-width:0;}
   #config-form .field select{width:100%;min-width:0;}
+  /* Linksbündig am Auslöser statt rechtsbündig (app.css): sonst ragt das Menü
+     eines Auslösers in der linken Spalte links aus der Karte heraus. */
+  #config-form .dd-picker-popover{left:0;right:auto;max-width:calc(100vw - 48px);}
   #config-form .save-status{grid-column:1/-1;margin:0;}
   .preview{grid-column:1/-1;margin-top:4px;padding-top:22px;border-top:1px solid var(--border);}
   /* Uhrzeit auf derselben Zeile wie das Datum statt als eigene kleinere Zeile

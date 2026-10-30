@@ -57,15 +57,16 @@ def pending_bucket_end(path: Path, interval_seconds: int) -> float | None:
     return bucket_end(interval_seconds, pending[-1][0])
 
 
-def collapse_pending_window(path: Path, interval_seconds: int) -> None:
+def collapse_pending_window(path: Path, interval_seconds: int) -> int:
     """Fasst die trailing unaufgelösten Rohzeilen zu einer Ø/Min/Max-Zeile
     zusammen und schreibt die Datei neu. Kein Effekt, wenn es nichts
     Unaufgelöstes gibt (z. B. wenn der Wartungslauf zweimal über dieselbe
-    Datei läuft)."""
+    Datei läuft). Liefert, um wie viele Zeilen die Datei geschrumpft ist —
+    der Aufrufer zieht damit den Zeilenzähler im Index nach."""
     records = read_full_rows(path)
     pending = _pending_run(records)
     if not pending:
-        return
+        return 0
     resolved_count = len(records) - len(pending)
     values = [record[1] for record in pending]
     end_ts = bucket_end(interval_seconds, pending[-1][0])
@@ -73,3 +74,4 @@ def collapse_pending_window(path: Path, interval_seconds: int) -> None:
     collapsed: HotRecord = (end_ts, avg_value, None, min(values), max(values))
 
     write_records(path, records[:resolved_count] + [collapsed])
+    return len(pending) - 1

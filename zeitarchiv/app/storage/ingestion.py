@@ -545,7 +545,9 @@ class IngestionService:
             # Nur vorwärts schließen — ein leicht verspätet eintreffender Wert
             # für das noch offene Fenster darf es nicht fälschlich abschließen.
             if pending_end is not None and new_bucket_end > pending_end:
-                resolution.collapse_pending_window(path, live_resolution_interval)
+                removed = resolution.collapse_pending_window(path, live_resolution_interval)
+                if removed:
+                    self._index.add_row_count(event.entity_id, -removed)
         hotbuffer.append(
             self._data_dir,
             event.entity_id,

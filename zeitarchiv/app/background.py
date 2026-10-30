@@ -1017,7 +1017,9 @@ class BackgroundService:
                 path = hotbuffer.hot_path(self.data_dir, entity_id, now_ts, self.tz)
                 pending_end = resolution_mod.pending_bucket_end(path, interval)
                 if pending_end is not None and now_ts >= pending_end:
-                    resolution_mod.collapse_pending_window(path, interval)
+                    removed = resolution_mod.collapse_pending_window(path, interval)
+                    if removed:
+                        self.index.add_row_count(entity_id, -removed)
 
     def _run_automatic_compaction_if_due(self, now: datetime) -> None:
         """Automatische Verdichtung (Housekeeping → Verdichten) — standardmäßig

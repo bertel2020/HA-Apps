@@ -40,6 +40,13 @@
   über die y-Achse und verdeckte deren Beschriftung. Die Achse beginnt jetzt
   etwas früher, sodass der Balken ganz im Diagramm liegt (Chart-Editor und
   Kacheln).
+- **Entität konfigurieren**: Die Auswahlmenüs (Auflösung, Verdichtungsziel,
+  Aufbewahrung) öffnen sich jetzt direkt unter ihrem Knopf statt links neben
+  der Karte.
+- **Live-Auflösung**: Bei Entitäten mit eingestellter Auflösung (z. B. 15 Min.)
+  erschien regelmäßig der Hinweis „Index-Abweichungen automatisch behoben“. Der
+  Index zählt die zusammengefassten Werte jetzt von vornherein richtig mit. Die
+  Messwerte waren nie betroffen.
 
 ---
 
@@ -81,6 +88,13 @@
 - **Rolling periods**: the first, partial daily bar stuck out to the left over
   the y-axis and covered its labels. The axis now starts slightly earlier so the
   bar sits fully inside the chart (chart editor and tiles).
+- **Entity configuration**: The dropdowns (Resolution, Compaction target,
+  Retention) now open directly below their button instead of beside the card.
+- **Live resolution**: Entities with a resolution set (e.g. 15 min) regularly
+  showed the notice “Index discrepancies fixed automatically”. The index now
+  counts the merged values correctly from the start. The measurements were
+  never affected.
+
 
 ## 1.11.2 - 2026-10-26
 
