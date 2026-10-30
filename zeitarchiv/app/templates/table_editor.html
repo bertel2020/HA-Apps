@@ -291,11 +291,11 @@
                   <button type="button" class="chip" :class="{active: style.comparison_columns}" data-tooltip="{{ _('Vergleichsspalten wie Vortag, Vormonat und Vorjahr optisch zurücknehmen') }}" @click="style.comparison_columns = !style.comparison_columns">{{ _("Vergleichsspalten absetzen") }}</button>
                   <button type="button" class="chip" :class="{active: style.show_deviation}" data-tooltip="{{ _('Prozentuale Abweichung unter dem aktuellen Wert anzeigen, jeweils gegenüber der zugehörigen Vergleichsspalte') }}" @click="style.show_deviation = !style.show_deviation">{{ _("Abweichung zum Vergleich") }}</button>
                   <button type="button" class="chip" :class="{active: style.show_row_sum}" data-tooltip="{{ _('Zusätzliche Spalte mit der Summe über die Zeiträume je Zeile. Welche Spalten mitzählen, steht in der jeweiligen Spalte.') }}" @click="style.show_row_sum = !style.show_row_sum; recomputeRowSums()">{{ _("Summenspalte") }}</button>
-                  <label class="tbl-sum-label" x-show="style.show_row_sum">{{ _("Beschriftung") }}
-                    <input type="text" maxlength="12" x-model="style.row_sum_label" placeholder="Σ">
-                  </label>
-                  <button type="button" class="chip" x-show="style.show_row_sum" :class="{active: style.row_sum_position === 'left'}" @click="style.row_sum_position = 'left'">{{ _("links") }}</button>
-                  <button type="button" class="chip" x-show="style.show_row_sum" :class="{active: style.row_sum_position === 'right'}" @click="style.row_sum_position = 'right'">{{ _("rechts") }}</button>
+                  <input type="text" class="tbl-sum-input" maxlength="12" x-show="style.show_row_sum" x-model="style.row_sum_label" placeholder="Σ" aria-label="{{ _('Beschriftung') }}" data-tooltip="{{ _('Beschriftung der Summenspalte') }}">
+                  <span class="tbl-chip-split" x-show="style.show_row_sum" role="group" aria-label="{{ _('Position') }}" data-tooltip="{{ _('Summenspalte links oder rechts der Zeiträume') }}">
+                    <button type="button" :class="{active: style.row_sum_position === 'left'}" @click="style.row_sum_position = 'left'">{{ _("Links") }}</button>
+                    <button type="button" :class="{active: style.row_sum_position === 'right'}" @click="style.row_sum_position = 'right'">{{ _("Rechts") }}</button>
+                  </span>
                 </div>
               </div>
               <div>

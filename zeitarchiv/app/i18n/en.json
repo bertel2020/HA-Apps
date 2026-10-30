@@ -3245,13 +3245,16 @@
     "Sag, was dich interessiert, zum Beispiel Energie oder Wetter. Zeitarchiv prüft dein Home Assistant und schlägt passende Entitäten vor.": "Tell it what you are interested in, for example energy or weather. Zeitarchiv checks your Home Assistant and suggests matching entities.",
     "Keine Muster in der Auswahl. Vorschläge gibt es im Auswahl-Assistenten.": "No patterns in the selection. Suggestions are in the selection assistant.",
     "Summenspalte": "Sum column",
-    "links": "left",
-    "rechts": "right",
     "Zusätzliche Spalte mit der Summe über die Zeiträume je Zeile. Welche Spalten mitzählen, steht in der jeweiligen Spalte.": "Extra column with the sum over the periods for each row. Each column sets whether it counts.",
     "In Summe einrechnen": "Include in sum",
     "Diese Spalte in die Summenspalte einrechnen. Ausgeblendete Spalten zählen nie mit.": "Include this column in the sum column. Hidden columns never count.",
     "Ungültige Position der Summenspalte": "Invalid position of the sum column",
-    "Die Beschriftung der Summenspalte darf höchstens {MAX_TABLE_ROW_SUM_LABEL_LENGTH} Zeichen lang sein": "The label of the sum column may be at most {MAX_TABLE_ROW_SUM_LABEL_LENGTH} characters long"
+    "Die Beschriftung der Summenspalte darf höchstens {MAX_TABLE_ROW_SUM_LABEL_LENGTH} Zeichen lang sein": "The label of the sum column may be at most {MAX_TABLE_ROW_SUM_LABEL_LENGTH} characters long",
+    "Beschriftung der Summenspalte": "Label of the sum column",
+    "Position": "Position",
+    "Links": "Left",
+    "Rechts": "Right",
+    "Summenspalte links oder rechts der Zeiträume": "Sum column to the left or right of the periods"
   },
   "js": {
     "Langzeit": "Long-term",
