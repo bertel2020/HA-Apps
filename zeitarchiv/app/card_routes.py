@@ -31,10 +31,11 @@ import json
 import threading
 from collections.abc import Callable
 
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Query, Request
 
 from .chart_types import effective_chart_type
 from .i18n import tr
+from .storage import query as query_mod
 from .storage.index import Index
 from .storage.paths import validate_entity_id
 
@@ -42,9 +43,9 @@ from .storage.paths import validate_entity_id
 #: einer unbekannten Fassung eine Meldung statt falsch zu zeichnen.
 SPEC_VERSION = 1
 
-#: Darstellungen, die die Karte kann. "bar" ist die ausdrückliche Wahl "kein
-#: Zeitstrahl" eines Charts aus Zahlen (chart_types.effective_chart_type).
-SUPPORTED_CHART_TYPES = ("auto", "bar")
+#: Darstellungen, die die Karte kann: alle, die ein gespeichertes Chart hat. "bar" ist die
+#: ausdrückliche Wahl "kein Zeitstrahl" eines Charts aus Zahlen.
+SUPPORTED_CHART_TYPES = ("auto", "bar", "timeline", "donut", "shares", "changes", "heatmap")
 
 #: Zeiträume der Karte ohne gespeichertes Chart: Schlüssel -> (Zeitraum, fortlaufend).
 #: "day" ist der heutige Tag, "24h" die letzten 24 Stunden (so wie im Chart-Editor).
@@ -64,8 +65,11 @@ MAX_SERIES_ENTITIES = 10
 SPARK_RANGES = {"24h": ("day", True), "7d": ("week", True), "30d": ("month", True)}
 SPARK_MAX_POINTS = 60
 
-#: Arten, die die Karte nicht zeichnet.
-UNSUPPORTED_TYPES = ("state", "switch")
+#: Arten, die die Sparkline nicht zeichnet (sie zeigt nur Zahlenverläufe).
+SPARK_UNSUPPORTED_TYPES = ("state", "switch")
+
+#: Breite der Zeichenfläche in Bildpunkten, für die Spalten des Zeitstrahls in Jahr und Dekade.
+MAX_PX = 4000
 
 #: Gleichzeitige Abfragen der Karte. Viele Karten auf einem Dashboard fragen
 #: beim Laden gemeinsam an; ohne Grenze hielten sie die Index-Sperren der
@@ -142,10 +146,8 @@ def tile_compare(chart: dict, chart_type: str, entity_ids: list[str]) -> dict | 
 
 
 def is_supported(chart: dict, chart_type: str, aggregation_types: dict[str, str]) -> bool:
-    """Nur Zahlen-Charts in einer Darstellung, die die Karte zeichnet."""
-    if chart_type not in SUPPORTED_CHART_TYPES or not chart["entity_ids"]:
-        return False
-    return all(aggregation_types.get(entity_id) not in UNSUPPORTED_TYPES for entity_id in chart["entity_ids"])
+    """Ob die Karte dieses Chart zeichnet (aggregation_types bleibt für spätere Einschränkungen)."""
+    return chart_type in SUPPORTED_CHART_TYPES and bool(chart["entity_ids"])
 
 
 def ad_hoc_chart(entity_ids: list[str], period: str, style: str) -> dict:
@@ -190,7 +192,42 @@ def create_card_router(
     def aggregation_types() -> dict[str, str]:
         return {row["entity_id"]: row["aggregation_type"] for row in index.list_entities()}
 
-    def answer(chart: dict, at: str | None) -> dict:
+    def run_queries(chart: dict, chart_type: str, visible: list[str], at: str | None, px: int) -> dict:
+        """Die Abfragen, die eine Kachel für dieses Chart stellt (fetchChartData() in
+        chart-tile-render.js): die Reihen, bei der Heatmap zusätzlich die Zellen, beim Zeitstrahl in
+        Jahr und Dekade zusätzlich die Spalten in der Breite der Zeichenfläche."""
+        compare = tile_compare(chart, chart_type, visible)
+        range_key = chart["range_key"]
+        base = {
+            "entity_ids": ",".join(visible), "range": range_key, "offset": 0, "continuous": chart["continuous"],
+            "year_over_year": False,
+            # Ein fester Zeitraum bleibt fest, der Stichtag gilt nur für die übrigen.
+            "at": chart["period_anchor"] or at,
+        }
+        timeline = chart_type == "timeline"
+        data = query_multi(
+            **base, compare=compare is not None, compare_mode=compare["mode"] if compare else "previous",
+            raw=timeline, previous_years=compare["years"] if compare and compare["longterm"] else 1,
+            heatmap=False, columns=False, px=0,
+        )
+        plain = {"compare": False, "compare_mode": "previous", "raw": False, "previous_years": 1}
+        if chart_type == "heatmap" and range_key in query_mod.STATE_HEATMAP_RANGES:
+            heat = query_multi(**base, **plain, heatmap=True, columns=False, px=0)
+            cells = {item["entity_id"]: item.get("cells") for item in heat.get("series", [])}
+            for entry in data.get("series", []):
+                if cells.get(entry["entity_id"]):
+                    entry["cells"] = cells[entry["entity_id"]]
+        if timeline and range_key in query_mod.STATE_COLUMNS_RANGES:
+            columns = query_multi(**{**base}, compare=False, compare_mode="previous", raw=False, previous_years=1,
+                                  heatmap=False, columns=True, px=max(60, px - 10))
+            by_id = {item["entity_id"]: item for item in columns.get("series", []) if item.get("columns")}
+            for entry in data.get("series", []):
+                if entry["entity_id"] in by_id:
+                    entry["columns"] = by_id[entry["entity_id"]]["columns"]
+                    entry["dt"] = by_id[entry["entity_id"]].get("dt")
+        return data
+
+    def answer(chart: dict, at: str | None, px: int = 0) -> dict:
         """Antwort für ein gespeichertes oder ad hoc gebautes Chart: Spec immer, Daten nur für
         Darstellbares."""
         types = aggregation_types()
@@ -214,15 +251,7 @@ def create_card_router(
         if not slots.acquire(blocking=False):
             raise HTTPException(status_code=429, detail=tr("Zu viele gleichzeitige Abfragen"))
         try:
-            compare = tile_compare(chart, chart_type, visible)
-            result["data"] = query_multi(
-                entity_ids=",".join(visible), range=chart["range_key"], offset=0,
-                continuous=chart["continuous"], year_over_year=False, compare=compare is not None,
-                compare_mode=compare["mode"] if compare else "previous", raw=False,
-                previous_years=compare["years"] if compare and compare["longterm"] else 1,
-                # Ein fester Zeitraum bleibt fest, der Stichtag gilt nur für die übrigen.
-                at=chart["period_anchor"] or at, heatmap=False, columns=False, px=0,
-            )
+            result["data"] = run_queries(chart, chart_type, visible, at, px)
         finally:
             slots.release()
         return result
@@ -253,6 +282,7 @@ def create_card_router(
         request: Request,
         id: int,
         at: str | None = None,
+        px: int = Query(0, ge=0, le=MAX_PX),
         authorization: str | None = Header(default=None),
         x_zeitarchiv_integration_version: str | None = Header(default=None),
     ) -> dict:
@@ -264,7 +294,7 @@ def create_card_router(
         chart = index.get_saved_chart(id)
         if chart is None:
             raise HTTPException(status_code=404, detail=tr("Chart nicht gefunden"))
-        return answer(chart, at)
+        return answer(chart, at, px)
 
     @router.get("/api/card/entities")
     def card_entities(
@@ -277,7 +307,6 @@ def create_card_router(
         entities = [
             {"entity_id": row["entity_id"], "aggregation_type": row["aggregation_type"]}
             for row in index.list_entities()
-            if row["aggregation_type"] not in UNSUPPORTED_TYPES
         ]
         return {"spec_version": SPEC_VERSION, "entities": entities}
 
@@ -302,7 +331,7 @@ def create_card_router(
             raise HTTPException(status_code=404, detail=tr("Entität nicht gefunden"))
         result = {
             "spec_version": SPEC_VERSION, "entity_id": entity_id, "range": range,
-            "supported": entity["aggregation_type"] not in UNSUPPORTED_TYPES, "unit": entity["unit"],
+            "supported": entity["aggregation_type"] not in SPARK_UNSUPPORTED_TYPES, "unit": entity["unit"],
             "aggregation_type": entity["aggregation_type"], "points": [], "app_link": app_link(),
         }
         if not result["supported"]:
@@ -330,6 +359,7 @@ def create_card_router(
         period: str = "month",
         style: str = "auto",
         at: str | None = None,
+        px: int = Query(0, ge=0, le=MAX_PX),
         authorization: str | None = Header(default=None),
         x_zeitarchiv_integration_version: str | None = Header(default=None),
     ) -> dict:
@@ -352,6 +382,6 @@ def create_card_router(
             raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
         if style not in STYLES:
             raise HTTPException(status_code=400, detail=tr("Ungültige Darstellung"))
-        return answer(ad_hoc_chart(ids, period, style), at)
+        return answer(ad_hoc_chart(ids, period, style), at, px)
 
     return router

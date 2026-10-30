@@ -94,7 +94,7 @@ def test_items_mark_what_the_card_can_draw() -> None:
     body = client.get("/api/card/items", headers=AUTH).json()
     assert body["spec_version"] == SPEC_VERSION
     supported = {item["id"]: item["supported"] for item in body["items"]}
-    assert supported == {1: True, 2: False, 3: False, 4: False, 5: True, 6: False}
+    assert supported == {1: True, 2: True, 3: True, 4: True, 5: True, 6: False}
     assert body["items"][0] == {"id": 1, "name": "Chart 1", "kind": "chart", "chart_type": "auto", "supported": True}
 
 
@@ -104,13 +104,12 @@ def test_an_unknown_chart_is_a_404() -> None:
     assert client.get("/api/card/chart", params={"id": "x"}, headers=AUTH).status_code == 422
 
 
-def test_an_unsupported_chart_comes_without_data_and_without_a_query() -> None:
-    client, calls = _client([_chart(2, ["switch.c"]), _chart(3, ["sensor.a"], chart_type="donut")])
+def test_a_chart_without_entities_comes_without_data_and_without_a_query() -> None:
+    client, calls = _client([_chart(2, []), _chart(3, ["sensor.a"], hidden_entity_ids=["sensor.a"])])
     for chart_id in (2, 3):
         body = client.get("/api/card/chart", params={"id": chart_id}, headers=AUTH).json()
-        assert body["supported"] is False
         assert body["data"] is None
-        assert body["spec"]["entityIds"]
+    assert client.get("/api/card/chart", params={"id": 2}, headers=AUTH).json()["supported"] is False
     assert calls == []
 
 
@@ -233,11 +232,11 @@ def test_the_app_reports_its_page_in_home_assistant() -> None:
 # --- Karte ohne gespeichertes Chart ----------------------------------------------------------
 
 
-def test_the_entity_list_leaves_out_what_the_card_cannot_draw() -> None:
+def test_the_entity_list_names_every_archived_entity() -> None:
     client, _ = _client([])
     assert client.get("/api/card/entities").status_code == 401
     entities = client.get("/api/card/entities", headers=AUTH).json()["entities"]
-    assert {item["entity_id"] for item in entities} == {"sensor.a", "sensor.b"}
+    assert {item["entity_id"] for item in entities} == {"sensor.a", "sensor.b", "switch.c", "select.d"}
     assert {"entity_id": "sensor.b", "aggregation_type": "counter"} in entities
 
 
@@ -282,11 +281,11 @@ def test_a_series_asks_for_known_entities_and_known_words_only(params: dict, sta
     assert calls == []
 
 
-def test_a_series_of_states_comes_without_data() -> None:
+def test_a_series_with_a_switch_is_drawn_like_any_other() -> None:
     client, calls = _client([])
     body = client.get("/api/card/series", params={"entity_ids": "sensor.a,switch.c"}, headers=AUTH).json()
-    assert body["supported"] is False and body["data"] is None
-    assert calls == []
+    assert body["supported"] is True and body["data"] is not None
+    assert len(calls) == 1
 
 
 def test_the_new_routes_need_the_token() -> None:
@@ -426,3 +425,76 @@ def test_a_chart_with_a_comparison_asks_the_query_for_it() -> None:
     client, calls = _client([plain])
     client.get("/api/card/chart", params={"id": 2}, headers=AUTH)
     assert (calls[0]["compare"], calls[0]["compare_mode"], calls[0]["previous_years"]) == (False, "previous", 1)
+
+
+# --- Zeitstrahl, Heatmap, Spalten ------------------------------------------------------------
+
+
+class _Recorder:
+    """query_multi, das je Art der Abfrage eine eigene Antwort gibt."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def __call__(self, **kwargs) -> dict:
+        self.calls.append(kwargs)
+        ids = kwargs["entity_ids"].split(",")
+        if kwargs["heatmap"]:
+            return {"series": [{"entity_id": i, "cells": [[1, 2, 3]]} for i in ids]}
+        if kwargs["columns"]:
+            return {"series": [{"entity_id": i, "columns": [[1, {"a": 5}]], "dt": 3600} for i in ids]}
+        return {"series": [{"entity_id": i, "points": [{"ts": 1, "value": 1}]} for i in ids]}
+
+
+def _recorded(chart: dict, **params):
+    recorder = _Recorder()
+    client, _ = _client([chart], query_multi=recorder)
+    body = client.get("/api/card/chart", params={"id": chart["id"], **params}, headers=AUTH).json()
+    return body, recorder.calls
+
+
+def test_a_timeline_asks_for_raw_values() -> None:
+    body, calls = _recorded(_chart(1, ["switch.c"], range_key="day"))
+    assert body["chart_type"] == "timeline" and len(calls) == 1 and calls[0]["raw"] is True
+
+
+def test_a_timeline_over_a_year_also_asks_for_columns_as_wide_as_the_card() -> None:
+    body, calls = _recorded(_chart(1, ["select.d"], chart_type="timeline", range_key="year"), px=500)
+    assert [(c["raw"], c["columns"], c["px"]) for c in calls] == [(True, False, 0), (False, True, 490)]
+    series = body["data"]["series"][0]
+    assert series["columns"] == [[1, {"a": 5}]] and series["dt"] == 3600
+    # Eine winzige Breite wird nicht schmaler als 60 Bildpunkte.
+    _, calls = _recorded(_chart(1, ["select.d"], chart_type="timeline", range_key="decade"), px=10)
+    assert calls[1]["px"] == 60
+
+
+def test_a_heatmap_gets_its_cells_only_where_the_range_allows_it() -> None:
+    body, calls = _recorded(_chart(1, ["select.d"], chart_type="heatmap", range_key="month"))
+    assert [c["heatmap"] for c in calls] == [False, True]
+    assert body["data"]["series"][0]["cells"] == [[1, 2, 3]]
+    _, calls = _recorded(_chart(1, ["select.d"], chart_type="heatmap", range_key="week"))
+    assert [c["heatmap"] for c in calls] == [False]
+
+
+def test_a_plain_chart_needs_one_query() -> None:
+    _, calls = _recorded(_chart(1, ["sensor.a"], range_key="year"))
+    assert len(calls) == 1 and (calls[0]["raw"], calls[0]["heatmap"], calls[0]["columns"]) == (False, False, False)
+
+
+def test_the_width_is_bounded() -> None:
+    client, _ = _client([_chart(1, ["sensor.a"])])
+    assert client.get("/api/card/chart", params={"id": 1, "px": 4001}, headers=AUTH).status_code == 422
+    assert client.get("/api/card/chart", params={"id": 1, "px": -1}, headers=AUTH).status_code == 422
+
+
+def test_the_ranges_of_the_extra_queries_equal_those_of_the_renderer() -> None:
+    import re
+    import subprocess
+
+    from app.storage import query as query_mod
+
+    source = (APP / "static/js/state-entities.js").read_text(encoding="utf-8")
+    share = re.search(r"const SERVER_SHARE_RANGES = (\[[^\]]*\])", source).group(1)
+    columns = re.search(r"const COLUMN_RANGES = (\[[^\]]*\])", source).group(1)
+    run = subprocess.run(["node", "-e", f"console.log(JSON.stringify([{share}, {columns}]))"], check=True, capture_output=True, text=True)
+    assert [tuple(item) for item in json.loads(run.stdout)] == [query_mod.STATE_HEATMAP_RANGES, query_mod.STATE_COLUMNS_RANGES]
