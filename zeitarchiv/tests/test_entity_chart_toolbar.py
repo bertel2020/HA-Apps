@@ -260,7 +260,10 @@ def test_soll_entity_is_excluded_from_the_names_and_order_list() -> None:
     von der tatsächlichen, auf selectedEntityIds basierenden Chart-Farbe ab,
     sobald Soll irgendwo dazwischen im rohen Array steht."""
     assert 'x-for="(id, idx) in orderableEntityIds"' in EDITOR_TEMPLATE
-    assert "colorIndexFor(id) % 8 + 1" in EDITOR_TEMPLATE
+    # Der Punkt nimmt die Farbe über colorFor(id) (eigene Farbe oder Palette); die
+    # Palettenfarbe kommt weiter aus colorIndexFor(), nicht aus dem lokalen idx.
+    assert "'--dot:' + colorFor(id)" in EDITOR_TEMPLATE
+    assert "PALETTE[this.colorIndexFor(entityId) % PALETTE.length]" in EDITOR_JS
     # Die Liste "Ausgewählt" steht immer da; ihr Leer-Hinweis richtet sich
     # ebenfalls nach orderableEntityIds, eine allein gewählte Soll-Entität
     # gilt also nicht als Auswahl.
