@@ -2022,6 +2022,8 @@
     "Supervisor meldete: {v}": "Supervisor reported: {v}",
     "Supervisor-Statistik konnte nicht geladen werden": "Supervisor statistics could not be loaded",
     "Supervisor-Statistik hat unerwartetes Format": "Supervisor statistics have an unexpected format",
+    "Supervisor-Information konnte nicht geladen werden": "Supervisor information could not be loaded",
+    "Supervisor-Information hat unerwartetes Format": "Supervisor information has an unexpected format",
     "Neustart über Supervisor fehlgeschlagen": "Restart via Supervisor failed",
     "Zeitzonenname muss ein String sein": "Time zone name must be a string",
     "Übersprungen, weil bereits ein Retention-Lauf aktiv ist": "Skipped because a retention run is already active",

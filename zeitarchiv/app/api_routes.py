@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field, model_validator
 
-from . import ai_settings, ha_integration, selection_jobs
+from . import ai_settings, ha_integration, selection_jobs, supervisor_stats
 from .ai_routes import AiDependencies, create_ai_router
 from .card_routes import create_card_router
 from .selection_routes import create_catalog_router
@@ -1073,5 +1073,5 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         collect_notices=deps.collect_notices, latest_backup=deps.latest_backup,
     )))
     router.include_router(create_catalog_router(deps.data_dir, check_auth))
-    router.include_router(create_card_router(deps.index, str(deps.tz), check_auth, api_query_multi))
+    router.include_router(create_card_router(deps.index, str(deps.tz), check_auth, api_query_multi, supervisor_stats.panel_link))
     return router

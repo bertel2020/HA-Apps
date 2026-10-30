@@ -95,6 +95,7 @@ def create_card_router(
     time_zone: str,
     check_auth: Callable[..., None],
     query_multi: Callable[..., dict],
+    app_link: Callable[[], str | None] = lambda: None,
 ) -> APIRouter:
     router = APIRouter()
     slots = threading.BoundedSemaphore(MAX_CONCURRENT_QUERIES)
@@ -121,7 +122,7 @@ def create_card_router(
                 "chart_type": chart_type,
                 "supported": is_supported(chart, chart_type, types),
             })
-        return {"spec_version": SPEC_VERSION, "items": items}
+        return {"spec_version": SPEC_VERSION, "items": items, "app_link": app_link()}
 
     @router.get("/api/card/chart")
     def card_chart(
@@ -150,6 +151,8 @@ def create_card_router(
             "supported": supported,
             "spec": chart_spec(chart, chart_type),
             "env": {"timezone": time_zone},
+            # Pfad der Zeitarchiv-Seite in Home Assistant, für den Link der Karte; None ohne Supervisor.
+            "app_link": app_link(),
             "data": None,
         }
         visible = [entity_id for entity_id in chart["entity_ids"] if entity_id not in chart["hidden_entity_ids"]]

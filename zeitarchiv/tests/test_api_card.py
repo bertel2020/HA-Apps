@@ -45,7 +45,7 @@ class _FakeIndex:
 TYPES = {"sensor.a": "standard", "sensor.b": "counter", "switch.c": "switch", "select.d": "state"}
 
 
-def _client(charts: list[dict], query_multi=None) -> tuple[TestClient, list[dict]]:
+def _client(charts: list[dict], query_multi=None, app_link=lambda: None) -> tuple[TestClient, list[dict]]:
     calls: list[dict] = []
 
     def default_query(**kwargs) -> dict:
@@ -57,7 +57,7 @@ def _client(charts: list[dict], query_multi=None) -> tuple[TestClient, list[dict
             raise HTTPException(status_code=401, detail="nein")
 
     app = FastAPI()
-    app.include_router(create_card_router(_FakeIndex(charts, TYPES), "Europe/Berlin", check_auth, query_multi or default_query))
+    app.include_router(create_card_router(_FakeIndex(charts, TYPES), "Europe/Berlin", check_auth, query_multi or default_query, app_link))
     return TestClient(app), calls
 
 
@@ -213,3 +213,12 @@ def test_the_real_app_serves_a_saved_chart_with_its_token(client) -> None:
     assert body["supported"] is True
     assert body["data"]["series"][0]["entity_id"] == "sensor.card_probe"
     assert json.loads(body["spec"]["entityIds"]) == ["sensor.card_probe"]
+
+
+def test_the_app_reports_its_page_in_home_assistant() -> None:
+    client, _ = _client([_chart(1, ["sensor.a"])], app_link=lambda: "/hassio/ingress/abc_zeitarchiv")
+    assert client.get("/api/card/items", headers=AUTH).json()["app_link"] == "/hassio/ingress/abc_zeitarchiv"
+    assert client.get("/api/card/chart", params={"id": 1}, headers=AUTH).json()["app_link"] == "/hassio/ingress/abc_zeitarchiv"
+    # Ohne Supervisor gibt es keinen Link, das Feld bleibt trotzdem da.
+    client, _ = _client([_chart(1, ["sensor.a"])])
+    assert client.get("/api/card/items", headers=AUTH).json()["app_link"] is None
