@@ -1229,6 +1229,15 @@ Purely visual settings, they never affect the calculated values:
 - **Comparison:** set comparison columns (previous day, previous month,
   previous year …) apart visually, show percentage deviation from the
   associated comparison column.
+- **Sum column:** An extra column (left or right of the periods, label of
+  your choice) shows the sum over the periods for each row. Each column
+  card has “Include in sum”, so with 8 days you can leave out the oldest.
+  Hidden columns never count. Counters and switches are summed, as are rows
+  with the aggregation “Σ Sum”; average, minimum, maximum and states show
+  “–”. Formula rows evaluate their formula again on the sums, so a quotient
+  like “A / B” gives ΣA ÷ ΣB. If included columns overlap in time (e.g. week
+  and day), the header cell warns because values are counted twice. The column
+  also appears in dashboard tiles and the CSV export.
 - **Numbers / units:** show/hide units, align them in a fixed column or show
   them smaller, align the decimal separator column-wise, spell out missing
   values as "No data" instead of as a dash.

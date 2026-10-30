@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Neu
+
+- **Tabellen, Summenspalte**: Eine zusätzliche Spalte zeigt je Zeile die Summe
+  über die Zeiträume, links oder rechts, mit frei wählbarer Beschriftung. In
+  jeder Spalte lässt sich einstellen, ob sie mitzählt, zum Beispiel 7 von 8
+  Tagen für eine Wochensumme. Summiert werden Zähler und Schalter; bei
+  Durchschnitt, Minimum, Maximum und Zuständen steht „–“. Formelzeilen
+  rechnen auf den Summen weiter, die Summenzeile addiert die Summen ihrer
+  Zeilen. Die Spalte gibt es auch in Dashboard-Kacheln und im CSV-Export.
+
 ### Behoben
 
 - **Entitätsansicht und Chart-Editor**: Im Diagramm fehlte bei langen
@@ -18,6 +28,16 @@
 ---
 
 ### English
+
+#### New
+
+- **Tables, sum column**: An extra column shows the sum over the periods for
+  each row, on the left or right, with a label of your choice. Each column can
+  be set to count or not, for example 7 of 8 days for a weekly sum. Counters
+  and switches are summed; average, minimum, maximum and states show “–”.
+  Formula rows continue to calculate on the sums, and the sum row adds up the
+  sums of its rows. The column is also available in dashboard tiles and the
+  CSV export.
 
 #### Fixed
 

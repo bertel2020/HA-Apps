@@ -5,6 +5,7 @@
       show_deviation: false, explicit_missing: false, show_units: true, align_units: false,
       small_units: false, align_numbers: false, label_col_width: null,
       header_align: 'right', value_align: 'right', equal_value_cols: false,
+      show_row_sum: false, row_sum_label: 'Σ', row_sum_position: 'left',
     };
     const ENTITY_LABEL_BY_ID = Object.fromEntries(ENTITY_OPTIONS.map(o => [o.entity_id, o.label]));
 
@@ -272,13 +273,17 @@
         // ?edit=1 hierher, um direkt im Bearbeiten-Modus zu starten statt
         // erst über "Anpassen" umschalten zu müssen.
         editing: !TABLE_ID || new URLSearchParams(location.search).has('edit'),
-        columns: INITIAL_COLUMNS.map(c => ({decimals: 'auto', year_over_year: false, hidden: false, group_label: '', heatmap: false, width: null, ...c, uid: uid(), offset: Math.min(c.offset || 0, 0)})),
+        columns: INITIAL_COLUMNS.map(c => ({decimals: 'auto', year_over_year: false, hidden: false, group_label: '', heatmap: false, width: null, in_sum: true, ...c, uid: uid(), offset: Math.min(c.offset || 0, 0)})),
         rows: INITIAL_ROWS.map(r => ({
           formula_unit: '', aggregation: 'auto', hidden: false, show_label: false, accent: false,
           percent_of_total: false, hide_if_empty: false,
           ...r, uid: uid(), pickerOpen: false, typePickerOpen: false, aggPickerOpen: false, optsPickerOpen: false, search: '',
         })),
         style: {...DEFAULT_STYLE, ...INITIAL_STYLE},
+        rowSums: {},  // row.uid -> Σ-Zelle {value, unit} | null (siehe recomputeRowSums)
+        sumOverlapping: false,
+        _computedValues: null,
+        _summable: null,
         values: {},  // col.uid -> row.uid -> {value, unit, error} | null
         windowStarts: {},  // col.uid -> tatsächlich aufgelöster Fensterbeginn (Sekunden) | null
         windowEnds: {},  // col.uid -> tatsächlich aufgelöstes (ggf. gedecktes) Fensterende (Sekunden) | null
@@ -311,6 +316,12 @@
 
         get visibleColumnCount() {
           return this.columns.filter(c => !c.hidden).length;
+        },
+
+        // Beschriftungsspalte + sichtbare Zeitspalten (+ Σ-Spalte) — für
+        // Trennlinien und die Leerzeile, die die ganze Tabellenbreite füllen.
+        get tableColspan() {
+          return this.visibleColumnCount + 1 + (this.style.show_row_sum ? 1 : 0);
         },
 
         // Der Menü-Button selbst wird aktiv, sobald irgendeine enthaltene
@@ -420,7 +431,10 @@
           const cols = this.columns.filter(c => !c.hidden);
           const csvEscape = s => `"${String(s).replace(/"/g, '""')}"`;
           const lines = [];
-          lines.push(['', ...cols.map(c => csvEscape(this.columnExportLabel(c)))].join(';'));
+          const withSum = !!this.style.show_row_sum;
+          const sumLeft = withSum && this.style.row_sum_position === 'left';
+          const sumRight = withSum && !sumLeft;
+          lines.push(['', ...(sumLeft ? [csvEscape(this.sumLabel())] : []), ...cols.map(c => csvEscape(this.columnExportLabel(c))), ...(sumRight ? [csvEscape(this.sumLabel())] : [])].join(';'));
           this.rows.forEach(row => {
             if (row.row_type === 'separator' || !this.rowVisible(row)) return;
             const cells = cols.map(col => {
@@ -429,7 +443,11 @@
               const number = `${parts.whole}${parts.separator}${parts.fraction}`;
               return csvEscape(unit ? `${number} ${unit}` : number);
             });
-            lines.push([csvEscape(this.resolvedRowLabel(row)), ...cells].join(';'));
+            const sumParts = this.sumNumberParts(row);
+            const sumUnit = this.sumUnit(row);
+            const sumNumber = `${sumParts.whole}${sumParts.separator}${sumParts.fraction}`;
+            const sumText = csvEscape(sumUnit ? `${sumNumber} ${sumUnit}` : sumNumber);
+            lines.push([csvEscape(this.resolvedRowLabel(row)), ...(sumLeft ? [sumText] : []), ...cells, ...(sumRight ? [sumText] : [])].join(';'));
           });
           const blob = new Blob(['﻿' + lines.join('\r\n')], {type: 'text/csv;charset=utf-8;'});
           const url = URL.createObjectURL(blob);
@@ -462,7 +480,7 @@
         },
 
         addColumn() {
-          this.columns.push({uid: uid(), label: '', range_key: 'month', offset: 0, year_over_year: false, decimals: 'auto', hidden: false, group_label: '', heatmap: false, width: null});
+          this.columns.push({uid: uid(), label: '', range_key: 'month', offset: 0, year_over_year: false, decimals: 'auto', hidden: false, group_label: '', heatmap: false, width: null, in_sum: true});
         },
         // Kopie mit neuer uid direkt nach dem Original — dieselbe Idee wie
         // "Tabelle duplizieren" auf der Übersichtsseite, nur für eine
@@ -761,12 +779,16 @@
           }
           const requestId = ++this._loadSeq;
           this.loading = true;
-          const plainColumns = this.columns.map(c => ({range_key: c.range_key, offset: c.offset, year_over_year: c.year_over_year}));
+          const plainColumns = this.columns.map(c => ({
+            range_key: c.range_key, offset: c.offset, year_over_year: c.year_over_year,
+            hidden: !!c.hidden, in_sum: c.in_sum !== false,
+          }));
           const plainRows = this.rows.map(r => ({
             row_type: r.row_type, entity_ids: r.entity_ids, formula: r.formula,
             formula_unit: r.formula_unit || '', aggregation: r.aggregation || 'auto',
+            percent_of_total: !!r.percent_of_total,
           }));
-          const {values: computed, windowStarts, windowEnds, isCurrent, elapsedSeconds} =
+          const {values: computed, windowStarts, windowEnds, isCurrent, elapsedSeconds, summable} =
             await TableCompute.computeValues(BASE, plainColumns, plainRows);
           if (requestId !== this._loadSeq) return;  // überholt von einer neueren Anfrage
           const newValues = {};
@@ -782,13 +804,56 @@
             newIsCurrent[col.uid] = isCurrent[ci];
             newElapsedSeconds[col.uid] = elapsedSeconds[ci];
           });
+          // Rohdaten für die Σ-Spalte merken, damit ein Umschalten von
+          // "in Σ"/"ausgeblendet" ohne neue Serverabfrage neu summiert (siehe
+          // recomputeRowSums()).
+          this._computedValues = computed;
+          this._summable = summable;
           this.values = newValues;
           this.windowStarts = newWindowStarts;
           this.windowEnds = newWindowEnds;
           this.isCurrent = newIsCurrent;
           this.elapsedSeconds = newElapsedSeconds;
+          this.recomputeRowSums();
           this.loading = false;
         },
+
+        // Σ-Spalte (style.show_row_sum): reine Client-Rechnung auf den schon
+        // geladenen Werten, siehe TableCompute.computeRowSums().
+        recomputeRowSums() {
+          if (!this._computedValues) { this.rowSums = {}; this.sumOverlapping = false; return; }
+          const cols = this.columns.map(c => ({hidden: !!c.hidden, in_sum: c.in_sum !== false}));
+          const rows = this.rows.map(r => ({
+            row_type: r.row_type, formula: r.formula, formula_unit: r.formula_unit || '',
+            aggregation: r.aggregation || 'auto', percent_of_total: !!r.percent_of_total,
+          }));
+          const sums = TableCompute.computeRowSums(cols, rows, this._computedValues, this._summable);
+          const bySums = {};
+          this.rows.forEach((row, ri) => { bySums[row.uid] = sums[ri]; });
+          this.rowSums = bySums;
+          this.sumOverlapping = TableCompute.sumOverlap(
+            cols, this.columns.map(c => (this.windowStarts[c.uid] ?? null)), this.columns.map(c => (this.windowEnds[c.uid] ?? null)));
+        },
+        // Nachkommastellen der Σ-Zelle: die der ersten einbezogenen Spalte.
+        sumDecimals(row) {
+          if (row.percent_of_total) return '1';
+          const col = this.columns.find(c => !c.hidden && c.in_sum !== false);
+          return col ? col.decimals : 'auto';
+        },
+        sumCell(row) { return this.rowSums[row.uid] || null; },
+        sumNumberParts(row) {
+          return TableCompute.cellNumberParts(this.sumCell(row), this.sumDecimals(row), this.style.explicit_missing);
+        },
+        sumUnit(row) { return TableCompute.cellUnit(this.sumCell(row)); },
+        sumLabel() { return (this.style.row_sum_label || '').trim() || 'Σ'; },
+        // Nach Summierbarkeit: warum die Σ-Zelle leer ist (Tooltip).
+        sumEmptyTitle(row) {
+          if (this.sumCell(row)) return '';
+          if (row.row_type === 'formula') return t('Die Formel verweist auf eine Zeile ohne Summe');
+          if (row.row_type === 'summary') return t('Enthält Zeilen ohne Summe');
+          return t('Für diese Zeile ergibt eine Summe über die Zeiträume keinen Sinn (Durchschnitt, Minimum, Maximum oder Zustand)');
+        },
+        sumSkippedColumns() { return this.columns.filter(c => !c.hidden && c.in_sum === false); },
 
         async save() {
           if (!this.name.trim()) { appAlert(t('Bitte einen Namen für die Tabelle angeben.')); return; }
@@ -812,7 +877,7 @@
               label: c.label.trim() || suggestColumnLabel(c), range_key: c.range_key, offset: c.offset || 0,
               year_over_year: !!c.year_over_year, decimals: c.decimals || 'auto', hidden: !!c.hidden,
               group_label: (c.group_label || '').trim(), heatmap: !!c.heatmap,
-              width: c.width || null,
+              width: c.width || null, in_sum: c.in_sum !== false,
             })),
             rows: this.rows.map(r => ({
               label: this.resolvedRowLabel(r), row_type: r.row_type,

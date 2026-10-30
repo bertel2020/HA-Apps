@@ -455,6 +455,8 @@
   .tbl-style-group-chips .chip{
     font-size:calc(11.5px * var(--font-scale, 1));padding:4px 10px;text-align:left;white-space:normal;
   }
+  .tbl-sum-label{display:flex;flex-direction:column;gap:2px;font-size:.8em;color:var(--ink-muted);}
+  .tbl-sum-label input{width:100%;}
   .tbl-style-group-chips .dd-picker-wrap{width:100%;}
   .tbl-style-group-chips .dd-picker-wrap > button{
     width:100%;text-align:left;font-size:calc(11.5px * var(--font-scale, 1));padding:4px 10px;
@@ -579,6 +581,10 @@
   .tbl-style-sticky-header.tbl-style-header-accent tr.tbl-group-header-row th{background:color-mix(in srgb, var(--accent-line) 80%, black);}
   .tbl-style-comparison-columns:not(.tbl-style-header-accent) .tbl-comparison-col{color:var(--ink-muted);}
   .tbl-style-comparison-columns.tbl-style-header-accent th.tbl-comparison-col{color:color-mix(in srgb, var(--accent-contrast) 72%, var(--accent-line));}
+  .tbl-sum-col{background:color-mix(in srgb, var(--accent-line) 8%, transparent);font-weight:600;}
+  .tbl-sum-head{color:var(--accent-line);}
+  .tbl-sum-empty{color:var(--ink-muted);font-weight:400;}
+  .tbl-sum-warn{display:inline-block;margin-left:4px;color:var(--accent-bar);font-weight:700;}
   .tbl-style-align-units .tbl-cell-unit{display:inline-block;min-width:3.5em;text-align:left;color:var(--ink-muted);}
   .tbl-style-small-units .tbl-cell-unit{font-size:.82em;color:var(--ink-muted);}
   .tbl-style-align-numbers .tbl-cell-number{display:inline-grid;grid-template-columns:auto .45em 2.4em;align-items:baseline;text-align:right;}

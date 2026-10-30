@@ -1730,10 +1730,15 @@
       return;
     }
     const base = el.closest('#dashboard-grid')?.dataset.appRoot || '';
-    let values, allValues, windowStarts, windowEnds, isCurrent, elapsedSeconds;
+    let values, allValues, windowStarts, windowEnds, isCurrent, elapsedSeconds, rowSums, sumOverlapping;
     try {
-      ({values, windowStarts, windowEnds, isCurrent, elapsedSeconds} = await TableCompute.computeValues(base, visibleCols, allRows, {at: stichtag()}));
+      let summable;
+      ({values, windowStarts, windowEnds, isCurrent, elapsedSeconds, summable} = await TableCompute.computeValues(base, visibleCols, allRows, {at: stichtag()}));
       allValues = values;
+      // Σ-Spalte: nur die sichtbaren Spalten kommen hier an, ausgeblendete
+      // zählen also wie im Editor nie mit.
+      rowSums = TableCompute.computeRowSums(visibleCols, allRows, allValues, summable);
+      sumOverlapping = TableCompute.sumOverlap(visibleCols, windowStarts, windowEnds);
       values = values.map(colValues => visibleRowIndexes.map(i => colValues[i]));
     } catch (e) {
       previewEl.innerHTML = '<div class="dtile-loading">' + t('Fehler beim Laden') + '</div>';
@@ -1853,6 +1858,10 @@
       return Math.max(70, Math.min(260, longestCellText * 8 + 32));
     })();
     const autoValueWidth = equalValueWidth || 120;
+    const showRowSum = !!style.show_row_sum;
+    const sumLeft = showRowSum && style.row_sum_position !== 'right';
+    const sumRight = showRowSum && !sumLeft;
+    const sumLabel = (style.row_sum_label || '').trim() || 'Σ';
     // Bei "gleichmäßig" gilt equalValueWidth für JEDE Wertespalte, auch wenn
     // einzelne Spalten zusätzlich noch eine individuell gezogene Breite
     // gespeichert haben (table_editor.html) — sonst wären die Spalten trotz
@@ -1860,7 +1869,9 @@
     const layoutWidths = needsColumnLayout
       ? [
           savedLabelWidth || autoLabelWidth,
+          ...(sumLeft ? [autoValueWidth] : []),
           ...savedValueWidths.map(w => equalValueWidth || w || autoValueWidth),
+          ...(sumRight ? [autoValueWidth] : []),
         ]
       : [];
     const savedTableWidth = layoutWidths.reduce((sum, width) => sum + width, 0);
@@ -1871,13 +1882,25 @@
       ? `<colgroup>${layoutWidths.map(width => `<col style="width:${width}px">`).join('')}</colgroup>`
       : '';
 
+    const sumHeadTh = () => {
+      const overlapNote = t('Einige Spalten überschneiden sich zeitlich (z. B. Woche und Tag). Ihre Werte zählen in der Summe doppelt.');
+      const tip = sumOverlapping ? ` data-tooltip-fixed="${escapeHtml(overlapNote)}"` : '';
+      return `<th class="tbl-sum-col tbl-sum-head"${tip}>${escapeHtml(sumLabel)}${sumOverlapping ? '<span class="tbl-sum-warn" aria-hidden="true">!</span>' : ''}</th>`;
+    };
+    const sumTd = (row, ri) => {
+      const cell = rowSums[visibleRowIndexes[ri]];
+      const numberParts = TableCompute.cellNumberParts(cell, row.percent_of_total ? '1' : (visibleCols[0] ? (visibleCols.find(c => c.in_sum !== false) || visibleCols[0]).decimals : 'auto'), !!style.explicit_missing);
+      const unit = style.show_units === false ? '' : TableCompute.cellUnit(cell);
+      return `<td class="tbl-sum-col tbl-num${cell ? '' : ' tbl-sum-empty'}"><span class="tbl-cell"><span class="tbl-cell-number"><span class="tbl-number-whole">${escapeHtml(numberParts.whole)}</span><span class="tbl-number-separator">${escapeHtml(numberParts.separator)}</span><span class="tbl-number-fraction">${escapeHtml(numberParts.fraction)}</span></span>${unit ? `<span class="tbl-cell-unit">${escapeHtml(unit)}</span>` : ''}</span></td>`;
+    };
+
     const styleClasses = TableCompute.styleClasses(style);
     let html = `<table class="dt compact dtile-mini-table ${styleClasses}"${tableWidthAttr}>${colgroup}<thead>`;
     // Mehrstufige Kopfzeile (col.group_label) — dieselbe Lauflängen-Logik wie
     // groupHeaderCells() in table_editor.html, hier direkt auf visibleCols
     // (die Kachel kürzt Spalten ohnehin schon aufs Sichtbare).
     if (visibleCols.some(c => (c.group_label || '').trim())) {
-      html += `<tr class="tbl-header-row tbl-group-header-row"><th${labelWidthAttr}>&nbsp;</th>`;
+      html += `<tr class="tbl-header-row tbl-group-header-row"><th${labelWidthAttr}>&nbsp;</th>${sumLeft ? '<th></th>' : ''}`;
       let gi = 0;
       while (gi < visibleCols.length) {
         const label = (visibleCols[gi].group_label || '').trim();
@@ -1886,9 +1909,9 @@
         html += `<th colspan="${span}" class="tbl-group-header">${escapeHtml(label)}</th>`;
         gi += span;
       }
-      html += '</tr>';
+      html += `${sumRight ? '<th></th>' : ''}</tr>`;
     }
-    html += `<tr class="tbl-header-row"><th${labelWidthAttr}>&nbsp;</th>`;
+    html += `<tr class="tbl-header-row"><th${labelWidthAttr}>&nbsp;</th>${sumLeft ? sumHeadTh() : ''}`;
     // Beschriftungs-Platzhalter (z. B. "{jahr}") wurden beim Speichern bewusst
     // NICHT aufgelöst (siehe table_editor.html save()) — sonst würde eine so
     // beschriftete Spalte hier ewig denselben, beim Speichern eingefrorenen
@@ -1905,11 +1928,11 @@
       const periodHint = periodNote ? '<span class="tbl-period-hint">i</span>' : '';
       html += `<th${comparisonClass}${colWidthAttr(c.width)}${periodTooltipAttr}>${escapeHtml(TableCompute.resolveLabel(c.label, windowStarts[ci]))}${periodHint}</th>`;
     });
-    html += '</tr></thead><tbody>';
+    html += `${sumRight ? sumHeadTh() : ''}</tr></thead><tbody>`;
     let dataRowIndex = 0;
     visibleRows.forEach((row, ri) => {
       if (row.row_type === 'separator') {
-        const span = visibleCols.length + 1;
+        const span = visibleCols.length + 1 + (showRowSum ? 1 : 0);
         const sectionLabel = row.show_label && row.label ? escapeHtml(row.label) : '';
         const sepClasses = `tbl-separator-row${row.bold ? ' tbl-bold' : ''}`;
         html += `<tr class="${sepClasses}"><td colspan="${span}"><span class="tbl-separator-content"><span class="tbl-separator-line" aria-hidden="true"></span>${sectionLabel ? `<span class="tbl-separator-label">${sectionLabel}</span><span class="tbl-separator-line" aria-hidden="true"></span>` : ''}</span></td></tr>`;
@@ -1922,7 +1945,7 @@
       if (row.row_type === 'formula' && row.accent) rowClasses.push('tbl-row-accent');
       if (dataRowIndex % 2 === 1) rowClasses.push('tbl-zebra-alt');
       dataRowIndex += 1;
-      html += `<tr${rowClasses.length ? ` class="${rowClasses.join(' ')}"` : ''}><td${labelWidthAttr}>${escapeHtml(row.label)}</td>`;
+      html += `<tr${rowClasses.length ? ` class="${rowClasses.join(' ')}"` : ''}><td${labelWidthAttr}>${escapeHtml(row.label)}</td>${sumLeft ? sumTd(row, ri) : ''}`;
       visibleCols.forEach((col, ci) => {
         let cell = values[ci] && values[ci][ri];
         if (row.percent_of_total) cell = TableCompute.percentOfTotalCell(cell, sectionMemberCells(ci, ri));
@@ -1958,7 +1981,7 @@
         const cellStyleAttr = (widthCss || heatmapCss) ? ` style="${widthCss}${heatmapCss}"` : '';
         html += `<td class="${cellClasses.join(' ')}"${cellStyleAttr}><span class="tbl-cell"><span class="tbl-cell-number"><span class="tbl-number-whole">${escapeHtml(numberParts.whole)}</span><span class="tbl-number-separator">${escapeHtml(numberParts.separator)}</span><span class="tbl-number-fraction">${escapeHtml(numberParts.fraction)}</span></span>${unit ? `<span class="tbl-cell-unit">${escapeHtml(unit)}</span>` : ''}</span>${deviation ? `<span class="tbl-cell-deviation" data-tooltip-fixed="${escapeHtml(deviationTitle)}">${escapeHtml(deviation)}</span>` : ''}</td>`;
       });
-      html += '</tr>';
+      html += `${sumRight ? sumTd(row, ri) : ''}</tr>`;
     });
     html += '</tbody></table>';
     previewEl.innerHTML = html;

@@ -41,7 +41,7 @@
                       <button type="button" data-tooltip="{{ _('Spalte nach rechts') }}" :disabled="idx === columns.length - 1" @click="moveColumn(col.uid, 1)">→</button>
                     </span>
                     <button type="button" class="tbl-col-hide" :class="{active: col.hidden}"
-                            :data-tooltip="col.hidden ? t('Spalte einblenden') : t('Spalte ausblenden')" @click="col.hidden = !col.hidden">
+                            :data-tooltip="col.hidden ? t('Spalte einblenden') : t('Spalte ausblenden')" @click="col.hidden = !col.hidden; recomputeRowSums()">
                       <svg x-show="!col.hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                       <svg x-show="col.hidden" x-cloak width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                     </button>
@@ -97,6 +97,9 @@
                   </label>
                   <label class="cbx" data-tooltip="{{ _('Färbt die Zellen dieser Spalte nach ihrem Wert ein — z. B. welche Entität diesen Zeitraum am meisten verbraucht') }}">
                     <input type="checkbox" x-model="col.heatmap"> {{ _("Farbskala") }}
+                  </label>
+                  <label class="cbx" x-show="style.show_row_sum" data-tooltip="{{ _('Diese Spalte in die Summenspalte einrechnen. Ausgeblendete Spalten zählen nie mit.') }}">
+                    <input type="checkbox" x-model="col.in_sum" @change="recomputeRowSums()"> {{ _("In Summe einrechnen") }}
                   </label>
                   <span class="tbl-field-label">{{ _("Nachkommastellen") }}</span>
                   <!-- position:fixed aus demselben Grund wie beim Zeitraum-Typ-
@@ -287,6 +290,12 @@
                 <div class="tbl-style-group-chips">
                   <button type="button" class="chip" :class="{active: style.comparison_columns}" data-tooltip="{{ _('Vergleichsspalten wie Vortag, Vormonat und Vorjahr optisch zurücknehmen') }}" @click="style.comparison_columns = !style.comparison_columns">{{ _("Vergleichsspalten absetzen") }}</button>
                   <button type="button" class="chip" :class="{active: style.show_deviation}" data-tooltip="{{ _('Prozentuale Abweichung unter dem aktuellen Wert anzeigen, jeweils gegenüber der zugehörigen Vergleichsspalte') }}" @click="style.show_deviation = !style.show_deviation">{{ _("Abweichung zum Vergleich") }}</button>
+                  <button type="button" class="chip" :class="{active: style.show_row_sum}" data-tooltip="{{ _('Zusätzliche Spalte mit der Summe über die Zeiträume je Zeile. Welche Spalten mitzählen, steht in der jeweiligen Spalte.') }}" @click="style.show_row_sum = !style.show_row_sum; recomputeRowSums()">{{ _("Summenspalte") }}</button>
+                  <label class="tbl-sum-label" x-show="style.show_row_sum">{{ _("Beschriftung") }}
+                    <input type="text" maxlength="12" x-model="style.row_sum_label" placeholder="Σ">
+                  </label>
+                  <button type="button" class="chip" x-show="style.show_row_sum" :class="{active: style.row_sum_position === 'left'}" @click="style.row_sum_position = 'left'">{{ _("links") }}</button>
+                  <button type="button" class="chip" x-show="style.show_row_sum" :class="{active: style.row_sum_position === 'right'}" @click="style.row_sum_position = 'right'">{{ _("rechts") }}</button>
                 </div>
               </div>
               <div>
@@ -405,19 +414,26 @@
                    kann also immer gerendert werden. -->
               <colgroup>
                 <col :style="style.label_col_width ? `width:${style.label_col_width}px` : ''">
+                <col x-show="style.show_row_sum && style.row_sum_position === 'left'">
                 <template x-for="col in columns.filter(c => !c.hidden)" :key="col.uid"><col></template>
+                <col x-show="style.show_row_sum && style.row_sum_position === 'right'">
               </colgroup>
               <thead>
               <tr class="tbl-header-row tbl-group-header-row" x-show="hasColumnGroups()">
                 <th class="tbl-label-col" :style="labelColStyle()">&nbsp;</th>
+                <th x-show="style.show_row_sum && style.row_sum_position === 'left'"></th>
                 <template x-for="(g, gi) in groupHeaderCells()" :key="gi">
                   <th :colspan="g.span" class="tbl-group-header" x-text="g.label"></th>
                 </template>
+                <th x-show="style.show_row_sum && style.row_sum_position === 'right'"></th>
               </tr>
               <tr class="tbl-header-row">
                 <th class="tbl-label-col" :style="labelColStyle()">
                   &nbsp;
                   <span class="tbl-col-resize-handle" x-show="editing" @mousedown.stop.prevent="startLabelColResize($event)" @dblclick.stop.prevent="style.label_col_width = null" data-tooltip="{{ _('Ziehen zum Verändern der Breite, Doppelklick für automatische Breite') }}"></span>
+                </th>
+                <th class="tbl-sum-col tbl-sum-head" x-show="style.show_row_sum && style.row_sum_position === 'left'" :data-tooltip-fixed="sumOverlapping ? t('Einige Spalten überschneiden sich zeitlich (z. B. Woche und Tag). Ihre Werte zählen in der Summe doppelt.') : ''">
+                  <span x-text="sumLabel()"></span><span class="tbl-sum-warn" x-show="sumOverlapping" aria-hidden="true">!</span>
                 </th>
                 <template x-for="col in columns" :key="col.uid">
                   <th x-show="!col.hidden" :class="{'tbl-comparison-col': isComparisonColumn(col)}" :style="colWidthStyle(col)" :data-tooltip-fixed="columnPeriodTooltip(col)" :data-col-uid="col.uid">
@@ -426,7 +442,10 @@
                     <span class="tbl-col-resize-handle" x-show="editing" @mousedown.stop.prevent="startColResize($event, col)" @dblclick.stop.prevent="col.width = null" data-tooltip="{{ _('Ziehen zum Verändern der Breite, Doppelklick für automatische Breite') }}"></span>
                   </th>
                 </template>
-              </tr>
+                <th class="tbl-sum-col tbl-sum-head" x-show="style.show_row_sum && style.row_sum_position === 'right'" :data-tooltip-fixed="sumOverlapping ? t('Einige Spalten überschneiden sich zeitlich (z. B. Woche und Tag). Ihre Werte zählen in der Summe doppelt.') : ''">
+                  <span x-text="sumLabel()"></span><span class="tbl-sum-warn" x-show="sumOverlapping" aria-hidden="true">!</span>
+                </th>
+</tr>
               </thead>
               <tbody>
               <template x-for="(row, idx) in rows" :key="row.uid">
@@ -435,18 +454,24 @@
                     <a x-show="row.row_type === 'entity' && row.entity_ids.length === 1" :href="`${BASE}/entities/${encodeURIComponent(row.entity_ids[0] || '')}`" x-text="resolvedRowLabel(row)"></a>
                     <span x-show="!(row.row_type === 'entity' && row.entity_ids.length === 1)" x-text="resolvedRowLabel(row)"></span>
                   </td>
+                  <td class="tbl-sum-col tbl-num" x-show="style.show_row_sum && style.row_sum_position === 'left' && row.row_type !== 'separator'" :class="{'tbl-sum-empty': !sumCell(row)}" :data-tooltip-fixed="sumEmptyTitle(row)">
+                    <span class="tbl-cell"><span class="tbl-cell-number"><span class="tbl-number-whole" x-text="sumNumberParts(row).whole"></span><span class="tbl-number-separator" x-text="sumNumberParts(row).separator"></span><span class="tbl-number-fraction" x-text="sumNumberParts(row).fraction"></span></span><span class="tbl-cell-unit" x-show="style.show_units && sumUnit(row)" x-text="sumUnit(row)"></span></span>
+                  </td>
                   <template x-for="col in columns" :key="col.uid">
                     <td x-show="row.row_type !== 'separator' && !col.hidden" class="tbl-num" :class="{'tbl-error': cellError(row, col), 'tbl-comparison-col': isComparisonColumn(col)}" :style="colWidthStyle(col) + heatmapStyleFor(row, col)">
                       <span class="tbl-cell"><span class="tbl-cell-number"><span class="tbl-number-whole" x-text="cellNumberParts(row, col).whole"></span><span class="tbl-number-separator" x-text="cellNumberParts(row, col).separator"></span><span class="tbl-number-fraction" x-text="cellNumberParts(row, col).fraction"></span></span><span class="tbl-cell-unit" x-show="style.show_units && cellUnit(row, col)" x-text="cellUnit(row, col)"></span></span>
                       <span class="tbl-cell-deviation" x-show="style.show_deviation && !row.percent_of_total && deviationText(row, col)" :data-tooltip-fixed="deviationTitle(row, col)" x-text="deviationText(row, col)"></span>
                     </td>
                   </template>
-                  <td x-show="row.row_type === 'separator'" :colspan="visibleColumnCount + 1">
+                  <td class="tbl-sum-col tbl-num" x-show="style.show_row_sum && style.row_sum_position === 'right' && row.row_type !== 'separator'" :class="{'tbl-sum-empty': !sumCell(row)}" :data-tooltip-fixed="sumEmptyTitle(row)">
+                    <span class="tbl-cell"><span class="tbl-cell-number"><span class="tbl-number-whole" x-text="sumNumberParts(row).whole"></span><span class="tbl-number-separator" x-text="sumNumberParts(row).separator"></span><span class="tbl-number-fraction" x-text="sumNumberParts(row).fraction"></span></span><span class="tbl-cell-unit" x-show="style.show_units && sumUnit(row)" x-text="sumUnit(row)"></span></span>
+                  </td>
+<td x-show="row.row_type === 'separator'" :colspan="tableColspan">
                     <span class="tbl-separator-content"><span class="tbl-separator-line" aria-hidden="true"></span><span class="tbl-separator-label" x-show="row.show_label && row.label.trim()" x-text="row.label.trim()"></span><span class="tbl-separator-line" x-show="row.show_label && row.label.trim()" aria-hidden="true"></span></span>
                   </td>
                 </tr>
               </template>
-              <tr x-show="!rows.length || !columns.length || !visibleColumnCount || !hasVisibleDataRow"><td :colspan="visibleColumnCount + 1" style="text-align:center;color:var(--ink-faint);">{{ _("Bitte mindestens eine Spalte und eine Zeile anlegen.") }}</td></tr>
+              <tr x-show="!rows.length || !columns.length || !visibleColumnCount || !hasVisibleDataRow"><td :colspan="tableColspan" style="text-align:center;color:var(--ink-faint);">{{ _("Bitte mindestens eine Spalte und eine Zeile anlegen.") }}</td></tr>
               </tbody>
             </table>
           </div>

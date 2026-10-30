@@ -3243,7 +3243,15 @@
     "Auswahl-Assistent": "Selection assistant",
     "Assistent starten": "Start assistant",
     "Sag, was dich interessiert, zum Beispiel Energie oder Wetter. Zeitarchiv prüft dein Home Assistant und schlägt passende Entitäten vor.": "Tell it what you are interested in, for example energy or weather. Zeitarchiv checks your Home Assistant and suggests matching entities.",
-    "Keine Muster in der Auswahl. Vorschläge gibt es im Auswahl-Assistenten.": "No patterns in the selection. Suggestions are in the selection assistant."
+    "Keine Muster in der Auswahl. Vorschläge gibt es im Auswahl-Assistenten.": "No patterns in the selection. Suggestions are in the selection assistant.",
+    "Summenspalte": "Sum column",
+    "links": "left",
+    "rechts": "right",
+    "Zusätzliche Spalte mit der Summe über die Zeiträume je Zeile. Welche Spalten mitzählen, steht in der jeweiligen Spalte.": "Extra column with the sum over the periods for each row. Each column sets whether it counts.",
+    "In Summe einrechnen": "Include in sum",
+    "Diese Spalte in die Summenspalte einrechnen. Ausgeblendete Spalten zählen nie mit.": "Include this column in the sum column. Hidden columns never count.",
+    "Ungültige Position der Summenspalte": "Invalid position of the sum column",
+    "Die Beschriftung der Summenspalte darf höchstens {MAX_TABLE_ROW_SUM_LABEL_LENGTH} Zeichen lang sein": "The label of the sum column may be at most {MAX_TABLE_ROW_SUM_LABEL_LENGTH} characters long"
   },
   "js": {
     "Langzeit": "Long-term",
@@ -3802,6 +3810,10 @@
     "Treffer": "Matches",
     "Alle Entitäten": "All entities",
     "weniger": "less",
-    "mehr … {n}": "more … {n}"
+    "mehr … {n}": "more … {n}",
+    "Einige Spalten überschneiden sich zeitlich (z. B. Woche und Tag). Ihre Werte zählen in der Summe doppelt.": "Some columns overlap in time (e.g. week and day). Their values are counted twice in the sum.",
+    "Die Formel verweist auf eine Zeile ohne Summe": "The formula refers to a row without a sum",
+    "Enthält Zeilen ohne Summe": "Contains rows without a sum",
+    "Für diese Zeile ergibt eine Summe über die Zeiträume keinen Sinn (Durchschnitt, Minimum, Maximum oder Zustand)": "A sum over the periods makes no sense for this row (average, minimum, maximum or state)"
   }
 }

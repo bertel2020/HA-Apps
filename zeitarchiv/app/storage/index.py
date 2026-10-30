@@ -745,7 +745,8 @@ CREATE TABLE IF NOT EXISTS table_columns (
     hidden INTEGER NOT NULL DEFAULT 0,
     group_label TEXT NOT NULL DEFAULT '',
     heatmap INTEGER NOT NULL DEFAULT 0,
-    width INTEGER
+    width INTEGER,
+    in_sum INTEGER NOT NULL DEFAULT 1
 );
 
 -- Eine Zeile ist eine von drei Arten (Konzept: v1 entity, v2 group, v3
@@ -1362,6 +1363,10 @@ class Index:
             # main.py _TableColumnBody.width) — kein DEFAULT 0 o.ä., damit
             # bestehende Spalten unverändert automatisch breit bleiben.
             self._conn.execute("ALTER TABLE table_columns ADD COLUMN width INTEGER")
+        if "in_sum" not in table_column_columns:
+            # DEFAULT 1: bestehende Spalten zählen zur Σ-Spalte, sobald diese
+            # eingeschaltet wird (siehe main.py _TableColumnBody.in_sum).
+            self._conn.execute("ALTER TABLE table_columns ADD COLUMN in_sum INTEGER NOT NULL DEFAULT 1")
 
         dashboard_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(dashboard_pins)")}
         if "grid_cols" not in dashboard_columns:
@@ -3343,13 +3348,13 @@ class Index:
         # zweites with self._lock hier würde deadlocken).
         self._conn.executemany(
             "INSERT INTO table_columns "
-            "(table_id, position, label, range_key, offset, year_over_year, decimals, hidden, group_label, heatmap, width) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "(table_id, position, label, range_key, offset, year_over_year, decimals, hidden, group_label, heatmap, width, in_sum) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     table_id, i, c["label"], c["range_key"], c["offset"], int(c["year_over_year"]),
                     c.get("decimals", "auto"), int(c.get("hidden", False)), c.get("group_label", ""),
-                    int(c.get("heatmap", False)), c.get("width"),
+                    int(c.get("heatmap", False)), c.get("width"), int(c.get("in_sum", True)),
                 )
                 for i, c in enumerate(columns)
             ],
@@ -3457,6 +3462,7 @@ class Index:
                     "label": c["label"], "range_key": c["range_key"], "offset": c["offset"],
                     "year_over_year": bool(c["year_over_year"]), "decimals": c["decimals"],
                     "hidden": bool(c["hidden"]), "group_label": c["group_label"], "heatmap": bool(c["heatmap"]),
+                    "in_sum": bool(c["in_sum"]),
                 }
                 for c in column_rows
             ]

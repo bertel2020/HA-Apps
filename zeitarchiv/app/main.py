@@ -4290,6 +4290,9 @@ class _TableColumnBody(BaseModel):
     # Ziehgriff am rechten Spaltenrand) — None/nicht gesetzt heißt automatische
     # Breite (Standard-Tabellenlayout, richtet sich nach dem Inhalt).
     width: int | None = None
+    # Zählt diese Spalte zur Σ-Spalte (style.show_row_sum) mit? Ausgeblendete
+    # Spalten zählen nie mit, unabhängig von diesem Feld.
+    in_sum: bool = True
 
 
 _TABLE_ROW_AGGREGATIONS = ("auto", "avg", "min", "max", "sum")
@@ -4367,8 +4370,16 @@ class _TableStyleBody(BaseModel):
     # bewusst nur die Werte-Spalten, nicht die Beschriftungsspalte (siehe
     # table_editor.html tbl-style-equal-cols).
     equal_value_cols: bool = False
+    # Σ-Spalte: je Zeile die Summe über die Zeitspalten (siehe
+    # TableCompute.computeRowSums()). Beschriftung und Position links/rechts
+    # der Werte-Spalten frei wählbar.
+    show_row_sum: bool = False
+    row_sum_label: str = "Σ"
+    row_sum_position: str = "left"
 
 
+_TABLE_ROW_SUM_POSITIONS = ("left", "right")
+MAX_TABLE_ROW_SUM_LABEL_LENGTH = 12
 _TABLE_BORDER_OPTIONS = ("horizontal", "grid", "none")
 _TABLE_DENSITY_OPTIONS = ("comfortable", "compact")
 _TABLE_ALIGN_OPTIONS = ("left", "center", "right")
@@ -4462,6 +4473,13 @@ def _validate_table_body(body: _SaveTableBody) -> None:
         raise HTTPException(status_code=400, detail=tr("Ungültige Dichte-Option"))
     if body.style.header_align not in _TABLE_ALIGN_OPTIONS or body.style.value_align not in _TABLE_ALIGN_OPTIONS:
         raise HTTPException(status_code=400, detail=tr("Ungültige Ausrichtungs-Option"))
+    if body.style.row_sum_position not in _TABLE_ROW_SUM_POSITIONS:
+        raise HTTPException(status_code=400, detail=tr("Ungültige Position der Summenspalte"))
+    if len(body.style.row_sum_label) > MAX_TABLE_ROW_SUM_LABEL_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=tr("Die Beschriftung der Summenspalte darf höchstens {MAX_TABLE_ROW_SUM_LABEL_LENGTH} Zeichen lang sein", MAX_TABLE_ROW_SUM_LABEL_LENGTH=MAX_TABLE_ROW_SUM_LABEL_LENGTH),
+        )
 
 
 # Muss VOR "/tables/{table_id}" stehen — dieselbe Begründung wie bei

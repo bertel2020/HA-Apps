@@ -533,6 +533,10 @@
   .tbl-style-sticky-header.tbl-style-sticky-first-col tr.tbl-header-row th:first-child{z-index:4;}
   .tbl-style-comparison-columns:not(.tbl-style-header-accent) .tbl-comparison-col{color:var(--ink-muted);}
   .tbl-style-comparison-columns.tbl-style-header-accent th.tbl-comparison-col{color:color-mix(in srgb, var(--accent-contrast) 72%, var(--accent-line));}
+  .tbl-sum-col{background:color-mix(in srgb, var(--accent-line) 8%, transparent);font-weight:600;}
+  .tbl-sum-head{color:var(--accent-line);}
+  .tbl-sum-empty{color:var(--ink-muted);font-weight:400;}
+  .tbl-sum-warn{display:inline-block;margin-left:4px;color:var(--accent-bar);font-weight:700;}
   .tbl-style-align-units .tbl-cell-unit{display:inline-block;min-width:3.5em;text-align:left;color:var(--ink-muted);}
   .tbl-style-small-units .tbl-cell-unit{font-size:.82em;color:var(--ink-muted);}
   .tbl-style-align-numbers .tbl-cell-number{display:inline-grid;grid-template-columns:auto .45em 2.4em;align-items:baseline;text-align:right;}

@@ -1343,6 +1343,17 @@ Rein optische Einstellungen, wirken sich nie auf die berechneten Werte aus:
 - **Vergleich:** Vergleichsspalten (Vortag, Vormonat, Vorjahr …) optisch
   absetzen, prozentuale Abweichung zur zugehörigen Vergleichsspalte
   anzeigen.
+- **Summenspalte:** Eine zusätzliche Spalte (links oder rechts der
+  Zeiträume, Beschriftung frei wählbar) zeigt je Zeile die Summe über die
+  Zeiträume. In jeder Spaltenkarte steht „In Summe einrechnen“, so lässt
+  sich z. B. bei 8 Tagen der älteste herausnehmen. Ausgeblendete Spalten
+  zählen nie mit. Summiert werden Zähler und Schalter sowie Zeilen mit
+  Aggregation „Σ Summe“; Durchschnitt, Minimum, Maximum und Zustände zeigen
+  „–“. Formelzeilen rechnen ihre Formel noch einmal auf den Summen, ein
+  Quotient wie „A / B“ ergibt also ΣA ÷ ΣB. Überschneiden sich einbezogene
+  Spalten zeitlich (z. B. Woche und Tag), warnt die Kopfzelle, weil dann
+  doppelt gezählt wird. Die Spalte erscheint auch in Dashboard-Kacheln und
+  im CSV-Export.
 - **Zahlen / Einheiten:** Einheiten ein-/ausblenden, in einer festen Spalte
   ausrichten oder kleiner darstellen, Dezimaltrennzeichen spaltenweise
   ausrichten, fehlende Werte als „Keine Daten“ statt als Gedankenstrich

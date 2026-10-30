@@ -16,8 +16,8 @@ def test_editor_offers_separator_and_full_width_preview() -> None:
     assert "row.row_type === 'separator'" in EDITOR
     assert 'class="tbl-separator-line"' in EDITOR
     # Berücksichtigt seither ausgeblendete Spalten (visibleColumnCount statt
-    # der rohen Spaltenanzahl).
-    assert ':colspan="visibleColumnCount + 1"' in EDITOR
+    # der rohen Spaltenanzahl), plus Summenspalte (tableColspan).
+    assert ':colspan="tableColspan"' in EDITOR
 
 
 def test_separator_can_be_positioned_in_existing_tables() -> None:

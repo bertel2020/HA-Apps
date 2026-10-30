@@ -304,6 +304,9 @@ window.TableCompute = (() => {
     // Grundlage für comparisonElapsedTimeText() unten (Uhrzeit-Anzeige im
     // Abweichungs-Tooltip). null, wenn die Spalte ungekappt ist.
     const elapsedSeconds = columns.map(() => null);
+    // Je Entität-/Gruppen-Zeile: darf eine Σ-Spalte die Spaltenwerte
+    // aufsummieren? (siehe computeRowSums()). Nach der Server-Antwort gesetzt.
+    const summable = rows.map(() => false);
 
     let columnData = [];
     if (allEntityIds.length) {
@@ -350,6 +353,11 @@ window.TableCompute = (() => {
         const members = row.entity_ids.map(id => byEntity[id]).filter(Boolean);
         if (!members.length) { values[ci][ri] = null; return; }
         const aggregation = row.aggregation || 'auto';
+        // Summierbar: ausdrücklich "Σ Summe", oder "Automatisch" bei lauter
+        // Zählern/Schaltern. Ø/Min/Max und Zustände sind es nie — selbst ein
+        // Zähler mit Zeilen-Aggregation "max" darf nicht addiert werden.
+        summable[ri] = row.entity_ids.length === members.length && (aggregation === 'sum'
+          || (aggregation === 'auto' && members.every(s => s.aggregation_type === 'counter' || s.aggregation_type === 'switch')));
         const memberValues = members.map(s => memberValueFor(s, aggregation));
         const memberComparisonValues = members.map(s => memberComparisonValueFor(s, aggregation));
         let value;
@@ -431,7 +439,98 @@ window.TableCompute = (() => {
       });
     });
 
-    return {values, windowStarts, windowEnds, isCurrent, elapsedSeconds};
+    return {values, windowStarts, windowEnds, isCurrent, elapsedSeconds, summable};
+  }
+
+  // Σ-Spalte: je Zeile die Summe über die einbezogenen Spalten (nicht
+  // ausgeblendet, col.in_sum !== false). Ein Ergebnis je Zeile, im Format von
+  // values[ci][ri]; null = keine Summe ("–"). Läuft in Zeilenreihenfolge wie
+  // computeValues(), damit Formeln auf bereits berechnete Σ-Werte zugreifen.
+  // - Entität/Gruppe: Summe der Spaltenwerte, nur wenn summable[ri] (Zähler/
+  //   Schalter bzw. Aggregation "Σ Summe"), sonst null.
+  // - Formel: dieselbe Formel noch einmal auf den Σ-Werten ihrer Zeilen —
+  //   bei A/B*100 ergibt das ΣA/ΣB statt einer Summe von Quotienten. Ist eine
+  //   referenzierte Zeile null, ist es die Formel auch.
+  // - Summenzeile: Summe (bzw. Ø) der Σ ihrer Abschnitts-Mitglieder, null,
+  //   sobald eines davon null ist (eine Teilsumme sähe vollständig aus).
+  // - % Anteil: Σ der Zeile im Verhältnis zur Σ des ganzen Abschnitts.
+  function computeRowSums(columns, rows, values, summable) {
+    const included = columns.map((c, ci) => ci).filter(ci => !columns[ci].hidden && columns[ci].in_sum !== false);
+    const letters = rowLetters(rows);
+    const raw = rows.map(() => null);
+    const isMember = r => r.row_type === 'entity' || r.row_type === 'group';
+    const sectionOf = (ri) => {
+      // Dieselbe Abschnitts-Suche wie bei der Summenzeile in computeValues().
+      let sectionEnd = ri;
+      while (true) {
+        let sectionStart = 0;
+        for (let j = sectionEnd - 1; j >= 0; j--) {
+          if (rows[j].row_type === 'separator') { sectionStart = j + 1; break; }
+        }
+        const hasMembers = rows.slice(sectionStart, sectionEnd).some(isMember);
+        if (!hasMembers && sectionStart > 0) { sectionEnd = sectionStart - 1; continue; }
+        return {start: sectionStart, end: sectionEnd};
+      }
+    };
+    rows.forEach((row, ri) => {
+      if (isMember(row)) {
+        if (!summable || !summable[ri]) return;
+        const cells = included.map(ci => values[ci][ri]).filter(c => c && !c.error && c.value != null);
+        if (!cells.length) return;
+        const units = [...new Set(cells.map(c => c.unit || ''))];
+        raw[ri] = {value: cells.reduce((a, c) => a + c.value, 0), unit: units.length === 1 ? units[0] : ''};
+      } else if (row.row_type === 'formula') {
+        if (!included.length) return;
+        const refs = [...new Set((row.formula || '').toUpperCase().match(/[A-Z]/g) || [])];
+        const scope = {};
+        const unitScope = {};
+        for (let j = 0; j < ri; j++) {
+          if (!letters[j]) continue;
+          scope[letters[j]] = raw[j] ? raw[j].value : null;
+          unitScope[letters[j]] = raw[j] ? (raw[j].unit || '') : '';
+        }
+        if (refs.some(l => l in scope && scope[l] == null)) return;
+        const unit = (row.formula_unit || '').trim() || inheritedFormulaUnit(row.formula, unitScope);
+        try {
+          const value = evalFormula(row.formula, scope);
+          raw[ri] = value == null ? null : {value, unit};
+        } catch (e) {
+          raw[ri] = null;
+        }
+      } else if (row.row_type === 'summary') {
+        const {start, end} = sectionOf(ri);
+        const members = [];
+        for (let j = start; j < end; j++) if (isMember(rows[j])) members.push(raw[j]);
+        if (!members.length || members.some(m => m == null)) return;
+        const total = members.reduce((a, m) => a + m.value, 0);
+        const units = [...new Set(members.map(m => m.unit || ''))];
+        raw[ri] = {value: row.aggregation === 'avg' ? total / members.length : total, unit: units.length === 1 ? units[0] : ''};
+      }
+    });
+    return rows.map((row, ri) => {
+      if (!raw[ri] || !row.percent_of_total || !isMember(row)) return raw[ri];
+      // Eigener Abschnitt der Zeile (anders als bei der Summenzeile keine
+      // Rückwärtssuche über Trennlinien hinweg).
+      let start = 0;
+      for (let j = ri - 1; j >= 0; j--) { if (rows[j].row_type === 'separator') { start = j + 1; break; } }
+      const cells = [];
+      for (let j = start; j < rows.length && rows[j].row_type !== 'separator'; j++) if (isMember(rows[j])) cells.push(raw[j]);
+      return percentOfTotalCell(raw[ri], cells);
+    });
+  }
+
+  // Warnung für die Kopfzelle: überschneiden sich zwei einbezogene Spalten
+  // zeitlich (z. B. "Woche" und "Tag"), zählt Σ Werte doppelt.
+  function sumOverlap(columns, windowStarts, windowEnds) {
+    const spans = [];
+    columns.forEach((col, ci) => {
+      if (col.hidden || col.in_sum === false) return;
+      if (windowStarts[ci] == null || windowEnds[ci] == null) return;
+      spans.push([windowStarts[ci], windowEnds[ci]]);
+    });
+    spans.sort((a, b) => a[0] - b[0]);
+    for (let i = 1; i < spans.length; i++) if (spans[i][0] < spans[i - 1][1]) return true;
+    return false;
   }
 
   // Datum/Uhrzeit in der Zeitzone des Servers (static/js/server-time.js), nicht
@@ -647,7 +746,7 @@ window.TableCompute = (() => {
   return {
     evalFormula, inheritedFormulaUnit, fmtNum, cellValueText, cellUnit, cellNumberParts, cellText,
     isComparisonColumn, comparisonIndexForBase, deviationText, comparisonValueText, comparisonElapsedTimeText, percentOfTotalCell, heatmapStyle,
-    rowLetters, computeValues, styleClasses, currentPeriodNote, currentPeriodShortSuffix,
+    rowLetters, computeValues, computeRowSums, sumOverlap, styleClasses, currentPeriodNote, currentPeriodShortSuffix,
     resolveLabel, LABEL_VARIABLES,
   };
 })();
