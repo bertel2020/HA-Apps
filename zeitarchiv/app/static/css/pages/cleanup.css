@@ -218,6 +218,10 @@
      eigenen, leicht unterschiedlichen Inhaltsgröße rendern. */
   #rows-table table.dt.compact td{height:calc(30px * var(--font-scale, 1));vertical-align:middle;}
   .value-unit{color:var(--ink-faint);font-size:calc(11.5px * var(--font-scale, 1));}
+  .rows-actionbar .btn-primary{background:var(--accent-line);}
+  .correct-bulk{display:flex;align-items:center;gap:8px;flex:1;}
+  .correct-bulk[hidden]{display:none;}
+  .correct-bulk .btn:first-of-type{margin-left:auto;}
   .correct-inline{display:flex;align-items:center;gap:6px;}
   .correct-inline input{
     width:110px;font-family:inherit;font-size:inherit;padding:4px 6px;border-radius:6px;

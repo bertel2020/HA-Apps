@@ -188,7 +188,18 @@
       // die Zeile zur Geschwister-Zelle statt über eine (nicht vorhandene)
       // gemeinsame Elternschaft.
       const cell = btn.closest('tr').querySelector('.correct-value-cell');
+      startCorrectCell(cell);
+    }
+
+    function startCorrectCell(cell) {
+      if (cell.dataset.editing === 'true') {
+        const open = cell.querySelector('input, select');
+        open.focus();
+        if (open.select) open.select();
+        return;
+      }
       const oldValue = cell.dataset.oldValue;
+      cell._unit = cell.querySelector('.value-unit')?.cloneNode(true) ?? null;
       cell.dataset.editing = 'true';
       cell.replaceChildren();
       const wrapper = document.createElement('span');
@@ -224,29 +235,98 @@
       cancel.className = 'correct-cancel';
       cancel.title = t('Abbrechen');
       cancel.textContent = '✗';
-      cancel.addEventListener('click', () => htmx.trigger('#controls', 'change'));
+      cancel.addEventListener('click', () => cancelCorrect(cell));
       wrapper.append(input, confirm, cancel);
       cell.append(wrapper);
       input.focus();
+      // Beim Anklicken ist der alte Wert markiert: Tippen überschreibt ihn.
+      if (input.select) input.select();
+      updateCorrectBar();
     }
 
-    async function confirmCorrect(btn) {
-      const cell = btn.closest('.correct-value-cell');
+    // Mehrere Zeilen können gleichzeitig offen sein. Neu geladen wird erst,
+    // wenn keine mehr offen ist — ein Neuladen würde sonst alle noch nicht
+    // gespeicherten Eingaben der anderen Zeilen verwerfen.
+    function openCorrectCells() {
+      return [...document.querySelectorAll('.correct-value-cell[data-editing="true"]')];
+    }
+
+    function updateCorrectBar() {
+      const bulk = document.getElementById('correct-bulk');
+      if (!bulk) return;
+      const n = openCorrectCells().length;
+      bulk.hidden = n === 0;
+      document.getElementById('correct-hint').hidden = n > 0;
+      document.getElementById('correct-bulk-count').textContent = t('{count} in Bearbeitung', {count: n});
+      document.getElementById('correct-save-all').textContent = t('Alle speichern ({count})', {count: n});
+    }
+
+    function cancelCorrect(cell) {
+      if (openCorrectCells().length <= 1) { htmx.trigger('#controls', 'change'); return; }
+      finishCorrectCell(cell, null);
+    }
+
+    function cancelAllCorrect() {
+      htmx.trigger('#controls', 'change');
+    }
+
+    // Zelle ohne Neuladen zurück in die Anzeige: mit dem neuen Wert nach dem
+    // Speichern, mit dem alten (newValue null) nach Abbrechen.
+    function finishCorrectCell(cell, newValue) {
+      const input = cell.querySelector('input, select');
+      let text;
+      if (newValue === null) {
+        text = Number(cell.dataset.oldValue).toLocaleString(undefined, {maximumFractionDigits: 6});
+      } else if (input.tagName === 'SELECT') {
+        text = input.selectedOptions[0].textContent;
+        cell.dataset.oldValue = String(newValue);
+      } else {
+        text = newValue.toLocaleString(undefined, {maximumFractionDigits: 6});
+        cell.dataset.oldValue = String(newValue);
+      }
+      cell.replaceChildren(text);
+      if (cell._unit) cell.append(' ', cell._unit);
+      delete cell.dataset.editing;
+      updateCorrectBar();
+    }
+
+    async function postCorrect(cell) {
       const input = cell.querySelector('input, select');
       const newValue = parseFloat(input.value);
-      if (Number.isNaN(newValue)) { input.focus(); return; }
-      btn.disabled = true;
+      if (Number.isNaN(newValue)) { input.focus(); return false; }
       try {
         const res = await fetch(`${BASE}/entities/${ENTITY_ID}/rows/correct`, {
           method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ts: parseFloat(cell.dataset.ts), old_value: parseFloat(cell.dataset.oldValue), new_value: newValue}),
         });
-        if (!res.ok) { appAlert(t('Korrigieren fehlgeschlagen.')); btn.disabled = false; return; }
-        htmx.trigger('#controls', 'change');
+        if (!res.ok) return false;
       } catch (e) {
-        appAlert(t('Korrigieren fehlgeschlagen.'));
-        btn.disabled = false;
+        return false;
       }
+      finishCorrectCell(cell, newValue);
+      return true;
+    }
+
+    async function saveAllCorrect(btn) {
+      btn.disabled = true;
+      let failed = 0;
+      for (const cell of openCorrectCells()) {
+        if (!(await postCorrect(cell))) failed++;
+      }
+      btn.disabled = false;
+      if (failed) { appAlert(t('Korrigieren fehlgeschlagen.')); return; }
+      htmx.trigger('#controls', 'change');
+    }
+
+    async function confirmCorrect(btn) {
+      const cell = btn.closest('.correct-value-cell');
+      btn.disabled = true;
+      if (!(await postCorrect(cell))) {
+        if (cell.dataset.editing === 'true') appAlert(t('Korrigieren fehlgeschlagen.'));
+        btn.disabled = false;
+        return;
+      }
+      if (openCorrectCells().length === 0) htmx.trigger('#controls', 'change');
     }
 
     // range-field/offset-field (in #controls) sind die einzige Quelle der

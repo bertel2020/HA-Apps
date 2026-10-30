@@ -119,7 +119,12 @@
 {% endif %}
 <div class="rows-actionbar">
   {% if mode == 'correct' %}
-  {{ _("✎ auf eine Zeile klicken, um ihren Wert zu korrigieren.") }}
+  <span id="correct-hint" class="correct-hint">{{ _("✎ auf eine Zeile klicken, um ihren Wert zu korrigieren.") }}</span>
+  <span id="correct-bulk" class="correct-bulk" hidden>
+    <strong id="correct-bulk-count"></strong>
+    <button type="button" class="btn" onclick="cancelAllCorrect()">{{ _("Alle verwerfen") }}</button>
+    <button type="button" class="btn btn-primary" id="correct-save-all" onclick="saveAllCorrect(this)"></button>
+  </span>
   {% else %}
   <strong><span id="selected-count">0</span> {{ _("ausgewählt") }}</strong>
   <button class="btn btn-danger needs-selection" disabled
