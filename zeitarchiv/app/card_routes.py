@@ -227,7 +227,6 @@ def create_card_router(
     time_zone: str,
     check_auth: Callable[..., None],
     query_multi: Callable[..., dict],
-    app_link: Callable[[], str | None] = lambda: None,
     query_table: Callable[[dict], dict] | None = None,
 ) -> APIRouter:
     router = APIRouter()
@@ -299,8 +298,6 @@ def create_card_router(
             "supported": supported,
             "spec": chart_spec(chart, chart_type),
             "env": {"timezone": time_zone},
-            # Pfad der Zeitarchiv-Seite in Home Assistant, für den Link der Karte; None ohne Supervisor.
-            "app_link": app_link(),
             "data": None,
         }
         visible = [entity_id for entity_id in chart["entity_ids"] if entity_id not in chart["hidden_entity_ids"]]
@@ -337,7 +334,7 @@ def create_card_router(
             {"id": row["id"], "name": row["name"], "kind": "table", "column_count": row["column_count"], "row_count": row["row_count"]}
             for row in index.list_saved_tables()
         ]
-        return {"spec_version": SPEC_VERSION, "items": items, "tables": tables, "app_link": app_link()}
+        return {"spec_version": SPEC_VERSION, "items": items, "tables": tables}
 
     @router.get("/api/card/chart")
     def card_chart(
@@ -374,7 +371,7 @@ def create_card_router(
         result = {
             "spec_version": SPEC_VERSION, "id": table["id"], "name": table["name"],
             "table": {"columns": table["columns"], "rows": table["rows"], "style": table["style"]},
-            "env": {"timezone": time_zone}, "app_link": app_link(), "query": {"columns": []},
+            "env": {"timezone": time_zone}, "query": {"columns": []},
         }
         visible = [col for col in table["columns"] if not col.get("hidden")]
         body = table_query_body(visible, table["rows"], at)
@@ -424,7 +421,7 @@ def create_card_router(
         result = {
             "spec_version": SPEC_VERSION, "entity_id": entity_id, "range": range,
             "supported": entity["aggregation_type"] not in SPARK_UNSUPPORTED_TYPES, "unit": entity["unit"],
-            "aggregation_type": entity["aggregation_type"], "points": [], "app_link": app_link(),
+            "aggregation_type": entity["aggregation_type"], "points": [],
         }
         if not result["supported"]:
             return result

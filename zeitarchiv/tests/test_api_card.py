@@ -59,7 +59,7 @@ class _FakeIndex:
 TYPES = {"sensor.a": "standard", "sensor.b": "counter", "switch.c": "switch", "select.d": "state"}
 
 
-def _client(charts: list[dict], query_multi=None, app_link=lambda: None, tables=None, query_table=None) -> tuple[TestClient, list[dict]]:
+def _client(charts: list[dict], query_multi=None, tables=None, query_table=None) -> tuple[TestClient, list[dict]]:
     calls: list[dict] = []
 
     def default_query(**kwargs) -> dict:
@@ -73,7 +73,7 @@ def _client(charts: list[dict], query_multi=None, app_link=lambda: None, tables=
     app = FastAPI()
     index = _FakeIndex(charts, TYPES)
     index.tables = {t["id"]: t for t in (tables or [])}
-    app.include_router(create_card_router(index, "Europe/Berlin", check_auth, query_multi or default_query, app_link, query_table))
+    app.include_router(create_card_router(index, "Europe/Berlin", check_auth, query_multi or default_query, query_table))
     return TestClient(app), calls
 
 
@@ -304,15 +304,6 @@ def test_the_real_app_serves_a_saved_chart_with_its_token(client) -> None:
     assert table["query"]["columns"][0]["series"][0]["entity_id"] == "sensor.card_probe"
 
 
-def test_the_app_reports_its_page_in_home_assistant() -> None:
-    client, _ = _client([_chart(1, ["sensor.a"])], app_link=lambda: "/hassio/ingress/abc_zeitarchiv")
-    assert client.get("/api/card/items", headers=AUTH).json()["app_link"] == "/hassio/ingress/abc_zeitarchiv"
-    assert client.get("/api/card/chart", params={"id": 1}, headers=AUTH).json()["app_link"] == "/hassio/ingress/abc_zeitarchiv"
-    # Ohne Supervisor gibt es keinen Link, das Feld bleibt trotzdem da.
-    client, _ = _client([_chart(1, ["sensor.a"])])
-    assert client.get("/api/card/items", headers=AUTH).json()["app_link"] is None
-
-
 # --- Karte ohne gespeichertes Chart ----------------------------------------------------------
 
 
@@ -410,7 +401,7 @@ def _spark_query(**kwargs) -> dict:
 
 def _spark_client():
     _spark_query.calls = []
-    client, _ = _client([], query_multi=_spark_query, app_link=lambda: "/hassio/ingress/x_zeitarchiv")
+    client, _ = _client([], query_multi=_spark_query)
     return client, _spark_query.calls
 
 
@@ -418,7 +409,6 @@ def test_a_spark_asks_the_same_query_as_the_chart_for_one_entity() -> None:
     client, calls = _spark_client()
     body = client.get("/api/card/spark", params={"entity_id": "sensor.a", "range": "7d"}, headers=AUTH).json()
     assert body["supported"] is True and body["unit"] == "kWh" and body["decimals"] == 1
-    assert body["app_link"] == "/hassio/ingress/x_zeitarchiv"
     assert 0 < len(body["points"]) <= SPARK_MAX_POINTS
     assert (calls[0]["entity_ids"], calls[0]["range"], calls[0]["continuous"]) == ("sensor.a", "week", True)
     assert {key: SPARK_RANGES[key] for key in SPARK_RANGES} == {"24h": ("day", True), "7d": ("week", True), "30d": ("month", True)}
