@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from _paths import TEMPLATES, page_text, template_text
+from _paths import TEMPLATES, page_text, template_text, tile_js
 from app.main import asset as asset_helper
 
 
@@ -115,7 +115,7 @@ def test_dashboard_tile_has_three_by_three_size_picker_and_grid_spans() -> None:
 
 def test_dashboard_css_and_script_support_variable_tile_sizes() -> None:
     template = page_text("entities.html")
-    script = (TEMPLATES_DIR.parent / "static" / "js" / "dashboard-tiles.js").read_text(encoding="utf-8")
+    script = tile_js()
     assert "grid-auto-rows:var(--dashboard-row-height)" in template
     assert "--dashboard-row-height:{{ dashboard_row_height | default(218) }}px" in template
     assert 'data-grid-cols="3"' in template
@@ -135,7 +135,7 @@ def test_dashboard_tile_title_only_reserves_space_for_one_menu_button() -> None:
 def test_value_tile_editor_and_sparkline_defaults_are_exposed() -> None:
     menu = template_text("_dashboard_tile_menu.html")
     tiles = template_text("_dashboard_tiles.html")
-    script = (TEMPLATES_DIR.parent / "static" / "js" / "dashboard-tiles.js").read_text(encoding="utf-8")
+    script = tile_js()
     assert "auto_open_pin_id == tile.pin_id" in menu
     assert 'name="new_entity_id"' in menu
     assert "entityPicker(" in menu
@@ -172,7 +172,7 @@ def test_table_tile_sticky_corner_stays_above_header_and_first_column() -> None:
 
 
 def test_table_tile_keeps_saved_widths_scrollable_and_sticky_borders_attached() -> None:
-    script = (TEMPLATES_DIR.parent / "static" / "js" / "dashboard-tiles.js").read_text(encoding="utf-8")
+    script = tile_js()
     assert "width:${w}px;min-width:${w}px;max-width:${w}px" in script
     # Eine gespeicherte Label-Breite allein erzwingt seither kein Spalten-
     # Layout mehr — nur noch gespeicherte Wert-Breiten (savedValueWidths).
@@ -237,7 +237,7 @@ def test_only_the_size_heading_repeats_its_value() -> None:
     # Die Kachelgröße ist die Ausnahme — und die einzige.
     assert '<div class="dtile-size-picker-head">Kachelgröße <strong>' in menu
 
-    script = (TEMPLATES_DIR.parent / "static" / "js" / "dashboard-tiles.js").read_text(encoding="utf-8")
+    script = tile_js()
     assert "data-head" not in script, "toter Nachzieh-Code"
 
 

@@ -9,12 +9,12 @@ from pathlib import Path
 
 from app.storage.index import Index
 
-from _paths import APP, page_text
+from _paths import APP, page_text, tile_js
 
 EDITOR = page_text("table_editor.html")
 EDITOR_JS = (APP / "static/js/pages/table_editor.js").read_text(encoding="utf-8")
 COMPUTE = (APP / "static/js/table-compute.js").read_text(encoding="utf-8")
-DASHBOARD = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+DASHBOARD = tile_js()
 MAIN = (APP / "main.py").read_text(encoding="utf-8")
 
 

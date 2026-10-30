@@ -267,6 +267,44 @@ window.TableCompute = (() => {
     return null;
   }
 
+  // Der Körper der Abfrage an /api/query-table: alle gebrauchten Entitäten und je Spalte Zeitraum,
+  // Versatz und Vergleichsart. Rein, damit der Server (card_routes.table_query_body) dieselbe Abfrage
+  // stellen kann; ein Test hält beide gleich. Ohne Entität-/Gruppen-Zeile gibt es nichts zu fragen (null).
+  function queryBody(columns, rows, at = null) {
+    const entityRows = rows.filter(r => r.row_type === 'entity' || r.row_type === 'group');
+    const entityIds = [...new Set(entityRows.flatMap(r => r.entity_ids))];
+    if (!entityIds.length) return null;
+    return {
+      entity_ids: entityIds,
+      at,
+      columns: columns.map(col => ({
+        range_key: col.range_key,
+        offset: col.offset || 0,
+        year_over_year: !!col.year_over_year,
+        // "Gleicher Zeitpunkt"-Vergleich: eine Vergleichsspalte (Versatz<0)
+        // wird auf denselben Abstand vom Periodenanfang gekappt wie die
+        // noch laufende aktuelle Periode — aber NUR, wenn diese Tabelle
+        // überhaupt eine laufende Basis-Spalte (Versatz 0, kein
+        // Vorjahresvergleich) mit demselben Zeitraum-Typ enthält. Ohne
+        // Basis-Spalte bleibt die Vergleichsspalte unverändert vollständig
+        // (z. B. eine reine "Vormonat"-Spalte ohne "Monat" daneben).
+        same_elapsed: !at && (col.offset || 0) < 0 && !col.year_over_year
+          && columns.some(c => c.range_key === col.range_key && (c.offset || 0) === 0 && !c.year_over_year),
+      })),
+    };
+  }
+
+  // Die Abfrage der Oberfläche; die Lovelace-Karte reicht stattdessen die fertige Antwort des Servers.
+  const defaultQueryTable = (base) => async (body) => {
+    const res = await fetch(`${base}/api/query-table`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(t('Tabellenabfrage fehlgeschlagen ({status})',{status: res.status}));
+    return res.json();
+  };
+
   // Berechnet values[colIndex][rowIndex] = {value, unit} | {error:true} | null
   // — ein gemeinsamer Request an /api/query-table für alle Spalten und
   // gebrauchten Entitäten, Formel-Zeilen danach in Zeilen-
@@ -282,7 +320,8 @@ window.TableCompute = (() => {
   // dashboard-tiles.js) — der Server verschiebt damit jede Spalte auf die
   // Periode, die diesen Tag enthält. Eine solche Periode läuft nicht mehr,
   // deshalb dann auch kein "Gleicher Zeitpunkt"-Vergleich.
-  async function computeValues(base, columns, rows, {at = null} = {}) {
+  // queryTable: optional eine eigene Abfrage (body → Antwort von /api/query-table), statt sie über fetch zu stellen.
+  async function computeValues(base, columns, rows, {at = null, queryTable = null} = {}) {
     const letters = rowLetters(rows);
     const entityRows = rows.filter(r => r.row_type === 'entity' || r.row_type === 'group');
     const allEntityIds = [...new Set(entityRows.flatMap(r => r.entity_ids))];
@@ -311,30 +350,7 @@ window.TableCompute = (() => {
     let columnData = [];
     if (allEntityIds.length) {
       try {
-        const res = await fetch(`${base}/api/query-table`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            entity_ids: allEntityIds,
-            at,
-            columns: columns.map(col => ({
-              range_key: col.range_key,
-              offset: col.offset || 0,
-              year_over_year: !!col.year_over_year,
-              // "Gleicher Zeitpunkt"-Vergleich: eine Vergleichsspalte (Versatz<0)
-              // wird auf denselben Abstand vom Periodenanfang gekappt wie die
-              // noch laufende aktuelle Periode — aber NUR, wenn diese Tabelle
-              // überhaupt eine laufende Basis-Spalte (Versatz 0, kein
-              // Vorjahresvergleich) mit demselben Zeitraum-Typ enthält. Ohne
-              // Basis-Spalte bleibt die Vergleichsspalte unverändert vollständig
-              // (z. B. eine reine "Vormonat"-Spalte ohne "Monat" daneben).
-              same_elapsed: !at && (col.offset || 0) < 0 && !col.year_over_year
-                && columns.some(c => c.range_key === col.range_key && (c.offset || 0) === 0 && !c.year_over_year),
-            })),
-          }),
-        });
-        if (!res.ok) throw new Error(t('Tabellenabfrage fehlgeschlagen ({status})',{status: res.status}));
-        columnData = (await res.json()).columns || [];
+        columnData = (await (queryTable || defaultQueryTable(base))(queryBody(columns, rows, at))).columns || [];
       } catch (e) {
         columnData = [];
       }
@@ -746,7 +762,7 @@ window.TableCompute = (() => {
   return {
     evalFormula, inheritedFormulaUnit, fmtNum, cellValueText, cellUnit, cellNumberParts, cellText,
     isComparisonColumn, comparisonIndexForBase, deviationText, comparisonValueText, comparisonElapsedTimeText, percentOfTotalCell, heatmapStyle,
-    rowLetters, computeValues, computeRowSums, sumOverlap, styleClasses, currentPeriodNote, currentPeriodShortSuffix,
+    rowLetters, computeValues, queryBody, computeRowSums, sumOverlap, styleClasses, currentPeriodNote, currentPeriodShortSuffix,
     resolveLabel, LABEL_VARIABLES,
   };
 })();

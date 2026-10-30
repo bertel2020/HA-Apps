@@ -1,11 +1,11 @@
 """Regression tests for formula rows and hidden rows in the dashboard table tile."""
 
 
-from _paths import APP
+from _paths import APP, tile_js
 
 
 COMPUTE = (APP / "static/js/table-compute.js").read_text(encoding="utf-8")
-DASHBOARD = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+DASHBOARD = tile_js()
 
 
 def test_tile_computes_formulas_over_hidden_rows_too() -> None:

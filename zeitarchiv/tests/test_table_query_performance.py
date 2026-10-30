@@ -25,12 +25,12 @@ from app.api_routes import (
 from app.storage.coordinator import StorageCoordinator
 from app.storage.index import Index
 
-from _paths import APP, TEMPLATES, page_text
+from _paths import APP, TEMPLATES, page_text, tile_js
 
 
 TZ = ZoneInfo("Europe/Berlin")
 COMPUTE = (APP / "static/js/table-compute.js").read_text(encoding="utf-8")
-DASHBOARD = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+DASHBOARD = tile_js()
 FIXED_TOOLTIP = (APP / "static/js/fixed-tooltip.js").read_text(encoding="utf-8")
 TABLE_EDITOR = page_text("table_editor.html")
 

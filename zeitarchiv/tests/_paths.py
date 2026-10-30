@@ -45,7 +45,7 @@ if str(ADDON) not in sys.path:
 
 
 def tile_js() -> str:
-    """Quelltext der Dashboard-Kacheln: Darstellung (chart-tile-render.js) plus Kachel-Hülle.
+    """Quelltext der Dashboard-Kacheln: Darstellung (chart-/table-tile-render.js) plus Kachel-Hülle.
 
     Die Chart-Darstellung wurde aus dashboard-tiles.js herausgelöst (Phase 0 der
     Lovelace-Karte). Quelltext-Tests, die eine Zeichenregel der Kachel prüfen,
@@ -53,7 +53,7 @@ def tile_js() -> str:
     """
     return "\n".join(
         (APP_JS / name).read_text(encoding="utf-8")
-        for name in ("chart-tile-render.js", "dashboard-tiles.js")
+        for name in ("chart-tile-render.js", "table-tile-render.js", "dashboard-tiles.js")
     )
 
 

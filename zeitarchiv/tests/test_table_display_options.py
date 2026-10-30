@@ -1,13 +1,13 @@
 """Regressionstests für optionale Darstellungsmerkmale von Vergleichstabellen."""
 
 
-from _paths import APP, page_text
+from _paths import APP, page_text, tile_js
 
 
 
 EDITOR = page_text("table_editor.html")
 COMPUTE = (APP / "static/js/table-compute.js").read_text(encoding="utf-8")
-DASHBOARD = (APP / "static/js/dashboard-tiles.js").read_text(encoding="utf-8")
+DASHBOARD = tile_js()
 MAIN = (APP / "main.py").read_text(encoding="utf-8")
 
 
