@@ -1296,6 +1296,13 @@ class Index:
             # Entität gültig und verschiebt sich, wenn sie neu zugeordnet
             # wird. '{}' = überall die Vorbelegung (größte Streuung).
             self._conn.execute("ALTER TABLE saved_charts ADD COLUMN heatmap_states TEXT NOT NULL DEFAULT '{}'")
+        if "series_colors" not in sc_columns:
+            # Eigene Farbe je Serie als JSON {entity_id: "palette:N" | "#rrggbb"}.
+            # Nur Überschreibungen; fehlt ein Eintrag, gilt wie bisher die
+            # Palettenfarbe nach Position in entity_ids ("Auto"). "palette:N"
+            # statt des aufgelösten Hex-Werts, damit die Farbe beim Wechsel
+            # des Themes mitgeht. Siehe series_colors_clean() in chart_types.py.
+            self._conn.execute("ALTER TABLE saved_charts ADD COLUMN series_colors TEXT NOT NULL DEFAULT '{}'")
 
         if self._conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='saved_tables'").fetchone()[0]:
             st_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(saved_tables)")}
@@ -2446,6 +2453,7 @@ class Index:
         period_anchor: str | None = None,
         compare_settings: dict | None = None,
         heatmap_states: dict | None = None,
+        series_colors: dict | None = None,
     ) -> int:
         now = time.time()
         with self._lock, self._conn:
@@ -2457,8 +2465,8 @@ class Index:
                 "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
                 "chart_type, decimals, show_values, average_line, area_fill, show_points, stacked, normalize, "
                 "average_style, horizontal, donut_aggregation, period_anchor, compare_settings, "
-                "heatmap_states, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "heatmap_states, series_colors, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -2468,7 +2476,8 @@ class Index:
                     legend_style, chart_type, decimals, int(show_values),
                     int(average_line), int(area_fill), int(show_points), int(stacked), int(normalize),
                     average_style, int(horizontal), donut_aggregation, period_anchor,
-                    json.dumps(compare_settings or {}), json.dumps(heatmap_states or {}), now, now,
+                    json.dumps(compare_settings or {}), json.dumps(heatmap_states or {}),
+                    json.dumps(series_colors or {}), now, now,
                 ),
             )
             return cur.lastrowid
@@ -2502,6 +2511,7 @@ class Index:
         period_anchor: str | None = None,
         compare_settings: dict | None = None,
         heatmap_states: dict | None = None,
+        series_colors: dict | None = None,
     ) -> None:
         with self._lock, self._conn:
             self._ensure_valid_name_locked("saved_charts", name, exclude_id=chart_id)
@@ -2512,7 +2522,7 @@ class Index:
                 "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, decimals = ?, "
                 "show_values = ?, average_line = ?, area_fill = ?, show_points = ?, stacked = ?, normalize = ?, "
                 "average_style = ?, horizontal = ?, donut_aggregation = ?, period_anchor = ?, "
-                "compare_settings = ?, heatmap_states = ?, updated_at = ? WHERE id = ?",
+                "compare_settings = ?, heatmap_states = ?, series_colors = ?, updated_at = ? WHERE id = ?",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -2522,7 +2532,8 @@ class Index:
                     legend_style, chart_type, decimals, int(show_values),
                     int(average_line), int(area_fill), int(show_points), int(stacked), int(normalize),
                     average_style, int(horizontal), donut_aggregation, period_anchor,
-                    json.dumps(compare_settings or {}), json.dumps(heatmap_states or {}), time.time(), chart_id,
+                    json.dumps(compare_settings or {}), json.dumps(heatmap_states or {}),
+                    json.dumps(series_colors or {}), time.time(), chart_id,
                 ),
             )
 
@@ -2549,6 +2560,7 @@ class Index:
         d["period_anchor"] = d.get("period_anchor") or None
         d["compare_settings"] = json.loads(d["compare_settings"]) if d.get("compare_settings") else {}
         d["heatmap_states"] = json.loads(d["heatmap_states"]) if d.get("heatmap_states") else {}
+        d["series_colors"] = json.loads(d["series_colors"]) if d.get("series_colors") else {}
         d["entity_names"] = json.loads(d["entity_names"]) if d.get("entity_names") else {}
         d["hidden_entity_ids"] = (
             json.loads(d["hidden_entity_ids"]) if d.get("hidden_entity_ids") else []

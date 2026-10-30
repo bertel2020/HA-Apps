@@ -567,6 +567,8 @@
         // gezeichnet — dieselbe Bedeutung wie hidden bei Spalten und Zeilen
         // im Tabellen-Editor.
         hiddenEntityIds: [...HIDDEN_ENTITY_IDS],
+        seriesColors: {...SERIES_COLORS},
+        colorPickerFor: null,
         name: CHART_NAME,
         entityNames: {...ENTITY_NAMES},
         series: [],
@@ -742,6 +744,26 @@
         colorIndexFor(entityId) {
           const idx = this.selectedEntityIds.indexOf(entityId);
           return idx === -1 ? 0 : idx;
+        },
+        // Eigene Farbe je Serie ("palette:N" oder "#rrggbb", siehe
+        // saved_charts.series_colors), sonst Palettenfarbe nach Position.
+        // Gleiche Regel wie colorFor() in dashboard-tiles.js.
+        colorFor(entityId) {
+          const own = this.seriesColors[entityId];
+          if (typeof own === 'string') {
+            if (own.startsWith('palette:') && PALETTE[+own.slice(8)]) return PALETTE[+own.slice(8)];
+            if (/^#[0-9a-f]{6}$/i.test(own)) return own;
+          }
+          return PALETTE[this.colorIndexFor(entityId) % PALETTE.length];
+        },
+        // null = zurück auf Auto. Neues Objekt statt Mutation, damit Alpine
+        // die Änderung sicher bemerkt (wie bei heatmapStates).
+        setSeriesColor(entityId, value) {
+          const next = {...this.seriesColors};
+          if (value) next[entityId] = value;
+          else delete next[entityId];
+          this.seriesColors = next;
+          this.render();
         },
         toggleEntityHidden(entityId) {
           const idx = this.hiddenEntityIds.indexOf(entityId);
@@ -938,7 +960,7 @@
               name: this.entityNames[s.entity_id] || s.friendly_name,
               isState: s.aggregation_type === 'state',
               stateRows: s.aggregation_type === 'state' ? this.stateRowsFor(s) : [],
-              color: PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length],
+              color: this.colorFor(s.entity_id),
               ...this.seriesStatsFor(s, s.points, this.windowEnd),
               // Min/Max/Ø über Zustandsindizes sind keine Aussage.
               ...(s.aggregation_type === 'state' ? {last: '—', min: '—', max: '—', average: '—', sum: null} : {}),
@@ -966,7 +988,7 @@
           const previousYear = currentYear - 1;
           this.series.forEach(s => {
             if (!s.compare_points) return;
-            const color = PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length];
+            const color = this.colorFor(s.entity_id);
             const name = this.entityNames[s.entity_id] || s.friendly_name;
             // Die Soll-Entität bekommt EINEN Eintrag ohne Jahreszahl (siehe
             // renderYearsCompare(): sie ist eine einzelne Ziel-Linie, kein
@@ -1126,7 +1148,7 @@
         // Farbe je Entität wie überall im Editor, nach Alter abgestuft, damit
         // auch "Alle" mit vielen Linien lesbar bleibt.
         multiYearColor(index, total) {
-          const color = PALETTE[this.colorIndexFor(this.series[0].entity_id) % PALETTE.length];
+          const color = this.colorFor(this.series[0].entity_id);
           if (index === 0) return color;
           const steps = Math.max(total - 1, 1);
           return withOpacity(color, total === 2 ? 0.55 : 0.75 - 0.5 * (index - 1) / Math.max(steps - 1, 1));
@@ -1946,7 +1968,7 @@
           // Ganzes, siehe setCompareMode()/disableCompare()).
           const legendSelected = {};
           this.series.forEach((s, i) => {
-            const color = PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length];
+            const color = this.colorFor(s.entity_id);
             // chart_type kommt vom Server (query.py: "bar" für Zähler/Schalter,
             // sonst "line", im Raw-Modus immer "line") statt hier redundant aus
             // aggregation_type neu abgeleitet zu werden — sonst würde z. B. ein
@@ -2341,7 +2363,7 @@
           data.push(...stateTimeline.items);
           this.series.forEach((s, catIndex) => {
             if (s.aggregation_type === 'state') return;
-            const color = PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length];
+            const color = this.colorFor(s.entity_id);
             const points = s.points;
             for (let i = 0; i < points.length; i++) {
               const start = points[i].ts;
@@ -2546,7 +2568,7 @@
           const echartsSeries = [];
           this.series.forEach(s => {
             if (!hasCompare(s)) return;
-            const color = PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length];
+            const color = this.colorFor(s.entity_id);
             const displayName = this.entityNames[s.entity_id] || s.friendly_name;
             const decimals = unitDecimals.get(axisUnit(s));
             const unitIndex = units.indexOf(axisUnit(s));
@@ -2885,7 +2907,7 @@
           const data = this.series.map(s => ({
             name: this.entityNames[s.entity_id] || s.friendly_name,
             value: Math.max(0, this.donutValueFor(s)),
-            itemStyle: {color: PALETTE[this.colorIndexFor(s.entity_id) % PALETTE.length]},
+            itemStyle: {color: this.colorFor(s.entity_id)},
           }));
           // Serien-Umschalter der Legende (toggleLegendItem()/legendHiddenIds)
           // wirkt bei type:'pie' auf einzelne DATENPUNKTE statt auf ganze
@@ -3020,6 +3042,7 @@
             legend_style: this.legendStyle,
             chart_type: this.donut ? 'donut' : (this.timeline ? (this.hasState ? (this.heatmapWanted ? 'heatmap' : (this.stateChosen ? this.stateMode : 'auto')) : 'timeline') : (this.allSwitch ? 'bar' : 'auto')),
             heatmap_states: this.heatmapStates,
+            series_colors: this.seriesColors,
             decimals: this.decimals,
             show_values: this.showValues,
             average_line: this.averageLine,

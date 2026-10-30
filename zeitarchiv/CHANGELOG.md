@@ -4,6 +4,12 @@
 
 ### Neu
 
+- **Chart-Editor, Serienfarben**: Unter **Ausgewählt** öffnet ein Klick auf den
+  Farbpunkt einer Serie die Farbwahl: „Auto“ wie bisher, eine der acht
+  Palettenfarben oder eine eigene Farbe. Die Wahl gilt im Chart und in allen
+  Dashboard-Kacheln dieses Charts. Palettenfarben passen sich dem Theme an,
+  eigene Farben bleiben überall gleich.
+
 - **Tabellen, Summenspalte**: Eine zusätzliche Spalte zeigt je Zeile die Summe
   über die Zeiträume, links oder rechts, mit frei wählbarer Beschriftung. In
   jeder Spalte lässt sich einstellen, ob sie mitzählt, zum Beispiel 7 von 8
@@ -30,6 +36,12 @@
 ### English
 
 #### New
+
+- **Chart editor, series colors**: Under **Selected**, clicking a series' color
+  dot opens the color picker: “Auto” as before, one of the eight palette
+  colors, or a custom color. The choice applies in the chart and in all
+  dashboard tiles of that chart. Palette colors follow the theme, custom colors
+  stay the same everywhere.
 
 - **Tables, sum column**: An extra column shows the sum over the periods for
   each row, on the left or right, with a label of your choice. Each column can

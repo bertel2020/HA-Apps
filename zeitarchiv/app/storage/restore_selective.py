@@ -145,6 +145,7 @@ _CHART_FIELD_LABELS = {
     "compare_settings": N_("Vergleich"),
     "chart_type": N_("Typ"),
     "heatmap_states": N_("Typ"),
+    "series_colors": N_("Farben"),
     "resolution_preset": N_("Auflösung"),
 }
 

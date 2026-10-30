@@ -1052,7 +1052,11 @@ eines bestehenden (Kachelmenü ⋮).
   Ist schon etwas gewählt, stehen Treffer mit passender Einheit oben
   („Passt zu vorhandener Achse"). Unter **Ausgewählt** lassen sich die
   gewählten Entitäten umbenennen, umsortieren, ausblenden und mit ✕
-  entfernen.
+  entfernen. Ein Klick auf den
+  Farbpunkt öffnet die Farbwahl: „Auto“ (Palette nach Reihenfolge), eine der
+  acht Palettenfarben oder eine eigene Farbe. Die Farbe gilt im Chart und in
+  den Dashboard-Kacheln dazu; Palettenfarben passen sich dem Theme an,
+  eigene Farben bleiben gleich.
 - Beliebig viele Entitäten überlagern; unterschiedliche Einheiten erhalten
   automatisch getrennte Y-Achsen, sodass z. B. Temperatur und Luftfeuchte
   in einem Chart sinnvoll lesbar bleiben.

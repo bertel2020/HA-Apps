@@ -124,8 +124,31 @@
                      die Palette ist fest über die Position vergeben (siehe PALETTE in
                      chart_editor.js), der Punkt verbindet den Eintrag damit sichtbar mit
                      Legende und Kurve. -->
-                <span class="entity-name-dot" aria-hidden="true"
-                      :style="'--dot:var(--chart-' + (colorIndexFor(id) % 8 + 1) + ')'"></span>
+                <!-- Der Punkt öffnet die Farbwahl: Auto (Palette nach Position), eine der
+                     acht Palettenfarben (themefähig) oder eine eigene Farbe (fest). -->
+                <div class="menu-wrap" @click.outside="colorPickerFor === id && (colorPickerFor = null)">
+                  <button type="button" class="entity-name-dot entity-name-dot-btn"
+                          :style="'--dot:' + colorFor(id)"
+                          title="{{ _('Farbe wählen') }}" aria-label="{{ _('Farbe wählen') }}"
+                          @click="colorPickerFor = colorPickerFor === id ? null : id"></button>
+                  <div class="menu-popover color-popover" x-show="colorPickerFor === id" x-cloak
+                       x-transition:enter="menu-pop-enter" x-transition:enter-start="menu-pop-enter-start" x-transition:enter-end="menu-pop-enter-end">
+                    <div class="color-swatches">
+                      <button type="button" class="color-swatch color-swatch-auto" :class="{on: !seriesColors[id]}"
+                              title="{{ _('Auto') }}" aria-label="{{ _('Auto') }}" @click="setSeriesColor(id, null)">A</button>
+                      <template x-for="n in 8" :key="n">
+                        <button type="button" class="color-swatch" :class="{on: seriesColors[id] === 'palette:' + (n - 1)}"
+                                :style="'--dot:var(--chart-' + n + ')'" :aria-label="'{{ _('Palettenfarbe') }} ' + n"
+                                @click="setSeriesColor(id, 'palette:' + (n - 1))"></button>
+                      </template>
+                    </div>
+                    <div class="color-custom">
+                      <span>{{ _("Eigene Farbe") }}</span>
+                      <input type="color" :value="colorFor(id)" @input="setSeriesColor(id, $event.target.value)">
+                    </div>
+                    <p class="color-hint" x-show="(seriesColors[id] || '').startsWith('#')" x-cloak>{{ _("Eigene Farben bleiben in allen Themes gleich, Palettenfarben passen sich an.") }}</p>
+                  </div>
+                </div>
                 <span class="entity-name-default">
                   <span class="name" x-text="labelFor(id)"></span>
                   <span class="id" x-text="id"></span>
@@ -985,6 +1008,8 @@
     const HIDDEN_ENTITY_IDS = {{ hidden_entity_ids | tojson }};
     // Gezeichneter Zustand je Zustands-Entität der Heatmap (Rohtext).
     const HEATMAP_STATES = {{ heatmap_states | default({}) | tojson }};
+    // Eigene Serienfarben {entity_id: "palette:N" | "#rrggbb"}.
+    const SERIES_COLORS = {{ series_colors | default({}) | tojson }};
     const ENTITY_OPTIONS = {{ entity_options | tojson }};
     const RESOLUTION_PRESET = {{ resolution_preset | tojson }};
     const DYNAMIC_Y_AXIS = {{ dynamic_y_axis | tojson }};

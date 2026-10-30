@@ -210,6 +210,7 @@ def tiles_context(
                 "horizontal": c["horizontal"], "donut_aggregation": c["donut_aggregation"], "period_anchor": c["period_anchor"],
                 "compare_settings": c["compare_settings"],  # Vergleich wie auf der Chart-Seite
                 "heatmap_states": c["heatmap_states"],  # gezeichneter Zustand je Entität der Heatmap
+                "series_colors": c["series_colors"],  # eigene Serienfarbe wie auf der Chart-Seite
             })
             groups[-1]["tiles"].append(tiles[-1])
         elif p["item_type"] == "table":

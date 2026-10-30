@@ -8,6 +8,8 @@ effective_chart_type() daraus macht.
 
 from __future__ import annotations
 
+import re
+
 from .i18n import N_
 
 # "timeline" nur clientseitig erzwingbar, wenn tatsächlich alle Serien
@@ -150,3 +152,27 @@ def heatmap_states_clean(value: dict | None, entity_ids: list[str]) -> dict[str,
         for entity_id, text in (value or {}).items()
         if entity_id in allowed and isinstance(text, str) and 0 < len(text) <= _HEATMAP_STATE_MAX_LENGTH
     }
+
+
+# Palettenfarben --chart-1 … --chart-8 (siehe app.css); mit Absicht 8, nicht
+# aus dem CSS gelesen — die Zahl steht auch in PALETTE (dashboard-tiles.js).
+_PALETTE_SIZE = 8
+_HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def series_colors_clean(value: dict | None, entity_ids: list[str]) -> dict[str, str]:
+    """Eigene Serienfarbe je Entität (saved_charts.series_colors).
+
+    Erlaubt sind "palette:N" (N = 0…7, themefähig) und "#rrggbb" (fest).
+    Einträge zu Entitäten, die nicht im Chart stehen, und Unpassendes fallen
+    still weg — die Serie nimmt dann wieder die Palettenfarbe nach Position."""
+    allowed = set(entity_ids)
+    out: dict[str, str] = {}
+    for entity_id, color in (value or {}).items():
+        if entity_id not in allowed or not isinstance(color, str):
+            continue
+        if color.startswith("palette:") and color[8:].isdigit() and int(color[8:]) < _PALETTE_SIZE:
+            out[entity_id] = color
+        elif _HEX_COLOR.match(color):
+            out[entity_id] = color.lower()
+    return out

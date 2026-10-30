@@ -1,5 +1,11 @@
 {
   "app": {
+    "Farbe wählen": "Choose color",
+    "Auto": "Auto",
+    "Palettenfarbe": "Palette color",
+    "Eigene Farbe": "Custom color",
+    "Eigene Farben bleiben in allen Themes gleich, Palettenfarben passen sich an.": "Custom colors stay the same in all themes; palette colors adapt.",
+    "Farben": "Colors",
     "Ungültiger Vergleich": "Invalid comparison",
     "Ø Strompreis Netzbezug": "Avg. grid price",
     "je kWh": "per kWh",
@@ -819,7 +825,6 @@
     "Horizontal": "Horizontal",
     "Werte anzeigen": "Show values",
     "Dynamische Y-Achse": "Dynamic Y axis",
-    "Auto": "Auto",
     "Durchschnittslinie": "Average line",
     "nicht im gestapelten Modus": "not in stacked mode",
     "Flach": "Flat",

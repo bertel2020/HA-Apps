@@ -476,6 +476,19 @@
       const idx = allEntityIds.indexOf(entityId);
       return idx === -1 ? 0 : idx;
     };
+    // Eigene Farbe je Serie (saved_charts.series_colors, "palette:N" oder
+    // "#rrggbb"), sonst Palettenfarbe nach Position. Gleiche Regel wie
+    // colorFor() in pages/chart_editor.js.
+    let seriesColors = {};
+    try { seriesColors = JSON.parse(el.dataset.seriesColors || '{}') || {}; } catch (e) { seriesColors = {}; }
+    const colorFor = (entityId) => {
+      const own = seriesColors[entityId];
+      if (typeof own === 'string') {
+        if (own.startsWith('palette:') && PALETTE[+own.slice(8)]) return PALETTE[+own.slice(8)];
+        if (/^#[0-9a-f]{6}$/i.test(own)) return own;
+      }
+      return PALETTE[colorIndexFor(entityId) % PALETTE.length];
+    };
     const entityNames = JSON.parse(el.dataset.entityNames || '{}');
     const range = el.dataset.range || 'day';
     const continuous = el.dataset.continuous === 'true';
@@ -652,7 +665,7 @@
     const multiYear = compare?.longterm && series.length === 1 && Array.isArray(series[0].years)
       ? tileMultiYear(series[0], data, compare, {
         small: tileEl?.dataset.gridCols === '1' && tileEl?.dataset.gridRows === '1',
-        color: PALETTE[colorIndexFor(series[0].entity_id) % PALETTE.length],
+        color: colorFor(series[0].entity_id),
         inkMuted: getComputedStyle(document.body).getPropertyValue('--ink-muted').trim(),
       })
       : null;
@@ -679,7 +692,7 @@
       legendItems = [];
       series.forEach(s => {
         if (!s.compare_points) return;
-        const color = PALETTE[colorIndexFor(s.entity_id) % PALETTE.length];
+        const color = colorFor(s.entity_id);
         const displayName = entityNames[s.entity_id] || s.friendly_name;
         if (s.entity_id === compare.target) { legendItems.push(statsItem(s, s.points, displayName, color)); return; }
         legendItems.push(statsItem(s, s.points, `${displayName} (${currentYear})`, color));
@@ -687,7 +700,7 @@
       });
     } else {
       legendItems = series.map(s => statsItem(
-        s, s.points, entityNames[s.entity_id] || s.friendly_name, PALETTE[colorIndexFor(s.entity_id) % PALETTE.length]
+        s, s.points, entityNames[s.entity_id] || s.friendly_name, colorFor(s.entity_id)
       ));
     }
     const legendMetrics = JSON.parse(el.dataset.legendMetrics || '["sum"]');
@@ -752,7 +765,7 @@
     }
     if (compare?.yearsCompare) {
       renderTileYearsCompare(chart, series, compare, data, {
-        entityNames, colorIndexFor, effectiveDecimals, animation, style, borderColor, inkFaint, inkMuted, surface,
+        entityNames, colorFor, effectiveDecimals, animation, style, borderColor, inkFaint, inkMuted, surface,
         hiddenSet: legendHidden.get(chartId),
       });
       return;
@@ -766,7 +779,7 @@
       return;
     }
     if (timeline || viewType === 'timeline') {
-      renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface, colorIndexFor);
+      renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface, colorFor);
       return;
     }
     if (donut && series.some(s => s.aggregation_type === 'state')) {
@@ -774,7 +787,7 @@
       return;
     }
     if (donut) {
-      renderTileDonut(chart, series, entityNames, colorIndexFor, donutAggregation, effectiveDecimals, style, surface, chartId);
+      renderTileDonut(chart, series, entityNames, colorFor, donutAggregation, effectiveDecimals, style, surface, chartId);
       return;
     }
 
@@ -959,7 +972,7 @@
     // ZUSÄTZLICHE, eigenständige Serie (siehe showRollingAverage unten).
     const rollingSeries = [];
     const echartsSeries = series.map((s, i) => {
-      const color = PALETTE[colorIndexFor(s.entity_id) % PALETTE.length];
+      const color = colorFor(s.entity_id);
       const displayName = entityNames[s.entity_id] || s.friendly_name;
       const isStackedBar = s.chart_type === 'bar' && stackedActive;
       // 100%-Normierung nur auf reinen Balken-Achsen und nur für Balken-
@@ -1100,7 +1113,7 @@
     if (compare && !singleBucket) {
       series.forEach(s => {
         if (!s.compare_points || !s.compare_points.length) return;
-        const color = PALETTE[colorIndexFor(s.entity_id) % PALETTE.length];
+        const color = colorFor(s.entity_id);
         const displayName = entityNames[s.entity_id] || s.friendly_name;
         const shiftMs = (s.compare_window_start != null && data.window_start != null)
           ? (data.window_start - s.compare_window_start) * 1000
@@ -1380,7 +1393,7 @@
   // unsichtbarer Achse je Einheit, Soll als gepunktete Linie. Ohne
   // Achsennamen: dafür ist in der Kachel kein Platz.
   function renderTileYearsCompare(chart, series, compare, data, opts) {
-    const {entityNames, colorIndexFor, effectiveDecimals} = opts;
+    const {entityNames, colorFor, effectiveDecimals} = opts;
     const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
     const axisUnit = s => isDurationSeries(s) ? ' duration' : s.unit;
     const hasCompare = s => !!s.compare_points;
@@ -1420,7 +1433,7 @@
     const echartsSeries = [];
     series.forEach(s => {
       if (!hasCompare(s)) return;
-      const color = PALETTE[colorIndexFor(s.entity_id) % PALETTE.length];
+      const color = colorFor(s.entity_id);
       const displayName = entityNames[s.entity_id] || s.friendly_name;
       const valueFormatter = tileValueFormatter(s, unitDecimals.get(axisUnit(s)));
       if (isSoll(s)) {
@@ -1510,7 +1523,7 @@
     chart.setOption({...StateEntities.heatmapPanels(rows, {compact: true}), animation}, true);
   }
 
-  function renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface, colorIndexFor) {
+  function renderTileTimeline(chart, series, entityNames, data, range, animation, style, borderColor, inkFaint, surface, colorFor) {
     const categories = series.map(s => entityNames[s.entity_id] || s.friendly_name);
     const items = [];
     const pattern = StateEntities.unavailablePattern();
@@ -1527,7 +1540,7 @@
     items.push(...stateTimeline.items);
     series.forEach((s, catIndex) => {
       if (s.aggregation_type === 'state') return;
-      const color = PALETTE[colorIndexFor(s.entity_id) % PALETTE.length];
+      const color = colorFor(s.entity_id);
       const points = s.points || [];
       for (let i = 0; i < points.length; i++) {
         const start = points[i].ts;
@@ -1650,7 +1663,7 @@
     }, true);
   }
 
-  function renderTileDonut(chart, series, entityNames, colorIndexFor, aggregation, effectiveDecimals, style, surface, chartId) {
+  function renderTileDonut(chart, series, entityNames, colorFor, aggregation, effectiveDecimals, style, surface, chartId) {
     const data = series.map(s => {
       const values = (s.points || []).map(p => p.value).filter(Number.isFinite);
       let value = 0;
@@ -1662,7 +1675,7 @@
       return {
         name: entityNames[s.entity_id] || s.friendly_name,
         value: Math.max(0, value),
-        itemStyle: {color: PALETTE[colorIndexFor(s.entity_id) % PALETTE.length]},
+        itemStyle: {color: colorFor(s.entity_id)},
       };
     });
     // Serien-Umschalter der Legende (toggleTileLegendItem()) wirkt bei

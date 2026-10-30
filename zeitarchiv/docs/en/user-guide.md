@@ -962,7 +962,10 @@ Own editor, reachable via **Charts** → new chart or editing an existing one
   first and can be narrowed with chips by **Type** and **Unit**. Once something
   is selected, matches with a fitting unit come first ("Fits an existing
   axis"). Under **Selected** the chosen entities can be renamed, reordered,
-  hidden and removed with ✕.
+  hidden and removed with ✕. Clicking the color dot opens the color picker:
+  “Auto” (palette by order), one of the eight palette colors, or a custom
+  color. The color applies in the chart and its dashboard tiles; palette colors
+  follow the theme, custom colors stay the same.
 - Overlay any number of entities; different units automatically get separate Y
   axes so that, e.g., temperature and humidity remain sensibly readable in one
   chart.
