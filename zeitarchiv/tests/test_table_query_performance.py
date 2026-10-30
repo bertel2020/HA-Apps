@@ -192,7 +192,8 @@ def test_dashboard_computes_hidden_rows_like_the_editor() -> None:
     # Hidden rows are not rendered but stay part of the computation (formula
     # letters, sums, percent shares, heatmap range), exactly as in the table
     # editor. See test_table_tile_formulas.py.
-    assert "computeValues(base, visibleCols, allRows, {at: stichtag()})" in DASHBOARD
+    assert "computeValues(base, visibleCols, allRows, {at, queryTable})" in DASHBOARD
+    assert "{base, at: stichtag()}" in DASHBOARD
 
 
 # --- Rollup-Cache für grobe Stufen (PERFORMANCE.md, ZP-008) -----------------

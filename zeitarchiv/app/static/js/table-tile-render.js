@@ -1,7 +1,7 @@
 // Tabellen der Dashboard-Kacheln als HTML, getrennt von der Kachel im DOM.
 // Aus dashboard-tiles.js (renderTableTile) herausgelöst, damit dieselbe Tabelle ohne die Kachel-Hülle
 // auch anderswo gebaut werden kann, etwa in einer Lovelace-Karte. buildHtml() bekommt die sichtbaren
-// Spalten/Zeilen, den Stil und die berechneten Werte (TableCompute.computeValues) und liefert den
+// Spalten/Zeilen, den Stil und die berechneten Werte (compute() rechnet sie über TableCompute) und liefert den
 // HTML-Text der Tabelle; afterInsert() setzt danach die gemessene Höhe der Gruppen-Kopfzeile.
 // Braucht t(), escapeHtml und TableCompute (table-compute.js) als Globals.
 (() => {
@@ -14,6 +14,27 @@
     const visibleCols = columns.filter(c => !c.hidden);
     const visibleRowIndexes = rows.map((r, i) => (r.hidden ? -1 : i)).filter(i => i >= 0);
     return {visibleCols, allRows: rows, visibleRowIndexes, visibleRows: visibleRowIndexes.map(i => rows[i])};
+  }
+
+  // Wählt das Sichtbare und berechnet die Werte (TableCompute.computeValues, Zeilensummen, Überlappung der
+  // Spalten). Liefert alles, was buildHtml() braucht, oder {empty: true} ohne sichtbare Zeilen/Spalten, dann
+  // wird nichts abgefragt. base/at: Adresse der App und Stichtag; queryTable: optional eine eigene Abfrage
+  // (body → Antwort von /api/query-table), die Lovelace-Karte setzt hier die fertige Antwort des Servers ein.
+  async function compute(columns, rows, {base = '', at = null, queryTable = null} = {}) {
+    const selected = selectVisible(columns, rows);
+    const {visibleCols, allRows, visibleRowIndexes, visibleRows} = selected;
+    if (!visibleCols.length || !visibleRows.length) return {empty: true};
+    const computed = await TableCompute.computeValues(base, visibleCols, allRows, {at, queryTable});
+    const {windowStarts, windowEnds, isCurrent, elapsedSeconds, summable} = computed;
+    const allValues = computed.values;
+    // Σ-Spalte: nur die sichtbaren Spalten kommen hier an, ausgeblendete zählen also wie im Editor nie mit.
+    const rowSums = TableCompute.computeRowSums(visibleCols, allRows, allValues, summable);
+    const sumOverlapping = TableCompute.sumOverlap(visibleCols, windowStarts, windowEnds);
+    const values = allValues.map(colValues => visibleRowIndexes.map(i => colValues[i]));
+    return {
+      visibleCols, allRows, visibleRowIndexes, visibleRows, values, allValues,
+      windowStarts, windowEnds, isCurrent, elapsedSeconds, rowSums, sumOverlapping,
+    };
   }
 
   function buildHtml({visibleCols, allRows, visibleRowIndexes, visibleRows, style, values, allValues, windowStarts, windowEnds, isCurrent, elapsedSeconds, rowSums, sumOverlapping}) {
@@ -272,5 +293,5 @@
     }
   }
 
-  window.TableTileRender = {selectVisible, buildHtml, afterInsert};
+  window.TableTileRender = {selectVisible, compute, buildHtml, afterInsert};
 })();

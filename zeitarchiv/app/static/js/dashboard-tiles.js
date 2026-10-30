@@ -410,43 +410,23 @@
   // (Zebra/Rahmen/Dichte/Kopfzeile, siehe TableCompute.styleClasses) wirken
   // hier genauso wie in der vollen Ansicht.
   async function renderTableTile(el) {
-    // Ausgeblendete Spalten/Zeilen (Tabelleneditor, col.hidden/row.hidden)
-    // werden nicht gerendert, bleiben aber Teil der Berechnung — dieselbe
-    // Regel wie in table_editor.html. computeValues() bekommt deshalb ALLE
-    // Zeilen: sonst verschieben sich die Formel-Buchstaben, Formeln auf eine
-    // ausgeblendete Zeile liefern "Fehler", und Summen-/Anteilszeilen
-    // weichen vom Editor ab. Erst danach werden die sichtbaren Zeilen
-    // herausgezogen.
-    const {visibleCols, allRows, visibleRowIndexes, visibleRows} = TableTileRender.selectVisible(
-      JSON.parse(el.dataset.columns || '[]'), JSON.parse(el.dataset.rows || '[]'));
     const style = JSON.parse(el.dataset.style || '{}');
     const previewEl = el.querySelector('.dtile-table-preview');
     if (!previewEl) return;
-
-    if (!visibleCols.length || !visibleRows.length) {
-      previewEl.innerHTML = '<div class="dtile-loading">' + t('Keine sichtbaren Zeilen/Spalten') + '</div>';
-      return;
-    }
     const base = el.closest('#dashboard-grid')?.dataset.appRoot || '';
-    let values, allValues, windowStarts, windowEnds, isCurrent, elapsedSeconds, rowSums, sumOverlapping;
+    let table;
     try {
-      let summable;
-      ({values, windowStarts, windowEnds, isCurrent, elapsedSeconds, summable} = await TableCompute.computeValues(base, visibleCols, allRows, {at: stichtag()}));
-      allValues = values;
-      // Σ-Spalte: nur die sichtbaren Spalten kommen hier an, ausgeblendete
-      // zählen also wie im Editor nie mit.
-      rowSums = TableCompute.computeRowSums(visibleCols, allRows, allValues, summable);
-      sumOverlapping = TableCompute.sumOverlap(visibleCols, windowStarts, windowEnds);
-      values = values.map(colValues => visibleRowIndexes.map(i => colValues[i]));
+      table = await TableTileRender.compute(
+        JSON.parse(el.dataset.columns || '[]'), JSON.parse(el.dataset.rows || '[]'), {base, at: stichtag()});
     } catch (e) {
       previewEl.innerHTML = '<div class="dtile-loading">' + t('Fehler beim Laden') + '</div>';
       return;
     }
-
-    previewEl.innerHTML = TableTileRender.buildHtml({
-      visibleCols, allRows, visibleRowIndexes, visibleRows, style, values, allValues,
-      windowStarts, windowEnds, isCurrent, elapsedSeconds, rowSums, sumOverlapping,
-    });
+    if (table.empty) {
+      previewEl.innerHTML = '<div class="dtile-loading">' + t('Keine sichtbaren Zeilen/Spalten') + '</div>';
+      return;
+    }
+    previewEl.innerHTML = TableTileRender.buildHtml({...table, style});
     TableTileRender.afterInsert(previewEl);
   }
 
