@@ -971,8 +971,8 @@
     // genau ein Element je Durchlauf, die Trendlinie ist aber eine
     // ZUSÄTZLICHE, eigenständige Serie (siehe showRollingAverage unten).
     const rollingSeries = [];
-    // Linien-Serien, deren Tooltip-Zeile auch ohne eigenen Punkt am Cursor
-    // erscheint (tooltip-hold.js, gleiche Regel wie chart_editor.js).
+    // Linien- und Balken-Serien, deren Tooltip-Zeile auch ohne eigenen Punkt am
+    // Cursor erscheint (tooltip-hold.js, gleiche Regel wie chart_editor.js).
     const holdSeries = [];
     const echartsSeries = series.map((s, i) => {
       const color = colorFor(s.entity_id);
@@ -1107,8 +1107,8 @@
           z: 3,
         });
       }
-      if (s.chart_type === 'line' && !singleBucket && !horizontalActive) {
-        holdSeries.push({seriesIndex: i, name: displayName, color, data: lineData});
+      if (!singleBucket && !horizontalActive) {
+        holdSeries.push({seriesIndex: i, name: displayName, color, data: lineData, bucket: s.chart_type === 'bar'});
       }
       return cfg;
     });
@@ -1225,8 +1225,8 @@
         textStyle: {color: inkMuted, fontFamily: style.getPropertyValue('--font-mono'), fontSize: scaledFont(12)},
         formatter: (allParams) => {
           // Auffüll-Punkte gestapelter Serien (padStackedSeries) haben keinen Wert.
-          // Danach jede sichtbare Linien-Serie mit ihrem letzten bekannten Wert
-          // (tooltip-hold.js), auch ohne eigenen Punkt am Cursor.
+          // Danach jede sichtbare Linien- und Balken-Serie mit ihrem letzten
+          // bekannten Wert (tooltip-hold.js), auch ohne eigenen Punkt am Cursor.
           const legendState = chart.getOption().legend?.[0]?.selected || {};
           const params = TooltipHold.complete(
             allParams.filter(p => p.data[1] != null),

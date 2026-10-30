@@ -20,12 +20,13 @@
 
 ### Geändert
 
-- **Chart-Tooltip**: Beim Überfahren eines Diagramms mit mehreren Linien zeigt
-  der Tooltip jetzt immer alle sichtbaren Entitäten, jeweils mit ihrem letzten
-  bekannten Wert zu diesem Zeitpunkt. Bisher fehlten Entitäten, die dort keinen
-  eigenen Messwert hatten. Ist ein Wert merklich älter als die übrigen, steht
-  darunter sein Zeitpunkt und das Alter, zum Beispiel „10:30 · vor 5m“. Gilt im
-  Chart-Editor und in Dashboard-Kacheln.
+- **Chart-Tooltip**: Beim Überfahren eines Diagramms mit mehreren Linien oder
+  Balken zeigt der Tooltip jetzt immer alle sichtbaren Entitäten, jeweils mit
+  ihrem letzten bekannten Wert zu diesem Zeitpunkt. Bisher fehlten Entitäten,
+  die dort keinen eigenen Messwert hatten, zum Beispiel Stundenbalken neben
+  einer feineren Linie. Ist der Wert einer Linie merklich älter als die
+  übrigen, steht darunter sein Zeitpunkt und das Alter, zum Beispiel
+  „10:30 · vor 5m“. Gilt im Chart-Editor und in Dashboard-Kacheln.
 
 ### Behoben
 
@@ -62,12 +63,12 @@
 
 #### Changed
 
-- **Chart tooltip**: When you hover a chart with several lines, the tooltip now
-  always shows all visible entities, each with its last known value at that
-  point in time. Before, entities without a reading of their own there were
-  missing. If a value is noticeably older than the others, its time and age
-  appear below it, for example “10:30 · 5m ago”. Applies in the chart editor and
-  in dashboard tiles.
+- **Chart tooltip**: When you hover a chart with several lines or bars, the
+  tooltip now always shows all visible entities, each with its last known value
+  at that point in time. Before, entities without a reading of their own there
+  were missing, for example hourly bars next to a finer line. If a line's value
+  is noticeably older than the others, its time and age appear below it, for
+  example “10:30 · 5m ago”. Applies in the chart editor and in dashboard tiles.
 
 #### Fixed
 

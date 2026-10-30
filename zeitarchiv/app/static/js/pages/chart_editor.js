@@ -1962,8 +1962,8 @@
           // Zähler zeigen Bucket-Summen, ein Schalter eine Einschaltdauer je
           // Bucket — beides liest sich als Balken natürlicher als als Linie.
           const echartsSeries = [];
-          // Linien-Serien, deren Tooltip-Zeile auch dann erscheint, wenn die
-          // Serie am Cursor keinen eigenen Punkt hat (siehe tooltip-hold.js).
+          // Linien- und Balken-Serien, deren Tooltip-Zeile auch dann erscheint,
+          // wenn die Serie am Cursor keinen eigenen Punkt hat (tooltip-hold.js).
           const holdSeries = [];
           // Für legend.selected unten — nur die Hauptserie ist über die
           // eigene Legende (siehe HTML-Template) umschaltbar, nicht die
@@ -2141,8 +2141,8 @@
                 data: [horizontalActive ? {xAxis: durchschnitt} : {yAxis: durchschnitt}],
               };
             }
-            if (chartType === 'line' && !singleBucket && !horizontalActive) {
-              holdSeries.push({seriesIndex: echartsSeries.length, name: displayName, color, data: mainData});
+            if (!singleBucket && !horizontalActive) {
+              holdSeries.push({seriesIndex: echartsSeries.length, name: displayName, color, data: mainData, bucket: chartType === 'bar'});
             }
             echartsSeries.push(main);
             if (showRollingAverage) {
@@ -2319,9 +2319,12 @@
                 );
                 if (!params.length) return '';
                 const times = params.map(p => fmtTooltipTimestamp(p.data[2], tooltipBucketSeconds));
-                // Veraltete Zeilen (holdAgeMs) tragen ihren Zeitpunkt selbst und
-                // zählen für die gemeinsame Kopfzeile nicht mit.
-                const freshIndexes = params.map((p, i) => i).filter(i => !params[i].holdAgeMs);
+                // Veraltete Zeilen (holdAgeMs) tragen ihren Zeitpunkt selbst, Balken
+                // (holdBucket) liegen am Bucket-Anfang statt am Cursor — beide zählen
+                // für die gemeinsame Kopfzeile nicht mit, sie richtet sich nach den
+                // Linien (nur Balken: nach den Balken).
+                let freshIndexes = params.map((p, i) => i).filter(i => !params[i].holdAgeMs && !params[i].holdBucket);
+                if (!freshIndexes.length) freshIndexes = params.map((p, i) => i).filter(i => !params[i].holdAgeMs);
                 const sameTime = freshIndexes.every(i => times[i] === times[freshIndexes[0]]);
                 // 100%-Normierung: zeigt IMMER beides — Anteil und
                 // Original-Absolutwert in Klammern (data[6]/[7]/[8], siehe

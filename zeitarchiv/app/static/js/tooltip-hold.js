@@ -1,13 +1,20 @@
-// Tooltip mehrerer Linien-Serien (chart_editor.js, dashboard-tiles.js): jede
-// sichtbare Serie zeigt ihren letzten bekannten Wert zum Cursor-Zeitpunkt.
+// Tooltip mehrerer Serien (chart_editor.js, dashboard-tiles.js): jede
+// sichtbare Linien- und Balken-Serie zeigt ihren letzten bekannten Wert zum
+// Cursor-Zeitpunkt.
 //
 // ECharts' trigger:'axis' listet nur Serien, die am Cursor einen eigenen Punkt
 // haben — Entitäten mit unterschiedlichem Meldetakt (Temperatur alle 5 Min.,
 // Luftfeuchtigkeit alle 30 Min., Ventil nur bei Änderung) fehlten deshalb
-// zeitweise im Tooltip. Hier wird je Linien-Serie der letzte Punkt VOR oder
-// AUF dem Cursor nachgeschlagen (Zeitachse, Tupel-Position 0 = ms-Zeitstempel,
-// aufsteigend sortiert, Position 1 = Wert). Zeitstrahl, Balken, Vergleichs-
-// und Durchschnittsserien bleiben bei ECharts' eigener Zeilenauswahl.
+// zeitweise im Tooltip, ebenso Stundenbalken neben einer feineren Linie. Hier
+// wird je Serie der letzte Punkt VOR oder AUF dem Cursor nachgeschlagen
+// (Zeitachse, Tupel-Position 0 = ms-Zeitstempel, aufsteigend sortiert,
+// Position 1 = Wert). Zeitstrahl, Vergleichs- und Durchschnittsserien bleiben
+// bei ECharts' eigener Zeilenauswahl.
+//
+// Balken (bucket: true) gelten für ihren ganzen Zeitabschnitt: ein Stunden-
+// balken ist bis zum nächsten Balken aktuell und wird erst danach als älter
+// markiert. Linien gelten als älter, wenn sie dem jüngsten Linienpunkt um mehr
+// als einen Meldetakt hinterherhinken.
 window.TooltipHold = (() => {
   const MIN_STALE_MS = 60 * 1000;
 
@@ -41,16 +48,16 @@ window.TooltipHold = (() => {
   const dot = color => `<span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:${color};"></span>`;
 
   // allParams: ECharts-Params der Tooltip-Formatter-Funktion. holdSeries:
-  // [{seriesIndex, name, color, data}] der beteiligten Linien-Serien (data wie
-  // in der ECharts-Option). isVisible(name): ob die Serie in der Legende an
-  // ist. Ergebnis: Params nach seriesIndex; Linien-Serien tragen zusätzlich
-  // holdAgeMs (> 0 nur, wenn ihr Wert merklich älter ist als der jüngste der
-  // Linien) und holdX (Zeitstempel ihres Werts, ms).
+  // [{seriesIndex, name, color, data, bucket}] der beteiligten Serien (data wie
+  // in der ECharts-Option, bucket: Balken). isVisible(name): ob die Serie in
+  // der Legende an ist. Ergebnis: Params nach seriesIndex; beteiligte Serien
+  // tragen zusätzlich holdAgeMs (> 0 nur, wenn ihr Wert merklich älter ist,
+  // s. o.), holdX (Zeitstempel ihres Werts, ms) und holdBucket.
   function complete(allParams, holdSeries, isVisible) {
     const cursor = allParams.length ? allParams[0].axisValue : null;
     if (!holdSeries.length || typeof cursor !== 'number') return allParams;
-    const gaps = holdSeries.map(h => medianGap(h.data)).filter(g => g != null);
-    const threshold = gaps.length ? Math.max(MIN_STALE_MS, Math.min(...gaps)) : MIN_STALE_MS;
+    const lineGaps = holdSeries.filter(h => !h.bucket).map(h => medianGap(h.data)).filter(g => g != null);
+    const lineThreshold = lineGaps.length ? Math.max(MIN_STALE_MS, Math.min(...lineGaps)) : MIN_STALE_MS;
     const byIndex = new Map(allParams.map(p => [p.seriesIndex, p]));
     const hits = [];
     holdSeries.forEach(h => {
@@ -65,12 +72,19 @@ window.TooltipHold = (() => {
         data: point,
         holdX: point[0],
         holdAgeMs: 0,
+        holdBucket: !!h.bucket,
       };
+      if (h.bucket) {
+        // Eigene Bucket-Breite statt des Linien-Takts, s. o.
+        const age = cursor - point[0];
+        param.holdAgeMs = age > Math.max(MIN_STALE_MS, medianGap(h.data) ?? 0) ? age : 0;
+      } else {
+        hits.push(param);
+      }
       byIndex.set(h.seriesIndex, param);
-      hits.push(param);
     });
     const newest = Math.max(...hits.map(p => p.holdX));
-    hits.forEach(p => { if (newest - p.holdX > threshold) p.holdAgeMs = newest - p.holdX; });
+    hits.forEach(p => { if (newest - p.holdX > lineThreshold) p.holdAgeMs = newest - p.holdX; });
     return [...byIndex.values()].sort((a, b) => a.seriesIndex - b.seriesIndex);
   }
 
