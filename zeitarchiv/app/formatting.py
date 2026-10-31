@@ -211,6 +211,7 @@ DECIMALS_LABELS = {
     "1": N_("1 Nachkommastelle"),
     "2": N_("2 Nachkommastellen"),
     "3": N_("3 Nachkommastellen"),
+    "4": N_("4 Nachkommastellen"),
 }
 VALUE_FILTER_LABELS = {
     "off": N_("Aus"),

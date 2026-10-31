@@ -3256,7 +3256,7 @@ class Index:
             return cursor.rowcount > 0
 
     def set_dashboard_entity_pin_decimals(self, dashboard_id: int, pin_id: int, decimals: str) -> bool:
-        if decimals not in ("auto", "0", "1", "2", "3"):
+        if decimals not in ("auto", "0", "1", "2", "3", "4"):
             raise ValueError(tr("Ungültige Nachkommastellen"))
         with self._lock, self._conn:
             cursor = self._conn.execute(

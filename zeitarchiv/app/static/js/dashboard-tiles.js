@@ -1374,7 +1374,7 @@
 
       const decimalsCells = Array.from(control.querySelectorAll('.dtile-decimals-cell'));
       const decimalsHead = control.querySelector('.dtile-decimals-picker-head strong');
-      const DECIMALS_HEAD_LABELS = {auto: t('Auto'), '0': '0', '1': '1', '2': '2', '3': '3'};
+      const DECIMALS_HEAD_LABELS = {auto: t('Auto'), '0': '0', '1': '1', '2': '2', '3': '3', '4': '4'};
       decimalsCells.forEach(cell => {
         cell.addEventListener('click', async () => {
           const decimals = cell.dataset.decimals;

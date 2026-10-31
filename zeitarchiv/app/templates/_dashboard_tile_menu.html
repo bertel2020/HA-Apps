@@ -207,7 +207,7 @@
         <div class="dtile-settings-section"{% if tile.is_state %} hidden{% endif %}>
           <div class="dtile-decimals-picker-head">{{ _("Nachkommastellen") }}</div>
           <div class="dtile-decimals-row" role="group" aria-label="{{ _('Nachkommastellen wählen') }}">
-            {% for value, label in [('auto', _('Auto')), ('0', '0'), ('1', '1'), ('2', '2'), ('3', '3')] %}
+            {% for value, label in [('auto', _('Auto')), ('0', '0'), ('1', '1'), ('2', '2'), ('3', '3'), ('4', '4')] %}
             <button type="button" class="dtile-decimals-cell{% if tile.decimals == value %} is-selected{% endif %}"
                     data-decimals="{{ value }}"
                     title="{{ _('Automatisch') if value == 'auto' else (value ~ _(' Nachkommastelle') ~ ('n' if value != '1' else '')) }}">{{ label }}</button>

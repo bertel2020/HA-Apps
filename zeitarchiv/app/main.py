@@ -3308,7 +3308,7 @@ _ENTITY_CHART_OPTION_DEFAULTS = {
     # Zeitstrahl standardmäßig offen; ohne Wirkung bei allen anderen Typen.
     "state_log": True,
 }
-_ENTITY_CHART_DECIMALS = {"auto", "0", "1", "2", "3"}
+_ENTITY_CHART_DECIMALS = {"auto", "0", "1", "2", "3", "4"}
 _ON_OFF_LABELS = {"1": N_("An"), "0": N_("Aus")}
 _ENTITY_LEGEND_STYLE_LABELS = {"chips": N_("Chips"), "table": N_("Tabelle")}
 _ENTITY_LEGEND_METRIC_LABELS = {"last": N_("Aktuell"), "min": N_("Min"), "max": N_("Max"), "average": N_("Durchschnitt"), "sum": N_("Summe")}

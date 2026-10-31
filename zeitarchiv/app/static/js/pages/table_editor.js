@@ -23,7 +23,7 @@
     // als JS-Konstante dupliziert, weil die Optionsliste (5 feste Werte) sich
     // praktisch nie ändert und die anderen Picker in dieser Datei (BORDER_
     // OPTIONS, DENSITY_OPTIONS, …) genauso lokal statt aus Jinja befüllt sind.
-    const DECIMALS_LABELS = {auto: t('Automatisch'), '0': t('0 Nachkommastellen'), '1': t('1 Nachkommastelle'), '2': t('2 Nachkommastellen'), '3': t('3 Nachkommastellen')};
+    const DECIMALS_LABELS = {auto: t('Automatisch'), '0': t('0 Nachkommastellen'), '1': t('1 Nachkommastelle'), '2': t('2 Nachkommastellen'), '3': t('3 Nachkommastellen'), '4': t('4 Nachkommastellen')};
     const RANGE_LABELS = {hour: t('Stunde'), day: t('Tag'), week: t('Woche'), month: t('Monat'), year: t('Jahr'), decade: t('Dekade')};
     const PREVIOUS_LABELS = {hour: t('Vorherige Stunde'), day: t('Vortag'), week: t('Vorwoche'), month: t('Vormonat'), year: t('Vorjahr'), decade: t('Vorherige Dekade')};
     const PLURAL_UNITS = {hour: t('Stunden'), day: t('Tagen'), week: t('Wochen'), month: t('Monaten'), year: t('Jahren'), decade: t('Dekaden')};
