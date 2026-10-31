@@ -626,6 +626,7 @@ def test_vertauschte_lade_und_entladerolle_wird_gemeldet(monkeypatch, tmp: Path)
         archiv.mkdir(parents=True, exist_ok=True)
         pq.write_table(tabelle, archiv / "2024-02.parquet")
         rollup.append_completed_month(tmp, entity_id, "counter", tabelle, 2024, 2, TZ)
+        a.index.record_write(entity_id, erster.timestamp())
         a.index.record_write(entity_id, letzter.timestamp())
     monkeypatch.setattr(ed, "datetime", _FesteUhr)
     try:
@@ -635,6 +636,33 @@ def test_vertauschte_lade_und_entladerolle_wird_gemeldet(monkeypatch, tmp: Path)
         assert pruefung["ok"] is False
         assert "Verdreht" in pruefung["detail"]
         assert flow["quality"]["plausible"] is False
+    finally:
+        a.close()
+
+
+def test_lueckenhafter_monat_ohne_soc_wird_nicht_geprueft(monkeypatch, tmp: Path) -> None:
+    """Beginnt das Archiv erst mitten im Monat (hier: ab dem 20.), kann ein zu Beginn
+    gefüllter Speicher scheinbar mehr entladen als laden — kein Hinweis auf vertauschte
+    Rollen. Unter 90 % Abdeckung entfällt die Prüfung, wie beim kurzen Fenster."""
+    a, config = _mit_speicher(tmp, [{
+        "name": "Verdreht",
+        "laden_entity_id": "sensor.wenig", "entladen_entity_id": "sensor.viel",
+    }])
+    for entity_id, start, ende in (("sensor.wenig", 10.0, 11.0), ("sensor.viel", 20.0, 29.0)):
+        a.index.get_or_create_entity(entity_id, "sensor", "total_increasing", "kWh")
+        erster = _dt.datetime(2024, 2, 20, 6, tzinfo=TZ)
+        letzter = _dt.datetime(2024, 2, 28, 18, tzinfo=TZ)
+        tabelle = pa.table({"ts": [erster.timestamp(), letzter.timestamp()], "value": [start, ende]})
+        archiv = tmp / "archive" / entity_id
+        archiv.mkdir(parents=True, exist_ok=True)
+        pq.write_table(tabelle, archiv / "2024-02.parquet")
+        rollup.append_completed_month(tmp, entity_id, "counter", tabelle, 2024, 2, TZ)
+        a.index.record_write(entity_id, erster.timestamp())
+        a.index.record_write(entity_id, letzter.timestamp())
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "month", -1)
+        assert all(c["label"] != "Speicher-Wirkungsgrad plausibel" for c in flow["quality"]["checks"])
     finally:
         a.close()
 

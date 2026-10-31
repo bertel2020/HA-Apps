@@ -121,6 +121,9 @@ STALE_SECONDS = 2 * 24 * 60 * 60
 # MAX_RAW_QUERY_POINTS (100.000, siehe limits.py) — hier reicht ein
 # günstiger, schneller Scan, kein vollständiger Chart-Datenabruf.
 RESET_CHECK_MAX_ROWS = 20_000
+# Mindestanteil des Zeitraums mit archivierten Werten, ab dem die Speicher-
+# Wirkungsgrad-Prüfung (ohne SOC-Sensor) in Monat/Jahr aussagekräftig ist.
+STORAGE_CHECK_MIN_COVERAGE = 0.9
 
 # Sparkline-Verfeinerung für die noch laufende Periode (siehe _entity_series):
 # "Monat" bucketet auf Tagesebene, "Jahr" auf Monatsebene — der jeweils
@@ -1223,6 +1226,24 @@ class EnergieDashboardService:
                 previous_value = value
         return reset_hits, fully_checked
 
+    def _storage_coverage(
+        self, entity_ids: list[str], window_start: datetime, window_end: datetime, now: datetime,
+    ) -> float:
+        """Anteil des (bis jetzt reichenden) Fensters, der ab dem ersten archivierten Wert
+        der Entitäten liegt; bei mehreren Entitäten gilt der schlechteste Wert."""
+        end_ts = min(window_end, now).timestamp()
+        start_ts = window_start.timestamp()
+        if end_ts <= start_ts:
+            return 1.0
+        coverage = 1.0
+        for entity_id in entity_ids:
+            entity = self.deps.index.get_entity(entity_id)
+            first_ts = entity["first_ts"] if entity is not None else None
+            if first_ts is None:
+                return 0.0
+            coverage = min(coverage, (end_ts - max(start_ts, first_ts)) / (end_ts - start_ts))
+        return coverage
+
     def _grundpreis_zustand(
         self, entity_id: str, window_start: datetime, window_end: datetime, now: datetime,
         read_cache: query_mod.QueryReadCache, fallback: Callable[[], dict[float, float]],
@@ -1516,6 +1537,7 @@ class EnergieDashboardService:
             speicher_entry = {
                 "name": sp_name, "entladen_val": sp_entladen_val, "laden_val": sp_laden_val,
                 "has_both": bool(sp.get("laden_entity_id")) and bool(sp.get("entladen_entity_id")),
+                "entity_ids": [eid for eid in (sp.get("laden_entity_id"), sp.get("entladen_entity_id")) if eid],
                 # Für die Wirkungsgrad-Plausibilitätsprüfung weiter unten: wie
                 # weit der Ladestand SELBST im Fenster gesunken ist (kWh) —
                 # nur gesetzt, wenn SOC-Sensor + Kapazität vorliegen und
@@ -2524,6 +2546,11 @@ class EnergieDashboardService:
             if soc_delta_kwh is not None:
                 threshold = e["laden_val"] + max(0.0, -soc_delta_kwh) + 0.05
             elif range_key in ("month", "year"):
+                # Ohne SOC-Korrektur taugt der Vergleich nur über einen (fast) vollständig
+                # archivierten Zeitraum: Beginnt das Archiv mitten im Monat, kann ein bei
+                # Archivbeginn gefüllter Speicher scheinbar mehr entladen als laden.
+                if self._storage_coverage(e["entity_ids"], window_start, window_end, now) < STORAGE_CHECK_MIN_COVERAGE:
+                    continue
                 threshold = e["laden_val"] + 0.05
             else:
                 continue
