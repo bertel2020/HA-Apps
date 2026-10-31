@@ -1600,6 +1600,7 @@
     "Erlauben": "Allow",
     "Kein Zähler": "Not a counter",
     "Melden": "Report",
+    "Erlaubt": "Allowed",
     "Melden (Standard): ein Rückgang des Zählerstands wird auf der Bereinigungs-Seite markiert, gemeldet und in Housekeeping gelistet. Erlauben: für Zähler, die sich planmäßig zurücksetzen, z. B. täglich um Mitternacht. Rückgänge gelten dann als normal, bereits gespeicherte Werte bleiben unverändert.": "Report (default): a drop in the counter reading is flagged on the cleanup page, reported and listed in Housekeeping. Allow: for counters that reset on a schedule, e.g. daily at midnight. Decreases then count as normal; values already stored stay unchanged.",
     "erlaubt": "allowed",
     "Rückgänge sind für diesen Zähler erlaubt: keine Markierung, keine Meldung, kein Eintrag in Housekeeping.": "Decreases are allowed for this counter: no flag, no notification, no Housekeeping entry.",

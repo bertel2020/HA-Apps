@@ -384,3 +384,29 @@ def test_housekeeping_lists_a_rule_counter_even_when_nothing_is_open(client) -> 
     finally:
         index.set_counter_decreases("sensor.pytest_rule3", "allow")  # schaltet die Regel aus
         index.set_counter_decreases("sensor.pytest_rule3", "report")
+
+
+def test_the_entity_table_column_shows_the_mode_for_counters_only(client) -> None:
+    """Die Spalte ist standardmäßig aus; sichtbar zeigt sie Melden/Erlaubt nur bei
+    Zählern, bei allen anderen Typen „—“."""
+    import re
+
+    from app.main import ENTITIES_DEFAULT_COLUMNS, index
+
+    assert "counter_decreases" not in ENTITIES_DEFAULT_COLUMNS.split(",")
+    index.get_or_create_entity("sensor.cdcol_a", "sensor", "total_increasing", "kWh")
+    index.get_or_create_entity("sensor.cdcol_b", "sensor", "total_increasing", "kWh")
+    index.get_or_create_entity("sensor.cdcol_c", "sensor", "measurement", "°C")
+    index.set_counter_decreases("sensor.cdcol_b", "allow")
+
+    vorher = index.get_setting("entities_columns", "")
+    index.set_setting("entities_columns", "counter_decreases")
+    try:
+        html = client.get("/entities-table", params={"search": "cdcol_"}).text
+        zellen = re.findall(r'<td[^>]*class="[^"]*col-counter-decreases[^"]*"[^>]*>(.*?)</td>', html)
+        sortiert = client.get("/entities-table", params={"search": "cdcol_", "sort": "counter_decreases"})
+    finally:
+        index.set_setting("entities_columns", vorher)
+
+    assert [z.strip() for z in zellen] == ["Melden", "Erlaubt", "—"]
+    assert sortiert.status_code == 200

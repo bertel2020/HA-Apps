@@ -2539,6 +2539,7 @@ ENTITIES_OPTIONAL_COLUMNS = [
     ("value_filter", N_("Wertfilter")),
     ("gap_threshold", N_("Lücken")),
     ("outlier_threshold", N_("Ausreißer")),
+    ("counter_decreases", N_("Zählerrückgänge")),
     ("historic", N_("Historisch")),
 ]
 # Nur Auflösung/Aufbewahrung initial aus — diese beiden Konfigurationsdetails
@@ -2629,6 +2630,14 @@ def _entities_table_response(
             entry["outlier_threshold_label"] = (
                 OUTLIER_THRESHOLD_LABELS.get(row["outlier_threshold"], row["outlier_threshold"])
                 if outlier_detection_applies(row["aggregation_type"])
+                else "—"
+            )
+        if "counter_decreases" in visible_columns:
+            # Nur Zähler kennen die Einstellung (Standard: melden); bei allen anderen
+            # Typen wäre „Melden“ eine Aussage über etwas, das es dort nicht gibt.
+            entry["counter_decreases_label"] = (
+                (tr("Erlaubt") if row["counter_decreases"] == "allow" else tr("Melden"))
+                if row["aggregation_type"] == "counter"
                 else "—"
             )
         if "historic" in visible_columns:
