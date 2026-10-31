@@ -57,6 +57,16 @@
   jetzt maskiert. Bisher hätte ein Anzeigename mit HTML-Code beim Überfahren
   ausgeführt werden können.
 
+- **Bereinigung, Reiter „Korrigieren“**: Das Speichern einer Zeile verwarf alle
+  anderen noch nicht gespeicherten Eingaben. Jetzt wird nur die betroffene Zelle
+  aktualisiert. Eine neue Leiste „Alle speichern (n)“ und „Alle verwerfen“
+  erledigt mehrere offene Zeilen auf einmal; beim Öffnen einer Zeile ist der
+  bisherige Wert markiert und lässt sich direkt überschreiben.
+
+- **Symcon-Import, ZIP-Upload**: Schlägt der Upload ohne Meldung der App fehl,
+  zum Beispiel mit 413 oder 502 von einem Proxy, hängt die Fehlermeldung jetzt den
+  HTTP-Status an. Bisher stand dort nur „ZIP konnte nicht verarbeitet werden.“
+
 - **Entitätsansicht und Chart-Editor**: Im Diagramm fehlte bei langen
   Beschriftungen der y-Achse links eine Ziffer („4,782 ct/kWh“ statt „24,782
   ct/kWh“). Der Rand richtet sich jetzt nach der tatsächlichen Breite der
@@ -141,6 +151,15 @@
 - **Chart tooltips**: Entity names and units are now escaped in the tooltip.
   Before, a display name containing HTML code could have been executed when
   hovering.
+
+- **Cleanup, “Correct” tab**: Saving one row discarded all other unsaved entries.
+  Now only the affected cell is updated. A new bar with “Save all (n)” and
+  “Discard all” handles several open rows at once; when a row is opened, its
+  current value is selected and can be overwritten directly.
+
+- **Symcon import, ZIP upload**: If the upload fails without a message from the
+  app, for example with 413 or 502 from a proxy, the error message now includes
+  the HTTP status. Before, it only said “The ZIP could not be processed.”
 
 - **Entity view and chart editor**: In the chart, long y-axis labels lost a digit
   on the left (“4,782 ct/kWh” instead of “24,782 ct/kWh”). The margin now follows
