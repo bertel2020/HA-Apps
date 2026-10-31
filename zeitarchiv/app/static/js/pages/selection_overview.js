@@ -7,6 +7,8 @@
 //     sind gesperrt, solange kein Kästchen markiert ist; die Leiste zählt die
 //     markierten Zeilen und zeigt ohne Markierung nur Zähler und kurzen Hinweis
 //     (data-empty, siehe selection_overview.css).
+//  3. Von den Zeilenmenüs (⋯) bleibt höchstens eines offen; ein Klick daneben
+//     oder Escape schließt es.
 (function () {
   'use strict';
   const banner = document.getElementById('ov-job');
@@ -41,5 +43,21 @@
     if (bar) bar.setAttribute('data-live', '');
     form.addEventListener('change', update);
     update();
+  }
+
+  const menus = document.querySelectorAll('details.ov-menu');
+  if (menus.length) {
+    const closeOthers = (keep) => menus.forEach((menu) => {
+      if (menu !== keep) menu.open = false;
+    });
+    menus.forEach((menu) => menu.addEventListener('toggle', () => {
+      if (menu.open) closeOthers(menu);
+    }));
+    document.addEventListener('click', (event) => {
+      if (!event.target.closest('details.ov-menu')) closeOthers(null);
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeOthers(null);
+    });
   }
 })();
