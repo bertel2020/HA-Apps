@@ -1716,7 +1716,10 @@
         },
 
         render() {
-          if (!chartInstance) chartInstance = echarts.init(document.getElementById('chart'));
+          if (!chartInstance) {
+            chartInstance = echarts.init(document.getElementById('chart'));
+            AxisFit.attach(chartInstance);
+          }
           if (!this.hasData) { chartInstance.clear(); return; }
           // Nur die Zustands-Balken brauchen mehr Höhe (ein Diagramm je Entität).
           if (!(this.timeline && this.hasState && this.stateMode !== 'timeline')) document.getElementById('chart').style.height = '';
@@ -2235,7 +2238,8 @@
             // 8px erhöht (20→28), damit das toolbox-Icon (oben rechts, s. o.)
             // nicht mit der obersten Y-Achsen-Beschriftung kollidiert.
             // left 24 statt 10: containLabel misst die breiteste Beschriftung etwas zu knapp, bei langen
-            // Werten (z. B. „25,000 ct/kWh“) fehlte links eine Ziffer (siehe entity_detail.js).
+            // Werten (z. B. „25,000 ct/kWh“) fehlte links eine Ziffer. AxisFit (axis-fit.js) setzt den Rand
+            // nach dem Zeichnen aus der gemessenen Breite; 24 ist der Wert fürs erste Bild.
             grid: {left: 24, right: 10, top: 28, bottom: 40, containLabel: true},
             // min/max explizit auf das Abfragefenster fixiert, statt ECharts
             // per Default auf den tatsächlichen Datenbereich auto-fitten zu
