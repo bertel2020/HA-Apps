@@ -55,7 +55,7 @@
               {% for key, label in column_options %}
               <label class="dd-picker-row">
                 <input type="checkbox" name="columns" value="{{ key }}" {% if key in visible_columns %}checked{% endif %}
-                       onchange="onColumnToggle('{{ key }}', this.checked); resetEntitiesPage()">
+                       onchange="onColumnToggle('{{ key }}', this.checked)">
                 <span>{{ label }}</span>
               </label>
               {% endfor %}
