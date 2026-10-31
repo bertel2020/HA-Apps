@@ -1012,6 +1012,49 @@ def test_anomalie_feuert_im_testaufbau_ueberhaupt(monkeypatch, tmp: Path) -> Non
         a.close()
 
 
+def _vorjahres_februar(tmp: Path, jahr: int, menge: float) -> None:
+    """Archivierter Februar eines früheren Jahres für sensor.geraet."""
+    erster = _dt.datetime(jahr, 2, 1, 6, tzinfo=TZ)
+    letzter = _dt.datetime(jahr, 2, 28, 18, tzinfo=TZ)
+    tabelle = pa.table({"ts": [erster.timestamp(), letzter.timestamp()], "value": [0.0, menge]})
+    archiv = tmp / "archive" / "sensor.geraet"
+    pq.write_table(tabelle, archiv / f"{jahr}-02.parquet")
+    rollup.append_completed_month(tmp, "sensor.geraet", "counter", tabelle, jahr, 2, TZ)
+
+
+def test_anomalie_vergleicht_monat_mit_den_vorjahren(monkeypatch, tmp: Path) -> None:
+    """Ein Verbraucher mit Jahreszeiten (Wärmepumpe) ist im Winter höher als in den
+    Vormonaten, aber nicht höher als im selben Monat der Vorjahre: keine Auffälligkeit.
+    Dieselben Daten ohne Vorjahre (siehe test_anomalie_feuert_im_testaufbau_ueberhaupt)
+    lösen sie aus — dort greift der Rückfall auf die Vormonate."""
+    a, config = _anomalie_anlage(tmp)
+    _vorjahres_februar(tmp, 2023, 38.0)
+    _vorjahres_februar(tmp, 2022, 42.0)
+    a.index.record_write("sensor.geraet", _dt.datetime(2023, 2, 28, 18, tzinfo=TZ).timestamp())
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "month", -1)
+        knoten = next(n for n in flow["nodes"] if n["name"] == "Gerät")
+        assert not knoten.get("anomaly")
+        assert flow["anomalien"] == []
+    finally:
+        a.close()
+
+
+def test_anomalie_vorjahr_faellt_nur_mit_daten_ins_gewicht(monkeypatch, tmp: Path) -> None:
+    """Ein einziges Vorjahr mit Daten genügt als Vergleich: die beiden fehlenden Jahre zählen
+    nicht als 0 (sonst läge der Schnitt bei 13 statt 40 und alles schlüge an)."""
+    a, config = _anomalie_anlage(tmp)
+    _vorjahres_februar(tmp, 2023, 39.0)
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "month", -1)
+        knoten = next(n for n in flow["nodes"] if n["name"] == "Gerät")
+        assert not knoten.get("anomaly")
+    finally:
+        a.close()
+
+
 def test_anomalie_braucht_mindestabstand_zum_vergleichswert(monkeypatch, tmp: Path) -> None:
     """40 kWh gegen 10 kWh überschreiten die Prozentschwelle weit; liegt der
     Mindestabstand aber über den 30 kWh Differenz, ist es keine Auffälligkeit

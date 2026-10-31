@@ -202,10 +202,13 @@ ANOMALIE_BASELINE_PERIODS = 3
 # Abstand der Vergleichsperioden in Einheiten des angezeigten Zeitraums. Bei
 # "Tag" ist es der gleiche Wochentag der Vorwochen (Sa gegen die letzten drei
 # Sa, nicht gegen Do/Fr/Fr), bei "Stunde" dieselbe Uhrzeit der Vortage (Mittag
-# gegen die letzten drei Mittage, nicht gegen die drei Stunden davor). Monat
-# und Jahr haben keinen so ausgeprägten Rhythmus und vergleichen mit dem
-# Unmittelbar-davor.
-ANOMALIE_BASELINE_STEP = {"hour": 24, "day": 7}
+# gegen die letzten drei Mittage, nicht gegen die drei Stunden davor), beim Monat
+# derselbe Monat der Vorjahre (Jahreszeiten), beim Jahr die Jahre davor.
+ANOMALIE_BASELINE_STEP = {"hour": 24, "day": 7, "month": 12}
+# Perioden, bei denen der Vergleich auf die unmittelbar vorangehenden zurückfällt, wenn es im
+# gewählten Abstand keine Daten gibt (Monat: kein Vorjahr). Ein Verbraucher mit Jahreszeiten
+# (Wärmepumpe) wäre sonst im Oktober gegen Juli bis September stets „+1000 %“.
+ANOMALIE_BASELINE_FALLBACK_RANGES = {"month"}
 
 # Mindestabstand zum Vergleichswert in kWh, ab dem eine Überschreitung der
 # Prozentschwelle als Auffälligkeit gilt. Ohne ihn wäre ein Gerät, das von
@@ -1694,33 +1697,52 @@ class EnergieDashboardService:
         # Zeitstempel hängen nur an range_key/offset, nicht an der Entität.
         anomalie_coarser = _COARSER_RANGE.get(range_key)
         anomalie_step = ANOMALIE_BASELINE_STEP.get(range_key, 1)
-        anomalie_starts: list[float] = []
-        anomalie_coarse_offsets: list[int] = []
-        if anomalie_active:
+        # Beim Monat zählen nur Vorjahre MIT Daten; wo es keins gibt, fällt der Vergleich auf
+        # die unmittelbar vorangehenden Perioden zurück (Schritt 1).
+        anomalie_has_fallback = range_key in ANOMALIE_BASELINE_FALLBACK_RANGES
+
+        def _baseline_plan(step: int) -> tuple[list[float], list[int]]:
+            """Anfangszeitpunkte der Vergleichsperioden und die gröberen Abfragefenster, die sie abdecken."""
+            starts: list[float] = []
+            coarse_offsets: list[int] = []
             now_local = now.astimezone(self.deps.tz)
             for i in range(1, ANOMALIE_BASELINE_PERIODS + 1):
                 period_start, _pw_end, _pp_end = query_mod._window(  # noqa: SLF001 — siehe Modul-Docstring
-                    range_key, now_local, offset - i * anomalie_step,
+                    range_key, now_local, offset - i * step,
                 )
-                anomalie_starts.append(period_start.timestamp())
+                starts.append(period_start.timestamp())
             if anomalie_coarser:
                 # Welche groben Fenster decken diese Zeitstempel ab? Meist genau
                 # eines — an einer Monats-/Jahresgrenze zwei (die letzten drei
                 # Tage am 2. eines Monats liegen in zwei Monaten).
-                for start in anomalie_starts:
+                for start in starts:
                     # Bei "Stunde" liegt der Vergleich bis zu drei Tage zurück, dazu der Versatz
                     # der angezeigten Stunde selbst — das grobe Fenster muss so weit reichen.
-                    for coarse_offset in range(0, -(ANOMALIE_BASELINE_PERIODS + 4 + (abs(offset) // anomalie_step if anomalie_step > 1 else 0)), -1):
+                    for coarse_offset in range(0, -(ANOMALIE_BASELINE_PERIODS + 4 + (abs(offset) // step if step > 1 else 0)), -1):
                         cw_start, cw_end, _cp_end = query_mod._window(  # noqa: SLF001
                             anomalie_coarser, now_local, coarse_offset,
                         )
                         if cw_start.timestamp() <= start < cw_end.timestamp():
-                            if coarse_offset not in anomalie_coarse_offsets:
-                                anomalie_coarse_offsets.append(coarse_offset)
+                            if coarse_offset not in coarse_offsets:
+                                coarse_offsets.append(coarse_offset)
                             break
+            return starts, coarse_offsets
 
-        def _anomaly_baseline(entity_id: str) -> float | None:
+        anomalie_plan: tuple[list[float], list[int]] = ([], [])
+        anomalie_fallback_plan: tuple[list[float], list[int]] = ([], [])
+        if anomalie_active:
+            anomalie_plan = _baseline_plan(anomalie_step)
+            if anomalie_has_fallback:
+                anomalie_fallback_plan = _baseline_plan(1)
+
+        def _baseline_from(entity_id: str, plan: tuple[list[float], list[int]], step: int, only_with_data: bool) -> float | None:
+            starts, coarse_offsets = plan
             """Mittel der letzten ANOMALIE_BASELINE_PERIODS Vergleichsperioden (Abstand: ANOMALIE_BASELINE_STEP).
+
+            Beim Monat sind das die gleichen Monate der Vorjahre; nur Jahre MIT Daten zählen
+            (ein fehlendes Jahr als 0 würde den Schnitt senken und bei jeder jungen Installation
+            Fehlalarme auslösen). Hat die Entität kein Vorjahr, gilt der Schnitt der letzten drei
+            Monate (Plan ``fallback``).
 
             Aus einer (selten zwei) gröberen Abfrage abgelesen statt je Periode
             einzeln gestellt — gemessen 15 % eines Requests für einen Wert, der
@@ -1736,29 +1758,42 @@ class EnergieDashboardService:
             Vergleichsperioden. Genau daran ist der erste Anlauf gescheitert
             (bis zu 456 kWh Abweichung an echten Daten).
             """
-            if not anomalie_coarse_offsets:
+            if not coarse_offsets:
                 # Kein gröberer Zeitraum hinterlegt (kann nur passieren, wenn
                 # RANGE_KEYS um einen Wert wächst, den _COARSER_RANGE nicht
                 # kennt) — dann wie bisher je Periode einzeln, langsamer aber
                 # korrekt.
-                values = [
-                    self._series_total(self._entity_series(entity_id, range_key, offset - i * anomalie_step, now, read_cache)[0])
+                serien = [
+                    self._entity_series(entity_id, range_key, offset - i * step, now, read_cache)[0]
                     for i in range(1, ANOMALIE_BASELINE_PERIODS + 1)
                 ]
+                values = [self._series_total(serie) for serie in serien if serie or not only_with_data]
                 return sum(values) / len(values) if values else None
             buckets: dict[float, float] = {}
-            for coarse_offset in anomalie_coarse_offsets:
+            with_data: set[float] = set()
+            for coarse_offset in coarse_offsets:
                 result = query_mod.query_series(
                     self.deps.data_dir, self.deps.index, entity_id, anomalie_coarser,
                     self.deps.tz, now, offset=coarse_offset, read_cache=read_cache,
                 )
                 for point in result["points"]:
                     buckets[point["ts"]] = point["value"] or 0.0
+                    if point["value"] is not None:
+                        with_data.add(point["ts"])
             # round() wie _series_total(), damit beide Wege bis auf die letzte
             # Stelle dasselbe ergeben. Ein fehlender Bucket ist 0 — genau das
             # liefert die Einzelabfrage für eine Periode ohne Daten auch.
-            values = [round(buckets.get(start, 0.0), 3) for start in anomalie_starts]
+            values = [
+                round(buckets.get(start, 0.0), 3) for start in starts
+                if not only_with_data or start in with_data
+            ]
             return sum(values) / len(values) if values else None
+
+        def _anomaly_baseline(entity_id: str) -> float | None:
+            baseline = _baseline_from(entity_id, anomalie_plan, anomalie_step, anomalie_has_fallback)
+            if baseline is None and anomalie_has_fallback:
+                baseline = _baseline_from(entity_id, anomalie_fallback_plan, 1, False)
+            return baseline
 
         verbraucher_sum = 0.0
         verbraucher_display_sum = 0.0
