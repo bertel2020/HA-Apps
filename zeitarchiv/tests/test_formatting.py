@@ -48,3 +48,13 @@ def _run_all() -> None:
 
 if __name__ == "__main__":
     _run_all()
+
+
+def test_auto_shows_four_significant_digits_below_one_tenth() -> None:
+    """Ein Preis von 0,0796 €/kWh darf nicht als „0,08“ erscheinen; ab 0,1 bleibt es bei drei Stellen."""
+    assert format_value(0.0796) == "0,0796"
+    assert format_value(0.05) == "0,05"
+    assert format_value(0.00123) == "0,00123"
+    assert format_value(-0.0796) == "-0,0796"
+    assert format_value(0.1234) == "0,123"
+    assert format_value(0.0000001) == "0"

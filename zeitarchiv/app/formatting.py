@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from . import formats
-from .i18n import N_, tr
-
+import math
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
+from . import formats
+from .i18n import N_, tr
 
 
 def entity_display_name(entity_id: str, friendly_name: str | None, custom_name: str | None = None) -> str:
@@ -111,7 +112,8 @@ def format_int(value: int, signed: bool = False) -> str:
 
 
 def format_value(value: float, decimals: int | None = None) -> str:
-    """decimals=None (Standard/"Automatisch"): bis zu 3 Nachkommastellen, aber
+    """decimals=None (Standard/"Automatisch"): bis zu 3 Nachkommastellen (bei Beträgen unter 0,1 vier
+    signifikante Stellen, siehe unten), aber
     überflüssige Nullen abgeschnitten — ein ganzzahliger Rohwert (z. B. 4 W) zeigt
     "4" statt "4.000", während ein echter Nachkommawert (z. B. 21.437 °C oder ein
     Zähler-Rohwert wie 6403.06) lesbar bleibt statt auf eine feste
@@ -122,7 +124,12 @@ def format_value(value: float, decimals: int | None = None) -> str:
     if decimals is not None:
         text = f"{value:.{decimals}f}"
     else:
-        text = f"{value:.3f}".rstrip("0").rstrip(".")
+        # Unter 0,1 reichen drei Stellen nicht für eine lesbare Zahl (ein Preis von 0,0796 €/kWh
+        # erschien als „0,08“): dort vier signifikante Stellen, höchstens sechs Nachkommastellen.
+        digits = 3
+        if value and abs(value) < 0.1:
+            digits = min(6, 3 - math.floor(math.log10(abs(value))))
+        text = f"{value:.{digits}f}".rstrip("0").rstrip(".")
         if not text or text in ("-", ""):
             text = "0"
     return _localize_number_text(text)
