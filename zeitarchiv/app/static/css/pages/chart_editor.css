@@ -89,7 +89,8 @@
   .entity-name-dot-btn{border:none;padding:0;cursor:pointer;}
   .entity-name-dot-btn:hover{box-shadow:0 0 0 2px var(--border);}
   .color-popover{width:288px;max-width:calc(100vw - 48px);padding:12px;gap:12px;}
-  .color-swatches{display:flex;flex-wrap:wrap;gap:10px;}
+  /* Auto + acht Palettenfarben: eine Zeile, sonst rutscht die letzte allein in die zweite. */
+  .color-swatches{display:grid;grid-template-columns:repeat(9,24px);justify-content:space-between;gap:10px 0;}
   .color-swatch{
     width:24px;height:24px;border-radius:999px;border:none;padding:0;cursor:pointer;
     background:var(--dot);position:relative;
