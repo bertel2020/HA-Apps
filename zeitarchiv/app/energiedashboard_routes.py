@@ -1201,6 +1201,11 @@ class EnergieDashboardService:
         reset_hits: list[tuple[str, str]] = []
         fully_checked = True
         for entity_id, label in entity_roles:
+            entity = self.deps.index.get_entity(entity_id)
+            # Bewusst erlaubte Rückgänge (Entitäts-Einstellung „Zählerrückgänge erlauben“)
+            # sind keine Auffälligkeit.
+            if entity is not None and entity["counter_decreases"] == "allow":
+                continue
             try:
                 rows = sorted(cleanup_mod.iter_raw_rows(
                     self.deps.data_dir, self.deps.index, entity_id, window_start_ts, window_end_ts,

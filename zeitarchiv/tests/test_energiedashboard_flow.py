@@ -639,6 +639,26 @@ def test_vertauschte_lade_und_entladerolle_wird_gemeldet(monkeypatch, tmp: Path)
         a.close()
 
 
+def test_erlaubter_zaehlerrueckgang_wird_nicht_gemeldet(monkeypatch, tmp: Path) -> None:
+    """Zählerrückgänge, die an der Entität als „erlaubt“ eingestellt sind, sind keine
+    Auffälligkeit; ohne diese Einstellung bleibt die Meldung."""
+    a, config = _beispielanlage(tmp)
+    a.zaehler("sensor.netz", (13, 10.0))  # Rückgang von 103/106 auf 10
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+
+    def _reset_check() -> dict:
+        flow = a.service.compute_flow(config, "day", -1)
+        return next(c for c in flow["quality"]["checks"]
+                    if c["label"] in ("Zählerrücksetzung erkannt", "Keine Zählerrücksetzungen"))
+
+    try:
+        assert _reset_check()["ok"] is False
+        a.index.set_counter_decreases("sensor.netz", "allow")
+        assert _reset_check()["ok"] is True
+    finally:
+        a.close()
+
+
 def test_kurzes_fenster_ohne_soc_wird_nicht_geprueft(monkeypatch, tmp: Path) -> None:
     """Der ursprüngliche Bug-Report: morgens, vor der ersten Ladung des Tages,
     übersteigt die Entladung (aus dem Vortag-Ladestand) die Ladung im
