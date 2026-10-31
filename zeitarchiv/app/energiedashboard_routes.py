@@ -2577,15 +2577,18 @@ class EnergieDashboardService:
         for e in speicher_per_entity:
             if not e["has_both"]:
                 continue
+            # Monat/Jahr: nur über einen (fast) vollständig archivierten Zeitraum. Beginnt das
+            # Archiv mitten im Monat, kann ein bei Archivbeginn gefüllter Speicher scheinbar mehr
+            # entladen als laden; die SOC-Korrektur unten deckt nur den Ladestand im Fenster ab,
+            # nicht den vor dem ersten archivierten Wert.
+            if range_key in ("month", "year") and (
+                self._storage_coverage(e["entity_ids"], window_start, window_end, now) < STORAGE_CHECK_MIN_COVERAGE
+            ):
+                continue
             soc_delta_kwh = e.get("soc_delta_kwh")
             if soc_delta_kwh is not None:
                 threshold = e["laden_val"] + max(0.0, -soc_delta_kwh) + 0.05
             elif range_key in ("month", "year"):
-                # Ohne SOC-Korrektur taugt der Vergleich nur über einen (fast) vollständig
-                # archivierten Zeitraum: Beginnt das Archiv mitten im Monat, kann ein bei
-                # Archivbeginn gefüllter Speicher scheinbar mehr entladen als laden.
-                if self._storage_coverage(e["entity_ids"], window_start, window_end, now) < STORAGE_CHECK_MIN_COVERAGE:
-                    continue
                 threshold = e["laden_val"] + 0.05
             else:
                 continue

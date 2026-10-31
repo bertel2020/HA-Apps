@@ -687,6 +687,53 @@ def test_erlaubter_zaehlerrueckgang_wird_nicht_gemeldet(monkeypatch, tmp: Path) 
         a.close()
 
 
+def _verdrehter_speicher_mit_soc_im_februar(tmp: Path, erster_tag: int) -> tuple[_Anlage, dict]:
+    """Vertauschte Lade-/Entladerolle (1 geladen, 9 entladen) mit SOC-Sensor, dessen Ladestand im
+    Monat gleich bleibt (50 % -> 50 %, also nichts zu korrigieren); das Archiv beginnt am
+    ``erster_tag`` Februar 2024."""
+    a, config = _mit_speicher(tmp, [{
+        "name": "Verdreht", "soc_entity_id": "sensor.soc", "capacity_kwh": 20.0,
+        "laden_entity_id": "sensor.wenig", "entladen_entity_id": "sensor.viel",
+    }])
+    for entity_id, typ, start, ende in (
+        ("sensor.wenig", "counter", 10.0, 11.0), ("sensor.viel", "counter", 20.0, 29.0),
+        ("sensor.soc", "standard", 50.0, 50.0),
+    ):
+        a.index.get_or_create_entity(
+            entity_id, "sensor", "measurement" if typ == "standard" else "total_increasing",
+            "%" if typ == "standard" else "kWh",
+        )
+        erster = _dt.datetime(2024, 2, erster_tag, 6, tzinfo=TZ)
+        letzter = _dt.datetime(2024, 2, 28, 18, tzinfo=TZ)
+        tabelle = pa.table({"ts": [erster.timestamp(), letzter.timestamp()], "value": [start, ende]})
+        archiv = tmp / "archive" / entity_id
+        archiv.mkdir(parents=True, exist_ok=True)
+        pq.write_table(tabelle, archiv / "2024-02.parquet")
+        rollup.append_completed_month(tmp, entity_id, typ, tabelle, 2024, 2, TZ)
+        a.index.record_write(entity_id, erster.timestamp())
+        a.index.record_write(entity_id, letzter.timestamp())
+    return a, config
+
+
+def test_lueckenhafter_monat_wird_auch_mit_soc_nicht_geprueft(monkeypatch, tmp: Path) -> None:
+    """Die SOC-Korrektur deckt nur den Ladestand im Fenster ab, nicht den vor dem ersten
+    archivierten Wert: Beginnt das Archiv erst am 20., entfällt die Prüfung auch mit SOC-Sensor.
+    Dasselbe mit vollständigem Monat meldet den Tausch (Gegenprobe, sonst prüft der Test nichts)."""
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    a, config = _verdrehter_speicher_mit_soc_im_februar(tmp / "voll", 1)
+    try:
+        flow = a.service.compute_flow(config, "month", -1)
+        assert any(c["label"] == "Speicher-Wirkungsgrad plausibel" for c in flow["quality"]["checks"])
+    finally:
+        a.close()
+    a, config = _verdrehter_speicher_mit_soc_im_februar(tmp / "luecke", 20)
+    try:
+        flow = a.service.compute_flow(config, "month", -1)
+        assert all(c["label"] != "Speicher-Wirkungsgrad plausibel" for c in flow["quality"]["checks"])
+    finally:
+        a.close()
+
+
 def test_kurzes_fenster_ohne_soc_wird_nicht_geprueft(monkeypatch, tmp: Path) -> None:
     """Der ursprüngliche Bug-Report: morgens, vor der ersten Ladung des Tages,
     übersteigt die Entladung (aus dem Vortag-Ladestand) die Ladung im
