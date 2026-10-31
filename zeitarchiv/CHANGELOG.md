@@ -23,6 +23,15 @@
   rechnen auf den Summen weiter, die Summenzeile addiert die Summen ihrer
   Zeilen. Die Spalte gibt es auch in Dashboard-Kacheln und im CSV-Export.
 
+- **Entitätenliste, Spalte „Zählerrückgänge“**: Eine optionale Spalte zeigt je
+  Zähler, ob Rückgänge gemeldet („Melden“) oder erlaubt („Erlaubt“) sind. Sie
+  ist standardmäßig ausgeblendet und lässt sich über „Spalten“ einschalten.
+
+- **Vierte Nachkommastelle**: Bei den Nachkommastellen lässt sich jetzt auch
+  „4“ wählen, in der Entitäts-Konfiguration, im Optionen-Menü, im Chart-Editor,
+  in Dashboard-Kacheln und im Tabellen-Editor. So bleibt ein Preis wie
+  0,0796 €/kWh sichtbar statt als 0,08 zu erscheinen.
+
 ### Geändert
 
 - **Chart-Tooltip**: Beim Überfahren eines Diagramms mit mehreren Linien oder
@@ -33,6 +42,15 @@
   übrigen, steht darunter sein Zeitpunkt und das Alter, zum Beispiel
   „10:30 · vor 5m“. Gilt im Chart-Editor und in Dashboard-Kacheln.
 
+- **Energie-Dashboard, Auffälligkeiten im Monat**: Der Monat wird jetzt mit
+  demselben Monat der Vorjahre verglichen statt mit den Vormonaten. Ein
+  Verbraucher mit Jahreszeiten, etwa eine Wärmepumpe, fällt so im Winter nicht
+  mehr als „+1000 %“ auf. Gibt es noch kein Vorjahr, gilt wie bisher der
+  Schnitt der letzten drei Monate; der Hinweis im Dialog nennt den Vergleich.
+
+- **Nachkommastellen „Auto“**: Werte unter 0,1 erscheinen jetzt mit vier
+  signifikanten Stellen, zum Beispiel 0,0796 statt 0,08.
+
 ### Behoben
 
 - **Diagramm-Tooltips**: Namen und Einheiten von Entitäten werden im Tooltip
@@ -41,7 +59,16 @@
 
 - **Entitätsansicht und Chart-Editor**: Im Diagramm fehlte bei langen
   Beschriftungen der y-Achse links eine Ziffer („4,782 ct/kWh“ statt „24,782
-  ct/kWh“). Der Rand ist jetzt groß genug.
+  ct/kWh“). Der Rand richtet sich jetzt nach der tatsächlichen Breite der
+  Beschriftung und wächst mit ihr.
+- **Energie-Dashboard, Zählerrücksetzung**: Zähler, bei denen Rückgänge erlaubt
+  sind, werden nicht mehr als „Zählerrücksetzung erkannt“ gemeldet.
+- **Energie-Dashboard, Speicher-Hinweis**: „Entladung übersteigt Ladung“
+  erscheint in Monat und Jahr nur noch, wenn der Zeitraum zu mindestens 90 %
+  archiviert ist, auch mit SOC-Sensor. Beginnt das Archiv mitten im Monat,
+  entfiel sonst der Ladestand zu Beginn und der Hinweis war ein Fehlalarm.
+- **Entitätenliste**: Beim Ein- und Ausblenden von Spalten springt die Liste
+  nicht mehr auf Seite 1 zurück.
 - **Energie-Dashboard**: In der englischen Oberfläche erschienen im Sankey-Diagramm
   und in der Lastprofil-Heatmap noch deutsche Beschriftungen („Grundlast“,
   „(Ladung)“, „(Entladung)“, Wochentage „Mo“/„Di“/…). Sie werden jetzt übersetzt.
@@ -82,6 +109,15 @@
   sums of its rows. The column is also available in dashboard tiles and the
   CSV export.
 
+- **Entity list, “Counter decreases” column**: An optional column shows for each
+  counter whether decreases are reported (“Report”) or allowed (“Allowed”). It
+  is hidden by default and can be switched on under “Columns”.
+
+- **Fourth decimal place**: “4” can now be chosen for decimal places, in the
+  entity configuration, the options menu, the chart editor, dashboard tiles and
+  the table editor. A price such as 0.0796 €/kWh stays visible instead of
+  appearing as 0.08.
+
 #### Changed
 
 - **Chart tooltip**: When you hover a chart with several lines or bars, the
@@ -91,6 +127,15 @@
   is noticeably older than the others, its time and age appear below it, for
   example “10:30 · 5m ago”. Applies in the chart editor and in dashboard tiles.
 
+- **Energy dashboard, anomalies in the month view**: The month is now compared
+  with the same month in previous years instead of the previous months. A
+  consumer with seasons, such as a heat pump, no longer shows up as “+1000 %” in
+  winter. If there is no earlier year yet, the average of the last three months
+  applies as before; the note in the dialog names the comparison.
+
+- **Decimal places “Auto”**: Values below 0.1 now appear with four significant
+  digits, for example 0.0796 instead of 0.08.
+
 #### Fixed
 
 - **Chart tooltips**: Entity names and units are now escaped in the tooltip.
@@ -98,8 +143,16 @@
   hovering.
 
 - **Entity view and chart editor**: In the chart, long y-axis labels lost a digit
-  on the left (“4,782 ct/kWh” instead of “24,782 ct/kWh”). The margin is now large
-  enough.
+  on the left (“4,782 ct/kWh” instead of “24,782 ct/kWh”). The margin now follows
+  the actual width of the labels and grows with them.
+- **Energy dashboard, counter reset**: Counters for which decreases are allowed
+  are no longer reported as “Counter reset detected”.
+- **Energy dashboard, storage notice**: “Discharge exceeds charge” now appears in
+  the month and year view only if at least 90 % of the period is archived, also
+  with an SOC sensor. If the archive starts mid-month, the charge level at the
+  start was missing and the notice was a false alarm.
+- **Entity list**: Showing or hiding columns no longer jumps the list back to
+  page 1.
 - **Energy dashboard**: In the English interface the Sankey chart and the load
   profile heatmap still showed German labels (“Grundlast”, “(Ladung)”,
   “(Entladung)”, weekdays “Mo”/“Di”/…). They are now translated.
