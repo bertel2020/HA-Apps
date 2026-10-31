@@ -1818,7 +1818,10 @@
           // Anzeigename je Entität, in Auswahlreihenfolge — dieselbe Quelle
           // wie die Legende (this.entityNames[entity_id] || friendly_name),
           // damit Kategorie-Beschriftung und Legende nie auseinanderlaufen.
-          const entityCategories = this.series.map(s => this.entityNames[s.entity_id] || s.friendly_name);
+          // Wh- und kWh-Serien teilen sich eine Achse (Kopien in der größten
+          // Einheit); die Kennzahlen-Tabelle liest weiter this.series.
+          const chartSeries = NumberFormat.harmonizeUnits(this.series);
+          const entityCategories = chartSeries.map(s => this.entityNames[s.entity_id] || s.friendly_name);
 
           // Eine Y-Achse je unterschiedlicher Einheit (wie die Wachstums-Chart auf
           // der Statistik-Seite mit zwei Achsen, hier verallgemeinert auf N) —
@@ -1830,7 +1833,7 @@
           // statt als Dauer beschriftet.
           const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
           const axisKey = s => isDurationSeries(s) ? ' duration' : s.unit;
-          const units = [...new Set(this.series.map(axisKey))];
+          const units = [...new Set(chartSeries.map(axisKey))];
           // Balken-Serien stapeln je Einheit statt in einem globalen "total"-
           // Topf — sonst würden z. B. kWh- und Dauer-Serien auf derselben
           // Achse zusammenaddiert, sobald ein Chart mehrere Einheiten
@@ -1845,7 +1848,7 @@
           // die gestapelten Balken gemeint ist, und zeigte ihre eigenen (nicht
           // normierten) Werte dadurch verzerrt.
           const barOnlyAxis = new Set(
-            units.filter(u => this.series.every(s => axisKey(s) !== u || s.chart_type === 'bar'))
+            units.filter(u => chartSeries.every(s => axisKey(s) !== u || s.chart_type === 'bar'))
           );
           // Achsen mit MINDESTENS einer Balken-Serie (nicht nur reine
           // Balken-Achsen wie barOnlyAxis oben) dürfen "Dynamische Y-Achse"
@@ -1857,20 +1860,20 @@
           // (dashboard-tiles.js, axisHasBar) und Einzel-Entitäts-Charts
           // (entity_detail.js, chartType !== 'bar') — hier bisher gefehlt.
           const axisHasBar = new Set(
-            units.filter(u => this.series.some(s => axisKey(s) === u && s.chart_type === 'bar'))
+            units.filter(u => chartSeries.some(s => axisKey(s) === u && s.chart_type === 'bar'))
           );
           // Resampelte Punkte je Serie einmal vorab berechnen (statt weiter
           // unten im Haupt-Loop) — die Prozent-Normierung braucht die Werte
           // ALLER Serien einer Achse zum selben Bucket-Zeitpunkt, bevor die
           // erste Serie fertig gebaut werden kann.
-          const preparedPoints = this.series.map(s => resamplePoints(
+          const preparedPoints = chartSeries.map(s => resamplePoints(
             s.points, this.range, this.resolutionPreset, s.aggregation_type, this.windowStart
           ));
           // ts -> Summe je Achse, nur für tatsächlich normierte reine
           // Balken-Achsen.
           const axisTotals = new Map();
           if (normalizeActive) {
-            this.series.forEach((s, i) => {
+            chartSeries.forEach((s, i) => {
               const u = axisKey(s);
               if (!barOnlyAxis.has(u)) return;
               if (!axisTotals.has(u)) axisTotals.set(u, new Map());
@@ -1883,7 +1886,7 @@
           // die "strengste" (kleinste) Rundung aller beteiligten Entitäten, damit
           // kein Wert unpassend abgeschnitten wirkt.
           const unitDecimals = new Map();
-          this.series.forEach(s => {
+          chartSeries.forEach(s => {
             const d = this.effectiveDecimals(s);
             if (d == null) return;
             const current = unitDecimals.get(axisKey(s));
@@ -1973,7 +1976,7 @@
           // Vergleichs-Nebenserie (die folgt dem "Vergleichen"-Menü als
           // Ganzes, siehe setCompareMode()/disableCompare()).
           const legendSelected = {};
-          this.series.forEach((s, i) => {
+          chartSeries.forEach((s, i) => {
             const color = this.colorFor(s.entity_id);
             // chart_type kommt vom Server (query.py: "bar" für Zähler/Schalter,
             // sonst "line", im Raw-Modus immer "line") statt hier redundant aus
@@ -1996,7 +1999,7 @@
             // ihre Achse nicht in barOnlyAxis steht).
             const axisNormalized = normalizeActive && chartType === 'bar' && barOnlyAxis.has(axisKey(s));
             // Bei singleBucket (Kategorie-Achse, s. o.) ist die X-Position die
-            // EIGENE Kategorie dieser Entität (ihre Position in this.series,
+            // EIGENE Kategorie dieser Entität (ihre Position in chartSeries,
             // s. entityCategories) statt eines Zeitstempels — der Halte-Punkt
             // bis windowEnd (nächster Block) ergibt bei einer einzelnen
             // Kategorie je Entität ohnehin keinen Sinn und entfällt deshalb
