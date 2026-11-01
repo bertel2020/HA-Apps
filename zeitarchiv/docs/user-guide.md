@@ -795,6 +795,14 @@ Auswahl kommen, auch bevor ihr erster Wert da ist; schon einsortierte behalten
 ihre Kategorie, außer du setzt den Haken **Auch bereits einsortierte
 Entitäten umsortieren**. Thema und Kategorie bleiben getrennt.
 
+Auch der **Export** hat den Filter **Kategorie**, damit sich zum Beispiel alle
+Entitäten der Wärmepumpe mit „Alle Entitäten wählen“ in einem Zug exportieren
+lassen. Backups sichern die Zuordnung mit. Der selektive Restore stellt sie
+über den Namen der Kategorie wieder her (eine fehlende Kategorie wird dabei
+angelegt): bei einer Entität, die es lokal nicht mehr gibt, zusammen mit ihr,
+bei vorhandenen Entitäten als eigene Feldgruppe **Kategorie** unter
+„Einstellungen“.
+
 ### Zeitraum-Navigation
 
 - Auswahl von Stunde, Tag, Woche, Monat, Jahr oder Dekade als Basiseinheit;
@@ -2514,7 +2522,7 @@ Eigener Menüpunkt **System → Backup / Restore** (nicht unter Einstellungen):
     Austauschs pausieren die Schreibzugriffe kurz.
   - **Einstellungen:** holt Dashboards, Charts, Vergleichstabellen,
     Feldgruppen der Entitäts-Einstellungen (Name, Aufbewahrung, Filter,
-    Zähler, Anzeige) und allgemeine Einstellungen einzeln zurück, ebenfalls
+    Zähler, Anzeige, Kategorie) und allgemeine Einstellungen einzeln zurück, ebenfalls
     ohne Neustart. Der Abgleich läuft über den Namen. Standardmäßig kommt ein
     Objekt, das es aktuell nicht oder anders gibt, als **Kopie** dazu und
     nichts Bestehendes wird verändert; optional lässt sich ein abweichendes

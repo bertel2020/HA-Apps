@@ -508,3 +508,95 @@ def test_selective_delete_route(client, wizard) -> None:
     name = rs.list_rollbacks(main.DATA_DIR)[0]["name"]
     assert client.post(f"/backup/selective/delete/{name}").status_code == 200
     assert client.post(f"/backup/selective/delete/{name}").status_code == 404
+
+
+# --------------------------------------------------------------------------- Kategorien
+
+
+def test_restored_missing_entity_gets_its_category_by_name_and_undo_takes_it_back(live) -> None:
+    data_dir, index, coordinator = live
+    _entity(index, data_dir, "sensor.gone", [1.0, 2.0])
+    solar = index.create_entity_category("Solar")
+    index.set_entities_category(["sensor.gone"], solar)
+    zip_path = _backup(data_dir, data_dir)
+    index.delete_entity("sensor.gone")
+    index.delete_entity_category(solar)  # lokal gibt es die Kategorie nicht mehr
+    import shutil
+    shutil.rmtree(data_dir / "archive" / "sensor.gone")
+
+    with rs.BackupSource(zip_path) as source:
+        result = rs.restore_entities(data_dir, index, coordinator, source, ["sensor.gone"], TZ, source_label="b")
+
+    categories = index.list_entity_categories()
+    assert [c["name"] for c in categories] == ["Solar"]  # aus dem Backup neu angelegt
+    assert index.get_entity_category_id("sensor.gone") == categories[0]["id"]
+
+    rs.undo(data_dir, index, coordinator, result["rollback"], TZ)
+    assert index.get_entity_category_id("sensor.gone") is None
+    assert index.list_entity_categories() == []  # die angelegte, nun leere Kategorie geht mit
+
+
+def test_restore_of_an_existing_entity_keeps_its_local_category(live) -> None:
+    data_dir, index, coordinator = live
+    _entity(index, data_dir, "sensor.keep", [1.0])
+    old = index.create_entity_category("Alt")
+    index.set_entities_category(["sensor.keep"], old)
+    zip_path = _backup(data_dir, data_dir)
+    new = index.create_entity_category("Neu")
+    index.set_entities_category(["sensor.keep"], new)
+
+    with rs.BackupSource(zip_path) as source:
+        rs.restore_entities(data_dir, index, coordinator, source, ["sensor.keep"], TZ, source_label="b")
+
+    assert index.get_entity_category_id("sensor.keep") == new
+
+
+def test_category_group_is_offered_applied_by_name_and_undone(live) -> None:
+    data_dir, index, _ = live
+    _entity(index, data_dir, "sensor.a", [1.0])
+    _entity(index, data_dir, "sensor.b", [1.0])
+    solar = index.create_entity_category("Solar")
+    index.set_entities_category(["sensor.a"], solar)
+    zip_path = _backup(data_dir, data_dir)
+    # Danach: a wechselt in eine andere Kategorie, b bekommt eine, die es im Backup nicht gab.
+    wetter = index.create_entity_category("Wetter")
+    index.set_entities_category(["sensor.a", "sensor.b"], wetter)
+    index.delete_entity_category(solar)  # „Solar“ gibt es lokal nicht mehr
+
+    with rs.BackupSource(zip_path) as source:
+        overview = rs.load_settings_overview(source, index, data_dir)
+        offered = {e["entity_id"]: e["groups"]["cat"]["lines"] for e in overview["entities"] if "cat" in e["groups"]}
+        assert offered["sensor.a"] == ["Kategorie: Wetter → Solar"]
+        assert offered["sensor.b"] == ["Kategorie: Wetter → —"]
+        plan = rs.make_plan(overview, {"e:sensor.a|cat", "e:sensor.b|cat"}, {})
+        result = rs.apply_settings(data_dir, index, source, overview, plan, source_label="b")
+
+    names = {c["id"]: c["name"] for c in index.list_entity_categories()}
+    assert names[index.get_entity_category_id("sensor.a")] == "Solar"  # neu angelegt, Zuordnung nach Namen
+    assert index.get_entity_category_id("sensor.b") is None
+
+    rs.undo(data_dir, index, StorageCoordinator(), result["rollback"], TZ)
+    assert index.get_entity_category_id("sensor.a") == wetter
+    assert index.get_entity_category_id("sensor.b") == wetter
+    assert [c["name"] for c in index.list_entity_categories()] == ["Wetter"]
+
+
+def test_backup_without_categories_offers_no_category_group(live) -> None:
+    data_dir, index, _ = live
+    _entity(index, data_dir, "sensor.a", [1.0])
+    # Ein Backup von vor den Kategorien: die Tabellen fehlen darin.
+    with index._lock, index._conn:
+        index._conn.execute("DROP TABLE entity_category")
+        index._conn.execute("DROP TABLE entity_categories")
+    zip_path = _backup(data_dir, data_dir)
+    with index._lock, index._conn:
+        index._conn.executescript(
+            "CREATE TABLE entity_categories (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, "
+            "position INTEGER NOT NULL, color_slot INTEGER NOT NULL DEFAULT 1);"
+            "CREATE TABLE entity_category (entity_id TEXT PRIMARY KEY, category_id INTEGER NOT NULL);"
+        )
+    index.set_entities_category(["sensor.a"], index.create_entity_category("Solar"))
+
+    with rs.BackupSource(zip_path) as source:
+        overview = rs.load_settings_overview(source, index, data_dir)
+    assert all("cat" not in e["groups"] for e in overview["entities"])

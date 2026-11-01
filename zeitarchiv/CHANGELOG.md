@@ -16,7 +16,9 @@
   einer Entität. Ein Filter **Kategorie** in der Liste zeigt eine oder
   mehrere Kategorien oder die Entitäten ohne Kategorie. Der
   Auswahl-Assistent schlägt beim Übernehmen eine Kategorie vor, passend zum
-  Thema, und legt sie bei Bedarf an.
+  Thema, und legt sie bei Bedarf an. Der Export hat denselben Filter. Der
+  selektive Restore bringt die Kategorien zurück, und die Demo-Daten kommen
+  mit Kategorien.
 
 ### Behoben
 
@@ -40,7 +42,8 @@
   in an entity's configuration. A **Category** filter in the list shows one
   or more categories or the entities without a category. The selection
   assistant suggests a category when applying, matching the topic, and creates
-  it if needed.
+  it if needed. The export has the same filter. The selective restore brings
+  the categories back, and the demo data comes with categories.
 
 #### Fixed
 

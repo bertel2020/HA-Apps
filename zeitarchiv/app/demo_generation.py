@@ -29,7 +29,7 @@ from zoneinfo import ZoneInfo
 
 import pyarrow.parquet as pq
 
-from .i18n import LANGUAGES, SOURCE_LANGUAGE, translate
+from .i18n import LANGUAGES, SOURCE_LANGUAGE, N_, translate
 from .storage import hotbuffer, reconcile
 from .storage.entity_removal import delete_all_values, delete_entity
 from .storage.index import STATE_UNAVAILABLE_INDEX, Index
@@ -1547,6 +1547,48 @@ def write_entity(
         import_rows(data_dir, index, current_rows, entity_id, tz, source_label="demo", accepts_state=True)
 
 
+# Kategorien der Demo (ROADMAP 1.42), in der Reihenfolge der Liste. Zugeordnet wird
+# nach dem Namensteil der Entitäts-ID, ohne Domain; was keine Regel trifft (Heizung,
+# Wasserzähler, Anwesenheit, Migrationspaare), bleibt ohne Kategorie.
+DEMO_CATEGORIES = (N_("Solar"), N_("Batterie"), N_("E-Auto"), N_("Netz"), N_("Verbraucher"), N_("Wetter"))
+_DEMO_CATEGORY_RULES = (
+    (0, ("pv_", "balkonkraftwerk_pv_", "balkonkraftwerk_ertrag_")),
+    (1, ("balkonkraftwerk_lade", "balkonkraftwerk_entlade", "balkonkraftwerk_speicher_", "balkonkraftwerk_geladen_",
+         "balkonkraftwerk_entladen_", "heimspeicher_")),
+    (2, ("wallbox",)),
+    (3, ("stromzaehler_", "strompreis_", "co2_")),
+    (4, ("gesamtwirkleistung", "waschmaschine", "spuelmaschine", "trockner", "kuehlschrank", "herd", "homeoffice",
+         "entertainment", "boiler", "werkstatt")),
+    (5, ("aussentemperatur", "luftfeuchte", "wind", "regensensor")),
+)
+
+
+def demo_category_index(entity_id: str) -> int | None:
+    """Position in DEMO_CATEGORIES oder None (keine Kategorie)."""
+    name = entity_id.split(".", 1)[1].removeprefix("demo_")
+    for position, prefixes in _DEMO_CATEGORY_RULES:
+        if name.startswith(prefixes):
+            return position
+    return None
+
+
+def assign_demo_categories(index: Index, language: str) -> None:
+    """Legt die Demo-Kategorien an (fehlende; vorhandene gleichnamige bleiben) und ordnet
+    Entitäten ohne Kategorie zu — eigene Zuordnungen bleiben unangetastet."""
+    ids: dict[int, int] = {}
+    existing = {c["name"].casefold(): c["id"] for c in index.list_entity_categories()}
+    for position, label in enumerate(DEMO_CATEGORIES):
+        name = translate(str(label), language)
+        ids[position] = existing.get(name.casefold()) or index.create_entity_category(name)
+    groups: dict[int, list[str]] = {}
+    for entity in DEMO_ENTITIES:
+        position = demo_category_index(entity.entity_id)
+        if position is not None:
+            groups.setdefault(position, []).append(localized_id(entity.entity_id, language))
+    for position, entity_ids in groups.items():
+        index.set_entities_category(entity_ids, ids[position], keep_existing=True)
+
+
 # Entity-ID -> Schlüssel in simulate_household()s counter_seed-Dict (siehe
 # dortiger Kommentar) — beim Fortsetzen (--append) wird hierüber der aktuell
 # gespeicherte Zählerstand jeder Entität als neuer Startwert übernommen.
@@ -1990,6 +2032,8 @@ def run_generation(
         total_rows += len(rows)
         if on_entity is not None:
             on_entity(index_in_list, localized_id(entity.entity_id, language), len(rows))
+
+    assign_demo_categories(index, language)
 
     report = reconcile.audit_storage_metadata(
         data_dir, index, tz,

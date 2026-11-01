@@ -740,6 +740,13 @@ their first value arrives; those that already have a category keep it unless
 you tick **Also re-sort entities that already have a category**. Topic and
 category stay separate.
 
+The **export** has the **Category** filter too, so that, for example, all heat
+pump entities can be exported in one go with "Select all entities". Backups
+include the assignment. The selective restore brings it back by the category's
+name (a missing category is created): for an entity that no longer exists
+locally together with it, for existing entities as its own field group
+**Category** under "Settings".
+
 ### Period navigation
 
 - Choose hour, day, week, month, year or decade as the base unit; forward/
@@ -2325,7 +2332,7 @@ Menu item of its own **System → Backup / Restore** (not under Settings):
     Deleted data points of the entity follow the backup afterwards. Writes
     pause briefly during the swap.
   - **Settings:** brings back dashboards, charts, comparison tables, field
-    groups of the entity settings (name, retention, filters, counter, display)
+    groups of the entity settings (name, retention, filters, counter, display, category)
     and general settings one by one, also without a restart. Matching is done
     by name. By default an object that does not exist currently, or differs,
     is added as a **copy** and nothing existing is changed; optionally a

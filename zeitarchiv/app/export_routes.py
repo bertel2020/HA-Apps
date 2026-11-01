@@ -94,7 +94,7 @@ def create_export_router(deps: ExportDependencies) -> APIRouter:
         return deps.templates.TemplateResponse(
             request,
             "export.html",
-            {"unit_options": unit_options, "max_rows": MAX_EXPORT_ROWS},
+            {"unit_options": unit_options, "max_rows": MAX_EXPORT_ROWS, "categories": index.list_entity_categories()},
         )
 
     def table_response(
@@ -106,13 +106,16 @@ def create_export_router(deps: ExportDependencies) -> APIRouter:
         direction: str,
         page: int,
         page_size: int,
+        category_filter: list[str] | None = None,
     ) -> HTMLResponse:
-        total = index.count_entities(search=search or None, type_filter=type_filter, unit_filter=unit_filter)
+        total = index.count_entities(
+            search=search or None, type_filter=type_filter, unit_filter=unit_filter, category_filter=category_filter,
+        )
         pagination = deps.paginate_meta(total, page, page_size)
         page_matched = index.list_entities(
             search=search or None, type_filter=type_filter, unit_filter=unit_filter, sort=sort,
             direction=direction, limit=pagination["page_size"],
-            offset=(pagination["page"] - 1) * pagination["page_size"],
+            offset=(pagination["page"] - 1) * pagination["page_size"], category_filter=category_filter,
         )
         rows = [
             {
@@ -166,18 +169,20 @@ def create_export_router(deps: ExportDependencies) -> APIRouter:
         dir: str = "asc",
         page: int = 1,
         page_size: int = 20,
+        category: list[str] = Query(["all"]),
     ) -> HTMLResponse:
-        return table_response(request, search, type, unit, sort, dir, page, page_size)
+        return table_response(request, search, type, unit, sort, dir, page, page_size, category)
 
     @router.get("/export/entity-ids")
     def export_entity_ids(
         search: str = "",
         type: list[str] = Query(["all"]),
         unit: str = "all",
+        category: list[str] = Query(["all"]),
     ) -> JSONResponse:
         """Alle Entitäten zu den Filtern der Liste (nicht nur die sichtbare Seite) —
         für „Alle Entitäten wählen"."""
-        rows = index.list_entities(search=search or None, type_filter=type, unit_filter=unit)
+        rows = index.list_entities(search=search or None, type_filter=type, unit_filter=unit, category_filter=category)
         return JSONResponse({"entity_ids": [row["entity_id"] for row in rows]})
 
     @router.post("/export/estimate")

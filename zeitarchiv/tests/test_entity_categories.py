@@ -349,3 +349,57 @@ def test_assistant_rejects_an_unknown_category_without_creating_a_job(client, en
 
     assert response.status_code == 400
     assert selection_jobs.all_jobs(Path(os.environ["ZEITARCHIV_DATA_DIR"])) == []
+
+
+# ---- Phase 3: Export und Demo ------------------------------------------------------------
+
+def test_export_wizard_filters_by_category(client, entities) -> None:
+    solar = client.post("/entities/categories", json={"name": "Solar"}).json()["id"]
+    client.post("/entities/set-category", data={"entity_id": entities[0], "category_id": str(solar)})
+
+    assert 'id="export-category-filter-popover"' in client.get("/export").text
+    table = client.get("/export-table", params={"search": "sensor.cat_", "category": [str(solar)]}).text
+    assert "sensor.cat_a" in table and "sensor.cat_b" not in table
+    ids = client.get("/export/entity-ids", params={"search": "sensor.cat_", "category": ["none"]}).json()["entity_ids"]
+    assert ids == [entities[1], entities[2]]
+
+
+def test_export_wizard_has_no_category_filter_without_categories(client, entities) -> None:
+    assert 'id="export-category-filter-popover"' not in client.get("/export").text
+
+
+def test_demo_entities_map_to_the_demo_categories() -> None:
+    from app import demo_generation as demo
+
+    expected = {
+        "sensor.demo_pv_leistung": "Solar", "sensor.demo_balkonkraftwerk_pv_leistung": "Solar",
+        "sensor.demo_heimspeicher_speicher_soc": "Batterie", "sensor.demo_balkonkraftwerk_entladeleistung": "Batterie",
+        "sensor.demo_wallbox_energie": "E-Auto", "sensor.demo_stromzaehler_bezug": "Netz",
+        "sensor.demo_waschmaschine_energie": "Verbraucher", "sensor.demo_aussentemperatur": "Wetter",
+    }
+    for entity_id, name in expected.items():
+        assert demo.DEMO_CATEGORIES[demo.demo_category_index(entity_id)] == name, entity_id
+    for entity_id in ("sensor.demo_heizung", "sensor.demo_wasserzaehler", "device_tracker.demo_smartphone"):
+        assert demo.demo_category_index(entity_id) is None, entity_id
+
+
+def test_demo_categories_keep_own_assignments_and_translate(client, entities) -> None:
+    from app import demo_generation as demo
+    from app import main
+
+    def local(entity_id: str) -> str:
+        return demo.localized_id(entity_id, "en")  # die Demo legt die Entitäten mit übersetzten IDs an
+
+    for entity in demo.DEMO_ENTITIES:
+        main.index.get_or_create_entity(local(entity.entity_id), entity.domain, entity.state_class, entity.unit)
+    own = main.index.create_entity_category("Eigene")
+    main.index.set_entities_category([local("sensor.demo_pv_leistung")], own)
+    try:
+        demo.assign_demo_categories(main.index, "en")
+        names = {c["id"]: c["name"] for c in main.index.list_entity_categories()}
+        assert {"Battery", "EV", "Grid", "Consumers", "Weather", "Solar"} <= set(names.values())
+        assert main.index.get_entity_category_id(local("sensor.demo_pv_leistung")) == own
+        assert names[main.index.get_entity_category_id(local("sensor.demo_aussentemperatur"))] == "Weather"
+    finally:
+        for entity in demo.DEMO_ENTITIES:
+            main.index.delete_entity(local(entity.entity_id))

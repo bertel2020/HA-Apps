@@ -11,6 +11,29 @@
       if (!anyChecked) document.querySelector('input[name=type][value=all]').checked = true;
     }
 
+    // Kategorie-Filter (ROADMAP 1.42), dieselbe Mehrfachauswahl wie beim Typ.
+    function onExportCategoryAllChange(checkbox) {
+      if (checkbox.checked) {
+        document.querySelectorAll('input[name=category]:not([value=all])').forEach(cb => cb.checked = false);
+      } else {
+        checkbox.checked = true;
+      }
+    }
+    function onExportCategorySpecificChange() {
+      document.querySelector('input[name=category][value=all]').checked = false;
+      const anyChecked = Array.from(document.querySelectorAll('input[name=category]:not([value=all])')).some(cb => cb.checked);
+      if (!anyChecked) document.querySelector('input[name=category][value=all]').checked = true;
+    }
+    function updateExportCategoryFilterLabel() {
+      const checked = Array.from(document.querySelectorAll('input[name=category]:checked'));
+      const btn = document.getElementById('export-category-filter-btn');
+      if (!checked.length || checked.some(cb => cb.value === 'all')) {
+        btn.textContent = t('Kategorie: Alle ▾');
+        return;
+      }
+      btn.textContent = t('Kategorie: ') + checked.map(cb => cb.parentElement.textContent.trim()).join(', ') + ' ▾';
+    }
+
     // Öffnen/Schließen/Auswählen der .dd-picker-Dropdowns (Typ, Einheit)
     // kommt aus dem gemeinsamen static/js/dd-picker.js.
     const EXPORT_TYPE_LABELS = {standard: t('Standard'), counter: t('Zähler'), switch: t('Schalter'), state: t('Zustand')};
@@ -313,6 +336,7 @@
         const search = document.querySelector('#controls [name=search]');
         if (search && search.value) params.set('search', search.value);
         document.querySelectorAll('input[name=type]:checked').forEach(cb => params.append('type', cb.value));
+        document.querySelectorAll('input[name=category]:checked').forEach(cb => params.append('category', cb.value));
         const unit = $('export-unit-filter-input');
         if (unit) params.set('unit', unit.value);
         try {
