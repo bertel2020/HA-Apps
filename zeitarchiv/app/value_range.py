@@ -67,3 +67,19 @@ def compute(data_dir: Path, index: Index, tz: ZoneInfo, entity, now: datetime) -
     }
     index.set_setting(_KEY_PREFIX + entity["entity_id"], json.dumps(entry))
     return entry
+
+
+def last_raw_value(data_dir: Path, index: Index, tz: ZoneInfo, entity, now: datetime) -> float | None:
+    """Der letzte Rohwert aus den Daten, für Entitäten, deren `last_value` im
+    Index fehlt: das ist nach einem Import, einem Restore und nach dem Abgleich
+    (reconcile.py setzt nur `last_ts`) der Normalfall, nicht die Ausnahme. Liest
+    nur den Monat des letzten Werts."""
+    last_ts = entity["last_ts"]
+    if last_ts is None:
+        return None
+    last = None
+    for _ts, value in cleanup.iter_raw_rows(
+        data_dir, index, entity["entity_id"], last_ts - 86400, last_ts + 1, tz, now=now
+    ):
+        last = value
+    return last

@@ -70,3 +70,15 @@ def test_entity_without_values_has_no_range(tmp_path: Path) -> None:
     entry = value_range.compute(tmp_path, index, TZ, _entity(index, first_ts=None), NOW)
     assert entry["min"] is None and entry["max"] is None
     index.close()
+
+
+def test_last_raw_value_reads_the_data_when_the_index_has_none(tmp_path: Path) -> None:
+    """Nach Import, Restore und Abgleich fehlt `last_value` im Index — der
+    Zählerstand der Leiste muss dann trotzdem erscheinen."""
+    index = _anlage(tmp_path)
+    entity = _entity(index)
+    entity["last_ts"] = _ts(4)
+    assert value_range.last_raw_value(tmp_path, index, TZ, entity, NOW) == 14.0
+    entity["last_ts"] = None
+    assert value_range.last_raw_value(tmp_path, index, TZ, entity, NOW) is None
+    index.close()

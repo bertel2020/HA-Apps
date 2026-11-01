@@ -2551,24 +2551,32 @@ def _entity_facts_extra(entity) -> dict | None:
         entry = value_range.cached(index, entity)
         return {
             "label": tr("Min / Max"), "note": tr("gesamter Zeitraum"), "pending": entry is None,
-            "text": _value_range_text(entry, decimals) if entry else "",
+            "text": _value_range_text(entry, decimals, entity) if entry else "",
         }
     if kind == "counter":
-        # „—“ statt keiner Zelle: last_value fehlt bei Entitäten, deren Werte nur
-        # importiert wurden, und die Zelle soll nicht je nach Herkunft verschwinden.
+        # last_value fehlt nach Import/Restore/Abgleich — dann aus den Daten lesen,
+        # statt die Zelle je nach Herkunft der Entität verschwinden zu lassen.
         last = entity["last_value"]
+        if last is None:
+            last = value_range.last_raw_value(DATA_DIR, index, TZ, entity, datetime.now(TZ))
         return {"label": tr("Zählerstand"), "note": "", "pending": False,
-                "text": format_value(last, decimals) if last is not None else "—"}
+                "text": _with_unit(format_value(last, decimals), entity) if last is not None else "—"}
     if kind == "state":
         return {"label": tr("Zustände"), "note": tr("verschieden"), "pending": False,
                 "text": format_int(len(index.get_state_map(entity["entity_id"])))}
     return None
 
 
-def _value_range_text(entry: dict, decimals: int | None) -> str:
+def _with_unit(text: str, entity) -> str:
+    """Wert mit Einheit, damit die Zelle für sich lesbar ist (die Einheit steht
+    zusätzlich in der Typ-Zelle, dort aber weit weg vom Wert)."""
+    return f"{text} {entity['unit']}" if entity["unit"] else text
+
+
+def _value_range_text(entry: dict, decimals: int | None, entity) -> str:
     if entry["min"] is None or entry["max"] is None:
         return "—"
-    return f"{format_value(entry['min'], decimals)} / {format_value(entry['max'], decimals)}"
+    return _with_unit(f"{format_value(entry['min'], decimals)} / {format_value(entry['max'], decimals)}", entity)
 
 
 def _visible_row_count(entity) -> int:
@@ -2900,7 +2908,7 @@ def entity_value_range(entity_id: str) -> dict:
     entry = value_range.cached(index, entity) or value_range.compute(
         DATA_DIR, index, TZ, entity, datetime.now(TZ)
     )
-    return {"text": _value_range_text(entry, decimals_to_int(entity["decimals"]))}
+    return {"text": _value_range_text(entry, decimals_to_int(entity["decimals"]), entity)}
 
 
 @app.get("/entities/{entity_id}/config", response_class=HTMLResponse)
