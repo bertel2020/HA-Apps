@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.13.0 - 2026-11-01
 
 ### Neu
 
