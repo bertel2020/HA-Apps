@@ -1380,6 +1380,15 @@ opened entity. Every setting applies **only to this one entity** and
 overrides the global default from **Settings → Archiving**. New global
 defaults never apply retroactively to entities that already exist.
 
+The page is divided into five sections: **General**, **Recording**,
+**Retention**, **Display** and **Checks**, with a jump line at the top. Each
+field is one row with a short line; the detailed text is behind the info button
+(i). The **customised** badge shows that a value differs from the current
+global default (the default is in the tooltip), and the jump line and section
+heading count such fields. Fields that cannot be set for the entity's type
+show their fixed value with the **fixed** badge; the reason is behind the info
+button.
+
 ### Where do I start?
 
 The fields act at very different points. This classification matters

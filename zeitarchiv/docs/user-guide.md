@@ -1508,6 +1508,15 @@ diese eine Entität** und
 überschreibt den globalen Standard aus **Einstellungen → Archivierung**. Neue
 globale Standards wirken nie rückwirkend auf bereits angelegte Entitäten.
 
+Die Seite ist in fünf Abschnitte gegliedert: **Allgemein**, **Erfassung**,
+**Aufbewahrung**, **Darstellung** und **Prüfung**, mit einer Sprungzeile oben.
+Jedes Feld ist eine Zeile mit einer Kurzzeile; der ausführliche Text steht
+hinter dem Info-Knopf (i). Das Abzeichen **angepasst** zeigt, dass ein Wert vom
+aktuellen globalen Standard abweicht (der Standard steht im Tooltip), und die
+Sprungzeile und der Abschnittskopf zählen solche Felder. Felder, die für den
+Typ der Entität nicht einstellbar sind, zeigen ihren festen Wert mit dem
+Abzeichen **fest**; der Grund steht hinter dem Info-Knopf.
+
 ### Womit fange ich an?
 
 Die Felder greifen an sehr unterschiedlichen Stellen an. Diese Einteilung

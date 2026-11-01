@@ -3,16 +3,39 @@
   .config-card-header{margin-bottom:20px;}
   .config-card-header h2{margin:0 0 4px;}
   .config-card-header .hint{margin:0;}
-  #config-form{
-    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 24px;
-  }
+  /* Abschnitte mit Zeilen (Mockup „Zeilen mit Abschnitten“). Jedes Feld ist eine
+     Zeile: links Beschriftung und Kurzzeile, rechts das Bedienelement; der lange
+     Erklärtext und Statuszeilen laufen darunter über die volle Breite. Die
+     Bedienelemente stehen rechts, die Popover öffnen deshalb rechtsbündig (app.css). */
   #config-form .field{margin:0;min-width:0;}
   #config-form .field select{width:100%;min-width:0;}
-  /* Linksbündig am Auslöser statt rechtsbündig (app.css): sonst ragt das Menü
-     eines Auslösers in der linken Spalte links aus der Karte heraus. */
-  #config-form .dd-picker-popover{left:0;right:auto;max-width:calc(100vw - 48px);}
-  #config-form .save-status{grid-column:1/-1;margin:0;}
-  .preview{grid-column:1/-1;margin-top:4px;padding-top:22px;border-top:1px solid var(--border);}
+  .cfg-jump{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;margin:0 0 18px;padding:0 0 12px;border-bottom:1px solid var(--border);
+    font-size:calc(13px * var(--font-scale, 1));}
+  .cfg-jump a{color:var(--accent-line);text-decoration:none;}
+  .cfg-jump a:hover{text-decoration:underline;}
+  .cfg-jump sup{margin-left:2px;font-weight:700;color:var(--warning);}
+  .cfg-jump .save-status{margin:0 0 0 auto;}
+  .cfg-sec{margin:0 0 22px;scroll-margin-top:81px;}
+  .cfg-sec-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;padding:0 0 8px;border-bottom:1px solid var(--border);}
+  .cfg-sec-head h3{margin:0;font-size:calc(14.5px * var(--font-scale, 1));}
+  .cfg-sec-head small{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
+  .cfg-sec-head .cfg-sec-adj{color:var(--warning);font-weight:600;}
+  .cfg-row{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:20px;row-gap:2px;align-items:center;
+    padding:12px 0;border-bottom:1px solid var(--border);}
+  .cfg-row:last-child{border-bottom:0;}
+  .cfg-row > *{grid-column:1/-1;}
+  .cfg-row > label{grid-column:1;grid-row:1;margin:0;}
+  .cfg-row > .cfg-short{grid-column:1;grid-row:2;margin:0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
+  .cfg-row > .dd-picker-wrap,.cfg-row > input[type="text"],.cfg-row > .cfg-fixed,.cfg-row > .cfg-ctl{
+    grid-column:2;grid-row:1 / span 2;justify-self:end;}
+  .cfg-row > input[type="text"]{width:240px;max-width:100%;}
+  .cfg-row .hint,.cfg-row .hint-status{margin:8px 0 0;}
+  .cfg-ctl{display:inline-flex;align-items:center;gap:8px;}
+  .cfg-fixed{color:var(--ink-muted);font-size:calc(13px * var(--font-scale, 1));white-space:nowrap;}
+  .badge.adjusted{margin-left:8px;vertical-align:1px;color:var(--warning);border-color:var(--warning);background:var(--warning-soft);cursor:help;}
+  .badge.fixed{margin-left:6px;color:var(--ink-faint);}
+  .cfg-row .counter-auto{margin-top:10px;}
+  .preview{margin-top:10px;padding-top:14px;}
   .entity-data-management{margin-top:28px;padding-top:22px;border-top:1px solid var(--border);}
   .entity-data-management > .hint{margin:0 0 14px;}
   .entity-data-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
@@ -32,8 +55,15 @@
   .entity-data-action.danger{border-color:var(--danger);background:var(--danger-soft);}
   .entity-data-action.danger strong{color:var(--danger);}
   @media (max-width:700px){
-    #config-form,.entity-data-actions{grid-template-columns:1fr;}
-    #config-form .save-status,.preview{grid-column:1;}
+    .entity-data-actions{grid-template-columns:1fr;}
+  }
+  @media (max-width:640px){
+    .cfg-row{grid-template-columns:minmax(0,1fr);row-gap:6px;}
+    .cfg-row > .dd-picker-wrap,.cfg-row > input[type="text"],.cfg-row > .cfg-fixed,.cfg-row > .cfg-ctl{
+      grid-column:1;grid-row:3;justify-self:stretch;}
+    .cfg-row > .dd-picker-wrap > .btn,.cfg-row > .cfg-ctl > .btn{width:100%;}
+    .cfg-row > input[type="text"]{width:100%;}
+    .cfg-jump .save-status{flex-basis:100%;margin:0;}
   }
   @media (max-width:480px){
     .config-card{padding:18px 16px;}

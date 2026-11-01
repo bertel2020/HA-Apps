@@ -90,7 +90,7 @@ def test_the_default_state_follows_the_width() -> None:
     den beiden anderen einklappbaren Blöcken. Der serverseitig gerenderte
     `hidden`-Zustand wird beim Laden korrigiert, auch nach einem htmx-Tausch."""
     assert "matchMedia('(max-width:700px)')" in JS
-    assert "ziel.hidden = SCHMAL.matches;" in JS
+    assert "ziel.hidden = SCHMAL.matches || !!ziel.closest('[data-hints=\"collapsed\"]');" in JS
     assert "htmx:afterSwap" in JS
 
 

@@ -2854,6 +2854,33 @@ def _gap_threshold_auto_adjust_message(
     )
 
 
+def _entity_config_adjusted(entity) -> dict[str, str]:
+    """Felder der Konfiguration, die vom globalen Standard (Einstellungen → Archivierung)
+    abweichen, mit der Beschriftung des Standards. Gesperrte Felder fehlen: dort gibt es
+    nichts einzustellen. Für Zustände gilt, was beim Anlegen erzwungen wird (siehe
+    Index.get_or_create_entity), nicht der globale Wert."""
+    defaults = _settings_archivierung_context()
+    kind = entity["aggregation_type"]
+    expected = {name: defaults[f"default_{name}"] for name in (
+        "resolution", "retention", "decimals", "value_filter", "gap_threshold", "outlier_threshold", "compact_target")}
+    if kind == "state":
+        expected.update(resolution="raw", compact_target="off", value_filter="off")
+    labels = {
+        "resolution": RESOLUTION_LABELS, "retention": RETENTION_LABELS, "decimals": DECIMALS_LABELS,
+        "value_filter": VALUE_FILTER_LABELS, "gap_threshold": GAP_THRESHOLD_LABELS,
+        "outlier_threshold": OUTLIER_THRESHOLD_LABELS, "compact_target": COMPACT_TARGET_LABELS,
+    }
+    blocked = {
+        "resolution": RESOLUTION_BLOCKED_REASONS, "compact_target": COMPACT_TARGET_BLOCKED_REASONS,
+        "outlier_threshold": OUTLIER_BLOCKED_REASONS,
+    }
+    return {
+        name: tr(str(labels[name].get(value, value)))
+        for name, value in expected.items()
+        if entity[name] != value and kind not in blocked.get(name, {})
+    }
+
+
 def _entity_config_context(entity) -> dict:
     """Gemeinsamer Kontext für die volle Konfigurationsseite (GET) und das per
     htmx nachgeladene/gespeicherte Formular-Fragment (POST) — beide zeigen
@@ -2887,6 +2914,7 @@ def _entity_config_context(entity) -> dict:
         "is_favorite": bool(entity["is_favorite"]), "historic": bool(entity["historic"]),
         "custom_name_max_length": MAX_CUSTOM_NAME_LENGTH,
         "categories": index.list_entity_categories(), "category_id": index.get_entity_category_id(entity_id),
+        "adjusted": _entity_config_adjusted(entity),
         "aggregation_type": entity["aggregation_type"],
         "type_label": format_type(entity["aggregation_type"]),
         "state_class": entity["state_class"] or "",

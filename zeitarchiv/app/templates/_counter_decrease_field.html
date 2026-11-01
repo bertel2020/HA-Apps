@@ -5,8 +5,9 @@
 {# Konfiguration → „Zählerrückgänge“ (nur bei Zählern): „Erlauben“ für Zähler, die sich planmäßig
    zurücksetzen (täglich, wöchentlich, monatlich). Wird von entity_config_form eingebunden und von
    POST /entities/{id}/counter-decreases (housekeeping_routes.py) allein neu gerendert. #}
-<div class="field" id="counter-decrease-field">
+<div class="field cfg-row" id="counter-decrease-field">
   <label>{{ _("Zählerrückgänge") }} {{ hint_button(_('Zählerrückgänge')) }}</label>
+  <p class="cfg-short">{{ _("Rückgänge des Zählerstands melden oder erlauben") }}</p>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="counter-decreases-btn" onclick="toggleDDPicker('counter-decreases')">{{ _("Erlauben") if counter_mode == 'allow' else _("Melden") }} ▾</button>
     <input type="hidden" name="counter_decreases" id="counter-decreases-input" value="{{ counter_mode }}"

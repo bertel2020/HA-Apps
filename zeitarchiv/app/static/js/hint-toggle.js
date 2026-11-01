@@ -52,10 +52,13 @@ function hinweisZu(knopf) {
    käme ein auf dem Telefon aufgeklappter Hinweis am Schreibtisch zugeklappt
    wieder. */
 const SCHMAL = window.matchMedia('(max-width:700px)');
+/* Ausnahme: Ein Bereich mit data-hints="collapsed" (Entität-Konfiguration) klappt
+   die Hinweise auf jeder Breite zu. Dort steht neben jedem Feld eine Kurzzeile, der
+   lange Text ist nur noch Nachschlagewerk. */
 
 function standardZustand() {
   document.querySelectorAll(HINWEIS).forEach(function (ziel) {
-    ziel.hidden = SCHMAL.matches;
+    ziel.hidden = SCHMAL.matches || !!ziel.closest('[data-hints="collapsed"]');
   });
   document.querySelectorAll('.hint-toggle').forEach(function (knopf) {
     const ziel = hinweisZu(knopf);

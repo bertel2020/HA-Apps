@@ -4,6 +4,14 @@
 
 ### Neu
 
+- **Entität konfigurieren, neu gegliedert**: Die Konfigurationsseite ist jetzt in
+  die Abschnitte Allgemein, Erfassung, Aufbewahrung, Darstellung und Prüfung
+  geteilt, mit einer Sprungzeile oben. Jedes Feld ist eine Zeile mit Kurzzeile,
+  der ausführliche Text steht hinter dem Info-Knopf und ist auch am Rechner
+  zugeklappt. Das Abzeichen „angepasst“ zeigt, welche Werte vom globalen Standard
+  abweichen, und bei Schaltern und Zuständen zeigen gesperrte Felder ihren
+  festen Wert statt eines ausgegrauten Auswahlfelds.
+
 - **Entitäten, Kategorien**: Entitäten lassen sich nach Thema ordnen, zum
   Beispiel Wärmepumpe, Solar oder Wetter, zusätzlich zu den
   Favoriten-Sternen. Der neue Reiter **Kategorien** neben „Liste“ und
@@ -39,6 +47,13 @@
 ### English
 
 #### New
+
+- **Configure an entity, restructured**: The configuration page is now split into
+  the sections General, Recording, Retention, Display and Checks, with a jump
+  line at the top. Each field is one row with a short line; the detailed text is
+  behind the info button and is collapsed on desktop too. The "customised" badge
+  shows which values differ from the global default, and for switches and states
+  locked fields show their fixed value instead of a greyed-out dropdown.
 
 - **Entities, categories**: Entities can be grouped by topic, for example heat
   pump, solar or weather, in addition to the favorite stars. The new
