@@ -367,9 +367,11 @@ def test_export_writes_the_raw_text_of_a_state_entity(setup) -> None:
     from app.storage.coordinator import StorageCoordinator
 
     tmp, index, service = setup
-    service.ingest(_state("charging", BASE_TS))
-    service.ingest(_state('say "hi", ok', BASE_TS + 60))
-    service.ingest(_state("unavailable", BASE_TS + 120))
+    # Der Export liest den laufenden Monat aus dem Hot Buffer; BASE_TS (20.10.2026) ist inzwischen ein Archivmonat.
+    first = datetime.now(TZ).replace(day=1, hour=0, minute=1, second=0, microsecond=0).timestamp()
+    service.ingest(_state("charging", first))
+    service.ingest(_state('say "hi", ok', first + 60))
+    service.ingest(_state("unavailable", first + 120))
     out = "".join(export_data.csv_chunks(
         tmp, index, index.get_entity(ENTITY), None, None, "hour", TZ, StorageCoordinator(), 1000,
     ))

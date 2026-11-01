@@ -172,7 +172,8 @@ def _row(days: list[str], entity_id="sensor.z") -> dict:
 def test_the_scan_collects_the_days_with_a_returning_decrease(tmp_path) -> None:
     index = Index(tmp_path / "index.sqlite")
     index.get_or_create_entity("sensor.z", "sensor", "total_increasing", "kWh")
-    now = datetime.now(TZ).replace(hour=12, minute=0, second=0, microsecond=0)
+    # Fünfter des Monats, damit die drei Tage davor im selben Monat liegen (Hot Buffer, nicht Archiv).
+    now = datetime.now(TZ).replace(day=5, hour=12, minute=0, second=0, microsecond=0)
     for day in (1, 2, 3):
         start = (now - timedelta(days=day)).timestamp()
         for i, value in enumerate([100.0 + day, 101.0 + day, 0.0, 101.5 + day, 102.0 + day]):

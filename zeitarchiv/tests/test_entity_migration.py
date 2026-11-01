@@ -178,9 +178,10 @@ def test_overlap_resolution_source_overwrites_target_value_in_the_hot_buffer(tmp
     Archivdatei) — ein eigener Codepfad in _overwrite_existing_values()."""
     index = Index(tmp_path / "index.sqlite")
     try:
-        now = datetime.now(TZ)
-        overlap_ts = now.timestamp()
-        other_ts = (now.replace(day=1) if now.day > 1 else now).timestamp()
+        # Zwei feste Stellen am Anfang des laufenden Monats; "jetzt" und der Monatserste fallen am 1. zusammen.
+        month_start = datetime.now(TZ).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        other_ts = month_start.timestamp() + 60
+        overlap_ts = month_start.timestamp() + 120
 
         index.get_or_create_entity("sensor.source", "sensor", "measurement", "°C")
         index.get_or_create_entity("sensor.target", "sensor", "measurement", "°C")

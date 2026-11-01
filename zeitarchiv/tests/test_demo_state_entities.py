@@ -50,7 +50,9 @@ def test_generation_writes_state_entities(tmp_path: Path, language: str) -> None
             assert {idx for p in shares["points"] for idx, _s, _e in p["states"]} <= {int(v) for v in allowed}
             # Die Heizung steht im Sommer durchgehend auf "Aus" — ein
             # zweimonatiger Lauf im August hätte dort nur einen Zustand.
-            if demo.entity_id != "sensor.demo_heizung_betrieb":
+            # Der Rohverlauf des Monats reicht nur bis in den Hot Buffer: in den ersten Tagen des Monats
+            # steckt dort erst ein Zustand.
+            if demo.entity_id != "sensor.demo_heizung_betrieb" and now.day > 7:
                 assert len(values) > 1, entity_id
     finally:
         index.close()

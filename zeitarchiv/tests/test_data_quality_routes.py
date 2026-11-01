@@ -117,7 +117,8 @@ def _mit_duplikaten(index, entity_id: str) -> None:
     from app.storage import hotbuffer
 
     _entity(index, entity_id)
-    ts = datetime.now(ZoneInfo(str(TZ))).replace(hour=3, minute=0, second=0, microsecond=0).timestamp() - 86_400
+    # Feste Stelle im laufenden Monat statt "gestern": am Monatsersten läge gestern im Archiv.
+    ts = datetime.now(ZoneInfo(str(TZ))).replace(day=1, hour=0, minute=1, second=0, microsecond=0).timestamp()
     for _ in range(3):
         hotbuffer.append(DATA_DIR, entity_id, ts, 5.0, TZ)
         index.record_write(entity_id, ts)
