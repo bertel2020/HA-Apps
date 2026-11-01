@@ -39,9 +39,10 @@
   .cat-suggest .filter-chip input:focus-visible + span{outline:2px solid var(--accent-line);outline-offset:2px;}
 
   @media (max-width:640px){
+    /* Zwei Zeilen je Kategorie: Griff, Position, Farbe, Name und Anzahl oben, die Aktionen
+       darunter; der Name kürzt, statt die Anzahl in eine eigene Zeile zu drängen. */
     .cat-row{flex-wrap:wrap;gap:8px 10px;padding:10px 12px;}
-    .cat-name{flex:1 1 calc(100% - 120px);}
-    .cat-count{order:3;}
-    .cat-actions{order:4;flex:1 1 100%;flex-wrap:wrap;}
+    .cat-name{flex:1 1 0;}
+    .cat-actions{flex:1 1 100%;flex-wrap:wrap;}
     .cat-add{max-width:none;}
   }
