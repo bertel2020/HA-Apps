@@ -1,0 +1,39 @@
+  /* Kategorien verwalten (ROADMAP 1.42). Nur Farben und Maße der App-Variablen;
+     die Farbpunkte kommen über --c aus der Diagrammpalette. */
+  .cat-panel{max-width:860px;}
+  .cat-list{list-style:none;margin:0 0 16px;padding:0;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
+  .cat-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-top:1px solid var(--border);}
+  .cat-row:first-child{border-top:0;}
+  .cat-row.is-dragging{opacity:.4;}
+  .cat-row.drop-before{box-shadow:inset 0 2px 0 var(--accent-line);}
+  .cat-row.drop-after{box-shadow:inset 0 -2px 0 var(--accent-line);}
+  .cat-handle{flex:none;cursor:grab;color:var(--ink-faint);letter-spacing:-2px;user-select:none;padding:4px 2px;}
+  .cat-pos{flex:none;width:18px;text-align:right;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);font-variant-numeric:tabular-nums;}
+  .cat-color{flex:none;}
+  .cat-swatch{width:20px;height:20px;padding:0;border-radius:50%;border:2px solid transparent;background:var(--c);cursor:pointer;box-shadow:0 0 0 1px var(--border-strong);}
+  .cat-swatch:hover,.cat-swatch:focus-visible{border-color:var(--surface);box-shadow:0 0 0 2px var(--accent-line);outline:none;}
+  .cat-swatch.is-current{box-shadow:0 0 0 2px var(--ink);}
+  .cat-palette{display:none;grid-template-columns:repeat(4,24px);gap:10px;padding:12px;min-width:0;}
+  .cat-palette.open{display:grid;}
+  .cat-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
+  .cat-name input{width:100%;max-width:280px;}
+  .cat-count{flex:none;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;}
+  .cat-actions{flex:none;display:flex;gap:6px;}
+  .cat-add{display:flex;gap:8px;max-width:460px;}
+  .cat-add input{flex:1 1 auto;min-width:0;}
+  .cat-hint{margin:8px 0 0;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  .cat-hint[hidden]{display:none;}
+  .cat-empty{margin:0 0 20px;padding:24px;border:1px dashed var(--border-strong);border-radius:12px;text-align:center;}
+  .cat-empty h2{margin:0 0 6px;}
+  .cat-empty p{margin:0 0 16px;color:var(--ink-muted);}
+  .cat-suggest{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:0 0 18px;}
+  .cat-empty-actions{display:flex;justify-content:center;}
+  .cat-empty + .cat-add{margin:0 auto;}
+
+  @media (max-width:640px){
+    .cat-row{flex-wrap:wrap;gap:8px 10px;padding:10px 12px;}
+    .cat-name{flex:1 1 calc(100% - 120px);}
+    .cat-count{order:3;}
+    .cat-actions{order:4;flex:1 1 100%;flex-wrap:wrap;}
+    .cat-add{max-width:none;}
+  }

@@ -70,7 +70,18 @@
           <span id="sel-count" class="sel-count"></span>
           <button type="button" class="btn btn-sm" id="sel-show" aria-expanded="false">{{ _("Auswahl anzeigen") }}</button>
           <button type="button" class="btn btn-sm" id="sel-clear">{{ _("Auswahl aufheben") }}</button>
+          <span class="dd-picker-wrap" id="sel-category-wrap">
+            <button type="button" class="btn btn-sm" onclick="toggleDDPicker('sel-category')">{{ _("Kategorie setzen ▾") }}</button>
+            <div class="dd-picker-popover dd-picker-popover-left" id="sel-category-popover">
+              {% for c in categories %}
+              <div class="dd-picker-row" role="button" tabindex="0" data-category="{{ c.id }}"><span class="cat-pill" style="--c:var(--chart-{{ c.color_slot }});"><i aria-hidden="true"></i><span>{{ c.name }}</span></span></div>
+              {% endfor %}
+              {% if categories %}<div class="dd-picker-row" role="button" tabindex="0" data-category=""><span class="cat-none">{{ _("— Keine Kategorie") }}</span></div>{% endif %}
+              <a class="dd-picker-row" href="{{ app_root }}/entities/categories">{{ _("Kategorien verwalten …") if categories else _("Kategorien anlegen …") }}</a>
+            </div>
+          </span>
           <button type="button" class="btn btn-sm btn-danger" id="sel-delete">{{ _("Löschen …") }}</button>
+          <span id="sel-status" class="sel-status" role="status" aria-live="polite"></span>
         </div>
         <div id="sel-panel" class="sel-panel" hidden></div>
 

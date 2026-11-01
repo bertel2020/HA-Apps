@@ -418,4 +418,35 @@
       }
     }
     document.getElementById('sel-delete').addEventListener('click', deleteSelection);
+
+    // ---- Kategorie setzen (ROADMAP 1.42) ------------------------------------------------------
+    // Ordnet alle Gewählten einer Kategorie zu (auch die, die gerade nicht in der Suche stehen);
+    // die Auswahl bleibt bestehen, damit sich weiter sortieren lässt. Leere Kategorie = lösen.
+    async function setSelectionCategory(categoryId) {
+      const ids = Array.from(selection.keys());
+      document.getElementById('sel-category-popover').classList.remove('open');
+      if (!ids.length) return;
+      const form = new FormData();
+      ids.forEach(id => form.append('entity_id', id));
+      form.append('category_id', categoryId);
+      const status = document.getElementById('sel-status');
+      try {
+        const response = await fetch('entities/set-category', {method: 'POST', body: form});
+        if (!response.ok) throw new Error('set-category failed');
+        const result = await response.json();
+        status.textContent = result.changed === 1 ? t('1 Entität geändert') : t('{n} Entitäten geändert', {n: result.changed});
+        setTimeout(() => { status.textContent = ''; }, 4000);
+        htmx.trigger('#controls', 'change');
+      } catch (error) {
+        appAlert(t('Die Kategorie konnte nicht gesetzt werden.'), {danger: true});
+      }
+    }
+    document.getElementById('sel-category-popover').addEventListener('click', (event) => {
+      const row = event.target.closest('[data-category]');
+      if (row) setSelectionCategory(row.dataset.category);
+    });
+    document.getElementById('sel-category-popover').addEventListener('keydown', (event) => {
+      const row = event.target.closest('[data-category]');
+      if (row && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); setSelectionCategory(row.dataset.category); }
+    });
     syncSelectionUI();

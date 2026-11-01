@@ -136,7 +136,7 @@ from .storage.coordinator import CoordinatorBusy, StorageCoordinator
 from .storage.paths import ENTITY_ID_MAX_LENGTH, ENTITY_ID_PATTERN, validate_entity_id
 from .timezone_config import load_timezone
 from .version import APP_VERSION
-from . import ai_settings_routes, api_routes, ha_integration, selection_routes
+from . import ai_settings_routes, api_routes, entity_category_routes, ha_integration, selection_routes
 from .import_routes import ImportDependencies, ImportService
 from .index_optimization import (
     build_index_detail_context,
@@ -414,6 +414,7 @@ templates.env.filters["retranslate"] = i18n.retranslate
 app.include_router(i18n.make_router(lambda: index))
 app.include_router(ai_settings_routes.make_router(lambda: index, templates, TZ))
 app.include_router(selection_routes.make_router(lambda: index, templates, DATA_DIR, TZ))
+app.include_router(entity_category_routes.make_router(lambda: index, templates, lambda: _add_category_column()))
 
 
 class RequestLoggingMiddleware:
@@ -923,8 +924,9 @@ def entities_list_view(request: Request) -> HTMLResponse:
         "entities_list.html",
         {
             "unit_options": unit_options,
-            "column_options": ENTITIES_OPTIONAL_COLUMNS,
+            "column_options": _entities_column_options(),
             "visible_columns": _entities_visible_columns(),
+            "categories": index.list_entity_categories(),
         },
     )
 
@@ -2597,6 +2599,9 @@ def _visible_row_count(entity) -> int:
 # wird wie font_scale über die settings-Tabelle persistiert (index.get_setting/
 # set_setting), gilt also global fürs ganze Add-on, nicht pro Browser.
 ENTITIES_OPTIONAL_COLUMNS = [
+    # Nur anbietbar, wenn es mindestens eine Kategorie gibt (ROADMAP 1.42),
+    # siehe _entities_column_options().
+    ("category", N_("Kategorie")),
     ("type", N_("Typ")),
     ("first_ts", N_("Erster Wert")),
     ("last_ts", N_("Letzter Wert")),
@@ -2619,8 +2624,35 @@ ENTITIES_DEFAULT_COLUMNS = "type,first_ts,last_ts,unit,rows,size"
 
 def _entities_visible_columns() -> set[str]:
     valid = {key for key, _ in ENTITIES_OPTIONAL_COLUMNS}
-    raw = index.get_setting("entities_columns", ENTITIES_DEFAULT_COLUMNS) or ""
-    return {c for c in raw.split(",") if c} & valid
+    saved = index.get_setting("entities_columns", None)
+    has_categories = bool(index.list_entity_categories())
+    columns = {c for c in (ENTITIES_DEFAULT_COLUMNS if saved is None else saved).split(",") if c} & valid
+    # Die Kategorie-Spalte erscheint von selbst, sobald es Kategorien gibt; wer
+    # die Spalten schon einmal gewählt hat, behält seine Auswahl (siehe
+    # entity_category_routes: die erste angelegte Kategorie nimmt sie auf).
+    if has_categories and saved is None:
+        columns.add("category")
+    if not has_categories:
+        columns.discard("category")
+    return columns
+
+
+def _add_category_column() -> None:
+    """Nimmt „Kategorie“ in eine bereits gespeicherte Spaltenauswahl auf, wenn die
+    erste Kategorie entsteht — sonst bliebe die Spalte für alle verborgen, die ihre
+    Spalten früher einmal gewählt haben."""
+    saved = index.get_setting("entities_columns", None)
+    if saved is None:
+        return
+    columns = [c for c in saved.split(",") if c]
+    if "category" not in columns:
+        index.set_setting("entities_columns", ",".join(["category", *columns]))
+
+
+def _entities_column_options() -> list[tuple[str, str]]:
+    """Spaltenauswahl der Liste; „Kategorie“ nur, solange es Kategorien gibt."""
+    has_categories = bool(index.list_entity_categories())
+    return [(key, label) for key, label in ENTITIES_OPTIONAL_COLUMNS if key != "category" or has_categories]
 
 
 def _entities_table_response(
@@ -2652,6 +2684,8 @@ def _entities_table_response(
     # unnötige format_*()-Aufrufe pro ausgeblendeter Spalte (PERFORMANCE.md,
     # ZP-014). entity_id/friendly_name/display_name/has_custom_name/
     # is_favorite werden immer gebraucht (Entität-Spalte, Favoriten-Stern).
+    categories = {c["id"]: c for c in index.list_entity_categories()}
+    category_of = index.category_map_for([row["entity_id"] for row in page_matched]) if "category" in visible_columns else {}
     rows = []
     for row in page_matched:
         entry = {
@@ -2664,6 +2698,8 @@ def _entities_table_response(
             # gebraucht (Zeilentönung + Hinweiszeile), keine Spalte zum Abwählen.
             "pending_purge": int(row["deleted_count"] or 0),
         }
+        if "category" in visible_columns:
+            entry["category"] = categories.get(category_of.get(row["entity_id"]))
         if "type" in visible_columns:
             entry["aggregation_type"] = row["aggregation_type"]
             entry["type_label"] = format_type(row["aggregation_type"])
@@ -2835,6 +2871,7 @@ def _entity_config_context(entity) -> dict:
         # seit der Reiterzeile denselben Kopf, und dort gehört er dazu.
         "is_favorite": bool(entity["is_favorite"]), "historic": bool(entity["historic"]),
         "custom_name_max_length": MAX_CUSTOM_NAME_LENGTH,
+        "categories": index.list_entity_categories(), "category_id": index.get_entity_category_id(entity_id),
         "aggregation_type": entity["aggregation_type"],
         "type_label": format_type(entity["aggregation_type"]),
         "state_class": entity["state_class"] or "",

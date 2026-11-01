@@ -3,7 +3,7 @@
    (selection_overview.html). Optik aus app.css (.entity-tabs), damit beide
    Seiten dieselbe Zeile ohne eigene Regeln tragen.
 
-   Aufrufer setzen `active` auf 'liste' oder 'auswahl'. #}
+   Aufrufer setzen `active` auf 'liste', 'auswahl' oder 'kategorien'. #}
 <nav class="entity-tabs" aria-label="{{ _('Ansichten der Entitäten') }}">
   <a class="entity-tab{{ ' is-active' if active == 'liste' }}"
      href="{{ app_root }}/entities"
@@ -11,4 +11,7 @@
   <a class="entity-tab{{ ' is-active' if active == 'auswahl' }}"
      href="{{ app_root }}/selection/overview"
      {% if active == 'auswahl' %}aria-current="page"{% endif %}>{{ _("Auswahl & Verlauf") }}</a>
+  <a class="entity-tab{{ ' is-active' if active == 'kategorien' }}"
+     href="{{ app_root }}/entities/categories"
+     {% if active == 'kategorien' %}aria-current="page"{% endif %}>{{ _("Kategorien") }}</a>
 </nav>

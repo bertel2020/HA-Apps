@@ -35,6 +35,7 @@ internals for developers are in the other documents of this folder (see
   - [Energy report](#energy-report)
 - [Entities and histories](#entities-and-histories)
   - [Deleting several entities](#deleting-several-entities)
+  - [Categories](#categories)
   - [Period navigation](#period-navigation)
   - [Presentation](#presentation)
   - [Zooming into a section](#zooming-into-a-section)
@@ -702,6 +703,30 @@ title. The references are deliberately not removed: if Home Assistant keeps
 sending values, the integration recreates the entity. If you no longer need it,
 take it out in the editor of the chart or table.
 
+### Categories
+
+Categories group entities by topic, for example heat pump, solar or weather.
+They are independent of the favorite star: the star says "important", the
+category says "belongs to". Each entity has at most one category; new entities
+arrive without one.
+
+They are created and ordered on the **Categories** tab next to "List" and
+"Selection & history". When first opened it offers suggestions to take over
+(Solar, Heat pump, Battery, EV, Weather, Consumers, Grid); deselect what does
+not fit. Afterwards they are ordinary categories of your own. Each row can be
+renamed, colored (the color comes from the chart palette) and deleted; deleting
+releases the assigned entities, the entities themselves are untouched. The
+**order** of the rows sets the sorting in the list: change it by dragging the
+handle or with the arrows. At most 30 categories, names up to 40 characters and
+each name only once; colors may repeat.
+
+The list shows the **Category** column as soon as at least one category exists;
+**Columns ▾** can hide it. Clicking the heading sorts by the order of the
+categories (not alphabetically), entities without a category come last. You
+assign in selection mode: mark entities, choose **Set category ▾** and click
+the category (or "No category" to release). A single entity can be set in its
+configuration, in the **Category** field.
+
 ### Period navigation
 
 - Choose hour, day, week, month, year or decade as the base unit; forward/
@@ -1361,6 +1386,12 @@ Zeitarchiv** (lists, selection fields, diagrams, tables) — Home Assistant's ow
 `friendly_name` and the entity ID remain untouched. A tag icon marks
 everywhere where a custom name is active. Leaving it empty restores the HA
 name.
+
+### Category
+
+Assigns the entity to a topic, for example heat pump or solar (see
+[Categories](#categories)). The choice applies immediately. Without any
+categories the field links to the management page.
 
 ### Historic
 

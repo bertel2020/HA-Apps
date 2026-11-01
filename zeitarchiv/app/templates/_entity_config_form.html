@@ -7,6 +7,24 @@
   {% call hint_body() %}{{ _("Gilt nur in dieser App (Listen, Dropdowns, Diagramme), der HA-Name bleibt unverändert. Leer lassen für den HA-Namen, höchstens {custom_name_max_length} Zeichen.", custom_name_max_length=custom_name_max_length) }}{% endcall %}
 </div>
 <div class="field">
+  <label>{{ _("Kategorie") }} {{ hint_button(_('Kategorie')) }}</label>
+  {% if categories %}
+  <span class="dd-picker-wrap">
+    <button type="button" class="btn" id="category-btn" onclick="toggleDDPicker('category')">{% for c in categories %}{% if c.id == category_id %}{{ c.name }}{% endif %}{% endfor %}{% if not category_id %}{{ _("Keine Kategorie") }}{% endif %} ▾</button>
+    <div class="dd-picker-popover" id="category-popover">
+      {% for c in categories %}
+      <div class="dd-picker-row{{ ' active' if c.id == category_id }}" role="button" tabindex="0" data-category="{{ c.id }}" data-label="{{ c.name }}" onclick="setEntityCategory(this)"><span class="cat-pill" style="--c:var(--chart-{{ c.color_slot }});"><i aria-hidden="true"></i><span>{{ c.name }}</span></span></div>
+      {% endfor %}
+      <div class="dd-picker-row{{ ' active' if not category_id }}" role="button" tabindex="0" data-category="" data-label="{{ _('Keine Kategorie') }}" onclick="setEntityCategory(this)"><span class="cat-none">{{ _("— Keine Kategorie") }}</span></div>
+    </div>
+  </span>
+  {% call hint_body() %}{{ _("Ordnet die Entität einem Thema zu, zum Beispiel Wärmepumpe oder Solar. Die Kategorie erscheint in der Entitätenliste und bestimmt dort die Sortierung. Unabhängig vom Favoriten-Stern.") }} <a href="{{ app_root }}/entities/categories">{{ _("Kategorien verwalten …") }}</a>{% endcall %}
+  {% else %}
+  <a href="{{ app_root }}/entities/categories">{{ _("Kategorien anlegen …") }}</a>
+  {% call hint_body() %}{{ _("Ordnet die Entität einem Thema zu, zum Beispiel Wärmepumpe oder Solar. Die Kategorie erscheint in der Entitätenliste und bestimmt dort die Sortierung. Unabhängig vom Favoriten-Stern.") }}{% endcall %}
+  {% endif %}
+</div>
+<div class="field">
   <label>{{ _("Historisch") }} {{ hint_button(_('Historisch')) }}</label>
   {% if historic %}<span class="badge historic">{{ _("Historisch") }}</span>{% endif %}
   <button type="button" class="btn" hx-post="{{ app_root }}/housekeeping/entities/{{ entity_id }}/historic?value={{ '0' if historic else '1' }}"

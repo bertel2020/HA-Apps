@@ -1,5 +1,46 @@
 # Changelog
 
+## Unreleased
+
+### Neu
+
+- **Entitäten, Kategorien**: Entitäten lassen sich nach Thema ordnen, zum
+  Beispiel Wärmepumpe, Solar oder Wetter, zusätzlich zu den
+  Favoriten-Sternen. Der neue Reiter **Kategorien** neben „Liste“ und
+  „Auswahl & Verlauf“ legt sie an, benennt sie um, färbt sie ein und
+  bestimmt per Ziehen ihre Reihenfolge; beim ersten Öffnen bietet er
+  Vorschläge zum Übernehmen an. In der Entitätenliste steht dann die Spalte
+  **Kategorie** (über „Spalten“ ausblendbar), ein Klick auf die Überschrift
+  sortiert nach der Reihenfolge der Kategorien. Zugeordnet wird im
+  Auswahlmodus über **Kategorie setzen** oder einzeln in der Konfiguration
+  einer Entität.
+
+### Behoben
+
+- **Entitätenliste merkt sich die Seite**: Wer auf Seite 2 eine Entität
+  öffnete und zur Liste zurückkehrte, landete wieder auf Seite 1. Die Liste
+  öffnet jetzt auf der zuletzt gezeigten Seite.
+
+---
+
+### English
+
+#### New
+
+- **Entities, categories**: Entities can be grouped by topic, for example heat
+  pump, solar or weather, in addition to the favorite stars. The new
+  **Categories** tab next to "List" and "Selection & history" creates, renames
+  and colors them and sets their order by dragging; when first opened it offers
+  suggestions to take over. The entity list then shows a **Category** column
+  (hideable via "Columns"), and clicking its heading sorts by the order of the
+  categories. Assign in selection mode with **Set category**, or one at a time
+  in an entity's configuration.
+
+#### Fixed
+
+- **Entity list remembers the page**: Opening an entity from page 2 and going
+  back used to land on page 1 again. The list now opens on the page last shown.
+
 ## 1.13.0 - 2026-11-01
 
 ### Neu

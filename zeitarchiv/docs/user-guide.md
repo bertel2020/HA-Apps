@@ -35,6 +35,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
   - [Energiebericht](#energiebericht)
 - [Entitäten und Verläufe](#entitäten-und-verläufe)
   - [Mehrere Entitäten löschen](#mehrere-entitäten-löschen)
+  - [Kategorien](#kategorien)
   - [Zeitraum-Navigation](#zeitraum-navigation)
   - [Darstellung](#darstellung)
   - [In einen Ausschnitt hineinzoomen](#in-einen-ausschnitt-hineinzoomen)
@@ -754,6 +755,32 @@ fehlt“** — als Abzeichen in der Chart- und Tabellenliste, als Hinweis über
 bewusst nicht entfernt: Sendet Home Assistant weiter Werte, legt die
 Integration die Entität neu an. Wer sie nicht mehr braucht, nimmt sie im
 Editor des Charts bzw. der Tabelle heraus.
+
+### Kategorien
+
+Kategorien ordnen die Entitäten nach Thema, zum Beispiel Wärmepumpe, Solar oder
+Wetter. Sie sind unabhängig vom Favoriten-Stern: Der Stern sagt „wichtig“, die
+Kategorie „gehört zu“. Jede Entität hat höchstens eine Kategorie, neue
+Entitäten kommen ohne an.
+
+Angelegt und geordnet werden sie im Reiter **Kategorien** neben „Liste“ und
+„Auswahl & Verlauf“. Beim ersten Öffnen bietet er Vorschläge zum Übernehmen an
+(Solar, Wärmepumpe, Batterie, E-Auto, Wetter, Verbraucher, Netz); abgewählt
+wird, was nicht passt. Danach sind es ganz normale, eigene Kategorien. Jede
+Zeile lässt sich umbenennen, einfärben (die Farbe stammt aus der
+Diagrammpalette) und löschen; beim Löschen verlieren die zugeordneten Entitäten
+ihre Kategorie, die Entitäten selbst bleiben unberührt. Die **Reihenfolge**
+der Zeilen legt die Sortierung in der Liste fest: Sie lässt sich am Griff
+ziehen oder mit den Pfeilen ändern. Höchstens 30 Kategorien, Namen bis 40
+Zeichen und je Name nur einmal; Farben dürfen sich wiederholen.
+
+In der Liste erscheint die Spalte **Kategorie**, sobald es mindestens eine gibt;
+über **Spalten ▾** lässt sie sich ausblenden. Ein Klick auf die Überschrift
+sortiert nach der Reihenfolge der Kategorien (nicht alphabetisch), Entitäten
+ohne Kategorie stehen am Ende. Zugeordnet wird im Auswahlmodus: Entitäten
+markieren, **Kategorie setzen ▾** wählen und die Kategorie anklicken (oder
+„Keine Kategorie“ zum Lösen). Einzeln geht es in der Konfiguration einer
+Entität im Feld **Kategorie**.
 
 ### Zeitraum-Navigation
 
@@ -1486,6 +1513,12 @@ Optional, bis 40 Zeichen. Überschreibt die Darstellung **nur in Zeitarchiv**
 `friendly_name` und die Entitäts-ID bleiben unangetastet. Ein Tag-Symbol
 markiert überall, wo ein eigener Name aktiv ist. Leer lassen stellt den
 HA-Namen wieder her.
+
+### Kategorie
+
+Ordnet die Entität einem Thema zu, zum Beispiel Wärmepumpe oder Solar (siehe
+[Kategorien](#kategorien)). Die Auswahl gilt sofort. Ohne angelegte Kategorien
+führt das Feld zur Verwaltung.
 
 ### Historisch
 

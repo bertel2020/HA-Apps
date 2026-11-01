@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ _("Zeitarchiv — Kategorien") }}{% endblock %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ asset('css/pages/entity_categories.css') }}">
+{% endblock %}
+{% block content %}
+  <div class="page">
+    <h1>{{ _("Entitäten") }}</h1>
+    <p class="sub">{{ _("Kategorien ordnen die Entitäten nach Thema, zum Beispiel Wärmepumpe oder Solar. Die Reihenfolge hier ist die Sortierung in der Liste.") }}</p>
+    {% with active = 'kategorien' %}{% include "_entities_tabs.html" %}{% endwith %}
+
+    <div class="settings-panel cat-panel" id="cat-root" data-app-root="{{ app_root }}"
+         data-max="{{ max_categories }}" data-count="{{ categories | length }}">
+      {% if not categories %}
+      <div class="cat-empty">
+        <h2>{{ _("Noch keine Kategorien") }}</h2>
+        <p>{{ _("Starte mit Vorschlägen oder lege eigene an. Beides lässt sich später ändern.") }}</p>
+        <div class="cat-suggest" id="cat-suggest">
+          {% for name in suggestions %}
+          <label class="filter-chip"><input type="checkbox" value="{{ name }}" checked><span>{{ name }}</span></label>
+          {% endfor %}
+        </div>
+        <div class="cat-empty-actions">
+          <button type="button" class="btn primary" id="cat-take" data-label="{{ _('{n} Vorschläge übernehmen') }}"></button>
+        </div>
+      </div>
+      {% else %}
+      <ol class="cat-list" id="cat-list">
+        {% for c in categories %}
+        <li class="cat-row" data-id="{{ c.id }}">
+          <span class="cat-handle" draggable="true" title="{{ _('Ziehen, um die Reihenfolge zu ändern') }}" aria-hidden="true">⋮⋮</span>
+          <span class="cat-pos" aria-hidden="true">{{ loop.index }}</span>
+          <span class="dd-picker-wrap cat-color">
+            <button type="button" class="cat-swatch" style="--c:var(--chart-{{ c.color_slot }});" data-action="color-open"
+                    title="{{ _('Farbe wählen') }}" aria-label="{{ _('Farbe wählen') }}" onclick="toggleDDPicker('cat-color-{{ c.id }}')"></button>
+            <div class="dd-picker-popover dd-picker-popover-left cat-palette" id="cat-color-{{ c.id }}-popover">
+              {% for slot in color_slots %}
+              <button type="button" class="cat-swatch{{ ' is-current' if slot == c.color_slot }}" style="--c:var(--chart-{{ slot }});"
+                      data-action="color" data-slot="{{ slot }}" title="{{ _('Farbe {n}', n=slot) }}" aria-label="{{ _('Farbe {n}', n=slot) }}"></button>
+              {% endfor %}
+            </div>
+          </span>
+          <span class="cat-name" data-name="{{ c.name }}">{{ c.name }}</span>
+          <span class="cat-count">{% if c.entity_count == 1 %}{{ _("1 Entität") }}{% else %}{{ _("{n} Entitäten", n=c.entity_count) }}{% endif %}</span>
+          <span class="cat-actions">
+            <button type="button" class="btn btn-sm cat-move" data-action="up" title="{{ _('Nach oben') }}" aria-label="{{ _('Nach oben') }}">↑</button>
+            <button type="button" class="btn btn-sm cat-move" data-action="down" title="{{ _('Nach unten') }}" aria-label="{{ _('Nach unten') }}">↓</button>
+            <button type="button" class="btn btn-sm" data-action="rename">{{ _("Umbenennen") }}</button>
+            <button type="button" class="btn btn-sm btn-danger" data-action="delete" data-count="{{ c.entity_count }}">{{ _("Löschen") }}</button>
+          </span>
+        </li>
+        {% endfor %}
+      </ol>
+      {% endif %}
+
+      <form class="cat-add" id="cat-add" autocomplete="off">
+        <input type="text" id="cat-new" maxlength="{{ max_name_length }}" placeholder="{{ _('Neue Kategorie') }}" aria-label="{{ _('Neue Kategorie') }}">
+        <button type="submit" class="btn">{{ _("+ Kategorie anlegen") }}</button>
+      </form>
+      <p class="cat-hint" id="cat-limit" hidden>{{ _("Es sind höchstens {n} Kategorien möglich.", n=max_categories) }}</p>
+    </div>
+  </div>
+
+  <script src="{{ asset('js/dd-picker.js') }}"></script>
+  <script src="{{ asset('js/confirm-dialog.js') }}"></script>
+  <script src="{{ asset('js/pages/entity_categories.js') }}"></script>
+{% endblock %}
