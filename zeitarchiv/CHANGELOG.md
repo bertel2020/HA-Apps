@@ -11,8 +11,8 @@
   auf Linie und Anteile in Prozent; der Speicher zeigt Ladung und Entladung
   nebeneinander, bei Stunde und Tag mit SOC-Sensor zusätzlich den Ladestand als
   Linie; Netzbezug und Einspeisung zeigen Balken (oder Linie) mit dem
-  Vorzeitraum als gestrichelter Linie. Die Zeilen darunter und „Entität öffnen“ führen wie bisher
-  zur jeweiligen Entität.
+  Vorzeitraum als gestrichelter Linie. Die Zeilen darunter und „Entität öffnen“
+  führen wie bisher zur jeweiligen Entität.
 
 ### Behoben
 
@@ -29,6 +29,18 @@
   wenig PV-Ertrag hatte. Ohne Ladestand-Sensor gilt jetzt die Kapazität des
   Speichers als Spielraum; ist auch keine Kapazität hinterlegt, wird nur noch
   über ein ganzes Jahr geprüft.
+- **Bereinigen, Löschen vieler Zeilen**: Bei einer Seitengröße von 1000 tat
+  „Löschen“ nichts, wenn alle Zeilen markiert waren. Dieselbe Grenze traf
+  Sammelaktionen mit sehr vielen Entitäten (Entitäten löschen, Nutzungsprüfung
+  und die Sammelaktionen der Datenqualität). Beides funktioniert wieder.
+- **Bereinigen, Seitengröße**: „Löschen“, „Duplikate automatisch entfernen“,
+  „Wiederholungen verdichten“, „Fehlwert-Rückgänge markieren“ und „Letzte
+  Löschung rückgängig“ setzten die gewählte Seitengröße auf 20 zurück. Sie
+  bleibt jetzt erhalten.
+- **Charts, Wh und kWh**: Serien in Wh und kWh im selben Chart landeten auf zwei
+  getrennten Achsen mit eigener Skala und waren nicht vergleichbar. Sie teilen
+  sich jetzt eine Achse in der größten vorkommenden Einheit; reine Wh-Charts
+  bleiben in Wh.
 
 ---
 
@@ -43,8 +55,8 @@
   shares; storage shows charge and discharge side by side, plus the state of
   charge as a line for hour and day if a state-of-charge sensor is set; grid
   import and feed-in show bars (or a line) with the previous period as a dashed
-  line. The
-  rows below and "Open entity" lead to the respective entity as before.
+  line. The rows below and "Open entity" lead to the respective entity as
+  before.
 
 #### Fixed
 
@@ -60,6 +72,16 @@
   little PV yield. Without a state-of-charge sensor the storage capacity is
   now the allowance; if no capacity is set either, only a full year is
   checked.
+- **Cleanup, deleting many rows**: With a page size of 1000, "Delete" did
+  nothing when all rows were selected. The same limit affected bulk actions with
+  very many entities (deleting entities, the usage check and the data-quality
+  bulk actions). Both work again.
+- **Cleanup, page size**: "Delete", "Remove duplicates automatically",
+  "Condense repetitions", "Mark missing-value drops" and "Undo last deletion"
+  reset the chosen page size to 20. It is now kept.
+- **Charts, Wh and kWh**: Series in Wh and kWh in the same chart ended up on two
+  separate axes with their own scale and could not be compared. They now share
+  one axis in the largest unit present; pure Wh charts stay in Wh.
 
 ## 1.12.0 - 2026-10-31
 
