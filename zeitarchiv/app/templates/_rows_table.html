@@ -143,7 +143,7 @@
     <button class="btn btn-danger-outline"
             {% if counts.duplicates == 0 %}disabled title="{{ _('Keine Duplikate im aktuellen Zeitraum') }}"{% endif %}
             hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/duplicates-preview"
-            hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
+            hx-include="#controls, [name=page_size]" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
       {{ _("Duplikate automatisch entfernen") }}
     </button>
     {% endif %}
@@ -151,7 +151,7 @@
     <button class="btn btn-danger-outline"
             {% if counts.repetitions == 0 %}disabled title="{{ _('Keine gerundet gleichen Folgewerte im aktuellen Zeitraum') }}"{% endif %}
             hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/repetitions-preview"
-            hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
+            hx-include="#controls, [name=page_size]" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
       {{ _("Wiederholungen verdichten") }}
     </button>
     {% endif %}
@@ -159,7 +159,7 @@
     <button class="btn btn-danger-outline"
             {% if counts.counter_decreases == 0 %}disabled title="{{ _('Keine Zählerrückgänge im aktuellen Zeitraum') }}"{% endif %}
             hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/counter-returning-delete"
-            hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this"
+            hx-include="#controls, [name=page_size]" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this"
             hx-confirm="{{ _('Alle Rückgänge, die zurückkehren („Vermutlich Fehlwert“), zur Löschung markieren? Rückgänge, nach denen der Stand niedrig bleibt, bleiben unberührt. Es wird nichts endgültig gelöscht; im Reiter „Markiert“ lässt sich alles wiederherstellen.') }}">
       {{ _("Fehlwert-Rückgänge markieren") }}
     </button>
@@ -178,7 +178,7 @@
     {% if last_batch_count %}
     <button class="btn" id="undo-preview-btn"
             hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/undo-preview"
-            hx-include="#controls" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
+            hx-include="#controls, [name=page_size]" hx-target="#rows-table" hx-swap="innerHTML" hx-disabled-elt="this">
       {{ _("Letzte Löschung rückgängig ({count} Werte)", count=(last_batch_count | format_int)) }}
     </button>
     {% endif %}
