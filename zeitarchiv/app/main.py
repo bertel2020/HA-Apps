@@ -5037,10 +5037,16 @@ def _rows_form_common(form) -> tuple[str, str, int, int, int, str]:
     return filter_, range_key, offset, page, page_size, mode
 
 
+MAX_ROWS_FORM_FIELDS = 10_000
+
+
 @app.post("/entities/{entity_id}/rows/delete", response_class=HTMLResponse)
 async def delete_rows(request: Request, entity_id: str) -> HTMLResponse:
     _require_entity(entity_id)
-    form = await request.form()
+    # Starlette erlaubt standardmäßig nur 1000 Formularfelder. Jede angekreuzte
+    # Zeile ist ein Feld ("ts"), bei 1000 Zeilen pro Seite plus range/filter/...
+    # also zu viel: der Request scheiterte mit 400, ohne dass etwas gelöscht wurde.
+    form = await request.form(max_fields=MAX_ROWS_FORM_FIELDS)
     timestamps = [float(value) for key, value in form.multi_items() if key == "ts"]
     filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
 
