@@ -812,7 +812,7 @@
           color: colorsList,
           // top: Platz für die Legende (oben) UND den Achsentitel darunter, sonst überlagern sie sich.
           grid: {left: 8, right: 12, top: 52, bottom: 4, containLabel: true},
-          legend: {top: 0, type: 'scroll', textStyle: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)}, itemWidth: 10, itemHeight: 10},
+          legend: {top: 0, left: 64, right: 8, type: 'scroll', textStyle: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)}, itemWidth: 10, itemHeight: 10},
           tooltip: {trigger: 'axis', axisPointer: {type: isLine ? 'line' : 'shadow'}, valueFormatter: fmt},
           xAxis: {type: 'category', data: data.labels, axisLabel: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)}, axisLine: {lineStyle: {color: gridLine}}},
           yAxis: [{
