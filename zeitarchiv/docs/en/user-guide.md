@@ -740,6 +740,10 @@ their first value arrives; those that already have a category keep it unless
 you tick **Also re-sort entities that already have a category**. Topic and
 category stay separate.
 
+On the **Selection & history** tab a row **Filter by category** sits below the
+search (display only, as in the list, including "No category"); the category is
+also shown under the name of each entity there.
+
 The **export** has the **Category** filter too, so that, for example, all heat
 pump entities can be exported in one go with "Select all entities". Backups
 include the assignment. The selective restore brings it back by the category's

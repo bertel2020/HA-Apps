@@ -3330,7 +3330,9 @@
     "{n} angepasst": "{n} customised",
     "Ohne Kategorie geblieben: {n}. Die Obergrenze von {max} Kategorien ist erreicht, im Backup gibt es weitere.": "Left without a category: {n}. The limit of {max} categories is reached, the backup has more.",
     "Standard: {value}. Klicken, um darauf zurückzusetzen.": "Default: {value}. Click to reset to it.",
-    "Aufbewahrung auf den Standard „{value}“ setzen? Ist der Standard kürzer, löscht der nächste Retention-Lauf ältere Daten endgültig.": "Set retention to the default “{value}”? If the default is shorter, the next retention run permanently deletes older data."
+    "Aufbewahrung auf den Standard „{value}“ setzen? Ist der Standard kürzer, löscht der nächste Retention-Lauf ältere Daten endgültig.": "Set retention to the default “{value}”? If the default is shorter, the next retention run permanently deletes older data.",
+    "Nach Kategorie filtern": "Filter by category",
+    "Alle Kategorien": "All categories"
   },
   "js": {
     "Ladestand": "State of charge",

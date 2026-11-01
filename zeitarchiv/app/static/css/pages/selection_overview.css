@@ -61,6 +61,7 @@
   .ov-col-actions{width:44px;text-align:right;}
   .ov-name{display:block;font-weight:500;color:var(--ink);}
   .ov-id{display:block;max-width:100%;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ov-cat{margin-top:4px;}
   .ov-col-entity{max-width:0;}
   .ov-tl-details .ov-id{display:inline;}
   .ov-badges{display:flex;flex-wrap:wrap;gap:4px;}

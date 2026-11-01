@@ -53,16 +53,30 @@
 
         <form method="get" action="{{ app_root }}/selection/overview" class="ov-search" role="search">
           <input type="hidden" name="filter" value="{{ table.filter }}">
+          {% if table.category %}<input type="hidden" name="category" value="{{ table.category }}">{% endif %}
           <input type="search" class="search" name="q" value="{{ table.query }}" placeholder="{{ _('Entität suchen …') }}" aria-label="{{ _('Entität suchen') }}">
           <button type="submit" class="btn">{{ _("Suchen") }}</button>
         </form>
 
         <nav class="ov-chips" aria-label="{{ _('Nach Herkunft filtern') }}">
           {% for key, text in filters if key == "alle" or table.counts[key] or table.filter == key %}
-          <a class="chip{{ ' active' if table.filter == key }}" href="{{ app_root }}/selection/overview?{{ {'filter': key, 'q': table.query}|urlencode }}"
+          <a class="chip{{ ' active' if table.filter == key }}" href="{{ app_root }}/selection/overview?{{ {'filter': key, 'q': table.query, 'category': table.category}|urlencode }}"
              {% if table.filter == key %}aria-current="true"{% endif %}>{{ text }} <span class="ov-chip-n">{{ table.counts[key] }}</span></a>
           {% endfor %}
         </nav>
+
+        {% if categories %}
+        <nav class="ov-chips" aria-label="{{ _('Nach Kategorie filtern') }}">
+          <a class="chip{{ ' active' if not table.category }}" href="{{ app_root }}/selection/overview?{{ {'filter': table.filter, 'q': table.query}|urlencode }}"
+             {% if not table.category %}aria-current="true"{% endif %}>{{ _("Alle Kategorien") }}</a>
+          {% for c in categories %}
+          <a class="chip{{ ' active' if table.category == c.id|string }}" href="{{ app_root }}/selection/overview?{{ {'filter': table.filter, 'q': table.query, 'category': c.id}|urlencode }}"
+             {% if table.category == c.id|string %}aria-current="true"{% endif %}>{{ c.name }}</a>
+          {% endfor %}
+          <a class="chip{{ ' active' if table.category == 'none' }}" href="{{ app_root }}/selection/overview?{{ {'filter': table.filter, 'q': table.query, 'category': 'none'}|urlencode }}"
+             {% if table.category == 'none' %}aria-current="true"{% endif %}>{{ _("Ohne Kategorie") }}</a>
+        </nav>
+        {% endif %}
 
         <form method="post" action="{{ app_root }}/selection/remove" id="ov-bulk">
           {# Auswahlleiste: eine Einheit aus Zähler, Aktionen und Hinweis. Ohne Skript
@@ -100,7 +114,7 @@
             {% set origin = row.badges|rejectattr("kind", "equalto", "excluded")|list %}
             <tr class="ov-row-{{ row.status }}">
               <td class="ov-col-check">{% if (row.removable and can_apply) or (can_change and (row.excludable or row.includable)) %}<input type="checkbox" class="ov-check" name="ids" value="{{ row.entity_id }}" aria-label="{{ _('{name} markieren', name=row.name) }}">{% endif %}</td>
-              <td class="ov-col-entity"><span class="ov-name">{{ row.name }}</span><span class="ov-id" title="{{ row.entity_id }}">{{ row.entity_id }}</span></td>
+              <td class="ov-col-entity"><span class="ov-name">{{ row.name }}</span><span class="ov-id" title="{{ row.entity_id }}">{{ row.entity_id }}</span>{% if row.category %}<span class="cat-pill ov-cat" style="--c:var(--chart-{{ row.category.color_slot }});"><i aria-hidden="true"></i><span>{{ row.category.name }}</span></span>{% endif %}</td>
               <td class="ov-col-origin{{ ' is-empty' if not origin }}">{% if origin %}<span class="ov-badges">{% for badge in origin %}<span class="ov-badge ov-badge-{{ badge.kind }}">{{ badge.text }}</span>{% endfor %}</span>{% else %}<span class="ov-faint">–</span>{% endif %}</td>
               <td class="ov-col-state">
                 <span class="ov-state ov-state-{{ row.status }}">{% if row.status == "archived" %}{{ _("archiviert") }}{% elif row.status == "excluded" %}{{ _("ausgeschlossen") }}{% elif row.status == "drifted" %}{{ _("nicht mehr ausgewählt") }}{% else %}{{ _("noch keine Werte") }}{% endif %}</span>
@@ -144,9 +158,9 @@
 
         {% if table.pages > 1 %}
         <nav class="pager" aria-label="{{ _('Seiten') }}">
-          {% if table.page > 1 %}<a class="btn navbtn" href="{{ app_root }}/selection/overview?{{ {'filter': table.filter, 'q': table.query, 'page': table.page - 1}|urlencode }}" aria-label="{{ _('Vorherige Seite') }}">‹</a>{% endif %}
+          {% if table.page > 1 %}<a class="btn navbtn" href="{{ app_root }}/selection/overview?{{ {'filter': table.filter, 'q': table.query, 'category': table.category, 'page': table.page - 1}|urlencode }}" aria-label="{{ _('Vorherige Seite') }}">‹</a>{% endif %}
           <span class="pager-page">{{ _("Seite {page} von {pages}", page=table.page, pages=table.pages) }}</span>
-          {% if table.page < table.pages %}<a class="btn navbtn" href="{{ app_root }}/selection/overview?{{ {'filter': table.filter, 'q': table.query, 'page': table.page + 1}|urlencode }}" aria-label="{{ _('Nächste Seite') }}">›</a>{% endif %}
+          {% if table.page < table.pages %}<a class="btn navbtn" href="{{ app_root }}/selection/overview?{{ {'filter': table.filter, 'q': table.query, 'category': table.category, 'page': table.page + 1}|urlencode }}" aria-label="{{ _('Nächste Seite') }}">›</a>{% endif %}
         </nav>
         {% endif %}
 

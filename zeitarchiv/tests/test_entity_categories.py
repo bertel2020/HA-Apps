@@ -415,3 +415,43 @@ def test_category_column_follows_type_and_replaces_size_by_default(client, entit
     html = client.get("/entities-table").text
     assert html.index("col-type") < html.index("col-category")
     assert html.index('class="col-type">') < html.index('class="col-category">')
+
+
+# ---- Auswahl & Verlauf: Filter nach Kategorie ----------------------------------------------
+
+def _overview_rows() -> list[dict]:
+    return [
+        {"entity_id": "sensor.ov_a", "name": "A", "selected": True, "origin": "assistant"},
+        {"entity_id": "sensor.ov_b", "name": "B", "selected": True, "origin": "manual", "via": [{"type": "entity"}]},
+        {"entity_id": "sensor.ov_c", "name": "C", "selected": True, "origin": "manual", "via": [{"type": "entity"}]},
+    ]
+
+
+def test_overview_filters_by_category_and_by_none() -> None:
+    from app import selection_overview as ov
+
+    categories = {1: {"id": 1, "name": "Solar", "color_slot": 1}, 2: {"id": 2, "name": "Wetter", "color_slot": 2}}
+    of = {"sensor.ov_a": 1, "sensor.ov_b": 2}
+
+    def names(category: str) -> list[str]:
+        data = ov.table(_overview_rows(), set(), category=category, category_of=of, categories=categories)
+        return [r["name"] for r in data["rows"]]
+
+    assert names("") == ["A", "B", "C"]
+    assert names("1") == ["A"] and names("2") == ["B"]
+    assert names("none") == ["C"]
+    assert names("99") == ["A", "B", "C"]  # unbekannte Kategorie: kein Filter statt leerer Liste
+    shown = ov.table(_overview_rows(), set(), category="1", category_of=of, categories=categories)
+    assert shown["rows"][0]["category"]["name"] == "Solar" and shown["category"] == "1"
+
+
+def test_overview_page_offers_the_filter_only_with_categories_and_keeps_it_in_links(client, entities, assistant_catalog) -> None:
+    from app import main
+
+    assert 'aria-label="Nach Kategorie filtern"' not in client.get("/selection/overview").text
+    solar = main.index.create_entity_category("Solar")
+    main.index.set_entities_category(["sensor.cat_aussen"], solar, only_known=False)
+    with_cat = client.get("/selection/overview", params={"category": str(solar)}).text
+    assert 'aria-label="Nach Kategorie filtern"' in with_cat
+    assert f'name="category" value="{solar}"' in with_cat  # die Suche behält den Filter
+    assert "category=none" in with_cat

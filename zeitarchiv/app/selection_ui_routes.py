@@ -219,15 +219,22 @@ def make_ui_router(get_index: Callable[[], Index], templates: Jinja2Templates, d
     # ---- Auswahl & Verlauf ---------------------------------------------------------------
 
     @router.get("/selection/overview", response_class=HTMLResponse)
-    def overview(request: Request, filter: str = "alle", q: str = "", page: int = 1, job: str = "") -> HTMLResponse:
+    def overview(
+        request: Request, filter: str = "alle", q: str = "", page: int = 1, job: str = "", category: str = "",
+    ) -> HTMLResponse:
         catalog = selection_catalog.load(data_dir)
         jobs = selection_jobs.all_jobs(data_dir)
         data = None
         patterns: list[dict[str, Any]] = []
+        category_list: list[dict[str, Any]] = []
         if catalog is not None:
+            index = get_index()
+            category_list = index.list_entity_categories()
             data = selection_overview.table(
                 catalog["entities"], archived(), filter_key=filter, query=q, page=page,
-                managed_label=(catalog.get("label") or {}).get("name"),
+                managed_label=(catalog.get("label") or {}).get("name"), category=category,
+                category_of=index.category_map_for([row["entity_id"] for row in catalog["entities"]]),
+                categories={c["id"]: c for c in category_list},
             )
             for row in data["rows"]:
                 row["since"] = when(row["added_ts"])
@@ -245,7 +252,7 @@ def make_ui_router(get_index: Callable[[], Index], templates: Jinja2Templates, d
             "job": current, "job_status_text": tr(str(selection_overview.STATUS_TEXT.get(current["status"], "")))
             if current else "", "can_apply": bool(catalog and catalog.get("phase1")),
             "can_change": bool(catalog and catalog.get("phase1") and catalog.get("phase2")),
-            "received": when(catalog["received_ts"]) if catalog else "",
+            "received": when(catalog["received_ts"]) if catalog else "", "categories": category_list,
             "label": (catalog or {}).get("label"), "patterns": patterns,
         })
 

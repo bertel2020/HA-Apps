@@ -795,6 +795,10 @@ Auswahl kommen, auch bevor ihr erster Wert da ist; schon einsortierte behalten
 ihre Kategorie, außer du setzt den Haken **Auch bereits einsortierte
 Entitäten umsortieren**. Thema und Kategorie bleiben getrennt.
 
+Im Reiter **Auswahl & Verlauf** steht unter der Suche eine Zeile **Nach Kategorie
+filtern** (nur Anzeige, wie in der Liste samt „Ohne Kategorie“); die Kategorie
+steht dort auch unter dem Namen jeder Entität.
+
 Auch der **Export** hat den Filter **Kategorie**, damit sich zum Beispiel alle
 Entitäten der Wärmepumpe mit „Alle Entitäten wählen“ in einem Zug exportieren
 lassen. Backups sichern die Zuordnung mit. Der selektive Restore stellt sie

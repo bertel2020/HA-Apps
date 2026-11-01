@@ -201,10 +201,18 @@ def explain(row: dict[str, Any], managed_label: str | None = None) -> list[str]:
 
 def table(
     entities: list[dict[str, Any]], archived: set[str], *, filter_key: str = "alle", query: str = "", page: int = 1,
-    managed_label: str | None = None,
+    managed_label: str | None = None, category: str = "", category_of: dict[str, int] | None = None,
+    categories: dict[int, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Gefilterte, durchsuchte und geblätterte Tabelle samt Zählern je Filterchip.
-    ``managed_label``: Name des Labels, das der Assistent verwaltet (aus dem Katalog)."""
+    ``managed_label``: Name des Labels, das der Assistent verwaltet (aus dem Katalog).
+    ``category``: "" (alle), "none" (ohne Kategorie) oder die ID einer Kategorie; nur
+    Anzeige und Filter, geändert wird hier nichts (ROADMAP 1.42). ``category_of``:
+    entity_id → category_id, ``categories``: id → Kategorie."""
+    category_of = category_of or {}
+    categories = categories or {}
+    if category not in ("", "none") and not (category.isdigit() and int(category) in categories):
+        category = ""
     rows = [row for row in entities if in_table(row)]
     counts = {key: sum(1 for row in rows if matches_filter(row, key, managed_label)) for key in FILTER_KEYS}
     if filter_key not in FILTER_KEYS:
@@ -214,6 +222,8 @@ def table(
         row for row in rows
         if matches_filter(row, filter_key, managed_label)
         and (not needle or needle in row["entity_id"] or needle in (row.get("name") or "").lower())
+        and (not category or (row["entity_id"] not in category_of if category == "none"
+                              else category_of.get(row["entity_id"]) == int(category)))
     ]
     shown.sort(key=lambda row: ((row.get("name") or row["entity_id"]).lower(), row["entity_id"]))
     pages = max(1, -(-len(shown) // PAGE_SIZE))
@@ -231,6 +241,7 @@ def table(
         items.append({
             "entity_id": row["entity_id"], "name": row.get("name") or row["entity_id"],
             "badges": badges(row, managed_label), "explain": explain(row, managed_label), "status": status,
+            "category": categories.get(category_of.get(row["entity_id"], -1)),
             "added_ts": row.get("added_ts"), "removable": removable(row), "manual": manual_single_id(row),
             "assistant": row.get("origin") == "assistant" or bool(row.get("drifted")),
             "only_in_ha": not removable(row) and bool(row.get("selected")),
@@ -238,7 +249,7 @@ def table(
             "excluded_patterns": excluded_patterns(row), "held_by_ha": held_by_ha(row, managed_label),
         })
     return {
-        "rows": items, "counts": counts, "filter": filter_key, "query": query.strip()[:100],
+        "rows": items, "counts": counts, "filter": filter_key, "query": query.strip()[:100], "category": category,
         "page": page, "pages": pages, "total": len(shown),
     }
 
