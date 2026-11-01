@@ -82,6 +82,12 @@ Hot-CSV-Datei gelöscht. Eine Entität, die aufhört zu senden, würde ihre
 letzte Hot-Datei sonst nie automatisch archivieren — daher der manuelle
 Nachzieh-Mechanismus.
 
+Gibt es für den Monat schon ein Archiv (verspätete Werte legen die Hot-Datei
+eines vergangenen Monats neu an), wird es **ergänzt**: beide Bestände nach Zeit
+zusammengeführt, vollständig identische Zeilen nur einmal, die Rollup-Zeilen des
+Monats über `rollup.replace_month()` aus dem Ergebnis neu berechnet. Das
+Archiv wird dabei nie durch die wenigen späten Zeilen ersetzt.
+
 ## Rollups (vorberechnete Aggregate)
 
 Nur **abgeschlossene** Perioden werden vorberechnet; die laufende Periode

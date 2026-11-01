@@ -16,6 +16,13 @@
 
 ### Behoben
 
+- **Verspätete Werte überschreiben kein Archiv mehr**: Trafen nach dem
+  Monatswechsel noch Werte für den Vormonat ein (zum Beispiel aus der
+  Warteschlange der Integration nach einem Ausfall), ersetzte die nächste
+  Rotation das bereits archivierte Monatsarchiv durch diese wenigen Werte, und
+  die übrigen gingen verloren. Das Archiv wird jetzt ergänzt, Doppelte werden
+  nur einmal gezählt, und die Tages- und Monatswerte des Monats werden neu
+  berechnet.
 - **Energiedashboard, Speicher-Prüfung im Monat**: Die Meldung „Entladung
   übersteigt Ladung — Ladung/Entladung vertauscht?“ erschien im laufenden
   Monat fälschlich, wenn der Speicher zu Monatsbeginn voll war und der Monat
@@ -41,6 +48,12 @@
 
 #### Fixed
 
+- **Late values no longer overwrite an archive**: If values for the previous
+  month arrived after the month change (for example from the integration's queue
+  after an outage), the next rotation replaced the already archived month with
+  those few values and the rest was lost. The archive is now extended,
+  duplicates are counted once, and the month's daily and monthly figures are
+  recomputed.
 - **Energy dashboard, storage check for the month**: The message "Discharge
   exceeds charge — charge/discharge swapped?" wrongly appeared for the current
   month when the storage was full at the start of the month and the month had
