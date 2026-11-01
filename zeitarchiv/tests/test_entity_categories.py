@@ -403,3 +403,15 @@ def test_demo_categories_keep_own_assignments_and_translate(client, entities) ->
     finally:
         for entity in demo.DEMO_ENTITIES:
             main.index.delete_entity(local(entity.entity_id))
+
+
+def test_category_column_follows_type_and_replaces_size_by_default(client, entities) -> None:
+    from app import main
+
+    client.post("/entities/categories", json={"name": "Solar"})
+    columns = main._entities_visible_columns()
+    assert "category" in columns and "size" not in columns
+
+    html = client.get("/entities-table").text
+    assert html.index("col-type") < html.index("col-category")
+    assert html.index('class="col-type">') < html.index('class="col-category">')

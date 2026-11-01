@@ -2599,10 +2599,10 @@ def _visible_row_count(entity) -> int:
 # wird wie font_scale über die settings-Tabelle persistiert (index.get_setting/
 # set_setting), gilt also global fürs ganze Add-on, nicht pro Browser.
 ENTITIES_OPTIONAL_COLUMNS = [
+    ("type", N_("Typ")),
     # Nur anbietbar, wenn es mindestens eine Kategorie gibt (ROADMAP 1.42),
     # siehe _entities_column_options().
     ("category", N_("Kategorie")),
-    ("type", N_("Typ")),
     ("first_ts", N_("Erster Wert")),
     ("last_ts", N_("Letzter Wert")),
     ("resolution", N_("Auflösung")),
@@ -2630,8 +2630,10 @@ def _entities_visible_columns() -> set[str]:
     # Die Kategorie-Spalte erscheint von selbst, sobald es Kategorien gibt; wer
     # die Spalten schon einmal gewählt hat, behält seine Auswahl (siehe
     # entity_category_routes: die erste angelegte Kategorie nimmt sie auf).
+    # Dafür weicht „Größe“ (am wenigsten gebraucht), damit die Liste nicht breiter wird.
     if has_categories and saved is None:
         columns.add("category")
+        columns.discard("size")
     if not has_categories:
         columns.discard("category")
     return columns
