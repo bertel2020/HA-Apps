@@ -20,6 +20,14 @@
   selektive Restore bringt die Kategorien zurück, und die Demo-Daten kommen
   mit Kategorien.
 
+- **Entitäten, Kennzahlen im Kopf**: Über den Reitern jeder Entität (Verlauf,
+  Werte bearbeiten, Konfiguration) stehen jetzt die Kennzahlen aus der
+  Entitätenliste: Typ und Einheit, erster und letzter Wert (mit dem Alter),
+  Anzahl der Datensätze und Größe. Dazu kommt je nach Typ der Wertebereich
+  (Minimum und Maximum über den gesamten Zeitraum), der aktuelle Zählerstand
+  oder die Zahl der Zustände. Die Kacheln auf dem Reiter Konfiguration
+  entfallen.
+
 ### Behoben
 
 - **Entitätenliste merkt sich die Seite**: Wer auf Seite 2 eine Entität
@@ -44,6 +52,13 @@
   assistant suggests a category when applying, matching the topic, and creates
   it if needed. The export has the same filter. The selective restore brings
   the categories back, and the demo data comes with categories.
+
+- **Entities, key facts in the header**: Above the tabs of every entity
+  (History, Edit values, Configuration) you now see the key facts from the
+  entity list: type and unit, first and last value (with its age), number of
+  records and size. Depending on the type there is also the value range
+  (minimum and maximum over the entire period), the current counter reading or
+  the number of states. The tiles on the Configuration tab are gone.
 
 #### Fixed
 
