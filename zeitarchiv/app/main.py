@@ -2530,7 +2530,10 @@ def _entity_facts(entity) -> dict:
         "first_ts_time": format_time(entity["first_ts"], TZ),
         "last_ts": format_timestamp(last_ts, TZ),
         "last_ts_time": format_time(last_ts, TZ),
-        "last_ago": tr("vor {dauer}", dauer=format_uptime(max(0.0, time.time() - last_ts))) if last_ts else "",
+        # Nur die größte Einheit („vor 1 Std.“, nicht „vor 1 Std. 16 Min.“): so passt
+        # sie hinter die Uhrzeit in dieselbe Zeile, ohne dass die Zelle höher wird
+        # oder mitten im Satz umbricht. Jede Einheit besteht aus Zahl und Wort.
+        "last_ago": tr("vor {dauer}", dauer=" ".join(format_uptime(max(0.0, time.time() - last_ts)).split()[:2])) if last_ts else "",
         "extra": _entity_facts_extra(entity),
     }
 
