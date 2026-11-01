@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Behoben
+
+- **Energiedashboard, Speicher-Prüfung im Monat**: Die Meldung „Entladung
+  übersteigt Ladung — Ladung/Entladung vertauscht?“ erschien im laufenden
+  Monat fälschlich, wenn der Speicher zu Monatsbeginn voll war und der Monat
+  wenig PV-Ertrag hatte. Ohne Ladestand-Sensor gilt jetzt die Kapazität des
+  Speichers als Spielraum; ist auch keine Kapazität hinterlegt, wird nur noch
+  über ein ganzes Jahr geprüft.
+
+---
+
+### English
+
+#### Fixed
+
+- **Energy dashboard, storage check for the month**: The message "Discharge
+  exceeds charge — charge/discharge swapped?" wrongly appeared for the current
+  month when the storage was full at the start of the month and the month had
+  little PV yield. Without a state-of-charge sensor the storage capacity is
+  now the allowance; if no capacity is set either, only a full year is
+  checked.
+
 ## 1.12.0 - 2026-10-31
 
 ### Neu
