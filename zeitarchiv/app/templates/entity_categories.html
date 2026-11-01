@@ -23,6 +23,11 @@
         <div class="cat-empty-actions">
           <button type="button" class="btn primary" id="cat-take" data-label="{{ _('{n} Vorschläge übernehmen') }}"></button>
         </div>
+        <p class="cat-or">{{ _("oder") }}</p>
+        <form class="cat-add" id="cat-add" autocomplete="off">
+          <input type="text" id="cat-new" maxlength="{{ max_name_length }}" placeholder="{{ _('Neue Kategorie') }}" aria-label="{{ _('Neue Kategorie') }}">
+          <button type="submit" class="btn">{{ _("+ Kategorie anlegen") }}</button>
+        </form>
       </div>
       {% else %}
       <ol class="cat-list" id="cat-list">
@@ -51,12 +56,12 @@
         </li>
         {% endfor %}
       </ol>
-      {% endif %}
-
       <form class="cat-add" id="cat-add" autocomplete="off">
         <input type="text" id="cat-new" maxlength="{{ max_name_length }}" placeholder="{{ _('Neue Kategorie') }}" aria-label="{{ _('Neue Kategorie') }}">
         <button type="submit" class="btn">{{ _("+ Kategorie anlegen") }}</button>
       </form>
+      {% endif %}
+
       <p class="cat-hint" id="cat-limit" hidden>{{ _("Es sind höchstens {n} Kategorien möglich.", n=max_categories) }}</p>
     </div>
   </div>

@@ -3307,7 +3307,8 @@
     "Kategorie setzen": "Set category",
     "Kategorie: Alle ▾": "Category: All ▾",
     "Ohne Kategorie": "No category",
-    "{name} (neu)": "{name} (new)"
+    "{name} (neu)": "{name} (new)",
+    "oder": "or"
   },
   "js": {
     "Ladestand": "State of charge",
