@@ -681,3 +681,14 @@ def test_an_unknown_table_is_a_404_and_the_token_is_needed() -> None:
     assert client.get("/api/card/table", params={"id": 1}).status_code == 401
     assert client.get("/api/card/table", params={"id": "x"}, headers=AUTH).status_code == 422
     assert calls == []
+
+
+def test_a_chosen_period_replaces_the_saved_one_even_a_fixed_period() -> None:
+    client, calls = _client([_chart(1, ["sensor.a"], period_anchor="2025-03-01", range_key="year")])
+    client.get("/api/card/chart", params={"id": 1, "period": "7d"}, headers=AUTH)
+    assert (calls[0]["range"], calls[0]["continuous"], calls[0]["offset"]) == ("week", True, 0)
+    # Ohne Angabe bleibt der gespeicherte Zeitraum.
+    client, calls = _client([_chart(2, ["sensor.a"], range_key="year")])
+    client.get("/api/card/chart", params={"id": 2}, headers=AUTH)
+    assert calls[0]["range"] == "year"
+    assert client.get("/api/card/chart", params={"id": 2, "period": "jahrzehnt"}, headers=AUTH).status_code == 400

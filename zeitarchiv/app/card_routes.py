@@ -341,6 +341,7 @@ def create_card_router(
         request: Request,
         id: int,
         at: str | None = None,
+        period: str | None = None,
         px: int = Query(0, ge=0, le=MAX_PX),
         authorization: str | None = Header(default=None),
         x_zeitarchiv_integration_version: str | None = Header(default=None),
@@ -348,11 +349,18 @@ def create_card_router(
         """Einstellungen und Daten eines gespeicherten Charts.
 
         ``at``: Stichtag (JJJJ-MM-TT) einer Zeitraum-Navigation, gilt wie bei den
-        Kacheln nur für Charts ohne festen Zeitraum."""
+        Kacheln nur für Charts ohne festen Zeitraum.
+        ``period``: überschreibt den gespeicherten Zeitraum des Charts (Schlüssel wie bei
+        ``/api/card/series``), auch einen festen."""
         check_auth(authorization, request.headers.get("x-request-id", "-"), x_zeitarchiv_integration_version)
         chart = index.get_saved_chart(id)
         if chart is None:
             raise HTTPException(status_code=404, detail=tr("Chart nicht gefunden"))
+        if period:
+            if period not in PERIODS:
+                raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
+            range_key, continuous = PERIODS[period]
+            chart = {**chart, "range_key": range_key, "continuous": continuous, "period_anchor": None}
         return answer(chart, at, px)
 
     @router.get("/api/card/table")
