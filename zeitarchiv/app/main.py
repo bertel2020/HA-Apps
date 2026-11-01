@@ -2537,7 +2537,16 @@ def _entity_facts(entity) -> dict:
         # oder mitten im Satz umbricht. Jede Einheit besteht aus Zahl und Wort.
         "last_ago": tr("vor {dauer}", dauer=" ".join(format_uptime(max(0.0, time.time() - last_ts)).split()[:2])) if last_ts else "",
         "extra": _entity_facts_extra(entity),
+        "category": _entity_facts_category(entity["entity_id"]),
     }
+
+
+def _entity_facts_category(entity_id: str) -> dict | None:
+    """Die Kategorie der Entität für den Chip unter dem Typ, oder None ohne."""
+    category_id = index.get_entity_category_id(entity_id)
+    if category_id is None:
+        return None
+    return next((c for c in index.list_entity_categories() if c["id"] == category_id), None)
 
 
 def _entity_facts_extra(entity) -> dict | None:

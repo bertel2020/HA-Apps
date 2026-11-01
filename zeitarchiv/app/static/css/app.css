@@ -1941,6 +1941,7 @@ button[data-tooltip]{cursor:pointer;}
   margin:1px 0 0;font-family:var(--font-mono);font-size:calc(13.5px * var(--font-scale, 1));
   font-weight:500;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;
 }
+.entity-fact-cat{display:block;margin-top:4px;}
 .entity-fact dd small{
   display:block;font-size:calc(11.5px * var(--font-scale, 1));font-weight:400;color:var(--ink-faint);
 }

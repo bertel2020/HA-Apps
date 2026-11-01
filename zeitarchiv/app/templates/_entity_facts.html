@@ -6,7 +6,8 @@
 
    Der Typ steht als Plakette (.badge wie in der Entitätenliste), der
    Rohwert der Zustandsklasse („measurement", „total_increasing") als Tooltip:
-   wer ihn braucht, findet ihn, ohne dass er eine Zeile belegt.
+   wer ihn braucht, findet ihn, ohne dass er eine Zeile belegt. Hat die Entität
+   eine Kategorie, steht sie als .cat-pill (wie in der Liste) unter dem Typ.
 
    Die letzte Zelle hängt vom Typ ab (main._entity_facts_extra). Fehlt bei Min/Max
    noch der Zwischenspeicher, steht dort „…“ und entity-facts.js füllt sie nach.
@@ -15,7 +16,7 @@
 <dl class="entity-facts">
   <div class="entity-fact">
     <dt>{{ _("Typ · Einheit") if facts.unit else _("Typ") }}</dt>
-    <dd><span class="badge {{ aggregation_type }}"{% if facts.state_class %} title="{{ facts.state_class }}"{% endif %}>{{ facts.type_label }}</span>{% if facts.unit %} {{ facts.unit }}{% endif %}</dd>
+    <dd><span class="badge {{ aggregation_type }}"{% if facts.state_class %} title="{{ facts.state_class }}"{% endif %}>{{ facts.type_label }}</span>{% if facts.unit %} {{ facts.unit }}{% endif %}{% if facts.category %}<span class="entity-fact-cat"><span class="cat-pill" style="--c:var(--chart-{{ facts.category.color_slot }});" title="{{ _("Kategorie") }}: {{ facts.category.name }}"><i aria-hidden="true"></i><span>{{ facts.category.name }}</span></span></span>{% endif %}</dd>
   </div>
   <div class="entity-fact">
     <dt>{{ _("Erster Wert") }}</dt>
