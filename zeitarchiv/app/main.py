@@ -162,7 +162,7 @@ from .energiedashboard_routes import (
     entity_has_energiedashboard_role,
     is_energiedashboard_configured,
 )
-from . import cleanup_stats, counter_bulk, data_quality, entity_usage
+from . import cleanup_stats, counter_bulk, data_quality, entity_usage, value_range
 from . import dashboard_tiles
 from .dashboard_tiles import tile_metric_context as _tile_metric_context
 from .route_support import MAX_FORM_FIELDS, UploadLimitExceeded, copy_upload_limited, dir_size, storage_locked
@@ -2531,7 +2531,44 @@ def _entity_facts(entity) -> dict:
         "last_ts": format_timestamp(last_ts, TZ),
         "last_ts_time": format_time(last_ts, TZ),
         "last_ago": tr("vor {dauer}", dauer=format_uptime(max(0.0, time.time() - last_ts))) if last_ts else "",
+        "extra": _entity_facts_extra(entity),
     }
+
+
+def _entity_facts_extra(entity) -> dict | None:
+    """Die typabhängige letzte Zelle der Kennzahlen-Leiste, oder None, wo es
+    keinen sinnvollen Wert gibt (Schalter).
+
+    Standard: Minimum/Maximum über den gesamten Zeitraum. Der Index kennt sie
+    nicht, ein Vollscan gehört nicht in den Seitenaufbau — liegt kein gültiger
+    Zwischenspeicher vor, bleibt `text` leer und der Browser holt sie über
+    /entities/{id}/value-range nach (static/js/entity-facts.js).
+    Zähler: der aktuelle Zählerstand (Min/Max wären hier nur Anfangs- und
+    Endstand). Zustand: Zahl der bekannten Zustände."""
+    kind = entity["aggregation_type"]
+    decimals = decimals_to_int(entity["decimals"])
+    if kind == "standard":
+        entry = value_range.cached(index, entity)
+        return {
+            "label": tr("Min / Max"), "note": tr("gesamter Zeitraum"), "pending": entry is None,
+            "text": _value_range_text(entry, decimals) if entry else "",
+        }
+    if kind == "counter":
+        # „—“ statt keiner Zelle: last_value fehlt bei Entitäten, deren Werte nur
+        # importiert wurden, und die Zelle soll nicht je nach Herkunft verschwinden.
+        last = entity["last_value"]
+        return {"label": tr("Zählerstand"), "note": "", "pending": False,
+                "text": format_value(last, decimals) if last is not None else "—"}
+    if kind == "state":
+        return {"label": tr("Zustände"), "note": tr("verschieden"), "pending": False,
+                "text": format_int(len(index.get_state_map(entity["entity_id"])))}
+    return None
+
+
+def _value_range_text(entry: dict, decimals: int | None) -> str:
+    if entry["min"] is None or entry["max"] is None:
+        return "—"
+    return f"{format_value(entry['min'], decimals)} / {format_value(entry['max'], decimals)}"
 
 
 def _visible_row_count(entity) -> int:
@@ -2851,6 +2888,19 @@ def entity_outlier_rate(request: Request, entity_id: str) -> HTMLResponse:
     return templates.TemplateResponse(
         request, "_entity_config_form.html", _entity_config_context(_require_entity(entity_id))
     )
+
+
+@app.get("/entities/{entity_id}/value-range")
+@_storage_locked(lambda args: args["entity_id"])
+def entity_value_range(entity_id: str) -> dict:
+    """Minimum/Maximum der Entität über den gesamten Zeitraum, als Text für die
+    Kennzahlen-Leiste. Rechnet bei Bedarf einen Vollscan (siehe value_range.py)
+    — deshalb ein eigener Aufruf, den die Seite erst nach dem Laden stellt."""
+    entity = _require_entity(entity_id)
+    entry = value_range.cached(index, entity) or value_range.compute(
+        DATA_DIR, index, TZ, entity, datetime.now(TZ)
+    )
+    return {"text": _value_range_text(entry, decimals_to_int(entity["decimals"]))}
 
 
 @app.get("/entities/{entity_id}/config", response_class=HTMLResponse)

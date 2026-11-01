@@ -8,6 +8,9 @@
    Rohwert der Zustandsklasse („measurement", „total_increasing") als Tooltip:
    wer ihn braucht, findet ihn, ohne dass er eine Zeile belegt.
 
+   Die letzte Zelle hängt vom Typ ab (main._entity_facts_extra). Fehlt bei Min/Max
+   noch der Zwischenspeicher, steht dort „…“ und entity-facts.js füllt sie nach.
+
    Erwartet `facts` aus main._entity_facts(). #}
 <dl class="entity-facts">
   <div class="entity-fact">
@@ -26,4 +29,11 @@
     <dt>{{ _("Datensätze") }}</dt>
     <dd>{{ facts.row_count }}<small>{{ facts.size }}</small></dd>
   </div>
+  {% if facts.extra %}
+  <div class="entity-fact">
+    <dt>{{ facts.extra.label }}</dt>
+    <dd{% if facts.extra.pending %} data-value-range-url="{{ app_root }}/entities/{{ entity_id }}/value-range"{% endif %}><span class="entity-fact-text">{{ facts.extra.text if not facts.extra.pending else "…" }}</span>{% if facts.extra.note %}<small>{{ facts.extra.note }}</small>{% endif %}</dd>
+  </div>
+  {% endif %}
 </dl>
+{% if facts.extra and facts.extra.pending %}<script src="{{ asset('js/entity-facts.js') }}" defer></script>{% endif %}
