@@ -290,7 +290,7 @@
   .edash-tile-dialog .detail-dialog-header{align-items:flex-start;margin-bottom:8px;}
   .edash-tile-dialog .detail-dialog-header .btn{padding:0;width:26px;height:26px;border-radius:50%;line-height:1;flex:none;}
   .edash-tile-sub{margin:2px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
-  .edash-tile-chart{height:240px;width:100%;}
+  .edash-tile-chart{height:270px;width:100%;}
   .edash-tile-modes{display:inline-flex;gap:4px;background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;padding:3px;margin-bottom:8px;}
   .edash-tile-modes button{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));padding:5px 10px;border-radius:6px;border:0;background:transparent;color:var(--ink-faint);cursor:pointer;}
   .edash-tile-modes button.is-active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:600;}
@@ -303,7 +303,7 @@
   .edash-tile-value{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--ink-faint);white-space:nowrap;}
   @media(max-width:560px){
     .edash-tile-dialog{padding:12px;}
-    .edash-tile-chart{height:220px;}
+    .edash-tile-chart{height:250px;}
     .edash-tile-rows li{flex-wrap:wrap;}
   }
   /* overflow:hidden oben ist für die Sparkline in der Energiefluss-Zeile
