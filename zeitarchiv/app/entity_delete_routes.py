@@ -21,7 +21,7 @@ from . import entity_usage
 from .background import BackgroundService
 from .formatting import format_time, format_timestamp, format_uptime
 from .i18n import tr
-from .route_support import storage_locked
+from .route_support import MAX_FORM_FIELDS, storage_locked
 from .storage import entity_removal
 from .storage.coordinator import StorageCoordinator
 from .storage.index import Index
@@ -70,7 +70,7 @@ def create_entity_delete_router(deps: EntityDeleteDependencies) -> APIRouter:
     async def entities_delete_selected(request: Request) -> dict:
         """Löscht mehrere Entitäten endgültig (Auswahl in der Entitäten-Übersicht)."""
         entity_ids = list(dict.fromkeys(
-            str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"
+            str(v) for k, v in (await request.form(max_fields=MAX_FORM_FIELDS)).multi_items() if k == "entity_id"
         ))
         if not entity_ids:
             raise HTTPException(status_code=400, detail=tr("Keine Entität gewählt"))
@@ -90,7 +90,7 @@ def create_entity_delete_router(deps: EntityDeleteDependencies) -> APIRouter:
     @router.post("/entities/usage-check")
     async def entities_usage_check(request: Request) -> dict:
         """Prüft vor dem Löschen, wo die gewählten Entitäten noch verwendet werden (nur lesend)."""
-        entity_ids = [str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"]
+        entity_ids = [str(v) for k, v in (await request.form(max_fields=MAX_FORM_FIELDS)).multi_items() if k == "entity_id"]
         usages = await run_in_threadpool(entity_usage.find_usages, deps.index, entity_ids)
         return {"usages": usages, "summary": entity_usage.summarize(usages)}
 

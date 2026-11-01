@@ -46,3 +46,19 @@ def test_every_action_button_keeps_the_chosen_page_size(client) -> None:
         ).text
         assert '<input type="hidden" name="page_size" value="500">' in html, route
         assert 'hx-include="#controls"' not in html, route
+
+
+def test_bulk_entity_actions_accept_more_than_1000_selected_entities(client) -> None:
+    ids = [f"sensor.pytest_bulk_select_{i}" for i in range(1001)]
+
+    for path in (
+        "/entities/usage-check",
+        "/housekeeping/datenqualitaet/duplicates/preview",
+        "/housekeeping/datenqualitaet/duplicates/delete",
+        "/housekeeping/datenqualitaet/duplicates/undo",
+    ):
+        response = client.post(path, data={"entity_id": ids})
+        assert response.status_code != 400 or "Too many fields" not in response.text, path
+
+    response = client.post("/entities/delete-selected", data={"entity_id": ids})
+    assert "Too many fields" not in response.text

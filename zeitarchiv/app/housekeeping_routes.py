@@ -75,6 +75,7 @@ from .formatting import (
     format_value,
 )
 from .progress import JobBusy, JobProgress
+from .route_support import MAX_FORM_FIELDS
 from .storage import cleanup, rotate
 from .storage import reset as reset_storage
 from .storage.coordinator import StorageCoordinator
@@ -1401,7 +1402,9 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     async def data_quality_duplicates_preview(request: Request) -> HTMLResponse:
         """Sammelaktion der Datenqualität, Schritt 1: zeigt je gewählter Entität, wie viele Duplikate
         entfernt würden, ohne etwas zu schreiben. Gelöscht wird erst nach der Bestätigung."""
-        entity_ids = [str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"]
+        entity_ids = [
+            str(v) for k, v in (await request.form(max_fields=MAX_FORM_FIELDS)).multi_items() if k == "entity_id"
+        ]
         preview = await run_in_threadpool(
             data_quality.preview_duplicate_removal, deps.data_dir, deps.index, deps.tz, entity_ids,
             deps.coordinator.entity,
@@ -1413,7 +1416,9 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     @router.post("/housekeeping/datenqualitaet/duplicates/delete", response_class=HTMLResponse)
     async def data_quality_duplicates_delete(request: Request) -> HTMLResponse:
         """Schritt 2: entfernt die Duplikate der bestätigten Entitäten (Soft-Delete, rückgängig machbar)."""
-        entity_ids = [str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"]
+        entity_ids = [
+            str(v) for k, v in (await request.form(max_fields=MAX_FORM_FIELDS)).multi_items() if k == "entity_id"
+        ]
         done = await run_in_threadpool(
             data_quality.remove_duplicates, deps.data_dir, deps.index, deps.tz, entity_ids,
             deps.coordinator.entity,
@@ -1427,7 +1432,9 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     @router.post("/housekeeping/datenqualitaet/duplicates/undo", response_class=HTMLResponse)
     async def data_quality_duplicates_undo(request: Request) -> HTMLResponse:
         """Nimmt den Sammellauf von eben wieder zurück (je Entität die zuletzt gelöschte Charge)."""
-        entity_ids = [str(v) for k, v in (await request.form()).multi_items() if k == "entity_id"]
+        entity_ids = [
+            str(v) for k, v in (await request.form(max_fields=MAX_FORM_FIELDS)).multi_items() if k == "entity_id"
+        ]
         restored = await run_in_threadpool(
             data_quality.undo_duplicate_removal, deps.index, entity_ids, deps.coordinator.entity
         )

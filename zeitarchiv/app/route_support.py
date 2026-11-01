@@ -17,6 +17,12 @@ from .storage.coordinator import StorageCoordinator
 # von einem laufenden Backup/Import gehalten werden kann als das SQLite-Lock.
 STORAGE_LOCKED_TIMEOUT_SECONDS = 30.0
 
+# Starlette lässt in request.form() standardmäßig nur 1000 Felder zu. Sammelaktionen
+# schicken je gewähltem Eintrag ein Feld (entity_id, ts); eine ganze Seite mit 1000
+# Zeilen plus Zusatzfeldern scheiterte sonst mit "400 Too many fields", ohne dass
+# etwas geschah.
+MAX_FORM_FIELDS = 10_000
+
 
 class UploadLimitExceeded(ValueError):
     """Ein Upload überschreitet sein festgelegtes Größenlimit."""
