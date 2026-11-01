@@ -351,10 +351,10 @@
       </div>
       <form method="dialog"><button class="btn" aria-label="{{ _('Dialog schließen') }}">×</button></form>
     </div>
-    <div class="edash-tile-modes" x-show="tileHasModes()" role="group" aria-label="{{ _('Darstellung') }}">
-      <button type="button" :class="{'is-active': tile.mode === 'bar'}" @click="setTileMode('bar')">{{ _("Balken") }}</button>
-      <button type="button" :class="{'is-active': tile.mode === 'line'}" @click="setTileMode('line')">{{ _("Linie") }}</button>
-      <button type="button" x-show="tileHasShare()" :class="{'is-active': tile.mode === 'share'}" @click="setTileMode('share')">{{ _("Anteile %") }}</button>
+    <div class="edash-tile-modes" x-show="tileHasModes()" role="group" aria-label="{{ _('Ansicht') }}">
+      <button type="button" :class="{'is-active': tile.mode === 'bar'}" :aria-pressed="tile.mode === 'bar'" @click="setTileMode('bar')">{{ _("Balken") }}</button>
+      <button type="button" :class="{'is-active': tile.mode === 'line'}" :aria-pressed="tile.mode === 'line'" @click="setTileMode('line')">{{ _("Linie") }}</button>
+      <button type="button" x-show="tileHasShare()" :class="{'is-active': tile.mode === 'share'}" :aria-pressed="tile.mode === 'share'" @click="setTileMode('share')">{{ _("Anteile %") }}</button>
     </div>
     <p class="edash-tile-note" x-show="tile.loading">{{ _("Lade …") }}</p>
     <p class="edash-tile-note" x-show="tile.error">{{ _("Das Diagramm konnte nicht geladen werden.") }}</p>

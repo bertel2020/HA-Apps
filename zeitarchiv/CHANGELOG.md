@@ -10,8 +10,8 @@
   zeigen gestapelte Balken je Quelle (der Verbrauch samt Grundlast), umschaltbar
   auf Linie und Anteile in Prozent; der Speicher zeigt Ladung und Entladung
   nebeneinander, bei Stunde und Tag mit SOC-Sensor zusätzlich den Ladestand als
-  Linie; Netzbezug und Einspeisung zeigen Balken mit dem Vorzeitraum als
-  gestrichelter Linie. Die Zeilen darunter und „Entität öffnen“ führen wie bisher
+  Linie; Netzbezug und Einspeisung zeigen Balken (oder Linie) mit dem
+  Vorzeitraum als gestrichelter Linie. Die Zeilen darunter und „Entität öffnen“ führen wie bisher
   zur jeweiligen Entität.
 
 ### Behoben
@@ -35,7 +35,8 @@
   (consumption including the base load), switchable to lines and percentage
   shares; storage shows charge and discharge side by side, plus the state of
   charge as a line for hour and day if a state-of-charge sensor is set; grid
-  import and feed-in show bars with the previous period as a dashed line. The
+  import and feed-in show bars (or a line) with the previous period as a dashed
+  line. The
   rows below and "Open entity" lead to the respective entity as before.
 
 #### Fixed

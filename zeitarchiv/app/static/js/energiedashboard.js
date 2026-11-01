@@ -685,6 +685,7 @@
           if (token !== tileFetchToken) return;
           this.tile.data = data;
           this.tile.loading = false;
+          if (!this.tileHasModes() || (this.tile.mode === 'share' && !this.tileHasShare())) this.tile.mode = 'bar';
           await this.$nextTick();
           this.renderTileChart();
         } catch (e) {
@@ -742,15 +743,36 @@
         this.renderTileChart();
       },
 
+      // Relativ wie die fetch()-Aufrufe in dieser Datei (energiedashboard/tile, /trends): unter Ingress lösen
+      // beide gegen denselben Präfix auf; app_root steht nur serverseitig in den Vorlagen zur Verfügung.
       entityHref(entityId) {
         return `entities/${encodeURIComponent(entityId)}?range=${this.range}&offset=${this.offset}`;
       },
 
-      // Grundlast hat keine Entität und bekommt wie im Sankey die neutrale Farbe; alle anderen Serien in der
-      // Reihenfolge der Verbraucheranteile (dieselbe Palette wie Tabelle und Donut).
+      // Dieselben Farben wie Tabelle und Donut der Anteile: Verbrauch über die Blätter der Verbraucheranteile
+      // (Grundlast ist dort ein Blatt mit Palettenfarbe), Erzeugung über die Position in den Versorgungsanteilen.
+      // Eine Zwischenzähler- oder Gruppenzeile hat im Popup EINEN Balken und nimmt die Farbe ihres ersten Blatts.
+      // Fehlt die Gegenstelle (Anteile noch nicht geladen), gilt die Reihenfolge der Serien.
       tileSeriesColors(series) {
-        let idx = 0;
-        return series.map((row) => (row.name === t('Grundlast') ? cssVar('--ink-faint') : this.shareColor(idx++)));
+        if (this.tile.kpi === 'verbrauch') return series.map((row, i) => this.verbrauchRowColor(row, i));
+        if (this.tile.kpi === 'erzeugung') {
+          return series.map((row, i) => {
+            const idx = this.versorgungBreakdown.findIndex((item) => item.entity_id && item.entity_id === row.entity_id);
+            return this.shareColor(idx === -1 ? i : idx);
+          });
+        }
+        return series.map((_row, i) => this.shareColor(i));
+      },
+
+      verbrauchRowColor(row, fallbackIdx) {
+        const item = this.verbraucherBreakdown.find((entry) => (
+          row.entity_id ? entry.entity_id === row.entity_id : (!entry.entity_id && entry.name === row.name)
+        ));
+        if (!item) return this.shareColor(fallbackIdx);
+        const leaf = this.isSummenzeile(item)
+          ? this.verbraucherLeaves.find((entry) => entry.name === this.leafNamesUnder(item)[0])
+          : item;
+        return leaf ? this.leafColor(leaf) : this.shareColor(fallbackIdx);
       },
 
       // Zeilen unter dem Diagramm: Verbrauch je Zeile der obersten Ebene (mit Anteil), Speicher je Ladung/Entladung.
@@ -791,8 +813,11 @@
         const gridLine = cssVar('--border');
         const palette = colors();
         const stacks = data.kpi === 'verbrauch' || data.kpi === 'erzeugung';
-        const isShare = stacks && this.tile.mode === 'share';
-        const isLine = this.tile.mode === 'line' && data.kpi !== 'speicher';
+        // Ein gespeicherter Modus gilt nur, wenn die Kachel ihn gerade anbietet (eine Serie: kein Umschalter, kein
+        // Anteil in %), sonst bliebe das Diagramm in einer Ansicht, aus der es keinen Weg zurück gibt.
+        const mode = this.tileHasModes() ? this.tile.mode : 'bar';
+        const isShare = stacks && this.tileHasShare() && mode === 'share';
+        const isLine = mode === 'line' && data.kpi !== 'speicher';
         const singleColor = {netzbezug: palette.grid, einspeisung: palette.exportColor}[data.kpi];
         const colorsList = data.kpi === 'speicher' ? [palette.storage, palette.storageOut]
           : (singleColor ? [singleColor] : this.tileSeriesColors(data.series));

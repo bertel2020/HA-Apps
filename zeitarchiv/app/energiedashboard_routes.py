@@ -1987,7 +1987,13 @@ class EnergieDashboardService:
                     grouped_members[gruppe_name] = []
                     grouped_order.append(gruppe_name)
                 grouped_values[gruppe_name] += item["value"]
-                grouped_series[gruppe_name].append(verbraucher_series_by_name.get(item["name"], {}))
+                # Entitätszeilen über die Entität nachschlagen: zwei Mitglieder mit gleichem Anzeigenamen
+                # würden sonst dieselbe (letzte) Serie bekommen.
+                member_entity = item.get("entity_id")
+                grouped_series[gruppe_name].append(
+                    verbraucher_series_by_entity.get(member_entity) if member_entity
+                    else verbraucher_series_by_name.get(item["name"], {})
+                )
                 grouped_members[gruppe_name].append(item["name"])
                 item["parent"] = gruppe_name
             for gruppe_name in grouped_order:
@@ -2727,8 +2733,11 @@ class EnergieDashboardService:
                     verbraucher_series_by_entity.get(item_entity) if item_entity
                     else verbraucher_series_by_name.get(item["name"])
                 )
+                # Grundlast hat weder Entität noch kind; das Popup erkennt sie nicht am Namen (ein Gerät kann so heißen).
+                is_grundlast = not item_entity and not item.get("kind") and item["name"] == tr("Grundlast")
                 verbrauch_rows.append({
-                    "name": item["name"], "entity_id": item_entity, "kind": item.get("kind"),
+                    "name": item["name"], "entity_id": item_entity,
+                    "kind": "grundlast" if is_grundlast else item.get("kind"),
                     "value": item["value"], "share": item.get("share"), "series": item_series or {},
                 })
             detail = {
@@ -2836,6 +2845,9 @@ class EnergieDashboardService:
         exakt überein, und nur die Serien sind für das Diagramm gedacht."""
         if kpi not in TILE_KPIS:
             raise HTTPException(status_code=400, detail=tr("Ungültige Kennzahl"))
+        # Vorwärts über "jetzt" hinaus gibt es nichts; _window kappt ebenfalls auf 0. Ohne das fragte die Vorperiode
+        # (offset - 1) dasselbe Fenster wie die aktuelle und hieße trotzdem "Vortag".
+        offset = min(offset, 0)
         if kpi in ("netzbezug", "einspeisung"):
             return self.compute_single_tile(config, kpi, range_key, offset, read_cache)
         flow = self.compute_flow(config, range_key, offset, skip_quality=True, read_cache=read_cache, with_detail=True)
@@ -2843,7 +2855,7 @@ class EnergieDashboardService:
         window_start = datetime.fromtimestamp(flow["window_start_ts"], tz)
 
         def values(series: dict[float, float]) -> list[float | None]:
-            return eb.align(series, {}, range_key, window_start, tz)["current"]
+            return self._tile_nonneg(eb.align(series, {}, range_key, window_start, tz)["current"])
 
         axis = eb.axis_keys(range_key, window_start)
         result: dict = {
@@ -2851,11 +2863,14 @@ class EnergieDashboardService:
             "keys": axis, "labels": self._tile_labels(range_key, axis, window_start),
         }
         if kpi == "erzeugung":
+            # Anteil an der Summe der gezeigten (auf 0 gekappten) Zeilen: die Kachel summiert ungekappt, ein
+            # Erzeuger mit negativem Wert ließe sonst Zähler und Nenner auseinanderlaufen.
             total = flow["kpi"]["erzeugung"]
+            rows_total = sum(row["value"] for row in flow["detail"]["erzeugung"])
             result["series"] = [
                 {
                     "name": row["name"], "entity_id": row["entity_id"], "kind": None, "value": row["value"],
-                    "share": round(row["value"] / total * 100, 1) if total > 0 else None,
+                    "share": round(row["value"] / rows_total * 100, 1) if rows_total > 0 else None,
                     "values": values(row["series"]),
                 }
                 for row in flow["detail"]["erzeugung"]
@@ -2892,6 +2907,7 @@ class EnergieDashboardService:
         (rollierend) wird im Popup nicht wiederholt, die Linie ist die Bucket-Sicht auf den Vorzeitraum."""
         if range_key not in RANGE_KEYS:
             raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
+        offset = min(offset, 0)
         tz = self.deps.tz
         now = datetime.now(tz)
         cache = read_cache if read_cache is not None else query_mod.QueryReadCache()
@@ -2902,6 +2918,7 @@ class EnergieDashboardService:
         current = self._entity_series(entity_id, range_key, offset, now, cache)[0] if entity_id else {}
         previous = self._entity_series(entity_id, range_key, offset - 1, now, cache)[0] if entity_id else {}
         aligned = eb.align(current, previous, range_key, window_start, tz)
+        aligned = {key: self._tile_nonneg(value) if key != "keys" else value for key, value in aligned.items()}
         axis = aligned["keys"]
         previous_label = tr(COMPARE_LABELS.get(range_key, N_("Vorperiode")))
         return {
@@ -2947,10 +2964,16 @@ class EnergieDashboardService:
         ]
 
     @staticmethod
+    def _tile_nonneg(values: list[float | None]) -> list[float | None]:
+        """Negative Bucket-Werte (nach einem Zählerreset) auf 0 kappen: sie ergäben negative Balkenstücke und in
+        der Prozentansicht Anteile unter 0 oder über 100 %. Lücken (None) bleiben Lücken."""
+        return [None if value is None else max(value, 0.0) for value in values]
+
+    @staticmethod
     def _tile_labels(range_key: str, axis: list[int], window_start: datetime) -> list[str]:
         """Beschriftung je Achsenposition: Minute, Uhrzeit, Wochentag, Tag, Monatskürzel, Jahr."""
         if range_key == "hour":
-            return [f"{key:02d}" for key in axis]
+            return [f"{window_start.hour:02d}:{key:02d}" for key in axis]
         if range_key == "day":
             return [f"{key:02d}:00" for key in axis]
         if range_key == "week":
@@ -3739,6 +3762,9 @@ class EnergieDashboardService:
             # Beim ersten Öffnen eines Kachel-Popups geladen (wie /trends), nicht in /data mitgeschleppt.
             # Nur über den Ingress erreichbar: nginx.conf leitet dort alles weiter, der öffentliche Port
             # liefert 404 — bewusst KEIN Eintrag in PUBLIC_ENDPOINTS.
+            # Eine unbekannte Kennzahl ist ein Fehler der Anfrage (400), unabhängig vom Stand der Einrichtung.
+            if kpi not in TILE_KPIS:
+                raise HTTPException(status_code=400, detail=tr("Ungültige Kennzahl"))
             config = _load_config(deps.index)
             if not _is_configured(config):
                 raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))

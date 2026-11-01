@@ -623,10 +623,14 @@ eingestellten Zeitraum: bei Erzeugung und Verbrauch gestapelte Balken je Quelle
 (beim Verbrauch samt Grundlast; umschaltbar auf Linie und Anteile in Prozent),
 beim Speicher Ladung und Entladung nebeneinander, bei Stunde und Tag mit
 SOC-Sensor zusätzlich der Ladestand als Linie, bei Netzbezug und Einspeisung
-Balken mit dem Vorzeitraum (Vortag, Vormonat …) als gestrichelte Linie. Die
-Zeilen darunter, bei Netzbezug und Einspeisung „Entität öffnen“, führen zur
-Entität mit demselben Zeitraum; das Popup lädt beim Öffnen und aktualisiert
-sich nicht von selbst. Eine Kachel ohne konfigurierte Quelle ist deaktiviert.
+Balken (umschaltbar auf Linie) mit dem Vorzeitraum (Vortag, Vormonat …) als
+gestrichelte Linie; der Vorzeitraum ist dabei der Kalenderzeitraum, die
+Prozentzahl in der Kachel vergleicht dagegen rollierend, beide können sich
+bei laufendem Zeitraum leicht unterscheiden. Die Zeilen darunter, bei
+Netzbezug und Einspeisung „Entität öffnen“, führen zur Entität mit demselben
+Zeitraum; das Popup lädt beim Öffnen und aktualisiert sich nicht von selbst.
+Erzeugung, Netzbezug und Einspeisung ohne konfigurierte Quelle sind
+deaktiviert, der Speicher erscheint nur, wenn einer konfiguriert ist.
 Der Link „← zurück zum
 Energiedashboard“ auf der Entitätsseite (ebenso der aus dem Energiebericht,
 siehe unten) führt wieder genau zu diesem Zeitraum zurück, nicht zur

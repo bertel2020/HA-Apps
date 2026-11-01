@@ -49,10 +49,10 @@ def _request() -> Request:
     return Request({"type": "http", "method": "GET", "path": "/energiedashboard", "headers": []})
 
 
-def test_page_context_carries_app_root_for_kpi_links() -> None:
-    """Ohne app_root im Kontext würden die Kachel-Links unter Ingress am
-    dynamischen Pfad-Präfix vorbeizeigen (siehe _app_root_context() in
-    main.py)."""
+def test_page_context_carries_app_root_for_the_template_links() -> None:
+    """Ohne app_root im Kontext würden die Entitätslinks der Vorlage (Qualitätsdialog: Zählerrücksetzungen und
+    Auffälligkeiten) unter Ingress am dynamischen Pfad-Präfix vorbeizeigen (siehe _app_root_context() in main.py).
+    Die Links des Popups entstehen im Skript und sind relativ, wie die fetch()-Aufrufe dort."""
     def run(service, index) -> None:
         _save_config(index, _empty_config())
         assert service._page_context(_request())["app_root"] == "/ingress-prefix"
@@ -115,3 +115,12 @@ def test_popup_renders_correctly_with_real_config() -> None:
         assert "@click=\"openTile('netzbezug')\" disabled" not in html
 
     _with_service(run)
+
+
+def test_popup_mode_switcher_is_accessible_and_only_applies_where_offered() -> None:
+    """aria-pressed wie an anderen Umschaltern der App; ein gespeicherter Modus gilt nur, wenn die Kachel ihn anbietet;
+    die Grundlast wird am kind erkannt, nicht am Namen."""
+    assert _VIEW_TEMPLATE.count(":aria-pressed=\"tile.mode ===") == 3
+    assert "this.tileHasShare() && mode === 'share'" in JS
+    assert "this.tileHasModes() ? this.tile.mode : 'bar'" in JS
+    assert "row.name === t('Grundlast')" not in JS

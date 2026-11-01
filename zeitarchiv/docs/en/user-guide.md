@@ -579,11 +579,15 @@ click on a tile opens a chart popup for the period currently set: stacked bars
 per source for generation and consumption (with the base load for consumption;
 switchable to lines and percentage shares), charge and discharge side by side
 for storage (plus the state of charge as a line for hour and day if a
-state-of-charge sensor is set), and bars with the previous period (previous
-day, previous month, …) as a dashed line for grid import and feed-in. The rows
-below, or "Open entity" for grid import and feed-in, lead to the entity with
-the same period; the popup loads when opened and does not refresh by itself. A
-tile without a configured source is disabled. The link
+state-of-charge sensor is set), and bars (switchable to a line) with the
+previous period (previous day, previous month, …) as a dashed line for grid
+import and feed-in; the previous period is the calendar period, while the
+percentage on the tile compares rolling windows, so the two can differ
+slightly while a period is still running. The rows below, or "Open entity" for
+grid import and feed-in, lead to the entity with the same period; the popup
+loads when opened and does not refresh by itself. Generation, grid import and
+feed-in without a configured source are disabled; storage only appears if one
+is configured. The link
 "← back to the energy dashboard" on the entity page (as well as the one from
 the energy report, see below) leads back exactly to this period, not to the
 default view.
