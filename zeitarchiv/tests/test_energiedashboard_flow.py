@@ -614,7 +614,7 @@ def test_vertauschte_lade_und_entladerolle_wird_gemeldet(monkeypatch, tmp: Path)
     vergangenen Monat liest aus Archiv/Rollup, nicht aus dem Hot-Buffer
     (gleiches Muster wie _anomalie_anlage())."""
     a, config = _mit_speicher(tmp, [{
-        "name": "Verdreht",
+        "name": "Verdreht", "capacity_kwh": 5.0,
         "laden_entity_id": "sensor.wenig", "entladen_entity_id": "sensor.viel",
     }])
     for entity_id, start, ende in (("sensor.wenig", 10.0, 11.0), ("sensor.viel", 20.0, 29.0)):
@@ -638,6 +638,40 @@ def test_vertauschte_lade_und_entladerolle_wird_gemeldet(monkeypatch, tmp: Path)
         assert flow["quality"]["plausible"] is False
     finally:
         a.close()
+
+
+def _februar_speicher_ohne_soc(tmp: Path, capacity_kwh: float | None) -> tuple[_Anlage, dict]:
+    """1 kWh geladen, 9 kWh entladen im vollständigen Februar 2024, ohne SOC-Sensor."""
+    speicher = {"name": "Heimspeicher", "laden_entity_id": "sensor.wenig", "entladen_entity_id": "sensor.viel"}
+    if capacity_kwh is not None:
+        speicher["capacity_kwh"] = capacity_kwh
+    a, config = _mit_speicher(tmp, [speicher])
+    for entity_id, start, ende in (("sensor.wenig", 10.0, 11.0), ("sensor.viel", 20.0, 29.0)):
+        a.index.get_or_create_entity(entity_id, "sensor", "total_increasing", "kWh")
+        erster = _dt.datetime(2024, 2, 1, 6, tzinfo=TZ)
+        letzter = _dt.datetime(2024, 2, 28, 18, tzinfo=TZ)
+        tabelle = pa.table({"ts": [erster.timestamp(), letzter.timestamp()], "value": [start, ende]})
+        archiv = tmp / "archive" / entity_id
+        archiv.mkdir(parents=True, exist_ok=True)
+        pq.write_table(tabelle, archiv / "2024-02.parquet")
+        rollup.append_completed_month(tmp, entity_id, "counter", tabelle, 2024, 2, TZ)
+        a.index.record_write(entity_id, erster.timestamp())
+        a.index.record_write(entity_id, letzter.timestamp())
+    return a, config
+
+
+def test_monat_ohne_soc_erlaubt_kapazitaet_als_spielraum(monkeypatch, tmp: Path) -> None:
+    """Ein bei Monatsbeginn voller Speicher entlädt in einem PV-armen Monat legitim mehr, als er
+    lädt — bis zur Kapazität (hier 9 kWh Entladung bei 1 kWh Ladung und 20 kWh Kapazität).
+    Ohne Kapazität (und ohne SOC) wird im Monat gar nicht geprüft."""
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    for unterordner, kapazitaet in (("mit", 20.0), ("ohne", None)):
+        a, config = _februar_speicher_ohne_soc(tmp / unterordner, kapazitaet)
+        try:
+            flow = a.service.compute_flow(config, "month", -1)
+            assert all(c["label"] != "Speicher-Wirkungsgrad plausibel" for c in flow["quality"]["checks"])
+        finally:
+            a.close()
 
 
 def test_lueckenhafter_monat_ohne_soc_wird_nicht_geprueft(monkeypatch, tmp: Path) -> None:

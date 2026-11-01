@@ -1547,6 +1547,7 @@ class EnergieDashboardService:
                 # mindestens zwei Messpunkte im Fenster liegen (siehe die
                 # soc_entity_id-Auswertung unten).
                 "soc_delta_kwh": None,
+                "capacity_kwh": None,
             }
             speicher_per_entity.append(speicher_entry)
             speicher_laden_vals.append(sp_laden_val)
@@ -1560,6 +1561,7 @@ class EnergieDashboardService:
             # Entität je Stelle erneut abzufragen.
             capacity_kwh = self._resolve_speicher_capacity(sp, now, read_cache)
             sp["_resolved_capacity_kwh"] = capacity_kwh
+            speicher_entry["capacity_kwh"] = capacity_kwh
             weight = capacity_kwh if capacity_kwh else 1.0
             if sp.get("soc_entity_id"):
                 # SOC ist ein Gauge (%), nicht Zähler — "auto" ist hier der
@@ -2570,9 +2572,9 @@ class EnergieDashboardService:
         # nichts vertauscht. Mit SOC-Sensor + Kapazität lässt sich das
         # korrigieren: erlaubt ist Ladung PLUS der tatsächliche Rückgang des
         # Ladestands im Fenster selbst (soc_delta_kwh negativ). Ohne SOC-Sensor
-        # fehlt diese Korrekturgröße — dort läuft die Prüfung nur noch für
-        # Monat/Jahr, wo ein einzelner nicht abgeschlossener Lade-/Entladezyklus
-        # im Verhältnis zur Gesamtmenge kaum noch ins Gewicht fällt.
+        # fehlt diese Korrekturgröße — dort ist die Kapazität der Spielraum (Monat/Jahr);
+        # ohne Kapazität läuft die Prüfung nur noch fürs Jahr, wo ein einzelner nicht
+        # abgeschlossener Zyklus im Verhältnis zur Gesamtmenge kaum noch ins Gewicht fällt.
         speicher_entladen_exceeds_names = []
         for e in speicher_per_entity:
             if not e["has_both"]:
@@ -2588,7 +2590,12 @@ class EnergieDashboardService:
             soc_delta_kwh = e.get("soc_delta_kwh")
             if soc_delta_kwh is not None:
                 threshold = e["laden_val"] + max(0.0, -soc_delta_kwh) + 0.05
-            elif range_key in ("month", "year"):
+            elif e.get("capacity_kwh"):
+                # Ohne SOC-Sensor ist der Ladestand zu Fensterbeginn unbekannt: ein bei Monatsbeginn
+                # voller Speicher darf höchstens seine Kapazität mehr entladen als laden (z. B. ein
+                # PV-armer Oktober). Mehr deutet weiter auf vertauschte Zuordnung hin.
+                threshold = e["laden_val"] + e["capacity_kwh"] + 0.05
+            elif range_key == "year":
                 threshold = e["laden_val"] + 0.05
             else:
                 continue
