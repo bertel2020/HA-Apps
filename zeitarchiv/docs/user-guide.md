@@ -621,7 +621,8 @@ Speichern oder Erzeugern zeigt ihr Tooltip zusätzlich die Aufschlüsselung je
 Gerät. Ein Klick auf **Verbrauch** oder **Speicher** öffnet ein Diagramm-Popup
 für den gerade eingestellten Zeitraum: beim Verbrauch gestapelte Balken je
 Verbraucher samt Grundlast (umschaltbar auf Linie und Anteile in Prozent), beim
-Speicher Ladung und Entladung nebeneinander. Die Zeilen darunter führen zur
+Speicher Ladung und Entladung nebeneinander, bei Stunde und Tag mit einem
+SOC-Sensor zusätzlich der Ladestand als Linie. Die Zeilen darunter führen zur
 jeweiligen Entität; das Popup lädt beim Öffnen und aktualisiert sich nicht von
 selbst. Die übrigen Kacheln führen zum Chart der zugrundeliegenden Entität, mit
 demselben Zeitraum; steckt mehr als eine Entität dahinter (mehrere Erzeuger),

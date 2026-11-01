@@ -578,7 +578,8 @@ or generators, their tooltip additionally shows the breakdown per device. A
 click on **consumption** or **storage** opens a chart popup for the period
 currently set: stacked bars per consumer including the base load for
 consumption (switchable to lines and percentage shares), charge and discharge
-side by side for storage. The rows below lead to the respective entity; the
+side by side for storage, with the state of charge as a line for hour and day if
+a state-of-charge sensor is set. The rows below lead to the respective entity; the
 popup loads when opened and does not refresh by itself. The other tiles lead to
 the chart of the underlying entity, with the same period; if more than one
 entity is behind it (several generators), a short selection window opens

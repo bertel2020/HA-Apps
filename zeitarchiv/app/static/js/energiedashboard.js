@@ -777,6 +777,9 @@
         const isShare = data.kpi === 'verbrauch' && this.tile.mode === 'share';
         const isLine = data.kpi === 'verbrauch' && this.tile.mode === 'line';
         const colorsList = data.kpi === 'speicher' ? [palette.storage, palette.storageOut] : this.tileSeriesColors(data.series);
+        // Ladestand (nur Stunde/Tag, mit SOC-Sensor): Linie auf einer zweiten Achse in Prozent.
+        const hasSoc = data.kpi === 'speicher' && Array.isArray(data.soc);
+        if (hasSoc) colorsList.push(cssVar('--chart-4'));
         let columns = data.series.map((row) => row.values);
         if (isShare) {
           // Anteile je Achsenposition: Summe der Reihen = 100 %, ohne Verbrauch (Summe 0) bleibt der Platz leer.
@@ -791,10 +794,13 @@
           legend: {top: 0, type: 'scroll', textStyle: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)}, itemWidth: 10, itemHeight: 10},
           tooltip: {trigger: 'axis', axisPointer: {type: isLine ? 'line' : 'shadow'}, valueFormatter: fmt},
           xAxis: {type: 'category', data: data.labels, axisLabel: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)}, axisLine: {lineStyle: {color: gridLine}}},
-          yAxis: {
+          yAxis: [{
             type: 'value', name: unit.trim(), nameTextStyle: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)}, max: isShare ? 100 : undefined,
             axisLabel: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)}, splitLine: {lineStyle: {color: gridLine}},
-          },
+          }].concat(hasSoc ? [{
+            type: 'value', name: '%', min: 0, max: 100, nameTextStyle: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)},
+            axisLabel: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)}, splitLine: {show: false},
+          }] : []),
           series: data.series.map((row, i) => ({
             name: row.name,
             type: isLine ? 'line' : 'bar',
@@ -803,7 +809,10 @@
             data: columns[i],
             symbolSize: 4,
             barMaxWidth: 22,
-          })),
+          })).concat(hasSoc ? [{
+            name: t('Ladestand'), type: 'line', yAxisIndex: 1, data: data.soc, symbol: 'none', lineStyle: {width: 2},
+            tooltip: {valueFormatter: (value) => (value == null ? '—' : this.fmt(value, 0) + ' %')},
+          }] : []),
         }, true);
         if (typeof ResizeObserver !== 'undefined') {
           if (tileResizeObserver) tileResizeObserver.disconnect();

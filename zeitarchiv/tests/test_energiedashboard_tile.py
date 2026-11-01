@@ -13,7 +13,7 @@ from fastapi import HTTPException
 
 from _paths import APP
 
-from test_energiedashboard_flow import _FesteUhr, _beispielanlage, ed
+from test_energiedashboard_flow import _FesteUhr, _beispielanlage, _gauge, ed
 
 
 @pytest.fixture()
@@ -172,3 +172,69 @@ def test_the_route_is_not_public() -> None:
     boundary = (Path(__file__).parent / "test_nginx_boundary.py").read_text(encoding="utf-8")
     assert "energiedashboard/tile" not in nginx
     assert "energiedashboard/tile" not in boundary
+
+
+def _speicher_mit_soc(a, config, *soc_werte, capacity_kwh=None) -> None:
+    speicher = {
+        "name": "Heimspeicher", "laden_entity_id": "sensor.laden", "entladen_entity_id": "sensor.entladen",
+        "soc_entity_id": "sensor.soc",
+    }
+    if capacity_kwh:
+        speicher["capacity_kwh"] = capacity_kwh
+    config["speicher"] = [speicher]
+    a.zaehler("sensor.laden", (0, 200.0), (23, 205.0))
+    a.zaehler("sensor.entladen", (0, 300.0), (23, 303.0))
+    _gauge(a, "sensor.soc", "%", *soc_werte)
+
+
+def test_speicher_day_has_the_state_of_charge_per_hour(monkeypatch, tmp: Path) -> None:
+    """Ladestand je Achsenposition (lokale Stunde), Mittel der Messwerte darin; Stunden ohne Messwert nach dem
+    Fensterrand bleiben leer statt 0 % zu zeigen."""
+    def mutate(a, config):
+        _speicher_mit_soc(a, config, (0, 40.0), (6, 50.0), (6.5, 60.0), (12, 80.0))
+
+    a, tile = _tile(monkeypatch, tmp, "speicher", mutate)
+    try:
+        soc = tile["soc"]
+        assert soc is not None and len(soc) == 24
+        assert soc[0] == pytest.approx(40.0)
+        assert soc[6] == pytest.approx(55.0)  # Mittel von 50 und 60 in dieser Stunde
+        assert soc[12] == pytest.approx(80.0)
+        assert all(v is None or 0.0 <= v <= 100.0 for v in soc)
+    finally:
+        a.close()
+
+
+def test_speicher_soc_is_weighted_by_capacity(monkeypatch, tmp: Path) -> None:
+    def mutate(a, config):
+        _speicher_mit_soc(a, config, (0, 40.0), (12, 80.0), capacity_kwh=10.0)
+        config["speicher"].append({
+            "name": "Zweitspeicher", "laden_entity_id": "sensor.laden2", "soc_entity_id": "sensor.soc2",
+            "capacity_kwh": 30.0,
+        })
+        a.zaehler("sensor.laden2", (0, 0.0), (23, 1.0))
+        _gauge(a, "sensor.soc2", "%", (0, 80.0), (12, 80.0))
+
+    a, tile = _tile(monkeypatch, tmp, "speicher", mutate)
+    try:
+        # (40 * 10 + 80 * 30) / 40 = 70 %
+        assert tile["soc"][0] == pytest.approx(70.0)
+    finally:
+        a.close()
+
+
+def test_speicher_soc_is_missing_without_sensor_and_for_long_ranges(monkeypatch, tmp: Path) -> None:
+    a, tile = _tile(monkeypatch, tmp, "speicher")
+    try:
+        assert tile["soc"] is None
+    finally:
+        a.close()
+
+    def mutate(a, config):
+        _speicher_mit_soc(a, config, (0, 40.0), (12, 80.0))
+
+    a, tile = _tile(monkeypatch, tmp / "monat", "speicher", mutate, range_key="month", offset=0)
+    try:
+        assert tile["soc"] is None
+    finally:
+        a.close()

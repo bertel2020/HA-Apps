@@ -24,11 +24,13 @@ from zoneinfo import ZoneInfo
 
 
 def bucket_key(ts: float, range_key: str, tz: ZoneInfo) -> int:
-    """Kalenderschlüssel eines Buckets: Minute (Stunde), lokale Stunde (Tag), Wochentag 0–6
-    (Woche), Tag des Monats (Monat), Monat 1–12 (Jahr), letzte Ziffer des Jahres (Dekade)."""
+    """Kalenderschlüssel eines Buckets: Fünf-Minuten-Raster (Stunde), lokale Stunde (Tag), Wochentag
+    0–6 (Woche), Tag des Monats (Monat), Monat 1–12 (Jahr), letzte Ziffer des Jahres (Dekade).
+    Zähler-Buckets der Stunde liegen ohnehin auf dem Fünf-Minuten-Raster; feinere Messreihen
+    (Ladestand, Minuten-Buckets) werden darauf abgerundet."""
     local = datetime.fromtimestamp(ts, tz)
     if range_key == "hour":
-        return local.minute
+        return local.minute // 5 * 5
     if range_key == "day":
         return local.hour
     if range_key == "week":
@@ -70,6 +72,18 @@ def fold_series(series: dict[float, float], range_key: str, tz: ZoneInfo) -> dic
         key = bucket_key(ts, range_key, tz)
         folded[key] = folded.get(key, 0.0) + (value or 0.0)
     return folded
+
+
+def fold_mean(points: dict[float, float], range_key: str, tz: ZoneInfo) -> dict[int, float]:
+    """Mittelwert je Kalenderschlüssel, für Messreihen (Ladestand in %) statt Summen. Die Buckets einer
+    Messreihe sind gleich breit, ein einfacher Mittelwert entspricht daher dem zeitgewichteten."""
+    sums: dict[int, float] = {}
+    counts: dict[int, int] = {}
+    for ts, value in points.items():
+        key = bucket_key(ts, range_key, tz)
+        sums[key] = sums.get(key, 0.0) + value
+        counts[key] = counts.get(key, 0) + 1
+    return {key: sums[key] / counts[key] for key in sums}
 
 
 def align(

@@ -8,8 +8,9 @@
   und **Speicher** öffnet jetzt ein Diagramm für den eingestellten Zeitraum
   statt einer Auswahlliste. Beim Verbrauch zeigt es gestapelte Balken je
   Verbraucher samt Grundlast, umschaltbar auf Linie und Anteile in Prozent; beim
-  Speicher stehen Ladung und Entladung nebeneinander. Die Zeilen darunter führen
-  wie bisher zur jeweiligen Entität.
+  Speicher stehen Ladung und Entladung nebeneinander, bei Stunde und Tag mit
+  SOC-Sensor zusätzlich der Ladestand als Linie. Die Zeilen darunter führen wie
+  bisher zur jeweiligen Entität.
 
 ### Behoben
 
@@ -30,7 +31,9 @@
   tiles now opens a chart for the selected period instead of a selection list.
   For consumption it shows stacked bars per consumer including the base load,
   switchable to lines and percentage shares; for storage, charge and discharge
-  sit side by side. The rows below lead to the respective entity as before.
+  sit side by side, plus the state of charge as a line for hour and day if a
+  state-of-charge sensor is set. The rows below lead to the respective entity as
+  before.
 
 #### Fixed
 

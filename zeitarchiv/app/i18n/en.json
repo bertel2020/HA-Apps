@@ -3268,6 +3268,7 @@
     "Summenspalte links oder rechts der Zeiträume": "Sum column to the left or right of the periods"
   },
   "js": {
+    "Ladestand": "State of charge",
     "{name} (Ladung)": "{name} (Charge)",
     "{name} (Entladung)": "{name} (Discharge)",
     "Langzeit": "Long-term",

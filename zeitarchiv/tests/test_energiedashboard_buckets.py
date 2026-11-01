@@ -126,3 +126,16 @@ def test_a_measured_zero_is_not_an_empty_bucket() -> None:
 
 def test_none_values_count_as_zero_when_folding() -> None:
     assert eb.fold_series({_ts(2026, 11, 1): None}, "month", TZ) == {1: 0.0}  # type: ignore[dict-item]
+
+
+def test_hour_range_floors_to_the_five_minute_grid() -> None:
+    assert eb.bucket_key(_ts(2026, 11, 1, 13, 7), "hour", TZ) == 5
+    assert eb.bucket_key(_ts(2026, 11, 1, 13, 59), "hour", TZ) == 55
+
+
+def test_fold_mean_averages_a_measurement_series_per_key() -> None:
+    """Ladestand (Messwert in %) wird gemittelt statt summiert."""
+    points = {_ts(2026, 11, 1, 6, 0): 50.0, _ts(2026, 11, 1, 6, 30): 60.0, _ts(2026, 11, 1, 7, 0): 70.0}
+    assert eb.fold_mean(points, "day", TZ) == {6: 55.0, 7: 70.0}
+    minutes = {_ts(2026, 11, 1, 13, m): float(m) for m in (0, 1, 2, 3, 4, 5)}
+    assert eb.fold_mean(minutes, "hour", TZ) == {0: 2.0, 5: 5.0}

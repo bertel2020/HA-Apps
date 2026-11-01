@@ -2875,11 +2875,45 @@ class EnergieDashboardService:
                 {"name": tr("Entladung"), "role": "entladen", "values": values(storage["entladen"])},
             ]
             result["units"] = storage["units"]
+            result["soc"] = self._tile_soc(config, range_key, offset, window_start, read_cache)
             result["total"] = {
                 "laden": round(sum(storage["laden"].values()), 3),
                 "entladen": round(sum(storage["entladen"].values()), 3),
             }
         return result
+
+    def _tile_soc(
+        self, config: dict, range_key: str, offset: int, window_start: datetime,
+        read_cache: query_mod.QueryReadCache | None,
+    ) -> list[float | None] | None:
+        """Ladestand in % je Achsenposition, über alle Speicher mit SOC-Sensor kapazitätsgewichtet
+        gemittelt; None ohne SOC-Sensor oder Daten. Nur bei Stunde und Tag: bei Monat und Jahr wäre es
+        ein grober Mittelwert je Bucket, der ein Bild vortäuscht. Eigene Abfrage statt der Serie aus
+        compute_flow, weil _entity_series fehlende Buckets zu 0 macht, was bei einem Messwert als
+        Ladestand 0 % erschiene."""
+        if range_key not in ("hour", "day"):
+            return None
+        now = datetime.now(self.deps.tz)
+        cache = read_cache if read_cache is not None else query_mod.QueryReadCache()
+        weighted: dict[int, list[tuple[float, float]]] = {}
+        for sp in config.get("speicher") or []:
+            soc_id = sp.get("soc_entity_id")
+            if not soc_id:
+                continue
+            result = query_mod.query_series(
+                self.deps.data_dir, self.deps.index, soc_id, range_key, self.deps.tz, now,
+                offset=offset, read_cache=cache,
+            )
+            points = {p["ts"]: p["value"] for p in result["points"] if p["value"] is not None}
+            weight = self._resolve_speicher_capacity(sp, now, cache) or 1.0
+            for key, mean in eb.fold_mean(points, range_key, self.deps.tz).items():
+                weighted.setdefault(key, []).append((mean, weight))
+        if not weighted:
+            return None
+        return [
+            round(self._capacity_weighted_avg(weighted[key]), 1) if key in weighted else None
+            for key in eb.axis_keys(range_key, window_start)
+        ]
 
     @staticmethod
     def _tile_labels(range_key: str, axis: list[int], window_start: datetime) -> list[str]:
