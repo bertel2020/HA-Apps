@@ -3322,14 +3322,15 @@
     "Prüfung": "Checks",
     "Raster für archivierte Daten": "Grid for archived data",
     "Rückgänge des Zählerstands melden oder erlauben": "Report or allow drops of the meter reading",
-    "Standard: {value}": "Default: {value}",
     "Thema der Entität, unabhängig vom Stern": "Topic of the entity, independent of the star",
     "Wie lange Werte bleiben": "How long values are kept",
     "Wie stark ein Wert abweichen darf": "How far a value may deviate",
     "Wirkt beim Eintreffen, Verworfenes lässt sich nicht zurückholen": "Takes effect on arrival; discarded values cannot be recovered",
     "fest": "fixed",
     "{n} angepasst": "{n} customised",
-    "Ohne Kategorie geblieben: {n}. Die Obergrenze von {max} Kategorien ist erreicht, im Backup gibt es weitere.": "Left without a category: {n}. The limit of {max} categories is reached, the backup has more."
+    "Ohne Kategorie geblieben: {n}. Die Obergrenze von {max} Kategorien ist erreicht, im Backup gibt es weitere.": "Left without a category: {n}. The limit of {max} categories is reached, the backup has more.",
+    "Standard: {value}. Klicken, um darauf zurückzusetzen.": "Default: {value}. Click to reset to it.",
+    "Aufbewahrung auf den Standard „{value}“ setzen? Ist der Standard kürzer, löscht der nächste Retention-Lauf ältere Daten endgültig.": "Set retention to the default “{value}”? If the default is shorter, the next retention run permanently deletes older data."
   },
   "js": {
     "Ladestand": "State of charge",

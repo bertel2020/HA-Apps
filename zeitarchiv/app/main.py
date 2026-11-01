@@ -2854,9 +2854,9 @@ def _gap_threshold_auto_adjust_message(
     )
 
 
-def _entity_config_adjusted(entity) -> dict[str, str]:
+def _entity_config_adjusted(entity) -> dict[str, dict[str, str]]:
     """Felder der Konfiguration, die vom globalen Standard (Einstellungen → Archivierung)
-    abweichen, mit der Beschriftung des Standards. Gesperrte Felder fehlen: dort gibt es
+    abweichen, mit Wert und Beschriftung des Standards (das Abzeichen setzt darauf zurück). Gesperrte Felder fehlen: dort gibt es
     nichts einzustellen. Für Zustände gilt, was beim Anlegen erzwungen wird (siehe
     Index.get_or_create_entity), nicht der globale Wert."""
     defaults = _settings_archivierung_context()
@@ -2875,7 +2875,7 @@ def _entity_config_adjusted(entity) -> dict[str, str]:
         "outlier_threshold": OUTLIER_BLOCKED_REASONS,
     }
     return {
-        name: tr(str(labels[name].get(value, value)))
+        name: {"value": value, "label": tr(str(labels[name].get(value, value)))}
         for name, value in expected.items()
         if entity[name] != value and kind not in blocked.get(name, {})
     }

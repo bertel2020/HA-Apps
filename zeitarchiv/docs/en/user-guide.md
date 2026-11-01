@@ -1384,7 +1384,8 @@ The page is divided into five sections: **General**, **Recording**,
 **Retention**, **Display** and **Checks**, with a jump line at the top. Each
 field is one row with a short line; the detailed text is behind the info button
 (i). The **customised** badge shows that a value differs from the current
-global default (the default is in the tooltip), and the jump line and section
+global default (the default is in the tooltip), a click on it resets the field to the
+default, and the jump line and section
 heading count such fields. Fields that cannot be set for the entity's type
 show their fixed value with the **fixed** badge; the reason is behind the info
 button.

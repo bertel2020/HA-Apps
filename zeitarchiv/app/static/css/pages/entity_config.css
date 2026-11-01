@@ -32,7 +32,8 @@
   .cfg-row .hint,.cfg-row .hint-status{margin:8px 0 0;}
   .cfg-ctl{display:inline-flex;align-items:center;gap:8px;}
   .cfg-fixed{color:var(--ink-muted);font-size:calc(13px * var(--font-scale, 1));white-space:nowrap;}
-  .badge.adjusted{margin-left:8px;vertical-align:1px;color:var(--warning);border-color:var(--warning);background:var(--warning-soft);cursor:help;}
+  .badge.adjusted{margin-left:8px;vertical-align:1px;color:var(--warning);border-color:var(--warning);background:var(--warning-soft);cursor:pointer;}
+  .badge.adjusted:hover,.badge.adjusted:focus-visible{background:var(--warning);color:var(--surface);outline:none;}
   .badge.fixed{margin-left:6px;color:var(--ink-faint);}
   .cfg-row .counter-auto{margin-top:10px;}
   .preview{margin-top:10px;padding-top:14px;}

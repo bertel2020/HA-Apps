@@ -78,3 +78,28 @@ def test_form_fragment_after_saving_keeps_the_structure_and_shows_saved(client, 
     assert response.status_code == 200
     assert 'id="cfg-erfassung"' in response.text and "✓ Gespeichert" in response.text
     assert 'class="badge adjusted"' in response.text
+
+
+def test_the_badge_resets_the_field_to_the_default_with_one_post(client, entities) -> None:
+    from app import main
+
+    _set(entities[0], gap_threshold="60", retention="365d")
+    html = client.get(f"/entities/{entities[0]}/config").text
+    assert """hx-vals='{"gap_threshold": "15"}'""" in html  # Standardwert, nicht die Beschriftung
+    assert 'hx-confirm="Aufbewahrung auf den Standard' in html  # nur die Aufbewahrung fragt nach
+    assert html.count("hx-confirm=") == 1
+
+    response = client.post(f"/entities/{entities[0]}/config", data={"gap_threshold": "15"})
+    assert response.status_code == 200
+    assert main.index.get_entity(entities[0])["gap_threshold"] == "15"
+    assert response.text.count('class="badge adjusted"') == 1  # die Aufbewahrung bleibt abweichend
+
+
+def test_states_compare_against_the_enforced_values_not_the_global_ones(client, entities) -> None:
+    from app import main
+
+    main.index.get_or_create_entity("sensor.cfg_state", "sensor", None, None, state=True)
+    try:
+        assert 'class="badge adjusted"' not in client.get("/entities/sensor.cfg_state/config").text
+    finally:
+        main.index.delete_entity("sensor.cfg_state")

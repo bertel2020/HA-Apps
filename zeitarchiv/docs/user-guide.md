@@ -1512,8 +1512,8 @@ Die Seite ist in fünf Abschnitte gegliedert: **Allgemein**, **Erfassung**,
 **Aufbewahrung**, **Darstellung** und **Prüfung**, mit einer Sprungzeile oben.
 Jedes Feld ist eine Zeile mit einer Kurzzeile; der ausführliche Text steht
 hinter dem Info-Knopf (i). Das Abzeichen **angepasst** zeigt, dass ein Wert vom
-aktuellen globalen Standard abweicht (der Standard steht im Tooltip), und die
-Sprungzeile und der Abschnittskopf zählen solche Felder. Felder, die für den
+aktuellen globalen Standard abweicht (der Standard steht im Tooltip), ein Klick darauf setzt das Feld auf den
+Standard zurück, und die Sprungzeile und der Abschnittskopf zählen solche Felder. Felder, die für den
 Typ der Entität nicht einstellbar sind, zeigen ihren festen Wert mit dem
 Abzeichen **fest**; der Grund steht hinter dem Info-Knopf.
 

@@ -4,9 +4,13 @@
    Die Gruppen folgen der Tabelle „Womit fange ich an?“ im Handbuch.
 
    `adjusted` (main.py, _entity_config_context) nennt die Felder, die vom globalen Standard
-   abweichen, mit dem Standard als Beschriftung. Gesperrte Felder tauchen dort nie auf. #}
+   abweichen, mit Wert und Beschriftung des Standards; ein Klick auf das Abzeichen setzt das Feld
+   darauf zurück. Gesperrte Felder tauchen dort nie auf. #}
 {% macro adj(field) -%}
-{% if field in adjusted %}<span class="badge adjusted" title="{{ _('Standard: {value}', value=adjusted[field]) }}">{{ _("angepasst") }}</span>{% endif %}
+{% if field in adjusted %}{% set d = adjusted[field] %}<button type="button" class="badge adjusted"
+  title="{{ _('Standard: {value}. Klicken, um darauf zurückzusetzen.', value=d.label) }}"
+  hx-post="{{ app_root }}/entities/{{ entity_id }}/config" hx-vals='{{ {field: d.value} | tojson }}' hx-target="#config-form" hx-swap="innerHTML"
+  {% if field == 'retention' %}hx-confirm="{{ _('Aufbewahrung auf den Standard „{value}“ setzen? Ist der Standard kürzer, löscht der nächste Retention-Lauf ältere Daten endgültig.', value=d.label) }}"{% endif %}>{{ _("angepasst") }}</button>{% endif %}
 {%- endmacro %}
 {% set n_erfassung = ['resolution', 'value_filter'] | select('in', adjusted) | list | length %}
 {% set n_aufbewahrung = ['retention', 'compact_target'] | select('in', adjusted) | list | length %}
