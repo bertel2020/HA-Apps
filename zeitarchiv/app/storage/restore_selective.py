@@ -424,14 +424,15 @@ def _category_assignments(conn: sqlite3.Connection) -> dict[str, tuple[str, int]
     return {r[0]: (r[1], r[2]) for r in rows}
 
 
-def _assign_category(conn: sqlite3.Connection, entity_id: str, category: tuple[str, int] | None, created: list[int]) -> None:
+def _assign_category(conn: sqlite3.Connection, entity_id: str, category: tuple[str, int] | None, created: list[int]) -> bool:
     """Setzt die Kategorie einer Entität nach Namen: eine gleichnamige vorhandene
     wird genutzt, sonst entsteht sie (mit der Farbe aus dem Backup, ans Ende der
     Reihenfolge; ihre ID kommt in ``created``). Ist die Obergrenze erreicht, bleibt
-    die Entität ohne Kategorie. ``None`` löst die Zuordnung."""
+    die Entität ohne Kategorie und der Aufruf liefert False, damit der Restore es
+    melden kann. ``None`` löst die Zuordnung."""
     if category is None:
         conn.execute("DELETE FROM entity_category WHERE entity_id = ?", (entity_id,))
-        return
+        return True
     name, slot = category
     row = next(
         (r for r in conn.execute("SELECT id, name FROM entity_categories").fetchall()
@@ -441,7 +442,7 @@ def _assign_category(conn: sqlite3.Connection, entity_id: str, category: tuple[s
     if row is None:
         count, last = conn.execute("SELECT COUNT(*), MAX(position) FROM entity_categories").fetchone()
         if count >= MAX_CATEGORIES:
-            return
+            return False
         row = (conn.execute(
             "INSERT INTO entity_categories (name, position, color_slot) VALUES (?, ?, ?)",
             (name, (last or 0) + 1, slot if isinstance(slot, int) and 1 <= slot <= 8 else 1),
@@ -452,6 +453,7 @@ def _assign_category(conn: sqlite3.Connection, entity_id: str, category: tuple[s
         "ON CONFLICT(entity_id) DO UPDATE SET category_id = excluded.category_id",
         (entity_id, row[0]),
     )
+    return True
 
 
 def _drop_unused_categories(conn: sqlite3.Connection, category_ids: list[int]) -> None:
@@ -567,6 +569,7 @@ def _swap_entities(
         now = time.time()
         snapshots: dict[str, dict] = {}
         created_categories: list[int] = []
+        over_limit = 0
         with index._lock, index._conn:
             conn = index._conn
             backup_categories = _category_assignments(source.db)
@@ -584,8 +587,10 @@ def _swap_entities(
                 if not snapshots[entity_id]["existed"]:
                     _insert_row(conn, "entities", backup_rows[entity_id], override={"updated_at": now})
                     # Wie die übrigen Einstellungen: nur, wenn die Entität lokal fehlte.
-                    if entity_id in backup_categories:
-                        _assign_category(conn, entity_id, backup_categories[entity_id], created_categories)
+                    if entity_id in backup_categories and not _assign_category(
+                        conn, entity_id, backup_categories[entity_id], created_categories
+                    ):
+                        over_limit += 1
                 _recount_deleted(conn, entity_id)
         # Statistik (row_count, size_bytes, first_ts, last_ts) neu aus den Dateien bilden.
         reconcile.audit_storage_metadata(data_dir, index, tz, entity_ids=ids, repair=True)
@@ -617,6 +622,7 @@ def _swap_entities(
         "rollback": rollback.name,
         "entities": ids,
         "created": [e for e in ids if not snapshots[e]["existed"]],
+        "category_limit": over_limit, "category_max": MAX_CATEGORIES,
         "rows": sum(max(int(backup_rows[e].get("row_count") or 0) - int(backup_rows[e].get("deleted_count") or 0), 0)
                     for e in ids),
     }
@@ -1083,6 +1089,7 @@ def apply_settings(
             b_entities = {r["entity_id"]: r for r in _rows(bconn, "SELECT * FROM entities")}
             b_cats = _category_assignments(bconn)
             created_categories: list[int] = []
+            over_limit = 0
             # Vor den Zuordnungen eingetragen: beim Rückgängigmachen läuft das Journal
             # rückwärts, die angelegten Kategorien werden also erst entfernt, wenn
             # keine Entität mehr auf sie zeigt.
@@ -1091,7 +1098,8 @@ def apply_settings(
                 if group == "cat":
                     old = conn.execute("SELECT category_id FROM entity_category WHERE entity_id = ?", (entity_id,)).fetchone()
                     journal.append({"op": "set_category", "entity_id": entity_id, "category_id": old[0] if old else None})
-                    _assign_category(conn, entity_id, b_cats.get(entity_id), created_categories)
+                    if not _assign_category(conn, entity_id, b_cats.get(entity_id), created_categories):
+                        over_limit += 1
                     continue
                 cols = [c for c in ENTITY_GROUPS[group] if c in b_entities[entity_id]]
                 old = conn.execute(f"SELECT {', '.join(cols)} FROM entities WHERE entity_id = ?", (entity_id,)).fetchone()
@@ -1141,7 +1149,8 @@ def apply_settings(
         shutil.rmtree(rollback, ignore_errors=True)
         raise
     prune_rollbacks(data_dir)
-    return {"kind": "settings", "rollback": rollback.name, "total": plan["total"], "skipped_pins": skipped_pins, "n": plan["n"]}
+    return {"kind": "settings", "rollback": rollback.name, "total": plan["total"], "skipped_pins": skipped_pins, "n": plan["n"],
+            "category_limit": over_limit, "category_max": MAX_CATEGORIES}
 
 
 def _undo_settings(data_dir: Path, index: Index, rollback: Path, info: dict) -> dict:

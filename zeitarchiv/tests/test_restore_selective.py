@@ -600,3 +600,27 @@ def test_backup_without_categories_offers_no_category_group(live) -> None:
     with rs.BackupSource(zip_path) as source:
         overview = rs.load_settings_overview(source, index, data_dir)
     assert all("cat" not in e["groups"] for e in overview["entities"])
+
+
+def test_restore_reports_entities_left_without_category_at_the_limit(live) -> None:
+    from app.storage.index import MAX_CATEGORIES
+
+    data_dir, index, coordinator = live
+    _entity(index, data_dir, "sensor.gone", [1.0])
+    extra = index.create_entity_category("Nur im Backup")
+    index.set_entities_category(["sensor.gone"], extra)
+    zip_path = _backup(data_dir, data_dir)
+    index.delete_entity("sensor.gone")
+    index.delete_entity_category(extra)
+    for number in range(MAX_CATEGORIES):
+        index.create_entity_category(f"Voll {number}")
+    import shutil
+    shutil.rmtree(data_dir / "archive" / "sensor.gone")
+
+    with rs.BackupSource(zip_path) as source:
+        result = rs.restore_entities(data_dir, index, coordinator, source, ["sensor.gone"], TZ, source_label="b")
+
+    assert result["category_limit"] == 1 and result["category_max"] == MAX_CATEGORIES
+    assert index.get_entity("sensor.gone") is not None  # die Entität selbst kommt zurück
+    assert index.get_entity_category_id("sensor.gone") is None
+    assert len(index.list_entity_categories()) == MAX_CATEGORIES

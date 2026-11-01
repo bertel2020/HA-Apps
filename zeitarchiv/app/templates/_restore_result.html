@@ -8,9 +8,11 @@
       {% elif result.kind == 'entities' %}
       <h2>{{ _("Entitäten wiederhergestellt: {n}", n=result.entities | length) }}</h2>
       <p class="sub">{{ _("Das Zeitarchiv hat nichts neu gestartet. Du kannst sofort weiterarbeiten.") }}{% if result.created %} {{ _("Davon neu angelegt: {n}.", n=result.created | length) }}{% endif %}</p>
+      {% if result.category_limit %}<p class="rw-note">{{ _("Ohne Kategorie geblieben: {n}. Die Obergrenze von {max} Kategorien ist erreicht, im Backup gibt es weitere.", n=result.category_limit, max=result.category_max) }}</p>{% endif %}
       {% else %}
       <h2>{{ _("Änderungen angewendet: {n}", n=result.total) }}</h2>
       <p class="sub">{{ _("Das Zeitarchiv hat nichts neu gestartet. Neue Dashboards, Charts und Tabellen findest du in den jeweiligen Listen.") }}{% if result.skipped_pins %} {{ _("Übersprungene Kacheln (Entität fehlt): {n}.", n=result.skipped_pins) }}{% endif %}</p>
+      {% if result.category_limit %}<p class="rw-note">{{ _("Ohne Kategorie geblieben: {n}. Die Obergrenze von {max} Kategorien ist erreicht, im Backup gibt es weitere.", n=result.category_limit, max=result.category_max) }}</p>{% endif %}
       {% endif %}
     </div>
   </div>

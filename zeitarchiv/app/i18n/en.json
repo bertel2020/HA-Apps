@@ -3328,7 +3328,8 @@
     "Wie stark ein Wert abweichen darf": "How far a value may deviate",
     "Wirkt beim Eintreffen, Verworfenes lässt sich nicht zurückholen": "Takes effect on arrival; discarded values cannot be recovered",
     "fest": "fixed",
-    "{n} angepasst": "{n} customised"
+    "{n} angepasst": "{n} customised",
+    "Ohne Kategorie geblieben: {n}. Die Obergrenze von {max} Kategorien ist erreicht, im Backup gibt es weitere.": "Left without a category: {n}. The limit of {max} categories is reached, the backup has more."
   },
   "js": {
     "Ladestand": "State of charge",
