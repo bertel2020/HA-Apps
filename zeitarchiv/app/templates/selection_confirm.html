@@ -33,6 +33,26 @@
       <p class="hint hint-warn">{{ _("Für {count} davon wird der Ausschluss aufgehoben. Sie stehen heute als Einzel-ID in den Ausschlüssen der Integration:", count=unexclude|length) }}</p>
       <ul>{% for name in unexclude_names %}<li>{{ name }}</li>{% endfor %}</ul>
       {% endif %}
+      {% if category.show %}
+      <div class="field">
+        <label for="apply-category">{{ _("Kategorie setzen") }}</label>
+        <select name="category" id="apply-category"
+                onchange="document.getElementById('apply-category-new').hidden = !this.value.startsWith('new:')">
+          <option value=""{{ ' selected' if not category.selected }}>{{ _("Keine Kategorie") }}</option>
+          {% for c in category.categories %}
+          <option value="id:{{ c.id }}"{{ ' selected' if category.selected == 'id:' ~ c.id }}>{{ c.name }}</option>
+          {% endfor %}
+          {% if category.new_name %}
+          <option value="new:{{ category.new_name }}"{{ ' selected' if category.selected == 'new:' ~ category.new_name }}>{{ _("{name} (neu)", name=category.new_name) }}</option>
+          {% endif %}
+        </select>
+        <p class="hint">{{ _("Gilt für die {count} Entitäten, die jetzt neu in die Auswahl kommen. Bereits einsortierte behalten ihre Kategorie, außer du setzt den Haken.", count=count) }}</p>
+        <label class="filter-chip"><input type="checkbox" name="recategorize" value="1"><span>{{ _("Auch bereits einsortierte Entitäten umsortieren") }}</span></label>
+        {% if category.new_name %}
+        <p class="hint" id="apply-category-new"{% if not category.selected.startswith('new:') %} hidden{% endif %}>{{ _("Die Kategorie „{name}“ gibt es noch nicht. Sie wird beim Übernehmen angelegt, ans Ende der Reihenfolge.", name=category.new_name) }}</p>
+        {% endif %}
+      </div>
+      {% endif %}
       {% if names %}
       <details>
         <summary>{{ _("Entitäten anzeigen") }}</summary>

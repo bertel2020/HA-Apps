@@ -13,7 +13,10 @@
   **Kategorie** (über „Spalten“ ausblendbar), ein Klick auf die Überschrift
   sortiert nach der Reihenfolge der Kategorien. Zugeordnet wird im
   Auswahlmodus über **Kategorie setzen** oder einzeln in der Konfiguration
-  einer Entität.
+  einer Entität. Ein Filter **Kategorie** in der Liste zeigt eine oder
+  mehrere Kategorien oder die Entitäten ohne Kategorie. Der
+  Auswahl-Assistent schlägt beim Übernehmen eine Kategorie vor, passend zum
+  Thema, und legt sie bei Bedarf an.
 
 ### Behoben
 
@@ -34,7 +37,10 @@
   suggestions to take over. The entity list then shows a **Category** column
   (hideable via "Columns"), and clicking its heading sorts by the order of the
   categories. Assign in selection mode with **Set category**, or one at a time
-  in an entity's configuration.
+  in an entity's configuration. A **Category** filter in the list shows one
+  or more categories or the entities without a category. The selection
+  assistant suggests a category when applying, matching the topic, and creates
+  it if needed.
 
 #### Fixed
 

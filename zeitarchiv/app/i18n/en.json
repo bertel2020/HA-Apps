@@ -3300,7 +3300,14 @@
     "Ziehen, um die Reihenfolge zu ändern": "Drag to change the order",
     "{n} Entitäten": "{n} entities",
     "{n} Vorschläge übernehmen": "Use {n} suggestions",
-    "— Keine Kategorie": "— No category"
+    "— Keine Kategorie": "— No category",
+    "Auch bereits einsortierte Entitäten umsortieren": "Also re-sort entities that already have a category",
+    "Die Kategorie „{name}“ gibt es noch nicht. Sie wird beim Übernehmen angelegt, ans Ende der Reihenfolge.": "The category “{name}” does not exist yet. It is created when you apply, at the end of the order.",
+    "Gilt für die {count} Entitäten, die jetzt neu in die Auswahl kommen. Bereits einsortierte behalten ihre Kategorie, außer du setzt den Haken.": "Applies to the {count} entities that are newly added to the selection now. Those that already have a category keep it unless you tick the box.",
+    "Kategorie setzen": "Set category",
+    "Kategorie: Alle ▾": "Category: All ▾",
+    "Ohne Kategorie": "No category",
+    "{name} (neu)": "{name} (new)"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -3877,6 +3884,8 @@
     "Die Entitäten selbst bleiben unberührt.": "The entities themselves are not affected.",
     "1 Entität geändert": "1 entity changed",
     "{n} Entitäten geändert": "{n} entities changed",
-    "Die Kategorie konnte nicht gesetzt werden.": "The category could not be set."
+    "Die Kategorie konnte nicht gesetzt werden.": "The category could not be set.",
+    "Kategorie: Alle ▾": "Category: All ▾",
+    "Kategorie: ": "Category: "
   }
 }

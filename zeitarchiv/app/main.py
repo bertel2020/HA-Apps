@@ -2666,16 +2666,18 @@ def _entities_table_response(
     page_size: int = 20,
     favorites_only: bool = False,
     visible_columns: set[str] | None = None,
+    category_filter: list[str] | None = None,
 ) -> HTMLResponse:
     if visible_columns is None:
         visible_columns = _entities_visible_columns()
     total = index.count_entities(
         search=search or None, type_filter=type_filter, unit_filter=unit_filter, favorites_only=favorites_only,
+        category_filter=category_filter,
     )
     pagination = _paginate_meta(total, page, page_size)
     page_matched = index.list_entities(
         search=search or None, type_filter=type_filter, unit_filter=unit_filter, sort=sort, direction=direction,
-        favorites_only=favorites_only,
+        favorites_only=favorites_only, category_filter=category_filter,
         limit=pagination["page_size"], offset=(pagination["page"] - 1) * pagination["page_size"],
     )
     # Nur die tatsächlich sichtbaren Spalten formatieren statt immer alle elf
@@ -2802,6 +2804,7 @@ def entities_table(
     page: int = 1,
     page_size: int = 20,
     favorites: bool = False,
+    category: list[str] = Query(["all"]),
     columns: list[str] = Query([]),
     columns_submitted: bool = False,
 ) -> HTMLResponse:
@@ -2814,7 +2817,8 @@ def entities_table(
         valid = {key for key, _ in ENTITIES_OPTIONAL_COLUMNS}
         index.set_setting("entities_columns", ",".join(c for c in columns if c in valid))
     return _entities_table_response(
-        request, search, type, unit, sort, dir, page, page_size, favorites, _entities_visible_columns()
+        request, search, type, unit, sort, dir, page, page_size, favorites, _entities_visible_columns(),
+        category_filter=category,
     )
 
 

@@ -217,3 +217,135 @@ def test_selection_bar_and_scripts_are_wired() -> None:
     script = (APP / "static/js/pages/entities_list.js").read_text(encoding="utf-8")
     assert 'id="sel-category-popover"' in template
     assert "entities/set-category" in script
+
+
+# ---- Phase 2: Filter ---------------------------------------------------------------------
+
+def test_list_filters_by_category_and_by_none(client, entities) -> None:
+    from app import main
+
+    solar = main.index.create_entity_category("Solar")
+    wetter = main.index.create_entity_category("Wetter")
+    main.index.set_entities_category([entities[0]], solar)
+    main.index.set_entities_category([entities[1]], wetter)
+
+    def found(*selected: str) -> list[str]:
+        return [r["entity_id"] for r in main.index.list_entities(search="sensor.cat_", category_filter=list(selected))]
+
+    assert found(str(solar)) == [entities[0]]
+    assert found(str(solar), str(wetter)) == [entities[0], entities[1]]
+    assert found("none") == [entities[2]]
+    assert found(str(wetter), "none") == [entities[1], entities[2]]
+    assert found("all") == entities  # kein Filter
+    assert main.index.count_entities(search="sensor.cat_", category_filter=[str(solar), "none"]) == 2
+
+
+def test_table_route_applies_the_category_filter_and_the_page_offers_it(client, entities) -> None:
+    solar = client.post("/entities/categories", json={"name": "Solar"}).json()["id"]
+    client.post("/entities/set-category", data={"entity_id": entities[0], "category_id": str(solar)})
+
+    html = client.get("/entities-table", params={"search": "sensor.cat_", "category": [str(solar)]}).text
+    assert "sensor.cat_a" in html and "sensor.cat_b" not in html
+
+    page = client.get("/entities").text
+    assert 'id="category-filter-popover"' in page and 'value="none"' in page
+
+
+def test_filter_is_hidden_without_categories(client, entities) -> None:
+    assert 'id="category-filter-popover"' not in client.get("/entities").text
+
+
+# ---- Phase 2: Auswahl-Assistent ----------------------------------------------------------
+
+@pytest.fixture()
+def assistant_catalog():
+    import os
+    from pathlib import Path
+
+    from app import selection_catalog, selection_jobs
+
+    data_dir = Path(os.environ["ZEITARCHIV_DATA_DIR"])
+    for name in (selection_catalog.FILENAME, selection_jobs.FILENAME):
+        (data_dir / name).unlink(missing_ok=True)
+    selection_catalog.save(
+        data_dir,
+        [
+            {"entity_id": "weather.cat_home", "name": "Cat Wetter", "text": True},
+            {"entity_id": "sensor.cat_aussen", "name": "Cat Aussentemperatur", "device_class": "temperature",
+             "state_class": "measurement", "unit": "°C"},
+            {"entity_id": "sensor.cat_regen", "name": "Cat Regen", "device_class": "precipitation",
+             "state_class": "total_increasing", "unit": "mm"},
+        ],
+        label={"id": "za", "name": "Zeitarchiv"}, log=[], ledger_count=0, entry_id="EINTRAG", phase1=True,
+    )
+    yield
+    for name in (selection_catalog.FILENAME, selection_jobs.FILENAME):
+        (data_dir / name).unlink(missing_ok=True)
+
+
+def _apply_form(client, **extra):
+    from app import main
+
+    preview = client.post("/selection/apply", data={"topic": "wetter", "entity_id": "sensor.cat_aussen"})
+    assert preview.status_code == 200
+    return preview, main
+
+
+def test_assistant_confirmation_offers_the_topic_as_a_new_category_only_when_categories_exist(client, entities, assistant_catalog) -> None:
+    preview, main = _apply_form(client)
+    # Noch keine Kategorien: angeboten, aber nicht vorgewählt, nichts wird aufgedrängt.
+    assert 'value="new:Wetter">' in preview.text and 'value="" selected' in preview.text
+
+    main.index.create_entity_category("Solar")
+    preview = client.post("/selection/apply", data={"topic": "wetter", "entity_id": "sensor.cat_aussen"})
+    assert 'value="new:Wetter" selected' in preview.text and "gibt es noch nicht" in preview.text
+
+    main.index.create_entity_category("wetter")
+    preview = client.post("/selection/apply", data={"topic": "wetter", "entity_id": "sensor.cat_aussen"})
+    assert "new:Wetter" not in preview.text and " selected>wetter</option>" in preview.text
+
+
+def test_assistant_apply_creates_the_category_and_assigns_before_the_entity_exists(client, entities, assistant_catalog) -> None:
+    from app import main
+
+    main.index.create_entity_category("Solar")
+    form = {"topic": "wetter", "entity_id": "sensor.cat_aussen", "confirmed": "1", "category": "new:Wetter"}
+
+    done = client.post("/selection/apply", data=form, follow_redirects=False)
+
+    assert done.status_code == 303
+    created = {c["name"]: c["id"] for c in main.index.list_entity_categories()}
+    assert set(created) == {"Solar", "Wetter"}
+    assert main.index.get_entity_category_id("sensor.cat_aussen") == created["Wetter"]  # Entität gibt es noch nicht
+    main.index.delete_entity_category(created["Wetter"])
+
+
+def test_assistant_keeps_existing_categories_unless_asked(client, entities, assistant_catalog) -> None:
+    from app import main
+
+    solar = main.index.create_entity_category("Solar")
+    wetter = main.index.create_entity_category("Wetter")
+    main.index.set_entities_category(["sensor.cat_aussen"], solar, only_known=False)
+
+    form = {"topic": "wetter", "entity_id": "sensor.cat_aussen", "confirmed": "1", "category": f"id:{wetter}"}
+    client.post("/selection/apply", data=form, follow_redirects=False)
+    assert main.index.get_entity_category_id("sensor.cat_aussen") == solar
+
+    from app import selection_jobs
+    import os
+    from pathlib import Path
+    (Path(os.environ["ZEITARCHIV_DATA_DIR"]) / selection_jobs.FILENAME).unlink(missing_ok=True)
+    client.post("/selection/apply", data={**form, "recategorize": "1"}, follow_redirects=False)
+    assert main.index.get_entity_category_id("sensor.cat_aussen") == wetter
+
+
+def test_assistant_rejects_an_unknown_category_without_creating_a_job(client, entities, assistant_catalog) -> None:
+    from app import selection_jobs
+    import os
+    from pathlib import Path
+
+    form = {"topic": "wetter", "entity_id": "sensor.cat_aussen", "confirmed": "1", "category": "id:9999"}
+    response = client.post("/selection/apply", data=form, follow_redirects=False)
+
+    assert response.status_code == 400
+    assert selection_jobs.all_jobs(Path(os.environ["ZEITARCHIV_DATA_DIR"])) == []

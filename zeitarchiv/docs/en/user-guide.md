@@ -727,6 +727,19 @@ assign in selection mode: mark entities, choose **Set category ▾** and click
 the category (or "No category" to release). A single entity can be set in its
 configuration, in the **Category** field.
 
+Next to the column the **Category: All ▾** filter appears: several categories
+can be chosen at once, **No category** shows what still needs sorting. If you
+hide the column, the filter is reset.
+
+In the **selection assistant** the confirmation step has a **Set category**
+field. It is preset to the category of the same name as the topic; if there is
+none, it is offered as "new" and created when you apply (the step says so).
+As long as you do not use categories yet, the field stays on "No category". The
+category applies to the entities that newly join the selection now, even before
+their first value arrives; those that already have a category keep it unless
+you tick **Also re-sort entities that already have a category**. Topic and
+category stay separate.
+
 ### Period navigation
 
 - Choose hour, day, week, month, year or decade as the base unit; forward/

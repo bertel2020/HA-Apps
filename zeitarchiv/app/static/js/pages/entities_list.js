@@ -27,6 +27,30 @@
       if (!anyChecked) document.querySelector('input[name=type][value=all]').checked = true;
     }
 
+    // Kategorie-Filter (ROADMAP 1.42): wie der Typ-Filter eine Mehrfachauswahl mit „Alle“,
+    // dazu „Ohne Kategorie“ (Wert none) für alles, was noch einzuordnen ist.
+    function onCategoryAllChange(checkbox) {
+      if (checkbox.checked) {
+        document.querySelectorAll('input[name=category]:not([value=all])').forEach(cb => cb.checked = false);
+      } else {
+        checkbox.checked = true;
+      }
+    }
+    function onCategorySpecificChange() {
+      document.querySelector('input[name=category][value=all]').checked = false;
+      const anyChecked = Array.from(document.querySelectorAll('input[name=category]:not([value=all])')).some(cb => cb.checked);
+      if (!anyChecked) document.querySelector('input[name=category][value=all]').checked = true;
+    }
+    function updateCategoryFilterLabel() {
+      const checked = Array.from(document.querySelectorAll('input[name=category]:checked'));
+      const btn = document.getElementById('category-filter-btn');
+      if (!checked.length || checked.some(cb => cb.value === 'all')) {
+        btn.textContent = t('Kategorie: Alle ▾');
+        return;
+      }
+      btn.textContent = t('Kategorie: ') + checked.map(cb => cb.parentElement.textContent.trim()).join(', ') + ' ▾';
+    }
+
     // page-field ist die einzige Quelle der Wahrheit für die Seiten-Navigation —
     // jeder Control, der die zugrunde liegende Trefferliste ändert (Suche, Typ-
     // Filter, Zeilen/Seite), setzt page zurück auf 1.
@@ -107,6 +131,14 @@
         if (!visible) {
           document.querySelectorAll('input[name=type]').forEach(cb => cb.checked = cb.value === 'all');
           updateTypeFilterLabel();
+        }
+      }
+      if (key === 'category') {
+        const wrap = document.getElementById('category-filter-wrap');
+        if (wrap) wrap.style.display = visible ? 'inline-block' : 'none';
+        if (!visible && wrap) {
+          document.querySelectorAll('input[name=category]').forEach(cb => cb.checked = cb.value === 'all');
+          updateCategoryFilterLabel();
         }
       }
       if (key === 'unit') {

@@ -1994,6 +1994,7 @@ class Index:
         type_filter: str | list[str] | None,
         unit_filter: str | None,
         favorites_only: bool,
+        category_filter: list[str] | None = None,
     ) -> tuple[list[str], list[str]]:
         if isinstance(type_filter, str):
             type_filter = [type_filter]
@@ -2019,6 +2020,22 @@ class Index:
                 params.append(unit_filter)
         if favorites_only:
             conditions.append("entities.is_favorite = 1")
+        # Kategorie: Kategorie-IDs und/oder „none“ (ohne Kategorie), ODER-verknüpft;
+        # „all“, leer oder nichts Brauchbares heißt: kein Filter.
+        category_ids = [int(c) for c in (category_filter or []) if c.isdigit()]
+        without = "none" in (category_filter or [])
+        if category_ids or without:
+            parts: list[str] = []
+            if category_ids:
+                placeholders = ", ".join("?" for _ in category_ids)
+                parts.append(
+                    "entities.entity_id IN (SELECT entity_id FROM entity_category "
+                    f"WHERE category_id IN ({placeholders}))"
+                )
+                params += category_ids
+            if without:
+                parts.append("entities.entity_id NOT IN (SELECT entity_id FROM entity_category)")
+            conditions.append("(" + " OR ".join(parts) + ")")
         return conditions, params
 
     def list_entities(
@@ -2031,6 +2048,7 @@ class Index:
         favorites_only: bool = False,
         limit: int | None = None,
         offset: int = 0,
+        category_filter: list[str] | None = None,
     ) -> list[sqlite3.Row]:
         """search filtert per LIKE auf entity_id/friendly_name, type_filter auf
         aggregation_type — ein einzelner Typ (Rückwärtskompatibilität), eine Liste
@@ -2060,7 +2078,7 @@ class Index:
         direction_sql = "DESC" if direction == "desc" else "ASC"
 
         conditions, params = self._entity_filter_conditions(
-            search, type_filter, unit_filter, favorites_only
+            search, type_filter, unit_filter, favorites_only, category_filter
         )
 
         query = "SELECT entities.* FROM entities"
@@ -2084,11 +2102,12 @@ class Index:
         type_filter: str | list[str] | None = None,
         unit_filter: str | None = None,
         favorites_only: bool = False,
+        category_filter: list[str] | None = None,
     ) -> int:
         """Gesamtzahl der Treffer für dieselben Filter wie list_entities() —
         Grundlage für die Seiteninfo bei SQL-seitiger Pagination (ZP-004)."""
         conditions, params = self._entity_filter_conditions(
-            search, type_filter, unit_filter, favorites_only
+            search, type_filter, unit_filter, favorites_only, category_filter
         )
         query = "SELECT COUNT(*) AS total FROM entities"
         if conditions:
@@ -2143,6 +2162,16 @@ class Index:
                    v=tr(_NAME_UNIQUE_TABLES["entity_categories"]), trimmed=trimmed)
             )
         return trimmed
+
+    def validate_new_category_name(self, name: str) -> str:
+        """Prüft Länge, Eindeutigkeit und die Obergrenze, ohne etwas anzulegen —
+        für Aufrufer, die erst nach einem anderen Schritt anlegen."""
+        with self._lock:
+            trimmed = self._validate_category_name_locked(name)
+            count = self._conn.execute("SELECT COUNT(*) FROM entity_categories").fetchone()[0]
+            if count >= MAX_CATEGORIES:
+                raise InvalidNameError(tr("Es sind höchstens {n} Kategorien möglich.", n=MAX_CATEGORIES))
+            return trimmed
 
     def _create_category_locked(self, name: str, color_slot: int | None) -> int:
         trimmed = self._validate_category_name_locked(name)
@@ -2225,12 +2254,19 @@ class Index:
             )
             return released.rowcount
 
-    def set_entities_category(self, entity_ids: list[str], category_id: int | None) -> int:
+    def set_entities_category(
+        self, entity_ids: list[str], category_id: int | None, *,
+        only_known: bool = True, keep_existing: bool = False,
+    ) -> int:
         """Ordnet die Entitäten einer Kategorie zu; category_id=None löst die
         Zuordnung. Unbekannte Entitäten werden übersprungen (eine Auswahl kann
         zwischen Markieren und Absenden gelöscht worden sein). Gibt die Zahl der
         tatsächlich geänderten Entitäten zurück. Eine unbekannte Kategorie
-        führt zu ValueError, damit keine Zuordnung ins Leere zeigt."""
+        führt zu ValueError, damit keine Zuordnung ins Leere zeigt.
+
+        only_known=False ordnet auch Entitäten zu, die es noch nicht gibt (der
+        Auswahl-Assistent setzt die Kategorie, bevor der erste Wert ankommt);
+        keep_existing=True lässt Entitäten mit Kategorie unverändert."""
         with self._lock, self._conn:
             if category_id is not None:
                 known = self._conn.execute(
@@ -2240,10 +2276,15 @@ class Index:
                     raise ValueError(tr("Kategorie nicht gefunden"))
             changed = 0
             for entity_id in dict.fromkeys(entity_ids):
-                exists = self._conn.execute(
-                    "SELECT 1 FROM entities WHERE entity_id = ?", (entity_id,)
-                ).fetchone()
-                if exists is None:
+                if only_known:
+                    exists = self._conn.execute(
+                        "SELECT 1 FROM entities WHERE entity_id = ?", (entity_id,)
+                    ).fetchone()
+                    if exists is None:
+                        continue
+                if keep_existing and category_id is not None and self._conn.execute(
+                    "SELECT 1 FROM entity_category WHERE entity_id = ?", (entity_id,)
+                ).fetchone():
                     continue
                 if category_id is None:
                     cursor = self._conn.execute("DELETE FROM entity_category WHERE entity_id = ?", (entity_id,))

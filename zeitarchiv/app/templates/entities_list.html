@@ -29,6 +29,18 @@
               <label class="dd-picker-row"><input type="checkbox" name="type" value="state" onchange="onTypeSpecificChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>{{ _("Zustand") }}</span></label>
             </div>
           </span>
+          {% if categories %}
+          <span id="category-filter-wrap" class="dd-picker-wrap" style="display:{{ 'inline-block' if 'category' in visible_columns else 'none' }};">
+            <button type="button" class="btn" id="category-filter-btn" onclick="toggleDDPicker('category-filter')">{{ _("Kategorie: Alle ▾") }}</button>
+            <div class="dd-picker-popover dd-picker-popover-left" id="category-filter-popover">
+              <label class="dd-picker-row"><input type="checkbox" name="category" value="all" checked onchange="onCategoryAllChange(this); resetEntitiesPage(); updateCategoryFilterLabel();"><span>{{ _("Alle") }}</span></label>
+              {% for c in categories %}
+              <label class="dd-picker-row"><input type="checkbox" name="category" value="{{ c.id }}" onchange="onCategorySpecificChange(this); resetEntitiesPage(); updateCategoryFilterLabel();"><span class="cat-pill" style="--c:var(--chart-{{ c.color_slot }});"><i aria-hidden="true"></i><span>{{ c.name }}</span></span></label>
+              {% endfor %}
+              <label class="dd-picker-row"><input type="checkbox" name="category" value="none" onchange="onCategorySpecificChange(this); resetEntitiesPage(); updateCategoryFilterLabel();"><span class="cat-none">{{ _("Ohne Kategorie") }}</span></label>
+            </div>
+          </span>
+          {% endif %}
           <span id="unit-filter-wrap" class="dd-picker-wrap" style="display:{{ 'inline-block' if 'unit' in visible_columns else 'none' }};">
             <button type="button" class="btn" id="unit-filter-btn" onclick="toggleDDPicker('unit-filter')">{{ _("Einheit: Alle ▾") }}</button>
             <input type="hidden" name="unit" id="unit-filter-input" value="all">

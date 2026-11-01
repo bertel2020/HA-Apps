@@ -782,6 +782,19 @@ markieren, **Kategorie setzen ▾** wählen und die Kategorie anklicken (oder
 „Keine Kategorie“ zum Lösen). Einzeln geht es in der Konfiguration einer
 Entität im Feld **Kategorie**.
 
+Neben der Spalte erscheint der Filter **Kategorie: Alle ▾**: mehrere
+Kategorien lassen sich zugleich wählen, **Ohne Kategorie** zeigt, was noch
+einzuordnen ist. Blendest du die Spalte aus, wird der Filter zurückgesetzt.
+
+Im **Auswahl-Assistenten** hat der Bestätigungsschritt ein Feld **Kategorie
+setzen**. Es ist mit der gleichnamigen Kategorie zum Thema vorbelegt, fehlt
+sie, wird sie als „neu“ angeboten und beim Übernehmen angelegt (steht im
+Schritt dabei). Solange du noch keine Kategorien nutzt, bleibt das Feld auf
+„Keine Kategorie“. Die Kategorie gilt für die Entitäten, die jetzt neu in die
+Auswahl kommen, auch bevor ihr erster Wert da ist; schon einsortierte behalten
+ihre Kategorie, außer du setzt den Haken **Auch bereits einsortierte
+Entitäten umsortieren**. Thema und Kategorie bleiben getrennt.
+
 ### Zeitraum-Navigation
 
 - Auswahl von Stunde, Tag, Woche, Monat, Jahr oder Dekade als Basiseinheit;
