@@ -129,7 +129,7 @@
   <strong><span id="selected-count">0</span> {{ _("ausgewählt") }}</strong>
   <button class="btn btn-danger needs-selection" disabled
           hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/delete"
-          hx-include="[name=ts]:checked, #controls" hx-target="#rows-table" hx-swap="innerHTML"
+          hx-include="[name=ts]:checked, #controls, [name=page_size]" hx-target="#rows-table" hx-swap="innerHTML"
           hx-disabled-elt="this"
           hx-confirm="{{ _('Ausgewählte Datensätze zur Löschung markieren? Sie werden noch nicht endgültig gelöscht und können mit „Letzte Löschung rückgängig“ oder im Reiter „Markiert“ wiederhergestellt werden.') }}">
     {{ _("Löschen") }}
