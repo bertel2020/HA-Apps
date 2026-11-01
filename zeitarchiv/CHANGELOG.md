@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Neu
+
+- **Energiedashboard, Diagramm-Popup**: Ein Klick auf die Kacheln **Verbrauch**
+  und **Speicher** öffnet jetzt ein Diagramm für den eingestellten Zeitraum
+  statt einer Auswahlliste. Beim Verbrauch zeigt es gestapelte Balken je
+  Verbraucher samt Grundlast, umschaltbar auf Linie und Anteile in Prozent; beim
+  Speicher stehen Ladung und Entladung nebeneinander. Die Zeilen darunter führen
+  wie bisher zur jeweiligen Entität.
+
 ### Behoben
 
 - **Energiedashboard, Speicher-Prüfung im Monat**: Die Meldung „Entladung
@@ -14,6 +23,14 @@
 ---
 
 ### English
+
+#### New
+
+- **Energy dashboard, chart popup**: Clicking the **consumption** and **storage**
+  tiles now opens a chart for the selected period instead of a selection list.
+  For consumption it shows stacked bars per consumer including the base load,
+  switchable to lines and percentage shares; for storage, charge and discharge
+  sit side by side. The rows below lead to the respective entity as before.
 
 #### Fixed
 

@@ -34,6 +34,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from . import energiedashboard_buckets as eb
 from . import formats
 from .formatting import entity_display_name
 from .limits import MAX_RAW_QUERY_POINTS
@@ -134,6 +135,9 @@ STORAGE_CHECK_MIN_COVERAGE = 0.9
 # wie der laufende Tages-/Monats-Bucket), ersetzt also nur dessen Auflösung,
 # ohne die Summe zu verändern.
 _FINER_RANGE = {"month": "day", "year": "month"}
+
+# Kennzahlen-Kacheln mit Diagramm-Popup (compute_tile). Die übrigen folgen in einer späteren Phase.
+TILE_KPIS = ("verbrauch", "speicher")
 
 # Umgekehrte Richtung: der nächstgröbere Zeitraum, dessen EINZELNE Buckets
 # jeweils genau eine Periode des feineren umfassen ("day" liefert Stunden-,
@@ -1294,9 +1298,13 @@ class EnergieDashboardService:
 
     def compute_flow(
         self, config: dict, range_key: str, offset: int, continuous: bool = False, skip_quality: bool = False,
-        read_cache: query_mod.QueryReadCache | None = None,
+        read_cache: query_mod.QueryReadCache | None = None, with_detail: bool = False,
     ) -> dict:
-        """read_cache optional von außen durchgereicht (main.py/hier unten:
+        """with_detail: legt zusätzlich die Bucket-Serien je Zeile unter "detail" ab (Kachel-Popups, siehe
+        compute_tile). Standardmäßig aus: /energiedashboard/data, Bericht und KI-Werkzeuge bekommen
+        das Feld nicht, sie würden die Serien nur mitschleppen.
+
+        read_cache optional von außen durchgereicht (main.py/hier unten:
         mehrere compute_flow()-Aufrufe desselben Requests teilen sich dann
         einen Cache, statt sich überlappende Hot-Buffer-Dateien mehrfach
         unabhängig voneinander neu einzulesen — QueryReadCache selbst bleibt
@@ -1517,6 +1525,8 @@ class EnergieDashboardService:
             sp_name = sp.get("name") or tr("Speicher")
             sp_entladen_val = 0.0
             sp_laden_val = 0.0
+            sp_entladen_series: dict[float, float] = {}
+            sp_laden_series: dict[float, float] = {}
             if sp.get("entladen_entity_id"):
                 sp_entladen_series, stale = entity_series(sp["entladen_entity_id"])
                 sp_entladen_val = self._series_total(sp_entladen_series)
@@ -1548,6 +1558,7 @@ class EnergieDashboardService:
                 # soc_entity_id-Auswertung unten).
                 "soc_delta_kwh": None,
                 "capacity_kwh": None,
+                "laden_series": sp_laden_series, "entladen_series": sp_entladen_series,
             }
             speicher_per_entity.append(speicher_entry)
             speicher_laden_vals.append(sp_laden_val)
@@ -1805,6 +1816,10 @@ class EnergieDashboardService:
         # Kosten-Spalte in der Verbraucheranteile-Tabelle — Name als Schlüssel
         # statt Index, weil verbraucher_breakdown weiter unten sortiert wird.
         verbraucher_series_by_name: dict[str, dict[float, float]] = {}
+        # Dieselben Serien je Entität: Anzeigenamen müssen nicht eindeutig sein, die Entität ist es.
+        # Das Popup (with_detail) schlägt Entitätszeilen darüber nach, damit keine Serie still von einer
+        # gleichnamigen überschrieben wird.
+        verbraucher_series_by_entity: dict[str, dict[float, float]] = {}
         # Woraus sich die Serie einer Zeile zusammensetzt, damit die Kosten sie aus
         # Stundenreihen nachbauen können: ("entity", id), ("rest", id, [Kind-ids]),
         # ("group", [Namen]) oder ("grundlast",).
@@ -1908,6 +1923,7 @@ class EnergieDashboardService:
                     })
                     nodes.append(kind_node)
                     verbraucher_series_by_name[kind_name] = kind_series
+                    verbraucher_series_by_entity[kind["entity_id"]] = kind_series
                     verbraucher_rezept[kind_name] = ("entity", kind["entity_id"])
                     kinder_summe += kind_display
                     kinder_serien.append(kind_series)
@@ -1959,6 +1975,7 @@ class EnergieDashboardService:
             })
             verbraucher_breakdown.extend(kind_eintraege)
             verbraucher_series_by_name[name] = series
+            verbraucher_series_by_entity[entity_id] = series
         if config.get("verbraucheranteile_gruppieren"):
             # Verbraucheranteile-Tabelle optional nach Gruppe: dieselbe (bereits
             # auf >=2 Mitglieder gefilterte) gruppe wie im Sankey oben. Die
@@ -2711,6 +2728,40 @@ class EnergieDashboardService:
             })
         quality_plausible = all(check["ok"] for check in quality_checks)
 
+        detail: dict | None = None
+        if with_detail:
+            # Nur die oberste Ebene (level 0): Geräte hinter einem Zwischenzähler und Mitglieder einer
+            # Gruppe stecken im Wert ihres Elternteils, gestapelt würden sie doppelt zählen. Entitätszeilen
+            # über die Entität nachschlagen (Namen sind nicht eindeutig), Gruppen und Grundlast über den Namen.
+            verbrauch_rows = []
+            for item in verbraucher_breakdown:
+                if item.get("level", 0) != 0:
+                    continue
+                item_entity = item.get("entity_id")
+                item_series = (
+                    verbraucher_series_by_entity.get(item_entity) if item_entity
+                    else verbraucher_series_by_name.get(item["name"])
+                )
+                verbrauch_rows.append({
+                    "name": item["name"], "entity_id": item_entity, "kind": item.get("kind"),
+                    "value": item["value"], "share": item.get("share"), "series": item_series or {},
+                })
+            detail = {
+                "verbrauch": verbrauch_rows,
+                "speicher": {
+                    "laden": speicher_laden_series,
+                    "entladen": speicher_entladen_series,
+                    "units": [
+                        {
+                            "name": entry["name"],
+                            "laden_entity_id": sp.get("laden_entity_id"), "laden": round(entry["laden_val"], 3),
+                            "entladen_entity_id": sp.get("entladen_entity_id"), "entladen": round(entry["entladen_val"], 3),
+                        }
+                        for sp, entry in zip(speicher_list, speicher_per_entity)
+                    ],
+                },
+            }
+
         return {
             "range": range_key,
             "range_label": RANGE_LABELS[range_key],
@@ -2783,7 +2834,67 @@ class EnergieDashboardService:
             "speicher_soc_now_breakdown": soc_now_breakdown,
             "anomalien": anomalien,
             "quality": {"plausible": quality_plausible, "checks": quality_checks},
+            **({"detail": detail} if detail is not None else {}),
         }
+
+    def compute_tile(
+        self, config: dict, kpi: str, range_key: str, offset: int, read_cache: query_mod.QueryReadCache | None = None,
+    ) -> dict:
+        """Daten für das Diagramm-Popup einer Kennzahlen-Kachel (Verbrauch, Speicher) auf der festen
+        Achse aus energiedashboard_buckets: je Serie ein Wert je Achsenposition, ``None`` für Buckets,
+        die es (noch) nicht gibt. Die Zeilen und Summen kommen aus denselben Zahlen wie die Kachel
+        (Breakdown), die Serien aus den Buckets; sie stimmen nur ohne Klammerung der Grundlast je Bucket
+        exakt überein, und nur die Serien sind für das Diagramm gedacht."""
+        if kpi not in TILE_KPIS:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Kennzahl"))
+        flow = self.compute_flow(config, range_key, offset, skip_quality=True, read_cache=read_cache, with_detail=True)
+        tz = self.deps.tz
+        window_start = datetime.fromtimestamp(flow["window_start_ts"], tz)
+
+        def values(series: dict[float, float]) -> list[float | None]:
+            return eb.align(series, {}, range_key, window_start, tz)["current"]
+
+        axis = eb.axis_keys(range_key, window_start)
+        result: dict = {
+            "kpi": kpi, "range": range_key, "offset": offset, "unit": "kWh",
+            "keys": axis, "labels": self._tile_labels(range_key, axis, window_start),
+        }
+        if kpi == "verbrauch":
+            result["series"] = [
+                {
+                    "name": row["name"], "entity_id": row["entity_id"], "kind": row["kind"],
+                    "value": row["value"], "share": row["share"], "values": values(row["series"]),
+                }
+                for row in flow["detail"]["verbrauch"]
+            ]
+            result["total"] = flow["kpi"]["verbrauch"]
+        else:
+            storage = flow["detail"]["speicher"]
+            result["series"] = [
+                {"name": tr("Ladung"), "role": "laden", "values": values(storage["laden"])},
+                {"name": tr("Entladung"), "role": "entladen", "values": values(storage["entladen"])},
+            ]
+            result["units"] = storage["units"]
+            result["total"] = {
+                "laden": round(sum(storage["laden"].values()), 3),
+                "entladen": round(sum(storage["entladen"].values()), 3),
+            }
+        return result
+
+    @staticmethod
+    def _tile_labels(range_key: str, axis: list[int], window_start: datetime) -> list[str]:
+        """Beschriftung je Achsenposition: Minute, Uhrzeit, Wochentag, Tag, Monatskürzel, Jahr."""
+        if range_key == "hour":
+            return [f"{key:02d}" for key in axis]
+        if range_key == "day":
+            return [f"{key:02d}:00" for key in axis]
+        if range_key == "week":
+            return [tr(_WEEKDAY_LABELS[key]) for key in axis]
+        if range_key == "year":
+            return [tr(_MONTH_NAMES_DE[key - 1])[:3] for key in axis]
+        if range_key == "decade":
+            return [str(window_start.year + key) for key in axis]
+        return [str(key) for key in axis]
 
     def _speicher_efficiency(
         self, speichers_with_both: list[dict], now: datetime, read_cache: query_mod.QueryReadCache,
@@ -3584,6 +3695,16 @@ class EnergieDashboardService:
             )
             current["compare_label"] = COMPARE_LABELS[range]
             return current
+
+        @router.get("/energiedashboard/tile")
+        def energiedashboard_tile(kpi: str, range: str = "day", offset: int = 0) -> dict:  # noqa: A002
+            # Beim ersten Öffnen eines Kachel-Popups geladen (wie /trends), nicht in /data mitgeschleppt.
+            # Nur über den Ingress erreichbar: nginx.conf leitet dort alles weiter, der öffentliche Port
+            # liefert 404 — bewusst KEIN Eintrag in PUBLIC_ENDPOINTS.
+            config = _load_config(deps.index)
+            if not _is_configured(config):
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
+            return self.compute_tile(config, kpi, range, offset)
 
         @router.get("/energiedashboard/report", response_class=HTMLResponse)
         def energiedashboard_report(request: Request, range: str = "year", offset: int = 0) -> HTMLResponse:  # noqa: A002

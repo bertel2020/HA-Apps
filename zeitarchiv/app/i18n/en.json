@@ -627,8 +627,10 @@
     "Anteil der Erzeugung, der selbst verbraucht (nicht eingespeist) wurde, je Monat (letzte drei Jahre).": "Share of generation that was self-consumed (not fed in), per month (last three years).",
     "Ø Ladezustand je Monat (letzte drei Jahre).": "Avg. state of charge per month (last three years).",
     "Erzeugung — welche Entität?": "Generation — which entity?",
-    "Verbrauch — welche Entität?": "Consumption — which entity?",
-    "Speicher — welche Entität?": "Storage — which entity?",
+    "Anteile %": "Shares %",
+    "Das Diagramm konnte nicht geladen werden.": "The chart could not be loaded.",
+    "Eine Zeile anklicken öffnet die Entität.": "Clicking a row opens the entity.",
+    "Lade …": "Loading …",
     "Vorherige Periode": "Previous period",
     "Nächste Periode": "Next period",
     "Energiebericht (drucken / als PDF speichern)": "Energy report (print / save as PDF)",
@@ -3266,6 +3268,8 @@
     "Summenspalte links oder rechts der Zeiträume": "Sum column to the left or right of the periods"
   },
   "js": {
+    "{name} (Ladung)": "{name} (Charge)",
+    "{name} (Entladung)": "{name} (Discharge)",
     "Langzeit": "Long-term",
     "bis {cut}: {delta} zum Ø": "until {cut}: {delta} vs. Ø",
     "{delta} zum Ø": "{delta} vs. Ø",

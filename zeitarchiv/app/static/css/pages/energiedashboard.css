@@ -288,6 +288,31 @@
      Quelle — kein href (kein eindeutiges Linkziel), stattdessen @click, das
      das Auswahlfenster öffnet (.edash-entity-picker-list unten). */
   a.edash-kpi[href],a.edash-kpi.is-pickable{cursor:pointer;}
+  /* Verbrauch/Speicher sind <button>: tastaturbedienbar, öffnen das Diagramm-Popup. Reset auf die Optik der
+     übrigen Kacheln (sonst Browser-Schaltfläche). */
+  button.edash-kpi{font:inherit;color:inherit;text-align:left;width:100%;cursor:pointer;}
+  button.edash-kpi:focus-visible{outline:2px solid var(--accent-bar);outline-offset:2px;}
+  /* Diagramm-Popup der Kacheln (Verbrauch, Speicher). Breite wie die übrigen Detail-Dialoge, Diagramm flach genug,
+     dass Zeilen darunter ohne Scrollen sichtbar bleiben. */
+  .edash-tile-dialog{width:min(640px,calc(100vw - 32px));padding:16px;}
+  .edash-tile-dialog .detail-dialog-header{align-items:flex-start;margin-bottom:8px;}
+  .edash-tile-dialog .detail-dialog-header .btn{padding:0;width:26px;height:26px;border-radius:50%;line-height:1;flex:none;}
+  .edash-tile-sub{margin:2px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
+  .edash-tile-chart{height:240px;width:100%;}
+  .edash-tile-modes{display:inline-flex;gap:4px;background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;padding:3px;margin-bottom:8px;}
+  .edash-tile-modes button{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));padding:5px 10px;border-radius:6px;border:0;background:transparent;color:var(--ink-faint);cursor:pointer;}
+  .edash-tile-modes button.is-active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:600;}
+  .edash-tile-note{margin:8px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
+  .edash-tile-rows{list-style:none;margin:10px 0 0;padding:0;}
+  .edash-tile-rows li{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--border);font-size:calc(13px * var(--font-scale, 1));}
+  .edash-tile-rows a{color:var(--ink);}
+  .edash-tile-swatch{flex:none;width:9px;height:9px;border-radius:2px;}
+  .edash-tile-value{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--ink-faint);white-space:nowrap;}
+  @media(max-width:560px){
+    .edash-tile-dialog{padding:12px;}
+    .edash-tile-chart{height:220px;}
+    .edash-tile-rows li{flex-wrap:wrap;}
+  }
   /* Kompakt und für alle drei Auswahlfenster (Erzeugung/Verbrauch/Speicher)
      gleich groß statt der .detail-dialog-Standardbreite (bis 860px, für
      Datenqualität/Kosten-Tabellen gedacht) — hier reicht eine kurze

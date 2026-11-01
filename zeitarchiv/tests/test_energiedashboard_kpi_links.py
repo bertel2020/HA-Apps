@@ -1,10 +1,10 @@
-"""Tests für die KPI-Kachel-Links im Energiedashboard (alle fünf Kacheln ->
-Entitäts-Chart mit übernommenem Zeitraum/Offset, siehe ROADMAP.md/
-Nutzerwunsch). Netzbezug/Einspeisung sind serverseitig immer genau eine
-Entität (direkter Link); Erzeugung/Verbrauch/Speicher können mehrere
-Ziel-Entitäten sein — bei genau einer ebenfalls direkter Link, bei mehreren
-ein kleines Auswahlfenster (siehe _page_context() in
-energiedashboard_routes.py)."""
+"""Tests für die KPI-Kachel-Links im Energiedashboard. Netzbezug/Einspeisung sind
+serverseitig immer genau eine Entität (direkter Link mit übernommenem
+Zeitraum/Offset); Erzeugung kann mehrere Ziel-Entitäten sein — bei genau einer
+ebenfalls direkter Link, bei mehreren ein kleines Auswahlfenster (siehe
+_page_context() in energiedashboard_routes.py). Verbrauch und Speicher öffnen
+dagegen ein Diagramm-Popup (openTile() in energiedashboard.js, ROADMAP 1.41),
+dessen Zeilen im Skript zur Entität verlinken."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from app.energiedashboard_routes import (
 )
 from app.storage.index import Index
 
-from _paths import TEMPLATES, page_text, template_text
+from _paths import APP, TEMPLATES, page_text, template_text
 
 TEMPLATES_DIR = TEMPLATES
 
@@ -151,11 +151,13 @@ def test_page_context_carries_app_root_for_kpi_links() -> None:
 
 
 _VIEW_TEMPLATE = template_text("_energiedashboard_view.html")
+JS = (APP / "static/js/energiedashboard.js").read_text(encoding="utf-8")
 
 
-def test_erzeugung_und_verbrauch_kacheln_verlinken_nur_bei_eindeutiger_quelle() -> None:
+def test_erzeugung_kachel_verlinkt_nur_bei_eindeutiger_quelle() -> None:
     assert 'single_erzeuger_id %}:href="`{{ app_root }}/entities/{{ single_erzeuger_id }}' in _VIEW_TEMPLATE
-    assert 'single_verbraucher_id %}:href="`{{ app_root }}/entities/{{ single_verbraucher_id }}' in _VIEW_TEMPLATE
+    # Verbrauch hängt nicht mehr an der Zahl der Quellen: immer das Popup.
+    assert "single_verbraucher_id %}:href" not in _VIEW_TEMPLATE
 
 
 def test_netzbezug_und_einspeisung_kacheln_verlinken_immer() -> None:
@@ -163,39 +165,42 @@ def test_netzbezug_und_einspeisung_kacheln_verlinken_immer() -> None:
     assert 'config.einspeisung %}:href="`{{ app_root }}/entities/{{ config.einspeisung }}' in _VIEW_TEMPLATE
 
 
-def test_speicher_kachel_verlinkt_ebenfalls() -> None:
-    assert 'single_speicher_id %}:href="`{{ app_root }}/entities/{{ single_speicher_id }}' in _VIEW_TEMPLATE
-    assert '<a class="edash-kpi has-tooltip tooltip-lines' in _VIEW_TEMPLATE
-    assert '<div class="edash-kpi has-tooltip tooltip-lines" x-show="kpi.speicher_netto' not in _VIEW_TEMPLATE
+def test_verbrauch_und_speicher_kacheln_oeffnen_das_diagramm_popup() -> None:
+    """Als <button> (tastaturbedienbar), unabhängig davon, wie viele Quellen konfiguriert sind."""
+    assert '<button type="button" class="edash-kpi edash-kpi-button has-tooltip" aria-haspopup="dialog" @click="openTile(\'verbrauch\')"' in _VIEW_TEMPLATE
+    assert "@click=\"openTile('speicher')\"" in _VIEW_TEMPLATE
+    assert "single_speicher_id %}:href" not in _VIEW_TEMPLATE
+    assert 'x-ref="tileDialog"' in _VIEW_TEMPLATE
+    assert "verbraucherPickerDialog" not in _VIEW_TEMPLATE
+    assert "speicherPickerDialog" not in _VIEW_TEMPLATE
 
 
 def test_kpi_links_carry_current_range_and_offset() -> None:
-    # 5 KPI-Kacheln (Erzeugung/Verbrauch/Netzbezug/Einspeisung/Speicher) + je
-    # ein Link pro Zeile in den drei Auswahlfenstern (Erzeuger-/Verbraucher-/
-    # Speicher-Liste), dazu im Qualitätsdialog der Entitätslink der
-    # Zählerrücksetzungen und der Auffälligkeiten.
-    assert _VIEW_TEMPLATE.count("?range=${range}&offset=${offset}`") == 10
+    # 3 KPI-Kacheln mit Link (Erzeugung/Netzbezug/Einspeisung) + eine Zeile in
+    # der Erzeuger-Auswahlliste, dazu im Qualitätsdialog der Entitätslink der
+    # Zählerrücksetzungen und der Auffälligkeiten. Verbrauch und Speicher
+    # verlinken aus dem Popup heraus (entityHref() im Skript).
+    assert _VIEW_TEMPLATE.count("?range=${range}&offset=${offset}`") == 6
+    assert "range=${this.range}&offset=${this.offset}" in JS
 
 
-def test_multiple_erzeuger_verbraucher_or_speicher_open_a_picker_dialog_instead_of_no_link() -> None:
+def test_multiple_erzeuger_open_a_picker_dialog_instead_of_no_link() -> None:
     """Nutzerwunsch: bei mehreren Ziel-Entitäten soll die Kachel trotzdem
     funktionieren, statt einfach unverlinkt zu bleiben — ein kleines
     Auswahlfenster (dasselbe <dialog>-Muster wie die Trend-Popups) lässt eine
-    der konfigurierten Entitäten wählen."""
-    for key in ("erzeuger", "verbraucher", "speicher"):
-        assert f'@click="$refs.{key}PickerDialog.showModal()"' in _VIEW_TEMPLATE
-        assert f'x-ref="{key}PickerDialog"' in _VIEW_TEMPLATE
-    # Dialoge sind an eine Bedingung geknüpft (nur gerendert, wenn gebraucht)
+    der konfigurierten Entitäten wählen. Verbrauch und Speicher sind darauf
+    nicht mehr angewiesen (Popup); Erzeugung folgt in einer späteren Phase."""
+    assert '@click="$refs.erzeugerPickerDialog.showModal()"' in _VIEW_TEMPLATE
+    assert 'x-ref="erzeugerPickerDialog"' in _VIEW_TEMPLATE
+    # Dialog ist an eine Bedingung geknüpft (nur gerendert, wenn gebraucht)
     assert "{% if erzeuger_list|length > 1 %}" in _VIEW_TEMPLATE
-    assert "{% if verbraucher_list|length > 1 %}" in _VIEW_TEMPLATE
-    assert "{% if speicher_link_entities|length > 1 %}" in _VIEW_TEMPLATE
 
 
 def test_picker_dialogs_share_one_compact_uniform_size() -> None:
     """Nutzerwunsch: alle Auswahlfenster gleich groß, nicht die
     .detail-dialog-Standardbreite (bis 860px, für Datenqualität/Kosten-
     Tabellen gedacht) — eine kurze Namensliste braucht deutlich weniger."""
-    assert _VIEW_TEMPLATE.count('class="detail-dialog edash-entity-picker-dialog"') == 3
+    assert _VIEW_TEMPLATE.count('class="detail-dialog edash-entity-picker-dialog"') == 1
     energiedashboard_html = page_text("energiedashboard.html")
     assert ".edash-entity-picker-dialog{width:" in energiedashboard_html
 
@@ -225,11 +230,10 @@ def test_picker_dialog_renders_correctly_with_real_config() -> None:
 
         assert "Dach Süd" in html
         assert "Dach West" in html
-        assert "Akku (Ladung)" in html
-        assert "Akku (Entladung)" in html
         assert 'x-ref="erzeugerPickerDialog"' in html
-        assert 'x-ref="speicherPickerDialog"' in html
-        # Genau ein Verbraucher -> direkter Link, kein Auswahlfenster nötig.
+        # Verbrauch und Speicher: ein gemeinsames Popup statt je einer Auswahlliste.
+        assert 'x-ref="tileDialog"' in html
+        assert 'x-ref="speicherPickerDialog"' not in html
         assert 'x-ref="verbraucherPickerDialog"' not in html
 
     _with_service(run)

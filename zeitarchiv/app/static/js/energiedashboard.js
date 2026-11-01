@@ -264,6 +264,12 @@
   let lastSankeyData = null;
   let lastSankeyIsNarrow = null;
   let currentRenderChart = null;
+  // Diagramm-Popup der Kacheln Verbrauch/Speicher (openTile): modulweit wie die übrigen Chart-Instanzen.
+  // tileFetchToken verwirft veraltete Antworten, wenn man schnell zwei Kacheln hintereinander öffnet.
+  let tileChartInstance = null;
+  let tileResizeObserver = null;
+  let tileFetchToken = 0;
+  const TILE_MODES = ['bar', 'line', 'share'];
 
   // Zeitraum/Offset spiegeln sich in der URL (?range=...&offset=...) statt
   // nur im Alpine-Zustand — sonst würde ein "zurück zum Energiedashboard"-
@@ -339,6 +345,7 @@
       trendsLoading: false,
       trendsError: false,
       heatmap: {rows: [], max_value: 0},
+      tile: {kpi: null, title: '', mode: 'bar', loading: false, error: false, data: null},
       get canGoForward() { return this.offset < 0; },
 
       // Bilanz (Grundlast plausibel) und Datenqualität (die übrigen Checks)
@@ -396,6 +403,7 @@
           heatmapResizeObserver.disconnect();
           heatmapResizeObserver = null;
         }
+        this.disposeTileChart();
         currentRenderChart = (data) => this.renderChart(data);
         this.load();
         if (!resizeListenerAdded) {
@@ -657,6 +665,151 @@
         if (!paths) return '';
         return `<svg class="sparkline" viewBox="0 0 600 60" preserveAspectRatio="none" style="width:100%;height:60px;">`
           + `<path class="area" d="${paths.area}"/><path class="line" d="${paths.line}"/></svg>`;
+      },
+
+      // --- Diagramm-Popup Verbrauch/Speicher ---------------------------------
+      // Öffnet sofort, lädt daneben (wie openTrend). Der Fetch trägt Zeitraum/Offset der Seite; das Popup hat
+      // bewusst keine eigene Navigation und aktualisiert sich nicht von selbst (der 60-Sekunden-Refresh betrifft
+      // nur die Kacheln dahinter).
+      async openTile(kpi) {
+        const title = kpi === 'speicher' ? t('Speicher') : t('Verbrauch');
+        this.tile = {kpi, title, mode: this.storedTileMode(kpi), loading: true, error: false, data: null};
+        this.$refs.tileDialog.showModal();
+        const token = ++tileFetchToken;
+        try {
+          const params = new URLSearchParams({kpi, range: this.range, offset: String(this.offset)});
+          const res = await fetch(`energiedashboard/tile?${params}`);
+          if (token !== tileFetchToken) return;
+          if (!res.ok) { this.tile.loading = false; this.tile.error = true; return; }
+          const data = await res.json();
+          if (token !== tileFetchToken) return;
+          this.tile.data = data;
+          this.tile.loading = false;
+          await this.$nextTick();
+          this.renderTileChart();
+        } catch (e) {
+          if (token !== tileFetchToken) return;
+          this.tile.loading = false;
+          this.tile.error = true;
+        }
+      },
+
+      // Escape schließt das <dialog> ohne das Formular: deshalb am close-Ereignis aufräumen, nicht am Button.
+      closeTile() {
+        tileFetchToken += 1;
+        this.disposeTileChart();
+        this.tile = {kpi: null, title: '', mode: 'bar', loading: false, error: false, data: null};
+      },
+
+      disposeTileChart() {
+        if (tileResizeObserver) {
+          tileResizeObserver.disconnect();
+          tileResizeObserver = null;
+        }
+        if (tileChartInstance) {
+          tileChartInstance.dispose();
+          tileChartInstance = null;
+        }
+      },
+
+      storedTileMode(kpi) {
+        if (kpi !== 'verbrauch') return 'bar';
+        try {
+          const mode = window.sessionStorage.getItem('edash.tileMode.' + kpi);
+          return TILE_MODES.includes(mode) ? mode : 'bar';
+        } catch (e) {
+          return 'bar';
+        }
+      },
+
+      setTileMode(mode) {
+        this.tile.mode = mode;
+        try { window.sessionStorage.setItem('edash.tileMode.' + this.tile.kpi, mode); } catch (e) { /* ohne Speicher weiter */ }
+        this.renderTileChart();
+      },
+
+      entityHref(entityId) {
+        return `entities/${encodeURIComponent(entityId)}?range=${this.range}&offset=${this.offset}`;
+      },
+
+      // Grundlast hat keine Entität und bekommt wie im Sankey die neutrale Farbe; alle anderen Serien in der
+      // Reihenfolge der Verbraucheranteile (dieselbe Palette wie Tabelle und Donut).
+      tileSeriesColors(series) {
+        let idx = 0;
+        return series.map((row) => (row.name === t('Grundlast') ? cssVar('--ink-faint') : this.shareColor(idx++)));
+      },
+
+      // Zeilen unter dem Diagramm: Verbrauch je Zeile der obersten Ebene (mit Anteil), Speicher je Ladung/Entladung.
+      tileRows() {
+        const data = this.tile.data;
+        if (!data) return [];
+        const fmtKwh = (value) => this.fmt(value, value < 10 ? 2 : 1) + ' kWh';
+        if (data.kpi === 'speicher') {
+          const palette = colors();
+          const rows = [];
+          (data.units || []).forEach((unit, i) => {
+            if (unit.laden_entity_id) {
+              rows.push({key: `l${i}`, name: t('{name} (Ladung)', {name: unit.name}), entity_id: unit.laden_entity_id,
+                         color: palette.storage, valueText: fmtKwh(unit.laden)});
+            }
+            if (unit.entladen_entity_id) {
+              rows.push({key: `e${i}`, name: t('{name} (Entladung)', {name: unit.name}), entity_id: unit.entladen_entity_id,
+                         color: palette.storageOut, valueText: fmtKwh(unit.entladen)});
+            }
+          });
+          return rows;
+        }
+        const colorsList = this.tileSeriesColors(data.series);
+        return data.series.map((row, i) => ({
+          key: `v${i}`, name: row.name, entity_id: row.entity_id, color: colorsList[i],
+          valueText: fmtKwh(row.value) + (row.share != null ? ` · ${this.fmt(row.share, 0)} %` : ''),
+        }));
+      },
+
+      renderTileChart() {
+        const el = this.$refs.tileChartEl;
+        const data = this.tile.data;
+        if (!el || typeof echarts === 'undefined' || !data) return;
+        if (!tileChartInstance) tileChartInstance = echarts.init(el);
+        const ink = cssVar('--ink-faint');
+        const gridLine = cssVar('--border');
+        const palette = colors();
+        const isShare = data.kpi === 'verbrauch' && this.tile.mode === 'share';
+        const isLine = data.kpi === 'verbrauch' && this.tile.mode === 'line';
+        const colorsList = data.kpi === 'speicher' ? [palette.storage, palette.storageOut] : this.tileSeriesColors(data.series);
+        let columns = data.series.map((row) => row.values);
+        if (isShare) {
+          // Anteile je Achsenposition: Summe der Reihen = 100 %, ohne Verbrauch (Summe 0) bleibt der Platz leer.
+          const totals = data.keys.map((_k, i) => columns.reduce((sum, values) => sum + (values[i] || 0), 0));
+          columns = columns.map((values) => values.map((v, i) => (totals[i] > 0 && v != null ? (v / totals[i]) * 100 : null)));
+        }
+        const unit = isShare ? ' %' : ' kWh';
+        const fmt = (value) => (value == null ? '—' : this.fmt(value, value < 10 ? 2 : 1) + unit);
+        tileChartInstance.setOption({
+          color: colorsList,
+          grid: {left: 8, right: 12, top: 28, bottom: 4, containLabel: true},
+          legend: {top: 0, type: 'scroll', textStyle: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)}, itemWidth: 10, itemHeight: 10},
+          tooltip: {trigger: 'axis', axisPointer: {type: isLine ? 'line' : 'shadow'}, valueFormatter: fmt},
+          xAxis: {type: 'category', data: data.labels, axisLabel: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)}, axisLine: {lineStyle: {color: gridLine}}},
+          yAxis: {
+            type: 'value', name: unit.trim(), nameTextStyle: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)}, max: isShare ? 100 : undefined,
+            axisLabel: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)}, splitLine: {lineStyle: {color: gridLine}},
+          },
+          series: data.series.map((row, i) => ({
+            name: row.name,
+            type: isLine ? 'line' : 'bar',
+            // Verbrauch gestapelt (Summe = Gesamtverbrauch), Speicher nebeneinander (Ladung gegen Entladung).
+            stack: data.kpi === 'verbrauch' && !isLine ? 'total' : undefined,
+            data: columns[i],
+            symbolSize: 4,
+            barMaxWidth: 22,
+          })),
+        }, true);
+        if (typeof ResizeObserver !== 'undefined') {
+          if (tileResizeObserver) tileResizeObserver.disconnect();
+          tileResizeObserver = new ResizeObserver(() => { if (tileChartInstance) tileChartInstance.resize(); });
+          tileResizeObserver.observe(el);
+        }
       },
 
       shareColor(idx) {

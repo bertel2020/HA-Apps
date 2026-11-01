@@ -618,11 +618,14 @@ selbst, nie zusätzlich seine Geräte.
 Direkt unter dem Sankey stehen fünf KPI-Kacheln (Erzeugung, Verbrauch,
 Netzbezug, Speicher, Einspeisung) für den gewählten Zeitraum; bei mehreren
 Speichern oder Erzeugern zeigt ihr Tooltip zusätzlich die Aufschlüsselung je
-Gerät. Ein Klick auf eine Kachel führt zum Chart der zugrundeliegenden
-Entität, mit demselben Zeitraum, der gerade im Energiedashboard eingestellt
-ist; steckt mehr als eine Entität dahinter (mehrere Erzeuger/Verbraucher,
-oder ein Speicher mit getrennter Lade-/Entlade-Entität), öffnet sich
-stattdessen ein kurzes Auswahlfenster. Der Link „← zurück zum
+Gerät. Ein Klick auf **Verbrauch** oder **Speicher** öffnet ein Diagramm-Popup
+für den gerade eingestellten Zeitraum: beim Verbrauch gestapelte Balken je
+Verbraucher samt Grundlast (umschaltbar auf Linie und Anteile in Prozent), beim
+Speicher Ladung und Entladung nebeneinander. Die Zeilen darunter führen zur
+jeweiligen Entität; das Popup lädt beim Öffnen und aktualisiert sich nicht von
+selbst. Die übrigen Kacheln führen zum Chart der zugrundeliegenden Entität, mit
+demselben Zeitraum; steckt mehr als eine Entität dahinter (mehrere Erzeuger),
+öffnet sich stattdessen ein kurzes Auswahlfenster. Der Link „← zurück zum
 Energiedashboard“ auf der Entitätsseite (ebenso der aus dem Energiebericht,
 siehe unten) führt wieder genau zu diesem Zeitraum zurück, nicht zur
 Standardansicht.
