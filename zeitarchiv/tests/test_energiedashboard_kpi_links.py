@@ -1,10 +1,6 @@
-"""Tests für die KPI-Kachel-Links im Energiedashboard. Netzbezug/Einspeisung sind
-serverseitig immer genau eine Entität (direkter Link mit übernommenem
-Zeitraum/Offset); Erzeugung kann mehrere Ziel-Entitäten sein — bei genau einer
-ebenfalls direkter Link, bei mehreren ein kleines Auswahlfenster (siehe
-_page_context() in energiedashboard_routes.py). Verbrauch und Speicher öffnen
-dagegen ein Diagramm-Popup (openTile() in energiedashboard.js, ROADMAP 1.41),
-dessen Zeilen im Skript zur Entität verlinken."""
+"""Tests für die KPI-Kacheln im Energiedashboard: alle fünf öffnen ein Diagramm-Popup
+(openTile() in energiedashboard.js, ROADMAP 1.41), dessen Zeilen und „Entität öffnen“
+im Skript zur Entität verlinken (aktueller Zeitraum/Offset)."""
 
 from __future__ import annotations
 
@@ -53,92 +49,6 @@ def _request() -> Request:
     return Request({"type": "http", "method": "GET", "path": "/energiedashboard", "headers": []})
 
 
-def test_single_erzeuger_id_present_when_exactly_one_configured() -> None:
-    def run(service, index) -> None:
-        config = _empty_config()
-        config["netzbezug"] = "sensor.bezug"
-        config["erzeuger"] = [{"entity_id": "sensor.pv1", "name": "PV1"}]
-        _save_config(index, config)
-
-        ctx = service._page_context(_request())
-
-        assert ctx["single_erzeuger_id"] == "sensor.pv1"
-
-    _with_service(run)
-
-
-def test_single_erzeuger_id_absent_when_zero_or_multiple_configured() -> None:
-    def run(service, index) -> None:
-        config = _empty_config()
-        config["netzbezug"] = "sensor.bezug"
-        config["erzeuger"] = [{"entity_id": "sensor.pv1"}, {"entity_id": "sensor.pv2"}]
-        _save_config(index, config)
-        assert service._page_context(_request())["single_erzeuger_id"] is None
-
-        config["erzeuger"] = []
-        _save_config(index, config)
-        assert service._page_context(_request())["single_erzeuger_id"] is None
-
-    _with_service(run)
-
-
-def test_single_verbraucher_id_present_only_when_exactly_one_configured() -> None:
-    def run(service, index) -> None:
-        config = _empty_config()
-        config["netzbezug"] = "sensor.bezug"
-        config["verbraucher"] = [{"entity_id": "sensor.waschmaschine", "name": "Waschmaschine"}]
-        _save_config(index, config)
-        assert service._page_context(_request())["single_verbraucher_id"] == "sensor.waschmaschine"
-
-        config["verbraucher"] = [{"entity_id": "sensor.a"}, {"entity_id": "sensor.b"}]
-        _save_config(index, config)
-        assert service._page_context(_request())["single_verbraucher_id"] is None
-
-    _with_service(run)
-
-
-def test_single_speicher_id_present_only_when_exactly_one_link_entity() -> None:
-    """Ein einzelner Speicher zählt hier trotzdem als "mehrere", sobald er
-    sowohl Laden- als auch Entladen-Entität hat (der Normalfall) — nur bei
-    genau EINER der beiden (oder genau einem Speicher mit nur einer Rolle
-    konfiguriert) gibt es einen direkten Link."""
-    def run(service, index) -> None:
-        config = _empty_config()
-        config["netzbezug"] = "sensor.bezug"
-        config["speicher"] = [{"name": "Akku", "laden_entity_id": "sensor.akku_laden"}]
-        _save_config(index, config)
-        assert service._page_context(_request())["single_speicher_id"] == "sensor.akku_laden"
-
-        config["speicher"] = [
-            {"name": "Akku", "laden_entity_id": "sensor.akku_laden", "entladen_entity_id": "sensor.akku_entladen"},
-        ]
-        _save_config(index, config)
-        assert service._page_context(_request())["single_speicher_id"] is None
-
-    _with_service(run)
-
-
-def test_speicher_link_entities_labels_each_role() -> None:
-    def run(service, index) -> None:
-        config = _empty_config()
-        config["netzbezug"] = "sensor.bezug"
-        config["speicher"] = [
-            {"name": "Akku 1", "laden_entity_id": "sensor.a_laden", "entladen_entity_id": "sensor.a_entladen"},
-            {"name": "Akku 2", "laden_entity_id": "sensor.b_laden"},
-        ]
-        _save_config(index, config)
-
-        entities = service._page_context(_request())["speicher_link_entities"]
-
-        assert entities == [
-            {"entity_id": "sensor.a_laden", "name": "Akku 1 (Ladung)"},
-            {"entity_id": "sensor.a_entladen", "name": "Akku 1 (Entladung)"},
-            {"entity_id": "sensor.b_laden", "name": "Akku 2 (Ladung)"},
-        ]
-
-    _with_service(run)
-
-
 def test_page_context_carries_app_root_for_kpi_links() -> None:
     """Ohne app_root im Kontext würden die Kachel-Links unter Ingress am
     dynamischen Pfad-Präfix vorbeizeigen (siehe _app_root_context() in
@@ -154,73 +64,43 @@ _VIEW_TEMPLATE = template_text("_energiedashboard_view.html")
 JS = (APP / "static/js/energiedashboard.js").read_text(encoding="utf-8")
 
 
-def test_erzeugung_kachel_verlinkt_nur_bei_eindeutiger_quelle() -> None:
-    assert 'single_erzeuger_id %}:href="`{{ app_root }}/entities/{{ single_erzeuger_id }}' in _VIEW_TEMPLATE
-    # Verbrauch hängt nicht mehr an der Zahl der Quellen: immer das Popup.
-    assert "single_verbraucher_id %}:href" not in _VIEW_TEMPLATE
-
-
-def test_netzbezug_und_einspeisung_kacheln_verlinken_immer() -> None:
-    assert 'config.netzbezug %}:href="`{{ app_root }}/entities/{{ config.netzbezug }}' in _VIEW_TEMPLATE
-    assert 'config.einspeisung %}:href="`{{ app_root }}/entities/{{ config.einspeisung }}' in _VIEW_TEMPLATE
-
-
-def test_verbrauch_und_speicher_kacheln_oeffnen_das_diagramm_popup() -> None:
-    """Als <button> (tastaturbedienbar), unabhängig davon, wie viele Quellen konfiguriert sind."""
-    assert '<button type="button" class="edash-kpi edash-kpi-button has-tooltip" aria-haspopup="dialog" @click="openTile(\'verbrauch\')"' in _VIEW_TEMPLATE
-    assert "@click=\"openTile('speicher')\"" in _VIEW_TEMPLATE
-    assert "single_speicher_id %}:href" not in _VIEW_TEMPLATE
+def test_alle_kacheln_oeffnen_das_diagramm_popup() -> None:
+    """Alle fünf Kennzahlen-Kacheln sind <button> (tastaturbedienbar) und öffnen dasselbe Popup, unabhängig davon,
+    wie viele Quellen konfiguriert sind."""
+    for kpi in ("erzeugung", "netzbezug", "einspeisung", "verbrauch", "speicher"):
+        assert f"@click=\"openTile('{kpi}')\"" in _VIEW_TEMPLATE, kpi
     assert 'x-ref="tileDialog"' in _VIEW_TEMPLATE
-    assert "verbraucherPickerDialog" not in _VIEW_TEMPLATE
-    assert "speicherPickerDialog" not in _VIEW_TEMPLATE
+    assert '<a class="edash-kpi' not in _VIEW_TEMPLATE
 
 
-def test_kpi_links_carry_current_range_and_offset() -> None:
-    # 3 KPI-Kacheln mit Link (Erzeugung/Netzbezug/Einspeisung) + eine Zeile in
-    # der Erzeuger-Auswahlliste, dazu im Qualitätsdialog der Entitätslink der
-    # Zählerrücksetzungen und der Auffälligkeiten. Verbrauch und Speicher
-    # verlinken aus dem Popup heraus (entityHref() im Skript).
-    assert _VIEW_TEMPLATE.count("?range=${range}&offset=${offset}`") == 6
+def test_kacheln_ohne_quelle_sind_deaktiviert() -> None:
+    assert "{% if not config.netzbezug %} disabled{% endif %}" in _VIEW_TEMPLATE
+    assert "{% if not config.einspeisung %} disabled{% endif %}" in _VIEW_TEMPLATE
+    assert "{% if not config.get('erzeuger') %} disabled{% endif %}" in _VIEW_TEMPLATE
+
+
+def test_die_alten_auswahlfenster_und_ihre_kontextwerte_sind_weg() -> None:
+    """Das Popup ersetzt die Auswahllisten; der Seitenkontext trägt keine single_*-IDs mehr."""
+    for name in ("erzeugerPickerDialog", "verbraucherPickerDialog", "speicherPickerDialog", "is-pickable"):
+        assert name not in _VIEW_TEMPLATE, name
+    assert "single_" not in _VIEW_TEMPLATE
+    assert "edash-entity-picker" not in page_text("energiedashboard.html")
+
+
+def test_popup_zeilen_verlinken_mit_aktuellem_zeitraum_und_offset() -> None:
+    """Die Zeilen und „Entität öffnen“ entstehen im Skript (entityHref) und tragen Zeitraum/Offset der Seite."""
     assert "range=${this.range}&offset=${this.offset}" in JS
+    assert "entityHref(tile.data.entity_id)" in _VIEW_TEMPLATE
+    # Im Qualitätsdialog bleiben die Entitätslinks der Zählerrücksetzungen und der Auffälligkeiten.
+    assert _VIEW_TEMPLATE.count("?range=${range}&offset=${offset}`") == 2
 
 
-def test_multiple_erzeuger_open_a_picker_dialog_instead_of_no_link() -> None:
-    """Nutzerwunsch: bei mehreren Ziel-Entitäten soll die Kachel trotzdem
-    funktionieren, statt einfach unverlinkt zu bleiben — ein kleines
-    Auswahlfenster (dasselbe <dialog>-Muster wie die Trend-Popups) lässt eine
-    der konfigurierten Entitäten wählen. Verbrauch und Speicher sind darauf
-    nicht mehr angewiesen (Popup); Erzeugung folgt in einer späteren Phase."""
-    assert '@click="$refs.erzeugerPickerDialog.showModal()"' in _VIEW_TEMPLATE
-    assert 'x-ref="erzeugerPickerDialog"' in _VIEW_TEMPLATE
-    # Dialog ist an eine Bedingung geknüpft (nur gerendert, wenn gebraucht)
-    assert "{% if erzeuger_list|length > 1 %}" in _VIEW_TEMPLATE
-
-
-def test_picker_dialogs_share_one_compact_uniform_size() -> None:
-    """Nutzerwunsch: alle Auswahlfenster gleich groß, nicht die
-    .detail-dialog-Standardbreite (bis 860px, für Datenqualität/Kosten-
-    Tabellen gedacht) — eine kurze Namensliste braucht deutlich weniger."""
-    assert _VIEW_TEMPLATE.count('class="detail-dialog edash-entity-picker-dialog"') == 1
-    energiedashboard_html = page_text("energiedashboard.html")
-    assert ".edash-entity-picker-dialog{width:" in energiedashboard_html
-
-
-def test_picker_dialog_renders_correctly_with_real_config() -> None:
-    """End-to-End-Rendering (nicht nur String-Check) — fängt z. B. einen
-    falschen Jinja-Loop-Variablennamen ab, den die reinen Substring-Tests
-    oben nicht sehen würden."""
+def test_popup_renders_correctly_with_real_config() -> None:
+    """End-to-End-Rendering (nicht nur String-Check) — fängt z. B. einen falschen Jinja-Variablennamen ab."""
     def run(service, index) -> None:
         config = _empty_config()
         config["netzbezug"] = "sensor.bezug"
-        config["einspeisung"] = "sensor.einspeisung"
-        config["erzeuger"] = [
-            {"entity_id": "sensor.pv1", "name": "Dach Süd"},
-            {"entity_id": "sensor.pv2", "name": "Dach West"},
-        ]
-        config["verbraucher"] = [{"entity_id": "sensor.waschmaschine", "name": "Waschmaschine"}]
-        config["speicher"] = [
-            {"name": "Akku", "laden_entity_id": "sensor.akku_laden", "entladen_entity_id": "sensor.akku_entladen"},
-        ]
+        config["erzeuger"] = [{"entity_id": "sensor.pv1", "name": "Dach Süd"}]
         _save_config(index, config)
 
         html = service.deps.templates.get_template("_energiedashboard_view.html").render(
@@ -228,12 +108,10 @@ def test_picker_dialog_renders_correctly_with_real_config() -> None:
             configured=True, kpi={}, kpiCompare={}, quality={}, anomalien=[],
         )
 
-        assert "Dach Süd" in html
-        assert "Dach West" in html
-        assert 'x-ref="erzeugerPickerDialog"' in html
-        # Verbrauch und Speicher: ein gemeinsames Popup statt je einer Auswahlliste.
         assert 'x-ref="tileDialog"' in html
-        assert 'x-ref="speicherPickerDialog"' not in html
-        assert 'x-ref="verbraucherPickerDialog"' not in html
+        assert html.count('class="edash-kpi edash-kpi-button') == 5
+        # Einspeisung ist nicht konfiguriert: deaktivierte Kachel statt Link.
+        assert "@click=\"openTile('einspeisung')\" disabled" in html
+        assert "@click=\"openTile('netzbezug')\" disabled" not in html
 
     _with_service(run)

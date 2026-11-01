@@ -136,8 +136,9 @@ STORAGE_CHECK_MIN_COVERAGE = 0.9
 # ohne die Summe zu verändern.
 _FINER_RANGE = {"month": "day", "year": "month"}
 
-# Kennzahlen-Kacheln mit Diagramm-Popup (compute_tile). Die übrigen folgen in einer späteren Phase.
-TILE_KPIS = ("verbrauch", "speicher")
+# Kennzahlen-Kacheln mit Diagramm-Popup (compute_tile). Netzbezug und Einspeisung sind genau eine Entität und
+# brauchen keinen compute_flow-Lauf (compute_single_tile).
+TILE_KPIS = ("erzeugung", "netzbezug", "einspeisung", "verbrauch", "speicher")
 
 # Umgekehrte Richtung: der nächstgröbere Zeitraum, dessen EINZELNE Buckets
 # jeweils genau eine Periode des feineren umfassen ("day" liefert Stunden-,
@@ -459,22 +460,6 @@ def cascade_structure(rows: list[dict]) -> tuple[dict[str, list[dict]], set[str]
 
 def _is_configured(config: dict) -> bool:
     return bool(config.get("netzbezug"))
-
-
-def _speicher_link_entities(config: dict) -> list[dict]:
-    """Laden/Entladen-Entitäten aller konfigurierten Speicher als
-    {entity_id, name}-Liste fürs Kachel-Auswahlfenster (siehe
-    _page_context()) — dieselbe Rollen-Benennung ("(Ladung)"/"(Entladung)")
-    wie _config_entity_roles() oben, hier eigenständig, weil diese Liste nur
-    die Speicher-Rollen braucht, nicht alle Konfig-Rollen."""
-    entities: list[dict] = []
-    for sp in config.get("speicher") or []:
-        sp_name = sp.get("name") or tr("Speicher")
-        if sp.get("laden_entity_id"):
-            entities.append({"entity_id": sp["laden_entity_id"], "name": tr("{name} (Ladung)", name=sp_name)})
-        if sp.get("entladen_entity_id"):
-            entities.append({"entity_id": sp["entladen_entity_id"], "name": tr("{name} (Entladung)", name=sp_name)})
-    return entities
 
 
 def entity_has_energiedashboard_role(index: Index, entity_id: str) -> bool:
@@ -2747,6 +2732,10 @@ class EnergieDashboardService:
                     "value": item["value"], "share": item.get("share"), "series": item_series or {},
                 })
             detail = {
+                "erzeugung": [
+                    {"name": item["name"], "entity_id": item["entity_id"], "value": item["value"], "series": item_series}
+                    for item, item_series in zip(erzeuger_breakdown, erzeuger_series_list)
+                ],
                 "verbrauch": verbrauch_rows,
                 "speicher": {
                     "laden": speicher_laden_series,
@@ -2847,6 +2836,8 @@ class EnergieDashboardService:
         exakt überein, und nur die Serien sind für das Diagramm gedacht."""
         if kpi not in TILE_KPIS:
             raise HTTPException(status_code=400, detail=tr("Ungültige Kennzahl"))
+        if kpi in ("netzbezug", "einspeisung"):
+            return self.compute_single_tile(config, kpi, range_key, offset, read_cache)
         flow = self.compute_flow(config, range_key, offset, skip_quality=True, read_cache=read_cache, with_detail=True)
         tz = self.deps.tz
         window_start = datetime.fromtimestamp(flow["window_start_ts"], tz)
@@ -2859,7 +2850,18 @@ class EnergieDashboardService:
             "kpi": kpi, "range": range_key, "offset": offset, "unit": "kWh",
             "keys": axis, "labels": self._tile_labels(range_key, axis, window_start),
         }
-        if kpi == "verbrauch":
+        if kpi == "erzeugung":
+            total = flow["kpi"]["erzeugung"]
+            result["series"] = [
+                {
+                    "name": row["name"], "entity_id": row["entity_id"], "kind": None, "value": row["value"],
+                    "share": round(row["value"] / total * 100, 1) if total > 0 else None,
+                    "values": values(row["series"]),
+                }
+                for row in flow["detail"]["erzeugung"]
+            ]
+            result["total"] = total
+        elif kpi == "verbrauch":
             result["series"] = [
                 {
                     "name": row["name"], "entity_id": row["entity_id"], "kind": row["kind"],
@@ -2881,6 +2883,35 @@ class EnergieDashboardService:
                 "entladen": round(sum(storage["entladen"].values()), 3),
             }
         return result
+
+    def compute_single_tile(
+        self, config: dict, kpi: str, range_key: str, offset: int, read_cache: query_mod.QueryReadCache | None = None,
+    ) -> dict:
+        """Popup von Netzbezug und Einspeisung: genau eine Entität, deshalb ohne compute_flow. Aktueller Zeitraum
+        plus der Vorzeitraum (kalendarisch, ``offset - 1``) auf derselben Achse. Die Prozentzahl der Kachel
+        (rollierend) wird im Popup nicht wiederholt, die Linie ist die Bucket-Sicht auf den Vorzeitraum."""
+        if range_key not in RANGE_KEYS:
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
+        tz = self.deps.tz
+        now = datetime.now(tz)
+        cache = read_cache if read_cache is not None else query_mod.QueryReadCache()
+        entity_id = config.get(kpi) or ""
+        default_name = tr("Netzbezug") if kpi == "netzbezug" else tr("Einspeisung")
+        name = config.get(f"{kpi}_name") or default_name
+        window_start = query_mod._window(range_key, now.astimezone(tz), offset)[0]  # noqa: SLF001 — siehe Modul-Docstring
+        current = self._entity_series(entity_id, range_key, offset, now, cache)[0] if entity_id else {}
+        previous = self._entity_series(entity_id, range_key, offset - 1, now, cache)[0] if entity_id else {}
+        aligned = eb.align(current, previous, range_key, window_start, tz)
+        axis = aligned["keys"]
+        previous_label = tr(COMPARE_LABELS.get(range_key, N_("Vorperiode")))
+        return {
+            "kpi": kpi, "range": range_key, "offset": offset, "unit": "kWh",
+            "keys": axis, "labels": self._tile_labels(range_key, axis, window_start),
+            "entity_id": entity_id or None,
+            "series": [{"name": name, "entity_id": entity_id or None, "values": aligned["current"]}] if entity_id else [],
+            "previous": {"name": previous_label, "values": aligned["previous"]} if entity_id else None,
+            "total": round(max(sum(current.values()), 0.0), 3),
+        }
 
     def _tile_soc(
         self, config: dict, range_key: str, offset: int, window_start: datetime,
@@ -3406,26 +3437,10 @@ class EnergieDashboardService:
 
     def _page_context(self, request: Request) -> dict:
         config = _load_config(self.deps.index)
-        erzeuger = config.get("erzeuger") or []
-        verbraucher = config.get("verbraucher") or []
-        speicher_link_entities = _speicher_link_entities(config)
         return {
             "configured": _is_configured(config),
             "enabled": _is_enabled(self.deps.index),
             "config": config,
-            # KPI-Kacheln verlinken auf den Chart der zugrundeliegenden
-            # Entität — direkt bei GENAU einer Entität (Netzbezug/Einspeisung
-            # immer, da je ein Konfigurationsfeld je Rolle; Erzeugung/
-            # Verbrauch/Speicher nur bei genau einer konfigurierten Quelle
-            # bzw. einer einzigen Laden/Entladen-Entität über alle Speicher),
-            # sonst über ein Auswahlfenster (siehe _energiedashboard_view.html)
-            # — Speicher hat selbst bei einem einzigen konfigurierten Gerät
-            # meist zwei Entitäten (Laden/Entladen), landet also fast immer
-            # im Auswahlfenster-Fall.
-            "single_erzeuger_id": erzeuger[0].get("entity_id") if len(erzeuger) == 1 else None,
-            "single_verbraucher_id": verbraucher[0].get("entity_id") if len(verbraucher) == 1 else None,
-            "single_speicher_id": speicher_link_entities[0]["entity_id"] if len(speicher_link_entities) == 1 else None,
-            "speicher_link_entities": speicher_link_entities,
             **self.deps.app_root_context(request),
         }
 
@@ -3689,22 +3704,11 @@ class EnergieDashboardService:
             _save_config(deps.index, config)
             sync_hourly_rollup_flags(deps.index, [eid for eid, _ in self._config_entity_roles(config)])
             deps.index.invalidate_heatmap_weekday_snapshots()
-            erzeuger = config.get("erzeuger") or []
-            verbraucher = config.get("verbraucher") or []
-            speicher_link_entities = _speicher_link_entities(config)
             return deps.templates.TemplateResponse(
                 request, "_energiedashboard_view.html",
                 {
                     "configured": _is_configured(config),
                     "config": config,
-                    # Dieselbe Regel wie in _page_context() oben — sonst würden
-                    # die KPI-Kacheln-Links direkt nach dem Speichern fehlen
-                    # bzw. ohne Ingress-Präfix zeigen, bis zum nächsten vollen
-                    # Seitenaufruf.
-                    "single_erzeuger_id": erzeuger[0].get("entity_id") if len(erzeuger) == 1 else None,
-                    "single_verbraucher_id": verbraucher[0].get("entity_id") if len(verbraucher) == 1 else None,
-                    "single_speicher_id": speicher_link_entities[0]["entity_id"] if len(speicher_link_entities) == 1 else None,
-                    "speicher_link_entities": speicher_link_entities,
                     **deps.app_root_context(request),
                 },
             )

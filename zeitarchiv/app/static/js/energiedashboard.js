@@ -672,7 +672,7 @@
       // bewusst keine eigene Navigation und aktualisiert sich nicht von selbst (der 60-Sekunden-Refresh betrifft
       // nur die Kacheln dahinter).
       async openTile(kpi) {
-        const title = kpi === 'speicher' ? t('Speicher') : t('Verbrauch');
+        const title = {speicher: t('Speicher'), verbrauch: t('Verbrauch'), erzeugung: t('Erzeugung'), netzbezug: t('Netzbezug'), einspeisung: t('Einspeisung')}[kpi];
         this.tile = {kpi, title, mode: this.storedTileMode(kpi), loading: true, error: false, data: null};
         this.$refs.tileDialog.showModal();
         const token = ++tileFetchToken;
@@ -712,8 +712,22 @@
         }
       },
 
+      // Umschalter: Balken/Linie bei Verbrauch und Erzeugung (mehrere Serien) sowie bei Netzbezug/Einspeisung;
+      // Anteile in Prozent nur dort, wo mehrere Serien eine Summe teilen. Der Speicher bleibt bei Balken + Ladestand.
+      tileStacks() {
+        return this.tile.kpi === 'verbrauch' || this.tile.kpi === 'erzeugung';
+      },
+      tileHasShare() {
+        return this.tileStacks() && !!this.tile.data && this.tile.data.series.length > 1;
+      },
+      tileHasModes() {
+        if (!this.tile.data) return false;
+        if (this.tile.kpi === 'netzbezug' || this.tile.kpi === 'einspeisung') return true;
+        return this.tileStacks() && this.tile.data.series.length > 1;
+      },
+
       storedTileMode(kpi) {
-        if (kpi !== 'verbrauch') return 'bar';
+        if (kpi === 'speicher') return 'bar';
         try {
           const mode = window.sessionStorage.getItem('edash.tileMode.' + kpi);
           return TILE_MODES.includes(mode) ? mode : 'bar';
@@ -759,6 +773,8 @@
           });
           return rows;
         }
+        // Netzbezug/Einspeisung sind genau eine Entität: statt Zeilen steht „Entität öffnen“ im Popup.
+        if (data.kpi === 'netzbezug' || data.kpi === 'einspeisung') return [];
         const colorsList = this.tileSeriesColors(data.series);
         return data.series.map((row, i) => ({
           key: `v${i}`, name: row.name, entity_id: row.entity_id, color: colorsList[i],
@@ -774,12 +790,16 @@
         const ink = cssVar('--ink-faint');
         const gridLine = cssVar('--border');
         const palette = colors();
-        const isShare = data.kpi === 'verbrauch' && this.tile.mode === 'share';
-        const isLine = data.kpi === 'verbrauch' && this.tile.mode === 'line';
-        const colorsList = data.kpi === 'speicher' ? [palette.storage, palette.storageOut] : this.tileSeriesColors(data.series);
+        const stacks = data.kpi === 'verbrauch' || data.kpi === 'erzeugung';
+        const isShare = stacks && this.tile.mode === 'share';
+        const isLine = this.tile.mode === 'line' && data.kpi !== 'speicher';
+        const singleColor = {netzbezug: palette.grid, einspeisung: palette.exportColor}[data.kpi];
+        const colorsList = data.kpi === 'speicher' ? [palette.storage, palette.storageOut]
+          : (singleColor ? [singleColor] : this.tileSeriesColors(data.series));
         // Ladestand (nur Stunde/Tag, mit SOC-Sensor): Linie auf einer zweiten Achse in Prozent.
         const hasSoc = data.kpi === 'speicher' && Array.isArray(data.soc);
         if (hasSoc) colorsList.push(cssVar('--chart-4'));
+        if (data.previous) colorsList.push(ink);
         let columns = data.series.map((row) => row.values);
         if (isShare) {
           // Anteile je Achsenposition: Summe der Reihen = 100 %, ohne Verbrauch (Summe 0) bleibt der Platz leer.
@@ -805,13 +825,17 @@
             name: row.name,
             type: isLine ? 'line' : 'bar',
             // Verbrauch gestapelt (Summe = Gesamtverbrauch), Speicher nebeneinander (Ladung gegen Entladung).
-            stack: data.kpi === 'verbrauch' && !isLine ? 'total' : undefined,
+            stack: stacks && !isLine ? 'total' : undefined,
             data: columns[i],
             symbolSize: 4,
             barMaxWidth: 22,
           })).concat(hasSoc ? [{
             name: t('Ladestand'), type: 'line', yAxisIndex: 1, data: data.soc, symbol: 'none', lineStyle: {width: 2},
             tooltip: {valueFormatter: (value) => (value == null ? '—' : this.fmt(value, 0) + ' %')},
+          }] : []).concat(data.previous ? [{
+            // Vorzeitraum (Vortag/Vormonat …) als gestrichelte Linie auf derselben Achse.
+            name: data.previous.name, type: 'line', data: data.previous.values, symbol: 'none',
+            lineStyle: {width: 1.5, type: 'dashed', color: ink}, itemStyle: {color: ink}, z: 5,
           }] : []),
         }, true);
         if (typeof ResizeObserver !== 'undefined') {

@@ -575,15 +575,15 @@ its devices on top.
 Directly below the Sankey are five KPI tiles (generation, consumption, grid
 import, storage, feed-in) for the selected period; with several storage units
 or generators, their tooltip additionally shows the breakdown per device. A
-click on **consumption** or **storage** opens a chart popup for the period
-currently set: stacked bars per consumer including the base load for
-consumption (switchable to lines and percentage shares), charge and discharge
-side by side for storage, with the state of charge as a line for hour and day if
-a state-of-charge sensor is set. The rows below lead to the respective entity; the
-popup loads when opened and does not refresh by itself. The other tiles lead to
-the chart of the underlying entity, with the same period; if more than one
-entity is behind it (several generators), a short selection window opens
-instead. The link
+click on a tile opens a chart popup for the period currently set: stacked bars
+per source for generation and consumption (with the base load for consumption;
+switchable to lines and percentage shares), charge and discharge side by side
+for storage (plus the state of charge as a line for hour and day if a
+state-of-charge sensor is set), and bars with the previous period (previous
+day, previous month, …) as a dashed line for grid import and feed-in. The rows
+below, or "Open entity" for grid import and feed-in, lead to the entity with
+the same period; the popup loads when opened and does not refresh by itself. A
+tile without a configured source is disabled. The link
 "← back to the energy dashboard" on the entity page (as well as the one from
 the energy report, see below) leads back exactly to this period, not to the
 default view.

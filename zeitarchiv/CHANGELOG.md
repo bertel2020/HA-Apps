@@ -4,13 +4,15 @@
 
 ### Neu
 
-- **Energiedashboard, Diagramm-Popup**: Ein Klick auf die Kacheln **Verbrauch**
-  und **Speicher** öffnet jetzt ein Diagramm für den eingestellten Zeitraum
-  statt einer Auswahlliste. Beim Verbrauch zeigt es gestapelte Balken je
-  Verbraucher samt Grundlast, umschaltbar auf Linie und Anteile in Prozent; beim
-  Speicher stehen Ladung und Entladung nebeneinander, bei Stunde und Tag mit
-  SOC-Sensor zusätzlich der Ladestand als Linie. Die Zeilen darunter führen wie
-  bisher zur jeweiligen Entität.
+- **Energiedashboard, Diagramm-Popup**: Ein Klick auf eine der fünf Kacheln
+  öffnet jetzt ein Diagramm für den eingestellten Zeitraum statt einer
+  Auswahlliste oder dem direkten Sprung in die Entität. Erzeugung und Verbrauch
+  zeigen gestapelte Balken je Quelle (der Verbrauch samt Grundlast), umschaltbar
+  auf Linie und Anteile in Prozent; der Speicher zeigt Ladung und Entladung
+  nebeneinander, bei Stunde und Tag mit SOC-Sensor zusätzlich den Ladestand als
+  Linie; Netzbezug und Einspeisung zeigen Balken mit dem Vorzeitraum als
+  gestrichelter Linie. Die Zeilen darunter und „Entität öffnen“ führen wie bisher
+  zur jeweiligen Entität.
 
 ### Behoben
 
@@ -27,13 +29,14 @@
 
 #### New
 
-- **Energy dashboard, chart popup**: Clicking the **consumption** and **storage**
-  tiles now opens a chart for the selected period instead of a selection list.
-  For consumption it shows stacked bars per consumer including the base load,
-  switchable to lines and percentage shares; for storage, charge and discharge
-  sit side by side, plus the state of charge as a line for hour and day if a
-  state-of-charge sensor is set. The rows below lead to the respective entity as
-  before.
+- **Energy dashboard, chart popup**: Clicking any of the five tiles now opens a
+  chart for the selected period instead of a selection list or a direct jump to
+  the entity. Generation and consumption show stacked bars per source
+  (consumption including the base load), switchable to lines and percentage
+  shares; storage shows charge and discharge side by side, plus the state of
+  charge as a line for hour and day if a state-of-charge sensor is set; grid
+  import and feed-in show bars with the previous period as a dashed line. The
+  rows below and "Open entity" lead to the respective entity as before.
 
 #### Fixed
 

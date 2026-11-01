@@ -8,11 +8,6 @@
   <button type="button" class="btn" hx-get="energiedashboard/setup" hx-target="#energiedashboard-root" hx-swap="innerHTML">{{ _("Rollen zuordnen") }}</button>
 </div>
 {% else %}
-{# Vor der ersten Verwendung gesetzt (Auswahlfenster für Erzeugung/Verbrauch
-   unten sowie die eigentliche KPI-Zeile brauchen beide diese Listen) — siehe
-   Kommentar bei .edash-kpi-row weiter unten. #}
-{% set erzeuger_list = config.get('erzeuger') or [] %}
-{% set verbraucher_list = config.get('verbraucher') or [] %}
 {# Bewusst OHNE x-init="init()": Alpine ruft eine im x-data-Objekt vorhandene
    init()-Methode bereits von sich aus auf. Zusammen mit x-init lief sie
    zweimal — also zwei parallele /energiedashboard/data- UND /heatmap-Fetches
@@ -343,37 +338,10 @@
      'speicherSocTrend',
      _('Noch nicht genug Historie für einen Trend.')) }}
 
-  {# Auswahlfenster für Erzeugung/Verbrauch/Speicher, wenn mehr als eine
-     Ziel-Entität infrage kommt (siehe Kommentar bei .edash-kpi-row unten) —
-     je eine Zeile pro Entität, führt zu deren eigenem Chart mit dem aktuell
-     gewählten Zeitraum/Offset. Nur gerendert, wenn überhaupt gebraucht (kein
-     leerer Dialog im DOM für den häufigeren Fall genau einer Quelle).
-     edash-entity-picker-dialog macht alle drei einheitlich kompakt statt der
-     .detail-dialog-Standardbreite (bis 860px, für Datenqualität/Kosten-
-     Tabellen gedacht) — hier reicht eine kurze Namensliste, dieselbe Idee
-     wie .edash-gruppen-dialog/.edash-item-dialog. #}
-  {% if erzeuger_list|length > 1 %}
-  <dialog class="detail-dialog edash-entity-picker-dialog" x-ref="erzeugerPickerDialog" aria-labelledby="erzeuger-picker-title"
-          @click="if ($event.target === $el) $el.close()">
-    <div class="detail-dialog-header">
-      <div>
-        <h2 id="erzeuger-picker-title">{{ _("Erzeugung — welche Entität?") }}</h2>
-      </div>
-      <form method="dialog"><button class="btn" aria-label="{{ _('Dialog schließen') }}">×</button></form>
-    </div>
-    <ul class="edash-entity-picker-list">
-      {% for erz in erzeuger_list %}
-      {% if erz.entity_id %}
-      <li><a :href="`{{ app_root }}/entities/{{ erz.entity_id }}?range=${range}&offset=${offset}`">{{ erz.name or erz.entity_id }}</a></li>
-      {% endif %}
-      {% endfor %}
-    </ul>
-  </dialog>
-  {% endif %}
-
-  {# Diagramm-Popup der Kennzahlen-Kacheln Verbrauch und Speicher (openTile() in energiedashboard.js).
+  {# Diagramm-Popup aller fünf Kennzahlen-Kacheln (openTile() in energiedashboard.js).
      Die Daten kommen beim Öffnen von /energiedashboard/tile, nicht aus /data. Die Zeilen darunter führen wie die
-     frühere Auswahlliste zur Entität (aktueller Zeitraum/Offset). Eine Quelle und mehrere verhalten sich gleich. #}
+     frühere Auswahlliste zur Entität (aktueller Zeitraum/Offset); bei Netzbezug und Einspeisung, die genau eine
+     Entität sind, ersetzt „Entität öffnen“ die Zeilen. Eine Quelle und mehrere verhalten sich gleich. #}
   <dialog class="detail-dialog edash-tile-dialog" x-ref="tileDialog" aria-labelledby="tile-dialog-title"
           @click="if ($event.target === $el) $el.close()" @close="closeTile()">
     <div class="detail-dialog-header">
@@ -383,10 +351,10 @@
       </div>
       <form method="dialog"><button class="btn" aria-label="{{ _('Dialog schließen') }}">×</button></form>
     </div>
-    <div class="edash-tile-modes" x-show="tile.kpi === 'verbrauch' && tile.data && tile.data.series.length > 1" role="group" aria-label="{{ _('Darstellung') }}">
+    <div class="edash-tile-modes" x-show="tileHasModes()" role="group" aria-label="{{ _('Darstellung') }}">
       <button type="button" :class="{'is-active': tile.mode === 'bar'}" @click="setTileMode('bar')">{{ _("Balken") }}</button>
       <button type="button" :class="{'is-active': tile.mode === 'line'}" @click="setTileMode('line')">{{ _("Linie") }}</button>
-      <button type="button" :class="{'is-active': tile.mode === 'share'}" @click="setTileMode('share')">{{ _("Anteile %") }}</button>
+      <button type="button" x-show="tileHasShare()" :class="{'is-active': tile.mode === 'share'}" @click="setTileMode('share')">{{ _("Anteile %") }}</button>
     </div>
     <p class="edash-tile-note" x-show="tile.loading">{{ _("Lade …") }}</p>
     <p class="edash-tile-note" x-show="tile.error">{{ _("Das Diagramm konnte nicht geladen werden.") }}</p>
@@ -401,6 +369,9 @@
         </li>
       </template>
     </ul>
+    <p class="edash-tile-open" x-show="tile.data && tile.data.entity_id">
+      <a class="btn" :href="entityHref(tile.data.entity_id)">{{ _("Entität öffnen") }}</a>
+    </p>
     <p class="edash-tile-note" x-show="tile.data && tileRows().some((r) => r.entity_id)">{{ _("Eine Zeile anklicken öffnet die Entität.") }}</p>
   </dialog>
 
@@ -471,26 +442,11 @@
       </div>
     </div>
 
-    {# Verbrauch und Speicher öffnen ein Diagramm-Popup (tilePopup unten); die übrigen KPI-Kacheln verlinken auf den Chart der zugrundeliegenden
-       Entität (aktueller Zeitraum/Offset übernommen). Netzbezug/Einspeisung
-       sind serverseitig immer genau eine Entität (ein Konfigurationsfeld je
-       Rolle) — direkter Link. Erzeugung/Verbrauch/Speicher können mehrere
-       Ziel-Entitäten sein: bei genau einer direkter Link
-       (single_erzeuger_id/single_verbraucher_id/single_speicher_id, siehe
-       _page_context() in energiedashboard_routes.py), bei mehreren öffnet
-       ein kleines Auswahlfenster (dasselbe <dialog>-Muster wie die
-       Trend-Popups oben), aus dem sich EINE der konfigurierten Entitäten
-       wählen lässt — sonst wäre unklar, zu welcher der Klick führen soll.
-       Speicher landet praktisch immer im Auswahlfenster-Fall: selbst ein
-       einzelner Speicher hat meist zwei Entitäten (Laden/Entladen). Ohne
-       href UND ohne @click ist <a> genau wie <div> nicht interaktiv (Fall:
-       keine einzige Quelle konfiguriert). #}
+    {# Alle fünf KPI-Kacheln sind <button> und öffnen das Diagramm-Popup (tilePopupDialog oben, openTile()). Eine Kachel
+       ohne konfigurierte Quelle ist deaktiviert (Netzbezug/Einspeisung ohne Entität, Erzeugung ohne Erzeuger). #}
     <div class="edash-kpi-row">
-      <a class="edash-kpi has-tooltip tooltip-lines{{ ' is-pickable' if erzeuger_list|length > 1 else '' }}"
-         :data-tooltip="erzeugerBreakdownText()"
-         {% if single_erzeuger_id %}:href="`{{ app_root }}/entities/{{ single_erzeuger_id }}?range=${range}&offset=${offset}`"
-         {% elif erzeuger_list|length > 1 %}@click="$refs.erzeugerPickerDialog.showModal()"
-         {% endif %}>
+      <button type="button" class="edash-kpi edash-kpi-button has-tooltip tooltip-lines" aria-haspopup="dialog" @click="openTile('erzeugung')"
+         :data-tooltip="erzeugerBreakdownText()"{% if not config.get('erzeuger') %} disabled{% endif %}>
         <div class="edash-kpi-accent" style="background:var(--energy-solar);"></div>
         <div class="edash-kpi-head">
           <span class="edash-kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="var(--energy-solar)" opacity=".85"/><g stroke="var(--energy-solar)" stroke-width="2" stroke-linecap="round" opacity=".55"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg></span>
@@ -499,9 +455,8 @@
         <div class="edash-kpi-val" x-text="fmt(kpi.erzeugung, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('erzeugung')" x-text="deltaText('erzeugung')"></div>
         <div class="edash-kpi-spark" x-ref="sparkErzeugung"></div>
-      </a>
-      <a class="edash-kpi"
-         {% if config.netzbezug %}:href="`{{ app_root }}/entities/{{ config.netzbezug }}?range=${range}&offset=${offset}`"{% endif %}>
+      </button>
+      <button type="button" class="edash-kpi edash-kpi-button" aria-haspopup="dialog" @click="openTile('netzbezug')"{% if not config.netzbezug %} disabled{% endif %}>
         <div class="edash-kpi-accent" style="background:var(--energy-grid);"></div>
         <div class="edash-kpi-head">
           <span class="edash-kpi-icon"><svg width="15" height="10" viewBox="0 0 28 18"><path d="M3 9 C10 9 12 9 18 9" stroke="var(--energy-grid)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="3" cy="9" r="3" fill="var(--energy-grid)"/><path d="M15 5 L20 9 L15 13" stroke="var(--energy-grid)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
@@ -510,7 +465,7 @@
         <div class="edash-kpi-val" x-text="fmt(kpi.netzbezug, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('netzbezug')" x-text="deltaText('netzbezug')"></div>
         <div class="edash-kpi-spark" x-ref="sparkNetzbezug"></div>
-      </a>
+      </button>
       <button type="button" class="edash-kpi edash-kpi-button has-tooltip" aria-haspopup="dialog" @click="openTile('verbrauch')"
          data-tooltip="{{ _('Gesamtverbrauch im gewählten Zeitraum: erfasste Verbraucher zusammen mit der Grundlast (nicht einzeln gemessene Geräte, rechnerisch aus der Bilanz ermittelt).') }}">
         <div class="edash-kpi-accent" style="background:var(--chart-7);"></div>
@@ -522,8 +477,7 @@
         <div class="edash-kpi-delta" x-show="deltaText('verbrauch')" x-text="deltaText('verbrauch')"></div>
         <div class="edash-kpi-spark" x-ref="sparkVerbrauch"></div>
       </button>
-      <a class="edash-kpi"
-         {% if config.einspeisung %}:href="`{{ app_root }}/entities/{{ config.einspeisung }}?range=${range}&offset=${offset}`"{% endif %}>
+      <button type="button" class="edash-kpi edash-kpi-button" aria-haspopup="dialog" @click="openTile('einspeisung')"{% if not config.einspeisung %} disabled{% endif %}>
         <div class="edash-kpi-accent" style="background:var(--energy-export);"></div>
         <div class="edash-kpi-head">
           <span class="edash-kpi-icon"><svg width="15" height="10" viewBox="0 0 28 18"><path d="M10 9 C16 9 18 9 25 9" stroke="var(--energy-export)" stroke-width="3" fill="none" stroke-linecap="round" opacity=".7"/><circle cx="25" cy="9" r="3" fill="var(--energy-export)"/><path d="M13 5 L8 9 L13 13" stroke="var(--energy-export)" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity=".7"/></svg></span>
@@ -532,7 +486,7 @@
         <div class="edash-kpi-val" x-text="fmt(kpi.einspeisung, 1) + ' kWh'"></div>
         <div class="edash-kpi-delta" x-show="deltaText('einspeisung')" x-text="deltaText('einspeisung')"></div>
         <div class="edash-kpi-spark" x-ref="sparkEinspeisung"></div>
-      </a>
+      </button>
       <button type="button" class="edash-kpi edash-kpi-button has-tooltip tooltip-lines" aria-haspopup="dialog" @click="openTile('speicher')"
          x-show="kpi.speicher_netto != null" :data-tooltip="speicherTooltipText()">
         <div class="edash-kpi-accent" style="background:var(--energy-battery-in);"></div>
