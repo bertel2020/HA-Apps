@@ -1911,6 +1911,36 @@ button[data-tooltip]{cursor:pointer;}
   background:var(--accent-line);border-radius:2px 2px 0 0;
 }
 
+/* Kennzahlen-Leiste über den Reitern der drei Entitätsseiten
+   (_entity_facts.html). Eine Fläche mit Trennlinien statt einzelner Kacheln:
+   vier Werte in einer Zeile sollen den Verlauf darunter nicht nach unten
+   drücken. Auf schmalen Schirmen brechen die Felder um, statt zu scrollen. */
+.entity-facts{
+  display:flex;flex-wrap:wrap;margin:14px 0 0;padding:0;
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+}
+.entity-fact{
+  flex:1 1 150px;min-width:0;padding:9px 16px;
+  border-right:1px solid var(--border);
+}
+.entity-fact:last-child{border-right:0;}
+.entity-fact dt{
+  font-size:calc(11px * var(--font-scale, 1));font-weight:600;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--ink-faint);
+}
+.entity-fact dd{
+  margin:1px 0 0;font-family:var(--font-mono);font-size:calc(13.5px * var(--font-scale, 1));
+  font-weight:500;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;
+}
+.entity-fact dd small{
+  display:block;font-size:calc(11.5px * var(--font-scale, 1));font-weight:400;color:var(--ink-faint);
+}
+@media (max-width:480px){
+  .entity-fact{flex-basis:45%;border-bottom:1px solid var(--border);}
+  .entity-fact:nth-child(2n){border-right:0;}
+  .entity-fact:nth-last-child(-n+2){border-bottom:0;}
+}
+
 /* Zur Löschung markierte, noch nicht endgültig entfernte Werte: Banner auf der
    Verlaufsseite und getönte Zeile in der Entitätenliste. Warnton wie die
    Meldung in der Glocke (--notice-warn), bewusst NICHT --danger: das gehört dem

@@ -1,0 +1,29 @@
+{# Kennzahlen der Entität als Leiste zwischen Seitenkopf und Reitern — dieselben
+   Felder wie die Spalten der Entitätenliste. Steht auf allen drei Seiten
+   (Verlauf, Werte bearbeiten, Konfiguration), deshalb als Teil-Template; die
+   Konfiguration trug dieselben Werte vorher als sechs Kacheln, die damit
+   entfallen.
+
+   Der Typ steht als Plakette (.badge wie in der Entitätenliste), der
+   Rohwert der Zustandsklasse („measurement", „total_increasing") als Tooltip:
+   wer ihn braucht, findet ihn, ohne dass er eine Zeile belegt.
+
+   Erwartet `facts` aus main._entity_facts(). #}
+<dl class="entity-facts">
+  <div class="entity-fact">
+    <dt>{{ _("Typ · Einheit") if facts.unit else _("Typ") }}</dt>
+    <dd><span class="badge {{ aggregation_type }}"{% if facts.state_class %} title="{{ facts.state_class }}"{% endif %}>{{ facts.type_label }}</span>{% if facts.unit %} {{ facts.unit }}{% endif %}</dd>
+  </div>
+  <div class="entity-fact">
+    <dt>{{ _("Erster Wert") }}</dt>
+    <dd>{{ facts.first_ts }}{% if facts.first_ts_time %}<small>{{ facts.first_ts_time }}</small>{% endif %}</dd>
+  </div>
+  <div class="entity-fact">
+    <dt>{{ _("Letzter Wert") }}</dt>
+    <dd>{{ facts.last_ts }}{% if facts.last_ts_time or facts.last_ago %}<small>{{ facts.last_ts_time }}{% if facts.last_ts_time and facts.last_ago %} &middot; {% endif %}{{ facts.last_ago }}</small>{% endif %}</dd>
+  </div>
+  <div class="entity-fact">
+    <dt>{{ _("Datensätze") }}</dt>
+    <dd>{{ facts.row_count }}<small>{{ facts.size }}</small></dd>
+  </div>
+</dl>

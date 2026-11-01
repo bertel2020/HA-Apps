@@ -460,24 +460,6 @@ def test_the_big_numbers_in_the_stat_tiles_shrink_on_phones() -> None:
     assert "word-break:break-word" in grund.group(0)
 
 
-def test_the_timestamp_tiles_use_the_two_line_form_on_phones() -> None:
-    """Auf der Entitäts-Konfiguration steht die Uhrzeit neben dem Datum statt
-    darunter, damit "Erster/Letzter Wert" nicht höher werden als die übrigen
-    Kacheln derselben Reihe. Auf dem Telefon lässt eine Kachel 133px für den
-    Wert, und "17.09.2023 09:41:41" braucht in der großen Schrift knapp 200px —
-    es brach mitten in der Uhrzeit um. Dort trägt die Reihe ohnehin nur die
-    beiden Zeitstempel-Kacheln, der Grund für die Regel entfällt also genau da,
-    wo sie schadet."""
-    html = page_text("entity_config.html")
-    assert re.search(r"@media \(min-width:641px\)\{\s*\.stat \.ts-time\{", html), (
-        "die Inline-Uhrzeit gilt nicht mehr nur am Schreibtisch"
-    )
-    # Eine zweite, unbedingte Regel würde die Grundform auf dem Telefon wieder
-    # aushebeln — die Abfrage allein sagt darüber nichts.
-    ohne_media = re.sub(r"@media[^{]*\{.*?\n  \}", "", html, flags=re.S)
-    assert ".stat .ts-time{" not in ohne_media
-
-
 def test_the_card_buttons_lie_above_the_name_link() -> None:
     """Der Namenslink trägt position:relative (für die Tooltip-Box) und steht im
     DOM NACH Stern und Aufklapper. Bei gleichem z-index gewinnt der spätere —

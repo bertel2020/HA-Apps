@@ -2513,6 +2513,27 @@ def statistik_index_optimize(request: Request) -> HTMLResponse:
     )
 
 
+def _entity_facts(entity) -> dict:
+    """Kennzahlen im Kopf der drei Entitätsseiten (Verlauf, Werte bearbeiten,
+    Konfiguration) — dieselben Felder wie die Spalten der Entitätenliste, damit
+    man sie nicht erst dort nachschlagen muss. Ein gemeinsamer Aufbau, weil der
+    Kopf auf allen drei Seiten gleich ist (_entity_facts.html) und die Werte
+    sonst dreimal leicht verschieden zusammengesetzt würden."""
+    last_ts = entity["last_ts"]
+    return {
+        "type_label": format_type(entity["aggregation_type"]),
+        "state_class": entity["state_class"] or "",
+        "unit": entity["unit"] or "",
+        "row_count": format_int(_visible_row_count(entity)),
+        "size": format_size(entity["size_bytes"]),
+        "first_ts": format_timestamp(entity["first_ts"], TZ),
+        "first_ts_time": format_time(entity["first_ts"], TZ),
+        "last_ts": format_timestamp(last_ts, TZ),
+        "last_ts_time": format_time(last_ts, TZ),
+        "last_ago": tr("vor {dauer}", dauer=format_uptime(max(0.0, time.time() - last_ts))) if last_ts else "",
+    }
+
+
 def _visible_row_count(entity) -> int:
     """Logische Rohwerte: physischer Indexzähler abzüglich Soft-Deletes."""
     deleted_count = int(entity["deleted_count"] or 0)
@@ -2770,12 +2791,7 @@ def _entity_config_context(entity) -> dict:
         "type_label": format_type(entity["aggregation_type"]),
         "state_class": entity["state_class"] or "",
         "unit": entity["unit"] or "—",
-        "row_count": format_int(_visible_row_count(entity)),
-        "first_ts": format_timestamp(entity["first_ts"], TZ),
-        "first_ts_time": format_time(entity["first_ts"], TZ),
-        "last_ts": format_timestamp(entity["last_ts"], TZ),
-        "last_ts_time": format_time(entity["last_ts"], TZ),
-        "size": format_size(entity["size_bytes"]),
+        "facts": _entity_facts(entity),
         "resolution": entity["resolution"],
         "resolution_blocked_reason": RESOLUTION_BLOCKED_REASONS.get(entity["aggregation_type"]),
         # Nur bei Standard und Auflösung != raw relevant — siehe resolution.py.
@@ -4623,6 +4639,7 @@ def entity_detail(
             "type_label": format_type(entity["aggregation_type"]),
             "state_class": entity["state_class"] or "",
             "unit": entity["unit"],
+            "facts": _entity_facts(entity),
             "decimals": decimals_to_int(effective_decimals),
             "display_mode": entity["display_mode"],
             "first_date": first_date,
@@ -4686,9 +4703,7 @@ def entity_cleanup(
             "entity_id": entity_id,
             "friendly_name": entity["friendly_name"],
             "custom_name": entity["custom_name"] or "",
-            # Für die Unterzeile: die drei Entitätsseiten tragen seit der
-            # Reiterzeile denselben Kopf, und dort steht der Typ.
-            "type_label": format_type(entity["aggregation_type"]),
+            "facts": _entity_facts(entity),
             "first_date": first_date,
             "last_date": last_date,
             "gap_detection_enabled": entity["gap_threshold"] != "off",
