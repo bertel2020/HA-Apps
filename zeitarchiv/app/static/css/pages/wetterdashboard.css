@@ -26,13 +26,23 @@
   .wt-heat-table td{font-size:calc(14px * var(--font-scale, 1));}
   .wt-dl{color:var(--chart-1);}
 
-  /* Kacheln */
-  .wt-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:16px;}
-  .wt-tile{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface-alt);display:flex;flex-direction:column;gap:2px;min-width:0;}
-  .wt-tile-label{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600;}
-  .wt-tile-value{font-size:calc(26px * var(--font-scale, 1));font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2;}
-  .wt-tile-value small{font-size:calc(14px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);margin-left:2px;}
-  .wt-tile-sub{font-family:var(--mono);font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);font-variant-numeric:tabular-nums;}
+  /* Kacheln: Aufbau wie die Kennzahl-Kacheln des Energiedashboards (Kopfbalken in der Rollenfarbe,
+     Beschriftung in Großbuchstaben, Wert in Monospace); ganze Kachel verlinkt auf die Entität. */
+  .wt-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:16px;}
+  .wt-tile{--wt-accent:var(--chart-8);display:flex;flex-direction:column;gap:2px;min-width:0;padding:10px 12px;
+    text-decoration:none;color:inherit;border:1px solid var(--border);border-top:3px solid var(--wt-accent);
+    border-radius:8px;background:var(--surface-alt);}
+  .wt-tile:hover{border-color:var(--wt-accent);}
+  .wt-tile[data-role="temperature"]{--wt-accent:var(--chart-2);}
+  .wt-tile[data-role="precip_mm"],.wt-tile[data-role="precip_dur"]{--wt-accent:var(--chart-3);}
+  .wt-tile[data-role="humidity"]{--wt-accent:var(--chart-6);}
+  .wt-tile[data-role="pressure"]{--wt-accent:var(--chart-4);}
+  .wt-tile[data-role="wind"],.wt-tile[data-role="gust"]{--wt-accent:var(--chart-8);}
+  .wt-tile[data-role="radiation"]{--wt-accent:var(--chart-7);}
+  .wt-tile-label{font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600;font-family:var(--font-mono);}
+  .wt-tile-value{font-family:var(--font-mono);font-size:calc(22px * var(--font-scale, 1));font-weight:600;font-variant-numeric:tabular-nums;line-height:1.25;}
+  .wt-tile-value small{font-size:calc(13px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);margin-left:3px;}
+  .wt-tile-sub{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);font-variant-numeric:tabular-nums;}
 
   /* Steuerung über der Tabelle */
   .wt-picker-sep{border-top:1px solid var(--border);margin-top:4px;padding-top:8px;}
@@ -56,15 +66,15 @@
   .wt-table tbody tr:last-child th,.wt-table tbody tr:last-child td{border-bottom:0;}
   .wt-table tbody th{font-weight:500;color:var(--ink-muted);font-size:calc(14px * var(--font-scale, 1));}
   .wt-table .wt-sep{border-left:1px solid var(--border);}
-  .wt-table thead .wt-sb{display:block;font-family:var(--mono);font-size:calc(11.5px * var(--font-scale, 1));font-weight:400;color:var(--ink-muted);}
+  .wt-table thead .wt-sb{display:block;font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));font-weight:400;color:var(--ink-muted);}
   .wt-table thead th.wt-vj{color:var(--ink-muted);}
   .wt-pill{display:inline-block;font-size:calc(11px * var(--font-scale, 1));font-weight:600;border-radius:99px;padding:0 7px;background:var(--surface-alt);color:var(--ink-muted);margin-bottom:2px;}
   .wt-table tr.wt-grp th{font-size:calc(12px * var(--font-scale, 1));text-transform:uppercase;letter-spacing:.07em;color:var(--accent-line);padding-top:16px;border-bottom:1px solid var(--border-strong);}
   .wt-table tr.wt-grp td{border-bottom:1px solid var(--border-strong);}
   .wt-table td .wt-v{font-size:calc(16px * var(--font-scale, 1));font-weight:600;}
   .wt-table td.wt-vj .wt-v{font-weight:400;color:var(--ink-muted);}
-  .wt-table td .wt-d{display:block;font-family:var(--mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);}
-  .wt-table td .wt-dl{display:block;font-family:var(--mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--chart-1);}
+  .wt-table td .wt-d{display:block;font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);}
+  .wt-table td .wt-dl{display:block;font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--chart-1);}
   .wt-table td.wt-na .wt-v{color:var(--ink-faint);font-weight:400;}
 
   /* Einrichtung */

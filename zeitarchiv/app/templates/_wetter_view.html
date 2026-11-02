@@ -34,11 +34,11 @@
   <section x-show="tab === 'overview'">
   <div class="wt-tiles" x-show="tiles.length" x-cloak>
     <template x-for="tile in tiles" :key="tile.key">
-      <div class="wt-tile">
+      <a class="wt-tile" :data-role="tile.key" :href="'entities/' + encodeURIComponent(tile.entity_id)" :title="t('Entität öffnen')">
         <span class="wt-tile-label" x-text="tile.label"></span>
         <span class="wt-tile-value" x-html="tileValue(tile)"></span>
         <span class="wt-tile-sub" x-text="tileSub(tile)"></span>
-      </div>
+      </a>
     </template>
   </div>
 

@@ -620,7 +620,7 @@ class WetterService:
                     config, held_off=bool(entity and entity["first_ts"] and entity["first_ts"] < yesterday["start"].timestamp()),
                 )
             tiles.append({
-                "key": spec["key"], "label": spec["label"], "kind": spec["kind"],
+                "key": spec["key"], "entity_id": spec["entity_id"], "label": spec["label"], "kind": spec["kind"],
                 "unit": spec["unit"], "decimals": spec["decimals"],
                 # Nicht entities.last_value: das ist bei vielen Sensoren leer (siehe Energiedashboard).
                 "last": query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
