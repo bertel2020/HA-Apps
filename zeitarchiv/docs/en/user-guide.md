@@ -739,6 +739,14 @@ day). Only completed days with at least 18 hours of values are counted; you pick
 year above. The same numbers appear as **Characteristic days** rows under the
 outdoor temperature in the comparison table (for month and year columns).
 
+**Years compared, day by day** stacks all years as a matrix: one row per year (the
+newest on top), one column per calendar day, coloured by the daily value. You can
+choose mean, max or min of the outdoor temperature, or precipitation (white to blue).
+Shifts in the seasons stand out: a heat wave or an early frost lines up vertically
+across all rows. Grey cells are days without enough values, blank is before the archive
+began and from today on; a day without a value is never drawn as 0. A click opens the
+day in the entity. 29 February has a column of its own.
+
 **Records** (warmest and coldest day, highest and lowest value, strongest gust,
 wettest day) appear once the archive holds at least a year of daily values and apply
 since the archive began. A single measurement error can set a record: **Open day**

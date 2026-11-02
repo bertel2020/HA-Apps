@@ -291,3 +291,54 @@ def records(points: list[DailyPoint], tz: ZoneInfo, today: date) -> dict | None:
         "highest": entry(highest, highest.max_value), "lowest": entry(lowest, lowest.min_value),
         "days": len(usable), "since": day_of(usable[0], tz).isoformat(),
     }
+
+
+LEAP_SLOTS = 366  # Plätze der Jahr×Tag-Matrix: ein Schaltjahr, damit der 29.02. eine eigene Spalte hat
+
+
+def matrix_slot(day: date) -> int:
+    """Spalte 0..365 in der Jahr×Tag-Matrix (Bezugsjahr 2024, der 29.02. hat Platz 59)."""
+    return date(2024, day.month, day.day).timetuple().tm_yday - 1
+
+
+def matrix(
+    points: list[DailyPoint], tz: ZoneInfo, today: date, field: str, scale: float = 1.0,
+    archive_start: date | None = None, dry_fill: bool = False, require_coverage: bool = True,
+) -> dict:
+    """Jahr×Tag-Matrix: eine Zeile je Jahr (neuestes oben), eine Spalte je Kalendertag.
+
+    field: Feld des Tageswerts (``value``, ``min_value``, ``max_value``). ``cells`` sind
+    ``[Spalte, Zeile, Wert]``. ``missing`` sind Tage zwischen Archivbeginn und gestern ohne Wert
+    (grau gezeichnet, nie als 0); Tage vor dem Archiv und in der Zukunft bleiben leer.
+    dry_fill (Regensensor ein/aus): ein Tag ohne Zeile ist trocken (0), nicht fehlend.
+    Der laufende Tag fehlt immer, sein Wert wandert noch."""
+    values: dict[date, float] = {}
+    for point in points:
+        day = day_of(point, tz)
+        raw = getattr(point, field)
+        if day >= today or raw is None or (require_coverage and not point.covered):
+            continue
+        values[day] = raw * scale
+    first = archive_start or (min(values) if values else None)
+    if first is None:
+        return {"years": [], "cells": [], "missing": [], "min": None, "max": None}
+    years = list(range(today.year, first.year - 1, -1))
+    cells: list[list[float]] = []
+    missing: list[list[int]] = []
+    for row, year in enumerate(years):
+        day = max(date(year, 1, 1), first)
+        stop = min(date(year, 12, 31), today - timedelta(days=1))
+        while day <= stop:
+            value = values.get(day)
+            if value is None and dry_fill:
+                value = 0.0
+            if value is None:
+                missing.append([matrix_slot(day), row])
+            else:
+                cells.append([matrix_slot(day), row, round(value, 2)])
+            day += timedelta(days=1)
+    numbers = [cell[2] for cell in cells]
+    return {
+        "years": years, "cells": cells, "missing": missing,
+        "min": min(numbers) if numbers else None, "max": max(numbers) if numbers else None,
+    }

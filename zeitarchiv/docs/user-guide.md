@@ -792,6 +792,15 @@ mit mindestens 18 Stunden Werten; das Jahr wählt ihr oben. Dieselben Zahlen ste
 als Zeilen **Kenntage** unter der Außentemperatur in der Vergleichstabelle (bei
 Monats- und Jahresspalten).
 
+**Jahre im Vergleich, Tag für Tag** legt alle Jahre als Matrix untereinander: eine
+Zeile je Jahr (das neueste oben), eine Spalte je Kalendertag, gefärbt nach dem
+Tageswert. Wählbar sind Ø, Max, Min der Außentemperatur und der Niederschlag
+(weiß bis blau). So fallen Saisonverschiebungen auf: Eine Hitzewelle oder ein früher
+Frost liegt in allen Zeilen senkrecht übereinander. Graue Felder sind Tage ohne
+ausreichende Werte, leer ist es vor dem Archivbeginn und ab heute; ein Tag ohne Wert
+wird nie als 0 gezeichnet. Ein Klick öffnet den Tag in der Entität. Der 29. Februar hat
+eine eigene Spalte.
+
 **Rekorde** (wärmster und kältester Tag, höchster und tiefster Wert, stärkste Böe,
 nassester Tag) erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte
 enthält, und gelten seit Archivbeginn. Ein einzelner Messfehler kann einen

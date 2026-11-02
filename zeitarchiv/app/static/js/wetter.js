@@ -194,6 +194,15 @@
 
   // Datum eines Platzes; in UTC formatiert, damit die Zeitzone des Browsers kein Datum verschiebt.
   const utcDayMonth = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', timeZone: 'UTC'});
+  // Spalten der Jahr×Tag-Matrix: ein Schaltjahr, damit der 29.02. eine eigene Spalte hat.
+  const MONTH_LENGTHS_LEAP = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const MONTH_STARTS_LEAP = MONTH_LENGTHS_LEAP.map((_len, index) => MONTH_LENGTHS_LEAP.slice(0, index).reduce((a, b) => a + b, 0));
+  function leapSlotDate(slot) {
+    let month = 11;
+    while (MONTH_STARTS_LEAP[month] > slot) month--;
+    return {month: month + 1, day: slot - MONTH_STARTS_LEAP[month] + 1};
+  }
+
   const slotLabel = (slot) => {
     const {month, day} = slotDate(slot);
     return utcDayMonth.format(new Date(Date.UTC(2025, month - 1, day)));
@@ -254,6 +263,9 @@
       longterm: null,
       longError: '',
       kenntageYear: '',
+      matrixMetric: 'avg',
+      matrix: null,
+      matrixError: '',
 
       columnKeys: COLUMN_KEYS,
       columns: [...COLUMN_KEYS],
@@ -330,6 +342,7 @@
         this.tab = tab;
         if (tab === 'precip' && !this.precip) this.loadPrecip();
         if (tab === 'long' && !this.longterm) this.loadLongterm();
+        if (tab === 'long' && !this.matrix) this.loadMatrix();
         // Ein Diagramm in einem eben erst sichtbaren Reiter hat noch keine Größe.
         this.$nextTick(() => Object.values(charts).forEach((chart) => chart.resize()));
       },
@@ -683,6 +696,119 @@
         }, true);
         // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
         requestAnimationFrame(() => chart.resize());
+      },
+
+      // Jahr×Tag-Matrix
+      async loadMatrix() {
+        this.matrixError = '';
+        try {
+          this.matrix = await this.fetchJson(
+            `wetterdashboard/matrix?metric=${this.matrixMetric}&mode=${this.precipModes[0] || 'mm'}`,
+          );
+          this.$nextTick(() => this.drawMatrix());
+        } catch (e) {
+          this.matrixError = t('Die Jahresübersicht konnte nicht geladen werden.');
+        }
+      },
+
+      setMatrixMetric(metric) {
+        this.matrixMetric = metric;
+        this.matrix = null;
+        this.loadMatrix();
+      },
+
+      // Eine Zeile je Jahr: 20 Pixel plus Platz für Achse und Farbskala.
+      matrixHeight() {
+        const years = this.matrix ? this.matrix.years.length : 3;
+        return `height: ${Math.max(160, years * 20 + 90)}px`;
+      },
+
+      matrixNote() {
+        const m = this.matrix;
+        if (!m) return '';
+        if (!m.years.length) return t('Noch keine Tageswerte.');
+        return t('Neuestes Jahr oben, eine Spalte je Kalendertag. Graue Felder sind Tage ohne ausreichende Werte (mindestens 18 Stunden), leer ist es vor dem Archivbeginn und ab heute. Ein Klick öffnet den Tag in der Entität.');
+      },
+
+      drawMatrix() {
+        const m = this.matrix;
+        const element = this.$refs.matrixChart;
+        if (!m || !element) return;
+        if (!m.years.length || m.min == null) {
+          if (charts.matrix) charts.matrix.clear();
+          return;
+        }
+        const colors = palette();
+        const isPrecip = m.metric === 'precip';
+        const decimals = isPrecip && m.unit === 'min' ? 0 : 1;
+        const unit = m.unit;
+        const inRange = isPrecip
+          ? [colors.surface, colors.cold]
+          : [colors.cold, colors.surface, colors.prev];
+        const hidden = {itemStyle: {borderWidth: 0}};
+        const chart = chartFor('matrix', element);
+        chart.setOption({
+          animation: false,
+          grid: {left: 8, right: 16, top: 6, bottom: 52, containLabel: true},
+          xAxis: {
+            type: 'category', data: Array.from({length: 366}, (_x, i) => i), splitArea: {show: false},
+            axisLine: {lineStyle: {color: colors.grid}}, axisTick: {show: false},
+            axisLabel: {
+              color: colors.text, fontSize: scaledFont(11),
+              interval: (index) => MONTH_STARTS_LEAP.includes(index),
+              formatter: (_value, index) => monthName(leapSlotDate(index).month, 'short'),
+            },
+          },
+          yAxis: {
+            type: 'category', data: m.years.map(String), inverse: true,
+            axisLine: {show: false}, axisTick: {show: false}, axisLabel: {color: colors.text, fontSize: scaledFont(11)},
+          },
+          visualMap: {
+            type: 'continuous', min: m.min, max: m.max, seriesIndex: 1, calculable: false, orient: 'horizontal',
+            left: 'center', bottom: 4, itemWidth: 12, itemHeight: 140, inRange: {color: inRange},
+            textStyle: {color: colors.text, fontSize: scaledFont(11)},
+            text: [`${num(m.max, decimals)} ${unit}`, `${num(m.min, decimals)} ${unit}`],
+          },
+          tooltip: {
+            confine: true, backgroundColor: colors.surface, borderColor: colors.grid,
+            textStyle: {color: colors.ink, fontSize: scaledFont(12)},
+            formatter: (param) => {
+              const [slot, row, value] = param.data;
+              const when = this.matrixDate(m.years[row], slot);
+              const label = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'}).format(when);
+              return param.seriesIndex === 0
+                ? `<b>${escapeHtml(label)}</b><br>${escapeHtml(t('Zu wenige Werte'))}`
+                : `<b>${escapeHtml(label)}</b><br>${escapeHtml(num(value, decimals))} ${escapeHtml(unit === '°C' ? '°C' : unit)}`;
+            },
+          },
+          series: [
+            {
+              type: 'heatmap', data: m.missing.map(([slot, row]) => [slot, row, 0]), silent: false, ...hidden,
+              itemStyle: {color: colors.grid, borderWidth: 0},
+            },
+            {type: 'heatmap', data: m.cells, ...hidden},
+          ],
+        }, true);
+        chart.off('click');
+        chart.on('click', (param) => {
+          if (param.seriesIndex !== 1) return;
+          const [slot, row] = param.data;
+          window.location.href = this.matrixLink(m, m.years[row], slot);
+        });
+        requestAnimationFrame(() => chart.resize());
+      },
+
+      // Kalendertag einer Spalte als UTC-Datum (Spalte 59 ist der 29.02. eines Schaltjahres).
+      matrixDate(year, slot) {
+        const leapDay = new Date(Date.UTC(2024, 0, 1 + slot));
+        return new Date(Date.UTC(year, leapDay.getUTCMonth(), leapDay.getUTCDate()));
+      },
+
+      matrixLink(m, year, slot) {
+        const day = this.matrixDate(year, slot);
+        const [ty, tm, td] = m.today.split('-').map(Number);
+        const offset = Math.round((day.getTime() - Date.UTC(ty, tm - 1, td)) / 86400000);
+        return `entities/${encodeURIComponent(m.entity_id)}?range=day&offset=${offset}`;
       },
 
       recordLabel(key) {

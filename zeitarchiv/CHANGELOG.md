@@ -19,7 +19,8 @@
   Reiter Niederschlag zeigt die Laufsumme seit Jahresbeginn gegen Vorjahr und
   Durchschnitt, mit Regentagen, nassestem Tag und Trockenphasen, der Reiter
   Langzeit Kenntage je Monat (Frost, Eis, Sommer, heiß) und Rekorde mit Sprung
-  zum Tag; die Kenntage stehen auch als Zeilen in der Tabelle.
+  zum Tag; die Kenntage stehen auch als Zeilen in der Tabelle. Dazu zeigt
+  Langzeit alle Jahre als Matrix, Tag für Tag, mit dem neuesten Jahr oben.
   Eingeschaltet wird die Seite über eine Kachel auf der Dashboard-Übersicht,
   danach steht sie im Menü Dashboards unter dem Energiedashboard. Die
   Demo-Daten bringen dafür Wetter-Entitäten und Heizzähler mit (nach „Neu
@@ -86,7 +87,8 @@
   year against last year and the average, with rain days, wettest day and dry
   spells; the Long-term tab shows characteristic days per month (frost, ice,
   summer, hot) and records with a jump to the day; the characteristic days also
-  appear as rows in the table. The page is switched on with a tile on the
+  appear as rows in the table. Long-term also shows all years as a matrix,
+  day by day, with the newest year on top. The page is switched on with a tile on the
   dashboards overview
   and then sits in the Dashboards menu below the energy dashboard. The demo data
   brings weather entities and heating counters for it (after "Regenerate").

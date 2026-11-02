@@ -203,3 +203,46 @@ def test_monthly_sums_for_a_rain_sensor_count_quiet_months_as_dry() -> None:
     assert wa.monthly(points, TZ, date(2025, 6, 10), "sum")["years"] == {}  # ohne Abdeckung unbekannt
     late = wa.monthly(points, TZ, date(2025, 6, 10), "sum", dry_start=date(2025, 4, 20))
     assert late["years"]["2025"][2] == 40.0 and late["years"]["2025"][0] is None  # vor Archivbeginn unbekannt
+
+
+# -- Jahr×Tag-Matrix ---------------------------------------------------------------------------
+
+
+def test_matrix_slots_give_the_leap_day_its_own_column() -> None:
+    assert wa.matrix_slot(date(2024, 2, 29)) == 59
+    assert wa.matrix_slot(date(2025, 3, 1)) == 60 and wa.matrix_slot(date(2024, 3, 1)) == 60
+    assert wa.matrix_slot(date(2025, 12, 31)) == 365
+
+
+def test_matrix_rows_are_years_newest_on_top_and_gaps_are_missing_not_zero() -> None:
+    today = date(2026, 3, 10)
+    points = [_point(day, value=5.0) for day in _days(date(2025, 1, 1), date(2025, 12, 31)) if day != date(2025, 5, 5)]
+    points += [_point(day, value=2.0) for day in _days(date(2026, 1, 1), date(2026, 3, 9))]
+    result = wa.matrix(points, TZ, today, "value", archive_start=date(2025, 1, 1))
+    assert result["years"] == [2026, 2025]
+    by_cell = {(slot, row): value for slot, row, value in result["cells"]}
+    assert by_cell[(0, 0)] == 2.0 and by_cell[(0, 1)] == 5.0
+    assert [wa.matrix_slot(date(2025, 5, 5)), 1] in result["missing"] and (wa.matrix_slot(date(2025, 5, 5)), 1) not in by_cell
+    assert (wa.matrix_slot(date(2026, 3, 10)), 0) not in by_cell  # heute fehlt immer
+    assert [wa.matrix_slot(date(2026, 3, 10)), 0] not in result["missing"]  # Zukunft und heute sind leer, nicht grau
+    assert (result["min"], result["max"]) == (2.0, 5.0)
+
+
+def test_matrix_skips_days_before_the_archive_and_thin_days() -> None:
+    today = date(2026, 1, 20)
+    points = [_point(date(2026, 1, 12), value=1.0), _point(date(2026, 1, 13), value=1.0, covered=False)]
+    result = wa.matrix(points, TZ, today, "value", archive_start=date(2026, 1, 10))
+    slots = {slot for slot, _row, _value in result["cells"]} | {slot for slot, _row in result["missing"]}
+    assert min(slots) == 9 and len(result["cells"]) == 1  # ab dem 10.1.; der dünne 13.1. ist grau
+    assert [12, 0] in result["missing"]
+
+
+def test_matrix_dry_fill_counts_quiet_days_as_zero_for_a_rain_sensor() -> None:
+    points = [_point(date(2026, 1, 3), value=20.0)]
+    result = wa.matrix(points, TZ, date(2026, 1, 6), "value", scale=0.5, archive_start=date(2026, 1, 1), dry_fill=True, require_coverage=False)
+    assert sorted(result["cells"]) == [[0, 0, 0.0], [1, 0, 0.0], [2, 0, 10.0], [3, 0, 0.0], [4, 0, 0.0]]
+    assert result["missing"] == []
+
+
+def test_matrix_without_data_is_empty() -> None:
+    assert wa.matrix([], TZ, date(2026, 1, 6), "value")["years"] == []

@@ -446,6 +446,39 @@ class WetterService:
         result["headline"] = analysis.headline(points, self.deps.tz, today) if metric == "temperature" else None
         return result
 
+    def compute_matrix(self, metric: str, mode: str = "mm", now_local: datetime | None = None) -> dict | None:
+        """Jahr×Tag-Matrix. metric: ``avg``/``max``/``min`` (Außentemperatur) oder ``precip``."""
+        config = _load_config(self.deps.index)
+        now_local = now_local or datetime.now(self.deps.tz)
+        today = now_local.date()
+        if metric == "precip":
+            role = self._precip_role(config, mode)
+            if role is None:
+                return None
+            entity_id, kind = role
+            entity = self.deps.index.get_entity(entity_id)
+            start = datetime.fromtimestamp(entity["first_ts"], self.deps.tz).date() if entity["first_ts"] else None
+            result = analysis.matrix(
+                self._daily(entity_id, now_local), self.deps.tz, today, "value",
+                scale=1.0 / 60.0 if kind == "dur" else 1.0, archive_start=start,
+                dry_fill=kind == "dur", require_coverage=False,
+            )
+            unit = "min" if kind == "dur" else (entity["unit"] or "mm")
+        else:
+            entity_id = config["temperature"]
+            entity = self.deps.index.get_entity(entity_id) if entity_id else None
+            if entity is None:
+                return None
+            field = {"avg": "value", "max": "max_value", "min": "min_value"}.get(metric)
+            if field is None:
+                raise ValueError(metric)
+            start = datetime.fromtimestamp(entity["first_ts"], self.deps.tz).date() if entity["first_ts"] else None
+            result = analysis.matrix(
+                self._daily(entity_id, now_local), self.deps.tz, today, field, archive_start=start,
+            )
+            unit = entity["unit"] or "°C"
+        return {**result, "metric": metric, "unit": unit, "entity_id": entity_id, "today": today.isoformat(), "tz": str(self.deps.tz)}
+
     def compute_longterm(self, now_local: datetime | None = None) -> dict | None:
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
@@ -675,6 +708,16 @@ class WetterService:
             if metric not in ("temperature", "precip"):
                 raise HTTPException(status_code=400, detail=tr("Ungültige Kennzahl."))
             result = self.compute_monthly(metric, mode)
+            if result is None:
+                raise HTTPException(status_code=404, detail=tr("Kein Niederschlag zugeordnet."))
+            return result
+
+        @router.get("/wetterdashboard/matrix")
+        def wetterdashboard_matrix(metric: str = "avg", mode: str = "mm") -> dict:
+            _require_configured()
+            if metric not in ("avg", "max", "min", "precip"):
+                raise HTTPException(status_code=400, detail=tr("Ungültige Kennzahl."))
+            result = self.compute_matrix(metric, mode)
             if result is None:
                 raise HTTPException(status_code=404, detail=tr("Kein Niederschlag zugeordnet."))
             return result

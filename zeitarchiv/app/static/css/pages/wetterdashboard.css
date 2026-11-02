@@ -14,6 +14,7 @@
   .wt-headline{font-size:calc(15px * var(--font-scale, 1));margin:8px 0 12px;color:var(--ink);}
   .wt-chart{width:100%;height:300px;}
   .wt-chart-tall{height:360px;}
+  .wt-matrix{min-height:160px;}
   .wt-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:8px 0 12px;}
   .wt-record-link{font-size:calc(12px * var(--font-scale, 1));color:var(--accent-line);margin-top:2px;}
   .wt-controls select{font:inherit;font-size:calc(13px * var(--font-scale, 1));padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink);}

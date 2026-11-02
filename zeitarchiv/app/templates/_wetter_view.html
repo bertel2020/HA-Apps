@@ -115,6 +115,22 @@
       <div class="wt-chart" x-ref="kenntageChart"></div>
       <p class="wt-hint" x-text="kenntageNote()"></p>
     </div>
+    <div class="card wt-card">
+      <div class="wt-controls">
+        <h2 class="wt-h2">{{ _("Jahre im Vergleich, Tag für Tag") }}</h2>
+        <div class="wt-seg" role="group" aria-label="{{ _('Kennzahl') }}">
+          <button type="button" :aria-pressed="(matrixMetric === 'avg').toString()" @click="setMatrixMetric('avg')">Ø</button>
+          <button type="button" :aria-pressed="(matrixMetric === 'max').toString()" @click="setMatrixMetric('max')">{{ _("Max") }}</button>
+          <button type="button" :aria-pressed="(matrixMetric === 'min').toString()" @click="setMatrixMetric('min')">{{ _("Min") }}</button>
+          {% if precip_modes %}
+          <button type="button" :aria-pressed="(matrixMetric === 'precip').toString()" @click="setMatrixMetric('precip')">{{ _("Niederschlag") }}</button>
+          {% endif %}
+        </div>
+      </div>
+      <div class="wt-chart wt-matrix" x-ref="matrixChart" :style="matrixHeight()"></div>
+      <p class="wt-hint" x-text="matrixNote()"></p>
+      <p class="wt-hint wt-error" x-show="matrixError" x-text="matrixError" x-cloak></p>
+    </div>
     <div class="card wt-card" x-show="longterm && longterm.records.length" x-cloak>
       <h2 class="wt-h2">{{ _("Rekorde") }}</h2>
       <div class="wt-kpis">

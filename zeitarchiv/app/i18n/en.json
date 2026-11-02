@@ -3384,7 +3384,8 @@
     "Spanne der Vorjahre": "Range of previous years",
     "Tag öffnen": "Open day",
     "Temperatur": "Temperature",
-    "Ungültige Kennzahl.": "Invalid metric."
+    "Ungültige Kennzahl.": "Invalid metric.",
+    "Jahre im Vergleich, Tag für Tag": "Years compared, day by day"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4016,6 +4017,10 @@
     "{month} bisher Ø {value} {unit}, so warm wie der Ø {from}–{to} ({range}, aus {n} Jahren)": "{month} so far mean {value} {unit}, as warm as the mean of {from}–{to} ({range}, from {n} years)",
     "{month} bisher Ø {value} {unit}, {delta} K kälter als der Ø {from}–{to} ({range}, aus {n} Jahren)": "{month} so far mean {value} {unit}, {delta} K colder than the mean of {from}–{to} ({range}, from {n} years)",
     "{month} bisher Ø {value} {unit}, {delta} K wärmer als der Ø {from}–{to} ({range}, aus {n} Jahren)": "{month} so far mean {value} {unit}, {delta} K warmer than the mean of {from}–{to} ({range}, from {n} years)",
-    "nur der 1.": "only the 1st"
+    "nur der 1.": "only the 1st",
+    "Die Jahresübersicht konnte nicht geladen werden.": "The year overview could not be loaded.",
+    "Noch keine Tageswerte.": "No daily values yet.",
+    "Neuestes Jahr oben, eine Spalte je Kalendertag. Graue Felder sind Tage ohne ausreichende Werte (mindestens 18 Stunden), leer ist es vor dem Archivbeginn und ab heute. Ein Klick öffnet den Tag in der Entität.": "Newest year on top, one column per calendar day. Grey cells are days without enough values (at least 18 hours), blank is before the archive began and from today on. A click opens the day in the entity.",
+    "Zu wenige Werte": "Too few values"
   }
 }

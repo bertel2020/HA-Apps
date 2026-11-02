@@ -347,3 +347,30 @@ def test_phase_two_routes_through_the_app(client) -> None:
     assert client.get("/wetterdashboard/monatsvergleich?metric=temperature").status_code == 200
     assert client.get("/wetterdashboard/langzeit").status_code == 200
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
+def test_matrix_for_temperature_and_rain(service) -> None:
+    _rain_setup(service)
+    _configure(service, temperature="sensor.t", precip_mm="sensor.regen", precip_dur="binary_sensor.regen")
+    rain = service.compute_matrix("precip", "mm", NOW)
+    assert rain["years"] == [2026] and rain["unit"] == "mm" and rain["entity_id"] == "sensor.regen"
+    assert any(cell[2] == pytest.approx(2.0) for cell in rain["cells"])
+    minutes = service.compute_matrix("precip", "dur", NOW)
+    # Der erste Wechsel war heute: vor dem Archiv und heute selbst bleibt die Matrix leer.
+    assert minutes["unit"] == "min" and minutes["cells"] == [] and minutes["missing"] == []
+    temperature = service.compute_matrix("avg", now_local=NOW)
+    assert temperature["unit"] == "°C" and temperature["cells"] == []  # zu wenige Stunden je Tag: keine abgedeckten Tage
+    _configure(service, temperature="sensor.t")
+    assert service.compute_matrix("precip", "mm", NOW) is None
+
+
+def test_matrix_route_validates_the_metric(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp3", "sensor", "measurement", "°C")
+    wetter_routes._save_config(index, {**wetter_routes._empty_config(), "temperature": "sensor.wetter_test_temp3"})
+    assert client.get("/wetterdashboard/matrix?metric=unsinn").status_code == 400
+    assert client.get("/wetterdashboard/matrix?metric=precip").status_code == 404
+    answer = client.get("/wetterdashboard/matrix?metric=max")
+    assert answer.status_code == 200 and answer.json()["years"] == []
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
