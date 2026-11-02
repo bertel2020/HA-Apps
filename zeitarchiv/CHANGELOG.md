@@ -24,7 +24,7 @@
   Ordnet ihr Heizzähler zu (auch mehrere), erscheint der Reiter Heizen:
   Streudiagramm Tagesmittel gegen kWh mit Ausgleichsgerade, Gradtagzahl und
   kWh je Gradtag je Monat und Heizperiode, und der Anteil je Zähler.
-  Die Tabelle lässt sich über einen Stichtag auf einen früheren Tag stellen.
+  Die Tabelle lässt sich über die Stichtag-Leiste der Dashboards auf einen früheren Tag stellen.
   Eingeschaltet wird die Seite über eine Kachel auf der Dashboard-Übersicht,
   danach steht sie im Menü Dashboards unter dem Energiedashboard. Backups
   sichern die Zuordnung mit, der selektive Restore stellt sie wieder her, und
@@ -99,7 +99,7 @@
   year against last year and the average, with rain days, wettest day and dry
   spells; the Long-term tab shows characteristic days per month (frost, ice,
   summer, hot) and records with a jump to the day; the characteristic days also
-  appear as rows in the table. The table can be set to an earlier day with a reference date. Long-term also shows all years as a matrix,
+  appear as rows in the table. The table can be set to an earlier day with the reference-date bar of the dashboards. Long-term also shows all years as a matrix,
   day by day, with the newest year on top. If you assign heating
   counters (several are possible), the Heating tab appears: scatter chart of daily
   mean against kWh with regression line, degree days and kWh per degree day per

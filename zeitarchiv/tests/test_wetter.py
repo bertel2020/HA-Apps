@@ -662,3 +662,35 @@ def test_tiles_use_short_names_and_the_layout_helper(service) -> None:
     assert [tile["label"] for tile in service.compute_tiles(NOW)] == ["Temperatur außen", "Niederschlag", "Regen"]
     assert "WetterLayout.tileColumns" in (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "wetter-layout.js" in (TEMPLATES / "wetterdashboard.html").read_text(encoding="utf-8")
+
+
+def test_reference_day_uses_the_dashboard_stichtag_bar_of_the_app() -> None:
+    from _paths import APP, TEMPLATES
+
+    view = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+    page = (TEMPLATES / "wetterdashboard.html").read_text(encoding="utf-8")
+    assert "{{ period_nav() }}" in view and "period_assets()" in page
+    assert "wt-daynav" not in view and 'type="date"' not in view
+    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "Alpine.store('dashStichtag').date" in script and "'dashboard-stichtag'" in script
+    assert "shiftStichtag" not in script and "setStichtag" not in script
+
+
+def test_page_context_carries_the_calendar_bounds_for_the_stichtag_bar(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp5", "sensor", "measurement", "°C")
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    html = client.get("/wetterdashboard").text
+    assert "dash-period-nav" not in html  # noch nicht eingerichtet: keine Leiste
+    wetter_routes._save_config(index, {**wetter_routes._empty_config(), "temperature": "sensor.wetter_test_temp5"})
+    page = client.get("/wetterdashboard").text
+    assert "dash-period-nav" in page and "dashboard-period-nav.js" in page and "calendar-picker.js" in page
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
+def test_columns_with_a_reference_day_show_the_weekday_under_the_date() -> None:
+    from _paths import APP
+
+    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "formats.weekday" in script and "weekday: new Intl.DateTimeFormat" in script

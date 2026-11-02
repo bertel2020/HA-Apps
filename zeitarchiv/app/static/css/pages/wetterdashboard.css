@@ -55,7 +55,6 @@
   .wt-tile-sub{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);font-variant-numeric:tabular-nums;}
 
   /* Steuerung über der Tabelle */
-  .wt-date{font:inherit;font-size:calc(13px * var(--font-scale, 1));padding:4px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);}
   .dd-picker-wrap > .btn.wt-btn-on{border-color:var(--accent-line);color:var(--accent-line);font-weight:600;}
   .wt-controls{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-bottom:6px;}
   .wt-cols{display:flex;flex-wrap:wrap;gap:4px 14px;}

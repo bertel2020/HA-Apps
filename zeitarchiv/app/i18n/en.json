@@ -2810,7 +2810,6 @@
     "Konfiguration öffnen": "Open configuration",
     "Zeitraum-Navigation": "Period navigation",
     "Blendet über den Kacheln eine Stichtag-Leiste ein. Damit springt das ganze Dashboard auf einen anderen Tag: Jede Kachel zeigt ihren Zeitraum, der diesen Tag enthält. Kacheln mit festem Zeitraum bleiben unverändert.": "Shows a reference-date bar above the tiles. It moves the whole dashboard to another day: each tile shows its period that contains this day. Tiles with a fixed period stay unchanged.",
-    "Stichtag": "Reference date",
     "Zu einem bestimmten Tag springen": "Jump to a specific day",
     "Schrittweite": "Step",
     "Jede Kachel zeigt ihren Zeitraum, der diesen Tag enthält. Kacheln mit festem Zeitraum bleiben unverändert, die automatische Aktualisierung pausiert.": "Each tile shows its period that contains this day. Tiles with a fixed period stay unchanged; automatic refresh is paused.",
@@ -3406,7 +3405,8 @@
     "Zeiträume im Vergleich": "Periods compared",
     "Gradtagzahl": "Degree days",
     "Ungültiges Datum: {value}": "Invalid date: {value}",
-    "Regen": "Rain"
+    "Regen": "Rain",
+    "Stichtag": "Reference date"
   },
   "js": {
     "Ladestand": "State of charge",

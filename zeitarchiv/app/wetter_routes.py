@@ -31,6 +31,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 from . import wetter_analysis as analysis
+from .chart_period import calendar_bounds
 from .formatting import decimals_to_int, entity_display_name
 from .storage import query as query_mod
 from .storage import rollup as rollup_mod
@@ -664,6 +665,7 @@ class WetterService:
             "configured": _is_configured(config),
             "precip_modes": self.available_precip(),
             "has_heating": bool(self.heating_counters(config)),
+            **calendar_bounds(self.deps.index.list_entities(), self.deps.tz),
             "enabled": _is_enabled(self.deps.index),
             "config": config,
             **self.deps.app_root_context(request),

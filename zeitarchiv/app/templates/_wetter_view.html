@@ -1,4 +1,5 @@
 {% from "_hints.html" import hint_button, hint_body %}
+{% from "_dashboard_period_nav.html" import nav as period_nav with context %}
 {% if not configured %}
 <div class="wt-title-row">
   <h1>{{ _("Wetterdashboard") }}</h1>
@@ -53,11 +54,9 @@
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Zeiträume im Vergleich") }} {{ hint_button(_("Zeiträume im Vergleich")) }}</h2>
       {% call hint_body() %}<span x-show="vorjahr" x-text="modeHint()"></span>{% endcall %}
-      {# Stichtag: die Tabelle zeigt die Zeiträume zu einem früheren Tag (Heute, Gestern, Monat … beziehen sich dann auf ihn). #}
-      <label class="wt-check">{{ _("Stichtag") }}
-        <input type="date" class="wt-date" :max="todayIso" :value="stichtag" @change="setStichtag($event.target.value)">
-      </label>
-      <button type="button" class="btn" x-show="stichtag" x-cloak @click="setStichtag('')">{{ _("Heute") }}</button>
+      {# Stichtag-Leiste des App-Standards (wie bei den Dashboards: ‹ Datum ›, Kalender, Schrittweite, „Heute“). Der Alpine-Store
+         dashStichtag hält den Tag und stellt ihn als ?date=… in die Adresse; wetter.js lädt die Tabelle bei „dashboard-stichtag“ neu. #}
+      {{ period_nav() }}
       {# Spaltenauswahl wie in der Entitätenliste: Knopf „Spalten ▾“ mit Popover (dd-picker). #}
       <div class="dd-picker-wrap">
         <button type="button" class="btn" onclick="toggleDDPicker('wt-cols')">{{ _("Spalten ▾") }}</button>
