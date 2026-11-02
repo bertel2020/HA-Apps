@@ -46,6 +46,13 @@
 
 ### Geändert
 
+- **CSV-Export, Assistent**: Der Assistent ist übersichtlicher.
+  - Die Schrittleiste sitzt als Kopf einer Karte und zeigt die bisherige Wahl
+  - Die Leiste mit „Weiter“ bleibt am unteren Rand sichtbar
+  - Gewählte Zeilen sind eingefärbt, der Download je Zeile heißt „↓ CSV“
+  - Zeitraum mit Hinweis auf die vorhandenen Daten; die Auflösungen stehen
+    nebeneinander mit einem Balken für die Dateigröße
+
 - **Entität konfigurieren, neu gegliedert**: Die Konfigurationsseite ist
   übersichtlicher.
   - Abschnitte Allgemein, Erfassung, Aufbewahrung, Darstellung und Prüfung mit
@@ -115,6 +122,13 @@
   get the same file as before.
 
 #### Changed
+
+- **CSV export, wizard**: The wizard is clearer.
+  - The step bar is the header of a card and shows the choices made so far
+  - The bar with "Next" stays visible at the bottom
+  - Selected rows are highlighted, the per-row download is now "↓ CSV"
+  - The period shows a note on the available data; the resolutions sit side
+    by side with a bar for the file size
 
 - **Configure an entity, restructured**: The configuration page is clearer.
   - Sections General, Recording, Retention, Display and Checks with a jump line

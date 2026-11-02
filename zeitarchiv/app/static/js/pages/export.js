@@ -250,12 +250,25 @@
         return true;
       }
 
+      // Kurze Wahl unter erledigten Schritten: Anzahl, Zeitraum, Auflösung.
+      function stepValue(k) {
+        if (k === 1) return t('{n} ausgewählt', {n: state.selected.size});
+        if (k === 2) {
+          const p = period();
+          if (state.mode === 'all') return t('Alles');
+          if (state.mode === 'year') return String(state.year);
+          if (state.mode === 'month') return `${MONTHS_LONG[state.month - 1]} ${state.year}`;
+          return p.from || p.to ? `${p.from ? localDate(p.from) : t('Anfang')} – ${p.to ? localDate(p.to) : t('Ende')}` : t('Alles');
+        }
+        return RESOLUTIONS.find(r => r.key === state.resolution).label;
+      }
       function renderSteps() {
         $('export-steps').innerHTML = STEPS.map((label, i) => {
           const k = i + 1;
           const cls = k === state.step ? 'cur' : (k < state.step ? 'done' : '') + (reachable(k) ? '' : ' locked');
+          const value = k < state.step && k < 4 ? `<span class="sv">${escapeHtml(stepValue(k))}</span>` : '';
           return `<li class="${cls.trim()}"><span class="dot">${k < state.step ? '✓' : k}</span>` +
-            `<button type="button" data-step="${k}"${k === state.step ? ' aria-current="step"' : ''}${reachable(k) ? '' : ' disabled'}>${label}</button></li>`;
+            `<button type="button" data-step="${k}"${k === state.step ? ' aria-current="step"' : ''}${reachable(k) ? '' : ' disabled'}>${label}${value}</button></li>`;
         }).join('');
       }
 
@@ -277,14 +290,18 @@
           return `<button type="button" data-month="${m}" aria-pressed="${state.month === m}"${has ? '' : ` disabled title="${t('Keine Daten')}"`}>${label}</button>`;
         }).join('');
         $('export-period-text').textContent = periodText();
+        $('export-span-text').textContent = s ? t('Daten vorhanden vom {first} bis {last}.', {first: localDate(s.first.slice(0, 10)), last: localDate(s.last.slice(0, 10))}) : '';
       }
 
       function renderResolutions() {
+        // Der Balken zeigt die Größe der größten Datei gegenüber den Rohwerten.
+        const rawWorst = Math.max(1, stats('raw').worst);
         $('export-resolutions').innerHTML = RESOLUTIONS.map(r => {
           const st = stats(r.key);
           const note = state.info ? `${t('größte Datei: {n} Zeilen', {n: number(st.worst)})}${st.tooBig.length ? ' ' + t('(zu groß)') : ''}` : '…';
-          return `<button type="button" class="export-res" data-resolution="${r.key}" aria-pressed="${state.resolution === r.key}">` +
-            `<b>${r.label}</b><span>${r.desc}</span><span class="n">${note}</span></button>`;
+          const width = state.info ? Math.max(st.worst ? 3 : 0, Math.min(100, st.worst / rawWorst * 100)) : 0;
+          return `<button type="button" class="export-res${st.tooBig.length ? ' over' : ''}" data-resolution="${r.key}" aria-pressed="${state.resolution === r.key}">` +
+            `<b>${r.label}</b><span>${r.desc}</span><div class="bar"><i style="width:${width}%"></i></div><span class="n">${note}</span></button>`;
         }).join('');
         $('export-res-hint').textContent = state.resolution === 'raw'
           ? t('Rohwerte werden unverändert übernommen.')
@@ -349,7 +366,8 @@
         renderOptions();
         const names = state.info ? state.info.files.map(f => f.name) : [];
         const resLabel = RESOLUTIONS.find(r => r.key === state.resolution).label;
-        const bar = Math.min(100, (mode === 'per_entity' ? st.worst : rows) / limit() * 100);
+        const fill = mode === 'per_entity' ? st.worst : rows;
+        const bar = fill ? Math.max(1.5, Math.min(100, fill / limit() * 100)) : 0;
         const shown = names.slice(0, 6).map(n => `<span class="export-chip">${escapeHtml(n)}</span>`).join('') +
           (names.length > 6 ? `<span class="export-chip more">${escapeHtml(t('+{n} weitere', {n: names.length - 6}))}</span>` : '');
         $('export-summary').innerHTML =

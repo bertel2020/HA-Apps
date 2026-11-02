@@ -41,11 +41,11 @@
       <td>{{ row.row_count | format_int }}</td>
       <td class="actions">
         {% if row.row_count == 0 %}
-        <span class="btn" aria-disabled="true" style="pointer-events:none;opacity:.4;">{{ _("CSV herunterladen") }}</span>
+        <span class="btn dl" aria-disabled="true" aria-label="{{ _('CSV herunterladen') }}" style="pointer-events:none;opacity:.4;"><span aria-hidden="true">↓</span> CSV</span>
         {% elif row.row_count > max_rows %}
-        <span class="btn" aria-disabled="true" style="pointer-events:none;opacity:.4;" title="{{ _('Mehr als {max_rows} Zeilen. Im Assistenten einen Zeitraum wählen.', max_rows=max_rows|format_int) }}">{{ _("CSV herunterladen") }}</span>
+        <span class="btn dl" aria-disabled="true" aria-label="{{ _('CSV herunterladen') }}" style="pointer-events:none;opacity:.4;" title="{{ _('Mehr als {max_rows} Zeilen. Im Assistenten einen Zeitraum wählen.', max_rows=max_rows|format_int) }}"><span aria-hidden="true">↓</span> CSV</span>
         {% else %}
-        <a class="btn" href="export/download?entity_id={{ row.entity_id | urlencode }}" title="{{ _('Komplette Historie, Rohwerte') }}">{{ _("CSV herunterladen") }}</a>
+        <a class="btn dl" href="export/download?entity_id={{ row.entity_id | urlencode }}" aria-label="{{ _('CSV herunterladen') }}" title="{{ _('Komplette Historie, Rohwerte') }}"><span aria-hidden="true">↓</span> CSV</a>
         {% endif %}
       </td>
     </tr>

@@ -9,13 +9,13 @@
     <h1>{{ _("CSV-Export") }}</h1>
     <p class="sub">{{ _("In vier Schritten zur Datei: Entitäten wählen, Zeitraum, Auflösung, Form und Download. Eine Entität ergibt eine CSV, mehrere ein ZIP mit je einer CSV oder eine gemeinsame Datei.") }}</p>
 
-    <ol class="export-steps" id="export-steps" aria-label="{{ _('Schritte') }}"></ol>
-
     <div class="settings-panel export-wizard" id="export-wizard" data-max-rows="{{ max_rows }}">
+
+      <ol class="export-steps" id="export-steps" aria-label="{{ _('Schritte') }}"></ol>
 
       <section class="export-step" id="export-step-1">
         <h2>{{ _("Welche Entitäten?") }}</h2>
-        <p class="export-lead">{{ _("Ankreuzen, was exportiert werden soll. „CSV herunterladen“ in einer Zeile lädt sofort die komplette Historie dieser Entität als Rohwerte.") }}</p>
+        <p class="export-lead">{{ _("Ankreuzen, was exportiert werden soll. „↓ CSV“ in einer Zeile lädt sofort die komplette Historie dieser Entität als Rohwerte.") }}</p>
 
         <div id="controls" class="export-controls" hx-trigger="load, change from:#controls, keyup delay:300ms from:[name=search]"
              hx-get="export-table" hx-include="#controls, [name=page_size]" hx-target="#export-table" hx-swap="innerHTML">
@@ -87,6 +87,7 @@
             <label>{{ _("Bis") }}<input type="date" id="export-to"></label>
           </div>
           <div class="export-period-text" id="export-period-text"></div>
+          <p class="export-hint" id="export-span-text"></p>
         </div>
       </section>
 
