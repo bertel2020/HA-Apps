@@ -56,7 +56,7 @@
     if (unit === 'K') text += ' K';
     if (withPercent && previous !== 0 && !zero) {
       const percent = diff / previous * 100;
-      text += ' · ' + (percent > 0 ? '+' : '−') + num(Math.abs(percent), 0) + ' %';
+      text += ' (' + (percent > 0 ? '+' : '−') + num(Math.abs(percent), 0) + ' %)';
     }
     return `<span class="wt-dl">${escapeHtml(text)}</span>`;
   }
