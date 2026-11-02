@@ -2,7 +2,8 @@
 {# Rollen-Zuordnung des Wetterdashboards. Jede Rolle zeigt nur Entitäten des passenden Typs
    (Messwert, Zähler, Schalter), weil die Rolle die Aggregation festlegt. #}
 {% macro role_field(name, role, initial) %}
-<span class="dd-picker-wrap" x-data='entityPicker(optionsFor({{ role | tojson }}), {{ initial | tojson }}, null, null, null, false)' @click.outside="open = false">
+<span class="dd-picker-wrap" x-data='entityPicker(optionsFor({{ role | tojson }}), {{ initial | tojson }}, null, null, null, false)' @click.outside="open = false"
+      @wetter-fill.window='if ($event.detail.role === {{ name | tojson }}) entityId = $event.detail.entity_id'>
   <span class="dd-picker-anchor">
     <button type="button" class="btn" :class="{'dd-picker-btn-clearable': entityId}"
             @click="toggleOpen($refs.search)"
@@ -38,6 +39,46 @@
         heating: {{ config.heating | tojson }},
         counterOptions: {{ counter_options | tojson }},
         maxHeating: {{ max_heating }},
+        hints: {}, note: "", missingNote: "", suggesting: false,
+        async suggest() {
+          this.suggesting = true; this.note = ""; this.missingNote = "";
+          try {
+            const res = await fetch("wetterdashboard/setup/vorschlaege");
+            if (!res.ok) throw new Error(String(res.status));
+            const data = await res.json();
+            const hints = {}; let filled = 0, open = 0;
+            for (const role of Object.keys(this.roleTypes)) {
+              const input = this.$root.querySelector(`input[name="${role}"]`);
+              if (!input || input.value) continue;
+              const pick = data.roles[role];
+              if (!pick) { open += 1; continue; }
+              window.dispatchEvent(new CustomEvent("wetter-fill", {detail: {role, entity_id: pick.entity_id}}));
+              hints[role] = pick; filled += 1;
+            }
+            if (!this.heating.length && data.heating.length) {
+              this.heating = data.heating.map((h) => ({entity_id: h.entity_id, name: ""}));
+              filled += 1;
+            }
+            this.hints = hints;
+            this.note = filled
+              ? t("{filled} Rollen vorgeschlagen, {open} offen. Es wurde nichts gespeichert: prüfen, ändern und dann speichern. Belegte Rollen bleiben unverändert.", {filled, open})
+              : t("Nichts zu ergänzen: alle Rollen sind belegt oder es wurde nichts Passendes gefunden.");
+            if (data.missing.length) {
+              this.missingNote = t("Passt, ist aber nicht archiviert: {items}. Im Auswahl-Assistenten übernehmen.", {items: data.missing.map((m) => m.label).join(", ")});
+            }
+          } catch (e) {
+            this.note = t("Vorschläge konnten nicht geladen werden.");
+          }
+          this.suggesting = false;
+        },
+        hintText(role) {
+          const pick = this.hints[role];
+          if (!pick) return "";
+          const more = pick.candidates.length
+            ? " · " + t("{n} weitere Kandidaten: {names}", {n: pick.candidates.length, names: pick.candidates.map((c) => c.label).join(", ")})
+            : "";
+          return pick.reason + more;
+        },
         maxExtra: {{ max_extra }},
         optionsFor(role) {
           const allowed = this.roleTypes[role] || ["standard"];
@@ -57,8 +98,13 @@
         removeHeating(i) { this.heating.splice(i, 1); }
       }'>
   <section class="settings-section wt-section-messwerte">
-  <h2 class="settings-section-title">{{ _("Messwerte") }}</h2>
+  <div class="wt-section-head">
+    <h2 class="settings-section-title">{{ _("Messwerte") }}</h2>
+    <button type="button" class="btn" @click="suggest()" :disabled="suggesting">{{ _("Vorschlagen") }}</button>
+  </div>
   <p class="settings-section-description">{{ _("Ordnet jeder Rolle eine Entität zu. Nur die Außentemperatur ist Pflicht, alles andere bleibt leer, bis passende Sensoren vorhanden sind.") }}</p>
+  <p class="wt-note" x-show="note" x-text="note" x-cloak></p>
+  <p class="wt-note wt-note-missing" x-show="missingNote" x-text="missingNote" x-cloak></p>
   <h3 class="wt-group-h">{{ _("Grundwerte") }}</h3>
   <div class="wt-roles">
     {% for key, label, types in roles if key not in ('gust', 'radiation') %}
@@ -68,6 +114,10 @@
       </div>
       {{ role_field(key, key, config[key]) }}
       {% if warnings[key] %}<p class="wt-warn">{{ warnings[key] }}</p>{% endif %}
+      <p class="wt-why" x-show="hints['{{ key }}']" x-cloak>
+        <span class="wt-badge" :class="{'is-check': hints['{{ key }}'] && hints['{{ key }}'].confidence === 'check'}" x-text="hints['{{ key }}'] && hints['{{ key }}'].confidence === 'check' ? t('prüfen') : t('Vorschlag')"></span>
+        <span x-text="hintText('{{ key }}')"></span>
+      </p>
     </div>
     {% endfor %}
   </div>
@@ -80,6 +130,10 @@
       </div>
       {{ role_field(key, key, config[key]) }}
       {% if warnings[key] %}<p class="wt-warn">{{ warnings[key] }}</p>{% endif %}
+      <p class="wt-why" x-show="hints['{{ key }}']" x-cloak>
+        <span class="wt-badge" :class="{'is-check': hints['{{ key }}'] && hints['{{ key }}'].confidence === 'check'}" x-text="hints['{{ key }}'] && hints['{{ key }}'].confidence === 'check' ? t('prüfen') : t('Vorschlag')"></span>
+        <span x-text="hintText('{{ key }}')"></span>
+      </p>
     </div>
     {% endfor %}
   </div>

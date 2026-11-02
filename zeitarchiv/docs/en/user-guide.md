@@ -686,7 +686,9 @@ A rain sensor that only reports on and off is enough: the page then shows rain
 minutes and rain days instead of millimetres. If you have both, both rows are
 shown side by side. Many on/off sensors also report “rain” in fog, dew or when
 the sensor is wet; the drying time then counts too. You set when a day counts
-as a rain day in setup (default 1 mm or 10 min). **Additional sensors** (temperature or humidity, for example cellar or attic)
+as a rain day in setup (default 1 mm or 10 min). The **Suggest** button in the readings section fills the roles that are still empty, based on device class, unit, names ("outdoor", "rain", "gust") and the weather integration; entities on the same device as the outdoor temperature are preferred. Roles that are already assigned stay unchanged, and nothing is saved until you press Save. Close calls are marked "check" and list further candidates. Heating counters (names with heating, heat pump, heating element …) are suggested too. Matching entities that are not archived yet are named and can be added in the selection assistant.
+
+**Additional sensors** (temperature or humidity, for example cellar or attic)
 become their own rows, shown on the **Temperature & climate** tab, and are never averaged with the outdoor temperature. Backups include the assignment; the
 selective restore brings it back as a whole ("Weather dashboard configuration").
 

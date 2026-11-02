@@ -30,7 +30,9 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
+from . import selection_catalog
 from . import wetter_analysis as analysis
+from . import wetter_autofill
 from .chart_period import calendar_bounds
 from .formatting import decimals_to_int, entity_display_name
 from .storage import query as query_mod
@@ -733,6 +735,18 @@ class WetterService:
                     "warnings": warnings, "max_extra": MAX_EXTRA_TEMPERATURES,
                     **deps.app_root_context(request),
                 },
+            )
+
+        @router.get("/wetterdashboard/setup/vorschlaege")
+        def wetterdashboard_setup_suggestions() -> dict:
+            """Rollenvorschläge für die Einrichtung (nichts wird gespeichert)."""
+            catalog = selection_catalog.load(deps.data_dir)
+            labels = {
+                row["entity_id"]: entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"])
+                for row in deps.index.list_entities()
+            }
+            return wetter_autofill.suggest(
+                [dict(row) for row in deps.index.list_entities()], labels, catalog["entities"] if catalog else None,
             )
 
         @router.post("/wetterdashboard/setup", response_class=HTMLResponse)

@@ -738,3 +738,13 @@ def test_extra_sensors_get_tiles_and_the_climate_tab_only_with_extras(client) ->
     assert [tile["key"] for tile in tiles] == ["temperature", "temperature:0"]
     assert tiles[1]["label"] == "Keller"
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
+def test_setup_suggestions_route_and_button(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_aussen8", "sensor", "measurement", "°C")
+    data = client.get("/wetterdashboard/setup/vorschlaege").json()
+    assert set(data) == {"roles", "heating", "missing", "has_catalog"}
+    setup = client.get("/wetterdashboard/setup").text
+    assert "suggest()" in setup and "wetter-fill" in setup and "wetterdashboard/setup/vorschlaege" in setup

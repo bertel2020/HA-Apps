@@ -737,6 +737,8 @@ Regenminuten und Regentage statt Millimeter. Habt ihr beides, stehen beide
 Zeilen nebeneinander. Viele Ein/Aus-Sensoren melden auch bei Nebel, Tau oder
 nassem Sensor „Regen“, die Trocknungszeit zählt dann mit. Ab wann ein Tag als
 Regentag zählt, stellt ihr in der Einrichtung ein (Standard 1 mm bzw. 10 min).
+Der Knopf **Vorschlagen** im Bereich Messwerte füllt die noch leeren Rollen: aus Geräteklasse, Einheit, Namen („außen“, „Regen“, „Böe“) und der Wetter-Integration; gleiche Geräte wie die Außentemperatur werden bevorzugt. Bereits belegte Rollen bleiben unverändert, gespeichert wird erst mit „Speichern“. Bei knappen Entscheidungen steht „prüfen“ und es werden weitere Kandidaten genannt. Auch Heizzähler (Name mit Heizung, Wärmepumpe, Heizstab …) werden vorgeschlagen. Passende Entitäten, die noch nicht archiviert sind, werden genannt und lassen sich im Auswahl-Assistenten übernehmen.
+
 **Weitere Sensoren** (Temperatur oder Feuchte, zum Beispiel Keller oder Dachboden) werden eigene Zeilen und nie mit der Außentemperatur
 gemittelt; sie stehen auf dem eigenen Reiter **Temperatur & Klima**. Backups sichern die Zuordnung mit; der selektive Restore stellt sie
 als Ganzes („Wetterdashboard-Konfiguration“) wieder her.

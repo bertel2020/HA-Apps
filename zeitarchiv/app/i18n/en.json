@@ -3417,7 +3417,24 @@
     "Jeder weitere Sensor bekommt eine eigene Zeile in der Tabelle, er wird nie mit der Außentemperatur gemittelt.": "Each additional sensor gets its own row in the table; it is never averaged with the outdoor temperature.",
     "+ Sensor": "+ Sensor",
     "Temperatur &amp; Klima": "Temperature &amp; climate",
-    "Regensensor (Ein/Aus)": "Rain sensor (on/off)"
+    "Regensensor (Ein/Aus)": "Rain sensor (on/off)",
+    "Vorschlagen": "Suggest",
+    "Außen oder Wetter-Integration": "Outdoors or weather integration",
+    "Einheit {unit}": "Unit {unit}",
+    "Geräteklasse Feuchte": "Device class humidity",
+    "Geräteklasse Feuchtigkeit": "Device class moisture",
+    "Geräteklasse Temperatur": "Device class temperature",
+    "Niederschlag, Zähler": "Precipitation, counter",
+    "Wetter-Integration": "Weather integration",
+    "gleiche Integration": "same integration",
+    "gleiches Gerät wie die Außentemperatur": "same device as the outdoor temperature",
+    "laufende Summe": "running total",
+    "relativer Druck": "relative pressure",
+    "„Außen“ im Namen": "“Outdoor” in the name",
+    "„Böe“ im Namen": "“Gust” in the name",
+    "„Feuchte“ im Namen": "“Humidity” in the name",
+    "„Gesamt“ im Namen": "“Total” in the name",
+    "„Regen“ im Namen": "“Rain” in the name"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4080,6 +4097,13 @@
     "Heute: Tiefstwert ▼ und Höchstwert ▲. Ein Klick öffnet die Entität.": "Today: low ▼ and high ▲. A click opens the entity.",
     "Heute bisher, darunter der gestrige Tag. Ein Klick öffnet die Entität.": "Today so far, below it yesterday. A click opens the entity.",
     "Stand {time}": "As of {time}",
-    "Tiefstwert ▼ und Höchstwert ▲ von heute": "Today's low ▼ and high ▲"
+    "Tiefstwert ▼ und Höchstwert ▲ von heute": "Today's low ▼ and high ▲",
+    "{filled} Rollen vorgeschlagen, {open} offen. Es wurde nichts gespeichert: prüfen, ändern und dann speichern. Belegte Rollen bleiben unverändert.": "{filled} roles suggested, {open} open. Nothing has been saved: check, adjust, then save. Roles that are already assigned stay unchanged.",
+    "Nichts zu ergänzen: alle Rollen sind belegt oder es wurde nichts Passendes gefunden.": "Nothing to add: all roles are assigned or nothing suitable was found.",
+    "Passt, ist aber nicht archiviert: {items}. Im Auswahl-Assistenten übernehmen.": "Fits, but is not archived: {items}. Add it in the selection assistant.",
+    "Vorschläge konnten nicht geladen werden.": "Suggestions could not be loaded.",
+    "{n} weitere Kandidaten: {names}": "{n} more candidates: {names}",
+    "prüfen": "check",
+    "Vorschlag": "Suggestion"
   }
 }
