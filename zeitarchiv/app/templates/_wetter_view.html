@@ -65,12 +65,17 @@
           <template x-for="key in columnKeys" :key="key">
             <label class="dd-picker-row"><input type="checkbox" :checked="columns.includes(key)" @change="toggleColumn(key)"><span x-text="columnName(key)"></span></label>
           </template>
-          <label class="dd-picker-row wt-picker-sep"><input type="checkbox" x-model="vorjahr" @change="saveAndLoad()"><span>{{ _("Mit Vorjahr") }}</span></label>
         </div>
       </div>
-      <div class="wt-seg" role="group" aria-label="{{ _('Vergleich mit dem Vorjahr') }}" x-show="vorjahr">
-        <button type="button" :aria-pressed="(mode === 'bis_jetzt').toString()" @click="setMode('bis_jetzt')">{{ _("Bis jetzt") }}</button>
-        <button type="button" :aria-pressed="(mode === 'komplett').toString()" @click="setMode('komplett')">{{ _("Komplett") }}</button>
+      {# Vorjahresvergleich als ein Menü wie „Vergleichen ▾“ auf der Entitätenseite: Aus / Bis jetzt / Komplett.
+         Der Knopf zeigt den Zustand, auch zugeklappt. #}
+      <div class="dd-picker-wrap">
+        <button type="button" class="btn" :class="{'wt-btn-on': vorjahr}" onclick="toggleDDPicker('wt-yoy')" x-text="yoyLabel()"></button>
+        <div class="dd-picker-popover" id="wt-yoy-popover">
+          <div class="dd-picker-row" role="button" tabindex="0" :class="{active: !vorjahr}" @click="setYoy('off')">{{ _("Aus") }}</div>
+          <div class="dd-picker-row" role="button" tabindex="0" :class="{active: vorjahr && mode === 'bis_jetzt'}" @click="setYoy('bis_jetzt')">{{ _("Bis jetzt") }}</div>
+          <div class="dd-picker-row" role="button" tabindex="0" :class="{active: vorjahr && mode === 'komplett'}" @click="setYoy('komplett')">{{ _("Komplett") }}</div>
+        </div>
       </div>
     </div>
     <p class="hint hint-warn" x-show="error" x-text="error" x-cloak></p>

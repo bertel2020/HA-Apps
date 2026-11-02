@@ -327,6 +327,22 @@
         this.loadTable();
       },
 
+      // Vorjahresvergleich: 'off' oder der Modus ('bis_jetzt'/'komplett'); schließt das Popover.
+      setYoy(choice) {
+        if (choice === 'off') this.vorjahr = false;
+        else {
+          this.vorjahr = true;
+          this.mode = choice;
+        }
+        document.getElementById('wt-yoy-popover').classList.remove('open');
+        this.saveAndLoad();
+      },
+
+      yoyLabel() {
+        if (!this.vorjahr) return t('Vorjahr: Aus ▾');
+        return (this.mode === 'komplett' ? t('Vorjahr: komplett') : t('Vorjahr: bis jetzt')) + ' ▾';
+      },
+
       setMode(mode) {
         this.mode = mode;
         this.saveAndLoad();

@@ -700,6 +700,7 @@ year sits below the current value and is deliberately neutral in colour, as
 warmer is not automatically better. Below max and min you see when the value
 occurred (the hour for today and yesterday, otherwise the day).
 
+You choose the **last year** comparison with the “Last year ▾” button (Off, So far, Complete); it shows the state even when closed.
 With **Reference date** the table shows the periods as of an earlier day: Today, Yesterday,
 Month, Last month and Year then refer to it, and the stretch of last year ends on the same
 calendar day. The reference date is part of the address (`?at=2026-01-15`), so the view can

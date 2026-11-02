@@ -639,3 +639,14 @@ def test_toggles_are_app_chips_and_card_heads_keep_one_layout() -> None:
     assert '<input type="checkbox" x-model="band"' in text and 'class="wt-check"><input type="checkbox"' not in text
     # Jede Karte beginnt mit der Kopfzeile: Titel links, Bedienelemente rechts.
     assert text.count('<div class="wt-controls">') >= 8
+
+
+def test_year_over_year_is_one_menu_and_not_part_of_the_column_list() -> None:
+    from _paths import APP, TEMPLATES
+
+    text = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+    assert "toggleDDPicker('wt-yoy')" in text and 'id="wt-yoy-popover"' in text
+    assert 'x-model="vorjahr"' not in text and "Mit Vorjahr" not in text  # kein Haken zwischen den Spalten mehr
+    assert "wt-picker-sep" not in text
+    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "setYoy(choice)" in script and "yoyLabel()" in script

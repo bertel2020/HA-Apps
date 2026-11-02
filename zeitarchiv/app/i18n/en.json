@@ -3344,7 +3344,6 @@
     "Jedes weitere Thermometer wird eine eigene Zeile in der Tabelle, es wird nie mit der Außentemperatur gemittelt.": "Each additional thermometer becomes its own row in the table; it is never averaged with the outdoor temperature.",
     "Komplett": "Complete",
     "Luftfeuchte": "Humidity",
-    "Mit Vorjahr": "With last year",
     "Name in der Tabelle (optional)": "Name in the table (optional)",
     "Niederschlag (Menge)": "Precipitation (amount)",
     "Noch nicht eingerichtet. Ordnet die Außentemperatur und, was ihr habt, Niederschlag, Luftfeuchte, Luftdruck und Wind jeweils einer Entität zu — Kacheln und Vergleichstabelle entstehen danach automatisch.": "Not set up yet. Assign the outdoor temperature and, if you have them, precipitation, humidity, pressure and wind to an entity each — tiles and the comparison table are created automatically.",
@@ -4064,6 +4063,9 @@
     "heute max. {max}": "today max. {max}",
     "Entität öffnen": "Open entity",
     "Die Tabelle zeigt die Zeiträume zum {date}; die Kacheln zeigen weiter die aktuellen Werte.": "The table shows the periods as of {date}; the tiles still show the current values.",
-    "{from}–{to} Uhr": "{from}–{to} h"
+    "{from}–{to} Uhr": "{from}–{to} h",
+    "Vorjahr: Aus ▾": "Last year: off ▾",
+    "Vorjahr: bis jetzt": "Last year: so far",
+    "Vorjahr: komplett": "Last year: complete"
   }
 }

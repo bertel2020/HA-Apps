@@ -752,6 +752,7 @@ gefärbt, weil wärmer nicht automatisch besser ist. Bei Max und Min steht
 darunter, wann der Wert auftrat (bei Heute und Gestern die Stunde, sonst der
 Tag).
 
+Das **Vorjahr** wählt ihr über den Knopf „Vorjahr ▾“ (Aus, Bis jetzt, Komplett); er zeigt den Zustand auch zugeklappt.
 Mit **Stichtag** zeigt die Tabelle die Zeiträume zu einem früheren Tag: Heute, Gestern,
 Monat, Letzter Monat und Jahr beziehen sich dann auf ihn, der Vorjahres-Ausschnitt endet am
 selben Kalendertag. Der Stichtag steht in der Adresse (`?at=2026-01-15`), die Ansicht lässt sich
