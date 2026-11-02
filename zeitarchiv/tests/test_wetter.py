@@ -260,6 +260,18 @@ def test_temperature_comparison_route_validates_the_period(client) -> None:
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
 
 
+def test_long_term_tab_has_the_year_by_month_temperature_card(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp10", "sensor", "measurement", "°C")
+    index.set_setting(wetter_routes.SETTING_ENABLED, "1")
+    wetter_routes._save_config(index, {**wetter_routes._empty_config(), "temperature": "sensor.wetter_test_temp10"})  # noqa: SLF001
+    html = client.get("/wetterdashboard").text
+    assert "tempYearsTable" in html and "setTempYearsMode" in html
+    assert client.get("/wetterdashboard/monatsvergleich?metric=temperature").status_code == 200  # Datenquelle der Karte
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
 # -- Routen ------------------------------------------------------------------------------------
 
 

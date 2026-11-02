@@ -753,6 +753,15 @@ Pointing at a bar shows the split across months in the tooltip. Only completed d
 with at least 18 hours of values are counted. The same numbers appear as **Characteristic days** rows under the
 outdoor temperature in the comparison table (for month and year columns).
 
+**Mean temperature per month and year** shows one row per year, one column per month and
+the annual mean on the right. The colour shows how far a month deviates from the mean of
+that month over all completed years in the archive (blue colder, red warmer); "Deviation
+from mean" writes the difference in kelvin into the cell, "Values" the temperature. A
+comparison exists only once a month has at least two completed years; until then the
+values are shown uncoloured. The annual mean appears from six months with values; the
+current year is marked with * and does not count towards the mean. At most the last ten
+years are shown.
+
 **Years compared, day by day** stacks all years as a matrix: one row per year (the
 newest on top), one column per calendar day, coloured by the daily value. You can
 choose mean, max or min of the outdoor temperature, or precipitation (white to blue).

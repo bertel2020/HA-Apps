@@ -317,6 +317,8 @@
       heatSeason: '',
       heatError: '',
       matrix: null,
+      tempYears: null,
+      tempYearsMode: 'dev',
       matrixError: '',
 
       columnKeys: COLUMN_KEYS,
@@ -336,6 +338,7 @@
         if (Array.isArray(saved.columns)) this.columns = COLUMN_KEYS.filter((key) => saved.columns.includes(key));
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
+        if (saved.tempYearsMode === 'val' || saved.tempYearsMode === 'dev') this.tempYearsMode = saved.tempYearsMode;
         if (saved.kenntageRange === '5' || saved.kenntageRange === 'all') this.kenntageRange = saved.kenntageRange;
         if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
         this.loadTiles();
@@ -480,6 +483,7 @@
         if (tab === 'klima') { if (!this.tempCmp) this.loadTemps(); else this.$nextTick(() => this.drawTemps()); }
         if (tab === 'long' && !this.longterm) this.loadLongterm();
         if (tab === 'long' && !this.matrix) this.loadMatrix();
+        if (tab === 'long' && !this.tempYears) this.loadTempYears();
         if (tab === 'heat' && !this.heat) this.loadHeat();
         // Ein Diagramm in einem eben erst sichtbaren Reiter hat noch keine Größe.
         this.$nextTick(() => {
@@ -915,6 +919,81 @@
         }, true);
         // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
         requestAnimationFrame(() => chart.resize());
+      },
+
+      // Mitteltemperatur je Monat und Jahr (Tabelle, Farbe = Abweichung vom Mittel dieses Monats über die abgeschlossenen Jahre)
+      async loadTempYears() {
+        try {
+          this.tempYears = await this.fetchJson('wetterdashboard/monatsvergleich?metric=temperature');
+          this.$nextTick(() => this.drawTempYears());
+        } catch (e) {
+          this.tempYears = null;
+        }
+      },
+
+      setTempYearsMode(mode) {
+        this.tempYearsMode = mode;
+        writeStore({tempYearsMode: mode});
+        this.drawTempYears();
+      },
+
+      tempYearsNote() {
+        return this.tempYearsMode === 'dev'
+          ? t('Farbe und Zahl zeigen, wie weit ein Monat vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv abweicht (in Kelvin). Die letzte Zeile ist das Mittel.')
+          : t('Mitteltemperatur je Monat. Die Farbe zeigt weiter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv; die letzte Zeile ist das Mittel.');
+      },
+
+      drawTempYears() {
+        const data = this.tempYears;
+        const table = this.$refs.tempYearsTable;
+        if (!data || !table) return;
+        const colors = palette();
+        const current = String(data.current_year);
+        const years = Object.keys(data.years).sort().slice(-10);
+        const mean = (values) => values.reduce((a, b) => a + b, 0) / values.length;
+        const present = (list) => list.filter((value) => value != null);
+        // Jahres-Ø nur aus vorhandenen Monaten und erst ab sechs davon; als Vergleich zählen nur komplette, abgeschlossene Jahre.
+        const yearMean = (year) => { const values = present(data.years[year]); return values.length >= 6 ? mean(values) : null; };
+        const reference = (() => {
+          const full = Object.keys(data.years).filter((y) => y < current && present(data.years[y]).length === 12);
+          return full.length >= 2 ? mean(full.map(yearMean)) : null;
+        })();
+        const unit = data.unit || '°C';
+        const sign = (value) => (Math.round(Math.abs(value) * 10) === 0 ? '±' : (value > 0 ? '+' : '−')) + num(Math.abs(value), 1);
+        const dev = this.tempYearsMode === 'dev';
+        const cold = colors.cold, hot = colors.prev, base = cssVar('--surface-alt');
+        const cell = (value, ref, title, strong) => {
+          if (value == null) return `<td class="wt-tm-na">–</td>`;
+          // Ohne Vergleichswert (weniger als zwei abgeschlossene Jahre für diesen Monat) bleibt die Zelle ungefärbt.
+          if (ref == null) return `<td class="wt-tm-plain${strong ? ' wt-tm-year' : ''}"${title ? ` data-tooltip-fixed="${escapeHtml(title)}"` : ''}>${escapeHtml(num(value, 1))}</td>`;
+          const diff = value - ref;
+          const share = Math.round(Math.min(1, Math.abs(diff) / 3.2) * 80);
+          const style = ` style="background:color-mix(in srgb, ${diff < 0 ? cold : hot} ${share}%, ${base})"`;
+          const shown = dev ? sign(diff) : num(value, 1);
+          return `<td${style} data-tooltip-fixed="${escapeHtml(title)}"${strong ? ' class="wt-tm-year"' : ''}>${escapeHtml(shown)}</td>`;
+        };
+        let html = `<thead><tr><th></th>${Array.from({length: 12}, (_x, i) => `<th>${escapeHtml(monthName(i + 1, 'short'))}</th>`).join('')}`
+          + `<th class="wt-tm-year">${escapeHtml(t('Jahr Ø'))}</th></tr></thead><tbody>`;
+        for (const year of years.slice().reverse()) {
+          const running = year === current;
+          html += `<tr><th>${escapeHtml(year)}${running ? '*' : ''}</th>`;
+          data.years[year].forEach((value, i) => {
+            const ref = data.counts[i] >= 2 ? data.avg[i] : null;
+            const title = value == null ? '' : (ref == null
+              ? t('{month} {year}: {value} {unit}', {month: monthName(i + 1, 'short'), year, value: num(value, 1), unit})
+              : t('{month} {year}: {value} {unit} ({delta} K zum Mittel)', {month: monthName(i + 1, 'short'), year, value: num(value, 1), unit, delta: sign(value - ref)}));
+            html += cell(value, ref, title, false);
+          });
+          const ya = yearMean(year);
+          const complete = !running && present(data.years[year]).length === 12;
+          html += cell(ya, complete ? reference : null, ya == null ? '' : t('Jahresmittel {year}: {value} {unit}', {year, value: num(ya, 1), unit}), true);
+          html += '</tr>';
+        }
+        html += `<tr class="wt-tm-avg"><th>Ø</th>${data.avg.map((value, i) => `<td>${value == null || data.counts[i] < 2 ? '–' : escapeHtml(num(value, 1))}</td>`).join('')}`
+          + `<td class="wt-tm-year">${reference == null ? '–' : escapeHtml(num(reference, 1))}</td></tr></tbody>`;
+        table.innerHTML = html;
+        const scale = this.$refs.tempYearsScale;
+        if (scale) scale.style.background = `linear-gradient(90deg, ${cold}, ${base}, ${hot})`;
       },
 
       // Jahr×Tag-Matrix

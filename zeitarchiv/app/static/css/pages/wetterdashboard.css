@@ -96,6 +96,19 @@
   .wt-yoy-popover .wt-yoy-toggle{margin-top:4px;border-top:1px solid var(--border);border-radius:0 0 6px 6px;}
   .wt-table td .wt-when{display:block;line-height:1.25;font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:var(--ink-faint);}
   .wt-table td .wt-dl{display:block;line-height:1.25;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:var(--chart-1);}
+  /* Mitteltemperatur je Monat und Jahr: eingefärbte Zellen (Farbe per color-mix im Inline-Stil), Jahres-Ø rechts abgesetzt */
+  .wt-tm{border-collapse:separate;border-spacing:2px;width:100%;min-width:600px;font-size:calc(12px * var(--font-scale, 1));font-variant-numeric:tabular-nums;table-layout:fixed;}
+  .wt-tm th{font-weight:400;color:var(--ink-muted);text-align:center;padding:2px 0;}
+  .wt-tm tbody th{text-align:left;font-weight:600;color:var(--ink);padding:0 4px;width:52px;}
+  .wt-tm td{height:30px;text-align:center;border-radius:4px;color:var(--ink);}
+  .wt-tm td[data-tooltip-fixed]{cursor:help;}
+  .wt-tm td.wt-tm-na{color:var(--ink-faint);}
+  .wt-tm td.wt-tm-plain{color:var(--ink-muted);}
+  .wt-tm .wt-tm-year{width:62px;font-weight:600;}
+  .wt-tm th.wt-tm-year{color:var(--ink);}
+  .wt-tm tr.wt-tm-avg th,.wt-tm tr.wt-tm-avg td{color:var(--ink-muted);height:auto;padding-top:6px;border-radius:0;border-top:1px solid var(--border-strong);}
+  .wt-tm-legend{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+  .wt-tm-scale{display:inline-block;width:160px;height:10px;border-radius:2px;}
   .wt-foot{margin:6px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
   .wt-table td.wt-empty{text-align:left;color:var(--ink-muted);white-space:normal;}
   .wt-table td.wt-na .wt-v{color:var(--ink-faint);font-weight:400;}

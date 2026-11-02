@@ -806,6 +806,15 @@ auf die Monate. Gezählt werden nur abgeschlossene Tage mit mindestens 18 Stunde
 als Zeilen **Kenntage** unter der Außentemperatur in der Vergleichstabelle (bei
 Monats- und Jahresspalten).
 
+**Mitteltemperatur je Monat und Jahr** zeigt eine Zeile je Jahr und eine Spalte je Monat
+sowie das Jahresmittel rechts. Die Farbe zeigt, wie weit ein Monat vom Mittel dieses
+Monats über alle abgeschlossenen Jahre im Archiv abweicht (blau kälter, rot wärmer);
+„Abweichung vom Mittel“ schreibt die Differenz in Kelvin in die Zelle, „Werte“ die
+Temperatur. Ein Vergleich entsteht erst, wenn es für den Monat mindestens zwei
+abgeschlossene Jahre gibt; bis dahin stehen die Werte ungefärbt da. Das Jahresmittel
+erscheint ab sechs Monaten mit Werten, das laufende Jahr ist mit * markiert und
+zählt nicht zum Mittel. Gezeigt werden höchstens die letzten zehn Jahre.
+
 **Jahre im Vergleich, Tag für Tag** legt alle Jahre als Matrix untereinander: eine
 Zeile je Jahr (das neueste oben), eine Spalte je Kalendertag, gefärbt nach dem
 Tageswert. Wählbar sind Ø, Max, Min der Außentemperatur und der Niederschlag

@@ -188,6 +188,20 @@
       <div class="wt-chart" x-ref="kenntageChart"></div>
       <p class="wt-foot" x-show="kenntageFoot()" x-text="kenntageFoot()" x-cloak></p>
     </div>
+    <div class="card wt-card" x-show="tempYears" x-cloak>
+      <div class="wt-controls">
+        <h2 class="wt-h2">{{ _("Mitteltemperatur je Monat und Jahr") }} {{ hint_button(_("Mitteltemperatur je Monat und Jahr")) }}</h2>
+        {% call hint_body() %}<span x-text="tempYearsNote()"></span>{% endcall %}
+        <div class="wt-seg" role="group" aria-label="{{ _('Anzeige') }}">
+          <button type="button" :aria-pressed="(tempYearsMode === 'dev').toString()" @click="setTempYearsMode('dev')">{{ _("Abweichung vom Mittel") }}</button>
+          <button type="button" :aria-pressed="(tempYearsMode === 'val').toString()" @click="setTempYearsMode('val')">{{ _("Werte") }}</button>
+        </div>
+      </div>
+      <div class="tbl-wrap wt-table-wrap"><table class="wt-tm" x-ref="tempYearsTable"></table></div>
+      <div class="wt-tm-legend">
+        <span>{{ _("kälter") }}</span><span class="wt-tm-scale" x-ref="tempYearsScale"></span><span>{{ _("wärmer als im Mittel der Jahre im Archiv") }}</span>
+      </div>
+    </div>
     <div class="card wt-card">
       <div class="wt-controls">
         <h2 class="wt-h2">{{ _("Jahre im Vergleich, Tag für Tag") }} {{ hint_button(_("Jahre im Vergleich, Tag für Tag")) }}</h2>
