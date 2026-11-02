@@ -3405,7 +3405,8 @@
     "Ansichten des Wetterdashboards": "Weather dashboard views",
     "Zeiträume im Vergleich": "Periods compared",
     "Gradtagzahl": "Degree days",
-    "Ungültiges Datum: {value}": "Invalid date: {value}"
+    "Ungültiges Datum: {value}": "Invalid date: {value}",
+    "Regen": "Rain"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -3999,9 +4000,6 @@
     "Regentage (ab {n} min)": "Rain days (from {n} min)",
     "Regentage (ab {n} mm)": "Rain days (from {n} mm)",
     "bis {time}": "until {time}",
-    "heute {min} / {max}": "today {min} / {max}",
-    "heute · gestern {value} min": "today · yesterday {value} min",
-    "heute · gestern {value} {unit}": "today · yesterday {value} {unit}",
     "(bisher)": "(so far)",
     "Abweichung": "Deviation",
     "Aktuell trocken": "Currently dry",
@@ -4060,12 +4058,15 @@
     "mehr": "more",
     "{period} bisher {value} kWh je Gradtag ({percent} % {direction} als im gleichen Ausschnitt von {other})": "{period} so far {value} kWh per degree day ({percent} % {direction} than in the same stretch of {other})",
     "{period}: {value} kWh je Kelvin ({n} Tage, R² {r2})": "{period}: {value} kWh per kelvin ({n} days, R² {r2})",
-    "heute max. {max}": "today max. {max}",
     "Entität öffnen": "Open entity",
     "Die Tabelle zeigt die Zeiträume zum {date}; die Kacheln zeigen weiter die aktuellen Werte.": "The table shows the periods as of {date}; the tiles still show the current values.",
     "{from}–{to} Uhr": "{from}–{to} h",
     "Vorjahr: Aus ▾": "Last year: off ▾",
     "Vorjahr: bis jetzt": "Last year: so far",
-    "Vorjahr: komplett": "Last year: complete"
+    "Vorjahr: komplett": "Last year: complete",
+    "gestern {value} {unit}": "yesterday {value} {unit}",
+    "gestern {value} min": "yesterday {value} min",
+    "Heute: Tiefstwert ▼ und Höchstwert ▲. Ein Klick öffnet die Entität.": "Today: low ▼ and high ▲. A click opens the entity.",
+    "Heute bisher, darunter der gestrige Tag. Ein Klick öffnet die Entität.": "Today so far, below it yesterday. A click opens the entity."
   }
 }

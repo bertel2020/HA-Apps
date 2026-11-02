@@ -34,14 +34,14 @@
 
   <section x-show="tab === 'overview'" role="tabpanel" id="wt-panel-overview" aria-labelledby="wt-tab-overview">
   {# Platzhalter bis die Kacheln geladen sind (wie die „– kWh“-Kacheln des Energiedashboards). #}
-  <div class="wt-tiles" x-show="!tilesLoaded" aria-hidden="true">
+  <div class="wt-tiles" style="--wt-cols:4" x-show="!tilesLoaded" aria-hidden="true">
     <template x-for="n in 4" :key="n">
       <span class="wt-tile is-loading"><span class="wt-tile-label">&nbsp;</span><span class="wt-tile-value">–</span><span class="wt-tile-sub">&nbsp;</span></span>
     </template>
   </div>
-  <div class="wt-tiles" x-show="tiles.length" x-cloak>
+  <div class="wt-tiles" x-ref="tiles" :style="'--wt-cols:' + tileCols" x-show="tiles.length" x-cloak>
     <template x-for="tile in tiles" :key="tile.key">
-      <a class="wt-tile" :data-role="tile.key" :href="'entities/' + encodeURIComponent(tile.entity_id)" :title="t('Entität öffnen')">
+      <a class="wt-tile" :data-role="tile.key" :href="'entities/' + encodeURIComponent(tile.entity_id)" :title="tileTitle(tile)">
         <span class="wt-tile-label" x-text="tile.label"></span>
         <span class="wt-tile-value" x-html="tileValue(tile)"></span>
         <span class="wt-tile-sub" x-text="tileSub(tile)"></span>

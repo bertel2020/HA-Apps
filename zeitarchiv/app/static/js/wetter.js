@@ -293,6 +293,7 @@
       mode: 'bis_jetzt',
       tiles: [],
       tilesLoaded: false,
+      tileCols: 4,
       error: '',
       _seq: 0,
 
@@ -306,6 +307,7 @@
         this.loadTiles();
         this.loadTable();
         this.loadMonthly();
+        new ResizeObserver(() => this.layoutTiles()).observe(this.$refs.tiles);
       },
 
       columnName,
@@ -378,15 +380,30 @@
         const decimals = tile.decimals != null ? tile.decimals : 1;
         if (tile.kind === 'standard') {
           if (!tile.today) return '';
+          // Strahlung fällt nachts auf 0: nur der Höchstwert.
           return tile.key === 'radiation'
-            ? t('heute max. {max}', {max: num(tile.today.max, decimals)})
-            : t('heute {min} / {max}', {min: num(tile.today.min, decimals), max: num(tile.today.max, decimals)});
+            ? `▲ ${num(tile.today.max, decimals)}`
+            : `▼ ${num(tile.today.min, decimals)}  ▲ ${num(tile.today.max, decimals)}`;
         }
         if (!tile.yesterday) return '';
         if (tile.kind === 'counter') {
-          return t('heute · gestern {value} {unit}', {value: num(tile.yesterday.sum, 1), unit: tile.unit || ''});
+          return t('gestern {value} {unit}', {value: num(tile.yesterday.sum, 1), unit: tile.unit || ''});
         }
-        return t('heute · gestern {value} min', {value: num(tile.yesterday.minutes, 0)});
+        return t('gestern {value} min', {value: num(tile.yesterday.minutes, 0)});
+      },
+
+      // Was die Zeile unter dem Wert bedeutet (Tooltip der Kachel).
+      tileTitle(tile) {
+        return tile.kind === 'standard'
+          ? t('Heute: Tiefstwert ▼ und Höchstwert ▲. Ein Klick öffnet die Entität.')
+          : t('Heute bisher, darunter der gestrige Tag. Ein Klick öffnet die Entität.');
+      },
+
+      // Spaltenzahl so wählen, dass keine einzelnen Kacheln allein in der letzten Reihe stehen.
+      layoutTiles() {
+        const element = this.$refs.tiles;
+        if (!element || !this.tiles.length) return;
+        this.tileCols = WetterLayout.tileColumns(this.tiles.length, element.clientWidth);
       },
 
       // ---- Reiter und Diagramme (Phase 2) ----------------------------------------------------
@@ -1186,6 +1203,7 @@
           // Kacheln sind Beiwerk; die Tabelle meldet Verbindungsfehler selbst.
         }
         this.tilesLoaded = true;
+        this.$nextTick(() => this.layoutTiles());
       },
 
       async loadTable() {

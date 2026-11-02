@@ -650,3 +650,15 @@ def test_year_over_year_is_one_menu_and_not_part_of_the_column_list() -> None:
     assert "wt-picker-sep" not in text
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "setYoy(choice)" in script and "yoyLabel()" in script
+
+
+def test_tiles_use_short_names_and_the_layout_helper(service) -> None:
+    from _paths import APP, TEMPLATES
+
+    _add(service, "sensor.regen", "sensor", "total_increasing", "mm", [(_ts(19, 0), 100.0), (_ts(20, 6), 103.5)])
+    _add(service, "binary_sensor.regen", "binary_sensor", None, "", [(_ts(20, 6), 1.0), (_ts(20, 6, 30), 0.0)])
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(20, 1), 12.0)])
+    _configure(service, temperature="sensor.t", precip_mm="sensor.regen", precip_dur="binary_sensor.regen")
+    assert [tile["label"] for tile in service.compute_tiles(NOW)] == ["Temperatur außen", "Niederschlag", "Regen"]
+    assert "WetterLayout.tileColumns" in (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "wetter-layout.js" in (TEMPLATES / "wetterdashboard.html").read_text(encoding="utf-8")

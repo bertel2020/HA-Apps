@@ -34,7 +34,7 @@
 
   /* Kacheln: Aufbau wie die Kennzahl-Kacheln des Energiedashboards (Kopfbalken in der Rollenfarbe,
      Beschriftung in Großbuchstaben, Wert in Monospace); ganze Kachel verlinkt auf die Entität. */
-  .wt-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:16px;}
+  .wt-tiles{display:grid;grid-template-columns:repeat(var(--wt-cols, 4),minmax(0,1fr));gap:10px;margin-bottom:16px;}
   .wt-tile{--wt-accent:var(--chart-8);display:flex;flex-direction:column;gap:2px;min-width:0;padding:10px 12px;
     text-decoration:none;color:inherit;border:1px solid var(--border);border-top:3px solid var(--wt-accent);
     border-radius:8px;background:var(--surface-alt);}
@@ -110,7 +110,7 @@
   .wt-actions{display:flex;gap:8px;margin-top:6px;}
 
   @media (max-width:640px){
-    .wt-tiles,.wt-kpis{grid-template-columns:repeat(2,1fr);}
+    .wt-kpis{grid-template-columns:repeat(2,1fr);}
     .wt-chart{height:260px;}
     .wt-chart-tall{height:300px;}
     .wt-table{min-width:520px;}

@@ -60,6 +60,8 @@ ROLE_LABELS = {key: label for key, label, _types in ROLES}
 MAX_EXTRA_TEMPERATURES = 5
 #: Nachkommastellen, wenn die Entität „automatisch“ eingestellt ist: Strahlung in ganzen W/m².
 ROLE_DEFAULT_DECIMALS = {"radiation": 0}
+#: Kurze Namen für die Kacheln (in der Tabelle stehen die ausführlichen Rollennamen).
+TILE_LABELS = {"precip_mm": N_("Niederschlag"), "precip_dur": N_("Regen")}
 MAX_HEATING_COUNTERS = 6
 DEFAULT_HEATING_ROOM = 20.0  # Raumtemperatur der Gradtagzahl (G20/15, VDI 3807)
 DEFAULT_HEATING_LIMIT = 15.0  # Heizgrenze: darüber wird nicht geheizt
@@ -642,7 +644,8 @@ class WetterService:
                     config, held_off=bool(entity and entity["first_ts"] and entity["first_ts"] < yesterday["start"].timestamp()),
                 )
             tiles.append({
-                "key": spec["key"], "entity_id": spec["entity_id"], "label": spec["label"], "kind": spec["kind"],
+                "key": spec["key"], "entity_id": spec["entity_id"], "kind": spec["kind"],
+                "label": tr(TILE_LABELS[spec["key"]]) if spec["key"] in TILE_LABELS else spec["label"],
                 "unit": spec["unit"], "decimals": spec["decimals"],
                 # Nicht entities.last_value: das ist bei vielen Sensoren leer (siehe Energiedashboard).
                 "last": query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
