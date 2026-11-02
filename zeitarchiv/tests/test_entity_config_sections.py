@@ -86,8 +86,10 @@ def test_the_badge_resets_the_field_to_the_default_with_one_post(client, entitie
     _set(entities[0], gap_threshold="60", retention="365d")
     html = client.get(f"/entities/{entities[0]}/config").text
     assert """hx-vals='{"gap_threshold": "15"}'""" in html  # Standardwert, nicht die Beschriftung
-    assert 'hx-confirm="Aufbewahrung auf den Standard' in html  # nur die Aufbewahrung fragt nach
-    assert html.count("hx-confirm=") == 1
+    assert html.count("hx-confirm=") == 2  # jedes Abzeichen fragt vorher nach
+    assert "„Lücken-Erkennung“ auf den Standard „15 Minuten“ setzen? Aktuell: „1 Stunde“." in html
+    assert "löscht der nächste Retention-Lauf" in html  # bei der Aufbewahrung mit Warnung
+    assert html.count("löscht der nächste Retention-Lauf") == 1  # bei den übrigen nicht
 
     response = client.post(f"/entities/{entities[0]}/config", data={"gap_threshold": "15"})
     assert response.status_code == 200

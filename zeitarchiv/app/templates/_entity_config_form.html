@@ -10,7 +10,7 @@
 {% if field in adjusted %}{% set d = adjusted[field] %}<button type="button" class="badge adjusted"
   title="{{ _('Standard: {value}. Klicken, um darauf zurückzusetzen.', value=d.label) }}"
   hx-post="{{ app_root }}/entities/{{ entity_id }}/config" hx-vals='{{ {field: d.value} | tojson }}' hx-target="#config-form" hx-swap="innerHTML"
-  {% if field == 'retention' %}hx-confirm="{{ _('Aufbewahrung auf den Standard „{value}“ setzen? Ist der Standard kürzer, löscht der nächste Retention-Lauf ältere Daten endgültig.', value=d.label) }}"{% endif %}>{{ _("angepasst") }}</button>{% endif %}
+  hx-confirm="{{ _('„{name}“ auf den Standard „{value}“ setzen? Aktuell: „{current}“.', name=d.title, value=d.label, current=d.current) }}{% if field == 'retention' %} {{ _('Ist der Standard kürzer, löscht der nächste Retention-Lauf ältere Daten endgültig.') }}{% endif %}">{{ _("angepasst") }}</button>{% endif %}
 {%- endmacro %}
 {% set n_erfassung = ['resolution', 'value_filter'] | select('in', adjusted) | list | length %}
 {% set n_aufbewahrung = ['retention', 'compact_target'] | select('in', adjusted) | list | length %}

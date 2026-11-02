@@ -2874,8 +2874,16 @@ def _entity_config_adjusted(entity) -> dict[str, dict[str, str]]:
         "resolution": RESOLUTION_BLOCKED_REASONS, "compact_target": COMPACT_TARGET_BLOCKED_REASONS,
         "outlier_threshold": OUTLIER_BLOCKED_REASONS,
     }
+    titles = {
+        "resolution": N_("Auflösung"), "retention": N_("Aufbewahrung"), "decimals": N_("Nachkommastellen"),
+        "value_filter": N_("Wertänderungsfilter"), "gap_threshold": N_("Lücken-Erkennung"),
+        "outlier_threshold": N_("Ausreißer-Erkennung"), "compact_target": N_("Verdichtungsziel"),
+    }
     return {
-        name: {"value": value, "label": tr(str(labels[name].get(value, value)))}
+        name: {
+            "value": value, "label": tr(str(labels[name].get(value, value))),
+            "current": tr(str(labels[name].get(entity[name], entity[name]))), "title": tr(str(titles[name])),
+        }
         for name, value in expected.items()
         if entity[name] != value and kind not in blocked.get(name, {})
     }
