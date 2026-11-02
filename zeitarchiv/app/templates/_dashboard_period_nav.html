@@ -7,8 +7,12 @@
      zurücksetzt. Der Kalender ist derselbe wie im Chart-Editor, über das
      ganze Archiv (calendar_first/last_date). -->
 {# compact: ohne Schrittweiten-Knöpfe, ‹ › geht immer einen Tag (Wetterdashboard: die Tabelle zeigt alle Zeiträume ohnehin gleichzeitig). #}
-{% macro nav(compact=false) %}
+{# today_first: „Heute“ links vor ‹, damit die Leiste in einer rechtsbündigen Titelzeile nicht rutscht, wenn der Knopf erscheint (Wetterdashboard). #}
+{% macro nav(compact=false, today_first=false) %}
 <div class="dash-period-nav" role="group" aria-label="{{ _('Stichtag') }}" x-data>
+  {% if today_first %}
+  <button type="button" class="chip now-chip" x-show="!$store.dashStichtag.isToday" x-cloak @click="$store.dashStichtag.set(null)">{{ _("Heute") }}</button>
+  {% endif %}
   <button type="button" class="btn navbtn" @click="$store.dashStichtag.go(-1)" :disabled="!$store.dashStichtag.canGoBack" aria-label="{{ _('Vorheriger Zeitraum') }}">‹</button>
   <span class="cal-wrap" x-data='calendarPicker(null, {{ app_root | tojson }}, {{ calendar_first_date | tojson }}, {{ calendar_last_date | tojson }})'>
     <!-- Beim Öffnen den Monat des Stichtags zeigen statt des letzten Archivmonats. -->
@@ -26,7 +30,9 @@
     </template>
   </span>
   {% endif %}
+  {% if not today_first %}
   <button type="button" class="chip now-chip" x-show="!$store.dashStichtag.isToday" x-cloak @click="$store.dashStichtag.set(null)">{{ _("Heute") }}</button>
+  {% endif %}
 </div>
 {% endmacro %}
 

@@ -708,7 +708,7 @@ def test_reference_day_uses_the_dashboard_stichtag_bar_of_the_app() -> None:
 
     view = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
     page = (TEMPLATES / "wetterdashboard.html").read_text(encoding="utf-8")
-    assert "{{ period_nav(true) }}" in view and "period_assets()" in page
+    assert "{{ period_nav(true, true) }}" in view and "period_assets()" in page
     assert "wt-daynav" not in view and 'type="date"' not in view
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "Alpine.store('dashStichtag').date" in script and "'dashboard-stichtag'" in script

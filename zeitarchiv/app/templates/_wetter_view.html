@@ -11,7 +11,7 @@
     <h2 class="wt-h2" :class="{'wt-h2-jump': stichtag()}" x-text="cardTitle()" @click="if (stichtag()) $store.dashStichtag.set(null)" :title="stichtag() ? t('Zurück zu heute') : ''"></h2>
     {# Stichtag-Leiste des App-Standards (wie bei den Dashboards: ‹ Datum ›, Kalender, „Heute“; ohne Schrittweiten-Knöpfe). Der Alpine-Store
        dashStichtag hält den Tag und stellt ihn als ?date=… in die Adresse; wetter.js lädt Kacheln und Tabelle bei „dashboard-stichtag“ neu. #}
-    {{ period_nav(true) }}
+    {{ period_nav(true, true) }}
   </div>
   <p class="wt-stand" x-show="tilesStand" x-cloak x-text="standText()"></p>
   <div class="wt-tiles" style="--wt-cols:{{ placeholders }}" x-show="!tilesLoaded" aria-hidden="true">
