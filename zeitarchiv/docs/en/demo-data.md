@@ -31,7 +31,7 @@ the files that a real instance would create too.
 
 The tables below list the German `entity_id`s; with `--language en` they follow the English name (`sensor.demo_gesamtwirkleistung` → `sensor.demo_total_active_power`).
 
-77 entities, thematically a single household with rooftop PV system (including
+85 entities, thematically a single household with rooftop PV system (including
 yield forecast), wallbox, an additional balcony power plant with its own
 storage, a larger home battery on the rooftop system and the grid CO2
 intensity, all with the prefix `demo_` in the entity ID (easy to recognize and
@@ -105,6 +105,14 @@ selectively deletable):
 | `binary_sensor.demo_praesenz_wohnzimmer` | Switch | — | Home/away with time-of-day-dependent probability and inertia (no switching every few minutes) |
 | `device_tracker.demo_smartphone` | Switch | — | Own, independent home/away simulation (`gen_presence()`) — example of the presence domains `device_tracker`/`person`, which are archived like switches (`home` → on, anything else → off) |
 | `binary_sensor.demo_regensensor` | Switch | — | One or several rain windows on some days, probability rises with that day's cloud cover |
+| `sensor.demo_luftdruck` | Standard | hPa | Weather dashboard: high pressure in clear weather plus a slow wave (passing lows), continuous across midnight |
+| `sensor.demo_boe` | Standard | km/h | Weather dashboard: gust for the wind, always above it (on average about a third) |
+| `sensor.demo_strahlung` | Standard | W/m² | Weather dashboard: global radiation, same bell curve and cloudiness as `demo_pv_leistung` (peak about 1000) |
+| `sensor.demo_niederschlag` | Counter (`total_increasing`) | mm | Weather dashboard: rain amount from the same windows `demo_regensensor` switches (0.4 to 6 mm/h), about 600 to 750 mm a year; together with the rain sensor the page shows both precipitation modes side by side |
+| `sensor.demo_aussentemperatur_nord` | Standard | °C | Weather dashboard: second thermometer on the north side, on average about 1 to 1.5 K cooler (its own table row) |
+| `sensor.demo_waermepumpe_energie` | Counter (`total_increasing`) | kWh | Weather dashboard (heating): 72 % of `demo_heizung` |
+| `sensor.demo_heizstab_energie` | Counter (`total_increasing`) | kWh | Weather dashboard (heating): 18 % of `demo_heizung`, only in frost |
+| `sensor.demo_konvektoren_energie` | Counter (`total_increasing`) | kWh | Weather dashboard (heating): the rest of `demo_heizung` (28 % minus heating element), e.g. bathroom and shoulder seasons |
 
 Washing machine, dishwasher, dryer and wallbox each have two or three entities
 — instantaneous power (W), energy counter (kWh) and, for the three household
@@ -216,7 +224,7 @@ cd addon
 .venv/bin/python3 scripts/generate_demo_data.py --data-dir /path/to/data-directory
 ```
 
-With the default values, generates 6 months of history for all 77 demo entities
+With the default values, generates 6 months of history for all 85 demo entities
 in a fresh (or empty) target directory.
 
 More examples:
@@ -286,7 +294,7 @@ directly at the add-on data path, then start the add-on again. A prior backup
 
 ## Regenerating demo data (`--clean`)
 
-Before rewriting, `--clean` cleans the values of all 77 `demo_*` entities — like
+Before rewriting, `--clean` cleans the values of all 85 `demo_*` entities — like
 **Housekeeping → Storage** in the app, just for all demo entities at once,
 without opening the app. Deliberately `delete_all_values()` instead of
 `delete_entity()`: the entities themselves remain in the index continuously

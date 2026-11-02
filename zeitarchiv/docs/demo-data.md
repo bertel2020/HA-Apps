@@ -31,7 +31,7 @@ also genau die Dateien, die auch eine echte Instanz anlegen würde.
 
 Die Tabellen unten nennen die deutschen `entity_id`s; mit `--language en` heißen sie wie der englische Name (`sensor.demo_gesamtwirkleistung` → `sensor.demo_total_active_power`).
 
-77 Entitäten, thematisch ein einzelner Haushalt mit Dach-PV-Anlage
+85 Entitäten, thematisch ein einzelner Haushalt mit Dach-PV-Anlage
 (inkl. Ertrags-Prognose), Wallbox, einem zusätzlichen Balkonkraftwerk mit
 eigenem Speicher, einem größeren Heimspeicher an der Dachanlage und der
 Netz-CO2-Intensität, alle mit dem Präfix `demo_` in der Entity-ID (leicht
@@ -105,6 +105,14 @@ wiederzuerkennen und gezielt löschbar):
 | `binary_sensor.demo_praesenz_wohnzimmer` | Schalter | — | Heim/Weg mit tageszeitabhängiger Wahrscheinlichkeit und Trägheit (kein Umschalten alle paar Minuten) |
 | `device_tracker.demo_smartphone` | Schalter | — | Eigene, unabhängige Heim/Weg-Simulation (`gen_presence()`) — Beispiel für die Anwesenheits-Domains `device_tracker`/`person`, die wie Schalter archiviert werden (`home` → an, alles andere → aus) |
 | `binary_sensor.demo_regensensor` | Schalter | — | Ein-/mehrmalige Regenfenster an manchen Tagen, Wahrscheinlichkeit steigt mit der Bewölkung dieses Tages |
+| `sensor.demo_luftdruck` | Standard | hPa | Wetterdashboard: Hochdruck bei klarem Wetter, dazu eine langsame Welle (durchziehende Tiefs), stetig auch um Mitternacht |
+| `sensor.demo_boe` | Standard | km/h | Wetterdashboard: Böe zum Wind, immer darüber (im Schnitt rund ein Drittel) |
+| `sensor.demo_strahlung` | Standard | W/m² | Wetterdashboard: Globalstrahlung, dieselbe Glockenkurve und Bewölkung wie `demo_pv_leistung` (Peak rund 1000) |
+| `sensor.demo_niederschlag` | Zähler (`total_increasing`) | mm | Wetterdashboard: Regenmenge aus denselben Fenstern, die `demo_regensensor` schaltet (0,4 bis 6 mm/h), rund 600 bis 750 mm im Jahr; zusammen mit dem Regensensor zeigt die Seite beide Niederschlags-Modi nebeneinander |
+| `sensor.demo_aussentemperatur_nord` | Standard | °C | Wetterdashboard: zweites Thermometer auf der Nordseite, im Mittel etwa 1 bis 1,5 K kühler (eigene Tabellenzeile) |
+| `sensor.demo_waermepumpe_energie` | Zähler (`total_increasing`) | kWh | Wetterdashboard (Heizen): 72 % von `demo_heizung` |
+| `sensor.demo_heizstab_energie` | Zähler (`total_increasing`) | kWh | Wetterdashboard (Heizen): 18 % von `demo_heizung`, nur bei Frost |
+| `sensor.demo_konvektoren_energie` | Zähler (`total_increasing`) | kWh | Wetterdashboard (Heizen): der Rest von `demo_heizung` (28 % abzüglich Heizstab), z. B. Bad und Übergangszeit |
 
 Waschmaschine, Spülmaschine, Trockner und Wallbox haben je zwei bzw. drei
 Entitäten — Momentanleistung (W), Energiezähler (kWh) und bei den drei
@@ -222,7 +230,7 @@ cd addon
 .venv/bin/python3 scripts/generate_demo_data.py --data-dir /pfad/zum/datenverzeichnis
 ```
 
-Erzeugt mit den Standardwerten 6 Monate Historie für alle 77 Demo-
+Erzeugt mit den Standardwerten 6 Monate Historie für alle 85 Demo-
 Entitäten in einem frischen (oder leeren) Zielverzeichnis.
 
 Weitere Beispiele:
@@ -294,7 +302,7 @@ Fall dringend empfohlen.
 
 ## Demo-Daten neu erzeugen (`--clean`)
 
-`--clean` bereinigt vor dem Neuschreiben die Werte aller 77 `demo_*`-
+`--clean` bereinigt vor dem Neuschreiben die Werte aller 85 `demo_*`-
 Entitäten — wie **Housekeeping → Speicherplatz** in der App, nur für alle
 Demo-Entitäten auf einmal, ohne die App zu öffnen. Bewusst
 `delete_all_values()` statt `delete_entity()`: die Entitäten selbst bleiben

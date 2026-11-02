@@ -60,6 +60,15 @@ class DemoEntity:
     states: tuple[tuple[str, str], ...] | None = None
 
 
+#: Entitäten, die für das Wetterdashboard dazukamen (am Ende von DEMO_ENTITIES). Eine ältere Demo
+#: hat sie nicht, und ein --append kann ihre Historie nicht nachträglich erzeugen.
+WETTER_ENTITY_IDS = (
+    "sensor.demo_luftdruck", "sensor.demo_boe", "sensor.demo_strahlung", "sensor.demo_niederschlag",
+    "sensor.demo_aussentemperatur_nord", "sensor.demo_waermepumpe_energie", "sensor.demo_heizstab_energie",
+    "sensor.demo_konvektoren_energie",
+)
+
+
 # Zustände der Demo-Zustands-Entitäten. Rohwerte wie Home Assistant sie
 # liefern würde (englisch), Anzeigenamen deutsch als Übersetzung — so zeigt
 # die Demo beides, Text und Rohwert im Tooltip.
@@ -254,6 +263,18 @@ DEMO_ENTITIES = [
                "sensor", "total_increasing", "kWh"),
     DemoEntity("sensor.demo_migration2_stromverbrauch", "Demo Migrationstest 2 Stromverbrauch",
                "sensor", "total_increasing", "Wh"),
+    # Wetterdashboard (ROADMAP 1.43): Rollen, die der Haushalt oben noch nicht hatte. Bewusst am
+    # ENDE der Liste, damit die Zufallsfolge (Datenqualitäts-Einstreuungen) der früheren Entitäten
+    # unverändert bleibt.
+    DemoEntity("sensor.demo_luftdruck", "Demo Luftdruck", "sensor", "measurement", "hPa"),
+    DemoEntity("sensor.demo_boe", "Demo Böe", "sensor", "measurement", "km/h"),
+    DemoEntity("sensor.demo_strahlung", "Demo Sonneneinstrahlung", "sensor", "measurement", "W/m²"),
+    DemoEntity("sensor.demo_niederschlag", "Demo Niederschlag", "sensor", "total_increasing", "mm"),
+    DemoEntity("sensor.demo_aussentemperatur_nord", "Demo Außentemperatur Nord", "sensor", "measurement", "°C"),
+    # Heizenergie in drei Zählern (Summe = demo_heizung): Wärmepumpe, Heizstab bei Frost, Konvektoren.
+    DemoEntity("sensor.demo_waermepumpe_energie", "Demo Wärmepumpe Energie", "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_heizstab_energie", "Demo Heizstab Energie", "sensor", "total_increasing", "kWh"),
+    DemoEntity("sensor.demo_konvektoren_energie", "Demo Konvektoren Energie", "sensor", "total_increasing", "kWh"),
 ]
 
 
@@ -599,6 +620,50 @@ def gen_wind(dt: datetime, weather: WeatherContext, rng: random.Random) -> float
     return round(max(0.0, value), 1)
 
 
+def _smooth_cloud(dt: datetime, weather: WeatherContext) -> float:
+    """Bewölkungsfaktor ohne Sprung um Mitternacht: mittags der Tageswert, zu den Tagesgrenzen hin
+    ein gleitender Übergang zum Nachbartag (Luftdruck ändert sich stetig, nicht tageweise)."""
+    x = dt.hour / 24 + dt.minute / 1440
+    today = weather.cloud_factor(dt)
+    try:
+        other = weather.cloud_factor(dt + timedelta(days=1) if x >= 0.5 else dt - timedelta(days=1))
+    except KeyError:
+        other = today
+    weight = abs(x - 0.5)
+    return today * (1 - weight) + other * weight
+
+
+def gen_pressure(dt: datetime, weather: WeatherContext, rng: random.Random) -> float:
+    """Luftdruck auf Meereshöhe: klares Wetter (hoher Bewölkungsfaktor) heißt Hochdruck, dazu eine
+    langsame Welle (durchziehende Tiefs, rund 9,5 Tage) und die kleine halbtägige Gezeit."""
+    day = dt.timetuple().tm_yday + dt.hour / 24
+    value = 1014.0 + 9.0 * (_smooth_cloud(dt, weather) - 0.6) / 0.4
+    value += 5.0 * math.sin(2 * math.pi * day / 9.5) + 0.5 * math.sin(2 * math.pi * (dt.hour - 4) / 12)
+    return round(max(985.0, min(1040.0, value + rng.uniform(-0.15, 0.15))), 1)
+
+
+def gen_gust(wind_kmh: float, rng: random.Random) -> float:
+    """Böe zum Windmittel: immer mindestens so stark, im Schnitt rund ein Drittel darüber."""
+    return round(wind_kmh + rng.uniform(1.5, 5.0) + wind_kmh * rng.uniform(0.15, 0.45), 1)
+
+
+def gen_radiation(pv_power_w: float, rng: random.Random) -> float:
+    """Globalstrahlung in W/m²: dieselbe Glockenkurve und Bewölkung wie die Dach-PV (Peak etwa
+    1000 W/m² bei voller PV-Leistung), damit beide Reihen zusammenpassen."""
+    if pv_power_w <= 0:
+        return 0.0
+    return round(max(0.0, pv_power_w / PV_PEAK_W * 1000.0 * rng.uniform(0.97, 1.03)), 0)
+
+
+def _rain_intensity_mm_h(schedule_for_day: list[ApplianceCycle], dt: datetime) -> float:
+    """Regenrate im gerade laufenden Regenfenster (0,4 bis 6 mm/h), je Fenster fest aus dessen Beginn
+    abgeleitet. So ist die Menge eine Funktion derselben Fenster, die der Regensensor schaltet."""
+    for cycle in schedule_for_day:
+        if cycle.start <= dt <= cycle.end:
+            return 0.4 + ((int(cycle.start.timestamp()) // 60) % 23) / 22 * 5.6
+    return 0.0
+
+
 PV_PEAK_W = 5200.0
 # ∫₀¹ sin(πx) dx — die analytische Fläche unter der Glockenkurvenform aus
 # gen_pv_power(), zur Tagesertrags-SCHÄTZUNG in pv_forecast_kwh() genutzt,
@@ -779,6 +844,8 @@ def simulate_household(
         "werkstatt_licht_energie": [], "werkstatt_ladestation_energie": [],
         "pv_power": [], "pv_ertrag": [], "stromzaehler_bezug": [], "stromzaehler_einspeisung": [],
         "pv_prognose_rest_heute": [], "pv_prognose_morgen": [], "co2_intensitaet": [],
+        "luftdruck": [], "boe": [], "strahlung": [], "niederschlag": [], "outdoor_temp_nord": [],
+        "waermepumpe_energie": [], "heizstab_energie": [], "konvektoren_energie": [],
         "balkon_pv": [], "balkon_ladeleistung": [], "balkon_entladeleistung": [],
         "balkon_soc_pct": [], "balkon_speicher_stand": [], "balkon_hausabgabe": [],
         "balkon_ertrag_heute": [], "balkon_ertrag_gesamt": [],
@@ -817,6 +884,13 @@ def simulate_household(
         "werkstatt_energie",
         werkstatt_kompressor_total + werkstatt_licht_total + werkstatt_ladestation_total + rng.uniform(5, 40),
     )
+    # Wetterdashboard-Reihen: eigene Zufallsfolge und feste Startwerte (kein rng-Zug), damit die
+    # Werte aller früheren Entitäten für denselben Seed unverändert bleiben.
+    wetter_rng = random.Random(int(start.timestamp()))
+    niederschlag_total = counter_seed.get("niederschlag", 842.3)
+    waermepumpe_total = counter_seed.get("waermepumpe_energie", 1480.0)
+    heizstab_total = counter_seed.get("heizstab_energie", 160.0)
+    konvektoren_total = counter_seed.get("konvektoren_energie", 240.0)
     on_state = {
         "waschmaschine": appliance_seed.get("waschmaschine", 0.0),
         "spuelmaschine": appliance_seed.get("spuelmaschine", 0.0),
@@ -890,7 +964,14 @@ def simulate_household(
         outdoor_humidity = gen_humidity(dt, weather, rng)
         series["humidity"].append((ts, outdoor_humidity))
         series["indoor_humidity"].append((ts, gen_indoor_humidity(dt, outdoor_humidity, rng)))
-        series["wind"].append((ts, gen_wind(dt, weather, rng)))
+        wind_now = gen_wind(dt, weather, rng)
+        series["wind"].append((ts, wind_now))
+        series["boe"].append((ts, gen_gust(wind_now, wetter_rng)))
+        series["luftdruck"].append((ts, gen_pressure(dt, weather, wetter_rng)))
+        # Zweites Thermometer auf der Nordseite: im Mittel kühler, nachmittags weniger Spitze.
+        outdoor_raw = _outdoor_temp_at(dt, weather)
+        north_shade = 0.9 + 0.9 * max(0.0, math.sin(2 * math.pi * (dt.hour + dt.minute / 60 - 9) / 24))
+        series["outdoor_temp_nord"].append((ts, round(outdoor_raw - north_shade + wetter_rng.uniform(-0.3, 0.3), 2)))
 
         heizung_w = _heating_power_at(dt, weather, rng)
         waschmaschine_w = _appliance_power_at(schedules["waschmaschine"], WASCHMASCHINE_PROFILE, dt, rng)
@@ -930,6 +1011,7 @@ def simulate_household(
         series["wallbox2"].append((ts, round(wallbox2_w, 1)))
         series["load_power"].append((ts, round(load_w, 1)))
         series["pv_power"].append((ts, pv_w))
+        series["strahlung"].append((ts, gen_radiation(pv_w, wetter_rng)))
 
         series["co2_intensitaet"].append((ts, gen_co2_intensity(dt, weather, rng)))
 
@@ -1071,6 +1153,13 @@ def simulate_household(
             rain_state = rain_now
             series["regensensor"].append((ts, rain_now))
 
+        niederschlag_total += _rain_intensity_mm_h(rain_schedule.get(dt.date().isoformat(), ()), dt) * step_hours
+        # Heizung auf drei Zähler verteilt: Wärmepumpe trägt den Großteil, der Heizstab springt nur
+        # bei Frost ein, die Konvektoren (Bad, Übergangszeit) bekommen den Rest.
+        stab_share = 0.18 if outdoor_raw < 0.0 else 0.0
+        waermepumpe_total += (heizung_w * 0.72 / 1000) * step_hours
+        heizstab_total += (heizung_w * stab_share / 1000) * step_hours
+        konvektoren_total += (heizung_w * (0.28 - stab_share) / 1000) * step_hours
         pv_ertrag_total += (pv_w / 1000) * step_hours
         # Balkonkraftwerk-Hausabgabe mindert wie im echten Netzanschluss den
         # Bezug, ohne eigenen Zähler/eigene Einspeisevergütung zu haben. Der
@@ -1100,6 +1189,10 @@ def simulate_household(
         werkstatt_energie_total += (werkstatt_w / 1000) * step_hours
 
         if index % COUNTER_EVERY_N == 0:
+            series["niederschlag"].append((ts, round(niederschlag_total, 1)))
+            series["waermepumpe_energie"].append((ts, round(waermepumpe_total, 3)))
+            series["heizstab_energie"].append((ts, round(heizstab_total, 3)))
+            series["konvektoren_energie"].append((ts, round(konvektoren_total, 3)))
             series["pv_ertrag"].append((ts, round(pv_ertrag_total, 3)))
             series["stromzaehler_bezug"].append((ts, round(bezug_total, 3)))
             series["stromzaehler_einspeisung"].append((ts, round(einspeisung_total, 3)))
@@ -1558,8 +1651,8 @@ _DEMO_CATEGORY_RULES = (
     (2, ("wallbox",)),
     (3, ("stromzaehler_", "strompreis_", "co2_")),
     (4, ("gesamtwirkleistung", "waschmaschine", "spuelmaschine", "trockner", "kuehlschrank", "herd", "homeoffice",
-         "entertainment", "boiler", "werkstatt")),
-    (5, ("aussentemperatur", "luftfeuchte", "wind", "regensensor")),
+         "entertainment", "boiler", "werkstatt", "waermepumpe", "heizstab", "konvektoren")),
+    (5, ("aussentemperatur", "luftfeuchte", "wind", "regensensor", "luftdruck", "boe", "strahlung", "niederschlag")),
 )
 
 
@@ -1610,6 +1703,10 @@ COUNTER_SEED_ENTITY_KEYS = {
     "sensor.demo_spuelmaschine_energie": "spuelmaschine_energie",
     "sensor.demo_trockner_energie": "trockner_energie",
     "sensor.demo_wallbox_energie": "wallbox_energie",
+    "sensor.demo_niederschlag": "niederschlag",
+    "sensor.demo_waermepumpe_energie": "waermepumpe_energie",
+    "sensor.demo_heizstab_energie": "heizstab_energie",
+    "sensor.demo_konvektoren_energie": "konvektoren_energie",
 }
 APPLIANCE_SEED_ENTITY_KEYS = {
     "binary_sensor.demo_waschmaschine_an": "waschmaschine",
@@ -1889,6 +1986,11 @@ def run_generation(
             heim_online_seed = _read_last_value(data_dir, "binary_sensor.demo_heimspeicher_online") or 0.0
             if on_status is not None:
                 on_status(f"Ergänze Demo-Daten ab {start.isoformat()} bis {now.isoformat()}.")
+                if any(index.get_entity(localized_id(entity_id, language)) is None for entity_id in WETTER_ENTITY_IDS):
+                    on_status(
+                        "Die Wetter-Entitäten für das Wetterdashboard fehlen in dieser Demo und starten nur ab jetzt; "
+                        "für ihre Historie die Demo-Daten neu erzeugen (--clean)."
+                    )
     else:
         start = now - timedelta(days=months * 30)
 
@@ -1998,6 +2100,14 @@ def run_generation(
         "binary_sensor.demo_praesenz_wohnzimmer": gen_presence(start, now, rng, start_state=presence_seed),
         "device_tracker.demo_smartphone": gen_presence(start, now, rng, start_state=device_presence_seed),
         "binary_sensor.demo_regensensor": household["regensensor"],
+        "sensor.demo_luftdruck": household["luftdruck"],
+        "sensor.demo_boe": household["boe"],
+        "sensor.demo_strahlung": household["strahlung"],
+        "sensor.demo_niederschlag": household["niederschlag"],
+        "sensor.demo_aussentemperatur_nord": household["outdoor_temp_nord"],
+        "sensor.demo_waermepumpe_energie": household["waermepumpe_energie"],
+        "sensor.demo_heizstab_energie": household["heizstab_energie"],
+        "sensor.demo_konvektoren_energie": household["konvektoren_energie"],
         "sensor.demo_saugroboter_status": gen_saugroboter_status(start, now, rng),
         "sensor.demo_waschmaschine_programm": gen_waschmaschine_programm(
             start, now, household["waschmaschine_an"], rng,

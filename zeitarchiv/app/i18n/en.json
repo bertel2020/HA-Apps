@@ -3363,7 +3363,15 @@
     "Wetterdashboard": "Weather dashboard",
     "Wind": "Wind",
     "Zeitarchiv — Wetterdashboard": "Zeitarchiv — Weather dashboard",
-    "{entity_id}: Typ „{type}“ passt nicht zur Rolle „{role}“.": "{entity_id}: type “{type}” does not fit the role “{role}”."
+    "{entity_id}: Typ „{type}“ passt nicht zur Rolle „{role}“.": "{entity_id}: type “{type}” does not fit the role “{role}”.",
+    "Demo Luftdruck": "Demo Air Pressure",
+    "Demo Böe": "Demo Gust",
+    "Demo Sonneneinstrahlung": "Demo Solar Radiation",
+    "Demo Niederschlag": "Demo Precipitation",
+    "Demo Außentemperatur Nord": "Demo Outdoor Temperature North",
+    "Demo Wärmepumpe Energie": "Demo Heat Pump Energy",
+    "Demo Heizstab Energie": "Demo Heating Element Energy",
+    "Demo Konvektoren Energie": "Demo Convector Energy"
   },
   "js": {
     "Ladestand": "State of charge",
