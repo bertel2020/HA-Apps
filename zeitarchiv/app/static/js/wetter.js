@@ -52,7 +52,8 @@
     const diff = cur - previous;
     const zero = Math.round(Math.abs(diff) * Math.pow(10, decimals)) === 0;
     let text = (zero ? '± ' : diff > 0 ? '▲ +' : '▼ −') + num(Math.abs(diff), decimals);
-    if (unit) text += ' ' + unit;
+    // Die Einheit steht schon am Wert; nur „K“ bleibt, weil sie von „°C“ abweicht. Kürzer = schmalere Spalte.
+    if (unit === 'K') text += ' K';
     if (withPercent && previous !== 0 && !zero) {
       const percent = diff / previous * 100;
       text += ' · ' + (percent > 0 ? '+' : '−') + num(Math.abs(percent), 0) + ' %';
