@@ -89,7 +89,7 @@
         <button type="button" :aria-pressed="(monthlyMetric === 'precip').toString()" @click="setMonthlyMetric('precip')">{{ _("Niederschlag") }}</button>
       </div>
       {% endif %}
-      <label class="wt-check"><input type="checkbox" x-model="band" @change="drawMonthly()"> {{ _("Spanne der Vorjahre") }}</label>
+      <label class="filter-chip"><input type="checkbox" x-model="band" @change="drawMonthly()"><span>{{ _("Spanne der Vorjahre") }}</span></label>
     </div>
     <p class="wt-headline" x-show="monthlyMetric === 'temperature' && headline()" x-text="headline()"></p>
     <div class="wt-chart" x-ref="monthlyChart"></div>
@@ -175,19 +175,20 @@
   {% if has_heating %}
   <section x-show="tab === 'heat'" x-cloak role="tabpanel" id="wt-panel-heat" aria-labelledby="wt-tab-heat">
     <div class="card wt-card">
-      <h2 class="wt-h2">{{ _("Heizen und Wetter") }}</h2>
-      <p class="wt-headline" x-show="heat" x-text="heatHeadline()"></p>
-      <div class="wt-controls" x-show="heat">
-        <div class="wt-cols" role="group" aria-label="{{ _('Heizzähler') }}">
-          <template x-for="(counter, i) in (heat ? heat.counters : [])" :key="counter.entity_id">
-            <label class="wt-check"><i class="wt-swatch" :style="'background:' + heatColor(i)"></i>
-              <input type="checkbox" :checked="heatOn[i]" @change="toggleHeatCounter(i)"> <span x-text="counter.name"></span></label>
-          </template>
-        </div>
-        <label class="wt-check">{{ _("Raumtemperatur") }}
+      <div class="wt-controls">
+        <h2 class="wt-h2">{{ _("Heizen und Wetter") }}</h2>
+        <label class="wt-check" x-show="heat" x-cloak>{{ _("Raumtemperatur") }}
           <input type="text" class="wt-num" x-model="heatRoom" @input="drawHeat()" inputmode="decimal" size="3"> °C</label>
-        <label class="wt-check">{{ _("Heizgrenze") }}
+        <label class="wt-check" x-show="heat" x-cloak>{{ _("Heizgrenze") }}
           <input type="text" class="wt-num" x-model="heatLimit" @input="drawHeat()" inputmode="decimal" size="3"> °C</label>
+      </div>
+      <p class="wt-headline" x-show="heat" x-text="heatHeadline()"></p>
+      {# Zähler als Auswahl-Pillen (.filter-chip aus app.css), mit Farbpunkt wie im Streudiagramm #}
+      <div class="wt-chips" role="group" aria-label="{{ _('Heizzähler') }}" x-show="heat && heat.counters.length > 1" x-cloak>
+        <template x-for="(counter, i) in (heat ? heat.counters : [])" :key="counter.entity_id">
+          <label class="filter-chip"><input type="checkbox" :checked="heatOn[i]" @change="toggleHeatCounter(i)">
+            <span><i class="wt-swatch" :style="'background:' + heatColor(i)"></i><em x-text="counter.name"></em></span></label>
+        </template>
       </div>
       <div class="wt-chart wt-chart-tall" x-ref="heatChart"></div>
       <p class="hint hint-status" x-text="heatReadout()"></p>

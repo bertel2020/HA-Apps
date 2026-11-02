@@ -629,3 +629,13 @@ def test_tabs_are_keyboard_operable_and_linked_to_their_panels() -> None:
     assert text.count('@keydown="tabKey($event)"') == len(tabs) and text.count(":tabindex=") == len(tabs)
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert all(key in script for key in ("ArrowLeft", "ArrowRight", "Home", "End"))
+
+
+def test_toggles_are_app_chips_and_card_heads_keep_one_layout() -> None:
+    from _paths import TEMPLATES
+
+    text = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+    assert text.count('class="filter-chip"') == 2  # Spanne der Vorjahre, Heizzähler
+    assert '<input type="checkbox" x-model="band"' in text and 'class="wt-check"><input type="checkbox"' not in text
+    # Jede Karte beginnt mit der Kopfzeile: Titel links, Bedienelemente rechts.
+    assert text.count('<div class="wt-controls">') >= 8

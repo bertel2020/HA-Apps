@@ -1020,12 +1020,16 @@
         });
         const chart = chartFor('heat', element);
         chart.setOption({
-          animation: false, grid: gridFor(element, {right: 20, bottom: 24}), legend: {...legendBox(colors, legend), left: 70},
+          animation: false, grid: gridFor(element, {right: 20, bottom: 24}), legend: legendBox(colors, legend),
           xAxis: {
             type: 'value', name: t('Tages-Ø Außentemperatur (°C)'), nameLocation: 'middle', nameGap: 26,
             nameTextStyle: {color: colors.text}, ...axisStyle(colors), min: (value) => Math.floor(value.min / 5) * 5,
           },
-          yAxis: {type: 'value', name: 'kWh', min: 0, nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
+          // Einheit an den Teilstrichen statt als Achsenname: der Name landete in diesem Diagramm mitten in der Legende.
+          yAxis: {
+            type: 'value', min: 0, ...axisStyle(colors),
+            axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => `${value} kWh`},
+          },
           tooltip: {
             trigger: 'item', confine: true, backgroundColor: colors.surface, borderColor: colors.grid,
             textStyle: {color: colors.ink, fontSize: scaledFont(12)},
