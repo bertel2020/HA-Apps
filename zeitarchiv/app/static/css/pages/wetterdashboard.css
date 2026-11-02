@@ -92,7 +92,7 @@
   .wt-table td .wt-v{font-weight:600;color:var(--ink);}
   .wt-table td.wt-vj .wt-v{font-weight:400;color:var(--ink-muted);}
   .wt-table td[data-tooltip-fixed]{cursor:help;}
-  .wt-table td .wt-dl{margin-left:8px;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:var(--chart-1);}
+  .wt-table td .wt-dl{display:block;line-height:1.25;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:var(--chart-1);}
   .wt-table td.wt-na .wt-v{color:var(--ink-faint);font-weight:400;}
 
   /* Einrichtung: Bereiche wie die Einrichtung des Energiedashboards (.settings-section mit Farbverlauf in der
