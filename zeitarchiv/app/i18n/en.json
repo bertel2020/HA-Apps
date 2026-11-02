@@ -3401,7 +3401,8 @@
     "Wert außerhalb von {low} bis {high}: {value}": "Value outside {low} to {high}: {value}",
     "{entity_id}: Heizenergie braucht einen Zähler.": "{entity_id}: heating energy needs a counter.",
     "Wetterdashboard-Konfiguration": "Weather dashboard configuration",
-    "Rollen, Heizzähler, Schwellenwerte": "Roles, heating counters, thresholds"
+    "Rollen, Heizzähler, Schwellenwerte": "Roles, heating counters, thresholds",
+    "Temperatur außen": "Outdoor temperature"
   },
   "js": {
     "Ladestand": "State of charge",

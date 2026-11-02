@@ -208,7 +208,9 @@ class WetterService:
         def role_label(key: str) -> str:
             return tr(ROLE_LABELS[key])
 
-        add("temperature", config["temperature"], role_label("temperature"), "standard")
+        # Anzeigename statt Rollenname: Kacheln und Tabellengruppen stehen in Großbuchstaben, und aus
+        # „Außentemperatur“ würde „AUSSENTEMPERATUR“, was wie ein Tippfehler aussieht.
+        add("temperature", config["temperature"], tr("Temperatur außen"), "standard")
         for position, extra in enumerate(config["extra_temperatures"]):
             entity = index.get_entity(extra["entity_id"])
             name = extra["name"] or (

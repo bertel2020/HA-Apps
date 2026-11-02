@@ -221,7 +221,7 @@ def test_extra_thermometer_becomes_its_own_row(service) -> None:
     _add(service, "sensor.n", "sensor", "measurement", "°C", [(_ts(20, 1), 9.0)])
     _configure(service, temperature="sensor.t", extra_temperatures=[{"entity_id": "sensor.n", "name": "Nord"}])
     data = service.compute_table(TableRequest(columns=["heute"], vorjahr=False), NOW)
-    assert [(row["key"], row["label"]) for row in data["rows"]] == [("temperature", "Außentemperatur"), ("kenntage", "Kenntage"), ("temperature:0", "Nord")]
+    assert [(row["key"], row["label"]) for row in data["rows"]] == [("temperature", "Temperatur außen"), ("kenntage", "Kenntage"), ("temperature:0", "Nord")]
 
 
 def test_tiles_show_today_and_skip_extra_thermometers(service) -> None:
