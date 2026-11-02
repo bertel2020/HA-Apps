@@ -1,3 +1,4 @@
+{% from "_hints.html" import hint_button, hint_body %}
 {# Rollen-Zuordnung des Wetterdashboards. Jede Rolle zeigt nur Entitäten des passenden Typs
    (Messwert, Zähler, Schalter), weil die Rolle die Aggregation festlegt. #}
 {% macro role_field(name, role, initial) %}
@@ -26,7 +27,7 @@
 </div>
 <p class="sub">{{ _("Ordnet jeder Rolle eine Entität zu. Nur die Außentemperatur ist Pflicht.") }}</p>
 
-<form class="card wt-setup" hx-post="wetterdashboard/setup" hx-target="#wetter-root" hx-swap="innerHTML"
+<form class="card wt-card wt-setup" hx-post="wetterdashboard/setup" hx-target="#wetter-root" hx-swap="innerHTML"
       x-data='{
         entityOptions: {{ entity_options | tojson }},
         roleTypes: {{ role_types | tojson }},
@@ -56,10 +57,10 @@
     {% endfor %}
   </div>
 
-  <h2 class="wt-sub-h">{{ _("Weitere Thermometer") }}</h2>
-  <p class="hint">{{ _("Jedes weitere Thermometer wird eine eigene Zeile in der Tabelle, es wird nie mit der Außentemperatur gemittelt.") }}</p>
+  <h2 class="wt-sub-h">{{ _("Weitere Thermometer") }} {{ hint_button(_("Weitere Thermometer")) }}</h2>
+  {% call hint_body() %}{{ _("Jedes weitere Thermometer wird eine eigene Zeile in der Tabelle, es wird nie mit der Außentemperatur gemittelt.") }}{% endcall %}
   <template x-for="(row, i) in extras" :key="i">
-    <div class="wt-extra">
+    <div class="wt-extra field">
       <span class="dd-picker-wrap" x-data="entityPicker(optionsFor('temperature'), row.entity_id, (id) => { row.entity_id = id })" @click.outside="open = false">
         <span class="dd-picker-anchor">
           <button type="button" class="btn" @click="toggleOpen($refs.search)" x-text="entityId ? label(entityId) : t('Entität wählen …')"></button>
@@ -76,12 +77,12 @@
       <button type="button" class="btn" @click="removeExtra(i)" aria-label="{{ _('Entfernen') }}">✕</button>
     </div>
   </template>
-  <button type="button" class="btn" x-show="extras.length < maxExtra" @click="addExtra()">{{ _("+ Thermometer") }}</button>
+  <button type="button" class="btn wt-add" x-show="extras.length < maxExtra" @click="addExtra()">{{ _("+ Thermometer") }}</button>
 
-  <h2 class="wt-sub-h">{{ _("Heizenergie") }}</h2>
-  <p class="hint">{{ _("Ein oder mehrere Energiezähler der Heizung, zum Beispiel Wärmepumpe, Heizstab oder Konvektoren. Sie werden zu einer Summe addiert, der Reiter „Heizen“ zeigt auch den Anteil je Zähler.") }}</p>
+  <h2 class="wt-sub-h">{{ _("Heizenergie") }} {{ hint_button(_("Heizenergie")) }}</h2>
+  {% call hint_body() %}{{ _("Ein oder mehrere Energiezähler der Heizung, zum Beispiel Wärmepumpe, Heizstab oder Konvektoren. Sie werden zu einer Summe addiert, der Reiter „Heizen“ zeigt auch den Anteil je Zähler.") }} {{ _("Gradtagzahl nach VDI 3807 (G20/15): Raumtemperatur minus Tagesmittel, nur an Tagen unter der Heizgrenze. Beide Werte lassen sich auf dem Reiter „Heizen“ vorübergehend ändern.") }}{% endcall %}
   <template x-for="(row, i) in heating" :key="i">
-    <div class="wt-extra">
+    <div class="wt-extra field">
       <span class="dd-picker-wrap" x-data="entityPicker(counterOptions, row.entity_id, (id) => { row.entity_id = id })" @click.outside="open = false">
         <span class="dd-picker-anchor">
           <button type="button" class="btn" @click="toggleOpen($refs.search)" x-text="entityId ? label(entityId) : t('Entität wählen …')"></button>
@@ -98,23 +99,22 @@
       <button type="button" class="btn" @click="removeHeating(i)" aria-label="{{ _('Entfernen') }}">✕</button>
     </div>
   </template>
-  <button type="button" class="btn" x-show="heating.length < maxHeating" @click="addHeating()">{{ _("+ Heizzähler") }}</button>
+  <button type="button" class="btn wt-add" x-show="heating.length < maxHeating" @click="addHeating()">{{ _("+ Heizzähler") }}</button>
   <div class="wt-thresholds">
-    <label>{{ _("Raumtemperatur") }}
-      <input type="text" name="heating_room" value="{{ config.heating_room | string | replace('.', ',') }}" inputmode="decimal" size="4"> °C</label>
-    <label>{{ _("Heizgrenze") }}
-      <input type="text" name="heating_limit" value="{{ config.heating_limit | string | replace('.', ',') }}" inputmode="decimal" size="4"> °C</label>
+    <div class="field"><label for="wt-heating-room">{{ _("Raumtemperatur") }}</label>
+      <input type="text" id="wt-heating-room" class="wt-short" name="heating_room" value="{{ config.heating_room | string | replace('.', ',') }}" inputmode="decimal"> <span class="wt-unit">°C</span></div>
+    <div class="field"><label for="wt-heating-limit">{{ _("Heizgrenze") }}</label>
+      <input type="text" id="wt-heating-limit" class="wt-short" name="heating_limit" value="{{ config.heating_limit | string | replace('.', ',') }}" inputmode="decimal"> <span class="wt-unit">°C</span></div>
   </div>
-  <p class="hint">{{ _("Gradtagzahl nach VDI 3807 (G20/15): Raumtemperatur minus Tagesmittel, nur an Tagen unter der Heizgrenze. Beide Werte lassen sich auf dem Reiter „Heizen“ vorübergehend ändern.") }}</p>
 
-  <h2 class="wt-sub-h">{{ _("Regentage") }}</h2>
+  <h2 class="wt-sub-h">{{ _("Regentage") }} {{ hint_button(_("Regentage")) }}</h2>
+  {% call hint_body() %}{{ _("Viele Ein/Aus-Regensensoren melden auch bei Nebel, Tau oder nassem Sensor „Regen“, die Trocknungszeit zählt dann mit.") }}{% endcall %}
   <div class="wt-thresholds">
-    <label>{{ _("Regentag bei Niederschlagsmenge ab") }}
-      <input type="text" name="rain_day_mm" value="{{ config.rain_day_mm | string | replace('.', ',') }}" inputmode="decimal" size="4"> mm</label>
-    <label>{{ _("Regentag bei Regendauer ab") }}
-      <input type="text" name="rain_day_minutes" value="{{ config.rain_day_minutes | int }}" inputmode="numeric" size="4"> min</label>
+    <div class="field"><label for="wt-rain-mm">{{ _("Regentag bei Niederschlagsmenge ab") }}</label>
+      <input type="text" id="wt-rain-mm" class="wt-short" name="rain_day_mm" value="{{ config.rain_day_mm | string | replace('.', ',') }}" inputmode="decimal"> <span class="wt-unit">mm</span></div>
+    <div class="field"><label for="wt-rain-min">{{ _("Regentag bei Regendauer ab") }}</label>
+      <input type="text" id="wt-rain-min" class="wt-short" name="rain_day_minutes" value="{{ config.rain_day_minutes | int }}" inputmode="numeric"> <span class="wt-unit">min</span></div>
   </div>
-  <p class="hint">{{ _("Viele Ein/Aus-Regensensoren melden auch bei Nebel, Tau oder nassem Sensor „Regen“, die Trocknungszeit zählt dann mit.") }}</p>
 
   <div class="wt-actions">
     <button type="submit" class="btn btn-primary">{{ _("Speichern") }}</button>

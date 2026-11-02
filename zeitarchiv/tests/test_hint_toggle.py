@@ -71,7 +71,7 @@ def test_the_pages_that_use_buttons_load_the_script() -> None:
             "_settings_ki_form.html",
         ],
         "statistik_index.html": ["_statistik_index_body.html"],
-        "wetterdashboard.html": ["_wetter_view.html"],
+        "wetterdashboard.html": ["_wetter_view.html", "_wetter_setup.html"],
         "data_quality.html": [],
         "table_editor.html": [],
         "dashboard_editor.html": [],

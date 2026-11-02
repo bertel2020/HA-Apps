@@ -545,3 +545,13 @@ def test_cards_match_the_energy_dashboard_card_metrics() -> None:
     energy = (APP / "static/css/pages/energiedashboard.css").read_text(encoding="utf-8")
     assert ".edash-card{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:16px 18px" in energy
     assert ".wt-card{padding:16px 18px;border-radius:12px;box-shadow:var(--shadow);}" in css
+
+
+def test_setup_form_uses_app_fields_and_info_buttons(client) -> None:
+    from app.main import index
+
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    html = client.get("/wetterdashboard/setup").text
+    assert html.count('class="field"') >= 4 and "wt-extra field" in html
+    assert html.count("hint-toggle") == 3  # Thermometer, Heizenergie, Regentage
+    assert '<p class="hint">' not in html  # lose .hint-Absätze verschwänden auf dem Telefon ohne Knopf
