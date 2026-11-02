@@ -615,3 +615,17 @@ def test_day_columns_name_the_hour_not_a_minute() -> None:
 
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "t('{from}–{to} Uhr'" in script and "fmtDate(formats.hm, ts)" not in script
+
+
+def test_tabs_are_keyboard_operable_and_linked_to_their_panels() -> None:
+    import re
+
+    from _paths import APP, TEMPLATES
+
+    text = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+    tabs = set(re.findall(r'role="tab" id="wt-tab-(\w+)" aria-controls="wt-panel-\1"', text))
+    panels = set(re.findall(r'role="tabpanel" id="wt-panel-(\w+)" aria-labelledby="wt-tab-\1"', text))
+    assert tabs == panels and {"overview", "long"} <= tabs
+    assert text.count('@keydown="tabKey($event)"') == len(tabs) and text.count(":tabindex=") == len(tabs)
+    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert all(key in script for key in ("ArrowLeft", "ArrowRight", "Home", "End"))

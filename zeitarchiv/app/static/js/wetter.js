@@ -385,6 +385,21 @@
         this.$nextTick(() => Object.values(charts).forEach((chart) => chart.resize()));
       },
 
+      // Pfeiltasten, Pos1 und Ende wechseln wie bei jeder Reiterleiste zwischen den Reitern.
+      tabKey(event) {
+        const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+        if (!keys.includes(event.key)) return;
+        const tabs = [...event.currentTarget.parentElement.querySelectorAll('[role="tab"]')];
+        const current = tabs.indexOf(event.currentTarget);
+        const target = {
+          ArrowLeft: (current + tabs.length - 1) % tabs.length, ArrowRight: (current + 1) % tabs.length,
+          Home: 0, End: tabs.length - 1,
+        }[event.key];
+        event.preventDefault();
+        tabs[target].click();
+        tabs[target].focus();
+      },
+
       async fetchJson(url) {
         const res = await fetch(url);
         if (!res.ok) throw new Error(String(res.status));
