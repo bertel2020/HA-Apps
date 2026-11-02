@@ -356,7 +356,10 @@ class WetterService:
             tiles.append({
                 "key": spec["key"], "label": spec["label"], "kind": spec["kind"],
                 "unit": spec["unit"], "decimals": spec["decimals"],
-                "last": entity["last_value"] if entity else None,
+                # Nicht entities.last_value: das ist bei vielen Sensoren leer (siehe Energiedashboard).
+                "last": query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
+                    self.deps.data_dir, spec["entity_id"], now_local.timestamp(), self.deps.tz, read_cache
+                ),
                 "last_ts": entity["last_ts"] if entity else None,
                 "today": now_summary, "yesterday": yesterday_summary,
             })
