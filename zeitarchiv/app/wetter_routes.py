@@ -58,6 +58,9 @@ ROLE_TYPES = {key: types for key, _label, types in ROLES}
 ROLE_LABELS = {key: label for key, label, _types in ROLES}
 
 MAX_EXTRA_TEMPERATURES = 5
+MAX_HEATING_COUNTERS = 6
+DEFAULT_HEATING_ROOM = 20.0  # Raumtemperatur der Gradtagzahl (G20/15, VDI 3807)
+DEFAULT_HEATING_LIMIT = 15.0  # Heizgrenze: darüber wird nicht geheizt
 COLUMN_KEYS = ("heute", "gestern", "monat", "vormonat", "jahr")
 #: Spalte -> (Zeitraum für query_mod._window, Versatz)
 COLUMN_WINDOWS = {
@@ -76,6 +79,9 @@ def _empty_config() -> dict:
     return {
         **{key: "" for key in ROLE_KEYS},
         "extra_temperatures": [],
+        "heating": [],
+        "heating_room": DEFAULT_HEATING_ROOM,
+        "heating_limit": DEFAULT_HEATING_LIMIT,
         "rain_day_mm": DEFAULT_RAIN_DAY_MM,
         "rain_day_minutes": DEFAULT_RAIN_DAY_MINUTES,
     }
@@ -102,6 +108,17 @@ def _load_config(index: Index) -> dict:
             for row in extras
             if isinstance(row, dict) and row.get("entity_id")
         ][:MAX_EXTRA_TEMPERATURES]
+    heating = data.get("heating")
+    if isinstance(heating, list):
+        config["heating"] = [
+            {"entity_id": str(row.get("entity_id") or ""), "name": str(row.get("name") or "")}
+            for row in heating
+            if isinstance(row, dict) and row.get("entity_id")
+        ][:MAX_HEATING_COUNTERS]
+    for key in ("heating_room", "heating_limit"):
+        value = data.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and 0 < value < 40:
+            config[key] = float(value)
     for key in ("rain_day_mm", "rain_day_minutes"):
         value = data.get(key)
         if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
@@ -127,7 +144,10 @@ def _is_configured(config: dict) -> bool:
 def wetter_role_count(index: Index) -> int:
     """Anzahl zugeordneter Rollen (Kachel auf der Dashboards-Seite)."""
     config = _load_config(index)
-    return sum(1 for key in ROLE_KEYS if config.get(key)) + len(config.get("extra_temperatures") or [])
+    return (
+        sum(1 for key in ROLE_KEYS if config.get(key))
+        + len(config.get("extra_temperatures") or []) + len(config.get("heating") or [])
+    )
 
 
 def is_wetter_configured(index: Index) -> bool:
@@ -446,6 +466,41 @@ class WetterService:
         result["headline"] = analysis.headline(points, self.deps.tz, today) if metric == "temperature" else None
         return result
 
+    def heating_counters(self, config: dict) -> list[dict]:
+        """Heizzähler der Konfiguration, die es im Archiv als Zähler gibt (Name, Einheit, Faktor nach kWh)."""
+        counters = []
+        for row in config.get("heating") or []:
+            entity = self.deps.index.get_entity(row["entity_id"])
+            if entity is None or entity["aggregation_type"] != "counter":
+                continue
+            unit = entity["unit"] or "kWh"
+            counters.append({
+                "entity_id": row["entity_id"], "unit": unit,
+                "name": row["name"] or entity_display_name(row["entity_id"], entity["friendly_name"], entity["custom_name"]),
+                "scale": {"Wh": 0.001, "MWh": 1000.0}.get(unit, 1.0),
+            })
+        return counters
+
+    def compute_heating(self, now_local: datetime | None = None) -> dict | None:
+        """Tage der Heizperiode mit Außentemperatur und kWh je Heizzähler. Gradtagzahl, Ausgleichsgerade
+        und Monatstabelle rechnet der Browser daraus, damit Heizgrenze und Raumtemperatur ohne Rundlauf
+        änderbar sind (siehe static/js/wetter-heating.js)."""
+        config = _load_config(self.deps.index)
+        now_local = now_local or datetime.now(self.deps.tz)
+        counters = self.heating_counters(config)
+        temperature = config["temperature"]
+        if not counters or not temperature or self.deps.index.get_entity(temperature) is None:
+            return None
+        days = analysis.heating_days(
+            self._daily(temperature, now_local), [self._daily(c["entity_id"], now_local) for c in counters],
+            [c["scale"] for c in counters], self.deps.tz, now_local.date(),
+        )
+        return {
+            "counters": [{"entity_id": c["entity_id"], "name": c["name"]} for c in counters],
+            "days": days, "room": config["heating_room"], "limit": config["heating_limit"],
+            "today": now_local.date().isoformat(), "tz": str(self.deps.tz),
+        }
+
     def compute_matrix(self, metric: str, mode: str = "mm", now_local: datetime | None = None) -> dict | None:
         """Jahr×Tag-Matrix. metric: ``avg``/``max``/``min`` (Außentemperatur) oder ``precip``."""
         config = _load_config(self.deps.index)
@@ -573,6 +628,7 @@ class WetterService:
         return {
             "configured": _is_configured(config),
             "precip_modes": self.available_precip(),
+            "has_heating": bool(self.heating_counters(config)),
             "enabled": _is_enabled(self.deps.index),
             "config": config,
             **self.deps.app_root_context(request),
@@ -621,6 +677,8 @@ class WetterService:
                     "config": config, "entity_options": self._entity_options(),
                     "roles": [(key, label, types) for key, label, types in ROLES],
                     "role_types": {key: list(types) for key, _label, types in ROLES},
+                    "counter_options": [o for o in self._entity_options() if o["aggregation_type"] == "counter"],
+                    "max_heating": MAX_HEATING_COUNTERS,
                     "warnings": warnings, "max_extra": MAX_EXTRA_TEMPERATURES,
                     **deps.app_root_context(request),
                 },
@@ -639,6 +697,10 @@ class WetterService:
             radiation: str = Form(""),
             extra_entity_id: list[str] = Form([]),
             extra_name: list[str] = Form([]),
+            heating_entity_id: list[str] = Form([]),
+            heating_name: list[str] = Form([]),
+            heating_room: str = Form(""),
+            heating_limit: str = Form(""),
             rain_day_mm: str = Form(""),
             rain_day_minutes: str = Form(""),
         ) -> HTMLResponse:
@@ -671,6 +733,34 @@ class WetterService:
                 name = extra_name[position].strip() if position < len(extra_name) else ""
                 extras.append({"entity_id": entity_id, "name": name[:60]})
             config["extra_temperatures"] = extras[:MAX_EXTRA_TEMPERATURES]
+            heating = []
+            for position, entity_id in enumerate(heating_entity_id):
+                entity_id = entity_id.strip()
+                if not entity_id:
+                    continue
+                entity = deps.index.get_entity(entity_id)
+                if entity is None or entity["aggregation_type"] != "counter":
+                    raise HTTPException(
+                        status_code=400,
+                        detail=tr("{entity_id}: Heizenergie braucht einen Zähler.", entity_id=entity_id),
+                    )
+                name = heating_name[position].strip() if position < len(heating_name) else ""
+                heating.append({"entity_id": entity_id, "name": name[:60]})
+            config["heating"] = heating[:MAX_HEATING_COUNTERS]
+            for key, raw, default, low, high in (
+                ("heating_room", heating_room, DEFAULT_HEATING_ROOM, 15.0, 25.0),
+                ("heating_limit", heating_limit, DEFAULT_HEATING_LIMIT, 5.0, 22.0),
+            ):
+                try:
+                    number = float(raw.replace(",", ".")) if raw.strip() else default
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=tr("Ungültige Zahl: {value}", value=raw)) from None
+                if not low <= number <= high:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=tr("Wert außerhalb von {low} bis {high}: {value}", low=f"{low:g}", high=f"{high:g}", value=raw),
+                    )
+                config[key] = number
             for key, raw, default in (
                 ("rain_day_mm", rain_day_mm, DEFAULT_RAIN_DAY_MM),
                 ("rain_day_minutes", rain_day_minutes, DEFAULT_RAIN_DAY_MINUTES),
@@ -710,6 +800,14 @@ class WetterService:
             result = self.compute_monthly(metric, mode)
             if result is None:
                 raise HTTPException(status_code=404, detail=tr("Kein Niederschlag zugeordnet."))
+            return result
+
+        @router.get("/wetterdashboard/heizen")
+        def wetterdashboard_heating() -> dict:
+            _require_configured()
+            result = self.compute_heating()
+            if result is None:
+                raise HTTPException(status_code=404, detail=tr("Keine Heizzähler zugeordnet."))
             return result
 
         @router.get("/wetterdashboard/matrix")

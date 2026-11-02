@@ -24,6 +24,9 @@
     <button type="button" role="tab" :aria-selected="(tab === 'precip').toString()" @click="showTab('precip')">{{ _("Niederschlag") }}</button>
     {% endif %}
     <button type="button" role="tab" :aria-selected="(tab === 'long').toString()" @click="showTab('long')">{{ _("Langzeit") }}</button>
+    {% if has_heating %}
+    <button type="button" role="tab" :aria-selected="(tab === 'heat').toString()" @click="showTab('heat')">{{ _("Heizen") }}</button>
+    {% endif %}
   </div>
 
   <section x-show="tab === 'overview'">
@@ -148,5 +151,45 @@
     <p class="wt-hint" x-show="longterm && !longterm.records.length" x-cloak>{{ _("Rekorde erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte enthält.") }}</p>
     <p class="wt-hint wt-error" x-show="longError" x-text="longError" x-cloak></p>
   </section>
+  {% if has_heating %}
+  <section x-show="tab === 'heat'" x-cloak>
+    <div class="card wt-card">
+      <h2 class="wt-h2">{{ _("Heizen und Wetter") }}</h2>
+      <p class="wt-headline" x-show="heat" x-text="heatHeadline()"></p>
+      <div class="wt-controls" x-show="heat">
+        <div class="wt-cols" role="group" aria-label="{{ _('Heizzähler') }}">
+          <template x-for="(counter, i) in (heat ? heat.counters : [])" :key="counter.entity_id">
+            <label class="wt-check"><i class="wt-swatch" :style="'background:' + heatColor(i)"></i>
+              <input type="checkbox" :checked="heatOn[i]" @change="toggleHeatCounter(i)"> <span x-text="counter.name"></span></label>
+          </template>
+        </div>
+        <label class="wt-check">{{ _("Raumtemperatur") }}
+          <input type="text" class="wt-num" x-model="heatRoom" @input="drawHeat()" inputmode="decimal" size="3"> °C</label>
+        <label class="wt-check">{{ _("Heizgrenze") }}
+          <input type="text" class="wt-num" x-model="heatLimit" @input="drawHeat()" inputmode="decimal" size="3"> °C</label>
+      </div>
+      <div class="wt-chart wt-chart-tall" x-ref="heatChart"></div>
+      <p class="wt-hint" x-text="heatReadout()"></p>
+      <p class="wt-hint wt-error" x-show="heatError" x-text="heatError" x-cloak></p>
+    </div>
+    <div class="card wt-card" x-show="heat" x-cloak>
+      <h2 class="wt-h2" x-text="t('Gradtagzahl {tag} und Verbrauch je Monat', {tag: heatTag()})"></h2>
+      <div class="wt-table-wrap"><table class="wt-table wt-heat-table" x-ref="heatTable"></table></div>
+      <p class="wt-hint">{{ _("Die Gradtagzahl zählt je Tag die Raumtemperatur minus Tagesmittel, aber nur an Tagen unter der Heizgrenze. kWh je Gradtag ist der witterungsbereinigte Verbrauch: Er lässt kalte und milde Winter vergleichen. Die Heizperiode ist fest 1.10. bis 30.4., und nur abgeschlossene Tage mit ausreichend Temperaturwerten zählen.") }}</p>
+    </div>
+    <div class="card wt-card" x-show="heat && heat.counters.length > 1" x-cloak>
+      <div class="wt-controls">
+        <h2 class="wt-h2">{{ _("Anteil je Zähler") }}</h2>
+        <label class="wt-check">{{ _("Heizperiode") }}
+          <select x-model="heatSeason" @change="drawHeat()">
+            <template x-for="period in heatPeriods()" :key="period"><option :value="period" x-text="heatLabel(period)"></option></template>
+          </select>
+        </label>
+      </div>
+      <div class="wt-chart" x-ref="heatShareChart"></div>
+      <p class="wt-hint" x-text="heatShareText()"></p>
+    </div>
+  </section>
+  {% endif %}
 </div>
 {% endif %}

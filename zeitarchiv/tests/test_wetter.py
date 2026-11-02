@@ -374,3 +374,76 @@ def test_matrix_route_validates_the_metric(client) -> None:
     answer = client.get("/wetterdashboard/matrix?metric=max")
     assert answer.status_code == 200 and answer.json()["years"] == []
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
+# -- Phase 3: Heizen ---------------------------------------------------------------------------
+
+
+def test_heating_config_round_trip_and_defaults(service) -> None:
+    index = service.deps.index
+    config = wetter_routes._load_config(index)
+    assert config["heating"] == [] and config["heating_room"] == 20.0 and config["heating_limit"] == 15.0
+    _configure(service, temperature="sensor.t", heating=[{"entity_id": "sensor.wp", "name": "WP"}], heating_room=21.0, heating_limit=14.0)
+    again = wetter_routes._load_config(index)
+    assert again["heating"] == [{"entity_id": "sensor.wp", "name": "WP"}] and again["heating_room"] == 21.0
+    assert wetter_routes.wetter_role_count(index) == 2  # Temperatur und ein Heizzähler
+    index.set_setting(wetter_routes.SETTING_CONFIG, json.dumps({"temperature": "x", "heating_room": 99, "heating_limit": "kalt"}))
+    assert wetter_routes._load_config(index)["heating_room"] == 20.0  # unplausible Werte fallen auf den Standard zurück
+
+
+def test_heating_counters_ignore_non_counters_and_convert_units(service) -> None:
+    _add(service, "sensor.wp", "sensor", "total_increasing", "Wh", [(_ts(19, 0), 1000.0)])
+    _add(service, "sensor.stab", "sensor", "total_increasing", "kWh", [(_ts(19, 0), 5.0)])
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(19, 0), 1.0)])
+    _configure(service, temperature="sensor.t", heating=[
+        {"entity_id": "sensor.wp", "name": ""}, {"entity_id": "sensor.stab", "name": "Heizstab"},
+        {"entity_id": "sensor.t", "name": "falsch"}, {"entity_id": "sensor.fehlt", "name": ""},
+    ])
+    counters = service.heating_counters(wetter_routes._load_config(service.deps.index))
+    assert [(c["entity_id"], c["scale"]) for c in counters] == [("sensor.wp", 0.001), ("sensor.stab", 1.0)]
+    assert counters[1]["name"] == "Heizstab"
+
+
+def test_compute_heating_needs_counters_and_a_temperature(service) -> None:
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(19, 0), 1.0)])
+    _configure(service, temperature="sensor.t")
+    assert service.compute_heating(NOW) is None
+    _configure(service, temperature="sensor.t", heating=[{"entity_id": "sensor.fehlt", "name": ""}])
+    assert service.compute_heating(NOW) is None
+
+
+def test_compute_heating_shape(service) -> None:
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(19, 0), 1.0)])
+    _add(service, "sensor.wp", "sensor", "total_increasing", "kWh", [(_ts(19, 0), 10.0), (_ts(19, 12), 14.0)])
+    _configure(service, temperature="sensor.t", heating=[{"entity_id": "sensor.wp", "name": "Wärmepumpe"}])
+    data = service.compute_heating(NOW)
+    assert data["counters"] == [{"entity_id": "sensor.wp", "name": "Wärmepumpe"}]
+    assert data["room"] == 20.0 and data["limit"] == 15.0 and data["today"] == "2026-08-20"
+    assert data["days"] == []  # August liegt außerhalb der Heizperiode, und ein Messwert ist kein abgedeckter Tag
+
+
+def test_heating_setup_and_route_through_the_app(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp4", "sensor", "measurement", "°C")
+    index.get_or_create_entity("sensor.wetter_test_wp", "sensor", "total_increasing", "kWh")
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    base = {"temperature": "sensor.wetter_test_temp4"}
+    assert client.post("/wetterdashboard/setup", data={**base, "heating_entity_id": "sensor.wetter_test_temp4"}).status_code == 400
+    assert client.post("/wetterdashboard/setup", data={**base, "heating_room": "40"}).status_code == 400
+    assert client.post("/wetterdashboard/setup", data={**base, "heating_limit": "kalt"}).status_code == 400
+    assert client.get("/wetterdashboard/heizen").status_code == 409  # die abgelehnten Eingaben haben nichts gespeichert
+    assert client.post("/wetterdashboard/setup", data=base).status_code == 200
+    assert client.get("/wetterdashboard/heizen").status_code == 404  # eingerichtet, aber kein Heizzähler
+    saved = client.post("/wetterdashboard/setup", data={
+        **base, "heating_entity_id": ["sensor.wetter_test_wp", ""], "heating_name": ["WP", ""],
+        "heating_room": "21,5", "heating_limit": "14",
+    })
+    assert saved.status_code == 200 and "Heizen" in saved.text  # Reiter erscheint
+    config = wetter_routes._load_config(index)
+    assert config["heating"] == [{"entity_id": "sensor.wetter_test_wp", "name": "WP"}]
+    assert (config["heating_room"], config["heating_limit"]) == (21.5, 14.0)
+    answer = client.get("/wetterdashboard/heizen")
+    assert answer.status_code == 200 and answer.json()["room"] == 21.5 and answer.json()["counters"][0]["name"] == "WP"
+    assert "wetter-heating.js" in client.get("/wetterdashboard").text
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")

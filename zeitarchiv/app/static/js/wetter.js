@@ -244,7 +244,7 @@
 
   function writeStore(value) {
     try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(value));
+      localStorage.setItem(STORE_KEY, JSON.stringify({...readStore(), ...value}));
     } catch (e) {
       // Privatmodus o. Ä.: die Auswahl gilt dann nur bis zum Neuladen.
     }
@@ -264,6 +264,12 @@
       longError: '',
       kenntageYear: '',
       matrixMetric: 'avg',
+      heat: null,
+      heatOn: [],
+      heatRoom: '20',
+      heatLimit: '15',
+      heatSeason: '',
+      heatError: '',
       matrix: null,
       matrixError: '',
 
@@ -343,6 +349,7 @@
         if (tab === 'precip' && !this.precip) this.loadPrecip();
         if (tab === 'long' && !this.longterm) this.loadLongterm();
         if (tab === 'long' && !this.matrix) this.loadMatrix();
+        if (tab === 'heat' && !this.heat) this.loadHeat();
         // Ein Diagramm in einem eben erst sichtbaren Reiter hat noch keine Größe.
         this.$nextTick(() => Object.values(charts).forEach((chart) => chart.resize()));
       },
@@ -809,6 +816,271 @@
         const [ty, tm, td] = m.today.split('-').map(Number);
         const offset = Math.round((day.getTime() - Date.UTC(ty, tm - 1, td)) / 86400000);
         return `entities/${encodeURIComponent(m.entity_id)}?range=day&offset=${offset}`;
+      },
+
+      // ---- Heizen (Phase 3) ------------------------------------------------------------------
+
+      async loadHeat() {
+        this.heatError = '';
+        try {
+          const data = await this.fetchJson('wetterdashboard/heizen');
+          const saved = readStore().heat || {};
+          this.heatOn = data.counters.map((_c, i) => (Array.isArray(saved.on) && saved.on.length === data.counters.length ? !!saved.on[i] : true));
+          this.heatRoom = String(saved.room || data.room).replace('.', ',');
+          this.heatLimit = String(saved.limit || data.limit).replace('.', ',');
+          this.heat = data;
+          const periods = this.heatPeriods();
+          this.heatSeason = String(periods.length > 1 && WetterHeating.currentPeriod(data.today) === periods[0] ? periods[1] : (periods[0] || ''));
+          this.$nextTick(() => this.drawHeat());
+        } catch (e) {
+          this.heatError = t('Die Heizwerte konnten nicht geladen werden.');
+        }
+      },
+
+      heatOpts() {
+        const read = (text, fallback) => {
+          const value = NumberFormat.parse(String(text));
+          return Number.isFinite(value) ? value : fallback;
+        };
+        return {room: read(this.heatRoom, 20), limit: read(this.heatLimit, 15), on: this.heatOn};
+      },
+
+      heatColor(index) {
+        const colors = palette();
+        return [colors.cur, colors.prev, colors.cold, cssVar('--chart-4'), cssVar('--chart-5'), cssVar('--chart-6')][index % 6];
+      },
+
+      heatLabel: (period) => WetterHeating.label(Number(period)),
+
+      heatPeriods() {
+        return this.heat ? WetterHeating.periods(this.heat.days) : [];
+      },
+
+      heatTag() {
+        const o = this.heatOpts();
+        return `G${num(o.room, 0)}/${num(o.limit, 0)}`;
+      },
+
+      toggleHeatCounter(index) {
+        this.heatOn = this.heatOn.map((value, i) => (i === index ? !value : value));
+        this.drawHeat();
+      },
+
+      // Wärmste und kälteste Periode für Kopfsatz und Tabelle: running = die laufende Heizperiode.
+      heatPeriodInfo() {
+        const periods = this.heatPeriods();
+        const current = WetterHeating.currentPeriod(this.heat.today);
+        const month = Number(this.heat.today.slice(5, 7));
+        const running = WetterHeating.MONTHS.includes(month);
+        const complete = periods.filter((p) => !running || p !== current);
+        return {periods, current, running, complete};
+      },
+
+      heatHeadline() {
+        if (!this.heat) return '';
+        const o = this.heatOpts();
+        const info = this.heatPeriodInfo();
+        const q = (period) => {
+          const [from, to] = WetterHeating.periodRange(period);
+          return WetterHeating.stat(this.heat.days, o, from, to).q;
+        };
+        let text = '';
+        if (info.complete.length) {
+          const latest = info.complete[0];
+          const a = q(latest);
+          const b = info.complete[1] != null ? q(info.complete[1]) : null;
+          if (a != null && b != null) {
+            const change = (a / b - 1) * 100;
+            const values = {period: WetterHeating.label(latest), value: num(a, 2), percent: num(Math.abs(change), 0), other: WetterHeating.label(info.complete[1]), before: num(b, 2)};
+            text = Math.round(Math.abs(change)) === 0
+              ? t('Heizperiode {period}: {value} kWh je Gradtag, genauso viel wie {other} ({before})', values)
+              : change < 0
+                ? t('Heizperiode {period}: {value} kWh je Gradtag, {percent} % weniger als {other} ({before})', values)
+                : t('Heizperiode {period}: {value} kWh je Gradtag, {percent} % mehr als {other} ({before})', values);
+          } else if (a != null) {
+            text = t('Heizperiode {period}: {value} kWh je Gradtag', {period: WetterHeating.label(latest), value: num(a, 2)});
+          }
+        }
+        if (info.running) {
+          const cut = WetterHeating.cutRange(info.current, this.heat.today);
+          const now = WetterHeating.stat(this.heat.days, o, cut.from, cut.to);
+          const earlier = info.complete[0] != null ? WetterHeating.cutRange(info.complete[0], this.heat.today) : null;
+          const before = earlier ? WetterHeating.stat(this.heat.days, o, earlier.from, earlier.to) : null;
+          if (now.q != null && before && before.q != null) {
+            const change = (now.q / before.q - 1) * 100;
+            const part = t('{period} bisher {value} kWh je Gradtag ({percent} % {direction} als im gleichen Ausschnitt von {other})', {
+              period: WetterHeating.label(info.current), value: num(now.q, 2), percent: num(Math.abs(change), 0),
+              direction: change < 0 ? t('weniger') : t('mehr'), other: WetterHeating.label(info.complete[0]),
+            });
+            text = text ? `${text}. ${part}` : part;
+          }
+        }
+        return text || t('Noch nicht genug Heiztage für einen Vergleich.');
+      },
+
+      heatReadout() {
+        if (!this.heat) return '';
+        const o = this.heatOpts();
+        const parts = [];
+        for (const period of this.heatPeriods().slice(0, 4)) {
+          const line = WetterHeating.fit(this.heat.days, o, period);
+          if (line) parts.push(t('{period}: {value} kWh je Kelvin ({n} Tage, R² {r2})', {period: WetterHeating.label(period), value: num(-line.slope, 2), n: line.n, r2: num(line.r2, 2)}));
+        }
+        parts.push(t('Gerade nur über Tage unter der Heizgrenze'));
+        return parts.join(' · ');
+      },
+
+      drawHeat() {
+        if (!this.heat) return;
+        writeStore({heat: {on: this.heatOn, room: this.heatRoom, limit: this.heatLimit}});
+        this.drawHeatScatter();
+        this.drawHeatTable();
+        this.drawHeatShare();
+      },
+
+      drawHeatScatter() {
+        const element = this.$refs.heatChart;
+        if (!element) return;
+        const o = this.heatOpts();
+        const colors = palette();
+        const periods = this.heatPeriods().slice(0, 4);
+        const series = [];
+        const legend = [];
+        periods.forEach((period, index) => {
+          const color = this.heatColor(index);
+          const name = WetterHeating.label(period);
+          legend.push(name);
+          const points = this.heat.days
+            .filter((day) => WetterHeating.periodOf(day[0]) === period)
+            .map((day) => [day[1], Math.round(WetterHeating.dayKwh(day, o.on) * 100) / 100, day[0]]);
+          const line = WetterHeating.fit(this.heat.days, o, period);
+          series.push({
+            name, type: 'scatter', data: points, symbolSize: index === 0 ? 7 : 5,
+            itemStyle: {color, opacity: index === 0 ? 0.9 : 0.5},
+            markLine: index === 0 ? {
+              silent: true, symbol: 'none', lineStyle: {color: colors.faint, type: 'dashed'},
+              label: {formatter: () => `${t('Heizgrenze')} ${num(o.limit, 0)} °C`, color: colors.text, fontSize: scaledFont(11)},
+              data: [{xAxis: o.limit}],
+            } : undefined,
+          });
+          if (line) {
+            const from = Math.min(...points.filter((p) => p[0] < o.limit).map((p) => p[0]));
+            series.push({
+              name: `${name} `, type: 'line', symbol: 'none', silent: true, z: 4,
+              data: [[from, line.intercept + line.slope * from], [o.limit, line.intercept + line.slope * o.limit]],
+              lineStyle: {color, width: 2.2}, tooltip: {show: false},
+            });
+          }
+        });
+        const chart = chartFor('heat', element);
+        chart.setOption({
+          animation: false, grid: {...gridBox, right: 20, bottom: 24}, legend: {...legendBox(colors, legend), left: 70},
+          xAxis: {
+            type: 'value', name: t('Tages-Ø Außentemperatur (°C)'), nameLocation: 'middle', nameGap: 26,
+            nameTextStyle: {color: colors.text}, ...axisStyle(colors), min: (value) => Math.floor(value.min / 5) * 5,
+          },
+          yAxis: {type: 'value', name: 'kWh', min: 0, nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
+          tooltip: {
+            trigger: 'item', confine: true, backgroundColor: colors.surface, borderColor: colors.grid,
+            textStyle: {color: colors.ink, fontSize: scaledFont(12)},
+            formatter: (param) => (param.data && param.data[2]
+              ? `<b>${escapeHtml(new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'}).format(new Date(param.data[2] + 'T12:00:00Z')))}</b>`
+                + `<br>${escapeHtml(num(param.data[0], 1))} °C<br>${escapeHtml(num(param.data[1], 1))} kWh`
+              : ''),
+          },
+          series,
+        }, true);
+        requestAnimationFrame(() => chart.resize());
+      },
+
+      drawHeatTable() {
+        const table = this.$refs.heatTable;
+        if (!table || !this.heat) return;
+        const o = this.heatOpts();
+        const days = this.heat.days;
+        const info = this.heatPeriodInfo();
+        const shown = info.periods.slice(0, 3);
+        if (!shown.length) {
+          table.innerHTML = `<tbody><tr><td>${escapeHtml(t('Noch keine Heiztage.'))}</td></tr></tbody>`;
+          return;
+        }
+        const tag = this.heatTag();
+        const cells = (st) => (st && st.n
+          ? `<td class="wt-sep">${escapeHtml(num(st.gt, 0))}</td><td>${escapeHtml(num(st.kwh, 0))}</td><td><b>${st.q == null ? '–' : escapeHtml(num(st.q, 2))}</b></td>`
+          : '<td class="wt-na wt-sep">–</td><td class="wt-na">–</td><td class="wt-na">–</td>');
+        const change = (a, b) => (a && b && a.q && b.q
+          ? `<td class="wt-sep wt-dl">${a.q / b.q - 1 >= 0 ? '+' : '−'}${escapeHtml(num(Math.abs(a.q / b.q - 1) * 100, 0))} %</td>`
+          : '<td class="wt-na wt-sep">–</td>');
+        // Spalte Δ: die zwei letzten abgeschlossenen Heizperioden; in der Zeile „bis gestern“ die laufende gegen die letzte.
+        const [newer, older] = [info.complete[0], info.complete[1]];
+        let html = '<thead><tr class="wt-g"><th></th>'
+          + shown.map((p) => `<th colspan="3" class="wt-sep">${escapeHtml(WetterHeating.label(p))}${info.running && p === info.current ? ' · ' + escapeHtml(t('läuft')) : ''}</th>`).join('')
+          + '<th class="wt-sep">Δ</th></tr><tr><th></th>'
+          + shown.map(() => `<th class="wt-sep"><span class="wt-sb">${escapeHtml(tag)}</span></th><th><span class="wt-sb">kWh</span></th><th><span class="wt-sb">kWh/Gt</span></th>`).join('')
+          + `<th class="wt-sep wt-sb">${newer != null && older != null ? escapeHtml(t('kWh/Gt {a} gegenüber {b}', {a: WetterHeating.label(newer), b: WetterHeating.label(older)})) : ''}</th></tr></thead><tbody>`;
+        for (const month of WetterHeating.MONTHS) {
+          const stats = shown.map((p) => WetterHeating.stat(days, o, ...WetterHeating.monthRange(p, month)));
+          const byPeriod = (p) => stats[shown.indexOf(p)];
+          html += `<tr><th scope="row">${escapeHtml(monthName(month, 'short'))}</th>${stats.map(cells).join('')}${change(byPeriod(newer), byPeriod(older))}</tr>`;
+        }
+        const totals = shown.map((p) => WetterHeating.stat(days, o, ...WetterHeating.periodRange(p)));
+        const totalOf = (p) => totals[shown.indexOf(p)];
+        html += `<tr class="wt-sum"><th scope="row">${escapeHtml(t('Heizperiode'))}</th>${totals.map(cells).join('')}${change(totalOf(newer), totalOf(older))}</tr>`;
+        if (info.running) {
+          const cutOf = (p) => WetterHeating.cutRange(p, this.heat.today);
+          const cuts = shown.map((p) => WetterHeating.stat(days, o, cutOf(p).from, cutOf(p).to));
+          const label = cutOf(info.current).label;
+          const first = info.current === shown[0] ? cuts[0] : null;
+          const previous = info.complete[0] != null && shown.includes(info.complete[0]) ? cuts[shown.indexOf(info.complete[0])] : null;
+          if (label) {
+            html += `<tr class="wt-cut"><th scope="row">${escapeHtml(t('1.10.–{day}.{month}.', {day: label.day, month: label.month}))}</th>${cuts.map(cells).join('')}${change(first, previous)}</tr>`;
+          }
+        }
+        table.innerHTML = html + '</tbody>';
+      },
+
+      heatShareTotals() {
+        const period = Number(this.heatSeason);
+        return WetterHeating.shares(this.heat.days, this.heat.counters, period);
+      },
+
+      heatShareText() {
+        if (!this.heat) return '';
+        const totals = this.heatShareTotals();
+        const sums = this.heat.counters.map((_c, i) => totals.reduce((a, row) => a + row[i], 0));
+        const all = sums.reduce((a, v, i) => a + (this.heatOn[i] ? v : 0), 0);
+        if (!all) return t('Keine Werte in dieser Heizperiode.');
+        return this.heat.counters
+          .map((counter, i) => (this.heatOn[i] ? `${counter.name} ${num(sums[i], 0)} kWh (${num(sums[i] / all * 100, 0)} %)` : ''))
+          .filter(Boolean).join(' · ');
+      },
+
+      drawHeatShare() {
+        const element = this.$refs.heatShareChart;
+        if (!element || !this.heat || this.heat.counters.length < 2 || !this.heatSeason) return;
+        const colors = palette();
+        const totals = this.heatShareTotals();
+        const labels = WetterHeating.MONTHS.map((month) => monthName(month, 'short'));
+        const series = this.heat.counters.map((counter, i) => ({
+          name: counter.name, type: 'bar', stack: 'kwh', barMaxWidth: 48,
+          data: totals.map((row) => (this.heatOn[i] ? Math.round(row[i] * 10) / 10 : 0)),
+          itemStyle: {color: this.heatColor(i)},
+        }));
+        const chart = chartFor('heatShare', element);
+        chart.setOption({
+          animation: false, grid: gridBox, legend: legendBox(colors, this.heat.counters.map((c) => c.name)),
+          xAxis: {type: 'category', data: labels, ...axisStyle(colors), splitLine: {show: false}},
+          yAxis: {type: 'value', name: 'kWh', nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
+          tooltip: tooltipBox(colors, (params) => {
+            const total = params.reduce((a, p) => a + (p.value || 0), 0);
+            return `<b>${escapeHtml(params[0].axisValue)}</b>` + params
+              .filter((p) => p.value)
+              .map((p) => `<br>${escapeHtml(p.seriesName)}: ${escapeHtml(num(p.value, 1))} kWh (${escapeHtml(num(total ? p.value / total * 100 : 0, 0))} %)`).join('')
+              + `<br>${escapeHtml(t('Summe'))}: ${escapeHtml(num(total, 1))} kWh`;
+          }),
+          series,
+        }, true);
+        requestAnimationFrame(() => chart.resize());
       },
 
       recordLabel(key) {

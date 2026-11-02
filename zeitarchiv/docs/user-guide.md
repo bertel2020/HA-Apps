@@ -39,6 +39,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
   - [Reiter Niederschlag](#reiter-niederschlag)
   - [Monatsvergleich](#monatsvergleich)
   - [Reiter Langzeit](#reiter-langzeit)
+  - [Reiter Heizen](#reiter-heizen)
 - [Entitäten und Verläufe](#entitäten-und-verläufe)
   - [Mehrere Entitäten löschen](#mehrere-entitäten-löschen)
   - [Kategorien](#kategorien)
@@ -807,6 +808,31 @@ enthält, und gelten seit Archivbeginn. Ein einzelner Messfehler kann einen
 Rekord setzen: über **Tag öffnen** springt ihr direkt in die Entität an diesem
 Tag. Fehlerhafte Werte lassen sich dort markieren; erst nach dem endgültigen
 Löschen rechnen die Rekorde ohne sie.
+
+### Reiter Heizen
+
+Sobald unter **Rollen bearbeiten → Heizenergie** ein oder mehrere Energiezähler der
+Heizung zugeordnet sind (Wärmepumpe, Heizstab, Konvektoren, elektrische Fußbodenheizung),
+erscheint der Reiter **Heizen**. Die Zähler werden zu einer Summe addiert; Zähler in Wh
+oder MWh rechnet die Seite in kWh um.
+
+Das **Streudiagramm** zeigt jeden Heiztag als Punkt: Tages-Ø der Außentemperatur gegen
+kWh, je Heizperiode in einer Farbe. Die Ausgleichsgerade läuft nur über die Tage unter der
+**Heizgrenze** (Standard 15 °C, als senkrechte Linie); ihre Steigung steht als „kWh je Kelvin“
+darunter. Raumtemperatur (Standard 20 °C) und Heizgrenze lassen sich oben ändern, ebenso die
+Auswahl der Zähler, ohne neu zu laden; der Browser merkt sich die Werte.
+
+Die **Gradtagzahl** (G20/15 nach VDI 3807) zählt je Tag Raumtemperatur minus Tagesmittel,
+aber nur an Tagen unter der Heizgrenze. **kWh je Gradtag** ist der witterungsbereinigte
+Verbrauch: Er lässt kalte und milde Winter vergleichen, was die reine Summe nicht kann.
+Die Tabelle zeigt je Monat und für die ganze Heizperiode (fest 1.10. bis 30.4.) Gradtage,
+kWh und kWh je Gradtag der letzten drei Perioden, dazu die Veränderung gegenüber der
+Vorperiode. Eine Zeile „1.10.–gestern“ vergleicht die laufende Periode mit demselben
+Stück der Vorperioden, damit ein Winteranfang nicht wie ein Einbruch wirkt. Ein Satz oben
+fasst es zusammen. Nur abgeschlossene Tage mit ausreichend Temperaturwerten zählen.
+
+Bei mehreren Zählern zeigt **Anteil je Zähler** gestapelte Balken je Monat für eine wählbare
+Heizperiode, mit dem Anteil jedes Zählers in Prozent.
 
 ## Entitäten und Verläufe
 

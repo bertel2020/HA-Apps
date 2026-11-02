@@ -342,3 +342,34 @@ def matrix(
         "years": years, "cells": cells, "missing": missing,
         "min": min(numbers) if numbers else None, "max": max(numbers) if numbers else None,
     }
+
+
+# -- Heizen (Phase 3) ---------------------------------------------------------------------------
+
+HEATING_MONTHS = (10, 11, 12, 1, 2, 3, 4)  # Heizperiode fest vom 1. Oktober bis 30. April
+
+
+def heating_days(
+    temperature: list[DailyPoint], counters: list[list[DailyPoint]], scales: list[float],
+    tz: ZoneInfo, today: date,
+) -> list[list]:
+    """Tage der Heizperiode für das Streudiagramm und die Gradtagzahl: ``[Datum, Tages-Ø, [kWh je Zähler]]``.
+
+    Gezählt wird nur ein abgeschlossener Tag (nicht heute) in den Monaten Oktober bis April mit
+    ausreichender Temperaturabdeckung und mindestens einem Zähler mit Wert. Ein Zähler ohne Zeile an
+    einem solchen Tag steuert 0 bei (er hat nichts gemessen); fehlt jeder Zähler, fehlt der Tag.
+    ``scales`` rechnet die Zählereinheit in kWh um (Wh: 0,001, MWh: 1000)."""
+    kwh: list[dict[date, float]] = [
+        {day_of(point, tz): (point.value or 0.0) * scale for point in series}
+        for series, scale in zip(counters, scales, strict=True)
+    ]
+    days: list[list] = []
+    for point in temperature:
+        day = day_of(point, tz)
+        if day >= today or day.month not in HEATING_MONTHS or not point.covered or point.value is None:
+            continue
+        per_counter = [values.get(day) for values in kwh]
+        if all(value is None for value in per_counter):
+            continue
+        days.append([day.isoformat(), round(point.value, 2), [round(v or 0.0, 3) for v in per_counter]])
+    return days

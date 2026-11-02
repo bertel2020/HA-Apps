@@ -246,3 +246,27 @@ def test_matrix_dry_fill_counts_quiet_days_as_zero_for_a_rain_sensor() -> None:
 
 def test_matrix_without_data_is_empty() -> None:
     assert wa.matrix([], TZ, date(2026, 1, 6), "value")["years"] == []
+
+
+# -- Heizen ------------------------------------------------------------------------------------
+
+
+def test_heating_days_cover_only_closed_heating_season_days_with_data() -> None:
+    today = date(2026, 11, 3)
+    temperature = [
+        _point(date(2026, 10, 1), value=9.0),
+        _point(date(2026, 7, 1), value=22.0),  # Sommer: keine Heizperiode
+        _point(date(2026, 10, 2), value=8.0, covered=False),  # Temperatur zu dünn
+        _point(date(2026, 10, 3), value=7.0),  # kein Zähler hat Werte
+        _point(date(2026, 11, 3), value=4.0),  # heute
+        _point(date(2026, 11, 2), value=5.0),
+    ]
+    heat_pump = [_point(date(2026, 10, 1), value=6000.0), _point(date(2026, 7, 1), value=1000.0),
+                 _point(date(2026, 10, 2), value=7000.0), _point(date(2026, 11, 2), value=9000.0)]
+    rod = [_point(date(2026, 11, 2), value=1.5)]
+    days = wa.heating_days(temperature, [heat_pump, rod], [0.001, 1.0], TZ, today)  # Wärmepumpe zählt in Wh
+    assert days == [["2026-10-01", 9.0, [6.0, 0.0]], ["2026-11-02", 5.0, [9.0, 1.5]]]
+
+
+def test_heating_days_without_counters_are_empty() -> None:
+    assert wa.heating_days([_point(date(2026, 1, 5))], [[]], [1.0], TZ, date(2026, 2, 1)) == []

@@ -39,6 +39,7 @@ internals for developers are in the other documents of this folder (see
   - [Precipitation tab](#precipitation-tab)
   - [Monthly comparison](#monthly-comparison)
   - [Long-term tab](#long-term-tab)
+  - [Heating tab](#heating-tab)
 - [Entities and histories](#entities-and-histories)
   - [Deleting several entities](#deleting-several-entities)
   - [Categories](#categories)
@@ -752,6 +753,31 @@ wettest day) appear once the archive holds at least a year of daily values and a
 since the archive began. A single measurement error can set a record: **Open day**
 jumps straight to the entity on that day, where faulty values can be marked; only after
 they are deleted for good do the records exclude them.
+
+### Heating tab
+
+As soon as one or more energy counters of the heating are assigned under **Edit roles →
+Heating energy** (heat pump, heating element, convectors, electric underfloor heating), the
+**Heating** tab appears. The counters are added up to a total; counters in Wh or MWh are
+converted to kWh.
+
+The **scatter chart** shows every heating day as a point: daily mean outdoor temperature
+against kWh, one colour per heating season. The regression line runs only over the days below
+the **heating limit** (default 15 °C, shown as a vertical line); its slope is listed as "kWh
+per kelvin" below. Room temperature (default 20 °C) and heating limit can be changed at the
+top, as can the selection of counters, without reloading; the browser remembers the values.
+
+The **degree-day figure** (G20/15 to VDI 3807) counts, for each day, room temperature minus
+daily mean, but only on days below the heating limit. **kWh per degree day** is the
+weather-adjusted consumption: it lets you compare cold and mild winters, which the plain total
+cannot. The table shows, per month and for the whole heating season (fixed 1 Oct to 30 Apr),
+degree days, kWh and kWh per degree day for the last three seasons, plus the change against
+the previous season. A "1 Oct–yesterday" row compares the running season with the same stretch
+of earlier seasons, so the start of a winter does not look like a slump. A sentence at the top
+sums it up. Only completed days with enough temperature values count.
+
+With several counters, **Share per counter** shows stacked bars per month for a selectable
+heating season, with each counter's share in percent.
 
 ## Entities and histories
 

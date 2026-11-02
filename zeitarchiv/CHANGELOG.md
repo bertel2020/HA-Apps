@@ -21,6 +21,9 @@
   Langzeit Kenntage je Monat (Frost, Eis, Sommer, heiß) und Rekorde mit Sprung
   zum Tag; die Kenntage stehen auch als Zeilen in der Tabelle. Dazu zeigt
   Langzeit alle Jahre als Matrix, Tag für Tag, mit dem neuesten Jahr oben.
+  Ordnet ihr Heizzähler zu (auch mehrere), erscheint der Reiter Heizen:
+  Streudiagramm Tagesmittel gegen kWh mit Ausgleichsgerade, Gradtagzahl und
+  kWh je Gradtag je Monat und Heizperiode, und der Anteil je Zähler.
   Eingeschaltet wird die Seite über eine Kachel auf der Dashboard-Übersicht,
   danach steht sie im Menü Dashboards unter dem Energiedashboard. Die
   Demo-Daten bringen dafür Wetter-Entitäten und Heizzähler mit (nach „Neu
@@ -88,7 +91,10 @@
   spells; the Long-term tab shows characteristic days per month (frost, ice,
   summer, hot) and records with a jump to the day; the characteristic days also
   appear as rows in the table. Long-term also shows all years as a matrix,
-  day by day, with the newest year on top. The page is switched on with a tile on the
+  day by day, with the newest year on top. If you assign heating
+  counters (several are possible), the Heating tab appears: scatter chart of daily
+  mean against kWh with regression line, degree days and kWh per degree day per
+  month and heating season, and the share per counter. The page is switched on with a tile on the
   dashboards overview
   and then sits in the Dashboards menu below the energy dashboard. The demo data
   brings weather entities and heating counters for it (after "Regenerate").

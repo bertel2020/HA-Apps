@@ -3385,7 +3385,21 @@
     "Tag öffnen": "Open day",
     "Temperatur": "Temperature",
     "Ungültige Kennzahl.": "Invalid metric.",
-    "Jahre im Vergleich, Tag für Tag": "Years compared, day by day"
+    "Jahre im Vergleich, Tag für Tag": "Years compared, day by day",
+    "+ Heizzähler": "+ Heating counter",
+    "Anteil je Zähler": "Share per counter",
+    "Die Gradtagzahl zählt je Tag die Raumtemperatur minus Tagesmittel, aber nur an Tagen unter der Heizgrenze. kWh je Gradtag ist der witterungsbereinigte Verbrauch: Er lässt kalte und milde Winter vergleichen. Die Heizperiode ist fest 1.10. bis 30.4., und nur abgeschlossene Tage mit ausreichend Temperaturwerten zählen.": "The degree-day figure counts, for each day, the room temperature minus the daily mean, but only on days below the heating limit. kWh per degree day is the weather-adjusted consumption: it lets you compare cold and mild winters. The heating season is fixed at 1 Oct to 30 Apr, and only completed days with enough temperature values count.",
+    "Ein oder mehrere Energiezähler der Heizung, zum Beispiel Wärmepumpe, Heizstab oder Konvektoren. Sie werden zu einer Summe addiert, der Reiter „Heizen“ zeigt auch den Anteil je Zähler.": "One or more energy counters of the heating, for example heat pump, heating element or convectors. They are added up to a total; the “Heating” tab also shows the share per counter.",
+    "Gradtagzahl nach VDI 3807 (G20/15): Raumtemperatur minus Tagesmittel, nur an Tagen unter der Heizgrenze. Beide Werte lassen sich auf dem Reiter „Heizen“ vorübergehend ändern.": "Degree-day figure to VDI 3807 (G20/15): room temperature minus daily mean, only on days below the heating limit. Both values can be changed temporarily on the “Heating” tab.",
+    "Heizen und Wetter": "Heating and weather",
+    "Heizenergie": "Heating energy",
+    "Heizgrenze": "Heating limit",
+    "Heizperiode": "Heating season",
+    "Heizzähler": "Heating counters",
+    "Keine Heizzähler zugeordnet.": "No heating counters assigned.",
+    "Name in der Auswertung (optional)": "Name in the analysis (optional)",
+    "Wert außerhalb von {low} bis {high}: {value}": "Value outside {low} to {high}: {value}",
+    "{entity_id}: Heizenergie braucht einen Zähler.": "{entity_id}: heating energy needs a counter."
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4021,6 +4035,24 @@
     "Die Jahresübersicht konnte nicht geladen werden.": "The year overview could not be loaded.",
     "Noch keine Tageswerte.": "No daily values yet.",
     "Neuestes Jahr oben, eine Spalte je Kalendertag. Graue Felder sind Tage ohne ausreichende Werte (mindestens 18 Stunden), leer ist es vor dem Archivbeginn und ab heute. Ein Klick öffnet den Tag in der Entität.": "Newest year on top, one column per calendar day. Grey cells are days without enough values (at least 18 hours), blank is before the archive began and from today on. A click opens the day in the entity.",
-    "Zu wenige Werte": "Too few values"
+    "Zu wenige Werte": "Too few values",
+    "1.10.–{day}.{month}.": "1 Oct–{day}.{month}.",
+    "Die Heizwerte konnten nicht geladen werden.": "The heating values could not be loaded.",
+    "Gerade nur über Tage unter der Heizgrenze": "Line only over days below the heating limit",
+    "Gradtagzahl {tag} und Verbrauch je Monat": "Degree days {tag} and consumption per month",
+    "Heizgrenze": "Heating limit",
+    "Heizperiode": "Heating season",
+    "Heizperiode {period}: {value} kWh je Gradtag": "Heating season {period}: {value} kWh per degree day",
+    "Heizperiode {period}: {value} kWh je Gradtag, genauso viel wie {other} ({before})": "Heating season {period}: {value} kWh per degree day, the same as {other} ({before})",
+    "Heizperiode {period}: {value} kWh je Gradtag, {percent} % mehr als {other} ({before})": "Heating season {period}: {value} kWh per degree day, {percent} % more than {other} ({before})",
+    "Heizperiode {period}: {value} kWh je Gradtag, {percent} % weniger als {other} ({before})": "Heating season {period}: {value} kWh per degree day, {percent} % less than {other} ({before})",
+    "Keine Werte in dieser Heizperiode.": "No values in this heating season.",
+    "Noch keine Heiztage.": "No heating days yet.",
+    "Noch nicht genug Heiztage für einen Vergleich.": "Not enough heating days for a comparison yet.",
+    "Tages-Ø Außentemperatur (°C)": "Daily mean outdoor temperature (°C)",
+    "kWh/Gt {a} gegenüber {b}": "kWh/DD {a} vs. {b}",
+    "mehr": "more",
+    "{period} bisher {value} kWh je Gradtag ({percent} % {direction} als im gleichen Ausschnitt von {other})": "{period} so far {value} kWh per degree day ({percent} % {direction} than in the same stretch of {other})",
+    "{period}: {value} kWh je Kelvin ({n} Tage, R² {r2})": "{period}: {value} kWh per kelvin ({n} days, R² {r2})"
   }
 }

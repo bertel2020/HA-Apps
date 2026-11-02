@@ -85,6 +85,8 @@ GERMAN_HINT = re.compile(
 UNTRANSLATED_SCRIPT_TEXT_OK: dict[str, set[str]] = {
     # Name der Tab-Taste in e.key, kein sichtbarer Text — gleicht nur zufällig dem Katalogschlüssel "Tab".
     "dd-picker.js": {"Tab"},
+    # Einheit kWh als Achsenname: gleicht einem Katalogschlüssel, ist aber in jeder Sprache gleich.
+    "wetter.js": {"kWh"},
 }
 
 

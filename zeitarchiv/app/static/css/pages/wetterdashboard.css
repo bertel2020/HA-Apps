@@ -19,6 +19,14 @@
   .wt-record-link{font-size:calc(12px * var(--font-scale, 1));color:var(--accent-line);margin-top:2px;}
   .wt-controls select{font:inherit;font-size:calc(13px * var(--font-scale, 1));padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink);}
 
+  .wt-swatch{display:inline-block;width:10px;height:10px;border-radius:3px;}
+  .wt-num{font:inherit;font-size:calc(13px * var(--font-scale, 1));width:3.2em;padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink);text-align:right;}
+  .wt-heat-table tr.wt-sum th,.wt-heat-table tr.wt-sum td{font-weight:600;color:var(--ink);border-top:1px solid var(--border-strong);}
+  .wt-heat-table tr.wt-cut th,.wt-heat-table tr.wt-cut td{background:var(--surface-alt);}
+  .wt-heat-table thead .wt-g th{text-align:center;}
+  .wt-heat-table td{font-size:calc(14px * var(--font-scale, 1));}
+  .wt-dl{color:var(--chart-1);}
+
   /* Kacheln */
   .wt-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:16px;}
   .wt-tile{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface-alt);display:flex;flex-direction:column;gap:2px;min-width:0;}
