@@ -700,6 +700,12 @@ year sits below the current value and is deliberately neutral in colour, as
 warmer is not automatically better. Below max and min you see when the value
 occurred (the hour for today and yesterday, otherwise the day).
 
+With **Reference date** the table shows the periods as of an earlier day: Today, Yesterday,
+Month, Last month and Year then refer to it, and the stretch of last year ends on the same
+calendar day. The reference date is part of the address (`?at=2026-01-15`), so the view can
+be linked; "Today" resets it. The tiles keep showing the current values. You choose the
+columns with **Columns ▾**; a click on a tile opens the entity.
+
 **So far** compares the running period with the same stretch of last year
 (1–2 Nov 2026 against 1–2 Nov 2025), **Complete** with the whole period of last
 year. Completed periods (yesterday, last month) are the same in both cases. If

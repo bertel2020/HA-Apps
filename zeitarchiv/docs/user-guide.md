@@ -752,6 +752,12 @@ gefärbt, weil wärmer nicht automatisch besser ist. Bei Max und Min steht
 darunter, wann der Wert auftrat (bei Heute und Gestern die Stunde, sonst der
 Tag).
 
+Mit **Stichtag** zeigt die Tabelle die Zeiträume zu einem früheren Tag: Heute, Gestern,
+Monat, Letzter Monat und Jahr beziehen sich dann auf ihn, der Vorjahres-Ausschnitt endet am
+selben Kalendertag. Der Stichtag steht in der Adresse (`?at=2026-01-15`), die Ansicht lässt sich
+also verlinken; „Heute“ stellt zurück. Die Kacheln zeigen weiter die aktuellen Werte. Die
+Spalten wählt ihr über **Spalten ▾**; ein Klick auf eine Kachel öffnet die Entität.
+
 **Bis jetzt** vergleicht den laufenden Zeitraum mit demselben Stück des
 Vorjahres (1.–2.11.2026 gegen 1.–2.11.2025), **Komplett** mit dem ganzen
 Vorjahreszeitraum. Abgeschlossene Zeiträume (Gestern, Letzter Monat) sind in
