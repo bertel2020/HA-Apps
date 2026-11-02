@@ -97,12 +97,15 @@ def test_a_flagged_row_without_assessment_counts_as_open(tmp_path) -> None:
 
 
 def _seed_live(index, data_dir, now):
-    # Nur 40 Minuten zurück: die Ansicht „Tag“ beginnt um Mitternacht, mehr Abstand ließe den
-    # Test in den ersten Stunden des Tages ins Leere laufen.
+    # Nur 40 Minuten zurück; abgefragt wird der Bereich „alle“, weil „Tag“ um Mitternacht beginnt
+    # und der Test in den ersten 40 Minuten des Tages sonst ins Leere liefe.
     base = now.timestamp() - 2400
     index.get_or_create_entity("sensor.pytest_bulk", "sensor", "total_increasing", "kWh")
     for i, value in enumerate([100.0, 101.0, 0.0, 101.5, 102.0]):
         hotbuffer.append(data_dir, "sensor.pytest_bulk", base + i * 300, value, TZ)
+    # Der Bereich „alle“ beginnt beim ersten Wert der Entität, den nur der Index kennt.
+    with index._lock, index._conn:
+        index._conn.execute("UPDATE entities SET first_ts = ? WHERE entity_id = ?", (base, "sensor.pytest_bulk"))
     return base
 
 
@@ -156,7 +159,7 @@ def test_the_cleanup_page_shows_the_verdict_in_the_badge(client) -> None:
     now = datetime.now(TZ)
     _seed_live(index, DATA_DIR, now)
     try:
-        html = client.get("/entities/sensor.pytest_bulk/rows?filter=counter_decreases&range=day").text
+        html = client.get("/entities/sensor.pytest_bulk/rows?filter=counter_decreases&range=all").text
         assert "Zählerrückgang" in html
         assert "Vermutlich Fehlwert" in html
         assert "Stand danach wieder bei" in html
