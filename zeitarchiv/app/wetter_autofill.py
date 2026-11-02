@@ -41,6 +41,8 @@ MIN_SCORE = 3
 #: Vorsprung zum Zweitplatzierten, ab dem ein Vorschlag als eindeutig gilt.
 CLEAR_LEAD = 2
 MAX_CANDIDATES = 5
+#: Höchstzahl vorgeschlagener weiterer Sensoren (Temperatur oder Feuchte, auch innen).
+MAX_EXTRAS = 4
 
 
 def _text(row: dict[str, Any]) -> str:
@@ -167,6 +169,25 @@ def _entry(ranked: list[tuple[int, dict[str, Any], list[str]]], labels: dict[str
     }
 
 
+def _extras(rows: list[dict[str, Any]], taken: set[str]) -> list[dict[str, str]]:
+    """Weitere Temperatur- und Feuchtesensoren (auch Innenräume), die keiner Rolle zugeordnet sind.
+
+    Außen-Sensoren zuerst, danach nach Entitäts-ID; Gerätetemperaturen (CPU, Akku …) zählen nicht.
+    """
+    found = []
+    for row in rows:
+        if row["entity_id"] in taken or row["domain"] != "sensor" or row["aggregation_type"] != "standard":
+            continue
+        dc, unit = row.get("device_class"), _unit(row)
+        temperature = dc == "temperature" or unit in _TEMP_UNITS
+        humidity = dc == "humidity" or (unit == "%" and _HUMIDITY.search(_text(row)))
+        if not (temperature or humidity) or _DEVICE_TEMP.search(_text(row)):
+            continue
+        found.append((0 if _outdoor_or_station(row) else 1, row["entity_id"], row))
+    found.sort(key=lambda item: item[:2])
+    return [row for _o, _e, row in found][:MAX_EXTRAS]
+
+
 def suggest(
     archived: list[dict[str, Any]], labels: dict[str, str], catalog: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
@@ -174,7 +195,7 @@ def suggest(
 
     archived: Zeilen der archivierten Entitäten (entity_id, aggregation_type, unit, state_class, …),
     labels: Anzeigenamen je Entität, catalog: Zeilen des Integrationskatalogs oder None.
-    Rückgabe: {"roles": {rolle: Vorschlag}, "heating": [...], "missing": [...], "has_catalog": bool}.
+    Rückgabe: {"roles": {rolle: Vorschlag}, "heating": [...], "extras": [...], "missing": [...], "has_catalog": bool}.
     """
     meta = {row["entity_id"]: row for row in (catalog or [])}
     rows = []
@@ -202,6 +223,11 @@ def suggest(
         roles[role] = _entry(ranked, labels)
         if role == "temperature":
             anchor = next(row for row in rows if row["entity_id"] == ranked[0][1]["entity_id"])
+    taken = {pick["entity_id"] for pick in roles.values()}
+    extras = [
+        {"entity_id": row["entity_id"], "label": labels.get(row["entity_id"], row["entity_id"])}
+        for row in _extras(rows, taken)
+    ]
     heating = [
         {"entity_id": row["entity_id"], "name": "", "label": labels.get(row["entity_id"], row["entity_id"])}
         for row in rows
@@ -227,4 +253,4 @@ def suggest(
             if ranked:
                 row = ranked[0][1]
                 missing.append({"role": role, "entity_id": row["entity_id"], "label": row.get("name") or row["entity_id"]})
-    return {"roles": roles, "heating": heating, "missing": missing, "has_catalog": bool(catalog)}
+    return {"roles": roles, "heating": heating, "extras": extras, "missing": missing, "has_catalog": bool(catalog)}

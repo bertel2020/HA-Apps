@@ -59,6 +59,12 @@
               this.heating = data.heating.map((h) => ({entity_id: h.entity_id, name: ""}));
               filled += 1;
             }
+            const taken = new Set(Object.keys(this.roleTypes).map((r) => (this.$root.querySelector(`input[name="${r}"]`) || {}).value).filter(Boolean));
+            const extras = (data.extras || []).filter((e) => !taken.has(e.entity_id));
+            if (!this.extras.length && extras.length) {
+              this.extras = extras.slice(0, this.maxExtra).map((e) => ({entity_id: e.entity_id, name: ""}));
+              filled += 1;
+            }
             this.hints = hints;
             this.note = filled
               ? t("{filled} Rollen vorgeschlagen, {open} offen. Es wurde nichts gespeichert: prüfen, ändern und dann speichern. Belegte Rollen bleiben unverändert.", {filled, open})
@@ -104,7 +110,7 @@
   </div>
   <p class="settings-section-description">{{ _("Ordnet jeder Rolle eine Entität zu. Nur die Außentemperatur ist Pflicht, alles andere bleibt leer, bis passende Sensoren vorhanden sind.") }}</p>
   <p class="wt-note" x-show="note" x-text="note" x-cloak></p>
-  <p class="wt-note wt-note-missing" x-show="missingNote" x-text="missingNote" x-cloak></p>
+  <p class="wt-note wt-note-missing" x-show="missingNote" x-cloak><span x-text="missingNote"></span> <a href="selection?topic=wetter">{{ _("Zum Auswahl-Assistenten") }}</a></p>
   <h3 class="wt-group-h">{{ _("Grundwerte") }}</h3>
   <div class="wt-roles">
     {% for key, label, types in roles if key not in ('gust', 'radiation') %}

@@ -76,6 +76,8 @@ ROLE_LABELS = {key: label for key, label, _types in ROLES}
 MAX_EXTRA_TEMPERATURES = 5
 #: Blöcke der Vergleichstabelle, die sich in der Einrichtung ausblenden lassen (die Außentemperatur
 #: und Zusatzsensoren bleiben immer sichtbar).
+#: Zeiträume (Tage) des Temperaturvergleichs auf dem Reiter „Temperatur & Klima“.
+TEMPERATURE_DAYS = (7, 30, 90)
 BLOCK_KEYS = ("kenntage", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation")
 #: Nachkommastellen, wenn die Entität „automatisch“ eingestellt ist: Strahlung in ganzen W/m².
 ROLE_DEFAULT_DECIMALS = {"radiation": 0}
@@ -594,6 +596,29 @@ class WetterService:
             unit = entity["unit"] or "°C"
         return {**result, "metric": metric, "unit": unit, "entity_id": entity_id, "today": today.isoformat(), "tz": str(self.deps.tz)}
 
+    def compute_temperatures(self, days: int, now_local: datetime | None = None) -> dict | None:
+        """Tagesmittel der Außentemperatur und aller weiteren Sensoren für die letzten ``days`` Tage."""
+        config = _load_config(self.deps.index)
+        now_local = now_local or datetime.now(self.deps.tz)
+        specs = [spec for spec in self._row_specs(config) if spec["key"].split(":")[0] == "temperature"]
+        if not specs:
+            return None
+        today = now_local.date()
+        dates = [today - timedelta(days=offset) for offset in range(days - 1, -1, -1)]
+        series = []
+        for spec in specs:
+            by_day = {
+                analysis.day_of(point, self.deps.tz): point.value
+                for point in self._daily(spec["entity_id"], now_local) if point.covered and point.value is not None
+            }
+            series.append({
+                "key": spec["key"], "entity_id": spec["entity_id"],
+                "label": tr(TILE_LABELS["temperature"]) if spec["key"] == "temperature" else spec["label"],
+                "unit": spec["unit"],
+                "values": [round(by_day[day], 1) if day in by_day else None for day in dates],
+            })
+        return {"days": days, "dates": [day.isoformat() for day in dates], "series": series}
+
     def compute_longterm(self, now_local: datetime | None = None) -> dict | None:
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
@@ -903,6 +928,16 @@ class WetterService:
             result = self.compute_matrix(metric, mode)
             if result is None:
                 raise HTTPException(status_code=404, detail=tr("Kein Niederschlag zugeordnet."))
+            return result
+
+        @router.get("/wetterdashboard/temperaturen")
+        def wetterdashboard_temperatures(days: int = 30) -> dict:
+            _require_configured()
+            if days not in TEMPERATURE_DAYS:
+                raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
+            result = self.compute_temperatures(days)
+            if result is None:
+                raise HTTPException(status_code=404, detail=tr("Noch nicht eingerichtet"))
             return result
 
         @router.get("/wetterdashboard/langzeit")

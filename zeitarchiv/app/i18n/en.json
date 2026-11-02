@@ -3436,7 +3436,11 @@
     "„Gesamt“ im Namen": "“Total” in the name",
     "„Regen“ im Namen": "“Rain” in the name",
     "Welche Blöcke die Vergleichstabelle zeigt. Die Außentemperatur und weitere Sensoren sind immer dabei.": "Which blocks the comparison table shows. The outdoor temperature and additional sensors are always included.",
-    "Ein ausgeblendeter Block fehlt in der Tabelle auf allen Reitern. Die Kacheln oben bleiben unverändert.": "A hidden block is missing from the table on every tab. The tiles at the top stay unchanged."
+    "Ein ausgeblendeter Block fehlt in der Tabelle auf allen Reitern. Die Kacheln oben bleiben unverändert.": "A hidden block is missing from the table on every tab. The tiles at the top stay unchanged.",
+    "Temperaturen im Vergleich": "Temperature comparison",
+    "Tagesmittel der Außentemperatur und der weiteren Sensoren. Tage mit zu wenigen Werten bleiben leer.": "Daily average of the outdoor temperature and the additional sensors. Days with too few values stay empty.",
+    "Ungültiger Zeitraum.": "Invalid period.",
+    "Zum Auswahl-Assistenten": "Open the selection assistant"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4106,6 +4110,9 @@
     "Vorschläge konnten nicht geladen werden.": "Suggestions could not be loaded.",
     "{n} weitere Kandidaten: {names}": "{n} more candidates: {names}",
     "prüfen": "check",
-    "Vorschlag": "Suggestion"
+    "Vorschlag": "Suggestion",
+    "Die Temperaturen konnten nicht geladen werden.": "The temperatures could not be loaded.",
+    "Alle Blöcke dieser Gruppe sind in der Einrichtung ausgeblendet.": "All blocks of this group are hidden in the setup.",
+    "{n} Tage": "{n} days"
   }
 }

@@ -150,6 +150,19 @@
   {% if has_klima %}
   <section x-show="tab === 'klima'" x-cloak role="tabpanel" id="wt-panel-klima" aria-labelledby="wt-tab-klima">
     {{ tile_card("klima", 3) }}
+    <div class="card wt-card">
+      <div class="wt-controls">
+        <h2 class="wt-h2">{{ _("Temperaturen im Vergleich") }} {{ hint_button(_("Temperaturen im Vergleich")) }}</h2>
+        {% call hint_body() %}{{ _("Tagesmittel der Außentemperatur und der weiteren Sensoren. Tage mit zu wenigen Werten bleiben leer.") }}{% endcall %}
+        <div class="wt-seg" role="group" aria-label="{{ _('Zeitraum') }}">
+          <template x-for="days in [7, 30, 90]" :key="days">
+            <button type="button" :aria-pressed="(tempDays === days).toString()" @click="setTempDays(days)" x-text="t('{n} Tage', {n: days})"></button>
+          </template>
+        </div>
+      </div>
+      <div class="wt-chart" x-ref="tempChart"></div>
+      <p class="hint hint-warn" x-show="tempError" x-text="tempError" x-cloak></p>
+    </div>
     {{ compare_card("klima") }}
   </section>
   {% endif %}

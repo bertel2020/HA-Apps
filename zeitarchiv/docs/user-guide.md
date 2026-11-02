@@ -739,7 +739,7 @@ nassem Sensor „Regen“, die Trocknungszeit zählt dann mit. Ab wann ein Tag a
 Regentag zählt, stellt ihr in der Einrichtung ein (Standard 1 mm bzw. 10 min).
 Im Bereich **Anzeige** lassen sich Blöcke der Vergleichstabelle ausblenden (Kenntage, Niederschlag, Regen, Luftfeuchte, Luftdruck, Wind, Böe, Strahlung); die Außentemperatur und weitere Sensoren bleiben immer sichtbar, die Kacheln oben ändern sich nicht. Der Zeitraum einer Spalte steht im Tooltip der Überschrift („ⓘ“), nicht als eigene Zeile.
 
-Der Knopf **Vorschlagen** im Bereich Messwerte füllt die noch leeren Rollen: aus Geräteklasse, Einheit, Namen („außen“, „Regen“, „Böe“) und der Wetter-Integration; gleiche Geräte wie die Außentemperatur werden bevorzugt. Bereits belegte Rollen bleiben unverändert, gespeichert wird erst mit „Speichern“. Bei knappen Entscheidungen steht „prüfen“ und es werden weitere Kandidaten genannt. Auch Heizzähler (Name mit Heizung, Wärmepumpe, Heizstab …) werden vorgeschlagen. Passende Entitäten, die noch nicht archiviert sind, werden genannt und lassen sich im Auswahl-Assistenten übernehmen.
+Der Knopf **Vorschlagen** im Bereich Messwerte füllt die noch leeren Rollen: aus Geräteklasse, Einheit, Namen („außen“, „Regen“, „Böe“) und der Wetter-Integration; gleiche Geräte wie die Außentemperatur werden bevorzugt. Bereits belegte Rollen bleiben unverändert, gespeichert wird erst mit „Speichern“. Bei knappen Entscheidungen steht „prüfen“ und es werden weitere Kandidaten genannt. Auch Heizzähler (Name mit Heizung, Wärmepumpe, Heizstab …) werden vorgeschlagen, ebenso weitere Temperatur- und Feuchtesensoren (auch Innenräume) für „Weitere Sensoren“, solange dort noch keiner steht. Passende Entitäten, die noch nicht archiviert sind, werden genannt; ein Link führt direkt in den Auswahl-Assistenten (Thema Wetter).
 
 **Weitere Sensoren** (Temperatur oder Feuchte, zum Beispiel Keller oder Dachboden) werden eigene Zeilen und nie mit der Außentemperatur
 gemittelt; sie stehen auf dem eigenen Reiter **Temperatur & Klima**. Backups sichern die Zuordnung mit; der selektive Restore stellt sie
@@ -747,7 +747,7 @@ als Ganzes („Wetterdashboard-Konfiguration“) wieder her.
 
 ### Kacheln und Vergleichstabelle
 
-Die Kacheln stehen oben in der Karte **Aktuell** und zeigen je Rolle den aktuellen Wert und den heutigen Verlauf. Die **Übersicht** enthält Temperatur, Niederschlag, Regen, Luftfeuchte und Luftdruck; Wind, Böe und Strahlung stehen auf dem eigenen Reiter **Wind & Sonne**, weitere Sensoren auf **Temperatur & Klima** (beide erscheinen nur, wenn dafür etwas zugeordnet ist), jeweils mit denselben Kacheln und derselben Vergleichstabelle.
+Die Kacheln stehen oben in der Karte **Aktuell** und zeigen je Rolle den aktuellen Wert und den heutigen Verlauf. Die **Übersicht** enthält Temperatur, Niederschlag, Regen, Luftfeuchte und Luftdruck; Wind, Böe und Strahlung stehen auf dem eigenen Reiter **Wind & Sonne**, weitere Sensoren auf **Temperatur & Klima** (beide erscheinen nur, wenn dafür etwas zugeordnet ist), jeweils mit denselben Kacheln und derselben Vergleichstabelle. Auf **Temperatur & Klima** zeigt außerdem das Diagramm **Temperaturen im Vergleich** die Tagesmittel der Außentemperatur und aller weiteren Sensoren für 7, 30 oder 90 Tage.
 Die Tabelle darunter hat die Spalten **Heute, Gestern, Dieser Monat, Letzter
 Monat** und **Dieses Jahr**, jeweils auf Wunsch mit einer **Vorjahr**-Spalte
 daneben; im Kopf steht der konkrete Zeitraum („November“, „2026“). Die

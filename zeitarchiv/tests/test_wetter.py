@@ -234,6 +234,32 @@ def test_tiles_show_today_and_include_extra_sensors(service) -> None:
     assert tiles[0]["last"] == 18.0 and tiles[0]["today"]["min"] == 12.0 and tiles[0]["yesterday"] is None
 
 
+def test_temperature_comparison_has_a_series_per_sensor_and_leaves_thin_days_empty(service) -> None:
+    hours = [(_ts(19, hour), 10.0 + hour * 0.1) for hour in range(24)]
+    _add(service, "sensor.t", "sensor", "measurement", "°C", hours + [(_ts(18, 1), 5.0)])
+    _add(service, "sensor.n", "sensor", "measurement", "°C", [(ts, 8.0) for ts, _v in hours])
+    _configure(service, temperature="sensor.t", extra_temperatures=[{"entity_id": "sensor.n", "name": "Nord"}])
+    data = service.compute_temperatures(7, NOW)
+    assert data["dates"][-1] == "2026-08-20" and len(data["dates"]) == 7
+    assert [row["label"] for row in data["series"]] == ["Temperatur", "Nord"]
+    day = data["dates"].index("2026-08-19")
+    assert data["series"][1]["values"][day] == 8.0
+    assert data["series"][0]["values"][day] is not None
+    assert data["series"][0]["values"][day - 1] is None  # ein einzelner Wert reicht nicht für ein Tagesmittel
+
+
+def test_temperature_comparison_route_validates_the_period(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp9", "sensor", "measurement", "°C")
+    index.set_setting(wetter_routes.SETTING_ENABLED, "1")
+    wetter_routes._save_config(index, {**wetter_routes._empty_config(), "temperature": "sensor.wetter_test_temp9"})  # noqa: SLF001
+    assert client.get("/wetterdashboard/temperaturen?days=5").status_code == 400
+    result = client.get("/wetterdashboard/temperaturen?days=7")
+    assert result.status_code == 200 and len(result.json()["dates"]) == 7
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
 # -- Routen ------------------------------------------------------------------------------------
 
 
@@ -745,7 +771,7 @@ def test_setup_suggestions_route_and_button(client) -> None:
 
     index.get_or_create_entity("sensor.wetter_test_aussen8", "sensor", "measurement", "°C")
     data = client.get("/wetterdashboard/setup/vorschlaege").json()
-    assert set(data) == {"roles", "heating", "missing", "has_catalog"}
+    assert set(data) == {"roles", "heating", "extras", "missing", "has_catalog"}
     setup = client.get("/wetterdashboard/setup").text
     assert "suggest()" in setup and "wetter-fill" in setup and "wetterdashboard/setup/vorschlaege" in setup
 

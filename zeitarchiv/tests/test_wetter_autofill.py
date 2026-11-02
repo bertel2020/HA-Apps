@@ -110,3 +110,11 @@ def test_matching_entities_that_are_not_archived_are_reported_separately() -> No
     result = wetter_autofill.suggest(archived, labels, catalog)
     assert "radiation" not in result["roles"]
     assert [item["role"] for item in result["missing"]] == ["radiation"]
+
+
+def test_extra_sensors_are_other_temperature_and_humidity_sensors_without_device_temperatures() -> None:
+    archived, labels, catalog = _station()
+    extras = wetter_autofill.suggest(archived, labels, catalog)["extras"]
+    ids = [entry["entity_id"] for entry in extras]
+    assert ids == ["sensor.keller_feuchte", "sensor.keller_temperatur"]
+    assert "sensor.cpu_temperatur" not in ids

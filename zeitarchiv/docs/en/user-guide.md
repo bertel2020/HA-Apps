@@ -688,7 +688,7 @@ shown side by side. Many on/off sensors also report “rain” in fog, dew or wh
 the sensor is wet; the drying time then counts too. You set when a day counts
 as a rain day in setup (default 1 mm or 10 min). In the **Display** section you can hide blocks of the comparison table (key days, precipitation, rain, humidity, pressure, wind, gust, radiation); the outdoor temperature and additional sensors are always shown, and the tiles at the top do not change. The period of a column is in the tooltip of its heading ("ⓘ"), not on a line of its own.
 
-The **Suggest** button in the readings section fills the roles that are still empty, based on device class, unit, names ("outdoor", "rain", "gust") and the weather integration; entities on the same device as the outdoor temperature are preferred. Roles that are already assigned stay unchanged, and nothing is saved until you press Save. Close calls are marked "check" and list further candidates. Heating counters (names with heating, heat pump, heating element …) are suggested too. Matching entities that are not archived yet are named and can be added in the selection assistant.
+The **Suggest** button in the readings section fills the roles that are still empty, based on device class, unit, names ("outdoor", "rain", "gust") and the weather integration; entities on the same device as the outdoor temperature are preferred. Roles that are already assigned stay unchanged, and nothing is saved until you press Save. Close calls are marked "check" and list further candidates. Heating counters (names with heating, heat pump, heating element …) are suggested too, and so are further temperature and humidity sensors (indoor rooms as well) for "More sensors" as long as none is set. Matching entities that are not archived yet are named; a link opens the selection assistant (topic Weather).
 
 **Additional sensors** (temperature or humidity, for example cellar or attic)
 become their own rows, shown on the **Temperature & climate** tab, and are never averaged with the outdoor temperature. Backups include the assignment; the
@@ -696,7 +696,7 @@ selective restore brings it back as a whole ("Weather dashboard configuration").
 
 ### Tiles and comparison table
 
-The tiles sit at the top in the **Current** card and show the current value and today's range for each role. The **Overview** holds temperature, precipitation, rain, humidity and pressure; wind, gust and radiation have their own **Wind & sun** tab, additional sensors the **Temperature & climate** tab (each appears only when something is assigned), with the same tiles and the same comparison table.
+The tiles sit at the top in the **Current** card and show the current value and today's range for each role. The **Overview** holds temperature, precipitation, rain, humidity and pressure; wind, gust and radiation have their own **Wind & sun** tab, additional sensors the **Temperature & climate** tab (each appears only when something is assigned), with the same tiles and the same comparison table. The **Temperature & climate** tab also has the **Temperature comparison** chart: daily averages of the outdoor temperature and all additional sensors for 7, 30 or 90 days.
 The table below has the columns **Today, Yesterday, This month, Last month**
 and **This year**, each optionally with a **Last year** column next to it; the
 header shows the concrete period (“November”, “2026”). The difference to last

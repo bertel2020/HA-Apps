@@ -136,6 +136,9 @@
     const cols = data.columns;
     if (!cols.length) return `<tbody><tr><td>${escapeHtml(t('Keine Spalte ausgewählt.'))}</td></tr></tbody>`;
     const span = data.vorjahr ? 2 : 1;
+    if (!data.rows.some((r) => inGroup(r.key, group))) {
+      return `<tbody><tr><td class="wt-empty">${escapeHtml(t('Alle Blöcke dieser Gruppe sind in der Einrichtung ausgeblendet.'))}</td></tr></tbody>`;
+    }
     // Zwei Zeilen: Titel mit Info-Tooltip (Zeitraum, „bis 15:47“), darunter Tag bzw. Jahr der Spalte und ihres Vorjahrs.
     // Mit Stichtag steht das Datum schon im Titel; die zweite Zeile nennt dann den Wochentag.
     const subText = (range, key) => {
@@ -292,6 +295,9 @@
       precipMode: (precipModes && precipModes[0]) || 'mm',
       precip: null,
       precipError: '',
+      tempCmp: null,
+      tempDays: 30,
+      tempError: '',
       monthly: null,
       monthlyMetric: 'temperature',
       band: true,
@@ -445,6 +451,7 @@
       showTab(tab) {
         this.tab = tab;
         if (tab === 'precip' && !this.precip) this.loadPrecip();
+        if (tab === 'klima') { if (!this.tempCmp) this.loadTemps(); else this.$nextTick(() => this.drawTemps()); }
         if (tab === 'long' && !this.longterm) this.loadLongterm();
         if (tab === 'long' && !this.matrix) this.loadMatrix();
         if (tab === 'heat' && !this.heat) this.loadHeat();
@@ -592,6 +599,53 @@
         }, true);
         // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
         requestAnimationFrame(() => chart.resize());
+      },
+
+      // Temperaturen im Vergleich (Reiter „Temperatur & Klima“)
+      async loadTemps() {
+        this.tempError = '';
+        try {
+          this.tempCmp = await this.fetchJson(`wetterdashboard/temperaturen?days=${this.tempDays}`);
+          this.$nextTick(() => this.drawTemps());
+        } catch (e) {
+          this.tempError = t('Die Temperaturen konnten nicht geladen werden.');
+        }
+      },
+
+      setTempDays(days) {
+        this.tempDays = days;
+        this.loadTemps();
+      },
+
+      drawTemps() {
+        const data = this.tempCmp;
+        const element = this.$refs.tempChart;
+        if (!data || !element) return;
+        const colors = palette();
+        const labels = data.dates.map((iso) => utcDayMonth.format(new Date(`${iso}T00:00:00Z`)));
+        const unit = (data.series[0] && data.series[0].unit) || '°C';
+        const names = data.series.map((row) => row.label);
+        const chart = chartFor('temps', element);
+        chart.setOption({
+          animation: false, grid: gridFor(element, {right: 8}), legend: legendBox(colors, names),
+          xAxis: {type: 'category', data: labels, boundaryGap: false, ...axisStyle(colors), splitLine: {show: false}},
+          yAxis: {type: 'value', scale: true, name: unit, nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
+          tooltip: tooltipBox(colors, (params) => {
+            let html = `<b>${escapeHtml(labels[params[0].dataIndex])}</b>`;
+            for (const param of params) {
+              const value = param.value == null ? '–' : `${num(param.value, 1)} ${unit}`;
+              html += `<br>${param.marker}${escapeHtml(param.seriesName)}: ${escapeHtml(value)}`;
+            }
+            return html;
+          }),
+          series: data.series.map((row, index) => ({
+            name: row.label, type: 'line', data: row.values, symbol: 'none', connectNulls: false,
+            z: index === 0 ? 5 : 2,
+            lineStyle: {color: this.heatColor(index), width: index === 0 ? 3 : 2},
+            itemStyle: {color: this.heatColor(index)},
+          })),
+        }, true);
+        chart.resize();
       },
 
       // Niederschlag
