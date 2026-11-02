@@ -22,12 +22,13 @@
 </span>
 {% endmacro %}
 
+<div class="settings-panel">
 <div class="wt-title-row">
   <h1>{{ _("Wetterdashboard") }}</h1>
 </div>
-<p class="sub">{{ _("Ordnet jeder Rolle eine Entität zu. Nur die Außentemperatur ist Pflicht.") }}</p>
+<p class="sub">{{ _("Wie euer Wetter war — Messwerte, Regen und Heizbedarf an einem Ort.") }}</p>
 
-<form class="card wt-card wt-setup" hx-post="wetterdashboard/setup" hx-target="#wetter-root" hx-swap="innerHTML"
+<form class="wt-setup" hx-post="wetterdashboard/setup" hx-target="#wetter-root" hx-swap="innerHTML"
       x-data='{
         entityOptions: {{ entity_options | tojson }},
         roleTypes: {{ role_types | tojson }},
@@ -45,9 +46,12 @@
         addHeating() { if (this.heating.length < this.maxHeating) this.heating.push({entity_id: "", name: ""}); },
         removeHeating(i) { this.heating.splice(i, 1); }
       }'>
+  <section class="settings-section wt-section-messwerte">
+  <h2 class="settings-section-title">{{ _("Messwerte") }}</h2>
+  <p class="settings-section-description">{{ _("Ordnet jeder Rolle eine Entität zu. Nur die Außentemperatur ist Pflicht, alles andere bleibt leer, bis passende Sensoren vorhanden sind.") }}</p>
   <div class="wt-roles">
     {% for key, label, types in roles %}
-    <div class="wt-role">
+    <div class="wt-role" data-role="{{ key }}">
       <div class="wt-role-head">
         <span class="wt-role-name">{{ _(label) }}{% if key == 'temperature' %} <span class="wt-required">{{ _("Pflicht") }}</span>{% endif %}</span>
       </div>
@@ -56,8 +60,11 @@
     </div>
     {% endfor %}
   </div>
+  </section>
 
-  <h2 class="wt-sub-h">{{ _("Weitere Thermometer") }} {{ hint_button(_("Weitere Thermometer")) }}</h2>
+  <section class="settings-section wt-section-neutral">
+  <h2 class="settings-section-title">{{ _("Weitere Thermometer") }} {{ hint_button(_("Weitere Thermometer")) }}</h2>
+  <p class="settings-section-description">{{ _("Zusätzliche Temperaturfühler, zum Beispiel Keller, Dachboden oder Nordseite.") }}</p>
   {% call hint_body() %}{{ _("Jedes weitere Thermometer wird eine eigene Zeile in der Tabelle, es wird nie mit der Außentemperatur gemittelt.") }}{% endcall %}
   <template x-for="(row, i) in extras" :key="i">
     <div class="wt-extra field">
@@ -78,8 +85,11 @@
     </div>
   </template>
   <button type="button" class="btn wt-add" x-show="extras.length < maxExtra" @click="addExtra()">{{ _("+ Thermometer") }}</button>
+  </section>
 
-  <h2 class="wt-sub-h">{{ _("Heizenergie") }} {{ hint_button(_("Heizenergie")) }}</h2>
+  <section class="settings-section wt-section-heizen">
+  <h2 class="settings-section-title">{{ _("Heizenergie") }} {{ hint_button(_("Heizenergie")) }}</h2>
+  <p class="settings-section-description">{{ _("Energiezähler der Heizung für den Reiter „Heizen“, mit Gradtagzahl und Verbrauch je Zähler.") }}</p>
   {% call hint_body() %}{{ _("Ein oder mehrere Energiezähler der Heizung, zum Beispiel Wärmepumpe, Heizstab oder Konvektoren. Sie werden zu einer Summe addiert, der Reiter „Heizen“ zeigt auch den Anteil je Zähler.") }} {{ _("Gradtagzahl nach VDI 3807 (G20/15): Raumtemperatur minus Tagesmittel, nur an Tagen unter der Heizgrenze. Beide Werte lassen sich auf dem Reiter „Heizen“ vorübergehend ändern.") }}{% endcall %}
   <template x-for="(row, i) in heating" :key="i">
     <div class="wt-extra field">
@@ -107,7 +117,11 @@
       <input type="text" id="wt-heating-limit" class="wt-short" name="heating_limit" value="{{ config.heating_limit | string | replace('.', ',') }}" inputmode="decimal"> <span class="wt-unit">°C</span></div>
   </div>
 
-  <h2 class="wt-sub-h">{{ _("Regentage") }} {{ hint_button(_("Regentage")) }}</h2>
+  </section>
+
+  <section class="settings-section wt-section-regen">
+  <h2 class="settings-section-title">{{ _("Regentage") }} {{ hint_button(_("Regentage")) }}</h2>
+  <p class="settings-section-description">{{ _("Ab wann ein Tag als Regentag zählt.") }}</p>
   {% call hint_body() %}{{ _("Viele Ein/Aus-Regensensoren melden auch bei Nebel, Tau oder nassem Sensor „Regen“, die Trocknungszeit zählt dann mit.") }}{% endcall %}
   <div class="wt-thresholds">
     <div class="field"><label for="wt-rain-mm">{{ _("Regentag bei Niederschlagsmenge ab") }}</label>
@@ -116,8 +130,11 @@
       <input type="text" id="wt-rain-min" class="wt-short" name="rain_day_minutes" value="{{ config.rain_day_minutes | int }}" inputmode="numeric"> <span class="wt-unit">min</span></div>
   </div>
 
-  <div class="wt-actions">
-    <button type="submit" class="btn btn-primary">{{ _("Speichern") }}</button>
+  </section>
+
+  <div class="actionbar" style="justify-content:flex-end;">
     <a class="btn" href="wetterdashboard">{{ _("Abbrechen") }}</a>
+    <button type="submit" class="btn" style="background:var(--accent-line);color:var(--accent-contrast);border-color:var(--accent-line);">{{ _("Speichern") }}</button>
   </div>
 </form>
+</div>

@@ -90,23 +90,44 @@
   .wt-table td .wt-dl{display:block;font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--chart-1);}
   .wt-table td.wt-na .wt-v{color:var(--ink-faint);font-weight:400;}
 
-  /* Einrichtung */
-  .wt-setup{display:flex;flex-direction:column;gap:10px;}
-  .wt-roles{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;}
-  .wt-role{border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0;}
+  /* Einrichtung: Bereiche wie die Einrichtung des Energiedashboards (.settings-section mit Farbverlauf in der
+     Ecke, Titel + Beschreibung); die Rollenkacheln tragen dieselbe Farbe wie die Kacheln der Übersicht. */
+  .wt-setup{display:flex;flex-direction:column;gap:0;}
+  .wt-setup .actionbar{margin-top:20px;}
+  .wt-section-messwerte{
+    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--chart-2) 16%, transparent), color-mix(in srgb, var(--chart-2) 5%, transparent) 70%), var(--surface);
+    border-color:color-mix(in srgb, var(--chart-2) 30%, var(--border));}
+  .wt-section-heizen{
+    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--chart-7) 16%, transparent), color-mix(in srgb, var(--chart-7) 5%, transparent) 70%), var(--surface);
+    border-color:color-mix(in srgb, var(--chart-7) 30%, var(--border));}
+  .wt-section-regen{
+    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--chart-3) 16%, transparent), color-mix(in srgb, var(--chart-3) 5%, transparent) 70%), var(--surface);
+    border-color:color-mix(in srgb, var(--chart-3) 30%, var(--border));}
+  .wt-section-neutral{
+    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--ink-faint) 22%, transparent), color-mix(in srgb, var(--ink-faint) 8%, transparent) 70%), var(--surface);}
+  .wt-roles{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;}
+  .wt-role{--wt-accent:var(--chart-8);display:flex;flex-direction:column;gap:8px;min-width:0;padding:10px 12px 12px;
+    background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--wt-accent);border-radius:12px;box-shadow:var(--shadow);}
+  .wt-role[data-role="temperature"]{--wt-accent:var(--chart-2);}
+  .wt-role[data-role="precip_mm"],.wt-role[data-role="precip_dur"]{--wt-accent:var(--chart-3);}
+  .wt-role[data-role="humidity"]{--wt-accent:var(--chart-6);}
+  .wt-role[data-role="pressure"]{--wt-accent:var(--chart-4);}
+  .wt-role[data-role="radiation"]{--wt-accent:var(--chart-7);}
   .wt-role-name{font-weight:600;font-size:calc(14px * var(--font-scale, 1));}
-  .wt-required{font-size:calc(11px * var(--font-scale, 1));font-weight:600;color:var(--accent-line);margin-left:4px;}
+  .wt-required{font-size:calc(11px * var(--font-scale, 1));font-weight:600;color:var(--accent-line);margin-left:6px;text-transform:uppercase;letter-spacing:.05em;}
   .wt-warn{margin:0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--warning);}
-  .wt-sub-h{font-size:calc(15px * var(--font-scale, 1));margin:10px 0 0;}
-  .wt-extra{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+  /* Auswahlfelder über die volle Breite, lange Namen mit Auslassung (wie .edash-field-grid) */
+  .wt-setup .dd-picker-wrap,.wt-setup .dd-picker-anchor{display:block;width:100%;}
+  .wt-setup .dd-picker-wrap .btn{width:100%;text-align:left;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .wt-setup .dd-picker-popover{left:0;right:auto;width:100%;box-sizing:border-box;}
+  .wt-extra{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto;gap:8px;align-items:center;}
   .wt-extra.field{margin-bottom:8px;}
-  .wt-extra input[type=text]{flex:1 1 160px;min-width:0;}
-  .wt-thresholds{display:flex;flex-wrap:wrap;gap:0 28px;}
+  .wt-extra input[type=text]{width:100%;box-sizing:border-box;min-width:0;}
+  .wt-thresholds{display:flex;flex-wrap:wrap;gap:0 28px;margin-top:6px;}
   .wt-thresholds .field{margin-bottom:12px;}
-  .field input[type=text].wt-short{width:5.5em;text-align:right;}
+  .wt-setup .field input[type=text].wt-short{width:5.5em;text-align:right;}
   .wt-unit{font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
   .wt-add{align-self:flex-start;}
-  .wt-actions{display:flex;gap:8px;margin-top:6px;}
 
   @media (max-width:640px){
     .wt-kpis{grid-template-columns:repeat(2,1fr);}
@@ -114,4 +135,6 @@
     .wt-chart-tall{height:300px;}
     .wt-table{min-width:520px;}
     .wt-roles{grid-template-columns:1fr;}
+    .wt-extra{grid-template-columns:minmax(0,1fr) auto;}
+    .wt-extra > .dd-picker-wrap{grid-column:1 / -1;}
   }
