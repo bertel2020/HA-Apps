@@ -875,48 +875,80 @@
         return t('* laufendes Jahr, bis {date}', {date: `${today[2]}.${today[1]}.`});
       },
 
-      drawKenntage() {
-        const element = this.$refs.kenntageChart;
-        const years = this.kenntageYears();
-        if (!element) return;
-        if (!years.length) {
-          if (charts.kenntage) charts.kenntage.clear();
-          return;
-        }
+      // Frost, Eis, Sommer, heiß: je ein kleines Diagramm mit eigener Achse (Eis- und heiße Tage gingen neben den Frosttagen unter).
+      kenntageKinds() {
         const colors = palette();
-        const data = this.longterm.kenntage;
-        const current = String(this.longterm.current_year);
-        const kinds = [
+        return [
           {key: 'frost', name: t('Frosttage'), color: colors.cold},
           {key: 'eis', name: t('Eistage'), color: cssVar('--chart-4')},
-          {key: 'sommer', name: t('Sommertage'), color: colors.prev},
+          {key: 'sommer', name: t('Sommertage'), color: cssVar('--chart-7')},
           {key: 'heiss', name: t('Heiße Tage'), color: cssVar('--chart-5')},
         ];
-        const labels = years.map((year) => (year === current ? `${year}*` : year));
+      },
+
+      // Ø je Jahr über die abgeschlossenen Jahre der Auswahl (das laufende Jahr zählt nicht).
+      kenntageAverage(key) {
+        if (!this.longterm) return null;
+        const current = String(this.longterm.current_year);
+        const past = this.kenntageYears().filter((year) => year !== current);
+        if (!past.length) return null;
         const sum = (list) => list.reduce((a, b) => a + b, 0);
-        const chart = chartFor('kenntage', element);
-        chart.setOption({
-          animation: false, grid: gridFor(element, {right: 8}), legend: legendBox(colors, kinds.map((kind) => kind.name)),
-          xAxis: {type: 'category', data: labels, ...axisStyle(colors), splitLine: {show: false}},
-          yAxis: {type: 'value', min: 0, name: t('Tage'), nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
-          // Je Balken: Summe des Jahres, darunter die Verteilung auf die Monate.
-          tooltip: {...tooltipBox(colors, (param) => {
-            const year = years[param.dataIndex];
-            const kind = kinds[param.seriesIndex];
-            const months = data[year][kind.key].map((count, i) => (count ? `${monthName(i + 1, 'short')} ${count}` : '')).filter(Boolean);
-            const lines = [];
-            for (let i = 0; i < months.length; i += 4) lines.push(escapeHtml(months.slice(i, i + 4).join(' · ')));
-            return `<b>${escapeHtml(kind.name)} ${escapeHtml(year)}</b><br>${escapeHtml(t('{n} Tage', {n: sum(data[year][kind.key])}))}`
-              + (lines.length ? `<br>${lines.join('<br>')}` : '')
-              + `<br>${escapeHtml(t('{days} Tage ausgewertet', {days: sum(data[year].days)}))}`;
-          }), trigger: 'item'},
-          series: kinds.map((kind) => ({
-            name: kind.name, type: 'bar', barMaxWidth: 34, barGap: '12%', barCategoryGap: '35%', itemStyle: {color: kind.color, borderRadius: [4, 4, 0, 0]},
-            data: years.map((year) => sum(data[year][kind.key])),
-          })),
-        }, true);
-        // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
-        requestAnimationFrame(() => chart.resize());
+        return sum(past.map((year) => sum(this.longterm.kenntage[year][key]))) / past.length;
+      },
+
+      kenntageAvg(key) {
+        const average = this.kenntageAverage(key);
+        return average == null ? '' : t('Ø {n} je Jahr', {n: num(average, 0)});
+      },
+
+      drawKenntage() {
+        const years = this.kenntageYears();
+        const colors = palette();
+        const data = this.longterm ? this.longterm.kenntage : {};
+        const current = this.longterm ? String(this.longterm.current_year) : '';
+        const sum = (list) => list.reduce((a, b) => a + b, 0);
+        for (const kind of this.kenntageKinds()) {
+          const element = this.$refs[`kenntageChart${kind.key.charAt(0).toUpperCase()}${kind.key.slice(1)}`];
+          if (!element) continue;
+          if (!years.length) {
+            if (charts[`kenntage-${kind.key}`]) charts[`kenntage-${kind.key}`].clear();
+            continue;
+          }
+          const labels = years.map((year) => (year === current ? `${year}*` : year));
+          const average = this.kenntageAverage(kind.key);
+          const chart = chartFor(`kenntage-${kind.key}`, element);
+          // Schmale Diagramme (Telefon) kürzen die Jahreszahl auf die letzten Ziffern; wird bei jedem Zeichnen und Größenwechsel neu ausgewertet.
+          const narrow = () => chart.getWidth() < 300;
+          chart.setOption({
+            animation: false, grid: {left: 4, right: 8, top: 14, bottom: 4, containLabel: true},
+            xAxis: {
+              type: 'category', data: labels, ...axisStyle(colors), splitLine: {show: false},
+              axisLabel: {color: colors.text, fontSize: scaledFont(10), rotate: 0, hideOverlap: true, formatter: (value) => (narrow() ? value.replace(/^\d\d/, '') : value)},
+            },
+            yAxis: {type: 'value', min: 0, max: (value) => Math.max(value.max, 3), minInterval: 1, ...axisStyle(colors), axisLine: {show: false}, splitNumber: 3, axisLabel: {color: colors.text, fontSize: scaledFont(10)}},
+            // Je Balken: Summe des Jahres, darunter die Verteilung auf die Monate.
+            tooltip: {...tooltipBox(colors, (param) => {
+              const year = years[param.dataIndex];
+              const months = data[year][kind.key].map((count, i) => (count ? `${monthName(i + 1, 'short')} ${count}` : '')).filter(Boolean);
+              const lines = [];
+              for (let i = 0; i < months.length; i += 4) lines.push(escapeHtml(months.slice(i, i + 4).join(' · ')));
+              return `<b>${escapeHtml(kind.name)} ${escapeHtml(year)}</b><br>${escapeHtml(t('{n} Tage', {n: sum(data[year][kind.key])}))}`
+                + (lines.length ? `<br>${lines.join('<br>')}` : '')
+                + `<br>${escapeHtml(t('{days} Tage ausgewertet', {days: sum(data[year].days)}))}`;
+            }), trigger: 'item'},
+            series: [{
+              name: kind.name, type: 'bar', barMaxWidth: 28,
+              itemStyle: {color: kind.color, borderRadius: [3, 3, 0, 0]},
+              data: years.map((year) => ({value: sum(data[year][kind.key]), itemStyle: year === current ? {opacity: 0.55} : {}})),
+              markLine: average == null ? undefined : {
+                silent: true, symbol: 'none', label: {show: false},
+                lineStyle: {color: colors.text, type: 'dashed', width: 1}, data: [{yAxis: Math.round(average * 10) / 10}],
+              },
+            }],
+          }, true);
+          // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
+          requestAnimationFrame(() => chart.resize());
+        }
       },
 
       // Mitteltemperatur je Monat und Jahr (Tabelle, Farbe = Abweichung vom Mittel dieses Monats über die abgeschlossenen Jahre)

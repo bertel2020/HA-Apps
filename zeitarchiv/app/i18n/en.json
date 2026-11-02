@@ -3476,7 +3476,11 @@
     "Abweichung vom Mittel": "Deviation from mean",
     "Mitteltemperatur je Monat und Jahr": "Mean temperature per month and year",
     "kälter": "colder",
-    "wärmer als im Mittel der Jahre im Archiv": "warmer than the mean of the years in the archive"
+    "wärmer als im Mittel der Jahre im Archiv": "warmer than the mean of the years in the archive",
+    "Frosttage": "Frost days",
+    "Eistage": "Ice days",
+    "Sommertage": "Summer days",
+    "Heiße Tage": "Hot days"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4180,6 +4184,7 @@
     "{month} {year}: {value} {unit} ({delta} K zum Mittel)": "{month} {year}: {value} {unit} ({delta} K from the mean)",
     "Jahresmittel {year}: {value} {unit}": "Annual mean {year}: {value} {unit}",
     "{month} {year}: {value} {unit}": "{month} {year}: {value} {unit}",
-    "Oben die Mitteltemperatur, darunter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv (in Kelvin). Die letzte Zeile ist das Mittel.": "Mean temperature on top, below it the deviation from the mean of that month over all completed years in the archive (in kelvin). The last row is the mean."
+    "Oben die Mitteltemperatur, darunter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv (in Kelvin). Die letzte Zeile ist das Mittel.": "Mean temperature on top, below it the deviation from the mean of that month over all completed years in the archive (in kelvin). The last row is the mean.",
+    "Ø {n} je Jahr": "Ø {n} per year"
   }
 }

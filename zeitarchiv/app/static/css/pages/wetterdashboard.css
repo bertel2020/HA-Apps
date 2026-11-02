@@ -112,6 +112,17 @@
   .wt-tm tr.wt-tm-avg th,.wt-tm tr.wt-tm-avg td{color:var(--ink-muted);height:auto;padding-top:6px;border-radius:0;border-top:1px solid var(--border-strong);}
   .wt-tm-legend{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
   .wt-tm-scale{display:inline-block;width:160px;height:10px;border-radius:2px;}
+  /* Kenntage je Jahr: vier kleine Diagramme (2×2), je Art eigene Achse; die Farben sind dieselben wie im Diagramm */
+  .wt-kk-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;}
+  .wt-kk-head{display:flex;align-items:center;gap:6px;font-size:calc(13px * var(--font-scale, 1));}
+  .wt-kk-name{font-weight:600;}
+  .wt-kk-avg{margin-left:auto;color:var(--ink-muted);}
+  .wt-kk-swatch{width:10px;height:10px;border-radius:2px;flex:none;}
+  .wt-kk-frost{background:var(--chart-3);}
+  .wt-kk-eis{background:var(--chart-4);}
+  .wt-kk-sommer{background:var(--chart-7);}
+  .wt-kk-heiss{background:var(--chart-5);}
+  .wt-kk-chart{height:170px;}
   .wt-foot{margin:6px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
   .wt-table td.wt-empty{text-align:left;color:var(--ink-muted);white-space:normal;}
   .wt-table td.wt-na .wt-v{color:var(--ink-faint);font-weight:400;}
@@ -194,9 +205,11 @@
     .wt-kpis{--wt-cols:2 !important;}
     .wt-chart{height:260px;}
     .wt-chart-tall{height:300px;}
+    .wt-chart.wt-kk-chart{height:190px;}
     .wt-table th:first-child,.wt-table td:first-child{min-width:78px;max-width:100px;white-space:normal;}
     .wt-table th,.wt-table td{padding-left:8px;padding-right:8px;}
     .wt-item-grid{grid-template-columns:repeat(2,1fr);}
+    .wt-kk-grid{grid-template-columns:minmax(0,1fr);}
     .wt-item-head{align-items:flex-start;flex-wrap:wrap;}
     .wt-item-name{white-space:normal;overflow:visible;text-overflow:unset;overflow-wrap:break-word;line-height:1.2;flex:1 1 100%;font-size:calc(12.5px * var(--font-scale, 1));}
     .wt-item-glyph{display:none;}

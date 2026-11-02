@@ -185,7 +185,14 @@
           <button type="button" :aria-pressed="(kenntageRange === '5').toString()" @click="setKenntageRange('5')">{{ _("Letzte 5") }}</button>
         </div>
       </div>
-      <div class="wt-chart" x-ref="kenntageChart"></div>
+      <div class="wt-kk-grid">
+        {% for key, label in (("frost", _("Frosttage")), ("eis", _("Eistage")), ("sommer", _("Sommertage")), ("heiss", _("Heiße Tage"))) %}
+        <div class="wt-kk">
+          <div class="wt-kk-head"><span class="wt-kk-swatch wt-kk-{{ key }}"></span><span class="wt-kk-name">{{ label }}</span><span class="wt-kk-avg" x-text="kenntageAvg('{{ key }}')"></span></div>
+          <div class="wt-chart wt-kk-chart" x-ref="kenntageChart{{ key | capitalize }}"></div>
+        </div>
+        {% endfor %}
+      </div>
       <p class="wt-foot" x-show="kenntageFoot()" x-text="kenntageFoot()" x-cloak></p>
     </div>
     <div class="card wt-card" x-show="tempYears" x-cloak>
