@@ -1,3 +1,4 @@
+{% from "_hints.html" import hint_button, hint_body %}
 {% if not configured %}
 <div class="wt-title-row">
   <h1>{{ _("Wetterdashboard") }}</h1>
@@ -44,7 +45,8 @@
 
   <div class="card wt-card">
     <div class="wt-controls">
-      <h2 class="wt-h2">{{ _("Zeiträume im Vergleich") }}</h2>
+      <h2 class="wt-h2">{{ _("Zeiträume im Vergleich") }} {{ hint_button(_("Zeiträume im Vergleich")) }}</h2>
+      {% call hint_body() %}<span x-show="vorjahr" x-text="modeHint()"></span>{% endcall %}
       {# Spaltenauswahl wie in der Entitätenliste: Knopf „Spalten ▾“ mit Popover (dd-picker). #}
       <div class="dd-picker-wrap">
         <button type="button" class="btn" onclick="toggleDDPicker('wt-cols')">{{ _("Spalten ▾") }}</button>
@@ -60,8 +62,7 @@
         <button type="button" :aria-pressed="(mode === 'komplett').toString()" @click="setMode('komplett')">{{ _("Komplett") }}</button>
       </div>
     </div>
-    <p class="wt-hint" x-show="vorjahr" x-text="modeHint()"></p>
-    <p class="wt-hint wt-error" x-show="error" x-text="error" x-cloak></p>
+    <p class="hint hint-warn" x-show="error" x-text="error" x-cloak></p>
     <div class="tbl-wrap wt-table-wrap" x-ref="tableWrap">
       <table class="wt-table" x-ref="table"></table>
     </div>
@@ -69,7 +70,8 @@
 
   <div class="card wt-card" x-show="monthly" x-cloak>
     <div class="wt-controls">
-      <h2 class="wt-h2">{{ _("Monatsvergleich") }}</h2>
+      <h2 class="wt-h2">{{ _("Monatsvergleich") }} {{ hint_button(_("Monatsvergleich")) }}</h2>
+      {% call hint_body() %}<span x-text="monthlyNote()"></span>{% endcall %}
       {% if precip_modes %}
       <div class="wt-seg" role="group" aria-label="{{ _('Kennzahl') }}">
         <button type="button" :aria-pressed="(monthlyMetric === 'temperature').toString()" @click="setMonthlyMetric('temperature')">{{ _("Temperatur") }}</button>
@@ -80,7 +82,6 @@
     </div>
     <p class="wt-headline" x-show="monthlyMetric === 'temperature' && headline()" x-text="headline()"></p>
     <div class="wt-chart" x-ref="monthlyChart"></div>
-    <p class="wt-hint" x-text="monthlyNote()"></p>
   </div>
   </section>
 
@@ -107,7 +108,7 @@
         </template>
       </div>
       <div class="wt-chart wt-chart-tall" x-ref="precipChart"></div>
-      <p class="wt-hint wt-error" x-show="precipError" x-text="precipError" x-cloak></p>
+      <p class="hint hint-warn" x-show="precipError" x-text="precipError" x-cloak></p>
     </div>
   </section>
   {% endif %}
@@ -115,7 +116,8 @@
   <section x-show="tab === 'long'" x-cloak>
     <div class="card wt-card">
       <div class="wt-controls">
-        <h2 class="wt-h2">{{ _("Kenntage je Monat") }}</h2>
+        <h2 class="wt-h2">{{ _("Kenntage je Monat") }} {{ hint_button(_("Kenntage je Monat")) }}</h2>
+        {% call hint_body() %}<span x-text="kenntageNote()"></span>{% endcall %}
         <label class="wt-check">{{ _("Jahr") }}
           <select x-model="kenntageYear" @change="drawKenntage()">
             <template x-for="year in kenntageYears()" :key="year"><option :value="year" x-text="year"></option></template>
@@ -123,11 +125,11 @@
         </label>
       </div>
       <div class="wt-chart" x-ref="kenntageChart"></div>
-      <p class="wt-hint" x-text="kenntageNote()"></p>
     </div>
     <div class="card wt-card">
       <div class="wt-controls">
-        <h2 class="wt-h2">{{ _("Jahre im Vergleich, Tag für Tag") }}</h2>
+        <h2 class="wt-h2">{{ _("Jahre im Vergleich, Tag für Tag") }} {{ hint_button(_("Jahre im Vergleich, Tag für Tag")) }}</h2>
+        {% call hint_body() %}<span x-text="matrixNote()"></span>{% endcall %}
         <div class="wt-seg" role="group" aria-label="{{ _('Kennzahl') }}">
           <button type="button" :aria-pressed="(matrixMetric === 'avg').toString()" @click="setMatrixMetric('avg')">Ø</button>
           <button type="button" :aria-pressed="(matrixMetric === 'max').toString()" @click="setMatrixMetric('max')">{{ _("Max") }}</button>
@@ -138,11 +140,13 @@
         </div>
       </div>
       <div class="wt-chart wt-matrix" x-ref="matrixChart" :style="matrixHeight()"></div>
-      <p class="wt-hint" x-text="matrixNote()"></p>
-      <p class="wt-hint wt-error" x-show="matrixError" x-text="matrixError" x-cloak></p>
+      <p class="hint hint-warn" x-show="matrixError" x-text="matrixError" x-cloak></p>
     </div>
     <div class="card wt-card" x-show="longterm && longterm.records.length" x-cloak>
-      <h2 class="wt-h2">{{ _("Rekorde") }}</h2>
+      <div class="wt-controls">
+        <h2 class="wt-h2">{{ _("Rekorde") }} {{ hint_button(_("Rekorde")) }}</h2>
+        {% call hint_body() %}<span x-text="recordsNote()"></span>{% endcall %}
+      </div>
       <div class="wt-kpis">
         <template x-for="record in (longterm ? longterm.records : [])" :key="record.key">
           <div class="wt-tile">
@@ -153,10 +157,9 @@
           </div>
         </template>
       </div>
-      <p class="wt-hint" x-text="recordsNote()"></p>
     </div>
-    <p class="wt-hint" x-show="longterm && !longterm.records.length" x-cloak>{{ _("Rekorde erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte enthält.") }}</p>
-    <p class="wt-hint wt-error" x-show="longError" x-text="longError" x-cloak></p>
+    <p class="hint hint-status" x-show="longterm && !longterm.records.length" x-cloak>{{ _("Rekorde erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte enthält.") }}</p>
+    <p class="hint hint-warn" x-show="longError" x-text="longError" x-cloak></p>
   </section>
   {% if has_heating %}
   <section x-show="tab === 'heat'" x-cloak>
@@ -176,13 +179,15 @@
           <input type="text" class="wt-num" x-model="heatLimit" @input="drawHeat()" inputmode="decimal" size="3"> °C</label>
       </div>
       <div class="wt-chart wt-chart-tall" x-ref="heatChart"></div>
-      <p class="wt-hint" x-text="heatReadout()"></p>
-      <p class="wt-hint wt-error" x-show="heatError" x-text="heatError" x-cloak></p>
+      <p class="hint hint-status" x-text="heatReadout()"></p>
+      <p class="hint hint-warn" x-show="heatError" x-text="heatError" x-cloak></p>
     </div>
     <div class="card wt-card" x-show="heat" x-cloak>
-      <h2 class="wt-h2" x-text="t('Gradtagzahl {tag} und Verbrauch je Monat', {tag: heatTag()})"></h2>
+      <div class="wt-controls">
+        <h2 class="wt-h2"><span x-text="t('Gradtagzahl {tag} und Verbrauch je Monat', {tag: heatTag()})"></span> {{ hint_button(_("Gradtagzahl")) }}</h2>
+        {% call hint_body() %}{{ _("Die Gradtagzahl zählt je Tag die Raumtemperatur minus Tagesmittel, aber nur an Tagen unter der Heizgrenze. kWh je Gradtag ist der witterungsbereinigte Verbrauch: Er lässt kalte und milde Winter vergleichen. Die Heizperiode ist fest 1.10. bis 30.4., und nur abgeschlossene Tage mit ausreichend Temperaturwerten zählen.") }}{% endcall %}
+      </div>
       <div class="wt-table-wrap"><table class="wt-table wt-heat-table" x-ref="heatTable"></table></div>
-      <p class="wt-hint">{{ _("Die Gradtagzahl zählt je Tag die Raumtemperatur minus Tagesmittel, aber nur an Tagen unter der Heizgrenze. kWh je Gradtag ist der witterungsbereinigte Verbrauch: Er lässt kalte und milde Winter vergleichen. Die Heizperiode ist fest 1.10. bis 30.4., und nur abgeschlossene Tage mit ausreichend Temperaturwerten zählen.") }}</p>
     </div>
     <div class="card wt-card" x-show="heat && heat.counters.length > 1" x-cloak>
       <div class="wt-controls">
@@ -194,7 +199,7 @@
         </label>
       </div>
       <div class="wt-chart" x-ref="heatShareChart"></div>
-      <p class="wt-hint" x-text="heatShareText()"></p>
+      <p class="hint hint-status" x-text="heatShareText()"></p>
     </div>
   </section>
   {% endif %}

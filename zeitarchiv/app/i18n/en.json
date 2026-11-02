@@ -3404,7 +3404,8 @@
     "Rollen, Heizzähler, Schwellenwerte": "Roles, heating counters, thresholds",
     "Temperatur außen": "Outdoor temperature",
     "Ansichten des Wetterdashboards": "Weather dashboard views",
-    "Zeiträume im Vergleich": "Periods compared"
+    "Zeiträume im Vergleich": "Periods compared",
+    "Gradtagzahl": "Degree days"
   },
   "js": {
     "Ladestand": "State of charge",

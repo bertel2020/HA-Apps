@@ -55,6 +55,9 @@
   .wt-seg button{background:var(--surface);border:0;padding:5px 12px;font:inherit;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);cursor:pointer;}
   .wt-seg button + button{border-left:1px solid var(--border);}
   .wt-seg button[aria-pressed="true"]{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+  /* Hinweise (.hint) stehen direkt hinter der Überschrift, damit der Info-Knopf sie findet (hint-toggle.js);
+     in der umbrechenden Kopfzeile rutschen sie per order unter die Bedienelemente. */
+  .wt-controls > .hint{order:10;flex:1 1 100%;margin:2px 0 0;}
   .wt-hint{font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);background:var(--surface-alt);border-radius:8px;padding:8px 12px;margin:8px 0;}
   .wt-error{color:var(--danger);}
 
