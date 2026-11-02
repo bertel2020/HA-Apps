@@ -3412,7 +3412,9 @@
     "Energiezähler der Heizung für den Reiter „Heizen“, mit Gradtagzahl und Verbrauch je Zähler.": "Heating energy counters for the “Heating” tab, with degree days and consumption per counter.",
     "Ab wann ein Tag als Regentag zählt.": "When a day counts as a rain day.",
     "Messwerte": "Readings",
-    "Weitere Entitäten": "Other entities"
+    "Weitere Entitäten": "Other entities",
+    "Grundwerte": "Basic readings",
+    "Weitere Messwerte": "More readings"
   },
   "js": {
     "Ladestand": "State of charge",

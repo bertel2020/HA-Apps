@@ -105,6 +105,8 @@
     border-color:color-mix(in srgb, var(--chart-3) 30%, var(--border));}
   .wt-section-neutral{
     background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--ink-faint) 22%, transparent), color-mix(in srgb, var(--ink-faint) 8%, transparent) 70%), var(--surface);}
+  .wt-group-h{margin:14px 0 8px;font-size:calc(11.5px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-muted);}
+  .wt-group-h:first-of-type{margin-top:0;}
   .wt-roles{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;}
   .wt-role{--wt-accent:var(--chart-8);display:flex;flex-direction:column;gap:8px;min-width:0;padding:10px 12px 12px;
     background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--wt-accent);border-radius:12px;box-shadow:var(--shadow);}

@@ -59,8 +59,21 @@
   <section class="settings-section wt-section-messwerte">
   <h2 class="settings-section-title">{{ _("Messwerte") }}</h2>
   <p class="settings-section-description">{{ _("Ordnet jeder Rolle eine Entität zu. Nur die Außentemperatur ist Pflicht, alles andere bleibt leer, bis passende Sensoren vorhanden sind.") }}</p>
+  <h3 class="wt-group-h">{{ _("Grundwerte") }}</h3>
   <div class="wt-roles">
-    {% for key, label, types in roles %}
+    {% for key, label, types in roles if key not in ('gust', 'radiation') %}
+    <div class="wt-role" data-role="{{ key }}">
+      <div class="wt-role-head">
+        <span class="wt-role-name">{{ _(label) }}{% if key == 'temperature' %} <span class="wt-required">{{ _("Pflicht") }}</span>{% endif %}</span>
+      </div>
+      {{ role_field(key, key, config[key]) }}
+      {% if warnings[key] %}<p class="wt-warn">{{ warnings[key] }}</p>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  <h3 class="wt-group-h">{{ _("Weitere Messwerte") }}</h3>
+  <div class="wt-roles">
+    {% for key, label, types in roles if key in ('gust', 'radiation') %}
     <div class="wt-role" data-role="{{ key }}">
       <div class="wt-role-head">
         <span class="wt-role-name">{{ _(label) }}{% if key == 'temperature' %} <span class="wt-required">{{ _("Pflicht") }}</span>{% endif %}</span>
