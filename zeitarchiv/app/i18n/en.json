@@ -3403,7 +3403,8 @@
     "Wetterdashboard-Konfiguration": "Weather dashboard configuration",
     "Rollen, Heizzähler, Schwellenwerte": "Roles, heating counters, thresholds",
     "Temperatur außen": "Outdoor temperature",
-    "Ansichten des Wetterdashboards": "Weather dashboard views"
+    "Ansichten des Wetterdashboards": "Weather dashboard views",
+    "Zeiträume im Vergleich": "Periods compared"
   },
   "js": {
     "Ladestand": "State of charge",

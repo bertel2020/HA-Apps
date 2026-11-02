@@ -510,3 +510,11 @@ def test_tabs_use_the_app_standard_tab_row() -> None:
     text = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
     assert 'class="entity-tabs' in text and text.count('class="entity-tab"') >= 2
     assert "wt-tabs button" not in text
+
+
+def test_column_selection_is_a_popover_like_the_entity_list() -> None:
+    from _paths import TEMPLATES
+
+    text = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+    assert "toggleDDPicker('wt-cols')" in text and 'id="wt-cols-popover"' in text
+    assert 'class="wt-check"><input type="checkbox" :checked="columns.includes(key)"' not in text

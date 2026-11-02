@@ -35,6 +35,7 @@
   .wt-tile-sub{font-family:var(--mono);font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);font-variant-numeric:tabular-nums;}
 
   /* Steuerung über der Tabelle */
+  .wt-picker-sep{border-top:1px solid var(--border);margin-top:4px;padding-top:8px;}
   .wt-controls{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-bottom:6px;}
   .wt-cols{display:flex;flex-wrap:wrap;gap:4px 14px;}
   .wt-check{display:inline-flex;align-items:center;gap:6px;font-size:calc(13.5px * var(--font-scale, 1));cursor:pointer;}
@@ -51,6 +52,7 @@
   .wt-table th,.wt-table td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--border);vertical-align:top;}
   .wt-table thead th{font-weight:600;border-bottom:1px solid var(--border-strong);vertical-align:bottom;}
   .wt-table thead tr.wt-g th{text-align:center;font-size:calc(15px * var(--font-scale, 1));border-bottom:1px solid var(--border);}
+  .wt-table th:first-child,.wt-table td:first-child{min-width:112px;}
   .wt-table th:first-child,.wt-table td:first-child{text-align:left;position:sticky;left:0;background:var(--surface);z-index:1;}
   .wt-table tbody th{font-weight:500;color:var(--ink-muted);font-size:calc(14px * var(--font-scale, 1));}
   .wt-table .wt-sep{border-left:1px solid var(--border);}

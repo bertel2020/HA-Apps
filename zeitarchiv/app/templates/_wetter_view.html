@@ -44,12 +44,17 @@
 
   <div class="card wt-card">
     <div class="wt-controls">
-      <div class="wt-cols" role="group" aria-label="{{ _('Spalten') }}">
-        <template x-for="key in columnKeys" :key="key">
-          <label class="wt-check"><input type="checkbox" :checked="columns.includes(key)" @change="toggleColumn(key)"> <span x-text="columnName(key)"></span></label>
-        </template>
+      <h2 class="wt-h2">{{ _("Zeiträume im Vergleich") }}</h2>
+      {# Spaltenauswahl wie in der Entitätenliste: Knopf „Spalten ▾“ mit Popover (dd-picker). #}
+      <div class="dd-picker-wrap">
+        <button type="button" class="btn" onclick="toggleDDPicker('wt-cols')">{{ _("Spalten ▾") }}</button>
+        <div class="dd-picker-popover" id="wt-cols-popover">
+          <template x-for="key in columnKeys" :key="key">
+            <label class="dd-picker-row"><input type="checkbox" :checked="columns.includes(key)" @change="toggleColumn(key)"><span x-text="columnName(key)"></span></label>
+          </template>
+          <label class="dd-picker-row wt-picker-sep"><input type="checkbox" x-model="vorjahr" @change="saveAndLoad()"><span>{{ _("Mit Vorjahr") }}</span></label>
+        </div>
       </div>
-      <label class="wt-check"><input type="checkbox" x-model="vorjahr" @change="saveAndLoad()"> {{ _("Mit Vorjahr") }}</label>
       <div class="wt-seg" role="group" aria-label="{{ _('Vergleich mit dem Vorjahr') }}" x-show="vorjahr">
         <button type="button" :aria-pressed="(mode === 'bis_jetzt').toString()" @click="setMode('bis_jetzt')">{{ _("Bis jetzt") }}</button>
         <button type="button" :aria-pressed="(mode === 'komplett').toString()" @click="setMode('komplett')">{{ _("Komplett") }}</button>
