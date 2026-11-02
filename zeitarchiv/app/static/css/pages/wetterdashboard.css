@@ -123,16 +123,37 @@
   .wt-why{margin:0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);line-height:1.5;}
   .wt-badge{display:inline-block;margin-right:6px;padding:0 7px;border-radius:99px;background:var(--bg-accent);color:var(--text-accent);font-size:calc(11px * var(--font-scale, 1));font-weight:600;}
   .wt-badge.is-check{background:var(--bg-warning);color:var(--text-warning);}
-  .wt-roles{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;}
-  .wt-role{--wt-accent:var(--chart-8);display:flex;flex-direction:column;gap:8px;min-width:0;padding:10px 12px 12px;
-    background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--wt-accent);border-radius:12px;box-shadow:var(--shadow);}
-  .wt-role[data-role="temperature"]{--wt-accent:var(--chart-2);}
-  .wt-role[data-role="precip_mm"],.wt-role[data-role="precip_dur"]{--wt-accent:var(--chart-3);}
-  .wt-role[data-role="humidity"]{--wt-accent:var(--chart-6);}
-  .wt-role[data-role="pressure"]{--wt-accent:var(--chart-4);}
-  .wt-role[data-role="radiation"]{--wt-accent:var(--chart-7);}
-  .wt-role-name{font-weight:600;font-size:calc(14px * var(--font-scale, 1));}
-  .wt-required{font-size:calc(11px * var(--font-scale, 1));font-weight:600;color:var(--accent-line);margin-left:6px;text-transform:uppercase;letter-spacing:.05em;}
+  /* Rollenkacheln und Auswahl-Dialog wie im Energiedashboard (.edash-item-tile / .edash-item-dialog): Farbstreifen,
+     Symbol, Name, unten die zugeordnete Entität; ein Klick öffnet den Dialog mit dem Auswahlfeld. */
+  .wt-item-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:4px 0 22px;}
+  .wt-item-tile{--wt-accent:var(--chart-8);
+    all:unset;box-sizing:border-box;display:flex;flex-direction:column;cursor:pointer;height:132px;min-width:0;
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;
+    box-shadow:var(--shadow);transition:border-color .12s;}
+  .wt-item-tile:hover{border-color:var(--border-strong);}
+  .wt-item-tile:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px;}
+  .wt-item-tile[data-role="temperature"],.wt-item-dialog[data-role="temperature"]{--wt-accent:var(--chart-2);}
+  .wt-item-tile[data-role="precip_mm"],.wt-item-tile[data-role="precip_dur"],.wt-item-dialog[data-role="precip_mm"],.wt-item-dialog[data-role="precip_dur"]{--wt-accent:var(--chart-3);}
+  .wt-item-tile[data-role="humidity"],.wt-item-dialog[data-role="humidity"]{--wt-accent:var(--chart-6);}
+  .wt-item-tile[data-role="pressure"],.wt-item-dialog[data-role="pressure"]{--wt-accent:var(--chart-4);}
+  .wt-item-tile[data-role="radiation"],.wt-item-dialog[data-role="radiation"]{--wt-accent:var(--chart-7);}
+  .wt-item-accent{height:3px;flex:none;background:var(--wt-accent);}
+  .wt-item-body{padding:10px 12px 11px;display:flex;flex-direction:column;gap:6px;flex:1;min-height:0;}
+  .wt-item-head{display:flex;align-items:center;gap:7px;}
+  .wt-item-glyph{flex:none;width:18px;height:18px;display:flex;align-items:center;justify-content:center;}
+  .wt-item-name{font-weight:600;font-size:calc(13px * var(--font-scale, 1));flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;}
+  .wt-item-req{flex:none;font-size:calc(9px * var(--font-scale, 1));font-weight:700;letter-spacing:.03em;color:var(--accent-bar);background:var(--accent-bar-soft);padding:2px 5px;border-radius:4px;}
+  .wt-item-bottom{margin-top:auto;display:flex;flex-direction:column;gap:4px;align-items:flex-start;min-width:0;}
+  .wt-item-meta{max-width:100%;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .wt-item-meta:not(.is-empty){color:var(--ink-muted);}
+  .wt-item-meta.is-empty{font-style:italic;}
+  .wt-item-flag .wt-badge{margin-right:0;}
+  .wt-item-warn{max-width:100%;font-size:calc(11.5px * var(--font-scale, 1));color:var(--warning);text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .wt-item-dialog{width:min(440px, calc(100vw - 32px));--dialog-accent:var(--wt-accent, var(--border-strong));}
+  .wt-item-dialog::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;border-radius:14px 14px 0 0;background:var(--dialog-accent);}
+  .wt-dialog-fields{display:flex;flex-direction:column;gap:14px;}
+  .wt-dialog-fields .field{margin-bottom:0;}
+  .wt-dialog-footer{display:flex;justify-content:flex-end;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);}
   .wt-warn{margin:0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--warning);}
   /* Auswahlfelder über die volle Breite, lange Namen mit Auslassung (wie .edash-field-grid) */
   .wt-setup .dd-picker-wrap,.wt-setup .dd-picker-anchor{display:block;width:100%;}
@@ -156,7 +177,10 @@
     .wt-chart-tall{height:300px;}
     .wt-table th:first-child,.wt-table td:first-child{min-width:78px;max-width:100px;white-space:normal;}
     .wt-table th,.wt-table td{padding-left:8px;padding-right:8px;}
-    .wt-roles{grid-template-columns:1fr;}
+    .wt-item-grid{grid-template-columns:repeat(2,1fr);}
+    .wt-item-head{align-items:flex-start;flex-wrap:wrap;}
+    .wt-item-name{white-space:normal;overflow:visible;text-overflow:unset;overflow-wrap:break-word;line-height:1.2;flex:1 1 100%;font-size:calc(12.5px * var(--font-scale, 1));}
+    .wt-item-glyph{display:none;}
     .wt-extra{grid-template-columns:minmax(0,1fr) auto;}
     .wt-extra > .dd-picker-wrap{grid-column:1 / -1;}
   }

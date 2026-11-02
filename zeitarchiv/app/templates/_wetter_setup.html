@@ -1,9 +1,8 @@
 {% from "_hints.html" import hint_button, hint_body %}
 {# Rollen-Zuordnung des Wetterdashboards. Jede Rolle zeigt nur Entitäten des passenden Typs
    (Messwert, Zähler, Schalter), weil die Rolle die Aggregation festlegt. #}
-{% macro role_field(name, role, initial) %}
-<span class="dd-picker-wrap" x-data='entityPicker(optionsFor({{ role | tojson }}), {{ initial | tojson }}, null, null, null, false)' @click.outside="open = false"
-      @wetter-fill.window='if ($event.detail.role === {{ name | tojson }}) entityId = $event.detail.entity_id'>
+{% macro role_picker() %}
+<span class="dd-picker-wrap" x-data='entityPicker(optionsFor(activeRole), draftRole, (id) => { draftRole = id; }, null, null, false)' @click.outside="open = false">
   <span class="dd-picker-anchor">
     <button type="button" class="btn" :class="{'dd-picker-btn-clearable': entityId}"
             @click="toggleOpen($refs.search)"
@@ -19,9 +18,23 @@
         </div>
       </template>
     </div>
-    <input type="hidden" name="{{ name }}" :value="entityId">
+    <input type="hidden" name="role_draft" :value="entityId">
   </span>
 </span>
+{% endmacro %}
+
+{# Symbole der Rollenkacheln, im Stil der Kacheln des Energiedashboards (18 px, Rollenfarbe, leicht transparent). #}
+{% macro role_glyph(key) %}
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--wt-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" opacity=".85">
+  {% if key == 'temperature' %}<path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0Z"/>
+  {% elif key in ('precip_mm', 'humidity') %}<path d="M12 3s6 6.4 6 11a6 6 0 0 1-12 0c0-4.6 6-11 6-11Z"/>
+  {% elif key == 'precip_dur' %}<path d="M7 15a4 4 0 0 1 .6-7.9A5.5 5.5 0 0 1 18 9a3.5 3.5 0 0 1-.5 7"/><path d="M9 19l1-2M13 19l1-2"/>
+  {% elif key == 'pressure' %}<path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l4-5"/>
+  {% elif key == 'wind' %}<path d="M3 9h11a3 3 0 1 0-3-3M3 15h15a3 3 0 1 1-3 3M3 12h8"/>
+  {% elif key == 'gust' %}<path d="M3 8h10a3 3 0 1 0-3-3M3 14h14a3 3 0 1 1-3 3"/><path d="M3 11l4 0"/>
+  {% else %}<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>
+  {% endif %}
+</svg>
 {% endmacro %}
 
 <div class="settings-panel">
@@ -35,6 +48,9 @@
         entityOptions: {{ entity_options | tojson }},
         roleTypes: {{ role_types | tojson }},
         roleUnits: {{ role_units | tojson }},
+        roleVals: { {% for key, label, types in roles %}{{ key | tojson }}: {{ (config[key] or '') | tojson }}{{ ',' if not loop.last }}{% endfor %} },
+        roleLabels: { {% for key, label, types in roles %}{{ key | tojson }}: {{ _(label) | tojson }}{{ ',' if not loop.last }}{% endfor %} },
+        activeRole: null, draftRole: "",
         extras: {{ config.extra_temperatures | tojson }},
         heating: {{ config.heating | tojson }},
         counterOptions: {{ counter_options | tojson }},
@@ -48,18 +64,17 @@
             const data = await res.json();
             const hints = {}; let filled = 0, open = 0;
             for (const role of Object.keys(this.roleTypes)) {
-              const input = this.$root.querySelector(`input[name="${role}"]`);
-              if (!input || input.value) continue;
+              if (this.roleVals[role]) continue;
               const pick = data.roles[role];
               if (!pick) { open += 1; continue; }
-              window.dispatchEvent(new CustomEvent("wetter-fill", {detail: {role, entity_id: pick.entity_id}}));
+              this.roleVals[role] = pick.entity_id;
               hints[role] = pick; filled += 1;
             }
             if (!this.heating.length && data.heating.length) {
               this.heating = data.heating.map((h) => ({entity_id: h.entity_id, name: ""}));
               filled += 1;
             }
-            const taken = new Set(Object.keys(this.roleTypes).map((r) => (this.$root.querySelector(`input[name="${r}"]`) || {}).value).filter(Boolean));
+            const taken = new Set(Object.values(this.roleVals).filter(Boolean));
             const extras = (data.extras || []).filter((e) => !taken.has(e.entity_id));
             if (!this.extras.length && extras.length) {
               this.extras = extras.slice(0, this.maxExtra).map((e) => ({entity_id: e.entity_id, name: ""}));
@@ -76,6 +91,15 @@
             this.note = t("Vorschläge konnten nicht geladen werden.");
           }
           this.suggesting = false;
+        },
+        nameFor(id) {
+          const option = this.entityOptions.find((o) => o.entity_id === id);
+          return option ? option.label : id;
+        },
+        openRole(role) {
+          this.activeRole = role;
+          this.draftRole = this.roleVals[role] || "";
+          this.$nextTick(() => this.$refs.roleDlg.showModal());
         },
         hintText(role) {
           const pick = this.hints[role];
@@ -111,38 +135,57 @@
   <p class="settings-section-description">{{ _("Ordnet jeder Rolle eine Entität zu. Nur die Außentemperatur ist Pflicht, alles andere bleibt leer, bis passende Sensoren vorhanden sind.") }}</p>
   <p class="wt-note" x-show="note" x-text="note" x-cloak></p>
   <p class="wt-note wt-note-missing" x-show="missingNote" x-cloak><span x-text="missingNote"></span> <a href="selection?topic=wetter">{{ _("Zum Auswahl-Assistenten") }}</a></p>
-  <h3 class="wt-group-h">{{ _("Grundwerte") }}</h3>
-  <div class="wt-roles">
-    {% for key, label, types in roles if key not in ('gust', 'radiation') %}
-    <div class="wt-role" data-role="{{ key }}">
-      <div class="wt-role-head">
-        <span class="wt-role-name">{{ _(label) }}{% if key == 'temperature' %} <span class="wt-required">{{ _("Pflicht") }}</span>{% endif %}</span>
+  {% for group_title, in_group in ((_("Grundwerte"), ('temperature', 'precip_mm', 'precip_dur', 'humidity', 'pressure', 'wind')), (_("Weitere Messwerte"), ('gust', 'radiation'))) %}
+  <h3 class="wt-group-h">{{ group_title }}</h3>
+  <div class="wt-item-grid">
+    {% for key, label, types in roles if key in in_group %}
+    <button type="button" class="wt-item-tile" data-role="{{ key }}" @click="openRole('{{ key }}')">
+      <div class="wt-item-accent"></div>
+      <div class="wt-item-body">
+        <div class="wt-item-head">
+          <span class="wt-item-glyph">{{ role_glyph(key) }}</span>
+          <span class="wt-item-name">{{ _(label) }}</span>
+          {% if key == 'temperature' %}<span class="wt-item-req">{{ _("Pflicht") }}</span>{% endif %}
+        </div>
+        <div class="wt-item-bottom">
+          <span class="wt-item-meta" :class="{'is-empty': !roleVals['{{ key }}']}" x-text="roleVals['{{ key }}'] ? nameFor(roleVals['{{ key }}']) : t('Nicht zugeordnet')"></span>
+          <span class="wt-item-flag" x-show="hints['{{ key }}']" x-cloak>
+            <span class="wt-badge" :class="{'is-check': hints['{{ key }}'] && hints['{{ key }}'].confidence === 'check'}" x-text="hints['{{ key }}'] && hints['{{ key }}'].confidence === 'check' ? t('prüfen') : t('Vorschlag')"></span>
+          </span>
+          {% if warnings[key] %}<span class="wt-item-warn">{{ warnings[key] }}</span>{% endif %}
+        </div>
       </div>
-      {{ role_field(key, key, config[key]) }}
-      {% if warnings[key] %}<p class="wt-warn">{{ warnings[key] }}</p>{% endif %}
-      <p class="wt-why" x-show="hints['{{ key }}']" x-cloak>
-        <span class="wt-badge" :class="{'is-check': hints['{{ key }}'] && hints['{{ key }}'].confidence === 'check'}" x-text="hints['{{ key }}'] && hints['{{ key }}'].confidence === 'check' ? t('prüfen') : t('Vorschlag')"></span>
-        <span x-text="hintText('{{ key }}')"></span>
-      </p>
-    </div>
+    </button>
     {% endfor %}
   </div>
-  <h3 class="wt-group-h">{{ _("Weitere Messwerte") }}</h3>
-  <div class="wt-roles">
-    {% for key, label, types in roles if key in ('gust', 'radiation') %}
-    <div class="wt-role" data-role="{{ key }}">
-      <div class="wt-role-head">
-        <span class="wt-role-name">{{ _(label) }}{% if key == 'temperature' %} <span class="wt-required">{{ _("Pflicht") }}</span>{% endif %}</span>
-      </div>
-      {{ role_field(key, key, config[key]) }}
-      {% if warnings[key] %}<p class="wt-warn">{{ warnings[key] }}</p>{% endif %}
-      <p class="wt-why" x-show="hints['{{ key }}']" x-cloak>
-        <span class="wt-badge" :class="{'is-check': hints['{{ key }}'] && hints['{{ key }}'].confidence === 'check'}" x-text="hints['{{ key }}'] && hints['{{ key }}'].confidence === 'check' ? t('prüfen') : t('Vorschlag')"></span>
-        <span x-text="hintText('{{ key }}')"></span>
-      </p>
+  {% endfor %}
+
+  <dialog class="detail-dialog wt-item-dialog" x-ref="roleDlg" :data-role="activeRole" @click="if ($event.target === $el) $el.close()" @close="activeRole = null">
+    <div class="detail-dialog-header">
+      <h2 x-text="activeRole ? roleLabels[activeRole] : ''"></h2>
+      <button type="button" class="btn" @click="$refs.roleDlg.close()" aria-label="{{ _('Schließen') }}">✕</button>
     </div>
-    {% endfor %}
-  </div>
+    <template x-if="activeRole">
+      <div>
+        <div class="wt-dialog-fields">
+          <div class="field">
+            <label>{{ _("Entität") }}</label>
+            {{ role_picker() }}
+          </div>
+          <p class="wt-why" x-show="hints[activeRole]" x-cloak>
+            <span class="wt-badge" :class="{'is-check': hints[activeRole] && hints[activeRole].confidence === 'check'}" x-text="hints[activeRole] && hints[activeRole].confidence === 'check' ? t('prüfen') : t('Vorschlag')"></span>
+            <span x-text="hintText(activeRole)"></span>
+          </p>
+        </div>
+        <div class="wt-dialog-footer">
+          <button type="button" class="btn primary" @click="roleVals[activeRole] = draftRole; $refs.roleDlg.close()">{{ _("Übernehmen") }}</button>
+        </div>
+      </div>
+    </template>
+  </dialog>
+  {# Die gesendeten Felder: immer im DOM und an den übernommenen Stand gebunden (das Dialogfeld steckt in einem
+     <template x-if> und ist nur „role_draft“, das der Server ignoriert). #}
+  {% for key, label, types in roles %}<input type="hidden" name="{{ key }}" :value="roleVals['{{ key }}']">{% endfor %}
   </section>
 
   <section class="settings-section wt-section-neutral">

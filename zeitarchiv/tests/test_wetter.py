@@ -773,7 +773,7 @@ def test_setup_suggestions_route_and_button(client) -> None:
     data = client.get("/wetterdashboard/setup/vorschlaege").json()
     assert set(data) == {"roles", "heating", "extras", "missing", "has_catalog"}
     setup = client.get("/wetterdashboard/setup").text
-    assert "suggest()" in setup and "wetter-fill" in setup and "wetterdashboard/setup/vorschlaege" in setup
+    assert "suggest()" in setup and "roleVals" in setup and "wetterdashboard/setup/vorschlaege" in setup
 
 
 def test_hidden_blocks_leave_the_table_and_are_saved_from_the_setup_form(service, client) -> None:
