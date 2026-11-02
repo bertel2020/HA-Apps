@@ -78,6 +78,11 @@ def _month_str(year: int, month: int) -> str:
     return f"{year:04d}-{month:02d}"
 
 
+def segment_name(year: int, month: int) -> str:
+    """Dateiname des Monatssegments in einem Rollup-Dataset (siehe _append_table())."""
+    return f"{_month_str(year, month)}.parquet"
+
+
 def last_value_before_month(data_dir: Path, entity_id: str, year: int, month: int) -> float | None:
     """Last raw value of the most recent archive month file before ``year-month``,
     the reference value for the counter delta at the start of the month (concept

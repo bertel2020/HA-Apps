@@ -123,6 +123,18 @@ scheduler with one entity per 30-second tick
 (`energiedashboard_routes.process_pending_hourly_backfill()`, uses
 `rollup.rebuild_entity_rollups(..., hourly_rollup=True)`).
 
+**Daily series (`query.query_daily_series()`).** For analyses over many years
+(weather dashboard) this function condenses the fine rollup level into daily
+values per local calendar day: mean, min and max for measurements, the daily sum
+for counters, the on-time for switches. A measurement day only counts as covered
+(`covered`) with at least 18 hours that have values. Complete, finished calendar
+years are held in a memory cache; on every call it checks name, modification time
+and size of the twelve monthly segments and recomputes as soon as one of them was
+rewritten (deleting marked values, recomputation, import, type change). A year
+whose December has not been rotated yet is never cached. Ten years of hourly data
+(about 87,600 rows) cost roughly 0.4 s cold and about 0.06 s from the cache
+(measured on a development machine).
+
 ## Soft delete and purge
 
 Cleanup (marking outliers/gaps/duplicates/repeats) is **never destructive**:

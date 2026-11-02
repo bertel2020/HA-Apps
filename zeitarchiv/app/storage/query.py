@@ -17,6 +17,9 @@ from __future__ import annotations
 
 from ..i18n import tr
 
+import threading
+from collections import OrderedDict
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -741,6 +744,171 @@ def query_hourly_counter_series(
         # Eine Stunde ohne Messwert ist kein Wert 0 (bei einem Preis wäre das gratis).
         return {row.bucket_start: row.value for row in completed + live if row.value is not None}
     return {row.bucket_start: (row.value or 0.0) for row in completed + live}
+
+
+#: Ein Tag mit Messwerten (Standard, Schalter) gilt nur bei so vielen Stunden mit Werten als belegt.
+#: Sonst entstünden Frosttage, Rekorde und Tagesmittel aus Lückentagen (ROADMAP 1.43).
+DAILY_MIN_HOURS = 18
+
+
+@dataclass(frozen=True)
+class DailyPoint:
+    day_start: float  # Unix-Timestamp (UTC) von Mitternacht des lokalen Tages
+    value: float | None  # Standard: Ø der Stunden-Ø; Zähler: Tagessumme; Schalter: Einschaltdauer in Sekunden
+    min_value: float | None = None  # nur Standard: kleinster Rohwert des Tages
+    max_value: float | None = None  # nur Standard: größter Rohwert des Tages
+    hours: int = 24  # Stunden mit Werten (Standard, Schalter); beim Zähler nicht ermittelt
+    covered: bool = True  # genug Stunden mit Werten (>= DAILY_MIN_HOURS); beim Zähler immer True
+
+
+def _daily_points(
+    data_dir: Path,
+    index: Index,
+    entity_id: str,
+    aggregation_type: str,
+    window_start: datetime,
+    window_end: datetime,
+    tz: ZoneInfo,
+    now_local: datetime,
+    read_cache: QueryReadCache | None = None,
+) -> list[DailyPoint]:
+    """Tageswerte einer Entität über ein Fenster, ohne Cache (siehe query_daily_series()).
+
+    Messwerte kommen aus den Stundenzeilen und werden je lokalem Kalendertag verdichtet: Ø ist das
+    ungewichtete Mittel der Stunden-Ø, Min/Max sind die echten Rohwert-Extreme. Zähler kommen
+    direkt aus ``tag.parquet`` (plus laufender Monat), Schalter liefern die Einschaltdauer je Tag.
+    Tage ohne jede Zeile fehlen in der Antwort; Tage mit zu wenigen Stunden sind ``covered=False``
+    und gehören nicht in Kenntage oder Rekorde. Zustands-Entitäten haben keine Tagesreihe (leer).
+    Der laufende Tag ist enthalten, aber meist unvollständig: der Aufrufer entscheidet.
+    """
+    rows = _query_completed_plus_live_fine(
+        data_dir, index, entity_id, aggregation_type, "line",
+        window_start, window_end, tz, now_local, read_cache,
+    )
+    if aggregation_type == "counter":
+        return [DailyPoint(day_start=row.bucket_start, value=row.value or 0.0) for row in rows]
+
+    # Ein Durchlauf: der Tagesschlüssel (Zeitzonen-Umrechnung) ist der teure Teil bei 87.600 Zeilen
+    # je zehn Jahre, deshalb nicht zweimal berechnen (einmal zum Zählen, einmal in der Verdichtung).
+    key_fn = rollup.named_bucket_key(tz, "tag")
+    is_switch = aggregation_type == "switch"
+    grouped: dict[float, list[rollup.FineRow]] = {}
+    for row in rows:
+        if (row.on_seconds is None) if is_switch else (row.value is None):
+            continue
+        grouped.setdefault(key_fn(row.bucket_start).timestamp(), []).append(row)
+    points: list[DailyPoint] = []
+    for day_start in sorted(grouped):
+        day_rows = grouped[day_start]
+        hours = len(day_rows)
+        if is_switch:
+            points.append(DailyPoint(
+                day_start=day_start, value=sum(row.on_seconds for row in day_rows),
+                hours=hours, covered=hours >= DAILY_MIN_HOURS,
+            ))
+            continue
+        minima = [row.min_value for row in day_rows if row.min_value is not None]
+        maxima = [row.max_value for row in day_rows if row.max_value is not None]
+        points.append(DailyPoint(
+            day_start=day_start, value=sum(row.value for row in day_rows) / hours,
+            min_value=min(minima) if minima else None, max_value=max(maxima) if maxima else None,
+            hours=hours, covered=hours >= DAILY_MIN_HOURS,
+        ))
+    return points
+
+
+#: Fertige Kalenderjahre je (Datenverzeichnis, Entität, Jahr, Zeitzone) -> (Fingerabdruck der
+#: Rollup-Segmente, Tagesreihe). Nur im Speicher: nach einem Neustart zahlt der erste Aufruf einmal.
+_DAILY_YEAR_CACHE: "OrderedDict[tuple, tuple[tuple, list[DailyPoint]]]" = OrderedDict()
+_DAILY_YEAR_CACHE_LOCK = threading.Lock()
+_DAILY_YEAR_CACHE_MAX = 256  # je Eintrag etwa 366 Tage; 256 Einträge sind weit unter 20 MB
+
+
+def _rollup_year_fingerprint(
+    data_dir: Path, entity_id: str, aggregation_type: str, year: int
+) -> tuple | None:
+    """Name, Änderungszeit und Größe der zwölf Monatssegmente des feinen Rollups eines Jahres.
+
+    Jede Änderung an diesen Dateien (Löschen markierter Werte, Neuberechnung, Import, Typwechsel)
+    schreibt ein Segment neu und ändert damit den Fingerabdruck; der Cache braucht deshalb keine
+    Haken in diesen Pfaden. None = nicht zwischenspeichern: Der Dezember muss als Segment vorliegen,
+    sonst könnte er noch im Hot Buffer stehen (Rotation steht aus), und ein einzelnes
+    Legacy-Rollup ohne Segmente hat keinen Jahresausschnitt, den man prüfen könnte."""
+    directory = rollup.rollup_path(data_dir, entity_id, FINE_LEVEL[aggregation_type])
+    if not directory.is_dir():
+        return None
+    names = [rollup.segment_name(year, month) for month in range(1, 13)] + ["legacy.parquet"]
+    parts = []
+    for name in names:
+        try:
+            info = (directory / name).stat()
+        except FileNotFoundError:
+            continue
+        parts.append((name, info.st_mtime_ns, info.st_size))
+    if not any(name == rollup.segment_name(year, 12) for name, _mtime, _size in parts):
+        return None
+    return tuple(parts)
+
+
+def query_daily_series(
+    data_dir: Path,
+    index: Index,
+    entity_id: str,
+    window_start: datetime,
+    window_end: datetime,
+    tz: ZoneInfo,
+    now_local: datetime,
+    read_cache: QueryReadCache | None = None,
+) -> list[DailyPoint]:
+    """Tageswerte einer Entität über ein beliebig langes Fenster (Wetterdashboard, ROADMAP 1.43).
+
+    Messwerte kommen aus den Stundenzeilen und werden je lokalem Kalendertag verdichtet: Ø ist das
+    ungewichtete Mittel der Stunden-Ø, Min/Max sind die echten Rohwert-Extreme. Zähler kommen
+    direkt aus ``tag.parquet`` (plus laufender Monat), Schalter liefern die Einschaltdauer je Tag.
+    Tage ohne jede Zeile fehlen in der Antwort; Tage mit zu wenigen Stunden sind ``covered=False``
+    und gehören nicht in Kenntage oder Rekorde. Zustands-Entitäten haben keine Tagesreihe (leer).
+    Der laufende Tag ist enthalten, aber meist unvollständig: der Aufrufer entscheidet.
+
+    Das Fenster wird je Kalenderjahr gerechnet. Ein vollständig enthaltenes, abgeschlossenes Jahr
+    wird im Speicher gehalten, solange der Fingerabdruck seiner Rollup-Segmente gleich bleibt
+    (_rollup_year_fingerprint()); alles andere wird jedes Mal frisch gelesen.
+    """
+    entity = index.get_entity(entity_id)
+    if entity is None or entity["aggregation_type"] == STATE_TYPE or window_end <= window_start:
+        return []
+    aggregation_type = entity["aggregation_type"]
+    points: list[DailyPoint] = []
+    for year in range(window_start.year, window_end.year + 1):
+        year_start = datetime(year, 1, 1, tzinfo=tz)
+        year_end = datetime(year + 1, 1, 1, tzinfo=tz)
+        segment_start, segment_end = max(window_start, year_start), min(window_end, year_end)
+        if segment_end <= segment_start:
+            continue
+        fingerprint = None
+        if segment_start == year_start and segment_end == year_end and year < now_local.year:
+            fingerprint = _rollup_year_fingerprint(data_dir, entity_id, aggregation_type, year)
+        if fingerprint is None:
+            points.extend(_daily_points(
+                data_dir, index, entity_id, aggregation_type, segment_start, segment_end, tz, now_local, read_cache,
+            ))
+            continue
+        key = (str(data_dir), entity_id, year, str(tz))
+        with _DAILY_YEAR_CACHE_LOCK:
+            cached = _DAILY_YEAR_CACHE.get(key)
+            if cached is not None and cached[0] == fingerprint:
+                _DAILY_YEAR_CACHE.move_to_end(key)
+                points.extend(cached[1])
+                continue
+        year_points = _daily_points(
+            data_dir, index, entity_id, aggregation_type, segment_start, segment_end, tz, now_local, read_cache,
+        )
+        with _DAILY_YEAR_CACHE_LOCK:
+            _DAILY_YEAR_CACHE[key] = (fingerprint, year_points)
+            _DAILY_YEAR_CACHE.move_to_end(key)
+            while len(_DAILY_YEAR_CACHE) > _DAILY_YEAR_CACHE_MAX:
+                _DAILY_YEAR_CACHE.popitem(last=False)
+        points.extend(year_points)
+    return points
 
 
 def _month_live_row(

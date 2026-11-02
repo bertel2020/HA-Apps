@@ -135,6 +135,18 @@ Entität je 30-Sekunden-Tick abgearbeitet
 (`energiedashboard_routes.process_pending_hourly_backfill()`, nutzt
 `rollup.rebuild_entity_rollups(..., hourly_rollup=True)`).
 
+**Tagesreihe (`query.query_daily_series()`).** Für Auswertungen über viele Jahre
+(Wetterdashboard) verdichtet diese Funktion die feine Rollup-Stufe zu Tageswerten
+je lokalem Kalendertag: bei Messwerten Ø, Min und Max, bei Zählern die
+Tagessumme, bei Schaltern die Einschaltdauer. Ein Messwert-Tag gilt nur bei
+mindestens 18 Stunden mit Werten als belegt (`covered`). Vollständige,
+abgeschlossene Kalenderjahre hält ein Speicher-Cache; er prüft bei jedem Aufruf
+Name, Änderungszeit und Größe der zwölf Monatssegmente und rechnet neu, sobald
+eines davon neu geschrieben wurde (Löschen markierter Werte, Neuberechnung,
+Import, Typwechsel). Ein Jahr, dessen Dezember noch nicht rotiert ist, wird nie
+zwischengespeichert. Zehn Jahre Stundendaten (rund 87.600 Zeilen) kosten kalt
+etwa 0,4 s, aus dem Cache etwa 0,06 s (Messung auf einem Entwicklungsrechner).
+
 ## Soft-Delete und Purge
 
 Bereinigung (Ausreißer/Lücken/Duplikate/Wiederholungen markieren) ist
