@@ -54,7 +54,7 @@
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Zeiträume im Vergleich") }} {{ hint_button(_("Zeiträume im Vergleich")) }}</h2>
       {% call hint_body() %}<span x-show="vorjahr" x-text="modeHint()"></span>{% endcall %}
-      {# Stichtag-Leiste des App-Standards (wie bei den Dashboards: ‹ Datum ›, Kalender, Schrittweite, „Heute“). Der Alpine-Store
+      {# Stichtag-Leiste des App-Standards (wie bei den Dashboards: ‹ Datum ›, Kalender, „Heute“; ohne Schrittweiten-Knöpfe). Der Alpine-Store
          dashStichtag hält den Tag und stellt ihn als ?date=… in die Adresse; wetter.js lädt die Tabelle bei „dashboard-stichtag“ neu. #}
       {{ period_nav(true) }}
       {# Spaltenauswahl wie in der Entitätenliste: Knopf „Spalten ▾“ mit Popover (dd-picker). #}
