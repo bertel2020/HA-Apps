@@ -502,3 +502,11 @@ def test_radiation_has_no_minimum_row_in_the_script() -> None:
 
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "row.key === 'radiation'" in script
+
+
+def test_tabs_use_the_app_standard_tab_row() -> None:
+    from _paths import TEMPLATES
+
+    text = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+    assert 'class="entity-tabs' in text and text.count('class="entity-tab"') >= 2
+    assert "wt-tabs button" not in text

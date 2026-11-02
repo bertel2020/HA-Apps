@@ -6,9 +6,8 @@
   .wt-setup-cta p{margin:0;color:var(--ink-muted);max-width:60ch;}
 
   /* Reiter */
-  .wt-tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto;}
-  .wt-tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:8px 14px;font:inherit;font-size:calc(14px * var(--font-scale, 1));color:var(--ink-muted);cursor:pointer;white-space:nowrap;margin-bottom:-1px;}
-  .wt-tabs button[aria-selected="true"]{color:var(--ink);font-weight:600;border-bottom-color:var(--accent-line);}
+  /* Die Reiterzeile selbst kommt aus app.css (.entity-tabs); hier nur, was eine Schaltfläche statt eines Links braucht. */
+  button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
   .wt-card + .wt-card{margin-top:16px;}
   .wt-h2{font-size:calc(16px * var(--font-scale, 1));margin:0;flex:1 1 auto;}
   .wt-headline{font-size:calc(15px * var(--font-scale, 1));margin:8px 0 12px;color:var(--ink);}

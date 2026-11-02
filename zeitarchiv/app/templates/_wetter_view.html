@@ -18,16 +18,18 @@
   </div>
   <p class="sub">{{ _("Aktuelle Werte und der Vergleich mit dem Vorjahr.") }}</p>
 
-  <div class="wt-tabs" role="tablist">
-    <button type="button" role="tab" :aria-selected="(tab === 'overview').toString()" @click="showTab('overview')">{{ _("Übersicht") }}</button>
+  {# Reiterzeile des App-Standards (.entity-tabs in app.css, wie bei Entitäten und Entitätsseiten); hier
+     Schaltflächen statt Links, weil die Reiter nur umschalten und die Seite nicht wechseln. #}
+  <nav class="entity-tabs wt-tabs" role="tablist" aria-label="{{ _('Ansichten des Wetterdashboards') }}">
+    <button type="button" role="tab" class="entity-tab" :class="{'is-active': tab === 'overview'}" :aria-selected="(tab === 'overview').toString()" @click="showTab('overview')">{{ _("Übersicht") }}</button>
     {% if precip_modes %}
-    <button type="button" role="tab" :aria-selected="(tab === 'precip').toString()" @click="showTab('precip')">{{ _("Niederschlag") }}</button>
+    <button type="button" role="tab" class="entity-tab" :class="{'is-active': tab === 'precip'}" :aria-selected="(tab === 'precip').toString()" @click="showTab('precip')">{{ _("Niederschlag") }}</button>
     {% endif %}
-    <button type="button" role="tab" :aria-selected="(tab === 'long').toString()" @click="showTab('long')">{{ _("Langzeit") }}</button>
+    <button type="button" role="tab" class="entity-tab" :class="{'is-active': tab === 'long'}" :aria-selected="(tab === 'long').toString()" @click="showTab('long')">{{ _("Langzeit") }}</button>
     {% if has_heating %}
-    <button type="button" role="tab" :aria-selected="(tab === 'heat').toString()" @click="showTab('heat')">{{ _("Heizen") }}</button>
+    <button type="button" role="tab" class="entity-tab" :class="{'is-active': tab === 'heat'}" :aria-selected="(tab === 'heat').toString()" @click="showTab('heat')">{{ _("Heizen") }}</button>
     {% endif %}
-  </div>
+  </nav>
 
   <section x-show="tab === 'overview'">
   <div class="wt-tiles" x-show="tiles.length" x-cloak>
