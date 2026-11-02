@@ -26,7 +26,8 @@
   kWh je Gradtag je Monat und Heizperiode, und der Anteil je Zähler.
   Eingeschaltet wird die Seite über eine Kachel auf der Dashboard-Übersicht,
   danach steht sie im Menü Dashboards unter dem Energiedashboard. Backups
-  sichern die Zuordnung mit, der selektive Restore stellt sie wieder her. Die
+  sichern die Zuordnung mit, der selektive Restore stellt sie wieder her, und
+  unter Einstellungen → Darstellung lässt sich die Seite als Startseite wählen. Die
   Demo-Daten bringen dafür Wetter-Entitäten und Heizzähler mit (nach „Neu
   erzeugen“).
 
@@ -104,7 +105,8 @@
   month and heating season, and the share per counter. The page is switched on
   with a tile on the dashboards overview and then sits in the Dashboards menu
   below the energy dashboard. Backups include the assignment, and the selective
-  restore brings it back. The demo data brings weather entities and heating
+  restore brings it back, and under Settings → Appearance the page can be chosen
+  as the start page. The demo data brings weather entities and heating
   counters for it (after "Regenerate").
 
 - **Entities, categories**: Entities can be grouped by topic, for example heat

@@ -221,8 +221,8 @@ Kachel-Ansicht wie unter **Dashboards**, nur fest der Übersicht zugeordnet
 und nicht umbenennbar oder löschbar. Es lässt sich wie jedes andere
 Dashboard mit Kacheln bestücken, umsortieren und fixieren (siehe unten).
 
-Was beim Öffnen von Zeitarchiv über die HA-Sidebar erscheint (Übersicht
-oder direkt das Energiedashboard), legt **Einstellungen → Darstellung →
+Was beim Öffnen von Zeitarchiv über die HA-Sidebar erscheint (Übersicht,
+Energiedashboard oder Wetterdashboard), legt **Einstellungen → Darstellung →
 Startseite** fest. Der „Übersicht"-Eintrag in der Kopfzeile führt davon
 unabhängig immer zur Übersicht selbst.
 
@@ -322,7 +322,8 @@ etwas kommt; er erscheint nur, wenn es tatsächlich etwas zu scrollen gibt.
   Standard-Dashboard trägt einen farbigen Kopfstreifen zur leichteren
   Wiedererkennung (dieselbe Idee wie bei der Energiedashboard-Kachel oben in
   der Liste); steht **Einstellungen → Darstellung → Startseite** auf
-  Energiedashboard, zeigt dessen Kachel zusätzlich ein kleines Haus-Symbol.
+  Energiedashboard oder Wetterdashboard, zeigt dessen Kachel zusätzlich ein kleines
+  Haus-Symbol.
 - Ein Klick auf die Kachel öffnet das Dashboard; „Bearbeiten“, „Duplizieren“,
   „Als Standard festlegen“ und „Löschen“ stehen im Kachelmenü (⋮).
   Suchfeld, Sortierung und der Schalter „Favoriten zuerst“ über den Kacheln
@@ -2834,7 +2835,7 @@ will, lädt es vorher herunter.
 
 | Bereich | Enthält |
 | --- | --- |
-| **Darstellung** | Sprache (Automatisch/Deutsch/English — Standard Deutsch; „Automatisch“ folgt der Browsersprache; nicht übersetzte Stellen erscheinen auf Deutsch), Zahlen- und Datumsformat (Automatisch/Deutsch/English UK/English US — „Automatisch“ folgt dem Browser: `en-GB` → `1,234.5` und `07/10/2026`, `en-US` → `10/07/2026` mit 12-Stunden-Uhr, `de-*` → `1.234,5` und `07.10.2026`; unabhängig von der Sprache; CSV-Exporte und Dateinamen bleiben unverändert), Währung (Automatisch/EUR/GBP/USD/CHF — „Automatisch“ übernimmt sie aus Home Assistant, sonst Euro; Beträge werden nicht umgerechnet, nach einem Wechsel die Preise neu eintragen), Startseite (Übersicht/Energiedashboard), Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
+| **Darstellung** | Sprache (Automatisch/Deutsch/English — Standard Deutsch; „Automatisch“ folgt der Browsersprache; nicht übersetzte Stellen erscheinen auf Deutsch), Zahlen- und Datumsformat (Automatisch/Deutsch/English UK/English US — „Automatisch“ folgt dem Browser: `en-GB` → `1,234.5` und `07/10/2026`, `en-US` → `10/07/2026` mit 12-Stunden-Uhr, `de-*` → `1.234,5` und `07.10.2026`; unabhängig von der Sprache; CSV-Exporte und Dateinamen bleiben unverändert), Währung (Automatisch/EUR/GBP/USD/CHF — „Automatisch“ übernimmt sie aus Home Assistant, sonst Euro; Beträge werden nicht umgerechnet, nach einem Wechsel die Preise neu eintragen), Startseite (Übersicht/Energiedashboard/Wetterdashboard), Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
 | **Archivierung** | Standardwerte für neu erkannte Entitäten (wirken nie rückwirkend auf bestehende Entitäten): Auflösung, Aufbewahrung, Nachkommastellen, Wertänderungsfilter, Lücken-/Ausreißer-Erkennung |
 | **Meldungen** | Tipp-Anzeige an-/ausschalten und Dialog mit allen Tipps (siehe [Housekeeping](#housekeeping)); Übersicht stummgeschalteter Systemmeldungen mit verbleibender Dauer, einzeln vorzeitig wieder aktivierbar |
 | **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start, verbundene Integrationsversion mit Zeitpunkt "zuletzt gesehen" (Hinweis bei veralteter oder neu verfügbarer Version) |

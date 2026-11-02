@@ -447,3 +447,26 @@ def test_heating_setup_and_route_through_the_app(client) -> None:
     assert answer.status_code == 200 and answer.json()["room"] == 21.5 and answer.json()["counters"][0]["name"] == "WP"
     assert "wetter-heating.js" in client.get("/wetterdashboard").text
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
+def test_the_weather_dashboard_can_be_the_start_page(client) -> None:
+    from app.main import STARTSEITE_LABELS, index
+
+    assert "wetterdashboard" in STARTSEITE_LABELS
+    previous = index.get_setting("startseite", "uebersicht")
+    try:
+        index.set_setting("startseite", "wetterdashboard")
+        answer = client.get("/", follow_redirects=False)
+        assert answer.status_code == 307 and answer.headers["location"].endswith("/wetterdashboard")
+        index.set_setting("startseite", "energiedashboard")
+        assert client.get("/", follow_redirects=False).headers["location"].endswith("/energiedashboard")
+        index.set_setting("startseite", "unsinn")  # unbekannter Wert: zurück auf die Übersicht
+        assert client.get("/", follow_redirects=False).headers["location"].endswith("/uebersicht")
+        index.set_setting("startseite", "wetterdashboard")
+        assert 'edash-pin-home-badge' in client.get("/dashboards").text
+        index.set_setting("startseite", "uebersicht")
+        assert client.post("/settings/darstellung", data={"startseite": "wetterdashboard"}).status_code == 200
+        assert index.get_setting("startseite") == "wetterdashboard"
+        assert client.post("/settings/darstellung", data={"startseite": "unsinn"}).status_code == 400
+    finally:
+        index.set_setting("startseite", previous)

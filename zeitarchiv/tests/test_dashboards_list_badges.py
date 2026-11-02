@@ -33,5 +33,9 @@ def test_home_badge_only_rendered_when_energiedashboard_is_the_start_page() -> N
     assert 'data-tooltip="Aktuelle Startseite"' in TEMPLATE
 
 
+def test_home_badge_is_also_rendered_for_the_weather_dashboard_card() -> None:
+    assert "{% if startseite == 'wetterdashboard' %}" in TEMPLATE
+
+
 def test_dashboards_list_route_passes_startseite_into_the_context() -> None:
     assert '"startseite": index.get_setting("startseite", "uebersicht"),' in MAIN_SOURCE

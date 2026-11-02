@@ -206,8 +206,8 @@ under **Dashboards**, just permanently assigned to the overview and not
 renamable or deletable. Like any other dashboard it can be populated with
 tiles, rearranged and locked (see below).
 
-What appears when opening Zeitarchiv via the HA sidebar (the overview or the
-energy dashboard directly) is determined by **Settings → Appearance → Start
+What appears when opening Zeitarchiv via the HA sidebar (the overview, the
+energy dashboard or the weather dashboard) is determined by **Settings → Appearance → Start
 page**. The "Overview" entry in the header always leads to the overview
 itself, independently of that.
 
@@ -299,8 +299,8 @@ something to scroll.
   upper limit on the number of dashboards. The default dashboard carries a
   colored header stripe for easier recognition (the same idea as with the
   energy dashboard tile at the top of the list); if **Settings → Appearance →
-  Start page** is set to Energy dashboard, its tile additionally shows a small
-  house icon.
+  Start page** is set to Energy dashboard or Weather dashboard, its tile
+  additionally shows a small house icon.
 - Clicking the tile opens the dashboard; "Edit", "Duplicate", "Set as default"
   and "Delete" are in the tile menu (⋮). Search field, sorting and the
   "Favorites first" switch above the tiles work as with charts and tables (see
@@ -2625,7 +2625,7 @@ If you want to look something up later, download it first.
 
 | Area | Contains |
 | --- | --- |
-| **Appearance** | Language (Automatic/German/English — default German; "Automatic" follows the browser language; untranslated places appear in German), number and date format (Automatic/German/English UK/English US — "Automatic" follows the browser: `en-GB` → `1,234.5` and `07/10/2026`, `en-US` → `10/07/2026` with a 12-hour clock, `de-*` → `1.234,5` and `07.10.2026`; independent of the language; CSV exports and file names stay unchanged), currency (Automatic/EUR/GBP/USD/CHF — "Automatic" takes it from Home Assistant, otherwise euro; amounts are not converted, enter your prices again after changing it), start page (overview/energy dashboard), color scheme (Zeitarchiv/Home Assistant/Modern), light/dark/automatic, font size, dashboard tile fade animation, starting values for the chart options of the entity history view |
+| **Appearance** | Language (Automatic/German/English — default German; "Automatic" follows the browser language; untranslated places appear in German), number and date format (Automatic/German/English UK/English US — "Automatic" follows the browser: `en-GB` → `1,234.5` and `07/10/2026`, `en-US` → `10/07/2026` with a 12-hour clock, `de-*` → `1.234,5` and `07.10.2026`; independent of the language; CSV exports and file names stay unchanged), currency (Automatic/EUR/GBP/USD/CHF — "Automatic" takes it from Home Assistant, otherwise euro; amounts are not converted, enter your prices again after changing it), start page (overview/energy dashboard/weather dashboard), color scheme (Zeitarchiv/Home Assistant/Modern), light/dark/automatic, font size, dashboard tile fade animation, starting values for the chart options of the entity history view |
 | **Archiving** | Default values for newly detected entities (never act retroactively on existing entities): resolution, retention, decimal places, value change filter, gap/outlier detection |
 | **Notices** | Switch the tip display on/off and dialog with all tips (see [Housekeeping](#housekeeping)); overview of muted system notices with remaining duration, individually re-enableable early |
 | **Connection** | Show/regenerate API token, last received value, number of writes and auth errors since start, connected integration version with "last seen" time (notice for outdated or newly available version) |

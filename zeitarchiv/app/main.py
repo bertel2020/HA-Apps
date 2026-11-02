@@ -292,7 +292,9 @@ DASHBOARD_ANIMATION_LABELS = {"1": N_("An"), "0": N_("Aus")}
 # Übersicht führt, unabhängig von dieser Einstellung (sonst würde er bei
 # startseite="energiedashboard" auf sich selbst zurückverweisen und die
 # Übersicht wäre über die Topnav gar nicht mehr erreichbar).
-STARTSEITE_LABELS = {"uebersicht": N_("Übersicht"), "energiedashboard": N_("Energiedashboard")}
+STARTSEITE_LABELS = {
+    "uebersicht": N_("Übersicht"), "energiedashboard": N_("Energiedashboard"), "wetterdashboard": N_("Wetterdashboard"),
+}
 
 
 def _current_font_scale() -> str:
@@ -895,7 +897,7 @@ def app_root(request: Request) -> RedirectResponse:
     if startseite not in STARTSEITE_LABELS:
         startseite = "uebersicht"
     app_root = _app_root_context(request)["app_root"]
-    target = "energiedashboard" if startseite == "energiedashboard" else "uebersicht"
+    target = startseite  # die Schlüssel der Einstellung sind zugleich die Pfade der Seiten
     return RedirectResponse(url=f"{app_root}/{target}", status_code=307)
 
 
