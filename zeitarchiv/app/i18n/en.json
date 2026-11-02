@@ -4163,6 +4163,11 @@
     "Daten vorhanden vom {first} bis {last}.": "Data available from {first} to {last}.",
     "Alles": "All",
     "Jetzt das letzte Jahr anklicken, oder dasselbe noch einmal für nur dieses.": "Now click the last year, or the same one again for just this one.",
-    "Jetzt den letzten Monat anklicken, oder denselben noch einmal für nur diesen.": "Now click the last month, or the same one again for just this one."
+    "Jetzt den letzten Monat anklicken, oder denselben noch einmal für nur diesen.": "Now click the last month, or the same one again for just this one.",
+    "Heizzähler": "Heating meter",
+    "Name in der Auswertung (optional)": "Name in the analysis (optional)",
+    "Name in der Tabelle (optional)": "Name in the table (optional)",
+    "Sensor": "Sensor",
+    "Weiterer Sensor": "Additional sensor"
   }
 }

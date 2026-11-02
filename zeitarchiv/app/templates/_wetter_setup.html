@@ -23,12 +23,35 @@
 </span>
 {% endmacro %}
 
+{% macro row_picker() %}
+<span class="dd-picker-wrap" x-data='entityPicker(listKind === "extra" ? optionsFor("extra") : preferUnits(counterOptions, "heating"), draft.entity_id, (id) => { draft.entity_id = id; }, null, null, false)' @click.outside="open = false">
+  <span class="dd-picker-anchor">
+    <button type="button" class="btn" :class="{'dd-picker-btn-clearable': entityId}"
+            @click="toggleOpen($refs.search)"
+            x-text="entityId ? label(entityId) : t('Entität wählen …')"></button>
+    <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak
+            @click.stop="clearSelection()" title="{{ _('Auswahl leeren') }}" aria-label="{{ _('Auswahl leeren') }}">✕</button>
+    <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:260px;overflow-y:auto;">
+      <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="{{ _('Suchen …') }}">
+      <template x-for="opt in filtered()" :key="opt.entity_id">
+        <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)">
+          <span class="wt-opt-sep" x-show="opt.sep && !search" x-cloak>{{ _("Weitere Entitäten") }}</span>
+          <span x-text="opt.label"></span><span class="wt-opt-unit" x-show="opt.unit" x-text="opt.unit"></span>
+        </div>
+      </template>
+    </div>
+    <input type="hidden" name="row_draft" :value="entityId">
+  </span>
+</span>
+{% endmacro %}
+
 {# Symbole der Rollenkacheln, im Stil der Kacheln des Energiedashboards (18 px, Rollenfarbe, leicht transparent). #}
 {% macro role_glyph(key) %}
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--wt-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" opacity=".85">
   {% if key == 'temperature' %}<path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0Z"/>
   {% elif key in ('precip_mm', 'humidity') %}<path d="M12 3s6 6.4 6 11a6 6 0 0 1-12 0c0-4.6 6-11 6-11Z"/>
   {% elif key == 'precip_dur' %}<path d="M7 15a4 4 0 0 1 .6-7.9A5.5 5.5 0 0 1 18 9a3.5 3.5 0 0 1-.5 7"/><path d="M9 19l1-2M13 19l1-2"/>
+  {% elif key == 'heating' %}<path d="M12 3c1 3 4 4.5 4 8.5a4 4 0 0 1-8 0c0-1.7.8-2.6 1.5-3.5.5 1 1 1.5 1.5 1.5 0-3 0-4.5 1-6.5Z"/>
   {% elif key == 'pressure' %}<path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l4-5"/>
   {% elif key == 'wind' %}<path d="M3 9h11a3 3 0 1 0-3-3M3 15h15a3 3 0 1 1-3 3M3 12h8"/>
   {% elif key == 'gust' %}<path d="M3 8h10a3 3 0 1 0-3-3M3 14h14a3 3 0 1 1-3 3"/><path d="M3 11l4 0"/>
@@ -93,7 +116,7 @@
           this.suggesting = false;
         },
         nameFor(id) {
-          const option = this.entityOptions.find((o) => o.entity_id === id);
+          const option = this.entityOptions.find((o) => o.entity_id === id) || this.counterOptions.find((o) => o.entity_id === id);
           return option ? option.label : id;
         },
         openRole(role) {
@@ -122,10 +145,39 @@
           rest[0] = {...rest[0], sep: true};
           return [...match, ...rest];
         },
-        addExtra() { if (this.extras.length < this.maxExtra) this.extras.push({entity_id: "", name: ""}); },
-        removeExtra(i) { this.extras.splice(i, 1); },
-        addHeating() { if (this.heating.length < this.maxHeating) this.heating.push({entity_id: "", name: ""}); },
-        removeHeating(i) { this.heating.splice(i, 1); }
+        // Listen (weitere Sensoren, Heizzähler): Kachel je Eintrag, ein gemeinsamer Dialog bearbeitet eine Kopie (draft),
+        // „Übernehmen“ schreibt sie zurück. Ein neuer Eintrag, der ohne Übernehmen geschlossen wird, verschwindet wieder.
+        listKind: null, listIdx: -1, listNew: false, draft: {entity_id: "", name: ""},
+        listRows(kind) { return kind === "extra" ? this.extras : this.heating; },
+        openRow(kind, idx) {
+          const row = this.listRows(kind)[idx];
+          this.listKind = kind; this.listIdx = idx; this.listNew = false;
+          this.draft = {entity_id: row.entity_id, name: row.name};
+          this.$nextTick(() => this.$refs.rowDlg.showModal());
+        },
+        addRow(kind) {
+          const rows = this.listRows(kind);
+          if (rows.length >= (kind === "extra" ? this.maxExtra : this.maxHeating)) return;
+          rows.push({entity_id: "", name: ""});
+          this.openRow(kind, rows.length - 1);
+          this.listNew = true;
+        },
+        applyRow() {
+          if (!this.draft.entity_id) { this.removeRow(); return; }
+          const row = this.listRows(this.listKind)[this.listIdx];
+          row.entity_id = this.draft.entity_id; row.name = this.draft.name.trim();
+          this.listNew = false;
+          this.$refs.rowDlg.close();
+        },
+        removeRow() {
+          this.listRows(this.listKind).splice(this.listIdx, 1);
+          this.listNew = false;
+          this.$refs.rowDlg.close();
+        },
+        onRowClose() {
+          if (this.listNew && this.listKind) this.listRows(this.listKind).splice(this.listIdx, 1);
+          this.listKind = null; this.listNew = false;
+        }
       }'>
   <section class="settings-section wt-section-messwerte">
   <div class="wt-section-head">
@@ -192,50 +244,52 @@
   <h2 class="settings-section-title">{{ _("Weitere Sensoren") }} {{ hint_button(_("Weitere Sensoren")) }}</h2>
   <p class="settings-section-description">{{ _("Zusätzliche Temperatur- oder Feuchtesensoren, zum Beispiel Keller, Dachboden oder Nordseite. Sie erscheinen auf dem Reiter „Temperatur &amp; Klima“.") }}</p>
   {% call hint_body() %}{{ _("Jeder weitere Sensor bekommt eine eigene Zeile in der Tabelle, er wird nie mit der Außentemperatur gemittelt.") }}{% endcall %}
-  <template x-for="(row, i) in extras" :key="i">
-    <div class="wt-extra field">
-      <span class="dd-picker-wrap" x-data="entityPicker(optionsFor('extra'), row.entity_id, (id) => { row.entity_id = id })" @click.outside="open = false">
-        <span class="dd-picker-anchor">
-          <button type="button" class="btn" @click="toggleOpen($refs.search)" x-text="entityId ? label(entityId) : t('Entität wählen …')"></button>
-          <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:260px;overflow-y:auto;">
-            <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="{{ _('Suchen …') }}">
-            <template x-for="opt in filtered()" :key="opt.entity_id">
-              <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)"><span class="wt-opt-sep" x-show="opt.sep && !search" x-cloak>{{ _("Weitere Entitäten") }}</span><span x-text="opt.label"></span><span class="wt-opt-unit" x-show="opt.unit" x-text="opt.unit"></span></div>
-            </template>
+  <div class="wt-item-grid wt-item-grid-list">
+    <template x-for="(row, i) in extras" :key="i">
+      <button type="button" class="wt-item-tile" data-role="extra" @click="openRow('extra', i)">
+        <div class="wt-item-accent"></div>
+        <div class="wt-item-body">
+          <div class="wt-item-head">
+            <span class="wt-item-glyph">{{ role_glyph('temperature') }}</span>
+            <span class="wt-item-name" x-text="row.name || (row.entity_id ? nameFor(row.entity_id) : t('Sensor'))"></span>
           </div>
-          <input type="hidden" name="extra_entity_id" :value="entityId">
-        </span>
-      </span>
-      <input type="text" name="extra_name" x-model="row.name" maxlength="60" placeholder="{{ _('Name in der Tabelle (optional)') }}">
-      <button type="button" class="btn" @click="removeExtra(i)" aria-label="{{ _('Entfernen') }}">✕</button>
-    </div>
-  </template>
-  <button type="button" class="btn wt-add" x-show="extras.length < maxExtra" @click="addExtra()">{{ _("+ Sensor") }}</button>
+          <div class="wt-item-bottom">
+            <span class="wt-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) : t('Nicht zugeordnet')"></span>
+          </div>
+        </div>
+      </button>
+    </template>
+    <button type="button" class="wt-item-tile wt-item-add" x-show="extras.length < maxExtra" @click="addRow('extra')">
+      <span class="wt-item-add-label">{{ _("+ Sensor") }}</span>
+    </button>
+  </div>
+  <template x-for="row in extras"><span><input type="hidden" name="extra_entity_id" :value="row.entity_id"><input type="hidden" name="extra_name" :value="row.name"></span></template>
   </section>
 
   <section class="settings-section wt-section-heizen">
   <h2 class="settings-section-title">{{ _("Heizenergie") }} {{ hint_button(_("Heizenergie")) }}</h2>
   <p class="settings-section-description">{{ _("Energiezähler der Heizung für den Reiter „Heizen“, mit Gradtagzahl und Verbrauch je Zähler.") }}</p>
   {% call hint_body() %}{{ _("Ein oder mehrere Energiezähler der Heizung, zum Beispiel Wärmepumpe, Heizstab oder Konvektoren. Sie werden zu einer Summe addiert, der Reiter „Heizen“ zeigt auch den Anteil je Zähler.") }} {{ _("Gradtagzahl nach VDI 3807 (G20/15): Raumtemperatur minus Tagesmittel, nur an Tagen unter der Heizgrenze. Beide Werte lassen sich auf dem Reiter „Heizen“ vorübergehend ändern.") }}{% endcall %}
-  <template x-for="(row, i) in heating" :key="i">
-    <div class="wt-extra field">
-      <span class="dd-picker-wrap" x-data="entityPicker(preferUnits(counterOptions, 'heating'), row.entity_id, (id) => { row.entity_id = id })" @click.outside="open = false">
-        <span class="dd-picker-anchor">
-          <button type="button" class="btn" @click="toggleOpen($refs.search)" x-text="entityId ? label(entityId) : t('Entität wählen …')"></button>
-          <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:260px;overflow-y:auto;">
-            <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="{{ _('Suchen …') }}">
-            <template x-for="opt in filtered()" :key="opt.entity_id">
-              <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)"><span class="wt-opt-sep" x-show="opt.sep && !search" x-cloak>{{ _("Weitere Entitäten") }}</span><span x-text="opt.label"></span><span class="wt-opt-unit" x-show="opt.unit" x-text="opt.unit"></span></div>
-            </template>
+  <div class="wt-item-grid wt-item-grid-list">
+    <template x-for="(row, i) in heating" :key="i">
+      <button type="button" class="wt-item-tile" data-role="heating" @click="openRow('heating', i)">
+        <div class="wt-item-accent"></div>
+        <div class="wt-item-body">
+          <div class="wt-item-head">
+            <span class="wt-item-glyph">{{ role_glyph('heating') }}</span>
+            <span class="wt-item-name" x-text="row.name || (row.entity_id ? nameFor(row.entity_id) : t('Heizzähler'))"></span>
           </div>
-          <input type="hidden" name="heating_entity_id" :value="entityId">
-        </span>
-      </span>
-      <input type="text" name="heating_name" x-model="row.name" maxlength="60" placeholder="{{ _('Name in der Auswertung (optional)') }}">
-      <button type="button" class="btn" @click="removeHeating(i)" aria-label="{{ _('Entfernen') }}">✕</button>
-    </div>
-  </template>
-  <button type="button" class="btn wt-add" x-show="heating.length < maxHeating" @click="addHeating()">{{ _("+ Heizzähler") }}</button>
+          <div class="wt-item-bottom">
+            <span class="wt-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) : t('Nicht zugeordnet')"></span>
+          </div>
+        </div>
+      </button>
+    </template>
+    <button type="button" class="wt-item-tile wt-item-add" x-show="heating.length < maxHeating" @click="addRow('heating')">
+      <span class="wt-item-add-label">{{ _("+ Heizzähler") }}</span>
+    </button>
+  </div>
+  <template x-for="row in heating"><span><input type="hidden" name="heating_entity_id" :value="row.entity_id"><input type="hidden" name="heating_name" :value="row.name"></span></template>
   <div class="wt-thresholds">
     <div class="field"><label for="wt-heating-room">{{ _("Raumtemperatur") }}</label>
       <input type="text" id="wt-heating-room" class="wt-short" name="heating_room" value="{{ config.heating_room | string | replace('.', ',') }}" inputmode="decimal"> <span class="wt-unit">°C</span></div>
@@ -269,6 +323,31 @@
     {% endfor %}
   </div>
   </section>
+
+  <dialog class="detail-dialog wt-item-dialog" x-ref="rowDlg" :data-role="listKind" @click="if ($event.target === $el) $el.close()" @close="onRowClose()">
+    <div class="detail-dialog-header">
+      <h2 x-text="listKind === 'heating' ? t('Heizzähler') : t('Weiterer Sensor')"></h2>
+      <button type="button" class="btn" @click="$refs.rowDlg.close()" aria-label="{{ _('Schließen') }}">✕</button>
+    </div>
+    <template x-if="listKind">
+      <div>
+        <div class="wt-dialog-fields">
+          <div class="field">
+            <label>{{ _("Name") }}</label>
+            <input type="text" x-model="draft.name" maxlength="60" :placeholder="listKind === 'heating' ? t('Name in der Auswertung (optional)') : t('Name in der Tabelle (optional)')">
+          </div>
+          <div class="field">
+            <label>{{ _("Entität") }}</label>
+            {{ row_picker() }}
+          </div>
+        </div>
+        <div class="wt-dialog-footer wt-dialog-footer-split">
+          <button type="button" class="btn btn-danger" @click="removeRow()">{{ _("Entfernen") }}</button>
+          <button type="button" class="btn primary" @click="applyRow()">{{ _("Übernehmen") }}</button>
+        </div>
+      </div>
+    </template>
+  </dialog>
 
   <div class="actionbar" style="justify-content:flex-end;">
     <a class="btn" href="wetterdashboard">{{ _("Abbrechen") }}</a>

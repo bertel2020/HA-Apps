@@ -579,7 +579,7 @@ def test_setup_form_uses_app_fields_and_info_buttons(client) -> None:
 
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
     html = client.get("/wetterdashboard/setup").text
-    assert html.count('class="field"') >= 4 and "wt-extra field" in html
+    assert html.count('class="field"') >= 4 and "wt-item-add" in html
     assert html.count("hint-toggle") == 4  # Weitere Sensoren, Heizenergie, Regentage, Anzeige
     assert '<p class="hint">' not in html  # lose .hint-Absätze verschwänden auf dem Telefon ohne Knopf
 
