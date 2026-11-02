@@ -65,6 +65,12 @@
 
 ### Behoben
 
+- **Indexprüfung meldete Fehlalarme**: Bei Entitäten mit eingestellter Auflösung
+  (z. B. 15 Min.) zeigte die Prüfung immer wieder „Abweichungen“, obwohl Index
+  und Daten dieselbe Zeilenzahl hatten, und die Meldung „Index-Abweichungen
+  automatisch behoben“ kam erneut. Das Ende des Zeitfensters zählt jetzt als
+  übereinstimmend.
+
 - **Entitätenliste merkt sich die Seite**: Wer auf Seite 2 eine Entität
   öffnete und zur Liste zurückkehrte, landete wieder auf Seite 1. Die Liste
   öffnet jetzt auf der zuletzt gezeigten Seite.
@@ -129,6 +135,11 @@
   locked fields show their fixed value instead of a greyed-out dropdown.
 
 #### Fixed
+
+- **Index check reported false alarms**: For entities with a resolution set
+  (e.g. 15 min), the check kept showing "deviations" although index and data
+  had the same row count, and the "Index deviations fixed automatically"
+  notice came back. The end of the time window now counts as matching.
 
 - **Entity list remembers the page**: Opening an entity from page 2 and going
   back used to land on page 1 again. The list now opens on the page last shown.

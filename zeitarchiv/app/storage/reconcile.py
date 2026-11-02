@@ -7,6 +7,7 @@ Prüfung rekonstruiert den Cache ohne Rohwerte oder Rollups zu verändern.
 
 from __future__ import annotations
 
+import math
 import time
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -14,7 +15,7 @@ from zoneinfo import ZoneInfo
 import pyarrow.parquet as pq
 
 from . import hotbuffer
-from .index import Index
+from .index import Index, resolution_seconds
 from .paths import entity_dir, storage_area_dir
 
 
@@ -106,6 +107,19 @@ def _timestamps_equal(left: float | None, right: float | None) -> bool:
     return abs(left - right) < 0.001
 
 
+def _window_end_equal(indexed: float | None, actual: float | None, interval: int | None) -> bool:
+    """Wie _timestamps_equal, nur dass bei einer Entität mit Auflösung auch das Fensterende gilt.
+
+    Der Index merkt sich den Zeitstempel des Rohwerts (record_write), die zusammengefasste Zeile in
+    der Datei trägt das Ende ihres Fensters (resolution.collapse_pending_window). Das ist kein
+    Fehler: erst ein Wert zwischen Rohwert und Fensterende gilt als gleich."""
+    if _timestamps_equal(indexed, actual):
+        return True
+    if interval is None or indexed is None or actual is None:
+        return False
+    return indexed <= actual <= math.ceil(indexed / interval) * interval + 0.001
+
+
 def audit_storage_metadata(
     data_dir: Path,
     index: Index,
@@ -159,9 +173,11 @@ def audit_storage_metadata(
             changed_fields.append("row_count")
         if int(entity["size_bytes"] or 0) != int(actual["size_bytes"]):
             changed_fields.append("size_bytes")
-        if not _timestamps_equal(entity["first_ts"], actual["first_ts"]):
+        # Nur Standard-Entitäten werden fensterweise zusammengefasst (siehe ingestion.py).
+        interval = resolution_seconds(entity["resolution"]) if entity["aggregation_type"] == "standard" else None
+        if not _window_end_equal(entity["first_ts"], actual["first_ts"], interval):
             changed_fields.append("first_ts")
-        if not _timestamps_equal(entity["last_ts"], actual["last_ts"]):
+        if not _window_end_equal(entity["last_ts"], actual["last_ts"], interval):
             changed_fields.append("last_ts")
         if not changed_fields:
             continue

@@ -55,6 +55,39 @@ def test_storage_audit_previews_and_atomically_repairs_derived_metadata(tmp_path
     index.close()
 
 
+def test_collapsed_window_end_is_not_reported_as_a_mismatch(tmp_path: Path) -> None:
+    """Der Index hält den Zeitstempel des letzten Rohwerts, die zusammengefasste Zeile in der Datei das
+    Fensterende. Bei einer Entität mit Auflösung ist das kein Fehler; ohne Auflösung weiterhin einer."""
+    index = Index(tmp_path / "index.sqlite")
+    entity_id = "sensor.aufgeloest"
+    index.get_or_create_entity(entity_id, "sensor", "measurement", "°C", "Aufgelöst")
+    with index._lock, index._conn:
+        index._conn.execute("UPDATE entities SET resolution = '15min' WHERE entity_id = ?", (entity_id,))
+
+    raw_ts = datetime(2026, 11, 2, 11, 7, 23, tzinfo=TZ).timestamp()
+    window_end = datetime(2026, 11, 2, 11, 15, tzinfo=TZ).timestamp()
+    hotbuffer.append(tmp_path, entity_id, window_end, 5.0, TZ)
+    index.record_write(entity_id, raw_ts)
+
+    report = reconcile.audit_storage_metadata(tmp_path, index, TZ, repair=False)
+    assert report["mismatches"] == []
+
+    # Ein Zeitstempel hinter dem Fensterende bleibt eine echte Abweichung.
+    with index._lock, index._conn:
+        index._conn.execute("UPDATE entities SET last_ts = ? WHERE entity_id = ?", (raw_ts - 3600, entity_id))
+    report = reconcile.audit_storage_metadata(tmp_path, index, TZ, repair=False)
+    assert [m["changed_fields"] for m in report["mismatches"]] == [["last_ts"]]
+
+    # Ohne Auflösung gilt der Fensterende-Spielraum nicht.
+    with index._lock, index._conn:
+        index._conn.execute(
+            "UPDATE entities SET resolution = 'raw', last_ts = ? WHERE entity_id = ?", (raw_ts, entity_id)
+        )
+    report = reconcile.audit_storage_metadata(tmp_path, index, TZ, repair=False)
+    assert [m["changed_fields"] for m in report["mismatches"]] == [["first_ts", "last_ts"]]
+    index.close()
+
+
 def test_storage_audit_streams_hot_files_without_materializing_them(monkeypatch, tmp_path: Path) -> None:
     index = Index(tmp_path / "index.sqlite")
     entity_id = "sensor.streaming"
