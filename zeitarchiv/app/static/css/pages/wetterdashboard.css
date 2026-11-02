@@ -80,6 +80,9 @@
   .wt-table thead th.wt-cur{padding-left:18px;cursor:help;}
   .wt-table thead th.wt-vj{font-weight:400;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);cursor:help;}
   .wt-table thead .wt-info{margin-left:4px;font-size:calc(10px * var(--font-scale, 1));font-weight:400;color:var(--ink-faint);vertical-align:1px;}
+  .wt-table thead tr.wt-subhead th{font-weight:400;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);padding-top:0;border-bottom:1.5px solid var(--border-strong);}
+  .wt-table thead tr.wt-subhead th.wt-vj{color:var(--ink-faint);}
+  .wt-table thead tr:first-child th{border-bottom:0;padding-bottom:1px;}
   .wt-table td.wt-sep{padding-left:18px;}
   .wt-table th:first-child,.wt-table td:first-child{min-width:96px;text-align:left;position:sticky;left:0;background:var(--surface);z-index:1;}
   .wt-table tbody tr:last-child th,.wt-table tbody tr:last-child td{border-bottom:0;}

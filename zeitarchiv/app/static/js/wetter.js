@@ -30,7 +30,7 @@
     if (data && data.at && (col.key === 'heute' || col.key === 'gestern')) return fmtDate(formats.dmy, col.cur.start);
     if (col.key === 'heute') return t('Heute');
     if (col.key === 'gestern') return t('Gestern');
-    if (col.key === 'jahr') return String(ZT.parts(col.cur.start).year);
+    if (col.key === 'jahr') return t('Jahr');
     return fmtDate(formats.month, col.cur.start);
   }
 
@@ -135,20 +135,28 @@
     const cols = data.columns;
     if (!cols.length) return `<tbody><tr><td>${escapeHtml(t('Keine Spalte ausgewählt.'))}</td></tr></tbody>`;
     const span = data.vorjahr ? 2 : 1;
-    // Einzeiliger Kopf: der Zeitraum steht im Tooltip (data-tooltip-fixed, fixed-tooltip.js), nicht als eigene Zeile —
-    // der lange Datumsbereich machte sonst die Spalten breiter als ihre Werte.
-    let html = '<thead><tr><th></th>';
+    // Zwei Zeilen: Titel mit Info-Tooltip (Zeitraum, „bis 15:47“), darunter Tag bzw. Jahr der Spalte und ihres Vorjahrs.
+    // Mit Stichtag steht das Datum schon im Titel; die zweite Zeile nennt dann den Wochentag.
+    const subText = (range, key) => {
+      if (key === 'heute' || key === 'gestern') return fmtDate(formats.dmy, range.start);
+      return String(ZT.parts(range.start).year);
+    };
+    let head = '<thead><tr><th></th>';
+    let sub = '<tr class="wt-subhead"><th></th>';
     for (const col of cols) {
-      let sub = rangeText(col.cur.start, col.cur.end);
-      if (col.key === 'heute' && !data.at) sub = t('bis {time}', {time: fmtDate(formats.hm, data.now)});
-      // Mit Stichtag steht das Datum schon im Titel; der Tooltip nennt den Wochentag.
-      if (data.at && (col.key === 'heute' || col.key === 'gestern')) sub = fmtDate(formats.weekday, col.cur.start);
-      html += `<th class="wt-cur wt-sep" data-tooltip-fixed="${escapeHtml(sub)}">${escapeHtml(columnTitle(col, data))}<span class="wt-info" aria-hidden="true">ⓘ</span></th>`;
+      let tip = rangeText(col.cur.start, col.cur.end);
+      const dayCol = col.key === 'heute' || col.key === 'gestern';
+      if (col.key === 'heute' && !data.at) tip = t('bis {time}', {time: fmtDate(formats.hm, data.now)});
+      if (data.at && dayCol) tip = fmtDate(formats.weekday, col.cur.start);
+      head += `<th class="wt-cur wt-sep" data-tooltip-fixed="${escapeHtml(tip)}">${escapeHtml(columnTitle(col, data))}<span class="wt-info" aria-hidden="true">ⓘ</span></th>`;
+      const curSub = data.at && dayCol ? fmtDate(formats.weekday, col.cur.start) : subText(col.cur, col.key);
+      sub += `<th class="wt-cur wt-sep">${escapeHtml(curSub)}</th>`;
       if (data.vorjahr) {
-        html += `<th class="wt-vj" data-tooltip-fixed="${escapeHtml(rangeText(col.vj.start, col.vj.end))}">${escapeHtml(t('Vorjahr'))}</th>`;
+        head += `<th class="wt-vj" data-tooltip-fixed="${escapeHtml(rangeText(col.vj.start, col.vj.end))}">${escapeHtml(t('Vorjahr'))}</th>`;
+        sub += `<th class="wt-vj">${escapeHtml(subText(col.vj, col.key))}</th>`;
       }
     }
-    html += '</tr>';
+    let html = head + '</tr>' + sub + '</tr>';
     html += '</thead><tbody>';
 
     for (const row of data.rows.filter((r) => inGroup(r.key, group))) {
