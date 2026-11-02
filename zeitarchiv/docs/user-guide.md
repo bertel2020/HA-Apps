@@ -796,12 +796,13 @@ Vorjahre. Er erscheint ab zwei Vorjahren mit genug Werten.
 
 ### Reiter Langzeit
 
-**Kenntage je Monat** zählt nach den festen Schwellen des Deutschen
+**Kenntage je Jahr** zählt nach den festen Schwellen des Deutschen
 Wetterdienstes: Frosttag (Tiefstwert unter 0 °C), Eistag (Höchstwert unter 0 °C),
-Sommertag (Höchstwert ab 25 °C), heißer Tag (ab 30 °C). Warme Tage stehen nach
-oben, kalte nach unten, die strengere Klasse als schmalerer, dunklerer Balken
-(jeder Eistag ist auch ein Frosttag). Gezählt werden nur abgeschlossene Tage
-mit mindestens 18 Stunden Werten; das Jahr wählt ihr oben. Dieselben Zahlen stehen
+Sommertag (Höchstwert ab 25 °C), heißer Tag (ab 30 °C). Je Jahr stehen vier Balken
+nebeneinander (jeder Eistag ist auch ein Frosttag, jeder heiße Tag auch ein
+Sommertag); über „Alle Jahre“ oder „Letzte 5“ begrenzt ihr die Auswahl. Das laufende
+Jahr ist mit * markiert. Zeigt man auf einen Balken, steht im Tooltip die Verteilung
+auf die Monate. Gezählt werden nur abgeschlossene Tage mit mindestens 18 Stunden Werten. Dieselben Zahlen stehen
 als Zeilen **Kenntage** unter der Außentemperatur in der Vergleichstabelle (bei
 Monats- und Jahresspalten).
 

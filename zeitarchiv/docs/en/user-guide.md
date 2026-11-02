@@ -744,12 +744,13 @@ years. It appears from two previous years with enough values.
 
 ### Long-term tab
 
-**Characteristic days per month** counts by the fixed thresholds of the German
+**Characteristic days per year** counts by the fixed thresholds of the German
 Weather Service: frost day (minimum below 0 °C), ice day (maximum below 0 °C),
-summer day (maximum from 25 °C), hot day (from 30 °C). Warm days go up, cold days
-down, the stricter class as a narrower, darker bar (every ice day is also a frost
-day). Only completed days with at least 18 hours of values are counted; you pick the
-year above. The same numbers appear as **Characteristic days** rows under the
+summer day (maximum from 25 °C), hot day (from 30 °C). Each year shows four bars
+side by side (every ice day is also a frost day, every hot day also a summer day);
+"All years" or "Last 5" limits the selection. The current year is marked with *.
+Pointing at a bar shows the split across months in the tooltip. Only completed days
+with at least 18 hours of values are counted. The same numbers appear as **Characteristic days** rows under the
 outdoor temperature in the comparison table (for month and year columns).
 
 **Years compared, day by day** stacks all years as a matrix: one row per year (the

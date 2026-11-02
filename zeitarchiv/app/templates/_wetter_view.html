@@ -178,15 +178,15 @@
   <section x-show="tab === 'long'" x-cloak role="tabpanel" id="wt-panel-long" aria-labelledby="wt-tab-long">
     <div class="card wt-card">
       <div class="wt-controls">
-        <h2 class="wt-h2">{{ _("Kenntage je Monat") }} {{ hint_button(_("Kenntage je Monat")) }}</h2>
+        <h2 class="wt-h2">{{ _("Kenntage je Jahr") }} {{ hint_button(_("Kenntage je Jahr")) }}</h2>
         {% call hint_body() %}<span x-text="kenntageNote()"></span>{% endcall %}
-        <label class="wt-check">{{ _("Jahr") }}
-          <select x-model="kenntageYear" @change="drawKenntage()">
-            <template x-for="year in kenntageYears()" :key="year"><option :value="year" x-text="year"></option></template>
-          </select>
-        </label>
+        <div class="wt-seg" role="group" aria-label="{{ _('Zeitraum') }}">
+          <button type="button" :aria-pressed="(kenntageRange === 'all').toString()" @click="setKenntageRange('all')">{{ _("Alle Jahre") }}</button>
+          <button type="button" :aria-pressed="(kenntageRange === '5').toString()" @click="setKenntageRange('5')">{{ _("Letzte 5") }}</button>
+        </div>
       </div>
       <div class="wt-chart" x-ref="kenntageChart"></div>
+      <p class="wt-foot" x-show="kenntageFoot()" x-text="kenntageFoot()" x-cloak></p>
     </div>
     <div class="card wt-card">
       <div class="wt-controls">

@@ -308,7 +308,7 @@
       band: true,
       longterm: null,
       longError: '',
-      kenntageYear: '',
+      kenntageRange: 'all',
       matrixMetric: 'avg',
       heat: null,
       heatOn: [],
@@ -336,6 +336,7 @@
         if (Array.isArray(saved.columns)) this.columns = COLUMN_KEYS.filter((key) => saved.columns.includes(key));
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
+        if (saved.kenntageRange === '5' || saved.kenntageRange === 'all') this.kenntageRange = saved.kenntageRange;
         if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
         this.loadTiles();
         this.loadTable();
@@ -839,62 +840,78 @@
         this.longError = '';
         try {
           this.longterm = await this.fetchJson('wetterdashboard/langzeit');
-          const years = this.kenntageYears();
-          this.kenntageYear = years.includes(String(this.longterm.current_year))
-            ? String(this.longterm.current_year) : (years[years.length - 1] || '');
           this.$nextTick(() => this.drawKenntage());
         } catch (e) {
           this.longError = t('Die Langzeitwerte konnten nicht geladen werden.');
         }
       },
 
+      // Jahre der Karte „Kenntage je Jahr“: alle oder die letzten fünf.
       kenntageYears() {
-        return this.longterm ? Object.keys(this.longterm.kenntage).sort() : [];
+        const years = this.longterm ? Object.keys(this.longterm.kenntage).sort() : [];
+        return this.kenntageRange === '5' ? years.slice(-5) : years;
+      },
+
+      setKenntageRange(range) {
+        this.kenntageRange = range;
+        writeStore({kenntageRange: range});
+        this.drawKenntage();
       },
 
       kenntageNote() {
-        const year = this.longterm && this.longterm.kenntage[this.kenntageYear];
-        if (!year) return t('Noch keine Tage mit ausreichend Werten (mindestens 18 Stunden je Tag).');
-        const days = year.days.reduce((a, b) => a + b, 0);
+        const all = this.longterm ? this.longterm.kenntage : {};
+        const days = Object.values(all).reduce((sum, year) => sum + year.days.reduce((a, b) => a + b, 0), 0);
+        if (!days) return t('Noch keine Tage mit ausreichend Werten (mindestens 18 Stunden je Tag).');
         return t('Frosttag: Tiefstwert unter 0 °C, Eistag: Höchstwert unter 0 °C, Sommertag: Höchstwert ab 25 °C, heißer Tag: ab 30 °C. Gezählt sind {days} abgeschlossene Tage mit mindestens 18 Stunden Werten; der laufende Tag zählt nicht.', {days});
+      },
+
+      // Fußnote zum laufenden Jahr (mit „*“ an der Jahreszahl markiert).
+      kenntageFoot() {
+        const years = this.kenntageYears();
+        if (!this.longterm || !years.includes(String(this.longterm.current_year))) return '';
+        const today = this.longterm.today.split('-');
+        return t('* laufendes Jahr, bis {date}', {date: `${today[2]}.${today[1]}.`});
       },
 
       drawKenntage() {
         const element = this.$refs.kenntageChart;
-        const year = this.longterm && this.longterm.kenntage[this.kenntageYear];
+        const years = this.kenntageYears();
         if (!element) return;
-        if (!year) {
+        if (!years.length) {
           if (charts.kenntage) charts.kenntage.clear();
           return;
         }
         const colors = palette();
-        const labels = Array.from({length: 12}, (_x, i) => monthName(i + 1, 'short'));
-        const bar = (name, data, color, width, opacity) => ({
-          name, type: 'bar', data, barGap: '-100%', barWidth: width, itemStyle: {color, opacity},
-        });
-        const negative = (values) => values.map((value) => (value ? -value : 0));
+        const data = this.longterm.kenntage;
+        const current = String(this.longterm.current_year);
+        const kinds = [
+          {key: 'frost', name: t('Frosttage'), color: colors.cold},
+          {key: 'eis', name: t('Eistage'), color: cssVar('--chart-4')},
+          {key: 'sommer', name: t('Sommertage'), color: colors.prev},
+          {key: 'heiss', name: t('Heiße Tage'), color: cssVar('--chart-5')},
+        ];
+        const labels = years.map((year) => (year === current ? `${year}*` : year));
+        const sum = (list) => list.reduce((a, b) => a + b, 0);
         const chart = chartFor('kenntage', element);
         chart.setOption({
-          animation: false, grid: gridFor(element),
-          legend: legendBox(colors, [t('Sommertage'), t('Heiße Tage'), t('Frosttage'), t('Eistage')]),
-          xAxis: {type: 'category', data: labels, ...axisStyle(colors), splitLine: {show: false}, axisLabel: {color: colors.text, fontSize: scaledFont(11), margin: 12}},
-          yAxis: {
-            type: 'value', name: t('Tage'), nameTextStyle: {color: colors.text}, ...axisStyle(colors),
-            axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => String(Math.abs(value))},
-          },
-          tooltip: tooltipBox(colors, (params) => {
-            const i = params[0].dataIndex;
-            return `<b>${escapeHtml(monthName(i + 1, 'long'))} ${escapeHtml(this.kenntageYear)}</b>`
-              + `<br>${escapeHtml(t('Sommertage'))}: ${year.sommer[i]} (${escapeHtml(t('heiß'))}: ${year.heiss[i]})`
-              + `<br>${escapeHtml(t('Frosttage'))}: ${year.frost[i]} (${escapeHtml(t('Eis'))}: ${year.eis[i]})`
-              + `<br>${escapeHtml(t('{days} Tage ausgewertet', {days: year.days[i]}))}`;
-          }),
-          series: [
-            bar(t('Sommertage'), year.sommer, colors.prev, '62%', 0.45),
-            bar(t('Heiße Tage'), year.heiss, colors.prev, '34%', 1),
-            bar(t('Frosttage'), negative(year.frost), colors.cold, '62%', 0.45),
-            bar(t('Eistage'), negative(year.eis), colors.cold, '34%', 1),
-          ],
+          animation: false, grid: gridFor(element, {right: 8}), legend: legendBox(colors, kinds.map((kind) => kind.name)),
+          xAxis: {type: 'category', data: labels, ...axisStyle(colors), splitLine: {show: false}},
+          yAxis: {type: 'value', min: 0, name: t('Tage'), nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
+          // Je Balken: Summe des Jahres, darunter die Verteilung auf die Monate.
+          tooltip: {...tooltipBox(colors, (param) => {
+            const year = years[param.dataIndex];
+            const kind = kinds[param.seriesIndex];
+            const months = data[year][kind.key].map((count, i) => (count ? `${monthName(i + 1, 'short')} ${count}` : '')).filter(Boolean);
+            const lines = [];
+            for (let i = 0; i < months.length; i += 4) lines.push(escapeHtml(months.slice(i, i + 4).join(' · ')));
+            return `<b>${escapeHtml(kind.name)} ${escapeHtml(year)}</b><br>${escapeHtml(t('{n} Tage', {n: sum(data[year][kind.key])}))}`
+              + (lines.length ? `<br>${lines.join('<br>')}` : '')
+              + `<br>${escapeHtml(t('{days} Tage ausgewertet', {days: sum(data[year].days)}))}`;
+          }), trigger: 'item'},
+          series: kinds.map((kind) => ({
+            name: kind.name, type: 'bar', barMaxWidth: 34, barGap: '12%', barCategoryGap: '35%', itemStyle: {color: kind.color, borderRadius: [4, 4, 0, 0]},
+            data: years.map((year) => sum(data[year][kind.key])),
+          })),
         }, true);
         // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
         requestAnimationFrame(() => chart.resize());

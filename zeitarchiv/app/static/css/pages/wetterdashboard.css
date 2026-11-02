@@ -96,6 +96,7 @@
   .wt-yoy-popover .wt-yoy-toggle{margin-top:4px;border-top:1px solid var(--border);border-radius:0 0 6px 6px;}
   .wt-table td .wt-when{display:block;line-height:1.25;font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:var(--ink-faint);}
   .wt-table td .wt-dl{display:block;line-height:1.25;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:var(--chart-1);}
+  .wt-foot{margin:6px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
   .wt-table td.wt-empty{text-align:left;color:var(--ink-muted);white-space:normal;}
   .wt-table td.wt-na .wt-v{color:var(--ink-faint);font-weight:400;}
 
