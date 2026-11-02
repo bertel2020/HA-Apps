@@ -58,6 +58,8 @@ ROLE_TYPES = {key: types for key, _label, types in ROLES}
 ROLE_LABELS = {key: label for key, label, _types in ROLES}
 
 MAX_EXTRA_TEMPERATURES = 5
+#: Nachkommastellen, wenn die Entität „automatisch“ eingestellt ist: Strahlung in ganzen W/m².
+ROLE_DEFAULT_DECIMALS = {"radiation": 0}
 MAX_HEATING_COUNTERS = 6
 DEFAULT_HEATING_ROOM = 20.0  # Raumtemperatur der Gradtagzahl (G20/15, VDI 3807)
 DEFAULT_HEATING_LIMIT = 15.0  # Heizgrenze: darüber wird nicht geheizt
@@ -166,6 +168,12 @@ def _role_warning(index: Index, role_key: str, entity_id: str) -> str | None:
     return None
 
 
+def _decimals(entity, role_key: str) -> int | None:
+    """Einstellung der Entität; bei „automatisch“ der Standard der Rolle (None = der Browser wählt)."""
+    configured = decimals_to_int(entity["decimals"])
+    return configured if configured is not None else ROLE_DEFAULT_DECIMALS.get(role_key.split(":")[0])
+
+
 class TableRequest(BaseModel):
     columns: list[str] = Field(default_factory=lambda: list(COLUMN_KEYS))
     vorjahr: bool = True
@@ -202,7 +210,7 @@ class WetterService:
                 "label": label,
                 "kind": kind,
                 "unit": entity["unit"] or "",
-                "decimals": 0 if kind == "switch" else decimals_to_int(entity["decimals"]),
+                "decimals": 0 if kind == "switch" else _decimals(entity, key),
             })
 
         def role_label(key: str) -> str:

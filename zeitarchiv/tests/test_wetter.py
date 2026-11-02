@@ -483,3 +483,22 @@ def test_view_template_never_iterates_data_that_may_still_be_null() -> None:
     for match in re.finditer(r'x-for="[^"]* in ([^"]+)"', text):
         expression = match.group(1)
         assert not re.match(r"^(longterm|heat|precip|monthly|matrix)\.", expression), expression
+
+
+def test_radiation_defaults_to_whole_numbers_and_other_roles_stay_automatic(service) -> None:
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(20, 1), 12.0)])
+    _add(service, "sensor.rad", "sensor", "measurement", "W/m²", [(_ts(20, 1), 300.0)])
+    _add(service, "sensor.wind", "sensor", "measurement", "km/h", [(_ts(20, 1), 9.0)])
+    _configure(service, temperature="sensor.t", radiation="sensor.rad", wind="sensor.wind")
+    specs = {spec["key"]: spec for spec in service._row_specs(wetter_routes._load_config(service.deps.index))}
+    assert specs["radiation"]["decimals"] == 0 and specs["wind"]["decimals"] is None
+    service.deps.index.set_config("sensor.rad", decimals="2")  # eine ausdrückliche Einstellung gewinnt
+    again = {spec["key"]: spec for spec in service._row_specs(wetter_routes._load_config(service.deps.index))}
+    assert again["radiation"]["decimals"] == 2
+
+
+def test_radiation_has_no_minimum_row_in_the_script() -> None:
+    from _paths import APP
+
+    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "row.key === 'radiation'" in script

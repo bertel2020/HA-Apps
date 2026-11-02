@@ -69,9 +69,11 @@
       ];
     }
     if (row.kind === 'standard') {
+      // Strahlung fällt nachts auf 0: ein Minimum sagt dort nichts, Max und Ø genügen.
+      const minimum = row.key === 'radiation' ? [] : [{label: t('Min'), field: 'min', when: 'point', delta: true}];
       return [
         {label: t('Max'), field: 'max', when: 'point', delta: true},
-        {label: t('Min'), field: 'min', when: 'point', delta: true},
+        ...minimum,
         {label: 'Ø', field: 'avg', delta: true},
       ];
     }
@@ -334,9 +336,10 @@
       tileSub(tile) {
         const decimals = tile.decimals != null ? tile.decimals : 1;
         if (tile.kind === 'standard') {
-          return tile.today
-            ? t('heute {min} / {max}', {min: num(tile.today.min, decimals), max: num(tile.today.max, decimals)})
-            : '';
+          if (!tile.today) return '';
+          return tile.key === 'radiation'
+            ? t('heute max. {max}', {max: num(tile.today.max, decimals)})
+            : t('heute {min} / {max}', {min: num(tile.today.min, decimals), max: num(tile.today.max, decimals)});
         }
         if (!tile.yesterday) return '';
         if (tile.kind === 'counter') {
