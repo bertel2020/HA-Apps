@@ -600,3 +600,11 @@ def test_reference_day_today_or_later_means_now_and_garbage_is_rejected(service)
     with pytest.raises(Exception) as caught:
         service.compute_table(TableRequest(columns=["heute"], at="gestern"), NOW)
     assert getattr(caught.value, "status_code", None) == 400
+
+
+def test_tiles_and_table_show_placeholders_while_loading() -> None:
+    from _paths import APP, TEMPLATES
+
+    text = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+    assert 'x-show="!tilesLoaded"' in text and "wt-tile is-loading" in text and 'class="wt-loading"' in text
+    assert "this.tilesLoaded = true" in (APP / "static/js/wetter.js").read_text(encoding="utf-8")

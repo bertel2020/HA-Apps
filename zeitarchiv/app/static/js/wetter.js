@@ -287,6 +287,7 @@
       vorjahr: true,
       mode: 'bis_jetzt',
       tiles: [],
+      tilesLoaded: false,
       error: '',
       _seq: 0,
 
@@ -1144,6 +1145,7 @@
         } catch (e) {
           // Kacheln sind Beiwerk; die Tabelle meldet Verbindungsfehler selbst.
         }
+        this.tilesLoaded = true;
       },
 
       async loadTable() {

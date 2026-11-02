@@ -33,6 +33,12 @@
   </nav>
 
   <section x-show="tab === 'overview'">
+  {# Platzhalter bis die Kacheln geladen sind (wie die „– kWh“-Kacheln des Energiedashboards). #}
+  <div class="wt-tiles" x-show="!tilesLoaded" aria-hidden="true">
+    <template x-for="n in 4" :key="n">
+      <span class="wt-tile is-loading"><span class="wt-tile-label">&nbsp;</span><span class="wt-tile-value">–</span><span class="wt-tile-sub">&nbsp;</span></span>
+    </template>
+  </div>
   <div class="wt-tiles" x-show="tiles.length" x-cloak>
     <template x-for="tile in tiles" :key="tile.key">
       <a class="wt-tile" :data-role="tile.key" :href="'entities/' + encodeURIComponent(tile.entity_id)" :title="t('Entität öffnen')">
@@ -69,7 +75,7 @@
     </div>
     <p class="hint hint-warn" x-show="error" x-text="error" x-cloak></p>
     <div class="tbl-wrap wt-table-wrap" x-ref="tableWrap">
-      <table class="wt-table" x-ref="table"></table>
+      <table class="wt-table" x-ref="table"><tbody><tr><td class="wt-loading">{{ _("Lädt …") }}</td></tr></tbody></table>
     </div>
   </div>
 
