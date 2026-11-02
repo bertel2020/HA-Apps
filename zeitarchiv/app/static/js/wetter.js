@@ -116,11 +116,13 @@
     }
     const decimals = metric.decimals != null ? metric.decimals : (row.decimals != null ? row.decimals : 1);
     const unit = metric.unit != null ? metric.unit : row.unit;
-    // Uhrzeit bzw. Tag von Max/Min im Tooltip der Zelle (data-tooltip-fixed, fixed-tooltip.js) — die Zelle bleibt einzeilig.
+    // Tag von Max/Min in Zeitraum-Spalten als eigene kleine Zeile unter dem Wert; in Tagesspalten steht die Stunde
+    // im Tooltip der Zelle (data-tooltip-fixed, fixed-tooltip.js).
     const when = whenText(metric, summary, col);
-    const tip = when ? ` data-tooltip-fixed="${escapeHtml(when)}"` : '';
+    const inline = col.range !== 'day' && when;
+    const tip = when && !inline ? ` data-tooltip-fixed="${escapeHtml(when)}"` : '';
     return `<td class="${cls}"${tip}><span class="wt-v">${escapeHtml(num(summary[metric.field], decimals))}${unit ? '&nbsp;' + escapeHtml(unit) : ''}</span>`
-      + (deltaHtml || '') + '</td>';
+      + (inline ? `<span class="wt-when">${escapeHtml(when)}</span>` : '') + (deltaHtml || '') + '</td>';
   }
 
   // Gruppen: „wind“ = Reiter „Wind & Sonne“, „klima“ = Zusatzsensoren (Schlüssel „temperature:N“) auf „Temperatur & Klima“,
@@ -132,7 +134,7 @@
   const GROUPS = ['basis', 'wind', 'klima'];
   const refName = (prefix, group) => prefix + (group === 'basis' && prefix !== 'tiles' ? '' : group.charAt(0).toUpperCase() + group.slice(1));
 
-  function renderTable(data, group) {
+  function renderTable(data, group, showDiff) {
     const cols = data.columns;
     if (!cols.length) return `<tbody><tr><td>${escapeHtml(t('Keine Spalte ausgewählt.'))}</td></tr></tbody>`;
     const span = data.vorjahr ? 2 : 1;
@@ -171,7 +173,7 @@
           const cell = row.cells[col.key] || {};
           const decimals = metric.decimals != null ? metric.decimals : (row.decimals != null ? row.decimals : 1);
           const unit = metric.unit != null ? metric.unit : (row.unit === '°C' ? 'K' : row.unit);
-          const deltaHtml = data.vorjahr && metric.delta && cell.cur && cell.vj
+          const deltaHtml = showDiff && data.vorjahr && metric.delta && cell.cur && cell.vj
             ? delta(cell.cur[metric.field], cell.vj[metric.field], unit, decimals, !!metric.percent) : '';
           html += cellHtml(cell.cur, cell.cur_from, metric, row, col, false, deltaHtml);
           if (data.vorjahr) html += cellHtml(cell.vj, cell.vj_from, metric, row, col, true, '');
@@ -272,6 +274,9 @@
     return values.map((value) => (value == null ? null : value * scale));
   }
 
+  // Zuletzt geladene Tabellendaten (außerhalb des Alpine-Objekts), damit das Umschalten der Differenz nicht neu lädt.
+  let lastTable = null;
+
   function readStore() {
     try {
       return JSON.parse(localStorage.getItem(STORE_KEY) || '{}') || {};
@@ -317,6 +322,7 @@
       columnKeys: COLUMN_KEYS,
       columns: [...COLUMN_KEYS],
       vorjahr: true,
+      diff: true,
       mode: 'bis_jetzt',
       tiles: [],
       tilesLoaded: false,
@@ -329,6 +335,7 @@
         const saved = readStore();
         if (Array.isArray(saved.columns)) this.columns = COLUMN_KEYS.filter((key) => saved.columns.includes(key));
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
+        if (typeof saved.diff === 'boolean') this.diff = saved.diff;
         if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
         this.loadTiles();
         this.loadTable();
@@ -375,6 +382,24 @@
       setMode(mode) {
         this.mode = mode;
         this.saveAndLoad();
+      },
+
+      // Differenzzeile unter den Werten ein- oder ausblenden; die Daten bleiben, nur die Tabelle wird neu gezeichnet.
+      toggleDiff() {
+        this.diff = !this.diff;
+        writeStore({diff: this.diff});
+        if (lastTable) this.paintTables(lastTable);
+      },
+
+      paintTables(data) {
+        for (const group of GROUPS) {
+          const table = this.$refs[refName('table', group)];
+          const wrap = this.$refs[refName('tableWrap', group)];
+          if (!table) continue;
+          table.innerHTML = renderTable(data, group, this.diff);
+          // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
+          wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1);
+        }
       },
 
       saveAndLoad() {
@@ -1313,14 +1338,8 @@
           if (!res.ok) throw new Error(String(res.status));
           const data = await res.json();
           if (seq !== this._seq) return;  // eine neuere Anfrage hat überholt
-          for (const group of GROUPS) {
-            const table = this.$refs[refName('table', group)];
-            const wrap = this.$refs[refName('tableWrap', group)];
-            if (!table) continue;
-            table.innerHTML = renderTable(data, group);
-            // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
-            wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1);
-          }
+          lastTable = data;
+          this.paintTables(data);
         } catch (e) {
           if (seq === this._seq) this.error = t('Die Tabelle konnte nicht geladen werden.');
         }

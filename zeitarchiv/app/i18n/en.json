@@ -3469,7 +3469,8 @@
     "Zustands-Entitäten lassen sich nicht in einer gemeinsamen Datei exportieren": "State entities cannot be exported in a combined file",
     "Zusätzlich Unix-Zeit (Sekunden seit 1970)": "Additionally Unix time (seconds since 1970)",
     "Ankreuzen, was exportiert werden soll. „↓ CSV“ in einer Zeile lädt sofort die komplette Historie dieser Entität als Rohwerte.": "Tick what should be exported. “↓ CSV” in a row immediately downloads the complete history of that entity as raw values.",
-    "Für ein Jahres-Backup ein Jahr wählen, für eine Auswertung einen Monat. Mit einem zweiten Klick auf den letzten Monat oder das letzte Jahr wird daraus ein Zeitraum.": "For a yearly backup choose a year, for an analysis a month. A second click on the last month or year turns it into a period."
+    "Für ein Jahres-Backup ein Jahr wählen, für eine Auswertung einen Monat. Mit einem zweiten Klick auf den letzten Monat oder das letzte Jahr wird daraus ein Zeitraum.": "For a yearly backup choose a year, for an analysis a month. A second click on the last month or year turns it into a period.",
+    "Differenz anzeigen": "Show difference"
   },
   "js": {
     "Ladestand": "State of charge",
