@@ -20,7 +20,7 @@ from .i18n import N_, tr
 
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -30,6 +30,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
+from . import wetter_analysis as analysis
 from .formatting import decimals_to_int, entity_display_name
 from .storage import query as query_mod
 from .storage import rollup as rollup_mod
@@ -212,8 +213,13 @@ class WetterService:
             start, end, self.deps.tz, now_local, read_cache,
         )
 
-    def summarize(self, kind: str, rows: list[rollup_mod.FineRow], config: dict) -> dict | None:
-        """Kennzahlen einer Zeilenmenge; None, wenn es keine Werte gibt (nie 0 vortäuschen)."""
+    def summarize(
+        self, kind: str, rows: list[rollup_mod.FineRow], config: dict, held_off: bool = False
+    ) -> dict | None:
+        """Kennzahlen einer Zeilenmenge; None, wenn es keine Werte gibt (nie 0 vortäuschen).
+
+        held_off (nur Schalter): Das Fenster liegt hinter dem ersten Wert und enthält keine Zeile, weil
+        kein Wechsel stattfand. Ein Schalter hält seinen Zustand, hier „aus“: 0 Minuten statt „–“."""
         if kind == "standard":
             values = [row.value for row in rows if row.value is not None]
             if not values:
@@ -243,10 +249,12 @@ class WetterService:
             return {
                 "sum": sum(value for value, _ts in days),
                 "days": sum(1 for value, _ts in days if value >= wet),
-                "top": top[0], "top_ts": top[1],
+                "top": top[0] if top[0] > 0 else None, "top_ts": top[1] if top[0] > 0 else None,
             }
         # Schalter: Einschaltdauer je Stunde -> Minuten je lokalem Kalendertag
         tz = self.deps.tz
+        if held_off and not rows:
+            return {"minutes": 0.0, "days": 0, "top": None, "top_ts": None}
         per_day: dict[date, float] = {}
         first_ts: dict[date, float] = {}
         for row in rows:
@@ -260,7 +268,8 @@ class WetterService:
         return {
             "minutes": sum(per_day.values()),
             "days": sum(1 for minutes in per_day.values() if minutes >= wet),
-            "top": per_day[top_day], "top_ts": first_ts[top_day],
+            "top": per_day[top_day] if per_day[top_day] > 0 else None,
+            "top_ts": first_ts[top_day] if per_day[top_day] > 0 else None,
         }
 
     # -- Spalten -----------------------------------------------------------------------
@@ -303,12 +312,16 @@ class WetterService:
                     *((("vj", win["vj_start"], win["vj_end"]),) if body.vorjahr else ()),
                 ):
                     rows = self._rows(spec["entity_id"], spec["kind"], start, end, now_local, read_cache)
-                    cell[side] = self.summarize(spec["kind"], rows, config)
+                    cell[side] = self.summarize(
+                        spec["kind"], rows, config, held_off=bool(first_ts and first_ts < start.timestamp()),
+                    )
                     # Fehlende Daten sind kein 0: Beginn des Archivs mitgeben, wenn er im Fenster liegt.
                     if cell[side] is None and first_ts and first_ts > start.timestamp():
                         cell[f"{side}_from"] = first_ts
                 cells[win["key"]] = cell
             rows_out.append({**spec, "cells": cells})
+            if spec["key"] == "temperature":
+                rows_out.append(self._kenntage_row(spec, windows, body.vorjahr, now_local, read_cache))
         return {
             "tz": str(self.deps.tz),
             "now": now_local.timestamp(),
@@ -325,6 +338,161 @@ class WetterService:
                 for win in windows
             ],
             "rows": rows_out,
+        }
+
+    def _kenntage_row(
+        self, spec: dict, windows: list[dict], with_vorjahr: bool, now_local: datetime,
+        read_cache: query_mod.QueryReadCache,
+    ) -> dict:
+        """Frost-, Eis-, Sommer- und heiße Tage als Zeilen unter der Außentemperatur. Nur Monats- und
+        Jahresspalten (an einem einzelnen Tag ist das keine Kennzahl); der laufende Tag zählt nie."""
+        tz, today = self.deps.tz, now_local.date()
+        cells: dict[str, dict] = {}
+        for win in windows:
+            if win["range"] == "day":
+                cells[win["key"]] = {}
+                continue
+            cell: dict = {}
+            for side, start, end in (
+                ("cur", win["start"], win["end"]),
+                *((("vj", win["vj_start"], win["vj_end"]),) if with_vorjahr else ()),
+            ):
+                points = query_mod.query_daily_series(
+                    self.deps.data_dir, self.deps.index, spec["entity_id"], start, end, tz, now_local, read_cache,
+                )
+                cell[side] = analysis.count_kenntage(points, tz, start.timestamp(), end.timestamp(), today)
+            cells[win["key"]] = cell
+        return {
+            "key": "kenntage", "entity_id": spec["entity_id"], "label": tr("Kenntage"), "kind": "kenntage",
+            "unit": "", "decimals": 0, "cells": cells,
+        }
+
+    # -- Auswertungen über viele Jahre (Phase 2) ----------------------------------------
+
+    def _precip_role(self, config: dict, mode: str) -> tuple[str, str] | None:
+        """(Entität, Art) der Niederschlagsrolle; ``mm`` = Zähler, ``dur`` = Regensensor. Fehlt die
+        gewünschte Art, gilt die andere; ohne beide None."""
+        roles = {"mm": "precip_mm", "dur": "precip_dur"}
+        for kind in (mode, "dur" if mode == "mm" else "mm"):
+            entity_id = config.get(roles[kind])
+            entity = self.deps.index.get_entity(entity_id) if entity_id else None
+            if entity is not None and entity["aggregation_type"] in ROLE_TYPES[roles[kind]]:
+                return entity_id, kind
+        return None
+
+    def _daily(self, entity_id: str, now_local: datetime) -> list:
+        entity = self.deps.index.get_entity(entity_id)
+        first = entity["first_ts"] if entity else None
+        if first is None:
+            return []
+        start = datetime.fromtimestamp(first, self.deps.tz).replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        return query_mod.query_daily_series(
+            self.deps.data_dir, self.deps.index, entity_id, start, now_local, self.deps.tz, now_local,
+            query_mod.QueryReadCache(),
+        )
+
+    def available_precip(self) -> list[str]:
+        """Zugeordnete Niederschlagsarten in fester Reihenfolge (Menge zuerst)."""
+        config = _load_config(self.deps.index)
+        return [kind for kind in ("mm", "dur") if (self._precip_role(config, kind) or ("", ""))[1] == kind]
+
+    def compute_precip(self, mode: str, now_local: datetime | None = None) -> dict | None:
+        config = _load_config(self.deps.index)
+        role = self._precip_role(config, mode)
+        if role is None:
+            return None
+        entity_id, kind = role
+        now_local = now_local or datetime.now(self.deps.tz)
+        factor = 1.0 / 60.0 if kind == "dur" else 1.0  # Schalter liefern Sekunden, gezeigt werden Minuten
+        daily = {
+            analysis.day_of(point, self.deps.tz): (point.value or 0.0) * factor
+            for point in self._daily(entity_id, now_local)
+        }
+        threshold = float(config["rain_day_minutes"] if kind == "dur" else config["rain_day_mm"])
+        entity = self.deps.index.get_entity(entity_id)
+        archive_start = (
+            datetime.fromtimestamp(entity["first_ts"], self.deps.tz).date() if entity and entity["first_ts"] else None
+        )
+        result = analysis.precipitation(daily, now_local.date(), threshold, hold_to_end=kind == "dur", archive_start=archive_start)
+        return {
+            **result, "mode": kind, "unit": "min" if kind == "dur" else (entity["unit"] or "mm"),
+            "threshold": threshold, "entity_id": entity_id, "tz": str(self.deps.tz),
+            "available": self.available_precip(),
+        }
+
+    def compute_monthly(self, metric: str, mode: str = "mm", now_local: datetime | None = None) -> dict | None:
+        config = _load_config(self.deps.index)
+        now_local = now_local or datetime.now(self.deps.tz)
+        if metric == "temperature":
+            entity_id, kind, unit = config["temperature"], "mean", ""
+        else:
+            role = self._precip_role(config, mode)
+            if role is None:
+                return None
+            entity_id, mode_kind = role
+            kind, unit = "sum", ("min" if mode_kind == "dur" else "mm")
+        entity = self.deps.index.get_entity(entity_id) if entity_id else None
+        if entity is None:
+            return None
+        points = self._daily(entity_id, now_local)
+        if metric != "temperature" and unit == "min":
+            points = [replace(point, value=(point.value or 0.0) / 60.0) for point in points]
+        today = now_local.date()
+        dry_start = None
+        if metric != "temperature" and unit == "min" and entity["first_ts"]:
+            dry_start = datetime.fromtimestamp(entity["first_ts"], self.deps.tz).date()
+        result = analysis.monthly(points, self.deps.tz, today, kind, dry_start)
+        result.update(metric=metric, unit=unit or entity["unit"] or "", entity_id=entity_id, tz=str(self.deps.tz))
+        result["headline"] = analysis.headline(points, self.deps.tz, today) if metric == "temperature" else None
+        return result
+
+    def compute_longterm(self, now_local: datetime | None = None) -> dict | None:
+        config = _load_config(self.deps.index)
+        now_local = now_local or datetime.now(self.deps.tz)
+        if not config["temperature"] or self.deps.index.get_entity(config["temperature"]) is None:
+            return None
+        today = now_local.date()
+        points = self._daily(config["temperature"], now_local)
+        found = analysis.records(points, self.deps.tz, today)
+        entries: list[dict] = []
+        if found:
+            for key in ("warmest_day", "coldest_day", "highest", "lowest"):
+                entries.append({"key": key, "entity_id": config["temperature"], **found[key]})
+            gust_id = config.get("gust")
+            if gust_id and self.deps.index.get_entity(gust_id) is not None:
+                gusts = [
+                    p for p in self._daily(gust_id, now_local)
+                    if p.covered and p.max_value is not None and analysis.day_of(p, self.deps.tz) < today
+                ]
+                if gusts:
+                    top = max(gusts, key=lambda p: (p.max_value, -p.day_start))
+                    entries.append({
+                        "key": "strongest_gust", "entity_id": gust_id,
+                        "value": round(top.max_value, 2), "date": analysis.day_of(top, self.deps.tz).isoformat(),
+                    })
+            precip = self._precip_role(config, "mm")
+            if precip is not None:
+                factor = 1.0 / 60.0 if precip[1] == "dur" else 1.0
+                days = [p for p in self._daily(precip[0], now_local) if analysis.day_of(p, self.deps.tz) < today]
+                if days:
+                    top = max(days, key=lambda p: ((p.value or 0.0), -p.day_start))
+                    entries.append({
+                        "key": "wettest_day" if precip[1] == "mm" else "rainiest_day", "entity_id": precip[0],
+                        "unit": "mm" if precip[1] == "mm" else "min",
+                        "value": round((top.value or 0.0) * factor, 2), "date": analysis.day_of(top, self.deps.tz).isoformat(),
+                    })
+            for entry in entries:
+                entry["offset_days"] = (date.fromisoformat(entry["date"]) - today).days
+                if "unit" not in entry:
+                    source = self.deps.index.get_entity(entry["entity_id"])
+                    entry["unit"] = (source["unit"] if source else "") or ""
+        entity = self.deps.index.get_entity(config["temperature"])
+        return {
+            "kenntage": analysis.kenntage(points, self.deps.tz, today),
+            "records": entries, "records_since": found["since"] if found else None,
+            "records_days": found["days"] if found else 0,
+            "unit": entity["unit"] or "°C", "tz": str(self.deps.tz), "today": today.isoformat(),
+            "current_year": today.year,
         }
 
     # -- Kacheln -----------------------------------------------------------------------
@@ -344,14 +512,14 @@ class WetterService:
             now_summary = self.summarize(
                 spec["kind"],
                 self._rows(spec["entity_id"], aggregation_type, today["start"], today["end"], now_local, read_cache),
-                config,
+                config, held_off=bool(entity and entity["first_ts"] and entity["first_ts"] < today["start"].timestamp()),
             )
             yesterday_summary = None
             if spec["kind"] != "standard":
                 yesterday_summary = self.summarize(
                     spec["kind"],
                     self._rows(spec["entity_id"], aggregation_type, yesterday["start"], yesterday["end"], now_local, read_cache),
-                    config,
+                    config, held_off=bool(entity and entity["first_ts"] and entity["first_ts"] < yesterday["start"].timestamp()),
                 )
             tiles.append({
                 "key": spec["key"], "label": spec["label"], "kind": spec["kind"],
@@ -371,6 +539,7 @@ class WetterService:
         config = _load_config(self.deps.index)
         return {
             "configured": _is_configured(config),
+            "precip_modes": self.available_precip(),
             "enabled": _is_enabled(self.deps.index),
             "config": config,
             **self.deps.app_root_context(request),
@@ -487,6 +656,36 @@ class WetterService:
             if not _is_configured(_load_config(deps.index)):
                 raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
             return self.compute_table(body)
+
+        def _require_configured() -> None:
+            if not _is_configured(_load_config(deps.index)):
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
+
+        @router.get("/wetterdashboard/niederschlag")
+        def wetterdashboard_precip(mode: str = "mm") -> dict:
+            _require_configured()
+            result = self.compute_precip(mode)
+            if result is None:
+                raise HTTPException(status_code=404, detail=tr("Kein Niederschlag zugeordnet."))
+            return result
+
+        @router.get("/wetterdashboard/monatsvergleich")
+        def wetterdashboard_monthly(metric: str = "temperature", mode: str = "mm") -> dict:
+            _require_configured()
+            if metric not in ("temperature", "precip"):
+                raise HTTPException(status_code=400, detail=tr("Ungültige Kennzahl."))
+            result = self.compute_monthly(metric, mode)
+            if result is None:
+                raise HTTPException(status_code=404, detail=tr("Kein Niederschlag zugeordnet."))
+            return result
+
+        @router.get("/wetterdashboard/langzeit")
+        def wetterdashboard_longterm() -> dict:
+            _require_configured()
+            result = self.compute_longterm()
+            if result is None:
+                raise HTTPException(status_code=404, detail=tr("Noch nicht eingerichtet"))
+            return result
 
         @router.get("/wetterdashboard/tiles")
         def wetterdashboard_tiles() -> dict:

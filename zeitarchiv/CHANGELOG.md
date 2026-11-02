@@ -14,6 +14,12 @@
   ganzen Vorjahreszeitraum. Der Niederschlag funktioniert mit einem Zähler
   (Menge, Regentage, nassester Tag) oder nur mit einem Regensensor ein/aus
   (Regenminuten, Regentage, regenreichster Tag), auch beides nebeneinander.
+  Unter der Tabelle vergleicht der Monatsvergleich die Jahre als Linien, mit
+  Durchschnitt, Spanne der Vorjahre und einem Satz zum laufenden Monat. Der
+  Reiter Niederschlag zeigt die Laufsumme seit Jahresbeginn gegen Vorjahr und
+  Durchschnitt, mit Regentagen, nassestem Tag und Trockenphasen, der Reiter
+  Langzeit Kenntage je Monat (Frost, Eis, Sommer, heiß) und Rekorde mit Sprung
+  zum Tag; die Kenntage stehen auch als Zeilen in der Tabelle.
   Eingeschaltet wird die Seite über eine Kachel auf der Dashboard-Übersicht,
   danach steht sie im Menü Dashboards unter dem Energiedashboard. Die
   Demo-Daten bringen dafür Wetter-Entitäten und Heizzähler mit (nach „Neu
@@ -74,7 +80,14 @@
   the same stretch of last year, "Complete" with the whole period of last year.
   Precipitation works with a counter (amount, rain days, wettest day) or with
   just an on/off rain sensor (rain minutes, rain days, rainiest day), or both
-  side by side. The page is switched on with a tile on the dashboards overview
+  side by side. Below the table, the monthly comparison shows the years as
+  lines, with average, range of previous years and a sentence on the running
+  month. The Precipitation tab shows the running total since the start of the
+  year against last year and the average, with rain days, wettest day and dry
+  spells; the Long-term tab shows characteristic days per month (frost, ice,
+  summer, hot) and records with a jump to the day; the characteristic days also
+  appear as rows in the table. The page is switched on with a tile on the
+  dashboards overview
   and then sits in the Dashboards menu below the energy dashboard. The demo data
   brings weather entities and heating counters for it (after "Regenerate").
 

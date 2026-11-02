@@ -36,6 +36,9 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 - [Wetterdashboard](#wetterdashboard)
   - [Rollen](#rollen)
   - [Kacheln und Vergleichstabelle](#kacheln-und-vergleichstabelle)
+  - [Reiter Niederschlag](#reiter-niederschlag)
+  - [Monatsvergleich](#monatsvergleich)
+  - [Reiter Langzeit](#reiter-langzeit)
 - [Entitäten und Verläufe](#entitäten-und-verläufe)
   - [Mehrere Entitäten löschen](#mehrere-entitäten-löschen)
   - [Kategorien](#kategorien)
@@ -752,6 +755,49 @@ Vorjahreszeitraum. Abgeschlossene Zeiträume (Gestern, Letzter Monat) sind in
 beiden Fällen gleich. Fehlen für einen Zeitraum Daten, steht „–“, nie 0; ein
 Tooltip nennt, ab wann das Archiv beginnt. Die Auswahl der Spalten merkt sich
 der Browser.
+
+### Reiter Niederschlag
+
+Sobald ein Niederschlag zugeordnet ist, zeigt der Reiter **Niederschlag** die
+Laufsumme seit Jahresbeginn als Linie, dazu das Vorjahr und den Durchschnitt
+der abgeschlossenen Vorjahre (gestrichelt, mit der Spanne von der trockensten bis
+zur nassesten Kurve). Ein Kopfsatz fasst es zusammen, zum Beispiel „412 mm bis
+02.11., 21 % unter dem Ø (520 mm, aus 3 Jahren)“; den Vergleich mit dem Ø gibt es
+erst ab zwei abgeschlossenen Vorjahren. Die Balken am unteren Rand sind die
+Tageswerte. Kacheln nennen Regentage, nassesten bzw. regenreichsten Tag, die
+längste Trockenphase und eine laufende Trockenphase. Mit Regensensor (ein/aus)
+zählt die Seite Regenzeit in Stunden und Regenminuten; sind beide Arten
+zugeordnet, schaltet **Menge/Dauer** um. Der 29. Februar zählt zum 28. Februar,
+eine Lücke hält die Laufsumme, nach dem letzten echten Wert endet die Linie.
+
+### Monatsvergleich
+
+Auf der Übersicht steht unter der Tabelle der Monatsvergleich: ein Linienzug je
+Jahr, das letzte Vorjahr kräftiger, das laufende Jahr am stärksten, dazu der
+Durchschnitt (gestrichelt) und auf Wunsch die Spanne der Vorjahre. Der Durchschnitt
+enthält nur abgeschlossene Vorjahre und nennt, aus wie vielen Jahren er stammt; der
+laufende Monat zeigt nur seinen bisherigen Stand. Über der Grafik steht für die
+Temperatur ein Satz wie „November bisher Ø 3,6 °C, 1,2 K kälter als der Ø 2023–2025
+(1.–2., aus 3 Jahren)“: der laufende Monat bis gestern gegen dasselbe Stück der
+Vorjahre. Er erscheint ab zwei Vorjahren mit genug Werten.
+
+### Reiter Langzeit
+
+**Kenntage je Monat** zählt nach den festen Schwellen des Deutschen
+Wetterdienstes: Frosttag (Tiefstwert unter 0 °C), Eistag (Höchstwert unter 0 °C),
+Sommertag (Höchstwert ab 25 °C), heißer Tag (ab 30 °C). Warme Tage stehen nach
+oben, kalte nach unten, die strengere Klasse als schmalerer, dunklerer Balken
+(jeder Eistag ist auch ein Frosttag). Gezählt werden nur abgeschlossene Tage
+mit mindestens 18 Stunden Werten; das Jahr wählt ihr oben. Dieselben Zahlen stehen
+als Zeilen **Kenntage** unter der Außentemperatur in der Vergleichstabelle (bei
+Monats- und Jahresspalten).
+
+**Rekorde** (wärmster und kältester Tag, höchster und tiefster Wert, stärkste Böe,
+nassester Tag) erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte
+enthält, und gelten seit Archivbeginn. Ein einzelner Messfehler kann einen
+Rekord setzen: über **Tag öffnen** springt ihr direkt in die Entität an diesem
+Tag. Fehlerhafte Werte lassen sich dort markieren; erst nach dem endgültigen
+Löschen rechnen die Rekorde ohne sie.
 
 ## Entitäten und Verläufe
 

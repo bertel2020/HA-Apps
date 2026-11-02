@@ -203,7 +203,7 @@ def test_table_counter_and_switch_rows(service) -> None:
     _configure(service, temperature="sensor.t", precip_mm="sensor.regen", precip_dur="binary_sensor.regen")
     data = service.compute_table(TableRequest(columns=["heute"], vorjahr=False), NOW)
     rows = {row["key"]: row for row in data["rows"]}
-    assert list(rows) == ["temperature", "precip_mm", "precip_dur"]
+    assert list(rows) == ["temperature", "kenntage", "precip_mm", "precip_dur"]
     assert rows["precip_mm"]["cells"]["heute"]["cur"]["sum"] == pytest.approx(1.5)
     assert rows["precip_dur"]["cells"]["heute"]["cur"]["minutes"] == pytest.approx(30.0)
     assert rows["precip_dur"]["cells"]["heute"]["cur"]["days"] == 1
@@ -221,7 +221,7 @@ def test_extra_thermometer_becomes_its_own_row(service) -> None:
     _add(service, "sensor.n", "sensor", "measurement", "°C", [(_ts(20, 1), 9.0)])
     _configure(service, temperature="sensor.t", extra_temperatures=[{"entity_id": "sensor.n", "name": "Nord"}])
     data = service.compute_table(TableRequest(columns=["heute"], vorjahr=False), NOW)
-    assert [(row["key"], row["label"]) for row in data["rows"]] == [("temperature", "Außentemperatur"), ("temperature:0", "Nord")]
+    assert [(row["key"], row["label"]) for row in data["rows"]] == [("temperature", "Außentemperatur"), ("kenntage", "Kenntage"), ("temperature:0", "Nord")]
 
 
 def test_tiles_show_today_and_skip_extra_thermometers(service) -> None:
@@ -260,7 +260,7 @@ def test_routes_page_setup_and_table_through_the_app(client) -> None:
         "temperature": "sensor.wetter_test_temp", "precip_mm": "sensor.wetter_test_regen",
         "rain_day_mm": "0,5", "rain_day_minutes": "15",
     })
-    assert saved.status_code == 200 and "wetterDashboard()" in saved.text
+    assert saved.status_code == 200 and "wetterDashboard([" in saved.text
     config = wetter_routes._load_config(index)
     assert config["rain_day_mm"] == 0.5 and config["rain_day_minutes"] == 15
 
@@ -268,10 +268,82 @@ def test_routes_page_setup_and_table_through_the_app(client) -> None:
     assert table.status_code == 200
     body = table.json()
     assert [col["key"] for col in body["columns"]] == ["heute", "jahr"] and body["mode"] == "komplett"
-    assert [row["key"] for row in body["rows"]] == ["temperature", "precip_mm"]
+    assert [row["key"] for row in body["rows"]] == ["temperature", "kenntage", "precip_mm"]
     assert client.get("/wetterdashboard/tiles").status_code == 200
 
     assert client.post("/wetterdashboard/enable").json() == {"enabled": True}
     dashboards = client.get("/dashboards").text
     assert 'href="wetterdashboard"' in dashboards and "/wetterdashboard" in dashboards  # Kachel und Menü
     assert client.post("/wetterdashboard/disable").json() == {"enabled": False}
+
+
+# -- Phase 2: Auswertungen über viele Jahre ----------------------------------------------------
+
+
+def _rain_setup(service):
+    _add(service, "sensor.regen", "sensor", "total_increasing", "mm", [
+        (_ts(18, 0), 100.0), (_ts(19, 12), 102.0), (_ts(20, 6), 103.5),
+    ])
+    _add(service, "binary_sensor.regen", "binary_sensor", None, "", [(_ts(20, 6), 1.0), (_ts(20, 6, 30), 0.0)])
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(19, 8), 10.0), (_ts(20, 1), 12.0)])
+
+
+def test_precip_series_for_the_counter_and_the_rain_sensor(service) -> None:
+    _rain_setup(service)
+    _configure(service, temperature="sensor.t", precip_mm="sensor.regen", precip_dur="binary_sensor.regen")
+    amount = service.compute_precip("mm", NOW)
+    assert amount["mode"] == "mm" and amount["unit"] == "mm" and amount["available"] == ["mm", "dur"]
+    assert amount["total"] == pytest.approx(3.5) and amount["year"] == 2026
+    assert amount["wettest"]["date"] == "2026-08-19"
+    duration = service.compute_precip("dur", NOW)
+    assert duration["mode"] == "dur" and duration["unit"] == "min" and duration["total"] == pytest.approx(30.0)
+    assert duration["threshold"] == 10.0
+
+
+def test_precip_falls_back_to_the_other_kind_and_is_none_without_roles(service) -> None:
+    _rain_setup(service)
+    _configure(service, temperature="sensor.t", precip_dur="binary_sensor.regen")
+    assert service.compute_precip("mm", NOW)["mode"] == "dur"  # nur Regensensor vorhanden
+    _configure(service, temperature="sensor.t")
+    assert service.compute_precip("mm", NOW) is None
+    assert service.compute_monthly("precip", "mm", NOW) is None
+
+
+def test_monthly_and_longterm_have_the_expected_shape(service) -> None:
+    _rain_setup(service)
+    _configure(service, temperature="sensor.t", precip_mm="sensor.regen")
+    monthly = service.compute_monthly("temperature", now_local=NOW)
+    assert monthly["metric"] == "temperature" and monthly["current_year"] == 2026 and monthly["headline"] is None
+    # Zwei Messwerte sind kein abgedeckter Tag (18 Stunden nötig): kein Monatsmittel aus Lückentagen.
+    assert len(monthly["avg"]) == 12 and monthly["years"] == {}
+    rain = service.compute_monthly("precip", "mm", NOW)
+    assert rain["unit"] == "mm" and rain["years"]["2026"][7] == pytest.approx(3.5)
+    longterm = service.compute_longterm(NOW)
+    assert longterm["records"] == [] and longterm["records_days"] == 0  # ein paar Tage sind kein Archiv
+    assert longterm["kenntage"] == {} and longterm["current_year"] == 2026  # ohne abgedeckte Tage keine Kenntage
+
+
+def test_kenntage_rows_in_the_table_for_months_only(service) -> None:
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(19, h), -2.0 if h < 12 else 6.0) for h in range(0, 24, 3)])
+    _configure(service, temperature="sensor.t")
+    data = service.compute_table(TableRequest(columns=["heute", "monat"], vorjahr=False), NOW)
+    row = next(row for row in data["rows"] if row["key"] == "kenntage")
+    assert row["cells"]["heute"] == {}  # an einem einzelnen Tag keine Kennzahl
+    assert row["cells"]["monat"]["cur"] is None or row["cells"]["monat"]["cur"]["frost"] >= 0
+
+
+def test_phase_two_routes_through_the_app(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp2", "sensor", "measurement", "°C")
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    for path in ("niederschlag", "monatsvergleich", "langzeit"):
+        assert client.get(f"/wetterdashboard/{path}").status_code == 409  # noch nicht eingerichtet
+    _save = {**wetter_routes._empty_config(), "temperature": "sensor.wetter_test_temp2"}
+    wetter_routes._save_config(index, _save)
+    assert client.get("/wetterdashboard/niederschlag").status_code == 404  # keine Niederschlagsrolle
+    assert client.get("/wetterdashboard/monatsvergleich?metric=precip").status_code == 404
+    assert client.get("/wetterdashboard/monatsvergleich?metric=unsinn").status_code == 400
+    assert client.get("/wetterdashboard/monatsvergleich?metric=temperature").status_code == 200
+    assert client.get("/wetterdashboard/langzeit").status_code == 200
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")

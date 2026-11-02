@@ -36,6 +36,9 @@ internals for developers are in the other documents of this folder (see
 - [Weather dashboard](#weather-dashboard)
   - [Roles](#roles)
   - [Tiles and comparison table](#tiles-and-comparison-table)
+  - [Precipitation tab](#precipitation-tab)
+  - [Monthly comparison](#monthly-comparison)
+  - [Long-term tab](#long-term-tab)
 - [Entities and histories](#entities-and-histories)
   - [Deleting several entities](#deleting-several-entities)
   - [Categories](#categories)
@@ -700,6 +703,47 @@ occurred (the hour for today and yesterday, otherwise the day).
 year. Completed periods (yesterday, last month) are the same in both cases. If
 a period has no data it shows “–”, never 0; a tooltip tells when the archive
 begins. The browser remembers the column selection.
+
+### Precipitation tab
+
+Once a precipitation entity is assigned, the **Precipitation** tab shows the
+running total since the start of the year as a line, plus last year and the
+average of the completed previous years (dashed, with the range from the driest to
+the wettest curve). A headline sums it up, for example "412 mm until 02.11., 21 %
+below the mean (520 mm, from 3 years)"; the comparison with the mean needs at
+least two completed previous years. The bars along the bottom are the daily
+values. Tiles name rain days, the wettest or rainiest day, the longest dry spell
+and a running dry spell. With an on/off rain sensor the page counts rain time in
+hours and rain minutes; if both kinds are assigned, **Amount/Duration** switches
+between them. 29 February counts to 28 February, a gap holds the running total,
+and the line ends after the last real value.
+
+### Monthly comparison
+
+On the overview, below the table, sits the monthly comparison: one line per year,
+the last previous year stronger, the current year strongest, plus the average
+(dashed) and optionally the range of previous years. The average contains only
+completed previous years and says how many years it comes from; the running month
+only shows its state so far. For temperature a sentence sits above the chart, such
+as "November so far mean 3.6 °C, 1.2 K colder than the mean of 2023–2025 (1–2, from
+3 years)": the running month up to yesterday against the same stretch of previous
+years. It appears from two previous years with enough values.
+
+### Long-term tab
+
+**Characteristic days per month** counts by the fixed thresholds of the German
+Weather Service: frost day (minimum below 0 °C), ice day (maximum below 0 °C),
+summer day (maximum from 25 °C), hot day (from 30 °C). Warm days go up, cold days
+down, the stricter class as a narrower, darker bar (every ice day is also a frost
+day). Only completed days with at least 18 hours of values are counted; you pick the
+year above. The same numbers appear as **Characteristic days** rows under the
+outdoor temperature in the comparison table (for month and year columns).
+
+**Records** (warmest and coldest day, highest and lowest value, strongest gust,
+wettest day) appear once the archive holds at least a year of daily values and apply
+since the archive began. A single measurement error can set a record: **Open day**
+jumps straight to the entity on that day, where faulty values can be marked; only after
+they are deleted for good do the records exclude them.
 
 ## Entities and histories
 

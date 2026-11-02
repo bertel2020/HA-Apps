@@ -10,7 +10,7 @@
 {% else %}
 {# Kein x-init="init()": Alpine ruft init() des x-data-Objekts selbst auf (siehe
    _energiedashboard_view.html — mit x-init liefe es doppelt). #}
-<div x-data="wetterDashboard()">
+<div x-data='wetterDashboard({{ precip_modes | tojson }})'>
   <div class="wt-title-row">
     <h1>{{ _("Wetterdashboard") }}</h1>
     <button type="button" class="wt-title-edit" title="{{ _('Rollen bearbeiten') }}"
@@ -18,6 +18,15 @@
   </div>
   <p class="sub">{{ _("Aktuelle Werte und der Vergleich mit dem Vorjahr.") }}</p>
 
+  <div class="wt-tabs" role="tablist">
+    <button type="button" role="tab" :aria-selected="(tab === 'overview').toString()" @click="showTab('overview')">{{ _("Übersicht") }}</button>
+    {% if precip_modes %}
+    <button type="button" role="tab" :aria-selected="(tab === 'precip').toString()" @click="showTab('precip')">{{ _("Niederschlag") }}</button>
+    {% endif %}
+    <button type="button" role="tab" :aria-selected="(tab === 'long').toString()" @click="showTab('long')">{{ _("Langzeit") }}</button>
+  </div>
+
+  <section x-show="tab === 'overview'">
   <div class="wt-tiles" x-show="tiles.length" x-cloak>
     <template x-for="tile in tiles" :key="tile.key">
       <div class="wt-tile">
@@ -47,5 +56,81 @@
       <table class="wt-table" x-ref="table"></table>
     </div>
   </div>
+
+  <div class="card wt-card" x-show="monthly" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Monatsvergleich") }}</h2>
+      {% if precip_modes %}
+      <div class="wt-seg" role="group" aria-label="{{ _('Kennzahl') }}">
+        <button type="button" :aria-pressed="(monthlyMetric === 'temperature').toString()" @click="setMonthlyMetric('temperature')">{{ _("Temperatur") }}</button>
+        <button type="button" :aria-pressed="(monthlyMetric === 'precip').toString()" @click="setMonthlyMetric('precip')">{{ _("Niederschlag") }}</button>
+      </div>
+      {% endif %}
+      <label class="wt-check"><input type="checkbox" x-model="band" @change="drawMonthly()"> {{ _("Spanne der Vorjahre") }}</label>
+    </div>
+    <p class="wt-headline" x-show="monthlyMetric === 'temperature' && headline()" x-text="headline()"></p>
+    <div class="wt-chart" x-ref="monthlyChart"></div>
+    <p class="wt-hint" x-text="monthlyNote()"></p>
+  </div>
+  </section>
+
+  {% if precip_modes %}
+  <section x-show="tab === 'precip'" x-cloak>
+    <div class="card wt-card">
+      <div class="wt-controls">
+        <h2 class="wt-h2">{{ _("Niederschlag seit Jahresbeginn") }}</h2>
+        {% if precip_modes | length > 1 %}
+        <div class="wt-seg" role="group" aria-label="{{ _('Art des Niederschlags') }}">
+          <button type="button" :aria-pressed="(precipMode === 'mm').toString()" @click="setPrecipMode('mm')">{{ _("Menge") }}</button>
+          <button type="button" :aria-pressed="(precipMode === 'dur').toString()" @click="setPrecipMode('dur')">{{ _("Dauer") }}</button>
+        </div>
+        {% endif %}
+      </div>
+      <p class="wt-headline" x-show="precip" x-text="precipHeadline()"></p>
+      <div class="wt-kpis" x-show="precip">
+        <template x-for="kpi in precipKpis()" :key="kpi.label">
+          <div class="wt-tile">
+            <span class="wt-tile-label" x-text="kpi.label"></span>
+            <span class="wt-tile-value" x-html="kpi.value"></span>
+            <span class="wt-tile-sub" x-text="kpi.sub"></span>
+          </div>
+        </template>
+      </div>
+      <div class="wt-chart wt-chart-tall" x-ref="precipChart"></div>
+      <p class="wt-hint wt-error" x-show="precipError" x-text="precipError" x-cloak></p>
+    </div>
+  </section>
+  {% endif %}
+
+  <section x-show="tab === 'long'" x-cloak>
+    <div class="card wt-card">
+      <div class="wt-controls">
+        <h2 class="wt-h2">{{ _("Kenntage je Monat") }}</h2>
+        <label class="wt-check">{{ _("Jahr") }}
+          <select x-model="kenntageYear" @change="drawKenntage()">
+            <template x-for="year in kenntageYears()" :key="year"><option :value="year" x-text="year"></option></template>
+          </select>
+        </label>
+      </div>
+      <div class="wt-chart" x-ref="kenntageChart"></div>
+      <p class="wt-hint" x-text="kenntageNote()"></p>
+    </div>
+    <div class="card wt-card" x-show="longterm && longterm.records.length" x-cloak>
+      <h2 class="wt-h2">{{ _("Rekorde") }}</h2>
+      <div class="wt-kpis">
+        <template x-for="record in longterm.records" :key="record.key">
+          <div class="wt-tile">
+            <span class="wt-tile-label" x-text="recordLabel(record.key)"></span>
+            <span class="wt-tile-value" x-html="recordValue(record)"></span>
+            <span class="wt-tile-sub" x-text="recordDate(record)"></span>
+            <a class="wt-record-link" :href="recordLink(record)">{{ _("Tag öffnen") }}</a>
+          </div>
+        </template>
+      </div>
+      <p class="wt-hint" x-text="recordsNote()"></p>
+    </div>
+    <p class="wt-hint" x-show="longterm && !longterm.records.length" x-cloak>{{ _("Rekorde erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte enthält.") }}</p>
+    <p class="wt-hint wt-error" x-show="longError" x-text="longError" x-cloak></p>
+  </section>
 </div>
 {% endif %}
