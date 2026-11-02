@@ -97,7 +97,12 @@
     if (!metric.when || !summary) return '';
     const ts = summary[metric.field + '_ts'];
     if (ts == null) return '';
-    if (col.range === 'day') return metric.when === 'point' ? fmtDate(formats.hm, ts) : '';
+    if (col.range === 'day') {
+      // Die Werte stammen aus Stundenzeilen: „0–1 Uhr“ ist ehrlicher als eine Minutenangabe wie „00:00“.
+      if (metric.when !== 'point') return '';
+      const hour = ZT.parts(ts).hour;
+      return t('{from}–{to} Uhr', {from: hour, to: hour + 1});
+    }
     return fmtDate(formats.dm, ts);
   }
 

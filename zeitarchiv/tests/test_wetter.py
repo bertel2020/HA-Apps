@@ -608,3 +608,10 @@ def test_tiles_and_table_show_placeholders_while_loading() -> None:
     text = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
     assert 'x-show="!tilesLoaded"' in text and "wt-tile is-loading" in text and 'class="wt-loading"' in text
     assert "this.tilesLoaded = true" in (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+
+
+def test_day_columns_name_the_hour_not_a_minute() -> None:
+    from _paths import APP
+
+    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "t('{from}–{to} Uhr'" in script and "fmtDate(formats.hm, ts)" not in script

@@ -4063,6 +4063,7 @@
     "{period}: {value} kWh je Kelvin ({n} Tage, R² {r2})": "{period}: {value} kWh per kelvin ({n} days, R² {r2})",
     "heute max. {max}": "today max. {max}",
     "Entität öffnen": "Open entity",
-    "Die Tabelle zeigt die Zeiträume zum {date}; die Kacheln zeigen weiter die aktuellen Werte.": "The table shows the periods as of {date}; the tiles still show the current values."
+    "Die Tabelle zeigt die Zeiträume zum {date}; die Kacheln zeigen weiter die aktuellen Werte.": "The table shows the periods as of {date}; the tiles still show the current values.",
+    "{from}–{to} Uhr": "{from}–{to} h"
   }
 }
