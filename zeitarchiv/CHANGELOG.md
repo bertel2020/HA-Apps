@@ -5,66 +5,44 @@
 ### Neu
 
 - **Wetterdashboard**: Eine neue Seite für Wetterwerte, aufgebaut wie das
-  Energiedashboard: Außentemperatur, Niederschlag, Luftfeuchte, Luftdruck, Wind,
-  Böe und Strahlung werden je einer Entität zugeordnet, weitere Thermometer
-  erscheinen als eigene Zeilen. Kacheln zeigen den aktuellen Wert, die Tabelle
-  vergleicht Heute, Gestern, Diesen und Letzten Monat sowie Dieses Jahr mit dem
-  Vorjahr, mit Zeitpunkt von Max und Min und der Differenz unter dem Wert.
-  „Bis jetzt“ vergleicht mit demselben Stück des Vorjahres, „Komplett“ mit dem
-  ganzen Vorjahreszeitraum. Der Niederschlag funktioniert mit einem Zähler
-  (Menge, Regentage, nassester Tag) oder nur mit einem Regensensor ein/aus
-  (Regenminuten, Regentage, regenreichster Tag), auch beides nebeneinander.
-  Unter der Tabelle vergleicht der Monatsvergleich die Jahre als Linien, mit
-  Durchschnitt, Spanne der Vorjahre und einem Satz zum laufenden Monat. Der
-  Reiter Niederschlag zeigt die Laufsumme seit Jahresbeginn gegen Vorjahr und
-  Durchschnitt, mit Regentagen, nassestem Tag und Trockenphasen, der Reiter
-  Langzeit Kenntage je Monat (Frost, Eis, Sommer, heiß) und Rekorde mit Sprung
-  zum Tag; die Kenntage stehen auch als Zeilen in der Tabelle. Dazu zeigt
-  Langzeit alle Jahre als Matrix, Tag für Tag, mit dem neuesten Jahr oben.
-  Ordnet ihr Heizzähler zu (auch mehrere), erscheint der Reiter Heizen:
-  Streudiagramm Tagesmittel gegen kWh mit Ausgleichsgerade, Gradtagzahl und
-  kWh je Gradtag je Monat und Heizperiode, und der Anteil je Zähler.
-  Die Tabelle lässt sich über die Stichtag-Leiste der Dashboards auf einen früheren Tag stellen.
-  Eingeschaltet wird die Seite über eine Kachel auf der Dashboard-Übersicht,
-  danach steht sie im Menü Dashboards unter dem Energiedashboard. Backups
-  sichern die Zuordnung mit, der selektive Restore stellt sie wieder her, und
-  unter Einstellungen → Darstellung lässt sich die Seite als Startseite wählen. Die
-  Demo-Daten bringen dafür Wetter-Entitäten und Heizzähler mit (nach „Neu
-  erzeugen“).
+  Energiedashboard.
+  - Außentemperatur, Niederschlag, Luftfeuchte, Luftdruck, Wind, Böe und
+    Strahlung werden je einer Entität zugeordnet
+  - Kacheln mit dem aktuellen Wert; Tabelle mit Heute, Gestern, Monat und Jahr
+    gegen den Vorjahreszeitraum (Stichtag über die Leiste der Dashboards wählbar)
+  - Niederschlag mit Zähler oder mit einem Regensensor ein/aus
+  - Monatsvergleich der Jahre als Linien
+  - Reiter Niederschlag (Laufsumme, Regentage, Trockenphasen) und Langzeit
+    (Kenntage, Rekorde, Jahresmatrix)
+  - Mit zugeordneten Heizzählern: Reiter Heizen mit Gradtagzahl und kWh je Gradtag
+  - Einschalten über die Dashboard-Übersicht; in Backups und selektivem Restore
+    enthalten, als Startseite wählbar, Demo-Daten inklusive
 
-- **Entitäten, Kategorien**: Entitäten lassen sich nach Thema ordnen, zum
-  Beispiel Wärmepumpe, Solar oder Wetter, zusätzlich zu den
-  Favoriten-Sternen. Der neue Reiter **Kategorien** neben „Liste“ und
-  „Auswahl & Verlauf“ legt sie an, benennt sie um, färbt sie ein und
-  bestimmt per Ziehen ihre Reihenfolge; beim ersten Öffnen bietet er
-  Vorschläge zum Übernehmen an. In der Entitätenliste steht dann die Spalte
-  **Kategorie** (über „Spalten“ ausblendbar), ein Klick auf die Überschrift
-  sortiert nach der Reihenfolge der Kategorien. Zugeordnet wird im
-  Auswahlmodus über **Kategorie setzen** oder einzeln in der Konfiguration
-  einer Entität. Ein Filter **Kategorie** in der Liste zeigt eine oder
-  mehrere Kategorien oder die Entitäten ohne Kategorie. Der
-  Auswahl-Assistent schlägt beim Übernehmen eine Kategorie vor, passend zum
-  Thema, und legt sie bei Bedarf an. Der Export hat denselben Filter. Der
-  selektive Restore bringt die Kategorien zurück, und die Demo-Daten kommen
-  mit Kategorien.
+- **Entitäten, Kategorien**: Entitäten lassen sich zusätzlich zu den Sternen
+  nach Thema ordnen, zum Beispiel Wärmepumpe oder Solar.
+  - Neuer Reiter **Kategorien**: anlegen, umbenennen, einfärben, per Ziehen
+    sortieren (mit Vorschlägen beim ersten Öffnen)
+  - Entitätenliste: Spalte **Kategorie**, Sortierung und Filter; zugeordnet
+    wird im Auswahlmodus oder in der Konfiguration einer Entität
+  - Der Auswahl-Assistent schlägt eine passende Kategorie vor
+  - Filter auch in „Auswahl & Verlauf“ und im Export
+  - Der selektive Restore stellt Kategorien wieder her
 
-- **Entitäten, Kennzahlen im Kopf**: Über den Reitern jeder Entität (Verlauf,
-  Werte bearbeiten, Konfiguration) stehen jetzt die Kennzahlen aus der
-  Entitätenliste: Typ und Einheit, erster und letzter Wert (mit dem Alter),
-  Anzahl der Datensätze und Größe. Dazu kommt je nach Typ der Wertebereich
-  (Minimum und Maximum über den gesamten Zeitraum), der aktuelle Zählerstand
-  oder die Zahl der Zustände. Die Kacheln auf dem Reiter Konfiguration
-  entfallen.
+- **Entitäten, Kennzahlen im Kopf**: Über den Reitern jeder Entität stehen jetzt
+  die Kennzahlen aus der Entitätenliste (Typ, Einheit, erster und letzter Wert,
+  Datensätze, Größe, je nach Typ Wertebereich oder Zählerstand). Die Kacheln auf
+  dem Reiter Konfiguration entfallen.
 
 ### Geändert
 
-- **Entität konfigurieren, neu gegliedert**: Die Konfigurationsseite ist jetzt in
-  die Abschnitte Allgemein, Erfassung, Aufbewahrung, Darstellung und Prüfung
-  geteilt, mit einer Sprungzeile oben. Jedes Feld ist eine Zeile mit Kurzzeile,
-  der ausführliche Text steht hinter dem Info-Knopf und ist auch am Rechner
-  zugeklappt. Das Abzeichen „angepasst“ zeigt, welche Werte vom globalen Standard
-  abweichen, und bei Schaltern und Zuständen zeigen gesperrte Felder ihren
-  festen Wert statt eines ausgegrauten Auswahlfelds.
+- **Entität konfigurieren, neu gegliedert**: Die Konfigurationsseite ist
+  übersichtlicher.
+  - Abschnitte Allgemein, Erfassung, Aufbewahrung, Darstellung und Prüfung mit
+    Sprungzeile
+  - Jedes Feld mit Kurzzeile, der ausführliche Text steht hinter dem Info-Knopf
+  - Das Abzeichen „angepasst“ zeigt Abweichungen vom Standard und setzt nach
+    einer Rückfrage zurück
+  - Gesperrte Felder zeigen ihren festen Wert
 
 ### Behoben
 
@@ -85,59 +63,43 @@
 #### New
 
 - **Weather dashboard**: A new page for weather values, built like the energy
-  dashboard: outdoor temperature, precipitation, humidity, air pressure, wind,
-  gust and radiation are each assigned to an entity, additional thermometers
-  appear as their own rows. Tiles show the current value, the table compares
-  Today, Yesterday, This and Last month and This year with last year, with the
-  time of max and min and the difference below the value. "So far" compares with
-  the same stretch of last year, "Complete" with the whole period of last year.
-  Precipitation works with a counter (amount, rain days, wettest day) or with
-  just an on/off rain sensor (rain minutes, rain days, rainiest day), or both
-  side by side. Below the table, the monthly comparison shows the years as
-  lines, with average, range of previous years and a sentence on the running
-  month. The Precipitation tab shows the running total since the start of the
-  year against last year and the average, with rain days, wettest day and dry
-  spells; the Long-term tab shows characteristic days per month (frost, ice,
-  summer, hot) and records with a jump to the day; the characteristic days also
-  appear as rows in the table. The table can be set to an earlier day with the reference-date bar of the dashboards. Long-term also shows all years as a matrix,
-  day by day, with the newest year on top. If you assign heating
-  counters (several are possible), the Heating tab appears: scatter chart of daily
-  mean against kWh with regression line, degree days and kWh per degree day per
-  month and heating season, and the share per counter. The page is switched on
-  with a tile on the dashboards overview and then sits in the Dashboards menu
-  below the energy dashboard. Backups include the assignment, and the selective
-  restore brings it back, and under Settings → Appearance the page can be chosen
-  as the start page. The demo data brings weather entities and heating
-  counters for it (after "Regenerate").
+  dashboard.
+  - Outdoor temperature, precipitation, humidity, pressure, wind, gust and
+    radiation are each assigned to an entity
+  - Tiles with the current value; table with Today, Yesterday, month and year
+    against the previous year (reference date selectable via the dashboards bar)
+  - Precipitation with a counter or with an on/off rain sensor
+  - Monthly comparison of the years as lines
+  - Precipitation tab (running total, rain days, dry spells) and Long-term tab
+    (characteristic days, records, year matrix)
+  - With assigned heating counters: Heating tab with degree days and kWh per
+    degree day
+  - Switch on via the dashboards overview; included in backups and the
+    selective restore, selectable as start page, demo data included
 
-- **Entities, categories**: Entities can be grouped by topic, for example heat
-  pump, solar or weather, in addition to the favorite stars. The new
-  **Categories** tab next to "List" and "Selection & history" creates, renames
-  and colors them and sets their order by dragging; when first opened it offers
-  suggestions to take over. The entity list then shows a **Category** column
-  (hideable via "Columns"), and clicking its heading sorts by the order of the
-  categories. Assign in selection mode with **Set category**, or one at a time
-  in an entity's configuration. A **Category** filter in the list shows one
-  or more categories or the entities without a category. The selection
-  assistant suggests a category when applying, matching the topic, and creates
-  it if needed. The export has the same filter. The selective restore brings
-  the categories back, and the demo data comes with categories.
+- **Entities, categories**: In addition to the stars, entities can be grouped
+  by topic, for example heat pump or solar.
+  - New **Categories** tab: create, rename, color, reorder by dragging (with
+    suggestions on first open)
+  - Entity list: **Category** column, sorting and filter; assign in selection
+    mode or in an entity's configuration
+  - The selection assistant suggests a fitting category
+  - Filter also in "Selection & history" and in the export
+  - The selective restore brings categories back
 
-- **Entities, key facts in the header**: Above the tabs of every entity
-  (History, Edit values, Configuration) you now see the key facts from the
-  entity list: type and unit, first and last value (with its age), number of
-  records and size. Depending on the type there is also the value range
-  (minimum and maximum over the entire period), the current counter reading or
-  the number of states. The tiles on the Configuration tab are gone.
+- **Entities, key facts in the header**: Above the tabs of every entity you now
+  see the key facts from the entity list (type, unit, first and last value,
+  records, size, depending on the type value range or counter reading). The
+  tiles on the Configuration tab are gone.
 
 #### Changed
 
-- **Configure an entity, restructured**: The configuration page is now split into
-  the sections General, Recording, Retention, Display and Checks, with a jump
-  line at the top. Each field is one row with a short line; the detailed text is
-  behind the info button and is collapsed on desktop too. The "customised" badge
-  shows which values differ from the global default, and for switches and states
-  locked fields show their fixed value instead of a greyed-out dropdown.
+- **Configure an entity, restructured**: The configuration page is clearer.
+  - Sections General, Recording, Retention, Display and Checks with a jump line
+  - Each field has a short line; the detailed text is behind the info button
+  - The "customised" badge shows deviations from the default and resets after a
+    confirmation
+  - Locked fields show their fixed value
 
 #### Fixed
 
