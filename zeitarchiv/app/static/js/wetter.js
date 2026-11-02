@@ -218,6 +218,9 @@
 
   const gridBox = {left: 8, right: 16, top: 34, bottom: 8, containLabel: true};
 
+  // Auf schmalen Bildschirmen bricht die Legende in zwei Zeilen um und braucht mehr Platz über dem Diagramm.
+  const gridFor = (element, extra) => ({...gridBox, top: element.clientWidth < 520 ? 74 : 34, ...extra});
+
   function legendBox(colors, data) {
     return {data, top: 0, textStyle: {color: colors.text, fontSize: scaledFont(12)}, itemWidth: 18, itemHeight: 8};
   }
@@ -455,7 +458,7 @@
         const unit = m.unit;
         const chart = chartFor('monthly', element);
         chart.setOption({
-          animation: false, grid: gridBox, legend: legendBox(colors, legend),
+          animation: false, grid: gridFor(element), legend: legendBox(colors, legend),
           xAxis: {type: 'category', data: labels, boundaryGap: false, ...axisStyle(colors)},
           yAxis: {type: 'value', scale: m.metric === 'temperature', name: unit, nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
           tooltip: tooltipBox(colors, (params) => {
@@ -609,13 +612,13 @@
         });
         const chart = chartFor('precip', element);
         chart.setOption({
-          animation: false, grid: {...gridBox, right: 8}, legend: legendBox(colors, legend),
+          animation: false, grid: gridFor(element, {right: 8}), legend: legendBox(colors, legend),
           xAxis: {
             type: 'category', data: labels, boundaryGap: false, ...axisStyle(colors),
             axisLabel: {
               color: colors.text, fontSize: scaledFont(11),
               interval: (index) => MONTH_STARTS.includes(index),
-              formatter: (_value, index) => monthName(slotDate(index).month, 'short'),
+              formatter: (_value, index) => monthName(slotDate(index).month, element.clientWidth < 520 ? 'narrow' : 'short'),
             },
             splitLine: {show: false},
           },
@@ -680,7 +683,7 @@
         const negative = (values) => values.map((value) => (value ? -value : 0));
         const chart = chartFor('kenntage', element);
         chart.setOption({
-          animation: false, grid: gridBox,
+          animation: false, grid: gridFor(element),
           legend: legendBox(colors, [t('Sommertage'), t('Heiße Tage'), t('Frosttage'), t('Eistage')]),
           xAxis: {type: 'category', data: labels, ...axisStyle(colors), splitLine: {show: false}, axisLabel: {color: colors.text, fontSize: scaledFont(11), margin: 12}},
           yAxis: {
@@ -763,7 +766,7 @@
             axisLabel: {
               color: colors.text, fontSize: scaledFont(11),
               interval: (index) => MONTH_STARTS_LEAP.includes(index),
-              formatter: (_value, index) => monthName(leapSlotDate(index).month, 'short'),
+              formatter: (_value, index) => monthName(leapSlotDate(index).month, element.clientWidth < 520 ? 'narrow' : 'short'),
             },
           },
           yAxis: {
@@ -974,7 +977,7 @@
         });
         const chart = chartFor('heat', element);
         chart.setOption({
-          animation: false, grid: {...gridBox, right: 20, bottom: 24}, legend: {...legendBox(colors, legend), left: 70},
+          animation: false, grid: gridFor(element, {right: 20, bottom: 24}), legend: {...legendBox(colors, legend), left: 70},
           xAxis: {
             type: 'value', name: t('Tages-Ø Außentemperatur (°C)'), nameLocation: 'middle', nameGap: 26,
             nameTextStyle: {color: colors.text}, ...axisStyle(colors), min: (value) => Math.floor(value.min / 5) * 5,
@@ -1068,7 +1071,7 @@
         }));
         const chart = chartFor('heatShare', element);
         chart.setOption({
-          animation: false, grid: gridBox, legend: legendBox(colors, this.heat.counters.map((c) => c.name)),
+          animation: false, grid: gridFor(element), legend: legendBox(colors, this.heat.counters.map((c) => c.name)),
           xAxis: {type: 'category', data: labels, ...axisStyle(colors), splitLine: {show: false}},
           yAxis: {type: 'value', name: 'kWh', nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
           tooltip: tooltipBox(colors, (params) => {
