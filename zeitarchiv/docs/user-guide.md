@@ -809,8 +809,7 @@ Monats- und Jahresspalten).
 **Mitteltemperatur je Monat und Jahr** zeigt eine Zeile je Jahr und eine Spalte je Monat
 sowie das Jahresmittel rechts. Die Farbe zeigt, wie weit ein Monat vom Mittel dieses
 Monats über alle abgeschlossenen Jahre im Archiv abweicht (blau kälter, rot wärmer);
-„Abweichung vom Mittel“ schreibt die Differenz in Kelvin in die Zelle, „Werte“ die
-Temperatur. Ein Vergleich entsteht erst, wenn es für den Monat mindestens zwei
+Jede Zelle zeigt oben die Temperatur und darunter die Differenz in Kelvin. Ein Vergleich entsteht erst, wenn es für den Monat mindestens zwei
 abgeschlossene Jahre gibt; bis dahin stehen die Werte ungefärbt da. Das Jahresmittel
 erscheint ab sechs Monaten mit Werten, das laufende Jahr ist mit * markiert und
 zählt nicht zum Mittel. Gezeigt werden höchstens die letzten zehn Jahre.

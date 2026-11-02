@@ -192,10 +192,6 @@
       <div class="wt-controls">
         <h2 class="wt-h2">{{ _("Mitteltemperatur je Monat und Jahr") }} {{ hint_button(_("Mitteltemperatur je Monat und Jahr")) }}</h2>
         {% call hint_body() %}<span x-text="tempYearsNote()"></span>{% endcall %}
-        <div class="wt-seg" role="group" aria-label="{{ _('Anzeige') }}">
-          <button type="button" :aria-pressed="(tempYearsMode === 'dev').toString()" @click="setTempYearsMode('dev')">{{ _("Abweichung vom Mittel") }}</button>
-          <button type="button" :aria-pressed="(tempYearsMode === 'val').toString()" @click="setTempYearsMode('val')">{{ _("Werte") }}</button>
-        </div>
       </div>
       <div class="tbl-wrap wt-table-wrap"><table class="wt-tm" x-ref="tempYearsTable"></table></div>
       <div class="wt-tm-legend">

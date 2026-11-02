@@ -755,8 +755,8 @@ outdoor temperature in the comparison table (for month and year columns).
 
 **Mean temperature per month and year** shows one row per year, one column per month and
 the annual mean on the right. The colour shows how far a month deviates from the mean of
-that month over all completed years in the archive (blue colder, red warmer); "Deviation
-from mean" writes the difference in kelvin into the cell, "Values" the temperature. A
+that month over all completed years in the archive (blue colder, red warmer). Each cell
+shows the temperature on top and the difference in kelvin below. A
 comparison exists only once a month has at least two completed years; until then the
 values are shown uncoloured. The annual mean appears from six months with values; the
 current year is marked with * and does not count towards the mean. At most the last ten

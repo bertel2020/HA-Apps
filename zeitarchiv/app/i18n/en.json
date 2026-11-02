@@ -4176,11 +4176,10 @@
     "Sensor": "Sensor",
     "Weiterer Sensor": "Additional sensor",
     "* laufendes Jahr, bis {date}": "* current year, up to {date}",
-    "Farbe und Zahl zeigen, wie weit ein Monat vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv abweicht (in Kelvin). Die letzte Zeile ist das Mittel.": "Colour and number show how far a month deviates from the mean of that month over all completed years in the archive (in kelvin). The last row is the mean.",
-    "Mitteltemperatur je Monat. Die Farbe zeigt weiter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv; die letzte Zeile ist das Mittel.": "Mean temperature per month. The colour still shows the deviation from the mean of that month over all completed years in the archive; the last row is the mean.",
     "Jahr Ø": "Year Ø",
     "{month} {year}: {value} {unit} ({delta} K zum Mittel)": "{month} {year}: {value} {unit} ({delta} K from the mean)",
     "Jahresmittel {year}: {value} {unit}": "Annual mean {year}: {value} {unit}",
-    "{month} {year}: {value} {unit}": "{month} {year}: {value} {unit}"
+    "{month} {year}: {value} {unit}": "{month} {year}: {value} {unit}",
+    "Oben die Mitteltemperatur, darunter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv (in Kelvin). Die letzte Zeile ist das Mittel.": "Mean temperature on top, below it the deviation from the mean of that month over all completed years in the archive (in kelvin). The last row is the mean."
   }
 }

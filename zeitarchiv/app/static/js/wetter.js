@@ -318,7 +318,6 @@
       heatError: '',
       matrix: null,
       tempYears: null,
-      tempYearsMode: 'dev',
       matrixError: '',
 
       columnKeys: COLUMN_KEYS,
@@ -338,7 +337,6 @@
         if (Array.isArray(saved.columns)) this.columns = COLUMN_KEYS.filter((key) => saved.columns.includes(key));
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
-        if (saved.tempYearsMode === 'val' || saved.tempYearsMode === 'dev') this.tempYearsMode = saved.tempYearsMode;
         if (saved.kenntageRange === '5' || saved.kenntageRange === 'all') this.kenntageRange = saved.kenntageRange;
         if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
         this.loadTiles();
@@ -931,16 +929,8 @@
         }
       },
 
-      setTempYearsMode(mode) {
-        this.tempYearsMode = mode;
-        writeStore({tempYearsMode: mode});
-        this.drawTempYears();
-      },
-
       tempYearsNote() {
-        return this.tempYearsMode === 'dev'
-          ? t('Farbe und Zahl zeigen, wie weit ein Monat vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv abweicht (in Kelvin). Die letzte Zeile ist das Mittel.')
-          : t('Mitteltemperatur je Monat. Die Farbe zeigt weiter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv; die letzte Zeile ist das Mittel.');
+        return t('Oben die Mitteltemperatur, darunter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv (in Kelvin). Die letzte Zeile ist das Mittel.');
       },
 
       drawTempYears() {
@@ -960,17 +950,18 @@
         })();
         const unit = data.unit || '°C';
         const sign = (value) => (Math.round(Math.abs(value) * 10) === 0 ? '±' : (value > 0 ? '+' : '−')) + num(Math.abs(value), 1);
-        const dev = this.tempYearsMode === 'dev';
+        // Mittelwerte ohne „-0,0“: ein Wert, der auf null rundet, heißt 0,0.
+        const plain = (value) => num(Math.round(Math.abs(value) * 10) === 0 ? 0 : value, 1);
         const cold = colors.cold, hot = colors.prev, base = cssVar('--surface-alt');
         const cell = (value, ref, title, strong) => {
           if (value == null) return `<td class="wt-tm-na">–</td>`;
-          // Ohne Vergleichswert (weniger als zwei abgeschlossene Jahre für diesen Monat) bleibt die Zelle ungefärbt.
-          if (ref == null) return `<td class="wt-tm-plain${strong ? ' wt-tm-year' : ''}"${title ? ` data-tooltip-fixed="${escapeHtml(title)}"` : ''}>${escapeHtml(num(value, 1))}</td>`;
+          const tip = title ? ` data-tooltip-fixed="${escapeHtml(title)}"` : '';
+          // Ohne Vergleichswert (weniger als zwei abgeschlossene Jahre für diesen Monat) bleibt die Zelle ungefärbt und einzeilig.
+          if (ref == null) return `<td class="wt-tm-plain${strong ? ' wt-tm-year' : ''}"${tip}>${escapeHtml(plain(value))}</td>`;
           const diff = value - ref;
           const share = Math.round(Math.min(1, Math.abs(diff) / 3.2) * 80);
           const style = ` style="background:color-mix(in srgb, ${diff < 0 ? cold : hot} ${share}%, ${base})"`;
-          const shown = dev ? sign(diff) : num(value, 1);
-          return `<td${style} data-tooltip-fixed="${escapeHtml(title)}"${strong ? ' class="wt-tm-year"' : ''}>${escapeHtml(shown)}</td>`;
+          return `<td${style}${tip}${strong ? ' class="wt-tm-year"' : ''}><span class="wt-tm-v">${escapeHtml(plain(value))}</span><span class="wt-tm-d">${escapeHtml(sign(diff))}</span></td>`;
         };
         let html = `<thead><tr><th></th>${Array.from({length: 12}, (_x, i) => `<th>${escapeHtml(monthName(i + 1, 'short'))}</th>`).join('')}`
           + `<th class="wt-tm-year">${escapeHtml(t('Jahr Ø'))}</th></tr></thead><tbody>`;
@@ -989,8 +980,8 @@
           html += cell(ya, complete ? reference : null, ya == null ? '' : t('Jahresmittel {year}: {value} {unit}', {year, value: num(ya, 1), unit}), true);
           html += '</tr>';
         }
-        html += `<tr class="wt-tm-avg"><th>Ø</th>${data.avg.map((value, i) => `<td>${value == null || data.counts[i] < 2 ? '–' : escapeHtml(num(value, 1))}</td>`).join('')}`
-          + `<td class="wt-tm-year">${reference == null ? '–' : escapeHtml(num(reference, 1))}</td></tr></tbody>`;
+        html += `<tr class="wt-tm-avg"><th>Ø</th>${data.avg.map((value, i) => `<td>${value == null || data.counts[i] < 2 ? '–' : escapeHtml(plain(value))}</td>`).join('')}`
+          + `<td class="wt-tm-year">${reference == null ? '–' : escapeHtml(plain(reference))}</td></tr></tbody>`;
         table.innerHTML = html;
         const scale = this.$refs.tempYearsScale;
         if (scale) scale.style.background = `linear-gradient(90deg, ${cold}, ${base}, ${hot})`;
