@@ -82,6 +82,9 @@
   .export-months button{font:inherit;padding:10px 0;border-radius:8px;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);cursor:pointer;}
   .export-months button:hover:not(:disabled){background:var(--surface-alt);}
   .export-months button[aria-pressed=true]{background:var(--accent-line);color:var(--accent-contrast);border-color:var(--accent-line);font-weight:600;}
+  .export-months button.mid[aria-pressed=true]{background:var(--accent-line-soft);border-color:var(--accent-line);color:var(--accent-line);}
+  .export-years{grid-template-columns:repeat(6,1fr);}
+  .export-pick .export-hint:empty{display:none;}
   .export-months button:disabled{opacity:.35;cursor:not-allowed;background:transparent;}
   .export-free{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
   .export-free label{display:flex;flex-direction:column;gap:4px;color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));}
@@ -150,4 +153,4 @@
     .export-summary dd{margin-bottom:8px;}
   }
   .export-nav .btn[hidden]{display:none;}
-  .export-step[hidden],.export-free[hidden],.export-months[hidden],.export-yearstep[hidden]{display:none;}
+  .export-step[hidden],.export-free[hidden],.export-months[hidden],.export-yearstep[hidden],.export-years[hidden]{display:none;}

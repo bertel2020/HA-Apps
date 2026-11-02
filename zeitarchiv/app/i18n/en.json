@@ -2452,7 +2452,6 @@
     "Alle auf dieser Seite wählen": "Select all on this page",
     "Alles": "All",
     "Das Enddatum liegt vor dem Startdatum": "The end date is before the start date",
-    "Für ein Jahres-Backup ein Jahr wählen, für eine Auswertung einen einzelnen Monat.": "Pick a year for a yearly backup, a single month for an analysis.",
     "Gröbere Auflösung macht die Dateien kleiner. Die Zeilenzahl zeigt die größte Datei im gewählten Zeitraum.": "A coarser resolution makes the files smaller. The row count shows the largest file in the chosen period.",
     "Komplette Historie, Rohwerte": "Complete history, raw values",
     "Mehr als {max_rows} Zeilen. Im Assistenten einen Zeitraum wählen.": "More than {max_rows} rows. Choose a period in the wizard.",
@@ -3469,7 +3468,8 @@
     "Zeit   Außen  Dach": "Time   Out    Roof",
     "Zustands-Entitäten lassen sich nicht in einer gemeinsamen Datei exportieren": "State entities cannot be exported in a combined file",
     "Zusätzlich Unix-Zeit (Sekunden seit 1970)": "Additionally Unix time (seconds since 1970)",
-    "Ankreuzen, was exportiert werden soll. „↓ CSV“ in einer Zeile lädt sofort die komplette Historie dieser Entität als Rohwerte.": "Tick what should be exported. “↓ CSV” in a row immediately downloads the complete history of that entity as raw values."
+    "Ankreuzen, was exportiert werden soll. „↓ CSV“ in einer Zeile lädt sofort die komplette Historie dieser Entität als Rohwerte.": "Tick what should be exported. “↓ CSV” in a row immediately downloads the complete history of that entity as raw values.",
+    "Für ein Jahres-Backup ein Jahr wählen, für eine Auswertung einen Monat. Mit einem zweiten Klick auf den letzten Monat oder das letzte Jahr wird daraus ein Zeitraum.": "For a yearly backup choose a year, for an analysis a month. A second click on the last month or year turns it into a period."
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4160,6 +4160,8 @@
     "Zustands-Entitäten lassen sich nicht in einer gemeinsamen Datei zusammenfassen.": "State entities cannot be combined in one file.",
     "„Nebeneinander“ passt zu Tabellenkalkulation, PowerPoint und Online-Diagrammen, „Untereinander“ zu Pivot-Tabellen und Skripten.": "\"Side by side\" suits spreadsheets, PowerPoint and online charts, \"one below the other\" suits pivot tables and scripts.",
     "Daten vorhanden vom {first} bis {last}.": "Data available from {first} to {last}.",
-    "Alles": "All"
+    "Alles": "All",
+    "Jetzt das letzte Jahr anklicken, oder dasselbe noch einmal für nur dieses.": "Now click the last year, or the same one again for just this one.",
+    "Jetzt den letzten Monat anklicken, oder denselben noch einmal für nur diesen.": "Now click the last month, or the same one again for just this one."
   }
 }

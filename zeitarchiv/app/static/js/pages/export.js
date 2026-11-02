@@ -92,7 +92,9 @@
       const FALLBACK_LIMIT = parseInt(wizard.dataset.maxRows || '5000000', 10);
       const now = new Date();
       const state = {
-        step: 1, selected: new Set(), mode: 'month', year: now.getFullYear(), month: now.getMonth() + 1,
+        step: 1, selected: new Set(), mode: 'month', year: now.getFullYear(),
+        // Auswahl als Bereich: Monate als Zähler (Jahr * 12 + Monat - 1), Jahre als Zahl; pending = der nächste Klick schließt den Bereich.
+        mA: now.getFullYear() * 12 + now.getMonth(), mB: now.getFullYear() * 12 + now.getMonth(), yA: now.getFullYear(), yB: now.getFullYear(), pending: false,
         from: '', to: '', resolution: 'raw', info: null, failed: false, seq: 0, placed: false,
         // Form der Datei (Schritt 4); die Vorbelegung ergibt dieselbe Datei wie vor dem Assistenten.
         files: 'zip', layout: 'wide', time: 'stamp', unix: true, preset: 'standard', sep: 'semicolon', decimal: 'comma',
@@ -110,20 +112,35 @@
       function limit() { return state.info ? state.info.limit : FALLBACK_LIMIT; }
 
       // Zeitraum als von/bis (ISO-Datum, beide Enden inklusive; leer = offen).
+      const monthY = ord => Math.floor(ord / 12);
+      const monthM = ord => (ord % 12) + 1;
+      const lowHigh = (a, b) => [Math.min(a, b), Math.max(a, b)];
       function period() {
-        if (state.mode === 'year') return {from: `${state.year}-01-01`, to: `${state.year}-12-31`};
+        if (state.mode === 'year') {
+          const [a, b] = lowHigh(state.yA, state.yB);
+          return {from: `${a}-01-01`, to: `${b}-12-31`};
+        }
         if (state.mode === 'month') {
-          const m = pad(state.month);
-          return {from: `${state.year}-${m}-01`, to: `${state.year}-${m}-${pad(lastOfMonth(state.year, state.month))}`};
+          const [a, b] = lowHigh(state.mA, state.mB);
+          return {from: `${monthY(a)}-${pad(monthM(a))}-01`, to: `${monthY(b)}-${pad(monthM(b))}-${pad(lastOfMonth(monthY(b), monthM(b)))}`};
         }
         if (state.mode === 'free') return {from: state.from, to: state.to};
         return {from: '', to: ''};
       }
+      // Kurzer Name der Auswahl: "2026", "2024 – 2026", "November 2026" oder "Okt 2026 – Dez 2026".
+      function rangeLabel(long) {
+        if (state.mode === 'year') {
+          const [a, b] = lowHigh(state.yA, state.yB);
+          return a === b ? (long ? `${t('Jahr')} ${a}` : String(a)) : `${a} – ${b}`;
+        }
+        const [a, b] = lowHigh(state.mA, state.mB);
+        const name = ord => `${(long && a === b ? MONTHS_LONG : MONTHS_SHORT)[monthM(ord) - 1]} ${monthY(ord)}`;
+        return a === b ? name(a) : `${name(a)} – ${name(b)}`;
+      }
       function periodText() {
         const p = period();
         if (state.mode === 'all') return t('Komplette Historie der gewählten Entitäten');
-        if (state.mode === 'year') return `${t('Jahr')} ${state.year}, ${localDate(p.from)} – ${localDate(p.to)}`;
-        if (state.mode === 'month') return `${MONTHS_LONG[state.month - 1]} ${state.year}, ${localDate(p.from)} – ${localDate(p.to)}`;
+        if (state.mode === 'year' || state.mode === 'month') return `${rangeLabel(true)}, ${localDate(p.from)} – ${localDate(p.to)}`;
         if (!p.from && !p.to) return t('Von und Bis leer: komplette Historie');
         return `${p.from ? localDate(p.from) : t('Anfang')} – ${p.to ? localDate(p.to) : t('Ende')}`;
       }
@@ -146,9 +163,9 @@
         const s = span();
         if (!s || state.placed) return false;
         state.placed = true;
-        if (monthHasData(state.year, state.month)) return false;
+        if (monthHasData(monthY(state.mA), monthM(state.mA))) return false;
         const [y, m] = s.last.split('-').map(Number);
-        state.year = y; state.month = m;
+        state.year = y; state.mA = state.mB = y * 12 + m - 1; state.yA = state.yB = y;
         return state.mode === 'month' || state.mode === 'year';
       }
 
@@ -256,8 +273,7 @@
         if (k === 2) {
           const p = period();
           if (state.mode === 'all') return t('Alles');
-          if (state.mode === 'year') return String(state.year);
-          if (state.mode === 'month') return `${MONTHS_LONG[state.month - 1]} ${state.year}`;
+          if (state.mode === 'year' || state.mode === 'month') return rangeLabel(false);
           return p.from || p.to ? `${p.from ? localDate(p.from) : t('Anfang')} – ${p.to ? localDate(p.to) : t('Ende')}` : t('Alles');
         }
         return RESOLUTIONS.find(r => r.key === state.resolution).label;
@@ -276,8 +292,12 @@
         const modeButtons = document.querySelectorAll('#export-mode button');
         modeButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode)));
         const yearly = state.mode === 'year' || state.mode === 'month';
-        $('export-yearstep').hidden = !yearly;
+        $('export-yearstep').hidden = state.mode !== 'month';
         $('export-months').hidden = state.mode !== 'month';
+        $('export-years').hidden = state.mode !== 'year';
+        $('export-range-hint').textContent = yearly && state.pending
+          ? (state.mode === 'year' ? t('Jetzt das letzte Jahr anklicken, oder dasselbe noch einmal für nur dieses.') : t('Jetzt den letzten Monat anklicken, oder denselben noch einmal für nur diesen.'))
+          : '';
         $('export-free').hidden = state.mode !== 'free';
         $('export-year-label').textContent = state.year;
         const s = span();
@@ -285,10 +305,17 @@
         const maxYear = s ? parseInt(s.last.slice(0, 4), 10) : state.year + 1;
         $('export-year-prev').disabled = state.year <= minYear;
         $('export-year-next').disabled = state.year >= maxYear;
+        const [mLo, mHi] = lowHigh(state.mA, state.mB);
         $('export-months').innerHTML = MONTHS_SHORT.map((label, i) => {
-          const m = i + 1, has = monthHasData(state.year, m);
-          return `<button type="button" data-month="${m}" aria-pressed="${state.month === m}"${has ? '' : ` disabled title="${t('Keine Daten')}"`}>${label}</button>`;
+          const m = i + 1, has = monthHasData(state.year, m), ord = state.year * 12 + i;
+          const inside = ord >= mLo && ord <= mHi;
+          return `<button type="button" data-month="${m}" class="${inside && ord > mLo && ord < mHi ? 'mid' : ''}" aria-pressed="${inside}"${has ? '' : ` disabled title="${t('Keine Daten')}"`}>${label}</button>`;
         }).join('');
+        const [yLo, yHi] = lowHigh(state.yA, state.yB);
+        const years = [];
+        for (let y = s ? Math.max(minYear, maxYear - 11) : state.year; y <= (s ? maxYear : state.year); y++) years.push(y);
+        $('export-years').innerHTML = years.map(y =>
+          `<button type="button" data-year="${y}" class="${y > yLo && y < yHi ? 'mid' : ''}" aria-pressed="${y >= yLo && y <= yHi}">${y}</button>`).join('');
         $('export-period-text').textContent = periodText();
         $('export-span-text').textContent = s ? t('Daten vorhanden vom {first} bis {last}.', {first: localDate(s.first.slice(0, 10)), last: localDate(s.last.slice(0, 10))}) : '';
       }
@@ -503,6 +530,7 @@
         const button = ev.target.closest('button[data-mode]');
         if (!button) return;
         state.mode = button.dataset.mode;
+        state.pending = false;
         render(); refresh();
       });
       $('export-year-prev').addEventListener('click', () => { state.year--; render(); refresh(); });
@@ -510,7 +538,15 @@
       $('export-months').addEventListener('click', ev => {
         const button = ev.target.closest('button[data-month]');
         if (!button || button.disabled) return;
-        state.month = parseInt(button.dataset.month, 10);
+        const ord = state.year * 12 + parseInt(button.dataset.month, 10) - 1;
+        if (state.pending) { state.mB = ord; state.pending = false; } else { state.mA = state.mB = ord; state.pending = true; }
+        render(); refresh();
+      });
+      $('export-years').addEventListener('click', ev => {
+        const button = ev.target.closest('button[data-year]');
+        if (!button) return;
+        const y = parseInt(button.dataset.year, 10);
+        if (state.pending) { state.yB = y; state.pending = false; } else { state.yA = state.yB = y; state.pending = true; }
         render(); refresh();
       });
       ['export-from', 'export-to'].forEach(id => $(id).addEventListener('change', () => {

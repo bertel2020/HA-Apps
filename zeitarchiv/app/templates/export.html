@@ -68,7 +68,7 @@
 
       <section class="export-step" id="export-step-2" hidden>
         <h2>{{ _("Welcher Zeitraum?") }}</h2>
-        <p class="export-lead">{{ _("Für ein Jahres-Backup ein Jahr wählen, für eine Auswertung einen einzelnen Monat.") }}</p>
+        <p class="export-lead">{{ _("Für ein Jahres-Backup ein Jahr wählen, für eine Auswertung einen Monat. Mit einem zweiten Klick auf den letzten Monat oder das letzte Jahr wird daraus ein Zeitraum.") }}</p>
         <div class="export-seg" id="export-mode" role="group" aria-label="{{ _('Zeitraum') }}">
           <button type="button" data-mode="all">{{ _("Alles") }}</button>
           <button type="button" data-mode="year">{{ _("Jahr") }}</button>
@@ -82,11 +82,13 @@
             <button type="button" class="btn" id="export-year-next" aria-label="{{ _('Nächstes Jahr') }}">›</button>
           </div>
           <div class="export-months" id="export-months"></div>
+          <div class="export-months export-years" id="export-years"></div>
           <div class="export-free" id="export-free">
             <label>{{ _("Von") }}<input type="date" id="export-from"></label>
             <label>{{ _("Bis") }}<input type="date" id="export-to"></label>
           </div>
           <div class="export-period-text" id="export-period-text"></div>
+          <p class="export-hint" id="export-range-hint"></p>
           <p class="export-hint" id="export-span-text"></p>
         </div>
       </section>
