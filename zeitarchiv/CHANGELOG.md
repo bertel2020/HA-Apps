@@ -33,6 +33,17 @@
   Datensätze, Größe, je nach Typ Wertebereich oder Zählerstand). Die Kacheln auf
   dem Reiter Konfiguration entfallen.
 
+- **CSV-Export, Form der Datei**: Der Assistent hat einen letzten Schritt
+  „Form und Download“ mit Vorschau der ersten Zeilen. Dort lässt sich bei
+  mehreren Entitäten eine **gemeinsame Datei** wählen, **nebeneinander**
+  (eine Spalte je Entität, eine Zeile je Zeitpunkt, ab der Auflösung Minute,
+  für höchstens 50 Entitäten) oder **untereinander** (eine Zeile je Wert mit
+  Entität und Einheit). Datum und Uhrzeit lassen sich in getrennte Spalten
+  schreiben, die Unix-Zeit abwählen. Das Zahlen- und Dateiformat gibt es als
+  „Standard“ (Komma, Punkt), „Deutsch / Excel“ (Semikolon, Dezimalkomma,
+  UTF-8-Kennung für Umlaute in Excel) oder frei mit Trennzeichen und
+  Dezimalzeichen. Ohne Änderung kommt dieselbe Datei wie bisher.
+
 ### Geändert
 
 - **Entität konfigurieren, neu gegliedert**: Die Konfigurationsseite ist
@@ -91,6 +102,17 @@
   see the key facts from the entity list (type, unit, first and last value,
   records, size, depending on the type value range or counter reading). The
   tiles on the Configuration tab are gone.
+
+- **CSV export, file format**: The wizard has a final step "Format and
+  download" with a preview of the first rows. With several entities you can
+  choose a **combined file**, **side by side** (one column per entity, one row
+  per point in time, from the minute resolution, for at most 50 entities) or
+  **one below the other** (one row per value with entity and unit). Date and
+  time can be written in separate columns, and the Unix time can be left out.
+  The number and file format comes as "Standard" (comma, point), "German /
+  Excel" (semicolon, decimal comma, UTF-8 byte order mark for umlauts in
+  Excel) or custom with separator and decimal separator. Without changes you
+  get the same file as before.
 
 #### Changed
 

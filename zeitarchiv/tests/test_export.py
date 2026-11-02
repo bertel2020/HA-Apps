@@ -200,3 +200,166 @@ def test_bad_requests_are_rejected(client, params, status) -> None:
 
 def test_estimate_without_entities_is_a_client_error(client) -> None:
     assert client.post("/export/estimate", json={"entity_ids": []}).status_code == 400
+
+
+def _post(client, **data):
+    base = {"entity_id": ["sensor.a", "sensor.b"], "start": "2020-01-01", "end": "2020-01-31"}
+    return client.post("/export/download", data={**base, **data})
+
+
+def test_default_form_fields_give_the_file_from_before(client) -> None:
+    with_fields = client.post("/export/download", data={
+        "entity_id": ["sensor.a"], "layout": "per_entity", "sep": "comma", "decimal": "point", "bom": "0",
+        "time": "stamp", "unix": "1",
+    })
+    assert with_fields.content == client.get("/export/download", params={"entity_id": "sensor.a"}).content
+
+
+def test_date_and_time_in_separate_columns_and_unix_time_optional(client) -> None:
+    lines = _lines(client.post("/export/download", data={
+        "entity_id": ["sensor.a"], "start": "2020-01-01", "end": "2020-01-31", "time": "split", "unix": "0",
+    }))
+    assert lines[0] == "date,time,value"
+    assert lines[1] == "2020-01-01,10:00:00,10.0"
+    split_with_unix = _lines(client.post("/export/download", data={"entity_id": ["sensor.a"], "time": "split"}))
+    assert split_with_unix[0] == "date,time,unix_ts,value"
+    only_stamp = _lines(client.post("/export/download", data={"entity_id": ["sensor.a"], "unix": "0"}))
+    assert only_stamp[0] == "timestamp,value"
+
+
+def test_german_format_uses_semicolon_decimal_comma_and_a_byte_order_mark(client) -> None:
+    response = client.post("/export/download", data={
+        "entity_id": ["sensor.a"], "start": "2020-01-01", "end": "2020-01-31", "resolution": "hour",
+        "sep": "semicolon", "decimal": "comma", "bom": "1", "unix": "0",
+    })
+    assert response.content.startswith(b"\xef\xbb\xbf")
+    lines = response.content.decode("utf-8-sig").strip().split("\r\n")
+    assert lines == ["timestamp;value", "2020-01-01 10:00:00;15", "2020-01-01 11:00:00;40"]
+    raw = client.post("/export/download", data={
+        "entity_id": ["sensor.a"], "start": "2020-01-01", "end": "2020-01-31", "sep": "semicolon", "decimal": "comma",
+    })
+    assert raw.content.decode().split("\r\n")[1].endswith(";10,0")
+    assert "1,0" not in raw.content.decode().split("\r\n")[0]
+
+
+def test_comma_as_separator_and_as_decimal_at_once_is_rejected(client) -> None:
+    assert _post(client, sep="comma", decimal="comma").status_code == 400
+    assert _post(client, sep="tab", decimal="comma").status_code == 200
+    assert _post(client, layout="diagonal").status_code == 400
+    assert _post(client, time="irgendwann").status_code == 400
+
+
+def test_each_zip_member_carries_the_byte_order_mark(client) -> None:
+    response = _post(client, bom="1")
+    with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+        assert all(archive.read(name).startswith(b"\xef\xbb\xbf") for name in archive.namelist())
+
+
+def test_joint_file_side_by_side_has_one_column_per_entity_and_empty_cells(client) -> None:
+    response = _post(client, layout="wide", resolution="hour", unix="0")
+    assert response.headers["content-type"].startswith("text/csv")
+    assert 'filename="zeitarchiv-export_2-entitaeten_2020-01_hour.csv"' in response.headers["content-disposition"]
+    assert _lines(response) == [
+        "timestamp,sensor.a [x],sensor.b [x]",
+        "2020-01-01 10:00:00,15,101.0",
+        "2020-01-01 11:00:00,40,",
+    ]
+
+
+def test_joint_file_one_below_the_other_has_entity_time_value_and_unit(client) -> None:
+    lines = _lines(_post(client, layout="long", resolution="hour", time="split", unix="0"))
+    assert lines == [
+        "entity,date,time,value,unit",
+        "sensor.a,2020-01-01,10:00:00,15,x",
+        "sensor.a,2020-01-01,11:00:00,40,x",
+        "sensor.b,2020-01-01,10:00:00,101.0,x",
+    ]
+    raw = _lines(_post(client, layout="long"))
+    assert raw[0] == "entity,timestamp,unix_ts,value,unit"
+    assert len(raw) == 1 + 3 + 2
+
+
+def test_joint_file_with_german_format_masks_by_the_chosen_separator(client) -> None:
+    lines = _post(client, layout="wide", resolution="hour", sep="semicolon", decimal="comma", unix="0", bom="1").content.decode("utf-8-sig").strip().split("\r\n")
+    assert lines[0] == "timestamp;sensor.a [x];sensor.b [x]"
+    assert lines[1] == "2020-01-01 10:00:00;15;101,0"
+
+
+def test_side_by_side_needs_a_fixed_resolution(client) -> None:
+    assert _post(client, layout="wide", resolution="raw").status_code == 400
+    assert _post(client, layout="wide", resolution="day").status_code == 200
+
+
+def test_side_by_side_is_limited_in_the_number_of_entities(client, monkeypatch) -> None:
+    monkeypatch.setattr(export_data, "MAX_WIDE_ENTITIES", 1)
+    assert _post(client, layout="wide", resolution="hour").status_code == 400
+    assert _post(client, layout="long", resolution="hour").status_code == 200
+
+
+def test_joint_file_limit_counts_the_rows_of_the_file(client, monkeypatch) -> None:
+    # Vorab zählt die Summe der Entitäten (hier 3 + 2 Rohwerte), das ist die obere Grenze der Zeilen.
+    monkeypatch.setattr(export_routes, "MAX_EXPORT_ROWS", 4)
+    assert _post(client, layout="long", resolution="raw").status_code == 413
+    assert _post(client, layout="wide", resolution="hour").status_code == 413
+    monkeypatch.setattr(export_routes, "MAX_EXPORT_ROWS", 5)
+    assert _post(client, layout="long", resolution="raw").status_code == 200
+    assert _post(client, layout="wide", resolution="hour").status_code == 200
+
+
+def test_side_by_side_estimate_is_capped_by_the_time_grid_not_the_sum(setup, monkeypatch) -> None:
+    """Zwei Entitäten mit je 120 Minutenwerten: untereinander 240 Zeilen, nebeneinander höchstens die
+    121 Zeitpunkte des gemeinsamen Fensters."""
+    rows = [(_ts(2020, 3, 1, 10, minute), float(minute)) for minute in range(60)] + [
+        (_ts(2020, 3, 1, 11, minute), float(minute)) for minute in range(60)
+    ]
+    setup.entity("sensor.c", "measurement", rows)
+    setup.entity("sensor.d", "measurement", rows)
+    entities = [setup.index.get_entity("sensor.c"), setup.index.get_entity("sensor.d")]
+    # Ein angeschnittener Monat wird anteilig geschätzt; für den Test steht die Zahl je Entität fest.
+    monkeypatch.setattr(export_data, "estimate_rows", lambda *args, **kwargs: {"minute": 120})
+    long_rows = export_data.estimate_joint_rows(setup.root, entities, None, None, "minute", "long", TZ)
+    wide_rows = export_data.estimate_joint_rows(setup.root, entities, None, None, "minute", "wide", TZ)
+    assert long_rows == 240
+    assert wide_rows < long_rows and wide_rows <= 122
+
+
+def test_state_entities_cannot_go_into_a_joint_file(client, setup) -> None:
+    setup.index.get_or_create_entity("sensor.zustand", "sensor", None, None, state=True)
+    response = client.post("/export/download", data={"entity_id": ["sensor.a", "sensor.zustand"], "layout": "long"})
+    assert response.status_code == 400
+
+
+def test_a_single_entity_ignores_the_joint_layout(client) -> None:
+    response = client.post("/export/download", data={"entity_id": ["sensor.a"], "layout": "wide", "resolution": "raw"})
+    assert response.status_code == 200
+    assert _lines(response)[0] == "timestamp,unix_ts,value"
+
+
+def test_estimate_reports_the_side_by_side_limit(client) -> None:
+    body = client.post("/export/estimate", json={"entity_ids": ["sensor.a"]}).json()
+    assert body["wide_limit"] == export_data.MAX_WIDE_ENTITIES
+
+
+def test_preview_shows_the_first_lines_of_the_file_the_download_would_give(client) -> None:
+    response = client.post("/export/preview", data={
+        "entity_id": ["sensor.a", "sensor.b"], "start": "2020-01-01", "end": "2020-01-31", "resolution": "hour",
+        "layout": "wide", "unix": "0",
+    })
+    body = response.json()
+    assert body["file"] == "zeitarchiv-export_2-entitaeten_2020-01_hour.csv"
+    assert body["text"].split("\n") == [
+        "timestamp,sensor.a [x],sensor.b [x]", "2020-01-01 10:00:00,15,101.0", "2020-01-01 11:00:00,40,",
+    ]
+
+
+def test_preview_of_a_zip_shows_its_first_file_and_keeps_the_bom_out_of_the_text(client) -> None:
+    body = client.post("/export/preview", data={
+        "entity_id": ["sensor.a", "sensor.b"], "start": "2020-01-01", "end": "2020-01-31", "bom": "1", "unix": "0",
+    }).json()
+    assert body["file"] == "sensor.a_2020-01.csv"
+    assert body["text"].split("\n")[0] == "timestamp,value"
+
+
+def test_preview_rejects_what_the_download_rejects(client) -> None:
+    assert client.post("/export/preview", data={"entity_id": ["sensor.a"], "sep": "comma", "decimal": "comma"}).status_code == 400
+    assert client.post("/export/preview", data={"entity_id": ["sensor.a", "sensor.b"], "layout": "wide"}).status_code == 400

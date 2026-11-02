@@ -80,7 +80,7 @@
       const wizard = document.getElementById('export-wizard');
       if (!wizard) return;
       const $ = id => document.getElementById(id);
-      const STEPS = [t('Entitäten'), t('Zeitraum'), t('Auflösung'), t('Prüfen')];
+      const STEPS = [t('Entitäten'), t('Zeitraum'), t('Auflösung'), t('Form und Download')];
       const RESOLUTIONS = [
         {key: 'raw', label: t('Rohwerte'), desc: t('Jeder gespeicherte Wert')},
         {key: 'minute', label: t('Minute'), desc: t('Ein Wert je Minute')},
@@ -94,7 +94,12 @@
       const state = {
         step: 1, selected: new Set(), mode: 'month', year: now.getFullYear(), month: now.getMonth() + 1,
         from: '', to: '', resolution: 'raw', info: null, failed: false, seq: 0, placed: false,
+        // Form der Datei (Schritt 4); die Vorbelegung ergibt dieselbe Datei wie vor dem Assistenten.
+        files: 'zip', layout: 'wide', time: 'stamp', unix: true, preset: 'standard', sep: 'semicolon', decimal: 'comma',
+        previewKey: '', previewSeq: 0, previewTimer: 0,
       };
+      const PRESETS = {standard: {sep: 'comma', decimal: 'point', bom: false}, german: {sep: 'semicolon', decimal: 'comma', bom: true}};
+      const BUCKETS_PER_DAY = {minute: 1440, hour: 24, day: 1};
       const number = n => Math.round(n).toLocaleString(window.ZA_FORMAT || undefined);
       const pad = n => String(n).padStart(2, '0');
       const day = text => { const [y, m, d] = text.split('-').map(Number); return new Date(y, m - 1, d); };
@@ -181,6 +186,54 @@
           tooBig: files.filter(f => f.rows[resolution] > limit()).map(f => f.name),
         };
       }
+      // Gemeinsame Datei: möglich bei mehreren Entitäten ohne Zustände; "nebeneinander" nur mit fester Auflösung
+      // und höchstens so vielen Entitäten, wie der Server zulässt.
+      function jointInfo() {
+        const files = state.info ? state.info.files : [];
+        const wideLimit = state.info ? state.info.wide_limit : 50;
+        const hasState = files.some(f => f.type === 'state');
+        const possible = files.length > 1 && !hasState;
+        let wideReason = '';
+        if (state.resolution === 'raw') wideReason = t('Nebeneinander gibt es ab der Auflösung Minute, weil die Zeitstempel der Entitäten bei Rohwerten nicht übereinstimmen.');
+        else if (files.length > wideLimit) wideReason = t('Nebeneinander gibt es für höchstens {n} Entitäten.', {n: wideLimit});
+        return {many: files.length > 1, hasState, possible, wideOk: !wideReason, wideReason};
+      }
+      // Wie die Datei aufgebaut wird: eine je Entität, nebeneinander oder untereinander.
+      function layout() {
+        const j = jointInfo();
+        if (!j.possible || state.files !== 'joint') return 'per_entity';
+        return state.layout === 'wide' && j.wideOk ? 'wide' : 'long';
+      }
+      // Zeilen der gemeinsamen Datei vorab: untereinander die Summe, nebeneinander höchstens die Zeitpunkte im Fenster.
+      function jointRows(resolution) {
+        const st = stats(resolution);
+        if (layout() !== 'wide') return st.total;
+        const p = period();
+        const files = state.info.files.filter(f => f.first && f.last);
+        if (!files.length) return 0;
+        const first = files.map(f => (p.from && p.from > f.first ? p.from : f.first)).sort()[0];
+        const last = files.map(f => (p.to && p.to < f.last ? p.to : f.last)).sort().slice(-1)[0];
+        const days = Math.max(0, Math.round((day(last) - day(first)) / 86400000)) + 1;
+        return Math.min(st.total, days * BUCKETS_PER_DAY[resolution] + 1);
+      }
+      function tooBig(resolution) {
+        return layout() === 'per_entity' ? stats(resolution).tooBig.length > 0 : jointRows(resolution) > limit();
+      }
+      function currentFormat() {
+        const preset = PRESETS[state.preset] || {sep: state.sep, decimal: state.decimal, bom: false};
+        return {layout: layout(), sep: preset.sep, decimal: preset.decimal, bom: preset.bom, time: state.time, unix: state.unix};
+      }
+      function formFields() {
+        const p = period();
+        const f = currentFormat();
+        return [
+          ['start', p.from], ['end', p.to], ['resolution', state.resolution],
+          ['layout', f.layout], ['sep', f.sep], ['decimal', f.decimal], ['bom', f.bom ? '1' : '0'],
+          ['time', f.time], ['unix', f.unix ? '1' : '0'],
+          ...selection().map(id => ['entity_id', id]),
+        ];
+      }
+
       function bytesText(stat) {
         const bytes = stat.total * 40 * (stat.count > 1 ? 0.25 : 1);
         return bytes > 1e6 ? `${(bytes / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1e3))} kB`;
@@ -190,7 +243,7 @@
         if (step === 1) return state.selected.size > 0;
         if (step === 2) return !state.failed && (state.mode !== 'free' || !state.from || !state.to || state.from <= state.to);
         if (step === 3) return !!state.info && stats(state.resolution).tooBig.length === 0;
-        return !!state.info && stats(state.resolution).tooBig.length === 0;
+        return !!state.info && !tooBig(state.resolution);
       }
       function reachable(step) {
         for (let i = 1; i < step; i++) if (!valid(i)) return false;
@@ -238,12 +291,52 @@
           : t('Mittelwert je Intervall, bei Zählern und Schaltern der letzte Wert des Intervalls.');
       }
 
+      function setPressed(selector, attr, value) {
+        document.querySelectorAll(selector).forEach(b => b.setAttribute('aria-pressed', String(b.dataset[attr] === value)));
+      }
+
+      function renderOptions() {
+        const j = jointInfo();
+        const mode = layout();
+        $('export-opt-files').hidden = !j.many;
+        $('export-opt-layout').hidden = !(j.many && mode !== 'per_entity');
+        setPressed('#export-opt-files button', 'files', j.possible ? state.files : 'zip');
+        document.querySelector('#export-opt-files [data-files=joint]').disabled = !j.possible;
+        $('export-files-hint').textContent = j.hasState
+          ? t('Zustands-Entitäten lassen sich nicht in einer gemeinsamen Datei zusammenfassen.')
+          : (mode === 'per_entity' ? t('Ein ZIP mit je einer CSV je Entität.') : t('Alle Entitäten stehen in einer CSV.'));
+        setPressed('#export-opt-layout button', 'layout', mode === 'wide' ? 'wide' : 'long');
+        document.querySelector('#export-opt-layout [data-layout=wide]').disabled = !j.wideOk;
+        $('export-layout-hint').textContent = j.wideOk
+          ? t('„Nebeneinander“ passt zu Tabellenkalkulation, PowerPoint und Online-Diagrammen, „Untereinander“ zu Pivot-Tabellen und Skripten.')
+          : j.wideReason;
+        setPressed('[data-time]', 'time', state.time);
+        $('export-unix').checked = state.unix;
+        setPressed('[data-preset]', 'preset', state.preset);
+        $('export-preset-hint').textContent = {
+          standard: t('Komma als Trennzeichen, Punkt als Dezimalzeichen: wie bisher.'),
+          german: t('Semikolon als Trennzeichen, Komma als Dezimalzeichen. Die Datei bekommt eine UTF-8-Kennung, damit Excel Umlaute richtig anzeigt.'),
+          custom: '',
+        }[state.preset];
+        $('export-custom').hidden = state.preset !== 'custom';
+        setPressed('[data-sep]', 'sep', state.sep);
+        setPressed('[data-decimal]', 'decimal', state.decimal);
+        // Komma als Trennzeichen und als Dezimalzeichen zugleich ist nicht lesbar: die Gegenseite sperren.
+        document.querySelector('[data-sep=comma]').disabled = state.decimal === 'comma';
+        document.querySelector('[data-decimal=comma]').disabled = state.sep === 'comma';
+      }
+
       function renderReview() {
         const st = stats(state.resolution);
         const error = $('export-error');
-        if (state.info && st.tooBig.length) {
+        const mode = layout();
+        const rows = mode === 'per_entity' ? st.total : jointRows(state.resolution);
+        if (state.info && mode === 'per_entity' && st.tooBig.length) {
           error.hidden = false;
           error.textContent = t('Zu groß: {names}. Zurück zu Zeitraum oder Auflösung und eingrenzen.', {names: st.tooBig.join(', ')});
+        } else if (state.info && mode !== 'per_entity' && rows > limit()) {
+          error.hidden = false;
+          error.textContent = t('Die gemeinsame Datei wäre zu groß ({rows} Zeilen). Zurück zu Zeitraum oder Auflösung und eingrenzen.', {rows: number(rows)});
         } else if (state.failed) {
           error.hidden = false;
           error.textContent = t('Die Größe konnte nicht berechnet werden. Bitte noch einmal versuchen.');
@@ -251,18 +344,48 @@
           error.hidden = true;
         }
         $('export-review-lead').textContent = st.count > 1
-          ? t('Mehrere Entitäten: Du bekommst ein ZIP mit je einer CSV.')
+          ? (mode === 'per_entity' ? t('Mehrere Entitäten: Du bekommst ein ZIP mit je einer CSV.') : t('Mehrere Entitäten: Du bekommst eine gemeinsame CSV.'))
           : t('Eine Entität: Du bekommst direkt eine CSV.');
+        renderOptions();
         const names = state.info ? state.info.files.map(f => f.name) : [];
         const resLabel = RESOLUTIONS.find(r => r.key === state.resolution).label;
-        const bar = Math.min(100, st.worst / limit() * 100);
+        const bar = Math.min(100, (mode === 'per_entity' ? st.worst : rows) / limit() * 100);
+        const shown = names.slice(0, 6).map(n => `<span class="export-chip">${escapeHtml(n)}</span>`).join('') +
+          (names.length > 6 ? `<span class="export-chip more">${escapeHtml(t('+{n} weitere', {n: names.length - 6}))}</span>` : '');
         $('export-summary').innerHTML =
-          `<dt>${t('Entitäten')}</dt><dd>${escapeHtml(names.length > 6 ? names.slice(0, 6).join(', ') + ' … (' + names.length + ')' : names.join(', '))}</dd>` +
+          `<dt>${t('Entitäten')}</dt><dd><div class="export-chips">${shown}</div></dd>` +
           `<dt>${t('Zeitraum')}</dt><dd>${escapeHtml(periodText())}</dd>` +
           `<dt>${t('Auflösung')}</dt><dd>${resLabel}</dd>` +
-          `<dt>${t('Umfang')}</dt><dd>${t('{rows} Zeilen, ca. {size}', {rows: number(st.total), size: bytesText(st)})}${st.count > 1 ? ' ' + t('als ZIP') : ''}` +
-          `<div class="export-meter${st.tooBig.length ? ' over' : ''}"><i style="width:${bar}%"></i></div>` +
-          `<span class="export-hint">${t('Größte Datei: {worst} von {limit} Zeilen', {worst: number(st.worst), limit: number(limit())})}</span></dd>`;
+          `<dt>${t('Umfang')}</dt><dd>${t('{rows} Zeilen, ca. {size}', {rows: number(rows), size: bytesText({total: rows, count: mode === 'per_entity' ? st.count : 1})})}${mode === 'per_entity' && st.count > 1 ? ' ' + t('als ZIP') : ''}` +
+          `<div class="export-meter${rows > limit() || (mode === 'per_entity' && st.tooBig.length) ? ' over' : ''}"><i style="width:${bar}%"></i></div>` +
+          `<span class="export-hint">${mode === 'per_entity' ? t('Größte Datei: {worst} von {limit} Zeilen', {worst: number(st.worst), limit: number(limit())}) : t('Zeilen der Datei: {rows} von {limit}', {rows: number(rows), limit: number(limit())})}` +
+          `${rows > 1048576 ? ' ' + t('Excel öffnet nur 1.048.576 Zeilen.') : ''}</span></dd>`;
+        schedulePreview();
+      }
+
+      // Vorschau: die ersten Zeilen der Datei vom Server, damit jede Option sofort sichtbar wird.
+      function schedulePreview() {
+        const key = JSON.stringify(formFields());
+        if (key === state.previewKey) return;
+        state.previewKey = key;
+        clearTimeout(state.previewTimer);
+        const seq = ++state.previewSeq;
+        if (!state.info || tooBig(state.resolution)) { $('export-preview').hidden = true; return; }
+        state.previewTimer = setTimeout(async () => {
+          try {
+            const body = new URLSearchParams();
+            formFields().forEach(([name, value]) => body.append(name, value));
+            const response = await fetch('export/preview', {method: 'POST', body});
+            if (!response.ok) throw new Error(String(response.status));
+            const data = await response.json();
+            if (seq !== state.previewSeq) return;
+            $('export-preview-cap').textContent = t('Vorschau: {file}', {file: data.file});
+            $('export-preview-text').textContent = data.text;
+            $('export-preview').hidden = false;
+          } catch (_err) {
+            if (seq === state.previewSeq) $('export-preview').hidden = true;
+          }
+        }, 250);
       }
 
       function renderFooter() {
@@ -272,12 +395,17 @@
         let live;
         if (!count) live = `<b>${t('Noch nichts gewählt')}</b><span>${t('Wähle mindestens eine Entität.')}</span>`;
         else if (!state.info) live = `<b>${count > 1 ? t('{n} CSV-Dateien im ZIP', {n: count}) : t('1 CSV-Datei')}</b><span>${state.failed ? t('Größe nicht verfügbar') : '…'}</span>`;
-        else live = `<b>${st.count > 1 ? t('{n} CSV-Dateien im ZIP', {n: st.count}) : t('1 CSV-Datei')}</b>` +
-          `<span>${t('{rows} Zeilen, ca. {size}', {rows: number(st.total), size: bytesText(st)})}${st.tooBig.length ? ' ' + t('(mindestens eine Datei zu groß)') : ''}</span>`;
+        else {
+          const mode = layout();
+          const rows = mode === 'per_entity' ? st.total : jointRows(state.resolution);
+          const big = mode === 'per_entity' ? st.tooBig.length > 0 : rows > limit();
+          const head = mode === 'per_entity' ? (st.count > 1 ? t('{n} CSV-Dateien im ZIP', {n: st.count}) : t('1 CSV-Datei')) : t('1 gemeinsame CSV-Datei');
+          live = `<b>${head}</b><span>${t('{rows} Zeilen, ca. {size}', {rows: number(rows), size: bytesText({total: rows, count: mode === 'per_entity' ? st.count : 1})})}${big ? ' ' + t('(mindestens eine Datei zu groß)') : ''}</span>`;
+        }
         $('export-live').innerHTML = live;
         $('export-back').hidden = state.step === 1;
         const next = $('export-next');
-        next.textContent = state.step === 4 ? (count > 1 ? t('ZIP herunterladen') : t('CSV herunterladen')) : t('Weiter');
+        next.textContent = state.step === 4 ? (count > 1 && layout() === 'per_entity' ? t('ZIP herunterladen') : t('CSV herunterladen')) : t('Weiter');
         next.disabled = !valid(state.step);
       }
 
@@ -298,9 +426,7 @@
 
       function download() {
         const form = $('export-form');
-        const p = period();
-        const fields = [['start', p.from], ['end', p.to], ['resolution', state.resolution], ...selection().map(id => ['entity_id', id])];
-        form.replaceChildren(...fields.map(([name, value]) => {
+        form.replaceChildren(...formFields().map(([name, value]) => {
           const input = document.createElement('input');
           input.type = 'hidden'; input.name = name; input.value = value;
           return input;
@@ -373,6 +499,20 @@
         state.from = $('export-from').value; state.to = $('export-to').value;
         render(); refresh();
       }));
+      // Schritt 4: die Form der Datei
+      const choose = (selector, key, apply) => document.querySelector(selector).addEventListener('click', ev => {
+        const button = ev.target.closest('button[data-' + key + ']');
+        if (!button || button.disabled) return;
+        apply(button.dataset[key]);
+        render();
+      });
+      choose('#export-opt-files', 'files', v => { state.files = v; });
+      choose('#export-opt-layout', 'layout', v => { state.layout = v; });
+      document.querySelectorAll('[data-time]').forEach(b => b.addEventListener('click', () => { state.time = b.dataset.time; render(); }));
+      $('export-unix').addEventListener('change', ev => { state.unix = ev.target.checked; render(); });
+      document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => { state.preset = b.dataset.preset; render(); }));
+      document.querySelectorAll('[data-sep]').forEach(b => b.addEventListener('click', () => { if (!b.disabled) { state.sep = b.dataset.sep; render(); } }));
+      document.querySelectorAll('[data-decimal]').forEach(b => b.addEventListener('click', () => { if (!b.disabled) { state.decimal = b.dataset.decimal; render(); } }));
       $('export-resolutions').addEventListener('click', ev => {
         const button = ev.target.closest('button[data-resolution]');
         if (!button) return;

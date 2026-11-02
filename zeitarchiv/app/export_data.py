@@ -4,6 +4,13 @@ Der Export liefert je Entität eine CSV (``timestamp,unix_ts,value``), bei mehre
 Entitäten automatisch als ZIP mit je einer CSV. Zeitraum und Auflösung sind
 optional: ohne beides kommt die komplette Rohdaten-Historie wie bisher.
 
+Die Form ist wählbar (CsvFormat): Datum und Uhrzeit getrennt, Unix-Zeit abwählbar,
+Trennzeichen und Dezimalzeichen, UTF-8-Kennung für Excel. Mehrere Entitäten lassen
+sich zusätzlich in einer gemeinsamen Datei ausgeben, "wide" (eine Spalte je Entität,
+eine Zeile je Zeitpunkt; nur mit fester Auflösung, damit alle Reihen dasselbe Raster
+haben) oder "long" (eine Zeile je Wert mit Entität und Einheit). Der Standard
+(CsvFormat()) ist byteidentisch mit der Datei von früher.
+
 Zeilenzahl vorab: Das Limit (MAX_EXPORT_ROWS) gilt je Datei. Für den Assistenten
 und die Sperre vor dem Download braucht es die Zeilenzahl, bevor eine Zeile
 gelesen wird. Ganze Monate liefert die Parquet-Metadaten-Zählung (archivierte
@@ -15,10 +22,13 @@ Limit höchstens knapp überschätzt. Beim Streamen gilt das Limit zusätzlich h
 
 from __future__ import annotations
 
+import heapq
+import itertools
 import math
 import re
 import zipfile
 from collections.abc import Callable, Iterable, Iterator
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -182,18 +192,87 @@ def aggregate_rows(
         yield bucket_start, (total / count if mean else last)
 
 
+LAYOUTS = ("per_entity", "wide", "long")
+SEPARATORS = {"comma": ",", "semicolon": ";", "tab": "\t"}
+DECIMALS = {"point": ".", "comma": ","}
+#: Entitäten, die "wide" nebeneinander zeigt: mehr Spalten sind in keinem Programm mehr lesbar.
+MAX_WIDE_ENTITIES = 50
+_BOM = "\ufeff"
+
+
+@dataclass(frozen=True)
+class CsvFormat:
+    """Form der Datei. Der Standard ist die Datei von früher."""
+
+    layout: str = "per_entity"
+    sep: str = ","
+    decimal: str = "."
+    bom: bool = False
+    split_time: bool = False
+    unix: bool = True
+
+
+def parse_format(
+    layout: str = "per_entity", sep: str = "comma", decimal: str = "point", bom: bool = False,
+    time: str = "stamp", unix: bool = True,
+) -> CsvFormat:
+    """CsvFormat aus den Wörtern der Oberfläche; ValueError bei Unbekanntem oder einer Kombination,
+    in der die Datei nicht lesbar wäre (Komma als Trenn- und als Dezimalzeichen)."""
+    if layout not in LAYOUTS:
+        raise ValueError(tr("Unbekannte Anordnung"))
+    if sep not in SEPARATORS or decimal not in DECIMALS or time not in ("stamp", "split"):
+        raise ValueError(tr("Unbekanntes Dateiformat"))
+    if SEPARATORS[sep] == DECIMALS[decimal]:
+        raise ValueError(tr("Komma als Trennzeichen und als Dezimalzeichen zugleich ist nicht möglich"))
+    return CsvFormat(layout, SEPARATORS[sep], DECIMALS[decimal], bom, time == "split", unix)
+
+
+def _cell(text: str, fmt: CsvFormat) -> str:
+    """Text für CSV maskiert (Trennzeichen, Anführungszeichen, Zeilenumbruch)."""
+    if any(c in text for c in (fmt.sep, '"', "\r", "\n")):
+        return '"' + text.replace('"', '""') + '"'
+    return text
+
+
+def _number(text: str, fmt: CsvFormat) -> str:
+    return text if fmt.decimal == "." else text.replace(".", fmt.decimal)
+
+
+def _time_headers(fmt: CsvFormat) -> list[str]:
+    return ["date", "time"] if fmt.split_time else ["timestamp"]
+
+
+def _time_cells(ts: float, tz: ZoneInfo, fmt: CsvFormat) -> list[str]:
+    moment = datetime.fromtimestamp(ts, tz)
+    cells = [moment.strftime("%Y-%m-%d"), moment.strftime("%H:%M:%S")] if fmt.split_time else [
+        moment.strftime("%Y-%m-%d %H:%M:%S")
+    ]
+    if fmt.unix:
+        cells.append(_number(f"{ts:.3f}", fmt))
+    return cells
+
+
+def _time_columns(fmt: CsvFormat) -> list[str]:
+    return _time_headers(fmt) + (["unix_ts"] if fmt.unix else [])
+
+
+def _line(cells: list[str], fmt: CsvFormat) -> str:
+    return fmt.sep.join(cells) + "\r\n"
+
+
+def _limit_error(max_rows: int) -> Exception:
+    return cleanup.ResultLimitExceeded(tr("CSV-Export ist auf {MAX_EXPORT_ROWS} Zeilen begrenzt", MAX_EXPORT_ROWS=max_rows))
+
+
 def _format_value(value: float, aggregated_mean: bool) -> str:
     return f"{value:.10g}" if aggregated_mean else f"{value}"
 
 
-def _state_cell(texts: dict[int, str], value: float) -> str:
+def _state_cell(texts: dict[int, str], value: float, fmt: CsvFormat = CsvFormat()) -> str:
     """Rohtext eines Zustands, für CSV maskiert (Trennzeichen, Anführungszeichen,
     Zeilenumbruch). -1 ist "nicht verfügbar", ein unbekannter Index bleibt leer."""
     idx = int(round(value))
-    text = "unavailable" if idx == -1 else texts.get(idx, "")
-    if any(c in text for c in ',"\r\n'):
-        text = '"' + text.replace('"', '""') + '"'
-    return text
+    return _cell("unavailable" if idx == -1 else texts.get(idx, ""), fmt)
 
 
 def csv_chunks(
@@ -206,6 +285,7 @@ def csv_chunks(
     tz: ZoneInfo,
     coordinator,
     max_rows: int,
+    fmt: CsvFormat = CsvFormat(),
 ) -> Iterator[str]:
     """Die CSV einer Entität in Textblöcken. Hält die Entitätssperre, solange sie
     gelesen wird (wie das Schreiben in archivierten Monaten)."""
@@ -215,7 +295,7 @@ def csv_chunks(
     if is_state:
         resolution = "raw"
     with coordinator.entity(entity_id):
-        yield STATE_CSV_HEADER if is_state else CSV_HEADER
+        yield (_BOM if fmt.bom else "") + _line(_time_columns(fmt) + ["state" if is_state else "value"], fmt)
         texts = {row["idx"]: row["text"] for row in index.get_state_map(entity_id)} if is_state else {}
         window = entity_window(entity, start_ts, end_ts)
         if window is None:
@@ -232,17 +312,130 @@ def csv_chunks(
         for ts, value in rows:
             emitted += 1
             if emitted > max_rows:
-                raise cleanup.ResultLimitExceeded(
-                    tr("CSV-Export ist auf {MAX_EXPORT_ROWS} Zeilen begrenzt", MAX_EXPORT_ROWS=max_rows)
-                )
-            stamp = datetime.fromtimestamp(ts, tz).strftime("%Y-%m-%d %H:%M:%S")
-            cell = _state_cell(texts, value) if is_state else _format_value(value, mean)
-            buffer.append(f"{stamp},{ts:.3f},{cell}\r\n")
+                raise _limit_error(max_rows)
+            cell = _state_cell(texts, value, fmt) if is_state else _number(_format_value(value, mean), fmt)
+            buffer.append(_line(_time_cells(ts, tz, fmt) + [cell], fmt))
             if len(buffer) >= _CHUNK_ROWS:
                 yield "".join(buffer)
                 buffer.clear()
         if buffer:
             yield "".join(buffer)
+
+
+def _series(data_dir: Path, index: Index, entity, start_ts, end_ts, resolution: str, tz: ZoneInfo, max_rows: int):
+    """Die Reihe einer Entität im Zeitraum in der gewählten Auflösung (leer ohne Daten)."""
+    window = entity_window(entity, start_ts, end_ts)
+    if window is None:
+        return iter(())
+    raw = cleanup.iter_raw_rows(
+        data_dir, index, entity["entity_id"], window[0], window[1], tz,
+        max_rows=max_rows if resolution == "raw" else None,
+    )
+    return raw if resolution == "raw" else aggregate_rows(raw, resolution, entity["aggregation_type"], tz)
+
+
+def long_chunks(
+    data_dir: Path,
+    index: Index,
+    entities: list,
+    names: dict[str, str],
+    start_ts: float | None,
+    end_ts: float | None,
+    resolution: str,
+    tz: ZoneInfo,
+    coordinator,
+    max_rows: int,
+    fmt: CsvFormat,
+) -> Iterator[str]:
+    """Gemeinsame Datei "untereinander": eine Zeile je Wert mit Entität und Einheit. Die Entitäten kommen
+    nacheinander, jede unter ihrer eigenen Sperre; das Limit zählt die Zeilen der ganzen Datei."""
+    yield (_BOM if fmt.bom else "") + _line(["entity"] + _time_columns(fmt) + ["value", "unit"], fmt)
+    emitted = 0
+    for entity in entities:
+        entity_id = entity["entity_id"]
+        mean = resolution != "raw" and entity["aggregation_type"] == "standard"
+        head = [_cell(names[entity_id], fmt)]
+        tail = _cell(entity["unit"] or "", fmt)
+        with coordinator.entity(entity_id):
+            buffer: list[str] = []
+            for ts, value in _series(data_dir, index, entity, start_ts, end_ts, resolution, tz, max_rows - emitted):
+                emitted += 1
+                if emitted > max_rows:
+                    raise _limit_error(max_rows)
+                buffer.append(_line(head + _time_cells(ts, tz, fmt) + [_number(_format_value(value, mean), fmt), tail], fmt))
+                if len(buffer) >= _CHUNK_ROWS:
+                    yield "".join(buffer)
+                    buffer.clear()
+            if buffer:
+                yield "".join(buffer)
+
+
+def _tagged(position: int, rows: Iterable[tuple[float, float]]) -> Iterator[tuple[float, int, float]]:
+    """Reihe mit der Spalte der Entität, damit der Merge sie wieder zuordnen kann."""
+    for ts, value in rows:
+        yield ts, position, value
+
+
+def wide_chunks(
+    data_dir: Path,
+    index: Index,
+    entities: list,
+    names: dict[str, str],
+    start_ts: float | None,
+    end_ts: float | None,
+    resolution: str,
+    tz: ZoneInfo,
+    coordinator,
+    max_rows: int,
+    fmt: CsvFormat,
+) -> Iterator[str]:
+    """Gemeinsame Datei "nebeneinander": eine Spalte je Entität, eine Zeile je Zeitpunkt. Nur mit fester
+    Auflösung, denn dann tragen alle Reihen denselben Zeitstempel (Beginn des Intervalls). Wo eine Entität
+    keinen Wert hat, bleibt die Zelle leer (keine Null, keine Fortschreibung). Alle Entitäten sind gesperrt,
+    solange gelesen wird, deadlock-frei in sortierter Reihenfolge (coordinator.entities)."""
+    heads = [
+        _cell(f"{names[entity['entity_id']]} [{entity['unit']}]" if entity["unit"] else names[entity["entity_id"]], fmt)
+        for entity in entities
+    ]
+    means = [entity["aggregation_type"] == "standard" for entity in entities]
+    with coordinator.entities([entity["entity_id"] for entity in entities]):
+        yield (_BOM if fmt.bom else "") + _line(_time_columns(fmt) + heads, fmt)
+        streams = [
+            _tagged(position, _series(data_dir, index, entity, start_ts, end_ts, resolution, tz, max_rows))
+            for position, entity in enumerate(entities)
+        ]
+        buffer: list[str] = []
+        emitted = 0
+        for ts, group in itertools.groupby(heapq.merge(*streams, key=lambda item: item[0]), key=lambda item: item[0]):
+            emitted += 1
+            if emitted > max_rows:
+                raise _limit_error(max_rows)
+            cells = [""] * len(entities)
+            for _ts, position, value in group:
+                cells[position] = _number(_format_value(value, means[position]), fmt)
+            buffer.append(_line(_time_cells(ts, tz, fmt) + cells, fmt))
+            if len(buffer) >= _CHUNK_ROWS:
+                yield "".join(buffer)
+                buffer.clear()
+        if buffer:
+            yield "".join(buffer)
+
+
+def estimate_joint_rows(
+    data_dir: Path, entities: list, start_ts: float | None, end_ts: float | None, resolution: str,
+    layout: str, tz: ZoneInfo,
+) -> int:
+    """Zeilen einer gemeinsamen Datei vorab. "long": die Summe der Entitäten. "wide": die Zeitpunkte, also
+    höchstens die Summe und höchstens so viele wie Intervalle im gemeinsamen Zeitfenster."""
+    estimates = [estimate_rows(data_dir, entity, start_ts, end_ts, tz)[resolution] for entity in entities]
+    total = sum(estimates)
+    if layout != "wide":
+        return total
+    windows = [w for w in (entity_window(entity, start_ts, end_ts) for entity in entities) if w is not None]
+    if not windows:
+        return 0
+    span = max(w[1] for w in windows) - min(w[0] for w in windows)
+    return min(total, math.ceil(span / _BUCKET_SECONDS[resolution]) + 1)
 
 
 class _Sink:

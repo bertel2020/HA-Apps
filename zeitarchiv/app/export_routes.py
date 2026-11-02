@@ -1,7 +1,7 @@
 """Export-Bereich (Einstellungen-Bereich, analog zum Import): ein Assistent in vier
-Schritten — Entitäten, Zeitraum, Auflösung, Prüfen. Eine Entität ergibt eine CSV,
-mehrere ergeben automatisch ein ZIP mit je einer CSV. Die Dateilogik steht in
-export_data.py.
+Schritten — Entitäten, Zeitraum, Auflösung, Form und Download. Eine Entität ergibt
+eine CSV, mehrere ergeben ein ZIP mit je einer CSV oder eine gemeinsame Datei
+(nebeneinander oder untereinander). Die Dateilogik steht in export_data.py.
 
 Der Download je Zeile der Entitätenliste bleibt: ohne Zeitraum und Auflösung
 (``/export/download?entity_id=…``) kommt die komplette Rohdaten-Historie, Hot
@@ -11,7 +11,7 @@ ausgeschlossen — dieselbe Sicht wie die Bereinigungs-Seite (list_raw_rows())."
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -35,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 # Obergrenze der Entitäten je Anfrage — nur Schutz vor absurden Query-Strings.
 MAX_EXPORT_ENTITIES = 5000
+#: Zeilen der Vorschau in Schritt 4, mit der Kopfzeile.
+PREVIEW_LINES = 4
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,22 @@ class ExportDependencies:
     templates: Jinja2Templates
     visible_row_count: Callable[[object], int]
     paginate_meta: Callable[[int, int, int], dict]
+
+
+@dataclass(frozen=True)
+class DownloadPlan:
+    """Was ein Download liefert: Dateiname, Typ, der Strom der Bytes und eine Probe (die erste Datei als Text)."""
+
+    filename: str
+    media_type: str
+    stream: Callable[[], Iterator[bytes]]
+    sample_name: str
+    sample: Callable[[], Iterator[str]]
+
+
+def iter_bytes(chunks: Iterator[str]) -> Iterator[bytes]:
+    for chunk in chunks:
+        yield chunk.encode("utf-8")
 
 
 class EstimateRequest(BaseModel):
@@ -204,14 +222,69 @@ def create_export_router(deps: ExportDependencies) -> APIRouter:
                 "last": datetime.fromtimestamp(last_ts, deps.tz).strftime("%Y-%m-%d") if last_ts is not None else None,
                 "rows": export_data.estimate_rows(deps.data_dir, entity, start_ts, end_ts, deps.tz),
             })
-        return JSONResponse({"limit": MAX_EXPORT_ROWS, "files": files})
+        return JSONResponse({"limit": MAX_EXPORT_ROWS, "wide_limit": export_data.MAX_WIDE_ENTITIES, "files": files})
 
-    def download_response(entity_ids: list[str], start: str, end: str, resolution: str) -> StreamingResponse:
-        """Eine Entität → CSV, mehrere → ZIP mit je einer CSV."""
+    def format_or_400(
+        layout: str, sep: str, decimal: str, bom: bool, time: str, unix: bool,
+    ) -> export_data.CsvFormat:
+        try:
+            return export_data.parse_format(layout, sep, decimal, bom, time, unix)
+        except ValueError as err:
+            raise HTTPException(status_code=400, detail=str(err)) from err
+
+    def too_many_rows() -> HTTPException:
+        return HTTPException(
+            status_code=413,
+            detail=tr("CSV-Export ist auf {MAX_EXPORT_ROWS} Zeilen begrenzt", MAX_EXPORT_ROWS=MAX_EXPORT_ROWS),
+        )
+
+    def joint_plan(
+        entities: list, start: str, end: str, resolution: str, start_ts: float | None, end_ts: float | None,
+        fmt: export_data.CsvFormat,
+    ) -> DownloadPlan:
+        """Eine gemeinsame CSV für mehrere Entitäten (nebeneinander oder untereinander)."""
+        if any(entity["aggregation_type"] == "state" for entity in entities):
+            raise HTTPException(
+                status_code=400, detail=tr("Zustands-Entitäten lassen sich nicht in einer gemeinsamen Datei exportieren"),
+            )
+        if fmt.layout == "wide":
+            if resolution == "raw":
+                raise HTTPException(status_code=400, detail=tr("Nebeneinander gibt es erst ab der Auflösung Minute"))
+            if len(entities) > export_data.MAX_WIDE_ENTITIES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=tr("Nebeneinander ist auf {MAX_WIDE_ENTITIES} Entitäten begrenzt", MAX_WIDE_ENTITIES=export_data.MAX_WIDE_ENTITIES),
+                )
+        if start_ts is None and end_ts is None and resolution == "raw":
+            rows = sum(deps.visible_row_count(entity) for entity in entities)
+        else:
+            rows = export_data.estimate_joint_rows(deps.data_dir, entities, start_ts, end_ts, resolution, fmt.layout, deps.tz)
+        if rows > MAX_EXPORT_ROWS:
+            raise too_many_rows()
+        names = {e["entity_id"]: entity_display_name(e["entity_id"], e["friendly_name"], e["custom_name"]) for e in entities}
+        make = export_data.wide_chunks if fmt.layout == "wide" else export_data.long_chunks
+        suffix = export_data.file_suffix(start or None, end or None, resolution)
+        filename = f"zeitarchiv-export_{len(entities)}-entitaeten{suffix}.csv"
+
+        def chunks() -> Iterator[str]:
+            return make(
+                deps.data_dir, index, entities, names, start_ts, end_ts, resolution, deps.tz, deps.coordinator,
+                MAX_EXPORT_ROWS, fmt,
+            )
+
+        return DownloadPlan(filename, "text/csv", lambda: iter_bytes(chunks()), filename, chunks)
+
+    def download_plan(
+        entity_ids: list[str], start: str, end: str, resolution: str, fmt: export_data.CsvFormat | None = None,
+    ) -> DownloadPlan:
+        """Eine Entität → CSV, mehrere → ZIP mit je einer CSV oder (fmt.layout) eine gemeinsame CSV."""
+        fmt = fmt or export_data.CsvFormat()
         if resolution not in export_data.RESOLUTIONS:
             raise HTTPException(status_code=400, detail=tr("Unbekannte Auflösung"))
         entities = entities_or_error(entity_ids)
         start_ts, end_ts = period_or_400(start, end)
+        if fmt.layout != "per_entity" and len(entities) > 1:
+            return joint_plan(entities, start, end, resolution, start_ts, end_ts, fmt)
 
         complete_raw = start_ts is None and end_ts is None and resolution == "raw"
         for entity in entities:
@@ -220,34 +293,32 @@ def create_export_router(deps: ExportDependencies) -> APIRouter:
             else:
                 rows = export_data.estimate_rows(deps.data_dir, entity, start_ts, end_ts, deps.tz)[resolution]
             if rows > MAX_EXPORT_ROWS:
-                raise HTTPException(
-                    status_code=413,
-                    detail=tr("CSV-Export ist auf {MAX_EXPORT_ROWS} Zeilen begrenzt", MAX_EXPORT_ROWS=MAX_EXPORT_ROWS),
-                )
+                raise too_many_rows()
 
         suffix = export_data.file_suffix(start or None, end or None, resolution)
 
         def chunks_for(entity):
             return lambda: export_data.csv_chunks(
                 deps.data_dir, index, entity, start_ts, end_ts, resolution, deps.tz,
-                deps.coordinator, MAX_EXPORT_ROWS,
+                deps.coordinator, MAX_EXPORT_ROWS, fmt,
             )
 
+        first = entities[0]
+        first_name = f"{first['entity_id']}{suffix}.csv"
         if len(entities) == 1:
-            entity = entities[0]
-            filename = f"{entity['entity_id']}{suffix}.csv"
-            return StreamingResponse(
-                chunks_for(entity)(),
-                media_type="text/csv",
-                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-            )
+            return DownloadPlan(first_name, "text/csv", lambda: iter_bytes(chunks_for(first)()), first_name, chunks_for(first))
 
         files = [(f"{entity['entity_id']}{suffix}.csv", chunks_for(entity)) for entity in entities]
         filename = f"zeitarchiv-export_{len(entities)}-entitaeten{suffix}.zip"
+        return DownloadPlan(
+            filename, "application/zip", lambda: export_data.zip_stream(files, datetime.now(deps.tz)),
+            first_name, chunks_for(first),
+        )
+
+    def download_response(plan: DownloadPlan) -> StreamingResponse:
         return StreamingResponse(
-            export_data.zip_stream(files, datetime.now(deps.tz)),
-            media_type="application/zip",
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            plan.stream(), media_type=plan.media_type,
+            headers={"Content-Disposition": f'attachment; filename="{plan.filename}"'},
         )
 
     @router.get("/export/download")
@@ -259,7 +330,7 @@ def create_export_router(deps: ExportDependencies) -> APIRouter:
     ) -> StreamingResponse:
         """Download je Zeile der Entitätenliste: ohne Zeitraum und Auflösung die
         komplette Rohdaten-Historie einer Entität."""
-        return download_response(entity_id, start, end, resolution)
+        return download_response(download_plan(entity_id, start, end, resolution))
 
     @router.post("/export/download")
     def export_download_form(
@@ -267,9 +338,48 @@ def create_export_router(deps: ExportDependencies) -> APIRouter:
         start: str = Form(""),
         end: str = Form(""),
         resolution: str = Form("raw"),
+        layout: str = Form("per_entity"),
+        sep: str = Form("comma"),
+        decimal: str = Form("point"),
+        bom: bool = Form(False),
+        time: str = Form("stamp"),
+        unix: bool = Form(True),
     ) -> StreamingResponse:
         """Download aus dem Assistenten als Formular-POST: die Auswahl kann für eine
-        Query-Zeile zu lang sein."""
-        return download_response(entity_id, start, end, resolution)
+        Query-Zeile zu lang sein. Ohne die Felder zur Form kommt die Datei von früher."""
+        fmt = format_or_400(layout, sep, decimal, bom, time, unix)
+        return download_response(download_plan(entity_id, start, end, resolution, fmt))
+
+    @router.post("/export/preview")
+    def export_preview(
+        entity_id: Annotated[list[str], Form()],
+        start: str = Form(""),
+        end: str = Form(""),
+        resolution: str = Form("raw"),
+        layout: str = Form("per_entity"),
+        sep: str = Form("comma"),
+        decimal: str = Form("point"),
+        bom: bool = Form(False),
+        time: str = Form("stamp"),
+        unix: bool = Form(True),
+    ) -> JSONResponse:
+        """Die ersten Zeilen der Datei, die der Download liefern würde (bei einem ZIP die der ersten Datei),
+        für die Vorschau in Schritt 4. Dieselben Prüfungen wie beim Download, Fehler als Statuscode."""
+        fmt = format_or_400(layout, sep, decimal, bom, time, unix)
+        plan = download_plan(entity_id, start, end, resolution, fmt)
+        lines: list[str] = []
+        chunks = plan.sample()
+        try:
+            text = ""
+            for chunk in chunks:
+                text += chunk
+                lines = text.split("\r\n")
+                if len(lines) > PREVIEW_LINES:
+                    break
+        finally:
+            # Gibt die Sperren frei, ohne den Rest der Datei zu lesen.
+            chunks.close()  # type: ignore[attr-defined]
+        shown = [line for line in lines[:PREVIEW_LINES] if line]
+        return JSONResponse({"file": plan.sample_name, "text": "\n".join(shown).lstrip("\ufeff")})
 
     return router
