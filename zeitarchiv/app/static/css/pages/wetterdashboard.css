@@ -11,7 +11,7 @@
   /* Karten wie im Energiedashboard (.edash-card): 12 px Rundung, 16×18 Innenabstand, leichter Schatten, Titel 14 px. */
   .wt-card{padding:16px 18px;border-radius:12px;box-shadow:var(--shadow);}
   .wt-card + .wt-card{margin-top:16px;}
-  .wt-h2{font-size:calc(14px * var(--font-scale, 1));font-weight:600;margin:0;flex:1 1 auto;}
+  .wt-h2{font-size:calc(14px * var(--font-scale, 1));font-weight:600;margin:0;flex:1 1 220px;}
   .wt-headline{font-size:calc(15px * var(--font-scale, 1));margin:8px 0 12px;color:var(--ink);}
   .wt-chart{width:100%;height:300px;}
   .wt-chart-tall{height:360px;}
@@ -47,6 +47,7 @@
   .wt-tile-sub{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);font-variant-numeric:tabular-nums;}
 
   /* Steuerung über der Tabelle */
+  .wt-date{font:inherit;font-size:calc(13px * var(--font-scale, 1));padding:4px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);}
   .wt-picker-sep{border-top:1px solid var(--border);margin-top:4px;padding-top:8px;}
   .wt-controls{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-bottom:6px;}
   .wt-cols{display:flex;flex-wrap:wrap;gap:4px 14px;}

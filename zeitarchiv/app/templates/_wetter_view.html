@@ -47,6 +47,11 @@
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Zeiträume im Vergleich") }} {{ hint_button(_("Zeiträume im Vergleich")) }}</h2>
       {% call hint_body() %}<span x-show="vorjahr" x-text="modeHint()"></span>{% endcall %}
+      {# Stichtag: die Tabelle zeigt die Zeiträume zu einem früheren Tag (Heute, Gestern, Monat … beziehen sich dann auf ihn). #}
+      <label class="wt-check">{{ _("Stichtag") }}
+        <input type="date" class="wt-date" :max="todayIso" :value="stichtag" @change="setStichtag($event.target.value)">
+      </label>
+      <button type="button" class="btn" x-show="stichtag" x-cloak @click="setStichtag('')">{{ _("Heute") }}</button>
       {# Spaltenauswahl wie in der Entitätenliste: Knopf „Spalten ▾“ mit Popover (dd-picker). #}
       <div class="dd-picker-wrap">
         <button type="button" class="btn" onclick="toggleDDPicker('wt-cols')">{{ _("Spalten ▾") }}</button>

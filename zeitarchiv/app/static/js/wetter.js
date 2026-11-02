@@ -24,7 +24,9 @@
     }[key];
   }
 
-  function columnTitle(col) {
+  function columnTitle(col, data) {
+    // Mit Stichtag stehen „Heute“ und „Gestern“ für andere Tage: dann das Datum selbst.
+    if (data && data.at && (col.key === 'heute' || col.key === 'gestern')) return fmtDate(formats.dmy, col.cur.start);
     if (col.key === 'heute') return t('Heute');
     if (col.key === 'gestern') return t('Gestern');
     if (col.key === 'jahr') return String(ZT.parts(col.cur.start).year);
@@ -118,11 +120,11 @@
     if (!cols.length) return `<tbody><tr><td>${escapeHtml(t('Keine Spalte ausgewählt.'))}</td></tr></tbody>`;
     const span = data.vorjahr ? 2 : 1;
     let html = '<thead><tr class="wt-g"><th></th>';
-    for (const col of cols) html += `<th class="wt-sep" colspan="${span}">${escapeHtml(columnTitle(col))}</th>`;
+    for (const col of cols) html += `<th class="wt-sep" colspan="${span}">${escapeHtml(columnTitle(col, data))}</th>`;
     html += '</tr><tr><th></th>';
     for (const col of cols) {
       let sub = rangeText(col.cur.start, col.cur.end);
-      if (col.key === 'heute') sub = t('bis {time}', {time: fmtDate(formats.hm, data.now)});
+      if (col.key === 'heute' && !data.at) sub = t('bis {time}', {time: fmtDate(formats.hm, data.now)});
       html += `<th class="wt-sep"><span class="wt-sb">${escapeHtml(sub)}</span></th>`;
       if (data.vorjahr) {
         html += `<th class="wt-vj"><span class="wt-pill">${escapeHtml(t('Vorjahr'))}</span><span class="wt-sb">${escapeHtml(rangeText(col.vj.start, col.vj.end))}</span></th>`;
@@ -258,6 +260,8 @@
   window.wetterDashboard = function wetterDashboard(precipModes) {
     return {
       tab: 'overview',
+      stichtag: '',
+      todayIso: '',
       precipModes: precipModes || [],
       precipMode: (precipModes && precipModes[0]) || 'mm',
       precip: null,
@@ -291,6 +295,8 @@
         if (Array.isArray(saved.columns)) this.columns = COLUMN_KEYS.filter((key) => saved.columns.includes(key));
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
+        const requested = new URLSearchParams(window.location.search).get('at');
+        if (requested && /^\d{4}-\d{2}-\d{2}$/.test(requested)) this.stichtag = requested;
         this.loadTiles();
         this.loadTable();
         this.loadMonthly();
@@ -305,6 +311,16 @@
         this.saveAndLoad();
       },
 
+      // Stichtag wählen (leer = heute). Er steht in der Adresse (?at=…), damit sich die Ansicht teilen lässt.
+      setStichtag(value) {
+        this.stichtag = value && value < this.todayIso ? value : '';
+        const url = new URL(window.location.href);
+        if (this.stichtag) url.searchParams.set('at', this.stichtag);
+        else url.searchParams.delete('at');
+        window.history.replaceState(null, '', url);
+        this.loadTable();
+      },
+
       setMode(mode) {
         this.mode = mode;
         this.saveAndLoad();
@@ -316,9 +332,12 @@
       },
 
       modeHint() {
-        return this.mode === 'bis_jetzt'
+        const base = this.mode === 'bis_jetzt'
           ? t('Laufende Zeiträume werden mit demselben Stück des Vorjahres verglichen. Abgeschlossene Zeiträume (Gestern, Letzter Monat) sind in beiden Fällen gleich.')
           : t('Laufende Zeiträume stehen neben dem kompletten Vorjahreszeitraum. Das Vorjahr hat dadurch mehr Spannweite und mehr Niederschlag.');
+        if (!this.stichtag) return base;
+        const date = fmtDate(formats.dmy, Date.parse(this.stichtag + 'T12:00:00Z') / 1000);
+        return `${base} ${t('Die Tabelle zeigt die Zeiträume zum {date}; die Kacheln zeigen weiter die aktuellen Werte.', {date})}`;
       },
 
       tileValue(tile) {
@@ -1134,11 +1153,13 @@
           const res = await fetch('wetterdashboard/table', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({columns: this.columns, vorjahr: this.vorjahr, mode: this.mode}),
+            body: JSON.stringify({columns: this.columns, vorjahr: this.vorjahr, mode: this.mode, at: this.stichtag || null}),
           });
           if (!res.ok) throw new Error(String(res.status));
           const data = await res.json();
           if (seq !== this._seq) return;  // eine neuere Anfrage hat überholt
+          this.todayIso = data.today;
+          if (this.stichtag && !data.at) this.stichtag = '';  // heute oder später gilt als „jetzt“
           this.$refs.table.innerHTML = renderTable(data);
           // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
           const wrap = this.$refs.tableWrap;

@@ -21,7 +21,7 @@ from .i18n import N_, tr
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -168,6 +168,17 @@ def _role_warning(index: Index, role_key: str, entity_id: str) -> str | None:
     return None
 
 
+def _parse_stichtag(raw: str | None, today: date) -> date | None:
+    """Gültiger Stichtag vor heute oder None (heute und Zukunft gelten als „jetzt“); ungültig: 400."""
+    if not raw:
+        return None
+    try:
+        day = date.fromisoformat(raw)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=tr("Ungültiges Datum: {value}", value=raw)) from None
+    return day if day < today else None
+
+
 def _decimals(entity, role_key: str) -> int | None:
     """Einstellung der Entität; bei „automatisch“ der Standard der Rolle (None = der Browser wählt)."""
     configured = decimals_to_int(entity["decimals"])
@@ -178,6 +189,8 @@ class TableRequest(BaseModel):
     columns: list[str] = Field(default_factory=lambda: list(COLUMN_KEYS))
     vorjahr: bool = True
     mode: str = "bis_jetzt"
+    #: Stichtag (JJJJ-MM-TT): die Tabelle zeigt dann die Zeiträume zu diesem Tag statt zu „jetzt“.
+    at: str | None = None
 
 
 @dataclass
@@ -304,14 +317,19 @@ class WetterService:
 
     # -- Spalten -----------------------------------------------------------------------
 
-    def column_windows(self, key: str, now_local: datetime, mode: str) -> dict:
+    def column_windows(self, key: str, now_local: datetime, mode: str, anchor: datetime | None = None) -> dict:
         """Zeitfenster einer Spalte und ihres Vorjahrespartners.
 
         „Bis jetzt“: ein laufender Zeitraum wird mit demselben Stück des Vorjahres verglichen.
         „Komplett“: mit dem ganzen Vorjahreszeitraum. Abgeschlossene Zeiträume (Gestern, Vormonat)
-        sind in beiden Modi gleich."""
+        sind in beiden Modi gleich.
+
+        anchor: ein Zeitpunkt am gewählten Stichtag (Mittag). Die Zeiträume richten sich dann nach diesem
+        Tag, und „bis jetzt“ heißt „bis zum Ende des Stichtags“. Ohne Stichtag gilt now_local."""
         range_key, offset = COLUMN_WINDOWS[key]
-        start, capped_end, natural_end = query_mod._window(range_key, now_local, offset)  # noqa: SLF001
+        start, _capped, natural_end = query_mod._window(range_key, anchor or now_local, offset)  # noqa: SLF001
+        cut = (anchor.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)) if anchor else now_local
+        capped_end = min(natural_end, cut)
         partial = capped_end < natural_end
         vj_start = query_mod._shift_year(start, -1)  # noqa: SLF001
         vj_end = query_mod._shift_year(  # noqa: SLF001
@@ -328,7 +346,9 @@ class WetterService:
         now_local = now_local or datetime.now(self.deps.tz)
         columns = [key for key in COLUMN_KEYS if key in body.columns]
         mode = body.mode if body.mode in MODES else "bis_jetzt"
-        windows = [self.column_windows(key, now_local, mode) for key in columns]
+        stichtag = _parse_stichtag(body.at, now_local.date())
+        anchor = datetime(stichtag.year, stichtag.month, stichtag.day, 12, tzinfo=self.deps.tz) if stichtag else None
+        windows = [self.column_windows(key, now_local, mode, anchor) for key in columns]
         read_cache = query_mod.QueryReadCache()
         rows_out = []
         for spec in self._row_specs(config):
@@ -356,6 +376,8 @@ class WetterService:
             "tz": str(self.deps.tz),
             "now": now_local.timestamp(),
             "mode": mode,
+            "at": stichtag.isoformat() if stichtag else None,
+            "today": now_local.date().isoformat(),
             "vorjahr": body.vorjahr,
             "rain_day_mm": config["rain_day_mm"],
             "rain_day_minutes": config["rain_day_minutes"],

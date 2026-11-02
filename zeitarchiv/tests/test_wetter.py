@@ -555,3 +555,48 @@ def test_setup_form_uses_app_fields_and_info_buttons(client) -> None:
     assert html.count('class="field"') >= 4 and "wt-extra field" in html
     assert html.count("hint-toggle") == 3  # Thermometer, Heizenergie, Regentage
     assert '<p class="hint">' not in html  # lose .hint-Absätze verschwänden auf dem Telefon ohne Knopf
+
+
+# -- Stichtag ---------------------------------------------------------------------------------
+
+
+def test_reference_day_moves_every_column_to_that_day(service) -> None:
+    anchor = datetime(2026, 3, 14, 12, tzinfo=TZ)
+    heute = service.column_windows("heute", NOW, "bis_jetzt", anchor)
+    assert heute["start"] == datetime(2026, 3, 14, tzinfo=TZ) and heute["end"] == datetime(2026, 3, 15, tzinfo=TZ)
+    assert not heute["partial"] and heute["vj_end"] == datetime(2025, 3, 15, tzinfo=TZ)  # ein vergangener Tag ist vollständig
+    monat = service.column_windows("monat", NOW, "bis_jetzt", anchor)
+    assert monat["start"] == datetime(2026, 3, 1, tzinfo=TZ) and monat["end"] == datetime(2026, 3, 15, tzinfo=TZ)
+    assert monat["partial"] and monat["vj_end"] == datetime(2025, 3, 15, tzinfo=TZ)  # derselbe Ausschnitt im Vorjahr
+    komplett = service.column_windows("monat", NOW, "komplett", anchor)
+    assert komplett["vj_end"] == datetime(2025, 4, 1, tzinfo=TZ)
+    assert service.column_windows("vormonat", NOW, "bis_jetzt", anchor)["start"] == datetime(2026, 2, 1, tzinfo=TZ)
+    assert service.column_windows("gestern", NOW, "bis_jetzt", anchor)["start"] == datetime(2026, 3, 13, tzinfo=TZ)
+    assert service.column_windows("jahr", NOW, "bis_jetzt", anchor)["end"] == datetime(2026, 3, 15, tzinfo=TZ)
+
+
+def test_reference_day_on_the_last_day_of_a_month_makes_the_month_complete(service) -> None:
+    anchor = datetime(2026, 7, 31, 12, tzinfo=TZ)
+    monat = service.column_windows("monat", NOW, "bis_jetzt", anchor)
+    assert monat["end"] == datetime(2026, 8, 1, tzinfo=TZ) and not monat["partial"]
+
+
+def test_table_at_a_reference_day_reads_that_day_from_the_archive(service) -> None:
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(10, 8), 4.0), (_ts(10, 16), 9.0), (_ts(19, 8), 10.0), (_ts(20, 1), 12.0)])
+    _configure(service, temperature="sensor.t")
+    data = service.compute_table(TableRequest(columns=["heute", "gestern"], vorjahr=False, at="2026-08-10"), NOW)
+    assert data["at"] == "2026-08-10" and data["today"] == "2026-08-20"
+    heute = data["rows"][0]["cells"]["heute"]["cur"]
+    assert (heute["max"], heute["min"]) == (9.0, 4.0)
+    assert data["columns"][0]["cur"]["start"] == datetime(2026, 8, 10, tzinfo=TZ).timestamp()
+    assert not data["columns"][0]["partial"]
+
+
+def test_reference_day_today_or_later_means_now_and_garbage_is_rejected(service) -> None:
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(20, 1), 12.0)])
+    _configure(service, temperature="sensor.t")
+    for value in ("2026-08-20", "2027-01-01", None, ""):
+        assert service.compute_table(TableRequest(columns=["heute"], vorjahr=False, at=value), NOW)["at"] is None
+    with pytest.raises(Exception) as caught:
+        service.compute_table(TableRequest(columns=["heute"], at="gestern"), NOW)
+    assert getattr(caught.value, "status_code", None) == 400
