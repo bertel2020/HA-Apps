@@ -94,13 +94,17 @@ Nur **abgeschlossene** Perioden werden vorberechnet; die laufende Periode
 berechnet `query.py` immer live aus dem Hot Buffer. Bucket-Größe hängt vom
 Aggregationstyp der Entität ab:
 
-| Aggregationstyp | Feine Bucket-Größe | Datei | Bedient |
+| Aggregationstyp | Persistierte Bucket-Größe | Datei | Bedient |
 | --- | --- | --- | --- |
-| `counter` (Zähler, `total`/`total_increasing`) | 5 Min. | `tag.parquet` | Woche, Monat |
-| `standard` / `switch` (Messwert/Schalter) | 1 Min. | `stunde.parquet` | Woche, Monat |
+| `counter` (Zähler, `total`/`total_increasing`) | 1 Tag | `tag.parquet` | Woche, Monat |
+| `standard` / `switch` (Messwert/Schalter) | 1 Stunde | `stunde.parquet` | Woche, Monat |
 
-Zusätzlich je Entität `monat.parquet` (bedient Jahr, bei Zählern auch
-Dekade) und bei Standard/Schalter `jahr.parquet` (bedient Dekade). Jede
+(Die feineren Buckets der Stunden- und Tagesansicht, 1 bzw. 5 Min. bei
+Messwerten und 5 Min. bzw. 1 Std. bei Zählern, werden nicht persistiert,
+sondern live aus dem Hot Buffer bzw. dem Archiv berechnet.)
+
+Zusätzlich je Entität `monat.parquet` (bedient Jahr, bei Standard/Schalter
+auch Dekade) und nur bei Zählern `jahr.parquet` (bedient Dekade). Jede
 Zeile trägt `bucket_start` (Unix-Timestamp UTC) plus, je nach Typ,
 `value`/`min_value`/`max_value` (Zähler: Summe bzw. Bucket-Extremwerte;
 Standard: Mittelwert bzw. Extremwerte) oder `on_seconds` (Schalter:

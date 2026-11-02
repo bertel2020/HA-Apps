@@ -85,13 +85,17 @@ Only **completed** periods are precomputed; `query.py` always computes the
 current period live from the hot buffer. Bucket size depends on the entity's
 aggregation type:
 
-| Aggregation type | Fine bucket size | File | Serves |
+| Aggregation type | Persisted bucket size | File | Serves |
 | --- | --- | --- | --- |
-| `counter` (counter, `total`/`total_increasing`) | 5 min | `tag.parquet` | week, month |
-| `standard` / `switch` (measurement/switch) | 1 min | `stunde.parquet` | week, month |
+| `counter` (counter, `total`/`total_increasing`) | 1 day | `tag.parquet` | week, month |
+| `standard` / `switch` (measurement/switch) | 1 hour | `stunde.parquet` | week, month |
 
-Additionally per entity `monat.parquet` (serves year, for counters also decade)
-and for standard/switch `jahr.parquet` (serves decade). Each row carries
+(The finer buckets of the hour and day views, 1 and 5 min for measurements
+and 5 min and 1 h for counters, are not persisted but computed live from the
+hot buffer or the archive.)
+
+Additionally per entity `monat.parquet` (serves year, for standard/switch also
+decade) and, for counters only, `jahr.parquet` (serves decade). Each row carries
 `bucket_start` (Unix timestamp UTC) plus, depending on type,
 `value`/`min_value`/`max_value` (counter: sum or bucket extremes; standard:
 mean or extremes) or `on_seconds` (switch: on-time in the bucket).
