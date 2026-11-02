@@ -74,6 +74,9 @@ ROLE_TYPES = {key: types for key, _label, types in ROLES}
 ROLE_LABELS = {key: label for key, label, _types in ROLES}
 
 MAX_EXTRA_TEMPERATURES = 5
+#: Blöcke der Vergleichstabelle, die sich in der Einrichtung ausblenden lassen (die Außentemperatur
+#: und Zusatzsensoren bleiben immer sichtbar).
+BLOCK_KEYS = ("kenntage", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation")
 #: Nachkommastellen, wenn die Entität „automatisch“ eingestellt ist: Strahlung in ganzen W/m².
 ROLE_DEFAULT_DECIMALS = {"radiation": 0}
 #: Kurze Namen für die Kacheln (in der Tabelle stehen die ausführlichen Rollennamen).
@@ -104,6 +107,7 @@ def _empty_config() -> dict:
         "heating_limit": DEFAULT_HEATING_LIMIT,
         "rain_day_mm": DEFAULT_RAIN_DAY_MM,
         "rain_day_minutes": DEFAULT_RAIN_DAY_MINUTES,
+        "hidden_blocks": [],
     }
 
 
@@ -135,6 +139,9 @@ def _load_config(index: Index) -> dict:
             for row in heating
             if isinstance(row, dict) and row.get("entity_id")
         ][:MAX_HEATING_COUNTERS]
+    hidden = data.get("hidden_blocks")
+    if isinstance(hidden, list):
+        config["hidden_blocks"] = [key for key in BLOCK_KEYS if key in hidden]
     for key in ("heating_room", "heating_limit"):
         value = data.get(key)
         if isinstance(value, (int, float)) and not isinstance(value, bool) and 0 < value < 40:
@@ -369,7 +376,10 @@ class WetterService:
         windows = [self.column_windows(key, now_local, mode, anchor) for key in columns]
         read_cache = query_mod.QueryReadCache()
         rows_out = []
+        hidden = set(config["hidden_blocks"])
         for spec in self._row_specs(config):
+            if spec["key"] in hidden:
+                continue
             entity = self.deps.index.get_entity(spec["entity_id"])
             first_ts = entity["first_ts"] if entity else None
             cells: dict[str, dict] = {}
@@ -388,7 +398,7 @@ class WetterService:
                         cell[f"{side}_from"] = first_ts
                 cells[win["key"]] = cell
             rows_out.append({**spec, "cells": cells})
-            if spec["key"] == "temperature":
+            if spec["key"] == "temperature" and "kenntage" not in hidden:
                 rows_out.append(self._kenntage_row(spec, windows, body.vorjahr, now_local, read_cache))
         return {
             "tz": str(self.deps.tz),
@@ -730,6 +740,9 @@ class WetterService:
                     "roles": [(key, label, types) for key, label, types in ROLES],
                     "role_types": {key: list(types) for key, _label, types in ROLES},
                     "role_units": ROLE_UNITS,
+                    "block_options": [("kenntage", tr("Kenntage"))] + [
+                        (key, tr(ROLE_LABELS[key])) for key in BLOCK_KEYS if key != "kenntage"
+                    ],
                     "counter_options": [o for o in self._entity_options() if o["aggregation_type"] == "counter"],
                     "max_heating": MAX_HEATING_COUNTERS,
                     "warnings": warnings, "max_extra": MAX_EXTRA_TEMPERATURES,
@@ -762,6 +775,8 @@ class WetterService:
             radiation: str = Form(""),
             extra_entity_id: list[str] = Form([]),
             extra_name: list[str] = Form([]),
+            blocks_submitted: str = Form(""),
+            show_block: list[str] = Form([]),
             heating_entity_id: list[str] = Form([]),
             heating_name: list[str] = Form([]),
             heating_room: str = Form(""),
@@ -798,6 +813,11 @@ class WetterService:
                 name = extra_name[position].strip() if position < len(extra_name) else ""
                 extras.append({"entity_id": entity_id, "name": name[:60]})
             config["extra_temperatures"] = extras[:MAX_EXTRA_TEMPERATURES]
+            # Ohne das Marker-Feld (ältere Aufrufer) bleibt die bisherige Auswahl erhalten.
+            if blocks_submitted:
+                config["hidden_blocks"] = [key for key in BLOCK_KEYS if key not in show_block]
+            else:
+                config["hidden_blocks"] = _load_config(deps.index)["hidden_blocks"]
             heating = []
             for position, entity_id in enumerate(heating_entity_id):
                 entity_id = entity_id.strip()

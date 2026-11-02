@@ -74,17 +74,17 @@
 
   /* Vergleichstabelle: Rahmen und Scroll-Hinweis aus .tbl-wrap (app.css), Kopf wie table.dt. */
   .wt-table-wrap{margin-top:10px;}
-  .wt-table{border-collapse:separate;border-spacing:0;width:100%;min-width:640px;font-variant-numeric:tabular-nums;font-size:calc(13.5px * var(--font-scale, 1));}
+  .wt-table{border-collapse:separate;border-spacing:0;width:auto;font-variant-numeric:tabular-nums;font-size:calc(13.5px * var(--font-scale, 1));}
   .wt-table th,.wt-table td{padding:5px 10px;text-align:right;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;}
-  .wt-table thead th{font-weight:600;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);vertical-align:bottom;}
-  .wt-table thead tr.wt-g th{text-align:center;border-bottom:0;padding-bottom:2px;}
-  .wt-table thead tr.wt-sub th{font-weight:400;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);padding-top:0;border-bottom:1.5px solid var(--border-strong);}
+  .wt-table thead th{font-weight:600;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);border-bottom:1.5px solid var(--border-strong);}
+  .wt-table thead th.wt-cur{padding-left:18px;cursor:help;}
+  .wt-table thead th.wt-vj{font-weight:400;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);cursor:help;}
+  .wt-table thead .wt-info{margin-left:4px;font-size:calc(10px * var(--font-scale, 1));font-weight:400;color:var(--ink-faint);vertical-align:1px;}
+  .wt-table td.wt-sep{padding-left:18px;}
   .wt-table th:first-child,.wt-table td:first-child{min-width:96px;text-align:left;position:sticky;left:0;background:var(--surface);z-index:1;}
   .wt-table tbody tr:last-child th,.wt-table tbody tr:last-child td{border-bottom:0;}
   .wt-table tbody th{font-weight:400;color:var(--ink-muted);}
   .wt-table .wt-sep{border-left:1px solid var(--border);}
-  .wt-table thead .wt-sb{display:block;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:var(--ink-faint);}
-  .wt-table thead th.wt-vj{cursor:help;}
   .wt-table tr.wt-grp th{font-size:calc(11.5px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--accent-line);text-align:left;padding-top:12px;border-bottom:1px solid var(--border-strong);white-space:nowrap;}
   .wt-table td .wt-v{font-weight:600;color:var(--ink);}
   .wt-table td.wt-vj .wt-v{font-weight:400;color:var(--ink-muted);}
@@ -147,7 +147,6 @@
     .wt-kpis{--wt-cols:2 !important;}
     .wt-chart{height:260px;}
     .wt-chart-tall{height:300px;}
-    .wt-table{min-width:520px;}
     .wt-table th:first-child,.wt-table td:first-child{min-width:78px;max-width:100px;white-space:normal;}
     .wt-table th,.wt-table td{padding-left:8px;padding-right:8px;}
     .wt-roles{grid-template-columns:1fr;}

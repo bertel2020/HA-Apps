@@ -3434,7 +3434,9 @@
     "„Böe“ im Namen": "“Gust” in the name",
     "„Feuchte“ im Namen": "“Humidity” in the name",
     "„Gesamt“ im Namen": "“Total” in the name",
-    "„Regen“ im Namen": "“Rain” in the name"
+    "„Regen“ im Namen": "“Rain” in the name",
+    "Welche Blöcke die Vergleichstabelle zeigt. Die Außentemperatur und weitere Sensoren sind immer dabei.": "Which blocks the comparison table shows. The outdoor temperature and additional sensors are always included.",
+    "Ein ausgeblendeter Block fehlt in der Tabelle auf allen Reitern. Die Kacheln oben bleiben unverändert.": "A hidden block is missing from the table on every tab. The tiles at the top stay unchanged."
   },
   "js": {
     "Ladestand": "State of charge",

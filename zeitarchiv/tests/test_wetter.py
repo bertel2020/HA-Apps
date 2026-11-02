@@ -554,7 +554,7 @@ def test_setup_form_uses_app_fields_and_info_buttons(client) -> None:
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
     html = client.get("/wetterdashboard/setup").text
     assert html.count('class="field"') >= 4 and "wt-extra field" in html
-    assert html.count("hint-toggle") == 3  # Thermometer, Heizenergie, Regentage
+    assert html.count("hint-toggle") == 4  # Weitere Sensoren, Heizenergie, Regentage, Anzeige
     assert '<p class="hint">' not in html  # lose .hint-Absätze verschwänden auf dem Telefon ohne Knopf
 
 
@@ -748,3 +748,24 @@ def test_setup_suggestions_route_and_button(client) -> None:
     assert set(data) == {"roles", "heating", "missing", "has_catalog"}
     setup = client.get("/wetterdashboard/setup").text
     assert "suggest()" in setup and "wetter-fill" in setup and "wetterdashboard/setup/vorschlaege" in setup
+
+
+def test_hidden_blocks_leave_the_table_and_are_saved_from_the_setup_form(service, client) -> None:
+    from app.main import index
+
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(20, 1), 12.0), (_ts(20, 10), 18.0)])
+    _add(service, "sensor.h", "sensor", "measurement", "%", [(_ts(20, 1), 60.0)])
+    _configure(service, temperature="sensor.t", humidity="sensor.h", hidden_blocks=["kenntage", "humidity"])
+    data = service.compute_table(TableRequest(columns=["heute"], vorjahr=False), NOW)
+    assert [row["key"] for row in data["rows"]] == ["temperature"]
+
+    index.get_or_create_entity("sensor.wetter_test_temp9", "sensor", "measurement", "°C")
+    base = {**wetter_routes._empty_config(), "temperature": "sensor.wetter_test_temp9"}  # noqa: SLF001
+    wetter_routes._save_config(index, {**base, "hidden_blocks": ["gust"]})  # noqa: SLF001
+    form = {"temperature": "sensor.wetter_test_temp9"}
+    client.post("/wetterdashboard/setup", data=form)  # ohne Marker bleibt die Auswahl
+    assert wetter_routes._load_config(index)["hidden_blocks"] == ["gust"]  # noqa: SLF001
+    client.post("/wetterdashboard/setup", data={**form, "blocks_submitted": "1", "show_block": ["kenntage", "wind"]})
+    assert "kenntage" not in wetter_routes._load_config(index)["hidden_blocks"]  # noqa: SLF001
+    assert "gust" in wetter_routes._load_config(index)["hidden_blocks"]  # noqa: SLF001
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")

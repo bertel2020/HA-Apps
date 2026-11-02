@@ -209,6 +209,18 @@
 
   </section>
 
+  <section class="settings-section wt-section-neutral wt-section-anzeige">
+  <h2 class="settings-section-title">{{ _("Anzeige") }} {{ hint_button(_("Anzeige")) }}</h2>
+  <p class="settings-section-description">{{ _("Welche Blöcke die Vergleichstabelle zeigt. Die Außentemperatur und weitere Sensoren sind immer dabei.") }}</p>
+  {% call hint_body() %}{{ _("Ein ausgeblendeter Block fehlt in der Tabelle auf allen Reitern. Die Kacheln oben bleiben unverändert.") }}{% endcall %}
+  <input type="hidden" name="blocks_submitted" value="1">
+  <div class="wt-chips">
+    {% for key, label in block_options %}
+    <label class="filter-chip"><input type="checkbox" name="show_block" value="{{ key }}" {% if key not in config.hidden_blocks %}checked{% endif %}><span>{{ label }}</span></label>
+    {% endfor %}
+  </div>
+  </section>
+
   <div class="actionbar" style="justify-content:flex-end;">
     <a class="btn" href="wetterdashboard">{{ _("Abbrechen") }}</a>
     <button type="submit" class="btn" style="background:var(--accent-line);color:var(--accent-contrast);border-color:var(--accent-line);">{{ _("Speichern") }}</button>

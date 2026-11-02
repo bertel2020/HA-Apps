@@ -135,24 +135,20 @@
     const cols = data.columns;
     if (!cols.length) return `<tbody><tr><td>${escapeHtml(t('Keine Spalte ausgewählt.'))}</td></tr></tbody>`;
     const span = data.vorjahr ? 2 : 1;
-    let html = '<thead><tr class="wt-g"><th></th>';
+    // Einzeiliger Kopf: der Zeitraum steht im Tooltip (data-tooltip-fixed, fixed-tooltip.js), nicht als eigene Zeile —
+    // der lange Datumsbereich machte sonst die Spalten breiter als ihre Werte.
+    let html = '<thead><tr><th></th>';
     for (const col of cols) {
       let sub = rangeText(col.cur.start, col.cur.end);
       if (col.key === 'heute' && !data.at) sub = t('bis {time}', {time: fmtDate(formats.hm, data.now)});
-      // Mit Stichtag steht das Datum schon im Kopf; darunter der Wochentag statt desselben Datums noch einmal.
+      // Mit Stichtag steht das Datum schon im Titel; der Tooltip nennt den Wochentag.
       if (data.at && (col.key === 'heute' || col.key === 'gestern')) sub = fmtDate(formats.weekday, col.cur.start);
-      html += `<th class="wt-sep" colspan="${span}">${escapeHtml(columnTitle(col, data))}<span class="wt-sb">${escapeHtml(sub)}</span></th>`;
+      html += `<th class="wt-cur wt-sep" data-tooltip-fixed="${escapeHtml(sub)}">${escapeHtml(columnTitle(col, data))}<span class="wt-info" aria-hidden="true">ⓘ</span></th>`;
+      if (data.vorjahr) {
+        html += `<th class="wt-vj" data-tooltip-fixed="${escapeHtml(rangeText(col.vj.start, col.vj.end))}">${escapeHtml(t('Vorjahr'))}</th>`;
+      }
     }
     html += '</tr>';
-    if (data.vorjahr) {
-      // Das Vorjahr steht als schmale Spaltenüberschrift; der Zeitraum dazu im Tooltip.
-      html += '<tr class="wt-sub"><th></th>';
-      for (const col of cols) {
-        html += '<th class="wt-sep"></th>'
-          + `<th class="wt-vj" data-tooltip-fixed="${escapeHtml(rangeText(col.vj.start, col.vj.end))}">${escapeHtml(t('Vorjahr'))}</th>`;
-      }
-      html += '</tr>';
-    }
     html += '</thead><tbody>';
 
     for (const row of data.rows.filter((r) => inGroup(r.key, group))) {
