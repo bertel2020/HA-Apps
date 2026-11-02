@@ -747,7 +747,7 @@ als Ganzes („Wetterdashboard-Konfiguration“) wieder her.
 
 ### Kacheln und Vergleichstabelle
 
-Die Kacheln stehen oben in der Karte **Aktuell** und zeigen je Rolle den aktuellen Wert und den heutigen Verlauf. Die **Übersicht** enthält Temperatur, Niederschlag, Regen, Luftfeuchte und Luftdruck; Wind, Böe und Strahlung stehen auf dem eigenen Reiter **Wind & Sonne**, weitere Sensoren auf **Temperatur & Klima** (beide erscheinen nur, wenn dafür etwas zugeordnet ist), jeweils mit denselben Kacheln und derselben Vergleichstabelle. Auf **Temperatur & Klima** zeigt außerdem das Diagramm **Temperaturen im Vergleich** die Tagesmittel der Außentemperatur und aller weiteren Sensoren für 7, 30 oder 90 Tage.
+Kacheln und Vergleichstabelle stehen in einer Karte, deren Titel den Tag nennt (Heute, Gestern, sonst Rückblick; ein Klick darauf springt zurück auf heute). Die Kacheln zeigen je Rolle den aktuellen Wert und den Verlauf des Tages. Die **Übersicht** enthält Temperatur, Niederschlag, Regen, Luftfeuchte und Luftdruck; Wind, Böe und Strahlung stehen auf dem eigenen Reiter **Wind & Sonne**, weitere Sensoren auf **Temperatur & Klima** (beide erscheinen nur, wenn dafür etwas zugeordnet ist), jeweils mit denselben Kacheln und derselben Vergleichstabelle. Auf **Temperatur & Klima** zeigt außerdem das Diagramm **Temperaturen im Vergleich** die Tagesmittel der Außentemperatur und aller weiteren Sensoren für 7, 30 oder 90 Tage.
 Die Tabelle darunter hat die Spalten **Heute, Gestern, Dieser Monat, Letzter
 Monat** und **Dieses Jahr**, jeweils auf Wunsch mit einer **Vorjahr**-Spalte
 daneben; im Kopf steht der konkrete Zeitraum („November“, „2026“). Die
@@ -759,7 +759,7 @@ Das **Vorjahr** wählt ihr über den Knopf „Vorjahr ▾“ (Aus, Bis jetzt, Ko
 Über die **Stichtag-Leiste** (wie bei den Dashboards: ‹ Datum ›, Kalender; ohne Schrittweiten-Knöpfe, ‹ › geht immer einen Tag, „Heute“ erscheint, sobald ein früherer Tag gewählt ist) zeigt die Tabelle die Zeiträume zu einem früheren Tag: Heute, Gestern,
 Monat, Letzter Monat und Jahr beziehen sich dann auf ihn, der Vorjahres-Ausschnitt endet am
 selben Kalendertag. Das Datum steht in der Adresse (`?date=2026-01-15`), die Ansicht lässt sich
-also verlinken; „Heute“ stellt zurück. Die Kacheln zeigen weiter die aktuellen Werte. Die
+also verlinken; „Heute“ stellt zurück. Die Leiste gilt auch für die Kacheln: Für einen früheren Tag zeigen sie den Wert am Tagesende, Tiefst- und Höchstwert dieses Tages und bei Niederschlag und Regen den Vortag. Die
 Spalten wählt ihr über **Spalten ▾**; ein Klick auf eine Kachel öffnet die Entität.
 
 **Bis jetzt** vergleicht den laufenden Zeitraum mit demselben Stück des

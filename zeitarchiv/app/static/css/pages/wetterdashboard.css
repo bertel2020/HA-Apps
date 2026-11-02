@@ -34,8 +34,14 @@
   /* Kacheln: Aufbau wie die Kennzahl-Kacheln des Energiedashboards (Kopfbalken in der Rollenfarbe,
      Beschriftung in Großbuchstaben, Wert in Monospace); ganze Kachel verlinkt auf die Entität. */
   .wt-tiles{display:grid;grid-template-columns:repeat(var(--wt-cols, 4),minmax(0,1fr));gap:10px;}
-  .wt-tilecard .wt-controls{margin-bottom:10px;}
-  .wt-stand{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
+  .wt-card-head{justify-content:space-between;}
+  .wt-card-head .wt-h2{margin:0;}
+  .wt-h2-jump{cursor:pointer;}
+  .wt-h2-jump:hover{text-decoration:underline;}
+  .wt-card-sep{border-top:1px solid var(--border);margin:18px 0 12px;}
+  .wt-h3{margin:0;font-size:calc(14px * var(--font-scale, 1));font-weight:600;}
+  .wt-controls-end{margin-left:auto;}
+  .wt-stand{margin:0 0 10px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
   .wt-tile{--wt-accent:var(--chart-8);display:flex;flex-direction:column;gap:2px;min-width:0;padding:10px 12px;
     text-decoration:none;color:inherit;border:1px solid var(--border);border-top:3px solid var(--wt-accent);
     border-radius:8px;background:var(--surface-alt);}

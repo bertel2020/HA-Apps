@@ -740,9 +740,8 @@ def test_wind_and_sun_tab_groups_tiles_and_rows() -> None:
 
     view = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
     assert "{% if has_windsun %}" in view and 'id="wt-panel-wind"' in view
-    assert 'tile_card("basis"' in view and 'tile_card("wind"' in view
-    assert 'compare_card("basis")' in view and 'compare_card("wind")' in view
-    assert 'tile_card("klima"' in view and 'compare_card("klima")' in view and 'id="wt-panel-klima"' in view
+    assert 'weather_card("basis"' in view and 'weather_card("wind"' in view
+    assert 'weather_card("klima"' in view and 'id="wt-panel-klima"' in view
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "const WIND_KEYS = ['wind', 'gust', 'radiation']" in script and "groupOf" in script
 
@@ -807,3 +806,14 @@ def test_hidden_blocks_leave_the_table_and_are_saved_from_the_setup_form(service
     assert "kenntage" not in wetter_routes._load_config(index)["hidden_blocks"]  # noqa: SLF001
     assert "gust" in wetter_routes._load_config(index)["hidden_blocks"]  # noqa: SLF001
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
+def test_tiles_follow_the_reference_day(service) -> None:
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(19, 1), 3.0), (_ts(19, 12), 11.0), (_ts(19, 22), 6.0), (_ts(20, 9), 15.0)])
+    _configure(service, temperature="sensor.t")
+    today = service.compute_tiles(NOW)[0]
+    assert today["last"] == 15.0 and today["today"]["max"] == 15.0
+    past = service.compute_tiles(NOW, at="2026-08-19")[0]
+    assert past["last"] == 6.0  # Wert am Ende des gewählten Tages
+    assert past["today"]["min"] == 3.0 and past["today"]["max"] == 11.0
+    assert service.compute_tiles(NOW, at="2026-08-20")[0]["last"] == 15.0  # heute gilt als „jetzt“

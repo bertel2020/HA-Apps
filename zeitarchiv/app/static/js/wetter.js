@@ -329,8 +329,10 @@
       tilesLoaded: false,
       tileCols: {basis: 4, wind: 3, klima: 3},
       tilesStand: '',
+      tilesAt: null,
       error: '',
       _seq: 0,
+      _tilesSeq: 0,
 
       init() {
         const saved = readStore();
@@ -348,7 +350,7 @@
           if (ref) observer.observe(ref);
         }
         // Stichtag-Leiste des App-Standards: bei jeder Änderung die Tabelle neu laden.
-        window.addEventListener('dashboard-stichtag', () => this.loadTable());
+        window.addEventListener('dashboard-stichtag', () => { this.loadTiles(); this.loadTable(); });
       },
 
       columnName,
@@ -416,7 +418,23 @@
         const stichtag = this.stichtag();
         if (!stichtag) return base;
         const date = fmtDate(formats.dmy, Date.parse(stichtag + 'T12:00:00Z') / 1000);
-        return `${base} ${t('Die Tabelle zeigt die Zeiträume zum {date}; die Kacheln zeigen weiter die aktuellen Werte.', {date})}`;
+        return `${base} ${t('Kacheln und Tabelle zeigen die Zeiträume zum {date}.', {date})}`;
+      },
+
+      // Titel der Karte: der gewählte Tag, in der Vergangenheit „Gestern“ oder „Rückblick“.
+      cardTitle() {
+        const stichtag = this.stichtag();
+        if (!stichtag) return t('Heute');
+        const now = new Date();
+        const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        const iso = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+        return stichtag === iso ? t('Gestern') : t('Rückblick');
+      },
+
+      // Zeile unter dem Titel: Stand (heute) bzw. Tagesende (früherer Tag) und was ▼ ▲ bedeuten.
+      standText() {
+        if (this.tilesAt) return t('Tagesende · Tiefstwert ▼ und Höchstwert ▲ des Tages');
+        return t('Stand {time}', {time: this.tilesStand}) + ' · ' + t('Tiefstwert ▼ und Höchstwert ▲ von heute');
       },
 
       tileValue(tile) {
@@ -442,13 +460,20 @@
         }
         if (!tile.yesterday) return '';
         if (tile.kind === 'counter') {
-          return t('gestern {value} {unit}', {value: num(tile.yesterday.sum, 1), unit: tile.unit || ''});
+          const values = {value: num(tile.yesterday.sum, 1), unit: tile.unit || ''};
+          return this.tilesAt ? t('Vortag {value} {unit}', values) : t('gestern {value} {unit}', values);
         }
-        return t('gestern {value} min', {value: num(tile.yesterday.minutes, 0)});
+        const minutes = {value: num(tile.yesterday.minutes, 0)};
+        return this.tilesAt ? t('Vortag {value} min', minutes) : t('gestern {value} min', minutes);
       },
 
       // Was die Zeile unter dem Wert bedeutet (Tooltip der Kachel).
       tileTitle(tile) {
+        if (this.tilesAt) {
+          return tile.kind === 'standard'
+            ? t('Dieser Tag: Tiefstwert ▼ und Höchstwert ▲. Ein Klick öffnet die Entität.')
+            : t('Dieser Tag, darunter der Vortag. Ein Klick öffnet die Entität.');
+        }
         return tile.kind === 'standard'
           ? t('Heute: Tiefstwert ▼ und Höchstwert ▲. Ein Klick öffnet die Entität.')
           : t('Heute bisher, darunter der gestrige Tag. Ein Klick öffnet die Entität.');
@@ -1432,10 +1457,14 @@
 
       async loadTiles() {
         try {
-          const res = await fetch('wetterdashboard/tiles');
+          const stichtag = this.stichtag();
+          const seq = ++this._tilesSeq;
+          const res = await fetch(`wetterdashboard/tiles${stichtag ? `?date=${encodeURIComponent(stichtag)}` : ''}`);
           if (res.ok) {
             const data = await res.json();
+            if (seq !== this._tilesSeq) return;  // ein neuerer Tag hat überholt
             this.tiles = data.tiles;
+            this.tilesAt = data.at;
             this.tilesStand = new Intl.DateTimeFormat(LOCALE, {hour: '2-digit', minute: '2-digit', timeZone: data.tz}).format(new Date());
           }
         } catch (e) {

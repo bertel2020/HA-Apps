@@ -1,14 +1,19 @@
 {% from "_hints.html" import hint_button, hint_body %}
 {% from "_dashboard_period_nav.html" import nav as period_nav with context %}
 
-{# Kachelkarte und Vergleichskarte gibt es für die Übersicht („basis“) und den Reiter „Wind & Sonne“ („wind“);
-   die Daten laden einmal, wetter.js filtert je Gruppe. #}
-{% macro tile_card(group, placeholders) %}
+{# Eine Karte je Reiter („basis“ = Übersicht, „klima“, „wind“): oben Titel und Stichtag-Leiste, darunter die Kacheln, dann die
+   Vergleichstabelle. Der Stichtag gilt für Kacheln und Tabelle; die Daten laden einmal, wetter.js filtert je Gruppe. #}
+{% macro weather_card(group, placeholders) %}
+{% set sfx = group %}
 <div class="card wt-card wt-tilecard">
-  <div class="wt-controls">
-    <h2 class="wt-h2">{{ _("Aktuell") }}</h2>
-    <span class="wt-stand" x-show="tilesStand" x-cloak x-text="t('Stand {time}', {time: tilesStand}) + ' · ' + t('Tiefstwert ▼ und Höchstwert ▲ von heute')"></span>
+  <div class="wt-controls wt-card-head">
+    {# Der Titel nennt den Tag („Heute“, „Gestern“, sonst „Rückblick“); in der Vergangenheit springt ein Klick auf heute. #}
+    <h2 class="wt-h2" :class="{'wt-h2-jump': stichtag()}" x-text="cardTitle()" @click="if (stichtag()) $store.dashStichtag.set(null)" :title="stichtag() ? t('Zurück zu heute') : ''"></h2>
+    {# Stichtag-Leiste des App-Standards (wie bei den Dashboards: ‹ Datum ›, Kalender, „Heute“; ohne Schrittweiten-Knöpfe). Der Alpine-Store
+       dashStichtag hält den Tag und stellt ihn als ?date=… in die Adresse; wetter.js lädt Kacheln und Tabelle bei „dashboard-stichtag“ neu. #}
+    {{ period_nav(true) }}
   </div>
+  <p class="wt-stand" x-show="tilesStand" x-cloak x-text="standText()"></p>
   <div class="wt-tiles" style="--wt-cols:{{ placeholders }}" x-show="!tilesLoaded" aria-hidden="true">
     {% for n in range(placeholders) %}<span class="wt-tile is-loading"><span class="wt-tile-label">&nbsp;</span><span class="wt-tile-value">–</span><span class="wt-tile-sub">&nbsp;</span></span>{% endfor %}
   </div>
@@ -21,20 +26,13 @@
       </a>
     </template>
   </div>
-</div>
-{% endmacro %}
 
-{% macro compare_card(group) %}
-{% set sfx = group %}
-<div class="card wt-card">
+  <div class="wt-card-sep"></div>
   <div class="wt-controls">
-    <h2 class="wt-h2">{{ _("Zeiträume im Vergleich") }} {{ hint_button(_("Zeiträume im Vergleich")) }}</h2>
+    <h3 class="wt-h3">{{ _("Zeiträume im Vergleich") }} {{ hint_button(_("Zeiträume im Vergleich")) }}</h3>
     {% call hint_body() %}<span x-show="vorjahr" x-text="modeHint()"></span>{% endcall %}
-    {# Stichtag-Leiste des App-Standards (wie bei den Dashboards: ‹ Datum ›, Kalender, „Heute“; ohne Schrittweiten-Knöpfe). Der Alpine-Store
-       dashStichtag hält den Tag und stellt ihn als ?date=… in die Adresse; wetter.js lädt die Tabelle bei „dashboard-stichtag“ neu. #}
-    {{ period_nav(true) }}
     {# Spaltenauswahl wie in der Entitätenliste: Knopf „Spalten ▾“ mit Popover (dd-picker). #}
-    <div class="dd-picker-wrap">
+    <div class="dd-picker-wrap wt-controls-end">
       <button type="button" class="btn" onclick="toggleDDPicker('wt-cols-{{ sfx }}')">{{ _("Spalten ▾") }}</button>
       <div class="dd-picker-popover" id="wt-cols-{{ sfx }}-popover">
         <template x-for="key in columnKeys" :key="key">
@@ -100,8 +98,7 @@
   </nav>
 
   <section x-show="tab === 'overview'" role="tabpanel" id="wt-panel-overview" aria-labelledby="wt-tab-overview">
-  {{ tile_card("basis", 5) }}
-  {{ compare_card("basis") }}
+  {{ weather_card("basis", 5) }}
 
   <div class="card wt-card" x-show="monthly" x-cloak>
     <div class="wt-controls">
@@ -150,7 +147,7 @@
 
   {% if has_klima %}
   <section x-show="tab === 'klima'" x-cloak role="tabpanel" id="wt-panel-klima" aria-labelledby="wt-tab-klima">
-    {{ tile_card("klima", 3) }}
+    {{ weather_card("klima", 3) }}
     <div class="card wt-card">
       <div class="wt-controls">
         <h2 class="wt-h2">{{ _("Temperaturen im Vergleich") }} {{ hint_button(_("Temperaturen im Vergleich")) }}</h2>
@@ -164,14 +161,12 @@
       <div class="wt-chart" x-ref="tempChart"></div>
       <p class="hint hint-warn" x-show="tempError" x-text="tempError" x-cloak></p>
     </div>
-    {{ compare_card("klima") }}
   </section>
   {% endif %}
 
   {% if has_windsun %}
   <section x-show="tab === 'wind'" x-cloak role="tabpanel" id="wt-panel-wind" aria-labelledby="wt-tab-wind">
-    {{ tile_card("wind", 3) }}
-    {{ compare_card("wind") }}
+    {{ weather_card("wind", 3) }}
   </section>
   {% endif %}
 

@@ -696,7 +696,7 @@ selective restore brings it back as a whole ("Weather dashboard configuration").
 
 ### Tiles and comparison table
 
-The tiles sit at the top in the **Current** card and show the current value and today's range for each role. The **Overview** holds temperature, precipitation, rain, humidity and pressure; wind, gust and radiation have their own **Wind & sun** tab, additional sensors the **Temperature & climate** tab (each appears only when something is assigned), with the same tiles and the same comparison table. The **Temperature & climate** tab also has the **Temperature comparison** chart: daily averages of the outdoor temperature and all additional sensors for 7, 30 or 90 days.
+Tiles and comparison table share one card whose title names the day (Today, Yesterday, otherwise Looking back; a click on it jumps back to today). The tiles show the current value and the day's range for each role. The **Overview** holds temperature, precipitation, rain, humidity and pressure; wind, gust and radiation have their own **Wind & sun** tab, additional sensors the **Temperature & climate** tab (each appears only when something is assigned), with the same tiles and the same comparison table. The **Temperature & climate** tab also has the **Temperature comparison** chart: daily averages of the outdoor temperature and all additional sensors for 7, 30 or 90 days.
 The table below has the columns **Today, Yesterday, This month, Last month**
 and **This year**, each optionally with a **Last year** column next to it; the
 header shows the concrete period (“November”, “2026”). The difference to last
@@ -708,7 +708,7 @@ You choose the **last year** comparison with the “Last year ▾” button (Off
 With the **reference-date bar** (as on the dashboards: ‹ date ›, calendar; no step buttons, ‹ › always moves one day, "Today" appears once an earlier day is chosen) the table shows the periods as of an earlier day: Today, Yesterday,
 Month, Last month and Year then refer to it, and the stretch of last year ends on the same
 calendar day. The date is part of the address (`?date=2026-01-15`), so the view can
-be linked; "Today" resets it. The tiles keep showing the current values. You choose the
+be linked; "Today" resets it. The bar also applies to the tiles: for an earlier day they show the value at the end of the day, the day's minimum and maximum and, for precipitation and rain, the previous day. You choose the
 columns with **Columns ▾**; a click on a tile opens the entity.
 
 **So far** compares the running period with the same stretch of last year

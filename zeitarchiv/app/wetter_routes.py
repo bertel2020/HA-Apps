@@ -670,12 +670,16 @@ class WetterService:
 
     # -- Kacheln -----------------------------------------------------------------------
 
-    def compute_tiles(self, now_local: datetime | None = None) -> list[dict]:
+    def compute_tiles(self, now_local: datetime | None = None, at: str | None = None) -> list[dict]:
+        """Kacheln für heute oder, mit ``at`` (Stichtag vor heute), für diesen Tag: Wert am Tagesende, Tiefst-
+        und Höchstwert des Tages, bei Zählern der Tag und der Vortag."""
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
+        stichtag = _parse_stichtag(at, now_local.date())
+        anchor = datetime(stichtag.year, stichtag.month, stichtag.day, 12, tzinfo=self.deps.tz) if stichtag else None
         read_cache = query_mod.QueryReadCache()
-        today = self.column_windows("heute", now_local, "bis_jetzt")
-        yesterday = self.column_windows("gestern", now_local, "bis_jetzt")
+        today = self.column_windows("heute", now_local, "bis_jetzt", anchor)
+        yesterday = self.column_windows("gestern", now_local, "bis_jetzt", anchor)
         tiles = []
         for spec in self._row_specs(config):
             entity = self.deps.index.get_entity(spec["entity_id"])
@@ -698,7 +702,7 @@ class WetterService:
                 "unit": spec["unit"], "decimals": spec["decimals"],
                 # Nicht entities.last_value: das ist bei vielen Sensoren leer (siehe Energiedashboard).
                 "last": query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
-                    self.deps.data_dir, spec["entity_id"], now_local.timestamp(), self.deps.tz, read_cache
+                    self.deps.data_dir, spec["entity_id"], today["end"].timestamp(), self.deps.tz, read_cache
                 ),
                 "last_ts": entity["last_ts"] if entity else None,
                 "today": now_summary, "yesterday": yesterday_summary,
@@ -949,9 +953,10 @@ class WetterService:
             return result
 
         @router.get("/wetterdashboard/tiles")
-        def wetterdashboard_tiles() -> dict:
+        def wetterdashboard_tiles(date: str | None = None) -> dict:
             if not _is_configured(_load_config(deps.index)):
                 raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
-            return {"tz": str(deps.tz), "tiles": self.compute_tiles()}
+            stichtag = _parse_stichtag(date, datetime.now(deps.tz).date())
+            return {"tz": str(deps.tz), "at": stichtag.isoformat() if stichtag else None, "tiles": self.compute_tiles(at=date)}
 
         return router

@@ -4133,7 +4133,6 @@
     "{period} bisher {value} kWh je Gradtag ({percent} % {direction} als im gleichen Ausschnitt von {other})": "{period} so far {value} kWh per degree day ({percent} % {direction} than in the same stretch of {other})",
     "{period}: {value} kWh je Kelvin ({n} Tage, R² {r2})": "{period}: {value} kWh per kelvin ({n} days, R² {r2})",
     "Entität öffnen": "Open entity",
-    "Die Tabelle zeigt die Zeiträume zum {date}; die Kacheln zeigen weiter die aktuellen Werte.": "The table shows the periods as of {date}; the tiles still show the current values.",
     "{from}–{to} Uhr": "{from}–{to} h",
     "Vorjahr: Aus ▾": "Last year: off ▾",
     "Vorjahr: bis jetzt": "Last year: so far",
@@ -4185,6 +4184,14 @@
     "Jahresmittel {year}: {value} {unit}": "Annual mean {year}: {value} {unit}",
     "{month} {year}: {value} {unit}": "{month} {year}: {value} {unit}",
     "Oben die Mitteltemperatur, darunter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv (in Kelvin). Die letzte Zeile ist das Mittel.": "Mean temperature on top, below it the deviation from the mean of that month over all completed years in the archive (in kelvin). The last row is the mean.",
-    "Ø {n} je Jahr": "Ø {n} per year"
+    "Ø {n} je Jahr": "Ø {n} per year",
+    "Kacheln und Tabelle zeigen die Zeiträume zum {date}.": "Tiles and table show the periods as of {date}.",
+    "Rückblick": "Looking back",
+    "Zurück zu heute": "Back to today",
+    "Tagesende · Tiefstwert ▼ und Höchstwert ▲ des Tages": "End of day · minimum ▼ and maximum ▲ of the day",
+    "Vortag {value} {unit}": "Previous day {value} {unit}",
+    "Vortag {value} min": "Previous day {value} min",
+    "Dieser Tag: Tiefstwert ▼ und Höchstwert ▲. Ein Klick öffnet die Entität.": "This day: minimum ▼ and maximum ▲. A click opens the entity.",
+    "Dieser Tag, darunter der Vortag. Ein Klick öffnet die Entität.": "This day, below it the previous day. A click opens the entity."
   }
 }
