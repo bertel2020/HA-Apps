@@ -206,12 +206,23 @@
     };
   }
 
+  // Ein Diagramm folgt der Breite seines Kastens auch ohne Fenster-Ereignis (Reiter eben erst sichtbar, Scrollleiste erscheint,
+  // Karte ändert ihre Breite): sonst blieb es bei der Breite des Zeichnens stehen und ließ rechts Leerraum.
+  const observers = {};
+
   function chartFor(key, element) {
     if (charts[key] && charts[key].getDom() !== element) {
       charts[key].dispose();
       delete charts[key];
+      if (observers[key]) observers[key].disconnect();
     }
-    if (!charts[key]) charts[key] = echarts.init(element);
+    if (!charts[key]) {
+      charts[key] = echarts.init(element);
+      if (typeof ResizeObserver === 'function') {
+        observers[key] = new ResizeObserver(() => { if (charts[key] && element.clientWidth) charts[key].resize(); });
+        observers[key].observe(element);
+      }
+    }
     return charts[key];
   }
 
