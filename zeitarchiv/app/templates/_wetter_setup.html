@@ -13,7 +13,8 @@
       <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="{{ _('Suchen …') }}">
       <template x-for="opt in filtered()" :key="opt.entity_id">
         <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)">
-          <span x-text="opt.label"></span>
+          <span class="wt-opt-sep" x-show="opt.sep && !search" x-cloak>{{ _("Weitere Entitäten") }}</span>
+          <span x-text="opt.label"></span><span class="wt-opt-unit" x-show="opt.unit" x-text="opt.unit"></span>
         </div>
       </template>
     </div>
@@ -32,6 +33,7 @@
       x-data='{
         entityOptions: {{ entity_options | tojson }},
         roleTypes: {{ role_types | tojson }},
+        roleUnits: {{ role_units | tojson }},
         extras: {{ config.extra_temperatures | tojson }},
         heating: {{ config.heating | tojson }},
         counterOptions: {{ counter_options | tojson }},
@@ -39,7 +41,15 @@
         maxExtra: {{ max_extra }},
         optionsFor(role) {
           const allowed = this.roleTypes[role] || ["standard"];
-          return this.entityOptions.filter(o => allowed.includes(o.aggregation_type));
+          return this.preferUnits(this.entityOptions.filter(o => allowed.includes(o.aggregation_type)), role);
+        },
+        preferUnits(opts, role) {
+          const units = this.roleUnits[role] || [];
+          const match = opts.filter(o => units.includes(o.unit));
+          const rest = opts.filter(o => !units.includes(o.unit));
+          if (!match.length || !rest.length) return opts;
+          rest[0] = {...rest[0], sep: true};
+          return [...match, ...rest];
         },
         addExtra() { if (this.extras.length < this.maxExtra) this.extras.push({entity_id: "", name: ""}); },
         removeExtra(i) { this.extras.splice(i, 1); },
@@ -74,7 +84,7 @@
           <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:260px;overflow-y:auto;">
             <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="{{ _('Suchen …') }}">
             <template x-for="opt in filtered()" :key="opt.entity_id">
-              <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)"><span x-text="opt.label"></span></div>
+              <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)"><span class="wt-opt-sep" x-show="opt.sep && !search" x-cloak>{{ _("Weitere Entitäten") }}</span><span x-text="opt.label"></span><span class="wt-opt-unit" x-show="opt.unit" x-text="opt.unit"></span></div>
             </template>
           </div>
           <input type="hidden" name="extra_entity_id" :value="entityId">
@@ -93,13 +103,13 @@
   {% call hint_body() %}{{ _("Ein oder mehrere Energiezähler der Heizung, zum Beispiel Wärmepumpe, Heizstab oder Konvektoren. Sie werden zu einer Summe addiert, der Reiter „Heizen“ zeigt auch den Anteil je Zähler.") }} {{ _("Gradtagzahl nach VDI 3807 (G20/15): Raumtemperatur minus Tagesmittel, nur an Tagen unter der Heizgrenze. Beide Werte lassen sich auf dem Reiter „Heizen“ vorübergehend ändern.") }}{% endcall %}
   <template x-for="(row, i) in heating" :key="i">
     <div class="wt-extra field">
-      <span class="dd-picker-wrap" x-data="entityPicker(counterOptions, row.entity_id, (id) => { row.entity_id = id })" @click.outside="open = false">
+      <span class="dd-picker-wrap" x-data="entityPicker(preferUnits(counterOptions, 'heating'), row.entity_id, (id) => { row.entity_id = id })" @click.outside="open = false">
         <span class="dd-picker-anchor">
           <button type="button" class="btn" @click="toggleOpen($refs.search)" x-text="entityId ? label(entityId) : t('Entität wählen …')"></button>
           <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:260px;overflow-y:auto;">
             <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="{{ _('Suchen …') }}">
             <template x-for="opt in filtered()" :key="opt.entity_id">
-              <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)"><span x-text="opt.label"></span></div>
+              <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)"><span class="wt-opt-sep" x-show="opt.sep && !search" x-cloak>{{ _("Weitere Entitäten") }}</span><span x-text="opt.label"></span><span class="wt-opt-unit" x-show="opt.unit" x-text="opt.unit"></span></div>
             </template>
           </div>
           <input type="hidden" name="heating_entity_id" :value="entityId">

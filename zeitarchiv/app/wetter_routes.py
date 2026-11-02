@@ -54,6 +54,18 @@ ROLES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("gust", N_("Böe"), ("standard",)),
     ("radiation", N_("Strahlung"), ("standard",)),
 )
+#: Erwartete Einheiten je Rolle: Entitäten damit stehen in der Auswahl zuerst (kein harter Filter,
+#: weil eine Einheit fehlen oder ungewöhnlich geschrieben sein kann).
+ROLE_UNITS = {
+    "temperature": ["°C", "°F", "K"],
+    "precip_mm": ["mm", "in"],
+    "humidity": ["%"],
+    "pressure": ["hPa", "mbar", "Pa", "kPa", "inHg"],
+    "wind": ["km/h", "m/s", "mph", "kn"],
+    "gust": ["km/h", "m/s", "mph", "kn"],
+    "radiation": ["W/m²"],
+    "heating": ["kWh", "Wh", "MWh"],
+}
 ROLE_KEYS = tuple(key for key, _label, _types in ROLES)
 ROLE_TYPES = {key: types for key, _label, types in ROLES}
 ROLE_LABELS = {key: label for key, label, _types in ROLES}
@@ -714,6 +726,7 @@ class WetterService:
                     "config": config, "entity_options": self._entity_options(),
                     "roles": [(key, label, types) for key, label, types in ROLES],
                     "role_types": {key: list(types) for key, _label, types in ROLES},
+                    "role_units": ROLE_UNITS,
                     "counter_options": [o for o in self._entity_options() if o["aggregation_type"] == "counter"],
                     "max_heating": MAX_HEATING_COUNTERS,
                     "warnings": warnings, "max_extra": MAX_EXTRA_TEMPERATURES,
