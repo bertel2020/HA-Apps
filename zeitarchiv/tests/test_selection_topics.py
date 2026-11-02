@@ -238,3 +238,14 @@ def test_doors_and_windows_are_recommended_and_locks_are_more() -> None:
     assert rec["binary_sensor.haustuer"]["reason"] == "Türkontakt"
     assert set(rec) == {"binary_sensor.haustuer", "binary_sensor.bad_fenster", "binary_sensor.garage"}
     assert set(more) == {"lock.haustuer"}
+
+
+def test_wetter_recommends_a_rain_switch_but_not_a_leak_sensor() -> None:
+    catalog = [
+        _row("binary_sensor.regensensor", "Regensensor Garten", device_class="moisture"),
+        _row("binary_sensor.rain", "Rain", device_class=None),
+        _row("binary_sensor.waschkeller_wasser", "Wasserleck Keller", device_class="moisture"),
+    ]
+    rec, more, _result = _rows("wetter", catalog)
+    assert {"binary_sensor.regensensor", "binary_sensor.rain"} <= set(rec)
+    assert "binary_sensor.waschkeller_wasser" not in rec and "binary_sensor.waschkeller_wasser" not in more

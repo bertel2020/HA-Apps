@@ -121,9 +121,14 @@
       + (deltaHtml || '') + '</td>';
   }
 
-  // Rollen des Reiters „Wind & Sonne“; alles andere steht in der Übersicht.
+  // Gruppen: „wind“ = Reiter „Wind & Sonne“, „klima“ = Zusatzsensoren (Schlüssel „temperature:N“) auf „Temperatur & Klima“,
+  // alles andere steht in der Übersicht.
   const WIND_KEYS = ['wind', 'gust', 'radiation'];
-  const inGroup = (key, group) => WIND_KEYS.includes(key) === (group === 'wind');
+  const groupOf = (key) => (WIND_KEYS.includes(key) ? 'wind' : (key.includes(':') ? 'klima' : 'basis'));
+  const inGroup = (key, group) => groupOf(key) === group;
+  // Tabellen und Kachelreihen je Gruppe: x-ref-Namen wie in _wetter_view.html (tiles<Gruppe>, table[Wrap]<Gruppe>, Übersicht ohne Gruppenname).
+  const GROUPS = ['basis', 'wind', 'klima'];
+  const refName = (prefix, group) => prefix + (group === 'basis' && prefix !== 'tiles' ? '' : group.charAt(0).toUpperCase() + group.slice(1));
 
   function renderTable(data, group) {
     const cols = data.columns;
@@ -298,7 +303,7 @@
       mode: 'bis_jetzt',
       tiles: [],
       tilesLoaded: false,
-      tileCols: {basis: 4, wind: 3},
+      tileCols: {basis: 4, wind: 3, klima: 3},
       tilesStand: '',
       error: '',
       _seq: 0,
@@ -312,7 +317,10 @@
         this.loadTable();
         this.loadMonthly();
         const observer = new ResizeObserver(() => this.layoutTiles());
-        for (const ref of [this.$refs.tilesBasis, this.$refs.tilesWind]) if (ref) observer.observe(ref);
+        for (const group of GROUPS) {
+          const ref = this.$refs[refName('tiles', group)];
+          if (ref) observer.observe(ref);
+        }
         // Stichtag-Leiste des App-Standards: bei jeder Änderung die Tabelle neu laden.
         window.addEventListener('dashboard-stichtag', () => this.loadTable());
       },
@@ -404,7 +412,8 @@
 
       // Spaltenzahl so wählen, dass keine einzelnen Kacheln allein in der letzten Reihe stehen.
       layoutTiles() {
-        for (const [group, element] of [['basis', this.$refs.tilesBasis], ['wind', this.$refs.tilesWind]]) {
+        for (const group of GROUPS) {
+          const element = this.$refs[refName('tiles', group)];
           const count = this.tilesFor(group).length;
           if (element && count && element.clientWidth) this.tileCols[group] = WetterLayout.tileColumns(count, element.clientWidth);
         }
@@ -1239,7 +1248,9 @@
           if (!res.ok) throw new Error(String(res.status));
           const data = await res.json();
           if (seq !== this._seq) return;  // eine neuere Anfrage hat überholt
-          for (const [group, table, wrap] of [['basis', this.$refs.table, this.$refs.tableWrap], ['wind', this.$refs.tableWind, this.$refs.tableWrapWind]]) {
+          for (const group of GROUPS) {
+            const table = this.$refs[refName('table', group)];
+            const wrap = this.$refs[refName('tableWrap', group)];
             if (!table) continue;
             table.innerHTML = renderTable(data, group);
             // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.

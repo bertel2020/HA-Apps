@@ -224,12 +224,13 @@ def test_extra_thermometer_becomes_its_own_row(service) -> None:
     assert [(row["key"], row["label"]) for row in data["rows"]] == [("temperature", "Temperatur außen"), ("kenntage", "Kenntage"), ("temperature:0", "Nord")]
 
 
-def test_tiles_show_today_and_skip_extra_thermometers(service) -> None:
+def test_tiles_show_today_and_include_extra_sensors(service) -> None:
     _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(20, 1), 12.0), (_ts(20, 10), 18.0)])
     _add(service, "sensor.n", "sensor", "measurement", "°C", [(_ts(20, 1), 9.0)])
     _configure(service, temperature="sensor.t", extra_temperatures=[{"entity_id": "sensor.n", "name": "Nord"}])
     tiles = service.compute_tiles(NOW)
-    assert [tile["key"] for tile in tiles] == ["temperature"]
+    assert [tile["key"] for tile in tiles] == ["temperature", "temperature:0"]
+    assert tiles[1]["label"] == "Nord" and tiles[1]["today"]["min"] == 9.0
     assert tiles[0]["last"] == 18.0 and tiles[0]["today"]["min"] == 12.0 and tiles[0]["yesterday"] is None
 
 
@@ -703,8 +704,9 @@ def test_wind_and_sun_tab_groups_tiles_and_rows() -> None:
     assert "{% if has_windsun %}" in view and 'id="wt-panel-wind"' in view
     assert 'tile_card("basis"' in view and 'tile_card("wind"' in view
     assert 'compare_card("basis")' in view and 'compare_card("wind")' in view
+    assert 'tile_card("klima"' in view and 'compare_card("klima")' in view and 'id="wt-panel-klima"' in view
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
-    assert "const WIND_KEYS = ['wind', 'gust', 'radiation']" in script
+    assert "const WIND_KEYS = ['wind', 'gust', 'radiation']" in script and "groupOf" in script
 
 
 def test_wind_and_sun_tab_only_appears_with_one_of_its_roles(client) -> None:
@@ -717,4 +719,22 @@ def test_wind_and_sun_tab_only_appears_with_one_of_its_roles(client) -> None:
     assert "wt-tab-wind" not in client.get("/wetterdashboard").text
     wetter_routes._save_config(index, {**base, "wind": "sensor.wetter_test_wind6"})  # noqa: SLF001
     assert "wt-tab-wind" in client.get("/wetterdashboard").text
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
+def test_extra_sensors_get_tiles_and_the_climate_tab_only_with_extras(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp7", "sensor", "measurement", "°C")
+    index.get_or_create_entity("sensor.wetter_test_keller7", "sensor", "measurement", "%")
+    base = {**wetter_routes._empty_config(), "temperature": "sensor.wetter_test_temp7"}  # noqa: SLF001
+    wetter_routes._save_config(index, base)  # noqa: SLF001
+    assert "wt-tab-klima" not in client.get("/wetterdashboard").text
+    wetter_routes._save_config(  # noqa: SLF001
+        index, {**base, "extra_temperatures": [{"entity_id": "sensor.wetter_test_keller7", "name": "Keller"}]}
+    )
+    assert "wt-tab-klima" in client.get("/wetterdashboard").text
+    tiles = client.get("/wetterdashboard/tiles").json()["tiles"]
+    assert [tile["key"] for tile in tiles] == ["temperature", "temperature:0"]
+    assert tiles[1]["label"] == "Keller"
     index.set_setting(wetter_routes.SETTING_CONFIG, "")

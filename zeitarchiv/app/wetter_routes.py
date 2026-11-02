@@ -64,6 +64,7 @@ ROLE_UNITS = {
     "wind": ["km/h", "m/s", "mph", "kn"],
     "gust": ["km/h", "m/s", "mph", "kn"],
     "radiation": ["W/m²"],
+    "extra": ["°C", "°F", "K", "%"],
     "heating": ["kWh", "Wh", "MWh"],
 }
 ROLE_KEYS = tuple(key for key, _label, _types in ROLES)
@@ -640,8 +641,6 @@ class WetterService:
         yesterday = self.column_windows("gestern", now_local, "bis_jetzt")
         tiles = []
         for spec in self._row_specs(config):
-            if ":" in spec["key"]:
-                continue  # Zusatzthermometer sind Tabellenzeilen, keine Kacheln
             entity = self.deps.index.get_entity(spec["entity_id"])
             aggregation_type = spec["kind"]  # "standard"/"counter"/"switch" sind zugleich die Aggregationstypen
             now_summary = self.summarize(
@@ -678,6 +677,7 @@ class WetterService:
             "precip_modes": self.available_precip(),
             "has_heating": bool(self.heating_counters(config)),
             "has_windsun": any(config[key] for key in ("wind", "gust", "radiation")),
+            "has_klima": any(extra["entity_id"] for extra in config["extra_temperatures"]),
             **calendar_bounds(self.deps.index.list_entities(), self.deps.tz),
             "enabled": _is_enabled(self.deps.index),
             "config": config,

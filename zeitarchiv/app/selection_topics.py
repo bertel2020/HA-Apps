@@ -97,10 +97,16 @@ def _counter(row: dict[str, Any]) -> bool:
 Rule = Callable[[dict[str, Any]], "tuple[str, str] | str | None"]
 
 
+_RAIN_NAME = re.compile(r"(regen|rain)", re.IGNORECASE)
+
+
 def rule_wetter(row: dict[str, Any]) -> tuple[str, str] | str | None:
     domain, dc, platform = row["domain"], row.get("device_class"), row.get("platform")
     if domain == "weather":
         return tr("Wetterdienst: Zustand und Vorhersage"), RECOMMENDED
+    if domain == "binary_sensor" and dc in {None, "moisture"} and _RAIN_NAME.search(_hint_text(row)):
+        # Ein/Aus-Regensensor (Rolle „Regen“ im Wetterdashboard); „moisture“ allein wäre auch ein Wasserleck-Melder.
+        return tr("Regensensor (Ein/Aus)"), RECOMMENDED
     if domain != "sensor":
         return None
     weather_source = platform in WEATHER_PLATFORMS

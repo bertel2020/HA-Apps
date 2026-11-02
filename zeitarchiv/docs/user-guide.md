@@ -737,13 +737,13 @@ Regenminuten und Regentage statt Millimeter. Habt ihr beides, stehen beide
 Zeilen nebeneinander. Viele Ein/Aus-Sensoren melden auch bei Nebel, Tau oder
 nassem Sensor „Regen“, die Trocknungszeit zählt dann mit. Ab wann ein Tag als
 Regentag zählt, stellt ihr in der Einrichtung ein (Standard 1 mm bzw. 10 min).
-**Weitere Thermometer** werden eigene Zeilen und nie mit der Außentemperatur
-gemittelt. Backups sichern die Zuordnung mit; der selektive Restore stellt sie
+**Weitere Sensoren** (Temperatur oder Feuchte, zum Beispiel Keller oder Dachboden) werden eigene Zeilen und nie mit der Außentemperatur
+gemittelt; sie stehen auf dem eigenen Reiter **Temperatur & Klima**. Backups sichern die Zuordnung mit; der selektive Restore stellt sie
 als Ganzes („Wetterdashboard-Konfiguration“) wieder her.
 
 ### Kacheln und Vergleichstabelle
 
-Die Kacheln stehen oben in der Karte **Aktuell** und zeigen je Rolle den aktuellen Wert und den heutigen Verlauf. Die **Übersicht** enthält Temperatur, Niederschlag, Regen, Luftfeuchte und Luftdruck; Wind, Böe und Strahlung stehen auf dem eigenen Reiter **Wind & Sonne** (er erscheint nur, wenn eine dieser Rollen zugeordnet ist), mit denselben Kacheln und derselben Vergleichstabelle.
+Die Kacheln stehen oben in der Karte **Aktuell** und zeigen je Rolle den aktuellen Wert und den heutigen Verlauf. Die **Übersicht** enthält Temperatur, Niederschlag, Regen, Luftfeuchte und Luftdruck; Wind, Böe und Strahlung stehen auf dem eigenen Reiter **Wind & Sonne**, weitere Sensoren auf **Temperatur & Klima** (beide erscheinen nur, wenn dafür etwas zugeordnet ist), jeweils mit denselben Kacheln und derselben Vergleichstabelle.
 Die Tabelle darunter hat die Spalten **Heute, Gestern, Dieser Monat, Letzter
 Monat** und **Dieses Jahr**, jeweils auf Wunsch mit einer **Vorjahr**-Spalte
 daneben; im Kopf steht der konkrete Zeitraum („November“, „2026“). Die

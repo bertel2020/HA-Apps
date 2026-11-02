@@ -686,13 +686,13 @@ A rain sensor that only reports on and off is enough: the page then shows rain
 minutes and rain days instead of millimetres. If you have both, both rows are
 shown side by side. Many on/off sensors also report “rain” in fog, dew or when
 the sensor is wet; the drying time then counts too. You set when a day counts
-as a rain day in setup (default 1 mm or 10 min). **Additional thermometers**
-become their own rows and are never averaged with the outdoor temperature. Backups include the assignment; the
+as a rain day in setup (default 1 mm or 10 min). **Additional sensors** (temperature or humidity, for example cellar or attic)
+become their own rows, shown on the **Temperature & climate** tab, and are never averaged with the outdoor temperature. Backups include the assignment; the
 selective restore brings it back as a whole ("Weather dashboard configuration").
 
 ### Tiles and comparison table
 
-The tiles sit at the top in the **Current** card and show the current value and today's range for each role. The **Overview** holds temperature, precipitation, rain, humidity and pressure; wind, gust and radiation have their own **Wind & sun** tab (it only appears when one of these roles is assigned), with the same tiles and the same comparison table.
+The tiles sit at the top in the **Current** card and show the current value and today's range for each role. The **Overview** holds temperature, precipitation, rain, humidity and pressure; wind, gust and radiation have their own **Wind & sun** tab, additional sensors the **Temperature & climate** tab (each appears only when something is assigned), with the same tiles and the same comparison table.
 The table below has the columns **Today, Yesterday, This month, Last month**
 and **This year**, each optionally with a **Last year** column next to it; the
 header shows the concrete period (“November”, “2026”). The difference to last

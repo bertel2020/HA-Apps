@@ -12,7 +12,7 @@
   <div class="wt-tiles" style="--wt-cols:{{ placeholders }}" x-show="!tilesLoaded" aria-hidden="true">
     {% for n in range(placeholders) %}<span class="wt-tile is-loading"><span class="wt-tile-label">&nbsp;</span><span class="wt-tile-value">–</span><span class="wt-tile-sub">&nbsp;</span></span>{% endfor %}
   </div>
-  <div class="wt-tiles" x-ref="tiles{{ 'Wind' if group == 'wind' else 'Basis' }}" :style="'--wt-cols:' + tileCols.{{ group }}" x-show="tilesFor('{{ group }}').length" x-cloak>
+  <div class="wt-tiles" x-ref="tiles{{ group | capitalize }}" :style="'--wt-cols:' + tileCols.{{ group }}" x-show="tilesFor('{{ group }}').length" x-cloak>
     <template x-for="(tile, i) in tilesFor('{{ group }}')" :key="tile.key">
       <a class="wt-tile" :class="{'wt-tile-wide': tileCols.{{ group }} > 1 && i === tilesFor('{{ group }}').length - 1 && tilesFor('{{ group }}').length % tileCols.{{ group }} === 1}" :data-role="tile.key" :href="'entities/' + encodeURIComponent(tile.entity_id)" :title="tileTitle(tile)">
         <span class="wt-tile-label" x-text="tile.label"></span>
@@ -25,7 +25,7 @@
 {% endmacro %}
 
 {% macro compare_card(group) %}
-{% set sfx = 'wind' if group == 'wind' else 'basis' %}
+{% set sfx = group %}
 <div class="card wt-card">
   <div class="wt-controls">
     <h2 class="wt-h2">{{ _("Zeiträume im Vergleich") }} {{ hint_button(_("Zeiträume im Vergleich")) }}</h2>
@@ -54,8 +54,8 @@
     </div>
   </div>
   <p class="hint hint-warn" x-show="error" x-text="error" x-cloak></p>
-  <div class="tbl-wrap wt-table-wrap" x-ref="tableWrap{{ 'Wind' if group == 'wind' else '' }}">
-    <table class="wt-table" x-ref="table{{ 'Wind' if group == 'wind' else '' }}"><tbody><tr><td class="wt-loading">{{ _("Lädt …") }}</td></tr></tbody></table>
+  <div class="tbl-wrap wt-table-wrap" x-ref="tableWrap{{ group | capitalize if group != 'basis' else '' }}">
+    <table class="wt-table" x-ref="table{{ group | capitalize if group != 'basis' else '' }}"><tbody><tr><td class="wt-loading">{{ _("Lädt …") }}</td></tr></tbody></table>
   </div>
 </div>
 {% endmacro %}
@@ -85,6 +85,9 @@
     <button type="button" role="tab" id="wt-tab-overview" aria-controls="wt-panel-overview" class="entity-tab" :class="{'is-active': tab === 'overview'}" :aria-selected="(tab === 'overview').toString()" :tabindex="tab === 'overview' ? 0 : -1" @click="showTab('overview')" @keydown="tabKey($event)">{{ _("Übersicht") }}</button>
     {% if precip_modes %}
     <button type="button" role="tab" id="wt-tab-precip" aria-controls="wt-panel-precip" class="entity-tab" :class="{'is-active': tab === 'precip'}" :aria-selected="(tab === 'precip').toString()" :tabindex="tab === 'precip' ? 0 : -1" @click="showTab('precip')" @keydown="tabKey($event)">{{ _("Niederschlag") }}</button>
+    {% endif %}
+    {% if has_klima %}
+    <button type="button" role="tab" id="wt-tab-klima" aria-controls="wt-panel-klima" class="entity-tab" :class="{'is-active': tab === 'klima'}" :aria-selected="(tab === 'klima').toString()" :tabindex="tab === 'klima' ? 0 : -1" @click="showTab('klima')" @keydown="tabKey($event)">{{ _("Temperatur &amp; Klima") }}</button>
     {% endif %}
     {% if has_windsun %}
     <button type="button" role="tab" id="wt-tab-wind" aria-controls="wt-panel-wind" class="entity-tab" :class="{'is-active': tab === 'wind'}" :aria-selected="(tab === 'wind').toString()" :tabindex="tab === 'wind' ? 0 : -1" @click="showTab('wind')" @keydown="tabKey($event)">{{ _("Wind &amp; Sonne") }}</button>
@@ -141,6 +144,13 @@
       <div class="wt-chart wt-chart-tall" x-ref="precipChart"></div>
       <p class="hint hint-warn" x-show="precipError" x-text="precipError" x-cloak></p>
     </div>
+  </section>
+  {% endif %}
+
+  {% if has_klima %}
+  <section x-show="tab === 'klima'" x-cloak role="tabpanel" id="wt-panel-klima" aria-labelledby="wt-tab-klima">
+    {{ tile_card("klima", 3) }}
+    {{ compare_card("klima") }}
   </section>
   {% endif %}
 
