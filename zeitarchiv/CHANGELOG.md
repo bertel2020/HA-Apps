@@ -25,7 +25,8 @@
   Streudiagramm Tagesmittel gegen kWh mit Ausgleichsgerade, Gradtagzahl und
   kWh je Gradtag je Monat und Heizperiode, und der Anteil je Zähler.
   Eingeschaltet wird die Seite über eine Kachel auf der Dashboard-Übersicht,
-  danach steht sie im Menü Dashboards unter dem Energiedashboard. Die
+  danach steht sie im Menü Dashboards unter dem Energiedashboard. Backups
+  sichern die Zuordnung mit, der selektive Restore stellt sie wieder her. Die
   Demo-Daten bringen dafür Wetter-Entitäten und Heizzähler mit (nach „Neu
   erzeugen“).
 
@@ -100,10 +101,11 @@
   day by day, with the newest year on top. If you assign heating
   counters (several are possible), the Heating tab appears: scatter chart of daily
   mean against kWh with regression line, degree days and kWh per degree day per
-  month and heating season, and the share per counter. The page is switched on with a tile on the
-  dashboards overview
-  and then sits in the Dashboards menu below the energy dashboard. The demo data
-  brings weather entities and heating counters for it (after "Regenerate").
+  month and heating season, and the share per counter. The page is switched on
+  with a tile on the dashboards overview and then sits in the Dashboards menu
+  below the energy dashboard. Backups include the assignment, and the selective
+  restore brings it back. The demo data brings weather entities and heating
+  counters for it (after "Regenerate").
 
 - **Entities, categories**: Entities can be grouped by topic, for example heat
   pump, solar or weather, in addition to the favorite stars. The new

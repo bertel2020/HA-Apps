@@ -737,7 +737,8 @@ Zeilen nebeneinander. Viele Ein/Aus-Sensoren melden auch bei Nebel, Tau oder
 nassem Sensor „Regen“, die Trocknungszeit zählt dann mit. Ab wann ein Tag als
 Regentag zählt, stellt ihr in der Einrichtung ein (Standard 1 mm bzw. 10 min).
 **Weitere Thermometer** werden eigene Zeilen und nie mit der Außentemperatur
-gemittelt.
+gemittelt. Backups sichern die Zuordnung mit; der selektive Restore stellt sie
+als Ganzes („Wetterdashboard-Konfiguration“) wieder her.
 
 ### Kacheln und Vergleichstabelle
 

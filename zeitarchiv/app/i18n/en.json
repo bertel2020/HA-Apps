@@ -3399,7 +3399,9 @@
     "Keine Heizzähler zugeordnet.": "No heating counters assigned.",
     "Name in der Auswertung (optional)": "Name in the analysis (optional)",
     "Wert außerhalb von {low} bis {high}: {value}": "Value outside {low} to {high}: {value}",
-    "{entity_id}: Heizenergie braucht einen Zähler.": "{entity_id}: heating energy needs a counter."
+    "{entity_id}: Heizenergie braucht einen Zähler.": "{entity_id}: heating energy needs a counter.",
+    "Wetterdashboard-Konfiguration": "Weather dashboard configuration",
+    "Rollen, Heizzähler, Schwellenwerte": "Roles, heating counters, thresholds"
   },
   "js": {
     "Ladestand": "State of charge",

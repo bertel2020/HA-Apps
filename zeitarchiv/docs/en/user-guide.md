@@ -687,7 +687,8 @@ minutes and rain days instead of millimetres. If you have both, both rows are
 shown side by side. Many on/off sensors also report “rain” in fog, dew or when
 the sensor is wet; the drying time then counts too. You set when a day counts
 as a rain day in setup (default 1 mm or 10 min). **Additional thermometers**
-become their own rows and are never averaged with the outdoor temperature.
+become their own rows and are never averaged with the outdoor temperature. Backups include the assignment; the
+selective restore brings it back as a whole ("Weather dashboard configuration").
 
 ### Tiles and comparison table
 

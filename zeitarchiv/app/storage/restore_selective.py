@@ -130,6 +130,9 @@ GENERAL_SETTINGS: list[tuple[str, str]] = [
     ("compact_min_age_months", N_("Verdichten ab Alter (Monate)")),
 ]
 _ENERGIE_KEYS = ("energiedashboard_enabled", "energiedashboard_config")
+_WETTER_KEYS = ("wetterdashboard_enabled", "wetterdashboard_config")
+#: Zusatz-Einträge der Einstellungs-Wiederherstellung, die ein Bündel von settings-Schlüsseln als Ganzes übernehmen.
+_SETTING_BUNDLES = {"x:energie": _ENERGIE_KEYS, "x:wetter": _WETTER_KEYS}
 SYMCON_FILE = "symcon_names.json"
 _SETTING_NEXT_RUN = {
     "backup_schedule": "backup_schedule_next_run",
@@ -880,10 +883,13 @@ def load_settings_overview(source: BackupSource, index: Index, data_dir: Path) -
                             "old": crow_settings.get(key, "—"), "new": brow_settings[key], "warn": warn})
 
     extra = []
-    energie_changed = any(k in brow_settings and brow_settings[k] != crow_settings.get(k) for k in _ENERGIE_KEYS)
-    if any(k in brow_settings for k in _ENERGIE_KEYS):
-        extra.append({"key": "x:energie", "label": tr("Energiedashboard-Konfiguration"),
-                      "st": "diff" if energie_changed else "same", "detail": tr("Speicher, Netzanschluss, Tarife")})
+    for key, keys, label, detail in (
+        ("x:energie", _ENERGIE_KEYS, tr("Energiedashboard-Konfiguration"), tr("Speicher, Netzanschluss, Tarife")),
+        ("x:wetter", _WETTER_KEYS, tr("Wetterdashboard-Konfiguration"), tr("Rollen, Heizzähler, Schwellenwerte")),
+    ):
+        if any(k in brow_settings for k in keys):
+            changed = any(k in brow_settings and brow_settings[k] != crow_settings.get(k) for k in keys)
+            extra.append({"key": key, "label": label, "st": "diff" if changed else "same", "detail": detail})
     b_symcon = source.read_bytes(SYMCON_FILE)
     if b_symcon is not None:
         current = (data_dir / SYMCON_FILE)
@@ -1124,8 +1130,8 @@ def apply_settings(
                 if item["name"] in _SETTING_NEXT_RUN:
                     reset_runs.add(_SETTING_NEXT_RUN[item["name"]])
             for item in plan["extra"]:
-                if item["key"] == "x:energie":
-                    for key in _ENERGIE_KEYS:
+                if item["key"] in _SETTING_BUNDLES:
+                    for key in _SETTING_BUNDLES[item["key"]]:
                         if key in b_settings:
                             put_setting(key, b_settings[key])
                 elif item["key"] == "x:symcon":

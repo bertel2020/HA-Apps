@@ -624,3 +624,32 @@ def test_restore_reports_entities_left_without_category_at_the_limit(live) -> No
     assert index.get_entity("sensor.gone") is not None  # die Entität selbst kommt zurück
     assert index.get_entity_category_id("sensor.gone") is None
     assert len(index.list_entity_categories()) == MAX_CATEGORIES
+
+
+def test_weather_dashboard_configuration_is_restored_as_a_bundle_and_undone(live) -> None:
+    data_dir, index, _ = live
+    index.set_setting("wetterdashboard_enabled", "1")
+    index.set_setting("wetterdashboard_config", json.dumps({"temperature": "sensor.alt", "schema_version": 1}))
+    zip_path = _backup(data_dir, data_dir)
+    index.set_setting("wetterdashboard_enabled", "0")
+    index.set_setting("wetterdashboard_config", json.dumps({"temperature": "sensor.neu", "schema_version": 1}))
+    with rs.BackupSource(zip_path) as source:
+        overview = rs.load_settings_overview(source, index, data_dir)
+        assert [(x["key"], x["st"]) for x in overview["extra"]] == [("x:wetter", "diff")]
+        assert overview["extra"][0]["label"] == "Wetterdashboard-Konfiguration"
+        plan = rs.make_plan(overview, {"x:wetter"}, {})
+        result = rs.apply_settings(data_dir, index, source, overview, plan, source_label="b")
+    assert index.get_setting("wetterdashboard_enabled") == "1"
+    assert json.loads(index.get_setting("wetterdashboard_config"))["temperature"] == "sensor.alt"
+    rs.undo(data_dir, index, StorageCoordinator(), result["rollback"], TZ)
+    assert index.get_setting("wetterdashboard_enabled") == "0"
+    assert json.loads(index.get_setting("wetterdashboard_config"))["temperature"] == "sensor.neu"
+
+
+def test_unchanged_weather_configuration_is_listed_but_not_selectable(live) -> None:
+    data_dir, index, _ = live
+    index.set_setting("wetterdashboard_config", json.dumps({"temperature": "sensor.a", "schema_version": 1}))
+    zip_path = _backup(data_dir, data_dir)
+    with rs.BackupSource(zip_path) as source:
+        overview = rs.load_settings_overview(source, index, data_dir)
+    assert [(x["key"], x["st"]) for x in overview["extra"]] == [("x:wetter", "same")]
