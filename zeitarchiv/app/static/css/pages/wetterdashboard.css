@@ -8,8 +8,10 @@
   /* Reiter */
   /* Die Reiterzeile selbst kommt aus app.css (.entity-tabs); hier nur, was eine Schaltfläche statt eines Links braucht. */
   button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
+  /* Karten wie im Energiedashboard (.edash-card): 12 px Rundung, 16×18 Innenabstand, leichter Schatten, Titel 14 px. */
+  .wt-card{padding:16px 18px;border-radius:12px;box-shadow:var(--shadow);}
   .wt-card + .wt-card{margin-top:16px;}
-  .wt-h2{font-size:calc(16px * var(--font-scale, 1));margin:0;flex:1 1 auto;}
+  .wt-h2{font-size:calc(14px * var(--font-scale, 1));font-weight:600;margin:0;flex:1 1 auto;}
   .wt-headline{font-size:calc(15px * var(--font-scale, 1));margin:8px 0 12px;color:var(--ink);}
   .wt-chart{width:100%;height:300px;}
   .wt-chart-tall{height:360px;}
