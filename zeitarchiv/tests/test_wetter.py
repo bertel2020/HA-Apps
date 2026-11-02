@@ -470,3 +470,16 @@ def test_the_weather_dashboard_can_be_the_start_page(client) -> None:
         assert client.post("/settings/darstellung", data={"startseite": "unsinn"}).status_code == 400
     finally:
         index.set_setting("startseite", previous)
+
+
+def test_view_template_never_iterates_data_that_may_still_be_null() -> None:
+    """Die Daten der Reiter kommen erst nach dem Laden. Ein x-for direkt auf `longterm.records`,
+    `heat.counters` o. Ä. wirft bei jedem Seitenaufruf einen Alpine-Fehler in die Konsole."""
+    import re
+
+    from _paths import TEMPLATES
+
+    text = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+    for match in re.finditer(r'x-for="[^"]* in ([^"]+)"', text):
+        expression = match.group(1)
+        assert not re.match(r"^(longterm|heat|precip|monthly|matrix)\.", expression), expression

@@ -137,7 +137,7 @@
     <div class="card wt-card" x-show="longterm && longterm.records.length" x-cloak>
       <h2 class="wt-h2">{{ _("Rekorde") }}</h2>
       <div class="wt-kpis">
-        <template x-for="record in longterm.records" :key="record.key">
+        <template x-for="record in (longterm ? longterm.records : [])" :key="record.key">
           <div class="wt-tile">
             <span class="wt-tile-label" x-text="recordLabel(record.key)"></span>
             <span class="wt-tile-value" x-html="recordValue(record)"></span>
