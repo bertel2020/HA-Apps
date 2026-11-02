@@ -747,10 +747,9 @@ Die Kacheln stehen oben in der Karte **Aktuell** und zeigen je Rolle den aktuell
 Die Tabelle darunter hat die Spalten **Heute, Gestern, Dieser Monat, Letzter
 Monat** und **Dieses Jahr**, jeweils auf Wunsch mit einer **Vorjahr**-Spalte
 daneben; im Kopf steht der konkrete Zeitraum („November“, „2026“). Die
-Differenz zum Vorjahr steht unter dem aktuellen Wert und ist bewusst neutral
-gefärbt, weil wärmer nicht automatisch besser ist. Bei Max und Min steht
-darunter, wann der Wert auftrat (bei Heute und Gestern die Stunde, sonst der
-Tag).
+Differenz zum Vorjahr steht neben dem aktuellen Wert und ist bewusst neutral
+gefärbt, weil wärmer nicht automatisch besser ist. Bei Max und Min zeigt ein Tooltip, wann der Wert auftrat (bei Heute und Gestern die Stunde, sonst der
+Tag); der Zeitraum des Vorjahres steht im Tooltip der Spaltenüberschrift „Vorjahr“.
 
 Das **Vorjahr** wählt ihr über den Knopf „Vorjahr ▾“ (Aus, Bis jetzt, Komplett); er zeigt den Zustand auch zugeklappt.
 Über die **Stichtag-Leiste** (wie bei den Dashboards: ‹ Datum ›, Kalender; ohne Schrittweiten-Knöpfe, ‹ › geht immer einen Tag, „Heute“ erscheint, sobald ein früherer Tag gewählt ist) zeigt die Tabelle die Zeiträume zu einem früheren Tag: Heute, Gestern,

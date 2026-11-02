@@ -696,9 +696,9 @@ The tiles sit at the top in the **Current** card and show the current value and 
 The table below has the columns **Today, Yesterday, This month, Last month**
 and **This year**, each optionally with a **Last year** column next to it; the
 header shows the concrete period (“November”, “2026”). The difference to last
-year sits below the current value and is deliberately neutral in colour, as
-warmer is not automatically better. Below max and min you see when the value
-occurred (the hour for today and yesterday, otherwise the day).
+year sits next to the current value and is deliberately neutral in colour, as
+warmer is not automatically better. For max and min a tooltip shows when the value
+occurred (the hour for today and yesterday, otherwise the day); the period of the last year is in the tooltip of the “Last year” column heading.
 
 You choose the **last year** comparison with the “Last year ▾” button (Off, So far, Complete); it shows the state even when closed.
 With the **reference-date bar** (as on the dashboards: ‹ date ›, calendar; no step buttons, ‹ › always moves one day, "Today" appears once an earlier day is chosen) the table shows the periods as of an earlier day: Today, Yesterday,

@@ -115,9 +115,10 @@
     }
     const decimals = metric.decimals != null ? metric.decimals : (row.decimals != null ? row.decimals : 1);
     const unit = metric.unit != null ? metric.unit : row.unit;
+    // Uhrzeit bzw. Tag von Max/Min im Tooltip der Zelle (data-tooltip-fixed, fixed-tooltip.js) — die Zelle bleibt einzeilig.
     const when = whenText(metric, summary, col);
-    return `<td class="${cls}"><span class="wt-v">${escapeHtml(num(summary[metric.field], decimals))}${unit ? '&nbsp;' + escapeHtml(unit) : ''}</span>`
-      + (when ? `<span class="wt-d">${escapeHtml(when)}</span>` : '')
+    const tip = when ? ` data-tooltip-fixed="${escapeHtml(when)}"` : '';
+    return `<td class="${cls}"${tip}><span class="wt-v">${escapeHtml(num(summary[metric.field], decimals))}${unit ? '&nbsp;' + escapeHtml(unit) : ''}</span>`
       + (deltaHtml || '') + '</td>';
   }
 
@@ -135,22 +136,27 @@
     if (!cols.length) return `<tbody><tr><td>${escapeHtml(t('Keine Spalte ausgewählt.'))}</td></tr></tbody>`;
     const span = data.vorjahr ? 2 : 1;
     let html = '<thead><tr class="wt-g"><th></th>';
-    for (const col of cols) html += `<th class="wt-sep" colspan="${span}">${escapeHtml(columnTitle(col, data))}</th>`;
-    html += '</tr><tr><th></th>';
     for (const col of cols) {
       let sub = rangeText(col.cur.start, col.cur.end);
       if (col.key === 'heute' && !data.at) sub = t('bis {time}', {time: fmtDate(formats.hm, data.now)});
       // Mit Stichtag steht das Datum schon im Kopf; darunter der Wochentag statt desselben Datums noch einmal.
       if (data.at && (col.key === 'heute' || col.key === 'gestern')) sub = fmtDate(formats.weekday, col.cur.start);
-      html += `<th class="wt-sep"><span class="wt-sb">${escapeHtml(sub)}</span></th>`;
-      if (data.vorjahr) {
-        html += `<th class="wt-vj"><span class="wt-pill">${escapeHtml(t('Vorjahr'))}</span><span class="wt-sb">${escapeHtml(rangeText(col.vj.start, col.vj.end))}</span></th>`;
-      }
+      html += `<th class="wt-sep" colspan="${span}">${escapeHtml(columnTitle(col, data))}<span class="wt-sb">${escapeHtml(sub)}</span></th>`;
     }
-    html += '</tr></thead><tbody>';
+    html += '</tr>';
+    if (data.vorjahr) {
+      // Das Vorjahr steht als schmale Spaltenüberschrift; der Zeitraum dazu im Tooltip.
+      html += '<tr class="wt-sub"><th></th>';
+      for (const col of cols) {
+        html += '<th class="wt-sep"></th>'
+          + `<th class="wt-vj" data-tooltip-fixed="${escapeHtml(rangeText(col.vj.start, col.vj.end))}">${escapeHtml(t('Vorjahr'))}</th>`;
+      }
+      html += '</tr>';
+    }
+    html += '</thead><tbody>';
+
     for (const row of data.rows.filter((r) => inGroup(r.key, group))) {
-      html += `<tr class="wt-grp"><th>${escapeHtml(row.label)}</th>`
-        + cols.map(() => '<td></td>' + (data.vorjahr ? '<td></td>' : '')).join('') + '</tr>';
+      html += `<tr class="wt-grp"><th colspan="${1 + cols.length * span}">${escapeHtml(row.label)}</th></tr>`;
       for (const metric of metricsFor(row, data)) {
         html += `<tr><th scope="row">${escapeHtml(metric.label)}</th>`;
         for (const col of cols) {

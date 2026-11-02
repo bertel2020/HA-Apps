@@ -30,7 +30,6 @@
   .wt-heat-table tr.wt-cut th,.wt-heat-table tr.wt-cut td{background:var(--surface-alt);}
   .wt-heat-table thead .wt-g th{text-align:center;}
   .wt-heat-table td{font-size:calc(14px * var(--font-scale, 1));}
-  .wt-dl{color:var(--chart-1);}
 
   /* Kacheln: Aufbau wie die Kennzahl-Kacheln des Energiedashboards (Kopfbalken in der Rollenfarbe,
      Beschriftung in Großbuchstaben, Wert in Monospace); ganze Kachel verlinkt auf die Entität. */
@@ -75,23 +74,22 @@
 
   /* Vergleichstabelle: Rahmen und Scroll-Hinweis aus .tbl-wrap (app.css), Kopf wie table.dt. */
   .wt-table-wrap{margin-top:10px;}
-  .wt-table{border-collapse:separate;border-spacing:0;width:100%;min-width:640px;font-variant-numeric:tabular-nums;}
-  .wt-table th,.wt-table td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--border);vertical-align:top;}
-  .wt-table thead th{font-weight:600;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);border-bottom:1.5px solid var(--border-strong);vertical-align:bottom;white-space:nowrap;}
-  .wt-table thead tr.wt-g th{text-align:center;font-size:calc(14px * var(--font-scale, 1));color:var(--ink);border-bottom:1px solid var(--border);}
-  .wt-table th:first-child,.wt-table td:first-child{min-width:112px;text-align:left;position:sticky;left:0;background:var(--surface);z-index:1;}
+  .wt-table{border-collapse:separate;border-spacing:0;width:100%;min-width:640px;font-variant-numeric:tabular-nums;font-size:calc(13.5px * var(--font-scale, 1));}
+  .wt-table th,.wt-table td{padding:5px 10px;text-align:right;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;}
+  .wt-table thead th{font-weight:600;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);vertical-align:bottom;}
+  .wt-table thead tr.wt-g th{text-align:center;border-bottom:0;padding-bottom:2px;}
+  .wt-table thead tr.wt-sub th{font-weight:400;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);padding-top:0;border-bottom:1.5px solid var(--border-strong);}
+  .wt-table th:first-child,.wt-table td:first-child{min-width:96px;text-align:left;position:sticky;left:0;background:var(--surface);z-index:1;}
   .wt-table tbody tr:last-child th,.wt-table tbody tr:last-child td{border-bottom:0;}
-  .wt-table tbody th{font-weight:500;color:var(--ink-muted);font-size:calc(14px * var(--font-scale, 1));}
+  .wt-table tbody th{font-weight:400;color:var(--ink-muted);}
   .wt-table .wt-sep{border-left:1px solid var(--border);}
-  .wt-table thead .wt-sb{display:block;font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));font-weight:400;color:var(--ink-muted);}
-  .wt-table thead th.wt-vj{color:var(--ink-muted);}
-  .wt-pill{display:inline-block;font-size:calc(11px * var(--font-scale, 1));font-weight:600;border-radius:99px;padding:0 7px;background:var(--surface-alt);color:var(--ink-muted);margin-bottom:2px;}
-  .wt-table tr.wt-grp th{font-size:calc(12px * var(--font-scale, 1));text-transform:uppercase;letter-spacing:.07em;color:var(--accent-line);padding-top:16px;border-bottom:1px solid var(--border-strong);}
-  .wt-table tr.wt-grp td{border-bottom:1px solid var(--border-strong);}
-  .wt-table td .wt-v{font-size:calc(16px * var(--font-scale, 1));font-weight:600;}
+  .wt-table thead .wt-sb{display:block;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:var(--ink-faint);}
+  .wt-table thead th.wt-vj{cursor:help;}
+  .wt-table tr.wt-grp th{font-size:calc(11.5px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--accent-line);text-align:left;padding-top:12px;border-bottom:1px solid var(--border-strong);white-space:nowrap;}
+  .wt-table td .wt-v{font-weight:600;color:var(--ink);}
   .wt-table td.wt-vj .wt-v{font-weight:400;color:var(--ink-muted);}
-  .wt-table td .wt-d{display:block;font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);}
-  .wt-table td .wt-dl{display:block;font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--chart-1);}
+  .wt-table td[data-tooltip-fixed]{cursor:help;}
+  .wt-table td .wt-dl{margin-left:8px;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:var(--chart-1);}
   .wt-table td.wt-na .wt-v{color:var(--ink-faint);font-weight:400;}
 
   /* Einrichtung: Bereiche wie die Einrichtung des Energiedashboards (.settings-section mit Farbverlauf in der
@@ -143,6 +141,8 @@
     .wt-chart{height:260px;}
     .wt-chart-tall{height:300px;}
     .wt-table{min-width:520px;}
+    .wt-table th:first-child,.wt-table td:first-child{min-width:78px;max-width:100px;white-space:normal;}
+    .wt-table th,.wt-table td{padding-left:8px;padding-right:8px;}
     .wt-roles{grid-template-columns:1fr;}
     .wt-extra{grid-template-columns:minmax(0,1fr) auto;}
     .wt-extra > .dd-picker-wrap{grid-column:1 / -1;}
