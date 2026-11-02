@@ -56,7 +56,7 @@
       {% call hint_body() %}<span x-show="vorjahr" x-text="modeHint()"></span>{% endcall %}
       {# Stichtag-Leiste des App-Standards (wie bei den Dashboards: ‹ Datum ›, Kalender, Schrittweite, „Heute“). Der Alpine-Store
          dashStichtag hält den Tag und stellt ihn als ?date=… in die Adresse; wetter.js lädt die Tabelle bei „dashboard-stichtag“ neu. #}
-      {{ period_nav() }}
+      {{ period_nav(true) }}
       {# Spaltenauswahl wie in der Entitätenliste: Knopf „Spalten ▾“ mit Popover (dd-picker). #}
       <div class="dd-picker-wrap">
         <button type="button" class="btn" onclick="toggleDDPicker('wt-cols')">{{ _("Spalten ▾") }}</button>

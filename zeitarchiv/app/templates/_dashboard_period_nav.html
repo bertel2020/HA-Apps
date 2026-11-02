@@ -6,7 +6,8 @@
      htmx-Tausch des Rasters (Anheften, Umsortieren) den Stichtag nicht
      zurücksetzt. Der Kalender ist derselbe wie im Chart-Editor, über das
      ganze Archiv (calendar_first/last_date). -->
-{% macro nav() %}
+{# jump_now: ein Klick auf die Schrittweite springt zusätzlich auf heute (Wetterdashboard, wie die Zeitraumwahl im Energiedashboard). #}
+{% macro nav(jump_now=false) %}
 <div class="dash-period-nav" role="group" aria-label="{{ _('Stichtag') }}" x-data>
   <button type="button" class="btn navbtn" @click="$store.dashStichtag.go(-1)" :disabled="!$store.dashStichtag.canGoBack" aria-label="{{ _('Vorheriger Zeitraum') }}">‹</button>
   <span class="cal-wrap" x-data='calendarPicker(null, {{ app_root | tojson }}, {{ calendar_first_date | tojson }}, {{ calendar_last_date | tojson }})'>
@@ -20,7 +21,7 @@
   <span class="dash-period-steps" role="group" aria-label="{{ _('Schrittweite') }}">
     <template x-for="s in $store.dashStichtag.steps" :key="s.key">
       <button type="button" class="chip" :class="{active: $store.dashStichtag.step === s.key}" :aria-pressed="$store.dashStichtag.step === s.key"
-              @click="$store.dashStichtag.step = s.key" x-text="s.label"></button>
+              @click="$store.dashStichtag.step = s.key{% if jump_now %}; $store.dashStichtag.set(null){% endif %}" x-text="s.label"></button>
     </template>
   </span>
   <button type="button" class="chip now-chip" x-show="!$store.dashStichtag.isToday" x-cloak @click="$store.dashStichtag.set(null)">{{ _("Heute") }}</button>
