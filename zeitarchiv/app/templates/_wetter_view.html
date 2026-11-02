@@ -1,0 +1,51 @@
+{% if not configured %}
+<div class="wt-title-row">
+  <h1>{{ _("Wetterdashboard") }}</h1>
+</div>
+<p class="sub">{{ _("Temperatur, Niederschlag und mehr im Vergleich mit dem Vorjahr.") }}</p>
+<div class="wt-setup-cta">
+  <p>{{ _("Noch nicht eingerichtet. Ordnet die Außentemperatur und, was ihr habt, Niederschlag, Luftfeuchte, Luftdruck und Wind jeweils einer Entität zu — Kacheln und Vergleichstabelle entstehen danach automatisch.") }}</p>
+  <button type="button" class="btn" hx-get="wetterdashboard/setup" hx-target="#wetter-root" hx-swap="innerHTML">{{ _("Rollen zuordnen") }}</button>
+</div>
+{% else %}
+{# Kein x-init="init()": Alpine ruft init() des x-data-Objekts selbst auf (siehe
+   _energiedashboard_view.html — mit x-init liefe es doppelt). #}
+<div x-data="wetterDashboard()">
+  <div class="wt-title-row">
+    <h1>{{ _("Wetterdashboard") }}</h1>
+    <button type="button" class="wt-title-edit" title="{{ _('Rollen bearbeiten') }}"
+            hx-get="wetterdashboard/setup" hx-target="#wetter-root" hx-swap="innerHTML">&#9998;</button>
+  </div>
+  <p class="sub">{{ _("Aktuelle Werte und der Vergleich mit dem Vorjahr.") }}</p>
+
+  <div class="wt-tiles" x-show="tiles.length" x-cloak>
+    <template x-for="tile in tiles" :key="tile.key">
+      <div class="wt-tile">
+        <span class="wt-tile-label" x-text="tile.label"></span>
+        <span class="wt-tile-value" x-html="tileValue(tile)"></span>
+        <span class="wt-tile-sub" x-text="tileSub(tile)"></span>
+      </div>
+    </template>
+  </div>
+
+  <div class="card wt-card">
+    <div class="wt-controls">
+      <div class="wt-cols" role="group" aria-label="{{ _('Spalten') }}">
+        <template x-for="key in columnKeys" :key="key">
+          <label class="wt-check"><input type="checkbox" :checked="columns.includes(key)" @change="toggleColumn(key)"> <span x-text="columnName(key)"></span></label>
+        </template>
+      </div>
+      <label class="wt-check"><input type="checkbox" x-model="vorjahr" @change="saveAndLoad()"> {{ _("Mit Vorjahr") }}</label>
+      <div class="wt-seg" role="group" aria-label="{{ _('Vergleich mit dem Vorjahr') }}" x-show="vorjahr">
+        <button type="button" :aria-pressed="(mode === 'bis_jetzt').toString()" @click="setMode('bis_jetzt')">{{ _("Bis jetzt") }}</button>
+        <button type="button" :aria-pressed="(mode === 'komplett').toString()" @click="setMode('komplett')">{{ _("Komplett") }}</button>
+      </div>
+    </div>
+    <p class="wt-hint" x-show="vorjahr" x-text="modeHint()"></p>
+    <p class="wt-hint wt-error" x-show="error" x-text="error" x-cloak></p>
+    <div class="wt-table-wrap">
+      <table class="wt-table" x-ref="table"></table>
+    </div>
+  </div>
+</div>
+{% endif %}

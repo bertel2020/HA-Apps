@@ -162,6 +162,7 @@ from .energiedashboard_routes import (
     entity_has_energiedashboard_role,
     is_energiedashboard_configured,
 )
+from .wetter_routes import WetterDependencies, WetterService, is_wetter_configured, wetter_role_count
 from . import cleanup_stats, counter_bulk, data_quality, entity_usage, value_range
 from . import dashboard_tiles
 from .dashboard_tiles import tile_metric_context as _tile_metric_context
@@ -351,6 +352,7 @@ def _nav_dashboards_context(request: Request) -> dict:
     return {
         "nav_dashboards_list": index.list_dashboards(),
         "nav_energiedashboard_enabled": index.get_setting("energiedashboard_enabled", "0") == "1",
+        "nav_wetterdashboard_enabled": index.get_setting("wetterdashboard_enabled", "0") == "1",
     }
 
 
@@ -775,6 +777,15 @@ _energiedashboard_service = EnergieDashboardService(EnergieDashboardDependencies
 # Hintergrunddienst selbst muss aber schon vor ihm existieren — siehe oben.
 _background.energiedashboard_service = _energiedashboard_service
 app.include_router(_energiedashboard_service.router())
+
+_wetter_service = WetterService(WetterDependencies(
+    data_dir=DATA_DIR,
+    index=index,
+    tz=TZ,
+    templates=templates,
+    app_root_context=_app_root_context,
+))
+app.include_router(_wetter_service.router())
 
 
 @app.exception_handler(cleanup.ResultLimitExceeded)
@@ -4282,6 +4293,9 @@ def dashboards_list(request: Request) -> HTMLResponse:
             # global aus _nav_dashboards_context, "configured" nur hier.
             "energiedashboard_configured": is_energiedashboard_configured(index),
             "energiedashboard_role_count": energiedashboard_role_count(index),
+            # Wie beim Energiedashboard: "enabled" kommt global aus _nav_dashboards_context.
+            "wetter_configured": is_wetter_configured(index),
+            "wetter_role_count": wetter_role_count(index),
             # Für das Startseiten-Symbol an der Energiedashboard-Kachel unten
             # (STARTSEITE_LABELS oben) — Default "uebersicht" spiegelt
             # dieselbe Rückfallregel wie überall sonst, wo diese Einstellung

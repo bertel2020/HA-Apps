@@ -25,6 +25,24 @@
       }
     }
 
+    // Wie toggleEnergieDashboard(): Reload, damit Kachel und Menü zusammen umschalten.
+    async function toggleWetterDashboard(btn) {
+      const willEnable = !btn.classList.contains('is-on');
+      btn.disabled = true;
+      try {
+        const res = await fetch(`wetterdashboard/${willEnable ? 'enable' : 'disable'}`, {method: 'POST'});
+        if (res.ok) {
+          window.location.reload();
+        } else {
+          btn.disabled = false;
+          appAlert(t('Konnte nicht umgeschaltet werden.'));
+        }
+      } catch (e) {
+        btn.disabled = false;
+        appAlert(t('Konnte nicht umgeschaltet werden.'));
+      }
+    }
+
     async function deleteDashboard(id, btn) {
       if (!await appConfirm(t('Dieses Dashboard wirklich löschen? Die Kachel-Anordnung geht verloren — die zugrunde liegenden Charts und Tabellen bleiben erhalten und lassen sich jederzeit auf einem anderen Dashboard neu anheften.'), {danger: true})) return;
       btn.disabled = true;

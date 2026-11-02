@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ _("Zeitarchiv — Wetterdashboard") }}{% endblock %}
+{% block page_css %}
+<link rel="stylesheet" href="{{ asset('css/pages/wetterdashboard.css') }}">
+{% endblock %}
+{% block content %}
+
+  <div class="page">
+    <div id="wetter-root">
+      {% include "_wetter_view.html" %}
+    </div>
+  </div>
+
+  <script src="{{ asset('vendor/htmx.min.js') }}"></script>
+  <script src="{{ asset('js/number-format.js') }}"></script>
+  <script src="{{ asset('js/dd-picker.js') }}"></script>
+  <script src="{{ asset('js/entity-picker.js') }}"></script>
+  <script src="{{ asset('js/wetter.js') }}"></script>
+{% endblock %}

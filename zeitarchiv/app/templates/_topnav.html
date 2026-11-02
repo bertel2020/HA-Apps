@@ -29,6 +29,7 @@
 {% set nav_home = _rel in ('/', '', '/uebersicht') %}
 {% set nav_dashboards = _rel.startswith('/dashboards') %}
 {% set nav_energiedashboard = _rel.startswith('/energiedashboard') %}
+{% set nav_wetterdashboard = _rel.startswith('/wetterdashboard') %}
 {% set nav_entities = _rel.startswith('/entities') %}
 {% set nav_charts = _rel.startswith('/charts') %}
 {% set nav_tables = _rel.startswith('/tables') %}
@@ -74,6 +75,8 @@
 <line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>
 {%- elif name == 'energiedashboard' -%}
 <polyline points="13,2 4,14 11,14 9,22 20,10 12,10 13,2"/>
+{%- elif name == 'wetterdashboard' -%}
+<path d="M7 18a4 4 0 0 1-.5-7.97A5.5 5.5 0 0 1 17 8.5a4.75 4.75 0 0 1 .5 9.5H7z"/>
 {%- endif %}</svg>
 {%- endmacro %}
 {% macro nav_chevron() -%}
@@ -105,6 +108,9 @@
           <a class="{{ 'is-active' if _rel == '/dashboards' }}" href="{{ app_root }}/dashboards">{{ nav_icon('dashboards') }}{{ _("Alle Dashboards") }}</a>
           {% if nav_energiedashboard_enabled %}
           <a class="{{ 'is-active' if nav_energiedashboard }}" href="{{ app_root }}/energiedashboard">{{ nav_icon('energiedashboard') }}{{ _("Energiedashboard") }}</a>
+          {% endif %}
+          {% if nav_wetterdashboard_enabled %}
+          <a class="{{ 'is-active' if nav_wetterdashboard }}" href="{{ app_root }}/wetterdashboard">{{ nav_icon('wetterdashboard') }}{{ _("Wetterdashboard") }}</a>
           {% endif %}
           {% if nav_dashboards_list %}
           <div class="topnav-menu-divider"></div>
@@ -308,6 +314,9 @@
         <a class="{{ 'is-active' if _rel == '/dashboards' }}" href="{{ app_root }}/dashboards">{{ _("Alle Dashboards") }}</a>
         {% if nav_energiedashboard_enabled %}
         <a class="{{ 'is-active' if nav_energiedashboard }}" href="{{ app_root }}/energiedashboard">{{ nav_icon('energiedashboard') }}{{ _("Energiedashboard") }}</a>
+        {% endif %}
+        {% if nav_wetterdashboard_enabled %}
+        <a class="{{ 'is-active' if nav_wetterdashboard }}" href="{{ app_root }}/wetterdashboard">{{ nav_icon('wetterdashboard') }}{{ _("Wetterdashboard") }}</a>
         {% endif %}
         {% for d in nav_dashboards_list %}
         {% set d_path = '/dashboards/' ~ d.id|string %}

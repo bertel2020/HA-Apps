@@ -127,6 +127,7 @@
      Formsprache wie das große Diagramm, hier nur als Icon verdichtet. */
   .edash-pin-card{display:flex;flex-direction:column;padding:0;overflow:hidden;position:relative;}
   .edash-pin-accent{height:4px;flex:none;background:linear-gradient(90deg, var(--energy-solar), var(--energy-grid) 55%, var(--energy-export));}
+  .wetter-pin-accent{background:linear-gradient(90deg, var(--chart-1), var(--chart-3) 55%, var(--chart-5));}
   .edash-pin-card.is-off .edash-pin-accent,.edash-pin-card.is-off .edash-pin-glyph{filter:grayscale(1);opacity:.4;}
   .edash-pin-body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px;flex:1;}
   .edash-pin-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}

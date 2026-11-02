@@ -33,6 +33,9 @@ internals for developers are in the other documents of this folder (see
   - [Status, data quality and anomalies](#status-data-quality-and-anomalies)
   - [Daily load profile](#daily-load-profile)
   - [Energy report](#energy-report)
+- [Weather dashboard](#weather-dashboard)
+  - [Roles](#roles)
+  - [Tiles and comparison table](#tiles-and-comparison-table)
 - [Entities and histories](#entities-and-histories)
   - [Deleting several entities](#deleting-several-entities)
   - [Categories](#categories)
@@ -654,6 +657,49 @@ library runs in the background — the **"Print / Save as PDF"** button merely
 calls the browser's print dialog, where you can choose "Save as PDF" instead of
 a real printer as usual. There is no automatic dispatch by e-mail — the
 report, like everything in Zeitarchiv, stays exclusively local.
+
+## Weather dashboard
+
+A standalone view for weather values, built like the energy dashboard: you
+assign roles (outdoor temperature, precipitation, humidity, …) to one entity
+each and the page is built from them. It is switched on and off with a fixed
+tile on the dashboards overview and is then available in the **Dashboards**
+menu directly below the energy dashboard.
+
+### Roles
+
+The role decides how values are calculated; setup only offers entities of the
+matching type for each role and rejects wrong assignments.
+
+| Role | Type | Figures |
+|---|---|---|
+| Outdoor temperature (required) | Measurement | Max and min with time, mean |
+| Precipitation (amount) | Counter | Sum, rain days, wettest day |
+| Rain (on/off) | Switch | Rain minutes, rain days, rainiest day |
+| Humidity, pressure, wind, gust, radiation | Measurement | Max and min with time, mean |
+
+A rain sensor that only reports on and off is enough: the page then shows rain
+minutes and rain days instead of millimetres. If you have both, both rows are
+shown side by side. Many on/off sensors also report “rain” in fog, dew or when
+the sensor is wet; the drying time then counts too. You set when a day counts
+as a rain day in setup (default 1 mm or 10 min). **Additional thermometers**
+become their own rows and are never averaged with the outdoor temperature.
+
+### Tiles and comparison table
+
+The tiles at the top show the current value and today's range for each role.
+The table below has the columns **Today, Yesterday, This month, Last month**
+and **This year**, each optionally with a **Last year** column next to it; the
+header shows the concrete period (“November”, “2026”). The difference to last
+year sits below the current value and is deliberately neutral in colour, as
+warmer is not automatically better. Below max and min you see when the value
+occurred (the hour for today and yesterday, otherwise the day).
+
+**So far** compares the running period with the same stretch of last year
+(1–2 Nov 2026 against 1–2 Nov 2025), **Complete** with the whole period of last
+year. Completed periods (yesterday, last month) are the same in both cases. If
+a period has no data it shows “–”, never 0; a tooltip tells when the archive
+begins. The browser remembers the column selection.
 
 ## Entities and histories
 

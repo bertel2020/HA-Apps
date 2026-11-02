@@ -33,6 +33,9 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
   - [Status, Datenqualität und Auffälligkeiten](#status-datenqualität-und-auffälligkeiten)
   - [Tageslastprofil](#tageslastprofil)
   - [Energiebericht](#energiebericht)
+- [Wetterdashboard](#wetterdashboard)
+  - [Rollen](#rollen)
+  - [Kacheln und Vergleichstabelle](#kacheln-und-vergleichstabelle)
 - [Entitäten und Verläufe](#entitäten-und-verläufe)
   - [Mehrere Entitäten löschen](#mehrere-entitäten-löschen)
   - [Kategorien](#kategorien)
@@ -703,6 +706,52 @@ Button **„Drucken / Als PDF speichern"** ruft lediglich den Druckdialog des
 Browsers auf, dort lässt sich wie gewohnt „Als PDF speichern“ statt eines
 echten Druckers wählen. Es gibt keinen automatischen Versand per E-Mail —
 der Bericht bleibt, wie alles in Zeitarchiv, ausschließlich lokal.
+
+## Wetterdashboard
+
+Eigenständige Ansicht für Wetterwerte, aufgebaut wie das Energiedashboard:
+Ihr ordnet Rollen (Außentemperatur, Niederschlag, Luftfeuchte, …) jeweils einer
+Entität zu, die Seite entsteht daraus. Sie wird über eine feste Kachel auf der
+Dashboard-Übersicht ein- und ausgeschaltet und ist danach im Menü
+**Dashboards** direkt unter dem Energiedashboard erreichbar.
+
+### Rollen
+
+Die Rolle legt fest, wie gerechnet wird; die Einrichtung zeigt je Rolle nur
+Entitäten des passenden Typs und lehnt falsche Zuordnungen ab.
+
+| Rolle | Typ | Kennzahlen |
+|---|---|---|
+| Außentemperatur (Pflicht) | Messwert | Max und Min mit Zeitpunkt, Ø |
+| Niederschlag (Menge) | Zähler | Summe, Regentage, nassester Tag |
+| Regen (ein/aus) | Schalter | Regenminuten, Regentage, regenreichster Tag |
+| Luftfeuchte, Luftdruck, Wind, Böe, Strahlung | Messwert | Max und Min mit Zeitpunkt, Ø |
+
+Ein Regensensor, der nur ein und aus meldet, reicht: Dann zeigt die Seite
+Regenminuten und Regentage statt Millimeter. Habt ihr beides, stehen beide
+Zeilen nebeneinander. Viele Ein/Aus-Sensoren melden auch bei Nebel, Tau oder
+nassem Sensor „Regen“, die Trocknungszeit zählt dann mit. Ab wann ein Tag als
+Regentag zählt, stellt ihr in der Einrichtung ein (Standard 1 mm bzw. 10 min).
+**Weitere Thermometer** werden eigene Zeilen und nie mit der Außentemperatur
+gemittelt.
+
+### Kacheln und Vergleichstabelle
+
+Die Kacheln oben zeigen je Rolle den aktuellen Wert und den heutigen Verlauf.
+Die Tabelle darunter hat die Spalten **Heute, Gestern, Dieser Monat, Letzter
+Monat** und **Dieses Jahr**, jeweils auf Wunsch mit einer **Vorjahr**-Spalte
+daneben; im Kopf steht der konkrete Zeitraum („November“, „2026“). Die
+Differenz zum Vorjahr steht unter dem aktuellen Wert und ist bewusst neutral
+gefärbt, weil wärmer nicht automatisch besser ist. Bei Max und Min steht
+darunter, wann der Wert auftrat (bei Heute und Gestern die Stunde, sonst der
+Tag).
+
+**Bis jetzt** vergleicht den laufenden Zeitraum mit demselben Stück des
+Vorjahres (1.–2.11.2026 gegen 1.–2.11.2025), **Komplett** mit dem ganzen
+Vorjahreszeitraum. Abgeschlossene Zeiträume (Gestern, Letzter Monat) sind in
+beiden Fällen gleich. Fehlen für einen Zeitraum Daten, steht „–“, nie 0; ein
+Tooltip nennt, ab wann das Archiv beginnt. Die Auswahl der Spalten merkt sich
+der Browser.
 
 ## Entitäten und Verläufe
 

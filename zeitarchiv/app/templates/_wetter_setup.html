@@ -1,0 +1,89 @@
+{# Rollen-Zuordnung des Wetterdashboards. Jede Rolle zeigt nur Entitäten des passenden Typs
+   (Messwert, Zähler, Schalter), weil die Rolle die Aggregation festlegt. #}
+{% macro role_field(name, role, initial) %}
+<span class="dd-picker-wrap" x-data='entityPicker(optionsFor({{ role | tojson }}), {{ initial | tojson }}, null, null, null, false)' @click.outside="open = false">
+  <span class="dd-picker-anchor">
+    <button type="button" class="btn" :class="{'dd-picker-btn-clearable': entityId}"
+            @click="toggleOpen($refs.search)"
+            x-text="entityId ? label(entityId) : t('Entität wählen …')"></button>
+    <button type="button" class="dd-picker-clear" x-show="entityId" x-cloak
+            @click.stop="clearSelection()" title="{{ _('Auswahl leeren') }}" aria-label="{{ _('Auswahl leeren') }}">✕</button>
+    <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:260px;overflow-y:auto;">
+      <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="{{ _('Suchen …') }}">
+      <template x-for="opt in filtered()" :key="opt.entity_id">
+        <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)">
+          <span x-text="opt.label"></span>
+        </div>
+      </template>
+    </div>
+    <input type="hidden" name="{{ name }}" :value="entityId">
+  </span>
+</span>
+{% endmacro %}
+
+<div class="wt-title-row">
+  <h1>{{ _("Wetterdashboard") }}</h1>
+</div>
+<p class="sub">{{ _("Ordnet jeder Rolle eine Entität zu. Nur die Außentemperatur ist Pflicht.") }}</p>
+
+<form class="card wt-setup" hx-post="wetterdashboard/setup" hx-target="#wetter-root" hx-swap="innerHTML"
+      x-data='{
+        entityOptions: {{ entity_options | tojson }},
+        roleTypes: {{ role_types | tojson }},
+        extras: {{ config.extra_temperatures | tojson }},
+        maxExtra: {{ max_extra }},
+        optionsFor(role) {
+          const allowed = this.roleTypes[role] || ["standard"];
+          return this.entityOptions.filter(o => allowed.includes(o.aggregation_type));
+        },
+        addExtra() { if (this.extras.length < this.maxExtra) this.extras.push({entity_id: "", name: ""}); },
+        removeExtra(i) { this.extras.splice(i, 1); }
+      }'>
+  <div class="wt-roles">
+    {% for key, label, types in roles %}
+    <div class="wt-role">
+      <div class="wt-role-head">
+        <span class="wt-role-name">{{ _(label) }}{% if key == 'temperature' %} <span class="wt-required">{{ _("Pflicht") }}</span>{% endif %}</span>
+      </div>
+      {{ role_field(key, key, config[key]) }}
+      {% if warnings[key] %}<p class="wt-warn">{{ warnings[key] }}</p>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <h2 class="wt-sub-h">{{ _("Weitere Thermometer") }}</h2>
+  <p class="hint">{{ _("Jedes weitere Thermometer wird eine eigene Zeile in der Tabelle, es wird nie mit der Außentemperatur gemittelt.") }}</p>
+  <template x-for="(row, i) in extras" :key="i">
+    <div class="wt-extra">
+      <span class="dd-picker-wrap" x-data="entityPicker(optionsFor('temperature'), row.entity_id, (id) => { row.entity_id = id })" @click.outside="open = false">
+        <span class="dd-picker-anchor">
+          <button type="button" class="btn" @click="toggleOpen($refs.search)" x-text="entityId ? label(entityId) : t('Entität wählen …')"></button>
+          <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:260px;overflow-y:auto;">
+            <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="{{ _('Suchen …') }}">
+            <template x-for="opt in filtered()" :key="opt.entity_id">
+              <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)"><span x-text="opt.label"></span></div>
+            </template>
+          </div>
+          <input type="hidden" name="extra_entity_id" :value="entityId">
+        </span>
+      </span>
+      <input type="text" name="extra_name" x-model="row.name" maxlength="60" placeholder="{{ _('Name in der Tabelle (optional)') }}">
+      <button type="button" class="btn" @click="removeExtra(i)" aria-label="{{ _('Entfernen') }}">✕</button>
+    </div>
+  </template>
+  <button type="button" class="btn" x-show="extras.length < maxExtra" @click="addExtra()">{{ _("+ Thermometer") }}</button>
+
+  <h2 class="wt-sub-h">{{ _("Regentage") }}</h2>
+  <div class="wt-thresholds">
+    <label>{{ _("Regentag bei Niederschlagsmenge ab") }}
+      <input type="text" name="rain_day_mm" value="{{ config.rain_day_mm | string | replace('.', ',') }}" inputmode="decimal" size="4"> mm</label>
+    <label>{{ _("Regentag bei Regendauer ab") }}
+      <input type="text" name="rain_day_minutes" value="{{ config.rain_day_minutes | int }}" inputmode="numeric" size="4"> min</label>
+  </div>
+  <p class="hint">{{ _("Viele Ein/Aus-Regensensoren melden auch bei Nebel, Tau oder nassem Sensor „Regen“, die Trocknungszeit zählt dann mit.") }}</p>
+
+  <div class="wt-actions">
+    <button type="submit" class="btn btn-primary">{{ _("Speichern") }}</button>
+    <a class="btn" href="wetterdashboard">{{ _("Abbrechen") }}</a>
+  </div>
+</form>
