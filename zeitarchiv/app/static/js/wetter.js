@@ -122,7 +122,7 @@
     html += '</tr><tr><th></th>';
     for (const col of cols) {
       let sub = rangeText(col.cur.start, col.cur.end);
-      if (col.key === 'heute') sub = `${fmtDate(formats.dmy, col.cur.start)} · ${t('bis {time}', {time: fmtDate(formats.hm, data.now)})}`;
+      if (col.key === 'heute') sub = t('bis {time}', {time: fmtDate(formats.hm, data.now)});
       html += `<th class="wt-sep"><span class="wt-sb">${escapeHtml(sub)}</span></th>`;
       if (data.vorjahr) {
         html += `<th class="wt-vj"><span class="wt-pill">${escapeHtml(t('Vorjahr'))}</span><span class="wt-sb">${escapeHtml(rangeText(col.vj.start, col.vj.end))}</span></th>`;
@@ -1140,6 +1140,9 @@
           const data = await res.json();
           if (seq !== this._seq) return;  // eine neuere Anfrage hat überholt
           this.$refs.table.innerHTML = renderTable(data);
+          // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
+          const wrap = this.$refs.tableWrap;
+          wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1);
         } catch (e) {
           if (seq === this._seq) this.error = t('Die Tabelle konnte nicht geladen werden.');
         }

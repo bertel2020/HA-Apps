@@ -518,3 +518,10 @@ def test_column_selection_is_a_popover_like_the_entity_list() -> None:
     text = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
     assert "toggleDDPicker('wt-cols')" in text and 'id="wt-cols-popover"' in text
     assert 'class="wt-check"><input type="checkbox" :checked="columns.includes(key)"' not in text
+
+
+def test_comparison_table_sits_in_the_app_table_frame() -> None:
+    from _paths import APP, TEMPLATES
+
+    assert 'class="tbl-wrap wt-table-wrap"' in (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+    assert "is-scrollable" in (APP / "static/js/wetter.js").read_text(encoding="utf-8")
