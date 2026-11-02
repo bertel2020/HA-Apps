@@ -4,6 +4,21 @@
 
 ### Neu
 
+- **Wetterdashboard**: Eine neue Seite für Wetterwerte, aufgebaut wie das
+  Energiedashboard: Außentemperatur, Niederschlag, Luftfeuchte, Luftdruck, Wind,
+  Böe und Strahlung werden je einer Entität zugeordnet, weitere Thermometer
+  erscheinen als eigene Zeilen. Kacheln zeigen den aktuellen Wert, die Tabelle
+  vergleicht Heute, Gestern, Diesen und Letzten Monat sowie Dieses Jahr mit dem
+  Vorjahr, mit Zeitpunkt von Max und Min und der Differenz unter dem Wert.
+  „Bis jetzt“ vergleicht mit demselben Stück des Vorjahres, „Komplett“ mit dem
+  ganzen Vorjahreszeitraum. Der Niederschlag funktioniert mit einem Zähler
+  (Menge, Regentage, nassester Tag) oder nur mit einem Regensensor ein/aus
+  (Regenminuten, Regentage, regenreichster Tag), auch beides nebeneinander.
+  Eingeschaltet wird die Seite über eine Kachel auf der Dashboard-Übersicht,
+  danach steht sie im Menü Dashboards unter dem Energiedashboard. Die
+  Demo-Daten bringen dafür Wetter-Entitäten und Heizzähler mit (nach „Neu
+  erzeugen“).
+
 - **Entitäten, Kategorien**: Entitäten lassen sich nach Thema ordnen, zum
   Beispiel Wärmepumpe, Solar oder Wetter, zusätzlich zu den
   Favoriten-Sternen. Der neue Reiter **Kategorien** neben „Liste“ und
@@ -49,6 +64,19 @@
 ### English
 
 #### New
+
+- **Weather dashboard**: A new page for weather values, built like the energy
+  dashboard: outdoor temperature, precipitation, humidity, air pressure, wind,
+  gust and radiation are each assigned to an entity, additional thermometers
+  appear as their own rows. Tiles show the current value, the table compares
+  Today, Yesterday, This and Last month and This year with last year, with the
+  time of max and min and the difference below the value. "So far" compares with
+  the same stretch of last year, "Complete" with the whole period of last year.
+  Precipitation works with a counter (amount, rain days, wettest day) or with
+  just an on/off rain sensor (rain minutes, rain days, rainiest day), or both
+  side by side. The page is switched on with a tile on the dashboards overview
+  and then sits in the Dashboards menu below the energy dashboard. The demo data
+  brings weather entities and heating counters for it (after "Regenerate").
 
 - **Entities, categories**: Entities can be grouped by topic, for example heat
   pump, solar or weather, in addition to the favorite stars. The new
