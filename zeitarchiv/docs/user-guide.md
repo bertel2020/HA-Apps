@@ -743,7 +743,7 @@ als Ganzes („Wetterdashboard-Konfiguration“) wieder her.
 
 ### Kacheln und Vergleichstabelle
 
-Die Kacheln oben zeigen je Rolle den aktuellen Wert und den heutigen Verlauf.
+Die Kacheln stehen oben in der Karte **Aktuell** und zeigen je Rolle den aktuellen Wert und den heutigen Verlauf. Die **Übersicht** enthält Temperatur, Niederschlag, Regen, Luftfeuchte und Luftdruck; Wind, Böe und Strahlung stehen auf dem eigenen Reiter **Wind & Sonne** (er erscheint nur, wenn eine dieser Rollen zugeordnet ist), mit denselben Kacheln und derselben Vergleichstabelle.
 Die Tabelle darunter hat die Spalten **Heute, Gestern, Dieser Monat, Letzter
 Monat** und **Dieses Jahr**, jeweils auf Wunsch mit einer **Vorjahr**-Spalte
 daneben; im Kopf steht der konkrete Zeitraum („November“, „2026“). Die

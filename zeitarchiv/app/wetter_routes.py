@@ -74,7 +74,7 @@ MAX_EXTRA_TEMPERATURES = 5
 #: Nachkommastellen, wenn die Entität „automatisch“ eingestellt ist: Strahlung in ganzen W/m².
 ROLE_DEFAULT_DECIMALS = {"radiation": 0}
 #: Kurze Namen für die Kacheln (in der Tabelle stehen die ausführlichen Rollennamen).
-TILE_LABELS = {"precip_mm": N_("Niederschlag"), "precip_dur": N_("Regen")}
+TILE_LABELS = {"temperature": N_("Temperatur"), "precip_mm": N_("Niederschlag"), "precip_dur": N_("Regen")}
 MAX_HEATING_COUNTERS = 6
 DEFAULT_HEATING_ROOM = 20.0  # Raumtemperatur der Gradtagzahl (G20/15, VDI 3807)
 DEFAULT_HEATING_LIMIT = 15.0  # Heizgrenze: darüber wird nicht geheizt
@@ -677,6 +677,7 @@ class WetterService:
             "configured": _is_configured(config),
             "precip_modes": self.available_precip(),
             "has_heating": bool(self.heating_counters(config)),
+            "has_windsun": any(config[key] for key in ("wind", "gust", "radiation")),
             **calendar_bounds(self.deps.index.list_entities(), self.deps.tz),
             "enabled": _is_enabled(self.deps.index),
             "config": config,

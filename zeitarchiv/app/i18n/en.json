@@ -3414,7 +3414,8 @@
     "Messwerte": "Readings",
     "Weitere Entitäten": "Other entities",
     "Grundwerte": "Basic readings",
-    "Weitere Messwerte": "More readings"
+    "Weitere Messwerte": "More readings",
+    "Wind &amp; Sonne": "Wind &amp; sun"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4075,6 +4076,8 @@
     "gestern {value} {unit}": "yesterday {value} {unit}",
     "gestern {value} min": "yesterday {value} min",
     "Heute: Tiefstwert ▼ und Höchstwert ▲. Ein Klick öffnet die Entität.": "Today: low ▼ and high ▲. A click opens the entity.",
-    "Heute bisher, darunter der gestrige Tag. Ein Klick öffnet die Entität.": "Today so far, below it yesterday. A click opens the entity."
+    "Heute bisher, darunter der gestrige Tag. Ein Klick öffnet die Entität.": "Today so far, below it yesterday. A click opens the entity.",
+    "Stand {time}": "As of {time}",
+    "Tiefstwert ▼ und Höchstwert ▲ von heute": "Today's low ▼ and high ▲"
   }
 }

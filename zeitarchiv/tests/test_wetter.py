@@ -516,7 +516,7 @@ def test_column_selection_is_a_popover_like_the_entity_list() -> None:
     from _paths import TEMPLATES
 
     text = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
-    assert "toggleDDPicker('wt-cols')" in text and 'id="wt-cols-popover"' in text
+    assert "toggleDDPicker('wt-cols-{{ sfx }}')" in text and 'id="wt-cols-{{ sfx }}-popover"' in text
     assert 'class="wt-check"><input type="checkbox" :checked="columns.includes(key)"' not in text
 
 
@@ -645,7 +645,7 @@ def test_year_over_year_is_one_menu_and_not_part_of_the_column_list() -> None:
     from _paths import APP, TEMPLATES
 
     text = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
-    assert "toggleDDPicker('wt-yoy')" in text and 'id="wt-yoy-popover"' in text
+    assert "toggleDDPicker('wt-yoy-{{ sfx }}')" in text and 'id="wt-yoy-{{ sfx }}-popover"' in text
     assert 'x-model="vorjahr"' not in text and "Mit Vorjahr" not in text  # kein Haken zwischen den Spalten mehr
     assert "wt-picker-sep" not in text
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
@@ -659,7 +659,7 @@ def test_tiles_use_short_names_and_the_layout_helper(service) -> None:
     _add(service, "binary_sensor.regen", "binary_sensor", None, "", [(_ts(20, 6), 1.0), (_ts(20, 6, 30), 0.0)])
     _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(20, 1), 12.0)])
     _configure(service, temperature="sensor.t", precip_mm="sensor.regen", precip_dur="binary_sensor.regen")
-    assert [tile["label"] for tile in service.compute_tiles(NOW)] == ["Temperatur außen", "Niederschlag", "Regen"]
+    assert [tile["label"] for tile in service.compute_tiles(NOW)] == ["Temperatur", "Niederschlag", "Regen"]
     assert "WetterLayout.tileColumns" in (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "wetter-layout.js" in (TEMPLATES / "wetterdashboard.html").read_text(encoding="utf-8")
 
@@ -694,3 +694,27 @@ def test_columns_with_a_reference_day_show_the_weekday_under_the_date() -> None:
 
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "formats.weekday" in script and "weekday: new Intl.DateTimeFormat" in script
+
+
+def test_wind_and_sun_tab_groups_tiles_and_rows() -> None:
+    from _paths import APP, TEMPLATES
+
+    view = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+    assert "{% if has_windsun %}" in view and 'id="wt-panel-wind"' in view
+    assert 'tile_card("basis"' in view and 'tile_card("wind"' in view
+    assert 'compare_card("basis")' in view and 'compare_card("wind")' in view
+    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "const WIND_KEYS = ['wind', 'gust', 'radiation']" in script
+
+
+def test_wind_and_sun_tab_only_appears_with_one_of_its_roles(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp6", "sensor", "measurement", "°C")
+    index.get_or_create_entity("sensor.wetter_test_wind6", "sensor", "measurement", "km/h")
+    base = {**wetter_routes._empty_config(), "temperature": "sensor.wetter_test_temp6"}  # noqa: SLF001
+    wetter_routes._save_config(index, base)  # noqa: SLF001
+    assert "wt-tab-wind" not in client.get("/wetterdashboard").text
+    wetter_routes._save_config(index, {**base, "wind": "sensor.wetter_test_wind6"})  # noqa: SLF001
+    assert "wt-tab-wind" in client.get("/wetterdashboard").text
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")

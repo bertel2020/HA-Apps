@@ -16,7 +16,7 @@
   .wt-chart{width:100%;height:300px;}
   .wt-chart-tall{height:360px;}
   .wt-matrix{min-height:160px;}
-  .wt-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:8px 0 12px;}
+  .wt-kpis{display:grid;grid-template-columns:repeat(var(--wt-cols, 3),minmax(0,1fr));gap:10px;margin:8px 0 14px;}
   .wt-record-link{font-size:calc(12px * var(--font-scale, 1));color:var(--accent-line);margin-top:2px;}
   .wt-controls select{font:inherit;font-size:calc(13px * var(--font-scale, 1));padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink);}
 
@@ -34,7 +34,9 @@
 
   /* Kacheln: Aufbau wie die Kennzahl-Kacheln des Energiedashboards (Kopfbalken in der Rollenfarbe,
      Beschriftung in Großbuchstaben, Wert in Monospace); ganze Kachel verlinkt auf die Entität. */
-  .wt-tiles{display:grid;grid-template-columns:repeat(var(--wt-cols, 4),minmax(0,1fr));gap:10px;margin-bottom:16px;}
+  .wt-tiles{display:grid;grid-template-columns:repeat(var(--wt-cols, 4),minmax(0,1fr));gap:10px;}
+  .wt-tilecard .wt-controls{margin-bottom:10px;}
+  .wt-stand{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
   .wt-tile{--wt-accent:var(--chart-8);display:flex;flex-direction:column;gap:2px;min-width:0;padding:10px 12px;
     text-decoration:none;color:inherit;border:1px solid var(--border);border-top:3px solid var(--wt-accent);
     border-radius:8px;background:var(--surface-alt);}
@@ -45,6 +47,7 @@
   .wt-tile[data-role="pressure"]{--wt-accent:var(--chart-4);}
   .wt-tile[data-role="wind"],.wt-tile[data-role="gust"]{--wt-accent:var(--chart-8);}
   .wt-tile[data-role="radiation"]{--wt-accent:var(--chart-7);}
+  .wt-tile.wt-tile-wide{grid-column:1 / -1;}
   .wt-tile.is-loading{border-top-color:var(--border-strong);color:var(--ink-faint);animation:wt-pulse 1.2s ease-in-out infinite alternate;}
   @keyframes wt-pulse{from{opacity:.55;}to{opacity:1;}}
   @media (prefers-reduced-motion:reduce){.wt-tile.is-loading{animation:none;}}
@@ -135,7 +138,7 @@
   .wt-add{align-self:flex-start;}
 
   @media (max-width:640px){
-    .wt-kpis{grid-template-columns:repeat(2,1fr);}
+    .wt-kpis{--wt-cols:2 !important;}
     .wt-chart{height:260px;}
     .wt-chart-tall{height:300px;}
     .wt-table{min-width:520px;}

@@ -692,7 +692,7 @@ selective restore brings it back as a whole ("Weather dashboard configuration").
 
 ### Tiles and comparison table
 
-The tiles at the top show the current value and today's range for each role.
+The tiles sit at the top in the **Current** card and show the current value and today's range for each role. The **Overview** holds temperature, precipitation, rain, humidity and pressure; wind, gust and radiation have their own **Wind & sun** tab (it only appears when one of these roles is assigned), with the same tiles and the same comparison table.
 The table below has the columns **Today, Yesterday, This month, Last month**
 and **This year**, each optionally with a **Last year** column next to it; the
 header shows the concrete period (“November”, “2026”). The difference to last

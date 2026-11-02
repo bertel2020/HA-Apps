@@ -121,7 +121,11 @@
       + (deltaHtml || '') + '</td>';
   }
 
-  function renderTable(data) {
+  // Rollen des Reiters „Wind & Sonne“; alles andere steht in der Übersicht.
+  const WIND_KEYS = ['wind', 'gust', 'radiation'];
+  const inGroup = (key, group) => WIND_KEYS.includes(key) === (group === 'wind');
+
+  function renderTable(data, group) {
     const cols = data.columns;
     if (!cols.length) return `<tbody><tr><td>${escapeHtml(t('Keine Spalte ausgewählt.'))}</td></tr></tbody>`;
     const span = data.vorjahr ? 2 : 1;
@@ -139,7 +143,7 @@
       }
     }
     html += '</tr></thead><tbody>';
-    for (const row of data.rows) {
+    for (const row of data.rows.filter((r) => inGroup(r.key, group))) {
       html += `<tr class="wt-grp"><th>${escapeHtml(row.label)}</th>`
         + cols.map(() => '<td></td>' + (data.vorjahr ? '<td></td>' : '')).join('') + '</tr>';
       for (const metric of metricsFor(row, data)) {
@@ -294,7 +298,8 @@
       mode: 'bis_jetzt',
       tiles: [],
       tilesLoaded: false,
-      tileCols: 4,
+      tileCols: {basis: 4, wind: 3},
+      tilesStand: '',
       error: '',
       _seq: 0,
 
@@ -306,7 +311,8 @@
         this.loadTiles();
         this.loadTable();
         this.loadMonthly();
-        new ResizeObserver(() => this.layoutTiles()).observe(this.$refs.tiles);
+        const observer = new ResizeObserver(() => this.layoutTiles());
+        for (const ref of [this.$refs.tilesBasis, this.$refs.tilesWind]) if (ref) observer.observe(ref);
         // Stichtag-Leiste des App-Standards: bei jeder Änderung die Tabelle neu laden.
         window.addEventListener('dashboard-stichtag', () => this.loadTable());
       },
@@ -332,7 +338,7 @@
           this.vorjahr = true;
           this.mode = choice;
         }
-        document.getElementById('wt-yoy-popover').classList.remove('open');
+        document.querySelectorAll('.wt-yoy-popover').forEach((popover) => popover.classList.remove('open'));
         this.saveAndLoad();
       },
 
@@ -398,9 +404,20 @@
 
       // Spaltenzahl so wählen, dass keine einzelnen Kacheln allein in der letzten Reihe stehen.
       layoutTiles() {
-        const element = this.$refs.tiles;
-        if (!element || !this.tiles.length) return;
-        this.tileCols = WetterLayout.tileColumns(this.tiles.length, element.clientWidth);
+        for (const [group, element] of [['basis', this.$refs.tilesBasis], ['wind', this.$refs.tilesWind]]) {
+          const count = this.tilesFor(group).length;
+          if (element && count && element.clientWidth) this.tileCols[group] = WetterLayout.tileColumns(count, element.clientWidth);
+        }
+      },
+
+      // Kennzahlen-Raster (Niederschlag, Rekorde): höchstens vier Spalten, ohne einzelne Kachel in der letzten Reihe
+      // (sechs Rekorde: 3+3). Schmale Bildschirme übernimmt das Stylesheet.
+      kpiCols(count) {
+        return WetterLayout.tileColumns(count, 640);
+      },
+
+      tilesFor(group) {
+        return this.tiles.filter((tile) => inGroup(tile.key, group));
       },
 
       // ---- Reiter und Diagramme (Phase 2) ----------------------------------------------------
@@ -412,7 +429,10 @@
         if (tab === 'long' && !this.matrix) this.loadMatrix();
         if (tab === 'heat' && !this.heat) this.loadHeat();
         // Ein Diagramm in einem eben erst sichtbaren Reiter hat noch keine Größe.
-        this.$nextTick(() => Object.values(charts).forEach((chart) => chart.resize()));
+        this.$nextTick(() => {
+          this.layoutTiles();
+          Object.values(charts).forEach((chart) => chart.resize());
+        });
       },
 
       // Pfeiltasten, Pos1 und Ende wechseln wie bei jeder Reiterleiste zwischen den Reitern.
@@ -1195,7 +1215,11 @@
       async loadTiles() {
         try {
           const res = await fetch('wetterdashboard/tiles');
-          if (res.ok) this.tiles = (await res.json()).tiles;
+          if (res.ok) {
+            const data = await res.json();
+            this.tiles = data.tiles;
+            this.tilesStand = new Intl.DateTimeFormat(LOCALE, {hour: '2-digit', minute: '2-digit', timeZone: data.tz}).format(new Date());
+          }
         } catch (e) {
           // Kacheln sind Beiwerk; die Tabelle meldet Verbindungsfehler selbst.
         }
@@ -1215,10 +1239,12 @@
           if (!res.ok) throw new Error(String(res.status));
           const data = await res.json();
           if (seq !== this._seq) return;  // eine neuere Anfrage hat überholt
-          this.$refs.table.innerHTML = renderTable(data);
-          // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
-          const wrap = this.$refs.tableWrap;
-          wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1);
+          for (const [group, table, wrap] of [['basis', this.$refs.table, this.$refs.tableWrap], ['wind', this.$refs.tableWind, this.$refs.tableWrapWind]]) {
+            if (!table) continue;
+            table.innerHTML = renderTable(data, group);
+            // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
+            wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1);
+          }
         } catch (e) {
           if (seq === this._seq) this.error = t('Die Tabelle konnte nicht geladen werden.');
         }
