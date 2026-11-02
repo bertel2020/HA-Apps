@@ -701,7 +701,7 @@ warmer is not automatically better. Below max and min you see when the value
 occurred (the hour for today and yesterday, otherwise the day).
 
 You choose the **last year** comparison with the “Last year ▾” button (Off, So far, Complete); it shows the state even when closed.
-With the **reference-date bar** (as on the dashboards: ‹ date ›, calendar, step day/week/month/year, "Today"; clicking a step also jumps back to today) the table shows the periods as of an earlier day: Today, Yesterday,
+With the **reference-date bar** (as on the dashboards: ‹ date ›, calendar, step day/week/month/year; clicking a step jumps to today, so there is no "Today" button there) the table shows the periods as of an earlier day: Today, Yesterday,
 Month, Last month and Year then refer to it, and the stretch of last year ends on the same
 calendar day. The date is part of the address (`?date=2026-01-15`), so the view can
 be linked; "Today" resets it. The tiles keep showing the current values. You choose the

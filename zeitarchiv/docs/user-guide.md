@@ -753,7 +753,7 @@ darunter, wann der Wert auftrat (bei Heute und Gestern die Stunde, sonst der
 Tag).
 
 Das **Vorjahr** wählt ihr über den Knopf „Vorjahr ▾“ (Aus, Bis jetzt, Komplett); er zeigt den Zustand auch zugeklappt.
-Über die **Stichtag-Leiste** (wie bei den Dashboards: ‹ Datum ›, Kalender, Schrittweite Tag/Woche/Monat/Jahr, „Heute“; ein Klick auf die Schrittweite springt zugleich auf heute) zeigt die Tabelle die Zeiträume zu einem früheren Tag: Heute, Gestern,
+Über die **Stichtag-Leiste** (wie bei den Dashboards: ‹ Datum ›, Kalender, Schrittweite Tag/Woche/Monat/Jahr; ein Klick auf die Schrittweite springt auf heute, einen „Heute“-Knopf gibt es dort nicht) zeigt die Tabelle die Zeiträume zu einem früheren Tag: Heute, Gestern,
 Monat, Letzter Monat und Jahr beziehen sich dann auf ihn, der Vorjahres-Ausschnitt endet am
 selben Kalendertag. Das Datum steht in der Adresse (`?date=2026-01-15`), die Ansicht lässt sich
 also verlinken; „Heute“ stellt zurück. Die Kacheln zeigen weiter die aktuellen Werte. Die

@@ -6,7 +6,7 @@
      htmx-Tausch des Rasters (Anheften, Umsortieren) den Stichtag nicht
      zurücksetzt. Der Kalender ist derselbe wie im Chart-Editor, über das
      ganze Archiv (calendar_first/last_date). -->
-{# jump_now: ein Klick auf die Schrittweite springt zusätzlich auf heute (Wetterdashboard, wie die Zeitraumwahl im Energiedashboard). #}
+{# jump_now: ein Klick auf die Schrittweite springt zusätzlich auf heute und ersetzt den „Heute“-Knopf (Wetterdashboard, wie die Zeitraumwahl im Energiedashboard). #}
 {% macro nav(jump_now=false) %}
 <div class="dash-period-nav" role="group" aria-label="{{ _('Stichtag') }}" x-data>
   <button type="button" class="btn navbtn" @click="$store.dashStichtag.go(-1)" :disabled="!$store.dashStichtag.canGoBack" aria-label="{{ _('Vorheriger Zeitraum') }}">‹</button>
@@ -24,7 +24,9 @@
               @click="$store.dashStichtag.step = s.key{% if jump_now %}; $store.dashStichtag.set(null){% endif %}" x-text="s.label"></button>
     </template>
   </span>
+  {% if not jump_now %}
   <button type="button" class="chip now-chip" x-show="!$store.dashStichtag.isToday" x-cloak @click="$store.dashStichtag.set(null)">{{ _("Heute") }}</button>
+  {% endif %}
 </div>
 {% endmacro %}
 
