@@ -535,9 +535,24 @@ class IngestionService:
             and event.value < entity["last_value"]
         )
 
-        rotate.rotate_if_needed(
-            self._data_dir, event.entity_id, event.ts, self._index, self._tz
-        )
+        try:
+            rotate.rotate_if_needed(
+                self._data_dir, event.entity_id, event.ts, self._index, self._tz
+            )
+        except Exception as exc:
+            # Eine nicht rotierbare Vormonatsdatei (z. B. beschädigtes Archiv) darf nicht den ganzen Batch
+            # scheitern lassen: Die Integration würde 5xx endlos wiederholen und die Aufnahme aller
+            # Entitäten stauen. Der neue Wert gehört in die Hot-Datei des aktuellen Monats; die alte
+            # bleibt liegen und wird beim nächsten Schreiben erneut versucht.
+            log_rate_limited(
+                logger,
+                logging.ERROR,
+                f"rotate_failed:{event.entity_id}",
+                "Rotation fehlgeschlagen · event=rotate_failed entity_id=%s error=%r",
+                event.entity_id,
+                exc,
+                interval_seconds=15 * 60,
+            )
         if live_resolution_interval is not None:
             path = hotbuffer.hot_path(self._data_dir, event.entity_id, event.ts, self._tz)
             pending_end = resolution.pending_bucket_end(path, live_resolution_interval)

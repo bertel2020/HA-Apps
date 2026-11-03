@@ -23,6 +23,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from . import rollup
+from .atomic import write_file_atomically
 from .hotbuffer import find_stale_hot_files, iter_records
 from .index import STATE_TYPE, STATE_UNAVAILABLE_INDEX, Index
 from .paths import entity_dir
@@ -153,7 +154,9 @@ def rotate_month_file(
             table = table.replace_schema_metadata(
                 {STATE_MAP_METADATA_KEY: json.dumps(mapping, ensure_ascii=False)}
             )
-    pq.write_table(table, archive_path, compression="zstd")
+    # Temp-Datei + fsync + Umbenennen, erst danach die Hot-CSV löschen: Bei einem Absturz
+    # steht entweder noch der alte Archivstand (und die CSV) oder der vollständige neue da.
+    write_file_atomically(archive_path, lambda tmp: pq.write_table(table, tmp, compression="zstd"))
     index.add_size_bytes(entity_id, archive_path.stat().st_size - previous_size)
     hot_csv_path.unlink()
 

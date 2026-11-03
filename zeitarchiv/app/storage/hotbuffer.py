@@ -13,6 +13,7 @@ from pathlib import Path
 from collections.abc import Iterator
 from zoneinfo import ZoneInfo
 
+from .atomic import write_text_atomically
 from .paths import hot_file_path, storage_area_dir, validate_entity_id
 
 logger = logging.getLogger(__name__)
@@ -177,10 +178,13 @@ def write_records(path: Path, records: list[HotRecord]) -> None:
     """Schreibt eine Hot-Datei komplett neu aus `records` — für die
     Live-Auflösung (resolution.py), die die trailing Rohzeilen eines
     abgeschlossenen Fensters durch eine Ø/Min/Max-Zeile ersetzt."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        for ts, value, event_id, min_value, max_value in records:
-            handle.write(_format_row(ts, value, event_id, min_value, max_value) + "\n")
+    write_text_atomically(
+        path,
+        (
+            _format_row(ts, value, event_id, min_value, max_value) + "\n"
+            for ts, value, event_id, min_value, max_value in records
+        ),
+    )
 
 
 def contains_event_id(path: Path, event_id: str) -> bool:

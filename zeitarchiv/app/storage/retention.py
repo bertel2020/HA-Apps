@@ -25,7 +25,7 @@ from zoneinfo import ZoneInfo
 import pyarrow.parquet as pq
 
 from .cleanup import remove_deleted_points_for_month
-from .hotbuffer import hot_path, read_rows
+from .hotbuffer import hot_path, read_full_rows, read_rows, write_records
 from .index import Index
 from .paths import entity_dir
 from .rollup import drop_rows_in_spans, period_span, rollup_path
@@ -175,15 +175,11 @@ def enforce_retention_for_entity(
 
     hot_file = hot_path(data_dir, entity_id, now.timestamp(), tz)
     if hot_file.exists():
-        rows = read_rows(hot_file)
-        expired_rows = [(ts, v) for ts, v in rows if ts < cutoff_ts]
+        # Volle Zeilen: event_id und min/max der verbleibenden Zeilen dürfen beim Umschreiben nicht verloren gehen.
+        records = read_full_rows(hot_file)
+        expired_rows = [(r[0], r[1]) for r in records if r[0] < cutoff_ts]
         if expired_rows:
-            kept = [(ts, v) for ts, v in rows if ts >= cutoff_ts]
-            tmp_path = hot_file.with_suffix(".tmp")
-            with tmp_path.open("w", encoding="utf-8") as f:
-                for ts, v in kept:
-                    f.write(f"{ts},{v}\n")
-            tmp_path.replace(hot_file)
+            write_records(hot_file, [r for r in records if r[0] >= cutoff_ts])
             rows_deleted += len(expired_rows)
             deleted_counts = index.get_deleted_counts_for_entity(entity_id)
             if deleted_counts:
