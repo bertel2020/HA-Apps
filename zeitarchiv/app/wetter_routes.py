@@ -179,6 +179,11 @@ def wetter_role_count(index: Index) -> int:
     )
 
 
+def radiation_entity(index: Index) -> str:
+    """Entität der Strahlung (W/m²) oder leer; das Energiedashboard braucht sie für den Ertrag je Einstrahlung."""
+    return _load_config(index).get("radiation") or ""
+
+
 def is_wetter_configured(index: Index) -> bool:
     return _is_configured(_load_config(index))
 

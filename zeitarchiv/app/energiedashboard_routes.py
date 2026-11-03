@@ -34,7 +34,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from . import energie_langzeit
+from . import energie_langzeit, wetter_routes
 from . import energiedashboard_buckets as eb
 from . import formats
 from .chart_period import calendar_bounds
@@ -537,6 +537,7 @@ class EnergieDashboardService:
         self.deps = deps
         self.langzeit = energie_langzeit.EnergieLangzeitService(
             deps.data_dir, deps.index, deps.tz, entity_series=self._entity_series,
+            radiation_entity=lambda: wetter_routes.radiation_entity(deps.index),
         )
 
     def _entity_options(self) -> list[dict]:
@@ -3536,6 +3537,7 @@ class EnergieDashboardService:
             einspeisung_name: str = Form(""),
             erzeuger_entity_id: list[str] = Form([]),
             erzeuger_name: list[str] = Form([]),
+            erzeuger_kwp: list[str] = Form([]),
             speicher_name: list[str] = Form([]),
             speicher_laden_entity_id: list[str] = Form([]),
             speicher_entladen_entity_id: list[str] = Form([]),
@@ -3577,7 +3579,7 @@ class EnergieDashboardService:
 
             def pairs(
                 entity_ids: list[str], names: list[str], gruppen: list[str] | None = None,
-                parents: list[str] | None = None,
+                parents: list[str] | None = None, kwps: list[str] | None = None,
             ) -> list[dict]:
                 # Reihen ohne gewählte Entität (z. B. eine per "+ hinzufügen"
                 # angelegte, dann leer gelassene Zeile) werden stillschweigend
@@ -3594,6 +3596,11 @@ class EnergieDashboardService:
                         "entity_id": eid.strip(),
                         "name": (names[idx] if idx < len(names) else "").strip(),
                     }
+                    if kwps is not None:
+                        # Anlagenleistung (nur Erzeuger), optional; nicht positiv gilt als nicht angegeben.
+                        kwp = _parse_float(kwps[idx] if idx < len(kwps) else "")
+                        if kwp is not None and kwp > 0:
+                            row["kwp"] = kwp
                     if gruppen is not None:
                         row["gruppe"] = (gruppen[idx] if idx < len(gruppen) else "").strip() or None
                     if parents is not None:
@@ -3709,7 +3716,7 @@ class EnergieDashboardService:
                 "netzbezug_name": netzbezug_name.strip() or None,
                 "einspeisung": einspeisung.strip() or None,
                 "einspeisung_name": einspeisung_name.strip() or None,
-                "erzeuger": pairs(erzeuger_entity_id, erzeuger_name),
+                "erzeuger": pairs(erzeuger_entity_id, erzeuger_name, kwps=erzeuger_kwp),
                 "speicher": speicher,
                 "verbraucher": verbraucher_rows,
                 # dict.fromkeys() statt set() — entfernt Duplikate (z. B. wenn

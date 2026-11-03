@@ -45,29 +45,41 @@
     return num(value, Math.abs(value) < 100 ? 1 : 0) + ' kWh';
   }
 
+  // Wert je Art der Zeile: kWh (energy), Prozent (pct, Differenz in Prozentpunkten) oder kWh je kWp (spec).
+  function formatValue(row, value) {
+    if (row.kind === 'pct') return num(value, 1) + '\u00a0%';
+    if (row.kind === 'spec') return num(value, 1) + '\u00a0' + t('kWh/kWp');
+    return energy(value);
+  }
+
   // Differenz zum Vorjahr unter dem Wert; die Farbe sagt, ob die Änderung günstig ist (mehr Erzeugung
-  // und Einspeisung, weniger Bezug und Verbrauch), nicht, ob die Zahl steigt oder fällt.
-  function delta(cur, previous, better) {
+  // und Einspeisung, weniger Bezug und Verbrauch), nicht, ob die Zahl steigt oder fällt. Zeilen ohne Wertung
+  // (Speicher) bleiben ungefärbt.
+  function delta(cur, previous, row) {
     if (cur == null || previous == null) return '';
     const diff = cur - previous;
     const zero = Math.round(Math.abs(diff) * 10) === 0;
-    let text = (zero ? '± ' : diff > 0 ? '▲ +' : '▼ −') + energy(Math.abs(diff));
-    if (previous !== 0 && !zero) {
+    let text = (zero ? '± ' : diff > 0 ? '▲ +' : '▼ −');
+    if (row.kind === 'pct') text += num(Math.abs(diff), 1) + ' ' + t('PP');
+    else if (row.kind === 'spec') text += num(Math.abs(diff), 1) + ' ' + t('kWh/kWp');
+    else text += energy(Math.abs(diff));
+    // Prozentwerte vergleichen sich in Prozentpunkten, dort steht kein zweites Prozent daneben.
+    if (row.kind !== 'pct' && previous !== 0 && !zero) {
       const percent = diff / previous * 100;
       text += ' (' + (percent > 0 ? '+' : '−') + num(Math.abs(percent), 0) + ' %)';
     }
-    const good = !zero && (diff > 0) === (better === 'up');
-    const cls = zero ? '' : (good ? ' wt-dl-good' : ' wt-dl-bad');
+    const good = !zero && row.better && (diff > 0) === (row.better === 'up');
+    const cls = zero || !row.better ? '' : (good ? ' wt-dl-good' : ' wt-dl-bad');
     return `<span class="wt-dl${cls}">${escapeHtml(text)}</span>`;
   }
 
-  function cellHtml(value, fromTs, vjCell, deltaHtml) {
+  function cellHtml(value, fromTs, vjCell, deltaHtml, row) {
     const cls = vjCell ? 'wt-vj' : 'wt-sep';
     if (value == null) {
       const title = fromTs ? ` title="${escapeHtml(t('Daten ab {date}', {date: fmtDate(formats.dmy, fromTs)}))}"` : '';
       return `<td class="wt-na ${cls}"${title}><span class="wt-v">–</span></td>`;
     }
-    return `<td class="${cls}"><span class="wt-v">${energy(value)}</span>${deltaHtml || ''}</td>`;
+    return `<td class="${cls}"><span class="wt-v">${formatValue(row, value)}</span>${deltaHtml || ''}</td>`;
   }
 
   function renderTable(data, showDiff) {
@@ -96,9 +108,9 @@
       html += `<tr><th scope="row">${escapeHtml(row.label)}</th>`;
       for (const col of cols) {
         const cell = row.cells[col.key] || {};
-        const deltaHtml = showDiff && data.vorjahr ? delta(cell.cur, cell.vj, row.better) : '';
-        html += cellHtml(cell.cur, cell.cur_from, false, deltaHtml);
-        if (data.vorjahr) html += cellHtml(cell.vj, cell.vj_from, true, '');
+        const deltaHtml = showDiff && data.vorjahr ? delta(cell.cur, cell.vj, row) : '';
+        html += cellHtml(cell.cur, cell.cur_from, false, deltaHtml, row);
+        if (data.vorjahr) html += cellHtml(cell.vj, cell.vj_from, true, '', row);
       }
       html += '</tr>';
     }

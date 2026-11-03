@@ -666,6 +666,18 @@ and feed-in, less grid import and consumption), red unfavorable.
   last year, “Complete” with the whole period of last year; last month is the
   same in both cases. “Show difference” shows or hides the difference line.
   The browser remembers the choice (columns, last year, difference).
+- **Ratios and storage:** Below consumption are self-consumption and
+  self-sufficiency (calculated as on the overview); their difference to last
+  year is in percentage points (pp). With storage assigned, rows for charge
+  and discharge are added, without a green or red rating.
+- **PV system, weather-adjusted:** If a generator has a **system capacity**
+  (kWp) in the setup, the **specific yield** (kWh per kWp) appears. If the
+  weather dashboard also has **irradiation** (W/m²) assigned, **Yield per
+  irradiation** shows how much of the irradiated energy the system generated;
+  this tells a weaker year from a worse summer. Only generators with a capacity
+  count. If the sensor has fewer than 80 % of the hourly values in a period,
+  it shows “–”. The sensor measures horizontally while roofs are tilted
+  differently, so the value is a comparison across years, not an efficiency.
 - **Consumption** here is the balance generation + grid import + storage
   discharge − feed-in − storage charge, the same calculation as the trends and
   the monthly course of the report. “This year” compares by calendar (1 Jan up

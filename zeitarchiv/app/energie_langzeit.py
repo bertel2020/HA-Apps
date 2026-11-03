@@ -41,13 +41,25 @@ COLUMN_WINDOWS = {
     "monat": ("month", 0),
     "jahr": ("year", 0),
 }
-#: Zeilen: Schlüssel, Gruppe, Beschriftung und ob mehr davon günstig ("up") oder ungünstig ("down") ist.
+#: Zeilen: Schlüssel, Gruppe, Beschriftung, Art (energy = kWh, pct = Prozent mit Differenz in Prozentpunkten, spec =
+#: kWh je kWp) und ob mehr davon günstig ("up"), ungünstig ("down") oder neutral (None) ist.
 ROWS: tuple[dict, ...] = (
-    {"key": "erzeugung", "group": N_("Energie"), "label": N_("Erzeugung"), "better": "up"},
-    {"key": "einspeisung", "group": N_("Energie"), "label": N_("Einspeisung"), "better": "up"},
-    {"key": "netzbezug", "group": N_("Energie"), "label": N_("Netzbezug"), "better": "down"},
-    {"key": "verbrauch", "group": N_("Energie"), "label": N_("Verbrauch"), "better": "down"},
+    {"key": "erzeugung", "group": N_("Energie"), "label": N_("Erzeugung"), "better": "up", "kind": "energy"},
+    {"key": "einspeisung", "group": N_("Energie"), "label": N_("Einspeisung"), "better": "up", "kind": "energy"},
+    {"key": "netzbezug", "group": N_("Energie"), "label": N_("Netzbezug"), "better": "down", "kind": "energy"},
+    {"key": "verbrauch", "group": N_("Energie"), "label": N_("Verbrauch"), "better": "down", "kind": "energy"},
+    {"key": "eigenverbrauch", "group": N_("Quoten"), "label": N_("Eigenverbrauch"), "better": "up", "kind": "pct"},
+    {"key": "autarkie", "group": N_("Quoten"), "label": N_("Autarkie"), "better": "up", "kind": "pct"},
+    {"key": "ladung", "group": N_("Speicher"), "label": N_("Ladung"), "better": None, "kind": "energy"},
+    {"key": "entladung", "group": N_("Speicher"), "label": N_("Entladung"), "better": None, "kind": "energy"},
+    {"key": "spezifisch", "group": N_("PV-Anlage, wetterbereinigt"), "label": N_("Spezifischer Ertrag"),
+     "better": "up", "kind": "spec"},
+    {"key": "einstrahlung", "group": N_("PV-Anlage, wetterbereinigt"), "label": N_("Ertrag je Einstrahlung"),
+     "better": "up", "kind": "pct"},
 )
+#: Anteil der Stunden mit Einstrahlungswert, ab dem ein Zeitraum für den Vergleich zählt (Lücken des Sensors
+#: ließen die Einstrahlung sonst zu klein und den Ertrag je Einstrahlung zu groß erscheinen).
+MIN_RADIATION_COVERAGE = 0.8
 
 
 #: Höchstzahl Jahre in Monatsvergleich und Matrix (je Jahr und Entität eine Abfrage).
@@ -82,6 +94,16 @@ def role_entities(config: dict) -> dict[str, list[str]]:
     }
 
 
+def pv_entities(config: dict) -> list[tuple[str, float]]:
+    """Erzeuger mit Anlagenleistung (Entität, kWp). Nur sie gehen in die wetterbereinigten Zeilen ein: Ertrag und
+    Leistung müssen aus denselben Erzeugern stammen, sonst stimmt das Verhältnis nicht."""
+    return [
+        (e["entity_id"], float(e["kwp"]))
+        for e in config.get("erzeuger") or []
+        if e.get("entity_id") and e.get("kwp") and float(e["kwp"]) > 0
+    ]
+
+
 def is_configured(config: dict) -> bool:
     roles = role_entities(config)
     return bool(roles["erzeugung"] or roles["netzbezug"])
@@ -106,6 +128,7 @@ class EnergieLangzeitService:
     def __init__(
         self, data_dir: Path, index: Index, tz: ZoneInfo,
         entity_series: Callable[..., tuple[dict[float, float], bool]] | None = None,
+        radiation_entity: Callable[[], str] | None = None,
     ) -> None:
         self.data_dir = data_dir
         self.index = index
@@ -113,6 +136,8 @@ class EnergieLangzeitService:
         #: (entity_id, range_key, offset, now, read_cache) -> (Bucket-Zeitstempel -> Wert, veraltet?); die
         #: Monatsbuckets des Energiedashboards. Ohne Angabe sind Monatswerte nicht verfügbar.
         self.entity_series = entity_series
+        #: Entität der Strahlung (W/m²) aus dem Wetterdashboard; ohne sie entfallen die wetterbereinigten Zeilen.
+        self.radiation_entity = radiation_entity
 
     def _rows(
         self, entity_id: str, start: datetime, end: datetime, now_local: datetime,
@@ -155,6 +180,73 @@ class EnergieLangzeitService:
             sums[role], froms[role] = self.window_total(entity_ids, start, end, now_local, read_cache)
         return sums, froms
 
+    def window_irradiation(
+        self, entity_id: str, start: datetime, end: datetime, now_local: datetime,
+        read_cache: query_mod.QueryReadCache,
+    ) -> float | None:
+        """Einstrahlung im Fenster in kWh/m² (Summe der Stundenmittel in W/m² mal 1 h); None, wenn weniger als
+        MIN_RADIATION_COVERAGE der vergangenen Stunden einen Wert haben."""
+        end = min(end, now_local)
+        if end <= start:
+            return None
+        rows = query_mod._query_completed_plus_live_fine(  # noqa: SLF001 — siehe Modul-Docstring
+            self.data_dir, self.index, entity_id, "standard", "line", start, end, self.tz, now_local, read_cache,
+        )
+        values = [row.value for row in rows if row.value is not None]
+        expected_hours = (end - start).total_seconds() / 3600
+        if not values or len(values) < MIN_RADIATION_COVERAGE * expected_hours:
+            return None
+        return sum(values) / 1000.0
+
+    def side_metrics(
+        self, config: dict, roles: dict[str, list[str]], start: datetime, end: datetime, now_local: datetime,
+        read_cache: query_mod.QueryReadCache,
+    ) -> tuple[dict[str, float | None], dict[str, float | None]]:
+        """Alle Kennzahlen eines Fensters (Zeilenschlüssel -> Wert) plus Archivbeginn je Rolle."""
+        sums, froms = self.side_values(roles, start, end, now_local, read_cache)
+        metrics: dict[str, float | None] = {
+            "erzeugung": sums["erzeugung"],
+            "einspeisung": max(sums["einspeisung"], 0.0) if sums["einspeisung"] is not None else None,
+            "netzbezug": max(sums["netzbezug"], 0.0) if sums["netzbezug"] is not None else None,
+            "ladung": sums["ladung"],
+            "entladung": sums["entladung"],
+        }
+        verbrauch = balance(sums)
+        metrics["verbrauch"] = round(verbrauch, 3) if verbrauch is not None else None
+        # Dieselben Formeln wie in compute_flow, auf 0 bis 100 begrenzt (Rundungsrauschen bei kleinen Summen).
+        metrics["autarkie"] = None
+        if metrics["verbrauch"] and metrics["verbrauch"] > 0 and metrics["netzbezug"] is not None:
+            metrics["autarkie"] = round(max(0.0, min(1.0, 1 - metrics["netzbezug"] / metrics["verbrauch"])) * 100, 1)
+        metrics["eigenverbrauch"] = None
+        if metrics["erzeugung"] and metrics["erzeugung"] > 0:
+            export = metrics["einspeisung"] or 0.0
+            metrics["eigenverbrauch"] = round(max(0.0, min(1.0, (metrics["erzeugung"] - export) / metrics["erzeugung"])) * 100, 1)
+        metrics["spezifisch"] = None
+        metrics["einstrahlung"] = None
+        pv = pv_entities(config)
+        if pv:
+            kwp = sum(power for _eid, power in pv)
+            yield_kwh, _first = self.window_total([eid for eid, _power in pv], start, end, now_local, read_cache)
+            if yield_kwh is not None:
+                metrics["spezifisch"] = round(yield_kwh / kwp, 3)
+                radiation = self.radiation_entity() if self.radiation_entity else ""
+                if radiation:
+                    irradiation = self.window_irradiation(radiation, start, end, now_local, read_cache)
+                    if irradiation:
+                        metrics["einstrahlung"] = round(yield_kwh / (kwp * irradiation) * 100, 1)
+        return metrics, froms
+
+    def visible_rows(self, config: dict, roles: dict[str, list[str]]) -> list[dict]:
+        """Zeilen, für die die Einrichtung ausreicht; fehlende Rollen blenden ihre Zeilen aus."""
+        have_bus = bool(roles["erzeugung"] or roles["netzbezug"])
+        radiation = bool(self.radiation_entity and self.radiation_entity())
+        pv = bool(pv_entities(config))
+        shown = {
+            "verbrauch": have_bus, "autarkie": have_bus, "eigenverbrauch": bool(roles["erzeugung"]),
+            "spezifisch": pv, "einstrahlung": pv and radiation,
+        }
+        return [row for row in ROWS if shown.get(row["key"], bool(roles.get(row["key"])))]
+
     def compute_table(self, config: dict, body: TableRequest, now_local: datetime | None = None) -> dict:
         now_local = now_local or datetime.now(self.tz)
         columns = [key for key in COLUMN_KEYS if key in body.columns]
@@ -166,31 +258,23 @@ class EnergieLangzeitService:
         ]
         roles = role_entities(config)
         read_cache = query_mod.QueryReadCache()
-        visible = [
-            row for row in ROWS
-            if (roles[row["key"]] if row["key"] != "verbrauch" else (roles["erzeugung"] or roles["netzbezug"]))
-        ]
+        visible = self.visible_rows(config, roles)
         cells: dict[str, dict[str, dict]] = {row["key"]: {} for row in visible}
         for win in windows:
             sides = [("cur", win["start"], win["end"])]
             if body.vorjahr:
                 sides.append(("vj", win["vj_start"], win["vj_end"]))
             side_data = {
-                side: self.side_values(roles, start, end, now_local, read_cache) for side, start, end in sides
+                side: self.side_metrics(config, roles, start, end, now_local, read_cache) for side, start, end in sides
             }
             for row in visible:
                 key = row["key"]
                 cell: dict = {}
                 for side, _start, _end in sides:
-                    sums, froms = side_data[side]
-                    if key == "verbrauch":
-                        value = balance(sums)
-                        cell[side] = round(value, 3) if value is not None else None
-                    elif key in ("einspeisung", "netzbezug"):
-                        cell[side] = max(sums[key], 0.0) if sums[key] is not None else None
-                    else:
-                        cell[side] = sums[key]
-                    if cell[side] is None and key != "verbrauch" and froms[key]:
+                    metrics, froms = side_data[side]
+                    cell[side] = metrics[key]
+                    # Fehlende Daten sind kein 0: Archivbeginn mitgeben, wenn er im Fenster liegt (nur Zählerrollen).
+                    if cell[side] is None and froms.get(key):
                         cell[f"{side}_from"] = froms[key]
                 cells[key][win["key"]] = cell
         return {
@@ -212,7 +296,7 @@ class EnergieLangzeitService:
             "rows": [
                 {
                     "key": row["key"], "group": tr(row["group"]), "label": tr(row["label"]),
-                    "better": row["better"], "cells": cells[row["key"]],
+                    "better": row["better"], "kind": row["kind"], "cells": cells[row["key"]],
                 }
                 for row in visible
             ],

@@ -717,6 +717,19 @@ Verbrauch), rot ungünstig.
   Monat ist in beiden Fällen gleich. „Differenz anzeigen“ blendet die
   Differenzzeile ein oder aus. Die Auswahl (Spalten, Vorjahr, Differenz) merkt
   sich der Browser.
+- **Quoten und Speicher:** Unter dem Verbrauch stehen Eigenverbrauch und Autarkie
+  (wie in der Übersicht gerechnet); ihre Differenz zum Vorjahr steht in
+  Prozentpunkten (PP). Mit zugeordneten Speichern kommen die Zeilen Ladung und
+  Entladung dazu, ohne Wertung in Grün oder Rot.
+- **PV-Anlage, wetterbereinigt:** Trägt ein Erzeuger in der Einrichtung eine
+  **Anlagenleistung** (kWp), erscheint der **spezifische Ertrag** (kWh je kWp).
+  Ist im Wetterdashboard zusätzlich die **Strahlung** (W/m²) zugeordnet, zeigt
+  **Ertrag je Einstrahlung**, wie viel der eingestrahlten Energie die Anlage
+  erzeugt hat; damit lässt sich ein schwächeres Jahr von einem schlechteren
+  Sommer unterscheiden. Es zählen nur Erzeuger mit Leistung. Hat der Sensor in
+  einem Zeitraum weniger als 80 % der Stundenwerte, steht dort „–“. Der Sensor
+  misst waagerecht, die Dachflächen sind unterschiedlich geneigt; der Wert ist
+  deshalb ein Vergleichswert über die Jahre, kein Wirkungsgrad.
 - **Verbrauch** ist hier die Bilanz Erzeugung + Netzbezug + Speicherentladung −
   Einspeisung − Speicherladung, dieselbe Rechnung wie in den Trends und im
   Monatsverlauf des Berichts. „Dieses Jahr“ vergleicht kalendarisch (1.1. bis

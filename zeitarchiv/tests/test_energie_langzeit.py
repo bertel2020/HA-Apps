@@ -71,12 +71,18 @@ def _zelle(daten: dict, zeile: str, spalte: str) -> dict:
 def test_summen_je_rolle_und_verbrauch_als_bilanz(service) -> None:
     config = _anlage(service)
     daten = service.compute_table(config, lz.TableRequest(columns=["monat"], vorjahr=False), NOW)
-    assert [r["key"] for r in daten["rows"]] == ["erzeugung", "einspeisung", "netzbezug", "verbrauch"]
+    assert [r["key"] for r in daten["rows"]] == [
+        "erzeugung", "einspeisung", "netzbezug", "verbrauch", "eigenverbrauch", "autarkie",
+    ]
     assert _zelle(daten, "erzeugung", "monat")["cur"] == pytest.approx(10.0)
     assert _zelle(daten, "einspeisung", "monat")["cur"] == pytest.approx(3.0)
     assert _zelle(daten, "netzbezug", "monat")["cur"] == pytest.approx(6.0)
     assert _zelle(daten, "verbrauch", "monat")["cur"] == pytest.approx(13.0)  # 10 + 6 − 3
     assert "vj" not in _zelle(daten, "verbrauch", "monat")
+    # Quoten wie in compute_flow: Eigenverbrauch = (Erzeugung − Einspeisung) / Erzeugung, Autarkie = 1 − Bezug / Verbrauch.
+    assert _zelle(daten, "eigenverbrauch", "monat")["cur"] == pytest.approx(70.0)
+    assert _zelle(daten, "autarkie", "monat")["cur"] == pytest.approx(53.8)
+    assert next(r for r in daten["rows"] if r["key"] == "autarkie")["kind"] == "pct"
 
 
 def test_speicher_geht_in_die_bilanz_ein(service) -> None:
@@ -101,8 +107,10 @@ def test_zeilen_ohne_zugeordnete_rolle_fehlen(service) -> None:
     _zaehler(service, "sensor.pv", (_ts(2), 500.0), (_ts(12), 510.0))
     config = _config(erzeuger=[{"entity_id": "sensor.pv", "name": "PV"}])
     daten = service.compute_table(config, lz.TableRequest(columns=["monat"], vorjahr=False), NOW)
-    assert [r["key"] for r in daten["rows"]] == ["erzeugung", "verbrauch"]
+    assert [r["key"] for r in daten["rows"]] == ["erzeugung", "verbrauch", "eigenverbrauch", "autarkie"]
     assert _zelle(daten, "verbrauch", "monat")["cur"] == pytest.approx(10.0)
+    assert _zelle(daten, "eigenverbrauch", "monat")["cur"] == pytest.approx(100.0)   # ohne Einspeisung-Rolle: alles selbst verbraucht
+    assert _zelle(daten, "autarkie", "monat")["cur"] is None                          # ohne Netzbezug-Rolle kein Autarkiegrad
 
 
 def test_stichtag_begrenzt_das_fenster_auf_das_ende_dieses_tages(service) -> None:
@@ -160,7 +168,7 @@ def test_route_antwortet_409_ohne_einrichtung_und_sonst_mit_tabelle(client) -> N
         assert antwort.status_code == 200
         daten = antwort.json()
         assert [c["key"] for c in daten["columns"]] == ["monat"]
-        assert [r["key"] for r in daten["rows"]] == ["netzbezug", "verbrauch"]
+        assert [r["key"] for r in daten["rows"]] == ["netzbezug", "verbrauch", "autarkie"]
         assert daten["rows"][0]["cells"]["monat"]["cur"] is None  # Entität ohne Daten, kein 0
     finally:
         index.set_setting(ed.SETTING_CONFIG, "")
@@ -315,5 +323,97 @@ def test_months_route_antwortet_409_ohne_einrichtung_und_sonst_mit_den_rollen(cl
         daten = antwort.json()
         assert [r["key"] for r in daten["roles"]] == ["netzbezug", "verbrauch"]
         assert daten["years"][0] == daten["current"]["year"]
+    finally:
+        index.set_setting(ed.SETTING_CONFIG, "")
+
+
+# -- Speicher, Quoten und PV wetterbereinigt (P3) -------------------------------------------------
+
+
+def test_speicherzeilen_zeigen_ladung_und_entladung_neutral(service) -> None:
+    _zaehler(service, "sensor.laden", (_ts(2), 200.0), (_ts(12), 205.0))
+    _zaehler(service, "sensor.entladen", (_ts(2), 300.0), (_ts(12), 303.0))
+    config = _anlage(service, speicher=[{
+        "name": "Speicher", "laden_entity_id": "sensor.laden", "entladen_entity_id": "sensor.entladen",
+    }])
+    daten = service.compute_table(config, lz.TableRequest(columns=["monat"], vorjahr=False), NOW)
+    assert _zelle(daten, "ladung", "monat")["cur"] == pytest.approx(5.0)
+    assert _zelle(daten, "entladung", "monat")["cur"] == pytest.approx(3.0)
+    assert next(r for r in daten["rows"] if r["key"] == "ladung")["better"] is None   # mehr Ladung ist weder gut noch schlecht
+    # Die Quoten rechnen mit dem Speicher: Verbrauch 11 (10 + 6 + 3 − 3 − 5), Autarkie 1 − 6 / 11.
+    assert _zelle(daten, "autarkie", "monat")["cur"] == pytest.approx(45.5)
+
+
+def _strahlung(service, entity_id: str, watt: float, von_tag: int, bis_tag: int) -> None:
+    """Stündliche Messwerte W/m² vom Beginn des ersten bis zum Ende des letzten Tages."""
+    service.index.get_or_create_entity(entity_id, "sensor", "measurement", "W/m²")
+    for tag in range(von_tag, bis_tag + 1):
+        for stunde in range(24):
+            ts = _ts(tag, stunde)
+            hotbuffer.append(service.data_dir, entity_id, ts, watt, TZ)
+            service.index.record_write(entity_id, ts, watt)
+
+
+def _pv_anlage(service, kwp: float = 5.0) -> dict:
+    _zaehler(service, "sensor.pv", (_ts(2), 500.0), (_ts(12), 566.0))          # 66 kWh Ertrag
+    return _config(erzeuger=[{"entity_id": "sensor.pv", "name": "PV", "kwp": kwp}])
+
+
+def test_wetterbereinigte_zeilen_rechnen_ertrag_je_kwp_und_einstrahlung(service) -> None:
+    config = _pv_anlage(service)
+    _strahlung(service, "sensor.strahlung", 500.0, 2, 12)                       # 264 h mit 500 W/m² = 132 kWh/m²
+    service.radiation_entity = lambda: "sensor.strahlung"
+    daten = service.compute_table(
+        config, lz.TableRequest(columns=["monat"], vorjahr=False, at="2026-08-12"), NOW,
+    )
+    assert _zelle(daten, "spezifisch", "monat")["cur"] == pytest.approx(13.2)   # 66 kWh / 5 kWp
+    assert _zelle(daten, "einstrahlung", "monat")["cur"] == pytest.approx(10.0)  # 66 / (5 × 132)
+    assert next(r for r in daten["rows"] if r["key"] == "spezifisch")["kind"] == "spec"
+
+
+def test_zu_wenig_einstrahlungswerte_ergeben_keinen_vergleich(service) -> None:
+    config = _pv_anlage(service)
+    _strahlung(service, "sensor.strahlung", 500.0, 2, 3)                        # nur 48 von 288 Stunden
+    service.radiation_entity = lambda: "sensor.strahlung"
+    daten = service.compute_table(
+        config, lz.TableRequest(columns=["monat"], vorjahr=False, at="2026-08-12"), NOW,
+    )
+    assert _zelle(daten, "spezifisch", "monat")["cur"] == pytest.approx(13.2)   # der Ertrag je kWp braucht keine Strahlung
+    assert _zelle(daten, "einstrahlung", "monat")["cur"] is None               # Lücken würden das Ergebnis verfälschen
+
+
+def test_wetterbereinigte_zeilen_brauchen_leistung_und_strahlung(service) -> None:
+    ohne_kwp = _pv_anlage(service, kwp=0.0)
+    daten = service.compute_table(ohne_kwp, lz.TableRequest(columns=["monat"], vorjahr=False), NOW)
+    assert "spezifisch" not in [r["key"] for r in daten["rows"]]
+    mit_kwp = _pv_anlage(service)
+    daten = service.compute_table(mit_kwp, lz.TableRequest(columns=["monat"], vorjahr=False), NOW)
+    keys = [r["key"] for r in daten["rows"]]
+    assert "spezifisch" in keys and "einstrahlung" not in keys                   # ohne Strahlungs-Entität nur der Ertrag je kWp
+
+
+def test_nur_erzeuger_mit_leistung_gehen_in_die_wetterbereinigung_ein() -> None:
+    config = _config(erzeuger=[
+        {"entity_id": "sensor.a", "kwp": 9.8}, {"entity_id": "sensor.b"}, {"entity_id": "sensor.c", "kwp": "5"},
+        {"entity_id": "sensor.d", "kwp": 0},
+    ])
+    assert lz.pv_entities(config) == [("sensor.a", 9.8), ("sensor.c", 5.0)]
+
+
+def test_anlagenleistung_wird_in_der_einrichtung_je_erzeuger_gespeichert(client) -> None:
+    from app.main import index
+
+    index.set_setting(ed.SETTING_CONFIG, "")
+    antwort = client.post("/energiedashboard/setup", data={
+        "netzbezug": "sensor.setup_netz",
+        "erzeuger_entity_id": ["sensor.setup_pv1", "sensor.setup_pv2", "sensor.setup_pv3"],
+        "erzeuger_name": ["Dach", "Balkon", "Garage"],
+        "erzeuger_kwp": ["9,8", "", "0"],
+    })
+    try:
+        assert antwort.status_code == 200
+        erzeuger = ed._load_config(index)["erzeuger"]
+        assert erzeuger[0] == {"entity_id": "sensor.setup_pv1", "name": "Dach", "kwp": 9.8}
+        assert "kwp" not in erzeuger[1] and "kwp" not in erzeuger[2]            # leer oder nicht positiv: nicht angegeben
     finally:
         index.set_setting(ed.SETTING_CONFIG, "")

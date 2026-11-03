@@ -185,7 +185,8 @@
   // "Verschieben bewegt nur das Namensfeld". Mit row._key als Schlüssel
   // erkennt Alpine die Zeile als tatsächlich verschoben und baut den
   // kompletten DOM-Knoten (inkl. entityPicker) neu auf.
-  erzeuger: ({{ (config.erzeuger or []) | tojson }}).map((row, i) => ({...row, _key: "e" + i})),
+  // kwp lokalisiert vorformatiert (Komma statt Punkt), wie capacity_kwh unten.
+  erzeuger: ({{ (config.erzeuger or []) | tojson }}).map((row, i) => ({...row, kwp: row.kwp != null ? NumberFormat.fmt(row.kwp) : "", _key: "e" + i})),
   // capacity_kwh lokalisiert vorformatiert (Komma statt Punkt) fürs erste
   // Anzeigen — dieselbe Notwendigkeit wie beim bisherigen number_field()
   // (siehe dort), hier aber innerhalb einer dynamischen x-for-Liste, wo ein
@@ -275,7 +276,7 @@
   // reaktiven DOM-Update (neue x-for-Iteration) existiert.
   addErzeuger() {
     const key = "e" + Date.now() + Math.random();
-    const row = {entity_id: "", name: "", _key: key};
+    const row = {entity_id: "", name: "", kwp: "", _key: key};
     this.erzeuger.push(row);
     this.draftRow = {...row};
     this.activePopup = key;
@@ -565,6 +566,14 @@
                       {{ entity_field('erzeuger_entity_id_draft', 'draftRow.entity_id', "(id) => { draftRow.entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
                       {% call hint_body() %}{{ _('Zähler „von diesem Erzeuger produzierte Energie" (kWh, steigend).') }}{% endcall %}
                     </div>
+                    <div class="field">
+                      <label>{{ _("Anlagenleistung") }} {{ hint_button(_('Anlagenleistung')) }}</label>
+                      <span class="edash-unit-input">
+                        <input type="text" inputmode="decimal" x-model="draftRow.kwp" class="edash-fixed-price-input">
+                        <span class="edash-unit-suffix">{{ _("kWp") }}</span>
+                      </span>
+                      {% call hint_body() %}{{ _("Nennleistung der Anlage, nur für den Vergleich der Erzeugung mit der Einstrahlung im Reiter „Langzeit“ (spezifischer Ertrag). Optional.") }}{% endcall %}
+                    </div>
                   </div>
                   <div class="edash-dialog-footer" style="justify-content:space-between;">
                     <button type="button" class="btn btn-danger" @click="removeRow(erzeuger, idx, row, t('Erzeuger'))">{{ _("Erzeuger entfernen") }}</button>
@@ -589,6 +598,7 @@
         <span>
           <input type="hidden" name="erzeuger_name" :value="row.name">
           <input type="hidden" name="erzeuger_entity_id" :value="row.entity_id">
+          <input type="hidden" name="erzeuger_kwp" :value="row.kwp">
         </span>
       </template>
     </section>
