@@ -379,13 +379,22 @@
         if (r.has_import) columns.push({field: 'autarkie', label: t('Autarkie 100 %')});
         if (r.has_export) columns.push({field: 'einspeisung_ueber_verbrauch', label: t('Einspeisung über Verbrauch')});
         if (r.has_pv) columns.push({field: 'kaum_pv', label: t('Kaum Erzeugung')});
-        let html = `<thead><tr><th></th>${columns.map((c) => `<th class="wt-cur wt-sep">${escapeHtml(c.label)}</th>`).join('')}`
-          + `<th class="wt-vj">${escapeHtml(t('Ausgewertete Tage'))}</th></tr></thead><tbody>`;
+        const share = (value, days) => {
+          if (!days) return '';
+          const pct = value / days * 100;
+          return value > 0 && pct < 1 ? '< 1 %' : `${num(pct, 0)} %`;
+        };
+        let html = `<thead><tr><th></th><th class="wt-vj wt-kt-days">${escapeHtml(t('Ausgewertete Tage'))}</th>`
+          + `${columns.map((c) => `<th class="wt-cur wt-sep">${escapeHtml(c.label)}</th>`).join('')}</tr></thead><tbody>`;
         const current = new Date().getFullYear();
         for (const row of r.kenntage) {
-          html += `<tr><th scope="row">${row.year}${row.year === current ? '*' : ''}</th>`;
-          for (const c of columns) html += `<td class="wt-sep"><span class="wt-v">${escapeHtml(num(row[c.field], 0))}</span></td>`;
-          html += `<td class="wt-vj"><span class="wt-v">${escapeHtml(num(row.days, 0))}</span></td></tr>`;
+          html += `<tr><th scope="row">${row.year}${row.year === current ? '*' : ''}</th>`
+            + `<td class="wt-vj wt-kt-days"><span class="wt-v">${escapeHtml(num(row.days, 0))}</span></td>`;
+          for (const c of columns) {
+            html += `<td class="wt-sep"><span class="wt-v">${escapeHtml(num(row[c.field], 0))}</span>`
+              + `<span class="wt-sub">${escapeHtml(share(row[c.field], row.days))}</span></td>`;
+          }
+          html += '</tr>';
         }
         table.innerHTML = html + '</tbody>';
       },
