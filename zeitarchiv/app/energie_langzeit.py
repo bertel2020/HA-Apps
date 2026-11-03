@@ -34,7 +34,7 @@ from .storage import query as query_mod
 from .storage import rollup as rollup_mod
 from .storage.index import Index
 
-COLUMN_KEYS = ("vormonat", "monat", "jahr")
+COLUMN_KEYS = ("monat", "vormonat", "jahr")
 #: Spalte -> (Zeitraum für query_mod._window, Versatz)
 COLUMN_WINDOWS = {
     "vormonat": ("month", -1),

@@ -3,7 +3,7 @@
 // Aufbau und Bedienung wie die Vergleichstabelle des Wetterdashboards (wetter.js). Kalenderangaben laufen
 // über ServerTime in der Zeitzone des Servers.
 (function () {
-  const COLUMN_KEYS = ['vormonat', 'monat', 'jahr'];
+  const COLUMN_KEYS = ['monat', 'vormonat', 'jahr'];
   const STORE_KEY = 'zeitarchiv.energie.langzeit';
   const LOCALE = window.ZA_FORMAT;
   const ZT = window.ServerTime;
