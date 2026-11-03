@@ -199,7 +199,7 @@ DEFAULT_HUB_NAME = N_("Haus")
 # dem Schnitt der Vorperioden — ein Prozentsatz ist dafür die richtige Größe,
 # weil beide Seiten dieselbe Größenordnung haben. Die Ausreißer-Erkennung sucht
 # dagegen unplausible EINZELwerte und misst deshalb in Vielfachen des Üblichen.
-ANOMALIE_SCHWELLE_LABELS = {"off": N_("Aus"), "25": "25 %", "50": "50 %", "100": "100 %"}
+ANOMALIE_SCHWELLE_LABELS = {"off": N_("Aus"), "25": "25 %", "50": "50 %", "100": "100 %", "200": "200 %", "300": "300 %"}
 # Anzahl vorheriger Perioden, deren Schnitt als "üblicher" Vergleichswert
 # dient — mehrere statt nur der einen Vorperiode, damit ein Gerät, das
 # einfach nicht jeden Tag läuft (z. B. Waschmaschine), nicht bei jedem
@@ -2870,6 +2870,7 @@ class EnergieDashboardService:
             "speicher_breakdown": speicher_breakdown,
             "speicher_soc_now_breakdown": soc_now_breakdown,
             "anomalien": anomalien,
+            "anomalien_aktiv": anomalie_schwelle != "off",
             "quality": {"plausible": quality_plausible, "checks": quality_checks},
             **({"detail": detail} if detail is not None else {}),
         }

@@ -332,6 +332,7 @@
       speicherBreakdown: [],
       speicherSocNowBreakdown: [],
       anomalien: [],
+      anomalienAktiv: true,
       // Die vier Ring-Trends kommen NICHT mehr mit load() mit, sondern erst
       // beim ersten Öffnen eines Trend-Popups (openTrend/loadTrends) — sie
       // machten serverseitig den Großteil der Rechenzeit eines /data-Requests
@@ -1040,6 +1041,7 @@
           this.speicherBreakdown = data.speicher_breakdown || [];
           this.speicherSocNowBreakdown = data.speicher_soc_now_breakdown || [];
           this.anomalien = data.anomalien || [];
+          this.anomalienAktiv = data.anomalien_aktiv !== false;
           this.renderChart(data);
           this.renderShareChart(this.verbraucherLeaves);
           this.renderVersorgungChart(this.versorgungBreakdown);

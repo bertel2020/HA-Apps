@@ -520,7 +520,7 @@
     "Name des zentralen Knotens": "Name of the central node",
     "Haus": "House",
     "Beschriftung des Sammelknotens in der Sankey-Mitte.": "Label of the collecting node in the middle of the Sankey diagram.",
-    "Schwellenwert für die Auffälligkeiten-Markierung. „Aus\" deaktiviert die Prüfung.": "Threshold for the anomaly marker. “Off” disables the check.",
+    "Schwellenwert für die Auffälligkeiten-Markierung. „Aus\" deaktiviert die Prüfung. Sie vergleicht einen Verbraucher mit dem Schnitt der letzten Perioden und passt am besten zu regelmäßigem Verbrauch. Bei wechselnden Gewohnheiten oder wetterabhängiger Heizung schlägt sie oft an; dann hilft eine höhere Schwelle oder „Aus\".": "Threshold for the anomaly marker. “Off” disables the check. It compares a consumer with the average of the previous periods and suits regular consumption best. With changing habits or weather-dependent heating it often triggers; a higher threshold or “Off” helps then.",
     "Sichtbare Kacheln": "Visible tiles",
     "Autarkie &amp; Speicher": "Self-sufficiency &amp; storage",
     "Versorgungsanteile": "Supply shares",

@@ -65,6 +65,10 @@
 
 ### Geändert
 
+- **Energiedashboard, Auffälligkeiten**: Die Prüfung lässt sich besser anpassen.
+  - Neue Schwellen 200 % und 300 %, ein Hinweis in den Einstellungen nennt, wann „Aus“ sinnvoll ist
+  - Bei „Aus“ entfallen Zeile, Liste und Vergleichshinweis im Status-Dialog
+
 - **CSV-Export, Assistent**: Der Assistent ist übersichtlicher.
   - Die Schrittleiste sitzt als Kopf einer Karte und zeigt die bisherige Wahl
   - Die Leiste mit „Weiter“ bleibt am unteren Rand sichtbar
@@ -203,6 +207,10 @@
     switched on and off
 
 #### Changed
+
+- **Energy dashboard, anomalies**: The check can be adjusted more easily.
+  - New thresholds 200 % and 300 %, a note in the settings says when "Off" makes sense
+  - With "Off", the row, list and comparison note disappear from the status dialog
 
 - **CSV export, wizard**: The wizard is clearer.
   - The step bar is the header of a card and shows the choices made so far

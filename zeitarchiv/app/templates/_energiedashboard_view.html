@@ -126,10 +126,10 @@
        geprüft wurde" statt nur bei Problemen zu erscheinen), die Treffer
        selbst als eigene Liste darunter statt als Ja/Nein-Detail, weil es
        hier keine feste Anzahl Prüfungen, sondern eine Rangliste mit Zahlen
-       ist. Ist die Schwelle auf "Aus" gestellt, bleibt anomalien
-       serverseitig leer — die Zeile zeigt dann "Keine Auffälligkeiten"
-       (nicht von "geprüft, nichts gefunden" unterschieden). #}
-    <div class="edash-quality-row" :class="{'is-warn': anomalien.length > 0}">
+       ist. Ist die Schwelle auf "Aus" gestellt, entfallen Zeile, Liste und
+       Vergleichshinweis ganz (anomalienAktiv), statt "Keine Auffälligkeiten"
+       zu behaupten, ohne geprüft zu haben. #}
+    <div class="edash-quality-row" x-show="anomalienAktiv" :class="{'is-warn': anomalien.length > 0}">
       <div class="edash-quality-icon" x-text="anomalien.length ? '!' : '✓'"></div>
       <div>
         <strong x-text="anomalien.length ? (anomalien.length === 1 ? t('1 Auffälligkeit') : t('{count} Auffälligkeiten', {count: anomalien.length})) : t('Keine Auffälligkeiten')"></strong>
@@ -150,7 +150,7 @@
     {# Vergleichsbasis offenlegen: wogegen verglichen wird, hängt vom Zeitraum ab
        (siehe ANOMALIE_BASELINE_STEP), und die laufende Periode ist erst am Ende
        voll — ohne den Hinweis wirkt eine spät erscheinende Auffälligkeit wie ein Fehler. #}
-    <p class="hint hint-status" style="margin:8px 0 0;" x-text="({hour: t('Verglichen wird mit derselben Stunde der letzten drei Tage.'), day: t('Verglichen wird mit dem gleichen Wochentag der letzten drei Wochen.'), month: t('Verglichen wird mit demselben Monat der Vorjahre, ohne Vorjahresdaten mit den letzten drei Monaten.'), year: t('Verglichen wird mit den letzten drei Jahren.')})[range] + (offset === 0 ? ' ' + t('Die laufende Periode ist noch nicht vollständig, Auffälligkeiten können daher erst später erscheinen.') : '')"></p>
+    <p class="hint hint-status" style="margin:8px 0 0;" x-show="anomalienAktiv" x-text="({hour: t('Verglichen wird mit derselben Stunde der letzten drei Tage.'), day: t('Verglichen wird mit dem gleichen Wochentag der letzten drei Wochen.'), month: t('Verglichen wird mit demselben Monat der Vorjahre, ohne Vorjahresdaten mit den letzten drei Monaten.'), year: t('Verglichen wird mit den letzten drei Jahren.')})[range] + (offset === 0 ? ' ' + t('Die laufende Periode ist noch nicht vollständig, Auffälligkeiten können daher erst später erscheinen.') : '')"></p>
   </dialog>
   {% endif %}
 
