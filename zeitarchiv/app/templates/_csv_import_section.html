@@ -217,6 +217,10 @@
       {% endfor %}
     </table>
   </div>
+  {# Datum ohne Uhrzeit (TT.MM.JJJJ, ISO nur mit Datum): Die Uhrzeit ist 00:00 Uhr, das sagt sonst nichts. #}
+  {% set midnight = namespace(all=read_as|length > 0) %}
+  {% for r in read_as %}{% if r.ts is none or not r.ts.endswith(" 00:00") %}{% set midnight.all = false %}{% endif %}{% endfor %}
+  {% if midnight.all %}<p class="hint hint-status" style="margin:0 0 6px;">{{ _("Steht in der Datei keine Uhrzeit, gilt 00:00 Uhr in der Zeitzone der App.") }}</p>{% endif %}
   <p class="hint hint-status" style="margin:0 0 14px;">{{ _("{total_lines} Datenzeile(n) in der Datei &mdash; Vorschau zeigt die ersten {sample_rows}.", total_lines=total_lines, sample_rows=(sample_rows | length)) }}</p>
 
   {# hx-trigger="load" wie beim Symcon-Import: Wird die Seite neu geladen,

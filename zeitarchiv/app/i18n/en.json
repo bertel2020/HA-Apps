@@ -1329,6 +1329,7 @@
     "mehrdeutig": "ambiguous",
     "Ein Trenner vor drei Ziffern kann Dezimal- oder Tausenderpunkt sein. Der Import liest ihn als Dezimaltrenner.": "A separator before three digits can be a decimal or a thousands separator. The import reads it as a decimal separator.",
     "TT.MM.JJJJ (z. B. 15.01.2026)": "DD.MM.YYYY (e.g. 15.01.2026)",
+    "Steht in der Datei keine Uhrzeit, gilt 00:00 Uhr in der Zeitzone der App.": "If the file contains no time of day, 00:00 in the app's time zone is used.",
     "TT.MM.JJJJ hh:mm (z. B. 15.01.2026 14:30)": "DD.MM.YYYY hh:mm (e.g. 15.01.2026 14:30)",
     "TT.MM.JJJJ hh:mm:ss (z. B. 15.01.2026 14:30:05)": "DD.MM.YYYY hh:mm:ss (e.g. 15.01.2026 14:30:05)",
     "Aus den ersten Zeilen der Datei erkannt. Bei Bedarf ändern.": "Detected from the first rows of the file. Change it if needed.",

@@ -68,6 +68,9 @@
 
 ### Geändert
 
+- **CSV-Import, Vorschau**: Hat die Datei keine Uhrzeit, steht unter „Zeitstempel gelesen als“
+  ein Hinweis, dass 00:00 Uhr gilt.
+
 - **Energiedashboard, Auffälligkeiten**: Die Prüfung lässt sich besser anpassen.
   - Neue Schwellen 200 % und 300 %, ein Hinweis in den Einstellungen nennt, wann „Aus“ sinnvoll ist
   - Bei „Aus“ entfallen Zeile, Liste und Vergleichshinweis im Status-Dialog
@@ -242,6 +245,9 @@
     switched on and off
 
 #### Changed
+
+- **CSV import, preview**: If the file has no time of day, a note under "Timestamp read as"
+  says that 00:00 is used.
 
 - **Energy dashboard, anomalies**: The check can be adjusted more easily.
   - New thresholds 200 % and 300 %, a note in the settings says when "Off" makes sense
