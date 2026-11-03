@@ -25,7 +25,9 @@ from __future__ import annotations
 import heapq
 import itertools
 import math
+import queue
 import re
+import threading
 import zipfile
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
@@ -260,6 +262,56 @@ def _line(cells: list[str], fmt: CsvFormat) -> str:
     return fmt.sep.join(cells) + "\r\n"
 
 
+_STREAM_QUEUE_CHUNKS = 8
+_STREAM_POLL_SECONDS = 0.2
+_STREAM_DONE = object()
+
+
+def _locked_stream(lock: Callable[[], object], produce: Callable[[], Iterator[str]]) -> Iterator[str]:
+    """Reicht die Textblöcke von `produce()` weiter, ohne dass der aufrufende Thread die Sperre hält.
+
+    Die Entitätssperre des Coordinators ist ein RLock und gehört dem Thread, der sie nimmt. Ein Generator in
+    einer StreamingResponse wird aber Block für Block in wechselnden Worker-Threads weitergeschaltet — nähme er die
+    Sperre selbst, liefe die Freigabe in einem anderen Thread ("cannot release un-acquired lock"), und jedes spätere
+    exclusive() (Backup, Retention, Restore) bliebe hängen. Deshalb liest ein eigener Thread unter der Sperre und
+    gibt sie selbst wieder frei; der Generator holt die Blöcke über eine begrenzte Warteschlange ab (Gegendruck,
+    der erste Block kommt wie bisher sofort). Bricht der Abnehmer ab, endet der Thread beim nächsten Block."""
+    chunks: queue.Queue = queue.Queue(maxsize=_STREAM_QUEUE_CHUNKS)
+    stop = threading.Event()
+
+    def put(item: object) -> bool:
+        while not stop.is_set():
+            try:
+                chunks.put(item, timeout=_STREAM_POLL_SECONDS)
+                return True
+            except queue.Full:
+                continue
+        return False
+
+    def run() -> None:
+        outcome: object = _STREAM_DONE
+        try:
+            with lock():  # type: ignore[attr-defined]
+                for chunk in produce():
+                    if not put(chunk):
+                        return
+        except BaseException as exc:  # an den Abnehmer weiterreichen, der sie auslöst
+            outcome = exc
+        put(outcome)
+
+    threading.Thread(target=run, name="zeitarchiv-export", daemon=True).start()
+    try:
+        while True:
+            item = chunks.get()
+            if item is _STREAM_DONE:
+                return
+            if isinstance(item, BaseException):
+                raise item
+            yield item  # type: ignore[misc]
+    finally:
+        stop.set()
+
+
 def _limit_error(max_rows: int) -> Exception:
     return cleanup.ResultLimitExceeded(tr("CSV-Export ist auf {MAX_EXPORT_ROWS} Zeilen begrenzt", MAX_EXPORT_ROWS=max_rows))
 
@@ -287,14 +339,14 @@ def csv_chunks(
     max_rows: int,
     fmt: CsvFormat = CsvFormat(),
 ) -> Iterator[str]:
-    """Die CSV einer Entität in Textblöcken. Hält die Entitätssperre, solange sie
-    gelesen wird (wie das Schreiben in archivierten Monaten)."""
+    """Die CSV einer Entität in Textblöcken. Die Entitätssperre liegt beim Lesen (wie beim Schreiben in
+    archivierten Monaten), gehalten von einem eigenen Thread — siehe _locked_stream."""
     entity_id = entity["entity_id"]
     is_state = entity["aggregation_type"] == "state"
     # Zustände gibt es nur roh: eine Summe oder ein Mittel über Indizes sagt nichts.
     if is_state:
         resolution = "raw"
-    with coordinator.entity(entity_id):
+    def produce() -> Iterator[str]:
         yield (_BOM if fmt.bom else "") + _line(_time_columns(fmt) + ["state" if is_state else "value"], fmt)
         texts = {row["idx"]: row["text"] for row in index.get_state_map(entity_id)} if is_state else {}
         window = entity_window(entity, start_ts, end_ts)
@@ -320,6 +372,8 @@ def csv_chunks(
                 buffer.clear()
         if buffer:
             yield "".join(buffer)
+
+    yield from _locked_stream(lambda: coordinator.entity(entity_id), produce)
 
 
 def _series(data_dir: Path, index: Index, entity, start_ts, end_ts, resolution: str, tz: ZoneInfo, max_rows: int):
@@ -356,7 +410,8 @@ def long_chunks(
         mean = resolution != "raw" and entity["aggregation_type"] == "standard"
         head = [_cell(names[entity_id], fmt)]
         tail = _cell(entity["unit"] or "", fmt)
-        with coordinator.entity(entity_id):
+        def produce(entity=entity, mean=mean, head=head, tail=tail) -> Iterator[str]:
+            nonlocal emitted
             buffer: list[str] = []
             for ts, value in _series(data_dir, index, entity, start_ts, end_ts, resolution, tz, max_rows - emitted):
                 emitted += 1
@@ -368,6 +423,8 @@ def long_chunks(
                     buffer.clear()
             if buffer:
                 yield "".join(buffer)
+
+        yield from _locked_stream(lambda entity_id=entity_id: coordinator.entity(entity_id), produce)
 
 
 def _tagged(position: int, rows: Iterable[tuple[float, float]]) -> Iterator[tuple[float, int, float]]:
@@ -398,7 +455,7 @@ def wide_chunks(
         for entity in entities
     ]
     means = [entity["aggregation_type"] == "standard" for entity in entities]
-    with coordinator.entities([entity["entity_id"] for entity in entities]):
+    def produce() -> Iterator[str]:
         yield (_BOM if fmt.bom else "") + _line(_time_columns(fmt) + heads, fmt)
         streams = [
             _tagged(position, _series(data_dir, index, entity, start_ts, end_ts, resolution, tz, max_rows))
@@ -419,6 +476,8 @@ def wide_chunks(
                 buffer.clear()
         if buffer:
             yield "".join(buffer)
+
+    yield from _locked_stream(lambda: coordinator.entities([entity["entity_id"] for entity in entities]), produce)
 
 
 def estimate_joint_rows(

@@ -18,6 +18,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import formats
 from .formatting import format_int, format_size, format_value
+from .route_support import UI_EXCLUSIVE_TIMEOUT_SECONDS
 from .storage import import_reports
 from .storage.coordinator import StorageCoordinator
 
@@ -121,8 +122,9 @@ class ReportService:
         date_from: str = "", date_to: str = "", sort: str = "finished_at",
         direction: str = "desc", page: int = 1, page_size: int = 20,
     ) -> dict:
-        with self.deps.coordinator.exclusive():
-            all_reports = [self.view(report) for report in import_reports.list_all(self.deps.data_dir)]
+        # Lesen ohne Sperre: Reports werden atomar geschrieben, ein parallel gelöschter fehlt einfach. Ein
+        # exclusive() hier hielte während eines laufenden Imports die gesamte Aufnahme an.
+        all_reports = [self.view(report) for report in import_reports.list_all(self.deps.data_dir)]
         needle = search.strip().lower()
 
         def matches(report: dict) -> bool:
@@ -189,8 +191,7 @@ class ReportService:
 
         @router.get("/reports/{report_id}", response_class=HTMLResponse)
         def report_detail(request: Request, report_id: str) -> HTMLResponse:
-            with deps.coordinator.exclusive():
-                report = import_reports.load(deps.data_dir, report_id)
+            report = import_reports.load(deps.data_dir, report_id)
             if report is None:
                 raise HTTPException(status_code=404, detail=tr("Report nicht gefunden"))
             return deps.templates.TemplateResponse(
@@ -199,18 +200,20 @@ class ReportService:
 
         @router.get("/reports/{report_id}/download")
         def report_download(report_id: str) -> Response:
-            with deps.coordinator.exclusive():
-                path = import_reports.download_path(deps.data_dir, report_id)
-                if path is None:
-                    raise HTTPException(status_code=404, detail=tr("Report nicht gefunden"))
+            path = import_reports.download_path(deps.data_dir, report_id)
+            if path is None:
+                raise HTTPException(status_code=404, detail=tr("Report nicht gefunden"))
+            try:
                 content = path.read_bytes()
+            except OSError:
+                raise HTTPException(status_code=404, detail=tr("Report nicht gefunden")) from None
             return Response(content=content, media_type="application/json", headers={
                 "Content-Disposition": f'attachment; filename="{path.name}"'
             })
 
         @router.post("/reports/{report_id}/delete", response_class=RedirectResponse)
         def report_delete(request: Request, report_id: str) -> RedirectResponse:
-            with deps.coordinator.exclusive():
+            with deps.coordinator.exclusive(timeout=UI_EXCLUSIVE_TIMEOUT_SECONDS):
                 if not import_reports.delete(deps.data_dir, report_id):
                     raise HTTPException(status_code=404, detail=tr("Report nicht gefunden"))
             return RedirectResponse(
@@ -219,7 +222,7 @@ class ReportService:
 
         @router.post("/reports/delete-all", response_class=RedirectResponse)
         def reports_delete_all(request: Request) -> RedirectResponse:
-            with deps.coordinator.exclusive():
+            with deps.coordinator.exclusive(timeout=UI_EXCLUSIVE_TIMEOUT_SECONDS):
                 import_reports.delete_all(deps.data_dir)
             return RedirectResponse(
                 url=f"{deps.app_root_context(request)['app_root']}/import?tab=reports", status_code=303

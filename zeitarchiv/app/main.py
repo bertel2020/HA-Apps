@@ -166,7 +166,14 @@ from .wetter_routes import WetterDependencies, WetterService, is_wetter_configur
 from . import cleanup_stats, counter_bulk, data_quality, entity_usage, value_range
 from . import dashboard_tiles
 from .dashboard_tiles import tile_metric_context as _tile_metric_context
-from .route_support import MAX_FORM_FIELDS, UploadLimitExceeded, copy_upload_limited, dir_size, storage_locked
+from .route_support import (
+    MAX_FORM_FIELDS,
+    UI_EXCLUSIVE_TIMEOUT_SECONDS,
+    UploadLimitExceeded,
+    copy_upload_limited,
+    dir_size,
+    storage_locked,
+)
 from . import notices as notices_mod
 from . import version_check
 from .notices import collect_notices
@@ -2110,7 +2117,7 @@ def backup_rollback_restore(request: Request, name: str) -> HTMLResponse:
 
 @app.post("/backup/rollback/delete/{name}", response_class=HTMLResponse)
 def backup_rollback_delete(request: Request, name: str) -> HTMLResponse:
-    with storage_coordinator.exclusive():
+    with storage_coordinator.exclusive(timeout=UI_EXCLUSIVE_TIMEOUT_SECONDS):
         deleted = backup.delete_restore_rollback(DATA_DIR, name)
     if not deleted:
         raise HTTPException(status_code=404, detail=tr("Rollback nicht gefunden"))
@@ -2160,7 +2167,7 @@ def backup_download(filename: str) -> StreamingResponse:
 @app.post("/backup/delete/{filename}", response_class=HTMLResponse)
 def backup_delete(request: Request, filename: str) -> HTMLResponse:
     """Löscht ein einzelnes manuelles Backup nach UI-Bestätigung."""
-    with storage_coordinator.exclusive():
+    with storage_coordinator.exclusive(timeout=UI_EXCLUSIVE_TIMEOUT_SECONDS):
         deleted = backup.delete_backup(BACKUPS_DIR, filename)
     if not deleted:
         raise HTTPException(status_code=404, detail=tr("Backup nicht gefunden"))
@@ -2172,7 +2179,7 @@ def backup_delete_all(request: Request) -> HTMLResponse:
     """Löscht alle vorhandenen Backup-ZIPs nach UI-Bestätigung (nicht den
     Ausführungsverlauf oder Restore-Rollbacks, die bleiben eigenständig über
     ihre jeweiligen Löschaktionen steuerbar)."""
-    with storage_coordinator.exclusive():
+    with storage_coordinator.exclusive(timeout=UI_EXCLUSIVE_TIMEOUT_SECONDS):
         count = backup.delete_all_backups(BACKUPS_DIR)
     message = tr("{count} Backup(s) gelöscht.", count=count) if count else tr("Keine Backups zum Löschen vorhanden.")
     return templates.TemplateResponse(request, "_settings_backup_ready.html", _backup_context(message=message))
@@ -2315,8 +2322,8 @@ def _diagnostics_payload() -> dict:
 
 @app.get("/settings/diagnostics")
 def settings_diagnostics_download() -> Response:
-    with storage_coordinator.exclusive():
-        payload = _diagnostics_payload()
+    # Ohne Sperre: nur Index-Werte und Verzeichnisgrößen, ein parallel aufräumender Import wird toleriert.
+    payload = _diagnostics_payload()
     filename = f"zeitarchiv-diagnose-{datetime.now(TZ).strftime('%Y%m%d-%H%M%S')}.json"
     return Response(
         content=json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
@@ -2350,11 +2357,13 @@ def _ingestion_rate_per_second(snapshots: list[dict], window_seconds: float) -> 
 
 
 @app.get("/statistik", response_class=HTMLResponse)
-@_storage_locked(lambda _args: [row["entity_id"] for row in index.list_entities()])
 def statistik_view(request: Request) -> HTMLResponse:
     """Allgemeine Statistik (Konzept Abschnitt 03/10) — Aufschlüsselung
     nach Typ/Auflösung/Aufbewahrung plus Wachstumsverlauf aus denselben
-    Schnappschüssen wie die Sparklines auf der Startseite."""
+    Schnappschüssen wie die Sparklines auf der Startseite.
+
+    Ohne Entitätssperren: gelesen werden nur Index-Werte und Verzeichnisgrößen. Eine Sperre auf alle Entitäten
+    hielte dagegen die Aufnahme jeder alphabetisch davor liegenden Entität an, solange ein Import läuft."""
     overview = index.get_overview()
     by_type = [
         {

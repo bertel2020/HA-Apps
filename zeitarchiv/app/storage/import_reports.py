@@ -135,7 +135,7 @@ def delete(data_dir: Path, report_id: str) -> bool:
     path = _path(data_dir, report_id)
     if path is None or not path.is_file():
         return False
-    path.unlink()
+    path.unlink(missing_ok=True)
     try:
         path.parent.rmdir()
     except OSError:

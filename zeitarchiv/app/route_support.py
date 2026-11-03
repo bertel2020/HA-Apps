@@ -17,6 +17,11 @@ from .storage.coordinator import StorageCoordinator
 # von einem laufenden Backup/Import gehalten werden kann als das SQLite-Lock.
 STORAGE_LOCKED_TIMEOUT_SECONDS = 30.0
 
+# Wartezeit auf exclusive() in UI-Routen (Löschen eines Reports/Backups). Ein wartender exclusive()-Aufruf hält
+# neue Entitätsoperationen an, auch die Aufnahme aus HA — deshalb kurz, danach 503 statt eines Staus hinter einem
+# langen Import.
+UI_EXCLUSIVE_TIMEOUT_SECONDS = 5.0
+
 # Starlette lässt in request.form() standardmäßig nur 1000 Felder zu. Sammelaktionen
 # schicken je gewähltem Eintrag ein Feld (entity_id, ts); eine ganze Seite mit 1000
 # Zeilen plus Zusatzfeldern scheiterte sonst mit "400 Too many fields", ohne dass
