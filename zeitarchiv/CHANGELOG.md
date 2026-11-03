@@ -4,13 +4,6 @@
 
 ### Neu
 
-- **Tipps**: Sieben neue Tipps im Meldungs-Center, unter anderem zu Wetterdashboard,
-  Kategorien, Langzeit-Reiter, Datenqualität und KI-Zugriff. Die Tipps zu Backup und
-  CSV-Export nennen das externe Backup-Ziel und die gemeinsame Datei.
-
-- **Energiedashboard, Datumsauswahl**: Ein Klick auf das Datum im Energiefluss öffnet den
-  Kalender. Je nach Zeitraum springt er zu einem Tag, Monat oder Jahr.
-
 - **Wetterdashboard**: Eine neue Seite für Wetterwerte, aufgebaut wie das
   Energiedashboard.
   - Außentemperatur, Niederschlag, Luftfeuchte, Luftdruck, Wind, Böe und
@@ -25,20 +18,42 @@
   - Einschalten über die Dashboard-Übersicht; in Backups und selektivem Restore
     enthalten, als Startseite wählbar, Demo-Daten inklusive
 
-- **Entitäten, Kategorien**: Entitäten lassen sich zusätzlich zu den Sternen
-  nach Thema ordnen, zum Beispiel Wärmepumpe oder Solar.
-  - Neuer Reiter **Kategorien**: anlegen, umbenennen, einfärben, per Ziehen
-    sortieren (mit Vorschlägen beim ersten Öffnen)
-  - Entitätenliste: Spalte **Kategorie**, Sortierung und Filter; zugeordnet
-    wird im Auswahlmodus oder in der Konfiguration einer Entität
-  - Der Auswahl-Assistent schlägt eine passende Kategorie vor
-  - Filter auch in „Auswahl & Verlauf“ und im Export
-  - Der selektive Restore stellt Kategorien wieder her
+- **Energiedashboard**
+  - **Reiter Langzeit**: Ein neuer Reiter vergleicht Zeiträume
+    über die Jahre, aufgebaut wie der Langzeit-Teil des Wetterdashboards.
+    - Vergleichstabelle für Dieser Monat, Letzter Monat und Dieses Jahr gegen den
+      Vorjahreszeitraum, mit Stichtag; dazu Eigenverbrauch, Autarkie, Speicher und
+      mit eingetragener Anlagenleistung (kWp je Erzeuger) der Ertrag je kWp und je
+      Einstrahlung
+    - Monatsvergleich der Jahre als Linien mit Mittel und Spanne, Matrix
+      **Jahre × Monate** mit Abweichung vom Mittel
+    - „Was hat sich verändert?“ zeigt die Verbraucher mit der größten Änderung
+    - Rekorde seit Archivbeginn
+    - **Kenntage je Jahr** in drei Paaren (fast autark und Überschusstage, Sonnentage
+      und trübe Tage, Speicher stark und kaum genutzt), wahlweise für ganze Jahre
+      oder nur bis heute; ein Klick zeigt die Tage im Jahreskalender
+    - Die Schwellen der Kenntage stehen im Setup unter „Kenntage“
+    - „Letzte 5“, „Letzte 10“ oder „Alle“ begrenzt die Jahre für Monatsvergleich,
+      Matrix und Kenntage
+    - Im Setup unter „Langzeit“ lassen sich die Blöcke der Tabelle und jede Karte
+      ein- und ausschalten
+  - **Datumsauswahl**: Ein Klick auf das Datum im Energiefluss öffnet den
+    Kalender. Je nach Zeitraum springt er zu einem Tag, Monat oder Jahr.
 
-- **Entitäten, Kennzahlen im Kopf**: Über den Reitern jeder Entität stehen jetzt
-  die Kennzahlen aus der Entitätenliste (Typ, Einheit, erster und letzter Wert,
-  Datensätze, Größe, je nach Typ Wertebereich oder Zählerstand). Die Kacheln auf
-  dem Reiter Konfiguration entfallen.
+- **Entitäten**
+  - **Kategorien**: Entitäten lassen sich zusätzlich zu den Sternen
+    nach Thema ordnen, zum Beispiel Wärmepumpe oder Solar.
+    - Neuer Reiter **Kategorien**: anlegen, umbenennen, einfärben, per Ziehen
+      sortieren (mit Vorschlägen beim ersten Öffnen)
+    - Entitätenliste: Spalte **Kategorie**, Sortierung und Filter; zugeordnet
+      wird im Auswahlmodus oder in der Konfiguration einer Entität
+    - Der Auswahl-Assistent schlägt eine passende Kategorie vor
+    - Filter auch in „Auswahl & Verlauf“ und im Export
+    - Der selektive Restore stellt Kategorien wieder her
+  - **Kennzahlen im Kopf**: Über den Reitern jeder Entität stehen jetzt
+    die Kennzahlen aus der Entitätenliste (Typ, Einheit, erster und letzter Wert,
+    Datensätze, Größe, je nach Typ Wertebereich oder Zählerstand). Die Kacheln auf
+    dem Reiter Konfiguration entfallen.
 
 - **CSV-Export, Form der Datei**: Der Assistent hat einen letzten Schritt
   „Form und Download“ mit Vorschau der ersten Zeilen. Dort lässt sich bei
@@ -51,24 +66,9 @@
   UTF-8-Kennung für Umlaute in Excel) oder frei mit Trennzeichen und
   Dezimalzeichen. Ohne Änderung kommt dieselbe Datei wie bisher.
 
-- **Energiedashboard, Reiter Langzeit**: Ein neuer Reiter vergleicht Zeiträume
-  über die Jahre, aufgebaut wie der Langzeit-Teil des Wetterdashboards.
-  - Vergleichstabelle für Dieser Monat, Letzter Monat und Dieses Jahr gegen den
-    Vorjahreszeitraum, mit Stichtag; dazu Eigenverbrauch, Autarkie, Speicher und
-    mit eingetragener Anlagenleistung (kWp je Erzeuger) der Ertrag je kWp und je
-    Einstrahlung
-  - Monatsvergleich der Jahre als Linien mit Mittel und Spanne, Matrix
-    **Jahre × Monate** mit Abweichung vom Mittel
-  - „Was hat sich verändert?“ zeigt die Verbraucher mit der größten Änderung
-  - Rekorde seit Archivbeginn
-  - **Kenntage je Jahr** in drei Paaren (fast autark und Überschusstage, Sonnentage
-    und trübe Tage, Speicher stark und kaum genutzt), wahlweise für ganze Jahre
-    oder nur bis heute; ein Klick zeigt die Tage im Jahreskalender
-  - Die Schwellen der Kenntage stehen im Setup unter „Kenntage“
-  - „Letzte 5“, „Letzte 10“ oder „Alle“ begrenzt die Jahre für Monatsvergleich,
-    Matrix und Kenntage
-  - Im Setup unter „Langzeit“ lassen sich die Blöcke der Tabelle und jede Karte
-    ein- und ausschalten
+- **Tipps**: Sieben neue Tipps im Meldungs-Center, unter anderem zu Wetterdashboard,
+  Kategorien, Langzeit-Reiter, Datenqualität und KI-Zugriff. Die Tipps zu Backup und
+  CSV-Export nennen das externe Backup-Ziel und die gemeinsame Datei.
 
 ### Geändert
 
@@ -265,13 +265,6 @@
 
 #### New
 
-- **Tips**: Seven new tips in the message center, including the weather dashboard,
-  categories, the long-term tab, data quality and AI access. The backup and CSV export
-  tips now mention the external backup target and the shared file.
-
-- **Energy dashboard, date picker**: Clicking the date in the energy flow opens the
-  calendar. Depending on the period it jumps to a day, month or year.
-
 - **Weather dashboard**: A new page for weather values, built like the energy
   dashboard.
   - Outdoor temperature, precipitation, humidity, pressure, wind, gust and
@@ -287,20 +280,42 @@
   - Switch on via the dashboards overview; included in backups and the
     selective restore, selectable as start page, demo data included
 
-- **Entities, categories**: In addition to the stars, entities can be grouped
-  by topic, for example heat pump or solar.
-  - New **Categories** tab: create, rename, color, reorder by dragging (with
-    suggestions on first open)
-  - Entity list: **Category** column, sorting and filter; assign in selection
-    mode or in an entity's configuration
-  - The selection assistant suggests a fitting category
-  - Filter also in "Selection & history" and in the export
-  - The selective restore brings categories back
+- **Energy dashboard**
+  - **Long-term tab**: A new tab compares periods across the
+    years, built like the long-term part of the weather dashboard.
+    - Comparison table for This month, Last month and This year against the
+      previous year, with a reference date; plus self-consumption,
+      self-sufficiency, battery and, with the system size (kWp per generator)
+      entered, the yield per kWp and per irradiation
+    - Monthly comparison of the years as lines with average and range, matrix
+      **Years × months** with the deviation from the average
+    - "What has changed?" shows the consumers with the biggest change
+    - Records since the archive began
+    - **Key days per year** in three pairs (almost self-sufficient and surplus
+      days, sunny and dull days, battery heavily and barely used), for full years
+      or only up to today; a click shows the days in the year calendar
+    - The key day thresholds are in the setup under "Key days"
+    - "Last 5", "Last 10" or "All" limits the years for the monthly comparison,
+      matrix and key days
+    - In the setup under "Long term" the table blocks and every card can be
+      switched on and off
+  - **Date picker**: Clicking the date in the energy flow opens the
+    calendar. Depending on the period it jumps to a day, month or year.
 
-- **Entities, key facts in the header**: Above the tabs of every entity you now
-  see the key facts from the entity list (type, unit, first and last value,
-  records, size, depending on the type value range or counter reading). The
-  tiles on the Configuration tab are gone.
+- **Entities**
+  - **Categories**: In addition to the stars, entities can be grouped
+    by topic, for example heat pump or solar.
+    - New **Categories** tab: create, rename, color, reorder by dragging (with
+      suggestions on first open)
+    - Entity list: **Category** column, sorting and filter; assign in selection
+      mode or in an entity's configuration
+    - The selection assistant suggests a fitting category
+    - Filter also in "Selection & history" and in the export
+    - The selective restore brings categories back
+  - **Key facts in the header**: Above the tabs of every entity you now
+    see the key facts from the entity list (type, unit, first and last value,
+    records, size, depending on the type value range or counter reading). The
+    tiles on the Configuration tab are gone.
 
 - **CSV export, file format**: The wizard has a final step "Format and
   download" with a preview of the first rows. With several entities you can
@@ -313,24 +328,9 @@
   Excel) or custom with separator and decimal separator. Without changes you
   get the same file as before.
 
-- **Energy dashboard, Long-term tab**: A new tab compares periods across the
-  years, built like the long-term part of the weather dashboard.
-  - Comparison table for This month, Last month and This year against the
-    previous year, with a reference date; plus self-consumption,
-    self-sufficiency, battery and, with the system size (kWp per generator)
-    entered, the yield per kWp and per irradiation
-  - Monthly comparison of the years as lines with average and range, matrix
-    **Years × months** with the deviation from the average
-  - "What has changed?" shows the consumers with the biggest change
-  - Records since the archive began
-  - **Key days per year** in three pairs (almost self-sufficient and surplus
-    days, sunny and dull days, battery heavily and barely used), for full years
-    or only up to today; a click shows the days in the year calendar
-  - The key day thresholds are in the setup under "Key days"
-  - "Last 5", "Last 10" or "All" limits the years for the monthly comparison,
-    matrix and key days
-  - In the setup under "Long term" the table blocks and every card can be
-    switched on and off
+- **Tips**: Seven new tips in the message center, including the weather dashboard,
+  categories, the long-term tab, data quality and AI access. The backup and CSV export
+  tips now mention the external backup target and the shared file.
 
 #### Changed
 
