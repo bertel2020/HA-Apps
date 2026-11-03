@@ -72,20 +72,24 @@
 
 ### Geändert
 
-- **CSV-Import, Vorschau**: Hat die Datei keine Uhrzeit, steht unter „Zeitstempel gelesen als“
-  ein Hinweis, dass 00:00 Uhr gilt.
+- **CSV**
+  - **Import, Vorschau**: Hat die Datei keine Uhrzeit, steht unter „Zeitstempel gelesen als“
+    ein Hinweis, dass 00:00 Uhr gilt.
+  - **Export, Assistent**: Der Assistent ist übersichtlicher.
+    - Die Schrittleiste sitzt als Kopf einer Karte und zeigt die bisherige Wahl
+    - Die Leiste mit „Weiter“ bleibt am unteren Rand sichtbar
+    - Gewählte Zeilen sind eingefärbt, der Download je Zeile heißt „↓ CSV“
+    - Zeitraum mit Hinweis auf die vorhandenen Daten; mit zwei Klicks lässt sich
+      ein Bereich aus mehreren Monaten oder Jahren wählen
+    - Die Auflösungen stehen nebeneinander mit einem Balken für die Dateigröße
 
-- **Energiedashboard, Auffälligkeiten**: Die Prüfung lässt sich besser anpassen.
-  - Neue Schwellen 200 % und 300 %, ein Hinweis in den Einstellungen nennt, wann „Aus“ sinnvoll ist
-  - Bei „Aus“ entfallen Zeile, Liste und Vergleichshinweis im Status-Dialog
-
-- **CSV-Export, Assistent**: Der Assistent ist übersichtlicher.
-  - Die Schrittleiste sitzt als Kopf einer Karte und zeigt die bisherige Wahl
-  - Die Leiste mit „Weiter“ bleibt am unteren Rand sichtbar
-  - Gewählte Zeilen sind eingefärbt, der Download je Zeile heißt „↓ CSV“
-  - Zeitraum mit Hinweis auf die vorhandenen Daten; mit zwei Klicks lässt sich
-    ein Bereich aus mehreren Monaten oder Jahren wählen
-  - Die Auflösungen stehen nebeneinander mit einem Balken für die Dateigröße
+- **Energiedashboard**
+  - **Auffälligkeiten**: Die Prüfung lässt sich besser anpassen.
+    - Neue Schwellen 200 % und 300 %, ein Hinweis in den Einstellungen nennt, wann „Aus“ sinnvoll ist
+    - Bei „Aus“ entfallen Zeile, Liste und Vergleichshinweis im Status-Dialog
+  - **Vergleich mit der Vorperiode**: Beim Zurückblättern wird
+    die Vorperiode nur noch mit den Energiemengen gerechnet, die der Vergleich
+    braucht. Die Seite lädt dadurch schneller; die Zahlen bleiben gleich.
 
 - **Entität konfigurieren, neu gegliedert**: Die Konfigurationsseite ist
   übersichtlicher.
@@ -96,10 +100,6 @@
     einer Rückfrage zurück
   - Gesperrte Felder zeigen ihren festen Wert
 
-- **Energiedashboard, Vergleich mit der Vorperiode**: Beim Zurückblättern wird
-  die Vorperiode nur noch mit den Energiemengen gerechnet, die der Vergleich
-  braucht. Die Seite lädt dadurch schneller; die Zahlen bleiben gleich.
-
 ### Behoben
 
 - **Indexprüfung meldete Fehlalarme**: Bei Entitäten mit eingestellter Auflösung
@@ -108,59 +108,124 @@
   automatisch behoben“ kam erneut. Das Ende des Zeitfensters zählt jetzt als
   übereinstimmend.
 
-- **Entitätenliste merkt sich die Seite**: Wer auf Seite 2 eine Entität
-  öffnete und zur Liste zurückkehrte, landete wieder auf Seite 1. Die Liste
-  öffnet jetzt auf der zuletzt gezeigten Seite.
+- **Oberfläche**
+  - **Entitätenliste merkt sich die Seite**: Wer auf Seite 2 eine Entität
+    öffnete und zur Liste zurückkehrte, landete wieder auf Seite 1. Die Liste
+    öffnet jetzt auf der zuletzt gezeigten Seite.
+  - **Fehler und Wartezeiten**: Schlägt eine Anfrage fehl, zeigen
+    Restore-Assistent, Entitäts- und Chart-Seiten, Export, Statistik und
+    Entitäten-Migration jetzt eine Meldung (Chart-Seiten mit „Erneut versuchen“)
+    statt leerer Flächen oder eines falschen „Fertig“. Speichern in den Editoren
+    und Verdichten lassen sich nicht mehr doppelt auslösen; das Verdichten zeigt
+    „Wird verdichtet …“. Langsame Antworten überschreiben keine neueren Anzeigen
+    mehr, das gilt für Energiedashboard und Kacheln. Fortschrittsabfragen beim
+    ZIP-Import überstehen kurze Aussetzer.
+  - **Bedienung per Tastatur**: Dropzones im Import öffnen mit Enter oder
+    Leertaste, Spaltenköpfe sortierbarer Tabellen sind fokussierbar und melden
+    ihre Sortierung, Dashboard-Abschnitte melden ihren Zustand, und Hinweise
+    erscheinen auch beim Fokussieren.
+  - **Texte**: Fehlende Übersetzungen im Report, im Home-Assistant-Import, in den
+    Dashboard-Kacheln und in den Einstellungen ergänzt; die Warnfarbe im
+    Energiedashboard folgt dem Theme.
 
-- **Monatsdateien absturzsicher**: Ein Stromausfall oder Absturz mitten im
-  Schreiben konnte die Datei des laufenden Monats oder einen archivierten Monat
-  beschädigen; ein beschädigtes Archiv stoppte danach die Aufnahme aller
-  Entitäten. Die Dateien werden jetzt atomar ersetzt, und ein nicht
-  archivierbarer Vormonat hält die Aufnahme nicht mehr auf.
+- **Aufnahme und Archiv**
+  - **Monatsdateien absturzsicher**: Ein Stromausfall oder Absturz mitten im
+    Schreiben konnte die Datei des laufenden Monats oder einen archivierten Monat
+    beschädigen; ein beschädigtes Archiv stoppte danach die Aufnahme aller
+    Entitäten. Die Dateien werden jetzt atomar ersetzt, und ein nicht
+    archivierbarer Vormonat hält die Aufnahme nicht mehr auf.
+  - **Export, Importliste und Statistik hielten die Aufnahme an**: Nach einem
+    CSV-Export blieben spätere Backups und Wartungen hängen, und die
+    Importseite oder die Statistik stoppten während eines langen Imports die
+    Aufnahme aus Home Assistant. Das Löschen von Reports und Backups antwortet
+    bei laufendem Import nach wenigen Sekunden mit „ausgelastet“ statt zu warten.
+  - **Eingestellte Auflösung, lange Monate**: Bei Messwerten mit Auflösung (z. B.
+    30 s) las die Aufnahme bei jedem Wert die ganze Monatsdatei; am Monatsende
+    dauerte das gut 50 ms je Wert und bremste die Aufnahme. Jetzt wird nur das
+    Dateiende gelesen (unter 1 ms). Ein nachträglich eingefügter oder verspäteter
+    Wert verschiebt dabei nicht mehr das Mittel des laufenden Zeitfensters,
+    sondern bekommt sein eigenes Fenster.
+  - **Typwechsel einer Entität**: Ändert Home Assistant die Art einer Entität
+    (zum Beispiel Messwert zu Zähler), hielt der Neuaufbau der Auswertungen die
+    Aufnahme aller anderen Entitäten an. Er sperrt jetzt nur noch diese Entität.
+  - **Seiten bleiben bedienbar**: Einstellungen speichern, Meldungen stumm
+    schalten, Kacheln tauschen, Backup-Zeitplan und Backup-Import rechnen nicht
+    mehr im Event-Loop. Bei vielen Archivdateien stand dort sonst der ganze Server
+    still.
 
-- **Export, Importliste und Statistik hielten die Aufnahme an**: Nach einem
-  CSV-Export blieben spätere Backups und Wartungen hängen, und die
-  Importseite oder die Statistik stoppten während eines langen Imports die
-  Aufnahme aus Home Assistant. Das Löschen von Reports und Backups antwortet
-  bei laufendem Import nach wenigen Sekunden mit „ausgelastet“ statt zu warten.
+- **Sicherheit und Zugriff**
+  - **Diagramm-Tooltips**: Namen und Einheiten von Entitäten werden
+    in den Tooltips des Energiedashboards, des Chart-Editors und der
+    Entitätsseite als Text angezeigt, nie als Markup.
+  - **Ungültiger API-Token**: Ein Token mit Sonderzeichen führte zu Fehler 500
+    statt 401. Der Token wird beim Schreiben jetzt vor dem Inhalt geprüft.
+  - **Uploads und Zugangsdaten**: Zu große Dateien werden sofort abgelehnt, statt
+    erst den Speicherplatz zu füllen. Der VictoriaMetrics-Import folgt keiner
+    Weiterleitung mehr und sendet die Zugangsdaten nur an die eingegebene Adresse.
+    „Alle Backups löschen“ lässt Backups stehen, die noch nicht auf das externe
+    Ziel übertragen sind.
+  - **KI-Zugriff, Freigabe und Konten**: Die Freigabe der Entitäten gilt jetzt in
+    jedem Werkzeug. Die Energieübersicht zeigt nicht freigegebene Verbraucher und
+    Erzeuger nur noch als „Other (not shared)“ (die Summen bleiben vollständig),
+    und bei eingeschränkter Auswahl werden Meldungen weggelassen, die Entitäten
+    nennen. Benutzerkonten ohne Administratorrechte dürfen über die KI keine
+    einzelnen Entitäten mehr abfragen, wie bei der Karte; Energieübersicht und
+    Meldungen bleiben für sie erreichbar. Abgelehnte Aufrufe zählt Einstellungen →
+    KI-Zugriff.
 
-- **Sicherheit, Diagramm-Tooltips**: Namen und Einheiten von Entitäten werden
-  in den Tooltips des Energiedashboards, des Chart-Editors und der
-  Entitätsseite als Text angezeigt, nie als Markup.
-
-- **Ungültiger API-Token**: Ein Token mit Sonderzeichen führte zu Fehler 500
-  statt 401. Der Token wird beim Schreiben jetzt vor dem Inhalt geprüft.
-
-- **Energiedashboard, Kosten bei Preisänderung im Zeitraum**: Änderte sich ein
-  Preis (zum Beispiel ein Tarif-Helfer) mitten im Monat oder Jahr, galten alle
-  Stunden vor der ersten Änderung als „ohne Preis“. Kosten, Ø-Preis, vermiedene
-  Kosten und die Kosten je Verbraucher fielen zu niedrig aus. Es gilt jetzt der
-  Preis, der am Anfang des Zeitraums schon galt. Zurückliegende Zeiträume
-  werden dadurch anders angezeigt als bisher.
+- **Energiedashboard**
+  - **Kosten bei Preisänderung im Zeitraum**: Änderte sich ein
+    Preis (zum Beispiel ein Tarif-Helfer) mitten im Monat oder Jahr, galten alle
+    Stunden vor der ersten Änderung als „ohne Preis“. Kosten, Ø-Preis, vermiedene
+    Kosten und die Kosten je Verbraucher fielen zu niedrig aus. Es gilt jetzt der
+    Preis, der am Anfang des Zeitraums schon galt. Zurückliegende Zeiträume
+    werden dadurch anders angezeigt als bisher.
+  - **Langzeit**: Verbraucher erscheinen mit dem Namen aus Home
+    Assistant statt mit der Entitäts-ID.
 
 - **Wetterdashboard, Kenntage und Regentage in anderen Einheiten**: Frost-,
   Eis-, Sommer- und heiße Tage werden auch bei einem Sensor in °F oder K
   richtig gezählt (vorher fast jeder Tag ein Sommertag), Regentage auch bei
   einem Niederschlagszähler in Zoll.
 
-- **Tiefst- und Höchstwerte in den Auswertungen**: Bei Messwerten mit
-  eingestellter Auflösung ging der echte Tiefst- und Höchstwert verloren, weil
-  der Monatsabschluss nur aus den Mittelwerten der Zeitfenster rechnete (ein
-  kurzer Frost war im Stundenmittel nicht mehr zu sehen). Monate, die ab jetzt
-  abgeschlossen oder neu berechnet werden, behalten die echten Extremwerte;
-  bestehende Auswertungen bleiben unverändert.
+- **Auswertungen**
+  - **Tiefst- und Höchstwerte in den Auswertungen**: Bei Messwerten mit
+    eingestellter Auflösung ging der echte Tiefst- und Höchstwert verloren, weil
+    der Monatsabschluss nur aus den Mittelwerten der Zeitfenster rechnete (ein
+    kurzer Frost war im Stundenmittel nicht mehr zu sehen). Monate, die ab jetzt
+    abgeschlossen oder neu berechnet werden, behalten die echten Extremwerte;
+    bestehende Auswertungen bleiben unverändert.
+  - **Vormonat selten sendender Entitäten**: Entitäten, die seit dem
+    Monatswechsel nichts mehr gesendet haben, fehlten in allen Auswertungen für
+    den Vormonat. Der Vormonat wird jetzt stündlich archiviert.
+  - **Zeitzone und Zahlenformat**: Jahres-, Monats- und Tagesgrenzen in Zustands-
+    Charts, Wetter- und Langzeit-Seiten, Chart-Editor und Kacheln folgen der
+    Zeitzone des Servers statt der des Browsers (bei abweichender Zone begann ein
+    Jahr eine Stunde zu früh). Tabellen sortieren Zahlen im eingestellten
+    Zahlenformat, auch auf Englisch.
+  - **Zahlen an Zeitgrenzen**: Ein Messwert genau auf der Grenze zweier Zeiträume
+    zählt nur noch zum späteren. Tageswerte der Home-Assistant-Statistik landen
+    an Tagen der Zeitumstellung am richtigen Tag.
+  - **Min/Max im laufenden Monat**: Tiefst- und Höchstwerte des laufenden Monats
+    (zum Beispiel für Frosttage) stammen jetzt aus den echten Extremwerten statt
+    aus den Mittelwerten der Fenster, wie es bei abgeschlossenen Monaten schon
+    gilt.
+    - Gilt für neue Daten; bestehende Rollups werden nicht neu aufgebaut
 
-- **CSV-Import, Dateien aus Excel**: Eine CSV im „ANSI“-Format (Windows-1252,
-  ä/ö/ü als Einzelzeichen) oder als „Unicode-Text“ (UTF-16) ließ den Upload mit
-  Fehler 500 scheitern, und danach war die ganze Importseite nicht mehr
-  erreichbar. Solche Dateien werden jetzt beim Hochladen umgewandelt; eine
-  Datei, die sich gar nicht lesen lässt, wird mit einem Hinweis entfernt.
-
-- **CSV-Import, Umstellung und Duplikate**: Die doppelte Stunde beim Wechsel auf
-  Winterzeit bekommt jetzt eigene Zeitstempel (vorher fiel sie auf dieselbe
-  Zeit), und überlappende Dateien schreiben dieselben Punkte nicht mehr doppelt
-  ins Archiv (sie zählen als Duplikate). Upload und Löschen der Datei werden
-  abgelehnt, solange ein Import oder eine Vorschau läuft.
+- **CSV**
+  - **Import, Dateien aus Excel**: Eine CSV im „ANSI“-Format (Windows-1252,
+    ä/ö/ü als Einzelzeichen) oder als „Unicode-Text“ (UTF-16) ließ den Upload mit
+    Fehler 500 scheitern, und danach war die ganze Importseite nicht mehr
+    erreichbar. Solche Dateien werden jetzt beim Hochladen umgewandelt; eine
+    Datei, die sich gar nicht lesen lässt, wird mit einem Hinweis entfernt.
+  - **Import, Umstellung und Duplikate**: Die doppelte Stunde beim Wechsel auf
+    Winterzeit bekommt jetzt eigene Zeitstempel (vorher fiel sie auf dieselbe
+    Zeit), und überlappende Dateien schreiben dieselben Punkte nicht mehr doppelt
+    ins Archiv (sie zählen als Duplikate). Upload und Löschen der Datei werden
+    abgelehnt, solange ein Import oder eine Vorschau läuft.
+  - **Export, Formeln**: Texte aus Home Assistant, die mit =, +, - oder @
+    beginnen, bekommen ein Hochkomma davor, damit Excel sie nicht als Formel
+    ausführt.
 
 - **Selektiver Restore, Abbruch**: Scheitert ein Wiederherstellen von Entitäten
   nach dem Schreiben der Datenbank, bleiben Dateien und Datenbank auf dem alten
@@ -169,74 +234,11 @@
 - **Importberichte der VictoriaMetrics-Importe** erscheinen in der Liste und
   lassen sich öffnen und löschen (vorher unsichtbar).
 
-- **CSV-Export, Formeln**: Texte aus Home Assistant, die mit =, +, - oder @
-  beginnen, bekommen ein Hochkomma davor, damit Excel sie nicht als Formel
-  ausführt.
-
-- **Uploads und Zugangsdaten**: Zu große Dateien werden sofort abgelehnt, statt
-  erst den Speicherplatz zu füllen. Der VictoriaMetrics-Import folgt keiner
-  Weiterleitung mehr und sendet die Zugangsdaten nur an die eingegebene Adresse.
-  „Alle Backups löschen“ lässt Backups stehen, die noch nicht auf das externe
-  Ziel übertragen sind.
-
-- **Eingestellte Auflösung, lange Monate**: Bei Messwerten mit Auflösung (z. B.
-  30 s) las die Aufnahme bei jedem Wert die ganze Monatsdatei; am Monatsende
-  dauerte das gut 50 ms je Wert und bremste die Aufnahme. Jetzt wird nur das
-  Dateiende gelesen (unter 1 ms). Ein nachträglich eingefügter oder verspäteter
-  Wert verschiebt dabei nicht mehr das Mittel des laufenden Zeitfensters,
-  sondern bekommt sein eigenes Fenster.
-
-- **Typwechsel einer Entität**: Ändert Home Assistant die Art einer Entität
-  (zum Beispiel Messwert zu Zähler), hielt der Neuaufbau der Auswertungen die
-  Aufnahme aller anderen Entitäten an. Er sperrt jetzt nur noch diese Entität.
-
-- **Vormonat selten sendender Entitäten**: Entitäten, die seit dem
-  Monatswechsel nichts mehr gesendet haben, fehlten in allen Auswertungen für
-  den Vormonat. Der Vormonat wird jetzt stündlich archiviert.
-
 - **Vergleichstabellen**: Beim Speichern gelten dieselben Grenzen wie bei der
   Abfrage (höchstens 25 verschiedene Entitäten, 100 Spalten); vorher ließ sich
   eine Tabelle speichern, die danach nicht mehr geladen werden konnte. Die
   Karte antwortet bei zu großen Tabellen mit einer Begründung statt mit
   Fehler 500.
-
-- **Seiten bleiben bedienbar**: Einstellungen speichern, Meldungen stumm
-  schalten, Kacheln tauschen, Backup-Zeitplan und Backup-Import rechnen nicht
-  mehr im Event-Loop. Bei vielen Archivdateien stand dort sonst der ganze Server
-  still.
-
-- **KI-Zugriff, Freigabe und Konten**: Die Freigabe der Entitäten gilt jetzt in
-  jedem Werkzeug. Die Energieübersicht zeigt nicht freigegebene Verbraucher und
-  Erzeuger nur noch als „Other (not shared)“ (die Summen bleiben vollständig),
-  und bei eingeschränkter Auswahl werden Meldungen weggelassen, die Entitäten
-  nennen. Benutzerkonten ohne Administratorrechte dürfen über die KI keine
-  einzelnen Entitäten mehr abfragen, wie bei der Karte; Energieübersicht und
-  Meldungen bleiben für sie erreichbar. Abgelehnte Aufrufe zählt Einstellungen →
-  KI-Zugriff.
-
-- **Oberfläche, Fehler und Wartezeiten**: Schlägt eine Anfrage fehl, zeigen
-  Restore-Assistent, Entitäts- und Chart-Seiten, Export, Statistik und
-  Entitäten-Migration jetzt eine Meldung (Chart-Seiten mit „Erneut versuchen“)
-  statt leerer Flächen oder eines falschen „Fertig“. Speichern in den Editoren
-  und Verdichten lassen sich nicht mehr doppelt auslösen; das Verdichten zeigt
-  „Wird verdichtet …“. Langsame Antworten überschreiben keine neueren Anzeigen
-  mehr, das gilt für Energiedashboard und Kacheln. Fortschrittsabfragen beim
-  ZIP-Import überstehen kurze Aussetzer.
-
-- **Zeitzone und Zahlenformat**: Jahres-, Monats- und Tagesgrenzen in Zustands-
-  Charts, Wetter- und Langzeit-Seiten, Chart-Editor und Kacheln folgen der
-  Zeitzone des Servers statt der des Browsers (bei abweichender Zone begann ein
-  Jahr eine Stunde zu früh). Tabellen sortieren Zahlen im eingestellten
-  Zahlenformat, auch auf Englisch.
-
-- **Bedienung per Tastatur**: Dropzones im Import öffnen mit Enter oder
-  Leertaste, Spaltenköpfe sortierbarer Tabellen sind fokussierbar und melden
-  ihre Sortierung, Dashboard-Abschnitte melden ihren Zustand, und Hinweise
-  erscheinen auch beim Fokussieren.
-
-- **Texte**: Fehlende Übersetzungen im Report, im Home-Assistant-Import, in den
-  Dashboard-Kacheln und in den Einstellungen ergänzt; die Warnfarbe im
-  Energiedashboard folgt dem Theme.
 
 - **Robustere Eingaben und Beenden**: Eine ungültige Entitäts-ID oder ein
   kaputter Zahlenwert in der Tabellenansicht ergibt jetzt eine Fehlermeldung
@@ -244,20 +246,7 @@
   beendet, wenn alle Hintergrundaufgaben wirklich gestoppt sind; sonst wird beim
   nächsten Start geprüft.
 
-- **Zahlen an Zeitgrenzen**: Ein Messwert genau auf der Grenze zweier Zeiträume
-  zählt nur noch zum späteren. Tageswerte der Home-Assistant-Statistik landen
-  an Tagen der Zeitumstellung am richtigen Tag.
-
-- **Energiedashboard, Langzeit**: Verbraucher erscheinen mit dem Namen aus Home
-  Assistant statt mit der Entitäts-ID.
-
 - **Container**: Das Basis-Image ist auf einen festen Stand gepinnt.
-
-- **Min/Max im laufenden Monat**: Tiefst- und Höchstwerte des laufenden Monats
-  (zum Beispiel für Frosttage) stammen jetzt aus den echten Extremwerten statt
-  aus den Mittelwerten der Fenster, wie es bei abgeschlossenen Monaten schon
-  gilt.
-  - Gilt für neue Daten; bestehende Rollups werden nicht neu aufgebaut
 
 ---
 
@@ -334,20 +323,24 @@
 
 #### Changed
 
-- **CSV import, preview**: If the file has no time of day, a note under "Timestamp read as"
-  says that 00:00 is used.
+- **CSV**
+  - **Import, preview**: If the file has no time of day, a note under "Timestamp read as"
+    says that 00:00 is used.
+  - **Export, wizard**: The wizard is clearer.
+    - The step bar is the header of a card and shows the choices made so far
+    - The bar with "Next" stays visible at the bottom
+    - Selected rows are highlighted, the per-row download is now "↓ CSV"
+    - The period shows a note on the available data; two clicks select a range
+      of several months or years
+    - The resolutions sit side by side with a bar for the file size
 
-- **Energy dashboard, anomalies**: The check can be adjusted more easily.
-  - New thresholds 200 % and 300 %, a note in the settings says when "Off" makes sense
-  - With "Off", the row, list and comparison note disappear from the status dialog
-
-- **CSV export, wizard**: The wizard is clearer.
-  - The step bar is the header of a card and shows the choices made so far
-  - The bar with "Next" stays visible at the bottom
-  - Selected rows are highlighted, the per-row download is now "↓ CSV"
-  - The period shows a note on the available data; two clicks select a range
-    of several months or years
-  - The resolutions sit side by side with a bar for the file size
+- **Energy dashboard**
+  - **Anomalies**: The check can be adjusted more easily.
+    - New thresholds 200 % and 300 %, a note in the settings says when "Off" makes sense
+    - With "Off", the row, list and comparison note disappear from the status dialog
+  - **Comparison with the previous period**: When paging back,
+    the previous period is calculated with only the energy amounts the comparison
+    needs. The page loads faster; the numbers stay the same.
 
 - **Configure an entity, restructured**: The configuration page is clearer.
   - Sections General, Recording, Retention, Display and Checks with a jump line
@@ -356,10 +349,6 @@
     confirmation
   - Locked fields show their fixed value
 
-- **Energy dashboard, comparison with the previous period**: When paging back,
-  the previous period is calculated with only the energy amounts the comparison
-  needs. The page loads faster; the numbers stay the same.
-
 #### Fixed
 
 - **Index check reported false alarms**: For entities with a resolution set
@@ -367,57 +356,117 @@
   had the same row count, and the "Index deviations fixed automatically"
   notice came back. The end of the time window now counts as matching.
 
-- **Entity list remembers the page**: Opening an entity from page 2 and going
-  back used to land on page 1 again. The list now opens on the page last shown.
+- **Interface**
+  - **Entity list remembers the page**: Opening an entity from page 2 and going
+    back used to land on page 1 again. The list now opens on the page last shown.
+  - **Errors and waiting**: When a request fails, the restore wizard,
+    entity and chart pages, export, statistics and entity migration now show a
+    message (chart pages with "Try again") instead of blank areas or a false
+    "Done". Saving in the editors and compacting can no longer be triggered
+    twice; compacting shows "Wird verdichtet …". Slow answers no longer overwrite
+    newer displays, which applies to the energy dashboard and tiles. Progress
+    polling during ZIP import survives short hiccups.
+  - **Keyboard use**: Dropzones in the import open with Enter or Space, headers
+    of sortable tables are focusable and announce their sort order, dashboard
+    sections announce their state, and hints also appear on focus.
+  - **Texts**: Missing translations in the report, the Home Assistant import, the
+    dashboard tiles and the settings were added; the warning colour in the energy
+    dashboard follows the theme.
 
-- **Monthly files crash-safe**: A power failure or crash in the middle of a
-  write could damage the current month's file or an archived month, and a
-  damaged archive then stopped ingestion for all entities. Files are now
-  replaced atomically, and a previous month that cannot be archived no longer
-  holds ingestion up.
+- **Ingestion and archive**
+  - **Monthly files crash-safe**: A power failure or crash in the middle of a
+    write could damage the current month's file or an archived month, and a
+    damaged archive then stopped ingestion for all entities. Files are now
+    replaced atomically, and a previous month that cannot be archived no longer
+    holds ingestion up.
+  - **Export, import list and statistics held up ingestion**: After a CSV
+    export, later backups and maintenance runs could hang, and the import page or
+    the statistics page stopped ingestion from Home Assistant during a long
+    import. Deleting reports and backups answers "busy" after a few seconds while
+    an import runs instead of waiting.
+  - **Set resolution, long months**: For measurements with a set resolution
+    (e.g. 30 s), ingestion read the whole month file for every value; at the end
+    of the month that took a good 50 ms per value and slowed ingestion down. Now
+    only the end of the file is read (under 1 ms). A value inserted afterwards or
+    arriving late no longer shifts the mean of the running time window but gets
+    its own window.
+  - **Type change of an entity**: When Home Assistant changes the kind of an
+    entity (for example measurement to counter), rebuilding the analyses held up
+    ingestion of all other entities. It now locks only this entity.
+  - **Pages stay usable**: Saving settings, muting notices, swapping tiles, the
+    backup schedule and the backup import no longer compute in the event loop.
+    With many archive files the whole server stood still there.
 
-- **Export, import list and statistics held up ingestion**: After a CSV
-  export, later backups and maintenance runs could hang, and the import page or
-  the statistics page stopped ingestion from Home Assistant during a long
-  import. Deleting reports and backups answers "busy" after a few seconds while
-  an import runs instead of waiting.
+- **Security and access**
+  - **Chart tooltips**: Entity names and units are shown as text in the
+    tooltips of the energy dashboard, the chart editor and the entity page,
+    never as markup.
+  - **Invalid API token**: A token with special characters caused error 500
+    instead of 401. When writing, the token is now checked before the content.
+  - **Uploads and credentials**: Files that are too large are refused right away
+    instead of filling the disk first. The VictoriaMetrics import no longer
+    follows redirects and sends the credentials only to the address entered.
+    "Delete all backups" leaves backups that have not yet been transferred to the
+    external target.
+  - **AI access, sharing and accounts**: The sharing of entities now applies in
+    every tool. The energy overview shows consumers and generators that are not
+    shared only as "Other (not shared)" (the totals stay complete), and with a
+    restricted selection, notices that name entities are left out. User accounts
+    without administrator rights can no longer query individual entities through
+    the AI, as with the card; the energy overview and the notices stay available
+    to them. Settings → AI access counts rejected calls.
 
-- **Security, chart tooltips**: Entity names and units are shown as text in the
-  tooltips of the energy dashboard, the chart editor and the entity page,
-  never as markup.
-
-- **Invalid API token**: A token with special characters caused error 500
-  instead of 401. When writing, the token is now checked before the content.
-
-- **Energy dashboard, costs when a price changes within the period**: If a
-  price (for example a tariff helper) changed in the middle of a month or year,
-  all hours before the first change counted as "no price". Costs, average
-  price, avoided costs and the costs per consumer came out too low. The price
-  that already applied at the start of the period is now used. Past periods are
-  therefore shown differently than before.
+- **Energy dashboard**
+  - **Costs when a price changes within the period**: If a
+    price (for example a tariff helper) changed in the middle of a month or year,
+    all hours before the first change counted as "no price". Costs, average
+    price, avoided costs and the costs per consumer came out too low. The price
+    that already applied at the start of the period is now used. Past periods are
+    therefore shown differently than before.
+  - **Long-term**: Consumers appear with their Home Assistant
+    name instead of the entity ID.
 
 - **Weather dashboard, key days and rain days in other units**: Frost, ice,
   summer and hot days are now counted correctly for a sensor in °F or K
   (before, almost every day was a summer day), and rain days for a rain counter
   in inches.
 
-- **Minimum and maximum values in the analyses**: For measurements with a set
-  resolution, the true minimum and maximum were lost because the month closing
-  calculated only from the means of the time windows (a short frost was no
-  longer visible in the hourly mean). Months that are closed or recalculated
-  from now on keep the true extremes; existing analyses stay unchanged.
+- **Analyses**
+  - **Minimum and maximum values in the analyses**: For measurements with a set
+    resolution, the true minimum and maximum were lost because the month closing
+    calculated only from the means of the time windows (a short frost was no
+    longer visible in the hourly mean). Months that are closed or recalculated
+    from now on keep the true extremes; existing analyses stay unchanged.
+  - **Previous month of rarely sending entities**: Entities that had sent nothing
+    since the month changed were missing from all analyses for the previous
+    month. The previous month is now archived hourly.
+  - **Time zone and number format**: Year, month and day boundaries in state
+    charts, weather and long-term pages, the chart editor and tiles follow the
+    server's time zone instead of the browser's (with a different zone a year
+    began an hour early). Tables sort numbers in the selected number format,
+    including English.
+  - **Numbers at time boundaries**: A value exactly on the boundary between two
+    periods now counts only for the later one. Daily values of the Home Assistant
+    statistics land on the right day on days with a clock change.
+  - **Min/max in the running month**: Lowest and highest values of the running
+    month (for example for frost days) now come from the real extremes instead of
+    the window means, as is already the case for completed months.
+    - Applies to new data; existing rollups are not rebuilt
 
-- **CSV import, files from Excel**: A CSV in "ANSI" format (Windows-1252, ä/ö/ü
-  as single characters) or as "Unicode text" (UTF-16) made the upload fail with
-  error 500, and afterwards the whole import page was unreachable. Such files
-  are now converted on upload; a file that cannot be read at all is removed
-  with a notice.
-
-- **CSV import, clock change and duplicates**: The repeated hour when the clock
-  goes back to standard time now gets its own timestamps (before, it fell on
-  the same time), and overlapping files no longer write the same points twice
-  into the archive (they count as duplicates). Uploading and deleting the file
-  are refused while an import or a preview is running.
+- **CSV**
+  - **Import, files from Excel**: A CSV in "ANSI" format (Windows-1252, ä/ö/ü
+    as single characters) or as "Unicode text" (UTF-16) made the upload fail with
+    error 500, and afterwards the whole import page was unreachable. Such files
+    are now converted on upload; a file that cannot be read at all is removed
+    with a notice.
+  - **Import, clock change and duplicates**: The repeated hour when the clock
+    goes back to standard time now gets its own timestamps (before, it fell on
+    the same time), and overlapping files no longer write the same points twice
+    into the archive (they count as duplicates). Uploading and deleting the file
+    are refused while an import or a preview is running.
+  - **Export, formulas**: Texts from Home Assistant that start with =, +, -
+    or @ get an apostrophe in front so that Excel does not execute them as a
+    formula.
 
 - **Selective restore, abort**: If restoring entities fails after the database
   was written, files and database stay in the old state. The Symcon names are
@@ -426,88 +475,17 @@
 - **Import reports of VictoriaMetrics imports** show up in the list and can be
   opened and deleted (before, they were invisible).
 
-- **CSV export, formulas**: Texts from Home Assistant that start with =, +, -
-  or @ get an apostrophe in front so that Excel does not execute them as a
-  formula.
-
-- **Uploads and credentials**: Files that are too large are refused right away
-  instead of filling the disk first. The VictoriaMetrics import no longer
-  follows redirects and sends the credentials only to the address entered.
-  "Delete all backups" leaves backups that have not yet been transferred to the
-  external target.
-
-- **Set resolution, long months**: For measurements with a set resolution
-  (e.g. 30 s), ingestion read the whole month file for every value; at the end
-  of the month that took a good 50 ms per value and slowed ingestion down. Now
-  only the end of the file is read (under 1 ms). A value inserted afterwards or
-  arriving late no longer shifts the mean of the running time window but gets
-  its own window.
-
-- **Type change of an entity**: When Home Assistant changes the kind of an
-  entity (for example measurement to counter), rebuilding the analyses held up
-  ingestion of all other entities. It now locks only this entity.
-
-- **Previous month of rarely sending entities**: Entities that had sent nothing
-  since the month changed were missing from all analyses for the previous
-  month. The previous month is now archived hourly.
-
 - **Comparison tables**: When saving, the same limits apply as for the query
   (at most 25 different entities, 100 columns); before, a table could be saved
   that could no longer be loaded afterwards. The card answers with a reason
   instead of error 500 for tables that are too large.
-
-- **Pages stay usable**: Saving settings, muting notices, swapping tiles, the
-  backup schedule and the backup import no longer compute in the event loop.
-  With many archive files the whole server stood still there.
-
-- **AI access, sharing and accounts**: The sharing of entities now applies in
-  every tool. The energy overview shows consumers and generators that are not
-  shared only as "Other (not shared)" (the totals stay complete), and with a
-  restricted selection, notices that name entities are left out. User accounts
-  without administrator rights can no longer query individual entities through
-  the AI, as with the card; the energy overview and the notices stay available
-  to them. Settings → AI access counts rejected calls.
-
-- **Interface, errors and waiting**: When a request fails, the restore wizard,
-  entity and chart pages, export, statistics and entity migration now show a
-  message (chart pages with "Try again") instead of blank areas or a false
-  "Done". Saving in the editors and compacting can no longer be triggered
-  twice; compacting shows "Wird verdichtet …". Slow answers no longer overwrite
-  newer displays, which applies to the energy dashboard and tiles. Progress
-  polling during ZIP import survives short hiccups.
-
-- **Time zone and number format**: Year, month and day boundaries in state
-  charts, weather and long-term pages, the chart editor and tiles follow the
-  server's time zone instead of the browser's (with a different zone a year
-  began an hour early). Tables sort numbers in the selected number format,
-  including English.
-
-- **Keyboard use**: Dropzones in the import open with Enter or Space, headers
-  of sortable tables are focusable and announce their sort order, dashboard
-  sections announce their state, and hints also appear on focus.
-
-- **Texts**: Missing translations in the report, the Home Assistant import, the
-  dashboard tiles and the settings were added; the warning colour in the energy
-  dashboard follows the theme.
 
 - **More robust input and shutdown**: An invalid entity ID or a broken number in
   the table view now gives an error message instead of a server error. On
   shutdown the storage only counts as cleanly closed if all background tasks
   have really stopped; otherwise it is checked on the next start.
 
-- **Numbers at time boundaries**: A value exactly on the boundary between two
-  periods now counts only for the later one. Daily values of the Home Assistant
-  statistics land on the right day on days with a clock change.
-
-- **Energy dashboard, long-term**: Consumers appear with their Home Assistant
-  name instead of the entity ID.
-
 - **Container**: The base image is pinned to a fixed version.
-
-- **Min/max in the running month**: Lowest and highest values of the running
-  month (for example for frost days) now come from the real extremes instead of
-  the window means, as is already the case for completed months.
-  - Applies to new data; existing rollups are not rebuilt
 
 ## 1.13.0 - 2026-11-01
 
