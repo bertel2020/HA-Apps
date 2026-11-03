@@ -47,12 +47,12 @@
      und dieselbe Basis für Ø zeigen. Rekorde zählen immer seit Archivbeginn. #}
   <div class="wt-yearbar" x-show="months" x-cloak>
     <span class="wt-yearbar-label">{{ _("Jahre") }}</span>
+    <span class="wt-yearbar-note">{{ _("Gilt für Monatsvergleich, Jahre × Monate und Kenntage.") }}</span>
     <div class="wt-seg" role="group" aria-label="{{ _('Anzahl der Jahre') }}">
       <template x-for="option in yearOptions()" :key="option.value">
         <button type="button" :aria-pressed="(yearLimit === option.value).toString()" @click="setYearLimit(option.value)" x-text="option.label"></button>
       </template>
     </div>
-    <span class="wt-yearbar-note">{{ _("Gilt für Monatsvergleich, Jahre × Monate und Kenntage. Ø und Spanne bilden sich nur aus diesen Jahren. Rekorde zählen seit Archivbeginn.") }}</span>
   </div>
 
   {# Monatsvergleich: eine Linie je Jahr über Jan–Dez, wie der Monatsvergleich des Wetterdashboards. #}
