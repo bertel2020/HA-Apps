@@ -2488,9 +2488,9 @@ button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
 
 /* Kenntage je Jahr (Energiedashboard, Reiter Langzeit): ein Feld je Kenntag, darin ein Balken je Jahr. */
 .wt-kt{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:10px;}
-.wt-kt-col{display:flex;flex-direction:column;gap:8px;min-width:0;padding:12px 14px;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;}
-.wt-kt-title{margin:0 0 2px;font-size:calc(11.5px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--accent-line);}
-.wt-kt-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;font-size:calc(13.5px * var(--font-scale, 1));font-variant-numeric:tabular-nums;cursor:help;}
+.wt-kt-col{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px 10px;align-content:start;min-width:0;padding:12px 14px;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;}
+.wt-kt-title{grid-column:1/-1;margin:0 0 2px;font-size:calc(11.5px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--accent-line);}
+.wt-kt-row{display:grid;grid-column:1/-1;grid-template-columns:subgrid;gap:10px;align-items:center;font-size:calc(13.5px * var(--font-scale, 1));font-variant-numeric:tabular-nums;cursor:help;}
 .wt-kt-year{color:var(--ink-muted);min-width:3.2em;}
 .wt-kt-bar{height:10px;background:var(--surface);border-radius:3px;overflow:hidden;}
 .wt-kt-bar i{display:block;height:100%;background:var(--chart-1);border-radius:3px;}
