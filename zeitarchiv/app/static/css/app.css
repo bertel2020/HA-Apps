@@ -2411,8 +2411,6 @@ button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
 /* Vergleichstabelle: Rahmen und Scroll-Hinweis aus .tbl-wrap (app.css), Kopf wie table.dt. */
 .wt-table-wrap{margin-top:10px;}
 .wt-table.wt-table-full{width:100%;}
-.wt-table td .wt-sub{display:block;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);}
-.wt-table .wt-kt-days{width:1%;}
 .wt-table{border-collapse:separate;border-spacing:0;width:auto;font-variant-numeric:tabular-nums;font-size:calc(13.5px * var(--font-scale, 1));}
 .wt-table th,.wt-table td{padding:5px 10px;text-align:right;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;}
 .wt-table thead th{font-weight:600;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);border-bottom:1.5px solid var(--border-strong);}
@@ -2487,6 +2485,17 @@ button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
   .wt-chg-row{grid-template-columns:minmax(0,1fr);gap:3px;}
   .wt-chg-val{text-align:left;}
 }
+
+/* Kenntage je Jahr (Energiedashboard, Reiter Langzeit): ein Feld je Kenntag, darin ein Balken je Jahr. */
+.wt-kt{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:10px;}
+.wt-kt-col{display:flex;flex-direction:column;gap:8px;min-width:0;padding:12px 14px;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;}
+.wt-kt-title{margin:0 0 2px;font-size:calc(11.5px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--accent-line);}
+.wt-kt-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;font-size:calc(13.5px * var(--font-scale, 1));font-variant-numeric:tabular-nums;cursor:help;}
+.wt-kt-year{color:var(--ink-muted);min-width:3.2em;}
+.wt-kt-bar{height:10px;background:var(--surface);border-radius:3px;overflow:hidden;}
+.wt-kt-bar i{display:block;height:100%;background:var(--chart-1);border-radius:3px;}
+.wt-kt-val{text-align:right;white-space:nowrap;color:var(--ink-muted);}
+.wt-kt-val b{color:var(--ink);font-weight:600;}
 
 /* Kacheln (Wetterdashboard, Rekorde im Energiedashboard): Kopfbalken in der Rollenfarbe, Beschriftung in Großbuchstaben, Wert in Monospace. */
 .wt-kpis{display:grid;grid-template-columns:repeat(var(--wt-cols, 3),minmax(0,1fr));gap:10px;margin:8px 0 14px;}

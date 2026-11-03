@@ -379,24 +379,21 @@
         if (r.has_import) columns.push({field: 'autarkie', label: t('Autarkie 100 %')});
         if (r.has_export) columns.push({field: 'einspeisung_ueber_verbrauch', label: t('Einspeisung über Verbrauch')});
         if (r.has_pv) columns.push({field: 'kaum_pv', label: t('Kaum Erzeugung')});
-        const share = (value, days) => {
-          if (!days) return '';
-          const pct = value / days * 100;
-          return value > 0 && pct < 1 ? '< 1 %' : `${num(pct, 0)} %`;
-        };
-        let html = `<thead><tr><th></th><th class="wt-vj wt-kt-days">${escapeHtml(t('Ausgewertete Tage'))}</th>`
-          + `${columns.map((c) => `<th class="wt-cur wt-sep">${escapeHtml(c.label)}</th>`).join('')}</tr></thead><tbody>`;
+        const share = (value, days) => (days ? value / days * 100 : 0);
+        const shareText = (value, pct) => (value > 0 && pct < 1 ? '< 1 %' : `${num(pct, 0)} %`);
         const current = new Date().getFullYear();
-        for (const row of r.kenntage) {
-          html += `<tr><th scope="row">${row.year}${row.year === current ? '*' : ''}</th>`
-            + `<td class="wt-vj wt-kt-days"><span class="wt-v">${escapeHtml(num(row.days, 0))}</span></td>`;
-          for (const c of columns) {
-            html += `<td class="wt-sep"><span class="wt-v">${escapeHtml(num(row[c.field], 0))}</span>`
-              + `<span class="wt-sub">${escapeHtml(share(row[c.field], row.days))}</span></td>`;
-          }
-          html += '</tr>';
-        }
-        table.innerHTML = html + '</tbody>';
+        // Ein Feld je Kenntag, darin ein Balken je Jahr (Länge = Anteil der ausgewerteten Tage, Maßstab je Feld).
+        table.innerHTML = columns.map((c) => {
+          const top = Math.max(...r.kenntage.map((row) => share(row[c.field], row.days)), 0);
+          const rows = r.kenntage.map((row) => {
+            const pct = share(row[c.field], row.days);
+            const tip = `${t('Ausgewertete Tage')}: ${num(row.days, 0)}`;
+            return `<div class="wt-kt-row" data-tooltip-fixed="${escapeHtml(tip)}"><span class="wt-kt-year">${row.year}${row.year === current ? '*' : ''}</span>`
+              + `<span class="wt-kt-bar"><i style="width:${top > 0 ? (pct / top * 100).toFixed(1) : 0}%"></i></span>`
+              + `<span class="wt-kt-val"><b>${escapeHtml(num(row[c.field], 0))}</b> ${escapeHtml(t('Tage'))} · ${escapeHtml(shareText(row[c.field], pct))}</span></div>`;
+          }).join('');
+          return `<div class="wt-kt-col"><h3 class="wt-kt-title">${escapeHtml(c.label)}</h3>${rows}</div>`;
+        }).join('');
       },
 
       // Verbraucher mit der größten Änderung; Stichtag und Vorjahr-Modus wie die Vergleichstabelle.
