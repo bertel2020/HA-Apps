@@ -76,4 +76,47 @@
     <p class="wt-foot">{{ _("Ein Klick auf ein Feld öffnet den Monat der Entität (bei Rollen mit genau einer Entität). Das Dreieck oben rechts markiert Messlücken oder Zählersprünge, der Tooltip nennt sie. * laufendes Jahr, der laufende Monat zählt im Mittel nicht mit.") }}</p>
 
   </div>
+
+  {# Was hat sich verändert? Verbraucher mit der größten Änderung gegenüber dem Vorjahr (Stichtag und Vorjahr-Modus wie die Tabelle). #}
+  <div class="card wt-card" x-show="changes && changes.consumers" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Was hat sich verändert?") }} {{ hint_button(_("Was hat sich verändert?")) }}</h2>
+      {% call hint_body() %}<span x-text="changesNote()"></span>{% endcall %}
+    </div>
+    <p class="wt-stand" x-text="changesRange()"></p>
+    <div class="wt-chg" x-ref="changes"></div>
+    <p class="hint hint-status" x-show="changes && !changes.items.length" x-cloak>{{ _("Noch keine Verbraucher mit Werten in beiden Zeiträumen.") }}</p>
+  </div>
+
+  <p class="hint hint-warn" x-show="recordsError" x-text="recordsError" x-cloak></p>
+
+  {# Rekorde: höchste Tageswerte seit Archivbeginn. #}
+  <div class="card wt-card" x-show="records && records.enough && records.records.length" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Rekorde") }} {{ hint_button(_("Rekorde")) }}</h2>
+      {% call hint_body() %}<span x-text="recordsNote()"></span>{% endcall %}
+    </div>
+    <div class="wt-kpis" :style="'--wt-cols:' + Math.min(4, records ? records.records.length : 1)">
+      <template x-for="record in (records ? records.records : [])" :key="record.key">
+        <div class="wt-tile" :style="'--wt-accent:' + recordAccent(record.key)">
+          <span class="wt-tile-label" x-text="record.label"></span>
+          <span class="wt-tile-value" x-html="recordValue(record)"></span>
+          <span class="wt-tile-sub" x-text="recordDate(record)"></span>
+          <a class="wt-record-link" x-show="record.entity_id" :href="recordLink(record)">{{ _("Tag öffnen") }}</a>
+        </div>
+      </template>
+    </div>
+  </div>
+  <p class="hint hint-status" x-show="records && !records.enough" x-cloak>{{ _("Rekorde erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte enthält.") }}</p>
+
+  {# Kenntage je Jahr: Tage mit bestimmten Eigenschaften, je Kalenderjahr. #}
+  <div class="card wt-card" x-show="records && records.kenntage.length" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Kenntage je Jahr") }} {{ hint_button(_("Kenntage je Jahr")) }}</h2>
+      {% call hint_body() %}<span x-text="kenntageNote()"></span>{% endcall %}
+    </div>
+    <div class="tbl-wrap wt-table-wrap"><table class="wt-table" x-ref="kenntageTable"></table></div>
+  </div>
+
+  </div>
 </div>

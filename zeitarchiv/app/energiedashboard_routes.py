@@ -3917,6 +3917,22 @@ class EnergieDashboardService:
                 raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
             return self.langzeit.compute_months(config)
 
+        @router.get("/energiedashboard/langzeit/records")
+        def energiedashboard_langzeit_records() -> dict:
+            # Rekordtage und Kenntage je Jahr aus den Tageswerten aller Rollen (Reiter „Langzeit“).
+            config = _load_config(deps.index)
+            if not energie_langzeit.is_configured(config):
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
+            return self.langzeit.compute_records(config)
+
+        @router.post("/energiedashboard/langzeit/changes")
+        def energiedashboard_langzeit_changes(body: energie_langzeit.TableRequest) -> dict:
+            # „Was hat sich verändert?“: Verbraucher mit der größten Änderung gegenüber dem Vorjahr.
+            config = _load_config(deps.index)
+            if not energie_langzeit.is_configured(config):
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
+            return self.langzeit.compute_changes(config, body)
+
         @router.get("/energiedashboard/heatmap")
         def energiedashboard_heatmap(range: str = "week", offset: int = 0) -> dict:  # noqa: A002
             config = _load_config(deps.index)

@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import statistics
 from collections.abc import Callable
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -72,6 +72,22 @@ BALANCE_ROLES = ("erzeugung", "netzbezug", "einspeisung", "entladung", "ladung")
 #: mindestens GAP_MIN und GAP_FACTOR mal der Median aller Monate. Zählerrückgänge werden immer markiert.
 GAP_FACTOR = 3
 GAP_MIN = 10
+#: Rekorde erscheinen erst, wenn das Archiv der Rollen mindestens so viele Tage umfasst.
+RECORD_MIN_DAYS = 365
+#: Kenntage: Autarkie 100 % heißt höchstens so viel Netzbezug (kWh) bei Verbrauch von mindestens CONSUMPTION_MIN;
+#: „kaum PV“ heißt weniger als LOW_PV_KWH Erzeugung.
+AUTARKY_EPSILON = 0.05
+CONSUMPTION_MIN = 0.5
+LOW_PV_KWH = 1.0
+#: Verbraucher der Veränderungsliste (nach Betrag der Änderung).
+CHANGES_LIMIT = 8
+#: Rekordzeilen: Schlüssel, Rolle (Verbrauch rechnet sich aus der Bilanz), Beschriftung.
+RECORDS: tuple[tuple[str, str, str], ...] = (
+    ("erzeugung", "erzeugung", N_("Stärkster Erzeugungstag")),
+    ("einspeisung", "einspeisung", N_("Höchste Einspeisung")),
+    ("verbrauch", "verbrauch", N_("Höchster Verbrauch")),
+    ("netzbezug", "netzbezug", N_("Höchster Netzbezug")),
+)
 
 
 class TableRequest(BaseModel):
@@ -432,4 +448,177 @@ class EnergieLangzeitService:
             "tz": str(self.tz), "now": now_local.timestamp(), "unit": "kWh",
             "current": {"year": now_local.year, "month": now_local.month, "day": now_local.day},
             "years": years, "roles": out_roles,
+        }
+
+    # -- Tageswerte: Rekorde und Kenntage -------------------------------------------------
+
+    def _daily_roles(
+        self, roles: dict[str, list[str]], start: datetime, end: datetime, now_local: datetime,
+        read_cache: query_mod.QueryReadCache,
+    ) -> dict[str, dict[date, float]]:
+        """Tagessumme je Rolle (lokales Datum -> kWh). Ein Tag zählt für eine Rolle nur, wenn jede ihrer Entitäten,
+        die an diesem Tag schon archiviert hat, einen Wert hat; sonst fehlt er."""
+        result: dict[str, dict[date, float]] = {}
+        for role, entity_ids in roles.items():
+            per_entity: list[tuple[float, dict[date, float]]] = []
+            for entity_id in entity_ids:
+                entity = self.index.get_entity(entity_id)
+                if entity is None or not entity["first_ts"]:
+                    continue
+                points = query_mod.query_daily_series(
+                    self.data_dir, self.index, entity_id, start, end, self.tz, now_local, read_cache,
+                )
+                per_entity.append((
+                    entity["first_ts"],
+                    {datetime.fromtimestamp(p.day_start, self.tz).date(): (p.value or 0.0) for p in points},
+                ))
+            days: dict[date, float] = {}
+            for day in {d for _first, series in per_entity for d in series}:
+                midnight = datetime(day.year, day.month, day.day, tzinfo=self.tz).timestamp()
+                expected = [series for first, series in per_entity if first < midnight + 86400]
+                if expected and all(day in series for series in expected):
+                    days[day] = sum(series[day] for series in expected)
+            result[role] = days
+        return result
+
+    def usable_days(self, config: dict, now_local: datetime | None = None) -> list[dict]:
+        """Tage mit allen Werten, ohne den Tag nach einem fehlenden Tag. Fehlt ein Tag ganz, bekäme der nächste
+        Messwert die ganze Differenz zugeschlagen und gäbe einen Schein-Rekord. Der heutige Tag fehlt (unvollständig).
+
+        Je Tag: Datum und Erzeugung, Einspeisung, Netzbezug, Verbrauch (Bilanz) in kWh; Rollen ohne Entität bleiben None."""
+        now_local = now_local or datetime.now(self.tz)
+        roles = role_entities(config)
+        used = {role: ids for role, ids in roles.items() if ids}
+        firsts = [
+            entity["first_ts"]
+            for ids in used.values() for entity_id in ids
+            if (entity := self.index.get_entity(entity_id)) is not None and entity["first_ts"]
+        ]
+        if not firsts:
+            return []
+        start = datetime.fromtimestamp(min(firsts), self.tz).replace(hour=0, minute=0, second=0, microsecond=0)
+        end = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        if end <= start:
+            return []
+        daily = self._daily_roles(used, start, end, now_local, query_mod.QueryReadCache())
+        # Eine Rolle, die erst später dazukam (z. B. ein nachgerüsteter Speicher), gilt für frühere Tage nicht.
+        role_start = {
+            role: min(
+                entity["first_ts"] for entity_id in ids
+                if (entity := self.index.get_entity(entity_id)) is not None and entity["first_ts"]
+            )
+            for role, ids in used.items()
+        }
+        complete: dict[date, dict[str, float | None]] = {}
+        for day in sorted({d for series in daily.values() for d in series}):
+            midnight = datetime(day.year, day.month, day.day, tzinfo=self.tz).timestamp()
+            expected = [role for role in used if role_start[role] < midnight + 86400]
+            if not expected or not all(day in daily[role] for role in expected):
+                continue
+            complete[day] = {role: (daily[role][day] if role in expected else None) for role in BALANCE_ROLES}
+        first_day = start.date()
+        out: list[dict] = []
+        for day, parts in complete.items():
+            if day > first_day and (day - timedelta(days=1)) not in complete:
+                continue
+            verbrauch = balance(parts)
+            if verbrauch is None:
+                continue
+            out.append({
+                "date": day,
+                "erzeugung": parts["erzeugung"],
+                "einspeisung": max(parts["einspeisung"], 0.0) if parts["einspeisung"] is not None else None,
+                "netzbezug": max(parts["netzbezug"], 0.0) if parts["netzbezug"] is not None else None,
+                "verbrauch": verbrauch,
+            })
+        return out
+
+    def compute_records(self, config: dict, now_local: datetime | None = None) -> dict:
+        """Rekordtage und Kenntage je Jahr aus den Tageswerten. Rekorde gibt es erst ab RECORD_MIN_DAYS Tagen Archiv."""
+        now_local = now_local or datetime.now(self.tz)
+        roles = role_entities(config)
+        days = self.usable_days(config, now_local)
+        today = now_local.date()
+        span = (days[-1]["date"] - days[0]["date"]).days + 1 if days else 0
+        records = []
+        if span >= RECORD_MIN_DAYS:
+            for key, role, label in RECORDS:
+                candidates = [d for d in days if d[key] is not None]
+                if not candidates:
+                    continue
+                # Gleichstand: der frühere Tag.
+                top = max(candidates, key=lambda d: (d[key], -d["date"].toordinal()))
+                single = roles[role][0] if role != "verbrauch" and len(roles.get(role, [])) == 1 else None
+                records.append({
+                    "key": key, "label": tr(label), "value": round(top[key], 3), "date": top["date"].isoformat(),
+                    "entity_id": single, "offset": (top["date"] - today).days,
+                })
+        years: dict[int, dict] = {}
+        for d in days:
+            entry = years.setdefault(d["date"].year, {
+                "year": d["date"].year, "days": 0, "autarkie": 0, "einspeisung_ueber_verbrauch": 0, "kaum_pv": 0,
+            })
+            entry["days"] += 1
+            if d["netzbezug"] is not None and d["verbrauch"] >= CONSUMPTION_MIN and d["netzbezug"] <= AUTARKY_EPSILON:
+                entry["autarkie"] += 1
+            if d["einspeisung"] is not None and d["einspeisung"] > d["verbrauch"] > 0:
+                entry["einspeisung_ueber_verbrauch"] += 1
+            if d["erzeugung"] is not None and d["erzeugung"] < LOW_PV_KWH:
+                entry["kaum_pv"] += 1
+        return {
+            "unit": "kWh",
+            "since": days[0]["date"].isoformat() if days else None,
+            "days": len(days), "span": span, "enough": span >= RECORD_MIN_DAYS,
+            "records": records,
+            "kenntage": sorted(years.values(), key=lambda e: -e["year"]),
+            "has_pv": bool(roles["erzeugung"]), "has_export": bool(roles["einspeisung"]),
+            "has_import": bool(roles["netzbezug"]),
+        }
+
+    # -- Was hat sich verändert? -----------------------------------------------------------
+
+    def compute_changes(self, config: dict, body: TableRequest, now_local: datetime | None = None) -> dict:
+        """Verbraucher mit der größten Änderung gegenüber dem Vorjahr im Zeitraum „Dieses Jahr“ (gleiche Fenster
+        und gleicher Stichtag wie die Vergleichstabelle). Geräte hinter einem Zwischenzähler fehlen: ihr Wert
+        steckt im Zwischenzähler. Der Rest bis zum Verbrauch laut Bilanz erscheint als „Übrige (Grundlast)“."""
+        now_local = now_local or datetime.now(self.tz)
+        mode = body.mode if body.mode in period_columns.MODES else "bis_jetzt"
+        stichtag = period_columns.parse_stichtag(body.at, now_local.date())
+        anchor = period_columns.stichtag_anchor(stichtag, self.tz)
+        win = period_columns.column_windows(COLUMN_WINDOWS, "jahr", now_local, mode, anchor)
+        roles = role_entities(config)
+        read_cache = query_mod.QueryReadCache()
+        consumers = [
+            c for c in config.get("verbraucher") or [] if c.get("entity_id") and not c.get("parent")
+        ]
+        items: list[dict] = []
+        measured = {"cur": 0.0, "vj": 0.0}
+        for consumer in consumers:
+            values: dict[str, float | None] = {}
+            for side, start, end in (("cur", win["start"], win["end"]), ("vj", win["vj_start"], win["vj_end"])):
+                values[side], _first = self.window_total([consumer["entity_id"]], start, end, now_local, read_cache)
+                measured[side] += values[side] or 0.0
+            if values["cur"] is None and values["vj"] is None:
+                continue
+            items.append({
+                "name": consumer.get("name") or consumer["entity_id"], "entity_id": consumer["entity_id"],
+                "cur": values["cur"], "vj": values["vj"],
+            })
+        total: dict[str, float | None] = {}
+        for side, start, end in (("cur", win["start"], win["end"]), ("vj", win["vj_start"], win["vj_end"])):
+            sums, _froms = self.side_values(roles, start, end, now_local, read_cache)
+            total[side] = balance(sums)
+        if consumers and total["cur"] is not None and total["vj"] is not None:
+            rest = {side: max(total[side] - measured[side], 0.0) for side in ("cur", "vj")}
+            items.append({"name": tr("Übrige (Grundlast)"), "entity_id": None, "cur": round(rest["cur"], 3), "vj": round(rest["vj"], 3)})
+        for item in items:
+            both = item["cur"] is not None and item["vj"] is not None
+            item["diff"] = round(item["cur"] - item["vj"], 3) if both else None
+            item["percent"] = round(item["diff"] / item["vj"] * 100, 1) if both and item["vj"] else None
+        ranked = sorted((i for i in items if i["diff"] is not None), key=lambda i: -abs(i["diff"]))[:CHANGES_LIMIT]
+        return {
+            "unit": "kWh", "mode": mode, "at": stichtag.isoformat() if stichtag else None,
+            "cur": {"start": win["start"].timestamp(), "end": win["end"].timestamp()},
+            "vj": {"start": win["vj_start"].timestamp(), "end": win["vj_end"].timestamp()},
+            "items": ranked, "consumers": len(consumers),
         }

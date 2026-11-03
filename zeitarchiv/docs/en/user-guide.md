@@ -685,6 +685,22 @@ and feed-in, less grid import and consumption), red unfavorable.
   days instead, so their percentages differ.
 - **Missing data** is not 0: if a period has no value, it shows “–”, with the
   start of the archive as a hint if it falls inside the period.
+- **What has changed?** A card with the consumers whose consumption changed most
+  compared with last year (period This year, reference day and last-year mode
+  as in the table). Bars to the right (red) mean more consumption, to the left
+  (green) less. Devices behind a sub-meter are included in the sub-meter; “Other
+  (base load)” is the rest up to the consumption from the balance. A consumer
+  that has values in only one of the two periods is not listed.
+- **Records:** Strongest generation day, highest feed-in, highest consumption and
+  highest grid import as daily values since the start of the archive, with date
+  and a link to the day (for roles with exactly one entity). Records appear only
+  from one year of archive. Days directly after a missing day do not count,
+  because the next reading carries the difference of several days there and
+  would give a false record; in a tie the earlier day counts.
+- **Key days per year:** For each calendar year the number of days with
+  self-sufficiency 100 % (no grid import with at least 0.5 kWh consumption), with
+  more feed-in than consumption and with hardly any generation (under 1 kWh),
+  plus the number of days evaluated. The same days count as for the records.
 - Totals from 10,000 kWh on are shown in MWh. The meters must deliver kWh, as
   on the overview.
 - **Monthly comparison:** Below it, a line chart shows the monthly values per

@@ -2470,3 +2470,46 @@ button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
 .wt-tm td.wt-tm-flag::after{content:"";position:absolute;top:0;right:0;border-style:solid;border-width:0 10px 10px 0;border-color:transparent var(--chart-7) transparent transparent;}
 .wt-tm a.wt-tm-link{display:block;color:inherit;text-decoration:none;border-radius:4px;}
 .wt-tm a.wt-tm-link:hover,.wt-tm a.wt-tm-link:focus-visible{outline:2px solid var(--accent-line);outline-offset:-2px;}
+/* „Was hat sich verändert?“ im Energiedashboard: Balken nach links (weniger) und rechts (mehr) von der Mitte. */
+.wt-chg{display:flex;flex-direction:column;gap:7px;margin-top:10px;}
+.wt-chg-row{display:grid;grid-template-columns:minmax(110px,190px) minmax(0,1fr) minmax(130px,190px);gap:10px;align-items:center;font-size:calc(13.5px * var(--font-scale, 1));}
+.wt-chg-name{min-width:0;overflow-wrap:anywhere;}
+.wt-chg-name a{color:inherit;text-decoration:none;}
+.wt-chg-name a:hover,.wt-chg-name a:focus-visible{color:var(--accent-line);text-decoration:underline;}
+.wt-chg-bar{position:relative;height:12px;background:var(--surface-alt);border-radius:3px;}
+.wt-chg-bar::before{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;border-left:1px solid var(--border-strong);}
+.wt-chg-bar i{position:absolute;top:0;bottom:0;border-radius:3px;}
+.wt-chg-val{font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));text-align:right;white-space:nowrap;}
+@media (max-width:640px){
+  .wt-chg-row{grid-template-columns:minmax(0,1fr);gap:3px;}
+  .wt-chg-val{text-align:left;}
+}
+
+/* Kacheln (Wetterdashboard, Rekorde im Energiedashboard): Kopfbalken in der Rollenfarbe, Beschriftung in Großbuchstaben, Wert in Monospace. */
+.wt-kpis{display:grid;grid-template-columns:repeat(var(--wt-cols, 3),minmax(0,1fr));gap:10px;margin:8px 0 14px;}
+.wt-record-link{font-size:calc(12px * var(--font-scale, 1));color:var(--accent-line);margin-top:2px;}
+/* Kacheln: Aufbau wie die Kennzahl-Kacheln des Energiedashboards (Kopfbalken in der Rollenfarbe,
+   Beschriftung in Großbuchstaben, Wert in Monospace); ganze Kachel verlinkt auf die Entität. */
+.wt-tiles{display:grid;grid-template-columns:repeat(var(--wt-cols, 4),minmax(0,1fr));gap:10px;}
+.wt-tile{--wt-accent:var(--chart-8);display:flex;flex-direction:column;gap:2px;min-width:0;padding:10px 12px;
+  text-decoration:none;color:inherit;border:1px solid var(--border);border-top:3px solid var(--wt-accent);
+  border-radius:8px;background:var(--surface-alt);}
+.wt-tile:hover{border-color:var(--wt-accent);}
+.wt-tile[data-role="temperature"]{--wt-accent:var(--chart-2);}
+.wt-tile[data-role="precip_mm"],.wt-tile[data-role="precip_dur"]{--wt-accent:var(--chart-3);}
+.wt-tile[data-role="humidity"]{--wt-accent:var(--chart-6);}
+.wt-tile[data-role="pressure"]{--wt-accent:var(--chart-4);}
+.wt-tile[data-role="wind"],.wt-tile[data-role="gust"]{--wt-accent:var(--chart-8);}
+.wt-tile[data-role="radiation"]{--wt-accent:var(--chart-7);}
+.wt-tiles[style*="--wt-cols:1"] .wt-tile{max-width:280px;}
+.wt-tile.wt-tile-wide{grid-column:1 / -1;}
+.wt-tile.is-loading{border-top-color:var(--border-strong);color:var(--ink-faint);animation:wt-pulse 1.2s ease-in-out infinite alternate;}
+@keyframes wt-pulse{from{opacity:.55;}to{opacity:1;}}
+@media (prefers-reduced-motion:reduce){.wt-tile.is-loading{animation:none;}}
+.wt-tile-label{font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600;font-family:var(--font-mono);}
+.wt-tile-value{font-family:var(--font-mono);font-size:calc(22px * var(--font-scale, 1));font-weight:600;font-variant-numeric:tabular-nums;line-height:1.25;}
+.wt-tile-value small{font-size:calc(13px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);margin-left:3px;}
+.wt-tile-sub{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);font-variant-numeric:tabular-nums;}
+@media (max-width:640px){
+  .wt-kpis{--wt-cols:2 !important;}
+}

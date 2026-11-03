@@ -8,8 +8,6 @@
   .wt-headline{font-size:calc(15px * var(--font-scale, 1));margin:8px 0 12px;color:var(--ink);}
   .wt-chart-tall{height:360px;}
   .wt-matrix{min-height:160px;}
-  .wt-kpis{display:grid;grid-template-columns:repeat(var(--wt-cols, 3),minmax(0,1fr));gap:10px;margin:8px 0 14px;}
-  .wt-record-link{font-size:calc(12px * var(--font-scale, 1));color:var(--accent-line);margin-top:2px;}
   .wt-controls select{font:inherit;font-size:calc(13px * var(--font-scale, 1));padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink);}
 
   .wt-chips em{font-style:normal;margin-left:6px;}
@@ -23,28 +21,6 @@
   .wt-heat-table thead .wt-g th{text-align:center;}
   .wt-heat-table td{font-size:calc(14px * var(--font-scale, 1));}
 
-  /* Kacheln: Aufbau wie die Kennzahl-Kacheln des Energiedashboards (Kopfbalken in der Rollenfarbe,
-     Beschriftung in Großbuchstaben, Wert in Monospace); ganze Kachel verlinkt auf die Entität. */
-  .wt-tiles{display:grid;grid-template-columns:repeat(var(--wt-cols, 4),minmax(0,1fr));gap:10px;}
-  .wt-tile{--wt-accent:var(--chart-8);display:flex;flex-direction:column;gap:2px;min-width:0;padding:10px 12px;
-    text-decoration:none;color:inherit;border:1px solid var(--border);border-top:3px solid var(--wt-accent);
-    border-radius:8px;background:var(--surface-alt);}
-  .wt-tile:hover{border-color:var(--wt-accent);}
-  .wt-tile[data-role="temperature"]{--wt-accent:var(--chart-2);}
-  .wt-tile[data-role="precip_mm"],.wt-tile[data-role="precip_dur"]{--wt-accent:var(--chart-3);}
-  .wt-tile[data-role="humidity"]{--wt-accent:var(--chart-6);}
-  .wt-tile[data-role="pressure"]{--wt-accent:var(--chart-4);}
-  .wt-tile[data-role="wind"],.wt-tile[data-role="gust"]{--wt-accent:var(--chart-8);}
-  .wt-tile[data-role="radiation"]{--wt-accent:var(--chart-7);}
-  .wt-tiles[style*="--wt-cols:1"] .wt-tile{max-width:280px;}
-  .wt-tile.wt-tile-wide{grid-column:1 / -1;}
-  .wt-tile.is-loading{border-top-color:var(--border-strong);color:var(--ink-faint);animation:wt-pulse 1.2s ease-in-out infinite alternate;}
-  @keyframes wt-pulse{from{opacity:.55;}to{opacity:1;}}
-  @media (prefers-reduced-motion:reduce){.wt-tile.is-loading{animation:none;}}
-  .wt-tile-label{font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600;font-family:var(--font-mono);}
-  .wt-tile-value{font-family:var(--font-mono);font-size:calc(22px * var(--font-scale, 1));font-weight:600;font-variant-numeric:tabular-nums;line-height:1.25;}
-  .wt-tile-value small{font-size:calc(13px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);margin-left:3px;}
-  .wt-tile-sub{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);font-variant-numeric:tabular-nums;}
 
   .wt-cols{display:flex;flex-wrap:wrap;gap:4px 14px;}
   .wt-check{display:inline-flex;align-items:center;gap:6px;font-size:calc(13.5px * var(--font-scale, 1));cursor:pointer;}
@@ -138,7 +114,6 @@
   .wt-unit{font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
 
   @media (max-width:640px){
-    .wt-kpis{--wt-cols:2 !important;}
     .wt-chart-tall{height:300px;}
     .wt-chart.wt-kk-chart{height:190px;}
     .wt-table th:first-child,.wt-table td:first-child{min-width:78px;max-width:100px;white-space:normal;}

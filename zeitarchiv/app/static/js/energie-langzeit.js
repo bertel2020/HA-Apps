@@ -209,6 +209,9 @@
       _seq: 0,
       months: null,
       monthsError: '',
+      changes: null,
+      records: null,
+      recordsError: '',
       monthlyRole: 'erzeugung',
       matrixRole: 'erzeugung',
       band: true,
@@ -226,13 +229,15 @@
             this.opened = true;
             this.loadTable();
             this.loadMonths();
+            this.loadRecords();
+            this.loadChanges();
           } else if (event.detail === 'long' && this.months) {
             // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
             this.$nextTick(() => Object.values(charts).forEach((chart) => chart.resize()));
           }
         });
         // Stichtag-Leiste des App-Standards: bei jeder Änderung die Tabelle neu laden.
-        window.addEventListener('dashboard-stichtag', () => { if (this.opened) this.loadTable(); });
+        window.addEventListener('dashboard-stichtag', () => { if (this.opened) { this.loadTable(); this.loadChanges(); } });
       },
 
       columnName,
@@ -304,6 +309,7 @@
       saveAndLoad() {
         writeStore({columns: this.columns, vorjahr: this.vorjahr, mode: this.mode});
         this.loadTable();
+        this.loadChanges();
       },
 
       modeHint() {
@@ -324,6 +330,110 @@
         const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
         const iso = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
         return stichtag === iso ? t('Gestern') : t('Rückblick');
+      },
+
+      // Rekorde und Kenntage je Jahr: einmal je Seitenaufruf, sie hängen nicht am Stichtag.
+      async loadRecords() {
+        this.recordsError = '';
+        try {
+          const res = await fetch('energiedashboard/langzeit/records');
+          if (!res.ok) throw new Error(String(res.status));
+          this.records = await res.json();
+          this.$nextTick(() => this.drawKenntage());
+        } catch (e) {
+          this.recordsError = t('Rekorde und Kenntage konnten nicht geladen werden.');
+        }
+      },
+
+      recordsNote() {
+        return t('Höchste Tageswerte seit Beginn des Archivs. Tage direkt nach einem fehlenden Tag zählen nicht mit, weil dort die Differenz mehrerer Tage steht und einen Schein-Rekord ergäbe. Bei Gleichstand gilt der frühere Tag.');
+      },
+
+      recordAccent(key) {
+        return {erzeugung: 'var(--chart-7)', einspeisung: 'var(--chart-4)', verbrauch: 'var(--chart-2)', netzbezug: 'var(--chart-3)'}[key] || 'var(--chart-8)';
+      },
+
+      recordValue(record) {
+        const text = energy(record.value);
+        const [value, unit] = text.split('\u00a0');
+        return `${escapeHtml(value)}<small>${escapeHtml(unit)}</small>`;
+      },
+
+      recordDate(record) {
+        return fmtDate(formats.dmy, Date.parse(record.date + 'T12:00:00Z') / 1000);
+      },
+
+      recordLink(record) {
+        return `entities/${encodeURIComponent(record.entity_id)}?range=day&offset=${record.offset}`;
+      },
+
+      kenntageNote() {
+        return t('Tage je Kalenderjahr: Autarkie 100 % (kein Netzbezug bei mindestens 0,5 kWh Verbrauch), mehr Einspeisung als Verbrauch und kaum Erzeugung (unter 1 kWh). Es zählen nur Tage mit allen Werten, ohne den Tag nach einem fehlenden Tag.');
+      },
+
+      drawKenntage() {
+        const r = this.records;
+        const table = this.$refs.kenntageTable;
+        if (!r || !table) return;
+        const columns = [];
+        if (r.has_import) columns.push({field: 'autarkie', label: t('Autarkie 100 %')});
+        if (r.has_export) columns.push({field: 'einspeisung_ueber_verbrauch', label: t('Einspeisung über Verbrauch')});
+        if (r.has_pv) columns.push({field: 'kaum_pv', label: t('Kaum Erzeugung')});
+        let html = `<thead><tr><th></th>${columns.map((c) => `<th class="wt-cur wt-sep">${escapeHtml(c.label)}</th>`).join('')}`
+          + `<th class="wt-vj">${escapeHtml(t('Ausgewertete Tage'))}</th></tr></thead><tbody>`;
+        const current = new Date().getFullYear();
+        for (const row of r.kenntage) {
+          html += `<tr><th scope="row">${row.year}${row.year === current ? '*' : ''}</th>`;
+          for (const c of columns) html += `<td class="wt-sep"><span class="wt-v">${escapeHtml(num(row[c.field], 0))}</span></td>`;
+          html += `<td class="wt-vj"><span class="wt-v">${escapeHtml(num(row.days, 0))}</span></td></tr>`;
+        }
+        table.innerHTML = html + '</tbody>';
+      },
+
+      // Verbraucher mit der größten Änderung; Stichtag und Vorjahr-Modus wie die Vergleichstabelle.
+      async loadChanges() {
+        try {
+          const res = await fetch('energiedashboard/langzeit/changes', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({mode: this.mode, at: this.stichtag()}),
+          });
+          if (!res.ok) throw new Error(String(res.status));
+          this.changes = await res.json();
+          this.$nextTick(() => this.drawChanges());
+        } catch (e) {
+          this.changes = null;
+        }
+      },
+
+      changesNote() {
+        return t('Verbraucher mit der größten Änderung gegenüber dem Vorjahr, im Zeitraum Dieses Jahr (Stichtag und Vorjahr wie in der Vergleichstabelle). Rot: mehr Verbrauch, grün: weniger. Geräte hinter einem Zwischenzähler stehen im Zwischenzähler. „Übrige (Grundlast)“ ist der Rest bis zum Verbrauch laut Bilanz.');
+      },
+
+      changesRange() {
+        const c = this.changes;
+        if (!c) return '';
+        return `${rangeText(c.cur.start, c.cur.end)} ${t('gegen')} ${rangeText(c.vj.start, c.vj.end)}`;
+      },
+
+      drawChanges() {
+        const c = this.changes;
+        const box = this.$refs.changes;
+        if (!c || !box) return;
+        const peak = Math.max(...c.items.map((item) => Math.abs(item.diff)), 0.0001);
+        box.innerHTML = c.items.map((item) => {
+          const more = item.diff > 0;
+          const width = Math.max(1, Math.round(Math.abs(item.diff) / peak * 48));
+          const side = more ? `left:50%;width:${width}%` : `right:50%;width:${width}%`;
+          const color = more ? 'var(--danger)' : 'var(--positive)';
+          const percent = item.percent == null ? '' : ` (${item.percent > 0 ? '+' : '−'}${num(Math.abs(item.percent), 0)} %)`;
+          const text = (more ? '▲ +' : '▼ −') + energy(Math.abs(item.diff)) + percent;
+          const name = item.entity_id
+            ? `<a href="entities/${encodeURIComponent(item.entity_id)}">${escapeHtml(item.name)}</a>` : escapeHtml(item.name);
+          return `<div class="wt-chg-row"><span class="wt-chg-name">${name}</span>`
+            + `<div class="wt-chg-bar"><i style="${side};background:${color}"></i></div>`
+            + `<span class="wt-chg-val" style="color:${color}">${escapeHtml(text)}</span></div>`;
+        }).join('');
       },
 
       async loadMonths() {

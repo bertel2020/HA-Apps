@@ -737,6 +737,23 @@ Verbrauch), rot ungünstig.
   365 Tage, ihre Prozentwerte weichen deshalb ab.
 - **Fehlende Daten** sind kein 0: Liegt in einem Zeitraum kein Wert, steht dort
   „–“, mit dem Beginn des Archivs als Hinweis, wenn er im Zeitraum liegt.
+- **Was hat sich verändert?** Eine Karte mit den Verbrauchern, die sich gegenüber
+  dem Vorjahr am stärksten geändert haben (Zeitraum Dieses Jahr, Stichtag und
+  Vorjahr-Modus wie die Tabelle). Balken nach rechts (rot) heißen mehr Verbrauch,
+  nach links (grün) weniger. Geräte hinter einem Zwischenzähler stehen im
+  Zwischenzähler; „Übrige (Grundlast)“ ist der Rest bis zum Verbrauch laut
+  Bilanz. Ein Verbraucher, der nur in einem der beiden Zeiträume Werte hat, steht
+  nicht in der Liste.
+- **Rekorde:** Stärkster Erzeugungstag, höchste Einspeisung, höchster Verbrauch und
+  höchster Netzbezug als Tageswerte seit Beginn des Archivs, mit Datum und einem
+  Link auf den Tag (bei Rollen mit genau einer Entität). Rekorde erscheinen erst
+  ab einem Jahr Archiv. Tage direkt nach einem fehlenden Tag zählen nicht mit,
+  weil der nächste Messwert dort die Differenz mehrerer Tage trägt und einen
+  Schein-Rekord ergäbe; bei Gleichstand gilt der frühere Tag.
+- **Kenntage je Jahr:** Je Kalenderjahr die Zahl der Tage mit Autarkie 100 % (kein
+  Netzbezug bei mindestens 0,5 kWh Verbrauch), mit mehr Einspeisung als Verbrauch
+  und mit kaum Erzeugung (unter 1 kWh), dazu die Zahl der ausgewerteten Tage. Es
+  zählen dieselben Tage wie bei den Rekorden.
 - Summen ab 10.000 kWh erscheinen in MWh. Die Zähler müssen in kWh liefern,
   wie in der Übersicht.
 - **Monatsvergleich:** Darunter zeigt ein Liniendiagramm die Monatswerte je Jahr
