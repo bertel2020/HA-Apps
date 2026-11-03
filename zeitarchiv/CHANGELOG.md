@@ -44,6 +44,23 @@
   UTF-8-Kennung für Umlaute in Excel) oder frei mit Trennzeichen und
   Dezimalzeichen. Ohne Änderung kommt dieselbe Datei wie bisher.
 
+- **Energiedashboard, Reiter Langzeit**: Ein neuer Reiter vergleicht Zeiträume
+  über die Jahre, aufgebaut wie der Langzeit-Teil des Wetterdashboards.
+  - Vergleichstabelle für Dieser Monat, Letzter Monat und Dieses Jahr gegen den
+    Vorjahreszeitraum, mit Stichtag; dazu Eigenverbrauch, Autarkie, Speicher und
+    mit eingetragener Anlagenleistung (kWp je Erzeuger) der Ertrag je kWp und je
+    Einstrahlung
+  - Monatsvergleich der Jahre als Linien mit Mittel und Spanne, Matrix
+    **Jahre × Monate** mit Abweichung vom Mittel
+  - „Was hat sich verändert?“ zeigt die Verbraucher mit der größten Änderung
+  - Rekorde seit Archivbeginn
+  - **Kenntage je Jahr** in drei Paaren (fast autark und Überschusstage, Sonnentage
+    und trübe Tage, Speicher stark und kaum genutzt), wahlweise für ganze Jahre
+    oder nur bis heute; ein Klick zeigt die Tage im Jahreskalender
+  - Die Schwellen der Kenntage stehen im Setup unter „Kenntage“
+  - „Letzte 5“, „Letzte 10“ oder „Alle“ begrenzt die Jahre für Monatsvergleich,
+    Matrix und Kenntage
+
 ### Geändert
 
 - **CSV-Export, Assistent**: Der Assistent ist übersichtlicher.
@@ -121,6 +138,23 @@
   Excel" (semicolon, decimal comma, UTF-8 byte order mark for umlauts in
   Excel) or custom with separator and decimal separator. Without changes you
   get the same file as before.
+
+- **Energy dashboard, Long-term tab**: A new tab compares periods across the
+  years, built like the long-term part of the weather dashboard.
+  - Comparison table for This month, Last month and This year against the
+    previous year, with a reference date; plus self-consumption,
+    self-sufficiency, battery and, with the system size (kWp per generator)
+    entered, the yield per kWp and per irradiation
+  - Monthly comparison of the years as lines with average and range, matrix
+    **Years × months** with the deviation from the average
+  - "What has changed?" shows the consumers with the biggest change
+  - Records since the archive began
+  - **Key days per year** in three pairs (almost self-sufficient and surplus
+    days, sunny and dull days, battery heavily and barely used), for full years
+    or only up to today; a click shows the days in the year calendar
+  - The key day thresholds are in the setup under "Key days"
+  - "Last 5", "Last 10" or "All" limits the years for the monthly comparison,
+    matrix and key days
 
 #### Changed
 
