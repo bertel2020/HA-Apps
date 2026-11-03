@@ -278,7 +278,8 @@ class WetterService:
         )
 
     def summarize(
-        self, kind: str, rows: list[rollup_mod.FineRow], config: dict, held_off: bool = False
+        self, kind: str, rows: list[rollup_mod.FineRow], config: dict, held_off: bool = False,
+        unit: str | None = None,
     ) -> dict | None:
         """Kennzahlen einer Zeilenmenge; None, wenn es keine Werte gibt (nie 0 vortäuschen).
 
@@ -308,7 +309,8 @@ class WetterService:
             days = [(row.value or 0.0, row.bucket_start) for row in rows]
             if not days:
                 return None
-            wet = float(config["rain_day_mm"])
+            # Die Schwelle steht in mm; ein Zähler in Zoll braucht sie in Zoll.
+            wet = analysis.mm_to_unit(float(config["rain_day_mm"]), unit)
             top = max(days, key=lambda pair: (pair[0], -pair[1]))
             return {
                 "sum": sum(value for value, _ts in days),
@@ -368,6 +370,7 @@ class WetterService:
                     rows = self._rows(spec["entity_id"], spec["kind"], start, end, now_local, read_cache)
                     cell[side] = self.summarize(
                         spec["kind"], rows, config, held_off=bool(first_ts and first_ts < start.timestamp()),
+                        unit=spec["unit"],
                     )
                     # Fehlende Daten sind kein 0: Beginn des Archivs mitgeben, wenn er im Fenster liegt.
                     if cell[side] is None and first_ts and first_ts > start.timestamp():
@@ -416,7 +419,9 @@ class WetterService:
                 points = query_mod.query_daily_series(
                     self.deps.data_dir, self.deps.index, spec["entity_id"], start, end, tz, now_local, read_cache,
                 )
-                cell[side] = analysis.count_kenntage(points, tz, start.timestamp(), end.timestamp(), today)
+                cell[side] = analysis.count_kenntage(
+                    points, tz, start.timestamp(), end.timestamp(), today, unit=spec["unit"],
+                )
             cells[win["key"]] = cell
         return {
             "key": "kenntage", "entity_id": spec["entity_id"], "label": tr("Kenntage"), "kind": "kenntage",
@@ -466,10 +471,12 @@ class WetterService:
         }
         threshold = float(config["rain_day_minutes"] if kind == "dur" else config["rain_day_mm"])
         entity = self.deps.index.get_entity(entity_id)
+        # Verglichen wird in der Einheit der Entität; angezeigt (threshold unten) bleibt der eingestellte Wert in mm.
+        wet_threshold = threshold if kind == "dur" else analysis.mm_to_unit(threshold, entity["unit"] if entity else None)
         archive_start = (
             datetime.fromtimestamp(entity["first_ts"], self.deps.tz).date() if entity and entity["first_ts"] else None
         )
-        result = analysis.precipitation(daily, now_local.date(), threshold, hold_to_end=kind == "dur", archive_start=archive_start)
+        result = analysis.precipitation(daily, now_local.date(), wet_threshold, hold_to_end=kind == "dur", archive_start=archive_start)
         return {
             **result, "mode": kind, "unit": "min" if kind == "dur" else (entity["unit"] or "mm"),
             "threshold": threshold, "entity_id": entity_id, "tz": str(self.deps.tz),
@@ -600,6 +607,7 @@ class WetterService:
             return None
         today = now_local.date()
         points = self._daily(config["temperature"], now_local)
+        temperature_unit = self.deps.index.get_entity(config["temperature"])["unit"]
         found = analysis.records(points, self.deps.tz, today)
         entries: list[dict] = []
         if found:
@@ -635,7 +643,7 @@ class WetterService:
                     entry["unit"] = (source["unit"] if source else "") or ""
         entity = self.deps.index.get_entity(config["temperature"])
         return {
-            "kenntage": analysis.kenntage(points, self.deps.tz, today),
+            "kenntage": analysis.kenntage(points, self.deps.tz, today, temperature_unit),
             "records": entries, "records_since": found["since"] if found else None,
             "records_days": found["days"] if found else 0,
             "unit": entity["unit"] or "°C", "tz": str(self.deps.tz), "today": today.isoformat(),
@@ -662,6 +670,7 @@ class WetterService:
                 spec["kind"],
                 self._rows(spec["entity_id"], aggregation_type, today["start"], today["end"], now_local, read_cache),
                 config, held_off=bool(entity and entity["first_ts"] and entity["first_ts"] < today["start"].timestamp()),
+                unit=spec["unit"],
             )
             yesterday_summary = None
             if spec["kind"] != "standard":
@@ -669,6 +678,7 @@ class WetterService:
                     spec["kind"],
                     self._rows(spec["entity_id"], aggregation_type, yesterday["start"], yesterday["end"], now_local, read_cache),
                     config, held_off=bool(entity and entity["first_ts"] and entity["first_ts"] < yesterday["start"].timestamp()),
+                    unit=spec["unit"],
                 )
             tiles.append({
                 "key": spec["key"], "entity_id": spec["entity_id"], "kind": spec["kind"],

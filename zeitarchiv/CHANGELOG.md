@@ -82,6 +82,10 @@
     einer Rückfrage zurück
   - Gesperrte Felder zeigen ihren festen Wert
 
+- **Energiedashboard, Vergleich mit der Vorperiode**: Beim Zurückblättern wird
+  die Vorperiode nur noch mit den Energiemengen gerechnet, die der Vergleich
+  braucht. Die Seite lädt dadurch schneller; die Zahlen bleiben gleich.
+
 ### Behoben
 
 - **Indexprüfung meldete Fehlalarme**: Bei Entitäten mit eingestellter Auflösung
@@ -112,6 +116,25 @@
 
 - **Ungültiger API-Token**: Ein Token mit Sonderzeichen führte zu Fehler 500
   statt 401. Der Token wird beim Schreiben jetzt vor dem Inhalt geprüft.
+
+- **Energiedashboard, Kosten bei Preisänderung im Zeitraum**: Änderte sich ein
+  Preis (zum Beispiel ein Tarif-Helfer) mitten im Monat oder Jahr, galten alle
+  Stunden vor der ersten Änderung als „ohne Preis“. Kosten, Ø-Preis, vermiedene
+  Kosten und die Kosten je Verbraucher fielen zu niedrig aus. Es gilt jetzt der
+  Preis, der am Anfang des Zeitraums schon galt. Zurückliegende Zeiträume
+  werden dadurch anders angezeigt als bisher.
+
+- **Wetterdashboard, Kenntage und Regentage in anderen Einheiten**: Frost-,
+  Eis-, Sommer- und heiße Tage werden auch bei einem Sensor in °F oder K
+  richtig gezählt (vorher fast jeder Tag ein Sommertag), Regentage auch bei
+  einem Niederschlagszähler in Zoll.
+
+- **Tiefst- und Höchstwerte in den Auswertungen**: Bei Messwerten mit
+  eingestellter Auflösung ging der echte Tiefst- und Höchstwert verloren, weil
+  der Monatsabschluss nur aus den Mittelwerten der Zeitfenster rechnete (ein
+  kurzer Frost war im Stundenmittel nicht mehr zu sehen). Monate, die ab jetzt
+  abgeschlossen oder neu berechnet werden, behalten die echten Extremwerte;
+  bestehende Auswertungen bleiben unverändert.
 
 ---
 
@@ -196,6 +219,10 @@
     confirmation
   - Locked fields show their fixed value
 
+- **Energy dashboard, comparison with the previous period**: When paging back,
+  the previous period is calculated with only the energy amounts the comparison
+  needs. The page loads faster; the numbers stay the same.
+
 #### Fixed
 
 - **Index check reported false alarms**: For entities with a resolution set
@@ -224,6 +251,24 @@
 
 - **Invalid API token**: A token with special characters caused error 500
   instead of 401. When writing, the token is now checked before the content.
+
+- **Energy dashboard, costs when a price changes within the period**: If a
+  price (for example a tariff helper) changed in the middle of a month or year,
+  all hours before the first change counted as "no price". Costs, average
+  price, avoided costs and the costs per consumer came out too low. The price
+  that already applied at the start of the period is now used. Past periods are
+  therefore shown differently than before.
+
+- **Weather dashboard, key days and rain days in other units**: Frost, ice,
+  summer and hot days are now counted correctly for a sensor in °F or K
+  (before, almost every day was a summer day), and rain days for a rain counter
+  in inches.
+
+- **Minimum and maximum values in the analyses**: For measurements with a set
+  resolution, the true minimum and maximum were lost because the month closing
+  calculated only from the means of the time windows (a short frost was no
+  longer visible in the hourly mean). Months that are closed or recalculated
+  from now on keep the true extremes; existing analyses stay unchanged.
 
 ## 1.13.0 - 2026-11-01
 

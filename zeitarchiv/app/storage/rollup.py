@@ -193,7 +193,7 @@ def compute_fine_rollup(
 
 
 def compute_fine_rollup_with_key(
-    rows: list[tuple[float, float]],
+    rows: list[tuple],
     aggregation_type: str,
     bucket_key_fn,
     boundary_value: float | None,
@@ -209,6 +209,11 @@ def compute_fine_rollup_with_key(
     (z. B. ein Regensensor, der stundenlang unverändert meldet), muss korrekt auf
     alle betroffenen Buckets aufgeteilt werden statt komplett im Start-Bucket zu
     landen — sonst zeigt ein einzelner 5-Minuten-Bucket z. B. 3000 Sekunden "an".
+
+    rows sind (ts, value). Bei Standard-Entitäten darf eine Zeile um (min_value, max_value) erweitert sein: Die
+    Live-Auflösung und die Verdichtung speichern je Fenster den echten kleinsten und größten Rohwert neben dem
+    Mittel. Min/Max des Buckets sind dann die echten Extremwerte statt "Min/Max der Mittelwerte" (ein kurzer Frost
+    von −1 °C bei einem Stundenmittel von +0,5 °C ginge sonst verloren).
 
     window_start_ts gilt nur für Zustände: boundary_value ist dort der Zustand,
     der beim Fensteranfang schon galt, und reicht von window_start_ts bis zum
@@ -239,15 +244,22 @@ def compute_fine_rollup_with_key(
 
     if aggregation_type == "standard":
         sums: dict[datetime, list[float]] = {}
-        for ts, value in rows:
+        lows: dict[datetime, list[float]] = {}
+        highs: dict[datetime, list[float]] = {}
+        for row in rows:
+            ts, value = row[0], row[1]
+            low = row[2] if len(row) > 2 and row[2] is not None else value
+            high = row[3] if len(row) > 3 and row[3] is not None else value
             key = bucket_key_fn(ts)
             sums.setdefault(key, []).append(value)
+            lows.setdefault(key, []).append(low)
+            highs.setdefault(key, []).append(high)
         fine = [
             FineRow(
                 bucket_start=key.timestamp(),
                 value=sum(values) / len(values),
-                min_value=min(values),
-                max_value=max(values),
+                min_value=min(lows[key]),
+                max_value=max(highs[key]),
             )
             for key, values in sorted(sums.items())
         ]
@@ -478,7 +490,25 @@ def append_completed_month(
     Tageslastprofil bei Energiedashboard-Rollen (siehe energiedashboard_routes.py).
     """
     level = FINE_LEVEL[aggregation_type]
-    rows_raw = sorted(zip(month_table.column("ts").to_pylist(), month_table.column("value").to_pylist()))
+    rows_raw: list[tuple] = sorted(
+        zip(month_table.column("ts").to_pylist(), month_table.column("value").to_pylist())
+    )
+    if (
+        aggregation_type == "standard"
+        and "min_value" in month_table.column_names
+        and "max_value" in month_table.column_names
+    ):
+        # Zeilen mit gespeichertem Min/Max (Live-Auflösung, Verdichtung): die echten Extremwerte in den Rollup
+        # übernehmen. Ältere Archive ohne diese Spalten bleiben bei (ts, value).
+        rows_raw = sorted(
+            zip(
+                month_table.column("ts").to_pylist(),
+                month_table.column("value").to_pylist(),
+                month_table.column("min_value").to_pylist(),
+                month_table.column("max_value").to_pylist(),
+            ),
+            key=lambda row: (row[0], row[1]),
+        )
 
     # Zähler: Bezugswert für das erste Delta. Zustand: der Zustand, der beim
     # Monatsanfang schon galt (siehe compute_fine_rollup_with_key).

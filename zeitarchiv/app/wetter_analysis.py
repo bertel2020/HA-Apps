@@ -38,6 +38,33 @@ KENNTAGE = (
 )
 
 
+_FAHRENHEIT = {"°F", "℉"}
+_INCH = {"in", "inch", "inches"}
+
+
+def celsius_to_unit(value: float, unit: str | None) -> float:
+    """Ein Grenzwert in °C in der Einheit der Temperatur-Entität. Fahrenheit und Kelvin werden umgerechnet,
+    alles andere (°C, keine Einheit) bleibt wie es ist. Ohne das zählte ein °F-Sensor fast jeden Tag als
+    Sommertag (ab 25 °F) und einen Frosttag erst bei −18 °C, ein Kelvin-Sensor jeden Tag als heißen Tag."""
+    unit = (unit or "").strip()
+    if unit in _FAHRENHEIT:
+        return value * 9 / 5 + 32
+    if unit == "K":
+        return value + 273.15
+    return value
+
+
+def mm_to_unit(value: float, unit: str | None) -> float:
+    """Eine Menge in mm in der Einheit der Niederschlags-Entität (Zoll werden umgerechnet)."""
+    if (unit or "").strip().lower() in _INCH:
+        return value / 25.4
+    return value
+
+
+def _kenntage_limits(unit: str | None) -> list[tuple[str, float, str, str]]:
+    return [(key, celsius_to_unit(limit, unit), field, direction) for key, limit, field, direction in KENNTAGE]
+
+
 def slot_of(day: date) -> int:
     """Index 0..364 im Nicht-Schaltjahr; der 29.02. fällt auf den 28.02."""
     capped = day.day if not (day.month == 2 and day.day == 29) else 28
@@ -230,11 +257,13 @@ def headline(points: list[DailyPoint], tz: ZoneInfo, today: date) -> dict | None
     }
 
 
-def kenntage(points: list[DailyPoint], tz: ZoneInfo, today: date) -> dict:
+def kenntage(points: list[DailyPoint], tz: ZoneInfo, today: date, unit: str | None = None) -> dict:
     """Kenntage je Jahr und Monat. Der laufende Tag zählt nie, Tage ohne Abdeckung auch nicht.
 
     Rückgabe: {Jahr: {"frost": [12], "eis": [12], "sommer": [12], "heiss": [12], "days": [12]}} mit
-    "days" als Zahl der gezählten Tage je Monat (Grundlage für „n von m Tagen“)."""
+    "days" als Zahl der gezählten Tage je Monat (Grundlage für „n von m Tagen“). ``unit`` ist die Einheit der
+    Temperatur-Entität; die Grenzwerte sind °C und werden dorthin umgerechnet."""
+    limits = _kenntage_limits(unit)
     result: dict[int, dict[str, list[int]]] = {}
     for point in points:
         day = day_of(point, tz)
@@ -242,15 +271,19 @@ def kenntage(points: list[DailyPoint], tz: ZoneInfo, today: date) -> dict:
             continue
         year = result.setdefault(day.year, {key: [0] * 12 for key, *_rest in KENNTAGE} | {"days": [0] * 12})
         year["days"][day.month - 1] += 1
-        for key, limit, field, direction in KENNTAGE:
+        for key, limit, field, direction in limits:
             value = getattr(point, field)
             if (value < limit) if direction == "below" else (value >= limit):
                 year[key][day.month - 1] += 1
     return {str(year): counts for year, counts in sorted(result.items())}
 
 
-def count_kenntage(points: list[DailyPoint], tz: ZoneInfo, window_start: float, window_end: float, today: date) -> dict | None:
-    """Kenntage über ein Fenster (Tabellenzeilen). None ohne belegten Tag."""
+def count_kenntage(
+    points: list[DailyPoint], tz: ZoneInfo, window_start: float, window_end: float, today: date,
+    unit: str | None = None,
+) -> dict | None:
+    """Kenntage über ein Fenster (Tabellenzeilen). None ohne belegten Tag. ``unit`` wie bei kenntage()."""
+    limits = _kenntage_limits(unit)
     counts = {key: 0 for key, *_rest in KENNTAGE}
     days = 0
     for point in points:
@@ -259,7 +292,7 @@ def count_kenntage(points: list[DailyPoint], tz: ZoneInfo, window_start: float, 
         if day_of(point, tz) >= today or not point.covered or point.min_value is None or point.max_value is None:
             continue
         days += 1
-        for key, limit, field, direction in KENNTAGE:
+        for key, limit, field, direction in limits:
             value = getattr(point, field)
             if (value < limit) if direction == "below" else (value >= limit):
                 counts[key] += 1

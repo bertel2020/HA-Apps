@@ -1387,7 +1387,7 @@ class EnergieDashboardService:
             if price_entity_id not in hourly_price_cache:
                 price_entity = self.deps.index.get_entity(price_entity_id)
                 scale = _price_unit_scale(price_entity["unit"]) if price_entity is not None else 1.0
-                hourly_price_cache[price_entity_id] = (
+                series: dict[float, float] = (
                     {
                         ts: value * scale
                         for ts, value in query_mod.query_hourly_counter_series(
@@ -1398,6 +1398,18 @@ class EnergieDashboardService:
                     if price_entity is not None and price_entity["aggregation_type"] == "standard"
                     else {}
                 )
+                start_ts = window_start.timestamp()
+                if series and min(series) > start_ts:
+                    # Ein Preis gilt bis zum nächsten Wert. Die Stundenreihe enthält aber nur Stunden mit einem
+                    # Rohwert; der Preis, der schon am Fensteranfang galt (Tarif-Helfer, der sich selten ändert),
+                    # fehlt. Ersetzt sie die Bucket-Reihe (die diesen Randpunkt hat), gälten alle Stunden vor der
+                    # ersten Änderung als "ohne Preis" und die Kosten wären entsprechend zu niedrig.
+                    vorher = query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
+                        self.deps.data_dir, price_entity_id, start_ts, self.deps.tz, read_cache
+                    )
+                    if vorher is not None:
+                        series[start_ts] = vorher * scale
+                hourly_price_cache[price_entity_id] = series
             return hourly_price_cache[price_entity_id]
 
         def hourly_merge(parts: list[dict[float, float] | None], factors: list[float] | None = None) -> dict[float, float] | None:
@@ -3147,7 +3159,13 @@ class EnergieDashboardService:
             )
         else:
             rolling_current = current
-            rolling_previous = self.compute_flow(config, range_key, offset - 1, read_cache=read_cache)
+            # skip_quality: gebraucht werden nur die Energiemengen und Quoten (Vergleich, Autarkie, Eigenverbrauch).
+            # Ohne die Markierung rechnete die Vorperiode Kosten, Auffälligkeiten (je drei weitere Perioden),
+            # Speicher-Wirkungsgrad und Datenqualität mit und kostete damit etwa das Doppelte. Der laufende Fall
+            # oben (continuous) überspringt dasselbe ohnehin.
+            rolling_previous = self.compute_flow(
+                config, range_key, offset - 1, skip_quality=True, read_cache=read_cache,
+            )
         return (
             self._compare_kpi(rolling_current["kpi"], rolling_previous["kpi"]),
             rolling_current["kpi"],
