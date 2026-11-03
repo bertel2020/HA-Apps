@@ -768,6 +768,11 @@ Verbrauch), rot ungünstig.
   gefüllt, ein Klick auf einen Tag öffnet ihn im Energiedashboard. Es zählen nur
   Tage mit allen Werten, ohne den Tag nach einem fehlenden Tag. Die Schwellen
   stellt ihr im Setup unter „Kenntage“ ein, ein leeres Feld nimmt die Vorgabe.
+- **Bereiche ausblenden:** Im Setup unter „Langzeit“ lässt sich jeder Block der
+  Tabelle „Zeiträume im Vergleich“ (Quoten, Speicher, PV-Anlage wetterbereinigt)
+  und jede Karte des Reiters (Monatsvergleich, Jahre × Monate, Was hat sich
+  verändert?, Rekorde, Kenntage je Jahr) ein- und ausschalten. Der Block Energie
+  bleibt immer sichtbar. Abgewählte Karten laden ihre Daten gar nicht erst.
 - Summen ab 10.000 kWh erscheinen in MWh. Die Zähler müssen in kWh liefern,
   wie in der Übersicht.
 - **Monatsvergleich:** Darunter zeigt ein Liniendiagramm die Monatswerte je Jahr

@@ -277,6 +277,9 @@ def _empty_config() -> dict:
         # Schwellen der Kenntage im Reiter „Langzeit“ (siehe energie_langzeit.KENNTAGE_DEFAULTS). Nur geänderte Werte
         # stehen drin, ein fehlender Schlüssel heißt „Vorgabe“.
         "kenntage": {},
+        # Im Reiter „Langzeit“ abgewählte Bereiche (siehe energie_langzeit.TABLE_BLOCKS und CARD_BLOCKS). Leer heißt: alles
+        # sichtbar, auch für Configs aus älteren Versionen.
+        "langzeit_ausblenden": [],
     }
 
 
@@ -3579,12 +3582,18 @@ class EnergieDashboardService:
             kt_truebe: str = Form(""),
             kt_stark: str = Form(""),
             kt_schwach: str = Form(""),
+            langzeit_zeigen: list[str] = Form([]),
         ) -> HTMLResponse:
             if not netzbezug.strip():
                 raise HTTPException(status_code=422, detail=tr("Netzbezug ist Pflicht"))
             if anomalie_schwelle not in ANOMALIE_SCHWELLE_LABELS:
                 raise HTTPException(status_code=422, detail=tr("Ungültige Auffälligkeiten-Schwelle"))
 
+            # Abgewählt ist, was im Formular nicht angehakt ist; „energie“ lässt sich nicht abwählen.
+            langzeit_ausblenden = [
+                key for key in (*energie_langzeit.TABLE_BLOCKS[1:], *energie_langzeit.CARD_BLOCKS)
+                if key not in langzeit_zeigen
+            ]
             kenntage: dict[str, float] = {}
             for key, raw in (
                 ("autark", kt_autark), ("sonnig", kt_sonnig), ("truebe", kt_truebe),
@@ -3756,6 +3765,7 @@ class EnergieDashboardService:
                 "verbraucheranteile_gruppieren": verbraucheranteile_gruppieren == "on",
                 "anomalie_schwelle": anomalie_schwelle,
                 "kenntage": kenntage,
+                "langzeit_ausblenden": langzeit_ausblenden,
             }
             _save_config(deps.index, config)
             sync_hourly_rollup_flags(deps.index, [eid for eid, _ in self._config_entity_roles(config)])

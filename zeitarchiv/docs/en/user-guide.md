@@ -715,6 +715,11 @@ and feed-in, less grid import and consumption), red unfavorable.
   clicking a day opens it in the energy dashboard. Only days with all values
   count, without the day after a missing day. You set the thresholds in the setup
   under “Key days”; an empty field uses the default.
+- **Hiding areas:** In the setup under “Long term” you can switch every block
+  of the “Periods compared” table (ratios, battery, PV system weather-adjusted)
+  and every card of the tab (monthly comparison, years × months, what has
+  changed?, records, key days per year) on and off. The Energy block is always
+  visible. Cards you switch off do not even load their data.
 - Totals from 10,000 kWh on are shown in MWh. The meters must deliver kWh, as
   on the overview.
 - **Monthly comparison:** Below it, a line chart shows the monthly values per

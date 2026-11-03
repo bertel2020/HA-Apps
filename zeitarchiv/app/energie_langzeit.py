@@ -44,6 +44,20 @@ COLUMN_WINDOWS = {
 }
 #: Zeilen: Schlüssel, Gruppe, Beschriftung, Art (energy = kWh, pct = Prozent mit Differenz in Prozentpunkten, spec =
 #: kWh je kWp) und ob mehr davon günstig ("up"), ungünstig ("down") oder neutral (None) ist.
+#: Ausblendbare Bereiche des Reiters „Langzeit“ (Setup, `langzeit_ausblenden`): Blöcke der Vergleichstabelle und Karten.
+#: Der Block „energie“ bleibt immer, sonst wäre die Tabelle leer.
+TABLE_BLOCKS = ("energie", "quoten", "speicher", "pv")
+CARD_BLOCKS = ("monatsvergleich", "matrix", "veraenderungen", "rekorde", "kenntage")
+BLOCK_BY_GROUP = {"Energie": "energie", "Quoten": "quoten", "Speicher": "speicher", "PV-Anlage, wetterbereinigt": "pv"}
+
+
+def hidden_blocks(config: dict) -> set[str]:
+    """Im Setup abgewählte Bereiche (nur bekannte Schlüssel, „energie“ nie)."""
+    stored = config.get("langzeit_ausblenden")
+    allowed = set(TABLE_BLOCKS[1:]) | set(CARD_BLOCKS)
+    return {key for key in stored if key in allowed} if isinstance(stored, list) else set()
+
+
 ROWS: tuple[dict, ...] = (
     {"key": "erzeugung", "group": N_("Energie"), "label": N_("Erzeugung"), "better": "up", "kind": "energy"},
     {"key": "einspeisung", "group": N_("Energie"), "label": N_("Einspeisung"), "better": "up", "kind": "energy"},
@@ -333,7 +347,11 @@ class EnergieLangzeitService:
             "verbrauch": have_bus, "autarkie": have_bus, "eigenverbrauch": bool(roles["erzeugung"]),
             "spezifisch": pv, "einstrahlung": pv and radiation,
         }
-        return [row for row in ROWS if shown.get(row["key"], bool(roles.get(row["key"])))]
+        hidden = hidden_blocks(config)
+        return [
+            row for row in ROWS
+            if shown.get(row["key"], bool(roles.get(row["key"]))) and BLOCK_BY_GROUP[row["group"]] not in hidden
+        ]
 
     def compute_table(self, config: dict, body: TableRequest, now_local: datetime | None = None) -> dict:
         now_local = now_local or datetime.now(self.tz)

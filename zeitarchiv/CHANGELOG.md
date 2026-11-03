@@ -60,6 +60,8 @@
   - Die Schwellen der Kenntage stehen im Setup unter „Kenntage“
   - „Letzte 5“, „Letzte 10“ oder „Alle“ begrenzt die Jahre für Monatsvergleich,
     Matrix und Kenntage
+  - Im Setup unter „Langzeit“ lassen sich die Blöcke der Tabelle und jede Karte
+    ein- und ausschalten
 
 ### Geändert
 
@@ -155,6 +157,8 @@
   - The key day thresholds are in the setup under "Key days"
   - "Last 5", "Last 10" or "All" limits the years for the monthly comparison,
     matrix and key days
+  - In the setup under "Long term" the table blocks and every card can be
+    switched on and off
 
 #### Changed
 

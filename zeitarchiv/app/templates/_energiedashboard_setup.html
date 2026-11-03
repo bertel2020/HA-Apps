@@ -1099,11 +1099,37 @@
       </dialog>
     </section>
 
-    {# Schwellen der Kenntage im Reiter „Langzeit“. Ein leeres Feld heißt „Vorgabe“ (steht als Platzhalter); gespeichert
-       werden nur geänderte Werte (siehe energie_langzeit.KENNTAGE_DEFAULTS). #}
+    {# Reiter „Langzeit“: welche Bereiche sichtbar sind und die Schwellen der Kenntage. Ein leeres Schwellenfeld heißt „Vorgabe“
+       (steht als Platzhalter); gespeichert werden nur geänderte Werte (siehe energie_langzeit.KENNTAGE_DEFAULTS). Abgewählt
+       ist, was nicht angehakt ist (`langzeit_ausblenden`); der Block „Energie“ bleibt immer. #}
     <section class="settings-section edash-section-neutral">
-      <h2 class="settings-section-title">{{ _("Kenntage") }} {{ hint_button(_('Kenntage-Schwellen')) }}</h2>
-      <p class="settings-section-description">{{ _("Schwellen für die Kenntage im Reiter „Langzeit“. Ein leeres Feld verwendet die Vorgabe.") }}</p>
+      <h2 class="settings-section-title">{{ _("Langzeit") }} {{ hint_button(_('Langzeit-Anzeige')) }}</h2>
+      <p class="settings-section-description">{{ _("Welche Bereiche der Reiter „Langzeit“ zeigt, und die Schwellen der Kenntage.") }}</p>
+      {% call hint_body() %}{{ _("Bereiche ohne passende Einrichtung (zum Beispiel Speicher ohne Speicher-Rolle) erscheinen ohnehin nicht. Energie in der Tabelle bleibt immer sichtbar.") }}{% endcall %}
+      {% set hidden = config.langzeit_ausblenden or [] %}
+      <div class="field" style="margin-bottom:0;">
+        <label>{{ _("Tabelle „Zeiträume im Vergleich“") }}</label>
+        <div class="edash-toggle-list">
+          <label class="filter-chip"><input type="checkbox" checked disabled><span>{{ _("Energie") }}</span></label>
+          <label class="filter-chip"><input type="checkbox" name="langzeit_zeigen" value="quoten" {% if 'quoten' not in hidden %}checked{% endif %}><span>{{ _("Quoten") }}</span></label>
+          <label class="filter-chip"><input type="checkbox" name="langzeit_zeigen" value="speicher" {% if 'speicher' not in hidden %}checked{% endif %}><span>{{ _("Speicher") }}</span></label>
+          <label class="filter-chip"><input type="checkbox" name="langzeit_zeigen" value="pv" {% if 'pv' not in hidden %}checked{% endif %}><span>{{ _("PV-Anlage, wetterbereinigt") }}</span></label>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:0;margin-top:14px;">
+        <label>{{ _("Karten") }}</label>
+        <div class="edash-toggle-list">
+          <label class="filter-chip"><input type="checkbox" name="langzeit_zeigen" value="monatsvergleich" {% if 'monatsvergleich' not in hidden %}checked{% endif %}><span>{{ _("Monatsvergleich") }}</span></label>
+          <label class="filter-chip"><input type="checkbox" name="langzeit_zeigen" value="matrix" {% if 'matrix' not in hidden %}checked{% endif %}><span>{{ _("Jahre × Monate") }}</span></label>
+          <label class="filter-chip"><input type="checkbox" name="langzeit_zeigen" value="veraenderungen" {% if 'veraenderungen' not in hidden %}checked{% endif %}><span>{{ _("Was hat sich verändert?") }}</span></label>
+          <label class="filter-chip"><input type="checkbox" name="langzeit_zeigen" value="rekorde" {% if 'rekorde' not in hidden %}checked{% endif %}><span>{{ _("Rekorde") }}</span></label>
+          <label class="filter-chip"><input type="checkbox" name="langzeit_zeigen" value="kenntage" {% if 'kenntage' not in hidden %}checked{% endif %}><span>{{ _("Kenntage je Jahr") }}</span></label>
+        </div>
+      </div>
+      <div class="field" style="margin:18px 0 6px;">
+        <label>{{ _("Schwellen der Kenntage") }} {{ hint_button(_('Kenntage-Schwellen')) }}</label>
+      </div>
+      <p class="settings-section-description">{{ _("Ein leeres Feld verwendet die Vorgabe.") }}</p>
       {% call hint_body() %}{{ _("Fast autark zählt Tage, an denen der Netzbezug höchstens (100 − Wert) % des Verbrauchs ausmacht. Sonnentage brauchen bei jedem Erzeuger die Anlagenleistung (kWp). Trübe Tage vergleichen mit dem Tagesmittel des Jahres. Die beiden Speicher-Schwellen gelten für die Entladung je Tag.") }}{% endcall %}
       {% set kt = config.kenntage or {} %}
       <div class="edash-field-grid">

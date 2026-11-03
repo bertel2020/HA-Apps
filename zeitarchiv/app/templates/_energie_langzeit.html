@@ -4,7 +4,8 @@
    Aufbau wie die Wetter-Übersicht (_wetter_view.html): eine Karte, oben Titel und Stichtag-Leiste des
    App-Standards, darunter Spalten- und Vorjahres-Menü und die Tabelle. Die Daten kommen von
    POST energiedashboard/langzeit/table; energie-langzeit.js formatiert und zeichnet nur. #}
-<div x-data="energieLangzeit()">
+{% set hidden = config.langzeit_ausblenden or [] %}
+<div x-data="energieLangzeit({{ hidden | tojson }})">
   <div class="card wt-card">
     <div class="wt-controls wt-card-head">
       {# Der Titel nennt den Tag („Heute“, „Gestern“, sonst „Rückblick“); in der Vergangenheit springt ein Klick auf heute. #}
@@ -43,9 +44,10 @@
 
   <p class="hint hint-warn" x-show="monthsError" x-text="monthsError" x-cloak></p>
 
+{% if 'monatsvergleich' not in hidden or 'matrix' not in hidden or 'kenntage' not in hidden %}
   {# Anzahl der Jahre: gilt gemeinsam für Monatsvergleich, Jahre × Monate und Kenntage, damit alle drei dieselben Jahre
      und dieselbe Basis für Ø zeigen. Rekorde zählen immer seit Archivbeginn. #}
-  <div class="wt-yearbar" x-show="months" x-cloak>
+  <div class="wt-yearbar" x-show="months || records" x-cloak>
     <span class="wt-yearbar-label">{{ _("Jahre") }}</span>
     <span class="wt-yearbar-note">{{ _("Gilt für Monatsvergleich, Jahre × Monate und Kenntage.") }}</span>
     <div class="wt-seg" role="group" aria-label="{{ _('Anzahl der Jahre') }}">
@@ -54,7 +56,9 @@
       </template>
     </div>
   </div>
+{% endif %}
 
+{% if 'monatsvergleich' not in hidden %}
   {# Monatsvergleich: eine Linie je Jahr über Jan–Dez, wie der Monatsvergleich des Wetterdashboards. #}
   <div class="card wt-card" x-show="months" x-cloak>
     <div class="wt-controls">
@@ -69,7 +73,9 @@
     </div>
     <div class="wt-chart" x-ref="monthlyChart"></div>
   </div>
+{% endif %}
 
+{% if 'matrix' not in hidden %}
   {# Jahre × Monate: dieselbe Tabelle wie „Mitteltemperatur je Monat und Jahr“ im Wetterdashboard. #}
   <div class="card wt-card" x-show="months" x-cloak>
     <div class="wt-controls">
@@ -88,7 +94,9 @@
     <p class="wt-foot">{{ _("Ein Klick auf ein Feld öffnet den Monat der Entität (bei Rollen mit genau einer Entität). Das Dreieck oben rechts markiert Messlücken oder Zählersprünge, der Tooltip nennt sie. * laufendes Jahr, der laufende Monat zählt im Mittel nicht mit.") }}</p>
 
   </div>
+{% endif %}
 
+{% if 'veraenderungen' not in hidden %}
   {# Was hat sich verändert? Verbraucher mit der größten Änderung gegenüber dem Vorjahr (Stichtag und Vorjahr-Modus wie die Tabelle). #}
   <div class="card wt-card" x-show="changes && changes.consumers" x-cloak>
     <div class="wt-controls">
@@ -99,9 +107,11 @@
     <div class="wt-chg" x-ref="changes"></div>
     <p class="hint hint-status" x-show="changes && !changes.items.length" x-cloak>{{ _("Noch keine Verbraucher mit Werten in beiden Zeiträumen.") }}</p>
   </div>
+{% endif %}
 
   <p class="hint hint-warn" x-show="recordsError" x-text="recordsError" x-cloak></p>
 
+{% if 'rekorde' not in hidden %}
   {# Rekorde: höchste Tageswerte seit Archivbeginn. #}
   <div class="card wt-card" x-show="records && records.enough && records.records.length" x-cloak>
     <div class="wt-controls">
@@ -120,7 +130,9 @@
     </div>
   </div>
   <p class="hint hint-status" x-show="records && !records.enough" x-cloak>{{ _("Rekorde erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte enthält.") }}</p>
+{% endif %}
 
+{% if 'kenntage' not in hidden %}
   {# Kenntage je Jahr: sechs Kenntage in drei Paaren, je Jahr ein Balken (Anteil an den ausgewerteten Tagen). Ein Klick auf
      eine Zeile öffnet den Jahreskalender. #}
   <div class="card wt-card" x-show="records && records.kenntage && records.kenntage.available.length" x-cloak>
@@ -153,5 +165,6 @@
       <span><i class="wt-ktcal-off"></i>{{ _("außerhalb des Zeitraums") }}</span>
     </div>
   </dialog>
+{% endif %}
 
 </div>

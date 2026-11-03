@@ -227,7 +227,9 @@
 
   let lastTable = null;
 
-  window.energieLangzeit = function energieLangzeit() {
+  // hidden: im Setup abgewählte Bereiche (Schlüssel wie energie_langzeit.CARD_BLOCKS); deren Daten werden gar nicht erst geladen.
+  window.energieLangzeit = function energieLangzeit(hidden = []) {
+    const shown = (key) => !hidden.includes(key);
     return {
       columnKeys: COLUMN_KEYS,
       columns: [...COLUMN_KEYS],
@@ -263,16 +265,16 @@
           if (event.detail === 'long' && !this.opened) {
             this.opened = true;
             this.loadTable();
-            this.loadMonths();
-            this.loadRecords();
-            this.loadChanges();
+            if (shown('monatsvergleich') || shown('matrix')) this.loadMonths();
+            if (shown('rekorde') || shown('kenntage')) this.loadRecords();
+            if (shown('veraenderungen')) this.loadChanges();
           } else if (event.detail === 'long' && this.months) {
             // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
             this.$nextTick(() => Object.values(charts).forEach((chart) => chart.resize()));
           }
         });
         // Stichtag-Leiste des App-Standards: bei jeder Änderung die Tabelle neu laden.
-        window.addEventListener('dashboard-stichtag', () => { if (this.opened) { this.loadTable(); this.loadChanges(); } });
+        window.addEventListener('dashboard-stichtag', () => { if (this.opened) { this.loadTable(); if (shown('veraenderungen')) this.loadChanges(); } });
       },
 
       columnName,

@@ -3514,7 +3514,6 @@
     "Fast autark zählt Tage, an denen der Netzbezug höchstens (100 − Wert) % des Verbrauchs ausmacht. Sonnentage brauchen bei jedem Erzeuger die Anlagenleistung (kWp). Trübe Tage vergleichen mit dem Tagesmittel des Jahres. Die beiden Speicher-Schwellen gelten für die Entladung je Tag.": "Almost self-sufficient counts days on which grid import is at most (100 − value) % of consumption. Sunny days need the system size (kWp) on every generator. Dull days compare with the year’s daily average. The two battery thresholds apply to discharge per day.",
     "Kenntag (Klick öffnet den Tag)": "Key day (click opens the day)",
     "Kenntage-Schwellen": "Key day thresholds",
-    "Schwellen für die Kenntage im Reiter „Langzeit“. Ein leeres Feld verwendet die Vorgabe.": "Thresholds for the key days in the “Long term” tab. An empty field uses the default.",
     "Sonnentage ab": "Sunny days from",
     "Speicher kaum genutzt unter": "Battery barely used below",
     "Speicher stark genutzt ab": "Battery heavily used from",
@@ -3523,7 +3522,14 @@
     "außerhalb des Zeitraums": "outside the period",
     "kein Kenntag": "not a key day",
     "nicht ausgewertet": "not evaluated",
-    "Gilt für Monatsvergleich, Jahre × Monate und Kenntage.": "Applies to the monthly comparison, years × months and key days."
+    "Gilt für Monatsvergleich, Jahre × Monate und Kenntage.": "Applies to the monthly comparison, years × months and key days.",
+    "Bereiche ohne passende Einrichtung (zum Beispiel Speicher ohne Speicher-Rolle) erscheinen ohnehin nicht. Energie in der Tabelle bleibt immer sichtbar.": "Areas without a matching setup (for example battery without a battery role) do not appear anyway. Energy in the table is always visible.",
+    "Ein leeres Feld verwendet die Vorgabe.": "An empty field uses the default.",
+    "Karten": "Cards",
+    "Langzeit-Anzeige": "Long-term display",
+    "Schwellen der Kenntage": "Key day thresholds",
+    "Tabelle „Zeiträume im Vergleich“": "Table “Periods compared”",
+    "Welche Bereiche der Reiter „Langzeit“ zeigt, und die Schwellen der Kenntage.": "Which areas the “Long term” tab shows, and the thresholds for the key days."
   },
   "js": {
     "Ladestand": "State of charge",

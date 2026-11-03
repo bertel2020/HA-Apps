@@ -449,6 +449,49 @@ def test_kalender_route_lehnt_unbekannte_kenntage_ab(client) -> None:
         index.set_setting(ed.SETTING_CONFIG, "")
 
 
+def test_abgewaehlte_tabellenbloecke_entfallen_energie_bleibt(service) -> None:
+    config = _config(
+        netzbezug="sensor.netz", einspeisung="sensor.einsp", erzeuger=[{"entity_id": "sensor.pv", "kwp": 9.8}],
+        speicher=[{"laden_entity_id": "sensor.lad", "entladen_entity_id": "sensor.ent"}],
+    )
+    roles = lz.role_entities(config)
+    alle = {r["key"] for r in service.visible_rows(config, roles)}
+    assert {"eigenverbrauch", "autarkie", "ladung", "entladung", "spezifisch"} <= alle
+
+    config["langzeit_ausblenden"] = ["quoten", "speicher", "pv", "energie", "unbekannt"]
+    rest = {r["key"] for r in service.visible_rows(config, roles)}
+    assert rest == {"erzeugung", "einspeisung", "netzbezug", "verbrauch"}   # „energie“ lässt sich nicht abwählen
+    assert lz.hidden_blocks(config) == {"quoten", "speicher", "pv"}
+    assert lz.hidden_blocks(_config(langzeit_ausblenden="kaputt")) == set()
+
+
+def test_bereiche_des_reiters_werden_im_setup_gespeichert_und_nicht_gerendert(client) -> None:
+    from app.main import index
+
+    index.set_setting(ed.SETTING_CONFIG, "")
+    try:
+        alles = client.post("/energiedashboard/setup", data={
+            "netzbezug": "sensor.setup_netz",
+            "langzeit_zeigen": ["quoten", "speicher", "pv", "monatsvergleich", "matrix", "veraenderungen", "rekorde", "kenntage"],
+        })
+        assert ed._load_config(index)["langzeit_ausblenden"] == []
+        assert 'x-ref="monthlyChart"' in alles.text and 'x-ref="kenntage"' in alles.text
+
+        wenig = client.post("/energiedashboard/setup", data={
+            "netzbezug": "sensor.setup_netz", "langzeit_zeigen": ["quoten", "rekorde"],
+        })
+        assert ed._load_config(index)["langzeit_ausblenden"] == [
+            "speicher", "pv", "monatsvergleich", "matrix", "veraenderungen", "kenntage",
+        ]
+        for ref in ('x-ref="monthlyChart"', 'x-ref="matrixTable"', 'x-ref="changes"', 'x-ref="kenntage"', "wt-yearbar"):
+            assert ref not in wenig.text, ref
+        assert "wt-kpis" in wenig.text                                   # die Rekorde sind angehakt geblieben
+        assert 'x-ref="table"' in wenig.text                              # die Tabelle gibt es immer
+        assert '"monatsvergleich"' in wenig.text                          # das Frontend lädt die abgewählten Daten nicht
+    finally:
+        index.set_setting(ed.SETTING_CONFIG, "")
+
+
 # -- Rekorde, Kenntage und Veränderungen (P4) -----------------------------------------------------
 
 
