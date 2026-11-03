@@ -94,6 +94,25 @@
   öffnete und zur Liste zurückkehrte, landete wieder auf Seite 1. Die Liste
   öffnet jetzt auf der zuletzt gezeigten Seite.
 
+- **Monatsdateien absturzsicher**: Ein Stromausfall oder Absturz mitten im
+  Schreiben konnte die Datei des laufenden Monats oder einen archivierten Monat
+  beschädigen; ein beschädigtes Archiv stoppte danach die Aufnahme aller
+  Entitäten. Die Dateien werden jetzt atomar ersetzt, und ein nicht
+  archivierbarer Vormonat hält die Aufnahme nicht mehr auf.
+
+- **Export, Importliste und Statistik hielten die Aufnahme an**: Nach einem
+  CSV-Export blieben spätere Backups und Wartungen hängen, und die
+  Importseite oder die Statistik stoppten während eines langen Imports die
+  Aufnahme aus Home Assistant. Das Löschen von Reports und Backups antwortet
+  bei laufendem Import nach wenigen Sekunden mit „ausgelastet“ statt zu warten.
+
+- **Sicherheit, Diagramm-Tooltips**: Namen und Einheiten von Entitäten werden
+  in den Tooltips des Energiedashboards, des Chart-Editors und der
+  Entitätsseite als Text angezeigt, nie als Markup.
+
+- **Ungültiger API-Token**: Ein Token mit Sonderzeichen führte zu Fehler 500
+  statt 401. Der Token wird beim Schreiben jetzt vor dem Inhalt geprüft.
+
 ---
 
 ### English
@@ -186,6 +205,25 @@
 
 - **Entity list remembers the page**: Opening an entity from page 2 and going
   back used to land on page 1 again. The list now opens on the page last shown.
+
+- **Monthly files crash-safe**: A power failure or crash in the middle of a
+  write could damage the current month's file or an archived month, and a
+  damaged archive then stopped ingestion for all entities. Files are now
+  replaced atomically, and a previous month that cannot be archived no longer
+  holds ingestion up.
+
+- **Export, import list and statistics held up ingestion**: After a CSV
+  export, later backups and maintenance runs could hang, and the import page or
+  the statistics page stopped ingestion from Home Assistant during a long
+  import. Deleting reports and backups answers "busy" after a few seconds while
+  an import runs instead of waiting.
+
+- **Security, chart tooltips**: Entity names and units are shown as text in the
+  tooltips of the energy dashboard, the chart editor and the entity page,
+  never as markup.
+
+- **Invalid API token**: A token with special characters caused error 500
+  instead of 401. When writing, the token is now checked before the content.
 
 ## 1.13.0 - 2026-11-01
 
