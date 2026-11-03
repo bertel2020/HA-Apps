@@ -231,6 +231,44 @@ def build_heatmap(index: Index, *, days: int, kind: str, today: date) -> dict:
     }
 
 
+def monthly_findings(index: Index, entity_ids) -> dict[str, dict]:
+    """Messlücken und Zählerrückgänge je Entität und Kalendermonat, für Auswertungen über
+    mehrere Jahre (Matrix „Jahre × Monate“ im Energiedashboard).
+
+    Fasst die Tageszähler des Gesamt-Caches zu Monaten zusammen und liest keine Rohdaten.
+    Die Gültigkeitsregeln sind die der Heatmap: Lücken zählen nur, wenn sie mit der aktuellen
+    Schwelle gemessen wurden; Zählerrückgänge stehen im Cache nur, wenn sie für die Entität
+    überhaupt gezählt werden (``counter_decreases_flagged`` beim Messen).
+
+    Je Entität: ``measured`` (es gibt Tageszähler) und ``gaps_measured``, dazu ``months``
+    (``"JJJJ-MM"`` → ``{"gaps": n, "counter_decreases": n}``, nur Monate mit Befund).
+    Eine Entität ohne Tageszähler hat ``measured`` False: das heißt „nicht geprüft“, nicht
+    „ohne Befund“. Unbekannte Entitäten fehlen im Ergebnis.
+    """
+    entries = index.list_cleanup_alltime_stats()
+    result: dict[str, dict] = {}
+    for entity_id in entity_ids:
+        entity = index.get_entity(entity_id)
+        if entity is None:
+            continue
+        entry = entries.get(entity_id)
+        daily = (entry or {}).get("daily")
+        if daily is None:
+            result[entity_id] = {"measured": False, "gaps_measured": False, "months": {}}
+            continue
+        gaps_ok = cleanup_stats.gaps_measured(entity, entry)
+        months: dict[str, dict[str, int]] = {}
+        for day, per_day in daily.items():
+            for key in ("gaps", "counter_decreases"):
+                if key == "gaps" and not gaps_ok:
+                    continue
+                if n := per_day.get(key, 0):
+                    bucket = months.setdefault(day[:7], {})
+                    bucket[key] = bucket.get(key, 0) + n
+        result[entity_id] = {"measured": True, "gaps_measured": gaps_ok, "months": months}
+    return result
+
+
 SORT_KEYS = ("total", "name", "measured") + tuple(column["key"] for column in COLUMNS)
 KIND_KEYS = tuple(column["key"] for column in COLUMNS)
 

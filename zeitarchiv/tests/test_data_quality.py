@@ -588,3 +588,31 @@ def test_sortierung_nach_stand_aelteste_zuerst(index):
     assert [r["entity_id"] for r in aufsteigend] == ["sensor.alt", "sensor.neu"]
     absteigend = data_quality.filter_and_sort(rows, sort="measured", direction="desc")
     assert [r["entity_id"] for r in absteigend] == ["sensor.neu", "sensor.alt"]
+
+
+def test_monatsbefunde_fassen_tageszaehler_zu_monaten_zusammen(index):
+    _mit_tageszahlen(index, "sensor.a", {
+        "2025-03-04": {"gaps": 2},
+        "2025-03-20": {"gaps": 1, "counter_decreases": 3},
+        "2025-04-01": {"counter_decreases": 1},
+    })
+    ergebnis = data_quality.monthly_findings(index, ["sensor.a", "sensor.unbekannt"])
+    assert ergebnis["sensor.a"] == {
+        "measured": True, "gaps_measured": True,
+        "months": {"2025-03": {"gaps": 3, "counter_decreases": 3}, "2025-04": {"counter_decreases": 1}},
+    }
+    assert "sensor.unbekannt" not in ergebnis
+
+
+def test_monatsbefunde_ohne_tageszaehler_heissen_nicht_geprueft(index):
+    _mit_daten(index, "sensor.a")
+    ergebnis = data_quality.monthly_findings(index, ["sensor.a"])
+    assert ergebnis["sensor.a"] == {"measured": False, "gaps_measured": False, "months": {}}
+
+
+def test_monatsbefunde_zaehlen_luecken_nur_mit_passender_schwelle(index):
+    _mit_tageszahlen(index, "sensor.a", {"2025-03-04": {"gaps": 2, "counter_decreases": 1}})
+    index.set_config("sensor.a", gap_threshold="60")
+    ergebnis = data_quality.monthly_findings(index, ["sensor.a"])
+    assert ergebnis["sensor.a"]["gaps_measured"] is False
+    assert ergebnis["sensor.a"]["months"] == {"2025-03": {"counter_decreases": 1}}

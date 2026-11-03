@@ -1371,3 +1371,42 @@ def test_complete_prices_report_no_gap(monkeypatch, tmp: Path) -> None:
         assert pruefung["ok"] is True
     finally:
         a.close()
+
+
+def test_verbrauch_ist_die_bilanz_inklusive_speicher(monkeypatch, tmp: Path) -> None:
+    """Solange die Grundlast nicht negativ ist, ist der Verbrauch der Live-Ansicht genau die
+    Bilanz, die Trends, Monatsverlauf und die Jahre-×-Monate-Auswertung rechnen:
+    Erzeugung + Bezug + Entladung − Einspeisung − Ladung. 10 + 6 + 3 − 3 − 5 = 11."""
+    a, config = _mit_speicher(tmp, [{
+        "name": "Heimspeicher",
+        "laden_entity_id": "sensor.laden", "entladen_entity_id": "sensor.entladen",
+    }])
+    a.zaehler("sensor.laden", (0, 200.0), (23, 205.0))
+    a.zaehler("sensor.entladen", (0, 300.0), (23, 303.0))
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        kpi = a.service.compute_flow(config, "day", -1)["kpi"]
+        bilanz = (kpi["erzeugung"] + kpi["netzbezug"] + kpi["speicher_entladen"]
+                  - kpi["einspeisung"] - kpi["speicher_laden"])
+        assert bilanz == pytest.approx(11.0)
+        assert kpi["verbrauch"] == pytest.approx(bilanz)
+    finally:
+        a.close()
+
+
+def test_verbrauch_ist_nie_kleiner_als_die_summe_der_gemessenen_verbraucher(monkeypatch, tmp: Path) -> None:
+    """Bei negativer Grundlast (Zähler passen nicht zusammen) bleibt die Live-Ansicht bei der
+    Summe der gemessenen Verbraucher und meldet die Bilanz als unplausibel, statt weniger
+    Verbrauch zu zeigen, als nachweislich geflossen ist. Die Bilanz allein wäre hier 13 kWh,
+    gemessen sind 1 + 2 + 20 = 23 kWh. Das ist der einzige Fall, in dem Live und Bilanz
+    auseinanderlaufen (Roadmap 1.45, P0)."""
+    a, config = _beispielanlage(tmp)
+    a.zaehler("sensor.wallbox_gross", (0, 30.0), (12, 40.0), (23, 50.0))   # +20 statt +4
+    config["verbraucher"][2]["entity_id"] = "sensor.wallbox_gross"
+    monkeypatch.setattr(ed, "datetime", _FesteUhr)
+    try:
+        flow = a.service.compute_flow(config, "day", -1)
+        assert flow["kpi"]["verbrauch"] == pytest.approx(23.0)
+        assert flow["quality"]["plausible"] is False
+    finally:
+        a.close()
