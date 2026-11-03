@@ -857,6 +857,9 @@
         sumSkippedColumns() { return this.columns.filter(c => !c.hidden && c.in_sum === false); },
 
         async save() {
+          // Enter im Namensfeld ruft save() direkt auf, am gesperrten Knopf vorbei: ohne diesen Wächter entstanden bei
+          // Doppel-Enter oder Enter plus Klick zwei Einträge.
+          if (this.saving) return;
           if (!this.name.trim()) { appAlert(t('Bitte einen Namen für die Tabelle angeben.')); return; }
           if (!this.columns.length) { appAlert(t('Bitte mindestens eine Spalte anlegen.')); return; }
           if (!this.rows.length) { appAlert(t('Bitte mindestens eine Zeile anlegen.')); return; }
@@ -915,6 +918,9 @@
             this.savedMessage = t('✓ Gespeichert');
             this.editing = false;
             setTimeout(() => { this.savedMessage = ''; }, 2000);
+          } catch (error) {
+            // Netzwerkfehler: fetch() wirft nur dann; sonst bliebe nur der wieder freigegebene Knopf als Hinweis.
+            appAlert(t('Speichern fehlgeschlagen.'));
           } finally {
             this.saving = false;
           }

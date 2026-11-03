@@ -245,6 +245,11 @@
     });
   }
 
+  function nextRenderSeq(el) {
+    el.dataset.renderSeq = String((Number(el.dataset.renderSeq) || 0) + 1);
+    return el.dataset.renderSeq;
+  }
+
   async function renderTile(el) {
     // item-id sitzt auf der äußeren .dtile (auch Drag&Drop-Handle, siehe
     // setupDragAndDrop), die restlichen Daten auf dem inneren Link selbst.
@@ -255,13 +260,18 @@
     if (!chartEl || !entityIds.length) return;
 
     const base = el.closest('#dashboard-grid')?.dataset.appRoot || '';
+    // Laufnummer je Kachel: Wechselt der Stichtag schnell hintereinander (oder feuert der Auto-Refresh kurz davor),
+    // kann eine ältere Antwort zuletzt ankommen und die neuere überschreiben.
+    const seq = nextRenderSeq(el);
     let data;
     try {
       data = await fetchChartData(spec, {base, stichtag: stichtag(), widthPx: chartEl.clientWidth});
     } catch (e) {
+      if (el.dataset.renderSeq !== seq) return;
       chartEl.innerHTML = '<div class="dtile-loading">' + t('Fehler beim Laden') + '</div>';
       return;
     }
+    if (el.dataset.renderSeq !== seq) return;
     const series = prepareSeries(data);
     if (!hasData(series)) {
       chartEl.innerHTML = '<div class="dtile-loading">' + t('Keine Daten') + '</div>';
@@ -414,14 +424,17 @@
     const previewEl = el.querySelector('.dtile-table-preview');
     if (!previewEl) return;
     const base = el.closest('#dashboard-grid')?.dataset.appRoot || '';
+    const seq = nextRenderSeq(el);
     let table;
     try {
       table = await TableTileRender.compute(
         JSON.parse(el.dataset.columns || '[]'), JSON.parse(el.dataset.rows || '[]'), {base, at: stichtag()});
     } catch (e) {
+      if (el.dataset.renderSeq !== seq) return;
       previewEl.innerHTML = '<div class="dtile-loading">' + t('Fehler beim Laden') + '</div>';
       return;
     }
+    if (el.dataset.renderSeq !== seq) return;
     if (table.empty) {
       previewEl.innerHTML = '<div class="dtile-loading">' + t('Keine sichtbaren Zeilen/Spalten') + '</div>';
       return;
@@ -667,7 +680,7 @@
           + ` data-tooltip-fixed="${escapeHtml(StateEntities.label(st.states, idx))}"`
           + ` data-tooltip-dot="${StateEntities.swatchStyle(idx)}" data-tooltip-value="${NumberFormat.fmtDuration(seconds)}"></i>`)
         .join('');
-      const weekday = new Date(day.ts * 1000).toLocaleDateString(LOCALE, {weekday: 'short'});
+      const weekday = new Date(day.ts * 1000).toLocaleDateString(LOCALE, window.ServerTime.withZone({weekday: 'short'}));
       return `<div class="dtile-state-day"><span>${escapeHtml(weekday)}</span><div class="dtile-state-bar">${bars}</div></div>`;
     });
     return `<div class="dtile-state-days">${rows.join('')}</div>`;
@@ -750,7 +763,7 @@
       // "An"/"Aus" nur für den Momentanwert — eine Summe über Schalter ist
       // eine Einschaltdauer in Sekunden, kein Zustand.
       numberEl.textContent = istSchalter && primary === 'last'
-        ? (wert ? 'An' : t('Aus'))
+        ? (wert ? t('An') : t('Aus'))
         : (istSchalter && primary === 'sum'
             ? NumberFormat.fmtDuration(wert)
             : NumberFormat.fmt(wert, dezimal));
@@ -1563,19 +1576,20 @@
         });
       });
     });
+    // Die neue Reihenfolge bleibt im Browser wie gezogen stehen; nach dem Neuladen gälte aber der alte Stand. Das
+    // sah früher nach einem 4xx/5xx still wie gespeichert aus. Jetzt ein Hinweis, damit man es noch einmal versucht.
+    let saved = false;
     try {
-      await fetch(`${base}/dashboard/reorder`, {
+      const res = await fetch(`${base}/dashboard/reorder`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({dashboard_id: dashboardId, pins}),
       });
+      saved = res.ok;
     } catch (e) {
-      // Reihenfolge bleibt clientseitig wie gezogen bestehen — ein erneutes
-      // Laden der Seite würde bei einem Netzwerkfehler zwar auf den
-      // zuletzt gespeicherten Stand zurückfallen, das ist aber kein Zustand,
-      // der hier aktiv aufgelöst werden muss (kein Datenverlust, nur eine
-      // im schlimmsten Fall nicht übernommene Umsortierung).
+      saved = false;
     }
+    if (!saved && window.appAlert) window.appAlert(t('Die neue Reihenfolge konnte nicht gespeichert werden. Bitte versuche es noch einmal.'));
   }
 
   // Sektionen ein-/ausklappen — rein clientseitig, nur lokal im Browser
@@ -1610,6 +1624,8 @@
         collapsed = localStorage.getItem(sectionCollapseKey(group.dataset.sectionId)) === '1';
       } catch (e) { /* ohne gemerkten Zustand bleibt die Sektion ausgeklappt */ }
       group.classList.toggle('collapsed', collapsed);
+      const sectionToggle = group.querySelector('.dsection-toggle');
+      if (sectionToggle) sectionToggle.setAttribute('aria-expanded', String(!collapsed));
     });
     updateSectionHiddenCounts(root);
   }
@@ -1621,6 +1637,7 @@
     if (!group) return;
     const collapsed = !group.classList.contains('collapsed');
     group.classList.toggle('collapsed', collapsed);
+    toggle.setAttribute('aria-expanded', String(!collapsed));
     try {
       localStorage.setItem(sectionCollapseKey(group.dataset.sectionId), collapsed ? '1' : '0');
     } catch (err) { /* Zustand gilt dann nur für diesen Seitenaufruf */ }

@@ -438,7 +438,7 @@
       const groups = Array.from({length: 12}, () => []);
       points.forEach(point => {
         if (!Number.isFinite(point.value)) return;
-        groups[new Date(point.ts * 1000).getMonth()].push(point.value);
+        groups[window.ServerTime.parts(point.ts).month - 1].push(point.value);  // Kalendermonat des Servers, nicht des Browsers
       });
       return groups.map(values => {
         if (!values.length) return null;
@@ -726,6 +726,7 @@
         // gezeichnet werden (siehe load()).
         droppedStateIds: [],
         loading: false,
+        loadError: false,
         saving: false,
         savedMessage: '',
         _requestId: 0,
@@ -1622,6 +1623,7 @@
           if (this.compare && this.compareMode === 'longterm' && !this.longtermAvailable) this.compareMode = 'previous';
           const requestId = ++this._requestId;
           this.loading = true;
+          this.loadError = false;
           const params = new URLSearchParams({
             entity_ids: this.visibleEntityIds.join(','),
             range: this.range, offset: String(this.offset), continuous: String(this.continuous),
@@ -1645,16 +1647,26 @@
           columnsParams.set('compare', 'false');
           const chartEl = document.getElementById('chart');
           columnsParams.set('px', String(Math.max(60, Math.round((chartEl ? chartEl.clientWidth : 600) - 30))));
-          const [res, heatmapRes, columnsRes] = await Promise.all([
-            fetch(`${BASE}/api/query-multi?${params}`),
-            wantHeatmap ? fetch(`${BASE}/api/query-multi?${heatmapParams}`) : Promise.resolve(null),
-            wantColumns ? fetch(`${BASE}/api/query-multi?${columnsParams}`) : Promise.resolve(null),
-          ]);
-          const columnsData = columnsRes && columnsRes.ok ? await columnsRes.json() : null;
-          // Die Rohabfrage bricht bei zu vielen Wechseln mit einem Fehler ab: dann gilt die
-          // Spaltenantwort (Fenster, Zustandsliste und Spalten je Zustands-Entität).
-          const data = res.ok ? await res.json() : (columnsData || {});
-          const heatmapData = heatmapRes ? await heatmapRes.json() : null;
+          let res, heatmapRes, columnsRes, columnsData, data, heatmapData;
+          try {
+            [res, heatmapRes, columnsRes] = await Promise.all([
+              fetch(`${BASE}/api/query-multi?${params}`),
+              wantHeatmap ? fetch(`${BASE}/api/query-multi?${heatmapParams}`) : Promise.resolve(null),
+              wantColumns ? fetch(`${BASE}/api/query-multi?${columnsParams}`) : Promise.resolve(null),
+            ]);
+            columnsData = columnsRes && columnsRes.ok ? await columnsRes.json() : null;
+            // Die Rohabfrage bricht bei zu vielen Wechseln mit einem Fehler ab: dann gilt die
+            // Spaltenantwort (Fenster, Zustandsliste und Spalten je Zustands-Entität).
+            data = res.ok ? await res.json() : (columnsData || {});
+            heatmapData = heatmapRes && heatmapRes.ok ? await heatmapRes.json() : null;
+          } catch (error) {
+            // Netzwerkfehler oder ein 502 vom Proxy mit HTML statt JSON: sonst bliebe "Lädt …" für immer stehen.
+            if (requestId === this._requestId) {
+              this.loading = false;
+              this.loadError = true;
+            }
+            return;
+          }
           if (requestId !== this._requestId) return;
           if (heatmapData) {
             const cellsById = new Map((heatmapData.series || []).map(x => [x.entity_id, x.cells]));
@@ -3035,6 +3047,9 @@
         },
 
         async save() {
+          // Enter im Namensfeld ruft save() direkt auf, am gesperrten Knopf vorbei: ohne diesen Wächter entstanden bei
+          // Doppel-Enter oder Enter plus Klick zwei Einträge.
+          if (this.saving) return;
           if (!this.name.trim()) { appAlert(t('Bitte einen Namen für das Chart angeben.')); return; }
           if (this.selectedEntityIds.length === 0) { appAlert(t('Bitte mindestens eine Entität auswählen.')); return; }
           this.saving = true;
@@ -3101,6 +3116,9 @@
             this.savedMessage = t('✓ Gespeichert');
             this.editing = false;
             setTimeout(() => { this.savedMessage = ''; }, 2000);
+          } catch (error) {
+            // Netzwerkfehler: fetch() wirft nur dann; sonst bliebe nur der wieder freigegebene Knopf als Hinweis.
+            appAlert(t('Speichern fehlgeschlagen.'));
           } finally {
             this.saving = false;
           }

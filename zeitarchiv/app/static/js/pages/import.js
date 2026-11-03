@@ -260,8 +260,15 @@
     // hier per fetch()-Polling verfolgt, mit eigenem Schritt-Label je Phase,
     // statt die Fortschrittsanzeige nach dem Upload einfach einfrieren zu lassen.
     const PHASE_LABELS = { extracting: t('Wird entpackt'), scanning: t('Scanne Variablen') };
-    function pollUploadProgress() {
-      fetch('import/upload-progress').then(r => r.json()).then(state => {
+    // Ein einzelner Aussetzer (Netz, 502 vom Proxy) beendete das Abfragen früher still, und die Leiste fror ein.
+    // Jetzt wird mit wachsendem Abstand weiter gefragt und erst nach mehreren Fehlschlägen eine Meldung gezeigt;
+    // das Entpacken läuft auf dem Server ohnehin weiter.
+    const MAX_POLL_FAILURES = 6;
+    function pollUploadProgress(failures = 0) {
+      fetch('import/upload-progress').then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      }).then(state => {
         if (state.phase === 'done') {
           location.reload();
           return;
@@ -280,6 +287,12 @@
           state.total ? t('{done} von {total}', {done: state.done, total: state.total}) : ''
         );
         setTimeout(pollUploadProgress, 400);
+      }).catch(() => {
+        if (failures + 1 >= MAX_POLL_FAILURES) {
+          appendUploadError(uploadArea, t('Der Fortschritt lässt sich nicht mehr abrufen. Das Entpacken läuft im Hintergrund weiter; lade die Seite in einer Weile neu.'));
+          return;
+        }
+        setTimeout(() => pollUploadProgress(failures + 1), Math.min(400 * 2 ** failures, 5000));
       });
     }
 
@@ -287,7 +300,13 @@
     if (dropzone) {
       const input = document.getElementById('zip-input');
 
+      let uploading = false;
+
       function uploadZip(file) {
+        // Eine zweite Datei während des Uploads startete einen parallelen Upload auf denselben Fortschrittsstand.
+        if (uploading) return;
+        uploading = true;
+        input.disabled = true;
         const progress = renderUploadProgress(
           uploadArea,
           t('Wird hochgeladen…'),
@@ -316,10 +335,14 @@
             // sonst der einzige Hinweis auf die Ursache.
             let message = `${t('ZIP konnte nicht verarbeitet werden.')} (HTTP ${xhr.status}${xhr.statusText ? ' ' + xhr.statusText : ''})`;
             try { message = JSON.parse(xhr.responseText).detail || message; } catch (e) {}
+            uploading = false;
+            input.disabled = false;
             appendUploadError(uploadArea, message);
           }
         };
         xhr.onerror = () => {
+          uploading = false;
+          input.disabled = false;
           appendUploadError(uploadArea, t('Upload fehlgeschlagen — Verbindung unterbrochen.'));
         };
         xhr.send(formData);

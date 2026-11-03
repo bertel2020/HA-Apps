@@ -477,6 +477,13 @@
           return input;
         }));
         form.submit();
+        // Bei großen Dateien passiert sichtbar nichts, bis der Browser den Download startet; wiederholtes Klicken
+        // startete weitere Exporte auf dem Server. Der Download meldet kein Ende, deshalb nach kurzer Zeit wieder frei.
+        const button = $('export-next');
+        const label = button.textContent;
+        button.disabled = true;
+        button.textContent = t('Export wird erstellt …');
+        setTimeout(() => { button.disabled = false; button.textContent = label; }, 5000);
       }
 
       // ---- Ereignisse
@@ -512,9 +519,12 @@
         if (unit) params.set('unit', unit.value);
         try {
           const response = await fetch('export/entity-ids?' + params.toString());
-          if (!response.ok) return;
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
           (await response.json()).entity_ids.forEach(id => state.selected.add(id));
-        } catch (_err) { return; }
+        } catch (_err) {
+          if (window.appAlert) window.appAlert(t('Die Auswahl konnte nicht geladen werden.'));
+          return;
+        }
         markChecked();
         refresh();
       });

@@ -24,6 +24,7 @@ window.FixedTooltip = (() => {
   function hide() {
     if (timer) { clearTimeout(timer); timer = null; }
     if (tipEl) { tipEl.remove(); tipEl = null; }
+    if (target) target.removeAttribute('aria-describedby');
     target = null;
   }
 
@@ -81,6 +82,10 @@ window.FixedTooltip = (() => {
     if (!text) return;
     target = el;
     tipEl = el.hasAttribute('data-tooltip-dot') ? chartBauen(el, text) : bauen(text);
+    // Für Screenreader mit dem Element verbunden, solange der Tooltip steht.
+    tipEl.id = 'fixed-tooltip';
+    tipEl.setAttribute('role', 'tooltip');
+    el.setAttribute('aria-describedby', 'fixed-tooltip');
     document.body.appendChild(tipEl);
     const rect = el.getBoundingClientRect();
     const tipRect = tipEl.getBoundingClientRect();
@@ -109,6 +114,18 @@ window.FixedTooltip = (() => {
     document.body.addEventListener('mouseout', (e) => {
       if (e.target.closest('[data-tooltip-fixed]')) hide();
     });
+    // Auch per Tastatur: Ein fokussierbares Element mit Tooltip (Knopf, Link) zeigt ihn sofort beim Fokus, nicht erst
+    // nach dem Mauszeiger-Verzug. Nicht fokussierbare Zellen bleiben, wie sie waren, nur mit der Maus erreichbar.
+    document.body.addEventListener('focusin', (e) => {
+      const el = e.target.closest && e.target.closest('[data-tooltip-fixed]');
+      if (!el || el === target) return;
+      hide();
+      show(el);
+    });
+    document.body.addEventListener('focusout', (e) => {
+      if (e.target.closest && e.target.closest('[data-tooltip-fixed]')) hide();
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
     document.addEventListener('scroll', hide, true);
     window.addEventListener('resize', hide);
   }

@@ -655,7 +655,8 @@
 
         <div class="card">
           <div id="chart" x-show="hasData"></div>
-          <div class="empty" x-show="!hasData" x-text="loading ? t('Lädt …') : (selectedCount === 0 ? t('Bitte mindestens eine Entität auswählen.') : t('Keine Daten für diesen Zeitraum.'))"></div>
+          <div class="empty" x-show="!hasData" x-text="loading ? t('Lädt …') : (loadError ? t('Die Daten konnten nicht geladen werden.') : (selectedCount === 0 ? t('Bitte mindestens eine Entität auswählen.') : t('Keine Daten für diesen Zeitraum.')))"></div>
+          <div class="empty" x-show="!hasData && loadError && !loading" x-cloak><button type="button" class="btn" @click="load()">{{ _("Erneut versuchen") }}</button></div>
           {# Zustands- und Zahlen-Entitäten zusammen sind nicht vorgesehen
              (ROADMAP 1.29) — die Zustände fallen heraus, und das steht hier. #}
           <p class="hint hint-status" x-show="droppedStateIds.length" x-cloak

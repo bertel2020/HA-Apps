@@ -4,7 +4,9 @@
 <link rel="stylesheet" href="{{ asset('css/pages/backup_restore.css') }}">
 {% endblock %}
 {% block content %}
-<div class="page rw" data-restore-url="{{ app_root }}/backup/restore/{{ filename }}">
+<div class="page rw" data-restore-url="{{ app_root }}/backup/restore/{{ filename }}"
+     data-request-failed="{{ _('Die Anfrage ist fehlgeschlagen. Bitte versuche es noch einmal.') }}"
+     data-apply-failed="{{ _('Die Antwort blieb aus. Ob die Wiederherstellung durchgeführt wurde, ist unklar: Prüfe vor einem neuen Versuch auf der Backup-Seite die Liste der Rollbacks.') }}">
   <div class="rw-crumb"><a href="{{ app_root }}/backup">{{ _("Backup / Restore") }}</a> &rsaquo; {{ _("Wiederherstellen") }}</div>
   <h1>{{ _("Backup vom {created_at} wiederherstellen", created_at=facts.created_at) }}</h1>
   <p class="sub">{{ _("Wähle, was zurückgespielt werden soll. Vor jeder Änderung wird der aktuelle Stand als Rollback gesichert.") }}</p>

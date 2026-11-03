@@ -257,7 +257,7 @@ def tiles_context(
                 # display_mode='time' (Summe der Einschaltdauer über einen
                 # Zeitraum, siehe dashboard-tiles.js isDuration) geht es hier
                 # um "gerade an oder aus", das display_mode nicht berührt.
-                value_text = "An" if e["last_value"] else "Aus"
+                value_text = tr("An") if e["last_value"] else tr("Aus")
             else:
                 value_text = format_value(e["last_value"], decimals_to_int(effective_decimals))
             seconds_ago = (time.time() - e["last_ts"]) if e["last_ts"] is not None else None

@@ -392,9 +392,11 @@
       cardTitle() {
         const stichtag = this.stichtag();
         if (!stichtag) return t('Heute');
-        const now = new Date();
-        const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-        const iso = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+        // "Gestern" nach dem Kalender des Servers, nicht des Browsers: Der Stichtag kommt vom Server (Mittag als Anker,
+        // damit eine Zeitumstellung das Datum nicht verschiebt).
+        const today = ZT.parts(Date.now() / 1000);
+        const yesterday = ZT.parts(ZT.toEpoch(today.year, today.month, today.day - 1, 12));
+        const iso = `${yesterday.year}-${String(yesterday.month).padStart(2, '0')}-${String(yesterday.day).padStart(2, '0')}`;
         return stichtag === iso ? t('Gestern') : t('Rückblick');
       },
 

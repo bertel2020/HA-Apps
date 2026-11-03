@@ -57,14 +57,14 @@
     {% if group.title is not none %}
     <div class="dsection" data-item-type="section" data-item-id="{{ group.section_id }}"
          draggable="{{ 'false' if dashboard_locked else 'true' }}"
-         {% if not dashboard_locked %}title="Zum Umsortieren ziehen"{% endif %}
+         {% if not dashboard_locked %}title="{{ _('Zum Umsortieren ziehen') }}"{% endif %}
          x-data="{menuOpen: false, editing: false}" :class="{'is-open': menuOpen}">
       <span class="dsection-grip">⠿</span>
       <!-- Ein-/Ausklappen ist rein clientseitig (dashboard-tiles.js) und nur
            lokal im Browser gemerkt (localStorage) — kein Server-Roundtrip,
            kein Sync über Geräte, dieselbe Konvention wie Sortierung/
            Favoriten auf der Dashboard-Liste (card-browser.js). -->
-      <button type="button" class="dsection-toggle" draggable="false" @pointerdown.stop
+      <button type="button" class="dsection-toggle" draggable="false" @pointerdown.stop aria-expanded="true"
               aria-label="{{ _('Sektion ein-/ausklappen') }}" title="{{ _('Ein-/ausklappen') }}">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </button>
@@ -105,7 +105,7 @@
       <div class="dtile" draggable="{{ 'false' if dashboard_locked else 'true' }}" data-item-type="chart" data-item-id="{{ tile.id }}"
            data-grid-cols="{{ tile.grid_cols }}" data-grid-rows="{{ tile.grid_rows }}"
            style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}"
-           {% if not dashboard_locked %}title="Zum Umsortieren ziehen"{% endif %}>
+           {% if not dashboard_locked %}title="{{ _('Zum Umsortieren ziehen') }}"{% endif %}>
         {% if not dashboard_locked %}{% include "_dashboard_tile_menu.html" %}{% endif %}
         <a class="dtile-body" href="{{ href_base }}charts/{{ tile.id }}" draggable="false"
            data-period-anchor="{{ tile.period_anchor or '' }}"
@@ -143,7 +143,7 @@
       <div class="dtile dtile-table" draggable="{{ 'false' if dashboard_locked else 'true' }}" data-item-type="table" data-item-id="{{ tile.id }}"
            data-grid-cols="{{ tile.grid_cols }}" data-grid-rows="{{ tile.grid_rows }}"
            style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}"
-           {% if not dashboard_locked %}title="Zum Umsortieren ziehen"{% endif %}>
+           {% if not dashboard_locked %}title="{{ _('Zum Umsortieren ziehen') }}"{% endif %}>
         {% if not dashboard_locked %}{% include "_dashboard_tile_menu.html" %}{% endif %}
         <a class="dtile-body" href="{{ href_base }}tables/{{ tile.id }}" draggable="false"
            data-columns='{{ tile.columns | tojson }}' data-rows='{{ tile.rows | tojson }}' data-style='{{ tile.style | tojson }}'>
@@ -204,7 +204,7 @@
            data-item-entity-id="{{ tile.entity_id }}"
            data-grid-cols="{{ tile.grid_cols }}" data-grid-rows="{{ tile.grid_rows }}"
            style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}"
-           {% if not dashboard_locked %}title="Zum Umsortieren ziehen"{% endif %}>
+           {% if not dashboard_locked %}title="{{ _('Zum Umsortieren ziehen') }}"{% endif %}>
         {% if not dashboard_locked %}{% include "_dashboard_tile_menu.html" %}{% endif %}
         <a class="dtile-body dtile-entity-body" href="{{ href_base }}entities/{{ tile.entity_id }}" draggable="false"
            data-entity-id="{{ tile.entity_id }}" data-is-switch="{{ 'true' if tile.is_switch else 'false' }}"

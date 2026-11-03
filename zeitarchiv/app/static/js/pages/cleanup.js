@@ -130,7 +130,7 @@
         btn.type = 'button';
         btn.className = 'btn btn-danger';
         btn.textContent = t('Verdichten — nicht umkehrbar');
-        btn.onclick = () => submitCompact(startTs, endTs, target);
+        btn.onclick = () => submitCompact(startTs, endTs, target, btn);
         previewEl.innerHTML =
           '<div class="stat-row" style="margin:12px 0;">' +
           `<div class="stat"><div class="label">${t('Zeilen aktuell')}</div><div class="value">${data.rows_before}</div></div>` +
@@ -144,15 +144,18 @@
       }
     }
 
-    async function submitCompact(startTs, endTs, target) {
+    async function submitCompact(startTs, endTs, target, button) {
       const statusEl = document.getElementById('compact-value-status');
       const ok = await appConfirm(
         t('Werte im gewählten Zeitraum jetzt verdichten? Das lässt sich nicht rückgängig machen.'),
         {danger: true}
       );
       if (!ok) return;
+      // Der Lauf dauert bei mehreren Monaten Sekunden und ist nicht umkehrbar: ohne Rückmeldung klickte man erneut
+      // und bestätigte einen zweiten Lauf.
+      if (button) button.disabled = true;
       statusEl.className = 'add-value-status';
-      statusEl.textContent = '';
+      statusEl.textContent = t('Wird verdichtet …');
       try {
         const res = await fetch(`${BASE}/entities/${ENTITY_ID}/rows/compact`, {
           method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -172,6 +175,8 @@
       } catch (e) {
         statusEl.className = 'add-value-status err';
         statusEl.textContent = t('Verdichten fehlgeschlagen.');
+      } finally {
+        if (button) button.disabled = false;
       }
     }
 

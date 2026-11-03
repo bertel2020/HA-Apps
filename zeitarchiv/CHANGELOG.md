@@ -210,6 +210,30 @@
   Meldungen bleiben für sie erreichbar. Abgelehnte Aufrufe zählt Einstellungen →
   KI-Zugriff.
 
+- **Oberfläche, Fehler und Wartezeiten**: Schlägt eine Anfrage fehl, zeigen
+  Restore-Assistent, Entitäts- und Chart-Seiten, Export, Statistik und
+  Entitäten-Migration jetzt eine Meldung (Chart-Seiten mit „Erneut versuchen“)
+  statt leerer Flächen oder eines falschen „Fertig“. Speichern in den Editoren
+  und Verdichten lassen sich nicht mehr doppelt auslösen; das Verdichten zeigt
+  „Wird verdichtet …“. Langsame Antworten überschreiben keine neueren Anzeigen
+  mehr, das gilt für Energiedashboard und Kacheln. Fortschrittsabfragen beim
+  ZIP-Import überstehen kurze Aussetzer.
+
+- **Zeitzone und Zahlenformat**: Jahres-, Monats- und Tagesgrenzen in Zustands-
+  Charts, Wetter- und Langzeit-Seiten, Chart-Editor und Kacheln folgen der
+  Zeitzone des Servers statt der des Browsers (bei abweichender Zone begann ein
+  Jahr eine Stunde zu früh). Tabellen sortieren Zahlen im eingestellten
+  Zahlenformat, auch auf Englisch.
+
+- **Bedienung per Tastatur**: Dropzones im Import öffnen mit Enter oder
+  Leertaste, Spaltenköpfe sortierbarer Tabellen sind fokussierbar und melden
+  ihre Sortierung, Dashboard-Abschnitte melden ihren Zustand, und Hinweise
+  erscheinen auch beim Fokussieren.
+
+- **Texte**: Fehlende Übersetzungen im Report, im Home-Assistant-Import, in den
+  Dashboard-Kacheln und in den Einstellungen ergänzt; die Warnfarbe im
+  Energiedashboard folgt dem Theme.
+
 ---
 
 ### English
@@ -414,6 +438,28 @@
   without administrator rights can no longer query individual entities through
   the AI, as with the card; the energy overview and the notices stay available
   to them. Settings → AI access counts rejected calls.
+
+- **Interface, errors and waiting**: When a request fails, the restore wizard,
+  entity and chart pages, export, statistics and entity migration now show a
+  message (chart pages with "Try again") instead of blank areas or a false
+  "Done". Saving in the editors and compacting can no longer be triggered
+  twice; compacting shows "Wird verdichtet …". Slow answers no longer overwrite
+  newer displays, which applies to the energy dashboard and tiles. Progress
+  polling during ZIP import survives short hiccups.
+
+- **Time zone and number format**: Year, month and day boundaries in state
+  charts, weather and long-term pages, the chart editor and tiles follow the
+  server's time zone instead of the browser's (with a different zone a year
+  began an hour early). Tables sort numbers in the selected number format,
+  including English.
+
+- **Keyboard use**: Dropzones in the import open with Enter or Space, headers
+  of sortable tables are focusable and announce their sort order, dashboard
+  sections announce their state, and hints also appear on focus.
+
+- **Texts**: Missing translations in the report, the Home Assistant import, the
+  dashboard tiles and the settings were added; the warning colour in the energy
+  dashboard follows the theme.
 
 ## 1.13.0 - 2026-11-01
 

@@ -10,6 +10,9 @@
         savedMessage: '',
 
         async save() {
+          // Enter im Namensfeld ruft save() direkt auf, am gesperrten Knopf vorbei: ohne diesen Wächter entstanden bei
+          // Doppel-Enter oder Enter plus Klick zwei Einträge.
+          if (this.saving) return;
           if (!this.name.trim()) { appAlert(t('Bitte einen Namen für das Dashboard angeben.')); return; }
           this.saving = true;
           this.savedMessage = '';
@@ -43,10 +46,14 @@
               if (!periodNavRes.ok) { appAlert(t('Speichern der Zeitraum-Navigation fehlgeschlagen.')); return; }
             }
             window.location.href = this.dashboardId ? `${BASE}/dashboards/${this.dashboardId}` : `${BASE}/dashboards/${data.id}`;
+          } catch (error) {
+            // Netzwerkfehler: fetch() wirft nur dann; sonst bliebe nur der wieder freigegebene Knopf als Hinweis.
+            appAlert(t('Speichern fehlgeschlagen.'));
           } finally {
             this.saving = false;
           }
         },
+
 
         async deleteDashboard() {
           if (!await appConfirm(t('Dieses Dashboard wirklich löschen? Die Kachel-Anordnung geht verloren — die zugrunde liegenden Charts und Tabellen bleiben erhalten und lassen sich jederzeit auf einem anderen Dashboard neu anheften.'), {danger: true})) return;

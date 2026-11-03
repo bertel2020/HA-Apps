@@ -468,6 +468,7 @@ function selectBrush() {
         periodEnd: null,
         isCurrent: true,
         loading: false,
+        loadError: false,
         _requestId: 0,
         // Bleibt über mehrere reine Auflösungswechsel hinweg erhalten. Ohne
         // diesen separaten Anker würde z. B. der 22. eines laufenden Monats
@@ -1101,6 +1102,7 @@ function selectBrush() {
           // (Achsen-Skalierung/Daten aus zwei verschiedenen Anfragen gemischt).
           const requestId = ++this._requestId;
           this.loading = true;
+          this.loadError = false;
           const params = new URLSearchParams({
             entity_id: ENTITY_ID, range: this.range, offset: String(this.offset),
             continuous: String(this.continuous), compare: String(this.compare),
@@ -1135,17 +1137,27 @@ function selectBrush() {
           columnsParams.set('compare', 'false');
           const chartEl = document.getElementById('chart');
           columnsParams.set('px', String(Math.max(60, Math.round((chartEl ? chartEl.clientWidth : 600) - 30))));
-          const [res, shareRes, heatmapRes, columnsRes] = await Promise.all([
-            fetch(`${BASE}/api/query?${params}`),
-            wantShares ? fetch(`${BASE}/api/query?${shareParams}`) : Promise.resolve(null),
-            wantHeatmap ? fetch(`${BASE}/api/query?${heatmapParams}`) : Promise.resolve(null),
-            wantColumns ? fetch(`${BASE}/api/query?${columnsParams}`) : Promise.resolve(null),
-          ]);
-          // Die Rohabfrage bricht bei zu vielen Wechseln mit einem Fehler ab: dann ohne Punkte weiter.
-          const data = res.ok ? await res.json() : {};
-          const shareData = shareRes && shareRes.ok ? await shareRes.json() : null;
-          const heatmapData = heatmapRes ? await heatmapRes.json() : null;
-          const columnsData = columnsRes && columnsRes.ok ? await columnsRes.json() : null;
+          let res, shareRes, heatmapRes, columnsRes, data, shareData, heatmapData, columnsData;
+          try {
+            [res, shareRes, heatmapRes, columnsRes] = await Promise.all([
+              fetch(`${BASE}/api/query?${params}`),
+              wantShares ? fetch(`${BASE}/api/query?${shareParams}`) : Promise.resolve(null),
+              wantHeatmap ? fetch(`${BASE}/api/query?${heatmapParams}`) : Promise.resolve(null),
+              wantColumns ? fetch(`${BASE}/api/query?${columnsParams}`) : Promise.resolve(null),
+            ]);
+            // Die Rohabfrage bricht bei zu vielen Wechseln mit einem Fehler ab: dann ohne Punkte weiter.
+            data = res.ok ? await res.json() : {};
+            shareData = shareRes && shareRes.ok ? await shareRes.json() : null;
+            heatmapData = heatmapRes && heatmapRes.ok ? await heatmapRes.json() : null;
+            columnsData = columnsRes && columnsRes.ok ? await columnsRes.json() : null;
+          } catch (error) {
+            // Netzwerkfehler oder ein 502 vom Proxy mit HTML statt JSON: sonst bliebe "Lädt …" für immer stehen.
+            if (requestId === this._requestId) {
+              this.loading = false;
+              this.loadError = true;
+            }
+            return;
+          }
           if (requestId !== this._requestId) return; // eine neuere Anfrage ist schon unterwegs/angekommen
           this.sharePoints = shareData && shareData.chart_type === 'shares' ? shareData.points : [];
           this.heatmapCells = heatmapData && heatmapData.chart_type === 'heatmap' ? heatmapData.cells || [] : null;

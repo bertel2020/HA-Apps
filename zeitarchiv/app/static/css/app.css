@@ -1216,6 +1216,7 @@ table.dt th a:hover,table.dt th a.active{color:var(--accent-line);}
    (Gegenstück zu den serverseitig sortierten Tabellen mit <th><a sort=…>). */
 table.dt th.dt-sortable-col{cursor:pointer;user-select:none;}
 table.dt th.dt-sortable-col:hover{color:var(--accent-line);}
+table.dt th.dt-sortable-col:focus-visible{outline:2px solid var(--accent-line);outline-offset:-2px;}
 table.dt th.dt-sort-asc,table.dt th.dt-sort-desc{color:var(--accent-line);}
 /* Dieselbe schlanke Richtungsanzeige wie in der serverseitig sortierten
    Entitätenliste: kein geometrisches Dreieck, sondern ein normaler Pfeil in

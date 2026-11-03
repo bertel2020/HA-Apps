@@ -14,8 +14,18 @@
 (function () {
   function cellSortValue(td) {
     const raw = (td.dataset.sort !== undefined ? td.dataset.sort : td.textContent).trim();
-    const num = parseFloat(raw.replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, ''));
-    return {raw, num: Number.isNaN(num) ? null : num};
+    return {raw, num: parseNumber(raw)};
+  }
+
+  // Die Zellen stehen im Zahlenformat der Oberfläche ("1.234,5" auf Deutsch, "1,234.5" auf Englisch). Früher galt
+  // immer das deutsche: "12.5" wurde zu 125 und "1,234" zu 1.234, die Sortierung stimmte nicht. NumberFormat.parse()
+  // leitet die Trennzeichen aus dem eingestellten Format ab; wo number-format.js fehlt, bleibt es beim deutschen.
+  function parseNumber(raw) {
+    const digits = raw.replace(/[^0-9.,+-]/g, '');
+    const value = window.NumberFormat && window.NumberFormat.parse
+      ? window.NumberFormat.parse(digits)
+      : parseFloat(digits.replace(/\./g, '').replace(',', '.'));
+    return Number.isNaN(value) ? null : value;
   }
 
   function sortRows(table, colIndex, dir) {
@@ -112,10 +122,23 @@
       Array.from(headRow.cells).forEach((th, idx) => {
         if (th.hasAttribute('data-no-sort')) return;
         th.classList.add('dt-sortable-col');
+        // Per Tastatur erreichbar und für Screenreader als sortierbar gekennzeichnet (aria-sort).
+        th.tabIndex = 0;
+        th.setAttribute('aria-sort', 'none');
+        th.addEventListener('keydown', (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          th.click();
+        });
         th.addEventListener('click', () => {
           const dir = th.dataset.dir === 'asc' ? 'desc' : 'asc';
-          Array.from(headRow.cells).forEach((h) => { delete h.dataset.dir; h.classList.remove('dt-sort-asc', 'dt-sort-desc'); });
+          Array.from(headRow.cells).forEach((h) => {
+            delete h.dataset.dir;
+            h.classList.remove('dt-sort-asc', 'dt-sort-desc');
+            if (h.classList.contains('dt-sortable-col')) h.setAttribute('aria-sort', 'none');
+          });
           th.dataset.dir = dir;
+          th.setAttribute('aria-sort', dir === 'asc' ? 'ascending' : 'descending');
           th.classList.add(dir === 'asc' ? 'dt-sort-asc' : 'dt-sort-desc');
           sortRows(table, idx, dir);
           // Nur bei data-paginate: updatePager() legt sonst — auch ohne das

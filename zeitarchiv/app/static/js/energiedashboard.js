@@ -309,6 +309,11 @@
       offset: initialPeriod.offset,
       loading: false,
       loadError: false,
+      // Laufnummern von load()/loadHeatmap(): Klickt man schnell dreimal auf ‹, kann eine ältere, langsamere Antwort
+      // zuletzt ankommen und die neuere überschreiben. Kopf und Charts zeigten dann einen anderen Zeitraum als
+      // this.offset, und der nächste Pfeil sprang unerwartet.
+      _loadSeq: 0,
+      _heatmapSeq: 0,
       kpi: {},
       kpiCompare: {},
       compareLabel: '',
@@ -1042,13 +1047,16 @@
       },
 
       async load() {
+        const seq = ++this._loadSeq;
         this.loading = true;
         this.loadError = false;
         try {
           const params = new URLSearchParams({range: this.range, offset: String(this.offset)});
           const res = await fetch(`energiedashboard/data?${params}`);
+          if (seq !== this._loadSeq) return; // eine neuere Anfrage ist schon unterwegs
           if (!res.ok) { this.loadError = true; return; }
           const data = await res.json();
+          if (seq !== this._loadSeq) return;
           this.kpi = data.kpi;
           this.kpiCompare = data.kpi_compare || {};
           this.compareLabel = data.compare_label || '';
@@ -1068,10 +1076,11 @@
           this.renderVersorgungChart(this.versorgungBreakdown);
           this.renderSparklines(data.kpi_series || {});
         } catch (e) {
-          this.loadError = true;
+          if (seq === this._loadSeq) this.loadError = true;
         } finally {
-          this.loading = false;
+          if (seq === this._loadSeq) this.loading = false;
         }
+        if (seq !== this._loadSeq) return;
         // Eigener, unabhängiger Fetch (eigenes try/catch unten) — ein
         // Fehlschlag hier soll die restliche Seite nicht als loadError
         // markieren, die Karte blendet sich per x-show einfach aus.
@@ -1120,11 +1129,14 @@
       // Zustand wie load(), deshalb hier nicht als Parameter, sondern direkt
       // aus this gelesen.
       async loadHeatmap() {
+        const seq = ++this._heatmapSeq;
         try {
           const params = new URLSearchParams({range: this.range, offset: String(this.offset)});
           const res = await fetch(`energiedashboard/heatmap?${params}`);
           if (!res.ok) return;
-          this.heatmap = await res.json();
+          const heatmap = await res.json();
+          if (seq !== this._heatmapSeq) return;
+          this.heatmap = heatmap;
           // Die Karte hängt an x-show="heatmap.rows.length" (startet leer,
           // also unsichtbar) — ohne $nextTick() initialisiert echarts.init()
           // hier auf einem noch display:none-Element (0×0 Breite), bevor

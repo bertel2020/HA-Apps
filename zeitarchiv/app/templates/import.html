@@ -48,7 +48,7 @@
       <span style="flex:1;min-width:220px;">
         {{ _("Noch keine <code>settings.json</code> importiert &mdash; optional, liefert Klarnamen und Einheiten je Symcon-ID aus Symcons Objektbaum für die Liste unten.") }}
       </span>
-      <label class="btn" style="cursor:pointer;">
+      <label class="btn" style="cursor:pointer;" role="button" tabindex="0">
         {{ _("settings.json importieren") }}
         <input type="file" id="settings-json-input" accept=".json" style="display:none;"
                onchange="if(this.files.length) uploadSettingsJson(this.files[0]);">

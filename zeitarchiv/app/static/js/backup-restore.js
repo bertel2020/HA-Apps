@@ -210,12 +210,29 @@
   };
 
   // ------------------------------------------------------------------ Navigation
-  function request(verb, path, target) {
-    return htmx.ajax(verb.toUpperCase(), base + path, { source: form, target: target, swap: 'innerHTML' });
+  // htmx löst das Versprechen von htmx.ajax() auch bei 4xx/5xx auf (und tauscht die Fehlerantwort nicht ein):
+  // Ohne diese Prüfung sprang der Assistent bei einem Serverfehler auf "Fertig" mit leerem Ergebnis, und ob
+  // wiederhergestellt wurde, blieb unklar. Die Fehler- und Abbruch-Ereignisse der Anfrage steigen bis zum Dokument auf.
+  const FAILURE_EVENTS = ['htmx:responseError', 'htmx:sendError', 'htmx:timeout'];
+  function request(verb, path, target, withForm = true) {
+    let failed = false;
+    const mark = () => { failed = true; };
+    FAILURE_EVENTS.forEach((name) => document.addEventListener(name, mark));
+    const finish = () => FAILURE_EVENTS.forEach((name) => document.removeEventListener(name, mark));
+    const config = withForm ? { source: form, target: target, swap: 'innerHTML' } : { target: target, swap: 'innerHTML' };
+    return htmx.ajax(verb.toUpperCase(), base + path, config).then(
+      () => { finish(); if (failed) throw new Error('request failed'); },
+      (error) => { finish(); throw error; },
+    );
+  }
+
+  function fail(message) {
+    info.textContent = message || root.dataset.requestFailed || '';
+    refresh();
   }
 
   function loadReview() {
-    return request('post', '/review', '#rw-review').then(() => show(3));
+    return request('post', '/review', '#rw-review').then(() => show(3), () => fail());
   }
 
   next.addEventListener('click', () => {
@@ -223,13 +240,13 @@
       if (mode() === 'all') return loadReview();
       if (loadedMode === mode()) { show(2); return undefined; }
       next.disabled = true;
-      htmx.ajax('GET', base + '/options?mode=' + encodeURIComponent(mode()), { target: '#rw-options', swap: 'innerHTML' }).then(() => {
+      request('get', '/options?mode=' + encodeURIComponent(mode()), '#rw-options', false).then(() => {
         loadedMode = mode();
         const scope = $('#rw-options .rw-options');
         if (scope && scope.dataset.kind === 'entities' && $('.rw-all', scope)) options.initEntities(scope);
         else if (scope && scope.dataset.kind === 'settings') options.initSettings(scope);
         show(2);
-      });
+      }, () => fail());
       return undefined;
     }
     if (step === 2) return loadReview();
@@ -238,7 +255,9 @@
   back.addEventListener('click', () => show(step === 3 && mode() === 'all' ? 1 : step - 1));
   apply.addEventListener('click', () => {
     apply.disabled = true;
-    request('post', '/apply', '#rw-result').then(() => show(4));
+    // Bei einem Fehler hier ist offen, ob der Server schon angewendet hat (etwa eine Zeitüberschreitung des Proxys
+    // bei langer Arbeit): eigener Text, der vor dem erneuten Versuch auf die Rollback-Liste verweist.
+    request('post', '/apply', '#rw-result').then(() => show(4), () => fail(root.dataset.applyFailed));
   });
   form.addEventListener('change', (e) => {
     if (e.target.name === 'mode') refresh();

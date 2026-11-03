@@ -64,12 +64,28 @@
     }
 
     let growthRangeSeq = 0;
-    async function setGrowthRange(range) {
+    let shownGrowthRange = ((document.querySelector('#growth-range-seg button.active') || {}).dataset || {}).range;
+    function markGrowthRange(range) {
       document.querySelectorAll('#growth-range-seg button').forEach(b => b.classList.toggle('active', b.dataset.range === range));
+    }
+    async function setGrowthRange(range) {
+      markGrowthRange(range);
       const requestId = ++growthRangeSeq;
-      const res = await fetch(`api/stats-snapshots?range=${range}`);
-      const data = await res.json();
+      let data;
+      try {
+        const res = await fetch(`api/stats-snapshots?range=${range}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        data = await res.json();
+      } catch (error) {
+        // Der Knopf zeigt sonst einen Zeitraum, dessen Daten nie ankamen, und die Zusage hing unbehandelt.
+        if (requestId === growthRangeSeq) {
+          markGrowthRange(shownGrowthRange);
+          if (window.appAlert) window.appAlert(t('Der Verlauf konnte nicht geladen werden.'));
+        }
+        return;
+      }
       if (requestId !== growthRangeSeq) return;
+      shownGrowthRange = range;
       renderGrowth(data.points || []);
     }
 

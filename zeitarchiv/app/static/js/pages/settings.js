@@ -19,7 +19,7 @@
         if (row) row.remove();
         const list = document.getElementById('muted-notices-list');
         if (list && !list.querySelector('.settings-compact-row')) {
-          list.outerHTML = '<div class="empty">Keine stummgeschalteten Meldungen.</div>';
+          list.outerHTML = '<div class="empty">' + escapeHtml(t('Keine stummgeschalteten Meldungen.')) + '</div>';
         }
         // Die zurückgeholte Meldung erscheint wieder im Glocken-Menü — ohne
         // diesen Refresh (definiert in _topnav.html, global verfügbar) blieb

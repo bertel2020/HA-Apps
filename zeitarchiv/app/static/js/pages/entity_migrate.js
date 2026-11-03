@@ -138,13 +138,15 @@ async function migrateExecute() {
     });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      throw new Error(body.detail || 'migrate failed');
+      throw Object.assign(new Error(body.detail || 'migrate failed'), {serverDetail: Boolean(body.detail)});
     }
     showResult(await response.json());
   } catch (error) {
     button.disabled = false;
     goToStep(2);
-    appAlert(t('Die Migration konnte nicht ausgeführt werden.'));
+    // Lehnt der Server mit einem Grund ab (etwa wegen der Einheit), gehört der Grund in die Meldung.
+    const message = t('Die Migration konnte nicht ausgeführt werden.');
+    appAlert(error && error.serverDetail ? `${message} ${error.message}` : message);
   }
 }
 

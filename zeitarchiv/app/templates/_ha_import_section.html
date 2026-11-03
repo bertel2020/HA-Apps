@@ -186,9 +186,9 @@
         </td>
         <td class="mono" style="font-size:calc(12px * var(--font-scale, 1));">
           {% if ha_history_source == "full" and entity.full_details %}
-          <div class="ha-available-line"><strong>Roh:</strong> {{ entity.full_details.raw.label }}</div>
+          <div class="ha-available-line"><strong>{{ _('Roh:') }}</strong> {{ entity.full_details.raw.label }}</div>
           {% if entity.full_details.stats_enabled %}
-          <div class="ha-available-line ha-available-count"><strong>Statistik:</strong> {{ entity.full_details.stats.label }}</div>
+          <div class="ha-available-line ha-available-count"><strong>{{ _('Statistik:') }}</strong> {{ entity.full_details.stats.label }}</div>
           {% endif %}
           {% elif entity.available_range %}
           <div>{{ entity.available_range }}</div>

@@ -37,7 +37,7 @@
     background:var(--accent-line-soft);color:var(--accent-line);cursor:pointer;
   }
   .edash-quality-badge:hover{border-color:var(--accent-line);}
-  .edash-quality-badge.is-warn{background:#F3E4C4;color:#8A6414;}
+  .edash-quality-badge.is-warn{background:var(--warning-soft);color:var(--warning);}
   /* Rechtsbündige Gruppe für die übrigen Badges — margin-left:auto sitzt auf
      dem GRUPPEN-Container, nicht auf dem ersten Badge darin, damit die
      Rechtsbündigkeit unabhängig davon funktioniert, welche Kombination aus
@@ -493,7 +493,7 @@
      Datenqualität) bleibt center genauso stimmig. */
   .edash-quality-row{display:flex;gap:10px;align-items:center;}
   .edash-quality-icon{width:30px;height:30px;border-radius:8px;background:var(--accent-line-soft);color:var(--accent-line);display:flex;align-items:center;justify-content:center;flex:none;font-size:calc(15px * var(--font-scale, 1));}
-  .edash-quality-row.is-warn .edash-quality-icon{background:#F3E4C4;color:#8A6414;}
+  .edash-quality-row.is-warn .edash-quality-icon{background:var(--warning-soft);color:var(--warning);}
   .edash-quality-row strong{font-size:calc(13px * var(--font-scale, 1));display:block;margin-bottom:3px;}
   /* Immer beide Prüfungen zeigen (nicht nur bei Problemen, siehe Kommentar
      in compute_flow()) — je Zeile ein eigenes ✓/!-Symbol statt eines
@@ -507,7 +507,7 @@
   .edash-quality-list + .edash-quality-row{margin-top:14px;padding-top:10px;border-top:1px solid var(--border);}
   .edash-quality-list li{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-muted);display:flex;align-items:baseline;gap:7px;}
   .edash-quality-check-icon{flex:none;color:var(--chart-6);font-weight:700;}
-  .edash-quality-list li.is-warn .edash-quality-check-icon{color:#8A6414;}
+  .edash-quality-list li.is-warn .edash-quality-check-icon{color:var(--warning);}
   .edash-quality-list li.is-warn{color:var(--ink);}
 
   /* Bilanz-Anteilsbalken: erfasste Verbraucher vs. Grundlast, als einfacher

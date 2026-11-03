@@ -3540,7 +3540,18 @@
     "Eine Tabelle darf höchstens {limit} verschiedene Entitäten enthalten (jetzt {count})": "A table may contain at most {limit} different entities (now {count})",
     "Die Tabelle ist zu groß für die Abfrage (höchstens {entities} Entitäten und {columns} Spalten)": "The table is too large for the query (at most {entities} entities and {columns} columns)",
     "Abgelehnt: Benutzerkonto ohne Administratorrechte": "Rejected: user account without administrator rights",
-    "Benutzerkonten ohne Administratorrechte dürfen nur die Energieübersicht und die Meldungen abrufen, keine einzelnen Entitäten (wie bei der Karte). Verbraucher und Erzeuger, die du nicht freigegeben hast, erscheinen dort nur als „Other (not shared)“.": "User accounts without administrator rights may only fetch the energy overview and the notices, no individual entities (as with the card). Consumers and generators you have not shared appear there only as “Other (not shared)”."
+    "Benutzerkonten ohne Administratorrechte dürfen nur die Energieübersicht und die Meldungen abrufen, keine einzelnen Entitäten (wie bei der Karte). Verbraucher und Erzeuger, die du nicht freigegeben hast, erscheinen dort nur als „Other (not shared)“.": "User accounts without administrator rights may only fetch the energy overview and the notices, no individual entities (as with the card). Consumers and generators you have not shared appear there only as “Other (not shared)”.",
+    "Datei:": "File:",
+    "Report-ID:": "Report ID:",
+    "Statistik:": "Statistics:",
+    "Roh:": "Raw:",
+    "Quelle:": "Source:",
+    "Ziel:": "Target:",
+    "Statistikzeitraum:": "Statistics period:",
+    "Diesen Import-Report wirklich löschen?": "Really delete this import report?",
+    "Die Anfrage ist fehlgeschlagen. Bitte versuche es noch einmal.": "The request failed. Please try again.",
+    "Die Antwort blieb aus. Ob die Wiederherstellung durchgeführt wurde, ist unklar: Prüfe vor einem neuen Versuch auf der Backup-Seite die Liste der Rollbacks.": "No answer came back. It is unclear whether the restore was carried out: Before trying again, check the list of rollbacks on the backup page.",
+    "Erneut versuchen": "Try again"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4302,6 +4313,16 @@
     "Die Tage konnten nicht geladen werden.": "The days could not be loaded.",
     "ab {value} % der Kapazität": "from {value} % of capacity",
     "unter {value} % der Kapazität": "below {value} % of capacity",
-    "Entladung {n} kWh ({percent} %)": "Discharge {n} kWh ({percent} %)"
+    "Entladung {n} kWh ({percent} %)": "Discharge {n} kWh ({percent} %)",
+    "An": "On",
+    "Keine stummgeschalteten Meldungen.": "No muted notices.",
+    "{count} Zeilen · {time}": "{count} lines · {time}",
+    "Die Daten konnten nicht geladen werden.": "The data could not be loaded.",
+    "Der Fortschritt lässt sich nicht mehr abrufen. Das Entpacken läuft im Hintergrund weiter; lade die Seite in einer Weile neu.": "The progress can no longer be retrieved. Unpacking continues in the background; reload the page in a while.",
+    "Wird verdichtet …": "Compacting …",
+    "Der Verlauf konnte nicht geladen werden.": "The history could not be loaded.",
+    "Export wird erstellt …": "Creating export …",
+    "Die Auswahl konnte nicht geladen werden.": "The selection could not be loaded.",
+    "Die neue Reihenfolge konnte nicht gespeichert werden. Bitte versuche es noch einmal.": "The new order could not be saved. Please try again."
   }
 }
