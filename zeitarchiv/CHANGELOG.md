@@ -175,6 +175,32 @@
   „Alle Backups löschen“ lässt Backups stehen, die noch nicht auf das externe
   Ziel übertragen sind.
 
+- **Eingestellte Auflösung, lange Monate**: Bei Messwerten mit Auflösung (z. B.
+  30 s) las die Aufnahme bei jedem Wert die ganze Monatsdatei; am Monatsende
+  dauerte das gut 50 ms je Wert und bremste die Aufnahme. Jetzt wird nur das
+  Dateiende gelesen (unter 1 ms). Ein nachträglich eingefügter oder verspäteter
+  Wert verschiebt dabei nicht mehr das Mittel des laufenden Zeitfensters,
+  sondern bekommt sein eigenes Fenster.
+
+- **Typwechsel einer Entität**: Ändert Home Assistant die Art einer Entität
+  (zum Beispiel Messwert zu Zähler), hielt der Neuaufbau der Auswertungen die
+  Aufnahme aller anderen Entitäten an. Er sperrt jetzt nur noch diese Entität.
+
+- **Vormonat selten sendender Entitäten**: Entitäten, die seit dem
+  Monatswechsel nichts mehr gesendet haben, fehlten in allen Auswertungen für
+  den Vormonat. Der Vormonat wird jetzt stündlich archiviert.
+
+- **Vergleichstabellen**: Beim Speichern gelten dieselben Grenzen wie bei der
+  Abfrage (höchstens 25 verschiedene Entitäten, 100 Spalten); vorher ließ sich
+  eine Tabelle speichern, die danach nicht mehr geladen werden konnte. Die
+  Karte antwortet bei zu großen Tabellen mit einer Begründung statt mit
+  Fehler 500.
+
+- **Seiten bleiben bedienbar**: Einstellungen speichern, Meldungen stumm
+  schalten, Kacheln tauschen, Backup-Zeitplan und Backup-Import rechnen nicht
+  mehr im Event-Loop. Bei vielen Archivdateien stand dort sonst der ganze Server
+  still.
+
 ---
 
 ### English
@@ -347,6 +373,30 @@
   follows redirects and sends the credentials only to the address entered.
   "Delete all backups" leaves backups that have not yet been transferred to the
   external target.
+
+- **Set resolution, long months**: For measurements with a set resolution
+  (e.g. 30 s), ingestion read the whole month file for every value; at the end
+  of the month that took a good 50 ms per value and slowed ingestion down. Now
+  only the end of the file is read (under 1 ms). A value inserted afterwards or
+  arriving late no longer shifts the mean of the running time window but gets
+  its own window.
+
+- **Type change of an entity**: When Home Assistant changes the kind of an
+  entity (for example measurement to counter), rebuilding the analyses held up
+  ingestion of all other entities. It now locks only this entity.
+
+- **Previous month of rarely sending entities**: Entities that had sent nothing
+  since the month changed were missing from all analyses for the previous
+  month. The previous month is now archived hourly.
+
+- **Comparison tables**: When saving, the same limits apply as for the query
+  (at most 25 different entities, 100 columns); before, a table could be saved
+  that could no longer be loaded afterwards. The card answers with a reason
+  instead of error 500 for tables that are too large.
+
+- **Pages stay usable**: Saving settings, muting notices, swapping tiles, the
+  backup schedule and the backup import no longer compute in the event loop.
+  With many archive files the whole server stood still there.
 
 ## 1.13.0 - 2026-11-01
 

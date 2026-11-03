@@ -3535,7 +3535,10 @@
     "Die CSV-Datei lässt sich nicht lesen ({reason}). Sie wurde entfernt.": "The CSV file cannot be read ({reason}). It was removed.",
     "Ein CSV-Import oder eine Vorschau läuft gerade. Bitte warten, bis sie fertig ist.": "A CSV import or preview is running. Please wait until it has finished.",
     "{count} Backup(s) gelöscht, {kept} noch nicht auf das externe Ziel übertragene bleiben liegen.": "{count} backup(s) deleted, {kept} not yet transferred to the external target remain.",
-    "{kept} Backup(s) sind noch nicht auf das externe Ziel übertragen und bleiben liegen.": "{kept} backup(s) have not yet been transferred to the external target and remain."
+    "{kept} Backup(s) sind noch nicht auf das externe Ziel übertragen und bleiben liegen.": "{kept} backup(s) have not yet been transferred to the external target and remain.",
+    "Eine Tabelle darf höchstens {limit} Spalten haben": "A table may have at most {limit} columns",
+    "Eine Tabelle darf höchstens {limit} verschiedene Entitäten enthalten (jetzt {count})": "A table may contain at most {limit} different entities (now {count})",
+    "Die Tabelle ist zu groß für die Abfrage (höchstens {entities} Entitäten und {columns} Spalten)": "The table is too large for the query (at most {entities} entities and {columns} columns)"
   },
   "js": {
     "Ladestand": "State of charge",

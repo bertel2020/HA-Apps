@@ -16,7 +16,7 @@ from typing import Annotated
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, ValidationError, model_validator
 
 from . import ai_settings, ha_integration, selection_jobs
 from .ai_routes import AiDependencies, create_ai_router
@@ -28,6 +28,7 @@ from .limits import (
     MAX_EVENT_TEXT_LENGTH,
     MAX_MARKED_RANGES,
     MAX_MULTI_QUERY_ENTITIES,
+    MAX_TABLE_COLUMNS,
     MAX_WRITE_EVENTS,
 )
 from .logging_setup import log_rate_limited
@@ -129,7 +130,7 @@ class TableQueryRequest(BaseModel):
     """Alle Zeitfenster einer Vergleichstabelle in einem Storage-Snapshot."""
 
     entity_ids: list[EntityId] = Field(min_length=1, max_length=MAX_MULTI_QUERY_ENTITIES)
-    columns: list[TableQueryColumn] = Field(min_length=1, max_length=100)
+    columns: list[TableQueryColumn] = Field(min_length=1, max_length=MAX_TABLE_COLUMNS)
     # Stichtag der Zeitraum-Navigation eines Dashboards (JJJJ-MM-TT), siehe
     # chart_period.stichtag_window(). None = heute.
     at: str | None = None
@@ -1076,6 +1077,18 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             })
         return {"columns": column_results}
 
+    def card_table_query(body: dict) -> dict:
+        """Tabellenabfrage der Karte. Eine Tabelle über den Grenzen der Abfrage (Entitäten, Spalten) ergab hier einen
+        rohen ValidationError, also 500; jetzt eine Antwort mit Begründung."""
+        try:
+            request = TableQueryRequest(**body)
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=tr("Die Tabelle ist zu groß für die Abfrage (höchstens {entities} Entitäten und {columns} Spalten)", entities=MAX_MULTI_QUERY_ENTITIES, columns=MAX_TABLE_COLUMNS),
+            ) from exc
+        return api_query_table(request)
+
     router.include_router(create_ai_router(AiDependencies(
         data_dir=deps.data_dir, index=deps.index, tz=deps.tz,
         coordinator=deps.coordinator, check_auth=check_auth,
@@ -1084,6 +1097,6 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
     router.include_router(create_catalog_router(deps.data_dir, check_auth))
     router.include_router(create_card_router(
         deps.index, str(deps.tz), check_auth, api_query_multi,
-        lambda body: api_query_table(TableQueryRequest(**body)),
+        card_table_query,
     ))
     return router

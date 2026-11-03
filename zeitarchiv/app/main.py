@@ -78,6 +78,8 @@ from .formatting import (
 )
 from .limits import (
     MAX_CSV_UPLOAD_BYTES,
+    MAX_MULTI_QUERY_ENTITIES,
+    MAX_TABLE_COLUMNS,
     MAX_SETTINGS_UPLOAD_BYTES,
     MAX_UI_ANALYSIS_ROWS,
     MAX_ZIP_MEMBERS,
@@ -1340,35 +1342,39 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
     Dauer kommt aus einer festen Preset-Liste (SNOOZE_PRESETS) statt einem
     frei wählbaren Datum — "forever" (None) eingeschlossen, bleibt trotzdem
     sicher, siehe Kommentar dort (Fingerprint statt Ablaufdatum)."""
-    purge_preview = _background.load_purge_preview()
-    notice = next(
-        (
-            n for n in notices_mod.build_notices(
-                index, DATA_DIR / "index.sqlite", TZ, purge_preview["totals"],
-                _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
-                _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
-                demo_dir_info=_background.demo_dir_info_cached,
-                coordinator_busy_events=storage_coordinator.recent_busy_events(),
-                duplicate_ratio_events=ingestion_service.recent_duplicate_ratio_events(),
-                purge_rows=purge_preview["rows"],
-            )
-            if n["id"] == notice_id
-        ),
-        None,
-    )
-    if notice is None:
-        raise HTTPException(status_code=404, detail=tr("Meldung nicht gefunden oder nicht mehr aktiv"))
-    if not notice["mutable"]:
-        raise HTTPException(status_code=400, detail=tr("Diese Meldung lässt sich nicht stumm schalten"))
     form = await request.form()
-    duration = form.get("duration")
-    if duration not in notices_mod.SNOOZE_PRESETS:
-        raise HTTPException(status_code=400, detail=tr("Ungültige Dauer"))
-    seconds = notices_mod.SNOOZE_PRESETS[duration]
-    until = time.time() + seconds if seconds is not None else None
-    notices_mod.mute_notice(index, notice_id, notice["title"], notice["detail"], notice["meta"], until=until)
-    remaining = _collect_all_notices()
-    return {"success": True, "remaining_count": len(remaining)}
+
+    def apply():
+        purge_preview = _background.load_purge_preview()
+        notice = next(
+            (
+                n for n in notices_mod.build_notices(
+                    index, DATA_DIR / "index.sqlite", TZ, purge_preview["totals"],
+                    _background.storage_reconcile_last, _background.stale_entity_count_cached, _background.last_scheduler_tick,
+                    _background.last_reconcile_tick, _background.reconcile_in_progress(), _background.host_disk_usage_cached,
+                    demo_dir_info=_background.demo_dir_info_cached,
+                    coordinator_busy_events=storage_coordinator.recent_busy_events(),
+                    duplicate_ratio_events=ingestion_service.recent_duplicate_ratio_events(),
+                    purge_rows=purge_preview["rows"],
+                )
+                if n["id"] == notice_id
+            ),
+            None,
+        )
+        if notice is None:
+            raise HTTPException(status_code=404, detail=tr("Meldung nicht gefunden oder nicht mehr aktiv"))
+        if not notice["mutable"]:
+            raise HTTPException(status_code=400, detail=tr("Diese Meldung lässt sich nicht stumm schalten"))
+        duration = form.get("duration")
+        if duration not in notices_mod.SNOOZE_PRESETS:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Dauer"))
+        seconds = notices_mod.SNOOZE_PRESETS[duration]
+        until = time.time() + seconds if seconds is not None else None
+        notices_mod.mute_notice(index, notice_id, notice["title"], notice["detail"], notice["meta"], until=until)
+        remaining = _collect_all_notices()
+        return {"success": True, "remaining_count": len(remaining)}
+
+    return await run_in_threadpool(apply)
 
 
 @app.post("/notices/{notice_id}/unmute")
@@ -1524,87 +1530,95 @@ async def settings_darstellung(request: Request) -> HTMLResponse:
     """Globale Schriftgröße (Einstellungen, Bereich "Darstellung") — wirkt über
     den _font_scale_context-Kontextprozessor auf jede Seite, siehe FONT_SCALE oben."""
     form = await request.form()
-    font_scale = form.get("font_scale")
-    color_scheme = form.get("color_scheme")
-    color_mode = form.get("color_mode")
-    if font_scale is not None and font_scale not in FONT_SCALE_LABELS:
-        raise HTTPException(status_code=400, detail=tr("Ungültige Schriftgröße"))
-    if font_scale is not None:
-        index.set_setting("font_scale", str(font_scale))
-    if color_scheme is not None and color_scheme not in COLOR_SCHEME_LABELS:
-        raise HTTPException(status_code=400, detail=tr("Ungültiges Farbschema"))
-    if color_scheme is not None:
-        index.set_setting("color_scheme", str(color_scheme))
-    if color_mode is not None and color_mode not in COLOR_MODE_LABELS:
-        raise HTTPException(status_code=400, detail=tr("Ungültiger Darstellungsmodus"))
-    if color_mode is not None:
-        index.set_setting("color_mode", str(color_mode))
-    dashboard_animation = form.get("dashboard_animation")
-    if dashboard_animation is not None and dashboard_animation not in DASHBOARD_ANIMATION_LABELS:
-        raise HTTPException(status_code=400, detail=tr("Ungültige Dashboard-Animation"))
-    if dashboard_animation is not None:
-        index.set_setting("dashboard_animation", str(dashboard_animation))
-    startseite = form.get("startseite")
-    if startseite is not None and startseite not in STARTSEITE_LABELS:
-        raise HTTPException(status_code=400, detail=tr("Ungültige Startseite"))
-    if startseite is not None:
-        index.set_setting("startseite", str(startseite))
 
-    # Globale Defaults für das Optionen-Menü der Entität-eigenen Chart-Seite
-    # (entity_detail.html) — jedes Feld postet wie oben einzeln für sich,
-    # _update_entity_chart_default() liest/schreibt das gemeinsame
-    # "entity_chart_defaults"-Setting darum jedes Mal frisch statt es über
-    # mehrere Requests hinweg im Speicher zu halten.
-    bool_fields = {
-        "entity_continuous": "continuous", "entity_raw": "raw",
-        "entity_show_points": "show_points", "entity_show_values": "show_values",
-        "entity_dynamic_y_axis": "dynamic_y_axis", "entity_chart_stats": "chart_stats",
-    }
-    for form_key, option_key in bool_fields.items():
-        value = form.get(form_key)
-        if value is None:
-            continue
-        if value not in _ON_OFF_LABELS:
-            raise HTTPException(status_code=400, detail=tr("Ungültiger Wert"))
-        _update_entity_chart_default(option_key, value == "1")
-    entity_legend_style = form.get("entity_legend_style")
-    if entity_legend_style is not None and entity_legend_style not in _CHART_LEGEND_STYLES:
-        raise HTTPException(status_code=400, detail=tr("Ungültiger Legenden-Stil"))
-    if entity_legend_style is not None:
-        _update_entity_chart_default("legend_style", entity_legend_style)
-    if "entity_legend_metrics" in form:
-        entity_legend_metrics = form.getlist("entity_legend_metrics")
-        if not set(entity_legend_metrics) <= _CHART_LEGEND_METRICS:
-            raise HTTPException(status_code=400, detail=tr("Ungültige Legenden-Kennzahl"))
-        _update_entity_chart_default("legend_metrics", entity_legend_metrics)
+    def apply():
+        font_scale = form.get("font_scale")
+        color_scheme = form.get("color_scheme")
+        color_mode = form.get("color_mode")
+        if font_scale is not None and font_scale not in FONT_SCALE_LABELS:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Schriftgröße"))
+        if font_scale is not None:
+            index.set_setting("font_scale", str(font_scale))
+        if color_scheme is not None and color_scheme not in COLOR_SCHEME_LABELS:
+            raise HTTPException(status_code=400, detail=tr("Ungültiges Farbschema"))
+        if color_scheme is not None:
+            index.set_setting("color_scheme", str(color_scheme))
+        if color_mode is not None and color_mode not in COLOR_MODE_LABELS:
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Darstellungsmodus"))
+        if color_mode is not None:
+            index.set_setting("color_mode", str(color_mode))
+        dashboard_animation = form.get("dashboard_animation")
+        if dashboard_animation is not None and dashboard_animation not in DASHBOARD_ANIMATION_LABELS:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Dashboard-Animation"))
+        if dashboard_animation is not None:
+            index.set_setting("dashboard_animation", str(dashboard_animation))
+        startseite = form.get("startseite")
+        if startseite is not None and startseite not in STARTSEITE_LABELS:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Startseite"))
+        if startseite is not None:
+            index.set_setting("startseite", str(startseite))
 
-    return templates.TemplateResponse(
-        request, "_settings_darstellung_form.html", _settings_darstellung_context(saved=True)
-    )
+        # Globale Defaults für das Optionen-Menü der Entität-eigenen Chart-Seite
+        # (entity_detail.html) — jedes Feld postet wie oben einzeln für sich,
+        # _update_entity_chart_default() liest/schreibt das gemeinsame
+        # "entity_chart_defaults"-Setting darum jedes Mal frisch statt es über
+        # mehrere Requests hinweg im Speicher zu halten.
+        bool_fields = {
+            "entity_continuous": "continuous", "entity_raw": "raw",
+            "entity_show_points": "show_points", "entity_show_values": "show_values",
+            "entity_dynamic_y_axis": "dynamic_y_axis", "entity_chart_stats": "chart_stats",
+        }
+        for form_key, option_key in bool_fields.items():
+            value = form.get(form_key)
+            if value is None:
+                continue
+            if value not in _ON_OFF_LABELS:
+                raise HTTPException(status_code=400, detail=tr("Ungültiger Wert"))
+            _update_entity_chart_default(option_key, value == "1")
+        entity_legend_style = form.get("entity_legend_style")
+        if entity_legend_style is not None and entity_legend_style not in _CHART_LEGEND_STYLES:
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Legenden-Stil"))
+        if entity_legend_style is not None:
+            _update_entity_chart_default("legend_style", entity_legend_style)
+        if "entity_legend_metrics" in form:
+            entity_legend_metrics = form.getlist("entity_legend_metrics")
+            if not set(entity_legend_metrics) <= _CHART_LEGEND_METRICS:
+                raise HTTPException(status_code=400, detail=tr("Ungültige Legenden-Kennzahl"))
+            _update_entity_chart_default("legend_metrics", entity_legend_metrics)
+
+        return templates.TemplateResponse(
+            request, "_settings_darstellung_form.html", _settings_darstellung_context(saved=True)
+        )
+
+    return await run_in_threadpool(apply)
 
 
 @app.post("/settings/logging", response_class=HTMLResponse)
 async def settings_logging(request: Request) -> HTMLResponse:
     """Speichert und aktiviert Protokollstufen ohne App-Neustart."""
     form = await request.form()
-    level = str(form.get("log_level", DEFAULT_LOG_LEVEL))
-    access_mode = str(form.get("access_log_mode", DEFAULT_ACCESS_LOG_MODE))
-    if level not in LOG_LEVEL_LABELS:
-        raise HTTPException(status_code=400, detail=tr("Ungültiges Loglevel"))
-    if access_mode not in ACCESS_LOG_LABELS:
-        raise HTTPException(status_code=400, detail=tr("Ungültiges HTTP-Protokoll"))
-    index.set_setting("log_level", level)
-    index.set_setting("access_log_mode", access_mode)
-    configure_logging(level, access_mode)
-    logger.info(
-        "Protokollierung geändert · event=logging_configuration_changed "
-        "level=%s http_access=%s",
-        level,
-        access_mode,
-    )
-    return templates.TemplateResponse(
-        request, "_settings_logging_form.html", _settings_logging_context(saved=True)
-    )
+
+    def apply():
+        level = str(form.get("log_level", DEFAULT_LOG_LEVEL))
+        access_mode = str(form.get("access_log_mode", DEFAULT_ACCESS_LOG_MODE))
+        if level not in LOG_LEVEL_LABELS:
+            raise HTTPException(status_code=400, detail=tr("Ungültiges Loglevel"))
+        if access_mode not in ACCESS_LOG_LABELS:
+            raise HTTPException(status_code=400, detail=tr("Ungültiges HTTP-Protokoll"))
+        index.set_setting("log_level", level)
+        index.set_setting("access_log_mode", access_mode)
+        configure_logging(level, access_mode)
+        logger.info(
+            "Protokollierung geändert · event=logging_configuration_changed "
+            "level=%s http_access=%s",
+            level,
+            access_mode,
+        )
+        return templates.TemplateResponse(
+            request, "_settings_logging_form.html", _settings_logging_context(saved=True)
+        )
+
+    return await run_in_threadpool(apply)
 
 
 @app.get("/settings/logging/debug", response_class=HTMLResponse)
@@ -1964,36 +1978,40 @@ def _backup_status_response(request: Request) -> HTMLResponse:
 async def backup_schedule_save(request: Request) -> HTMLResponse:
     """Speichert Kalenderzeitplan und berechnet dessen nächsten Termin neu."""
     form = await request.form()
-    schedule = form.get("backup_schedule")
-    keep_count = form.get("backup_keep_count")
-    keep_days = form.get("backup_keep_days")
-    schedule_time = str(form.get("backup_schedule_time", BACKUP_DEFAULT_TIME))
-    weekday_raw = str(form.get("backup_schedule_weekday", BACKUP_DEFAULT_WEEKDAY))
-    if schedule is not None and schedule not in BACKUP_SCHEDULE_LABELS:
-        raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitplan"))
-    if keep_count is not None and keep_count not in BACKUP_KEEP_COUNT_LABELS:
-        raise HTTPException(status_code=400, detail=tr("Ungültige Anzahl"))
-    if keep_days is not None and keep_days not in RETENTION_LABELS:
-        raise HTTPException(status_code=400, detail=tr("Ungültige Aufbewahrung"))
-    try:
-        parse_schedule_time(schedule_time)
-        weekday = int(weekday_raw)
-        if weekday not in range(7):
-            raise ValueError
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=tr("Ungültiger Sicherungszeitpunkt")) from exc
-    if schedule is not None:
-        index.set_setting("backup_schedule", str(schedule))
-    if keep_count is not None:
-        index.set_setting("backup_keep_count", str(keep_count))
-    if keep_days is not None:
-        index.set_setting("backup_keep_days", str(keep_days))
-    index.set_setting("backup_schedule_time", schedule_time)
-    index.set_setting("backup_schedule_weekday", str(weekday))
-    _background.set_next_backup_run(datetime.now(TZ))
-    return templates.TemplateResponse(
-        request, "_settings_backup_schedule_form.html", _backup_context()
-    )
+
+    def apply():
+        schedule = form.get("backup_schedule")
+        keep_count = form.get("backup_keep_count")
+        keep_days = form.get("backup_keep_days")
+        schedule_time = str(form.get("backup_schedule_time", BACKUP_DEFAULT_TIME))
+        weekday_raw = str(form.get("backup_schedule_weekday", BACKUP_DEFAULT_WEEKDAY))
+        if schedule is not None and schedule not in BACKUP_SCHEDULE_LABELS:
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitplan"))
+        if keep_count is not None and keep_count not in BACKUP_KEEP_COUNT_LABELS:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Anzahl"))
+        if keep_days is not None and keep_days not in RETENTION_LABELS:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Aufbewahrung"))
+        try:
+            parse_schedule_time(schedule_time)
+            weekday = int(weekday_raw)
+            if weekday not in range(7):
+                raise ValueError
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Sicherungszeitpunkt")) from exc
+        if schedule is not None:
+            index.set_setting("backup_schedule", str(schedule))
+        if keep_count is not None:
+            index.set_setting("backup_keep_count", str(keep_count))
+        if keep_days is not None:
+            index.set_setting("backup_keep_days", str(keep_days))
+        index.set_setting("backup_schedule_time", schedule_time)
+        index.set_setting("backup_schedule_weekday", str(weekday))
+        _background.set_next_backup_run(datetime.now(TZ))
+        return templates.TemplateResponse(
+            request, "_settings_backup_schedule_form.html", _backup_context()
+        )
+
+    return await run_in_threadpool(apply)
 
 
 @app.post("/backup/verify/{filename}", response_class=HTMLResponse)
@@ -2029,7 +2047,7 @@ async def backup_import(request: Request, file: UploadFile = File(...)) -> HTMLR
         return templates.TemplateResponse(
             request,
             "_settings_backup_ready.html",
-            _backup_context(message=tr("Import fehlgeschlagen: Bitte eine ZIP-Datei auswählen.")),
+            await run_in_threadpool(_backup_context, message=tr("Import fehlgeschlagen: Bitte eine ZIP-Datei auswählen.")),
         )
     BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
     staging = BACKUPS_DIR / f".backup-upload-{secrets.token_hex(12)}.zip"
@@ -2053,14 +2071,14 @@ async def backup_import(request: Request, file: UploadFile = File(...)) -> HTMLR
         return templates.TemplateResponse(
             request,
             "_settings_backup_ready.html",
-            _backup_context(message=tr("Import fehlgeschlagen: {exc}", exc=exc)),
+            await run_in_threadpool(_backup_context, message=tr("Import fehlgeschlagen: {exc}", exc=exc)),
         )
     except (OSError, ValueError) as exc:
         logger.warning("Backup-Import fehlgeschlagen · %s", exc)
         return templates.TemplateResponse(
             request,
             "_settings_backup_ready.html",
-            _backup_context(message=tr("Import fehlgeschlagen: {exc}", exc=exc)),
+            await run_in_threadpool(_backup_context, message=tr("Import fehlgeschlagen: {exc}", exc=exc)),
         )
     finally:
         staging.unlink(missing_ok=True)
@@ -2075,7 +2093,8 @@ async def backup_import(request: Request, file: UploadFile = File(...)) -> HTMLR
     return templates.TemplateResponse(
         request,
         "_settings_backup_ready.html",
-        _backup_context(
+        await run_in_threadpool(
+            _backup_context,
             message=tr("Backup importiert und erfolgreich geprüft (Formatversion {version}, {name}).", version=version, name=destination.name)
         ),
     )
@@ -4037,16 +4056,20 @@ def dashboard_pin_entity(request: Request, entity_id: str, dashboard_id: int = 1
 async def dashboard_entity_change(
     request: Request, pin_id: int, dashboard_id: int = 1
 ) -> HTMLResponse:
-    _require_dashboard_unlocked(dashboard_id)
     form = await request.form()
-    new_entity_id = str(form.get("new_entity_id", "")).strip()
-    _require_entity(new_entity_id)
-    if not index.set_dashboard_entity_pin_entity(dashboard_id, pin_id, new_entity_id):
-        raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
-    return templates.TemplateResponse(
-        request, "_dashboard_tiles.html",
-        _dashboard_tiles_context(dashboard_id, auto_open_pin_id=pin_id),
-    )
+
+    def apply():
+        _require_dashboard_unlocked(dashboard_id)
+        new_entity_id = str(form.get("new_entity_id", "")).strip()
+        _require_entity(new_entity_id)
+        if not index.set_dashboard_entity_pin_entity(dashboard_id, pin_id, new_entity_id):
+            raise HTTPException(status_code=404, detail=tr("Dashboard-Kachel nicht gefunden"))
+        return templates.TemplateResponse(
+            request, "_dashboard_tiles.html",
+            _dashboard_tiles_context(dashboard_id, auto_open_pin_id=pin_id),
+        )
+
+    return await run_in_threadpool(apply)
 
 
 @app.post("/dashboard/pin-cleanup", response_class=HTMLResponse)
@@ -4666,6 +4689,22 @@ def _validate_table_body(body: _SaveTableBody) -> None:
         raise HTTPException(status_code=400, detail=tr("Bitte mindestens eine Spalte anlegen"))
     if not body.rows:
         raise HTTPException(status_code=400, detail=tr("Bitte mindestens eine Zeile anlegen"))
+    # Dieselben Grenzen wie die Abfrage (TableQueryRequest): Sonst ließe sich eine Tabelle speichern, die Vorschau
+    # und Kachel danach nie mehr laden (422) und die Karte nur mit 500 beantwortet.
+    if len(body.columns) > MAX_TABLE_COLUMNS:
+        raise HTTPException(
+            status_code=400,
+            detail=tr("Eine Tabelle darf höchstens {limit} Spalten haben", limit=MAX_TABLE_COLUMNS),
+        )
+    used_entities = {entity_id for r in body.rows for entity_id in r.entity_ids}
+    if len(used_entities) > MAX_MULTI_QUERY_ENTITIES:
+        raise HTTPException(
+            status_code=400,
+            detail=tr(
+                "Eine Tabelle darf höchstens {limit} verschiedene Entitäten enthalten (jetzt {count})",
+                limit=MAX_MULTI_QUERY_ENTITIES, count=len(used_entities),
+            ),
+        )
     for c in body.columns:
         if c.range_key not in dict(_CHART_RANGE_OPTIONS):
             raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum in einer Spalte"))

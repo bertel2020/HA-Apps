@@ -18,6 +18,9 @@ MAX_EVENT_TS = 4_102_444_800.0  # 2100-01-01T00:00:00Z
 # Vokabular nachzubilden.
 MAX_EVENT_TEXT_LENGTH = 255
 MAX_MULTI_QUERY_ENTITIES = 25
+# Spalten einer Vergleichstabelle (Abfrage und Speichern): dieselbe Grenze an beiden Stellen, sonst ließe sich eine
+# Tabelle speichern, die danach nie mehr geladen werden kann.
+MAX_TABLE_COLUMNS = 100
 # Mehrjahresvergleich im Chart-Editor ("Jahre: Alle"): höchstens so viele
 # Vorjahre. Jedes Jahr kostet bis zu zwei Jahresabfragen (Werte + "bis zum
 # gleichen Tag"); die Grenze fängt ein fehlerhaftes, uralt wirkendes first_ts

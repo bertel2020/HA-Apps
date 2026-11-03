@@ -799,7 +799,11 @@ def test_the_write_path_still_routes_the_type_change_through_the_announcement() 
     wieder direkt auf rollup.rebuild_entity_rollups(), wäre die Anzeige
     lautlos weg — der Test darüber liefe trotzdem weiter grün."""
     quelle = (APP / "storage" / "ingestion.py").read_text(encoding="utf-8")
-    assert "on_type_change=lambda _old, new, hourly_rollup: _rebuild_after_type_change(" in quelle
+    # Der Neuaufbau läuft seit Phase 7 vor get_or_create_entity() und damit außerhalb des Index-Locks; der Hook an
+    # get_or_create_entity() ist nur noch ein No-op, der Neuaufbau selbst weiterhin über die Anmeldung.
+    assert "self._rebuild_if_type_changes(event)" in quelle
+    assert "        _rebuild_after_type_change(\n            self._data_dir, event.entity_id, new_type" in quelle
+    assert "rollup.rebuild_entity_rollups(" not in quelle.split("def _rebuild_if_type_changes")[1].split("def _ingest_entity_locked")[0]
     assert quelle.count("rollup.rebuild_entity_rollups(") == 1, (
         "der Neuaufbau läuft an der Anmeldung vorbei"
     )

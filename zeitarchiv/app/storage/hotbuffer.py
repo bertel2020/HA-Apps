@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from zoneinfo import ZoneInfo
 
 from .atomic import write_text_atomically
@@ -56,6 +56,11 @@ def _format_row(
     min_part = "" if min_value is None else min_value
     max_part = "" if max_value is None else max_value
     return f"{ts},{value},{event_id or ''},{min_part},{max_part}"
+
+
+def format_record(record: HotRecord) -> str:
+    """Eine Zeile der Hot-Datei (ohne Zeilenende) für einen Datensatz."""
+    return _format_row(*record)
 
 
 def append(
@@ -123,6 +128,17 @@ def read_full_rows(path: Path) -> list[HotRecord]:
     return read_records(path)
 
 
+def _parse_line(line: str) -> HotRecord | None:
+    """Eine bereinigte, nicht leere Zeile als Datensatz; None bei zu wenigen Spalten, ValueError bei kaputten Zahlen."""
+    parts = line.split(",", 4)
+    if len(parts) < 2:
+        return None
+    event_id = (parts[2] or None) if len(parts) >= 3 else None
+    min_value = float(parts[3]) if len(parts) >= 5 and parts[3] != "" else None
+    max_value = float(parts[4]) if len(parts) >= 5 and parts[4] != "" else None
+    return (float(parts[0]), float(parts[1]), event_id, min_value, max_value)
+
+
 def iter_records(path: Path, corrupt_lines: list[str] | None = None) -> Iterator[HotRecord]:
     """Streamt Hot-Dateien in allen bisherigen Formaten: zwei Spalten (alt),
     drei Spalten (ts,value,event_id) oder fünf Spalten
@@ -143,14 +159,8 @@ def iter_records(path: Path, corrupt_lines: list[str] | None = None) -> Iterator
             line = line.strip()
             if not line:
                 continue
-            parts = line.split(",", 4)
-            if len(parts) < 2:
-                continue
             try:
-                event_id = (parts[2] or None) if len(parts) >= 3 else None
-                min_value = float(parts[3]) if len(parts) >= 5 and parts[3] != "" else None
-                max_value = float(parts[4]) if len(parts) >= 5 and parts[4] != "" else None
-                record = (float(parts[0]), float(parts[1]), event_id, min_value, max_value)
+                record = _parse_line(line)
             except ValueError:
                 # Nach einem unsauberen Absturz kann das Dateisystem den Rest einer
                 # noch nicht geflushten Zeile als Nullbytes zurückliefern (ext4 u. a.
@@ -166,12 +176,83 @@ def iter_records(path: Path, corrupt_lines: list[str] | None = None) -> Iterator
                 if corrupt_lines is not None:
                     corrupt_lines.append(line[:80])
                 continue
-            yield record
+            if record is not None:
+                yield record
 
 
 def read_records(path: Path) -> list[HotRecord]:
     """Materialisiert ``iter_records()`` für Aufrufer, die alle Zeilen brauchen."""
     return list(iter_records(path))
+
+
+_TAIL_BLOCK = 64 * 1024
+
+
+def read_tail_after(path: Path, is_boundary: Callable[[HotRecord], bool]) -> tuple[int, list[HotRecord]]:
+    """Liest nur das Ende einer Hot-Datei: alle Datensätze NACH dem letzten, für den ``is_boundary`` zutrifft.
+
+    Rückgabe: (Byte-Offset, an dem diese Zeilen beginnen, die Datensätze). Gibt es keinen solchen Datensatz,
+    ist es die ganze Datei (Offset 0). Gelesen wird von hinten in wachsenden Blöcken statt die ganze Datei zu
+    parsen: Die Live-Auflösung fragt bei jedem Messwert nach den noch offenen Zeilen, und eine Monatsdatei hat
+    bei 30 s Auflösung am Monatsende rund 89 000 davon (gemessen: 50 ms je Messwert für das Parsen, unter der
+    Entitätssperre). Kaputte Zeilen werden wie in iter_records() übersprungen."""
+    if not path.exists():
+        return 0, []
+    size = path.stat().st_size
+    if size == 0:
+        return 0, []
+    block = _TAIL_BLOCK
+    with path.open("rb") as handle:
+        while True:
+            window = min(block, size)
+            handle.seek(size - window)
+            data = handle.read(window)
+            base = size - window
+            if window < size:
+                # Die erste Zeile im Fenster ist vermutlich angeschnitten: erst ab der nächsten rechnen.
+                cut = data.find(b"\n")
+                if cut == -1:
+                    block *= 2
+                    continue
+                data, base = data[cut + 1:], base + cut + 1
+            lines: list[tuple[int, str]] = []
+            position = base
+            for raw in data.split(b"\n"):
+                lines.append((position, raw.decode("utf-8", errors="replace")))
+                position += len(raw) + 1
+            for index in range(len(lines) - 1, -1, -1):
+                text = lines[index][1].strip()
+                if not text:
+                    continue
+                try:
+                    record = _parse_line(text)
+                except ValueError:
+                    continue
+                if record is not None and is_boundary(record):
+                    start = lines[index + 1][0] if index + 1 < len(lines) else size
+                    return start, _records_of(lines[index + 1:], path)
+            if window >= size:
+                return 0, _records_of(lines, path)
+            block *= 2
+
+
+def _records_of(lines: list[tuple[int, str]], path: Path) -> list[HotRecord]:
+    records: list[HotRecord] = []
+    for _position, raw in lines:
+        text = raw.strip()
+        if not text:
+            continue
+        try:
+            record = _parse_line(text)
+        except ValueError:
+            logger.warning(
+                "Kaputte Hot-Buffer-Zeile übersprungen · event=hotbuffer_corrupt_line path=%s snippet=%r",
+                path, text[:80],
+            )
+            continue
+        if record is not None:
+            records.append(record)
+    return records
 
 
 def write_records(path: Path, records: list[HotRecord]) -> None:

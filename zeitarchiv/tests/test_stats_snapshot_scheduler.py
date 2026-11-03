@@ -186,6 +186,10 @@ WARTUNGSPLANER_ZEILEN: dict[str, str | None] = {
     # der Effekt (Zeitfenster zu Ø/Min/Max zusammengefasst) ist direkt als
     # normale Zeile in der Roh-Werte-Tabelle der Entität sichtbar.
     "_flush_stale_resolution_windows": None,
+    # Archiviert den Vormonat von Entitäten, die seit dem Monatswechsel nichts mehr gesendet haben. Ersetzt den
+    # manuellen Anstoß, den es schon gibt (Housekeeping → Rotation, mit Zähler "rotation_pending"); der Effekt ist
+    # der archivierte Monat selbst, ein eigener globaler Zustand entsteht nicht.
+    "_rotate_stale_months_if_due": None,
     # Standardmäßig aus (Housekeeping → Verdichten), und ihr Effekt (verdichtete
     # Monate) ist direkt an der betroffenen Entität sichtbar (Korrektur-Hinweis
     # im Bearbeitungsbereich, Konfiguration) — kein eigener globaler Zustand,

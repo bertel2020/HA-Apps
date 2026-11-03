@@ -28,6 +28,7 @@ from .index import (
     STATE_REJECTION_LIMIT,
     STATE_REJECTION_TYPE_MISMATCH,
     StateTypeMismatch,
+    derive_type,
     resolution_seconds,
     should_accept_value,
     should_accept_write,
@@ -397,6 +398,25 @@ class IngestionService:
         with self._coordinator.entity(event.entity_id):
             return self._ingest_entity_locked(event, archive_cache)
 
+    def _rebuild_if_type_changes(self, event: IngestEvent) -> None:
+        """Baut die Rollups einer Entität neu, deren Aggregationstyp sich mit diesem Event ändert.
+
+        Der Neuaufbau (bei langem Archiv Sekunden) lief früher als Rückruf INNERHALB von
+        Index.get_or_create_entity(), also unter dem globalen Index-Lock: Währenddessen bekamen die Aufnahme aller
+        anderen Entitäten und die Oberfläche IndexBusy (Lock-Timeout 8 s, Batches endeten mit 500). Hier hält er
+        nur die Entitätssperre, die dieser Aufruf ohnehin hat. Scheitert er, wird der neue Typ nicht gespeichert
+        (wie vorher): die Ausnahme verlässt die Methode, bevor get_or_create_entity() den Typ ändert."""
+        existing = self._index.get_entity(event.entity_id)
+        if existing is None:
+            return
+        new_type = STATE_TYPE if event.state is not None else derive_type(event.domain, event.state_class)
+        old_type = existing["aggregation_type"]
+        if new_type == old_type or STATE_TYPE in (new_type, old_type):
+            return  # unverändert, oder ein Zahl/Text-Wechsel (den lehnt get_or_create_entity() selbst ab)
+        _rebuild_after_type_change(
+            self._data_dir, event.entity_id, new_type, self._tz, bool(existing["hourly_rollup"])
+        )
+
     def _ingest_entity_locked(
         self,
         event: IngestEvent,
@@ -425,15 +445,15 @@ class IngestionService:
                 return "skipped"
             event = replace(event, value=state_value)
         try:
+            self._rebuild_if_type_changes(event)
             self._index.get_or_create_entity(
                 event.entity_id,
                 event.domain,
                 event.state_class,
                 event.unit,
                 event.friendly_name,
-                on_type_change=lambda _old, new, hourly_rollup: _rebuild_after_type_change(
-                    self._data_dir, event.entity_id, new, self._tz, hourly_rollup
-                ),
+                # Ein Typwechsel ist oben schon behandelt (Neuaufbau, bevor der neue Typ gespeichert wird).
+                on_type_change=lambda _old, _new, _hourly_rollup: None,
                 state=event.state is not None,
             )
         except StateTypeMismatch:
