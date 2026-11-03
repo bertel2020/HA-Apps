@@ -60,9 +60,10 @@
     const diff = cur - previous;
     const zero = Math.round(Math.abs(diff) * 10) === 0;
     let text = (zero ? '± ' : diff > 0 ? '▲ +' : '▼ −');
+    // Die Einheit steht schon im Wert darüber; nur bei Prozentpunkten und MWh bleibt sie, damit die Zeile eindeutig ist.
     if (row.kind === 'pct') text += num(Math.abs(diff), 1) + ' ' + t('PP');
-    else if (row.kind === 'spec') text += num(Math.abs(diff), 1) + ' ' + t('kWh/kWp');
-    else text += energy(Math.abs(diff));
+    else if (row.kind === 'spec') text += num(Math.abs(diff), 1);
+    else text += Math.abs(diff) >= 10000 ? energy(Math.abs(diff)) : num(Math.abs(diff), Math.abs(diff) < 100 ? 1 : 0);
     // Prozentwerte vergleichen sich in Prozentpunkten, dort steht kein zweites Prozent daneben.
     if (row.kind !== 'pct' && previous !== 0 && !zero) {
       const percent = diff / previous * 100;
