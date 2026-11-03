@@ -594,11 +594,17 @@ def test_notes_are_cleaned_and_capped() -> None:
 def test_usage_counts_calls_and_the_account_kind(anlage) -> None:
     client, index = anlage
     _enable(index)
-    for header in ({"X-Zeitarchiv-Ai-User": "admin"}, {"X-Zeitarchiv-Ai-User": "user"}, {}):
-        client.post("/api/ai/search_entities", json={}, headers={**AUTH, **header})
+    # Konten ohne Administratorrechte dürfen keine Entitäten abfragen (siehe test_ai_sharing_rules.py): Für die
+    # Zählung nach Kontoart ruft das Benutzerkonto das Meldungs-Werkzeug auf.
+    for tool, header in (
+        ("search_entities", {"X-Zeitarchiv-Ai-User": "admin"}),
+        ("get_notices", {"X-Zeitarchiv-Ai-User": "user"}),
+        ("search_entities", {}),
+    ):
+        client.post(f"/api/ai/{tool}", json={}, headers={**AUTH, **header})
     client.post("/api/ai/get_notices", json={}, headers=AUTH)
     snapshot = ai_usage.USAGE.snapshot(index)
-    assert snapshot["calls"] == {"search_entities": 3, "get_notices": 1}
+    assert snapshot["calls"] == {"search_entities": 2, "get_notices": 2}
     assert snapshot["by_account"] == {"admin": 1, "user": 1, "unknown": 2}
     assert snapshot["last_used"] is not None
     assert index.get_setting("ai_last_used") is not None

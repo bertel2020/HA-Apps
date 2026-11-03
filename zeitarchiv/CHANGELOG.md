@@ -201,6 +201,15 @@
   mehr im Event-Loop. Bei vielen Archivdateien stand dort sonst der ganze Server
   still.
 
+- **KI-Zugriff, Freigabe und Konten**: Die Freigabe der Entitäten gilt jetzt in
+  jedem Werkzeug. Die Energieübersicht zeigt nicht freigegebene Verbraucher und
+  Erzeuger nur noch als „Other (not shared)“ (die Summen bleiben vollständig),
+  und bei eingeschränkter Auswahl werden Meldungen weggelassen, die Entitäten
+  nennen. Benutzerkonten ohne Administratorrechte dürfen über die KI keine
+  einzelnen Entitäten mehr abfragen, wie bei der Karte; Energieübersicht und
+  Meldungen bleiben für sie erreichbar. Abgelehnte Aufrufe zählt Einstellungen →
+  KI-Zugriff.
+
 ---
 
 ### English
@@ -397,6 +406,14 @@
 - **Pages stay usable**: Saving settings, muting notices, swapping tiles, the
   backup schedule and the backup import no longer compute in the event loop.
   With many archive files the whole server stood still there.
+
+- **AI access, sharing and accounts**: The sharing of entities now applies in
+  every tool. The energy overview shows consumers and generators that are not
+  shared only as "Other (not shared)" (the totals stay complete), and with a
+  restricted selection, notices that name entities are left out. User accounts
+  without administrator rights can no longer query individual entities through
+  the AI, as with the card; the energy overview and the notices stay available
+  to them. Settings → AI access counts rejected calls.
 
 ## 1.13.0 - 2026-11-01
 

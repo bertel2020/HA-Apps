@@ -66,6 +66,7 @@ def _usage(index: Index, tz: ZoneInfo, language: str) -> dict:
         "rejected_week": snapshot["rejected_week"],
         "rejected_disabled": snapshot["rejected"].get("ai_disabled", 0),
         "rejected_tool": snapshot["rejected"].get("tool_disabled", 0),
+        "rejected_admin_only": snapshot["rejected"].get("admin_only", 0),
     }
 
 

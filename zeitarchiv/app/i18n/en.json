@@ -3538,7 +3538,9 @@
     "{kept} Backup(s) sind noch nicht auf das externe Ziel übertragen und bleiben liegen.": "{kept} backup(s) have not yet been transferred to the external target and remain.",
     "Eine Tabelle darf höchstens {limit} Spalten haben": "A table may have at most {limit} columns",
     "Eine Tabelle darf höchstens {limit} verschiedene Entitäten enthalten (jetzt {count})": "A table may contain at most {limit} different entities (now {count})",
-    "Die Tabelle ist zu groß für die Abfrage (höchstens {entities} Entitäten und {columns} Spalten)": "The table is too large for the query (at most {entities} entities and {columns} columns)"
+    "Die Tabelle ist zu groß für die Abfrage (höchstens {entities} Entitäten und {columns} Spalten)": "The table is too large for the query (at most {entities} entities and {columns} columns)",
+    "Abgelehnt: Benutzerkonto ohne Administratorrechte": "Rejected: user account without administrator rights",
+    "Benutzerkonten ohne Administratorrechte dürfen nur die Energieübersicht und die Meldungen abrufen, keine einzelnen Entitäten (wie bei der Karte). Verbraucher und Erzeuger, die du nicht freigegeben hast, erscheinen dort nur als „Other (not shared)“.": "User accounts without administrator rights may only fetch the energy overview and the notices, no individual entities (as with the card). Consumers and generators you have not shared appear there only as “Other (not shared)”."
   },
   "js": {
     "Ladestand": "State of charge",

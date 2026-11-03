@@ -176,6 +176,14 @@ def create_ai_router(deps: AiDependencies) -> APIRouter:
         if tool in access.tools_disabled:
             reject(tool, "tool_disabled")
             return error(403, "tool_disabled", "The owner switched this tool off; use another tool or tell the user.")
+        if request.headers.get("x-zeitarchiv-ai-user") == "user" and tool in ai_tools.ENTITY_TOOLS:
+            # Konten ohne Administratorrechte: wie bei der Karte nichts für einzelne Entitäten. Die Integration
+            # bietet diese Werkzeuge ihnen gar nicht erst an; das hier fängt ältere Integrationen ab.
+            reject(tool, "admin_only")
+            return error(
+                403, "admin_only",
+                "This tool reads individual entities and is limited to Home Assistant administrators.",
+            )
         if (reason := limiter.acquire()) is not None:
             return error(
                 429, reason,

@@ -166,6 +166,12 @@
         <span class="settings-compact-value ki-warn-value">{{ ai_usage.rejected_tool }}</span>
       </div>
       {% endif %}
+      {% if ai_usage.rejected_admin_only %}
+      <div class="settings-compact-row">
+        <span class="settings-compact-label">{{ _("Abgelehnt: Benutzerkonto ohne Administratorrechte") }}</span>
+        <span class="settings-compact-value ki-warn-value">{{ ai_usage.rejected_admin_only }}</span>
+      </div>
+      {% endif %}
     </div>
   </details>
   {% endif %}
@@ -184,6 +190,7 @@
       <p class="hint hint-status">{{ _("Gespeichert werden die letzten 50 Änderungen. Wer sie vorgenommen hat, erfasst die App nicht.") }}</p>
     </div>
   </details>
+  <p class="hint hint-status">{{ _("Benutzerkonten ohne Administratorrechte dürfen nur die Energieübersicht und die Meldungen abrufen, keine einzelnen Entitäten (wie bei der Karte). Verbraucher und Erzeuger, die du nicht freigegeben hast, erscheinen dort nur als „Other (not shared)“.") }}</p>
 {% if ai_usage.admin %}
   <p class="hint hint-status">{{ _("Zugriffe mit Administratorkonto sind normal, wenn die Adresse mit der API-ID verwendet wird: Der Client sieht dann nur die Zeitarchiv-Werkzeuge. Verwende nicht die allgemeine Adresse /api/mcp mit den Voreinstellungen.") }}</p>
   {% endif %}

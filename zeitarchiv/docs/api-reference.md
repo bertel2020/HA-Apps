@@ -228,13 +228,24 @@ Abgeschaltete Werkzeuge (Einstellungen → KI-Zugriff) fehlen in `/api/ai/config
 man sie trotzdem auf, kommt `403` `tool_disabled`. Die Hinweise des Besitzers stehen im
 `api_prompt` der Konfiguration und als `owner_notes` in der Antwort von `search_entities`.
 Der Kopf `X-Zeitarchiv-Ai-User` (`admin` oder `user`) sagt, mit welchem Konto der Client in
-Home Assistant angemeldet ist; er fließt nur in die Nutzungsanzeige ein, gesperrt wird nichts.
+Home Assistant angemeldet ist. Für `user` lehnt die App die Werkzeuge ab, die einzelne Entitäten
+abfragen (`search_entities`, `get_summary`, `get_series`, `compare_periods`; `ENTITY_TOOLS` in
+`app/ai_tools.py`): `403` `admin_only`. Das ist dieselbe Regel wie bei der Karte, wo „Entitäten direkt“
+Administratoren vorbehalten sind; die Integration bietet diese Werkzeuge solchen Konten gar nicht erst an
+(`ai.py`). Ohne Kopf (etwa der lokale Gesprächsagent) und für `admin` gilt keine Einschränkung.
+Energieübersicht und Meldungen stehen allen Konten offen.
+
+Die Freigabe des Besitzers (Einstellungen → KI-Zugriff, Bereich „alle / alle außer / nur diese“) gilt in
+jedem Werkzeug: `get_energy_overview` fasst Verbraucher und Erzeuger, die nicht freigegeben sind, in
+`Other (not shared)` zusammen (die Summen bleiben vollständig, Gruppen und die Grundlast stehen unverändert da),
+und `get_notices` lässt bei eingeschränktem Bereich die Meldungen weg, deren Text Entitäten nennt
+(`ENTITY_NOTICE_PREFIXES`); `healthy` gilt weiter für alle Meldungen.
 
 Abgelehnte Aufrufe (`403`) werden je Tag gezählt und in Einstellungen → KI-Zugriff
 angezeigt; Aufrufe gelten als Nutzung nur, wenn sie ein Werkzeug ausgeführt haben.
 
 Fehler: `{"error": code, "message": …}`. `401` falscher Token, `403`
-`ai_disabled` (Schalter aus) oder `tool_disabled` (Werkzeug abgeschaltet), `429` `busy`/`rate_limited` (höchstens 2 gleichzeitig,
+`ai_disabled` (Schalter aus), `tool_disabled` (Werkzeug abgeschaltet) oder `admin_only` (Konto ohne Administratorrechte, Werkzeug für einzelne Entitäten), `429` `busy`/`rate_limited` (höchstens 2 gleichzeitig,
 60 je Minute; mit `Retry-After`), `504` `timeout` (nach 20 s). Die Antwort ist auf
 etwa 8.000 Zeichen begrenzt und sagt `truncated`, wenn sie gekürzt wurde.
 `/api/notices` trägt `ai_config_rev`; ändert sich der Wert, holt die Integration

@@ -29,7 +29,7 @@ SETTING_DAILY = "ai_usage_daily"
 #: Wie oft die Zähler höchstens in die Datenbank geschrieben werden.
 PERSIST_INTERVAL_SECONDS = 60.0
 CLIENT_KINDS = ("admin", "user")
-REJECT_REASONS = ("ai_disabled", "tool_disabled")
+REJECT_REASONS = ("ai_disabled", "tool_disabled", "admin_only")
 RETENTION_DAYS = 90
 WINDOW_DAYS = 7
 

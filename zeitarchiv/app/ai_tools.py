@@ -106,6 +106,21 @@ class AiToolContext:
             )
 
 
+#: Werkzeuge, die einzelne Entitäten abfragen. Konten ohne Administratorrechte dürfen sie nicht nutzen — dieselbe
+#: Regel wie bei der Karte, wo "Entitäten direkt" Administratoren vorbehalten sind (card.py der Integration).
+ENTITY_TOOLS = frozenset({"search_entities", "get_summary", "get_series", "compare_periods"})
+
+#: Meldungen, deren Text Entitätsnamen oder -IDs nennt. Schränkt der Besitzer die Entitäten ein (scope "include" oder
+#: "exclude"), bekommt die KI sie nicht: Eine Meldung trägt keine strukturierte Entität, der Name steht nur im Text.
+ENTITY_NOTICE_PREFIXES = (
+    "entities.", "housekeeping.counter_decreases", "housekeeping.duplicates_found", "housekeeping.historic_alive",
+    "housekeeping.inactive_entities_", "housekeeping.data_quality_new", "housekeeping.purge_available",
+)
+
+#: Sammelposten für Verbraucher und Erzeuger, die der Besitzer der KI nicht freigegeben hat.
+UNSHARED_LABEL = "Other (not shared)"
+
+
 def clean_text(value: str | None) -> str:
     text = _CONTROL_CHARS.sub(" ", value or "").strip()
     return text if len(text) <= MAX_TEXT_LENGTH else text[: MAX_TEXT_LENGTH - 1] + "…"
@@ -647,6 +662,32 @@ def compare_periods(
 
 # ---------------------------------------------------------------- Energie
 
+
+def _share_only_allowed(ctx: AiToolContext, rows: list[dict], limit: int = 10) -> list[dict]:
+    """Die ersten ``limit`` Zeilen, ohne die entity_id und ohne Entitäten, die der Besitzer der KI nicht freigegeben hat.
+
+    Deren Werte stehen gemeinsam in einer Zeile "Other (not shared)": Die Summen bleiben vollständig, aber der Name
+    eines gesperrten Geräts (Sauna, Wallbox …) erreicht das Modell nicht. Zeilen ohne Entität (eine Gruppe aus der
+    Einrichtung, die Grundlast) bleiben stehen: Sie tragen den Namen des Besitzers, keinen einer Entität."""
+    shown: list[dict] = []
+    hidden_kwh, hidden_cost, hidden_any, has_cost = 0.0, 0.0, False, False
+    for row in rows:
+        entity_id = row.pop("entity_id", None)
+        if entity_id and not ctx.allows(entity_id):
+            hidden_any = True
+            hidden_kwh += row["kwh"] or 0.0
+            if row.get("cost") is not None:
+                has_cost, hidden_cost = True, hidden_cost + row["cost"]
+            continue
+        shown.append(row)
+    shown = shown[:limit]
+    if hidden_any:
+        other: dict = {"name": UNSHARED_LABEL, "kwh": round(hidden_kwh, 3)}
+        if any("cost" in row for row in rows):
+            other["cost"] = round(hidden_cost, 2) if has_cost else None
+        shown.append(other)
+    return shown
+
 _ENERGY_KPI_KEYS = {
     "erzeugung": "generation_kwh", "verbrauch": "consumption_kwh", "netzbezug": "grid_import_kwh",
     "einspeisung": "grid_export_kwh", "autarkie": "self_sufficiency_pct", "eigenverbrauch": "self_consumption_pct",
@@ -681,16 +722,16 @@ def get_energy_overview(ctx: AiToolContext, period: str, on_date: str | None = N
     end = datetime.fromtimestamp(flow["window_end_ts"], ctx.tz)
     costs = {name: kpi.get(key) for key, name in _ENERGY_COST_KEYS.items()}
     has_prices = any(value is not None for value in costs.values())
-    consumers = [
-        {"name": clean_text(item["name"]), "kwh": item["value"], "cost": item.get("kosten")}
+    consumers = _share_only_allowed(ctx, [
+        {"name": clean_text(item["name"]), "kwh": item["value"], "cost": item.get("kosten"), "entity_id": item.get("entity_id")}
         for item in flow.get("verbraucher_breakdown", []) if item.get("level", 0) == 0
-    ][:10]
+    ])
     # Erzeuger einzeln (Dach-PV, Balkonkraftwerk …): sonst ist "Photovoltaik" nicht von einem
     # zweiten Erzeuger zu trennen. Wie bei den Verbrauchern nur Name und kWh, keine entity_id.
-    generators = [
-        {"name": clean_text(item["name"]), "kwh": item["value"]}
+    generators = _share_only_allowed(ctx, [
+        {"name": clean_text(item["name"]), "kwh": item["value"], "entity_id": item.get("entity_id")}
         for item in flow.get("erzeuger_breakdown", [])
-    ][:10]
+    ])
     gaps = kpi.get("kosten_luecke") or []
     response = {
         "as_of": as_of(ctx, real_now),
@@ -722,10 +763,16 @@ def get_energy_overview(ctx: AiToolContext, period: str, on_date: str | None = N
 
 def get_notices(ctx: AiToolContext) -> dict:
     notices = ctx.collect_notices() if ctx.collect_notices else []
+    # "healthy" aus ALLEN Meldungen: Es nennt keine Entität, und ein "alles in Ordnung" neben verschwiegenen
+    # Warnungen wäre falsch.
+    healthy = not any(notice.get("severity") in ("warn", "error") for notice in notices)
+    if ctx.access.scope != "all":
+        # Der Besitzer hat die Entitäten eingeschränkt: Meldungen, die Entitäten nennen, bleiben beim Besitzer.
+        notices = [n for n in notices if not str(n.get("id", "")).startswith(ENTITY_NOTICE_PREFIXES)]
     backup = ctx.latest_backup() if ctx.latest_backup else None
     return _cap_size({
         "as_of": as_of(ctx),
-        "healthy": not any(notice.get("severity") in ("warn", "error") for notice in notices),
+        "healthy": healthy,
         "notices": [
             {
                 "id": clean_text(notice.get("id")),
