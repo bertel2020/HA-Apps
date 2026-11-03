@@ -370,7 +370,7 @@
       </template>
     </ul>
     <p class="edash-tile-open" x-show="tile.data && tile.data.entity_id">
-      <a class="btn" :href="entityHref(tile.data.entity_id)">{{ _("Entität öffnen") }}</a>
+      <a class="btn" :href="tile.data ? entityHref(tile.data.entity_id) : '#'">{{ _("Entität öffnen") }}</a>
     </p>
     <p class="edash-tile-note" x-show="tile.data && tileRows().some((r) => r.entity_id)">{{ _("Eine Zeile anklicken öffnet die Entität.") }}</p>
   </dialog>

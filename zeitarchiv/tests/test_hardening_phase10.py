@@ -198,3 +198,10 @@ def test_a_slow_answer_cannot_overwrite_the_entity_tiles_of_a_newer_request() ->
     assert "const seqs = new Map(tiles.map(el => [el, nextRenderSeq(el)]));" in body
     assert "el.dataset.renderSeq === seqs.get(el)" in body
     assert body.index("nextRenderSeq(el)") < body.index("await fetch(")
+
+
+def test_the_energy_tile_link_does_not_read_data_before_it_is_loaded() -> None:
+    """x-show blendet den Absatz nur aus, :href wird trotzdem ausgewertet: mit tile.data = null warf Alpine einen TypeError."""
+    template = (ADDON / "app" / "templates" / "_energiedashboard_view.html").read_text(encoding="utf-8")
+    assert ":href=\"tile.data ? entityHref(tile.data.entity_id) : '#'\"" in template
+    assert ':href="entityHref(tile.data.entity_id)"' not in template
