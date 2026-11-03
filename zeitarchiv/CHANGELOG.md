@@ -4,6 +4,10 @@
 
 ### Neu
 
+- **Tipps**: Sieben neue Tipps im Meldungs-Center, unter anderem zu Wetterdashboard,
+  Kategorien, Langzeit-Reiter, Datenqualität und KI-Zugriff. Die Tipps zu Backup und
+  CSV-Export nennen das externe Backup-Ziel und die gemeinsame Datei.
+
 - **Energiedashboard, Datumsauswahl**: Ein Klick auf das Datum im Energiefluss öffnet den
   Kalender. Je nach Zeitraum springt er zu einem Tag, Monat oder Jahr.
 
@@ -260,6 +264,10 @@
 ### English
 
 #### New
+
+- **Tips**: Seven new tips in the message center, including the weather dashboard,
+  categories, the long-term tab, data quality and AI access. The backup and CSV export
+  tips now mention the external backup target and the shared file.
 
 - **Energy dashboard, date picker**: Clicking the date in the energy flow opens the
   calendar. Depending on the period it jumps to a day, month or year.

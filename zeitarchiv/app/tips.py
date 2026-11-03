@@ -60,7 +60,7 @@ TIPS = [
     {
         "slug": "automatische_backups",
         "title": N_("Tipp: Automatische Backups einrichten"),
-        "detail": N_("Ein Zeitplan für regelmäßige Sicherungen lässt sich einmal festlegen, statt manuell ans Backup zu denken."),
+        "detail": N_("Ein Zeitplan für regelmäßige Sicherungen lässt sich einmal festlegen, statt manuell ans Backup zu denken. Jedes erfolgreiche Backup kann zusätzlich auf ein externes Ziel kopiert werden."),
         "meta": N_("Backup"),
         "link": "/backup",
     },
@@ -116,7 +116,7 @@ TIPS = [
     {
         "slug": "csv_export",
         "title": N_("Tipp: CSV-Export für externe Auswertung"),
-        "detail": N_("Rohdaten oder Aggregate lassen sich als CSV exportieren, um sie z. B. in einer Tabellenkalkulation weiterzuverarbeiten."),
+        "detail": N_("Rohdaten oder Aggregate lassen sich als CSV exportieren, um sie z. B. in einer Tabellenkalkulation weiterzuverarbeiten. Mehrere Entitäten passen nebeneinander in eine Datei, das Format „Deutsch / Excel“ öffnet sich direkt richtig."),
         "meta": N_("Export"),
         "link": "/export",
     },
@@ -280,6 +280,55 @@ TIPS = [
         "detail": N_("Liefert eine Entität bewusst keine Werte mehr (z. B. ein ausgemusterter Zähler), nimmt „Historisch“ sie aus der Inaktiv-Erkennung — Daten und Charts bleiben unverändert. Zu finden im Reiter „Konfiguration“ der Entität."),
         "meta": N_("Entitäten"),
         "link": "/housekeeping#entitaeten",
+    },
+    {
+        "slug": "wetterdashboard",
+        "title": N_("Tipp: Wetterdashboard einschalten"),
+        "detail": N_("Ordne Außentemperatur, Niederschlag, Wind und Co. je einer Entität zu, und du siehst Heute, Monat und Jahr gegen den Vorjahreszeitraum — mit Regentagen, Trockenphasen und Rekorden. Eingeschaltet wird es in der Dashboard-Übersicht."),
+        "meta": N_("Dashboards"),
+        "link": "/wetterdashboard",
+    },
+    {
+        "slug": "entitaeten_kategorien",
+        "title": N_("Tipp: Entitäten nach Thema ordnen"),
+        "detail": N_("Kategorien wie „Wärmepumpe“ oder „Solar“ ergänzen die Sterne: in der Entitätenliste filtern und sortieren, auch im Export. Beim ersten Öffnen gibt es Vorschläge."),
+        "meta": N_("Entitäten"),
+        "link": "/entities/categories",
+    },
+    {
+        "slug": "energie_langzeit",
+        "title": N_("Tipp: Energie über die Jahre vergleichen"),
+        "detail": N_("Der Reiter „Langzeit“ im Energiedashboard zeigt eine Matrix Jahre × Monate mit Abweichung vom Mittel, Rekorde und Kenntage wie fast autarke Tage oder Sonnentage — ein Klick zeigt sie im Jahreskalender."),
+        "meta": N_("Energiedashboard"),
+        "link": "/energiedashboard",
+    },
+    {
+        "slug": "datenqualitaet_seite",
+        "title": N_("Tipp: Datenqualität auf einen Blick"),
+        "detail": N_("Die Datenqualitäts-Seite zeigt je Entität Ausreißer, Lücken, Duplikate und Zählerrückgänge. Gelb heißt: Aufräumen lohnt sich, Grau ist nur Information."),
+        "meta": N_("Housekeeping"),
+        "link": "/housekeeping/datenqualitaet",
+    },
+    {
+        "slug": "werte_ignorieren",
+        "title": N_("Tipp: Startwerte wie 0 ignorieren"),
+        "detail": N_("Meldet ein Sensor nach dem Start kurz 0, lässt sich diese Zahl je Entität von der Speicherung ausschließen — dann entstehen gar keine Ausreißer oder Zählerrückgänge."),
+        "meta": N_("Entitäten"),
+        "link": None,
+    },
+    {
+        "slug": "text_zustaende",
+        "title": N_("Tipp: Auch Zustände mit Text archivieren"),
+        "detail": N_("Thermostat („Heizen“/„Leerlauf“), Saugroboter oder Waschprogramm werden archiviert, wenn sie in der Integration ausgewählt sind. Der Verlauf zeigt einen farbigen Zeitstrahl mit Dauer und Anteil je Zustand."),
+        "meta": N_("Entitäten"),
+        "link": "/entities",
+    },
+    {
+        "slug": "ki_zugriff",
+        "title": N_("Tipp: Die KI auf dein Archiv loslassen"),
+        "detail": N_("Claude, ChatGPT oder der Gesprächsagent von Home Assistant können Verläufe und die Energieübersicht abfragen. Welche Entitäten sie sehen, legst du in den Einstellungen unter „KI-Zugriff“ fest."),
+        "meta": N_("Einstellungen"),
+        "link": "/settings#ki-zugriff",
     },
 ]
 
