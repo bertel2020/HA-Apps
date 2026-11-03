@@ -124,6 +124,20 @@ Nach dem Start erscheint Zeitarchiv in der Home-Assistant-Seitenleiste. Die
 vollständige Oberfläche läuft über den authentifizierten Supervisor-Ingress;
 ein separates Benutzerkonto ist nicht erforderlich.
 
+### Aktualisieren
+
+Zeitarchiv lässt sich ohne Datenverlust aktualisieren — die archivierten Daten
+liegen im Datenordner der App und bleiben bei einem Update erhalten:
+
+1. Optional vorab ein Backup unter **System → Backup / Restore** erstellen.
+2. In Home Assistant unter **Einstellungen → Add-ons → Zeitarchiv** auf
+   **Aktualisieren** klicken (erscheint, sobald eine neue Version verfügbar ist).
+3. Die [Integration](https://github.com/bertel2020/HA-Zeitarchiv) in HACS
+   ebenfalls aktualisieren und Home Assistant neu starten.
+
+Das Add-on **nicht deinstallieren und neu installieren**: Beim Deinstallieren
+löscht Home Assistant den Datenordner der App.
+
 ### 2. API-Token kopieren
 
 Zeitarchiv öffnen und unter **Einstellungen → Verbindung** den automatisch

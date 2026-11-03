@@ -118,6 +118,20 @@ After starting, Zeitarchiv appears in the Home Assistant sidebar. The full
 interface runs through the authenticated Supervisor Ingress; a separate user
 account is not required.
 
+### Updating
+
+Zeitarchiv can be updated without losing data — the archived data lives in the
+app's data folder and is kept across updates:
+
+1. Optionally create a backup under **System → Backup / Restore** first.
+2. In Home Assistant, go to **Settings → Add-ons → Zeitarchiv** and click
+   **Update** (shown as soon as a new version is available).
+3. Also update the [integration](https://github.com/bertel2020/HA-Zeitarchiv)
+   in HACS and restart Home Assistant.
+
+Do **not uninstall and reinstall** the add-on: uninstalling makes Home
+Assistant delete the app's data folder.
+
 ### 2. Copy the API token
 
 Open Zeitarchiv and copy the automatically generated API token under
