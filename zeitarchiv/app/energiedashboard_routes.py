@@ -535,7 +535,9 @@ class EnergieDashboardDependencies:
 class EnergieDashboardService:
     def __init__(self, deps: EnergieDashboardDependencies) -> None:
         self.deps = deps
-        self.langzeit = energie_langzeit.EnergieLangzeitService(deps.data_dir, deps.index, deps.tz)
+        self.langzeit = energie_langzeit.EnergieLangzeitService(
+            deps.data_dir, deps.index, deps.tz, entity_series=self._entity_series,
+        )
 
     def _entity_options(self) -> list[dict]:
         # "unit"/"aggregation_type" zusätzlich zu den bisherigen Feldern — die
@@ -3898,6 +3900,15 @@ class EnergieDashboardService:
             if not energie_langzeit.is_configured(config):
                 raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
             return self.langzeit.compute_table(config, body)
+
+        @router.get("/energiedashboard/langzeit/months")
+        def energiedashboard_langzeit_months() -> dict:
+            # Monatswerte je Rolle über alle Jahre für Monatsvergleich und Matrix „Jahre × Monate“ (Reiter
+            # „Langzeit“). Das Frontend holt sie genau einmal, wenn der Reiter zum ersten Mal geöffnet wird.
+            config = _load_config(deps.index)
+            if not energie_langzeit.is_configured(config):
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
+            return self.langzeit.compute_months(config)
 
         @router.get("/energiedashboard/heatmap")
         def energiedashboard_heatmap(range: str = "week", offset: int = 0) -> dict:  # noqa: A002

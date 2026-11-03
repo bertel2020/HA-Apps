@@ -40,4 +40,40 @@
     </div>
     <p class="wt-foot">{{ _("Grün: günstig (mehr Erzeugung und Einspeisung, weniger Netzbezug und Verbrauch), rot: ungünstig. „Dieses Jahr“ vergleicht kalendarisch, die Kacheln der Übersicht vergleichen rollierend über 365 Tage. Der Verbrauch ist die Bilanz: Erzeugung + Netzbezug + Speicherentladung − Einspeisung − Speicherladung.") }}</p>
   </div>
+
+  <p class="hint hint-warn" x-show="monthsError" x-text="monthsError" x-cloak></p>
+
+  {# Monatsvergleich: eine Linie je Jahr über Jan–Dez, wie der Monatsvergleich des Wetterdashboards. #}
+  <div class="card wt-card" x-show="months" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Monatsvergleich") }} {{ hint_button(_("Monatsvergleich")) }}</h2>
+      {% call hint_body() %}<span x-text="monthlyNote()"></span>{% endcall %}
+      <div class="wt-seg" role="group" aria-label="{{ _('Kennzahl') }}">
+        <template x-for="role in monthRoles()" :key="role.key">
+          <button type="button" :aria-pressed="(monthlyRole === role.key).toString()" @click="setMonthlyRole(role.key)" x-text="role.label"></button>
+        </template>
+      </div>
+      <label class="filter-chip"><input type="checkbox" x-model="band" @change="drawMonthly()"><span>{{ _("Spanne der Vorjahre") }}</span></label>
+    </div>
+    <div class="wt-chart" x-ref="monthlyChart"></div>
+  </div>
+
+  {# Jahre × Monate: dieselbe Tabelle wie „Mitteltemperatur je Monat und Jahr“ im Wetterdashboard. #}
+  <div class="card wt-card" x-show="months" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Jahre × Monate") }} {{ hint_button(_("Jahre × Monate")) }}</h2>
+      {% call hint_body() %}<span x-text="matrixNote()"></span>{% endcall %}
+      <div class="wt-seg" role="group" aria-label="{{ _('Kennzahl') }}">
+        <template x-for="role in monthRoles()" :key="role.key">
+          <button type="button" :aria-pressed="(matrixRole === role.key).toString()" @click="setMatrixRole(role.key)" x-text="role.label"></button>
+        </template>
+      </div>
+    </div>
+    <div class="tbl-wrap wt-table-wrap"><table class="wt-tm" x-ref="matrixTable"></table></div>
+    <div class="wt-tm-legend">
+      <span>{{ _("ungünstiger") }}</span><span class="wt-tm-scale" x-ref="matrixScale"></span><span>{{ _("günstiger als im Mittel der Jahre im Archiv") }}</span>
+    </div>
+    <p class="wt-foot">{{ _("Ein Klick auf ein Feld öffnet den Monat der Entität (bei Rollen mit genau einer Entität). Das Dreieck oben rechts markiert Messlücken oder Zählersprünge, der Tooltip nennt sie. * laufendes Jahr, der laufende Monat zählt im Mittel nicht mit.") }}</p>
+
+  </div>
 </div>

@@ -121,6 +121,68 @@
     }
   }
 
+  // ---- Monatsvergleich und Matrix „Jahre × Monate“ ----------------------------------------------
+  // ECharts-Instanzen liegen außerhalb des Alpine-Objekts: ECharts verlässt sich intern auf Objekt-Identität,
+  // ein Alpine-Proxy bricht das lautlos (wie bei den anderen Seiten).
+  const charts = {};
+  const observers = {};
+  const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const scaledFont = (size) => Math.round(size * (parseFloat(cssVar('--font-scale')) || 1) * 10) / 10;
+
+  // Bei jedem Zeichnen frisch gelesen: ein Wechsel von Farbschema oder Schriftgröße gilt sofort.
+  function palette() {
+    return {
+      cur: cssVar('--chart-1'), prev: cssVar('--chart-2'), text: cssVar('--ink-muted'), faint: cssVar('--ink-faint'),
+      grid: cssVar('--border'), ink: cssVar('--ink'), surface: cssVar('--surface'),
+      good: cssVar('--positive'), bad: cssVar('--danger'), base: cssVar('--surface-alt'),
+    };
+  }
+
+  // Ein Diagramm folgt der Breite seines Kastens auch ohne Fenster-Ereignis (Reiter eben erst sichtbar).
+  function chartFor(key, element) {
+    if (charts[key] && charts[key].getDom() !== element) {
+      charts[key].dispose();
+      delete charts[key];
+      if (observers[key]) observers[key].disconnect();
+    }
+    if (!charts[key]) {
+      charts[key] = echarts.init(element);
+      if (typeof ResizeObserver === 'function') {
+        observers[key] = new ResizeObserver(() => { if (charts[key] && element.clientWidth) charts[key].resize(); });
+        observers[key].observe(element);
+      }
+    }
+    return charts[key];
+  }
+
+  window.addEventListener('resize', () => Object.values(charts).forEach((chart) => chart.resize()));
+
+  const monthFormat = (style) => new Intl.DateTimeFormat(LOCALE, {month: style, timeZone: 'UTC'});
+  const monthName = (month, style) => monthFormat(style).format(new Date(Date.UTC(2000, month - 1, 15)));
+  const mean = (values) => values.reduce((a, b) => a + b, 0) / values.length;
+  const present = (list) => list.filter((value) => value != null);
+  const monthKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
+
+  // Mittel, Spanne und Anzahl je Monat über alle abgeschlossenen Jahre (mindestens zwei, sonst kein Vergleich).
+  // Der Monat, in dem das Archiv mitten im Monat beginnt, ist nur zum Teil erfasst: er geht in kein Mittel ein.
+  const isPartialStart = (role, year, index) => !!role.partial_start && role.partial_start[0] === year && role.partial_start[1] === index + 1;
+
+  function monthStats(role, months) {
+    const past = months.years.filter((year) => year < months.current.year);
+    const avg = [], low = [], high = [], counts = [];
+    for (let i = 0; i < 12; i++) {
+      const values = present(past.filter((year) => !isPartialStart(role, year, i)).map((year) => role.values[year][i]));
+      counts.push(values.length);
+      const enough = values.length >= 2;
+      avg.push(enough ? mean(values) : null);
+      low.push(enough ? Math.min(...values) : null);
+      high.push(enough ? Math.max(...values) : null);
+    }
+    return {past, avg, low, high, counts};
+  }
+
+  const yearSum = (list) => (list.every((value) => value != null) ? list.reduce((a, b) => a + b, 0) : null);
+
   let lastTable = null;
 
   window.energieLangzeit = function energieLangzeit() {
@@ -133,6 +195,11 @@
       error: '',
       opened: false,
       _seq: 0,
+      months: null,
+      monthsError: '',
+      monthlyRole: 'erzeugung',
+      matrixRole: 'erzeugung',
+      band: true,
 
       init() {
         const saved = readStore();
@@ -146,6 +213,10 @@
           if (event.detail === 'long' && !this.opened) {
             this.opened = true;
             this.loadTable();
+            this.loadMonths();
+          } else if (event.detail === 'long' && this.months) {
+            // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
+            this.$nextTick(() => Object.values(charts).forEach((chart) => chart.resize()));
           }
         });
         // Stichtag-Leiste des App-Standards: bei jeder Änderung die Tabelle neu laden.
@@ -153,6 +224,26 @@
       },
 
       columnName,
+
+      // Rollen mit Monatswerten (Erzeugung, Einspeisung, Netzbezug, Verbrauch), je nach Einrichtung.
+      monthRoles() {
+        return this.months ? this.months.roles : [];
+      },
+
+      roleOf(key) {
+        const roles = this.monthRoles();
+        return roles.find((role) => role.key === key) || roles[0] || null;
+      },
+
+      setMonthlyRole(key) {
+        this.monthlyRole = key;
+        this.drawMonthly();
+      },
+
+      setMatrixRole(key) {
+        this.matrixRole = key;
+        this.drawMatrix();
+      },
 
       toggleColumn(key) {
         this.columns = this.columns.includes(key)
@@ -221,6 +312,199 @@
         const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
         const iso = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
         return stichtag === iso ? t('Gestern') : t('Rückblick');
+      },
+
+      async loadMonths() {
+        this.monthsError = '';
+        try {
+          const res = await fetch('energiedashboard/langzeit/months');
+          if (!res.ok) throw new Error(String(res.status));
+          this.months = await res.json();
+          const keys = this.monthRoles().map((role) => role.key);
+          if (!keys.includes(this.monthlyRole)) this.monthlyRole = keys[0];
+          if (!keys.includes(this.matrixRole)) this.matrixRole = keys[0];
+          // Erst zeichnen, wenn Alpine die Karten sichtbar gemacht hat (x-show="months").
+          this.$nextTick(() => { this.drawMonthly(); this.drawMatrix(); });
+        } catch (e) {
+          this.monthsError = t('Die Monatswerte konnten nicht geladen werden.');
+        }
+      },
+
+      monthlyNote() {
+        return t('Monatswerte je Jahr in kWh. Die gestrichelte Linie ist das Mittel der abgeschlossenen Jahre, die Fläche ihre Spanne. Der laufende Monat steht nur im Tooltip.');
+      },
+
+      drawMonthly() {
+        const m = this.months;
+        const element = this.$refs.monthlyChart;
+        const role = m && this.roleOf(this.monthlyRole);
+        if (!role || !element) return;
+        const colors = palette();
+        const labels = Array.from({length: 12}, (_x, i) => monthName(i + 1, 'short'));
+        const {past, avg, low, high, counts} = monthStats(role, m);
+        const current = m.current.year;
+        const lastPast = past[0];
+        const hasAvg = counts.some((count) => count >= 2);
+        const series = [];
+        const legend = [];
+        if (this.band && hasAvg) {
+          series.push({
+            name: 'low', type: 'line', stack: 'band', data: low, symbol: 'none', silent: true,
+            lineStyle: {opacity: 0}, tooltip: {show: false},
+          }, {
+            name: 'band', type: 'line', stack: 'band', symbol: 'none', silent: true, lineStyle: {opacity: 0},
+            data: high.map((top, i) => (top == null || low[i] == null ? null : top - low[i])),
+            areaStyle: {color: colors.prev, opacity: 0.16},
+          });
+        }
+        for (const year of past.slice().reverse()) {
+          const strong = year === lastPast;
+          const data = role.values[year].map((value, i) => (isPartialStart(role, year, i) ? null : value));
+          series.push({
+            name: String(year), type: 'line', data, symbol: 'none', connectNulls: false,
+            lineStyle: {color: colors.prev, width: strong ? 2 : 1.2, opacity: strong ? 1 : 0.45},
+            itemStyle: {color: colors.prev},
+          });
+          if (strong) legend.push(String(year));
+        }
+        if (hasAvg) {
+          series.push({
+            name: 'Ø', type: 'line', data: avg, symbol: 'none',
+            lineStyle: {color: colors.text, width: 2, type: 'dashed'}, itemStyle: {color: colors.text},
+          });
+          legend.push('Ø');
+        }
+        if (role.values[current]) {
+          // Der laufende Monat ist erst zum Teil vergangen und würde die Linie einbrechen lassen.
+          const data = role.values[current].map((value, i) => (i + 1 >= m.current.month ? null : value));
+          series.push({
+            name: String(current), type: 'line', data, symbol: 'circle', symbolSize: 7, z: 5,
+            lineStyle: {color: colors.cur, width: 3}, itemStyle: {color: colors.cur},
+          });
+          legend.unshift(String(current));
+        }
+        const cell = (value) => (value == null ? '–' : energy(value));
+        const chart = chartFor('monthly', element);
+        chart.setOption({
+          animation: false,
+          grid: {left: 8, right: 16, top: element.clientWidth < 520 ? 74 : 34, bottom: 8, containLabel: true},
+          legend: {data: legend, top: 0, textStyle: {color: colors.text, fontSize: scaledFont(12)}, itemWidth: 18, itemHeight: 8},
+          xAxis: {
+            type: 'category', data: labels, boundaryGap: false,
+            axisLine: {lineStyle: {color: colors.grid}}, axisTick: {show: false},
+            axisLabel: {color: colors.text, fontSize: scaledFont(11)}, splitLine: {lineStyle: {color: colors.grid}},
+          },
+          yAxis: {
+            type: 'value', name: t('kWh'), nameTextStyle: {color: colors.text},
+            axisLine: {lineStyle: {color: colors.grid}}, axisTick: {show: false},
+            axisLabel: {color: colors.text, fontSize: scaledFont(11)}, splitLine: {lineStyle: {color: colors.grid}},
+          },
+          tooltip: {
+            trigger: 'axis', confine: true,
+            backgroundColor: colors.surface, borderColor: colors.grid,
+            textStyle: {color: colors.ink, fontSize: scaledFont(12)},
+            formatter: (params) => {
+              const i = params[0].dataIndex;
+              const running = i + 1 === m.current.month;
+              const now = role.values[current] ? role.values[current][i] : null;
+              let html = `<b>${escapeHtml(monthName(i + 1, 'long'))}</b>`;
+              html += `<br>${current}: ${cell(now)}${running && now != null ? ' ' + escapeHtml(t('(bisher)')) : ''}`;
+              if (lastPast != null) html += `<br>${lastPast}: ${cell(role.values[lastPast][i])}`;
+              if (avg[i] != null) html += `<br>Ø (${counts[i]}): ${cell(avg[i])}`;
+              return html;
+            },
+          },
+          series,
+        }, true);
+        requestAnimationFrame(() => chart.resize());
+      },
+
+      matrixNote() {
+        const role = this.roleOf(this.matrixRole);
+        let text = t('Oben der Monatswert in kWh, darunter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv. Die letzte Zeile ist das Mittel. Grün ist günstig, rot ungünstig.');
+        if (role && role.unchecked) {
+          text += ' ' + t('{n} Entität(en) sind noch nicht auf Lücken und Zählersprünge geprüft.', {n: role.unchecked});
+        }
+        return text;
+      },
+
+      // Link auf den Monat der Entität (nur wenn die Rolle genau eine hat); sonst kein Link.
+      matrixLink(role, year, month) {
+        if (!role.entity_id) return '';
+        const back = (this.months.current.year - year) * 12 + (this.months.current.month - month);
+        return `entities/${encodeURIComponent(role.entity_id)}?range=month&offset=${-back}`;
+      },
+
+      drawMatrix() {
+        const m = this.months;
+        const table = this.$refs.matrixTable;
+        const role = m && this.roleOf(this.matrixRole);
+        if (!role || !table) return;
+        const colors = palette();
+        const {avg, counts} = monthStats(role, m);
+        const closed = m.years.filter((year) => year < m.current.year);
+        const fullSums = closed.map((year) => yearSum(role.values[year])).filter((value) => value != null);
+        const reference = fullSums.length >= 2 ? mean(fullSums) : null;
+        const sign = (diff) => (Math.round(Math.abs(diff)) === 0 ? '±' : (diff > 0 ? '+' : '−')) + num(Math.abs(diff), 0) + ' %';
+        const flagText = (flag) => {
+          const parts = [];
+          if (flag.gaps) parts.push(t('Messlücken: {n} (sonst etwa {typical})', {n: flag.gaps, typical: flag.gaps_typical || 0}));
+          if (flag.counter_decreases) parts.push(t('Zählerrückgänge: {n}', {n: flag.counter_decreases}));
+          return parts.join(', ');
+        };
+        const cell = (value, ref, tip, opts) => {
+          if (value == null) return '<td class="wt-tm-na">–</td>';
+          const attrs = (tip ? ` data-tooltip-fixed="${escapeHtml(tip)}"` : '');
+          const klass = [opts.strong ? 'wt-tm-year' : '', opts.flag ? 'wt-tm-flag' : ''].filter(Boolean).join(' ');
+          const inner = (opts.href
+            ? (content) => `<a class="wt-tm-link" href="${escapeHtml(opts.href)}">${content}</a>`
+            : (content) => content);
+          if (ref == null) {
+            return `<td class="wt-tm-plain ${klass}"${attrs}>${inner(escapeHtml(num(value, 0)))}</td>`;
+          }
+          const diff = (value - ref) / ref * 100;
+          const favorable = role.better === 'up' ? diff > 0 : diff < 0;
+          const share = Math.round(Math.min(1, Math.abs(diff) / 30) * 70);
+          const style = ` style="background:color-mix(in srgb, ${favorable ? colors.good : colors.bad} ${share}%, ${colors.base})"`;
+          return `<td${style}${attrs}${klass ? ` class="${klass}"` : ''}>${inner(
+            `<span class="wt-tm-v">${escapeHtml(num(value, 0))}</span><span class="wt-tm-d">${escapeHtml(sign(diff))}</span>`)}</td>`;
+        };
+        let html = `<thead><tr><th></th>${Array.from({length: 12}, (_x, i) => `<th>${escapeHtml(monthName(i + 1, 'short'))}</th>`).join('')}`
+          + `<th class="wt-tm-year">${escapeHtml(t('Jahr Σ'))}</th></tr></thead><tbody>`;
+        for (const year of m.years) {
+          const running = year === m.current.year;
+          html += `<tr><th>${year}${running ? '*' : ''}</th>`;
+          role.values[year].forEach((value, i) => {
+            const month = i + 1;
+            const flag = role.flags[monthKey(year, month)];
+            let tip = value == null ? '' : `${monthName(month, 'short')} ${year}: ${energy(value)}`;
+            if (value != null && avg[i] != null && !(running && month >= m.current.month) && !isPartialStart(role, year, i)) {
+              const diff = (value - avg[i]) / avg[i] * 100;
+              tip += ` (${sign(diff)} ${t('zum Mittel')})`;
+            }
+            if (running && month === m.current.month && value != null) tip += ' – ' + t('laufender Monat, noch nicht abgeschlossen');
+            const partialStart = isPartialStart(role, year, i);
+            if (partialStart && value != null) tip += ' – ' + t('das Archiv beginnt in diesem Monat');
+            if (flag) tip += ' – ' + flagText(flag);
+            const href = value == null ? '' : this.matrixLink(role, year, month);
+            // Der laufende Monat ist noch nicht abgeschlossen und bekommt keinen Vergleich.
+            const ref = (running && month >= m.current.month) || partialStart ? null : (counts[i] >= 2 ? avg[i] : null);
+            html += cell(value, ref, tip, {flag: !!flag, href});
+          });
+          const total = yearSum(role.values[year]);
+          const partial = present(role.values[year]);
+          const sum = total != null ? total : (partial.length ? partial.reduce((a, b) => a + b, 0) : null);
+          const complete = !running && total != null;
+          const tipSum = sum == null ? '' : (complete ? t('Summe {year}: {value}', {year, value: energy(sum)})
+            : t('Summe {year} bis jetzt: {value}', {year, value: energy(sum)}));
+          html += cell(sum, complete ? reference : null, tipSum, {strong: true});
+          html += '</tr>';
+        }
+        html += `<tr class="wt-tm-avg"><th>Ø</th>${avg.map((value, i) => `<td>${value == null ? '–' : escapeHtml(num(value, 0))}</td>`).join('')}`
+          + `<td class="wt-tm-year">${reference == null ? '–' : escapeHtml(num(reference, 0))}</td></tr></tbody>`;
+        table.innerHTML = html;
+        const scale = this.$refs.matrixScale;
+        if (scale) scale.style.background = `linear-gradient(90deg, ${colors.bad}, ${colors.base}, ${colors.good})`;
       },
 
       async loadTable() {

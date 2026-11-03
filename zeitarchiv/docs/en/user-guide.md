@@ -675,6 +675,26 @@ and feed-in, less grid import and consumption), red unfavorable.
   start of the archive as a hint if it falls inside the period.
 - Totals from 10,000 kWh on are shown in MWh. The meters must deliver kWh, as
   on the overview.
+- **Monthly comparison:** Below it, a line chart shows the monthly values per
+  year (generation, feed-in, grid import or consumption in kWh), one line per
+  year. The dashed line is the average of the completed years, the area their
+  range (“Range of previous years” hides it). The running month is not yet
+  complete and appears only in the tooltip.
+- **Years × months:** The table lists all years of the archive one below the
+  other (newest on top), one field per month: the monthly value on top, below
+  it the deviation from the average of this month over the completed years,
+  colored by favorability. The yearly total is on the right, the average at the
+  bottom. Clicking a field opens the month of the entity (for roles with exactly
+  one entity). A triangle at the top right of a field marks gaps or counter
+  decreases in that month; the tooltip gives the count. Gaps mark only months
+  clearly above the usual level of the role (at least 10 and three times the
+  median), because meters that report rarely have many gaps in every month;
+  counter decreases are always marked. The month in which the archive starts
+  in the middle of the month is only partly covered and does not enter any
+  average. The findings come from the daily counts of the data quality
+  overview; entities not measured there yet
+  count as not checked, not as “no findings”. Months before the start of the
+  archive show “–”, never 0.
 
 ### Energy report
 

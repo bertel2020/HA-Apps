@@ -726,6 +726,25 @@ Verbrauch), rot ungünstig.
   „–“, mit dem Beginn des Archivs als Hinweis, wenn er im Zeitraum liegt.
 - Summen ab 10.000 kWh erscheinen in MWh. Die Zähler müssen in kWh liefern,
   wie in der Übersicht.
+- **Monatsvergleich:** Darunter zeigt ein Liniendiagramm die Monatswerte je Jahr
+  (Erzeugung, Einspeisung, Netzbezug oder Verbrauch in kWh), eine Linie je Jahr.
+  Die gestrichelte Linie ist das Mittel der abgeschlossenen Jahre, die Fläche
+  ihre Spanne („Spanne der Vorjahre“ schaltet sie ab). Der laufende Monat ist
+  noch nicht abgeschlossen und steht nur im Tooltip.
+- **Jahre × Monate:** Die Tabelle legt alle Jahre des Archivs untereinander
+  (neuestes oben), ein Feld je Monat: oben der Monatswert, darunter die
+  Abweichung vom Mittel dieses Monats über die abgeschlossenen Jahre, farbig
+  nach Günstigkeit. Rechts steht die Jahressumme, unten das Mittel. Ein Klick auf
+  ein Feld öffnet den Monat der Entität (bei Rollen mit genau einer Entität). Ein
+  Dreieck oben rechts im Feld markiert Messlücken oder Zählerrückgänge in diesem
+  Monat; der Tooltip nennt die Anzahl. Messlücken markieren nur Monate, die
+  deutlich über dem Üblichen der Rolle liegen (mindestens 10 und das Dreifache
+  des Medians), weil Zähler, die selten melden, in jedem Monat viele Lücken
+  haben; Zählerrückgänge markieren immer. Der Monat, in dem das Archiv mitten
+  im Monat beginnt, ist nur zum Teil erfasst und geht in kein Mittel ein. Die
+  Befunde stammen aus den Tageszählern der Datenqualität; Entitäten, die dort noch nicht gemessen wurden, sind nicht
+  geprüft und erscheinen nicht als „ohne Befund“. Monate vor dem Archivbeginn
+  stehen als „–“, nie als 0.
 
 ### Energiebericht
 
