@@ -1099,6 +1099,37 @@
       </dialog>
     </section>
 
+    {# Schwellen der Kenntage im Reiter „Langzeit“. Ein leeres Feld heißt „Vorgabe“ (steht als Platzhalter); gespeichert
+       werden nur geänderte Werte (siehe energie_langzeit.KENNTAGE_DEFAULTS). #}
+    <section class="settings-section edash-section-neutral">
+      <h2 class="settings-section-title">{{ _("Kenntage") }} {{ hint_button(_('Kenntage-Schwellen')) }}</h2>
+      <p class="settings-section-description">{{ _("Schwellen für die Kenntage im Reiter „Langzeit“. Ein leeres Feld verwendet die Vorgabe.") }}</p>
+      {% call hint_body() %}{{ _("Fast autark zählt Tage, an denen der Netzbezug höchstens (100 − Wert) % des Verbrauchs ausmacht. Sonnentage brauchen bei jedem Erzeuger die Anlagenleistung (kWp). Trübe Tage vergleichen mit dem Tagesmittel des Jahres. Die beiden Speicher-Schwellen gelten für die Entladung je Tag.") }}{% endcall %}
+      {% set kt = config.kenntage or {} %}
+      <div class="edash-field-grid">
+        <div class="field">
+          <label>{{ _("Fast autark ab") }}</label>
+          {{ number_field('kt_autark', kt.get('autark'), '90', '', '%') }}
+        </div>
+        <div class="field">
+          <label>{{ _("Sonnentage ab") }}</label>
+          {{ number_field('kt_sonnig', kt.get('sonnig'), '4', '', _('kWh je kWp')) }}
+        </div>
+        <div class="field">
+          <label>{{ _("Trübe Tage unter") }}</label>
+          {{ number_field('kt_truebe', kt.get('truebe'), '10', '', _('% des Tagesmittels')) }}
+        </div>
+        <div class="field">
+          <label>{{ _("Speicher stark genutzt ab") }}</label>
+          {{ number_field('kt_stark', kt.get('stark'), '5', '', _('kWh Entladung')) }}
+        </div>
+        <div class="field">
+          <label>{{ _("Speicher kaum genutzt unter") }}</label>
+          {{ number_field('kt_schwach', kt.get('schwach'), '1', '', _('kWh Entladung')) }}
+        </div>
+      </div>
+    </section>
+
     <div class="actionbar" style="justify-content:flex-end;">
       <a class="btn" href="energiedashboard">{{ _("Abbrechen") }}</a>
       <button type="submit" class="btn" style="background:var(--accent-line);color:var(--accent-contrast);border-color:var(--accent-line);">{{ _("Speichern") }}</button>

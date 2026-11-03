@@ -7,6 +7,7 @@ Regel „fehlende Daten sind kein 0“.
 
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 from datetime import datetime
@@ -419,6 +420,35 @@ def test_anlagenleistung_wird_in_der_einrichtung_je_erzeuger_gespeichert(client)
         index.set_setting(ed.SETTING_CONFIG, "")
 
 
+def test_kenntage_schwellen_werden_im_setup_gespeichert(client) -> None:
+    from app.main import index
+
+    index.set_setting(ed.SETTING_CONFIG, "")
+    antwort = client.post("/energiedashboard/setup", data={
+        "netzbezug": "sensor.setup_netz",
+        "kt_autark": "95", "kt_sonnig": "4,5", "kt_truebe": "", "kt_stark": "0", "kt_schwach": "1",
+    })
+    try:
+        assert antwort.status_code == 200
+        # Gespeichert wird nur, was gültig ist und von der Vorgabe abweicht: leer, außerhalb der Grenzen und Vorgabe fallen weg.
+        assert ed._load_config(index)["kenntage"] == {"autark": 95.0, "sonnig": 4.5}
+        assert 'name="kt_autark"' in client.get("/energiedashboard/setup").text
+    finally:
+        index.set_setting(ed.SETTING_CONFIG, "")
+
+
+def test_kalender_route_lehnt_unbekannte_kenntage_ab(client) -> None:
+    from app.main import index
+
+    index.set_setting(ed.SETTING_CONFIG, json.dumps({**ed._empty_config(), "netzbezug": "sensor.setup_netz"}))
+    try:
+        assert client.get("/energiedashboard/langzeit/kenntage?field=nope&year=2025").status_code == 422
+        antwort = client.get("/energiedashboard/langzeit/kenntage?field=fast_autark&year=2025")
+        assert antwort.status_code == 200 and antwort.json()["days"] == []
+    finally:
+        index.set_setting(ed.SETTING_CONFIG, "")
+
+
 # -- Rekorde, Kenntage und Veränderungen (P4) -----------------------------------------------------
 
 
@@ -492,10 +522,68 @@ def test_kenntage_je_jahr(service, monkeypatch) -> None:
     pv[tage[2]] = 0.4                                      # kaum PV
     einsp[tage[3]] = 20.0                                  # mehr eingespeist als verbraucht (10 + 2 − 20 < 0)
     _tagesreihen(monkeypatch, {"sensor.pv": pv, "sensor.netz": netz, "sensor.einsp": einsp})
-    jahr = service.compute_records(config, NOW)["kenntage"][0]
-    assert jahr["year"] == 2025 and jahr["days"] == 10
-    assert jahr["autarkie"] == 2 and jahr["kaum_pv"] == 1
-    assert jahr["einspeisung_ueber_verbrauch"] == 0        # Verbrauch negativ: unplausibler Tag zählt nicht als „mehr eingespeist“
+    kenntage = service.compute_records(config, NOW)["kenntage"]
+    assert kenntage["available"] == ["fast_autark", "ueberschuss", "truebe"]   # ohne kWp keine Sonnentage, ohne Speicher kein Paar
+    felder = kenntage["years"][0]["fields"]
+    assert kenntage["years"][0]["year"] == 2025
+    assert felder["fast_autark"]["hit"] == 2 and felder["fast_autark"]["days"] == 10
+    assert felder["truebe"]["hit"] == 1                    # 0,4 kWh sind unter 10 % des Tagesmittels
+    assert felder["ueberschuss"]["hit"] == 0               # Verbrauch negativ: unplausibler Tag zählt nicht als „mehr eingespeist“
+
+
+def _kenntage_anlage(service, monkeypatch, **extra):
+    """Zehn Tage im Juli 2025 und zehn im September 2025 mit Anlagenleistung und Speicher."""
+    from datetime import date, timedelta
+
+    for eid in ("sensor.pv", "sensor.netz", "sensor.ent"):
+        _archiv(service, eid, _monat(2025, 7))
+    tage = [date(2025, 7, 1) + timedelta(days=i) for i in range(10)] + [date(2025, 9, 1) + timedelta(days=i) for i in range(10)]
+    pv = {t: 25.0 for t in tage}                           # 5 kWh je kWp bei 5 kWp
+    netz = {t: 2.0 for t in tage}
+    ent = {t: 6.0 for t in tage}
+    ent[tage[1]] = 0.5
+    pv[tage[2]] = 10.0                                     # 2 kWh je kWp
+    _tagesreihen(monkeypatch, {"sensor.pv": pv, "sensor.netz": netz, "sensor.ent": ent})
+    config = _config(
+        netzbezug="sensor.netz", erzeuger=[{"entity_id": "sensor.pv", "kwp": 5.0}],
+        speicher=[{"entladen_entity_id": "sensor.ent"}], **extra,
+    )
+    return config, tage
+
+
+def test_kenntage_sonnentage_und_speicherpaar(service, monkeypatch) -> None:
+    config, _tage = _kenntage_anlage(service, monkeypatch)
+    kenntage = service.compute_records(config, NOW)["kenntage"]
+    assert kenntage["available"] == ["fast_autark", "sonnig", "truebe", "speicher_stark", "speicher_schwach"]
+    assert kenntage["kwp"] == 5.0
+    felder = kenntage["years"][0]["fields"]
+    assert felder["sonnig"]["hit"] == 18 and felder["sonnig"]["days"] == 19   # der 1. September folgt auf einen fehlenden Tag
+    assert felder["speicher_stark"]["hit"] == 18 and felder["speicher_schwach"]["hit"] == 1
+
+
+def test_kenntage_bis_heute_zaehlt_nur_bis_zum_heutigen_kalendertag(service, monkeypatch) -> None:
+    config, _tage = _kenntage_anlage(service, monkeypatch)
+    heute = datetime(2025, 8, 15, 12, tzinfo=TZ)           # der Juli liegt davor, der September danach
+    feld = service.compute_records(config, datetime(2026, 8, 15, 12, tzinfo=TZ))["kenntage"]["years"][0]["fields"]["sonnig"]
+    assert heute.year == 2025 and feld["days"] == 19 and feld["days_ytd"] == 10 and feld["hit_ytd"] == 9
+
+
+def test_kenntage_schwellen_aus_dem_setup(service, monkeypatch) -> None:
+    config, _tage = _kenntage_anlage(service, monkeypatch, kenntage={"sonnig": 6.0, "stark": 7.0, "schwach": 1.0})
+    felder = service.compute_records(config, NOW)["kenntage"]["years"][0]["fields"]
+    assert felder["sonnig"]["hit"] == 0                    # 5 kWh je kWp erreichen 6 nicht
+    assert felder["speicher_stark"]["hit"] == 0            # 6 kWh Entladung erreichen 7 nicht
+    schwellen = lz.kenntage_thresholds(_config(kenntage={"autark": 3, "sonnig": "x", "truebe": 99}))
+    assert schwellen == {"autark": 50.0, "sonnig": 4.0, "truebe": 50.0, "stark": 5.0, "schwach": 1.0}
+
+
+def test_kenntage_kalender_liefert_die_tage_mit_werten(service, monkeypatch) -> None:
+    config, tage = _kenntage_anlage(service, monkeypatch)
+    daten = service.compute_kenntage_days(config, "speicher_schwach", 2025, NOW)
+    treffer = [d for d in daten["days"] if d["hit"]]
+    assert [d["date"] for d in treffer] == [tage[1].isoformat()]
+    assert treffer[0]["values"]["entladung"] == 0.5 and len(daten["days"]) == 19
+    assert service.compute_kenntage_days(config, "ueberschuss", 2025, NOW)["days"] == []   # keine Einspeisung eingerichtet
 
 
 def test_veraenderungen_ranken_nach_betrag_und_nehmen_den_rest_als_grundlast(service, monkeypatch) -> None:

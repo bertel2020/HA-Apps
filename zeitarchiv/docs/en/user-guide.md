@@ -697,10 +697,24 @@ and feed-in, less grid import and consumption), red unfavorable.
   from one year of archive. Days directly after a missing day do not count,
   because the next reading carries the difference of several days there and
   would give a false record; in a tie the earlier day counts.
-- **Key days per year:** For each calendar year the number of days with
-  self-sufficiency of 90 % or more (grid import at most 10 % of consumption, with at least 0.5 kWh consumption), with
-  more feed-in than consumption and with hardly any generation (under 1 kWh),
-  plus the number of days evaluated. The same days count as for the records.
+- **Years:** Above the monthly comparison, “Last 5”, “Last 10” or “All” sets how
+  many years the monthly comparison, “Years × months” and key days show. The
+  average and range are formed only from these years. Records always count since
+  the archive began. The browser remembers the choice.
+- **Key days per year:** Six key days in three pairs, one bar per year with the
+  number of days and their share of the days evaluated: **Almost
+  self-sufficient** (self-sufficiency of 90 % or more, i.e. grid import at most
+  10 % of consumption with at least 0.5 kWh consumption) and **Surplus days**
+  (more feed-in than consumption), **Sunny days** (from 4 kWh per kWp, needs the
+  system size on every generator) and **Dull days** (below 10 % of the year’s
+  daily average), **Battery heavily used** (from 5 kWh discharge) and **Battery
+  barely used** (below 1 kWh discharge). A box appears only if the roles for it
+  are set up. “Full year” counts calendar years, “Until today” counts only up to
+  today’s calendar day in every year so the current year is comparable. Clicking
+  a row opens the year calendar: 12 months of 31 days with the key days filled,
+  clicking a day opens it in the energy dashboard. Only days with all values
+  count, without the day after a missing day. You set the thresholds in the setup
+  under “Key days”; an empty field uses the default.
 - Totals from 10,000 kWh on are shown in MWh. The meters must deliver kWh, as
   on the overview.
 - **Monthly comparison:** Below it, a line chart shows the monthly values per

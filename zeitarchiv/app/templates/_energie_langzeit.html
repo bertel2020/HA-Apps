@@ -43,6 +43,18 @@
 
   <p class="hint hint-warn" x-show="monthsError" x-text="monthsError" x-cloak></p>
 
+  {# Anzahl der Jahre: gilt gemeinsam für Monatsvergleich, Jahre × Monate und Kenntage, damit alle drei dieselben Jahre
+     und dieselbe Basis für Ø zeigen. Rekorde zählen immer seit Archivbeginn. #}
+  <div class="wt-yearbar" x-show="months" x-cloak>
+    <span class="wt-yearbar-label">{{ _("Jahre") }}</span>
+    <div class="wt-seg" role="group" aria-label="{{ _('Anzahl der Jahre') }}">
+      <template x-for="option in yearOptions()" :key="option.value">
+        <button type="button" :aria-pressed="(yearLimit === option.value).toString()" @click="setYearLimit(option.value)" x-text="option.label"></button>
+      </template>
+    </div>
+    <span class="wt-yearbar-note">{{ _("Gilt für Monatsvergleich, Jahre × Monate und Kenntage. Ø und Spanne bilden sich nur aus diesen Jahren. Rekorde zählen seit Archivbeginn.") }}</span>
+  </div>
+
   {# Monatsvergleich: eine Linie je Jahr über Jan–Dez, wie der Monatsvergleich des Wetterdashboards. #}
   <div class="card wt-card" x-show="months" x-cloak>
     <div class="wt-controls">
@@ -109,14 +121,37 @@
   </div>
   <p class="hint hint-status" x-show="records && !records.enough" x-cloak>{{ _("Rekorde erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte enthält.") }}</p>
 
-  {# Kenntage je Jahr: Tage mit bestimmten Eigenschaften, je Kalenderjahr. #}
-  <div class="card wt-card" x-show="records && records.kenntage.length" x-cloak>
+  {# Kenntage je Jahr: sechs Kenntage in drei Paaren, je Jahr ein Balken (Anteil an den ausgewerteten Tagen). Ein Klick auf
+     eine Zeile öffnet den Jahreskalender. #}
+  <div class="card wt-card" x-show="records && records.kenntage && records.kenntage.available.length" x-cloak>
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Kenntage je Jahr") }} {{ hint_button(_("Kenntage je Jahr")) }}</h2>
       {% call hint_body() %}<span x-text="kenntageNote()"></span>{% endcall %}
+      <div class="wt-seg" role="group" aria-label="{{ _('Zählung') }}">
+        <button type="button" :aria-pressed="(ktMode === 'full').toString()" @click="setKtMode('full')">{{ _("Ganzes Jahr") }}</button>
+        <button type="button" :aria-pressed="(ktMode === 'ytd').toString()" @click="setKtMode('ytd')">{{ _("Bis heute") }}</button>
+      </div>
     </div>
-    <div class="wt-kt" x-ref="kenntageTable"></div>
+    <p class="wt-stand" x-text="ktRange()"></p>
+    <div class="wt-kt" x-ref="kenntage" @click="kenntageClick($event)"></div>
+    <p class="wt-foot">{{ _("Die Länge der Balken zeigt den Anteil an den ausgewerteten Tagen, im Maßstab des größten Anteils im Feld. Ein Klick auf eine Zeile zeigt die Tage im Jahreskalender. Die Schwellen stellst du im Setup unter „Kenntage“ ein.") }}</p>
   </div>
 
-  </div>
+  {# Jahreskalender eines Kenntags. #}
+  <dialog class="detail-dialog wt-ktcal-dialog" x-ref="kenntageDialog" aria-labelledby="kt-dialog-title" @click="if ($event.target === $el) $el.close()">
+    <div class="detail-dialog-header">
+      <h2 id="kt-dialog-title" x-text="ktDialog.title"></h2>
+      <button type="button" class="btn" onclick="this.closest('dialog').close()" aria-label="{{ _('Schließen') }}">✕</button>
+    </div>
+    <p class="wt-stand" x-text="ktDialog.sub"></p>
+    <p class="hint hint-warn" x-show="ktDialog.error" x-text="ktDialog.error" x-cloak></p>
+    <div class="tbl-wrap wt-table-wrap"><table class="wt-ktcal" x-html="ktDialog.html"></table></div>
+    <div class="wt-ktcal-legend">
+      <span><i class="wt-ktcal-hit"></i>{{ _("Kenntag (Klick öffnet den Tag)") }}</span>
+      <span><i class="wt-ktcal-none"></i>{{ _("kein Kenntag") }}</span>
+      <span><i class="wt-ktcal-gap"></i>{{ _("nicht ausgewertet") }}</span>
+      <span><i class="wt-ktcal-off"></i>{{ _("außerhalb des Zeitraums") }}</span>
+    </div>
+  </dialog>
+
 </div>

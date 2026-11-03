@@ -274,6 +274,9 @@ def _empty_config() -> dict:
         # analog zu den übrigen Kacheln, die ebenfalls per Default sichtbar
         # sind.
         "anomalie_schwelle": "50",
+        # Schwellen der Kenntage im Reiter „Langzeit“ (siehe energie_langzeit.KENNTAGE_DEFAULTS). Nur geänderte Werte
+        # stehen drin, ein fehlender Schlüssel heißt „Vorgabe“.
+        "kenntage": {},
     }
 
 
@@ -3571,11 +3574,26 @@ class EnergieDashboardService:
             show_sankey_legende: str = Form(""),
             verbraucheranteile_gruppieren: str = Form(""),
             anomalie_schwelle: str = Form("50"),
+            kt_autark: str = Form(""),
+            kt_sonnig: str = Form(""),
+            kt_truebe: str = Form(""),
+            kt_stark: str = Form(""),
+            kt_schwach: str = Form(""),
         ) -> HTMLResponse:
             if not netzbezug.strip():
                 raise HTTPException(status_code=422, detail=tr("Netzbezug ist Pflicht"))
             if anomalie_schwelle not in ANOMALIE_SCHWELLE_LABELS:
                 raise HTTPException(status_code=422, detail=tr("Ungültige Auffälligkeiten-Schwelle"))
+
+            kenntage: dict[str, float] = {}
+            for key, raw in (
+                ("autark", kt_autark), ("sonnig", kt_sonnig), ("truebe", kt_truebe),
+                ("stark", kt_stark), ("schwach", kt_schwach),
+            ):
+                value = _parse_float(raw)
+                low, high = energie_langzeit.KENNTAGE_LIMITS[key]
+                if value is not None and low <= value <= high and value != energie_langzeit.KENNTAGE_DEFAULTS[key]:
+                    kenntage[key] = value
 
             def pairs(
                 entity_ids: list[str], names: list[str], gruppen: list[str] | None = None,
@@ -3737,6 +3755,7 @@ class EnergieDashboardService:
                 "show_sankey_legende": show_sankey_legende == "on",
                 "verbraucheranteile_gruppieren": verbraucheranteile_gruppieren == "on",
                 "anomalie_schwelle": anomalie_schwelle,
+                "kenntage": kenntage,
             }
             _save_config(deps.index, config)
             sync_hourly_rollup_flags(deps.index, [eid for eid, _ in self._config_entity_roles(config)])
@@ -3924,6 +3943,16 @@ class EnergieDashboardService:
             if not energie_langzeit.is_configured(config):
                 raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
             return self.langzeit.compute_records(config)
+
+        @router.get("/energiedashboard/langzeit/kenntage")
+        def energiedashboard_langzeit_kenntage(field: str, year: int) -> dict:
+            # Die Tage eines Jahres für den Kalender eines Kenntags (Reiter „Langzeit“).
+            config = _load_config(deps.index)
+            if not energie_langzeit.is_configured(config):
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
+            if field not in {key for key, _group, _needs in energie_langzeit.KENNTAGE}:
+                raise HTTPException(status_code=422, detail=tr("Unbekannter Kenntag: {value}", value=field))
+            return self.langzeit.compute_kenntage_days(config, field, year)
 
         @router.post("/energiedashboard/langzeit/changes")
         def energiedashboard_langzeit_changes(body: energie_langzeit.TableRequest) -> dict:

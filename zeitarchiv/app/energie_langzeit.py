@@ -21,6 +21,7 @@ direkt genutzt.
 from __future__ import annotations
 
 import statistics
+import time
 from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -74,12 +75,24 @@ GAP_FACTOR = 3
 GAP_MIN = 10
 #: Rekorde erscheinen erst, wenn das Archiv der Rollen mindestens so viele Tage umfasst.
 RECORD_MIN_DAYS = 365
-#: Kenntage: „fast autark“ heißt höchstens AUTARKY_MAX_IMPORT Netzbezug-Anteil am Verbrauch (also Autarkie ab 90 %) bei Verbrauch
-#: von mindestens CONSUMPTION_MIN; 100 % käme ohne großen Speicher praktisch nie vor;
-#: „kaum PV“ heißt weniger als LOW_PV_KWH Erzeugung.
-AUTARKY_MAX_IMPORT = 0.1
+#: Verbrauch, ab dem ein Tag für „fast autark“ zählt (bei weniger ist der Anteil Zufall).
 CONSUMPTION_MIN = 0.5
-LOW_PV_KWH = 1.0
+#: Schwellen der Kenntage (Setup des Energiedashboards, leer = Vorgabe): Autarkie ab … %, Sonnentage ab … kWh je kWp,
+#: trübe Tage unter … % des Tagesmittels, Speicher stark genutzt ab … kWh Entladung, kaum genutzt unter … kWh.
+#: 100 % Autarkie kommt ohne großen Speicher praktisch nie vor, deshalb Vorgabe 90.
+KENNTAGE_DEFAULTS = {"autark": 90.0, "sonnig": 4.0, "truebe": 10.0, "stark": 5.0, "schwach": 1.0}
+KENNTAGE_LIMITS = {"autark": (50.0, 100.0), "sonnig": (1.0, 8.0), "truebe": (1.0, 50.0), "stark": (1.0, 30.0), "schwach": (0.1, 5.0)}
+#: Kenntage in Anzeigereihenfolge: Schlüssel, Gruppe, Rollen, deren Wert der Tag braucht. Die Felder bilden Paare.
+KENNTAGE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("fast_autark", "eigenversorgung", ("netzbezug",)),
+    ("ueberschuss", "eigenversorgung", ("einspeisung",)),
+    ("sonnig", "erzeugung", ("erzeugung",)),
+    ("truebe", "erzeugung", ("erzeugung",)),
+    ("speicher_stark", "speicher", ("entladung",)),
+    ("speicher_schwach", "speicher", ("entladung",)),
+)
+#: Lebensdauer des Tage-Zwischenspeichers (der Kalender liest dieselben Tage noch einmal).
+DAYS_CACHE_SECONDS = 300
 #: Verbraucher der Veränderungsliste (nach Betrag der Änderung).
 CHANGES_LIMIT = 8
 #: Rekordzeilen: Schlüssel, Rolle (Verbrauch rechnet sich aus der Bilanz), Beschriftung.
@@ -126,6 +139,62 @@ def is_configured(config: dict) -> bool:
     return bool(roles["erzeugung"] or roles["netzbezug"])
 
 
+def kenntage_thresholds(config: dict) -> dict[str, float]:
+    """Schwellen der Kenntage: Setup-Werte (leer = Vorgabe), auf sinnvolle Grenzen gebracht."""
+    stored = config.get("kenntage") if isinstance(config.get("kenntage"), dict) else {}
+    out: dict[str, float] = {}
+    for key, default in KENNTAGE_DEFAULTS.items():
+        try:
+            value = float(stored.get(key, default))
+        except (TypeError, ValueError):
+            value = default
+        low, high = KENNTAGE_LIMITS[key]
+        out[key] = min(max(value, low), high)
+    return out
+
+
+def total_kwp(config: dict) -> float | None:
+    """Summe der Anlagenleistung, nur wenn jeder Erzeuger eine hat (sonst passen Ertrag und Leistung nicht zusammen)."""
+    erzeuger = [e for e in config.get("erzeuger") or [] if e.get("entity_id")]
+    if not erzeuger or len(pv_entities(config)) != len(erzeuger):
+        return None
+    return sum(kwp for _entity, kwp in pv_entities(config))
+
+
+def kenntage_available(config: dict) -> tuple[str, ...]:
+    """Kenntage, für die die Rollen da sind: Sonnentage brauchen die Anlagenleistung, das Speicherpaar einen Speicher."""
+    roles = role_entities(config)
+    out = []
+    for key, _group, needs in KENNTAGE:
+        if not all(roles.get(role) for role in needs):
+            continue
+        if key == "sonnig" and total_kwp(config) is None:
+            continue
+        out.append(key)
+    return tuple(out)
+
+
+def kenntag_hit(
+    key: str, day: dict, thresholds: dict[str, float], average: float | None, kwp: float | None,
+) -> bool | None:
+    """Ob der Tag den Kenntag trifft; None, wenn ein dafür nötiger Wert fehlt (der Tag zählt dann nicht mit)."""
+    if key == "fast_autark":
+        if day["netzbezug"] is None:
+            return None
+        return day["verbrauch"] >= CONSUMPTION_MIN and day["netzbezug"] <= day["verbrauch"] * (100 - thresholds["autark"]) / 100 + 1e-9
+    if key == "ueberschuss":
+        return None if day["einspeisung"] is None else day["einspeisung"] > day["verbrauch"] > 0
+    if key == "sonnig":
+        return None if day["erzeugung"] is None or not kwp else day["erzeugung"] / kwp >= thresholds["sonnig"]
+    if key == "truebe":
+        return None if day["erzeugung"] is None or average is None else day["erzeugung"] < average * thresholds["truebe"] / 100
+    if key == "speicher_stark":
+        return None if day.get("entladung") is None else day["entladung"] >= thresholds["stark"]
+    if key == "speicher_schwach":
+        return None if day.get("entladung") is None else day["entladung"] < thresholds["schwach"]
+    return None
+
+
 def balance(parts: dict[str, float | None]) -> float | None:
     """Verbrauch als Bilanz; None, wenn weder Erzeugung noch Netzbezug Werte haben (nie 0 vortäuschen).
 
@@ -155,6 +224,8 @@ class EnergieLangzeitService:
         self.entity_series = entity_series
         #: Entität der Strahlung (W/m²) aus dem Wetterdashboard; ohne sie entfallen die wetterbereinigten Zeilen.
         self.radiation_entity = radiation_entity
+        #: (Schlüssel, Zeitpunkt, Tage): die Tageswerte, die der Jahreskalender der Kenntage nach den Kenntagen noch einmal braucht.
+        self._days_cache: tuple[tuple, float, list[dict]] | None = None
 
     def _rows(
         self, entity_id: str, start: datetime, end: datetime, now_local: datetime,
@@ -483,6 +554,18 @@ class EnergieLangzeitService:
         return result
 
     def usable_days(self, config: dict, now_local: datetime | None = None) -> list[dict]:
+        """usable_days_uncached, mit kurzem Zwischenspeicher (gleiche Rollen, gleicher Tag)."""
+        now_local = now_local or datetime.now(self.tz)
+        roles = role_entities(config)
+        key = (tuple((role, tuple(ids)) for role, ids in sorted(roles.items())), now_local.date())
+        cached = self._days_cache
+        if cached and cached[0] == key and time.monotonic() - cached[1] < DAYS_CACHE_SECONDS:
+            return cached[2]
+        days = self.usable_days_uncached(config, now_local)
+        self._days_cache = (key, time.monotonic(), days)
+        return days
+
+    def usable_days_uncached(self, config: dict, now_local: datetime | None = None) -> list[dict]:
         """Tage mit allen Werten, ohne den Tag nach einem fehlenden Tag. Fehlt ein Tag ganz, bekäme der nächste
         Messwert die ganze Differenz zugeschlagen und gäbe einen Schein-Rekord. Der heutige Tag fehlt (unvollständig).
 
@@ -531,6 +614,7 @@ class EnergieLangzeitService:
                 "einspeisung": max(parts["einspeisung"], 0.0) if parts["einspeisung"] is not None else None,
                 "netzbezug": max(parts["netzbezug"], 0.0) if parts["netzbezug"] is not None else None,
                 "verbrauch": verbrauch,
+                "entladung": parts["entladung"],
             })
         return out
 
@@ -554,27 +638,72 @@ class EnergieLangzeitService:
                     "key": key, "label": tr(label), "value": round(top[key], 3), "date": top["date"].isoformat(),
                     "entity_id": single, "offset": (top["date"] - today).days,
                 })
-        years: dict[int, dict] = {}
-        for d in days:
-            entry = years.setdefault(d["date"].year, {
-                "year": d["date"].year, "days": 0, "autarkie": 0, "einspeisung_ueber_verbrauch": 0, "kaum_pv": 0,
-            })
-            entry["days"] += 1
-            if d["netzbezug"] is not None and d["verbrauch"] >= CONSUMPTION_MIN and d["netzbezug"] <= d["verbrauch"] * AUTARKY_MAX_IMPORT:
-                entry["autarkie"] += 1
-            if d["einspeisung"] is not None and d["einspeisung"] > d["verbrauch"] > 0:
-                entry["einspeisung_ueber_verbrauch"] += 1
-            if d["erzeugung"] is not None and d["erzeugung"] < LOW_PV_KWH:
-                entry["kaum_pv"] += 1
+        kenntage = self.compute_kenntage(config, days, today)
         return {
             "unit": "kWh",
             "since": days[0]["date"].isoformat() if days else None,
             "days": len(days), "span": span, "enough": span >= RECORD_MIN_DAYS,
             "records": records,
-            "kenntage": sorted(years.values(), key=lambda e: -e["year"]),
-            "has_pv": bool(roles["erzeugung"]), "has_export": bool(roles["einspeisung"]),
-            "has_import": bool(roles["netzbezug"]),
+            "kenntage": kenntage,
         }
+
+    def compute_kenntage(self, config: dict, days: list[dict], today: date) -> dict:
+        """Kenntage je Jahr: Tage mit einer Eigenschaft (Schwellen aus dem Setup) und die Tage, an denen sie sich prüfen
+        ließ. „Bis heute“ zählt in jedem Jahr nur bis zum Kalendertag von heute, damit das laufende Jahr vergleichbar ist."""
+        thresholds = kenntage_thresholds(config)
+        available = kenntage_available(config)
+        cutoff = (today.month, today.day)
+        years: dict[int, dict] = {}
+        averages: dict[int, float] = {}
+        for year in {d["date"].year for d in days}:
+            produced = [d["erzeugung"] for d in days if d["date"].year == year and d["erzeugung"] is not None]
+            if produced:
+                averages[year] = sum(produced) / len(produced)
+        kwp = total_kwp(config)
+        for d in days:
+            year = d["date"].year
+            entry = years.setdefault(year, {"year": year, "fields": {
+                key: {"days": 0, "hit": 0, "days_ytd": 0, "hit_ytd": 0} for key in available
+            }})
+            ytd = (d["date"].month, d["date"].day) <= cutoff
+            for key in available:
+                hit = kenntag_hit(key, d, thresholds, averages.get(year), kwp)
+                if hit is None:
+                    continue
+                counts = entry["fields"][key]
+                counts["days"] += 1
+                counts["hit"] += hit
+                if ytd:
+                    counts["days_ytd"] += 1
+                    counts["hit_ytd"] += hit
+        return {
+            "available": list(available),
+            "groups": {key: group for key, group, _roles in KENNTAGE},
+            "thresholds": thresholds, "kwp": kwp,
+            "today": today.isoformat(),
+            "years": sorted(years.values(), key=lambda e: -e["year"]),
+        }
+
+    def compute_kenntage_days(self, config: dict, field: str, year: int, now_local: datetime | None = None) -> dict:
+        """Die Tage eines Jahres, an denen sich der Kenntag prüfen ließ, mit Treffer und den Werten dazu (Jahreskalender)."""
+        now_local = now_local or datetime.now(self.tz)
+        thresholds = kenntage_thresholds(config)
+        if field not in kenntage_available(config):
+            return {"field": field, "year": year, "days": [], "average": None}
+        days = [d for d in self.usable_days(config, now_local) if d["date"].year == year]
+        produced = [d["erzeugung"] for d in days if d["erzeugung"] is not None]
+        average = sum(produced) / len(produced) if produced else None
+        kwp = total_kwp(config)
+        out = []
+        for d in days:
+            hit = kenntag_hit(field, d, thresholds, average, kwp)
+            if hit is None:
+                continue
+            out.append({
+                "date": d["date"].isoformat(), "hit": bool(hit),
+                "values": {k: round(d[k], 2) for k in ("erzeugung", "einspeisung", "netzbezug", "verbrauch", "entladung") if d.get(k) is not None},
+            })
+        return {"field": field, "year": year, "days": out, "average": round(average, 2) if average is not None else None}
 
     # -- Was hat sich verändert? -----------------------------------------------------------
 

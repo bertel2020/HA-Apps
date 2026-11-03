@@ -2486,16 +2486,41 @@ button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
   .wt-chg-val{text-align:left;}
 }
 
-/* Kenntage je Jahr (Energiedashboard, Reiter Langzeit): ein Feld je Kenntag, darin ein Balken je Jahr. */
-.wt-kt{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:10px;}
+/* Kenntage je Jahr (Energiedashboard, Reiter Langzeit): Paare von Feldern, darin ein Balken je Jahr; Jahreskalender im Dialog. */
+.wt-kt{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px;}
+.wt-kt-group{grid-column:1/-1;margin:6px 0 -4px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);letter-spacing:.02em;}
+.wt-kt-group:first-child{margin-top:0;}
 .wt-kt-col{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px 10px;align-content:start;min-width:0;padding:12px 14px;background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;}
 .wt-kt-title{grid-column:1/-1;margin:0 0 2px;font-size:calc(11.5px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--accent-line);}
-.wt-kt-row{display:grid;grid-column:1/-1;grid-template-columns:subgrid;gap:10px;align-items:center;font-size:calc(13.5px * var(--font-scale, 1));font-variant-numeric:tabular-nums;cursor:help;}
+.wt-kt-rule{grid-column:1/-1;margin:-4px 0 2px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+.wt-kt-row{display:grid;grid-column:1/-1;grid-template-columns:subgrid;gap:10px;align-items:center;margin:0 -6px;padding:1px 6px;border:0;border-radius:6px;background:none;color:inherit;font:inherit;font-size:calc(13.5px * var(--font-scale, 1));font-variant-numeric:tabular-nums;text-align:left;cursor:pointer;}
+.wt-kt-row:hover,.wt-kt-row:focus-visible{background:var(--surface);}
 .wt-kt-year{color:var(--ink-muted);min-width:3.2em;}
 .wt-kt-bar{height:10px;background:var(--surface);border-radius:3px;overflow:hidden;}
 .wt-kt-bar i{display:block;height:100%;background:var(--chart-1);border-radius:3px;}
 .wt-kt-val{text-align:right;white-space:nowrap;color:var(--ink-muted);}
 .wt-kt-val b{color:var(--ink);font-weight:600;}
+@media (max-width:760px){.wt-kt{grid-template-columns:minmax(0,1fr);}}
+.wt-yearbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin:16px 0;}
+.wt-yearbar-label{font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--ink);}
+.wt-yearbar-note{flex:1 1 280px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
+.wt-ktcal-dialog{max-width:880px;}
+.wt-ktcal{border-collapse:separate;border-spacing:3px;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-muted);}
+.wt-ktcal th{font-weight:400;text-align:right;padding-right:6px;white-space:nowrap;}
+.wt-ktcal thead th{text-align:center;padding:0;color:var(--ink-faint);font-size:calc(10.5px * var(--font-scale, 1));}
+.wt-ktcal td{width:18px;height:18px;padding:0;border-radius:4px;background:var(--surface-alt);}
+.wt-ktcal td.hit{background:var(--chart-1);}
+.wt-ktcal td.hit:hover,.wt-ktcal td.hit:focus-within{outline:2px solid var(--ink);}
+.wt-ktcal td.hit a{display:block;width:100%;height:100%;}
+.wt-ktcal td.off{background:none;border:1px dashed var(--border);}
+.wt-ktcal td.none{background:none;}
+.wt-ktcal td.gap{background:repeating-linear-gradient(45deg,var(--surface-alt),var(--surface-alt) 3px,var(--surface) 3px,var(--surface) 6px);}
+.wt-ktcal-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+.wt-ktcal-legend i{display:inline-block;width:12px;height:12px;margin-right:5px;border-radius:3px;vertical-align:-2px;}
+.wt-ktcal-hit{background:var(--chart-1);}
+.wt-ktcal-none{background:var(--surface-alt);}
+.wt-ktcal-gap{background:repeating-linear-gradient(45deg,var(--surface-alt),var(--surface-alt) 3px,var(--surface) 3px,var(--surface) 6px);}
+.wt-ktcal-off{border:1px dashed var(--border-strong);}
 
 /* Kacheln (Wetterdashboard, Rekorde im Energiedashboard): Kopfbalken in der Rollenfarbe, Beschriftung in Großbuchstaben, Wert in Monospace. */
 .wt-kpis{display:grid;grid-template-columns:repeat(var(--wt-cols, 3),minmax(0,1fr));gap:10px;margin:8px 0 14px;}

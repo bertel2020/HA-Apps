@@ -195,6 +195,35 @@
 
   const yearSum = (list) => (list.every((value) => value != null) ? list.reduce((a, b) => a + b, 0) : null);
 
+  // Kenntage je Jahr: Beschriftung, Regel und die Tooltip-Zeile je Kenntag. Die Schwellen kommen aus dem Setup.
+  const KENNTAG_GROUPS = () => ({eigenversorgung: t('Eigenversorgung'), erzeugung: t('Erzeugung'), speicher: t('Speicher')});
+  const KENNTAG_LABELS = () => ({
+    fast_autark: t('Fast autark'), ueberschuss: t('Überschusstage'), sonnig: t('Sonnentage'), truebe: t('Trübe Tage'),
+    speicher_stark: t('Speicher stark genutzt'), speicher_schwach: t('Speicher kaum genutzt'),
+  });
+
+  function kenntagRule(key, th) {
+    switch (key) {
+      case 'fast_autark': return t('Autarkie ab {value} %', {value: num(th.autark, 0)});
+      case 'ueberschuss': return t('mehr Einspeisung als Verbrauch');
+      case 'sonnig': return t('ab {value} kWh je kWp', {value: num(th.sonnig, 1)});
+      case 'truebe': return t('unter {value} % des Tagesmittels', {value: num(th.truebe, 0)});
+      case 'speicher_stark': return t('ab {value} kWh Entladung', {value: num(th.stark, 1)});
+      default: return t('unter {value} kWh Entladung', {value: num(th.schwach, 1)});
+    }
+  }
+
+  function kenntagValues(key, values, average, kwp) {
+    const kwh = (value) => num(value, 1);
+    switch (key) {
+      case 'fast_autark': return t('Netzbezug {grid} kWh bei {use} kWh Verbrauch', {grid: kwh(values.netzbezug), use: kwh(values.verbrauch)});
+      case 'ueberschuss': return t('Einspeisung {feed} kWh, Verbrauch {use} kWh', {feed: kwh(values.einspeisung), use: kwh(values.verbrauch)});
+      case 'sonnig': return t('Erzeugung {pv} kWh ({spec} kWh je kWp)', {pv: kwh(values.erzeugung), spec: kwh(values.erzeugung / kwp)});
+      case 'truebe': return t('Erzeugung {pv} kWh (Tagesmittel {avg} kWh)', {pv: kwh(values.erzeugung), avg: kwh(average)});
+      default: return t('Entladung {n} kWh', {n: kwh(values.entladung)});
+    }
+  }
+
   let lastTable = null;
 
   window.energieLangzeit = function energieLangzeit() {
@@ -215,6 +244,9 @@
       monthlyRole: 'erzeugung',
       matrixRole: 'erzeugung',
       band: true,
+      yearLimit: 10,
+      ktMode: 'full',
+      ktDialog: {title: '', sub: '', html: '', error: ''},
 
       init() {
         const saved = readStore();
@@ -222,6 +254,8 @@
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
         if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
+        if ([0, 5, 10].includes(saved.yearLimit)) this.yearLimit = saved.yearLimit;
+        if (saved.ktMode === 'full' || saved.ktMode === 'ytd') this.ktMode = saved.ktMode;
         // Geladen wird erst beim ersten Öffnen des Reiters: Die Übersicht ist die Startansicht und
         // soll nicht auf eine verborgene Tabelle warten.
         window.addEventListener('energie-tab', (event) => {
@@ -241,6 +275,35 @@
       },
 
       columnName,
+
+      // Anzahl der Jahre für Monatsvergleich, Jahre × Monate und Kenntage (0 = alle); die Jahre stehen neueste zuerst.
+      yearCount() {
+        const m = this.months ? this.months.years.length : 0;
+        const k = this.records && this.records.kenntage ? this.records.kenntage.years.length : 0;
+        return Math.max(m, k);
+      },
+
+      yearOptions() {
+        return [
+          {value: 5, label: t('Letzte 5')},
+          {value: 10, label: t('Letzte 10')},
+          {value: 0, label: t('Alle ({n})', {n: this.yearCount()})},
+        ];
+      },
+
+      setYearLimit(value) {
+        this.yearLimit = value;
+        writeStore({yearLimit: value});
+        this.drawMonthly();
+        this.drawMatrix();
+        this.drawKenntage();
+      },
+
+      // Die Monatswerte mit den gewählten Jahren, für Diagramm und Matrix.
+      view() {
+        const years = this.yearLimit ? this.months.years.slice(0, this.yearLimit) : this.months.years;
+        return {...this.months, years};
+      },
 
       // Rollen mit Monatswerten (Erzeugung, Einspeisung, Netzbezug, Verbrauch), je nach Einrichtung.
       monthRoles() {
@@ -368,32 +431,108 @@
       },
 
       kenntageNote() {
-        return t('Tage je Kalenderjahr: Autarkie ab 90 % (Netzbezug höchstens 10 % des Verbrauchs, bei mindestens 0,5 kWh Verbrauch), mehr Einspeisung als Verbrauch und kaum Erzeugung (unter 1 kWh). Es zählen nur Tage mit allen Werten, ohne den Tag nach einem fehlenden Tag.');
+        return t('Tage je Kalenderjahr mit einer Eigenschaft, die Regel steht unter dem Titel. Die Schwellen stellst du im Setup ein. Es zählen nur Tage mit allen Werten, ohne den Tag nach einem fehlenden Tag.');
       },
 
+      ktRange() {
+        const kt = this.records && this.records.kenntage;
+        if (!kt) return '';
+        if (this.ktMode !== 'ytd') return t('Ganze Kalenderjahre. Das laufende Jahr (*) zählt bis heute.');
+        const date = fmtDate(formats.dmy, Date.parse(kt.today + 'T12:00:00Z') / 1000);
+        return t('Alle Jahre nur bis {date} gezählt, damit das laufende Jahr (*) vergleichbar ist.', {date});
+      },
+
+      setKtMode(mode) {
+        this.ktMode = mode;
+        writeStore({ktMode: mode});
+        this.drawKenntage();
+      },
+
+      // Ein Feld je Kenntag, darin ein Balken je Jahr (Länge = Anteil an den ausgewerteten Tagen, Maßstab je Feld).
       drawKenntage() {
         const r = this.records;
-        const table = this.$refs.kenntageTable;
-        if (!r || !table) return;
-        const columns = [];
-        if (r.has_import) columns.push({field: 'autarkie', label: t('Autarkie ab 90 %')});
-        if (r.has_export) columns.push({field: 'einspeisung_ueber_verbrauch', label: t('Einspeisung über Verbrauch')});
-        if (r.has_pv) columns.push({field: 'kaum_pv', label: t('Kaum Erzeugung')});
-        const share = (value, days) => (days ? value / days * 100 : 0);
-        const shareText = (value, pct) => (value > 0 && pct < 1 ? '< 1 %' : `${num(pct, 0)} %`);
+        const host = this.$refs.kenntage;
+        if (!r || !r.kenntage || !host) return;
+        const kt = r.kenntage;
+        const ytd = this.ktMode === 'ytd';
+        const years = this.yearLimit ? kt.years.slice(0, this.yearLimit) : kt.years;
         const current = new Date().getFullYear();
-        // Ein Feld je Kenntag, darin ein Balken je Jahr (Länge = Anteil der ausgewerteten Tage, Maßstab je Feld).
-        table.innerHTML = columns.map((c) => {
-          const top = Math.max(...r.kenntage.map((row) => share(row[c.field], row.days)), 0);
-          const rows = r.kenntage.map((row) => {
-            const pct = share(row[c.field], row.days);
+        const groups = KENNTAG_GROUPS();
+        const labels = KENNTAG_LABELS();
+        let html = '';
+        let lastGroup = null;
+        for (const key of kt.available) {
+          const group = kt.groups[key];
+          if (group !== lastGroup) html += `<div class="wt-kt-group">${escapeHtml(groups[group])}</div>`;
+          lastGroup = group;
+          const rows = years.map((entry) => {
+            const f = entry.fields[key];
+            const days = ytd ? f.days_ytd : f.days;
+            const hit = ytd ? f.hit_ytd : f.hit;
+            return {year: entry.year, days, hit, pct: days ? hit / days * 100 : 0};
+          }).filter((row) => row.days > 0);
+          const top = Math.max(0, ...rows.map((row) => row.pct));
+          html += `<div class="wt-kt-col"><h3 class="wt-kt-title">${escapeHtml(labels[key])}</h3>`
+            + `<p class="wt-kt-rule">${escapeHtml(kenntagRule(key, kt.thresholds))}</p>`;
+          for (const row of rows) {
+            const pct = row.hit > 0 && row.pct < 1 ? '< 1 %' : `${num(row.pct, 0)} %`;
             const tip = `${t('Ausgewertete Tage')}: ${num(row.days, 0)}`;
-            return `<div class="wt-kt-row" data-tooltip-fixed="${escapeHtml(tip)}"><span class="wt-kt-year">${row.year}${row.year === current ? '*' : ''}</span>`
-              + `<span class="wt-kt-bar"><i style="width:${top > 0 ? (pct / top * 100).toFixed(1) : 0}%"></i></span>`
-              + `<span class="wt-kt-val"><b>${escapeHtml(num(row[c.field], 0))}</b> ${escapeHtml(t('Tage'))} · ${escapeHtml(shareText(row[c.field], pct))}</span></div>`;
-          }).join('');
-          return `<div class="wt-kt-col"><h3 class="wt-kt-title">${escapeHtml(c.label)}</h3>${rows}</div>`;
-        }).join('');
+            html += `<button type="button" class="wt-kt-row" data-field="${key}" data-year="${row.year}" data-tooltip-fixed="${escapeHtml(tip)}">`
+              + `<span class="wt-kt-year">${row.year}${row.year === current ? '*' : ''}</span>`
+              + `<span class="wt-kt-bar"><i style="width:${top > 0 ? (row.pct / top * 100).toFixed(1) : 0}%"></i></span>`
+              + `<span class="wt-kt-val"><b>${escapeHtml(num(row.hit, 0))}</b> ${escapeHtml(t('Tage'))} · ${escapeHtml(pct)}</span></button>`;
+          }
+          html += '</div>';
+        }
+        host.innerHTML = html;
+      },
+
+      kenntageClick(event) {
+        const row = event.target.closest('.wt-kt-row');
+        if (row) this.openKenntage(row.dataset.field, Number(row.dataset.year));
+      },
+
+      // Jahreskalender eines Kenntags: 12 Monate × 31 Tage, die Treffer sind gefüllt, ein Klick öffnet den Tag.
+      async openKenntage(field, year) {
+        const kt = this.records.kenntage;
+        const dialog = this.$refs.kenntageDialog;
+        this.ktDialog = {title: `${KENNTAG_LABELS()[field]} · ${year}`, sub: kenntagRule(field, kt.thresholds), html: '', error: ''};
+        dialog.showModal();
+        try {
+          const res = await fetch(`energiedashboard/langzeit/kenntage?field=${encodeURIComponent(field)}&year=${year}`);
+          if (!res.ok) throw new Error(String(res.status));
+          const data = await res.json();
+          const byDate = new Map(data.days.map((d) => [d.date, d]));
+          const since = this.records.since;
+          const cutoff = this.ktMode === 'ytd' ? kt.today.slice(5) : null;
+          const iso = (month, day) => `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const gapLabel = t('nicht ausgewertet');
+          let hits = 0, days = 0;
+          let html = `<thead><tr><th></th>${Array.from({length: 31}, (_x, i) => `<th>${i + 1}</th>`).join('')}</tr></thead><tbody>`;
+          for (let month = 1; month <= 12; month++) {
+            html += `<tr><th>${escapeHtml(monthName(month, 'short'))}</th>`;
+            const last = new Date(year, month, 0).getDate();
+            for (let day = 1; day <= 31; day++) {
+              if (day > last) { html += '<td class="none"></td>'; continue; }
+              const key = iso(month, day);
+              const dateText = fmtDate(formats.dmy, Date.parse(key + 'T12:00:00Z') / 1000);
+              const beyond = key < since || key > kt.today || (cutoff && key.slice(5) > cutoff);
+              if (beyond) { html += `<td class="off" data-tooltip-fixed="${escapeHtml(dateText)}"></td>`; continue; }
+              const entry = byDate.get(key);
+              if (!entry) { html += `<td class="gap" data-tooltip-fixed="${escapeHtml(dateText + ' · ' + gapLabel)}"></td>`; continue; }
+              days++;
+              if (!entry.hit) { html += `<td data-tooltip-fixed="${escapeHtml(dateText)}"></td>`; continue; }
+              hits++;
+              const tip = `${dateText} · ${kenntagValues(field, entry.values, data.average, kt.kwp)}`;
+              html += `<td class="hit" data-tooltip-fixed="${escapeHtml(tip)}"><a href="energiedashboard?date=${key}" aria-label="${escapeHtml(tip)}"></a></td>`;
+            }
+            html += '</tr>';
+          }
+          this.ktDialog.html = html + '</tbody>';
+          this.ktDialog.sub = `${kenntagRule(field, kt.thresholds)} · ${t('{hits} von {days} ausgewerteten Tagen', {hits: num(hits, 0), days: num(days, 0)})}`;
+        } catch (e) {
+          this.ktDialog.error = t('Die Tage konnten nicht geladen werden.');
+        }
       },
 
       // Verbraucher mit der größten Änderung; Stichtag und Vorjahr-Modus wie die Vergleichstabelle.
@@ -463,7 +602,8 @@
       },
 
       drawMonthly() {
-        const m = this.months;
+        if (!this.months) return;
+        const m = this.view();
         const element = this.$refs.monthlyChart;
         const role = m && this.roleOf(this.monthlyRole);
         if (!role || !element) return;
@@ -564,7 +704,8 @@
       },
 
       drawMatrix() {
-        const m = this.months;
+        if (!this.months) return;
+        const m = this.view();
         const table = this.$refs.matrixTable;
         const role = m && this.roleOf(this.matrixRole);
         if (!role || !table) return;

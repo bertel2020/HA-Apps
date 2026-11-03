@@ -750,10 +750,24 @@ Verbrauch), rot ungünstig.
   ab einem Jahr Archiv. Tage direkt nach einem fehlenden Tag zählen nicht mit,
   weil der nächste Messwert dort die Differenz mehrerer Tage trägt und einen
   Schein-Rekord ergäbe; bei Gleichstand gilt der frühere Tag.
-- **Kenntage je Jahr:** Je Kalenderjahr die Zahl der Tage mit Autarkie ab 90 % (Netzbezug
-  höchstens 10 % des Verbrauchs, bei mindestens 0,5 kWh Verbrauch), mit mehr Einspeisung als Verbrauch
-  und mit kaum Erzeugung (unter 1 kWh), dazu die Zahl der ausgewerteten Tage. Es
-  zählen dieselben Tage wie bei den Rekorden.
+- **Jahre:** Über dem Monatsvergleich stellt „Letzte 5“, „Letzte 10“ oder „Alle“
+  ein, wie viele Jahre Monatsvergleich, „Jahre × Monate“ und Kenntage zeigen.
+  Ø und Spanne bilden sich nur aus diesen Jahren. Die Rekorde zählen immer seit
+  Archivbeginn. Die Auswahl merkt sich der Browser.
+- **Kenntage je Jahr:** Sechs Kenntage in drei Paaren, je Jahr ein Balken mit
+  der Zahl der Tage und ihrem Anteil an den ausgewerteten Tagen: **Fast autark**
+  (Autarkie ab 90 %, also Netzbezug höchstens 10 % des Verbrauchs bei mindestens
+  0,5 kWh Verbrauch) und **Überschusstage** (mehr Einspeisung als Verbrauch),
+  **Sonnentage** (ab 4 kWh je kWp, braucht bei jedem Erzeuger die Anlagenleistung)
+  und **Trübe Tage** (unter 10 % des Tagesmittels des Jahres), **Speicher stark
+  genutzt** (ab 5 kWh Entladung) und **Speicher kaum genutzt** (unter 1 kWh
+  Entladung). Ein Feld erscheint nur, wenn die Rollen dafür eingerichtet sind.
+  „Ganzes Jahr“ zählt die Kalenderjahre, „Bis heute“ in jedem Jahr nur bis zum
+  heutigen Kalendertag, damit das laufende Jahr vergleichbar ist. Ein Klick auf
+  eine Zeile öffnet den Jahreskalender: 12 Monate mit 31 Tagen, die Kenntage sind
+  gefüllt, ein Klick auf einen Tag öffnet ihn im Energiedashboard. Es zählen nur
+  Tage mit allen Werten, ohne den Tag nach einem fehlenden Tag. Die Schwellen
+  stellt ihr im Setup unter „Kenntage“ ein, ein leeres Feld nimmt die Vorgabe.
 - Summen ab 10.000 kWh erscheinen in MWh. Die Zähler müssen in kWh liefern,
   wie in der Übersicht.
 - **Monatsvergleich:** Darunter zeigt ein Liniendiagramm die Monatswerte je Jahr
