@@ -42,6 +42,7 @@
       </span>
 {% endmacro %}
 {% if not csv_uploaded %}
+{% if csv_error %}<div class="upload-error" role="alert">{{ csv_error }}</div>{% endif %}
 <div id="csv-upload-area">
   <label class="dropzone" id="csv-dropzone" for="csv-file-input" role="button" tabindex="0">
     <p>{{ _("CSV-Datei hierher ziehen oder klicken zum Auswählen") }}</p>

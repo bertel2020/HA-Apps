@@ -89,11 +89,23 @@ def _request(
     return urllib.request.Request(url, headers=headers)
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Folgt keiner Weiterleitung: urllib schickt den Authorization-Header sonst auch an den neuen Host mit, und
+    die Zugangsdaten gehören nur zur eingegebenen Adresse. Eine Weiterleitung endet als Fehler mit ihrem Statuscode
+    (wie beim WebDAV-Client)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def _open(request: urllib.request.Request) -> bytes:
     # Nie den Authorization-Header loggen.
     logger.debug("VM-Anfrage · %s", request.selector.split("?", 1)[0])
     try:
-        with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT) as response:
+        with _OPENER.open(request, timeout=REQUEST_TIMEOUT) as response:
             return response.read()
     except urllib.error.HTTPError as exc:
         # Vor URLError prüfen (Unterklasse), sonst ginge der Statuscode verloren.

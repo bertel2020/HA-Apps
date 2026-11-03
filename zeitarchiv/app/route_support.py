@@ -10,6 +10,8 @@ import stat
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
+from starlette.responses import JSONResponse
+
 from .storage.coordinator import StorageCoordinator
 
 # Default-Zeitbudget für storage_locked() — deutlich großzügiger als
@@ -39,6 +41,37 @@ def format_upload_limit(max_bytes: int) -> str:
     if max_bytes % gib == 0:
         return f"{max_bytes // gib} GiB"
     return f"{max_bytes // mib} MiB"
+
+
+#: Zuschlag auf das Dateilimit für den Multipart-Rahmen (Grenzen, Feldnamen, Dateiname) in Content-Length.
+UPLOAD_OVERHEAD_BYTES = 1024 * 1024
+
+
+class UploadSizeLimitMiddleware:
+    """Weist einen Upload anhand von Content-Length ab, bevor Starlette das Formular einliest.
+
+    Starlette legt den ganzen Multipart-Body in einer Temp-Datei ab, bevor die Route überhaupt läuft; copy_upload_limited()
+    greift erst danach. Ein versehentlich gewählter 2-GB-Upload an die CSV-Route (Limit 256 MiB) füllte so erst die
+    Platte und brach dann ab. Eine Anfrage ohne Content-Length (chunked) lässt die Middleware durch; nginx davor
+    erlaubt für die Oberfläche höchstens 2050 MB. Reines ASGI wie die übrigen Middlewares (kein zweiter Task)."""
+
+    def __init__(self, app, limits: dict[str, int]) -> None:
+        self.app = app
+        self.limits = limits
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] == "http" and scope["method"] == "POST":
+            limit = self.limits.get(scope["path"].rstrip("/"))
+            if limit is not None:
+                raw = dict(scope["headers"]).get(b"content-length")
+                if raw is not None and raw.isdigit() and int(raw) > limit + UPLOAD_OVERHEAD_BYTES:
+                    response = JSONResponse(
+                        {"detail": tr("Upload ist größer als {format_upload_limit}", format_upload_limit=format_upload_limit(limit))},
+                        status_code=413,
+                    )
+                    await response(scope, receive, send)
+                    return
+        await self.app(scope, receive, send)
 
 
 def copy_upload_limited(source, destination: Path, max_bytes: int) -> int:

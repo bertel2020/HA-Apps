@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import secrets
 import shutil
@@ -39,10 +40,13 @@ from zoneinfo import ZoneInfo
 
 from ..i18n import N_, tr
 from . import reconcile
+from .atomic import write_file_atomically
 from .backup import BACKUP_MANIFEST_NAME
 from .coordinator import StorageCoordinator
 from .index import MAX_CATEGORIES, Index, _normalized_name
 from .paths import entity_dir, validate_entity_id
+
+logger = logging.getLogger(__name__)
 
 ROLLBACK_PREFIX = ".zeitarchiv-selective-rollback-"
 ROLLBACK_RE = re.compile(r"^\.zeitarchiv-selective-rollback-\d{8}T\d{6}Z$")
@@ -548,6 +552,9 @@ def _swap_entities(
 ) -> dict:
     moved: list[tuple[Path, Path]] = []
     placed: list[Path] = []
+    snapshots: dict[str, dict] = {}
+    created_categories: list[int] = []
+    db_committed = False
     rollback.mkdir(parents=True)
     try:
         for entity_id in ids:
@@ -570,8 +577,6 @@ def _swap_entities(
                 placed.append(data_dir / rel)
 
         now = time.time()
-        snapshots: dict[str, dict] = {}
-        created_categories: list[int] = []
         over_limit = 0
         with index._lock, index._conn:
             conn = index._conn
@@ -595,6 +600,7 @@ def _swap_entities(
                     ):
                         over_limit += 1
                 _recount_deleted(conn, entity_id)
+        db_committed = True
         # Statistik (row_count, size_bytes, first_ts, last_ts) neu aus den Dateien bilden.
         reconcile.audit_storage_metadata(data_dir, index, tz, entity_ids=ids, repair=True)
 
@@ -617,6 +623,17 @@ def _swap_entities(
             if target.exists():
                 original.parent.mkdir(parents=True, exist_ok=True)
                 target.replace(original)
+        if db_committed:
+            # Die Datenbank ist schon auf dem Stand des Backups (eigene Transaktion, danach folgten noch Audit und
+            # Info-Datei): ohne diese Rücksicherung stünden alte Dateien neben Löschmarkierungen und
+            # Zustandstexten aus dem Backup, und das Rollback-Verzeichnis ist gleich weg.
+            try:
+                _restore_db_snapshots(index, ids, snapshots, created_categories)
+                existing = [e for e in ids if snapshots[e]["existed"]]
+                if existing:
+                    reconcile.audit_storage_metadata(data_dir, index, tz, entity_ids=existing, repair=True)
+            except Exception:  # noqa: BLE001 — der ursprüngliche Fehler soll beim Aufrufer ankommen
+                logger.exception("Datenbank nach abgebrochenem selektivem Restore nicht zurückgesetzt")
         shutil.rmtree(rollback, ignore_errors=True)
         raise
     prune_rollbacks(data_dir)
@@ -629,6 +646,43 @@ def _swap_entities(
         "rows": sum(max(int(backup_rows[e].get("row_count") or 0) - int(backup_rows[e].get("deleted_count") or 0), 0)
                     for e in ids),
     }
+
+
+def _restore_db_snapshots(
+    index: Index, ids: list[str], db: dict[str, dict], created_categories: list[int],
+) -> None:
+    """Stellt die Datenbankzeilen der Entitäten aus den gesicherten Zuständen wieder her (eine Transaktion).
+
+    Genutzt vom Rückgängigmachen und vom Abbruch eines selektiven Restores nach dem Schreiben der Datenbank."""
+    with index._lock, index._conn:
+        conn = index._conn
+        for entity_id in ids:
+            snap = db[entity_id]
+            _clear_entity_db(conn, entity_id)
+            for ts, deleted_at in snap["deleted_points"]:
+                conn.execute("INSERT INTO deleted_points (entity_id, ts, deleted_at) VALUES (?, ?, ?)",
+                             (entity_id, ts, deleted_at))
+            for ts in snap["counter_mark_ignored"]:
+                conn.execute("INSERT OR IGNORE INTO counter_mark_ignored (entity_id, ts) VALUES (?, ?)",
+                             (entity_id, ts))
+            for year, month, target, compacted_at in snap["compacted_months"]:
+                conn.execute(
+                    "INSERT OR REPLACE INTO compacted_months "
+                    "(entity_id, year, month, target_resolution, compacted_at) VALUES (?, ?, ?, ?, ?)",
+                    (entity_id, year, month, target, compacted_at))
+            # .get(): Rollback-Infos von vor diesem Update kennen den Schlüssel nicht.
+            for idx, text, label, first_seen in snap.get("entity_states", []):
+                conn.execute(
+                    "INSERT OR REPLACE INTO entity_states "
+                    "(entity_id, idx, text, label, first_seen) VALUES (?, ?, ?, ?, ?)",
+                    (entity_id, idx, text, label, first_seen))
+            if not snap["existed"]:
+                conn.execute("DELETE FROM entities WHERE entity_id = ?", (entity_id,))
+                conn.execute("DELETE FROM entity_category WHERE entity_id = ?", (entity_id,))
+            else:
+                _recount_deleted(conn, entity_id)
+        # .get(): Rollback-Infos von vor den Kategorien kennen den Schlüssel nicht.
+        _drop_unused_categories(conn, created_categories)
 
 
 def _undo_entities(
@@ -657,35 +711,7 @@ def _undo_entities(
                         (data_dir / rel).parent.mkdir(parents=True, exist_ok=True)
                         (rollback / rel).replace(data_dir / rel)
                         returned.append((data_dir / rel, rollback / rel))
-            with index._lock, index._conn:
-                conn = index._conn
-                for entity_id in ids:
-                    snap = info["db"][entity_id]
-                    _clear_entity_db(conn, entity_id)
-                    for ts, deleted_at in snap["deleted_points"]:
-                        conn.execute("INSERT INTO deleted_points (entity_id, ts, deleted_at) VALUES (?, ?, ?)",
-                                     (entity_id, ts, deleted_at))
-                    for ts in snap["counter_mark_ignored"]:
-                        conn.execute("INSERT OR IGNORE INTO counter_mark_ignored (entity_id, ts) VALUES (?, ?)",
-                                     (entity_id, ts))
-                    for year, month, target, compacted_at in snap["compacted_months"]:
-                        conn.execute(
-                            "INSERT OR REPLACE INTO compacted_months "
-                            "(entity_id, year, month, target_resolution, compacted_at) VALUES (?, ?, ?, ?, ?)",
-                            (entity_id, year, month, target, compacted_at))
-                    # .get(): Rollback-Infos von vor diesem Update kennen den Schlüssel nicht.
-                    for idx, text, label, first_seen in snap.get("entity_states", []):
-                        conn.execute(
-                            "INSERT OR REPLACE INTO entity_states "
-                            "(entity_id, idx, text, label, first_seen) VALUES (?, ?, ?, ?, ?)",
-                            (entity_id, idx, text, label, first_seen))
-                    if not snap["existed"]:
-                        conn.execute("DELETE FROM entities WHERE entity_id = ?", (entity_id,))
-                        conn.execute("DELETE FROM entity_category WHERE entity_id = ?", (entity_id,))
-                    else:
-                        _recount_deleted(conn, entity_id)
-                # .get(): Rollback-Infos von vor den Kategorien kennen den Schlüssel nicht.
-                _drop_unused_categories(conn, info.get("created_categories", []))
+            _restore_db_snapshots(index, ids, info["db"], info.get("created_categories", []))
             existing = [e for e in ids if info["db"][e]["existed"]]
             if existing:
                 reconcile.audit_storage_metadata(data_dir, index, tz, entity_ids=existing, repair=True)
@@ -973,6 +999,7 @@ def apply_settings(
     bconn = source.db
     rollback = _reserve_rollback_dir(data_dir)
     journal: list[dict] = []
+    symcon_data: bytes | None = None
     skipped_pins = 0
     now = time.time()
     rollback.mkdir(parents=True)
@@ -1139,11 +1166,10 @@ def apply_settings(
                     if target.is_file():
                         shutil.copy2(target, rollback / SYMCON_FILE)
                     journal.append({"op": "symcon", "had_file": target.is_file()})
-                    data = source.read_bytes(SYMCON_FILE)
-                    if data is not None:
-                        tmp = target.with_suffix(".json.tmp")
-                        tmp.write_bytes(data)
-                        tmp.replace(target)
+                    # Erst als letzten Schritt schreiben (unten): Schlägt davor etwas fehl, rollt die Datenbank
+                    # zurück und das Rollback-Verzeichnis wird gelöscht; eine schon ersetzte Datei bliebe sonst
+                    # ohne Sicherung stehen.
+                    symcon_data = source.read_bytes(SYMCON_FILE)
             # Geänderte Zeitpläne müssen ihren nächsten Lauf neu berechnen.
             for key in reset_runs:
                 put_setting(key, "")
@@ -1151,6 +1177,8 @@ def apply_settings(
             (rollback / INFO_NAME).write_text(json.dumps({
                 "kind": "settings", "created_at": now, "source": source_label, "journal": journal,
             }), encoding="utf-8")
+            if symcon_data is not None:
+                write_file_atomically(data_dir / SYMCON_FILE, lambda tmp: tmp.write_bytes(symcon_data))
     except Exception:
         shutil.rmtree(rollback, ignore_errors=True)
         raise

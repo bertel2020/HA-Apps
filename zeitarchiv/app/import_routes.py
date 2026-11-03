@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from .i18n import N_, tr
 
+import csv
 import dataclasses
 import io
 import json
@@ -53,7 +54,7 @@ from .limits import (
     MAX_ZIP_UPLOAD_BYTES,
 )
 from .progress import JobBusy, JobProgress, register_source
-from .route_support import UploadLimitExceeded, copy_upload_limited, dir_size
+from .route_support import UI_EXCLUSIVE_TIMEOUT_SECONDS, UploadLimitExceeded, copy_upload_limited, dir_size
 from .storage import csv_import, ha_import, ha_statistics, hotbuffer, import_reports, symcon_import, vm_import
 from .storage.coordinator import StorageCoordinator
 from .storage.index import Index
@@ -1179,6 +1180,18 @@ class ImportService:
 
 
 
+    def _refuse_while_csv_job_runs(self) -> None:
+        """Ein laufender CSV-Import (oder Dry Run) liest die Datei ohne Sperre, bei mehreren Spalten sogar je
+        Spalte neu. Ersetzte oder löschte man sie währenddessen, käme die zweite Spalte aus der falschen Datei
+        oder der Import bräche halb fertig mit FileNotFoundError ab."""
+        with self._csv_progress.lock:
+            running = self._csv_progress.running
+        if running:
+            raise HTTPException(
+                status_code=409,
+                detail=tr("Ein CSV-Import oder eine Vorschau läuft gerade. Bitte warten, bis sie fertig ist."),
+            )
+
     def _csv_uploaded_path(self) -> Path | None:
         if not self.deps.csv_import_dir.exists():
             return None
@@ -1187,7 +1200,28 @@ class ImportService:
 
 
 
-    def _csv_import_context(self,
+    def _csv_import_context(self, *args, **kwargs) -> dict:
+        """Kontext des CSV-Bereichs. Eine gespeicherte Datei, die sich nicht lesen lässt, würde sonst jeden Aufruf
+        der Importseite mit 500 beantworten (auch für die Reiter Symcon, Home Assistant und VictoriaMetrics),
+        und gelöscht werden könnte sie nur auf dieser Seite. Windows-1252-Dateien (deutsches Excel) werden vorher
+        auf UTF-8 umgeschrieben; was trotzdem nicht lesbar ist, wird entfernt und mit einem Hinweis gemeldet."""
+        path = self._csv_uploaded_path()
+        if path is not None:
+            try:
+                csv_import.ensure_utf8(path)
+                return self._csv_import_context_unchecked(*args, **kwargs)
+            except (csv.Error, UnicodeError) as exc:
+                logger.warning("CSV-Quelldatei nicht lesbar, wird entfernt · fehler=%s", exc)
+                shutil.rmtree(self.deps.csv_import_dir, ignore_errors=True)
+                return {
+                    **self._csv_import_context_unchecked(),
+                    "csv_error": tr(
+                        "Die CSV-Datei lässt sich nicht lesen ({reason}). Sie wurde entfernt.", reason=str(exc)[:120]
+                    ),
+                }
+        return self._csv_import_context_unchecked(*args, **kwargs)
+
+    def _csv_import_context_unchecked(self,
         delimiter: str | None = None,
         has_header: bool | None = None,
         ts_col: int | None = None,
@@ -2413,6 +2447,7 @@ class ImportService:
             eigene XHR-Fortschrittsanzeige wie beim (potenziell riesigen) Symcon-ZIP."""
             if not file.filename or not file.filename.lower().endswith(".csv"):
                 raise HTTPException(status_code=400, detail=tr("Bitte eine CSV-Datei hochladen"))
+            self._refuse_while_csv_job_runs()
             staging = self.deps.data_dir / "_csv_upload"
             try:
                 await run_in_threadpool(
@@ -2420,8 +2455,16 @@ class ImportService:
                 )
             except UploadLimitExceeded as exc:
                 raise HTTPException(status_code=413, detail=str(exc)) from exc
+            try:
+                # Windows-1252 (deutsches Excel) und UTF-16 werden schon hier auf UTF-8 umgeschrieben; alle Leser
+                # öffnen die gespeicherte Datei als UTF-8.
+                await run_in_threadpool(csv_import.ensure_utf8, staging)
+            except Exception:
+                staging.unlink(missing_ok=True)
+                raise
             def install_staging() -> None:
-                with self.deps.coordinator.exclusive():
+                with self.deps.coordinator.exclusive(timeout=UI_EXCLUSIVE_TIMEOUT_SECONDS):
+                    self._refuse_while_csv_job_runs()
                     if self.deps.csv_import_dir.exists():
                         shutil.rmtree(self.deps.csv_import_dir)
                     self.deps.csv_import_dir.mkdir(parents=True, exist_ok=True)
@@ -2445,7 +2488,9 @@ class ImportService:
 
         @router.post("/import/csv/delete", response_class=HTMLResponse)
         def import_csv_delete(request: Request) -> HTMLResponse:
-            with self.deps.coordinator.exclusive():
+            self._refuse_while_csv_job_runs()
+            with self.deps.coordinator.exclusive(timeout=UI_EXCLUSIVE_TIMEOUT_SECONDS):
+                self._refuse_while_csv_job_runs()
                 if self.deps.csv_import_dir.exists():
                     shutil.rmtree(self.deps.csv_import_dir)
             notices_mod.forget_import_leftovers()

@@ -194,12 +194,18 @@ def delete_backup(backups_dir: Path, filename: str) -> bool:
     return True
 
 
-def delete_all_backups(backups_dir: Path) -> int:
+def delete_all_backups(backups_dir: Path, protected: set[str] | None = None) -> int:
     """Löscht alle vorhandenen Backup-ZIPs (nicht Rollbacks/Ausführungsverlauf,
-    siehe delete_restore_rollback()); gibt die Anzahl gelöschter Dateien zurück."""
+    siehe delete_restore_rollback()); gibt die Anzahl gelöschter Dateien zurück.
+
+    protected: Dateinamen, die stehen bleiben (noch nicht auf das externe Ziel übertragene Backups, wie bei
+    prune_backups()). Ist das Ziel ausgefallen, gäbe es diese Sicherungen sonst nirgends mehr."""
     if not backups_dir.exists():
         return 0
-    files = [p for p in backups_dir.glob("zeitarchiv-backup-*.zip") if p.is_file()]
+    files = [
+        p for p in backups_dir.glob("zeitarchiv-backup-*.zip")
+        if p.is_file() and p.name not in (protected or ())
+    ]
     for path in files:
         path.unlink()
     return len(files)

@@ -165,7 +165,7 @@ def test_open_maps_http_errors_with_status_and_detail(monkeypatch) -> None:
     def raise_http(request, timeout):
         raise urllib.error.HTTPError(request.full_url, 422, "x", {}, io.BytesIO(b"too many points"))
 
-    monkeypatch.setattr(vm_import.urllib.request, "urlopen", raise_http)
+    monkeypatch.setattr(vm_import._OPENER, "open", raise_http)
     request = vm_import._request("http://vm:8428", "/api/v1/query", None, None)
     with pytest.raises(vm_import.VmApiError) as exc:
         vm_import._open(request)
@@ -176,7 +176,7 @@ def test_open_maps_network_errors(monkeypatch) -> None:
     def raise_url(request, timeout):
         raise urllib.error.URLError("No route to host")
 
-    monkeypatch.setattr(vm_import.urllib.request, "urlopen", raise_url)
+    monkeypatch.setattr(vm_import._OPENER, "open", raise_url)
     with pytest.raises(vm_import.VmApiError) as exc:
         vm_import._open(vm_import._request("http://vm:8428", "/health", None, None))
     assert "No route to host" in str(exc.value)
@@ -187,3 +187,45 @@ def test_request_adds_basic_auth_only_when_given() -> None:
     assert plain.get_header("Authorization") is None
     authed = vm_import._request("http://vm:8428", "/health", None, ("user", "pw"))
     assert authed.get_header("Authorization") == "Basic dXNlcjpwdw=="
+
+
+def test_a_redirect_is_not_followed_and_never_carries_the_credentials_along() -> None:
+    """urllib schickt den Authorization-Header bei einer Weiterleitung auch an den neuen Host mit; die Zugangsdaten
+    gehören nur zur eingegebenen Adresse."""
+    import http.server
+    import threading
+
+    received: list[dict] = []
+
+    class Target(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            received.append(dict(self.headers))
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+        def log_message(self, *args):
+            pass
+
+    target = http.server.HTTPServer(("127.0.0.1", 0), Target)
+
+    class Redirector(Target):
+        def do_GET(self):  # noqa: N802
+            self.send_response(302)
+            self.send_header("Location", f"http://127.0.0.1:{target.server_port}/stolen")
+            self.end_headers()
+
+    redirector = http.server.HTTPServer(("127.0.0.1", 0), Redirector)
+    threads = [threading.Thread(target=server.serve_forever, daemon=True) for server in (target, redirector)]
+    for thread in threads:
+        thread.start()
+    try:
+        request = vm_import._request(f"http://127.0.0.1:{redirector.server_port}", "/health", None, ("user", "pw"))
+        with pytest.raises(vm_import.VmApiError) as exc:
+            vm_import._open(request)
+        assert "302" in str(exc.value)
+        assert received == []
+    finally:
+        for server in (target, redirector):
+            server.shutdown()
+            server.server_close()

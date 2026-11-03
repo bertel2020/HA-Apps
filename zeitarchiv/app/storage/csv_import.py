@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from ..i18n import N_, tr
 
+import codecs
 import csv
 import math
 import re
@@ -24,6 +25,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from ..limits import MAX_IMPORT_ROWS_PER_ENTITY
+from .atomic import write_file_atomically
 
 TIMESTAMP_FORMATS = {
     "unix_s": N_("Unix-Zeitstempel (Sekunden)"),
@@ -60,6 +62,49 @@ class CsvPreview:
     sample_rows: list[list[str]] = field(default_factory=list)
     column_count: int = 0
     total_lines: int = 0
+
+
+_ENCODING_BLOCK = 1024 * 1024
+
+
+def _detect_encoding(path: Path) -> str:
+    """Kodierung einer CSV-Datei: UTF-16 (mit Kennung), UTF-8 oder sonst Windows-1252 — das "ANSI", das deutsches
+    Excel beim Speichern als CSV schreibt (ä, ö, ü, ß als Einzelbytes)."""
+    with path.open("rb") as handle:
+        head = handle.read(4)
+        if head.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+            return "utf-16"
+        handle.seek(0)
+        decoder = codecs.getincrementaldecoder("utf-8-sig")()
+        try:
+            while block := handle.read(_ENCODING_BLOCK):
+                decoder.decode(block)
+            decoder.decode(b"", final=True)
+        except UnicodeDecodeError:
+            return "cp1252"
+    return "utf-8-sig"
+
+
+def ensure_utf8(path: Path) -> str | None:
+    """Stellt sicher, dass die Datei UTF-8 ist, und schreibt sie sonst um (atomar, in Blöcken).
+
+    Alle Leser dieses Moduls öffnen die Datei als UTF-8. Eine CSV aus deutschem Excel (Windows-1252) warf dort
+    beim ersten Lesen einen UnicodeDecodeError — beim Hochladen mit 500, danach bei jedem Aufruf der Importseite,
+    weil die Datei gespeichert blieb. Liefert den Namen der erkannten Kodierung, wenn umgewandelt wurde (sonst
+    None). Ein nicht darstellbares Byte (in Windows-1252 gibt es fünf unbelegte) wird zu U+FFFD."""
+    encoding = _detect_encoding(path)
+    if encoding == "utf-8-sig":
+        return None
+
+    def convert(target: Path) -> None:
+        with path.open("r", encoding=encoding, errors="replace", newline="") as source, target.open(
+            "w", encoding="utf-8", newline=""
+        ) as destination:
+            while block := source.read(_ENCODING_BLOCK):
+                destination.write(block)
+
+    write_file_atomically(path, convert)
+    return encoding
 
 
 def sniff_delimiter(path: Path) -> str:
@@ -164,7 +209,7 @@ def _parse_value(raw: str) -> float | None:
     return _BOOL_VALUES.get(raw.lower())
 
 
-def _parse_timestamp(raw: str, ts_format: str, custom_pattern: str, tz: ZoneInfo) -> float | None:
+def _parse_timestamp(raw: str, ts_format: str, custom_pattern: str, tz: ZoneInfo, fold: int = 0) -> float | None:
     raw = raw.strip()
     if not raw:
         return None
@@ -191,7 +236,8 @@ def _parse_timestamp(raw: str, ts_format: str, custom_pattern: str, tz: ZoneInfo
         except ValueError:
             return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=tz)
+        # fold=1: die zweite Ausprägung einer Uhrzeit, die beim Zurückstellen der Uhr zweimal vorkommt.
+        dt = dt.replace(tzinfo=tz, fold=fold)
     return dt.timestamp()
 
 
@@ -353,6 +399,7 @@ def parse_rows(
     result = ParseResult()
     max_col = max(ts_col, value_col)
     gelesen = 0
+    previous_ts: float | None = None
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         reader = csv.reader(f, delimiter=delimiter)
         if has_header:
@@ -366,6 +413,15 @@ def parse_rows(
                 _note_skipped(result, reader.line_num, "columns", ",".join(line))
                 continue
             ts = _parse_timestamp(line[ts_col], ts_format, custom_pattern, tz)
+            if ts is not None and previous_ts is not None and 0 <= previous_ts - ts < 3600:
+                # Die Uhrzeit ging um bis zu eine Stunde zurück: In der Nacht der Umstellung auf Winterzeit steht
+                # die Stunde 02:00–02:59 zweimal in der Datei, ohne Zone. Beide Ausprägungen hätten sonst denselben
+                # Zeitstempel (die zweite Stunde ginge als Duplikat verloren).
+                again = _parse_timestamp(line[ts_col], ts_format, custom_pattern, tz, fold=1)
+                if again is not None and again > previous_ts:
+                    ts = again
+            if ts is not None:
+                previous_ts = ts
             value = (
                 _parse_value(line[value_col]) if state_mapper is None or ts is None
                 else state_mapper(line[value_col], ts)

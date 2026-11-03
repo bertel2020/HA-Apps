@@ -78,6 +78,7 @@ from .formatting import (
 )
 from .limits import (
     MAX_CSV_UPLOAD_BYTES,
+    MAX_SETTINGS_UPLOAD_BYTES,
     MAX_UI_ANALYSIS_ROWS,
     MAX_ZIP_MEMBERS,
     MAX_ZIP_UNCOMPRESSED_BYTES,
@@ -170,6 +171,7 @@ from .route_support import (
     MAX_FORM_FIELDS,
     UI_EXCLUSIVE_TIMEOUT_SECONDS,
     UploadLimitExceeded,
+    UploadSizeLimitMiddleware,
     copy_upload_limited,
     dir_size,
     storage_locked,
@@ -528,6 +530,15 @@ class _CachedStaticFiles(StaticFiles):
         return response
 
 
+# Zuerst eingehängt, damit sie innen sitzt: Die Anfrage-Protokollierung sieht dann auch die abgewiesenen Uploads.
+app.add_middleware(
+    UploadSizeLimitMiddleware,
+    limits={
+        "/import/upload": MAX_ZIP_UPLOAD_BYTES,
+        "/import/settings-upload": MAX_SETTINGS_UPLOAD_BYTES,
+        "/import/csv/upload": MAX_CSV_UPLOAD_BYTES,
+    },
+)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=500)  # bislang kein Content-Encoding irgendwo
@@ -2179,9 +2190,23 @@ def backup_delete_all(request: Request) -> HTMLResponse:
     """Löscht alle vorhandenen Backup-ZIPs nach UI-Bestätigung (nicht den
     Ausführungsverlauf oder Restore-Rollbacks, die bleiben eigenständig über
     ihre jeweiligen Löschaktionen steuerbar)."""
+    # Noch nicht auf das externe Ziel übertragene Backups bleiben liegen: Ist das Ziel ausgefallen, gäbe es sie
+    # sonst nirgends mehr (dieselbe Regel wie beim automatischen Aufräumen).
+    protected = _background._unsent_backup_names() if backup_external.load_config(index).enabled else set()
     with storage_coordinator.exclusive(timeout=UI_EXCLUSIVE_TIMEOUT_SECONDS):
-        count = backup.delete_all_backups(BACKUPS_DIR)
-    message = tr("{count} Backup(s) gelöscht.", count=count) if count else tr("Keine Backups zum Löschen vorhanden.")
+        count = backup.delete_all_backups(BACKUPS_DIR, protected)
+        kept = len([name for name in protected if (BACKUPS_DIR / name).is_file()])
+    if count and kept:
+        message = tr(
+            "{count} Backup(s) gelöscht, {kept} noch nicht auf das externe Ziel übertragene bleiben liegen.",
+            count=count, kept=kept,
+        )
+    elif count:
+        message = tr("{count} Backup(s) gelöscht.", count=count)
+    elif kept:
+        message = tr("{kept} Backup(s) sind noch nicht auf das externe Ziel übertragen und bleiben liegen.", kept=kept)
+    else:
+        message = tr("Keine Backups zum Löschen vorhanden.")
     return templates.TemplateResponse(request, "_settings_backup_ready.html", _backup_context(message=message))
 
 

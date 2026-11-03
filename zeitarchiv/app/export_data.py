@@ -229,8 +229,18 @@ def parse_format(
     return CsvFormat(layout, SEPARATORS[sep], DECIMALS[decimal], bom, time == "split", unix)
 
 
+#: Anfangszeichen, bei denen Excel & Co. eine Zelle als Formel auswerten (CSV-Injection).
+_FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
+
+
 def _cell(text: str, fmt: CsvFormat) -> str:
-    """Text für CSV maskiert (Trennzeichen, Anführungszeichen, Zeilenumbruch)."""
+    """Text für CSV maskiert (Trennzeichen, Anführungszeichen, Zeilenumbruch).
+
+    Beginnt der Text mit einem Zeichen, das eine Tabellenkalkulation als Formel liest (= + - @), steht ein ' davor.
+    Entitätsnamen, Einheiten und Zustandstexte kommen aus Home Assistant; ein Gerät mit dem Namen
+    ``=HYPERLINK(…)`` würde sonst beim Öffnen der Datei ausgeführt. Zahlen laufen nicht über diese Funktion."""
+    if text.startswith(_FORMULA_STARTS):
+        text = "'" + text
     if any(c in text for c in (fmt.sep, '"', "\r", "\n")):
         return '"' + text.replace('"', '""') + '"'
     return text
