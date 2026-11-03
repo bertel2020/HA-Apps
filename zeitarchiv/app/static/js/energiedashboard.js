@@ -1525,8 +1525,8 @@
             formatter: (p) => {
               if (p.dataType !== 'edge') {
                 const node = nodeByName[p.name];
-                const label = labelFor(p.name);
-                const head = `${label}: ${fmt(p.value)} kWh${nodeShareSuffix(p.name, p.value)}`;
+                const label = escapeHtml(labelFor(p.name));
+                const head = `${label}: ${fmt(p.value)} kWh${escapeHtml(nodeShareSuffix(p.name, p.value))}`;
                 if (node && node.anomaly) {
                   return `${head}<br/>`
                     + `<span style="color:${palette.warning}">`
@@ -1535,8 +1535,8 @@
                 }
                 return head;
               }
-              return `${labelFor(p.data.source)} → ${labelFor(p.data.target)}: `
-                + `${fmt(p.data.value)} kWh${shareSuffix(p.data.source, p.data.target, p.data.value)}`;
+              return `${escapeHtml(labelFor(p.data.source))} → ${escapeHtml(labelFor(p.data.target))}: `
+                + `${fmt(p.data.value)} kWh${escapeHtml(shareSuffix(p.data.source, p.data.target, p.data.value))}`;
             },
           },
           series: [{
@@ -1615,7 +1615,7 @@
         shareChartInstance.setOption({
           tooltip: {
             trigger: 'item',
-            formatter: (p) => `${p.marker}${p.name}: <strong>${fmt(p.value)} kWh</strong> (${this.fmt(p.percent, 0)} %)`,
+            formatter: (p) => `${p.marker}${escapeHtml(p.name)}: <strong>${fmt(p.value)} kWh</strong> (${this.fmt(p.percent, 0)} %)`,
           },
           series: [{
             type: 'pie',
@@ -1676,7 +1676,7 @@
         versorgungChartInstance.setOption({
           tooltip: {
             trigger: 'item',
-            formatter: (p) => `${p.marker}${p.name}: <strong>${fmt(p.value)} kWh</strong> (${this.fmt(p.percent, 0)} %)`,
+            formatter: (p) => `${p.marker}${escapeHtml(p.name)}: <strong>${fmt(p.value)} kWh</strong> (${this.fmt(p.percent, 0)} %)`,
           },
           series: [{
             type: 'pie',

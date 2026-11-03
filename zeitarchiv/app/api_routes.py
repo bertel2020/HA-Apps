@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field, model_validator
 
 from . import ai_settings, ha_integration, selection_jobs
@@ -411,7 +411,11 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         komplett fehlender Token an diesem einen Endpunkt gilt als Healthcheck,
         kein echtes Auth-Problem."""
         expected = f"Bearer {deps.api_token()}"
-        if authorization is None or not secrets.compare_digest(authorization, expected):
+        # Als Bytes vergleichen: compare_digest() wirft bei str mit Nicht-ASCII-Zeichen einen TypeError, und den
+        # Header kann auf dem öffentlichen Port jeder Client frei wählen (500 statt 401, ohne Auth-Fehlerzähler).
+        if authorization is None or not secrets.compare_digest(
+            authorization.encode("utf-8", "surrogatepass"), expected.encode("utf-8", "surrogatepass")
+        ):
             if not (missing_token_is_healthcheck and authorization is None):
                 state.connection_stats["auth_failures"] += 1
                 state.connection_stats["last_auth_failure_ts"] = time.time()
@@ -499,15 +503,18 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             "selection_rev": selection_jobs.rev(deps.data_dir),
         }
 
-    @router.post("/api/write")
-    def write(
-        payload: WriteRequest,
+    def require_write_auth(
         request: Request,
         authorization: str | None = Header(default=None),
         x_zeitarchiv_integration_version: str | None = Header(default=None),
-    ) -> dict:
+    ) -> None:
+        check_auth(authorization, getattr(request.state, "request_id", "-"), x_zeitarchiv_integration_version)
+
+    # Der Token wird als Abhängigkeit geprüft: FastAPI führt sie vor der Schema-Validierung des Bodys aus. Ein
+    # Client ohne gültigen Token bekommt so 401 statt einer 422 mit den Feldern des Schemas.
+    @router.post("/api/write", dependencies=[Depends(require_write_auth)])
+    def write(payload: WriteRequest, request: Request) -> dict:
         request_id = getattr(request.state, "request_id", "-")
-        check_auth(authorization, request_id, x_zeitarchiv_integration_version)
         state.connection_stats["write_requests_ok"] += 1
         now = time.time()
         captured_now = False

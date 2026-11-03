@@ -318,7 +318,7 @@ def create_card_router(
         x_zeitarchiv_integration_version: str | None = Header(default=None),
     ) -> dict:
         """Gespeicherte Charts für die Auswahl im Karten-Editor."""
-        check_auth(authorization, request.headers.get("x-request-id", "-"), x_zeitarchiv_integration_version)
+        check_auth(authorization, getattr(request.state, "request_id", "-"), x_zeitarchiv_integration_version)
         types = aggregation_types()
         items = []
         for chart in index.list_saved_charts():
@@ -352,7 +352,7 @@ def create_card_router(
         Kacheln nur für Charts ohne festen Zeitraum.
         ``period``: überschreibt den gespeicherten Zeitraum des Charts (Schlüssel wie bei
         ``/api/card/series``), auch einen festen."""
-        check_auth(authorization, request.headers.get("x-request-id", "-"), x_zeitarchiv_integration_version)
+        check_auth(authorization, getattr(request.state, "request_id", "-"), x_zeitarchiv_integration_version)
         chart = index.get_saved_chart(id)
         if chart is None:
             raise HTTPException(status_code=404, detail=tr("Chart nicht gefunden"))
@@ -372,7 +372,7 @@ def create_card_router(
         x_zeitarchiv_integration_version: str | None = Header(default=None),
     ) -> dict:
         """Aufbau und fertige Abfrage einer gespeicherten Vergleichstabelle."""
-        check_auth(authorization, request.headers.get("x-request-id", "-"), x_zeitarchiv_integration_version)
+        check_auth(authorization, getattr(request.state, "request_id", "-"), x_zeitarchiv_integration_version)
         table = index.get_saved_table(id)
         if table is None:
             raise HTTPException(status_code=404, detail=tr("Tabelle nicht gefunden"))
@@ -400,7 +400,7 @@ def create_card_router(
         x_zeitarchiv_integration_version: str | None = Header(default=None),
     ) -> dict:
         """Archivierte Entitäten, die die Karte ohne gespeichertes Chart zeigen kann."""
-        check_auth(authorization, request.headers.get("x-request-id", "-"), x_zeitarchiv_integration_version)
+        check_auth(authorization, getattr(request.state, "request_id", "-"), x_zeitarchiv_integration_version)
         entities = [
             {"entity_id": row["entity_id"], "aggregation_type": row["aggregation_type"]}
             for row in index.list_entities()
@@ -416,7 +416,7 @@ def create_card_router(
         x_zeitarchiv_integration_version: str | None = Header(default=None),
     ) -> dict:
         """Kurze Reihe einer Entität für die Sparkline unter einer Kachelkarte."""
-        check_auth(authorization, request.headers.get("x-request-id", "-"), x_zeitarchiv_integration_version)
+        check_auth(authorization, getattr(request.state, "request_id", "-"), x_zeitarchiv_integration_version)
         try:
             validate_entity_id(entity_id)
         except ValueError as err:
@@ -461,7 +461,7 @@ def create_card_router(
         x_zeitarchiv_integration_version: str | None = Header(default=None),
     ) -> dict:
         """Einstellungen und Daten für frei gewählte Entitäten (die Karte ohne gespeichertes Chart)."""
-        check_auth(authorization, request.headers.get("x-request-id", "-"), x_zeitarchiv_integration_version)
+        check_auth(authorization, getattr(request.state, "request_id", "-"), x_zeitarchiv_integration_version)
         ids = list(dict.fromkeys(item.strip() for item in entity_ids.split(",") if item.strip()))
         if not ids or len(ids) > MAX_SERIES_ENTITIES:
             raise HTTPException(

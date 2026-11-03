@@ -1572,7 +1572,7 @@ function selectBrush() {
                 const times = params.map(p => fmtTooltipTimestamp(p.data[2], tooltipBucketSeconds));
                 const sameTime = times.every(t => t === times[0]);
                 const row = p => {
-                  const val = UNIT ? `${fmtValue(p.value[1])} ${UNIT}` : fmtValue(p.value[1]);
+                  const val = UNIT ? `${fmtValue(p.value[1])} ${escapeHtml(UNIT)}` : fmtValue(p.value[1]);
                   return `<span style="display:flex;align-items:center;gap:5px;">${p.marker}<strong>${val}</strong></span>`;
                 };
                 if (sameTime) {
@@ -1581,7 +1581,7 @@ function selectBrush() {
                 }
                 return params.map((p, i) =>
                   `<div style="display:flex;align-items:center;gap:5px;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);margin-bottom:2px;">${p.marker}${times[i]}</div>`
-                  + `<strong style="display:block;margin-bottom:4px;">${UNIT ? `${fmtValue(p.value[1])} ${UNIT}` : fmtValue(p.value[1])}</strong>`
+                  + `<strong style="display:block;margin-bottom:4px;">${UNIT ? `${fmtValue(p.value[1])} ${escapeHtml(UNIT)}` : fmtValue(p.value[1])}</strong>`
                 ).join('');
               },
               // appendToBody: die Karte hat overflow:hidden (verhindert, dass die

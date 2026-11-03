@@ -2341,11 +2341,11 @@
                 const row = (p, withStamp) => {
                   const [, , , , , , absValue, absUnit, absDecimals] = p.data;
                   const extra = absValue != null
-                    ? ` <span style="color:${faint};">(${fmtNum(absValue, absDecimals)}${absUnit ? ' ' + absUnit : ''})</span>`
+                    ? ` <span style="color:${faint};">(${fmtNum(absValue, absDecimals)}${absUnit ? ' ' + escapeHtml(absUnit) : ''})</span>`
                     : '';
                   return `<div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:4px;">`
-                       + `<span>${p.marker}${p.seriesName}</span>`
-                       + `<span style="margin-left:8px;text-align:right;"><strong>${formatPointValue(p.data)}${extra}</strong>`
+                       + `<span>${p.marker}${escapeHtml(p.seriesName)}</span>`
+                       + `<span style="margin-left:8px;text-align:right;"><strong>${escapeHtml(formatPointValue(p.data))}${extra}</strong>`
                        + `${TooltipHold.note(p, faint, withStamp ? ms => fmtTooltipTimestamp(ms, tooltipBucketSeconds) : null)}</span></div>`;
                 };
                 if (sameTime) {
@@ -2445,7 +2445,7 @@
                 const fmtTime = ms => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
                 const span = `${fmtTime(startMs)}–${fmtTime(endMs)} · <strong>${NumberFormat.fmtDuration((endMs - startMs) / 1000)}</strong>`;
                 const s = this.series[catIndex];
-                if (!s || s.aggregation_type !== 'state') return `${categories[catIndex]}<br>${span}`;
+                if (!s || s.aggregation_type !== 'state') return `${escapeHtml(categories[catIndex])}<br>${span}`;
                 if (partsIndex >= 0) {
                   const stamp = ms => new Date(ms).toLocaleString(LOCALE, {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
                   return StateEntities.condensedTooltip(timelineParts[partsIndex], startMs, endMs, s.states, stamp, escapeHtml(categories[catIndex]));
@@ -2454,7 +2454,7 @@
                 const name = StateEntities.label(s.states, idx);
                 const raw = StateEntities.raw(s.states, idx);
                 const rawPart = raw && raw !== name ? ` <span style="opacity:.6">${escapeHtml(raw)}</span>` : '';
-                return `${categories[catIndex]}<br><strong>${escapeHtml(name)}</strong>${rawPart}<br>${span}`;
+                return `${escapeHtml(categories[catIndex])}<br><strong>${escapeHtml(name)}</strong>${rawPart}<br>${span}`;
               },
               appendToBody: true,
             },
@@ -2773,7 +2773,7 @@
                     const value = typeof p.value === 'object' ? p.value.value : p.value;
                     const partial = p.seriesName === String(my.years[0].year) && m === my.cutMonth
                       ? ` (${t('bis {cut}', {cut: my.cutLabel})})` : '';
-                    return `${p.marker}${p.seriesName}: <strong>${format(value)}</strong>${partial}`;
+                    return `${p.marker}${escapeHtml(p.seriesName)}: <strong>${escapeHtml(format(value))}</strong>${partial}`;
                   });
                 const reference = my.currentReference ? my.currentReference[m] : null;
                 const delta = this.multiYearDelta(my.years[0].monthly[m], reference);
@@ -2957,8 +2957,8 @@
               trigger: 'item',
               formatter: p => {
                 const s = this.series[p.dataIndex];
-                const unit = s.unit ? ` ${s.unit}` : '';
-                return `${p.marker} ${p.name}: <strong>${fmtNum(p.value, this.effectiveDecimals(s))}${unit}</strong> (${fmtNum(p.percent, 1)} %)`;
+                const unitHtml = s.unit ? ` ${escapeHtml(s.unit)}` : '';
+                return `${p.marker} ${escapeHtml(p.name)}: <strong>${fmtNum(p.value, this.effectiveDecimals(s))}${unitHtml}</strong> (${fmtNum(p.percent, 1)} %)`;
               },
               appendToBody: true,
             },

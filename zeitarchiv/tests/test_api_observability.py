@@ -91,13 +91,17 @@ def _write_endpoint(state: ApiState, result: str = "written"):
         ),
         state,
     )
-    raw = next(route.endpoint for route in router.routes if route.path == "/api/write")
-    # x_zeitarchiv_integration_version fehlt beim Direktaufruf (kein
-    # FastAPI-Request-Parsing hier) sonst als unaufgelöstes
-    # Header(default=None)-Sentinel statt echtem None — siehe _FakeIndex.
-    return lambda payload, request, authorization: raw(
-        payload, request, authorization, x_zeitarchiv_integration_version=None,
-    )
+    route = next(route for route in router.routes if route.path == "/api/write")
+    # Der Token wird als Route-Abhängigkeit geprüft (vor der Validierung des Bodys). FastAPI führt sie vor dem
+    # Endpunkt aus; hier ersetzt der Direktaufruf genau diese Reihenfolge. x_zeitarchiv_integration_version
+    # fehlt sonst als unaufgelöstes Header(default=None)-Sentinel statt echtem None — siehe _FakeIndex.
+    authenticate = route.dependencies[0].dependency
+
+    def call(payload, request, authorization):
+        authenticate(request, authorization, x_zeitarchiv_integration_version=None)
+        return route.endpoint(payload, request)
+
+    return call
 
 
 def _health_endpoint(state: ApiState):
