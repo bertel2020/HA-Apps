@@ -95,6 +95,13 @@
     ];
   }
 
+  // Zusatz in Klammern („(ab 10 min)“) klein und gedämpft hinter dem Namen: hält die erste Spalte schmal.
+  function metricLabelHtml(label) {
+    const i = label.indexOf(' (');
+    if (i < 0) return escapeHtml(label);
+    return `${escapeHtml(label.slice(0, i))} <small class="wt-qual">${escapeHtml(label.slice(i + 1))}</small>`;
+  }
+
   function whenText(metric, summary, col) {
     if (!metric.when || !summary) return '';
     const ts = summary[metric.field + '_ts'];
@@ -168,7 +175,7 @@
     for (const row of data.rows.filter((r) => inGroup(r.key, group))) {
       html += `<tr class="wt-grp"><th colspan="${1 + cols.length * span}">${escapeHtml(row.label)}</th></tr>`;
       for (const metric of metricsFor(row, data)) {
-        html += `<tr><th scope="row">${escapeHtml(metric.label)}</th>`;
+        html += `<tr><th scope="row">${metricLabelHtml(metric.label)}</th>`;
         for (const col of cols) {
           const cell = row.cells[col.key] || {};
           const decimals = metric.decimals != null ? metric.decimals : (row.decimals != null ? row.decimals : 1);
