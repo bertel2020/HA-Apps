@@ -3551,7 +3551,8 @@
     "Diesen Import-Report wirklich löschen?": "Really delete this import report?",
     "Die Anfrage ist fehlgeschlagen. Bitte versuche es noch einmal.": "The request failed. Please try again.",
     "Die Antwort blieb aus. Ob die Wiederherstellung durchgeführt wurde, ist unklar: Prüfe vor einem neuen Versuch auf der Backup-Seite die Liste der Rollbacks.": "No answer came back. It is unclear whether the restore was carried out: Before trying again, check the list of rollbacks on the backup page.",
-    "Erneut versuchen": "Try again"
+    "Erneut versuchen": "Try again",
+    "Ungültiger Zahlenwert in der Anfrage.": "Invalid number in the request."
   },
   "js": {
     "Ladestand": "State of charge",

@@ -234,6 +234,21 @@
   Dashboard-Kacheln und in den Einstellungen ergänzt; die Warnfarbe im
   Energiedashboard folgt dem Theme.
 
+- **Robustere Eingaben und Beenden**: Eine ungültige Entitäts-ID oder ein
+  kaputter Zahlenwert in der Tabellenansicht ergibt jetzt eine Fehlermeldung
+  statt eines Serverfehlers. Beim Beenden gilt der Speicher nur dann als sauber
+  beendet, wenn alle Hintergrundaufgaben wirklich gestoppt sind; sonst wird beim
+  nächsten Start geprüft.
+
+- **Zahlen an Zeitgrenzen**: Ein Messwert genau auf der Grenze zweier Zeiträume
+  zählt nur noch zum späteren. Tageswerte der Home-Assistant-Statistik landen
+  an Tagen der Zeitumstellung am richtigen Tag.
+
+- **Energiedashboard, Langzeit**: Verbraucher erscheinen mit dem Namen aus Home
+  Assistant statt mit der Entitäts-ID.
+
+- **Container**: Das Basis-Image ist auf einen festen Stand gepinnt.
+
 ---
 
 ### English
@@ -460,6 +475,20 @@
 - **Texts**: Missing translations in the report, the Home Assistant import, the
   dashboard tiles and the settings were added; the warning colour in the energy
   dashboard follows the theme.
+
+- **More robust input and shutdown**: An invalid entity ID or a broken number in
+  the table view now gives an error message instead of a server error. On
+  shutdown the storage only counts as cleanly closed if all background tasks
+  have really stopped; otherwise it is checked on the next start.
+
+- **Numbers at time boundaries**: A value exactly on the boundary between two
+  periods now counts only for the later one. Daily values of the Home Assistant
+  statistics land on the right day on days with a clock change.
+
+- **Energy dashboard, long-term**: Consumers appear with their Home Assistant
+  name instead of the entity ID.
+
+- **Container**: The base image is pinned to a fixed version.
 
 ## 1.13.0 - 2026-11-01
 

@@ -1360,8 +1360,13 @@ class BackgroundService:
         if self._storage_reconcile_thread is not None:
             self._storage_reconcile_thread.join(timeout=5)
         # Ein abgebrochener Hintergrundabgleich gilt vorsichtshalber nicht als
-        # sauberer Shutdown; dann wird beim nächsten Start synchron geprüft.
-        if self.requires_synchronous_reconciliation or self._storage_reconcile_completed:
+        # sauberer Shutdown; dann wird beim nächsten Start synchron geprüft. Das gilt ebenso, wenn ein Thread
+        # nach dem join() mit Zeitgrenze noch läuft: er kann mitten in einer Schreibarbeit stecken.
+        threads_stopped = not any(
+            thread is not None and thread.is_alive()
+            for thread in (self._maintenance_scheduler_thread, self._storage_reconcile_thread)
+        )
+        if threads_stopped and (self.requires_synchronous_reconciliation or self._storage_reconcile_completed):
             self.index.set_setting("storage_clean_shutdown", "1")
 
     def lock_status_rows(self) -> list[dict]:

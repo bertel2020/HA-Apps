@@ -20,6 +20,11 @@ def _resolve_safely(path: Path) -> Path:
         raise ValueError(tr("Unsicherer oder nicht auflösbarer Speicherpfad: {path}", path=path)) from err
 
 
+class InvalidEntityIdError(ValueError):
+    """Eigene Unterklasse, damit die Web-Schicht eine fremde ID als 400 beantworten kann
+    (jedes ValueError zentral abzufangen würde auch interne Fehler als Eingabefehler tarnen)."""
+
+
 def validate_entity_id(entity_id: str) -> str:
     """Validiert das Home-Assistant-Format und schließt Pfadbestandteile aus."""
     if (
@@ -27,7 +32,7 @@ def validate_entity_id(entity_id: str) -> str:
         or len(entity_id) > ENTITY_ID_MAX_LENGTH
         or _ENTITY_ID_RE.fullmatch(entity_id) is None
     ):
-        raise ValueError(tr("Ungültige Home-Assistant-Entitäts-ID: {entity_id!r}", entity_id=entity_id))
+        raise InvalidEntityIdError(tr("Ungültige Home-Assistant-Entitäts-ID: {entity_id!r}", entity_id=entity_id))
     return entity_id
 
 

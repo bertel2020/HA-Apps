@@ -234,6 +234,16 @@ def _has_state(entry: dict) -> bool:
     return isinstance(state, (int, float)) and math.isfinite(state)
 
 
+def _bucket_end_ts(entry: dict, start_ts: float, period: str) -> float:
+    """Ende des Buckets: das "end" der Antwort, sonst Beginn + Periodenlänge. Ein Tages-Bucket an einem
+    Zeitumstellungstag dauert 23 oder 25 Stunden; mit pauschal 86 400 s landete der Zählerstand am
+    23-Stunden-Tag eine Stunde im Folgetag."""
+    end = _bucket_ts({"start": entry.get("end")})
+    if end is not None and start_ts < end <= start_ts + 90_000:
+        return end
+    return start_ts + PERIOD_SECONDS.get(period, PERIOD_SECONDS[DEFAULT_PERIOD])
+
+
 def _bucket_ts(entry: dict) -> float | None:
     """"start" ist in aktuellen HA-Versionen ein Unix-Zeitstempel in
     Millisekunden (int/float); ältere WS-API-Antworten lieferten dafür eine
@@ -329,7 +339,7 @@ def fetch_statistics_rows(
             # ein echter Messpunkt und bleibt trotzdem im richtigen Bucket.
             state_stamped = _has_state(entry)
             if state_stamped:
-                ts += PERIOD_SECONDS.get(period, PERIOD_SECONDS[DEFAULT_PERIOD]) - 1
+                ts = _bucket_end_ts(entry, ts, period) - 1
             if ts in seen_timestamps:
                 result.discarded.append({
                     "reason": tr("Statistik-Zeitstempel ist doppelt"),

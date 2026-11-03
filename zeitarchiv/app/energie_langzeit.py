@@ -30,6 +30,7 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, Field
 
 from . import data_quality, period_columns
+from .formatting import entity_display_name
 from .i18n import N_, tr
 from .storage import query as query_mod
 from .storage import rollup as rollup_mod
@@ -232,6 +233,16 @@ def balance(parts: dict[str, float | None]) -> float | None:
 
 
 class EnergieLangzeitService:
+    def _consumer_name(self, consumer: dict) -> str:
+        """Eigener Name, sonst Friendly-Name der Entität, die rohe ID nur als letzter Ausweg."""
+        given = (consumer.get("name") or "").strip()
+        if given:
+            return given
+        entity = self.index.get_entity(consumer["entity_id"])
+        if entity is None:
+            return consumer["entity_id"]
+        return entity_display_name(consumer["entity_id"], entity["friendly_name"], entity["custom_name"])
+
     def __init__(
         self, data_dir: Path, index: Index, tz: ZoneInfo,
         entity_series: Callable[..., tuple[dict[float, float], bool]] | None = None,
@@ -762,7 +773,7 @@ class EnergieLangzeitService:
             if values["cur"] is None and values["vj"] is None:
                 continue
             items.append({
-                "name": consumer.get("name") or consumer["entity_id"], "entity_id": consumer["entity_id"],
+                "name": self._consumer_name(consumer), "entity_id": consumer["entity_id"],
                 "cur": values["cur"], "vj": values["vj"],
             })
         total: dict[str, float | None] = {}

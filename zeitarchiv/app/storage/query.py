@@ -251,7 +251,7 @@ def _read_hot_rows_filtered(
     read_cache: QueryReadCache | None = None,
 ) -> list[tuple[float, float]]:
     rows = _hot_rows(hot_path(data_dir, entity_id, anchor_ts, tz), read_cache)
-    in_range = sorted((ts, v) for ts, v in rows if start_ts <= ts <= end_ts)
+    in_range = sorted((ts, v) for ts, v in rows if start_ts <= ts < end_ts)
     deleted_counts = index.get_deleted_counts(entity_id, start_ts, end_ts)
     return filter_deleted_occurrences(in_range, deleted_counts)
 

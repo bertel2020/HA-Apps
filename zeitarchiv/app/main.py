@@ -136,7 +136,7 @@ from .storage.index import (
 )
 from .storage.ingestion import IngestionService
 from .storage.coordinator import CoordinatorBusy, StorageCoordinator
-from .storage.paths import ENTITY_ID_MAX_LENGTH, ENTITY_ID_PATTERN, validate_entity_id
+from .storage.paths import ENTITY_ID_MAX_LENGTH, ENTITY_ID_PATTERN, InvalidEntityIdError, validate_entity_id
 from .timezone_config import load_timezone
 from .version import APP_VERSION
 from . import ai_settings_routes, api_routes, entity_category_routes, ha_integration, selection_routes
@@ -828,6 +828,12 @@ async def _invalid_name_handler(
     zu langen Namen. Die Editoren zeigen "detail" unverändert an."""
     status = 409 if isinstance(exc, DuplicateNameError) else 400
     return JSONResponse(status_code=status, content={"detail": str(exc)})
+
+
+@app.exception_handler(InvalidEntityIdError)
+async def _invalid_entity_id_handler(_request: Request, exc: InvalidEntityIdError) -> JSONResponse:
+    """Eine ungültige Entitäts-ID aus Pfad oder Formular ist ein Eingabefehler (400), kein Serverfehler."""
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 @app.exception_handler(IndexBusy)
@@ -5283,9 +5289,12 @@ def entity_rows(
 def _rows_form_common(form) -> tuple[str, str, int, int, int, str]:
     filter_ = str(form.get("filter", "all"))
     range_key = str(form.get("range", "day"))
-    offset = int(form.get("offset", 0))
-    page = int(form.get("page", 1))
-    page_size = int(form.get("page_size", 20))
+    try:
+        offset = int(form.get("offset", 0))
+        page = int(form.get("page", 1))
+        page_size = int(form.get("page_size", 20))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Zahlenwert in der Anfrage.")) from None
     mode = str(form.get("mode", "cleanup"))
     return filter_, range_key, offset, page, page_size, mode
 
