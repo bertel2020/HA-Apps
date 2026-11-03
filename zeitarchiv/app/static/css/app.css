@@ -2410,7 +2410,7 @@ button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
 .wt-controls > .hint{order:10;flex:1 1 100%;margin:2px 0 0;}
 /* Vergleichstabelle: Rahmen und Scroll-Hinweis aus .tbl-wrap (app.css), Kopf wie table.dt. */
 .wt-table-wrap{margin-top:10px;}
-.wt-table-full{width:100%;}
+.wt-table.wt-table-full{width:100%;}
 .wt-table td .wt-sub{display:block;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);}
 .wt-table .wt-kt-days{width:1%;}
 .wt-table{border-collapse:separate;border-spacing:0;width:auto;font-variant-numeric:tabular-nums;font-size:calc(13.5px * var(--font-scale, 1));}
