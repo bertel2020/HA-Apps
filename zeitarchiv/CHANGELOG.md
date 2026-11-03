@@ -249,6 +249,12 @@
 
 - **Container**: Das Basis-Image ist auf einen festen Stand gepinnt.
 
+- **Min/Max im laufenden Monat**: Tiefst- und Höchstwerte des laufenden Monats
+  (zum Beispiel für Frosttage) stammen jetzt aus den echten Extremwerten statt
+  aus den Mittelwerten der Fenster, wie es bei abgeschlossenen Monaten schon
+  gilt.
+  - Gilt für neue Daten; bestehende Rollups werden nicht neu aufgebaut
+
 ---
 
 ### English
@@ -489,6 +495,11 @@
   name instead of the entity ID.
 
 - **Container**: The base image is pinned to a fixed version.
+
+- **Min/max in the running month**: Lowest and highest values of the running
+  month (for example for frost days) now come from the real extremes instead of
+  the window means, as is already the case for completed months.
+  - Applies to new data; existing rollups are not rebuilt
 
 ## 1.13.0 - 2026-11-01
 

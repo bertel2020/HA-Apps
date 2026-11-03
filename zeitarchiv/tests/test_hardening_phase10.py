@@ -88,14 +88,20 @@ def test_an_implausible_end_field_is_ignored(monkeypatch) -> None:
 
 
 def test_a_point_on_the_window_end_belongs_to_the_next_window(tmp_path) -> None:
-    from app.storage import query
+    from app.storage import hotbuffer, query
+    from app.storage.index import Index
 
-    rows = [(100.0, 1.0), (200.0, 2.0), (300.0, 3.0)]
-    source = (ADDON / "app" / "storage" / "query.py").read_text(encoding="utf-8")
-    assert "if start_ts <= ts < end_ts)" in source and "ts <= end_ts" not in source
-    # Gleiche Auswahl wie die Löschzählung (index.get_deleted_counts: ts >= start AND ts < end).
-    assert [r for r in rows if 100.0 <= r[0] < 300.0] == rows[:2]
-    assert hasattr(query, "_read_hot_rows_filtered")
+    tz = ZoneInfo("Europe/Berlin")
+    start = datetime(2024, 7, 1, tzinfo=tz).timestamp()
+    end = datetime(2024, 7, 2, tzinfo=tz).timestamp()
+    index = Index(tmp_path / "index.sqlite")
+    try:
+        hot = hotbuffer.hot_path(tmp_path, "sensor.x", start, tz)
+        hotbuffer.write_records(hot, [(start, 1.0, "a", None, None), (end - 1, 2.0, "b", None, None), (end, 3.0, "c", None, None)])
+        rows = query._read_hot_rows_filtered(tmp_path, "sensor.x", index, start, start, end, tz)
+        assert [value for _ts, value in rows] == [1.0, 2.0]  # der Punkt genau auf dem Ende gehört zum nächsten Fenster
+    finally:
+        index.close()
 
 
 # ---------------------------------------------------------------- C14: "sauber beendet" nur ohne laufende Threads
@@ -173,3 +179,22 @@ def test_the_longterm_consumer_name_prefers_the_friendly_name_over_the_entity_id
     assert name({"entity_id": "sensor.wp", "name": " Heizung "}) == "Heizung"
     assert name({"entity_id": "sensor.x"}) == "sensor.x"
     assert name({"entity_id": "sensor.unbekannt"}) == "sensor.unbekannt"
+
+
+# ---------------------------------------------------------------- Phase 11: Reste aus Phase 3 und 9
+
+
+def test_the_selection_routes_do_not_log_a_client_supplied_request_id() -> None:
+    """Wie die Karten-Routen: die Anfrage-ID kommt aus der Middleware, nicht aus dem Kopf des Clients."""
+    for name in ("selection_routes.py", "card_routes.py"):
+        source = (ADDON / "app" / name).read_text(encoding="utf-8")
+        assert "x-request-id" not in source.lower(), name
+    assert (ADDON / "app" / "selection_routes.py").read_text(encoding="utf-8").count('getattr(request.state, "request_id", "-")') == 3
+
+
+def test_a_slow_answer_cannot_overwrite_the_entity_tiles_of_a_newer_request() -> None:
+    script = (ADDON / "app" / "static" / "js" / "dashboard-tiles.js").read_text(encoding="utf-8")
+    body = script.split("async function loadEntityGroup(tiles) {", 1)[1].split("// ---- Darstellung", 1)[0]
+    assert "const seqs = new Map(tiles.map(el => [el, nextRenderSeq(el)]));" in body
+    assert "el.dataset.renderSeq === seqs.get(el)" in body
+    assert body.index("nextRenderSeq(el)") < body.index("await fetch(")

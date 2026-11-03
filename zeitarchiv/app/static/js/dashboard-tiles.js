@@ -593,6 +593,9 @@
   async function loadEntityGroup(tiles) {
     const base = document.getElementById('dashboard-grid')?.dataset.appRoot || '';
     const erste = tiles[0];
+    // Laufnummer je Kachel wie bei renderTile(): ein Stichtagswechsel startet eine neue Abfrage, die ältere
+    // Antwort darf die neuere nicht mehr überschreiben.
+    const seqs = new Map(tiles.map(el => [el, nextRenderSeq(el)]));
     const params = new URLSearchParams({
       range: erste.dataset.range || 'day',
       continuous: erste.dataset.continuous === 'true' ? 'true' : 'false',
@@ -625,7 +628,7 @@
       const fenster = stichtag() ? stichtagWindowText(daten.window_start, daten.window_end) : null;
       stueck.forEach(el => {
         const serie = nachId.get(el.dataset.entityId);
-        if (serie) applyEntityTile(el, serie, fenster);
+        if (serie && el.dataset.renderSeq === seqs.get(el)) applyEntityTile(el, serie, fenster);
       });
     }
   }

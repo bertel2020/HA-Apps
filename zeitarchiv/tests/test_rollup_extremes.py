@@ -107,3 +107,52 @@ def test_rotating_a_month_with_resolution_windows_keeps_the_real_frost() -> None
             assert min(row.value for row in hours) == 0.5  # das Mittel bleibt, was es war
         finally:
             index.close()
+
+
+# ---- Der laufende Monat (Phase 11): dieselben Extremwerte wie nach dem Monatsabschluss ----
+
+
+def _live_month_setup(data_dir: Path, index) -> str:
+    entity_id = "sensor.aussen_live"
+    index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+    hot = hotbuffer.hot_path(data_dir, entity_id, _ts(7, 5, 12), TZ)
+    hotbuffer.write_records(hot, [
+        (_ts(7, 1, 5, 30), 0.5, "a", -1.0, 2.0),    # aufgelöstes Fenster: Mittel +0,5, echter Tiefstwert −1
+        (_ts(7, 1, 6, 0), 1.0, "b", 0.0, 2.5),
+        (_ts(7, 3, 12, 0), 21.0, None, None, None),  # roher Wert ohne Extremwerte
+    ])
+    return entity_id
+
+
+def test_the_running_month_shows_the_real_extremes_of_resolved_windows() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        data_dir = Path(directory)
+        index = Index(data_dir / "index.sqlite")
+        try:
+            entity_id = _live_month_setup(data_dir, index)
+            now = datetime(2024, 7, 5, 12, tzinfo=TZ)
+            row = query._month_live_row(
+                data_dir, index, entity_id, "standard", datetime(2024, 7, 1, tzinfo=TZ), datetime(2024, 8, 1, tzinfo=TZ),
+                now, TZ,
+            )
+            assert (row.min_value, row.max_value) == (-1.0, 21.0)
+            assert row.value == pytest.approx((0.5 + 1.0 + 21.0) / 3)  # das Mittel bleibt, was es war
+        finally:
+            index.close()
+
+
+def test_the_extremes_of_resolved_windows_survive_the_hot_row_filter_and_the_read_cache() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        data_dir = Path(directory)
+        index = Index(data_dir / "index.sqlite")
+        try:
+            entity_id = _live_month_setup(data_dir, index)
+            args = (data_dir, entity_id, index, _ts(7, 5, 12), _ts(7, 1, 0), _ts(7, 6, 0), TZ)
+            plain = query._read_hot_rows_filtered(*args)
+            assert plain[0] == (_ts(7, 1, 5, 30), 0.5)  # ohne Wunsch bleibt es bei (ts, value)
+            for cache in (None, query.QueryReadCache()):
+                full = query._read_hot_rows_filtered(*args, read_cache=cache, extremes=True)
+                assert full[0] == (_ts(7, 1, 5, 30), 0.5, -1.0, 2.0)
+                assert full[-1] == (_ts(7, 3, 12), 21.0, None, None)
+        finally:
+            index.close()

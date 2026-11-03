@@ -83,7 +83,7 @@ def create_catalog_router(
         x_zeitarchiv_entry_id: str | None = Header(default=None),
     ) -> dict:
         """Nimmt den Entitäten-Katalog der Integration an und ersetzt den vorigen."""
-        check_auth(authorization, request.headers.get("x-request-id", "-"), x_zeitarchiv_integration_version)
+        check_auth(authorization, getattr(request.state, "request_id", "-"), x_zeitarchiv_integration_version)
         phase1 = "log" in body.model_fields_set or "ledger_count" in body.model_fields_set
         phase2 = "patterns" in body.model_fields_set and body.patterns is not None
         count = selection_catalog.save(
@@ -101,7 +101,7 @@ def create_catalog_router(
         x_zeitarchiv_entry_id: str | None = Header(default=None),
     ) -> dict:
         """Offene Aufträge für die Integration, nur für den Besitzer des Katalogs."""
-        check_auth(authorization, request.headers.get("x-request-id", "-"), x_zeitarchiv_integration_version)
+        check_auth(authorization, getattr(request.state, "request_id", "-"), x_zeitarchiv_integration_version)
         requester = _requester(x_zeitarchiv_entry_id)
         if requester is _INVALID:
             return {"jobs": []}
@@ -117,7 +117,7 @@ def create_catalog_router(
     ) -> dict:
         """Quittung je Auftrag. Unbekannte oder abgelaufene Aufträge: ``{"ok": false}``
         mit Status 200, damit die Integration ohne Sonderfall weitermacht."""
-        check_auth(authorization, request.headers.get("x-request-id", "-"), x_zeitarchiv_integration_version)
+        check_auth(authorization, getattr(request.state, "request_id", "-"), x_zeitarchiv_integration_version)
         requester = _requester(x_zeitarchiv_entry_id)
         ok = requester is not _INVALID and selection_jobs.ack(
             data_dir, body.job_id, body.status, body.results, body.message,

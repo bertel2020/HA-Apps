@@ -27,7 +27,7 @@ from zoneinfo import ZoneInfo
 import pyarrow.parquet as pq
 
 from . import cleanup, rollup
-from .hotbuffer import hot_path, read_rows
+from .hotbuffer import hot_path, iter_records, read_rows
 from .index import STATE_TYPE, STATE_UNAVAILABLE_INDEX, Index, filter_deleted_occurrences
 from .paths import entity_dir
 from ..limits import MAX_COMPARE_YEARS, MAX_RAW_QUERY_POINTS
@@ -75,6 +75,7 @@ class QueryReadCache:
 
     def __init__(self) -> None:
         self._hot_rows: dict[Path, list[tuple[float, float]]] = {}
+        self._hot_rows_extremes: dict[Path, list[tuple[float, float, float | None, float | None]]] = {}
         # Schlüssel (entity_id, level) statt Pfad: rollup_path() geht über
         # entity_dir(), und das ruft für jeden Pfad Path.resolve() auf
         # (Symlink-Schutz) — ein realpath-Syscall. Bei einer Vergleichstabelle
@@ -98,6 +99,11 @@ class QueryReadCache:
             self._hot_rows[path] = read_rows(path)
         return self._hot_rows[path]
 
+    def read_hot_rows_with_extremes(self, path: Path) -> list[tuple[float, float, float | None, float | None]]:
+        if path not in self._hot_rows_extremes:
+            self._hot_rows_extremes[path] = _read_rows_with_extremes(path)
+        return self._hot_rows_extremes[path]
+
     def read_rollup_rows(self, data_dir: Path, entity_id: str, level: str) -> list[rollup.FineRow]:
         """Liefert eine grobe Rollup-Stufe VOLLSTÄNDIG und liest sie je Request
         höchstens einmal.
@@ -118,7 +124,15 @@ class QueryReadCache:
         return self._rollup_rows[key]
 
 
-def _hot_rows(path: Path, read_cache: QueryReadCache | None) -> list[tuple[float, float]]:
+def _read_rows_with_extremes(path: Path) -> list[tuple[float, float, float | None, float | None]]:
+    """(ts, value, min_value, max_value): die Zeilen aufgelöster Fenster tragen den echten kleinsten und größten
+    Rohwert, rohe Zeilen None (dann gilt der Wert selbst)."""
+    return [(ts, value, low, high) for ts, value, _event_id, low, high in iter_records(path)]
+
+
+def _hot_rows(path: Path, read_cache: QueryReadCache | None, extremes: bool = False) -> list[tuple]:
+    if extremes:
+        return read_cache.read_hot_rows_with_extremes(path) if read_cache is not None else _read_rows_with_extremes(path)
     return read_cache.read_hot_rows(path) if read_cache is not None else read_rows(path)
 
 
@@ -248,10 +262,12 @@ def _window(
 
 def _read_hot_rows_filtered(
     data_dir: Path, entity_id: str, index: Index, anchor_ts: float, start_ts: float, end_ts: float, tz: ZoneInfo,
-    read_cache: QueryReadCache | None = None,
-) -> list[tuple[float, float]]:
-    rows = _hot_rows(hot_path(data_dir, entity_id, anchor_ts, tz), read_cache)
-    in_range = sorted((ts, v) for ts, v in rows if start_ts <= ts < end_ts)
+    read_cache: QueryReadCache | None = None, extremes: bool = False,
+) -> list[tuple]:
+    """extremes=True liefert (ts, value, min_value, max_value) für die Min/Max-Rechnung der Standard-Entitäten:
+    ohne die Extremwerte wurde im laufenden Monat "Min/Max der Mittelwerte" gerechnet (ein kurzer Frost ginge verloren)."""
+    rows = _hot_rows(hot_path(data_dir, entity_id, anchor_ts, tz), read_cache, extremes)
+    in_range = sorted((row for row in rows if start_ts <= row[0] < end_ts), key=lambda row: (row[0], row[1]))
     deleted_counts = index.get_deleted_counts(entity_id, start_ts, end_ts)
     return filter_deleted_occurrences(in_range, deleted_counts)
 
@@ -672,7 +688,7 @@ def _query_completed_plus_live_fine(
     if live_start < window_end:
         rows = _read_hot_rows_filtered(
             data_dir, entity_id, index, now_local.timestamp(), live_start.timestamp(), window_end.timestamp(), tz,
-            read_cache,
+            read_cache, extremes=aggregation_type == "standard",
         )
         boundary = (
             _boundary_value(data_dir, entity_id, live_start.timestamp(), tz, read_cache)
@@ -924,7 +940,7 @@ def _month_live_row(
 ) -> rollup.FineRow | None:
     rows = _read_hot_rows_filtered(
         data_dir, entity_id, index, now_local.timestamp(), month_start.timestamp(), window_end.timestamp(), tz,
-        read_cache,
+        read_cache, extremes=aggregation_type == "standard",
     )
     if not rows:
         return None
