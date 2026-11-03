@@ -135,8 +135,8 @@ liegen im Datenordner der App und bleiben bei einem Update erhalten:
 3. Die [Integration](https://github.com/bertel2020/HA-Zeitarchiv) in HACS
    ebenfalls aktualisieren und Home Assistant neu starten.
 
-Das Add-on **nicht deinstallieren und neu installieren**: Beim Deinstallieren
-löscht Home Assistant den Datenordner der App.
+**Das Add-on nicht deinstallieren und neu installieren: Beim Deinstallieren
+löscht Home Assistant den Datenordner der App.**
 
 ### 2. API-Token kopieren
 

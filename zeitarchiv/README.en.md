@@ -129,8 +129,8 @@ app's data folder and is kept across updates:
 3. Also update the [integration](https://github.com/bertel2020/HA-Zeitarchiv)
    in HACS and restart Home Assistant.
 
-Do **not uninstall and reinstall** the add-on: uninstalling makes Home
-Assistant delete the app's data folder.
+**Do not uninstall and reinstall the add-on: uninstalling makes Home
+Assistant delete the app's data folder.**
 
 ### 2. Copy the API token
 
