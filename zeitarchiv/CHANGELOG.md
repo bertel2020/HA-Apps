@@ -4,6 +4,9 @@
 
 ### Neu
 
+- **Energiedashboard, Datumsauswahl**: Ein Klick auf das Datum im Energiefluss öffnet den
+  Kalender. Je nach Zeitraum springt er zu einem Tag, Monat oder Jahr.
+
 - **Wetterdashboard**: Eine neue Seite für Wetterwerte, aufgebaut wie das
   Energiedashboard.
   - Außentemperatur, Niederschlag, Luftfeuchte, Luftdruck, Wind, Böe und
@@ -140,11 +143,43 @@
   abgeschlossen oder neu berechnet werden, behalten die echten Extremwerte;
   bestehende Auswertungen bleiben unverändert.
 
+- **CSV-Import, Dateien aus Excel**: Eine CSV im „ANSI“-Format (Windows-1252,
+  ä/ö/ü als Einzelzeichen) oder als „Unicode-Text“ (UTF-16) ließ den Upload mit
+  Fehler 500 scheitern, und danach war die ganze Importseite nicht mehr
+  erreichbar. Solche Dateien werden jetzt beim Hochladen umgewandelt; eine
+  Datei, die sich gar nicht lesen lässt, wird mit einem Hinweis entfernt.
+
+- **CSV-Import, Umstellung und Duplikate**: Die doppelte Stunde beim Wechsel auf
+  Winterzeit bekommt jetzt eigene Zeitstempel (vorher fiel sie auf dieselbe
+  Zeit), und überlappende Dateien schreiben dieselben Punkte nicht mehr doppelt
+  ins Archiv (sie zählen als Duplikate). Upload und Löschen der Datei werden
+  abgelehnt, solange ein Import oder eine Vorschau läuft.
+
+- **Selektiver Restore, Abbruch**: Scheitert ein Wiederherstellen von Entitäten
+  nach dem Schreiben der Datenbank, bleiben Dateien und Datenbank auf dem alten
+  Stand. Die Symcon-Namen werden erst als letzter Schritt ersetzt.
+
+- **Importberichte der VictoriaMetrics-Importe** erscheinen in der Liste und
+  lassen sich öffnen und löschen (vorher unsichtbar).
+
+- **CSV-Export, Formeln**: Texte aus Home Assistant, die mit =, +, - oder @
+  beginnen, bekommen ein Hochkomma davor, damit Excel sie nicht als Formel
+  ausführt.
+
+- **Uploads und Zugangsdaten**: Zu große Dateien werden sofort abgelehnt, statt
+  erst den Speicherplatz zu füllen. Der VictoriaMetrics-Import folgt keiner
+  Weiterleitung mehr und sendet die Zugangsdaten nur an die eingegebene Adresse.
+  „Alle Backups löschen“ lässt Backups stehen, die noch nicht auf das externe
+  Ziel übertragen sind.
+
 ---
 
 ### English
 
 #### New
+
+- **Energy dashboard, date picker**: Clicking the date in the energy flow opens the
+  calendar. Depending on the period it jumps to a day, month or year.
 
 - **Weather dashboard**: A new page for weather values, built like the energy
   dashboard.
@@ -277,6 +312,35 @@
   calculated only from the means of the time windows (a short frost was no
   longer visible in the hourly mean). Months that are closed or recalculated
   from now on keep the true extremes; existing analyses stay unchanged.
+
+- **CSV import, files from Excel**: A CSV in "ANSI" format (Windows-1252, ä/ö/ü
+  as single characters) or as "Unicode text" (UTF-16) made the upload fail with
+  error 500, and afterwards the whole import page was unreachable. Such files
+  are now converted on upload; a file that cannot be read at all is removed
+  with a notice.
+
+- **CSV import, clock change and duplicates**: The repeated hour when the clock
+  goes back to standard time now gets its own timestamps (before, it fell on
+  the same time), and overlapping files no longer write the same points twice
+  into the archive (they count as duplicates). Uploading and deleting the file
+  are refused while an import or a preview is running.
+
+- **Selective restore, abort**: If restoring entities fails after the database
+  was written, files and database stay in the old state. The Symcon names are
+  replaced as the very last step.
+
+- **Import reports of VictoriaMetrics imports** show up in the list and can be
+  opened and deleted (before, they were invisible).
+
+- **CSV export, formulas**: Texts from Home Assistant that start with =, +, -
+  or @ get an apostrophe in front so that Excel does not execute them as a
+  formula.
+
+- **Uploads and credentials**: Files that are too large are refused right away
+  instead of filling the disk first. The VictoriaMetrics import no longer
+  follows redirects and sends the credentials only to the address entered.
+  "Delete all backups" leaves backups that have not yet been transferred to the
+  external target.
 
 ## 1.13.0 - 2026-11-01
 

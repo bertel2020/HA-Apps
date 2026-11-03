@@ -314,6 +314,7 @@
       compareLabel: '',
       quality: {plausible: true, checks: []},
       periodText: '',
+      windowStart: null,  // Beginn des angezeigten Zeitraums (Sekunden), Ausgangspunkt des Kalender-Sprungs
       hasFlow: false,
       // Farblegende unter dem Sankey. Wird in renderChart() aus DERSELBEN
       // palette/colorForNode-Quelle gefüllt wie die Knoten selbst — eine
@@ -476,6 +477,25 @@
         if (key === this.range && this.offset === 0) return;
         this.range = key;
         this.offset = 0;
+        syncUrlWithPeriod(this.range, this.offset);
+        this.load();
+      },
+      // Rückruf des Kalenders (calendarPicker(..., onJump)): Datum JJJJ-MM-TT in
+      // einen Versatz zum angezeigten Zeitraum umrechnen. Je nach Zeitraum zählt
+      // nur Jahr, Jahr+Monat oder der Tag; bei „Stunde“ bleibt die Uhrzeit.
+      jumpTo(dateStr) {
+        if (this.windowStart == null) return;
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const cur = window.ServerTime.parts(this.windowStart);
+        let delta;
+        if (this.range === 'year') delta = y - cur.year;
+        else if (this.range === 'month') delta = (y - cur.year) * 12 + (m - cur.month);
+        else {
+          const days = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(cur.year, cur.month - 1, cur.day)) / 86400000);
+          delta = this.range === 'hour' ? days * 24 : days;
+        }
+        if (delta === 0) return;
+        this.offset = Math.min(0, this.offset + delta);
         syncUrlWithPeriod(this.range, this.offset);
         this.load();
       },
@@ -1034,6 +1054,7 @@
           this.compareLabel = data.compare_label || '';
           this.quality = data.quality;
           this.periodText = periodLabel(data);
+          this.windowStart = data.window_start_ts;
           this.hasFlow = data.nodes.some(n => n.role !== 'bus' && n.value > 0);
           this.verbraucherBreakdown = data.verbraucher_breakdown || [];
           this.versorgungBreakdown = data.versorgung_breakdown || [];

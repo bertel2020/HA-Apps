@@ -394,7 +394,10 @@
         </div>
         <div class="edash-period-nav">
           <button type="button" @click="goBack()" title="{{ _('Vorherige Periode') }}">&#8249;</button>
-          <span class="edash-period-nav-label" x-text="periodText"></span>
+          <span class="cal-wrap" x-data='calendarPicker(null, {{ app_root | tojson }}, {{ calendar_first_date | tojson }}, {{ calendar_last_date | tojson }}, d => jumpTo(d))'>
+            <button type="button" class="edash-period-nav-label edash-period-nav-pick" @click="toggle()" title="{{ _('Zu einem bestimmten Tag springen') }}" x-text="periodText"></button>
+            {% include "_calendar_popover.html" %}
+          </span>
           <button type="button" @click="goForward()" :disabled="!canGoForward" title="{{ _('Nächste Periode') }}">&#8250;</button>
         </div>
         {# Energiebericht (ROADMAP.md 1.7): nur bei Monat/Jahr sinnvoll (siehe

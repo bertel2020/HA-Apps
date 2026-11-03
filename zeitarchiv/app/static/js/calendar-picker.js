@@ -22,12 +22,22 @@
 // springen" pro Seite unterschiedlich in Zustand übersetzt wird (cleanup.html:
 // ein Tage-Block-Offset, entity_detail.html: ein Perioden-Offset je nach
 // gewähltem Zeitraum).
-function calendarPicker(entityId, base, firstDate, lastDate) {
+function calendarPicker(entityId, base, firstDate, lastDate, onJump) {
   const MONTH_NAMES = [
     t('Januar'), t('Februar'), t('März'), t('April'), t('Mai'), t('Juni'),
     t('Juli'), t('August'), t('September'), t('Oktober'), t('November'), t('Dezember'),
   ];
   const pad2 = n => String(n).padStart(2, '0');
+  // Mit onJump (Energiedashboard) springt der Kalender über diesen Rückruf statt
+  // über das globale jumpToDate(), das dort schon der Stichtag-Leiste im Reiter
+  // „Langzeit“ gehört. Dann kommen range und windowStart auch aus dem
+  // Alpine-Zustand um den Kalender herum, nicht aus dem .page-Element.
+  const jump = dateStr => (onJump || jumpToDate)(dateStr);
+  const pageData = el => {
+    if (onJump) return Alpine.$data(el.parentElement);
+    const pageRoot = document.querySelector('.page');
+    return pageRoot ? Alpine.$data(pageRoot) : null;
+  };
   const parseYm = s => { const [y, m] = s.split('-').map(Number); return {y, m}; };
   const firstYm = firstDate ? parseYm(firstDate) : null;
   const lastYm = lastDate ? parseYm(lastDate) : null;
@@ -58,8 +68,7 @@ function calendarPicker(entityId, base, firstDate, lastDate) {
     // hat gar kein "range" (dort immer der volle Tage-Picker, siehe Fallback
     // 'day' unten).
     get pickerMode() {
-      const pageRoot = document.querySelector('.page');
-      const parentData = pageRoot ? Alpine.$data(pageRoot) : null;
+      const parentData = pageData(this.$el);
       const range = parentData ? parentData.range : null;
       if (range === 'month') return 'month';
       if (range === 'year') return 'year';
@@ -80,8 +89,7 @@ function calendarPicker(entityId, base, firstDate, lastDate) {
     // (z. B. vor dem ersten Laden), bleibt currentPeriodYm null und init()s
     // Fallback greift unverändert.
     get currentPeriodYm() {
-      const pageRoot = document.querySelector('.page');
-      const parentData = pageRoot ? Alpine.$data(pageRoot) : null;
+      const parentData = pageData(this.$el);
       const windowStart = parentData ? parentData.windowStart : null;
       if (windowStart == null) return null;
       const d = window.ServerTime.parts(windowStart);
@@ -192,7 +200,7 @@ function calendarPicker(entityId, base, firstDate, lastDate) {
     },
     pick(cell) {
       if (!cell || !cell.inRange || !cell.hasData) return;
-      jumpToDate(cell.dateStr);
+      jump(cell.dateStr);
       this.open = false;
     },
     // pickMonth/pickYear sind das Gegenstück zu pick() für die reduzierten
@@ -200,11 +208,11 @@ function calendarPicker(entityId, base, firstDate, lastDate) {
     // jumpToDate() liest je nach range() ohnehin nur Jahr bzw. Jahr+Monat aus
     // dem übergebenen Datum, der 1. reicht als Platzhalter.
     pickMonth() {
-      jumpToDate(`${this.year}-${pad2(this.month)}-01`);
+      jump(`${this.year}-${pad2(this.month)}-01`);
       this.open = false;
     },
     pickYear() {
-      jumpToDate(`${this.year}-01-01`);
+      jump(`${this.year}-01-01`);
       this.open = false;
     },
     onMonthChange(value) {
@@ -230,7 +238,7 @@ function calendarPicker(entityId, base, firstDate, lastDate) {
       const todayStr = `${y}-${pad2(m)}-${pad2(d)}`;
       const inRange = (!firstDate || todayStr >= firstDate) && (!lastDate || todayStr <= lastDate);
       if (inRange && (!entityId || this.dataDays.includes(d))) {
-        jumpToDate(todayStr);
+        jump(todayStr);
         this.open = false;
       }
       // Kein Datenpunkt heute: Kalender bleibt offen und zeigt zumindest

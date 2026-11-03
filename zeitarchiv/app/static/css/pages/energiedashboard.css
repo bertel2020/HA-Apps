@@ -151,8 +151,8 @@
   .edash-period-pills button{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));padding:5px 10px;border-radius:6px;border:0;background:transparent;color:var(--ink-faint);cursor:pointer;}
   .edash-period-pills button.is-active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:600;}
   .edash-period-nav{display:flex;align-items:center;gap:8px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
-  .edash-period-nav button{width:22px;height:22px;flex:none;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink-faint);cursor:pointer;line-height:1;}
-  .edash-period-nav button:disabled{opacity:.4;cursor:default;}
+  .edash-period-nav > button{width:22px;height:22px;flex:none;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink-faint);cursor:pointer;line-height:1;}
+  .edash-period-nav > button:disabled{opacity:.4;cursor:default;}
   /* Feste Breite für das Perioden-Label: "27.08.2026 · 14:00–15:00 Uhr"
      (Stunde) ist deutlich länger als "September 2026" (Monat) oder "2026"
      (Jahr) — ohne Mindestbreite verschob sich beim Umschalten die gesamte
@@ -160,6 +160,8 @@
      sichtbar hin und her, weil .edash-card-head sie per
      justify-content:space-between am rechten Rand verankert. */
   .edash-period-nav-label{min-width:210px;text-align:center;font-variant-numeric:tabular-nums;}
+  .edash-period-nav-pick{border:none;background:none;padding:2px 6px;border-radius:6px;font:inherit;color:inherit;cursor:pointer;}
+  .edash-period-nav-pick:hover{color:var(--ink);background:var(--surface-alt);}
   @media(max-width:560px){
     .edash-period-controls{flex:1 1 100%;justify-content:center;}
     /* Navigation auf eigener, zentrierter Zeile — der Zustand vor 0.87.0.
