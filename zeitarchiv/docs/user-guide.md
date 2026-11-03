@@ -697,6 +697,36 @@ bei Monat/Jahr stattdessen den nach Wochentag gemittelten Verbrauch (Mo–So)
 über den gewählten Zeitraum, sodass erkennbar wird, an welchen Wochentagen
 typischerweise mehr verbraucht wird.
 
+### Reiter „Langzeit“
+
+Unter Titel und Untertitel stehen zwei Reiter: **Übersicht** (der Energiefluss
+mit allen Karten, unverändert) und **Langzeit**. Der Reiter Langzeit
+vergleicht Zeiträume mit dem Vorjahr, im Aufbau wie die Vergleichstabelle des
+Wetterdashboards: Spaltengruppen **Letzter Monat**, **Dieser Monat** und
+**Dieses Jahr**, daneben jeweils das Vorjahr, darunter die Differenz zum Wert
+des Vorjahres. Die Zeilen sind Erzeugung, Einspeisung, Netzbezug und Verbrauch.
+Grün heißt günstig (mehr Erzeugung und Einspeisung, weniger Netzbezug und
+Verbrauch), rot ungünstig.
+
+- **Stichtag:** die Leiste „‹ Datum ›“ mit Kalender und „Heute“ oben in der
+  Karte zeigt die Zeiträume zu einem früheren Tag. Der Stichtag steht in der
+  Adresse (`?date=`) und gilt nur für diesen Reiter; die Übersicht hat ihre
+  eigene Zeitraum-Auswahl.
+- **Vorjahr:** „Bis jetzt“ vergleicht einen laufenden Zeitraum mit demselben
+  Stück des Vorjahres, „Komplett“ mit dem ganzen Vorjahreszeitraum; der letzte
+  Monat ist in beiden Fällen gleich. „Differenz anzeigen“ blendet die
+  Differenzzeile ein oder aus. Die Auswahl (Spalten, Vorjahr, Differenz) merkt
+  sich der Browser.
+- **Verbrauch** ist hier die Bilanz Erzeugung + Netzbezug + Speicherentladung −
+  Einspeisung − Speicherladung, dieselbe Rechnung wie in den Trends und im
+  Monatsverlauf des Berichts. „Dieses Jahr“ vergleicht kalendarisch (1.1. bis
+  zum Stichtag); die Kacheln der Übersicht vergleichen dagegen rollierend über
+  365 Tage, ihre Prozentwerte weichen deshalb ab.
+- **Fehlende Daten** sind kein 0: Liegt in einem Zeitraum kein Wert, steht dort
+  „–“, mit dem Beginn des Archivs als Hinweis, wenn er im Zeitraum liegt.
+- Summen ab 10.000 kWh erscheinen in MWh. Die Zähler müssen in kWh liefern,
+  wie in der Übersicht.
+
 ### Energiebericht
 
 Ein Symbol neben der Zeitraum-Navigation (nur bei Monat/Jahr aktiv) öffnet

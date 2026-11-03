@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_dashboard_period_nav.html" import assets as period_assets with context %}
 {% block title %}{{ _("Zeitarchiv — Energiedashboard") }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/energiedashboard.css') }}">
@@ -19,5 +20,8 @@
   <script src="{{ asset('js/group-picker.js') }}"></script>
   <script src="{{ asset('js/confirm-dialog.js') }}"></script>
   <script src="{{ asset('js/hint-toggle.js') }}"></script>
+  <script src="{{ asset('js/fixed-tooltip.js') }}"></script>
+  {{ period_assets() }}
   <script src="{{ asset('js/energiedashboard.js') }}"></script>
+  <script src="{{ asset('js/energie-langzeit.js') }}"></script>
 {% endblock %}

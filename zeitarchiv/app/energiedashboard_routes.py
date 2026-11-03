@@ -34,8 +34,10 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from . import energie_langzeit
 from . import energiedashboard_buckets as eb
 from . import formats
+from .chart_period import calendar_bounds
 from .formatting import entity_display_name
 from .limits import MAX_RAW_QUERY_POINTS
 from .progress import JobProgress
@@ -533,6 +535,7 @@ class EnergieDashboardDependencies:
 class EnergieDashboardService:
     def __init__(self, deps: EnergieDashboardDependencies) -> None:
         self.deps = deps
+        self.langzeit = energie_langzeit.EnergieLangzeitService(deps.data_dir, deps.index, deps.tz)
 
     def _entity_options(self) -> list[dict]:
         # "unit"/"aggregation_type" zusätzlich zu den bisherigen Feldern — die
@@ -3464,6 +3467,8 @@ class EnergieDashboardService:
             "configured": _is_configured(config),
             "enabled": _is_enabled(self.deps.index),
             "config": config,
+            # Erster und letzter Tag des Archivs für den Kalender der Stichtag-Leiste im Reiter „Langzeit“.
+            **calendar_bounds(self.deps.index.list_entities(), self.deps.tz),
             **self.deps.app_root_context(request),
         }
 
@@ -3732,6 +3737,7 @@ class EnergieDashboardService:
                 {
                     "configured": _is_configured(config),
                     "config": config,
+                    **calendar_bounds(deps.index.list_entities(), deps.tz),
                     **deps.app_root_context(request),
                 },
             )
@@ -3883,6 +3889,15 @@ class EnergieDashboardService:
             if not _is_configured(config):
                 raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
             return self.compute_trends(config)
+
+        @router.post("/energiedashboard/langzeit/table")
+        def energiedashboard_langzeit_table(body: energie_langzeit.TableRequest) -> dict:
+            # Reiter „Langzeit“: Vergleichstabelle Zeiträume gegen das Vorjahr, Rechnung in
+            # energie_langzeit.py (nur Zählersummen, kein compute_flow je Spalte).
+            config = _load_config(deps.index)
+            if not energie_langzeit.is_configured(config):
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
+            return self.langzeit.compute_table(config, body)
 
         @router.get("/energiedashboard/heatmap")
         def energiedashboard_heatmap(range: str = "week", offset: int = 0) -> dict:  # noqa: A002

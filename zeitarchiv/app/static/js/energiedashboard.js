@@ -302,6 +302,8 @@
   window.energieFlow = function energieFlow() {
     const initialPeriod = readInitialRangeOffset();
     return {
+      // Reiter „Übersicht“ (der Energiefluss) und „Langzeit“ (Vergleich mit dem Vorjahr, energie-langzeit.js).
+      tab: 'over',
       ranges: [{key: 'hour', label: t('Stunde')}, {key: 'day', label: t('Tag')}, {key: 'month', label: t('Monat')}, {key: 'year', label: t('Jahr')}],
       range: initialPeriod.range,
       offset: initialPeriod.offset,
@@ -365,6 +367,24 @@
       get grundlastShare() {
         const g = this.verbraucherBreakdown.find((v) => v.name === t('Grundlast'));
         return g ? g.share : null;
+      },
+
+      // Reiter wechseln. Die Diagramme der Übersicht ändern ihre Größe nicht, solange sie verborgen sind;
+      // nach der Rückkehr bekommen sie ein resize, falls das Fenster inzwischen anders war.
+      showTab(tab) {
+        this.tab = tab;
+        window.dispatchEvent(new CustomEvent('energie-tab', {detail: tab}));
+        if (tab === 'over') this.$nextTick(() => window.dispatchEvent(new Event('resize')));
+      },
+
+      tabKey(event) {
+        const keys = ['over', 'long'];
+        const step = {ArrowRight: 1, ArrowLeft: -1}[event.key];
+        if (!step) return;
+        const next = keys[(keys.indexOf(this.tab) + step + keys.length) % keys.length];
+        this.showTab(next);
+        this.$nextTick(() => document.getElementById('ed-tab-' + next)?.focus());
+        event.preventDefault();
       },
 
       init() {

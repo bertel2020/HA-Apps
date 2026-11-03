@@ -5,13 +5,6 @@
   .wt-setup-cta{border:1px dashed var(--border-strong);border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:12px;align-items:flex-start;}
   .wt-setup-cta p{margin:0;color:var(--ink-muted);max-width:60ch;}
 
-  /* Reiter */
-  /* Die Reiterzeile selbst kommt aus app.css (.entity-tabs); hier nur, was eine Schaltfläche statt eines Links braucht. */
-  button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
-  /* Karten wie im Energiedashboard (.edash-card): 12 px Rundung, 16×18 Innenabstand, leichter Schatten, Titel 14 px. */
-  .wt-card{padding:16px 18px;border-radius:12px;box-shadow:var(--shadow);}
-  .wt-card + .wt-card{margin-top:16px;}
-  .wt-h2{font-size:calc(14px * var(--font-scale, 1));font-weight:600;margin:0;flex:1 1 220px;}
   .wt-headline{font-size:calc(15px * var(--font-scale, 1));margin:8px 0 12px;color:var(--ink);}
   .wt-chart{width:100%;height:300px;}
   .wt-chart-tall{height:360px;}
@@ -34,14 +27,6 @@
   /* Kacheln: Aufbau wie die Kennzahl-Kacheln des Energiedashboards (Kopfbalken in der Rollenfarbe,
      Beschriftung in Großbuchstaben, Wert in Monospace); ganze Kachel verlinkt auf die Entität. */
   .wt-tiles{display:grid;grid-template-columns:repeat(var(--wt-cols, 4),minmax(0,1fr));gap:10px;}
-  .wt-card-head{justify-content:space-between;}
-  .wt-card-head .wt-h2{margin:0;}
-  .wt-h2-jump{cursor:pointer;}
-  .wt-h2-jump:hover{text-decoration:underline;}
-  .wt-card-sep{border-top:1px solid var(--border);margin:18px 0 12px;}
-  .wt-h3{margin:0;font-size:calc(14px * var(--font-scale, 1));font-weight:600;}
-  .wt-controls-end{margin-left:auto;}
-  .wt-stand{margin:0 0 10px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
   .wt-tile{--wt-accent:var(--chart-8);display:flex;flex-direction:column;gap:2px;min-width:0;padding:10px 12px;
     text-decoration:none;color:inherit;border:1px solid var(--border);border-top:3px solid var(--wt-accent);
     border-radius:8px;background:var(--surface-alt);}
@@ -57,51 +42,20 @@
   .wt-tile.is-loading{border-top-color:var(--border-strong);color:var(--ink-faint);animation:wt-pulse 1.2s ease-in-out infinite alternate;}
   @keyframes wt-pulse{from{opacity:.55;}to{opacity:1;}}
   @media (prefers-reduced-motion:reduce){.wt-tile.is-loading{animation:none;}}
-  .wt-table td.wt-loading{text-align:left;color:var(--ink-faint);padding:18px 12px;}
   .wt-tile-label{font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600;font-family:var(--font-mono);}
   .wt-tile-value{font-family:var(--font-mono);font-size:calc(22px * var(--font-scale, 1));font-weight:600;font-variant-numeric:tabular-nums;line-height:1.25;}
   .wt-tile-value small{font-size:calc(13px * var(--font-scale, 1));font-weight:500;color:var(--ink-muted);margin-left:3px;}
   .wt-tile-sub{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);font-variant-numeric:tabular-nums;}
 
-  /* Steuerung über der Tabelle */
-  .dd-picker-wrap > .btn.wt-btn-on{border-color:var(--accent-line);color:var(--accent-line);font-weight:600;}
-  .wt-controls{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-bottom:6px;}
   .wt-cols{display:flex;flex-wrap:wrap;gap:4px 14px;}
   .wt-check{display:inline-flex;align-items:center;gap:6px;font-size:calc(13.5px * var(--font-scale, 1));cursor:pointer;}
   .wt-seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
   .wt-seg button{background:var(--surface);border:0;padding:5px 12px;font:inherit;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);cursor:pointer;}
   .wt-seg button + button{border-left:1px solid var(--border);}
   .wt-seg button[aria-pressed="true"]{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
-  /* Hinweise (.hint) stehen direkt hinter der Überschrift, damit der Info-Knopf sie findet (hint-toggle.js);
-     in der umbrechenden Kopfzeile rutschen sie per order unter die Bedienelemente. */
-  .wt-controls > .hint{order:10;flex:1 1 100%;margin:2px 0 0;}
   .wt-hint{font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);background:var(--surface-alt);border-radius:8px;padding:8px 12px;margin:8px 0;}
   .wt-error{color:var(--danger);}
 
-  /* Vergleichstabelle: Rahmen und Scroll-Hinweis aus .tbl-wrap (app.css), Kopf wie table.dt. */
-  .wt-table-wrap{margin-top:10px;}
-  .wt-table{border-collapse:separate;border-spacing:0;width:auto;font-variant-numeric:tabular-nums;font-size:calc(13.5px * var(--font-scale, 1));}
-  .wt-table th,.wt-table td{padding:5px 10px;text-align:right;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;}
-  .wt-table thead th{font-weight:600;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);border-bottom:1.5px solid var(--border-strong);}
-  .wt-table thead th.wt-cur{padding-left:18px;cursor:help;}
-  .wt-table thead th.wt-vj{font-weight:400;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);cursor:help;}
-  .wt-table thead .wt-info{margin-left:4px;font-size:calc(10px * var(--font-scale, 1));font-weight:400;color:var(--ink-faint);vertical-align:1px;}
-  .wt-table thead tr.wt-subhead th{font-weight:400;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);padding-top:0;border-bottom:1.5px solid var(--border-strong);}
-  .wt-table thead tr.wt-subhead th.wt-vj{color:var(--ink-faint);}
-  .wt-table thead tr:first-child th{border-bottom:0;padding-bottom:1px;}
-  .wt-table td.wt-sep{padding-left:18px;}
-  .wt-table th:first-child,.wt-table td:first-child{min-width:96px;text-align:left;position:sticky;left:0;background:var(--surface);z-index:1;}
-  .wt-table tbody tr:last-child th,.wt-table tbody tr:last-child td{border-bottom:0;}
-  .wt-table tbody th{font-weight:400;color:var(--ink-muted);}
-  .wt-table .wt-sep{border-left:1px solid var(--border);}
-  .wt-table tr.wt-grp th{font-size:calc(11.5px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--accent-line);text-align:left;padding-top:12px;border-bottom:1px solid var(--border-strong);white-space:nowrap;}
-  .wt-table td .wt-v{font-weight:600;color:var(--ink);}
-  .wt-table td.wt-vj .wt-v{font-weight:400;color:var(--ink-muted);}
-  .wt-table td[data-tooltip-fixed]{cursor:help;}
-  .wt-table tbody td,.wt-table tbody th{vertical-align:top;}
-  .wt-yoy-popover .wt-yoy-toggle{margin-top:4px;border-top:1px solid var(--border);border-radius:0 0 6px 6px;}
-  .wt-table td .wt-when{display:block;line-height:1.25;font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:var(--ink-faint);}
-  .wt-table td .wt-dl{display:block;line-height:1.25;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));font-weight:400;color:var(--chart-1);}
   /* Mitteltemperatur je Monat und Jahr: eingefärbte Zellen (Farbe per color-mix im Inline-Stil), Jahres-Ø rechts abgesetzt */
   .wt-tm{border-collapse:separate;border-spacing:2px;width:100%;min-width:600px;font-size:calc(12px * var(--font-scale, 1));font-variant-numeric:tabular-nums;table-layout:fixed;}
   .wt-tm th{font-weight:400;color:var(--ink-muted);text-align:center;padding:2px 0;}
@@ -129,9 +83,6 @@
   .wt-kk-sommer{background:var(--chart-7);}
   .wt-kk-heiss{background:var(--chart-5);}
   .wt-kk-chart{height:170px;}
-  .wt-foot{margin:6px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
-  .wt-table td.wt-empty{text-align:left;color:var(--ink-muted);white-space:normal;}
-  .wt-table td.wt-na .wt-v{color:var(--ink-faint);font-weight:400;}
 
   /* Einrichtung: Bereiche wie die Einrichtung des Energiedashboards (.settings-section mit Farbverlauf in der
      Ecke, Titel + Beschreibung); die Rollenkacheln tragen dieselbe Farbe wie die Kacheln der Übersicht. */

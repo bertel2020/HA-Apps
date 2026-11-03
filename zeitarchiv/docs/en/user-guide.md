@@ -648,6 +648,34 @@ month/year, instead the consumption averaged by weekday (Mon–Sun) over the
 selected period, so that it becomes visible on which weekdays more is
 typically consumed.
 
+### “Long-term” tab
+
+Two tabs sit under the title: **Overview** (the energy flow with all cards,
+unchanged) and **Long-term**. The Long-term tab compares periods with last
+year, built like the comparison table of the weather dashboard: column groups
+**Last month**, **This month** and **This year**, each with last year next to
+it and the difference to last year's value below. The rows are generation,
+feed-in, grid import and consumption. Green means favorable (more generation
+and feed-in, less grid import and consumption), red unfavorable.
+
+- **Reference day:** the “‹ date ›” bar with calendar and “Today” at the top of
+  the card shows the periods as of an earlier day. The day is part of the
+  address (`?date=`) and applies to this tab only; the overview has its own
+  period selection.
+- **Last year:** “So far” compares a running period with the same stretch of
+  last year, “Complete” with the whole period of last year; last month is the
+  same in both cases. “Show difference” shows or hides the difference line.
+  The browser remembers the choice (columns, last year, difference).
+- **Consumption** here is the balance generation + grid import + storage
+  discharge − feed-in − storage charge, the same calculation as the trends and
+  the monthly course of the report. “This year” compares by calendar (1 Jan up
+  to the reference day); the tiles on the overview compare over a rolling 365
+  days instead, so their percentages differ.
+- **Missing data** is not 0: if a period has no value, it shows “–”, with the
+  start of the archive as a hint if it falls inside the period.
+- Totals from 10,000 kWh on are shown in MWh. The meters must deliver kWh, as
+  on the overview.
+
 ### Energy report
 
 An icon next to the period navigation (active only for month/year) opens a

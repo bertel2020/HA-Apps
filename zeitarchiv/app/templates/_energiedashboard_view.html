@@ -375,6 +375,14 @@
     <p class="edash-tile-note" x-show="tile.data && tileRows().some((r) => r.entity_id)">{{ _("Eine Zeile anklicken öffnet die Entität.") }}</p>
   </dialog>
 
+  {# Reiterzeile des App-Standards (.entity-tabs), wie beim Wetterdashboard: Schaltflächen statt Links, weil die
+     Reiter nur umschalten und die Seite nicht wechseln. „Übersicht“ ist der bisherige Energiefluss, unverändert. #}
+  <nav class="entity-tabs wt-tabs" role="tablist" aria-label="{{ _('Ansichten des Energiedashboards') }}" style="margin-top:14px;" @keydown="tabKey($event)">
+    <button type="button" role="tab" id="ed-tab-over" aria-controls="ed-panel-over" class="entity-tab" :class="{'is-active': tab === 'over'}" :aria-selected="(tab === 'over').toString()" :tabindex="tab === 'over' ? 0 : -1" @click="showTab('over')">{{ _("Übersicht") }}</button>
+    <button type="button" role="tab" id="ed-tab-long" aria-controls="ed-panel-long" class="entity-tab" :class="{'is-active': tab === 'long'}" :aria-selected="(tab === 'long').toString()" :tabindex="tab === 'long' ? 0 : -1" @click="showTab('long')">{{ _("Langzeit") }}</button>
+  </nav>
+
+  <section x-show="tab === 'over'" role="tabpanel" id="ed-panel-over" aria-labelledby="ed-tab-over">
   <div class="edash-card edash-span3 edash-flow-card">
     <div class="edash-card-head">
       <div class="edash-card-title">{{ _("Energiefluss") }}</div>
@@ -710,5 +718,10 @@
     {% endif %}
 
   </div>
+  </section>
+
+  <section x-show="tab === 'long'" x-cloak role="tabpanel" id="ed-panel-long" aria-labelledby="ed-tab-long">
+    {% include "_energie_langzeit.html" %}
+  </section>
 </div>
 {% endif %}

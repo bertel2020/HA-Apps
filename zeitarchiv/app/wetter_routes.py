@@ -30,11 +30,12 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
-from . import selection_catalog
+from . import period_columns, selection_catalog
 from . import wetter_analysis as analysis
 from . import wetter_autofill
 from .chart_period import calendar_bounds
 from .formatting import decimals_to_int, entity_display_name
+from .period_columns import MODES, parse_stichtag
 from .storage import query as query_mod
 from .storage import rollup as rollup_mod
 from .storage.index import Index
@@ -95,7 +96,6 @@ COLUMN_WINDOWS = {
     "vormonat": ("month", -1),
     "jahr": ("year", 0),
 }
-MODES = ("bis_jetzt", "komplett")
 DEFAULT_RAIN_DAY_MM = 1.0  # DWD: Niederschlagstag ab 1 mm
 DEFAULT_RAIN_DAY_MINUTES = 10
 
@@ -193,17 +193,6 @@ def _role_warning(index: Index, role_key: str, entity_id: str) -> str | None:
     if entity["aggregation_type"] not in ROLE_TYPES.get(role_key, ("standard",)):
         return tr("Typ „{type}“ passt nicht zu dieser Rolle.", type=entity["aggregation_type"])
     return None
-
-
-def _parse_stichtag(raw: str | None, today: date) -> date | None:
-    """Gültiger Stichtag vor heute oder None (heute und Zukunft gelten als „jetzt“); ungültig: 400."""
-    if not raw:
-        return None
-    try:
-        day = date.fromisoformat(raw)
-    except ValueError:
-        raise HTTPException(status_code=400, detail=tr("Ungültiges Datum: {value}", value=raw)) from None
-    return day if day < today else None
 
 
 def _decimals(entity, role_key: str) -> int | None:
@@ -345,35 +334,15 @@ class WetterService:
     # -- Spalten -----------------------------------------------------------------------
 
     def column_windows(self, key: str, now_local: datetime, mode: str, anchor: datetime | None = None) -> dict:
-        """Zeitfenster einer Spalte und ihres Vorjahrespartners.
-
-        „Bis jetzt“: ein laufender Zeitraum wird mit demselben Stück des Vorjahres verglichen.
-        „Komplett“: mit dem ganzen Vorjahreszeitraum. Abgeschlossene Zeiträume (Gestern, Vormonat)
-        sind in beiden Modi gleich.
-
-        anchor: ein Zeitpunkt am gewählten Stichtag (Mittag). Die Zeiträume richten sich dann nach diesem
-        Tag, und „bis jetzt“ heißt „bis zum Ende des Stichtags“. Ohne Stichtag gilt now_local."""
-        range_key, offset = COLUMN_WINDOWS[key]
-        start, _capped, natural_end = query_mod._window(range_key, anchor or now_local, offset)  # noqa: SLF001
-        cut = (anchor.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)) if anchor else now_local
-        capped_end = min(natural_end, cut)
-        partial = capped_end < natural_end
-        vj_start = query_mod._shift_year(start, -1)  # noqa: SLF001
-        vj_end = query_mod._shift_year(  # noqa: SLF001
-            capped_end if (partial and mode == "bis_jetzt") else natural_end, -1
-        )
-        return {
-            "key": key, "range": range_key, "partial": partial,
-            "start": start, "end": capped_end, "natural_end": natural_end,
-            "vj_start": vj_start, "vj_end": vj_end,
-        }
+        """Zeitfenster einer Spalte und ihres Vorjahrespartners (Rechnung in period_columns)."""
+        return period_columns.column_windows(COLUMN_WINDOWS, key, now_local, mode, anchor)
 
     def compute_table(self, body: TableRequest, now_local: datetime | None = None) -> dict:
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
         columns = [key for key in COLUMN_KEYS if key in body.columns]
         mode = body.mode if body.mode in MODES else "bis_jetzt"
-        stichtag = _parse_stichtag(body.at, now_local.date())
+        stichtag = parse_stichtag(body.at, now_local.date())
         anchor = datetime(stichtag.year, stichtag.month, stichtag.day, 12, tzinfo=self.deps.tz) if stichtag else None
         windows = [self.column_windows(key, now_local, mode, anchor) for key in columns]
         read_cache = query_mod.QueryReadCache()
@@ -675,7 +644,7 @@ class WetterService:
         und Höchstwert des Tages, bei Zählern der Tag und der Vortag."""
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
-        stichtag = _parse_stichtag(at, now_local.date())
+        stichtag = parse_stichtag(at, now_local.date())
         anchor = datetime(stichtag.year, stichtag.month, stichtag.day, 12, tzinfo=self.deps.tz) if stichtag else None
         read_cache = query_mod.QueryReadCache()
         today = self.column_windows("heute", now_local, "bis_jetzt", anchor)
@@ -956,7 +925,7 @@ class WetterService:
         def wetterdashboard_tiles(date: str | None = None) -> dict:
             if not _is_configured(_load_config(deps.index)):
                 raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
-            stichtag = _parse_stichtag(date, datetime.now(deps.tz).date())
+            stichtag = parse_stichtag(date, datetime.now(deps.tz).date())
             return {"tz": str(deps.tz), "at": stichtag.isoformat() if stichtag else None, "tiles": self.compute_tiles(at=date)}
 
         return router

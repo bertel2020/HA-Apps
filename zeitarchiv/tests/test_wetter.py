@@ -580,7 +580,8 @@ def test_tiles_carry_the_entity_and_link_to_it_and_css_uses_defined_font_tokens(
 def test_cards_match_the_energy_dashboard_card_metrics() -> None:
     from _paths import APP
 
-    css = (APP / "static/css/pages/wetterdashboard.css").read_text(encoding="utf-8")
+    # Die Kartenregeln stehen seit dem Reiter „Langzeit“ des Energiedashboards in app.css (beide Seiten brauchen sie).
+    css = (APP / "static/css/app.css").read_text(encoding="utf-8")
     energy = (APP / "static/css/pages/energiedashboard.css").read_text(encoding="utf-8")
     assert ".edash-card{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:16px 18px" in energy
     assert ".wt-card{padding:16px 18px;border-radius:12px;box-shadow:var(--shadow);}" in css
