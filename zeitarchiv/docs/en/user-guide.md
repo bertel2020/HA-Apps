@@ -698,7 +698,7 @@ and feed-in, less grid import and consumption), red unfavorable.
   because the next reading carries the difference of several days there and
   would give a false record; in a tie the earlier day counts.
 - **Key days per year:** For each calendar year the number of days with
-  self-sufficiency 100 % (no grid import with at least 0.5 kWh consumption), with
+  self-sufficiency of 90 % or more (grid import at most 10 % of consumption, with at least 0.5 kWh consumption), with
   more feed-in than consumption and with hardly any generation (under 1 kWh),
   plus the number of days evaluated. The same days count as for the records.
 - Totals from 10,000 kWh on are shown in MWh. The meters must deliver kWh, as

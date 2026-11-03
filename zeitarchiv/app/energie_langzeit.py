@@ -74,9 +74,10 @@ GAP_FACTOR = 3
 GAP_MIN = 10
 #: Rekorde erscheinen erst, wenn das Archiv der Rollen mindestens so viele Tage umfasst.
 RECORD_MIN_DAYS = 365
-#: Kenntage: Autarkie 100 % heißt höchstens so viel Netzbezug (kWh) bei Verbrauch von mindestens CONSUMPTION_MIN;
+#: Kenntage: „fast autark“ heißt höchstens AUTARKY_MAX_IMPORT Netzbezug-Anteil am Verbrauch (also Autarkie ab 90 %) bei Verbrauch
+#: von mindestens CONSUMPTION_MIN; 100 % käme ohne großen Speicher praktisch nie vor;
 #: „kaum PV“ heißt weniger als LOW_PV_KWH Erzeugung.
-AUTARKY_EPSILON = 0.05
+AUTARKY_MAX_IMPORT = 0.1
 CONSUMPTION_MIN = 0.5
 LOW_PV_KWH = 1.0
 #: Verbraucher der Veränderungsliste (nach Betrag der Änderung).
@@ -559,7 +560,7 @@ class EnergieLangzeitService:
                 "year": d["date"].year, "days": 0, "autarkie": 0, "einspeisung_ueber_verbrauch": 0, "kaum_pv": 0,
             })
             entry["days"] += 1
-            if d["netzbezug"] is not None and d["verbrauch"] >= CONSUMPTION_MIN and d["netzbezug"] <= AUTARKY_EPSILON:
+            if d["netzbezug"] is not None and d["verbrauch"] >= CONSUMPTION_MIN and d["netzbezug"] <= d["verbrauch"] * AUTARKY_MAX_IMPORT:
                 entry["autarkie"] += 1
             if d["einspeisung"] is not None and d["einspeisung"] > d["verbrauch"] > 0:
                 entry["einspeisung_ueber_verbrauch"] += 1

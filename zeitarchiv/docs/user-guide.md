@@ -750,8 +750,8 @@ Verbrauch), rot ungünstig.
   ab einem Jahr Archiv. Tage direkt nach einem fehlenden Tag zählen nicht mit,
   weil der nächste Messwert dort die Differenz mehrerer Tage trägt und einen
   Schein-Rekord ergäbe; bei Gleichstand gilt der frühere Tag.
-- **Kenntage je Jahr:** Je Kalenderjahr die Zahl der Tage mit Autarkie 100 % (kein
-  Netzbezug bei mindestens 0,5 kWh Verbrauch), mit mehr Einspeisung als Verbrauch
+- **Kenntage je Jahr:** Je Kalenderjahr die Zahl der Tage mit Autarkie ab 90 % (Netzbezug
+  höchstens 10 % des Verbrauchs, bei mindestens 0,5 kWh Verbrauch), mit mehr Einspeisung als Verbrauch
   und mit kaum Erzeugung (unter 1 kWh), dazu die Zahl der ausgewerteten Tage. Es
   zählen dieselben Tage wie bei den Rekorden.
 - Summen ab 10.000 kWh erscheinen in MWh. Die Zähler müssen in kWh liefern,

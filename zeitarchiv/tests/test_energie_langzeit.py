@@ -486,13 +486,15 @@ def test_kenntage_je_jahr(service, monkeypatch) -> None:
     pv = {t: 10.0 for t in tage}
     netz = {t: 2.0 for t in tage}
     einsp = {t: 1.0 for t in tage}
-    netz[tage[1]] = 0.0                                    # Autarkie: Netzbezug 0 bei Verbrauch 9 kWh
+    netz[tage[1]] = 0.0                                    # fast autark: kein Netzbezug bei Verbrauch 11 kWh
+    netz[tage[4]] = 1.0                                    # fast autark: genau 10 % von 10 kWh
+    netz[tage[5]] = 1.5                                    # nicht autark genug: 15 %
     pv[tage[2]] = 0.4                                      # kaum PV
     einsp[tage[3]] = 20.0                                  # mehr eingespeist als verbraucht (10 + 2 − 20 < 0)
     _tagesreihen(monkeypatch, {"sensor.pv": pv, "sensor.netz": netz, "sensor.einsp": einsp})
     jahr = service.compute_records(config, NOW)["kenntage"][0]
     assert jahr["year"] == 2025 and jahr["days"] == 10
-    assert jahr["autarkie"] == 1 and jahr["kaum_pv"] == 1
+    assert jahr["autarkie"] == 2 and jahr["kaum_pv"] == 1
     assert jahr["einspeisung_ueber_verbrauch"] == 0        # Verbrauch negativ: unplausibler Tag zählt nicht als „mehr eingespeist“
 
 

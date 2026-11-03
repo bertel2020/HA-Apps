@@ -368,7 +368,7 @@
       },
 
       kenntageNote() {
-        return t('Tage je Kalenderjahr: Autarkie 100 % (kein Netzbezug bei mindestens 0,5 kWh Verbrauch), mehr Einspeisung als Verbrauch und kaum Erzeugung (unter 1 kWh). Es zählen nur Tage mit allen Werten, ohne den Tag nach einem fehlenden Tag.');
+        return t('Tage je Kalenderjahr: Autarkie ab 90 % (Netzbezug höchstens 10 % des Verbrauchs, bei mindestens 0,5 kWh Verbrauch), mehr Einspeisung als Verbrauch und kaum Erzeugung (unter 1 kWh). Es zählen nur Tage mit allen Werten, ohne den Tag nach einem fehlenden Tag.');
       },
 
       drawKenntage() {
@@ -376,7 +376,7 @@
         const table = this.$refs.kenntageTable;
         if (!r || !table) return;
         const columns = [];
-        if (r.has_import) columns.push({field: 'autarkie', label: t('Autarkie 100 %')});
+        if (r.has_import) columns.push({field: 'autarkie', label: t('Autarkie ab 90 %')});
         if (r.has_export) columns.push({field: 'einspeisung_ueber_verbrauch', label: t('Einspeisung über Verbrauch')});
         if (r.has_pv) columns.push({field: 'kaum_pv', label: t('Kaum Erzeugung')});
         const share = (value, days) => (days ? value / days * 100 : 0);
