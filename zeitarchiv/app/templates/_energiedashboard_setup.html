@@ -1130,7 +1130,7 @@
         <label>{{ _("Schwellen der Kenntage") }} {{ hint_button(_('Kenntage-Schwellen')) }}</label>
       </div>
       <p class="settings-section-description">{{ _("Ein leeres Feld verwendet die Vorgabe.") }}</p>
-      {% call hint_body() %}{{ _("Fast autark zählt Tage, an denen der Netzbezug höchstens (100 − Wert) % des Verbrauchs ausmacht. Sonnentage brauchen bei jedem Erzeuger die Anlagenleistung (kWp). Trübe Tage vergleichen mit dem Tagesmittel des Jahres. Die beiden Speicher-Schwellen gelten für die Entladung je Tag.") }}{% endcall %}
+      {% call hint_body() %}{{ _("Fast autark zählt Tage, an denen der Netzbezug höchstens (100 − Wert) % des Verbrauchs ausmacht. Sonnentage brauchen bei jedem Erzeuger die Anlagenleistung (kWp). Trübe Tage vergleichen mit dem Tagesmittel des Jahres. Die beiden Speicher-Schwellen sind Prozent der Speicherkapazität und gelten für die Entladung je Tag; ohne bekannte Kapazität erscheinen die beiden Felder nicht.") }}{% endcall %}
       {% set kt = config.kenntage or {} %}
       <div class="edash-field-grid">
         <div class="field">
@@ -1147,11 +1147,11 @@
         </div>
         <div class="field">
           <label>{{ _("Speicher stark genutzt ab") }}</label>
-          {{ number_field('kt_stark', kt.get('stark'), '5', '', _('kWh Entladung')) }}
+          {{ number_field('kt_stark', kt.get('speicher_stark'), '80', '', _('% der Kapazität')) }}
         </div>
         <div class="field">
           <label>{{ _("Speicher kaum genutzt unter") }}</label>
-          {{ number_field('kt_schwach', kt.get('schwach'), '1', '', _('kWh Entladung')) }}
+          {{ number_field('kt_schwach', kt.get('speicher_schwach'), '10', '', _('% der Kapazität')) }}
         </div>
       </div>
     </section>

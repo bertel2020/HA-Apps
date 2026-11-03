@@ -94,8 +94,11 @@ CONSUMPTION_MIN = 0.5
 #: Schwellen der Kenntage (Setup des Energiedashboards, leer = Vorgabe): Autarkie ab … %, Sonnentage ab … kWh je kWp,
 #: trübe Tage unter … % des Tagesmittels, Speicher stark genutzt ab … kWh Entladung, kaum genutzt unter … kWh.
 #: 100 % Autarkie kommt ohne großen Speicher praktisch nie vor, deshalb Vorgabe 90.
-KENNTAGE_DEFAULTS = {"autark": 90.0, "sonnig": 4.0, "truebe": 10.0, "stark": 5.0, "schwach": 1.0}
-KENNTAGE_LIMITS = {"autark": (50.0, 100.0), "sonnig": (1.0, 8.0), "truebe": (1.0, 50.0), "stark": (1.0, 30.0), "schwach": (0.1, 5.0)}
+KENNTAGE_DEFAULTS = {"autark": 90.0, "sonnig": 4.0, "truebe": 10.0, "speicher_stark": 80.0, "speicher_schwach": 10.0}
+KENNTAGE_LIMITS = {
+    "autark": (50.0, 100.0), "sonnig": (1.0, 8.0), "truebe": (1.0, 50.0),
+    "speicher_stark": (10.0, 300.0), "speicher_schwach": (1.0, 50.0),
+}
 #: Kenntage in Anzeigereihenfolge: Schlüssel, Gruppe, Rollen, deren Wert der Tag braucht. Die Felder bilden Paare.
 KENNTAGE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("fast_autark", "eigenversorgung", ("netzbezug",)),
@@ -175,8 +178,9 @@ def total_kwp(config: dict) -> float | None:
     return sum(kwp for _entity, kwp in pv_entities(config))
 
 
-def kenntage_available(config: dict) -> tuple[str, ...]:
-    """Kenntage, für die die Rollen da sind: Sonnentage brauchen die Anlagenleistung, das Speicherpaar einen Speicher."""
+def kenntage_available(config: dict, capacity: float | None = None) -> tuple[str, ...]:
+    """Kenntage, für die die Rollen da sind: Sonnentage brauchen die Anlagenleistung, das Speicherpaar einen Speicher mit
+    bekannter Kapazität (die Schwellen sind Prozent der Kapazität)."""
     roles = role_entities(config)
     out = []
     for key, _group, needs in KENNTAGE:
@@ -184,12 +188,15 @@ def kenntage_available(config: dict) -> tuple[str, ...]:
             continue
         if key == "sonnig" and total_kwp(config) is None:
             continue
+        if key.startswith("speicher") and not capacity:
+            continue
         out.append(key)
     return tuple(out)
 
 
 def kenntag_hit(
     key: str, day: dict, thresholds: dict[str, float], average: float | None, kwp: float | None,
+    capacity: float | None = None,
 ) -> bool | None:
     """Ob der Tag den Kenntag trifft; None, wenn ein dafür nötiger Wert fehlt (der Tag zählt dann nicht mit)."""
     if key == "fast_autark":
@@ -203,9 +210,9 @@ def kenntag_hit(
     if key == "truebe":
         return None if day["erzeugung"] is None or average is None else day["erzeugung"] < average * thresholds["truebe"] / 100
     if key == "speicher_stark":
-        return None if day.get("entladung") is None else day["entladung"] >= thresholds["stark"]
+        return None if day.get("entladung") is None or not capacity else day["entladung"] / capacity * 100 >= thresholds["speicher_stark"]
     if key == "speicher_schwach":
-        return None if day.get("entladung") is None else day["entladung"] < thresholds["schwach"]
+        return None if day.get("entladung") is None or not capacity else day["entladung"] / capacity * 100 < thresholds["speicher_schwach"]
     return None
 
 
@@ -229,6 +236,7 @@ class EnergieLangzeitService:
         self, data_dir: Path, index: Index, tz: ZoneInfo,
         entity_series: Callable[..., tuple[dict[float, float], bool]] | None = None,
         radiation_entity: Callable[[], str] | None = None,
+        storage_capacity: Callable[[dict], float | None] | None = None,
     ) -> None:
         self.data_dir = data_dir
         self.index = index
@@ -238,6 +246,9 @@ class EnergieLangzeitService:
         self.entity_series = entity_series
         #: Entität der Strahlung (W/m²) aus dem Wetterdashboard; ohne sie entfallen die wetterbereinigten Zeilen.
         self.radiation_entity = radiation_entity
+        #: config -> Summe der Speicherkapazität in kWh (None, wenn sie nicht bei jedem Speicher bekannt ist). Ohne sie entfällt
+        #: das Speicherpaar der Kenntage.
+        self.storage_capacity = storage_capacity
         #: (Schlüssel, Zeitpunkt, Tage): die Tageswerte, die der Jahreskalender der Kenntage nach den Kenntagen noch einmal braucht.
         self._days_cache: tuple[tuple, float, list[dict]] | None = None
 
@@ -669,7 +680,8 @@ class EnergieLangzeitService:
         """Kenntage je Jahr: Tage mit einer Eigenschaft (Schwellen aus dem Setup) und die Tage, an denen sie sich prüfen
         ließ. „Bis heute“ zählt in jedem Jahr nur bis zum Kalendertag von heute, damit das laufende Jahr vergleichbar ist."""
         thresholds = kenntage_thresholds(config)
-        available = kenntage_available(config)
+        capacity = self.storage_capacity(config) if self.storage_capacity else None
+        available = kenntage_available(config, capacity)
         cutoff = (today.month, today.day)
         years: dict[int, dict] = {}
         averages: dict[int, float] = {}
@@ -685,7 +697,7 @@ class EnergieLangzeitService:
             }})
             ytd = (d["date"].month, d["date"].day) <= cutoff
             for key in available:
-                hit = kenntag_hit(key, d, thresholds, averages.get(year), kwp)
+                hit = kenntag_hit(key, d, thresholds, averages.get(year), kwp, capacity)
                 if hit is None:
                     continue
                 counts = entry["fields"][key]
@@ -697,7 +709,7 @@ class EnergieLangzeitService:
         return {
             "available": list(available),
             "groups": {key: group for key, group, _roles in KENNTAGE},
-            "thresholds": thresholds, "kwp": kwp,
+            "thresholds": thresholds, "kwp": kwp, "capacity": capacity,
             "today": today.isoformat(),
             "years": sorted(years.values(), key=lambda e: -e["year"]),
         }
@@ -706,7 +718,8 @@ class EnergieLangzeitService:
         """Die Tage eines Jahres, an denen sich der Kenntag prüfen ließ, mit Treffer und den Werten dazu (Jahreskalender)."""
         now_local = now_local or datetime.now(self.tz)
         thresholds = kenntage_thresholds(config)
-        if field not in kenntage_available(config):
+        capacity = self.storage_capacity(config) if self.storage_capacity else None
+        if field not in kenntage_available(config, capacity):
             return {"field": field, "year": year, "days": [], "average": None}
         days = [d for d in self.usable_days(config, now_local) if d["date"].year == year]
         produced = [d["erzeugung"] for d in days if d["erzeugung"] is not None]
@@ -714,7 +727,7 @@ class EnergieLangzeitService:
         kwp = total_kwp(config)
         out = []
         for d in days:
-            hit = kenntag_hit(field, d, thresholds, average, kwp)
+            hit = kenntag_hit(field, d, thresholds, average, kwp, capacity)
             if hit is None:
                 continue
             out.append({

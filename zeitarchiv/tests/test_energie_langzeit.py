@@ -426,7 +426,7 @@ def test_kenntage_schwellen_werden_im_setup_gespeichert(client) -> None:
     index.set_setting(ed.SETTING_CONFIG, "")
     antwort = client.post("/energiedashboard/setup", data={
         "netzbezug": "sensor.setup_netz",
-        "kt_autark": "95", "kt_sonnig": "4,5", "kt_truebe": "", "kt_stark": "0", "kt_schwach": "1",
+        "kt_autark": "95", "kt_sonnig": "4,5", "kt_truebe": "", "kt_stark": "5", "kt_schwach": "10",
     })
     try:
         assert antwort.status_code == 200
@@ -589,8 +589,9 @@ def _kenntage_anlage(service, monkeypatch, **extra):
     _tagesreihen(monkeypatch, {"sensor.pv": pv, "sensor.netz": netz, "sensor.ent": ent})
     config = _config(
         netzbezug="sensor.netz", erzeuger=[{"entity_id": "sensor.pv", "kwp": 5.0}],
-        speicher=[{"entladen_entity_id": "sensor.ent"}], **extra,
+        speicher=[{"entladen_entity_id": "sensor.ent", "capacity_kwh": 6.0}], **extra,
     )
+    service.storage_capacity = lambda cfg: sum(sp["capacity_kwh"] for sp in cfg["speicher"])   # 6 kWh
     return config, tage
 
 
@@ -601,7 +602,8 @@ def test_kenntage_sonnentage_und_speicherpaar(service, monkeypatch) -> None:
     assert kenntage["kwp"] == 5.0
     felder = kenntage["years"][0]["fields"]
     assert felder["sonnig"]["hit"] == 18 and felder["sonnig"]["days"] == 19   # der 1. September folgt auf einen fehlenden Tag
-    assert felder["speicher_stark"]["hit"] == 18 and felder["speicher_schwach"]["hit"] == 1
+    assert felder["speicher_stark"]["hit"] == 18 and felder["speicher_schwach"]["hit"] == 1   # 100 % und 8 % von 6 kWh
+    assert kenntage["capacity"] == 6.0
 
 
 def test_kenntage_bis_heute_zaehlt_nur_bis_zum_heutigen_kalendertag(service, monkeypatch) -> None:
@@ -612,12 +614,13 @@ def test_kenntage_bis_heute_zaehlt_nur_bis_zum_heutigen_kalendertag(service, mon
 
 
 def test_kenntage_schwellen_aus_dem_setup(service, monkeypatch) -> None:
-    config, _tage = _kenntage_anlage(service, monkeypatch, kenntage={"sonnig": 6.0, "stark": 7.0, "schwach": 1.0})
+    config, _tage = _kenntage_anlage(service, monkeypatch, kenntage={"sonnig": 6.0, "speicher_stark": 120.0, "speicher_schwach": 5.0})
     felder = service.compute_records(config, NOW)["kenntage"]["years"][0]["fields"]
     assert felder["sonnig"]["hit"] == 0                    # 5 kWh je kWp erreichen 6 nicht
-    assert felder["speicher_stark"]["hit"] == 0            # 6 kWh Entladung erreichen 7 nicht
-    schwellen = lz.kenntage_thresholds(_config(kenntage={"autark": 3, "sonnig": "x", "truebe": 99}))
-    assert schwellen == {"autark": 50.0, "sonnig": 4.0, "truebe": 50.0, "stark": 5.0, "schwach": 1.0}
+    assert felder["speicher_stark"]["hit"] == 0            # 6 kWh Entladung bei 6 kWh Kapazität sind 100 %, nicht 120 %
+    assert felder["speicher_schwach"]["hit"] == 0          # 0,5 kWh sind 8 % der Kapazität, nicht unter 5 %
+    schwellen = lz.kenntage_thresholds(_config(kenntage={"autark": 3, "sonnig": "x", "truebe": 99, "stark": 7}))
+    assert schwellen == {"autark": 50.0, "sonnig": 4.0, "truebe": 50.0, "speicher_stark": 80.0, "speicher_schwach": 10.0}
 
 
 def test_kenntage_kalender_liefert_die_tage_mit_werten(service, monkeypatch) -> None:
@@ -626,6 +629,9 @@ def test_kenntage_kalender_liefert_die_tage_mit_werten(service, monkeypatch) -> 
     treffer = [d for d in daten["days"] if d["hit"]]
     assert [d["date"] for d in treffer] == [tage[1].isoformat()]
     assert treffer[0]["values"]["entladung"] == 0.5 and len(daten["days"]) == 19
+    service.storage_capacity = lambda cfg: None            # ohne bekannte Kapazität gibt es das Speicherpaar nicht
+    assert "speicher_schwach" not in service.compute_records(config, NOW)["kenntage"]["available"]
+    assert service.compute_kenntage_days(config, "speicher_schwach", 2025, NOW)["days"] == []
     assert service.compute_kenntage_days(config, "ueberschuss", 2025, NOW)["days"] == []   # keine Einspeisung eingerichtet
 
 

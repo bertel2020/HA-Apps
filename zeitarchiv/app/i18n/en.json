@@ -3511,7 +3511,6 @@
     "Zählung": "Counting",
     "Die Länge der Balken zeigt den Anteil an den ausgewerteten Tagen, im Maßstab des größten Anteils im Feld. Ein Klick auf eine Zeile zeigt die Tage im Jahreskalender. Die Schwellen stellst du im Setup unter „Kenntage“ ein.": "The length of the bars shows the share of the days evaluated, scaled to the largest share in the box. Clicking a row shows its days in the year calendar. You set the thresholds in the setup under “Key days”.",
     "Fast autark ab": "Almost self-sufficient from",
-    "Fast autark zählt Tage, an denen der Netzbezug höchstens (100 − Wert) % des Verbrauchs ausmacht. Sonnentage brauchen bei jedem Erzeuger die Anlagenleistung (kWp). Trübe Tage vergleichen mit dem Tagesmittel des Jahres. Die beiden Speicher-Schwellen gelten für die Entladung je Tag.": "Almost self-sufficient counts days on which grid import is at most (100 − value) % of consumption. Sunny days need the system size (kWp) on every generator. Dull days compare with the year’s daily average. The two battery thresholds apply to discharge per day.",
     "Kenntag (Klick öffnet den Tag)": "Key day (click opens the day)",
     "Kenntage-Schwellen": "Key day thresholds",
     "Sonnentage ab": "Sunny days from",
@@ -3529,7 +3528,9 @@
     "Langzeit-Anzeige": "Long-term display",
     "Schwellen der Kenntage": "Key day thresholds",
     "Tabelle „Zeiträume im Vergleich“": "Table “Periods compared”",
-    "Welche Bereiche der Reiter „Langzeit“ zeigt, und die Schwellen der Kenntage.": "Which areas the “Long term” tab shows, and the thresholds for the key days."
+    "Welche Bereiche der Reiter „Langzeit“ zeigt, und die Schwellen der Kenntage.": "Which areas the “Long term” tab shows, and the thresholds for the key days.",
+    "% der Kapazität": "% of capacity",
+    "Fast autark zählt Tage, an denen der Netzbezug höchstens (100 − Wert) % des Verbrauchs ausmacht. Sonnentage brauchen bei jedem Erzeuger die Anlagenleistung (kWp). Trübe Tage vergleichen mit dem Tagesmittel des Jahres. Die beiden Speicher-Schwellen sind Prozent der Speicherkapazität und gelten für die Entladung je Tag; ohne bekannte Kapazität erscheinen die beiden Felder nicht.": "Almost self-sufficient counts days on which grid import is at most (100 − value) % of consumption. Sunny days need the system size (kWp) on every generator. Dull days compare with the year’s daily average. The two battery thresholds are percentages of the battery capacity and apply to discharge per day; without a known capacity the two boxes do not appear."
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4277,13 +4278,10 @@
     "mehr Einspeisung als Verbrauch": "more feed-in than consumption",
     "ab {value} kWh je kWp": "from {value} kWh per kWp",
     "unter {value} % des Tagesmittels": "below {value} % of the daily average",
-    "ab {value} kWh Entladung": "from {value} kWh discharge",
-    "unter {value} kWh Entladung": "below {value} kWh discharge",
     "Netzbezug {grid} kWh bei {use} kWh Verbrauch": "Grid import {grid} kWh with {use} kWh consumption",
     "Einspeisung {feed} kWh, Verbrauch {use} kWh": "Feed-in {feed} kWh, consumption {use} kWh",
     "Erzeugung {pv} kWh ({spec} kWh je kWp)": "Generation {pv} kWh ({spec} kWh per kWp)",
     "Erzeugung {pv} kWh (Tagesmittel {avg} kWh)": "Generation {pv} kWh (daily average {avg} kWh)",
-    "Entladung {n} kWh": "Discharge {n} kWh",
     "Letzte 5": "Last 5",
     "Letzte 10": "Last 10",
     "Alle ({n})": "All ({n})",
@@ -4291,6 +4289,9 @@
     "Ganze Kalenderjahre. Das laufende Jahr (*) zählt bis heute.": "Full calendar years. The current year (*) counts up to today.",
     "Alle Jahre nur bis {date} gezählt, damit das laufende Jahr (*) vergleichbar ist.": "All years counted only up to {date}, so the current year (*) is comparable.",
     "{hits} von {days} ausgewerteten Tagen": "{hits} of {days} days evaluated",
-    "Die Tage konnten nicht geladen werden.": "The days could not be loaded."
+    "Die Tage konnten nicht geladen werden.": "The days could not be loaded.",
+    "ab {value} % der Kapazität": "from {value} % of capacity",
+    "unter {value} % der Kapazität": "below {value} % of capacity",
+    "Entladung {n} kWh ({percent} %)": "Discharge {n} kWh ({percent} %)"
   }
 }

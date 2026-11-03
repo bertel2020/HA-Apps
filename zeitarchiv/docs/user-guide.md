@@ -760,8 +760,10 @@ Verbrauch), rot ungünstig.
   0,5 kWh Verbrauch) und **Überschusstage** (mehr Einspeisung als Verbrauch),
   **Sonnentage** (ab 4 kWh je kWp, braucht bei jedem Erzeuger die Anlagenleistung)
   und **Trübe Tage** (unter 10 % des Tagesmittels des Jahres), **Speicher stark
-  genutzt** (ab 5 kWh Entladung) und **Speicher kaum genutzt** (unter 1 kWh
-  Entladung). Ein Feld erscheint nur, wenn die Rollen dafür eingerichtet sind.
+  genutzt** (ab 80 % der Speicherkapazität als Entladung) und **Speicher kaum
+  genutzt** (unter 10 %). Ein Feld erscheint nur, wenn die Rollen dafür
+  eingerichtet sind; das Speicherpaar braucht außerdem die Kapazität des
+  Speichers (bei mehreren Speichern die Summe).
   „Ganzes Jahr“ zählt die Kalenderjahre, „Bis heute“ in jedem Jahr nur bis zum
   heutigen Kalendertag, damit das laufende Jahr vergleichbar ist. Ein Klick auf
   eine Zeile öffnet den Jahreskalender: 12 Monate mit 31 Tagen, die Kenntage sind

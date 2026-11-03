@@ -544,7 +544,22 @@ class EnergieDashboardService:
         self.langzeit = energie_langzeit.EnergieLangzeitService(
             deps.data_dir, deps.index, deps.tz, entity_series=self._entity_series,
             radiation_entity=lambda: wetter_routes.radiation_entity(deps.index),
+            storage_capacity=self._storage_capacity,
         )
+
+    def _storage_capacity(self, config: dict) -> float | None:
+        """Summe der Kapazität aller Speicher mit Entlade-Entität in kWh (für die Kenntage im Reiter „Langzeit“); None, wenn sie
+        nicht bei jedem dieser Speicher bekannt ist, denn eine halbe Summe ergäbe falsche Prozentwerte."""
+        now = datetime.now(self.deps.tz)
+        read_cache = query_mod.QueryReadCache()
+        total = 0.0
+        speicher = [sp for sp in config.get("speicher") or [] if sp.get("entladen_entity_id")]
+        for sp in speicher:
+            capacity = self._resolve_speicher_capacity(sp, now, read_cache)
+            if not capacity or capacity <= 0:
+                return None
+            total += float(capacity)
+        return total or None
 
     def _entity_options(self) -> list[dict]:
         # "unit"/"aggregation_type" zusätzlich zu den bisherigen Feldern — die
@@ -3597,7 +3612,7 @@ class EnergieDashboardService:
             kenntage: dict[str, float] = {}
             for key, raw in (
                 ("autark", kt_autark), ("sonnig", kt_sonnig), ("truebe", kt_truebe),
-                ("stark", kt_stark), ("schwach", kt_schwach),
+                ("speicher_stark", kt_stark), ("speicher_schwach", kt_schwach),
             ):
                 value = _parse_float(raw)
                 low, high = energie_langzeit.KENNTAGE_LIMITS[key]

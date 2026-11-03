@@ -209,19 +209,19 @@
       case 'ueberschuss': return t('mehr Einspeisung als Verbrauch');
       case 'sonnig': return t('ab {value} kWh je kWp', {value: num(th.sonnig, 1)});
       case 'truebe': return t('unter {value} % des Tagesmittels', {value: num(th.truebe, 0)});
-      case 'speicher_stark': return t('ab {value} kWh Entladung', {value: num(th.stark, 1)});
-      default: return t('unter {value} kWh Entladung', {value: num(th.schwach, 1)});
+      case 'speicher_stark': return t('ab {value} % der Kapazität', {value: num(th.speicher_stark, 0)});
+      default: return t('unter {value} % der Kapazität', {value: num(th.speicher_schwach, 0)});
     }
   }
 
-  function kenntagValues(key, values, average, kwp) {
+  function kenntagValues(key, values, average, kwp, capacity) {
     const kwh = (value) => num(value, 1);
     switch (key) {
       case 'fast_autark': return t('Netzbezug {grid} kWh bei {use} kWh Verbrauch', {grid: kwh(values.netzbezug), use: kwh(values.verbrauch)});
       case 'ueberschuss': return t('Einspeisung {feed} kWh, Verbrauch {use} kWh', {feed: kwh(values.einspeisung), use: kwh(values.verbrauch)});
       case 'sonnig': return t('Erzeugung {pv} kWh ({spec} kWh je kWp)', {pv: kwh(values.erzeugung), spec: kwh(values.erzeugung / kwp)});
       case 'truebe': return t('Erzeugung {pv} kWh (Tagesmittel {avg} kWh)', {pv: kwh(values.erzeugung), avg: kwh(average)});
-      default: return t('Entladung {n} kWh', {n: kwh(values.entladung)});
+      default: return t('Entladung {n} kWh ({percent} %)', {n: kwh(values.entladung), percent: num(values.entladung / capacity * 100, 0)});
     }
   }
 
@@ -526,7 +526,7 @@
               days++;
               if (!entry.hit) { html += `<td data-tooltip-fixed="${escapeHtml(dateText)}"></td>`; continue; }
               hits++;
-              const tip = `${dateText} · ${kenntagValues(field, entry.values, data.average, kt.kwp)}`;
+              const tip = `${dateText} · ${kenntagValues(field, entry.values, data.average, kt.kwp, kt.capacity)}`;
               html += `<td class="hit" data-tooltip-fixed="${escapeHtml(tip)}"><a href="energiedashboard?date=${key}" aria-label="${escapeHtml(tip)}"></a></td>`;
             }
             html += '</tr>';

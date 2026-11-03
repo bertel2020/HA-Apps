@@ -707,9 +707,10 @@ and feed-in, less grid import and consumption), red unfavorable.
   10 % of consumption with at least 0.5 kWh consumption) and **Surplus days**
   (more feed-in than consumption), **Sunny days** (from 4 kWh per kWp, needs the
   system size on every generator) and **Dull days** (below 10 % of the year’s
-  daily average), **Battery heavily used** (from 5 kWh discharge) and **Battery
-  barely used** (below 1 kWh discharge). A box appears only if the roles for it
-  are set up. “Full year” counts calendar years, “Until today” counts only up to
+  daily average), **Battery heavily used** (discharge from 80 % of the battery capacity) and
+  **Battery barely used** (below 10 %). A box appears only if the roles for it
+  are set up; the battery pair also needs the battery capacity (the sum for
+  several batteries). “Full year” counts calendar years, “Until today” counts only up to
   today’s calendar day in every year so the current year is comparable. Clicking
   a row opens the year calendar: 12 months of 31 days with the key days filled,
   clicking a day opens it in the energy dashboard. Only days with all values
