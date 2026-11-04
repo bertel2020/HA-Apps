@@ -115,45 +115,6 @@
 
   {{ weather_card("basis", 5) }}
 
-  {% if has_daylight %}
-  <div class="card wt-card" data-hints="collapsed" x-show="daylight || daylightError" x-cloak>
-    <div class="wt-controls">
-      <h2 class="wt-h2">{{ _("Tageslicht") }} {{ hint_button(_("Tageslicht")) }}</h2>
-      {% call hint_body() %}{{ _("Der Dämmerungssensor misst von 0 bis 1.000 lx. Die Kurve zeigt, wann es für den Sensor hell wird und wann nicht mehr, nicht den Sonnenstand: Dichte Wolken verschieben den Tagesbeginn nach hinten, Ausrichtung und Verschattung wirken ebenfalls. Die Schwellen für Nacht und Tag stehen in der Einrichtung.") }}{% endcall %}
-    </div>
-    <p class="wt-headline" x-show="daylight" x-text="daylightHead()"></p>
-    <div class="wt-kpis wt-kpis-soft" x-show="daylight" :style="'--wt-cols:' + kpiCols(daylightStats().length)">
-      <template x-for="stat in daylightStats()" :key="stat.label">
-        <div class="wt-tile">
-          <span class="wt-tile-label" x-text="stat.label"></span>
-          <span class="wt-tile-value" x-text="stat.value"></span>
-          <span class="wt-tile-sub" x-text="stat.sub"></span>
-        </div>
-      </template>
-    </div>
-    <div class="wt-chart" x-show="daylight" x-ref="daylightChart"></div>
-    <p class="hint hint-warn" x-show="daylightNote()" x-text="daylightNote()" x-cloak></p>
-    <p class="hint hint-warn" x-show="daylightError" x-text="daylightError" x-cloak></p>
-    <h3 class="wt-h3" x-show="daylight">{{ _("Die letzten Tage im Vergleich") }}</h3>
-    <div class="tbl-wrap wt-table-wrap" x-show="daylight">
-      <table class="wt-table wt-table-full">
-        <thead><tr>
-          <th>{{ _("Tag") }}</th><th>{{ _("Hell von–bis") }}</th><th>{{ _("Tageslänge") }}</th>
-          <th>{{ _("Dämmerung morgens") }}</th><th>{{ _("Dämmerung abends") }}</th>
-        </tr></thead>
-        <tbody>
-          <template x-for="row in daylightRows()" :key="row.date">
-            <tr :class="{'wt-row-current': row.current}">
-              <td x-text="row.day"></td><td x-text="row.span"></td><td x-text="row.length"></td>
-              <td x-text="row.morning"></td><td x-text="row.evening"></td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-    </div>
-    <p class="wt-hint" x-show="daylight && daylightHistoryNote()" x-text="daylightHistoryNote()" x-cloak></p>
-  </div>
-  {% endif %}
 
   <div class="card wt-card" x-show="monthly" x-cloak>
     <div class="wt-controls">
@@ -222,6 +183,46 @@
   {% if has_windsun %}
   <section x-show="tab === 'wind'" x-cloak role="tabpanel" id="wt-panel-wind" aria-labelledby="wt-tab-wind">
     {{ weather_card("wind", 3) }}
+
+  {% if has_daylight %}
+  <div class="card wt-card" data-hints="collapsed" x-show="daylight || daylightError" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Tageslicht") }} {{ hint_button(_("Tageslicht")) }}</h2>
+      {% call hint_body() %}{{ _("Der Dämmerungssensor misst von 0 bis 1.000 lx. Die Kurve zeigt, wann es für den Sensor hell wird und wann nicht mehr, nicht den Sonnenstand: Dichte Wolken verschieben den Tagesbeginn nach hinten, Ausrichtung und Verschattung wirken ebenfalls. Die Schwellen für Nacht und Tag stehen in der Einrichtung.") }}{% endcall %}
+    </div>
+    <p class="wt-headline" x-show="daylight" x-text="daylightHead()"></p>
+    <div class="wt-kpis wt-kpis-soft" x-show="daylight" :style="'--wt-cols:' + kpiCols(daylightStats().length)">
+      <template x-for="stat in daylightStats()" :key="stat.label">
+        <div class="wt-tile">
+          <span class="wt-tile-label" x-text="stat.label"></span>
+          <span class="wt-tile-value" x-text="stat.value"></span>
+          <span class="wt-tile-sub" x-text="stat.sub"></span>
+        </div>
+      </template>
+    </div>
+    <div class="wt-chart" x-show="daylight" x-ref="daylightChart"></div>
+    <p class="hint hint-warn" x-show="daylightNote()" x-text="daylightNote()" x-cloak></p>
+    <p class="hint hint-warn" x-show="daylightError" x-text="daylightError" x-cloak></p>
+    <h3 class="wt-h3" x-show="daylight">{{ _("Die letzten Tage im Vergleich") }}</h3>
+    <div class="tbl-wrap wt-table-wrap" x-show="daylight">
+      <table class="wt-table wt-table-full">
+        <thead><tr>
+          <th>{{ _("Tag") }}</th><th>{{ _("Hell von–bis") }}</th><th>{{ _("Tageslänge") }}</th>
+          <th>{{ _("Dämmerung morgens") }}</th><th>{{ _("Dämmerung abends") }}</th>
+        </tr></thead>
+        <tbody>
+          <template x-for="row in daylightRows()" :key="row.date">
+            <tr :class="{'wt-row-current': row.current}">
+              <td x-text="row.day"></td><td x-text="row.span"></td><td x-text="row.length"></td>
+              <td x-text="row.morning"></td><td x-text="row.evening"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+    <p class="wt-hint" x-show="daylight && daylightHistoryNote()" x-text="daylightHistoryNote()" x-cloak></p>
+  </div>
+  {% endif %}
   </section>
   {% endif %}
 

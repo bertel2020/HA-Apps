@@ -969,7 +969,7 @@ class WetterService:
             "configured": _is_configured(config),
             "precip_modes": self.available_precip(),
             "has_heating": bool(self.heating_counters(config)),
-            "has_windsun": any(config[key] for key in ("wind", "gust", "radiation", "illuminance")),
+            "has_windsun": any(config[key] for key in ("wind", "gust", "radiation", "illuminance", "illuminance_dawn")),
             "has_daylight": bool(config["illuminance_dawn"]),
             "has_conditions": any(
                 config[key] for key in ("illuminance", "illuminance_dawn", "radiation", "wind", "precip_dur", "precip_mm")

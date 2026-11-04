@@ -380,7 +380,6 @@
         if (this.hasConditions) this.startConditions();
         // Die Karte „Tageslicht“ gibt es nur mit zugeordneter Rolle; $refs sind in init() noch nicht angelegt.
         this.hasDaylight = !!this.$root.querySelector('[x-ref="daylightChart"]');
-        if (this.hasDaylight) this.loadDaylight();
         const observer = new ResizeObserver(() => this.layoutTiles());
         for (const group of GROUPS) {
           const ref = this.$refs[refName('tiles', group)];
@@ -390,7 +389,8 @@
         window.addEventListener('dashboard-stichtag', () => {
           this.loadTiles();
           this.loadTable();
-          if (this.hasDaylight) this.loadDaylight();
+          // Die Karte liegt im Reiter „Wind & Sonne“: dort sofort neu laden, sonst beim nächsten Öffnen.
+          if (this.hasDaylight) { this.daylight = null; if (this.tab === 'wind') this.loadDaylight(); }
           if (this.hasConditions) this.loadConditions();
         });
       },
@@ -552,6 +552,7 @@
         if (tab === 'long' && !this.matrix) this.loadMatrix();
         if (tab === 'long' && !this.tempYears) this.loadTempYears();
         if (tab === 'heat' && !this.heat) this.loadHeat();
+        if (tab === 'wind' && this.hasDaylight) { if (!this.daylight) this.loadDaylight(); else this.$nextTick(() => this.drawDaylight()); }
         // Ein Diagramm in einem eben erst sichtbaren Reiter hat noch keine Größe.
         this.$nextTick(() => {
           this.layoutTiles();
