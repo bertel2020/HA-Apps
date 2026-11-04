@@ -60,6 +60,9 @@
   .wt-section-regen{
     background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--chart-3) 16%, transparent), color-mix(in srgb, var(--chart-3) 5%, transparent) 70%), var(--surface);
     border-color:color-mix(in srgb, var(--chart-3) 30%, var(--border));}
+  .wt-section-sonne{
+    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--chart-7) 16%, transparent), color-mix(in srgb, var(--chart-7) 5%, transparent) 70%), var(--surface);
+    border-color:color-mix(in srgb, var(--chart-7) 30%, var(--border));}
   .wt-section-neutral{
     background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--ink-faint) 22%, transparent), color-mix(in srgb, var(--ink-faint) 8%, transparent) 70%), var(--surface);}
   .wt-group-h{margin:14px 0 8px;font-size:calc(11.5px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-muted);}
