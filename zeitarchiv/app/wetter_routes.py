@@ -56,6 +56,7 @@ ROLES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("wind", N_("Wind"), ("standard",)),
     ("gust", N_("Böe"), ("standard",)),
     ("radiation", N_("Strahlung"), ("standard",)),
+    ("illuminance", N_("Helligkeit"), ("standard",)),
 )
 #: Erwartete Einheiten je Rolle: Entitäten damit stehen in der Auswahl zuerst (kein harter Filter,
 #: weil eine Einheit fehlen oder ungewöhnlich geschrieben sein kann).
@@ -67,6 +68,7 @@ ROLE_UNITS = {
     "wind": ["km/h", "m/s", "mph", "kn"],
     "gust": ["km/h", "m/s", "mph", "kn"],
     "radiation": ["W/m²"],
+    "illuminance": ["lx"],
     "extra": ["°C", "°F", "K", "%"],
     "heating": ["kWh", "Wh", "MWh"],
 }
@@ -79,7 +81,7 @@ MAX_EXTRA_TEMPERATURES = 5
 #: und Zusatzsensoren bleiben immer sichtbar).
 #: Zeiträume (Tage) des Temperaturvergleichs auf dem Reiter „Temperatur & Klima“.
 TEMPERATURE_DAYS = (7, 30, 90)
-BLOCK_KEYS = ("kenntage", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation")
+BLOCK_KEYS = ("kenntage", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation", "illuminance")
 #: Nachkommastellen, wenn die Entität „automatisch“ eingestellt ist: Strahlung in ganzen W/m².
 ROLE_DEFAULT_DECIMALS = {"radiation": 0}
 #: Kurze Namen für die Kacheln (in der Tabelle stehen die ausführlichen Rollennamen).
@@ -96,6 +98,12 @@ COLUMN_WINDOWS = {
     "vormonat": ("month", -1),
     "jahr": ("year", 0),
 }
+#: Sonnenschein zählt, wenn die Süd-Helligkeit im Stundenmittel über dieser Schwelle liegt (lx). Kein
+#: offizieller DWD-Wert (der zählt ab 120 W/m² direkter Strahlung): die Station trennt direktes und diffuses
+#: Licht nicht. Startwert aus den Oktoberdaten des Nutzers: trübe Tage mittags bis etwa 15.000 lx, klare ab 50.000 lx.
+DEFAULT_SUN_THRESHOLD_LX = 25000.0
+SUN_THRESHOLD_RANGE_LX = (1000.0, 100000.0)
+SUN_MAX_GAP_HOURS = 6  # längste Lücke ohne Zeilen, die zwischen zwei sonnigen Stunden als sonnig gilt
 DEFAULT_RAIN_DAY_MM = 1.0  # DWD: Niederschlagstag ab 1 mm
 DEFAULT_RAIN_DAY_MINUTES = 10
 
@@ -109,6 +117,7 @@ def _empty_config() -> dict:
         "heating_limit": DEFAULT_HEATING_LIMIT,
         "rain_day_mm": DEFAULT_RAIN_DAY_MM,
         "rain_day_minutes": DEFAULT_RAIN_DAY_MINUTES,
+        "sun_threshold_lx": DEFAULT_SUN_THRESHOLD_LX,
         "hidden_blocks": [],
     }
 
@@ -152,6 +161,9 @@ def _load_config(index: Index) -> dict:
         value = data.get(key)
         if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
             config[key] = value
+    value = data.get("sun_threshold_lx")
+    if isinstance(value, (int, float)) and not isinstance(value, bool) and SUN_THRESHOLD_RANGE_LX[0] <= value <= SUN_THRESHOLD_RANGE_LX[1]:
+        config["sun_threshold_lx"] = float(value)
     return config
 
 
@@ -264,6 +276,8 @@ class WetterService:
         add("precip_dur", config["precip_dur"], role_label("precip_dur"), "switch")
         for key in ("humidity", "pressure", "wind", "gust", "radiation"):
             add(key, config[key], role_label(key), "standard")
+        # Die Helligkeit erscheint als Sonnenscheindauer (Stunden), nicht als lx-Kennzahlen.
+        add("illuminance", config["illuminance"], tr("Sonnenscheindauer"), "sunshine")
         return specs
 
     def _rows(
@@ -279,7 +293,7 @@ class WetterService:
 
     def summarize(
         self, kind: str, rows: list[rollup_mod.FineRow], config: dict, held_off: bool = False,
-        unit: str | None = None,
+        unit: str | None = None, until: float | None = None,
     ) -> dict | None:
         """Kennzahlen einer Zeilenmenge; None, wenn es keine Werte gibt (nie 0 vortäuschen).
 
@@ -305,6 +319,8 @@ class WetterService:
                 "max": high[0], "max_ts": high[1],
                 "min": low[0], "min_ts": low[1],
             }
+        if kind == "sunshine":
+            return self._summarize_sunshine(rows, config, until)
         if kind == "counter":
             days = [(row.value or 0.0, row.bucket_start) for row in rows]
             if not days:
@@ -338,6 +354,49 @@ class WetterService:
             "top_ts": first_ts[top_day] if per_day[top_day] > 0 else None,
         }
 
+    def _summarize_sunshine(self, rows: list[rollup_mod.FineRow], config: dict, until: float | None) -> dict | None:
+        """Sonnenstunden: Stundenzeilen, deren Mittel die Schwelle erreicht, je lokalem Kalendertag.
+
+        Eine angeschnittene Stunde (laufende Stunde, Ende des Fensters) zählt nur mit ihrem Anteil bis
+        ``until``, sonst würde „bis 14:32“ bis zu eine Stunde zu viel zeigen. Ohne Werte ``None``, nie 0:
+        ein Tag ohne Daten hatte nicht null Sonne. Genauigkeit: eine Stunde (die Mittel der Stunden entscheiden).
+
+        Lücken: Ein Sensor, der stundenlang denselben Wert hält (die Süd-Helligkeit klebt mittags bei
+        98.800 lx), löst in HA kein neues Ereignis aus, dann fehlen genau an den sonnigsten Stunden die
+        Zeilen. Eine Lücke von höchstens ``SUN_MAX_GAP_HOURS`` Stunden zählt als sonnig, wenn die Zeile davor
+        und die danach die Schwelle erreichen; an Rändern und neben dunklen Stunden zählt sie nicht."""
+        values = sorted((row for row in rows if row.value is not None), key=lambda row: row.bucket_start)
+        if not values:
+            return None
+        threshold = float(config["sun_threshold_lx"])
+        tz = self.deps.tz
+        per_day: dict[date, float] = {}
+
+        def count(bucket_start: float, bright: bool) -> None:
+            day = datetime.fromtimestamp(bucket_start, tz).date()
+            seconds = 3600.0
+            if until is not None:
+                seconds = max(0.0, min(3600.0, until - bucket_start))
+            per_day[day] = per_day.get(day, 0.0) + (seconds if bright else 0.0)
+
+        for position, row in enumerate(values):
+            count(row.bucket_start, row.value >= threshold)
+            following = values[position + 1] if position + 1 < len(values) else None
+            if following is None or row.value < threshold or following.value < threshold:
+                continue
+            missing = round((following.bucket_start - row.bucket_start) / 3600.0) - 1
+            if 0 < missing <= SUN_MAX_GAP_HOURS:
+                for step in range(1, missing + 1):
+                    count(row.bucket_start + step * 3600.0, True)
+        hours = {day: seconds / 3600.0 for day, seconds in per_day.items()}
+        top_day = max(hours, key=lambda day: (hours[day], -day.toordinal()))
+        top_start = min(row.bucket_start for row in values if datetime.fromtimestamp(row.bucket_start, tz).date() == top_day)
+        return {
+            "hours": sum(hours.values()),
+            "top": hours[top_day] if hours[top_day] > 0 else None,
+            "top_ts": top_start if hours[top_day] > 0 else None,
+        }
+
     # -- Spalten -----------------------------------------------------------------------
 
     def column_windows(self, key: str, now_local: datetime, mode: str, anchor: datetime | None = None) -> dict:
@@ -367,10 +426,12 @@ class WetterService:
                     ("cur", win["start"], win["end"]),
                     *((("vj", win["vj_start"], win["vj_end"]),) if body.vorjahr else ()),
                 ):
-                    rows = self._rows(spec["entity_id"], spec["kind"], start, end, now_local, read_cache)
+                    # Die Sonnenscheindauer liest die Stundenmittel eines Messwerts (kind „sunshine“ ist nur die Anzeigeart).
+                    aggregation = "standard" if spec["kind"] == "sunshine" else spec["kind"]
+                    rows = self._rows(spec["entity_id"], aggregation, start, end, now_local, read_cache)
                     cell[side] = self.summarize(
                         spec["kind"], rows, config, held_off=bool(first_ts and first_ts < start.timestamp()),
-                        unit=spec["unit"],
+                        unit=spec["unit"], until=min(end.timestamp(), now_local.timestamp()),
                     )
                     # Fehlende Daten sind kein 0: Beginn des Archivs mitgeben, wenn er im Fenster liegt.
                     if cell[side] is None and first_ts and first_ts > start.timestamp():
@@ -388,6 +449,7 @@ class WetterService:
             "vorjahr": body.vorjahr,
             "rain_day_mm": config["rain_day_mm"],
             "rain_day_minutes": config["rain_day_minutes"],
+            "sun_threshold_lx": config["sun_threshold_lx"],
             "columns": [
                 {
                     "key": win["key"], "range": win["range"], "partial": win["partial"],
@@ -701,7 +763,7 @@ class WetterService:
             "configured": _is_configured(config),
             "precip_modes": self.available_precip(),
             "has_heating": bool(self.heating_counters(config)),
-            "has_windsun": any(config[key] for key in ("wind", "gust", "radiation")),
+            "has_windsun": any(config[key] for key in ("wind", "gust", "radiation", "illuminance")),
             "has_klima": any(extra["entity_id"] for extra in config["extra_temperatures"]),
             **calendar_bounds(self.deps.index.list_entities(), self.deps.tz),
             "enabled": _is_enabled(self.deps.index),
@@ -754,7 +816,8 @@ class WetterService:
                     "role_types": {key: list(types) for key, _label, types in ROLES},
                     "role_units": ROLE_UNITS,
                     "block_options": [("kenntage", tr("Kenntage"))] + [
-                        (key, tr(ROLE_LABELS[key])) for key in BLOCK_KEYS if key != "kenntage"
+                        (key, tr("Sonnenscheindauer") if key == "illuminance" else tr(ROLE_LABELS[key]))
+                        for key in BLOCK_KEYS if key != "kenntage"
                     ],
                     "counter_options": [o for o in self._entity_options() if o["aggregation_type"] == "counter"],
                     "max_heating": MAX_HEATING_COUNTERS,
@@ -786,6 +849,7 @@ class WetterService:
             wind: str = Form(""),
             gust: str = Form(""),
             radiation: str = Form(""),
+            illuminance: str = Form(""),
             extra_entity_id: list[str] = Form([]),
             extra_name: list[str] = Form([]),
             blocks_submitted: str = Form(""),
@@ -796,10 +860,12 @@ class WetterService:
             heating_limit: str = Form(""),
             rain_day_mm: str = Form(""),
             rain_day_minutes: str = Form(""),
+            sun_threshold_lx: str = Form(""),
         ) -> HTMLResponse:
             submitted = {
                 "temperature": temperature, "precip_mm": precip_mm, "precip_dur": precip_dur,
                 "humidity": humidity, "pressure": pressure, "wind": wind, "gust": gust, "radiation": radiation,
+                "illuminance": illuminance,
             }
             config = _empty_config()
             for key, value in submitted.items():
@@ -868,6 +934,17 @@ class WetterService:
                 except ValueError:
                     raise HTTPException(status_code=400, detail=tr("Ungültige Zahl: {value}", value=raw)) from None
                 config[key] = value if value > 0 else default
+            try:
+                threshold = float(sun_threshold_lx.replace(",", ".").replace(" ", "")) if sun_threshold_lx.strip() else DEFAULT_SUN_THRESHOLD_LX
+            except ValueError:
+                raise HTTPException(status_code=400, detail=tr("Ungültige Zahl: {value}", value=sun_threshold_lx)) from None
+            low, high = SUN_THRESHOLD_RANGE_LX
+            if not low <= threshold <= high:
+                raise HTTPException(
+                    status_code=400,
+                    detail=tr("Wert außerhalb von {low} bis {high}: {value}", low=f"{low:g}", high=f"{high:g}", value=sun_threshold_lx),
+                )
+            config["sun_threshold_lx"] = threshold
             _save_config(deps.index, config)
             context = self._page_context(request)
             return deps.templates.TemplateResponse(request, "_wetter_view.html", context)

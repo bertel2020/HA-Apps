@@ -593,7 +593,7 @@ def test_setup_form_uses_app_fields_and_info_buttons(client) -> None:
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
     html = client.get("/wetterdashboard/setup").text
     assert html.count('class="field"') >= 4 and "wt-item-add" in html
-    assert html.count("hint-toggle") == 4  # Weitere Sensoren, Heizenergie, Regentage, Anzeige
+    assert html.count("hint-toggle") == 5  # Weitere Sensoren, Heizenergie, Regentage, Sonnenschein, Anzeige
     assert '<p class="hint">' not in html  # lose .hint-Absätze verschwänden auf dem Telefon ohne Knopf
 
 
@@ -744,7 +744,7 @@ def test_wind_and_sun_tab_groups_tiles_and_rows() -> None:
     assert 'weather_card("basis"' in view and 'weather_card("wind"' in view
     assert 'weather_card("klima"' in view and 'id="wt-panel-klima"' in view
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
-    assert "const WIND_KEYS = ['wind', 'gust', 'radiation']" in script and "groupOf" in script
+    assert "const WIND_KEYS = ['wind', 'gust', 'radiation', 'illuminance']" in script and "groupOf" in script
 
 
 def test_wind_and_sun_tab_only_appears_with_one_of_its_roles(client) -> None:
@@ -818,3 +818,111 @@ def test_tiles_follow_the_reference_day(service) -> None:
     assert past["last"] == 6.0  # Wert am Ende des gewählten Tages
     assert past["today"]["min"] == 3.0 and past["today"]["max"] == 11.0
     assert service.compute_tiles(NOW, at="2026-08-20")[0]["last"] == 15.0  # heute gilt als „jetzt“
+
+
+# -- Sonnenscheindauer (ROADMAP 1.43, Ergänzung Helligkeit) --------------------------------------
+
+
+def _hour_rows(day: int, values: list[tuple[int, float]]) -> list:
+    return [rollup_mod.FineRow(bucket_start=_ts(day, hour), value=value) for hour, value in values]
+
+
+def test_summarize_sunshine_counts_hours_at_or_above_the_threshold_per_day(service) -> None:
+    config = {**wetter_routes._empty_config(), "sun_threshold_lx": 25000.0}
+    rows = (
+        _hour_rows(18, [(9, 30000.0), (10, 25000.0), (11, 24999.0)])  # zwei Stunden: die Schwelle selbst zählt
+        + _hour_rows(19, [(9, 90000.0), (10, 98800.0), (11, 60000.0), (12, 10000.0)])  # drei Stunden
+    )
+    summary = service.summarize("sunshine", rows, config)
+    assert summary["hours"] == pytest.approx(5.0)
+    assert summary["top"] == pytest.approx(3.0) and summary["top_ts"] == _ts(19, 9)
+
+
+def test_summarize_sunshine_counts_a_cut_hour_only_up_to_the_end(service) -> None:
+    config = {**wetter_routes._empty_config(), "sun_threshold_lx": 25000.0}
+    rows = _hour_rows(20, [(10, 40000.0), (11, 40000.0)])
+    # Bis 11:30: die zweite Stunde ist erst zur Hälfte vorbei (laufende Stunde bzw. Schnitt des Vorjahresfensters).
+    assert service.summarize("sunshine", rows, config, until=_ts(20, 11, 30))["hours"] == pytest.approx(1.5)
+    assert service.summarize("sunshine", rows, config, until=_ts(21, 0))["hours"] == pytest.approx(2.0)
+
+
+def test_summarize_sunshine_bridges_gaps_between_two_bright_hours_only(service) -> None:
+    # Ein Sensor, der mittags bei 98.800 lx klebt, löst kein Ereignis aus: die Stunden dazwischen haben keine Zeile.
+    config = {**wetter_routes._empty_config(), "sun_threshold_lx": 25000.0}
+    bright = _hour_rows(20, [(10, 98800.0), (14, 98800.0)])
+    assert service.summarize("sunshine", bright, config)["hours"] == pytest.approx(5.0)  # 10 bis 14 Uhr
+    # Dunkle Zeile danach: die Lücke gilt nicht als sonnig (die Wolke kam irgendwann in der Lücke).
+    assert service.summarize("sunshine", _hour_rows(20, [(10, 98800.0), (13, 5000.0)]), config)["hours"] == pytest.approx(1.0)
+    # Eine Lücke über der Grenze (Ausfall) zählt nicht.
+    assert service.summarize("sunshine", _hour_rows(19, [(7, 98800.0)]) + _hour_rows(19, [(15, 98800.0)]), config)["hours"] == pytest.approx(2.0)
+    # Das Ende des Fensters kappt auch aufgefüllte Stunden.
+    assert service.summarize("sunshine", bright, config, until=_ts(20, 12, 30))["hours"] == pytest.approx(2.5)
+
+
+def test_summarize_sunshine_without_values_is_missing_not_zero(service) -> None:
+    config = {**wetter_routes._empty_config(), "sun_threshold_lx": 25000.0}
+    assert service.summarize("sunshine", [], config) is None
+    assert service.summarize("sunshine", [rollup_mod.FineRow(bucket_start=_ts(20, 9))], config) is None
+    # Ein dunkler Tag mit Werten ist 0 Stunden, nicht „fehlt“.
+    dark = service.summarize("sunshine", _hour_rows(20, [(9, 3000.0)]), config)
+    assert dark["hours"] == 0.0 and dark["top"] is None and dark["top_ts"] is None
+
+
+def test_table_has_a_sunshine_row_from_the_illuminance_role(service) -> None:
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(19, 8), 10.0), (_ts(20, 1), 12.0)])
+    _add(service, "sensor.lux_sued", "sensor", "measurement", "lx", [
+        (_ts(19, 8), 30000.0), (_ts(19, 9), 10000.0), (_ts(19, 10), 40000.0), (_ts(19, 11), 0.0),
+        (_ts(20, 10), 40000.0), (_ts(20, 11), 40000.0),
+    ])
+    _configure(service, temperature="sensor.t", illuminance="sensor.lux_sued")
+    data = service.compute_table(TableRequest(columns=["heute", "gestern"], vorjahr=True), NOW)
+    rows = {row["key"]: row for row in data["rows"]}
+    assert list(rows) == ["temperature", "kenntage", "illuminance"]
+    sun = rows["illuminance"]
+    assert sun["kind"] == "sunshine" and sun["label"] == "Sonnenscheindauer"
+    assert sun["cells"]["gestern"]["cur"]["hours"] == pytest.approx(2.0)  # 8 Uhr und 10 Uhr
+    assert sun["cells"]["heute"]["cur"]["hours"] == pytest.approx(2.0)  # 10 und 11 Uhr bei 40.000 lx
+    assert sun["cells"]["heute"]["vj"] is None  # das Archiv beginnt erst gestern: kein Vorjahr, nie 0
+    assert data["sun_threshold_lx"] == 25000.0
+
+
+def test_sunshine_threshold_config_round_trip_and_bounds(service) -> None:
+    index = service.deps.index
+    assert wetter_routes._load_config(index)["sun_threshold_lx"] == wetter_routes.DEFAULT_SUN_THRESHOLD_LX
+    _configure(service, temperature="sensor.t", sun_threshold_lx=40000.0)
+    assert wetter_routes._load_config(index)["sun_threshold_lx"] == 40000.0
+    _configure(service, temperature="sensor.t", sun_threshold_lx=5.0)  # außerhalb: Standard statt Unsinn
+    assert wetter_routes._load_config(index)["sun_threshold_lx"] == wetter_routes.DEFAULT_SUN_THRESHOLD_LX
+
+
+def test_sunshine_setup_through_the_app(client) -> None:
+    from app.main import index
+
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    index.get_or_create_entity("sensor.sonne_test_temp", "sensor", "measurement", "°C")
+    index.get_or_create_entity("sensor.sonne_test_lux", "sensor", "measurement", "lx")
+    index.get_or_create_entity("sensor.sonne_test_zaehler", "sensor", "total_increasing", "kWh")
+    form = client.get("/wetterdashboard/setup").text
+    assert 'name="sun_threshold_lx"' in form and 'data-role="illuminance"' in form
+    base = {"temperature": "sensor.sonne_test_temp", "illuminance": "sensor.sonne_test_lux"}
+    assert client.post("/wetterdashboard/setup", data={**base, "sun_threshold_lx": "30000"}).status_code == 200
+    config = wetter_routes._load_config(index)
+    assert config["illuminance"] == "sensor.sonne_test_lux" and config["sun_threshold_lx"] == 30000.0
+    assert client.post("/wetterdashboard/setup", data={**base, "sun_threshold_lx": "abc"}).status_code == 400
+    assert client.post("/wetterdashboard/setup", data={**base, "sun_threshold_lx": "50"}).status_code == 400
+    # Ein Zähler passt nicht zur Rolle Helligkeit.
+    assert client.post("/wetterdashboard/setup", data={
+        "temperature": "sensor.sonne_test_temp", "illuminance": "sensor.sonne_test_zaehler",
+    }).status_code == 400
+    # Leer: Standard.
+    assert client.post("/wetterdashboard/setup", data=base).status_code == 200
+    assert wetter_routes._load_config(index)["sun_threshold_lx"] == wetter_routes.DEFAULT_SUN_THRESHOLD_LX
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
+def test_sunshine_row_and_metrics_exist_in_the_script() -> None:
+    from _paths import APP
+
+    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "row.kind === 'sunshine'" in script and "field: 'hours'" in script
+    assert "data.sun_threshold_lx" in script  # die Schwelle steht in der Beschriftung, nicht versteckt

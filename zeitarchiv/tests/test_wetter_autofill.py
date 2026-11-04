@@ -118,3 +118,27 @@ def test_extra_sensors_are_other_temperature_and_humidity_sensors_without_device
     ids = [entry["entity_id"] for entry in extras]
     assert ids == ["sensor.keller_feuchte", "sensor.keller_temperatur"]
     assert "sensor.cpu_temperatur" not in ids
+
+
+def test_illuminance_prefers_the_south_sensor_of_the_station_and_skips_the_moon() -> None:
+    archived = [
+        _entity("sensor.station_temperatur", "°C"),
+        _entity("sensor.station_illuminance_dawn", "lx"),
+        _entity("sensor.station_illuminance_east", "lx"),
+        _entity("sensor.station_illuminance_central", "lx"),
+        _entity("sensor.station_illuminance_west", "lx"),
+        _entity("sensor.wolfegg_moon_illuminance", "lx"),
+    ]
+    catalog = [
+        _catalog("sensor.station_temperatur", device_class="temperature", platform="eltako", device="Wetterstation"),
+        *[
+            _catalog(f"sensor.station_illuminance_{name}", device_class="illuminance", platform="eltako", device="Wetterstation")
+            for name in ("dawn", "east", "central", "west")
+        ],
+        _catalog("sensor.wolfegg_moon_illuminance", device_class="illuminance", platform="moon", device="Mond"),
+    ]
+    labels = {row["entity_id"]: row["entity_id"] for row in archived}
+    pick = wetter_autofill.suggest(archived, labels, catalog)["roles"]["illuminance"]
+    assert pick["entity_id"] == "sensor.station_illuminance_central"
+    assert pick["confidence"] == "ok"
+    assert "sensor.wolfegg_moon_illuminance" not in {pick["entity_id"], *(c["entity_id"] for c in pick["candidates"])}

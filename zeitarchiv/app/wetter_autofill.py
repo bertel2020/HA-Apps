@@ -20,7 +20,7 @@ from .i18n import tr
 from .selection_topics import WEATHER_PLATFORMS, _DEVICE_TEMP, is_outdoor
 
 #: Rollen, für die Vorschläge berechnet werden (Reihenfolge wie in der Einrichtung).
-ROLE_KEYS = ("temperature", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation")
+ROLE_KEYS = ("temperature", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation", "illuminance")
 
 _TEMP_UNITS = {"°c", "°f", "k"}
 _PRESSURE_UNITS = {"hpa", "mbar", "kpa", "pa", "inhg"}
@@ -33,6 +33,9 @@ _TOTAL = re.compile(r"(total|gesamt|summe|jahr|year|lifetime)", re.IGNORECASE)
 _HUMIDITY = re.compile(r"(feucht|humid)", re.IGNORECASE)
 _RELATIVE = re.compile(r"(relativ|relative|meeresspiegel|sea)", re.IGNORECASE)
 _ABSOLUTE = re.compile(r"(absolut|absolute)", re.IGNORECASE)
+#: Mehrere Helligkeitssensoren an einer Station (Süd, Ost, West, Dämmerung): die Sonnenscheindauer braucht Süd.
+_SOUTH = re.compile(r"(s[üu]d|south|central|zentral)", re.IGNORECASE)
+_MOON = re.compile(r"(moon|mond)", re.IGNORECASE)
 _HEATING = re.compile(r"(heiz|w[äa]rmepumpe|waermepumpe|heat ?pump|heatpump|konvektor|heizstab|therme|fu(ß|ss)boden)", re.IGNORECASE)
 _HINT_FIELDS = ("name", "device", "area")
 
@@ -88,7 +91,7 @@ def _score(role: str, row: dict[str, Any], anchor: dict[str, Any] | None) -> tup
             add(3, tr("Wetter-Integration"))
         if not _outdoor_or_station(row):
             return 0, []  # eine Innentemperatur ist keine Außentemperatur
-    elif role in ("humidity", "pressure", "wind", "gust", "radiation"):
+    elif role in ("humidity", "pressure", "wind", "gust", "radiation", "illuminance"):
         if kind != "standard" or row["domain"] != "sensor":
             return 0, []
         if role == "humidity":
@@ -112,9 +115,16 @@ def _score(role: str, row: dict[str, Any], anchor: dict[str, Any] | None) -> tup
                     return 0, []
                 if gusty:
                     add(1, tr("„Böe“ im Namen"))
-        else:
+        elif role == "radiation":
             if dc == "irradiance" or unit == "w/m²":
                 add(3, tr("Strahlung"))
+        else:
+            if _MOON.search(text):
+                return 0, []  # die berechnete Mondhelligkeit ist kein Sensor
+            if dc == "illuminance" or unit == "lx":
+                add(3, tr("Helligkeit"))
+            if points and _SOUTH.search(text):
+                add(2, tr("Süd-Sensor"))
     elif role == "precip_mm":
         if kind != "counter" or row["domain"] != "sensor":
             return 0, []

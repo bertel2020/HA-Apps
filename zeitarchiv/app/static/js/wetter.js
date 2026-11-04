@@ -81,6 +81,13 @@
         {label: 'Ø', field: 'avg', delta: true},
       ];
     }
+    if (row.kind === 'sunshine') {
+      // Stundengenau: Stunden, deren Mittel die Schwelle erreicht. Die Schwelle steht in der Beschriftung.
+      return [
+        {label: t('Sonnenstunden (ab {n} lx)', {n: num(data.sun_threshold_lx, 0)}), field: 'hours', decimals: 1, unit: 'h', delta: true, percent: true},
+        {label: t('Sonnigster Tag'), field: 'top', decimals: 1, unit: 'h', when: 'day'},
+      ];
+    }
     if (row.kind === 'counter') {
       return [
         {label: t('Summe'), field: 'sum', decimals: 1, delta: true, percent: true},
@@ -134,7 +141,7 @@
 
   // Gruppen: „wind“ = Reiter „Wind & Sonne“, „klima“ = Zusatzsensoren (Schlüssel „temperature:N“) auf „Temperatur & Klima“,
   // alles andere steht in der Übersicht.
-  const WIND_KEYS = ['wind', 'gust', 'radiation'];
+  const WIND_KEYS = ['wind', 'gust', 'radiation', 'illuminance'];
   const groupOf = (key) => (WIND_KEYS.includes(key) ? 'wind' : (key.includes(':') ? 'klima' : 'basis'));
   const inGroup = (key, group) => groupOf(key) === group;
   // Tabellen und Kachelreihen je Gruppe: x-ref-Namen wie in _wetter_view.html (tiles<Gruppe>, table[Wrap]<Gruppe>, Übersicht ohne Gruppenname).
