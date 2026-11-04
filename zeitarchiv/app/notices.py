@@ -517,7 +517,13 @@ def build_notices(
     # zunächst nur lesend (siehe _settings_storage_index_form.html); bleiben
     # dabei gefundene Abweichungen unrepariert stehen, ist das noch zu tun —
     # dann warn, weil eine echte Handlung (Button "Index reparieren") fehlt.
-    if storage_reconcile and storage_reconcile.get("mismatches"):
+    # "acknowledged": Der Nutzer hat die Abweichungen selbst per "Index reparieren" behoben und sie damit gesehen —
+    # die Info bliebe sonst bis zum nächsten Abgleich stehen, obwohl nichts mehr zu tun ist.
+    if (
+        storage_reconcile
+        and storage_reconcile.get("mismatches")
+        and not storage_reconcile.get("acknowledged")
+    ):
         mismatch_count = len(storage_reconcile["mismatches"])
         repaired = bool(storage_reconcile.get("repaired"))
         notices.append({

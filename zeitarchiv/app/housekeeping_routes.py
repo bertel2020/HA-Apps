@@ -1070,6 +1070,8 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         """Prüft erneut und ersetzt nur abgeleitete Metadaten atomar."""
         with deps.coordinator.exclusive():
             report = deps.run_storage_reconciliation(repair=True)
+            # Dasselbe Objekt, das die Glocke liest (storage_reconcile_last): nach der manuellen Reparatur kein Hinweis mehr.
+            report["acknowledged"] = True
         return deps.templates.TemplateResponse(
             request, "_settings_storage_index_form.html", _settings_storage_index_context(report)
         )

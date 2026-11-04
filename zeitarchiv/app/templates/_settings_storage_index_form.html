@@ -14,7 +14,7 @@
     <span class="status-card-label">{{ _("Geprüfte Entitäten") }}</span>
     <strong>{{ storage_audit.entities_checked }}</strong>
   </div>
-  <div class="status-card{% if storage_audit.rows or storage_audit.errors %} status-card-danger{% endif %}">
+  <div class="status-card{% if (storage_audit.rows and not storage_audit.repaired) or storage_audit.errors %} status-card-danger{% endif %}">
     <span class="status-card-label">{{ _("Abweichungen") }}</span>
     <strong>{{ storage_audit.rows | length }}</strong>
     {% if storage_audit.repaired %}<span class="status-card-detail">{{ _("repariert") }}</span>{% endif %}

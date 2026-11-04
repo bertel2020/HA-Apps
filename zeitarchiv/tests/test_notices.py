@@ -10,6 +10,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 
+import _paths
 from app.energiedashboard_routes import CONFIG_SCHEMA_VERSION, SETTING_CONFIG
 from app.notices import (
     BACKUP_WORKER_STALLED_SECONDS,
@@ -22,6 +23,38 @@ from app.notices import (
 from app.storage.index import Index
 
 TZ = ZoneInfo("Europe/Berlin")
+
+
+def _reconcile_notice_ids(storage_reconcile: dict) -> list[str]:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
+    try:
+        db_path = tmp / "index.sqlite"
+        index = Index(db_path)
+        notices = build_notices(
+            index, db_path, TZ,
+            purge_totals={},
+            storage_reconcile=storage_reconcile,
+            stale_entity_count=0,
+            scheduler_last_tick=time.time(),
+            reconcile_last_tick=time.time(),
+            reconcile_in_progress=False,
+        )
+        index.close()
+        return [n["id"] for n in notices]
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_manual_index_repair_removes_the_mismatch_notice_but_automatic_repair_keeps_it() -> None:
+    report = {"mismatches": [{"entity_id": "sensor.a"}], "errors": [], "corrupted": [], "repaired": True}
+
+    assert "system.storage_reconcile_mismatches" in _reconcile_notice_ids(report)
+    assert "system.storage_reconcile_mismatches" not in _reconcile_notice_ids({**report, "acknowledged": True})
+
+
+def test_index_check_template_shows_repaired_deviations_without_danger_style() -> None:
+    text = (_paths.TEMPLATES / "_settings_storage_index_form.html").read_text(encoding="utf-8")
+    assert "(storage_audit.rows and not storage_audit.repaired) or storage_audit.errors" in text
 
 
 def test_purge_available_notice_appears_when_rows_are_removable() -> None:
