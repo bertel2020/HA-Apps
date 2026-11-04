@@ -334,6 +334,9 @@
       longterm: null,
       longError: '',
       kenntageRange: 'all',
+      hasConditions: false,
+      conditions: null,
+      _conditionsSeq: 0,
       hasDaylight: false,
       daylight: null,
       daylightError: '',
@@ -373,6 +376,8 @@
         this.loadTiles();
         this.loadTable();
         this.loadMonthly();
+        this.hasConditions = !!this.$root.querySelector('[data-wt-conditions]');
+        if (this.hasConditions) this.startConditions();
         // Die Karte „Tageslicht“ gibt es nur mit zugeordneter Rolle; $refs sind in init() noch nicht angelegt.
         this.hasDaylight = !!this.$root.querySelector('[x-ref="daylightChart"]');
         if (this.hasDaylight) this.loadDaylight();
@@ -386,6 +391,7 @@
           this.loadTiles();
           this.loadTable();
           if (this.hasDaylight) this.loadDaylight();
+          if (this.hasConditions) this.loadConditions();
         });
       },
 
@@ -690,6 +696,101 @@
         }, true);
         // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
         requestAnimationFrame(() => chart.resize());
+      },
+
+      // ---- Wetterlage: Satz aus Himmel, Wind, Regen und Temperatur (immer der aktuelle Stand) ---------
+
+      // Lädt neu, solange die Seite offen ist; nach dem Austausch der Seite (Einrichtung gespeichert) hört das alte Objekt auf.
+      startConditions() {
+        this.loadConditions();
+        const timer = setInterval(() => {
+          if (!this.$root.isConnected) clearInterval(timer);
+          else if (!document.hidden) this.loadConditions();
+        }, 5 * 60 * 1000);
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden && this.$root.isConnected) this.loadConditions();
+        });
+      },
+
+      async loadConditions() {
+        if (this.stichtag()) return;  // die Wetterlage gilt für jetzt, nicht für einen Rückblick
+        const seq = ++this._conditionsSeq;
+        try {
+          const data = await this.fetchJson('wetterdashboard/wetterlage');
+          if (seq === this._conditionsSeq) this.conditions = data.sky || data.wind || data.rain ? data : null;
+        } catch (e) {
+          // Die Zeile ist Beiwerk: ohne Antwort bleibt der letzte Stand stehen.
+        }
+      },
+
+      skyName(kind) {
+        return {
+          night: t('Nacht'), dusk: t('Dämmerung'), day: t('Tag'), overcast: t('trüb'), cloudy: t('bewölkt'),
+          fair: t('heiter'), sunny: t('sonnig'),
+        }[kind] || kind;
+      },
+
+      beaufortName(stage) {
+        return [
+          t('Windstille'), t('leiser Zug'), t('leichte Brise'), t('schwache Brise'), t('mäßige Brise'), t('frische Brise'),
+          t('starker Wind'), t('steifer Wind'), t('stürmischer Wind'), t('Sturm'), t('schwerer Sturm'),
+          t('orkanartiger Sturm'), t('Orkan'),
+        ][stage] || '';
+      },
+
+      conditionsRain() {
+        const rain = this.conditions && this.conditions.rain;
+        if (!rain) return null;
+        const mm = rain.mm_today ? ` · ${num(rain.mm_today, 1)} ${rain.mm_unit || 'mm'}` : '';
+        if (rain.raining) {
+          if (rain.minutes == null) return {text: t('Regen') + mm, sub: t('seit mehr als {n} h', {n: 48})};
+          const minutes = Math.round(rain.minutes);
+          const since = minutes < 120 ? t('Regen seit {n} min', {n: minutes}) : t('Regen seit {h} h {m} min', {h: Math.floor(minutes / 60), m: String(minutes % 60).padStart(2, '0')});
+          return {text: since + mm, sub: t('Beginn {time}', {time: fmtDate(formats.hm, rain.since)})};
+        }
+        let sub = '';
+        if (rain.raining === false) {
+          if (rain.last == null) sub = t('in den letzten {n} h kein Regen', {n: 48});
+          else {
+            const sameDay = fmtDate(formats.dm, rain.last) === fmtDate(formats.dm, this.conditions.now);
+            sub = t('zuletzt Regen um {time}', {time: (sameDay ? '' : fmtDate(formats.dm, rain.last) + ' ') + fmtDate(formats.hm, rain.last)});
+          }
+        }
+        if (rain.raining == null && rain.mm_today) return {text: t('heute {value} {unit}', {value: num(rain.mm_today, 1), unit: rain.mm_unit || 'mm'}), sub};
+        return {text: t('trocken'), sub};
+      },
+
+      conditionsLine() {
+        const c = this.conditions;
+        if (!c) return '';
+        const parts = [];
+        if (c.sky) parts.push(this.skyName(c.sky.class));
+        if (c.wind) parts.push(t('{name} ({kmh} km/h)', {name: this.beaufortName(c.wind.bft), kmh: num(c.wind.kmh, 0)}));
+        const rain = this.conditionsRain();
+        if (rain) parts.push(rain.text);
+        if (c.temp) parts.push(`${num(c.temp.value, c.temp.decimals == null ? 1 : c.temp.decimals)} ${c.temp.unit}`.trim());
+        return parts.join(' · ');
+      },
+
+      conditionsTiles() {
+        const c = this.conditions;
+        if (!c) return [];
+        const tiles = [];
+        if (c.sky) {
+          const sub = [];
+          if (c.sky.value != null) sub.push(t('Helligkeit {n} {unit}', {n: num(c.sky.value, 0), unit: c.sky.unit}));
+          if (c.sky.dawn != null) sub.push(t('Dämmerung {n} lx', {n: num(c.sky.dawn, 0)}));
+          tiles.push({label: t('Himmel'), value: this.skyName(c.sky.class), sub: sub.join(' · ')});
+        }
+        if (c.wind) {
+          tiles.push({
+            label: t('Wind'), value: this.beaufortName(c.wind.bft),
+            sub: t('Stärke {bft} · {kmh} km/h', {bft: c.wind.bft, kmh: num(c.wind.kmh, 0)}),
+          });
+        }
+        const rain = this.conditionsRain();
+        if (rain) tiles.push({label: t('Regen'), value: rain.text, sub: rain.sub});
+        return tiles;
       },
 
       // ---- Tageslicht (Dämmerungssensor): Kurve mit Nacht-, Dämmerungs- und Tagband -----------------

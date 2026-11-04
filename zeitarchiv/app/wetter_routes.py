@@ -33,6 +33,7 @@ from pydantic import BaseModel, Field
 from . import period_columns, selection_catalog
 from . import wetter_analysis as analysis
 from . import wetter_autofill
+from . import wetter_conditions as conditions
 from . import wetter_daylight as daylight
 from .chart_period import calendar_bounds
 from .formatting import decimals_to_int, entity_display_name
@@ -855,6 +856,111 @@ class WetterService:
             "compare": [{key: row[key] for key in compare_keys} for row in results],
         }
 
+    # -- Wetterlage ----------------------------------------------------------------------
+
+    def _recent(
+        self, entity_id: str, now_local: datetime, read_cache: query_mod.QueryReadCache, minutes: int = 10,
+    ) -> dict | None:
+        """Mittel, Maximum und letzter Wert der letzten Minuten; ein Sensor ohne neue Zeile hält seinen Wert."""
+        if not entity_id or self.deps.index.get_entity(entity_id) is None:
+            return None
+        rows = query_mod._query_live_fine(  # noqa: SLF001 — siehe Modul-Docstring
+            self.deps.data_dir, self.deps.index, entity_id, "standard", "hour", "line",
+            now_local - timedelta(minutes=minutes), now_local, self.deps.tz, now_local, read_cache,
+        )
+        rows = [row for row in rows if row.value is not None]
+        if not rows:
+            held = query_mod._boundary_value(  # noqa: SLF001
+                self.deps.data_dir, entity_id, now_local.timestamp(), self.deps.tz, read_cache,
+            )
+            return None if held is None else {"mean": held, "max": held, "last": held}
+        highs = [row.max_value if row.max_value is not None else row.value for row in rows]
+        return {"mean": sum(row.value for row in rows) / len(rows), "max": max(highs), "last": rows[-1].value}
+
+    def _rain_timeline(
+        self, entity_id: str, now_local: datetime, read_cache: query_mod.QueryReadCache,
+    ) -> list[tuple[float, bool]]:
+        start = (now_local - timedelta(hours=conditions.RAIN_LOOKBACK_HOURS)).timestamp()
+        rows = list(query_mod.cleanup.iter_raw_rows(
+            self.deps.data_dir, self.deps.index, entity_id, start, now_local.timestamp(), self.deps.tz,
+            now=now_local, max_rows=query_mod.MAX_RAW_QUERY_POINTS,
+            hot_rows_loader=read_cache.read_hot_rows,
+        ))
+        timeline = [(ts, value >= 0.5) for ts, value in rows]
+        initial = query_mod._boundary_value(self.deps.data_dir, entity_id, start, self.deps.tz, read_cache)  # noqa: SLF001
+        if initial is not None:
+            timeline.insert(0, (start, initial >= 0.5))
+        elif timeline:
+            # Die erste Zeile des Sensors überhaupt: davor gab es keinen Regen, den wir kennen.
+            timeline.insert(0, (start, False))
+        return timeline
+
+    def compute_conditions(self, now_local: datetime | None = None) -> dict | None:
+        """Wetterlage jetzt: Himmelsklasse, Wind, Regen und Temperatur; fehlt eine Rolle, fehlt ihr Teil (nie „unbekannt“)."""
+        config = _load_config(self.deps.index)
+        now_local = now_local or datetime.now(self.deps.tz)
+        read_cache = query_mod.QueryReadCache()
+        index = self.deps.index
+        night_lx, day_lx = config["daylight_night_lx"], config["daylight_day_lx"]
+
+        def unit_of(entity_id: str) -> str:
+            entity = index.get_entity(entity_id)
+            return (entity["unit"] or "") if entity else ""
+
+        sky = None
+        # Quelle der Klasse: die Helligkeit, sonst die Strahlung.
+        main_role = "illuminance"
+        main = self._recent(config["illuminance"], now_local, read_cache)
+        if main is None:
+            main_role, main = "radiation", self._recent(config["radiation"], now_local, read_cache)
+        dawn = self._recent(config["illuminance_dawn"], now_local, read_cache)
+        if main is not None or dawn is not None:
+            if main_role == "illuminance" and main is not None:
+                cuts, unit = conditions.lx_cuts(config["sun_threshold_lx"]), "lx"
+            else:
+                cuts, unit = conditions.CLASS_CUTS_WM2, unit_of(config["radiation"]) or "W/m²"
+            if dawn is not None:
+                kind = conditions.NIGHT if dawn["mean"] < night_lx else conditions.DUSK if dawn["mean"] < day_lx else None
+            elif main is not None and unit == "lx":
+                kind = conditions.NIGHT if main["mean"] < night_lx else conditions.DUSK if main["mean"] < day_lx else None
+            else:
+                kind = conditions.NIGHT if main is not None and main["mean"] < conditions.NIGHT_WM2 else None
+            if kind is None:
+                kind = conditions.sky_class(main["mean"], cuts) if main is not None else conditions.DAY
+            sky = {
+                "class": kind, "value": main["mean"] if main else None, "unit": unit,
+                "source": main_role if main else None, "dawn": dawn["mean"] if dawn else None,
+            }
+
+        wind = None
+        recent = self._recent(config["wind"], now_local, read_cache)
+        if recent is not None:
+            kmh = conditions.to_kmh(recent["max"], unit_of(config["wind"]))
+            if kmh is not None:
+                wind = {"kmh": kmh, "bft": conditions.beaufort(kmh)}
+
+        rain = None
+        if config["precip_dur"] and index.get_entity(config["precip_dur"]) is not None:
+            rain = conditions.rain_state(self._rain_timeline(config["precip_dur"], now_local, read_cache), now_local.timestamp())
+        if config["precip_mm"] and index.get_entity(config["precip_mm"]) is not None:
+            midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+            today = self.summarize(
+                "counter", self._rows(config["precip_mm"], "counter", midnight, now_local, now_local, read_cache),
+                config, unit=unit_of(config["precip_mm"]),
+            )
+            mm = {"mm_today": today["sum"] if today else None, "mm_unit": unit_of(config["precip_mm"])}
+            rain = {**(rain or {"raining": None, "since": None, "last": None, "minutes": None}), **mm}
+
+        temp = None
+        recent = self._recent(config["temperature"], now_local, read_cache)
+        entity = index.get_entity(config["temperature"]) if config["temperature"] else None
+        if recent is not None and entity is not None:
+            temp = {"value": recent["last"], "unit": entity["unit"] or "", "decimals": _decimals(entity, "temperature")}
+
+        if sky is None and wind is None and rain is None:
+            return None
+        return {"tz": str(self.deps.tz), "now": now_local.timestamp(), "sky": sky, "wind": wind, "rain": rain, "temp": temp}
+
     # -- Seite -------------------------------------------------------------------------
 
     def _page_context(self, request: Request) -> dict:
@@ -865,6 +971,9 @@ class WetterService:
             "has_heating": bool(self.heating_counters(config)),
             "has_windsun": any(config[key] for key in ("wind", "gust", "radiation", "illuminance")),
             "has_daylight": bool(config["illuminance_dawn"]),
+            "has_conditions": any(
+                config[key] for key in ("illuminance", "illuminance_dawn", "radiation", "wind", "precip_dur", "precip_mm")
+            ),
             "has_klima": any(extra["entity_id"] for extra in config["extra_temperatures"]),
             **calendar_bounds(self.deps.index.list_entities(), self.deps.tz),
             "enabled": _is_enabled(self.deps.index),
@@ -1132,6 +1241,11 @@ class WetterService:
             if data is None:
                 raise HTTPException(status_code=409, detail=tr("Keine Entität für „Helligkeit Dämmerung“ zugeordnet."))
             return data
+
+        @router.get("/wetterdashboard/wetterlage")
+        def wetterdashboard_conditions() -> dict:
+            _require_configured()
+            return self.compute_conditions() or {"sky": None, "wind": None, "rain": None, "temp": None}
 
         @router.get("/wetterdashboard/tiles")
         def wetterdashboard_tiles(date: str | None = None) -> dict:

@@ -87,6 +87,9 @@ UNTRANSLATED_SCRIPT_TEXT_OK: dict[str, set[str]] = {
     "dd-picker.js": {"Tab"},
     # Einheit kWh als Achsenname: gleicht einem Katalogschlüssel, ist aber in jeder Sprache gleich.
     "wetter.js": {"kWh"},
+    # Schlüssel des Kenntags „sonnig“ im Energie-Langzeitvergleich (case-Marke), kein sichtbarer Text; der Katalog
+    # kennt das Wort seit der Wetterlage („sonnig“ als Himmelsklasse).
+    "energie-langzeit.js": {"sonnig"},
 }
 
 
