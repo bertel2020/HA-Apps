@@ -45,7 +45,7 @@ from ..limits import (
     MAX_ZIP_MEMBERS,
     MAX_ZIP_UNCOMPRESSED_BYTES,
 )
-from .index import Index
+from .index import STATE_TYPE, Index
 from .paths import entity_dir
 
 
@@ -1002,6 +1002,13 @@ def import_rows(
         rollup.append_completed_month(
             data_dir, entity_id, aggregation_type, table, year, month, tz, hourly_rollup=hourly_rollup
         )
+        # Ein neu angelegter Monat ist der Bezugswert für den ersten Zuwachs eines schon archivierten Folgemonats
+        # (Zähler, Zustand). Dessen Rollup wurde ohne Vormonat gebaut — sein erster Tag stünde bei 0. Standard- und
+        # Schalter-Entitäten brauchen keinen Bezugswert.
+        if aggregation_type in ("counter", STATE_TYPE) and any(
+            path.stem > label for path in archive_dir.glob("????-??.parquet")
+        ):
+            archived_month_updated = True
 
         result.imported_months.append(label)
         result.rows_imported += len(month_rows)

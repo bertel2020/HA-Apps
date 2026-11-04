@@ -20,7 +20,7 @@ try:
     import pyarrow.parquet as pq
 
     from app.limits import MAX_IMPORT_ROWS_PER_ENTITY
-    from app.storage import hotbuffer, symcon_import
+    from app.storage import hotbuffer, rollup, symcon_import
     from app.storage.index import Index
 
     _PYARROW_AVAILABLE = True
@@ -237,7 +237,10 @@ def test_import_variable_never_overwrites_a_month_with_an_existing_archive_file(
 
         archive_dir = tmp / "archive" / entity_id
         archive_dir.mkdir(parents=True, exist_ok=True)
-        (archive_dir / "2024-08.parquet").write_bytes(b"not-really-parquet-but-must-survive-untouched")
+        # Eine echte, lesbare Archivdatei: nach dem Import des Vormonats baut der Import die Rollups neu auf und liest
+        # dabei auch den bestehenden August.
+        pq.write_table(pa.table({"ts": [_ts(2024, 8, 2)], "value": [105.0]}), archive_dir / "2024-08.parquet")
+        august_bytes = (archive_dir / "2024-08.parquet").read_bytes()
 
         source = tmp / "symcon"
         _write_csv(source / "777.csv", [(_ts(2024, 7, 15), 100.0), (_ts(2024, 8, 2), 105.0)])
@@ -247,7 +250,7 @@ def test_import_variable_never_overwrites_a_month_with_an_existing_archive_file(
 
         assert result.imported_months == ["2024-07"]
         assert result.skipped_months == ["2024-08"]
-        assert (archive_dir / "2024-08.parquet").read_bytes() == b"not-really-parquet-but-must-survive-untouched"
+        assert (archive_dir / "2024-08.parquet").read_bytes() == august_bytes
 
         index.close()
     finally:
@@ -723,6 +726,34 @@ def test_extract_variable_names_resolves_units_from_settings_profiles() -> None:
     assert names["1"]["unit"] == "°C"
     assert names["2"]["unit"] == "W"
     assert names["3"]["unit"] is None
+
+
+def test_import_of_an_earlier_month_rebuilds_the_first_increase_of_the_already_archived_next_month() -> None:
+    """Zuerst März, danach nachträglich eine Zeile im Februar (CSV-Neuimport mit Nullzeile davor): Der erste Tag
+    des Märzes hatte beim Bau seines Rollups keinen Vormonat und stand deshalb bei 0. Mit dem Februar als
+    Bezugswert muss er nach dem zweiten Import den vollen Zuwachs zeigen."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-earlier-month-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.solar_ertrag"
+        index.get_or_create_entity(entity_id, "sensor", "total_increasing", "kWh")
+        march = [(_ts(2026, 3, 1), 23.03), (_ts(2026, 3, 2), 51.10)]
+
+        symcon_import.import_rows(tmp, index, march, entity_id, TZ)
+
+        def day_values() -> list[float]:
+            path = rollup.rollup_path(tmp, entity_id, "tag")
+            table = pq.read_table(rollup._segment_dir(path) / "2026-03.parquet").sort_by("bucket_start")
+            return [round(v, 2) for v in table.column("value").to_pylist()]
+
+        assert day_values() == [0.0, 28.07]
+
+        symcon_import.import_rows(tmp, index, [(_ts(2026, 2, 28), 0.0)], entity_id, TZ)
+
+        assert day_values() == [23.03, 28.07]
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def _run_all() -> None:
