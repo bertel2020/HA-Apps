@@ -795,10 +795,9 @@
         const c = this.conditions;
         const parts = {};
         if (c.sky && c.sky.class) {
-          parts.sky = {
-            value: t('überwiegend {name}', {name: this.skyName(c.sky.class)}),
-            sub: c.sky.sun_hours != null ? t('{h} Sonnenstunden', {h: num(c.sky.sun_hours, 1)}) : t('{n} helle Stunden', {n: c.sky.day_hours}),
-          };
+          parts.sky = c.sky.sun_hours != null
+            ? {value: t('{h} Sonnenstunden', {h: num(c.sky.sun_hours, 1)}), sub: t('von {n} hellen Stunden', {n: c.sky.day_hours})}
+            : {value: t('{n} helle Stunden', {n: c.sky.day_hours}), sub: ''};
         }
         if (c.wind) {
           parts.wind = {
@@ -850,17 +849,17 @@
         if (!c) return [];
         if (c.mode === 'day') {
           const p = this.conditionsDayParts();
-          const labels = {sky: t('Himmel'), wind: t('Wind'), rain: t('Regen'), temp: t('Temperatur')};
+          const labels = {sky: t('Sonnenschein'), wind: t('Wind'), rain: t('Regen'), temp: t('Temperatur')};
           return ['sky', 'wind', 'rain', 'temp'].filter((key) => p[key]).map((key) => ({
             kind: key === 'temp' ? 'temp' : key, label: labels[key], value: p[key].value, sub: p[key].sub,
           }));
         }
         const tiles = [];
         if (c.sky) {
-          const sub = [];
-          if (c.sky.value != null) sub.push(t('Helligkeit {n} {unit}', {n: num(c.sky.value, 0), unit: c.sky.unit}));
-          if (c.sky.dawn != null) sub.push(t('Dämmerung {n} lx', {n: num(c.sky.dawn, 0)}));
-          tiles.push({kind: 'sky', label: t('Himmel'), value: this.skyName(c.sky.class), sub: sub.join(' · ')});
+          // Die Klasse steht in der Überschrift; die Kachel zeigt die Messwerte dahinter.
+          const main = c.sky.value != null ? {n: c.sky.value, unit: c.sky.unit} : {n: c.sky.dawn, unit: 'lx'};
+          const sub = c.sky.value != null && c.sky.dawn != null ? t('Dämmerung {n} lx', {n: num(c.sky.dawn, 0)}) : '';
+          tiles.push({kind: 'sky', label: t('Helligkeit'), value: `${num(main.n, 0)} ${main.unit}`.trim(), sub});
         }
         if (c.wind) {
           tiles.push({
