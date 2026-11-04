@@ -280,6 +280,21 @@ a coarser resolution (minute, hour, day) instead of the complete raw values.
   <br><sub>Long-term comparison</sub>
 </p>
 
+<p align="center">
+  <a href="docs/img/en/weather-dashboard.png"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/en/weather-dashboard-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/img/en/weather-dashboard.png">
+    <img src="docs/img/en/weather-dashboard.png" alt="Weather dashboard: current values and periods compared with last year" width="270">
+  </picture></a>
+  <a href="docs/img/en/weather-long-term.png"><img src="docs/img/en/weather-long-term.png" alt="Weather dashboard, Long-term tab: characteristic days per year" width="270"></a>
+  <a href="docs/img/en/energy-long-term.png"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/en/energy-long-term-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/img/en/energy-long-term.png">
+    <img src="docs/img/en/energy-long-term.png" alt="Energy dashboard, Long-term tab: periods compared with last year" width="270">
+  </picture></a>
+  <br><sub>Weather dashboard &nbsp;·&nbsp; Weather: characteristic days &nbsp;·&nbsp; Energy: long-term</sub>
+</p>
+
 <p align="center"><sub>Adapts automatically to light/dark (see home page/energy dashboard above); besides "Zeitarchiv" (default) and "Home Assistant" also selectable as "Modern". More views: <a href="docs/img/en">docs/img/en</a>.</sub></p>
 
 ## Storage and retention

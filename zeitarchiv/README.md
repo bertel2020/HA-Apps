@@ -299,6 +299,21 @@ gröberer Auflösung (Minute, Stunde, Tag) statt der kompletten Rohwerte.
   <br><sub>Datenqualität &nbsp;·&nbsp; Wiederherstellen mit Auswahl &nbsp;·&nbsp; Langzeit-Vergleich</sub>
 </p>
 
+<p align="center">
+  <a href="docs/img/wetterdashboard-light.png"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/wetterdashboard-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/img/wetterdashboard-light.png">
+    <img src="docs/img/wetterdashboard-light.png" alt="Wetterdashboard: aktuelle Werte und Zeiträume im Vergleich zum Vorjahr" width="270">
+  </picture></a>
+  <a href="docs/img/wetter-langzeit-light.png"><img src="docs/img/wetter-langzeit-light.png" alt="Wetterdashboard, Reiter Langzeit: Kenntage je Jahr" width="270"></a>
+  <a href="docs/img/energie-langzeit-light.png"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/energie-langzeit-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/img/energie-langzeit-light.png">
+    <img src="docs/img/energie-langzeit-light.png" alt="Energiedashboard, Reiter Langzeit: Zeiträume im Vergleich zum Vorjahr" width="270">
+  </picture></a>
+  <br><sub>Wetterdashboard &nbsp;·&nbsp; Wetter: Kenntage &nbsp;·&nbsp; Energie: Langzeit</sub>
+</p>
+
 <p align="center"><sub>Passt sich automatisch Hell/Dunkel an (siehe Startseite/Energiedashboard oben); neben „Zeitarchiv" (Standard) und „Home Assistant" auch als „Modern" wählbar. Weitere Ansichten: <a href="docs/img">docs/img</a>.</sub></p>
 
 ## Speicherung und Aufbewahrung
