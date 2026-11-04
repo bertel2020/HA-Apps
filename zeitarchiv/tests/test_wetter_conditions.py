@@ -174,4 +174,49 @@ def test_conditions_script_builds_the_sentence_and_follows_the_date() -> None:
 
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "wetterdashboard/wetterlage" in script and "conditionsLine" in script and "beaufortName" in script
-    assert "if (this.stichtag()) return;" in script  # ein Rückblick hat keine „aktuelle“ Wetterlage
+    assert "conditionsDayParts" in script and "wetterdashboard/wetterlage${stichtag" in script  # Rückblick: Tageszusammenfassung
+
+
+def _day_station(service) -> None:
+    hours = range(5, 20)
+    lux = {5: 0.0, 6: 300.0, 7: 20000.0, 8: 80000.0, 9: 90000.0, 10: 85000.0, 11: 30000.0, 12: 20000.0, 13: 90000.0,
+           14: 92000.0, 15: 88000.0, 16: 9000.0, 17: 300.0, 18: 0.0, 19: 0.0}
+    dawn = {hour: (0.0 if value < 5 else 100.0 if value < 5000 else 1000.0) for hour, value in lux.items()}
+    _add(service, "sensor.lux", "sensor", "measurement", "lx", [(_ts(h, 30, day=19), lux[h]) for h in hours])
+    _add(service, "sensor.dawn", "sensor", "measurement", "lx", [(_ts(h, 30, day=19), dawn[h]) for h in hours])
+    _add(service, "sensor.wind", "sensor", "measurement", "km/h", [(_ts(h, 30, day=19), 8.0 + h) for h in hours])
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(h, 30, day=19), 4.0 + h / 2) for h in hours])
+    _configure(
+        service, temperature="sensor.t", illuminance="sensor.lux", illuminance_dawn="sensor.dawn", wind="sensor.wind",
+        sun_threshold_lx=25000.0,
+    )
+
+
+def test_conditions_day_summarises_a_past_day(service) -> None:
+    _day_station(service)
+    data = service.compute_conditions_day("2026-08-19", NOW)
+    assert data["mode"] == "day" and data["date"] == "2026-08-19"
+    # Helle Stunden = Dämmerungssensor ab 400 lx: 7 bis 16 Uhr; sonnig sind 8, 9, 10, 13, 14, 15
+    assert data["sky"]["class"] == cond.SUNNY and data["sky"]["day_hours"] >= 7
+    assert data["sky"]["sun_hours"] >= 5
+    assert data["wind"]["kmh"] == pytest.approx(27.0) and data["wind"]["bft"] == 4
+    assert data["temp"]["min"] == pytest.approx(6.5) and data["temp"]["max"] == pytest.approx(13.5)
+    assert data["rain"] is None
+
+
+def test_conditions_day_is_none_for_today_and_without_data(service) -> None:
+    _day_station(service)
+    assert service.compute_conditions_day("2026-08-20", NOW) is None  # heute gilt als „jetzt“
+    assert service.compute_conditions_day("2026-08-10", NOW) is None  # kein Wert an diesem Tag
+
+
+def test_conditions_route_takes_a_date(client) -> None:
+    from app.main import index
+
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    index.get_or_create_entity("sensor.lagetag_wind", "sensor", "measurement", "km/h")
+    index.get_or_create_entity("sensor.lagetag_temp", "sensor", "measurement", "°C")
+    data = {"temperature": "sensor.lagetag_temp", "wind": "sensor.lagetag_wind"}
+    assert client.post("/wetterdashboard/setup", data=data).status_code == 200
+    body = client.get("/wetterdashboard/wetterlage?date=2020-01-01")
+    assert body.status_code == 200 and body.json()["wind"] is None

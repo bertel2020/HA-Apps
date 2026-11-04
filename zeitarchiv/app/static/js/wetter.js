@@ -391,7 +391,7 @@
           this.loadTable();
           // Die Karte liegt im Reiter „Wind & Sonne“: dort sofort neu laden, sonst beim nächsten Öffnen.
           if (this.hasDaylight) { this.daylight = null; if (this.tab === 'wind') this.loadDaylight(); }
-          if (this.hasConditions) this.loadConditions();
+          if (this.hasConditions) { this.conditions = null; this.loadConditions(); }
         });
       },
 
@@ -714,10 +714,10 @@
       },
 
       async loadConditions() {
-        if (this.stichtag()) return;  // die Wetterlage gilt für jetzt, nicht für einen Rückblick
+        const stichtag = this.stichtag();
         const seq = ++this._conditionsSeq;
         try {
-          const data = await this.fetchJson('wetterdashboard/wetterlage');
+          const data = await this.fetchJson(`wetterdashboard/wetterlage${stichtag ? `?date=${encodeURIComponent(stichtag)}` : ''}`);
           if (seq === this._conditionsSeq) this.conditions = data.sky || data.wind || data.rain ? data : null;
         } catch (e) {
           // Die Zeile ist Beiwerk: ohne Antwort bleibt der letzte Stand stehen.
@@ -761,9 +761,48 @@
         return {text: t('trocken'), sub};
       },
 
+      conditionsTitle() {
+        const c = this.conditions;
+        if (c && c.mode === 'day') return t('Wetter am {date}', {date: utcDayMonth.format(new Date(`${c.date}T12:00:00Z`))});
+        return t('Wetterlage');
+      },
+
+      // Rückblick auf einen Tag: Beschreibung der Teile (Himmel, Wind, Regen, Temperatur) als Zeile und als Kacheln.
+      conditionsDayParts() {
+        const c = this.conditions;
+        const parts = {};
+        if (c.sky && c.sky.class) {
+          parts.sky = {
+            value: t('überwiegend {name}', {name: this.skyName(c.sky.class)}),
+            sub: c.sky.sun_hours != null ? t('{h} Sonnenstunden', {h: num(c.sky.sun_hours, 1)}) : t('{n} helle Stunden', {n: c.sky.day_hours}),
+          };
+        }
+        if (c.wind) {
+          parts.wind = {
+            value: t('bis {name}', {name: this.beaufortName(c.wind.bft)}),
+            sub: t('Stärke {bft} · {kmh} km/h', {bft: c.wind.bft, kmh: num(c.wind.kmh, 0)}),
+          };
+        }
+        if (c.rain) {
+          const dry = !c.rain.mm && !c.rain.minutes;
+          const mm = c.rain.mm ? `${num(c.rain.mm, 1)} ${c.rain.mm_unit || 'mm'}` : '';
+          const minutes = c.rain.minutes ? t('{n} min', {n: num(c.rain.minutes, 0)}) : '';
+          parts.rain = {value: dry ? t('trocken') : (mm || minutes), sub: dry ? '' : (mm && minutes ? minutes : '')};
+        }
+        if (c.temp) {
+          const dec = c.temp.decimals == null ? 1 : c.temp.decimals;
+          parts.temp = {value: t('{min} bis {max} {unit}', {min: num(c.temp.min, dec), max: num(c.temp.max, dec), unit: c.temp.unit}).trim(), sub: ''};
+        }
+        return parts;
+      },
+
       conditionsLine() {
         const c = this.conditions;
         if (!c) return '';
+        if (c.mode === 'day') {
+          const p = this.conditionsDayParts();
+          return [p.sky && p.sky.value, p.wind && p.wind.value, p.rain && p.rain.value, p.temp && p.temp.value].filter(Boolean).join(' · ');
+        }
         const parts = [];
         if (c.sky) parts.push(this.skyName(c.sky.class));
         if (c.wind) parts.push(t('{name} ({kmh} km/h)', {name: this.beaufortName(c.wind.bft), kmh: num(c.wind.kmh, 0)}));
@@ -776,6 +815,13 @@
       conditionsTiles() {
         const c = this.conditions;
         if (!c) return [];
+        if (c.mode === 'day') {
+          const p = this.conditionsDayParts();
+          const labels = {sky: t('Himmel'), wind: t('Wind'), rain: t('Regen'), temp: t('Temperatur')};
+          return ['sky', 'wind', 'rain', 'temp'].filter((key) => p[key]).map((key) => ({
+            kind: key === 'temp' ? 'temp' : key, label: labels[key], value: p[key].value, sub: p[key].sub,
+          }));
+        }
         const tiles = [];
         if (c.sky) {
           const sub = [];

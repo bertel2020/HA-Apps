@@ -963,6 +963,94 @@ class WetterService:
             return None
         return {"tz": str(self.deps.tz), "now": now_local.timestamp(), "sky": sky, "wind": wind, "rain": rain, "temp": temp}
 
+    def compute_conditions_day(self, at: str, now_local: datetime | None = None) -> dict | None:
+        """Wetter eines vergangenen Tages als Zusammenfassung: häufigste Himmelsklasse und Sonnenstunden, stärkster
+        Wind, Regenmenge und -dauer, Tiefst- und Höchstwert. Ein „Jetzt“ gibt es dort nicht (am Tagesende ist
+        immer Nacht); fehlt eine Rolle oder haben ihre Werte keine Zeilen, fehlt ihr Teil."""
+        config = _load_config(self.deps.index)
+        now_local = now_local or datetime.now(self.deps.tz)
+        stichtag = parse_stichtag(at, now_local.date())
+        if stichtag is None:
+            return None
+        tz = self.deps.tz
+        start = datetime(stichtag.year, stichtag.month, stichtag.day, tzinfo=tz)
+        following = stichtag + timedelta(days=1)
+        end = min(datetime(following.year, following.month, following.day, tzinfo=tz), now_local)
+        if end <= start:
+            return None
+        read_cache = query_mod.QueryReadCache()
+        index = self.deps.index
+        night_lx, day_lx = config["daylight_night_lx"], config["daylight_day_lx"]
+
+        def unit_of(entity_id: str) -> str:
+            entity = index.get_entity(entity_id)
+            return (entity["unit"] or "") if entity else ""
+
+        def rows_of(entity_id: str, kind: str = "standard") -> list:
+            if not entity_id or index.get_entity(entity_id) is None:
+                return []
+            return self._rows(entity_id, kind, start, end, now_local, read_cache)
+
+        sky = None
+        main_role = "illuminance" if config["illuminance"] else "radiation"
+        main_rows = [row for row in rows_of(config[main_role]) if row.value is not None]
+        if main_rows:
+            lux = main_role == "illuminance"
+            cuts = conditions.lx_cuts(config["sun_threshold_lx"]) if lux else conditions.CLASS_CUTS_WM2
+            dawn = {row.bucket_start: row.value for row in rows_of(config["illuminance_dawn"]) if row.value is not None}
+            counts: dict[str, int] = {}
+            for row in main_rows:
+                if dawn:
+                    bright = dawn.get(row.bucket_start, -1.0) >= day_lx
+                else:
+                    bright = row.value >= (night_lx if lux else conditions.NIGHT_WM2)
+                if bright:
+                    kind = conditions.sky_class(row.value, cuts)
+                    counts[kind] = counts.get(kind, 0) + 1
+            order = (conditions.OVERCAST, conditions.CLOUDY, conditions.FAIR, conditions.SUNNY)
+            dominant = max(counts, key=lambda kind: (counts[kind], order.index(kind))) if counts else None
+            sun = self._summarize_sunshine(main_rows, config, None) if lux else None
+            sky = {
+                "class": dominant, "day_hours": sum(counts.values()),
+                "sun_hours": sun["hours"] if sun else None,
+            }
+
+        wind = None
+        wind_rows = [row for row in rows_of(config["wind"]) if row.value is not None]
+        if wind_rows:
+            peak = max(row.max_value if row.max_value is not None else row.value for row in wind_rows)
+            kmh = conditions.to_kmh(peak, unit_of(config["wind"]))
+            if kmh is not None:
+                wind = {"kmh": kmh, "bft": conditions.beaufort(kmh)}
+
+        rain = None
+        if config["precip_mm"] and index.get_entity(config["precip_mm"]) is not None:
+            total = self.summarize("counter", rows_of(config["precip_mm"], "counter"), config, unit=unit_of(config["precip_mm"]))
+            if total is not None:
+                rain = {"mm": total["sum"], "mm_unit": unit_of(config["precip_mm"]), "minutes": None}
+        if config["precip_dur"] and index.get_entity(config["precip_dur"]) is not None:
+            entity = index.get_entity(config["precip_dur"])
+            wet = self.summarize(
+                "switch", rows_of(config["precip_dur"], "switch"), config,
+                held_off=bool(entity and entity["first_ts"] and entity["first_ts"] < start.timestamp()),
+            )
+            if wet is not None:
+                rain = {**(rain or {"mm": None, "mm_unit": ""}), "minutes": wet["minutes"]}
+
+        temp = None
+        entity = index.get_entity(config["temperature"]) if config["temperature"] else None
+        if entity is not None:
+            summary = self.summarize("standard", rows_of(config["temperature"]), config)
+            if summary is not None:
+                temp = {
+                    "min": summary["min"], "max": summary["max"], "unit": entity["unit"] or "",
+                    "decimals": _decimals(entity, "temperature"),
+                }
+
+        if sky is None and wind is None and rain is None:
+            return None
+        return {"mode": "day", "date": stichtag.isoformat(), "tz": str(tz), "sky": sky, "wind": wind, "rain": rain, "temp": temp}
+
     # -- Seite -------------------------------------------------------------------------
 
     def _page_context(self, request: Request) -> dict:
@@ -1245,9 +1333,11 @@ class WetterService:
             return data
 
         @router.get("/wetterdashboard/wetterlage")
-        def wetterdashboard_conditions() -> dict:
+        def wetterdashboard_conditions(date: str | None = None) -> dict:
             _require_configured()
-            return self.compute_conditions() or {"sky": None, "wind": None, "rain": None, "temp": None}
+            stichtag = parse_stichtag(date, datetime.now(deps.tz).date())
+            data = self.compute_conditions_day(date) if stichtag else self.compute_conditions()
+            return data or {"sky": None, "wind": None, "rain": None, "temp": None}
 
         @router.get("/wetterdashboard/tiles")
         def wetterdashboard_tiles(date: str | None = None) -> dict:

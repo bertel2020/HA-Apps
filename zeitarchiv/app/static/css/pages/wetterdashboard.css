@@ -16,6 +16,7 @@
   .wt-kpis-soft .wt-tile[data-kind="sky"]{--wt-accent:var(--chart-7);}
   .wt-kpis-soft .wt-tile[data-kind="wind"]{--wt-accent:var(--chart-8);}
   .wt-kpis-soft .wt-tile[data-kind="rain"]{--wt-accent:var(--chart-3);}
+  .wt-kpis-soft .wt-tile[data-kind="temp"]{--wt-accent:var(--chart-2);}
   .wt-kpis-soft .wt-tile-label{font-family:inherit;font-size:calc(11.5px * var(--font-scale, 1));letter-spacing:.05em;color:var(--ink-muted);}
   .wt-kpis-soft .wt-tile-value{font-family:inherit;font-size:calc(21px * var(--font-scale, 1));letter-spacing:-.01em;}
   .wt-kpis-soft .wt-tile-sub{font-family:inherit;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);min-height:1.3em;}
