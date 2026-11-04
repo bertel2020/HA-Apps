@@ -105,11 +105,15 @@
       {% call hint_body() %}{{ _("Die Zeile fasst den Himmel, den Wind und den Regen zusammen und zeigt immer den aktuellen Stand. Der Himmel ergibt sich aus der Helligkeit der letzten 10 Minuten, nur bei Tag (laut Dämmerungssensor); die Grenzen folgen der Sonnen-Schwelle aus der Einrichtung (Standard: trüb unter 15.000 lx, bewölkt bis 25.000, heiter bis 70.000, darüber sonnig). Der Wind nennt die Beaufort-Stufe nach dem stärksten Wert der letzten 10 Minuten; meldet der Sensor nur Stufen oder steht er geschützt, fallen die Klassen eher niedrig aus. Beim Regen zählen auch Nebel und Tau mit, wenn der Sensor sie als Regen meldet. Fehlt ein Sensor, fehlt sein Teil in der Zeile.") }}{% endcall %}
     </div>
     <p class="wt-headline wt-lage" x-text="conditionsLine()"></p>
-    <ul class="wt-lage-detail">
+    <div class="wt-kpis wt-kpis-soft" :style="'--wt-cols:' + kpiCols(conditionsTiles().length)">
       <template x-for="tile in conditionsTiles()" :key="tile.label">
-        <li><span class="wt-lage-label" x-text="tile.label"></span> <span x-text="tile.sub"></span></li>
+        <div class="wt-tile" :data-kind="tile.kind">
+          <span class="wt-tile-label" x-text="tile.label"></span>
+          <span class="wt-tile-value" x-text="tile.value"></span>
+          <span class="wt-tile-sub" x-text="tile.sub"></span>
+        </div>
       </template>
-    </ul>
+    </div>
   </div>
   {% endif %}
 

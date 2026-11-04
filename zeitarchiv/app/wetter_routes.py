@@ -762,6 +762,8 @@ class WetterService:
         yesterday = self.column_windows("gestern", now_local, "bis_jetzt", anchor)
         tiles = []
         for spec in self._row_specs(config):
+            if spec["kind"] == "sunshine":
+                continue  # nur eine Tabellenzeile (Stunden), keine Kachel
             entity = self.deps.index.get_entity(spec["entity_id"])
             aggregation_type = spec["kind"]  # "standard"/"counter"/"switch" sind zugleich die Aggregationstypen
             now_summary = self.summarize(

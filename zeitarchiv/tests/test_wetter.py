@@ -926,3 +926,12 @@ def test_sunshine_row_and_metrics_exist_in_the_script() -> None:
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "row.kind === 'sunshine'" in script and "field: 'hours'" in script
     assert "data.sun_threshold_lx" in script  # die Schwelle steht in der Beschriftung, nicht versteckt
+
+
+def test_tiles_skip_the_sunshine_row_when_illuminance_is_assigned(service) -> None:
+    """Die Sonnenscheindauer ist nur eine Tabellenzeile; als Kachel (Aggregationstyp „sunshine“) stürzte die Abfrage ab."""
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(20, 1), 12.0)])
+    _add(service, "sensor.lux_sued", "sensor", "measurement", "lx", [(_ts(20, 10), 40000.0)])
+    _configure(service, temperature="sensor.t", illuminance="sensor.lux_sued")
+
+    assert [tile["key"] for tile in service.compute_tiles(NOW)] == ["temperature"]

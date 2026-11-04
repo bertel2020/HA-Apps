@@ -781,16 +781,16 @@
           const sub = [];
           if (c.sky.value != null) sub.push(t('Helligkeit {n} {unit}', {n: num(c.sky.value, 0), unit: c.sky.unit}));
           if (c.sky.dawn != null) sub.push(t('Dämmerung {n} lx', {n: num(c.sky.dawn, 0)}));
-          tiles.push({label: t('Himmel'), value: this.skyName(c.sky.class), sub: sub.join(' · ')});
+          tiles.push({kind: 'sky', label: t('Himmel'), value: this.skyName(c.sky.class), sub: sub.join(' · ')});
         }
         if (c.wind) {
           tiles.push({
-            label: t('Wind'), value: this.beaufortName(c.wind.bft),
+            kind: 'wind', label: t('Wind'), value: this.beaufortName(c.wind.bft),
             sub: t('Stärke {bft} · {kmh} km/h', {bft: c.wind.bft, kmh: num(c.wind.kmh, 0)}),
           });
         }
         const rain = this.conditionsRain();
-        if (rain) tiles.push({label: t('Regen'), value: rain.text, sub: rain.sub});
+        if (rain) tiles.push({kind: 'rain', label: t('Regen'), value: rain.text, sub: rain.sub});
         return tiles;
       },
 
