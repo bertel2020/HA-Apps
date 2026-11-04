@@ -834,9 +834,24 @@
         const day = this.daylight && this.daylight.day;
         if (!day) return '';
         if (!day.resolution) return t('Für diesen Tag liegen keine Werte vor.');
+        if (this.daylightStartedBright()) {
+          const start = this.daylightClock(day.points[0][0]);
+          return day.to == null
+            ? t('Hell seit Beginn der Aufzeichnung um {start} Uhr; der Tagesbeginn davor fehlt.', {start})
+            : t('Hell bis {to} Uhr; die Aufzeichnung setzt erst um {start} Uhr ein, der Tagesbeginn fehlt.', {to: this.daylightClock(day.to), start});
+        }
         if (day.from == null) return t('Der Sensor erreichte an diesem Tag {n} lx nicht.', {n: num(this.daylight.day_lx, 0)});
         const values = {span: this.daylightSpan(day), length: this.daylightDuration(day.length, day.approx)};
         return day.ongoing ? t('Hell {span}, bisher {length} Tageslicht', values) : t('Hell {span} Uhr, {length} Tageslicht', values);
+      },
+
+      // Die Aufzeichnung setzt schon über der Tag-Schwelle ein (Sensor erst seit Kurzem im Archiv): kein Anstieg
+      // sichtbar, der Tagesbeginn ist unbekannt, nicht „nie erreicht“.
+      daylightStartedBright() {
+        const data = this.daylight;
+        const day = data && data.day;
+        return !!(day && day.resolution === 'fine' && day.from == null && day.points && day.points.length
+          && day.points[0][1] >= data.day_lx);
       },
 
       daylightStats() {
@@ -845,7 +860,11 @@
         const day = data.day;
         const basis = day.approx ? t('Stundenraster, auf eine Stunde genau') : t('Minutenwerte');
         return [
-          {label: t('Tag ab / bis'), value: day.from == null ? '–' : (day.to == null ? this.daylightClock(day.from) : `${this.daylightClock(day.from)} / ${this.daylightClock(day.to)}`), sub: basis},
+          {
+            label: t('Tag ab / bis'),
+            value: day.from == null ? (day.to != null && this.daylightStartedBright() ? `– / ${this.daylightClock(day.to)}` : '–') : (day.to == null ? this.daylightClock(day.from) : `${this.daylightClock(day.from)} / ${this.daylightClock(day.to)}`),
+            sub: this.daylightStartedBright() ? t('Aufzeichnung ab {time}', {time: this.daylightClock(day.points[0][0])}) : basis,
+          },
           {label: t('Tageslänge'), value: this.daylightDuration(day.length, day.approx), sub: t('über {n} lx', {n: num(data.day_lx, 0)})},
           {
             label: t('Dämmerung morgens'), value: this.daylightMinutes(day.morning, day.approx),
@@ -864,10 +883,23 @@
         return t('Für diesen Tag liegen nur Stundenwerte vor. Eine Stunde zählt als Tag, wenn ihr Mittel die Tag-Schwelle erreicht; die Zeiten sind auf eine Stunde genau.');
       },
 
+      // Tage ohne Werte stehen nicht in der Tabelle, ein Satz nennt stattdessen, seit wann es Daten gibt.
+      daylightHistoryNote() {
+        const data = this.daylight;
+        if (!data) return '';
+        const empty = data.compare.filter((row) => !row.resolution).length;
+        if (!empty) return '';
+        const known = data.compare.filter((row) => row.resolution);
+        const since = known.length ? utcDayMonth.format(new Date(`${known[known.length - 1].date}T12:00:00Z`)) : '';
+        return since
+          ? t('Für {n} frühere Tage liegen keine Werte vor: Der Sensor wird erst seit dem {date} archiviert.', {n: empty, date: since})
+          : t('Für die letzten Tage liegen keine Werte vor.');
+      },
+
       daylightRows() {
         const data = this.daylight;
         if (!data) return [];
-        return data.compare.map((row) => ({
+        return data.compare.filter((row) => row.resolution).map((row) => ({
           date: row.date, current: row.date === data.day.date,
           day: utcDayMonth.format(new Date(`${row.date}T12:00:00Z`)),
           span: row.resolution ? this.daylightSpan(row) : '–',

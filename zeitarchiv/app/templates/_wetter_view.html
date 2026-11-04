@@ -136,7 +136,7 @@
     <p class="hint hint-warn" x-show="daylightError" x-text="daylightError" x-cloak></p>
     <h3 class="wt-h3" x-show="daylight">{{ _("Die letzten Tage im Vergleich") }}</h3>
     <div class="tbl-wrap wt-table-wrap" x-show="daylight">
-      <table class="wt-table">
+      <table class="wt-table wt-table-full">
         <thead><tr>
           <th>{{ _("Tag") }}</th><th>{{ _("Hell von–bis") }}</th><th>{{ _("Tageslänge") }}</th>
           <th>{{ _("Dämmerung morgens") }}</th><th>{{ _("Dämmerung abends") }}</th>
@@ -151,6 +151,7 @@
         </tbody>
       </table>
     </div>
+    <p class="wt-hint" x-show="daylight && daylightHistoryNote()" x-text="daylightHistoryNote()" x-cloak></p>
   </div>
   {% endif %}
 
