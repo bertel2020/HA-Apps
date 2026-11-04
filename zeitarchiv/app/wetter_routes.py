@@ -33,6 +33,7 @@ from pydantic import BaseModel, Field
 from . import period_columns, selection_catalog
 from . import wetter_analysis as analysis
 from . import wetter_autofill
+from . import wetter_daylight as daylight
 from .chart_period import calendar_bounds
 from .formatting import decimals_to_int, entity_display_name
 from .period_columns import MODES, parse_stichtag
@@ -57,6 +58,7 @@ ROLES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("gust", N_("Böe"), ("standard",)),
     ("radiation", N_("Strahlung"), ("standard",)),
     ("illuminance", N_("Helligkeit"), ("standard",)),
+    ("illuminance_dawn", N_("Helligkeit Dämmerung"), ("standard",)),
 )
 #: Erwartete Einheiten je Rolle: Entitäten damit stehen in der Auswahl zuerst (kein harter Filter,
 #: weil eine Einheit fehlen oder ungewöhnlich geschrieben sein kann).
@@ -69,6 +71,7 @@ ROLE_UNITS = {
     "gust": ["km/h", "m/s", "mph", "kn"],
     "radiation": ["W/m²"],
     "illuminance": ["lx"],
+    "illuminance_dawn": ["lx"],
     "extra": ["°C", "°F", "K", "%"],
     "heating": ["kWh", "Wh", "MWh"],
 }
@@ -103,6 +106,13 @@ COLUMN_WINDOWS = {
 #: Licht nicht. Startwert aus den Oktoberdaten des Nutzers: trübe Tage mittags bis etwa 15.000 lx, klare ab 50.000 lx.
 DEFAULT_SUN_THRESHOLD_LX = 25000.0
 SUN_THRESHOLD_RANGE_LX = (1000.0, 100000.0)
+#: Tageslichtkurve: Der Dämmerungssensor der Eltako-Station misst 0 bis 1.000 lx. „Nacht“ liegt unter der unteren
+#: Schwelle (ungefähr das Ende der bürgerlichen Dämmerung), „Tag“ ab der oberen (ungefähr Sonnenauf- und -untergang).
+DEFAULT_DAYLIGHT_NIGHT_LX = 5.0
+DEFAULT_DAYLIGHT_DAY_LX = 400.0
+DAYLIGHT_NIGHT_RANGE_LX = (1.0, 200.0)
+DAYLIGHT_DAY_RANGE_LX = (50.0, 990.0)
+DAYLIGHT_COMPARE_DAYS = 7  # Tage in der Vergleichstabelle unter der Kurve
 SUN_MAX_GAP_HOURS = 6  # längste Lücke ohne Zeilen, die zwischen zwei sonnigen Stunden als sonnig gilt
 DEFAULT_RAIN_DAY_MM = 1.0  # DWD: Niederschlagstag ab 1 mm
 DEFAULT_RAIN_DAY_MINUTES = 10
@@ -118,6 +128,8 @@ def _empty_config() -> dict:
         "rain_day_mm": DEFAULT_RAIN_DAY_MM,
         "rain_day_minutes": DEFAULT_RAIN_DAY_MINUTES,
         "sun_threshold_lx": DEFAULT_SUN_THRESHOLD_LX,
+        "daylight_night_lx": DEFAULT_DAYLIGHT_NIGHT_LX,
+        "daylight_day_lx": DEFAULT_DAYLIGHT_DAY_LX,
         "hidden_blocks": [],
     }
 
@@ -164,6 +176,14 @@ def _load_config(index: Index) -> dict:
     value = data.get("sun_threshold_lx")
     if isinstance(value, (int, float)) and not isinstance(value, bool) and SUN_THRESHOLD_RANGE_LX[0] <= value <= SUN_THRESHOLD_RANGE_LX[1]:
         config["sun_threshold_lx"] = float(value)
+    night, day = data.get("daylight_night_lx"), data.get("daylight_day_lx")
+    if (
+        all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in (night, day))
+        and DAYLIGHT_NIGHT_RANGE_LX[0] <= night <= DAYLIGHT_NIGHT_RANGE_LX[1]
+        and DAYLIGHT_DAY_RANGE_LX[0] <= day <= DAYLIGHT_DAY_RANGE_LX[1]
+        and night < day
+    ):
+        config["daylight_night_lx"], config["daylight_day_lx"] = float(night), float(day)
     return config
 
 
@@ -210,6 +230,21 @@ def _role_warning(index: Index, role_key: str, entity_id: str) -> str | None:
     if entity["aggregation_type"] not in ROLE_TYPES.get(role_key, ("standard",)):
         return tr("Typ „{type}“ passt nicht zu dieser Rolle.", type=entity["aggregation_type"])
     return None
+
+
+def _parse_bounded(raw: str, default: float, bounds: tuple[float, float]) -> float:
+    """Zahl aus einem Formularfeld (leer = Standard); außerhalb der Grenzen oder keine Zahl: HTTP 400."""
+    try:
+        value = float(raw.replace(",", ".").replace(" ", "")) if raw.strip() else default
+    except ValueError:
+        raise HTTPException(status_code=400, detail=tr("Ungültige Zahl: {value}", value=raw)) from None
+    low, high = bounds
+    if not low <= value <= high:
+        raise HTTPException(
+            status_code=400,
+            detail=tr("Wert außerhalb von {low} bis {high}: {value}", low=f"{low:g}", high=f"{high:g}", value=raw),
+        )
+    return value
 
 
 def _decimals(entity, role_key: str) -> int | None:
@@ -755,6 +790,71 @@ class WetterService:
             })
         return tiles
 
+    # -- Tageslicht ----------------------------------------------------------------------
+
+    def _daylight_day(
+        self, entity_id: str, day: date, config: dict, now_local: datetime, read_cache: query_mod.QueryReadCache,
+    ) -> dict:
+        """Auswertung eines Tages: feine Kurve aus den Rohdaten, sonst aus den Stundenzeilen."""
+        tz = self.deps.tz
+        night_lx, day_lx = config["daylight_night_lx"], config["daylight_day_lx"]
+        start = datetime(day.year, day.month, day.day, tzinfo=tz)
+        following = day + timedelta(days=1)
+        end = datetime(following.year, following.month, following.day, tzinfo=tz)
+        live = start <= now_local < end
+        until = min(end, now_local)
+        base: dict = {"date": day.isoformat(), "start": start.timestamp(), "end": end.timestamp(), "live": live}
+        if until <= start:
+            return {**base, "resolution": None, "points": [], **daylight.summarize_hours([], [])}
+        fine = query_mod._query_live_fine(  # noqa: SLF001 — siehe Modul-Docstring
+            self.deps.data_dir, self.deps.index, entity_id, "standard", "day", "line",
+            start, until, tz, now_local, read_cache,
+        )
+        points = [(row.bucket_start + 150, row.value) for row in fine if row.value is not None]
+        if points:
+            held = daylight.hold_points(points, start.timestamp(), until.timestamp(), night_lx)
+            summary = daylight.summarize_fine(held, night_lx, day_lx, until.timestamp(), live)
+            return {**base, "resolution": "fine", "points": [[round(t), round(v, 1)] for t, v in held], **summary}
+        rows = self._rows(entity_id, "standard", start, until, now_local, read_cache)
+        hour_starts = [start.timestamp() + 3600.0 * i for i in range(round((end - start).total_seconds() / 3600))]
+        by_hour = {
+            round(row.bucket_start): (row.value, row.max_value if row.max_value is not None else row.value)
+            for row in rows if row.value is not None
+        }
+        measured = {hour: by_hour[round(hour)] for hour in hour_starts if round(hour) in by_hour}
+        if not measured:
+            return {**base, "resolution": None, "points": [], **daylight.summarize_hours(hour_starts, [None] * len(hour_starts))}
+        classes = daylight.hour_classes(hour_starts, measured, night_lx, day_lx)
+        summary = daylight.summarize_hours(hour_starts, classes)
+        return {
+            **base, "resolution": "hour",
+            "points": [[round(hour + 1800), round(mean, 1)] for hour, (mean, _peak) in measured.items()],
+            "hours": [[round(hour), round(mean, 1), round(peak, 1)] for hour, (mean, peak) in measured.items()],
+            **summary,
+        }
+
+    def compute_daylight(self, at: str | None = None, now_local: datetime | None = None) -> dict | None:
+        """Kurve und Kennzahlen für einen Tag (Standard heute) plus ein Vergleich der letzten Tage; None ohne Rolle."""
+        config = _load_config(self.deps.index)
+        entity_id = config["illuminance_dawn"]
+        if not entity_id or self.deps.index.get_entity(entity_id) is None:
+            return None
+        now_local = now_local or datetime.now(self.deps.tz)
+        selected = parse_stichtag(at, now_local.date()) or now_local.date()
+        read_cache = query_mod.QueryReadCache()
+        days = [selected - timedelta(days=offset) for offset in range(DAYLIGHT_COMPARE_DAYS)]
+        results = [self._daylight_day(entity_id, day, config, now_local, read_cache) for day in days]
+        compare_keys = ("date", "resolution", "from", "to", "length", "morning", "evening", "approx", "ongoing")
+        return {
+            "tz": str(self.deps.tz),
+            "unit": "lx",
+            "night_lx": config["daylight_night_lx"],
+            "day_lx": config["daylight_day_lx"],
+            "now": now_local.timestamp(),
+            "day": results[0],
+            "compare": [{key: row[key] for key in compare_keys} for row in results],
+        }
+
     # -- Seite -------------------------------------------------------------------------
 
     def _page_context(self, request: Request) -> dict:
@@ -764,6 +864,7 @@ class WetterService:
             "precip_modes": self.available_precip(),
             "has_heating": bool(self.heating_counters(config)),
             "has_windsun": any(config[key] for key in ("wind", "gust", "radiation", "illuminance")),
+            "has_daylight": bool(config["illuminance_dawn"]),
             "has_klima": any(extra["entity_id"] for extra in config["extra_temperatures"]),
             **calendar_bounds(self.deps.index.list_entities(), self.deps.tz),
             "enabled": _is_enabled(self.deps.index),
@@ -850,6 +951,7 @@ class WetterService:
             gust: str = Form(""),
             radiation: str = Form(""),
             illuminance: str = Form(""),
+            illuminance_dawn: str = Form(""),
             extra_entity_id: list[str] = Form([]),
             extra_name: list[str] = Form([]),
             blocks_submitted: str = Form(""),
@@ -861,11 +963,13 @@ class WetterService:
             rain_day_mm: str = Form(""),
             rain_day_minutes: str = Form(""),
             sun_threshold_lx: str = Form(""),
+            daylight_night_lx: str = Form(""),
+            daylight_day_lx: str = Form(""),
         ) -> HTMLResponse:
             submitted = {
                 "temperature": temperature, "precip_mm": precip_mm, "precip_dur": precip_dur,
                 "humidity": humidity, "pressure": pressure, "wind": wind, "gust": gust, "radiation": radiation,
-                "illuminance": illuminance,
+                "illuminance": illuminance, "illuminance_dawn": illuminance_dawn,
             }
             config = _empty_config()
             for key, value in submitted.items():
@@ -945,6 +1049,14 @@ class WetterService:
                     detail=tr("Wert außerhalb von {low} bis {high}: {value}", low=f"{low:g}", high=f"{high:g}", value=sun_threshold_lx),
                 )
             config["sun_threshold_lx"] = threshold
+            night = _parse_bounded(daylight_night_lx, DEFAULT_DAYLIGHT_NIGHT_LX, DAYLIGHT_NIGHT_RANGE_LX)
+            day = _parse_bounded(daylight_day_lx, DEFAULT_DAYLIGHT_DAY_LX, DAYLIGHT_DAY_RANGE_LX)
+            if night >= day:
+                raise HTTPException(
+                    status_code=400,
+                    detail=tr("Die Nacht-Schwelle muss unter der Tag-Schwelle liegen."),
+                )
+            config["daylight_night_lx"], config["daylight_day_lx"] = night, day
             _save_config(deps.index, config)
             context = self._page_context(request)
             return deps.templates.TemplateResponse(request, "_wetter_view.html", context)
@@ -1012,6 +1124,14 @@ class WetterService:
             if result is None:
                 raise HTTPException(status_code=404, detail=tr("Noch nicht eingerichtet"))
             return result
+
+        @router.get("/wetterdashboard/tageslicht")
+        def wetterdashboard_daylight(date: str | None = None) -> dict:
+            _require_configured()
+            data = self.compute_daylight(date)
+            if data is None:
+                raise HTTPException(status_code=409, detail=tr("Keine Entität für „Helligkeit Dämmerung“ zugeordnet."))
+            return data
 
         @router.get("/wetterdashboard/tiles")
         def wetterdashboard_tiles(date: str | None = None) -> dict:

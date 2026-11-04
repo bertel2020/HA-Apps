@@ -52,6 +52,7 @@
   {% elif key in ('precip_mm', 'humidity') %}<path d="M12 3s6 6.4 6 11a6 6 0 0 1-12 0c0-4.6 6-11 6-11Z"/>
   {% elif key == 'precip_dur' %}<path d="M7 15a4 4 0 0 1 .6-7.9A5.5 5.5 0 0 1 18 9a3.5 3.5 0 0 1-.5 7"/><path d="M9 19l1-2M13 19l1-2"/>
   {% elif key == 'heating' %}<path d="M12 3c1 3 4 4.5 4 8.5a4 4 0 0 1-8 0c0-1.7.8-2.6 1.5-3.5.5 1 1 1.5 1.5 1.5 0-3 0-4.5 1-6.5Z"/>
+  {% elif key == 'illuminance_dawn' %}<path d="M3 18h18"/><path d="M7 18a5 5 0 0 1 10 0"/><path d="M12 6v3M5 11l1.8 1.8M19 11l-1.8 1.8"/>
   {% elif key == 'illuminance' %}<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6 19 19M5 19l1.4-1.4M17.6 6.4 19 5"/><path d="M9 12h6"/>
   {% elif key == 'pressure' %}<path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l4-5"/>
   {% elif key == 'wind' %}<path d="M3 9h11a3 3 0 1 0-3-3M3 15h15a3 3 0 1 1-3 3M3 12h8"/>
@@ -188,7 +189,7 @@
   <p class="settings-section-description">{{ _("Ordnet jeder Rolle eine Entität zu. Nur die Außentemperatur ist Pflicht, alles andere bleibt leer, bis passende Sensoren vorhanden sind.") }}</p>
   <p class="wt-note" x-show="note" x-text="note" x-cloak></p>
   <p class="wt-note wt-note-missing" x-show="missingNote" x-cloak><span x-text="missingNote"></span> <a href="selection?topic=wetter">{{ _("Zum Auswahl-Assistenten") }}</a></p>
-  {% for group_title, in_group in ((_("Grundwerte"), ('temperature', 'precip_mm', 'precip_dur', 'humidity', 'pressure', 'wind')), (_("Weitere Messwerte"), ('gust', 'radiation', 'illuminance'))) %}
+  {% for group_title, in_group in ((_("Grundwerte"), ('temperature', 'precip_mm', 'precip_dur', 'humidity', 'pressure', 'wind')), (_("Weitere Messwerte"), ('gust', 'radiation', 'illuminance', 'illuminance_dawn'))) %}
   <h3 class="wt-group-h">{{ group_title }}</h3>
   <div class="wt-item-grid">
     {% for key, label, types in roles if key in in_group %}
@@ -320,6 +321,18 @@
   <div class="wt-thresholds">
     <div class="field"><label for="wt-sun-lx">{{ _("Sonne ab einer Helligkeit von") }}</label>
       <input type="text" id="wt-sun-lx" class="wt-short" name="sun_threshold_lx" value="{{ config.sun_threshold_lx | int }}" inputmode="numeric"> <span class="wt-unit">lx</span></div>
+  </div>
+  </section>
+
+  <section class="settings-section wt-section-sonne wt-section-tageslicht">
+  <h2 class="settings-section-title">{{ _("Tageslicht") }} {{ hint_button(_("Tageslicht")) }}</h2>
+  <p class="settings-section-description">{{ _("Ab welcher Helligkeit der Dämmerungssensor Nacht, Dämmerung und Tag unterscheidet.") }}</p>
+  {% call hint_body() %}{{ _("Gilt für die Rolle „Helligkeit Dämmerung“. Nacht liegt unter der unteren Schwelle (etwa das Ende der bürgerlichen Dämmerung), Tag beginnt bei der oberen (etwa Sonnenauf- und -untergang). Die Zeiten zeigen, was der Sensor sieht, nicht den Sonnenstand: Dichte Wolken verschieben den Tagesbeginn nach hinten, Ausrichtung und Verschattung wirken ebenfalls.") }}{% endcall %}
+  <div class="wt-thresholds">
+    <div class="field"><label for="wt-night-lx">{{ _("Nacht unter") }}</label>
+      <input type="text" id="wt-night-lx" class="wt-short" name="daylight_night_lx" value="{{ config.daylight_night_lx | int }}" inputmode="numeric"> <span class="wt-unit">lx</span></div>
+    <div class="field"><label for="wt-day-lx">{{ _("Tag ab") }}</label>
+      <input type="text" id="wt-day-lx" class="wt-short" name="daylight_day_lx" value="{{ config.daylight_day_lx | int }}" inputmode="numeric"> <span class="wt-unit">lx</span></div>
   </div>
   </section>
 

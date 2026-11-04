@@ -334,6 +334,10 @@
       longterm: null,
       longError: '',
       kenntageRange: 'all',
+      hasDaylight: false,
+      daylight: null,
+      daylightError: '',
+      _daylightSeq: 0,
       matrixMetric: 'avg',
       heat: null,
       heatOn: [],
@@ -369,13 +373,20 @@
         this.loadTiles();
         this.loadTable();
         this.loadMonthly();
+        // Die Karte „Tageslicht“ gibt es nur mit zugeordneter Rolle; $refs sind in init() noch nicht angelegt.
+        this.hasDaylight = !!this.$root.querySelector('[x-ref="daylightChart"]');
+        if (this.hasDaylight) this.loadDaylight();
         const observer = new ResizeObserver(() => this.layoutTiles());
         for (const group of GROUPS) {
           const ref = this.$refs[refName('tiles', group)];
           if (ref) observer.observe(ref);
         }
         // Stichtag-Leiste des App-Standards: bei jeder Änderung die Tabelle neu laden.
-        window.addEventListener('dashboard-stichtag', () => { this.loadTiles(); this.loadTable(); });
+        window.addEventListener('dashboard-stichtag', () => {
+          this.loadTiles();
+          this.loadTable();
+          if (this.hasDaylight) this.loadDaylight();
+        });
       },
 
       columnName,
@@ -678,6 +689,145 @@
           series,
         }, true);
         // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
+        requestAnimationFrame(() => chart.resize());
+      },
+
+      // ---- Tageslicht (Dämmerungssensor): Kurve mit Nacht-, Dämmerungs- und Tagband -----------------
+
+      async loadDaylight() {
+        const stichtag = this.stichtag();
+        const seq = ++this._daylightSeq;
+        this.daylightError = '';
+        try {
+          const data = await this.fetchJson(`wetterdashboard/tageslicht${stichtag ? `?date=${encodeURIComponent(stichtag)}` : ''}`);
+          if (seq !== this._daylightSeq) return;  // ein neuerer Tag hat überholt
+          this.daylight = data;
+          this.$nextTick(() => this.drawDaylight());
+        } catch (e) {
+          if (seq === this._daylightSeq) this.daylightError = t('Das Tageslicht konnte nicht geladen werden.');
+        }
+      },
+
+      daylightClock(stamp) {
+        return stamp == null ? '–' : fmtDate(formats.hm, stamp);
+      },
+
+      daylightDuration(seconds, approx) {
+        if (seconds == null) return '–';
+        const minutes = Math.round(seconds / 60);
+        const text = t('{h} h {m} min', {h: Math.floor(minutes / 60), m: String(minutes % 60).padStart(2, '0')});
+        return (approx ? '≈ ' : '') + text;
+      },
+
+      daylightMinutes(seconds, approx) {
+        return seconds == null ? '–' : (approx ? '≈ ' : '') + t('{n} min', {n: num(seconds / 60, 0)});
+      },
+
+      daylightSpan(day) {
+        if (day.from == null) return '–';
+        if (day.ongoing) return t('ab {time}', {time: this.daylightClock(day.from)});
+        return day.to == null ? this.daylightClock(day.from) : `${this.daylightClock(day.from)}–${this.daylightClock(day.to)}`;
+      },
+
+      daylightHead() {
+        const day = this.daylight && this.daylight.day;
+        if (!day) return '';
+        if (!day.resolution) return t('Für diesen Tag liegen keine Werte vor.');
+        if (day.from == null) return t('Der Sensor erreichte an diesem Tag {n} lx nicht.', {n: num(this.daylight.day_lx, 0)});
+        const values = {span: this.daylightSpan(day), length: this.daylightDuration(day.length, day.approx)};
+        return day.ongoing ? t('Hell {span}, bisher {length} Tageslicht', values) : t('Hell {span} Uhr, {length} Tageslicht', values);
+      },
+
+      daylightStats() {
+        const data = this.daylight;
+        if (!data || !data.day.resolution) return [];
+        const day = data.day;
+        const basis = day.approx ? t('Stundenraster, auf eine Stunde genau') : t('Minutenwerte');
+        return [
+          {label: t('Tag ab / bis'), value: day.from == null ? '–' : (day.to == null ? this.daylightClock(day.from) : `${this.daylightClock(day.from)} / ${this.daylightClock(day.to)}`), sub: basis},
+          {label: t('Tageslänge'), value: this.daylightDuration(day.length, day.approx), sub: t('über {n} lx', {n: num(data.day_lx, 0)})},
+          {
+            label: t('Dämmerung morgens'), value: this.daylightMinutes(day.morning, day.approx),
+            sub: day.dawn != null ? t('ab {time} (über {n} lx)', {time: this.daylightClock(day.dawn), n: num(data.night_lx, 0)}) : '',
+          },
+          {
+            label: t('Dämmerung abends'), value: this.daylightMinutes(day.evening, day.approx),
+            sub: day.dusk != null ? t('bis {time} (unter {n} lx)', {time: this.daylightClock(day.dusk), n: num(data.night_lx, 0)}) : '',
+          },
+        ];
+      },
+
+      daylightNote() {
+        const day = this.daylight && this.daylight.day;
+        if (!day || day.resolution !== 'hour') return '';
+        return t('Für diesen Tag liegen nur Stundenwerte vor. Eine Stunde zählt als Tag, wenn ihr Mittel die Tag-Schwelle erreicht; die Zeiten sind auf eine Stunde genau.');
+      },
+
+      daylightRows() {
+        const data = this.daylight;
+        if (!data) return [];
+        return data.compare.map((row) => ({
+          date: row.date, current: row.date === data.day.date,
+          day: utcDayMonth.format(new Date(`${row.date}T12:00:00Z`)),
+          span: row.resolution ? this.daylightSpan(row) : '–',
+          length: row.resolution ? this.daylightDuration(row.length, row.approx) : '–',
+          morning: row.resolution ? this.daylightMinutes(row.morning, row.approx) : '–',
+          evening: row.resolution ? this.daylightMinutes(row.evening, row.approx) : '–',
+        }));
+      },
+
+      drawDaylight() {
+        const data = this.daylight;
+        const element = this.$refs.daylightChart;
+        if (!data || !element) return;
+        const day = data.day;
+        const colors = palette();
+        const kindName = (value) => (value >= data.day_lx ? t('Tag') : value >= data.night_lx ? t('Dämmerung') : t('Nacht'));
+        const bandColor = {
+          night: {color: colors.ink, opacity: 0.14},
+          dusk: {color: cssVar('--chart-3'), opacity: 0.2},
+          day: {color: cssVar('--chart-7'), opacity: 0.22},
+        };
+        const peak = Math.max(1000, ...day.points.map((point) => point[1]));
+        const chart = chartFor('daylight', element);
+        chart.setOption({
+          animation: false, grid: gridFor(element, {top: 16, right: 12}),
+          xAxis: {
+            type: 'value', min: day.start * 1000, max: day.end * 1000, interval: 3 * 3600 * 1000, ...axisStyle(colors),
+            splitLine: {show: false}, axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (ms) => fmtDate(formats.hm, ms / 1000)},
+          },
+          yAxis: {type: 'value', min: 0, max: peak, name: 'lx', nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
+          tooltip: {
+            trigger: 'axis', confine: true, backgroundColor: colors.surface, borderColor: colors.grid,
+            textStyle: {color: colors.ink, fontSize: scaledFont(12)},
+            formatter: (params) => {
+              const point = params[0].value;
+              let html = `<b>${escapeHtml(fmtDate(formats.hm, point[0] / 1000))}</b><br>${escapeHtml(num(point[1], 0))} lx · ${escapeHtml(kindName(point[1]))}`;
+              const hour = (day.hours || []).find((row) => row[0] * 1000 + 1800000 === point[0]);
+              if (hour) html += `<br>${escapeHtml(t('Max {n} lx', {n: num(hour[2], 0)}))}`;
+              return html;
+            },
+          },
+          series: [{
+            type: 'line', data: day.points.map((point) => [point[0] * 1000, point[1]]), symbol: day.resolution === 'hour' ? 'circle' : 'none',
+            symbolSize: 5, lineStyle: {color: colors.cur, width: 2.4}, itemStyle: {color: colors.cur},
+            markArea: {
+              silent: true,
+              data: day.bands.map(([from, to, kind]) => [
+                {xAxis: from * 1000, itemStyle: bandColor[kind]}, {xAxis: to * 1000},
+              ]),
+            },
+            markLine: {
+              silent: true, symbol: 'none',
+              lineStyle: {color: colors.faint, type: 'dashed', width: 1},
+              label: {color: colors.text, fontSize: scaledFont(11), position: 'insideEndTop'},
+              data: [
+                {yAxis: data.night_lx, label: {formatter: t('Nacht unter {n} lx', {n: num(data.night_lx, 0)})}},
+                {yAxis: data.day_lx, label: {formatter: t('Tag ab {n} lx', {n: num(data.day_lx, 0)})}},
+              ],
+            },
+          }],
+        }, true);
         requestAnimationFrame(() => chart.resize());
       },
 
