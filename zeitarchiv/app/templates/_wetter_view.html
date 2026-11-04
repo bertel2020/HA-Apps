@@ -99,7 +99,7 @@
 
   <section x-show="tab === 'overview'" role="tabpanel" id="wt-panel-overview" aria-labelledby="wt-tab-overview">
   {% if has_conditions %}
-  <div class="card wt-card" data-wt-conditions x-show="conditions && !stichtag()" x-cloak>
+  <div class="card wt-card" data-hints="collapsed" data-wt-conditions x-show="conditions && !stichtag()" x-cloak>
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Wetterlage") }} {{ hint_button(_("Wetterlage")) }}</h2>
       {% call hint_body() %}{{ _("Die Zeile fasst den Himmel, den Wind und den Regen zusammen und zeigt immer den aktuellen Stand. Der Himmel ergibt sich aus der Helligkeit der letzten 10 Minuten, nur bei Tag (laut Dämmerungssensor); die Grenzen folgen der Sonnen-Schwelle aus der Einrichtung (Standard: trüb unter 15.000 lx, bewölkt bis 25.000, heiter bis 70.000, darüber sonnig). Der Wind nennt die Beaufort-Stufe nach dem stärksten Wert der letzten 10 Minuten; meldet der Sensor nur Stufen oder steht er geschützt, fallen die Klassen eher niedrig aus. Beim Regen zählen auch Nebel und Tau mit, wenn der Sensor sie als Regen meldet. Fehlt ein Sensor, fehlt sein Teil in der Zeile.") }}{% endcall %}
@@ -116,13 +116,13 @@
   {{ weather_card("basis", 5) }}
 
   {% if has_daylight %}
-  <div class="card wt-card" x-show="daylight || daylightError" x-cloak>
+  <div class="card wt-card" data-hints="collapsed" x-show="daylight || daylightError" x-cloak>
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Tageslicht") }} {{ hint_button(_("Tageslicht")) }}</h2>
       {% call hint_body() %}{{ _("Der Dämmerungssensor misst von 0 bis 1.000 lx. Die Kurve zeigt, wann es für den Sensor hell wird und wann nicht mehr, nicht den Sonnenstand: Dichte Wolken verschieben den Tagesbeginn nach hinten, Ausrichtung und Verschattung wirken ebenfalls. Die Schwellen für Nacht und Tag stehen in der Einrichtung.") }}{% endcall %}
     </div>
     <p class="wt-headline" x-show="daylight" x-text="daylightHead()"></p>
-    <div class="wt-kpis" x-show="daylight" :style="'--wt-cols:' + kpiCols(daylightStats().length)">
+    <div class="wt-kpis wt-kpis-soft" x-show="daylight" :style="'--wt-cols:' + kpiCols(daylightStats().length)">
       <template x-for="stat in daylightStats()" :key="stat.label">
         <div class="wt-tile">
           <span class="wt-tile-label" x-text="stat.label"></span>
