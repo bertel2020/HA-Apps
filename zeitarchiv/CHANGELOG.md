@@ -20,6 +20,11 @@
     hellen Stunden. Ein Klick wählt den Tag aus
   - **Sonnenschein-Kachel**: Die Sonnenstunden von heute stehen auch als Kachel
     im Reiter Wind & Sonne, mit dem Vortag darunter
+  - **Heizen**: Die Tabelle der Gradtagzahl zeigt nur Monate mit Werten und die
+    Spalte Δ erst mit zwei abgeschlossenen Heizperioden; sie nutzt die volle
+    Breite
+  - Die Hinweistexte hinter dem (i) sind auf der ganzen Seite zunächst
+    eingeklappt
   - **Karten ein- und ausschalten**: In der Einrichtung unter „Anzeige“ lassen
     sich die Karten einzeln ausblenden; angeboten werden nur Karten, für die eine
     Entität zugeordnet ist. Fehlt einem Reiter damit jede Karte, entfällt er
@@ -54,6 +59,10 @@
     hours. A click selects the day
   - **Sunshine tile**: The hours of sunshine today are also shown as a tile on
     the Wind & sun tab, with the previous day below
+  - **Heating**: The degree-day table only shows months with values and the
+    Δ column only once two completed heating periods exist; it uses the full
+    width
+  - The hint texts behind the (i) are collapsed by default on the whole page
   - **Switch cards on and off**: In the setup under "Display" the cards can be
     hidden individually; only cards with an assigned entity are offered. A tab
     without any card is dropped

@@ -83,7 +83,7 @@
 {% set show_windtab = show_windtiles or show_daylight %}
 {% set show_long = 'longterm' not in hc %}
 {% set show_heat = has_heating and 'heating' not in hc %}
-<div x-data='wetterDashboard({{ precip_modes | tojson }})'>
+<div x-data='wetterDashboard({{ precip_modes | tojson }})' data-hints="collapsed">
   <div class="wt-title-row">
     <h1>{{ _("Wetterdashboard") }}</h1>
     <button type="button" class="wt-title-edit" title="{{ _('Rollen bearbeiten') }}"
@@ -117,7 +117,7 @@
   {% if show_overview %}
   <section x-show="tab === 'overview'" role="tabpanel" id="wt-panel-overview" aria-labelledby="wt-tab-overview">
   {% if show_conditions %}
-  <div class="card wt-card" data-hints="collapsed" data-wt-conditions x-show="conditions" x-cloak>
+  <div class="card wt-card" data-wt-conditions x-show="conditions" x-cloak>
     <div class="wt-controls">
       <h2 class="wt-h2"><span x-text="conditionsTitle()">{{ _("Wetterlage") }}</span> {{ hint_button(_("Wetterlage")) }}</h2>
       {% call hint_body() %}{{ _("Die Zeile fasst den Himmel, den Wind und den Regen zusammen und zeigt immer den aktuellen Stand. Der Himmel ergibt sich aus der Helligkeit der letzten 10 Minuten, nur bei Tag (laut Dämmerungssensor); die Grenzen folgen der Sonnen-Schwelle aus der Einrichtung (Standard: trüb unter 15.000 lx, bewölkt bis 25.000, heiter bis 70.000, darüber sonnig). Der Wind nennt die Beaufort-Stufe nach dem stärksten Wert der letzten 10 Minuten; meldet der Sensor nur Stufen oder steht er geschützt, fallen die Klassen eher niedrig aus. Beim Regen zählen auch Nebel und Tau mit, wenn der Sensor sie als Regen meldet. Fehlt ein Sensor, fehlt sein Teil in der Zeile. Für einen früheren Tag fasst die Karte den Tag zusammen: häufigste Himmelsklasse zu den hellen Stunden samt Sonnenstunden, stärkster Wind, Regenmenge und Tiefst- und Höchstwert der Temperatur.") }}{% endcall %}
@@ -140,7 +140,7 @@
   {% endif %}
 
   {% if show_dayimage %}
-  <div class="card wt-card" data-hints="collapsed" data-wt-dayimage x-show="dayimage || dayimageError" x-cloak>
+  <div class="card wt-card" data-wt-dayimage x-show="dayimage || dayimageError" x-cloak>
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Tagesbild") }} {{ hint_button(_("Tagesbild")) }}</h2>
       {% call hint_body() %}{{ _("Jeder Streifen ist ein Tag. Der Sonnenanteil ist die Zeit über der Sonnen-Schwelle geteilt durch die hellen Stunden des Tages (Dämmerungssensor ab der Tag-Schwelle): sonnig ab 50 %, wechselhaft ab 20 %, sonst trüb. Tage mit weniger als drei hellen Stunden oder ohne Werte bleiben leer. Ein Klick wählt den Tag aus. Das ist kein Wert des Wetterdienstes: Die Station trennt direktes und diffuses Licht nicht.") }}{% endcall %}
@@ -237,7 +237,7 @@
     {% endif %}
 
   {% if show_daylight %}
-  <div class="card wt-card" data-hints="collapsed" x-show="daylight || daylightError" x-cloak>
+  <div class="card wt-card" x-show="daylight || daylightError" x-cloak>
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Tageslicht") }} {{ hint_button(_("Tageslicht")) }}</h2>
       {% call hint_body() %}{{ _("Der Dämmerungssensor misst von 0 bis 1.000 lx. Die Kurve zeigt, wann es für den Sensor hell wird und wann nicht mehr, nicht den Sonnenstand: Dichte Wolken verschieben den Tagesbeginn nach hinten, Ausrichtung und Verschattung wirken ebenfalls. Die Schwellen für Nacht und Tag stehen in der Einrichtung.") }}{% endcall %}
@@ -373,7 +373,7 @@
         <h2 class="wt-h2"><span x-text="t('Gradtagzahl {tag} und Verbrauch je Monat', {tag: heatTag()})"></span> {{ hint_button(_("Gradtagzahl")) }}</h2>
         {% call hint_body() %}{{ _("Die Gradtagzahl zählt je Tag die Raumtemperatur minus Tagesmittel, aber nur an Tagen unter der Heizgrenze. kWh je Gradtag ist der witterungsbereinigte Verbrauch: Er lässt kalte und milde Winter vergleichen. Die Heizperiode ist fest 1.10. bis 30.4., und nur abgeschlossene Tage mit ausreichend Temperaturwerten zählen.") }}{% endcall %}
       </div>
-      <div class="wt-table-wrap"><table class="wt-table wt-heat-table" x-ref="heatTable"></table></div>
+      <div class="wt-table-wrap"><table class="wt-table wt-table-full wt-heat-table" x-ref="heatTable"></table></div>
     </div>
     <div class="card wt-card" x-show="heat && heat.counters.length > 1" x-cloak>
       <div class="wt-controls">

@@ -1794,27 +1794,33 @@
           : '<td class="wt-na wt-sep">–</td>');
         // Spalte Δ: die zwei letzten abgeschlossenen Heizperioden; in der Zeile „bis gestern“ die laufende gegen die letzte.
         const [newer, older] = [info.complete[0], info.complete[1]];
+        // Die Spalte Δ gibt es nur, wenn zwei abgeschlossene Heizperioden zum Vergleichen da sind.
+        const delta = newer != null && older != null && shown.includes(newer) && shown.includes(older);
         let html = '<thead><tr class="wt-g"><th></th>'
           + shown.map((p) => `<th colspan="3" class="wt-sep">${escapeHtml(WetterHeating.label(p))}${info.running && p === info.current ? ' · ' + escapeHtml(t('läuft')) : ''}</th>`).join('')
-          + '<th class="wt-sep">Δ</th></tr><tr><th></th>'
+          + (delta ? '<th class="wt-sep">Δ</th>' : '') + '</tr><tr><th></th>'
           + shown.map(() => `<th class="wt-sep"><span class="wt-sb">${escapeHtml(tag)}</span></th><th><span class="wt-sb">kWh</span></th><th><span class="wt-sb">kWh/Gt</span></th>`).join('')
-          + `<th class="wt-sep wt-sb">${newer != null && older != null ? escapeHtml(t('kWh/Gt {a} gegenüber {b}', {a: WetterHeating.label(newer), b: WetterHeating.label(older)})) : ''}</th></tr></thead><tbody>`;
+          + (delta ? `<th class="wt-sep wt-sb">${escapeHtml(t('kWh/Gt {a} gegenüber {b}', {a: WetterHeating.label(newer), b: WetterHeating.label(older)}))}</th>` : '') + '</tr></thead><tbody>';
+        const deltaCell = (a, b) => (delta ? change(a, b) : '');
+        // Monate, in denen keine der gezeigten Heizperioden Werte hat (noch nicht erreicht), bleiben weg.
         for (const month of WetterHeating.MONTHS) {
           const stats = shown.map((p) => WetterHeating.stat(days, o, ...WetterHeating.monthRange(p, month)));
+          if (!stats.some((st) => st && st.n)) continue;
           const byPeriod = (p) => stats[shown.indexOf(p)];
-          html += `<tr><th scope="row">${escapeHtml(monthName(month, 'short'))}</th>${stats.map(cells).join('')}${change(byPeriod(newer), byPeriod(older))}</tr>`;
+          html += `<tr><th scope="row">${escapeHtml(monthName(month, 'short'))}</th>${stats.map(cells).join('')}${deltaCell(byPeriod(newer), byPeriod(older))}</tr>`;
         }
         const totals = shown.map((p) => WetterHeating.stat(days, o, ...WetterHeating.periodRange(p)));
         const totalOf = (p) => totals[shown.indexOf(p)];
-        html += `<tr class="wt-sum"><th scope="row">${escapeHtml(t('Heizperiode'))}</th>${totals.map(cells).join('')}${change(totalOf(newer), totalOf(older))}</tr>`;
-        if (info.running) {
+        html += `<tr class="wt-sum"><th scope="row">${escapeHtml(t('Heizperiode'))}</th>${totals.map(cells).join('')}${deltaCell(totalOf(newer), totalOf(older))}</tr>`;
+        // Die Zeile „1.10. bis heute“ ist ohne zweite Heizperiode nur eine Wiederholung der Summe.
+        if (info.running && shown.length > 1) {
           const cutOf = (p) => WetterHeating.cutRange(p, this.heat.today);
           const cuts = shown.map((p) => WetterHeating.stat(days, o, cutOf(p).from, cutOf(p).to));
           const label = cutOf(info.current).label;
           const first = info.current === shown[0] ? cuts[0] : null;
           const previous = info.complete[0] != null && shown.includes(info.complete[0]) ? cuts[shown.indexOf(info.complete[0])] : null;
           if (label) {
-            html += `<tr class="wt-cut"><th scope="row">${escapeHtml(t('1.10.–{day}.{month}.', {day: label.day, month: label.month}))}</th>${cuts.map(cells).join('')}${change(first, previous)}</tr>`;
+            html += `<tr class="wt-cut"><th scope="row">${escapeHtml(t('1.10.–{day}.{month}.', {day: label.day, month: label.month}))}</th>${cuts.map(cells).join('')}${deltaCell(first, previous)}</tr>`;
           }
         }
         table.innerHTML = html + '</tbody>';
