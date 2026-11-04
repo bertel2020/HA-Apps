@@ -3605,7 +3605,10 @@
     "Die Anfrage ist fehlgeschlagen. Bitte versuche es noch einmal.": "The request failed. Please try again.",
     "Die Antwort blieb aus. Ob die Wiederherstellung durchgeführt wurde, ist unklar: Prüfe vor einem neuen Versuch auf der Backup-Seite die Liste der Rollbacks.": "No answer came back. It is unclear whether the restore was carried out: Before trying again, check the list of rollbacks on the backup page.",
     "Erneut versuchen": "Try again",
-    "Ungültiger Zahlenwert in der Anfrage.": "Invalid number in the request."
+    "Ungültiger Zahlenwert in der Anfrage.": "Invalid number in the request.",
+    "Sonne": "Sun",
+    "Sonnentage": "Sunny days",
+    "Trübe Tage": "Dull days"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4295,7 +4298,7 @@
     "Die Langzeitwerte konnten nicht geladen werden.": "The long-term values could not be loaded.",
     "Eis": "ice",
     "Eistage": "Ice days",
-    "Frosttag: Tiefstwert unter 0 °C, Eistag: Höchstwert unter 0 °C, Sommertag: Höchstwert ab 25 °C, heißer Tag: ab 30 °C. Gezählt sind {days} abgeschlossene Tage mit mindestens 18 Stunden Werten; der laufende Tag zählt nicht.": "Frost day: minimum below 0 °C, ice day: maximum below 0 °C, summer day: maximum from 25 °C, hot day: from 30 °C. {days} completed days with at least 18 hours of values are counted; the running day does not count.",
+    "Frosttag: Tiefstwert unter 0 °C, Eistag: Höchstwert unter 0 °C, Sommertag: Höchstwert ab 25 °C, heißer Tag: ab 30 °C. Gezählt sind {days} abgeschlossene Tage mit mindestens 18 Stunden Werten; der laufende Tag zählt nicht. Sonnentage und trübe Tage richten sich nach dem Sonnenanteil des Tages wie im Tagesbild.": "Frost day: minimum below 0 °C, ice day: maximum below 0 °C, summer day: maximum from 25 °C, hot day: from 30 °C. {days} completed days with at least 18 hours of values are counted; the running day does not count. Sunny and dull days follow the sun share of the day, as in the day picture.",
     "Frosttage": "Frost days",
     "Heiße Tage": "Hot days",
     "Höchster Wert": "Highest value",
@@ -4466,6 +4469,13 @@
     "Der Verlauf konnte nicht geladen werden.": "The history could not be loaded.",
     "Export wird erstellt …": "Creating export …",
     "Die Auswahl konnte nicht geladen werden.": "The selection could not be loaded.",
-    "Die neue Reihenfolge konnte nicht gespeichert werden. Bitte versuche es noch einmal.": "The new order could not be saved. Please try again."
+    "Die neue Reihenfolge konnte nicht gespeichert werden. Bitte versuche es noch einmal.": "The new order could not be saved. Please try again.",
+    "Keine Tagesklasse": "No day class",
+    "Längste sonnige Folge": "Longest sunny streak",
+    "Längste trübe Folge": "Longest dull streak",
+    "Sonnigster Monat": "Sunniest month",
+    "Sonnenstunden": "Hours of sunshine",
+    "Neuestes Jahr oben, eine Spalte je Kalendertag, gefärbt nach der Tagesklasse (sonnig, wechselhaft, trüb) wie im Tagesbild. Graue Felder sind Tage ohne Klasse (zu wenig helle Stunden oder keine Werte), leer ist es vor dem Archivbeginn und ab heute. Ein Klick öffnet den Tag in der Entität.": "Newest year on top, one column per calendar day, coloured by day class (sunny, changeable, dull) as in the day picture. Grey cells are days without a class (too few bright hours or no values), empty means before the archive began and from today. A click opens the day in the entity.",
+    "Summe der Sonnenstunden je Monat (Stunden über der Sonnen-Schwelle). Die Helligkeit gibt es erst seit Kurzem im Archiv, ein Durchschnitt der Vorjahre erscheint nach dem ersten abgeschlossenen Vorjahr.": "Total hours of sunshine per month (hours above the sunshine threshold). The brightness has only been in the archive for a short time; an average of the previous years appears after the first completed previous year."
   }
 }

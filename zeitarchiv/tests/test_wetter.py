@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
 
+from app import wetter_analysis as analysis_mod
 from app import wetter_routes
 from app.storage import hotbuffer
 from app.storage import rollup as rollup_mod
@@ -1086,4 +1087,109 @@ def test_hidden_cards_are_saved_only_for_available_cards_and_hide_cards_and_tabs
     # alles abgewählt: auch die Übersicht fehlt
     assert client.post("/wetterdashboard/setup", data={**base, "show_card": []}).status_code == 200
     assert 'id="wt-tab-overview"' not in client.get("/wetterdashboard").text
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
+# -- Sonne im Langzeit: Monatsvergleich, Kenntage, Rekorde, Matrix ---------------------------------
+
+
+def _sun_longterm_data(service) -> None:
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(d, 12), 15.0) for d in range(16, 20)])
+    _dayimage_data(service)
+    # Die Testdaten sind absteigend geschrieben, der Archivbeginn ist aber der älteste Tag.
+    with service.deps.index._conn:  # noqa: SLF001
+        service.deps.index._conn.execute(  # noqa: SLF001
+            "UPDATE entities SET first_ts = ? WHERE entity_id IN ('sensor.lux_sued', 'sensor.lux_daem')", (_ts(16, 7, 30),),
+        )
+
+
+def test_sun_history_lists_every_closed_day_since_the_archive_start(service) -> None:
+    _sun_longterm_data(service)
+    days = service.sun_history(wetter_routes._load_config(service.deps.index), NOW)
+    assert [(entry["date"].day, entry["class"]) for entry in days] == [
+        (16, None), (17, "mixed"), (18, "overcast"), (19, "sunny"),
+    ]
+    assert days[3]["hours"] == pytest.approx(9.0) and days[0]["hours"] == pytest.approx(0.0)
+
+
+def test_monthly_comparison_offers_the_sun_hours(service) -> None:
+    _sun_longterm_data(service)
+    data = service.compute_monthly("sun", "mm", NOW)
+    assert data["metric"] == "sun" and data["unit"] == "h" and data["headline"] is None
+    assert data["years"]["2026"][7] == pytest.approx(12.0)  # 9 sonnig + 3 wechselhaft
+    assert service.compute_monthly("sun", "mm", NOW) is not None
+    service.deps.index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    assert service.compute_monthly("sun", "mm", NOW) is None
+
+
+def test_year_matrix_shows_the_day_classes(service) -> None:
+    _sun_longterm_data(service)
+    data = service.compute_matrix("sun", "mm", NOW)
+    assert data["metric"] == "sun" and data["years"] == [2026]
+    by_slot = {cell[0]: cell[2] for cell in data["cells"]}
+    slot = analysis_mod.matrix_slot
+    assert by_slot[slot(date(2026, 8, 19))] == 2 and by_slot[slot(date(2026, 8, 18))] == 0
+    assert by_slot[slot(date(2026, 8, 17))] == 1
+    assert [slot(date(2026, 8, 16)), 0] in data["missing"]  # zu kurzer Tag: grau, nicht trüb
+    assert data["hours"]["2026-08-19"] == pytest.approx(9.0) and "2026-08-16" not in data["hours"]
+
+
+def test_longterm_carries_the_sun_kenntage(service) -> None:
+    _sun_longterm_data(service)
+    data = service.compute_longterm(NOW)
+    month = data["sun_kenntage"]["2026"]
+    assert month["sunny"][7] == 1 and month["overcast"][7] == 1 and month["days"][7] == 3
+    assert not any(entry["key"].startswith(("sunniest", "longest")) for entry in data["records"])  # Archiv zu kurz
+
+
+def _sun_days(classes: list[str | None], hours: float = 6.0) -> list[dict]:
+    start = date(2025, 1, 1)
+    return [
+        {"date": start + timedelta(days=i), "class": kind, "share": None, "hours": hours if kind else None, "bright": 9}
+        for i, kind in enumerate(classes)
+    ]
+
+
+def test_sun_kenntage_count_only_sunny_and_overcast_days() -> None:
+    days = _sun_days(["sunny", "mixed", "overcast", None, "sunny"])
+    assert analysis_mod.sun_kenntage(days) == {"2025": {
+        "sunny": [2] + [0] * 11, "overcast": [1] + [0] * 11, "days": [4] + [0] * 11,
+    }}
+
+
+def test_sun_records_find_the_longest_runs_and_the_sunniest_month() -> None:
+    kinds = (["sunny"] * 2 + ["overcast"] * 3 + ["sunny"] * 4 + [None] + ["sunny"] * 5) + ["mixed"] * 360
+    days = _sun_days(kinds)
+    days[3]["hours"] = 11.5
+    monthly = {"years": {"2025": [200.0, 310.5] + [None] * 10}}
+    out = analysis_mod.sun_records(days, monthly, date(2026, 6, 1))
+    assert out["sunniest_day"] == {"value": 11.5, "date": "2025-01-04"}
+    assert out["sunniest_month"] == {"value": 310.5, "date": "2025-02-01"}
+    assert out["longest_sunny_streak"] == {"value": 5, "date": "2025-01-11", "end": "2025-01-15"}
+    assert out["longest_overcast_streak"] == {"value": 3, "date": "2025-01-03", "end": "2025-01-05"}
+    assert analysis_mod.sun_records(days[:100], monthly, date(2026, 6, 1)) is None  # kein Jahr Werte
+
+
+def test_sun_records_skip_the_running_month() -> None:
+    days = _sun_days(["sunny"] * 400)
+    out = analysis_mod.sun_records(days, {"years": {"2026": [None] * 5 + [999.0] + [None] * 6, "2025": [100.0] + [None] * 11}}, date(2026, 6, 10))
+    assert out["sunniest_month"]["date"] == "2025-01-01"
+
+
+def test_longterm_page_offers_the_sun_views_only_with_the_illuminance_role(client) -> None:
+    from app.main import index
+
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    index.get_or_create_entity("sensor.sl_temp", "sensor", "measurement", "°C")
+    index.get_or_create_entity("sensor.sl_lux", "sensor", "measurement", "lx")
+    base = {"temperature": "sensor.sl_temp"}
+    assert client.post("/wetterdashboard/setup", data=base).status_code == 200
+    page = client.get("/wetterdashboard").text
+    assert "setMatrixMetric('sun')" not in page and "setMonthlyMetric('sun')" not in page
+    assert client.post("/wetterdashboard/setup", data={**base, "illuminance": "sensor.sl_lux"}).status_code == 200
+    page = client.get("/wetterdashboard").text
+    assert "setMatrixMetric('sun')" in page and "setMonthlyMetric('sun')" in page
+    assert 'x-ref="kenntageChartSunny"' in page and 'x-ref="kenntageChartOvercast"' in page
+    assert client.get("/wetterdashboard/monatsvergleich?metric=sun").status_code in (200, 404)
+    assert client.get("/wetterdashboard/matrix?metric=wolke").status_code == 400
     index.set_setting(wetter_routes.SETTING_CONFIG, "")

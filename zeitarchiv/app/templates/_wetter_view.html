@@ -167,10 +167,11 @@
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Monatsvergleich") }} {{ hint_button(_("Monatsvergleich")) }}</h2>
       {% call hint_body() %}<span x-text="monthlyNote()"></span>{% endcall %}
-      {% if precip_modes %}
+      {% if precip_modes or has_dayimage %}
       <div class="wt-seg" role="group" aria-label="{{ _('Kennzahl') }}">
         <button type="button" :aria-pressed="(monthlyMetric === 'temperature').toString()" @click="setMonthlyMetric('temperature')">{{ _("Temperatur") }}</button>
-        <button type="button" :aria-pressed="(monthlyMetric === 'precip').toString()" @click="setMonthlyMetric('precip')">{{ _("Niederschlag") }}</button>
+        {% if precip_modes %}<button type="button" :aria-pressed="(monthlyMetric === 'precip').toString()" @click="setMonthlyMetric('precip')">{{ _("Niederschlag") }}</button>{% endif %}
+        {% if has_dayimage %}<button type="button" :aria-pressed="(monthlyMetric === 'sun').toString()" @click="setMonthlyMetric('sun')">{{ _("Sonnenstunden") }}</button>{% endif %}
       </div>
       {% endif %}
       <label class="filter-chip"><input type="checkbox" x-model="band" @change="drawMonthly()"><span>{{ _("Spanne der Vorjahre") }}</span></label>
@@ -301,8 +302,8 @@
         </div>
       </div>
       <div class="wt-kk-grid">
-        {% for key, label in (("frost", _("Frosttage")), ("eis", _("Eistage")), ("sommer", _("Sommertage")), ("heiss", _("Heiße Tage"))) %}
-        <div class="wt-kk">
+        {% for key, label in (("frost", _("Frosttage")), ("eis", _("Eistage")), ("sommer", _("Sommertage")), ("heiss", _("Heiße Tage")), ("sunny", _("Sonnentage")), ("overcast", _("Trübe Tage"))) %}
+        <div class="wt-kk"{% if key in ("sunny", "overcast") %} x-show="longterm && longterm.sun_kenntage" x-cloak{% endif %}>
           <div class="wt-kk-head"><span class="wt-kk-swatch wt-kk-{{ key }}"></span><span class="wt-kk-name">{{ label }}</span><span class="wt-kk-avg" x-text="kenntageAvg('{{ key }}')"></span></div>
           <div class="wt-chart wt-kk-chart" x-ref="kenntageChart{{ key | capitalize }}"></div>
         </div>
@@ -331,6 +332,9 @@
           {% if precip_modes %}
           <button type="button" :aria-pressed="(matrixMetric === 'precip').toString()" @click="setMatrixMetric('precip')">{{ _("Niederschlag") }}</button>
           {% endif %}
+          {% if has_dayimage %}
+          <button type="button" :aria-pressed="(matrixMetric === 'sun').toString()" @click="setMatrixMetric('sun')">{{ _("Sonne") }}</button>
+          {% endif %}
         </div>
       </div>
       <div class="wt-chart wt-matrix" x-ref="matrixChart" :style="matrixHeight()"></div>
@@ -347,7 +351,7 @@
             <span class="wt-tile-label" x-text="recordLabel(record.key)"></span>
             <span class="wt-tile-value" x-html="recordValue(record)"></span>
             <span class="wt-tile-sub" x-text="recordDate(record)"></span>
-            <a class="wt-record-link" :href="recordLink(record)">{{ _("Tag öffnen") }}</a>
+            <a class="wt-record-link" x-show="record.key !== 'sunniest_month'" :href="recordLink(record)">{{ _("Tag öffnen") }}</a>
           </div>
         </template>
       </div>

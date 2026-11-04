@@ -638,6 +638,8 @@ class WetterService:
     def compute_monthly(self, metric: str, mode: str = "mm", now_local: datetime | None = None) -> dict | None:
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
+        if metric == "sun":
+            return self._monthly_sun(config, now_local)
         if metric == "temperature":
             entity_id, kind, unit = config["temperature"], "mean", ""
         else:
@@ -659,6 +661,16 @@ class WetterService:
         result = analysis.monthly(points, self.deps.tz, today, kind, dry_start)
         result.update(metric=metric, unit=unit or entity["unit"] or "", entity_id=entity_id, tz=str(self.deps.tz))
         result["headline"] = analysis.headline(points, self.deps.tz, today) if metric == "temperature" else None
+        return result
+
+    def _monthly_sun(self, config: dict, now_local: datetime, days: list[dict] | None = None) -> dict | None:
+        """Sonnenstunden je Monat und Jahr (Form wie beim Monatsvergleich), Summe der Tage mit Werten."""
+        entity_id = config["illuminance"]
+        if not entity_id or self.deps.index.get_entity(entity_id) is None:
+            return None
+        days = self.sun_history(config, now_local) if days is None else days
+        result = analysis.monthly(analysis.sun_points(days, self.deps.tz, "hours"), self.deps.tz, now_local.date(), "sum")
+        result.update(metric="sun", unit="h", entity_id=entity_id, tz=str(self.deps.tz), headline=None)
         return result
 
     def heating_counters(self, config: dict) -> list[dict]:
@@ -701,6 +713,8 @@ class WetterService:
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
         today = now_local.date()
+        if metric == "sun":
+            return self._matrix_sun(config, now_local)
         if metric == "precip":
             role = self._precip_role(config, mode)
             if role is None:
@@ -728,6 +742,24 @@ class WetterService:
             )
             unit = entity["unit"] or "°C"
         return {**result, "metric": metric, "unit": unit, "entity_id": entity_id, "today": today.isoformat(), "tz": str(self.deps.tz)}
+
+    def _matrix_sun(self, config: dict, now_local: datetime) -> dict | None:
+        """Jahr×Tag-Matrix der Tagesklassen (0 trüb, 1 wechselhaft, 2 sonnig); ``hours`` nennt die Sonnenstunden je Tag."""
+        entity_id = config["illuminance"]
+        entity = self.deps.index.get_entity(entity_id) if entity_id else None
+        if entity is None:
+            return None
+        days = self.sun_history(config, now_local)
+        today = now_local.date()
+        start = datetime.fromtimestamp(entity["first_ts"], self.deps.tz).date() if entity["first_ts"] else None
+        result = analysis.matrix(
+            analysis.sun_points(days, self.deps.tz, "class"), self.deps.tz, today, "value", archive_start=start,
+        )
+        hours = {entry["date"].isoformat(): round(entry["hours"], 1) for entry in days if entry["class"]}
+        return {
+            **result, "metric": "sun", "unit": "", "entity_id": entity_id, "today": today.isoformat(),
+            "tz": str(self.deps.tz), "hours": hours,
+        }
 
     def compute_temperatures(self, days: int, now_local: datetime | None = None) -> dict | None:
         """Tagesmittel der Außentemperatur und aller weiteren Sensoren für die letzten ``days`` Tage."""
@@ -794,8 +826,22 @@ class WetterService:
                     source = self.deps.index.get_entity(entry["entity_id"])
                     entry["unit"] = (source["unit"] if source else "") or ""
         entity = self.deps.index.get_entity(config["temperature"])
+        sun_days = self.sun_history(config, now_local)
+        sun_kenntage = analysis.sun_kenntage(sun_days) if sun_days else None
+        if sun_days:
+            found_sun = analysis.sun_records(sun_days, self._monthly_sun(config, now_local, sun_days) or {"years": {}}, today)
+            if found_sun:
+                for key in ("sunniest_day", "sunniest_month", "longest_sunny_streak", "longest_overcast_streak"):
+                    if key in found_sun:
+                        entry = {
+                            "key": key, "entity_id": config["illuminance"], **found_sun[key],
+                            "unit": {"sunniest_day": "h", "sunniest_month": "h"}.get(key, ""),
+                        }
+                        entry["offset_days"] = (date.fromisoformat(entry["date"]) - today).days
+                        entries.append(entry)
         return {
             "kenntage": analysis.kenntage(points, self.deps.tz, today, temperature_unit),
+            "sun_kenntage": sun_kenntage,
             "records": entries, "records_since": found["since"] if found else None,
             "records_days": found["days"] if found else 0,
             "unit": entity["unit"] or "°C", "tz": str(self.deps.tz), "today": today.isoformat(),
@@ -893,20 +939,16 @@ class WetterService:
 
     # -- Tagesbild -----------------------------------------------------------------------
 
-    def compute_dayimage(self, now_local: datetime | None = None, days: int = DAYIMAGE_DAYS) -> dict | None:
-        """Klasse je Tag (sonnig, wechselhaft, trüb) der letzten Tage aus dem Sonnenanteil: Stunden über der
-        Sonnen-Schwelle geteilt durch die hellen Stunden. Hell ist eine Stunde laut Dämmerungssensor (sonst nach der
-        Helligkeit selbst) ab der Tag-Schwelle. Ein Tag mit weniger als ``DAYIMAGE_MIN_BRIGHT_HOURS`` hellen Stunden
-        (oder ohne Werte) bekommt keine Klasse."""
-        config = _load_config(self.deps.index)
+    def _sun_days(self, first: date, last: date, config: dict, now_local: datetime) -> list[dict]:
+        """Sonnentage ``first`` bis ``last`` (einschließlich): je Tag ``class`` (sunny, mixed, overcast oder None),
+        ``share`` (Sonnenanteil), ``hours`` (Sonnenstunden, auch ohne Klasse; None ohne Werte) und ``bright``
+        (helle Stunden). Der Sonnenanteil ist Sonnenstunden geteilt durch die hellen Stunden; hell ist eine Stunde laut
+        Dämmerungssensor (sonst nach der Helligkeit selbst) ab der Tag-Schwelle. Ein Tag mit weniger als
+        ``DAYIMAGE_MIN_BRIGHT_HOURS`` hellen Stunden (oder ohne Werte) bekommt keine Klasse. Gemeinsame Grundlage von
+        Tagesbild, Langzeit-Kenntagen, Monatsvergleich, Jahresmatrix und Rekorden."""
         entity_id = config["illuminance"]
-        if not entity_id or self.deps.index.get_entity(entity_id) is None:
-            return None
-        now_local = now_local or datetime.now(self.deps.tz)
         tz = self.deps.tz
         read_cache = query_mod.QueryReadCache()
-        today = now_local.date()
-        first = today - timedelta(days=days - 1)
         start = datetime(first.year, first.month, first.day, tzinfo=tz)
         main_rows = sorted(
             (row for row in self._rows(entity_id, "standard", start, now_local, now_local, read_cache) if row.value is not None),
@@ -920,6 +962,7 @@ class WetterService:
             light_rows = [
                 row for row in self._rows(dawn_id, "standard", start, now_local, now_local, read_cache) if row.value is not None
             ]
+
         def stats_of(rows: list) -> dict[float, tuple[float, float]]:
             return {row.bucket_start: (row.value, row.max_value if row.max_value is not None else row.value) for row in rows}
 
@@ -927,8 +970,7 @@ class WetterService:
         main_stats = stats_of(main_rows)
         dawn_days = {datetime.fromtimestamp(stamp, tz).date() for stamp in stats}
         out = []
-        counts = {"sunny": 0, "mixed": 0, "overcast": 0, "none": 0}
-        for offset in range(days):
+        for offset in range((last - first).days + 1):
             day = first + timedelta(days=offset)
             midnight = datetime(day.year, day.month, day.day, tzinfo=tz)
             following = day + timedelta(days=1)
@@ -943,19 +985,43 @@ class WetterService:
             bright = sum(1 for kind in classes if kind == daylight.DAY)
             kind = None
             share = None
-            sun_hours = sun_seconds.get(day, 0.0) / 3600.0
-            if bright >= DAYIMAGE_MIN_BRIGHT_HOURS and day in sun_seconds:
-                share = min(1.0, sun_hours / bright)
+            hours = sun_seconds[day] / 3600.0 if day in sun_seconds else None
+            if bright >= DAYIMAGE_MIN_BRIGHT_HOURS and hours is not None:
+                share = min(1.0, hours / bright)
                 kind = "sunny" if share >= 0.5 else "mixed" if share >= 0.2 else "overcast"
+            out.append({"date": day, "class": kind, "share": share, "hours": hours, "bright": bright})
+        return out
+
+    def compute_dayimage(self, now_local: datetime | None = None, days: int = DAYIMAGE_DAYS) -> dict | None:
+        """Klasse je Tag (sonnig, wechselhaft, trüb) der letzten Tage, Regeln siehe ``_sun_days``."""
+        config = _load_config(self.deps.index)
+        entity_id = config["illuminance"]
+        if not entity_id or self.deps.index.get_entity(entity_id) is None:
+            return None
+        now_local = now_local or datetime.now(self.deps.tz)
+        today = now_local.date()
+        counts = {"sunny": 0, "mixed": 0, "overcast": 0, "none": 0}
+        out = []
+        for entry in self._sun_days(today - timedelta(days=days - 1), today, config, now_local):
+            kind = entry["class"]
             counts[kind or "none"] += 1
             out.append({
-                "date": day.isoformat(), "class": kind, "share": share,
-                "sun_hours": sun_hours if kind else None, "bright_hours": float(bright) if kind else None,
-                "today": day == today,
+                "date": entry["date"].isoformat(), "class": kind, "share": entry["share"],
+                "sun_hours": entry["hours"] if kind else None, "bright_hours": float(entry["bright"]) if kind else None,
+                "today": entry["date"] == today,
             })
         if counts["none"] == days:
             return None
-        return {"tz": str(tz), "days": out, "counts": counts, "threshold": config["sun_threshold_lx"]}
+        return {"tz": str(self.deps.tz), "days": out, "counts": counts, "threshold": config["sun_threshold_lx"]}
+
+    def sun_history(self, config: dict, now_local: datetime) -> list[dict]:
+        """Alle abgeschlossenen Tage seit Archivbeginn der Helligkeit (Einträge wie ``_sun_days``); leer ohne Rolle."""
+        entity = self.deps.index.get_entity(config["illuminance"]) if config["illuminance"] else None
+        if entity is None or not entity["first_ts"]:
+            return []
+        first = datetime.fromtimestamp(entity["first_ts"], self.deps.tz).date()
+        yesterday = now_local.date() - timedelta(days=1)
+        return self._sun_days(first, yesterday, config, now_local) if first <= yesterday else []
 
     # -- Tageslicht ----------------------------------------------------------------------
 
@@ -1464,7 +1530,7 @@ class WetterService:
         @router.get("/wetterdashboard/monatsvergleich")
         def wetterdashboard_monthly(metric: str = "temperature", mode: str = "mm") -> dict:
             _require_configured()
-            if metric not in ("temperature", "precip"):
+            if metric not in ("temperature", "precip", "sun"):
                 raise HTTPException(status_code=400, detail=tr("Ungültige Kennzahl."))
             result = self.compute_monthly(metric, mode)
             if result is None:
@@ -1482,7 +1548,7 @@ class WetterService:
         @router.get("/wetterdashboard/matrix")
         def wetterdashboard_matrix(metric: str = "avg", mode: str = "mm") -> dict:
             _require_configured()
-            if metric not in ("avg", "max", "min", "precip"):
+            if metric not in ("avg", "max", "min", "precip", "sun"):
                 raise HTTPException(status_code=400, detail=tr("Ungültige Kennzahl."))
             result = self.compute_matrix(metric, mode)
             if result is None:

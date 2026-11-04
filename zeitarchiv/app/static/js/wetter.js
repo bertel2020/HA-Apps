@@ -207,6 +207,21 @@
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   }
 
+  // Ein CSS-Farbausdruck (auch color-mix) als „rgb(…)“, weil ECharts nur klassische Farbwerte versteht.
+  function resolveColor(expression) {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 1;
+      const context = canvas.getContext('2d');
+      context.fillStyle = expression;
+      context.fillRect(0, 0, 1, 1);
+      const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
+      return `rgb(${r}, ${g}, ${b})`;
+    } catch (e) {
+      return expression;
+    }
+  }
+
   function scaledFont(size) {
     return Math.round(size * (parseFloat(cssVar('--font-scale')) || 1) * 10) / 10;
   }
@@ -217,6 +232,10 @@
       cur: cssVar('--chart-1'), prev: cssVar('--chart-2'), cold: cssVar('--chart-3'),
       text: cssVar('--ink-muted'), faint: cssVar('--ink-faint'), grid: cssVar('--border'),
       ink: cssVar('--ink'), surface: cssVar('--surface'),
+      // Tagesklassen der Sonne, dieselben Töne wie die Pillen im Tagesbild.
+      sun: resolveColor(`color-mix(in srgb, ${cssVar('--chart-7')} 70%, ${cssVar('--surface')})`),
+      sunSoft: resolveColor(`color-mix(in srgb, ${cssVar('--chart-7')} 30%, ${cssVar('--surface')})`),
+      overcast: resolveColor(`color-mix(in srgb, ${cssVar('--ink-faint')} 40%, ${cssVar('--surface')})`),
     };
   }
 
@@ -642,6 +661,7 @@
         const m = this.monthly;
         if (!m) return '';
         const used = m.counts.filter((count) => count > 0);
+        if (m.metric === 'sun' && !used.length) return t('Summe der Sonnenstunden je Monat (Stunden über der Sonnen-Schwelle). Die Helligkeit gibt es erst seit Kurzem im Archiv, ein Durchschnitt der Vorjahre erscheint nach dem ersten abgeschlossenen Vorjahr.');
         if (!used.length) return t('Noch kein abgeschlossenes Vorjahr mit genug Werten für einen Durchschnitt.');
         const n = Math.min(...used);
         return n === Math.max(...used)
@@ -654,7 +674,7 @@
         const element = this.$refs.monthlyChart;
         if (!m || !element) return;
         const colors = palette();
-        const decimals = m.metric === 'temperature' ? 1 : (m.unit === 'min' ? 0 : 1);
+        const decimals = m.metric === 'temperature' ? 1 : (m.unit === 'min' || m.unit === 'h' ? 0 : 1);
         const labels = Array.from({length: 12}, (_x, i) => monthName(i + 1, 'short'));
         const yearKeys = Object.keys(m.years).map(Number).sort((a, b) => a - b);
         const current = String(m.current_year);
@@ -1413,7 +1433,7 @@
         const all = this.longterm ? this.longterm.kenntage : {};
         const days = Object.values(all).reduce((sum, year) => sum + year.days.reduce((a, b) => a + b, 0), 0);
         if (!days) return t('Noch keine Tage mit ausreichend Werten (mindestens 18 Stunden je Tag).');
-        return t('Frosttag: Tiefstwert unter 0 °C, Eistag: Höchstwert unter 0 °C, Sommertag: Höchstwert ab 25 °C, heißer Tag: ab 30 °C. Gezählt sind {days} abgeschlossene Tage mit mindestens 18 Stunden Werten; der laufende Tag zählt nicht.', {days});
+        return t('Frosttag: Tiefstwert unter 0 °C, Eistag: Höchstwert unter 0 °C, Sommertag: Höchstwert ab 25 °C, heißer Tag: ab 30 °C. Gezählt sind {days} abgeschlossene Tage mit mindestens 18 Stunden Werten; der laufende Tag zählt nicht. Sonnentage und trübe Tage richten sich nach dem Sonnenanteil des Tages wie im Tagesbild.', {days});
       },
 
       // Fußnote zum laufenden Jahr (mit „*“ an der Jahreszahl markiert).
@@ -1432,17 +1452,27 @@
           {key: 'eis', name: t('Eistage'), color: cssVar('--chart-4')},
           {key: 'sommer', name: t('Sommertage'), color: cssVar('--chart-7')},
           {key: 'heiss', name: t('Heiße Tage'), color: cssVar('--chart-5')},
+          {key: 'sunny', name: t('Sonnentage'), color: cssVar('--chart-7'), sun: true},
+          {key: 'overcast', name: t('Trübe Tage'), color: cssVar('--ink-faint'), sun: true},
         ];
+      },
+
+      // Zähltabelle einer Art: Temperatur-Kenntage oder die der Sonne (dort fehlen Jahre vor dem Archivbeginn der Helligkeit).
+      kenntageSource(key) {
+        const sun = key === 'sunny' || key === 'overcast';
+        const source = this.longterm ? (sun ? this.longterm.sun_kenntage : this.longterm.kenntage) : null;
+        return source || {};
       },
 
       // Ø je Jahr über die abgeschlossenen Jahre der Auswahl (das laufende Jahr zählt nicht).
       kenntageAverage(key) {
         if (!this.longterm) return null;
         const current = String(this.longterm.current_year);
-        const past = this.kenntageYears().filter((year) => year !== current);
+        const source = this.kenntageSource(key);
+        const past = this.kenntageYears().filter((year) => year !== current && source[year]);
         if (!past.length) return null;
         const sum = (list) => list.reduce((a, b) => a + b, 0);
-        return sum(past.map((year) => sum(this.longterm.kenntage[year][key]))) / past.length;
+        return sum(past.map((year) => sum(source[year][key]))) / past.length;
       },
 
       kenntageAvg(key) {
@@ -1453,10 +1483,11 @@
       drawKenntage() {
         const years = this.kenntageYears();
         const colors = palette();
-        const data = this.longterm ? this.longterm.kenntage : {};
         const current = this.longterm ? String(this.longterm.current_year) : '';
         const sum = (list) => list.reduce((a, b) => a + b, 0);
         for (const kind of this.kenntageKinds()) {
+          const data = this.kenntageSource(kind.key);
+          const empty = {[kind.key]: Array(12).fill(0), days: Array(12).fill(0)};
           const element = this.$refs[`kenntageChart${kind.key.charAt(0).toUpperCase()}${kind.key.slice(1)}`];
           if (!element) continue;
           if (!years.length) {
@@ -1478,17 +1509,18 @@
             // Je Balken: Summe des Jahres, darunter die Verteilung auf die Monate.
             tooltip: {...tooltipBox(colors, (param) => {
               const year = years[param.dataIndex];
-              const months = data[year][kind.key].map((count, i) => (count ? `${monthName(i + 1, 'short')} ${count}` : '')).filter(Boolean);
+              const counts = data[year] || empty;
+              const months = counts[kind.key].map((count, i) => (count ? `${monthName(i + 1, 'short')} ${count}` : '')).filter(Boolean);
               const lines = [];
               for (let i = 0; i < months.length; i += 4) lines.push(escapeHtml(months.slice(i, i + 4).join(' · ')));
-              return `<b>${escapeHtml(kind.name)} ${escapeHtml(year)}</b><br>${escapeHtml(t('{n} Tage', {n: sum(data[year][kind.key])}))}`
+              return `<b>${escapeHtml(kind.name)} ${escapeHtml(year)}</b><br>${escapeHtml(t('{n} Tage', {n: sum(counts[kind.key])}))}`
                 + (lines.length ? `<br>${lines.join('<br>')}` : '')
-                + `<br>${escapeHtml(t('{days} Tage ausgewertet', {days: sum(data[year].days)}))}`;
+                + `<br>${escapeHtml(t('{days} Tage ausgewertet', {days: sum(counts.days)}))}`;
             }), trigger: 'item'},
             series: [{
               name: kind.name, type: 'bar', barMaxWidth: 28,
               itemStyle: {color: kind.color, borderRadius: [3, 3, 0, 0]},
-              data: years.map((year) => ({value: sum(data[year][kind.key]), itemStyle: year === current ? {opacity: 0.55} : {}})),
+              data: years.map((year) => ({value: sum((data[year] || empty)[kind.key]), itemStyle: year === current ? {opacity: 0.55} : {}})),
               markLine: average == null ? undefined : {
                 silent: true, symbol: 'none', label: {show: false},
                 lineStyle: {color: colors.text, type: 'dashed', width: 1}, data: [{yAxis: Math.round(average * 10) / 10}],
@@ -1597,6 +1629,7 @@
         const m = this.matrix;
         if (!m) return '';
         if (!m.years.length) return t('Noch keine Tageswerte.');
+        if (m.metric === 'sun') return t('Neuestes Jahr oben, eine Spalte je Kalendertag, gefärbt nach der Tagesklasse (sonnig, wechselhaft, trüb) wie im Tagesbild. Graue Felder sind Tage ohne Klasse (zu wenig helle Stunden oder keine Werte), leer ist es vor dem Archivbeginn und ab heute. Ein Klick öffnet den Tag in der Entität.');
         return t('Neuestes Jahr oben, eine Spalte je Kalendertag. Graue Felder sind Tage ohne ausreichende Werte (mindestens 18 Stunden), leer ist es vor dem Archivbeginn und ab heute. Ein Klick öffnet den Tag in der Entität.');
       },
 
@@ -1612,9 +1645,15 @@
         const isPrecip = m.metric === 'precip';
         const decimals = isPrecip && m.unit === 'min' ? 0 : 1;
         const unit = m.unit;
+        const isSun = m.metric === 'sun';
         const inRange = isPrecip
           ? [colors.surface, colors.cold]
           : [colors.cold, colors.surface, colors.prev];
+        const sunPieces = [
+          {value: 2, label: t('sonnig'), color: colors.sun},
+          {value: 1, label: t('wechselhaft'), color: colors.sunSoft},
+          {value: 0, label: t('trüb'), color: colors.overcast},
+        ];
         const hidden = {itemStyle: {borderWidth: 0}};
         const chart = chartFor('matrix', element);
         chart.setOption({
@@ -1633,7 +1672,10 @@
             type: 'category', data: m.years.map(String), inverse: true,
             axisLine: {show: false}, axisTick: {show: false}, axisLabel: {color: colors.text, fontSize: scaledFont(11)},
           },
-          visualMap: {
+          visualMap: isSun ? {
+            type: 'piecewise', pieces: sunPieces, seriesIndex: 1, orient: 'horizontal', left: 'center', bottom: 4,
+            itemWidth: 14, itemHeight: 14, textStyle: {color: colors.text, fontSize: scaledFont(11)},
+          } : {
             type: 'continuous', min: m.min, max: m.max, seriesIndex: 1, calculable: false, orient: 'horizontal',
             left: 'center', bottom: 4, itemWidth: 12, itemHeight: 140, inRange: {color: inRange},
             textStyle: {color: colors.text, fontSize: scaledFont(11)},
@@ -1646,9 +1688,13 @@
               const [slot, row, value] = param.data;
               const when = this.matrixDate(m.years[row], slot);
               const label = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'}).format(when);
-              return param.seriesIndex === 0
-                ? `<b>${escapeHtml(label)}</b><br>${escapeHtml(t('Zu wenige Werte'))}`
-                : `<b>${escapeHtml(label)}</b><br>${escapeHtml(num(value, decimals))} ${escapeHtml(unit === '°C' ? '°C' : unit)}`;
+              if (param.seriesIndex === 0) return `<b>${escapeHtml(label)}</b><br>${escapeHtml(isSun ? t('Keine Tagesklasse') : t('Zu wenige Werte'))}`;
+              if (isSun) {
+                const hours = m.hours ? m.hours[when.toISOString().slice(0, 10)] : null;
+                return `<b>${escapeHtml(label)}</b><br>${escapeHtml(sunPieces.find((piece) => piece.value === value).label)}`
+                  + (hours == null ? '' : `<br>${escapeHtml(num(hours, 1))} ${escapeHtml(t('Sonnenstunden'))}`);
+              }
+              return `<b>${escapeHtml(label)}</b><br>${escapeHtml(num(value, decimals))} ${escapeHtml(unit === '°C' ? '°C' : unit)}`;
             },
           },
           series: [
@@ -1960,15 +2006,23 @@
         return {
           warmest_day: t('Wärmster Tag (Ø)'), coldest_day: t('Kältester Tag (Ø)'), highest: t('Höchster Wert'),
           lowest: t('Tiefster Wert'), strongest_gust: t('Stärkste Böe'), wettest_day: t('Nassester Tag'),
-          rainiest_day: t('Regenreichster Tag'),
+          rainiest_day: t('Regenreichster Tag'), sunniest_day: t('Sonnigster Tag'), sunniest_month: t('Sonnigster Monat'),
+          longest_sunny_streak: t('Längste sonnige Folge'), longest_overcast_streak: t('Längste trübe Folge'),
         }[key] || key;
       },
 
       recordValue(record) {
+        if (record.key.endsWith('_streak')) return escapeHtml(num(record.value, 0)) + `<small>${escapeHtml(t('Tage'))}</small>`;
         return escapeHtml(num(record.value, 1)) + (record.unit ? `<small>${escapeHtml(record.unit)}</small>` : '');
       },
 
       recordDate(record) {
+        const day = (iso) => new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'})
+          .format(new Date(iso + 'T12:00:00Z'));
+        if (record.key === 'sunniest_month') {
+          return new Intl.DateTimeFormat(LOCALE, {month: 'long', year: 'numeric', timeZone: 'UTC'}).format(new Date(record.date + 'T12:00:00Z'));
+        }
+        if (record.end) return `${day(record.date)} – ${day(record.end)}`;
         return new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'})
           .format(new Date(record.date + 'T12:00:00Z'));
       },

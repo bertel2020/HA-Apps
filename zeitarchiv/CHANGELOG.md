@@ -23,6 +23,10 @@
     Überschrift nennt Sonnenstunden und Spitze
   - **Sonnenschein-Kachel**: Die Sonnenstunden von heute stehen auch als Kachel
     im Reiter Wind & Sonne, mit dem Vortag darunter
+  - **Sonne im Langzeit**: Der Monatsvergleich zeigt auch die Sonnenstunden je
+    Monat, die Kenntage ergänzen Sonnentage und trübe Tage je Jahr, die
+    Jahresübersicht färbt jeden Tag nach seiner Klasse, und die Rekorde nennen
+    den sonnigsten Tag und Monat sowie die längste sonnige und trübe Folge
   - **Heizen**: Die Tabelle der Gradtagzahl zeigt nur Monate mit Werten und die
     Spalte Δ erst mit zwei abgeschlossenen Heizperioden; sie nutzt die volle
     Breite
@@ -65,6 +69,10 @@
     shaded, and the headline gives the hours of sunshine and the peak
   - **Sunshine tile**: The hours of sunshine today are also shown as a tile on
     the Wind & sun tab, with the previous day below
+  - **Sun in the long-term view**: The monthly comparison also shows the hours
+    of sunshine per month, the key days add sunny and overcast days per year,
+    the year overview colours each day by its class, and the records name the
+    sunniest day and month and the longest sunny and overcast streak
   - **Heating**: The degree-day table only shows months with values and the
     Δ column only once two completed heating periods exist; it uses the full
     width

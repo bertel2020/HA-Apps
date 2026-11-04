@@ -67,6 +67,8 @@
   .wt-kk-eis{background:var(--chart-4);}
   .wt-kk-sommer{background:var(--chart-7);}
   .wt-kk-heiss{background:var(--chart-5);}
+  .wt-kk-sunny{background:var(--chart-7);}
+  .wt-kk-overcast{background:var(--ink-faint);}
   .wt-kk-chart{height:170px;}
 
   /* Einrichtung: Bereiche wie die Einrichtung des Energiedashboards (.settings-section mit Farbverlauf in der

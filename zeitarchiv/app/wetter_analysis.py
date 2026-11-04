@@ -326,6 +326,93 @@ def records(points: list[DailyPoint], tz: ZoneInfo, today: date) -> dict | None:
     }
 
 
+# -- Sonne (Langzeit) -----------------------------------------------------------------------------
+
+#: Tagesklassen der Sonne als Zahl in der Jahr×Tag-Matrix (Farbstufen von trüb bis sonnig).
+SUN_CLASS_CODES = {"overcast": 0, "mixed": 1, "sunny": 2}
+
+
+def sun_points(days: list[dict], tz: ZoneInfo, field: str) -> list[DailyPoint]:
+    """Tageswerte aus den Sonnentagen (``WetterService._sun_days``), damit Monatswerte und Matrix dieselben Regeln
+    nutzen wie die Temperatur. ``field`` ``hours``: Sonnenstunden jedes Tages mit Werten; ``class``: Klassenzahl,
+    nur für Tage mit Klasse (die anderen fehlen in der Matrix)."""
+    points = []
+    for entry in days:
+        value = entry["hours"] if field == "hours" else (
+            SUN_CLASS_CODES[entry["class"]] if entry["class"] else None
+        )
+        if value is None:
+            continue
+        stamp = datetime(entry["date"].year, entry["date"].month, entry["date"].day, tzinfo=tz).timestamp()
+        points.append(DailyPoint(day_start=stamp, value=float(value)))
+    return points
+
+
+def sun_kenntage(days: list[dict]) -> dict:
+    """Sonnentage und trübe Tage je Jahr und Monat (Form wie ``kenntage``): ``sunny`` und ``overcast`` zählen Tage der
+    Klasse sonnig beziehungsweise trüb, ``days`` die Tage mit Klasse. Wechselhafte Tage zählen nur in ``days``."""
+    result: dict[int, dict[str, list[int]]] = {}
+    for entry in days:
+        if entry["class"] is None:
+            continue
+        year = result.setdefault(entry["date"].year, {"sunny": [0] * 12, "overcast": [0] * 12, "days": [0] * 12})
+        month = entry["date"].month - 1
+        year["days"][month] += 1
+        if entry["class"] == "sunny":
+            year["sunny"][month] += 1
+        elif entry["class"] == "overcast":
+            year["overcast"][month] += 1
+    return {str(year): counts for year, counts in sorted(result.items())}
+
+
+def _longest_run(days: list[dict], kind: str) -> dict | None:
+    """Längste Folge aufeinanderfolgender Tage der Klasse ``kind``; bei Gleichstand die früheste."""
+    best: tuple[int, date, date] | None = None
+    start: date | None = None
+    previous: date | None = None
+    length = 0
+    for entry in days:
+        if entry["class"] != kind:
+            start = None
+        else:
+            if start is None or previous is None or (entry["date"] - previous).days != 1:
+                start, length = entry["date"], 0
+            length += 1
+            if best is None or length > best[0]:
+                best = (length, start, entry["date"])
+        previous = entry["date"]
+    if best is None:
+        return None
+    return {"value": best[0], "date": best[1].isoformat(), "end": best[2].isoformat()}
+
+
+def sun_records(days: list[dict], monthly_hours: dict, today: date) -> dict | None:
+    """Rekorde der Sonne: sonnigster Tag, sonnigster Monat (nur abgeschlossene Monate aus ``monthly``) und die
+    längste Folge sonniger beziehungsweise trüber Tage. Erst ab RECORDS_MIN_DAYS Tagen mit Werten."""
+    with_hours = [entry for entry in days if entry["hours"] is not None]
+    if len(with_hours) < RECORDS_MIN_DAYS:
+        return None
+    top = max(with_hours, key=lambda entry: (entry["hours"], -entry["date"].toordinal()))
+    out: dict = {
+        "sunniest_day": {"value": round(top["hours"], 2), "date": top["date"].isoformat()},
+        "since": with_hours[0]["date"].isoformat(), "days": len(with_hours),
+    }
+    best_month: tuple[float, int, int] | None = None
+    for year, values in monthly_hours["years"].items():
+        for month, value in enumerate(values, start=1):
+            if value is None or (int(year), month) == (today.year, today.month):
+                continue
+            if best_month is None or value > best_month[0]:
+                best_month = (value, int(year), month)
+    if best_month is not None:
+        out["sunniest_month"] = {"value": round(best_month[0], 1), "date": date(best_month[1], best_month[2], 1).isoformat()}
+    for key, kind in (("longest_sunny_streak", "sunny"), ("longest_overcast_streak", "overcast")):
+        run = _longest_run(days, kind)
+        if run:
+            out[key] = run
+    return out
+
+
 LEAP_SLOTS = 366  # Plätze der Jahr×Tag-Matrix: ein Schaltjahr, damit der 29.02. eine eigene Spalte hat
 
 
