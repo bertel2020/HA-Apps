@@ -86,6 +86,20 @@ MAX_EXTRA_TEMPERATURES = 5
 #: Zeiträume (Tage) des Temperaturvergleichs auf dem Reiter „Temperatur & Klima“.
 TEMPERATURE_DAYS = (7, 30, 90)
 BLOCK_KEYS = ("kenntage", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation", "illuminance")
+#: Karten, die sich in der Einrichtung ein- und ausblenden lassen: (Schlüssel, Name, Rollen, von denen mindestens
+#: eine zugeordnet sein muss; „@extras“ und „@heating“ stehen für die Listen weiterer Sensoren und Heizzähler).
+CARD_OPTIONS = (
+    ("conditions", N_("Wetterlage"), ("illuminance", "illuminance_dawn", "radiation", "wind", "precip_dur", "precip_mm")),
+    ("basis", N_("Heute und Vergleichstabelle"), ("temperature", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation", "illuminance")),
+    ("monthly", N_("Monatsvergleich"), ("temperature", "precip_mm", "precip_dur")),
+    ("precip", N_("Niederschlag"), ("precip_mm", "precip_dur")),
+    ("klima", N_("Temperatur & Klima"), ("@extras",)),
+    ("wind", N_("Wind & Sonne"), ("wind", "gust", "radiation", "illuminance")),
+    ("daylight", N_("Tageslicht"), ("illuminance_dawn",)),
+    ("longterm", N_("Langzeit"), ("temperature", "precip_mm", "precip_dur")),
+    ("heating", N_("Heizen"), ("@heating",)),
+)
+CARD_KEYS = tuple(key for key, _label, _needs in CARD_OPTIONS)
 #: Nachkommastellen, wenn die Entität „automatisch“ eingestellt ist: Strahlung in ganzen W/m².
 ROLE_DEFAULT_DECIMALS = {"radiation": 0}
 #: Kurze Namen für die Kacheln (in der Tabelle stehen die ausführlichen Rollennamen).
@@ -132,7 +146,23 @@ def _empty_config() -> dict:
         "daylight_night_lx": DEFAULT_DAYLIGHT_NIGHT_LX,
         "daylight_day_lx": DEFAULT_DAYLIGHT_DAY_LX,
         "hidden_blocks": [],
+        "hidden_cards": [],
     }
+
+
+def card_available(key: str, config: dict) -> bool:
+    """Ob die Karte etwas zeigen kann: mindestens eine ihrer Rollen (oder Listen) ist belegt."""
+    needs = next((roles for card, _label, roles in CARD_OPTIONS if card == key), ())
+    for token in needs:
+        if token == "@extras":
+            if config["extra_temperatures"]:
+                return True
+        elif token == "@heating":
+            if config["heating"]:
+                return True
+        elif config.get(token):
+            return True
+    return False
 
 
 def _load_config(index: Index) -> dict:
@@ -166,6 +196,9 @@ def _load_config(index: Index) -> dict:
     hidden = data.get("hidden_blocks")
     if isinstance(hidden, list):
         config["hidden_blocks"] = [key for key in BLOCK_KEYS if key in hidden]
+    hidden_cards = data.get("hidden_cards")
+    if isinstance(hidden_cards, list):
+        config["hidden_cards"] = [key for key in CARD_KEYS if key in hidden_cards]
     for key in ("heating_room", "heating_limit"):
         value = data.get(key)
         if isinstance(value, (int, float)) and not isinstance(value, bool) and 0 < value < 40:
@@ -1059,8 +1092,10 @@ class WetterService:
             "configured": _is_configured(config),
             "precip_modes": self.available_precip(),
             "has_heating": bool(self.heating_counters(config)),
+            "has_windtiles": any(config[key] for key in ("wind", "gust", "radiation", "illuminance")),
             "has_windsun": any(config[key] for key in ("wind", "gust", "radiation", "illuminance", "illuminance_dawn")),
             "has_daylight": bool(config["illuminance_dawn"]),
+            "hidden_cards": config["hidden_cards"],
             "has_conditions": any(
                 config[key] for key in ("illuminance", "illuminance_dawn", "radiation", "wind", "precip_dur", "precip_mm")
             ),
@@ -1115,6 +1150,8 @@ class WetterService:
                     "roles": [(key, label, types) for key, label, types in ROLES],
                     "role_types": {key: list(types) for key, _label, types in ROLES},
                     "role_units": ROLE_UNITS,
+                    "card_options": [(key, tr(label)) for key, label, _needs in CARD_OPTIONS],
+                    "card_needs": {key: list(needs) for key, _label, needs in CARD_OPTIONS},
                     "block_options": [("kenntage", tr("Kenntage"))] + [
                         (key, tr("Sonnenscheindauer") if key == "illuminance" else tr(ROLE_LABELS[key]))
                         for key in BLOCK_KEYS if key != "kenntage"
@@ -1155,6 +1192,8 @@ class WetterService:
             extra_name: list[str] = Form([]),
             blocks_submitted: str = Form(""),
             show_block: list[str] = Form([]),
+            cards_submitted: str = Form(""),
+            show_card: list[str] = Form([]),
             heating_entity_id: list[str] = Form([]),
             heating_name: list[str] = Form([]),
             heating_room: str = Form(""),
@@ -1200,6 +1239,18 @@ class WetterService:
                 config["hidden_blocks"] = [key for key in BLOCK_KEYS if key not in show_block]
             else:
                 config["hidden_blocks"] = _load_config(deps.index)["hidden_blocks"]
+            # Karten, die nach den gesendeten Rollen nichts zeigen könnten, bieten die Einrichtung nicht an; ihre
+            # frühere Wahl bleibt erhalten, bis eine Rolle sie wieder aktiviert.
+            previous_cards = _load_config(deps.index)["hidden_cards"]
+            heating_rows = [entity_id.strip() for entity_id in heating_entity_id if entity_id.strip()]
+            probe = {**config, "heating": heating_rows}
+            if cards_submitted:
+                config["hidden_cards"] = [
+                    key for key in CARD_KEYS
+                    if (key not in show_card if card_available(key, probe) else key in previous_cards)
+                ]
+            else:
+                config["hidden_cards"] = previous_cards
             heating = []
             for position, entity_id in enumerate(heating_entity_id):
                 entity_id = entity_id.strip()

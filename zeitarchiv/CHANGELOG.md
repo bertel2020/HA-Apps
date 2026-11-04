@@ -1,5 +1,47 @@
 # Changelog
 
+## Unreleased
+
+### Neu
+
+- **Wetterdashboard**: Mehr aus dem Helligkeitssensor der Wetterstation.
+  - **Sonnenscheindauer**: Neue Rolle „Helligkeit“; als Zeile in der Tabelle mit
+    Sonnenstunden und sonnigstem Tag. Die Schwelle, ab der eine Stunde als
+    sonnig zählt, ist einstellbar
+  - **Tageslicht**: Neue Rolle „Helligkeit Dämmerung“. Der Reiter Wind & Sonne
+    zeigt die Kurve des Tages mit Nacht, Dämmerung und Tag, Tagesbeginn und
+    -ende, Tageslänge und einen Vergleich der letzten Tage; die Schwellen sind
+    einstellbar
+  - **Wetterlage**: Eine Karte auf der Übersicht fasst Himmel, Wind (Beaufort),
+    Regen und Temperatur zusammen. Bei einem früheren Tag zeigt sie die
+    Zusammenfassung dieses Tages
+  - **Karten ein- und ausschalten**: In der Einrichtung unter „Anzeige“ lassen
+    sich die Karten einzeln ausblenden; angeboten werden nur Karten, für die eine
+    Entität zugeordnet ist. Fehlt einem Reiter damit jede Karte, entfällt er
+  - Die Demo-Daten enthalten die beiden Helligkeitssensoren mit Verlauf
+
+---
+
+### English
+
+#### New
+
+- **Weather dashboard**: More from the weather station's brightness sensor.
+  - **Sunshine duration**: New role "Illuminance"; shown as a table row with
+    hours of sunshine and the sunniest day. The threshold from which an hour
+    counts as sunny is adjustable
+  - **Daylight**: New role "Illuminance dusk/dawn". The Wind & sun tab shows
+    the curve of the day with night, twilight and day, start and end of the
+    day, day length and a comparison of the last days; the thresholds are
+    adjustable
+  - **Weather conditions**: A card on the overview summarises sky, wind
+    (Beaufort), rain and temperature. For an earlier day it shows the summary
+    of that day
+  - **Switch cards on and off**: In the setup under "Display" the cards can be
+    hidden individually; only cards with an assigned entity are offered. A tab
+    without any card is dropped
+  - The demo data contains both brightness sensors with a history
+
 ## 1.20.0 - 2026-11-03
 
 ### Neu

@@ -174,6 +174,7 @@ def test_conditions_script_builds_the_sentence_and_follows_the_date() -> None:
 
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "wetterdashboard/wetterlage" in script and "conditionsLine" in script and "beaufortName" in script
+    assert "regnerisch" in script and "windig" in script  # eine allgemeine Wetterlage statt einer Aufzählung
     assert "conditionsDayParts" in script and "wetterdashboard/wetterlage${stichtag" in script  # Rückblick: Tageszusammenfassung
 
 

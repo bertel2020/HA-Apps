@@ -373,9 +373,13 @@
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
         if (saved.kenntageRange === '5' || saved.kenntageRange === 'all') this.kenntageRange = saved.kenntageRange;
         if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
+        // Ausgeblendete Karten fehlen im Dokument: der erste vorhandene Reiter ist der Start, Diagramme ohne Karte laden nicht.
+        const firstTab = this.$root.querySelector('[role="tab"]');
+        if (firstTab) this.tab = firstTab.id.replace('wt-tab-', '');
+        if (this.tab !== 'overview') this.$nextTick(() => this.showTab(this.tab));
         this.loadTiles();
         this.loadTable();
-        this.loadMonthly();
+        if (this.$root.querySelector('[x-ref="monthlyChart"]')) this.loadMonthly();
         this.hasConditions = !!this.$root.querySelector('[data-wt-conditions]');
         if (this.hasConditions) this.startConditions();
         // Die Karte „Tageslicht“ gibt es nur mit zugeordneter Rolle; $refs sind in init() noch nicht angelegt.
@@ -779,8 +783,8 @@
         }
         if (c.wind) {
           parts.wind = {
-            value: t('bis {name}', {name: this.beaufortName(c.wind.bft)}),
-            sub: t('Stärke {bft} · {kmh} km/h', {bft: c.wind.bft, kmh: num(c.wind.kmh, 0)}),
+            value: this.beaufortName(c.wind.bft),
+            sub: t('Maximum: Stärke {bft} · {kmh} km/h', {bft: c.wind.bft, kmh: num(c.wind.kmh, 0)}),
           };
         }
         if (c.rain) {
@@ -789,27 +793,37 @@
           const minutes = c.rain.minutes ? t('{n} min', {n: num(c.rain.minutes, 0)}) : '';
           parts.rain = {value: dry ? t('trocken') : (mm || minutes), sub: dry ? '' : (mm && minutes ? minutes : '')};
         }
-        if (c.temp) {
-          const dec = c.temp.decimals == null ? 1 : c.temp.decimals;
-          parts.temp = {value: t('{min} bis {max} {unit}', {min: num(c.temp.min, dec), max: num(c.temp.max, dec), unit: c.temp.unit}).trim(), sub: ''};
-        }
+        if (c.temp) parts.temp = {value: this.conditionsTempText(), sub: ''};
         return parts;
       },
 
+      // Große Zeile: die allgemeine Wetterlage in einem Wort (Regen vor Himmel, ohne Himmelsdaten „trocken“), bei
+      // starkem Wind ergänzt; die Einzelheiten stehen in den Kacheln darunter und werden nicht wiederholt.
       conditionsLine() {
         const c = this.conditions;
         if (!c) return '';
+        const day = c.mode === 'day';
+        const rainy = day ? !!(c.rain && (c.rain.mm || c.rain.minutes)) : !!(c.rain && c.rain.raining);
+        let main = '';
+        if (rainy) main = day ? t('regnerisch') : t('Regen');
+        else if (c.sky && c.sky.class) main = this.skyName(c.sky.class);
+        else if (c.rain && (day || c.rain.raining === false)) main = t('trocken');
+        main = main.charAt(0).toUpperCase() + main.slice(1);
+        const windy = c.wind && c.wind.bft >= 8 ? t('stürmisch') : c.wind && c.wind.bft >= 6 ? t('windig') : '';
+        const line = [main, windy].filter(Boolean).join(' · ');
+        if (line) return line;
+        const temp = this.conditionsTempText();
+        return temp || '';
+      },
+
+      conditionsTempText() {
+        const c = this.conditions;
+        if (!c || !c.temp) return '';
+        const dec = c.temp.decimals == null ? 1 : c.temp.decimals;
         if (c.mode === 'day') {
-          const p = this.conditionsDayParts();
-          return [p.sky && p.sky.value, p.wind && p.wind.value, p.rain && p.rain.value, p.temp && p.temp.value].filter(Boolean).join(' · ');
+          return t('{min} bis {max} {unit}', {min: num(c.temp.min, dec), max: num(c.temp.max, dec), unit: c.temp.unit}).trim();
         }
-        const parts = [];
-        if (c.sky) parts.push(this.skyName(c.sky.class));
-        if (c.wind) parts.push(t('{name} ({kmh} km/h)', {name: this.beaufortName(c.wind.bft), kmh: num(c.wind.kmh, 0)}));
-        const rain = this.conditionsRain();
-        if (rain) parts.push(rain.text);
-        if (c.temp) parts.push(`${num(c.temp.value, c.temp.decimals == null ? 1 : c.temp.decimals)} ${c.temp.unit}`.trim());
-        return parts.join(' · ');
+        return `${num(c.temp.value, dec)} ${c.temp.unit}`.trim();
       },
 
       conditionsTiles() {
@@ -837,6 +851,7 @@
         }
         const rain = this.conditionsRain();
         if (rain) tiles.push({kind: 'rain', label: t('Regen'), value: rain.text, sub: rain.sub});
+        if (c.temp) tiles.push({kind: 'temp', label: t('Temperatur'), value: this.conditionsTempText(), sub: ''});
         return tiles;
       },
 

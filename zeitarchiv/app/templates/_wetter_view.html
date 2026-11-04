@@ -70,6 +70,18 @@
 {% else %}
 {# Kein x-init="init()": Alpine ruft init() des x-data-Objekts selbst auf (siehe
    _energiedashboard_view.html — mit x-init liefe es doppelt). #}
+{% set hc = hidden_cards %}
+{% set show_conditions = has_conditions and 'conditions' not in hc %}
+{% set show_basis = 'basis' not in hc %}
+{% set show_monthly = 'monthly' not in hc %}
+{% set show_overview = show_conditions or show_basis or show_monthly %}
+{% set show_precip = precip_modes and 'precip' not in hc %}
+{% set show_klima = has_klima and 'klima' not in hc %}
+{% set show_windtiles = has_windtiles and 'wind' not in hc %}
+{% set show_daylight = has_daylight and 'daylight' not in hc %}
+{% set show_windtab = show_windtiles or show_daylight %}
+{% set show_long = 'longterm' not in hc %}
+{% set show_heat = has_heating and 'heating' not in hc %}
 <div x-data='wetterDashboard({{ precip_modes | tojson }})'>
   <div class="wt-title-row">
     <h1>{{ _("Wetterdashboard") }}</h1>
@@ -81,24 +93,29 @@
   {# Reiterzeile des App-Standards (.entity-tabs in app.css, wie bei Entitäten und Entitätsseiten); hier
      Schaltflächen statt Links, weil die Reiter nur umschalten und die Seite nicht wechseln. #}
   <nav class="entity-tabs wt-tabs" role="tablist" aria-label="{{ _('Ansichten des Wetterdashboards') }}">
+    {% if show_overview %}
     <button type="button" role="tab" id="wt-tab-overview" aria-controls="wt-panel-overview" class="entity-tab" :class="{'is-active': tab === 'overview'}" :aria-selected="(tab === 'overview').toString()" :tabindex="tab === 'overview' ? 0 : -1" @click="showTab('overview')" @keydown="tabKey($event)">{{ _("Übersicht") }}</button>
-    {% if precip_modes %}
+    {% endif %}
+    {% if show_precip %}
     <button type="button" role="tab" id="wt-tab-precip" aria-controls="wt-panel-precip" class="entity-tab" :class="{'is-active': tab === 'precip'}" :aria-selected="(tab === 'precip').toString()" :tabindex="tab === 'precip' ? 0 : -1" @click="showTab('precip')" @keydown="tabKey($event)">{{ _("Niederschlag") }}</button>
     {% endif %}
-    {% if has_klima %}
+    {% if show_klima %}
     <button type="button" role="tab" id="wt-tab-klima" aria-controls="wt-panel-klima" class="entity-tab" :class="{'is-active': tab === 'klima'}" :aria-selected="(tab === 'klima').toString()" :tabindex="tab === 'klima' ? 0 : -1" @click="showTab('klima')" @keydown="tabKey($event)">{{ _("Temperatur &amp; Klima") }}</button>
     {% endif %}
-    {% if has_windsun %}
+    {% if show_windtab %}
     <button type="button" role="tab" id="wt-tab-wind" aria-controls="wt-panel-wind" class="entity-tab" :class="{'is-active': tab === 'wind'}" :aria-selected="(tab === 'wind').toString()" :tabindex="tab === 'wind' ? 0 : -1" @click="showTab('wind')" @keydown="tabKey($event)">{{ _("Wind &amp; Sonne") }}</button>
     {% endif %}
+    {% if show_long %}
     <button type="button" role="tab" id="wt-tab-long" aria-controls="wt-panel-long" class="entity-tab" :class="{'is-active': tab === 'long'}" :aria-selected="(tab === 'long').toString()" :tabindex="tab === 'long' ? 0 : -1" @click="showTab('long')" @keydown="tabKey($event)">{{ _("Langzeit") }}</button>
-    {% if has_heating %}
+    {% endif %}
+    {% if show_heat %}
     <button type="button" role="tab" id="wt-tab-heat" aria-controls="wt-panel-heat" class="entity-tab" :class="{'is-active': tab === 'heat'}" :aria-selected="(tab === 'heat').toString()" :tabindex="tab === 'heat' ? 0 : -1" @click="showTab('heat')" @keydown="tabKey($event)">{{ _("Heizen") }}</button>
     {% endif %}
   </nav>
 
+  {% if show_overview %}
   <section x-show="tab === 'overview'" role="tabpanel" id="wt-panel-overview" aria-labelledby="wt-tab-overview">
-  {% if has_conditions %}
+  {% if show_conditions %}
   <div class="card wt-card" data-hints="collapsed" data-wt-conditions x-show="conditions" x-cloak>
     <div class="wt-controls">
       <h2 class="wt-h2"><span x-text="conditionsTitle()">{{ _("Wetterlage") }}</span> {{ hint_button(_("Wetterlage")) }}</h2>
@@ -117,9 +134,12 @@
   </div>
   {% endif %}
 
+  {% if show_basis %}
   {{ weather_card("basis", 5) }}
+  {% endif %}
 
 
+  {% if show_monthly %}
   <div class="card wt-card" x-show="monthly" x-cloak>
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Monatsvergleich") }} {{ hint_button(_("Monatsvergleich")) }}</h2>
@@ -135,9 +155,11 @@
     <p class="wt-headline" x-show="monthlyMetric === 'temperature' && headline()" x-text="headline()"></p>
     <div class="wt-chart" x-ref="monthlyChart"></div>
   </div>
+  {% endif %}
   </section>
+  {% endif %}
 
-  {% if precip_modes %}
+  {% if show_precip %}
   <section x-show="tab === 'precip'" x-cloak role="tabpanel" id="wt-panel-precip" aria-labelledby="wt-tab-precip">
     <div class="card wt-card">
       <div class="wt-controls">
@@ -165,7 +187,7 @@
   </section>
   {% endif %}
 
-  {% if has_klima %}
+  {% if show_klima %}
   <section x-show="tab === 'klima'" x-cloak role="tabpanel" id="wt-panel-klima" aria-labelledby="wt-tab-klima">
     {{ weather_card("klima", 3) }}
     <div class="card wt-card">
@@ -184,11 +206,13 @@
   </section>
   {% endif %}
 
-  {% if has_windsun %}
+  {% if show_windtab %}
   <section x-show="tab === 'wind'" x-cloak role="tabpanel" id="wt-panel-wind" aria-labelledby="wt-tab-wind">
+    {% if show_windtiles %}
     {{ weather_card("wind", 3) }}
+    {% endif %}
 
-  {% if has_daylight %}
+  {% if show_daylight %}
   <div class="card wt-card" data-hints="collapsed" x-show="daylight || daylightError" x-cloak>
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Tageslicht") }} {{ hint_button(_("Tageslicht")) }}</h2>
@@ -230,6 +254,7 @@
   </section>
   {% endif %}
 
+  {% if show_long %}
   <section x-show="tab === 'long'" x-cloak role="tabpanel" id="wt-panel-long" aria-labelledby="wt-tab-long">
     <div class="card wt-card">
       <div class="wt-controls">
@@ -295,7 +320,9 @@
     <p class="hint hint-status" x-show="longterm && !longterm.records.length" x-cloak>{{ _("Rekorde erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte enthält.") }}</p>
     <p class="hint hint-warn" x-show="longError" x-text="longError" x-cloak></p>
   </section>
-  {% if has_heating %}
+  {% endif %}
+
+  {% if show_heat %}
   <section x-show="tab === 'heat'" x-cloak role="tabpanel" id="wt-panel-heat" aria-labelledby="wt-tab-heat">
     <div class="card wt-card">
       <div class="wt-controls">

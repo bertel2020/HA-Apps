@@ -740,7 +740,7 @@ def test_wind_and_sun_tab_groups_tiles_and_rows() -> None:
     from _paths import APP, TEMPLATES
 
     view = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
-    assert "{% if has_windsun %}" in view and 'id="wt-panel-wind"' in view
+    assert "{% if show_windtab %}" in view and "has_windtiles" in view and 'id="wt-panel-wind"' in view
     assert 'weather_card("basis"' in view and 'weather_card("wind"' in view
     assert 'weather_card("klima"' in view and 'id="wt-panel-klima"' in view
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
@@ -935,3 +935,38 @@ def test_tiles_skip_the_sunshine_row_when_illuminance_is_assigned(service) -> No
     _configure(service, temperature="sensor.t", illuminance="sensor.lux_sued")
 
     assert [tile["key"] for tile in service.compute_tiles(NOW)] == ["temperature"]
+
+
+def test_card_availability_follows_the_assigned_roles() -> None:
+    config = wetter_routes._empty_config()
+    assert not any(wetter_routes.card_available(key, config) for key in wetter_routes.CARD_KEYS)
+    config.update(temperature="sensor.t", illuminance_dawn="sensor.d", heating=[{"entity_id": "sensor.h", "name": ""}])
+    available = {key for key in wetter_routes.CARD_KEYS if wetter_routes.card_available(key, config)}
+    assert available == {"basis", "monthly", "longterm", "conditions", "daylight", "heating"}
+
+
+def test_hidden_cards_are_saved_only_for_available_cards_and_hide_cards_and_tabs(client) -> None:
+    from app.main import index
+
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    for entity, unit in (("sensor.karten_t", "°C"), ("sensor.karten_w", "km/h")):
+        index.get_or_create_entity(entity, "sensor", "measurement", unit)
+    base = {"temperature": "sensor.karten_t", "wind": "sensor.karten_w", "cards_submitted": "1"}
+    page = client.get("/wetterdashboard/setup").text
+    assert 'name="show_card"' in page and "cardAvailable(" in page
+    # alles angehakt: nichts ausgeblendet
+    shown = ["conditions", "basis", "monthly", "wind", "longterm", "daylight", "heating"]
+    assert client.post("/wetterdashboard/setup", data={**base, "show_card": shown}).status_code == 200
+    assert wetter_routes._load_config(index)["hidden_cards"] == []
+    html = client.get("/wetterdashboard").text
+    assert 'id="wt-tab-wind"' in html and 'id="wt-tab-long"' in html and "data-wt-conditions" in html
+    # Wetterlage, Wind & Sonne, Langzeit abgewählt; Tageslicht (keine Rolle) und Heizen (kein Zähler) sind nicht wählbar
+    assert client.post("/wetterdashboard/setup", data={**base, "show_card": ["basis", "monthly"]}).status_code == 200
+    assert wetter_routes._load_config(index)["hidden_cards"] == ["conditions", "wind", "longterm"]
+    html = client.get("/wetterdashboard").text
+    assert 'id="wt-tab-wind"' not in html and 'id="wt-tab-long"' not in html and "data-wt-conditions" not in html
+    assert 'id="wt-tab-overview"' in html
+    # alles abgewählt: auch die Übersicht fehlt
+    assert client.post("/wetterdashboard/setup", data={**base, "show_card": []}).status_code == 200
+    assert 'id="wt-tab-overview"' not in client.get("/wetterdashboard").text
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
