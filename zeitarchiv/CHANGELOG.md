@@ -20,6 +20,13 @@
     Entität zugeordnet ist. Fehlt einem Reiter damit jede Karte, entfällt er
   - Die Demo-Daten enthalten die beiden Helligkeitssensoren mit Verlauf
 
+### Behoben
+
+- **Import**: Wird ein früherer Monat nachträglich importiert, zeigt der erste Tag
+  des Folgemonats bei Zählern jetzt den richtigen Zuwachs statt 0.
+- **Index-Reparatur**: Nach „Index reparieren“ ist die Karte nicht mehr rot, und
+  die Meldung in der Glocke verschwindet.
+
 ---
 
 ### English
@@ -41,6 +48,13 @@
     hidden individually; only cards with an assigned entity are offered. A tab
     without any card is dropped
   - The demo data contains both brightness sensors with a history
+
+#### Fixed
+
+- **Import**: When an earlier month is imported afterwards, the first day of the
+  following month now shows the correct increase for counters instead of 0.
+- **Index repair**: After "Repair index" the card is no longer red, and the
+  notification in the bell disappears.
 
 ## 1.20.0 - 2026-11-03
 
