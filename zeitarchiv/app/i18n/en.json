@@ -3371,6 +3371,8 @@
     "Demo Luftdruck": "Demo Air Pressure",
     "Demo Böe": "Demo Gust",
     "Demo Sonneneinstrahlung": "Demo Solar Radiation",
+    "Demo Helligkeit Süd": "Demo Illuminance South",
+    "Demo Helligkeit Dämmerung": "Demo Illuminance Dusk Dawn",
     "Demo Niederschlag": "Demo Precipitation",
     "Demo Außentemperatur Nord": "Demo Outdoor Temperature North",
     "Demo Wärmepumpe Energie": "Demo Heat Pump Energy",

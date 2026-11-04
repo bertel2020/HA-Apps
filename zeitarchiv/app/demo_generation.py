@@ -65,7 +65,7 @@ class DemoEntity:
 WETTER_ENTITY_IDS = (
     "sensor.demo_luftdruck", "sensor.demo_boe", "sensor.demo_strahlung", "sensor.demo_niederschlag",
     "sensor.demo_aussentemperatur_nord", "sensor.demo_waermepumpe_energie", "sensor.demo_heizstab_energie",
-    "sensor.demo_konvektoren_energie",
+    "sensor.demo_konvektoren_energie", "sensor.demo_helligkeit_sued", "sensor.demo_helligkeit_daemmerung",
 )
 
 
@@ -275,6 +275,9 @@ DEMO_ENTITIES = [
     DemoEntity("sensor.demo_waermepumpe_energie", "Demo Wärmepumpe Energie", "sensor", "total_increasing", "kWh"),
     DemoEntity("sensor.demo_heizstab_energie", "Demo Heizstab Energie", "sensor", "total_increasing", "kWh"),
     DemoEntity("sensor.demo_konvektoren_energie", "Demo Konvektoren Energie", "sensor", "total_increasing", "kWh"),
+    # Helligkeit wie bei einer Eltako-Wetterstation: Süd (Sonnenschein, Wetterlage) und Dämmerung (Tageslichtkurve).
+    DemoEntity("sensor.demo_helligkeit_sued", "Demo Helligkeit Süd", "sensor", "measurement", "lx"),
+    DemoEntity("sensor.demo_helligkeit_daemmerung", "Demo Helligkeit Dämmerung", "sensor", "measurement", "lx"),
 ]
 
 
@@ -655,6 +658,33 @@ def gen_radiation(pv_power_w: float, rng: random.Random) -> float:
     return round(max(0.0, pv_power_w / PV_PEAK_W * 1000.0 * rng.uniform(0.97, 1.03)), 0)
 
 
+#: Der Süd-Sensor einer Eltako-Station sättigt bei 98.824 lx und meldet grob gestuft (etwa 590 lx je Schritt).
+SUED_LUX_MAX = 98824.0
+SUED_LUX_STEP = 590.0
+#: Etwa 110 lx je W/m² (Tageslicht), dieselbe Umrechnung wie die Strahlungsklassen der Wetterlage.
+LUX_PER_WM2 = 110.0
+
+
+def gen_south_lux(radiation_wm2: float, rng: random.Random) -> float:
+    """Helligkeit Süd in lx aus der Globalstrahlung: dieselbe Bewölkung und Tageskurve, gestuft und gekappt wie
+    der echte Sensor. Mittags im Sommer liegt sie an der Sättigung, trübe Tage bleiben unter 15.000 lx."""
+    if radiation_wm2 <= 0:
+        return 0.0
+    lux = radiation_wm2 * LUX_PER_WM2 * rng.uniform(0.9, 1.1)
+    return min(SUED_LUX_MAX, round(lux / SUED_LUX_STEP) * SUED_LUX_STEP)
+
+
+def gen_dawn_lux(dt: datetime, weather: WeatherContext, rng: random.Random) -> float:
+    """Dämmerungssensor in lx (0 bis 1.000, Stufen von 4): Rampe über etwa 80 Minuten um Sonnenauf- und
+    -untergang. Dichte Bewölkung dämpft sie, deshalb beginnt „Tag ab 400 lx“ an trüben Tagen später."""
+    daylight = _daylight_hours(dt.timetuple().tm_yday)
+    sunrise, sunset = 12.0 - daylight / 2, 12.0 + daylight / 2
+    hour = dt.hour + dt.minute / 60
+    ramp = max(0.0, min(1.0, (min(hour - sunrise, sunset - hour) + 0.75) / 1.35))
+    value = 1000.0 * ramp * ramp * (0.4 + 0.6 * weather.cloud_factor(dt)) * rng.uniform(0.97, 1.03)
+    return 0.0 if value < 4 else min(1000.0, round(value / 4) * 4)
+
+
 def _rain_intensity_mm_h(schedule_for_day: list[ApplianceCycle], dt: datetime) -> float:
     """Regenrate im gerade laufenden Regenfenster (0,4 bis 6 mm/h), je Fenster fest aus dessen Beginn
     abgeleitet. So ist die Menge eine Funktion derselben Fenster, die der Regensensor schaltet."""
@@ -845,6 +875,7 @@ def simulate_household(
         "pv_power": [], "pv_ertrag": [], "stromzaehler_bezug": [], "stromzaehler_einspeisung": [],
         "pv_prognose_rest_heute": [], "pv_prognose_morgen": [], "co2_intensitaet": [],
         "luftdruck": [], "boe": [], "strahlung": [], "niederschlag": [], "outdoor_temp_nord": [],
+        "helligkeit_sued": [], "helligkeit_daemmerung": [],
         "waermepumpe_energie": [], "heizstab_energie": [], "konvektoren_energie": [],
         "balkon_pv": [], "balkon_ladeleistung": [], "balkon_entladeleistung": [],
         "balkon_soc_pct": [], "balkon_speicher_stand": [], "balkon_hausabgabe": [],
@@ -887,6 +918,8 @@ def simulate_household(
     # Wetterdashboard-Reihen: eigene Zufallsfolge und feste Startwerte (kein rng-Zug), damit die
     # Werte aller früheren Entitäten für denselben Seed unverändert bleiben.
     wetter_rng = random.Random(int(start.timestamp()))
+    # Eigener Zufallsstrom für die Helligkeit: die Werte der übrigen Wetterreihen bleiben dadurch unverändert.
+    licht_rng = random.Random(int(start.timestamp()) + 1)
     niederschlag_total = counter_seed.get("niederschlag", 842.3)
     waermepumpe_total = counter_seed.get("waermepumpe_energie", 1480.0)
     heizstab_total = counter_seed.get("heizstab_energie", 160.0)
@@ -1011,7 +1044,10 @@ def simulate_household(
         series["wallbox2"].append((ts, round(wallbox2_w, 1)))
         series["load_power"].append((ts, round(load_w, 1)))
         series["pv_power"].append((ts, pv_w))
-        series["strahlung"].append((ts, gen_radiation(pv_w, wetter_rng)))
+        radiation_now = gen_radiation(pv_w, wetter_rng)
+        series["strahlung"].append((ts, radiation_now))
+        series["helligkeit_sued"].append((ts, gen_south_lux(radiation_now, licht_rng)))
+        series["helligkeit_daemmerung"].append((ts, gen_dawn_lux(dt, weather, licht_rng)))
 
         series["co2_intensitaet"].append((ts, gen_co2_intensity(dt, weather, rng)))
 
@@ -1652,7 +1688,8 @@ _DEMO_CATEGORY_RULES = (
     (3, ("stromzaehler_", "strompreis_", "co2_")),
     (4, ("gesamtwirkleistung", "waschmaschine", "spuelmaschine", "trockner", "kuehlschrank", "herd", "homeoffice",
          "entertainment", "boiler", "werkstatt", "waermepumpe", "heizstab", "konvektoren")),
-    (5, ("aussentemperatur", "luftfeuchte", "wind", "regensensor", "luftdruck", "boe", "strahlung", "niederschlag")),
+    (5, ("aussentemperatur", "luftfeuchte", "wind", "regensensor", "luftdruck", "boe", "strahlung", "niederschlag",
+         "helligkeit")),
 )
 
 
@@ -2108,6 +2145,8 @@ def run_generation(
         "sensor.demo_waermepumpe_energie": household["waermepumpe_energie"],
         "sensor.demo_heizstab_energie": household["heizstab_energie"],
         "sensor.demo_konvektoren_energie": household["konvektoren_energie"],
+        "sensor.demo_helligkeit_sued": household["helligkeit_sued"],
+        "sensor.demo_helligkeit_daemmerung": household["helligkeit_daemmerung"],
         "sensor.demo_saugroboter_status": gen_saugroboter_status(start, now, rng),
         "sensor.demo_waschmaschine_programm": gen_waschmaschine_programm(
             start, now, household["waschmaschine_an"], rng,

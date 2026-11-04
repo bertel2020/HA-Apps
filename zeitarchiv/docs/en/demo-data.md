@@ -113,6 +113,8 @@ selectively deletable):
 | `sensor.demo_waermepumpe_energie` | Counter (`total_increasing`) | kWh | Weather dashboard (heating): 72 % of `demo_heizung` |
 | `sensor.demo_heizstab_energie` | Counter (`total_increasing`) | kWh | Weather dashboard (heating): 18 % of `demo_heizung`, only in frost |
 | `sensor.demo_konvektoren_energie` | Counter (`total_increasing`) | kWh | Weather dashboard (heating): the rest of `demo_heizung` (28 % minus heating element), e.g. bathroom and shoulder seasons |
+| `sensor.demo_helligkeit_sued` | Standard | lx | Weather dashboard (sunshine duration, weather conditions): derived from the global radiation (about 110 lx per W/m²), stepped in 590 lx steps and capped at 98,824 lx like the south sensor of an Eltako station; 0 at night, below 15,000 lx on overcast days |
+| `sensor.demo_helligkeit_daemmerung` | Standard | lx | Weather dashboard (daylight curve, weather conditions): 0 to 1,000 lx in steps of 4, a ramp over about 80 minutes around sunrise and sunset; dense cloud dampens it, so “day from 400 lx” starts later |
 
 Washing machine, dishwasher, dryer and wallbox each have two or three entities
 — instantaneous power (W), energy counter (kWh) and, for the three household

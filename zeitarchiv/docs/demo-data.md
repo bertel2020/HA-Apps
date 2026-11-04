@@ -113,6 +113,8 @@ wiederzuerkennen und gezielt löschbar):
 | `sensor.demo_waermepumpe_energie` | Zähler (`total_increasing`) | kWh | Wetterdashboard (Heizen): 72 % von `demo_heizung` |
 | `sensor.demo_heizstab_energie` | Zähler (`total_increasing`) | kWh | Wetterdashboard (Heizen): 18 % von `demo_heizung`, nur bei Frost |
 | `sensor.demo_konvektoren_energie` | Zähler (`total_increasing`) | kWh | Wetterdashboard (Heizen): der Rest von `demo_heizung` (28 % abzüglich Heizstab), z. B. Bad und Übergangszeit |
+| `sensor.demo_helligkeit_sued` | Standard | lx | Wetterdashboard (Sonnenscheindauer, Wetterlage): aus der Globalstrahlung (rund 110 lx je W/m²), gestuft in 590-lx-Schritten und bei 98.824 lx gekappt wie der Süd-Sensor einer Eltako-Station; nachts 0, an trüben Tagen unter 15.000 lx |
+| `sensor.demo_helligkeit_daemmerung` | Standard | lx | Wetterdashboard (Tageslichtkurve, Wetterlage): 0 bis 1.000 lx in 4er-Stufen, Rampe über rund 80 Minuten um Sonnenauf- und -untergang; dichte Bewölkung dämpft sie, „Tag ab 400 lx“ beginnt dann später |
 
 Waschmaschine, Spülmaschine, Trockner und Wallbox haben je zwei bzw. drei
 Entitäten — Momentanleistung (W), Energiezähler (kWh) und bei den drei
