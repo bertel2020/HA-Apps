@@ -337,6 +337,10 @@
       hasConditions: false,
       conditions: null,
       _conditionsSeq: 0,
+      hasSunhours: false,
+      sunhours: null,
+      sunhoursError: '',
+      _sunhoursSeq: 0,
       hasDayimage: false,
       dayimage: null,
       dayimageError: '',
@@ -386,6 +390,7 @@
         this.hasConditions = !!this.$root.querySelector('[data-wt-conditions]');
         if (this.hasConditions) this.startConditions();
         // Die Karte „Tageslicht“ gibt es nur mit zugeordneter Rolle; $refs sind in init() noch nicht angelegt.
+        this.hasSunhours = !!this.$root.querySelector('[x-ref="sunChart"]');
         this.hasDayimage = !!this.$root.querySelector('[data-wt-dayimage]');
         if (this.hasDayimage) this.loadDayimage();
         this.hasDaylight = !!this.$root.querySelector('[x-ref="daylightChart"]');
@@ -400,6 +405,7 @@
           this.loadTable();
           // Die Karte liegt im Reiter „Wind & Sonne“: dort sofort neu laden, sonst beim nächsten Öffnen.
           if (this.hasDaylight) { this.daylight = null; if (this.tab === 'wind') this.loadDaylight(); }
+          if (this.hasSunhours) { this.sunhours = null; if (this.tab === 'wind') this.loadSunhours(); }
           if (this.hasConditions) { this.conditions = null; this.loadConditions(); }
         });
       },
@@ -568,6 +574,7 @@
         if (tab === 'long' && !this.matrix) this.loadMatrix();
         if (tab === 'long' && !this.tempYears) this.loadTempYears();
         if (tab === 'heat' && !this.heat) this.loadHeat();
+        if (tab === 'wind' && this.hasSunhours) { if (!this.sunhours) this.loadSunhours(); else this.$nextTick(() => this.drawSunhours()); }
         if (tab === 'wind' && this.hasDaylight) { if (!this.daylight) this.loadDaylight(); else this.$nextTick(() => this.drawDaylight()); }
         // Ein Diagramm in einem eben erst sichtbaren Reiter hat noch keine Größe.
         this.$nextTick(() => {
@@ -868,6 +875,89 @@
       },
 
       // ---- Tageslicht (Dämmerungssensor): Kurve mit Nacht-, Dämmerungs- und Tagband -----------------
+
+      // ---- Sonnenstunden: Tagesverlauf der Süd-Helligkeit mit den Stunden über der Schwelle ----------
+
+      async loadSunhours() {
+        const stichtag = this.stichtag();
+        const seq = ++this._sunhoursSeq;
+        this.sunhoursError = '';
+        try {
+          const data = await this.fetchJson(`wetterdashboard/sonnenstunden${stichtag ? `?date=${encodeURIComponent(stichtag)}` : ''}`);
+          if (seq !== this._sunhoursSeq) return;  // ein neuerer Tag hat überholt
+          this.sunhours = data;
+          this.$nextTick(() => this.drawSunhours());
+        } catch (e) {
+          if (seq === this._sunhoursSeq) this.sunhoursError = t('Die Sonnenstunden konnten nicht geladen werden.');
+        }
+      },
+
+      sunhoursHead() {
+        const data = this.sunhours;
+        if (!data) return '';
+        if (!data.hours.length) return escapeHtml(t('Für diesen Tag liegen keine Werte vor.'));
+        let text = `<b>${escapeHtml(t('{h} Sonnenstunden', {h: num(data.sun_hours || 0, 1)}))}</b> ${escapeHtml(t('bei Schwelle {n} lx', {n: num(data.threshold, 0)}))}`;
+        const peak = data.peak;
+        if (peak && peak.value > 0) {
+          text += ` · ${escapeHtml(t('Spitze um {time} Uhr: {value} lx', {time: fmtDate(formats.hm, peak.start), value: num(peak.value, 0)}))}`;
+          if (peak.value >= data.saturation * 0.995) text += ` · ${escapeHtml(t('Süd mittags „ab {n} lx“ (Sensor sättigt)', {n: num(data.saturation, 0)}))}`;
+        }
+        return text;
+      },
+
+      drawSunhours() {
+        const data = this.sunhours;
+        const element = this.$refs.sunChart;
+        if (!data || !element || !data.hours.length) return;
+        const colors = palette();
+        const byStart = new Map(data.hours.map((row) => [row[0], row]));
+        const points = [];
+        for (let stamp = data.start; stamp < Math.min(data.end, data.hours[data.hours.length - 1][0] + 3600); stamp += 3600) {
+          const row = byStart.get(stamp);
+          points.push([(stamp + 1800) * 1000, row ? row[1] : null]);
+        }
+        const peak = Math.max(data.threshold * 1.2, ...data.hours.map((row) => row[1]));
+        const chart = chartFor('sunhours', element);
+        chart.setOption({
+          animation: false, grid: gridFor(element, {top: 16, right: 12}),
+          xAxis: {
+            type: 'value', min: data.start * 1000, max: data.end * 1000, interval: 3 * 3600 * 1000, ...axisStyle(colors),
+            splitLine: {show: false}, axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (ms) => fmtDate(formats.hm, ms / 1000)},
+          },
+          yAxis: {
+            type: 'value', min: 0, max: peak, name: 'klx', nameTextStyle: {color: colors.text}, ...axisStyle(colors),
+            axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => num(value / 1000, 0)},
+          },
+          tooltip: {
+            trigger: 'axis', confine: true, backgroundColor: colors.surface, borderColor: colors.grid,
+            textStyle: {color: colors.ink, fontSize: scaledFont(12)},
+            formatter: (params) => {
+              const point = params[0].value;
+              if (point[1] == null) return '';
+              const stamp = point[0] / 1000 - 1800;
+              const sunny = point[1] >= data.threshold;
+              return `<b>${escapeHtml(fmtDate(formats.hm, stamp))}–${escapeHtml(fmtDate(formats.hm, stamp + 3600))}</b><br>${escapeHtml(num(point[1], 0))} lx · ${escapeHtml(sunny ? t('Sonne') : t('keine Sonne'))}`;
+            },
+          },
+          series: [{
+            type: 'line', data: points, symbol: 'circle', symbolSize: 5, connectNulls: false,
+            lineStyle: {color: colors.cur, width: 2.4}, itemStyle: {color: colors.cur},
+            markArea: {
+              silent: true,
+              data: data.hours.filter((row) => row[1] >= data.threshold).map((row) => [
+                {xAxis: row[0] * 1000, itemStyle: {color: cssVar('--chart-7'), opacity: 0.22}}, {xAxis: (row[0] + 3600) * 1000},
+              ]),
+            },
+            markLine: {
+              silent: true, symbol: 'none',
+              lineStyle: {color: colors.faint, type: 'dashed', width: 1},
+              label: {color: colors.text, fontSize: scaledFont(11), position: 'insideEndTop', formatter: t('Schwelle {n} lx', {n: num(data.threshold, 0)})},
+              data: [{yAxis: data.threshold}],
+            },
+          }],
+        }, true);
+        requestAnimationFrame(() => chart.resize());
+      },
 
       // ---- Tagesbild: ein Streifen mit der Klasse je Tag --------------------------------------------
 

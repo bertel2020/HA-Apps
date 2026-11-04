@@ -79,8 +79,9 @@
 {% set show_precip = precip_modes and 'precip' not in hc %}
 {% set show_klima = has_klima and 'klima' not in hc %}
 {% set show_windtiles = has_windtiles and 'wind' not in hc %}
+{% set show_sunhours = has_dayimage and 'sunhours' not in hc %}
 {% set show_daylight = has_daylight and 'daylight' not in hc %}
-{% set show_windtab = show_windtiles or show_daylight %}
+{% set show_windtab = show_windtiles or show_sunhours or show_daylight %}
 {% set show_long = 'longterm' not in hc %}
 {% set show_heat = has_heating and 'heating' not in hc %}
 <div x-data='wetterDashboard({{ precip_modes | tojson }})' data-hints="collapsed">
@@ -233,6 +234,18 @@
     {% if show_windtiles %}
     {{ weather_card("wind", 3) }}
     {% endif %}
+
+  {% if show_sunhours %}
+  <div class="card wt-card" x-show="sunhours || sunhoursError" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Sonnenstunden") }} {{ hint_button(_("Sonnenstunden")) }}</h2>
+      {% call hint_body() %}{{ _("Die Kurve zeigt das Stundenmittel der Süd-Helligkeit. Hinterlegt sind die Stunden über der Sonnen-Schwelle; sie zählen als Sonnenscheindauer. Das ist kein offizieller Wert des Wetterdienstes (der DWD zählt ab 120 W/m² direkter Strahlung, und die Station trennt direktes und diffuses Licht nicht). Der Süd-Sensor sättigt bei 98.800 lx. Die Schwelle steht in der Einrichtung.") }}{% endcall %}
+    </div>
+    <p class="wt-headline" x-show="sunhours" x-html="sunhoursHead()"></p>
+    <div class="wt-chart" x-show="sunhours && sunhours.hours.length" x-ref="sunChart"></div>
+    <p class="hint hint-warn" x-show="sunhoursError" x-text="sunhoursError" x-cloak></p>
+  </div>
+  {% endif %}
 
   {% if show_daylight %}
   <div class="card wt-card" x-show="daylight || daylightError" x-cloak>

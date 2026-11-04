@@ -987,6 +987,47 @@ def test_dayimage_falls_back_to_the_brightness_on_days_without_dawn_rows(service
     assert day18["class"] == "sunny" and day18["bright_hours"] >= 8
 
 
+def test_sunhours_curve_marks_hours_above_the_threshold_and_holds_gaps(service) -> None:
+    _add(service, "sensor.lux_sued", "sensor", "measurement", "lx", [
+        (_ts(19, 8, 30), 10000.0), (_ts(19, 9, 30), 60000.0), (_ts(19, 10, 30), 98800.0),
+        (_ts(19, 13, 30), 98800.0),  # 11 und 12 Uhr ohne Zeile: der Sensor hält seinen Wert
+        (_ts(19, 14, 30), 12000.0),
+    ])
+    _configure(service, temperature="sensor.t", illuminance="sensor.lux_sued")
+    data = service.compute_sunhours("2026-08-19", NOW)
+    assert data["date"] == "2026-08-19" and data["threshold"] == 25000.0 and data["saturation"] == 98800
+    by_hour = {round((row[0] - data["start"]) / 3600): row for row in data["hours"]}
+    assert sorted(by_hour) == [8, 9, 10, 11, 12, 13, 14]
+    assert by_hour[11][3] is True and by_hour[12][3] is True and by_hour[10][3] is False  # nur die Lücke ist „gehalten“
+    assert data["sun_hours"] == pytest.approx(5.0)  # 9, 10, 11, 12, 13 Uhr
+    assert data["peak"]["value"] == pytest.approx(98800.0)
+
+
+def test_sunhours_without_values_and_without_role(service) -> None:
+    assert service.compute_sunhours(None, NOW) is None
+    _add(service, "sensor.lux_sued", "sensor", "measurement", "lx", [(_ts(10, 12), 5000.0)])
+    _configure(service, temperature="sensor.t", illuminance="sensor.lux_sued")
+    data = service.compute_sunhours("2026-08-19", NOW)
+    assert data["hours"] == [] and data["sun_hours"] is None
+
+
+def test_sunhours_card_and_route_through_the_app(client) -> None:
+    from app.main import index
+
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    index.get_or_create_entity("sensor.sh_temp", "sensor", "measurement", "°C")
+    index.get_or_create_entity("sensor.sh_lux", "sensor", "measurement", "lx")
+    base = {"temperature": "sensor.sh_temp"}
+    assert client.post("/wetterdashboard/setup", data=base).status_code == 200
+    assert 'x-ref="sunChart"' not in client.get("/wetterdashboard").text
+    assert client.get("/wetterdashboard/sonnenstunden").status_code == 409
+    assert client.post("/wetterdashboard/setup", data={**base, "illuminance": "sensor.sh_lux"}).status_code == 200
+    page = client.get("/wetterdashboard").text
+    assert 'x-ref="sunChart"' in page and 'id="wt-tab-wind"' in page
+    assert client.get("/wetterdashboard/sonnenstunden").json()["hours"] == []
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
 def test_dayimage_needs_the_illuminance_role_and_values(service) -> None:
     assert service.compute_dayimage(NOW) is None
     _add(service, "sensor.lux_sued", "sensor", "measurement", "lx", [(_ts(2, 12), 5000.0)])

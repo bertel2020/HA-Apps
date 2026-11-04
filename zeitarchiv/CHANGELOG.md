@@ -18,6 +18,9 @@
   - **Tagesbild**: Auf der Übersicht zeigt je eine Karte die letzten 14 Tage als
     sonnig, wechselhaft oder trüb, mit den Sonnenstunden an den hellen Stunden.
     Ein Klick wählt den Tag aus
+  - **Sonnenstunden**: Im Reiter Wind & Sonne zeigt eine Kurve den Tagesverlauf
+    der Süd-Helligkeit; die Stunden über der Sonnen-Schwelle sind hinterlegt, die
+    Überschrift nennt Sonnenstunden und Spitze
   - **Sonnenschein-Kachel**: Die Sonnenstunden von heute stehen auch als Kachel
     im Reiter Wind & Sonne, mit dem Vortag darunter
   - **Heizen**: Die Tabelle der Gradtagzahl zeigt nur Monate mit Werten und die
@@ -57,6 +60,9 @@
   - **Day overview**: On the overview one card per day shows the last 14 days as
     sunny, changeable or overcast, with the hours of sunshine out of the bright
     hours. A click selects the day
+  - **Hours of sunshine**: On the Wind & sun tab a curve shows the course of the
+    south brightness over the day; the hours above the sun threshold are
+    shaded, and the headline gives the hours of sunshine and the peak
   - **Sunshine tile**: The hours of sunshine today are also shown as a tile on
     the Wind & sun tab, with the previous day below
   - **Heating**: The degree-day table only shows months with values and the

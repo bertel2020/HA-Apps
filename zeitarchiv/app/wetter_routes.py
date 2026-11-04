@@ -95,6 +95,7 @@ CARD_OPTIONS = (
     ("precip", N_("Niederschlag"), ("precip_mm", "precip_dur")),
     ("klima", N_("Temperatur & Klima"), ("@extras",)),
     ("wind", N_("Wind & Sonne"), ("wind", "gust", "radiation", "illuminance")),
+    ("sunhours", N_("Sonnenstunden"), ("illuminance",)),
     ("daylight", N_("Tageslicht"), ("illuminance_dawn",)),
     ("dayimage", N_("Tagesbild"), ("illuminance",)),
     ("longterm", N_("Langzeit"), ("temperature", "precip_mm", "precip_dur")),
@@ -135,6 +136,8 @@ DEFAULT_DAYLIGHT_DAY_LX = 400.0
 DAYLIGHT_NIGHT_RANGE_LX = (1.0, 200.0)
 DAYLIGHT_DAY_RANGE_LX = (50.0, 990.0)
 DAYLIGHT_COMPARE_DAYS = 7  # Tage in der Vergleichstabelle unter der Kurve
+#: Süd-Helligkeit der Eltako-Station sättigt hier; darüber steht „ab“ statt eines Messwerts.
+SUN_SENSOR_SATURATION_LX = 98800
 SUN_MAX_GAP_HOURS = 6  # längste Lücke ohne Zeilen, die zwischen zwei sonnigen Stunden als sonnig gilt
 DEFAULT_RAIN_DAY_MM = 1.0  # DWD: Niederschlagstag ab 1 mm
 DEFAULT_RAIN_DAY_MINUTES = 10
@@ -432,6 +435,7 @@ class WetterService:
 
     def _sunshine_per_day(
         self, values: list[rollup_mod.FineRow], threshold: float, until: float | None,
+        held: list[tuple[float, float]] | None = None,
     ) -> dict[date, float]:
         """Sonnensekunden je lokalem Kalendertag aus den nach Zeit sortierten Stundenzeilen (Regeln siehe
         ``_summarize_sunshine``)."""
@@ -454,6 +458,8 @@ class WetterService:
             if 0 < missing <= SUN_MAX_GAP_HOURS:
                 for step in range(1, missing + 1):
                     count(row.bucket_start + step * 3600.0, True)
+                    if held is not None:
+                        held.append((row.bucket_start + step * 3600.0, row.value))
         return per_day
 
     def _summarize_sunshine(self, rows: list[rollup_mod.FineRow], config: dict, until: float | None) -> dict | None:
@@ -839,6 +845,51 @@ class WetterService:
                 "today": now_summary, "yesterday": yesterday_summary,
             })
         return tiles
+
+    # -- Sonnenstunden -------------------------------------------------------------------
+
+    def compute_sunhours(self, at: str | None = None, now_local: datetime | None = None) -> dict | None:
+        """Tagesverlauf der Helligkeit (Stundenmittel) mit den Stunden über der Sonnen-Schwelle; None ohne Rolle."""
+        config = _load_config(self.deps.index)
+        entity_id = config["illuminance"]
+        if not entity_id or self.deps.index.get_entity(entity_id) is None:
+            return None
+        now_local = now_local or datetime.now(self.deps.tz)
+        tz = self.deps.tz
+        stichtag = parse_stichtag(at, now_local.date())
+        day = stichtag or now_local.date()
+        start = datetime(day.year, day.month, day.day, tzinfo=tz)
+        following = day + timedelta(days=1)
+        end = datetime(following.year, following.month, following.day, tzinfo=tz)
+        until = min(end, now_local)
+        threshold = float(config["sun_threshold_lx"])
+        base = {
+            "tz": str(tz), "date": day.isoformat(), "start": start.timestamp(), "end": end.timestamp(),
+            "live": start <= now_local < end, "threshold": threshold,
+            "unit": (self.deps.index.get_entity(entity_id)["unit"] or "lx"), "saturation": SUN_SENSOR_SATURATION_LX,
+        }
+        if until <= start:
+            return {**base, "hours": [], "sun_hours": None, "peak": None}
+        rows = sorted(
+            (row for row in self._rows(entity_id, "standard", start, until, now_local, query_mod.QueryReadCache()) if row.value is not None),
+            key=lambda row: row.bucket_start,
+        )
+        if not rows:
+            return {**base, "hours": [], "sun_hours": None, "peak": None}
+        held: list[tuple[float, float]] = []
+        per_day = self._sunshine_per_day(rows, threshold, until.timestamp(), held)
+        by_hour: dict[float, list] = {
+            row.bucket_start: [row.bucket_start, row.value, row.max_value if row.max_value is not None else row.value, False]
+            for row in rows
+        }
+        for stamp, value in held:
+            by_hour.setdefault(stamp, [stamp, value, value, True])
+        hours = [by_hour[stamp] for stamp in sorted(by_hour)]
+        top = max(hours, key=lambda row: (row[1], -row[0]))
+        return {
+            **base, "hours": hours, "sun_hours": per_day.get(day, 0.0) / 3600.0,
+            "peak": {"start": top[0], "value": top[2]},
+        }
 
     # -- Tagesbild -----------------------------------------------------------------------
 
@@ -1462,6 +1513,14 @@ class WetterService:
             data = self.compute_daylight(date)
             if data is None:
                 raise HTTPException(status_code=409, detail=tr("Keine Entität für „Helligkeit Dämmerung“ zugeordnet."))
+            return data
+
+        @router.get("/wetterdashboard/sonnenstunden")
+        def wetterdashboard_sunhours(date: str | None = None) -> dict:
+            _require_configured()
+            data = self.compute_sunhours(date)
+            if data is None:
+                raise HTTPException(status_code=409, detail=tr("Keine Entität für „Helligkeit“ zugeordnet."))
             return data
 
         @router.get("/wetterdashboard/tagesbild")
