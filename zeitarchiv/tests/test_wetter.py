@@ -977,6 +977,16 @@ def test_dayimage_classifies_each_day_by_its_sun_share(service) -> None:
     assert next(row for row in data["days"] if row["date"].endswith("20"))["today"] is True  # heute noch ohne helle Stunden
 
 
+def test_dayimage_falls_back_to_the_brightness_on_days_without_dawn_rows(service) -> None:
+    """Der Dämmerungssensor ist oft erst kurz im Archiv: Tage davor zählen die hellen Stunden nach der Helligkeit selbst."""
+    _add(service, "sensor.lux_sued", "sensor", "measurement", "lx", [(_ts(18, hour, 30), 80000.0) for hour in range(8, 17)])
+    _add(service, "sensor.lux_daem", "sensor", "measurement", "lx", [(_ts(19, 9, 30), 1000.0), (_ts(19, 10, 30), 1000.0)])
+    _configure(service, temperature="sensor.t", illuminance="sensor.lux_sued", illuminance_dawn="sensor.lux_daem")
+    data = service.compute_dayimage(NOW, days=3)
+    day18 = next(row for row in data["days"] if row["date"].endswith("18"))
+    assert day18["class"] == "sunny" and day18["bright_hours"] >= 8
+
+
 def test_dayimage_needs_the_illuminance_role_and_values(service) -> None:
     assert service.compute_dayimage(NOW) is None
     _add(service, "sensor.lux_sued", "sensor", "measurement", "lx", [(_ts(2, 12), 5000.0)])

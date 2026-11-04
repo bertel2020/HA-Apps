@@ -109,7 +109,7 @@ TILE_LABELS = {
     "illuminance": N_("Sonnenschein"),
 }
 #: Tagesbild: Anzahl Tage im Streifen; Tage mit weniger hellen Stunden bekommen keine Klasse.
-DAYIMAGE_DAYS = 30
+DAYIMAGE_DAYS = 14
 DAYIMAGE_MIN_BRIGHT_HOURS = 3
 MAX_HEATING_COUNTERS = 6
 DEFAULT_HEATING_ROOM = 20.0  # Raumtemperatur der Gradtagzahl (G20/15, VDI 3807)
@@ -869,7 +869,12 @@ class WetterService:
             light_rows = [
                 row for row in self._rows(dawn_id, "standard", start, now_local, now_local, read_cache) if row.value is not None
             ]
-        stats = {row.bucket_start: (row.value, row.max_value if row.max_value is not None else row.value) for row in light_rows}
+        def stats_of(rows: list) -> dict[float, tuple[float, float]]:
+            return {row.bucket_start: (row.value, row.max_value if row.max_value is not None else row.value) for row in rows}
+
+        stats = stats_of(light_rows)
+        main_stats = stats_of(main_rows)
+        dawn_days = {datetime.fromtimestamp(stamp, tz).date() for stamp in stats}
         out = []
         counts = {"sunny": 0, "mixed": 0, "overcast": 0, "none": 0}
         for offset in range(days):
@@ -882,7 +887,8 @@ class WetterService:
             while moment < end.timestamp():
                 hour_starts.append(moment)
                 moment += 3600.0
-            classes = daylight.hour_classes(hour_starts, stats, night_lx, day_lx)
+            # Hat der Dämmerungssensor an diesem Tag keine Zeilen (erst später im Archiv), zählt die Helligkeit selbst.
+            classes = daylight.hour_classes(hour_starts, stats if day in dawn_days else main_stats, night_lx, day_lx)
             bright = sum(1 for kind in classes if kind == daylight.DAY)
             kind = None
             share = None

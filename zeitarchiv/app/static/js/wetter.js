@@ -891,13 +891,20 @@
         const picked = this.stichtag();
         return data.days.map((day) => {
           const label = utcDayMonth.format(new Date(`${day.date}T12:00:00Z`));
-          const name = day.today ? t('{day} (bisher)', {day: label}) : label;
-          const title = day.class
+          const has = !!day.class;
+          const sub = has
+            ? t('{sun} von {bright} h Sonne', {sun: num(day.sun_hours, 1), bright: num(day.bright_hours, 0)})
+            : t('keine Klasse');
+          const title = has
             ? t('{day}: {kind} · {sun} h Sonne von {bright} h hell', {
-              day: name, kind: this.dayimageKindName(day.class), sun: num(day.sun_hours, 1), bright: num(day.bright_hours, 1),
+              day: day.today ? t('{day} (bisher)', {day: label}) : label, kind: this.dayimageKindName(day.class),
+              sun: num(day.sun_hours, 1), bright: num(day.bright_hours, 1),
             })
-            : t('{day}: keine Klasse (zu wenig helle Stunden oder keine Werte)', {day: name});
-          return {...day, picked: picked === day.date, title};
+            : t('{day}: keine Klasse (zu wenig helle Stunden oder keine Werte)', {day: label});
+          return {
+            ...day, picked: picked === day.date, title, sub, label: day.today ? t('{day} (bisher)', {day: label}) : label,
+            kindName: has ? this.dayimageKindName(day.class) : '–', percent: has ? Math.round(day.share * 100) : 0,
+          };
         });
       },
 
@@ -907,16 +914,6 @@
         const names = {sunny: t('sonnig'), mixed: t('wechselhaft'), overcast: t('trüb')};
         const parts = ['sunny', 'mixed', 'overcast'].filter((kind) => data.counts[kind]).map((kind) => `${data.counts[kind]} ${names[kind]}`);
         return parts.length ? t('Die letzten {n} Tage: {parts}', {n: data.days.length, parts: parts.join(' · ')}) : '';
-      },
-
-      dayimageFirst() {
-        const days = this.dayimage && this.dayimage.days;
-        return days && days.length ? utcDayMonth.format(new Date(`${days[0].date}T12:00:00Z`)) : '';
-      },
-
-      dayimageLast() {
-        const days = this.dayimage && this.dayimage.days;
-        return days && days.length ? utcDayMonth.format(new Date(`${days[days.length - 1].date}T12:00:00Z`)) : '';
       },
 
       pickDay(cell) {
