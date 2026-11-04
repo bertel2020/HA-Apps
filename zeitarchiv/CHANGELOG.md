@@ -15,6 +15,11 @@
   - **Wetterlage**: Eine Karte auf der Übersicht fasst Himmel, Wind (Beaufort),
     Regen und Temperatur zusammen. Bei einem früheren Tag zeigt sie die
     Zusammenfassung dieses Tages
+  - **Tagesbild**: Ein Streifen auf der Übersicht zeigt die letzten 30 Tage als
+    sonnig, wechselhaft oder trüb, nach dem Anteil der Sonnenstunden an den
+    hellen Stunden. Ein Klick wählt den Tag aus
+  - **Sonnenschein-Kachel**: Die Sonnenstunden von heute stehen auch als Kachel
+    im Reiter Wind & Sonne, mit dem Vortag darunter
   - **Karten ein- und ausschalten**: In der Einrichtung unter „Anzeige“ lassen
     sich die Karten einzeln ausblenden; angeboten werden nur Karten, für die eine
     Entität zugeordnet ist. Fehlt einem Reiter damit jede Karte, entfällt er
@@ -44,6 +49,11 @@
   - **Weather conditions**: A card on the overview summarises sky, wind
     (Beaufort), rain and temperature. For an earlier day it shows the summary
     of that day
+  - **Day overview**: A bar on the overview shows the last 30 days as sunny,
+    changeable or overcast, based on the share of sunshine hours in the bright
+    hours. A click selects the day
+  - **Sunshine tile**: The hours of sunshine today are also shown as a tile on
+    the Wind & sun tab, with the previous day below
   - **Switch cards on and off**: In the setup under "Display" the cards can be
     hidden individually; only cards with an assigned entity are offered. A tab
     without any card is dropped

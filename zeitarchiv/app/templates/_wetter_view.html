@@ -74,7 +74,8 @@
 {% set show_conditions = has_conditions and 'conditions' not in hc %}
 {% set show_basis = 'basis' not in hc %}
 {% set show_monthly = 'monthly' not in hc %}
-{% set show_overview = show_conditions or show_basis or show_monthly %}
+{% set show_dayimage = has_dayimage and 'dayimage' not in hc %}
+{% set show_overview = show_conditions or show_basis or show_dayimage or show_monthly %}
 {% set show_precip = precip_modes and 'precip' not in hc %}
 {% set show_klima = has_klima and 'klima' not in hc %}
 {% set show_windtiles = has_windtiles and 'wind' not in hc %}
@@ -136,6 +137,29 @@
 
   {% if show_basis %}
   {{ weather_card("basis", 5) }}
+  {% endif %}
+
+  {% if show_dayimage %}
+  <div class="card wt-card" data-hints="collapsed" data-wt-dayimage x-show="dayimage || dayimageError" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Tagesbild") }} {{ hint_button(_("Tagesbild")) }}</h2>
+      {% call hint_body() %}{{ _("Jeder Streifen ist ein Tag. Der Sonnenanteil ist die Zeit über der Sonnen-Schwelle geteilt durch die hellen Stunden des Tages (Dämmerungssensor ab der Tag-Schwelle): sonnig ab 50 %, wechselhaft ab 20 %, sonst trüb. Tage mit weniger als drei hellen Stunden oder ohne Werte bleiben leer. Ein Klick wählt den Tag aus. Das ist kein Wert des Wetterdienstes: Die Station trennt direktes und diffuses Licht nicht.") }}{% endcall %}
+    </div>
+    <p class="wt-headline" x-show="dayimage" x-text="dayimageHead()"></p>
+    <div class="wt-dayimage" x-show="dayimage" role="list">
+      <template x-for="cell in dayimageCells()" :key="cell.date">
+        <button type="button" role="listitem" class="wt-day" :class="{'is-today': cell.today, 'is-picked': cell.picked}" :data-class="cell.class || 'none'" :title="cell.title" :aria-label="cell.title" @click="pickDay(cell)"></button>
+      </template>
+    </div>
+    <div class="wt-dayimage-axis" x-show="dayimage"><span x-text="dayimageFirst()"></span><span x-text="dayimageLast()"></span></div>
+    <div class="wt-dayimage-legend" x-show="dayimage">
+      <span><i class="wt-day-key" data-class="sunny"></i>{{ _("sonnig") }}</span>
+      <span><i class="wt-day-key" data-class="mixed"></i>{{ _("wechselhaft") }}</span>
+      <span><i class="wt-day-key" data-class="overcast"></i>{{ _("trüb") }}</span>
+      <span><i class="wt-day-key" data-class="none"></i>{{ _("ohne Wert") }}</span>
+    </div>
+    <p class="hint hint-warn" x-show="dayimageError" x-text="dayimageError" x-cloak></p>
+  </div>
   {% endif %}
 
 

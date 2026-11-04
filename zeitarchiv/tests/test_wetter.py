@@ -928,13 +928,79 @@ def test_sunshine_row_and_metrics_exist_in_the_script() -> None:
     assert "data.sun_threshold_lx" in script  # die Schwelle steht in der Beschriftung, nicht versteckt
 
 
-def test_tiles_skip_the_sunshine_row_when_illuminance_is_assigned(service) -> None:
-    """Die Sonnenscheindauer ist nur eine Tabellenzeile; als Kachel (Aggregationstyp „sunshine“) stürzte die Abfrage ab."""
+def test_tiles_carry_the_sunshine_hours_when_illuminance_is_assigned(service) -> None:
+    """Die Sonnenscheindauer ist eine Kachel mit Stunden; mit dem Aggregationstyp „sunshine“ stürzte die Abfrage einmal ab."""
     _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(20, 1), 12.0)])
-    _add(service, "sensor.lux_sued", "sensor", "measurement", "lx", [(_ts(20, 10), 40000.0)])
+    _add(service, "sensor.lux_sued", "sensor", "measurement", "lx", [
+        (_ts(19, 10, 30), 40000.0), (_ts(19, 11, 30), 40000.0), (_ts(20, 10, 30), 40000.0), (_ts(20, 11, 30), 40000.0),
+    ])
     _configure(service, temperature="sensor.t", illuminance="sensor.lux_sued")
 
-    assert [tile["key"] for tile in service.compute_tiles(NOW)] == ["temperature"]
+    tiles = {tile["key"]: tile for tile in service.compute_tiles(NOW)}
+    assert list(tiles) == ["temperature", "illuminance"]
+    sun = tiles["illuminance"]
+    assert sun["kind"] == "sunshine" and sun["label"] == "Sonnenschein"
+    assert sun["today"]["hours"] == pytest.approx(2.0) and sun["yesterday"]["hours"] == pytest.approx(2.0)
+
+
+def _dayimage_data(service) -> None:
+    def day(number: int, lux: dict[int, float]) -> tuple[list, list]:
+        main = [(_ts(number, hour, 30), value) for hour, value in lux.items()]
+        dawn = [(_ts(number, hour, 30), 1000.0 if value >= 1000 else 0.0) for hour, value in lux.items()]
+        return main, dawn
+
+    sunny = {hour: 80000.0 for hour in range(8, 17)}
+    gray = {hour: 9000.0 for hour in range(8, 17)}
+    mixed = {hour: (80000.0 if hour in (10, 11, 12) else 9000.0) for hour in range(8, 17)}
+    short = {7: 0.0, 8: 9000.0, 9: 9000.0, 10: 0.0}
+    main_rows: list = []
+    dawn_rows: list = []
+    for number, lux in ((19, sunny), (18, gray), (17, mixed), (16, short)):
+        main, dawn = day(number, lux)
+        main_rows += main
+        dawn_rows += dawn
+    _add(service, "sensor.lux_sued", "sensor", "measurement", "lx", main_rows)
+    _add(service, "sensor.lux_daem", "sensor", "measurement", "lx", dawn_rows)
+    _configure(service, temperature="sensor.t", illuminance="sensor.lux_sued", illuminance_dawn="sensor.lux_daem")
+
+
+def test_dayimage_classifies_each_day_by_its_sun_share(service) -> None:
+    _dayimage_data(service)
+    data = service.compute_dayimage(NOW, days=6)
+    classes = {row["date"][-2:]: row["class"] for row in data["days"]}
+    assert classes == {"15": None, "16": None, "17": "mixed", "18": "overcast", "19": "sunny", "20": None}
+    sunny = next(row for row in data["days"] if row["date"].endswith("19"))
+    assert sunny["share"] == pytest.approx(1.0) and sunny["bright_hours"] == pytest.approx(9.0)
+    mixed = next(row for row in data["days"] if row["date"].endswith("17"))
+    assert mixed["share"] == pytest.approx(3 / 9, abs=0.12)
+    assert data["counts"] == {"sunny": 1, "mixed": 1, "overcast": 1, "none": 3}
+    assert next(row for row in data["days"] if row["date"].endswith("20"))["today"] is True  # heute noch ohne helle Stunden
+
+
+def test_dayimage_needs_the_illuminance_role_and_values(service) -> None:
+    assert service.compute_dayimage(NOW) is None
+    _add(service, "sensor.lux_sued", "sensor", "measurement", "lx", [(_ts(2, 12), 5000.0)])
+    _configure(service, temperature="sensor.t", illuminance="sensor.lux_sued")
+    assert service.compute_dayimage(NOW, days=5) is None  # nichts in den letzten fünf Tagen
+
+
+def test_dayimage_card_and_route_through_the_app(client) -> None:
+    from app.main import index
+
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    index.get_or_create_entity("sensor.tb_temp", "sensor", "measurement", "°C")
+    index.get_or_create_entity("sensor.tb_lux", "sensor", "measurement", "lx")
+    base = {"temperature": "sensor.tb_temp"}
+    assert client.post("/wetterdashboard/setup", data=base).status_code == 200
+    assert "data-wt-dayimage" not in client.get("/wetterdashboard").text
+    assert client.post("/wetterdashboard/setup", data={**base, "illuminance": "sensor.tb_lux"}).status_code == 200
+    assert "data-wt-dayimage" in client.get("/wetterdashboard").text
+    assert client.get("/wetterdashboard/tagesbild").status_code == 409  # Rolle ohne Werte
+    assert client.post("/wetterdashboard/setup", data={
+        **base, "illuminance": "sensor.tb_lux", "cards_submitted": "1", "show_card": ["basis"],
+    }).status_code == 200
+    assert "data-wt-dayimage" not in client.get("/wetterdashboard").text
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
 
 
 def test_card_availability_follows_the_assigned_roles() -> None:
@@ -942,7 +1008,7 @@ def test_card_availability_follows_the_assigned_roles() -> None:
     assert not any(wetter_routes.card_available(key, config) for key in wetter_routes.CARD_KEYS)
     config.update(temperature="sensor.t", illuminance_dawn="sensor.d", heating=[{"entity_id": "sensor.h", "name": ""}])
     available = {key for key in wetter_routes.CARD_KEYS if wetter_routes.card_available(key, config)}
-    assert available == {"basis", "monthly", "longterm", "conditions", "daylight", "heating"}
+    assert available == {"basis", "monthly", "longterm", "conditions", "daylight", "heating"}  # ohne Helligkeit kein Tagesbild
 
 
 def test_hidden_cards_are_saved_only_for_available_cards_and_hide_cards_and_tabs(client) -> None:

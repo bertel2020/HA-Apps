@@ -96,6 +96,7 @@ CARD_OPTIONS = (
     ("klima", N_("Temperatur & Klima"), ("@extras",)),
     ("wind", N_("Wind & Sonne"), ("wind", "gust", "radiation", "illuminance")),
     ("daylight", N_("Tageslicht"), ("illuminance_dawn",)),
+    ("dayimage", N_("Tagesbild"), ("illuminance",)),
     ("longterm", N_("Langzeit"), ("temperature", "precip_mm", "precip_dur")),
     ("heating", N_("Heizen"), ("@heating",)),
 )
@@ -103,7 +104,13 @@ CARD_KEYS = tuple(key for key, _label, _needs in CARD_OPTIONS)
 #: Nachkommastellen, wenn die Entität „automatisch“ eingestellt ist: Strahlung in ganzen W/m².
 ROLE_DEFAULT_DECIMALS = {"radiation": 0}
 #: Kurze Namen für die Kacheln (in der Tabelle stehen die ausführlichen Rollennamen).
-TILE_LABELS = {"temperature": N_("Temperatur"), "precip_mm": N_("Niederschlag"), "precip_dur": N_("Regen")}
+TILE_LABELS = {
+    "temperature": N_("Temperatur"), "precip_mm": N_("Niederschlag"), "precip_dur": N_("Regen"),
+    "illuminance": N_("Sonnenschein"),
+}
+#: Tagesbild: Anzahl Tage im Streifen; Tage mit weniger hellen Stunden bekommen keine Klasse.
+DAYIMAGE_DAYS = 30
+DAYIMAGE_MIN_BRIGHT_HOURS = 3
 MAX_HEATING_COUNTERS = 6
 DEFAULT_HEATING_ROOM = 20.0  # Raumtemperatur der Gradtagzahl (G20/15, VDI 3807)
 DEFAULT_HEATING_LIMIT = 15.0  # Heizgrenze: darüber wird nicht geheizt
@@ -423,21 +430,11 @@ class WetterService:
             "top_ts": first_ts[top_day] if per_day[top_day] > 0 else None,
         }
 
-    def _summarize_sunshine(self, rows: list[rollup_mod.FineRow], config: dict, until: float | None) -> dict | None:
-        """Sonnenstunden: Stundenzeilen, deren Mittel die Schwelle erreicht, je lokalem Kalendertag.
-
-        Eine angeschnittene Stunde (laufende Stunde, Ende des Fensters) zählt nur mit ihrem Anteil bis
-        ``until``, sonst würde „bis 14:32“ bis zu eine Stunde zu viel zeigen. Ohne Werte ``None``, nie 0:
-        ein Tag ohne Daten hatte nicht null Sonne. Genauigkeit: eine Stunde (die Mittel der Stunden entscheiden).
-
-        Lücken: Ein Sensor, der stundenlang denselben Wert hält (die Süd-Helligkeit klebt mittags bei
-        98.800 lx), löst in HA kein neues Ereignis aus, dann fehlen genau an den sonnigsten Stunden die
-        Zeilen. Eine Lücke von höchstens ``SUN_MAX_GAP_HOURS`` Stunden zählt als sonnig, wenn die Zeile davor
-        und die danach die Schwelle erreichen; an Rändern und neben dunklen Stunden zählt sie nicht."""
-        values = sorted((row for row in rows if row.value is not None), key=lambda row: row.bucket_start)
-        if not values:
-            return None
-        threshold = float(config["sun_threshold_lx"])
+    def _sunshine_per_day(
+        self, values: list[rollup_mod.FineRow], threshold: float, until: float | None,
+    ) -> dict[date, float]:
+        """Sonnensekunden je lokalem Kalendertag aus den nach Zeit sortierten Stundenzeilen (Regeln siehe
+        ``_summarize_sunshine``)."""
         tz = self.deps.tz
         per_day: dict[date, float] = {}
 
@@ -457,6 +454,24 @@ class WetterService:
             if 0 < missing <= SUN_MAX_GAP_HOURS:
                 for step in range(1, missing + 1):
                     count(row.bucket_start + step * 3600.0, True)
+        return per_day
+
+    def _summarize_sunshine(self, rows: list[rollup_mod.FineRow], config: dict, until: float | None) -> dict | None:
+        """Sonnenstunden: Stundenzeilen, deren Mittel die Schwelle erreicht, je lokalem Kalendertag.
+
+        Eine angeschnittene Stunde (laufende Stunde, Ende des Fensters) zählt nur mit ihrem Anteil bis
+        ``until``, sonst würde „bis 14:32“ bis zu eine Stunde zu viel zeigen. Ohne Werte ``None``, nie 0:
+        ein Tag ohne Daten hatte nicht null Sonne. Genauigkeit: eine Stunde (die Mittel der Stunden entscheiden).
+
+        Lücken: Ein Sensor, der stundenlang denselben Wert hält (die Süd-Helligkeit klebt mittags bei
+        98.800 lx), löst in HA kein neues Ereignis aus, dann fehlen genau an den sonnigsten Stunden die
+        Zeilen. Eine Lücke von höchstens ``SUN_MAX_GAP_HOURS`` Stunden zählt als sonnig, wenn die Zeile davor
+        und die danach die Schwelle erreichen; an Rändern und neben dunklen Stunden zählt sie nicht."""
+        values = sorted((row for row in rows if row.value is not None), key=lambda row: row.bucket_start)
+        if not values:
+            return None
+        tz = self.deps.tz
+        per_day = self._sunshine_per_day(values, float(config["sun_threshold_lx"]), until)
         hours = {day: seconds / 3600.0 for day, seconds in per_day.items()}
         top_day = max(hours, key=lambda day: (hours[day], -day.toordinal()))
         top_start = min(row.bucket_start for row in values if datetime.fromtimestamp(row.bucket_start, tz).date() == top_day)
@@ -795,15 +810,14 @@ class WetterService:
         yesterday = self.column_windows("gestern", now_local, "bis_jetzt", anchor)
         tiles = []
         for spec in self._row_specs(config):
-            if spec["kind"] == "sunshine":
-                continue  # nur eine Tabellenzeile (Stunden), keine Kachel
             entity = self.deps.index.get_entity(spec["entity_id"])
-            aggregation_type = spec["kind"]  # "standard"/"counter"/"switch" sind zugleich die Aggregationstypen
+            # Die Sonnenscheindauer liest die Stundenmittel eines Messwerts („sunshine“ ist nur die Anzeigeart).
+            aggregation_type = "standard" if spec["kind"] == "sunshine" else spec["kind"]  # "standard"/"counter"/"switch" sind zugleich die Aggregationstypen
             now_summary = self.summarize(
                 spec["kind"],
                 self._rows(spec["entity_id"], aggregation_type, today["start"], today["end"], now_local, read_cache),
                 config, held_off=bool(entity and entity["first_ts"] and entity["first_ts"] < today["start"].timestamp()),
-                unit=spec["unit"],
+                unit=spec["unit"], until=min(today["end"].timestamp(), now_local.timestamp()),
             )
             yesterday_summary = None
             if spec["kind"] != "standard":
@@ -811,7 +825,7 @@ class WetterService:
                     spec["kind"],
                     self._rows(spec["entity_id"], aggregation_type, yesterday["start"], yesterday["end"], now_local, read_cache),
                     config, held_off=bool(entity and entity["first_ts"] and entity["first_ts"] < yesterday["start"].timestamp()),
-                    unit=spec["unit"],
+                    unit=spec["unit"], until=min(yesterday["end"].timestamp(), now_local.timestamp()),
                 )
             tiles.append({
                 "key": spec["key"], "entity_id": spec["entity_id"], "kind": spec["kind"],
@@ -825,6 +839,66 @@ class WetterService:
                 "today": now_summary, "yesterday": yesterday_summary,
             })
         return tiles
+
+    # -- Tagesbild -----------------------------------------------------------------------
+
+    def compute_dayimage(self, now_local: datetime | None = None, days: int = DAYIMAGE_DAYS) -> dict | None:
+        """Klasse je Tag (sonnig, wechselhaft, trüb) der letzten Tage aus dem Sonnenanteil: Stunden über der
+        Sonnen-Schwelle geteilt durch die hellen Stunden. Hell ist eine Stunde laut Dämmerungssensor (sonst nach der
+        Helligkeit selbst) ab der Tag-Schwelle. Ein Tag mit weniger als ``DAYIMAGE_MIN_BRIGHT_HOURS`` hellen Stunden
+        (oder ohne Werte) bekommt keine Klasse."""
+        config = _load_config(self.deps.index)
+        entity_id = config["illuminance"]
+        if not entity_id or self.deps.index.get_entity(entity_id) is None:
+            return None
+        now_local = now_local or datetime.now(self.deps.tz)
+        tz = self.deps.tz
+        read_cache = query_mod.QueryReadCache()
+        today = now_local.date()
+        first = today - timedelta(days=days - 1)
+        start = datetime(first.year, first.month, first.day, tzinfo=tz)
+        main_rows = sorted(
+            (row for row in self._rows(entity_id, "standard", start, now_local, now_local, read_cache) if row.value is not None),
+            key=lambda row: row.bucket_start,
+        )
+        sun_seconds = self._sunshine_per_day(main_rows, float(config["sun_threshold_lx"]), now_local.timestamp())
+        night_lx, day_lx = config["daylight_night_lx"], config["daylight_day_lx"]
+        light_rows = main_rows
+        dawn_id = config["illuminance_dawn"]
+        if dawn_id and self.deps.index.get_entity(dawn_id) is not None:
+            light_rows = [
+                row for row in self._rows(dawn_id, "standard", start, now_local, now_local, read_cache) if row.value is not None
+            ]
+        stats = {row.bucket_start: (row.value, row.max_value if row.max_value is not None else row.value) for row in light_rows}
+        out = []
+        counts = {"sunny": 0, "mixed": 0, "overcast": 0, "none": 0}
+        for offset in range(days):
+            day = first + timedelta(days=offset)
+            midnight = datetime(day.year, day.month, day.day, tzinfo=tz)
+            following = day + timedelta(days=1)
+            end = min(datetime(following.year, following.month, following.day, tzinfo=tz), now_local)
+            hour_starts = []
+            moment = midnight.timestamp()
+            while moment < end.timestamp():
+                hour_starts.append(moment)
+                moment += 3600.0
+            classes = daylight.hour_classes(hour_starts, stats, night_lx, day_lx)
+            bright = sum(1 for kind in classes if kind == daylight.DAY)
+            kind = None
+            share = None
+            sun_hours = sun_seconds.get(day, 0.0) / 3600.0
+            if bright >= DAYIMAGE_MIN_BRIGHT_HOURS and day in sun_seconds:
+                share = min(1.0, sun_hours / bright)
+                kind = "sunny" if share >= 0.5 else "mixed" if share >= 0.2 else "overcast"
+            counts[kind or "none"] += 1
+            out.append({
+                "date": day.isoformat(), "class": kind, "share": share,
+                "sun_hours": sun_hours if kind else None, "bright_hours": float(bright) if kind else None,
+                "today": day == today,
+            })
+        if counts["none"] == days:
+            return None
+        return {"tz": str(tz), "days": out, "counts": counts, "threshold": config["sun_threshold_lx"]}
 
     # -- Tageslicht ----------------------------------------------------------------------
 
@@ -1095,6 +1169,7 @@ class WetterService:
             "has_windtiles": any(config[key] for key in ("wind", "gust", "radiation", "illuminance")),
             "has_windsun": any(config[key] for key in ("wind", "gust", "radiation", "illuminance", "illuminance_dawn")),
             "has_daylight": bool(config["illuminance_dawn"]),
+            "has_dayimage": bool(config["illuminance"]),
             "hidden_cards": config["hidden_cards"],
             "has_conditions": any(
                 config[key] for key in ("illuminance", "illuminance_dawn", "radiation", "wind", "precip_dur", "precip_mm")
@@ -1381,6 +1456,14 @@ class WetterService:
             data = self.compute_daylight(date)
             if data is None:
                 raise HTTPException(status_code=409, detail=tr("Keine Entität für „Helligkeit Dämmerung“ zugeordnet."))
+            return data
+
+        @router.get("/wetterdashboard/tagesbild")
+        def wetterdashboard_dayimage() -> dict:
+            _require_configured()
+            data = self.compute_dayimage()
+            if data is None:
+                raise HTTPException(status_code=409, detail=tr("Keine Helligkeitswerte für das Tagesbild vorhanden."))
             return data
 
         @router.get("/wetterdashboard/wetterlage")

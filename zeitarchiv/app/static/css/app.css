@@ -2544,7 +2544,7 @@ button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
 .wt-tile[data-role="humidity"]{--wt-accent:var(--chart-6);}
 .wt-tile[data-role="pressure"]{--wt-accent:var(--chart-4);}
 .wt-tile[data-role="wind"],.wt-tile[data-role="gust"]{--wt-accent:var(--chart-8);}
-.wt-tile[data-role="radiation"]{--wt-accent:var(--chart-7);}
+.wt-tile[data-role="radiation"],.wt-tile[data-role="illuminance"]{--wt-accent:var(--chart-7);}
 .wt-tiles[style*="--wt-cols:1"] .wt-tile{max-width:280px;}
 .wt-tile.wt-tile-wide{grid-column:1 / -1;}
 .wt-tile.is-loading{border-top-color:var(--border-strong);color:var(--ink-faint);animation:wt-pulse 1.2s ease-in-out infinite alternate;}

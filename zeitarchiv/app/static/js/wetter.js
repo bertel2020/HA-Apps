@@ -337,6 +337,9 @@
       hasConditions: false,
       conditions: null,
       _conditionsSeq: 0,
+      hasDayimage: false,
+      dayimage: null,
+      dayimageError: '',
       hasDaylight: false,
       daylight: null,
       daylightError: '',
@@ -383,6 +386,8 @@
         this.hasConditions = !!this.$root.querySelector('[data-wt-conditions]');
         if (this.hasConditions) this.startConditions();
         // Die Karte „Tageslicht“ gibt es nur mit zugeordneter Rolle; $refs sind in init() noch nicht angelegt.
+        this.hasDayimage = !!this.$root.querySelector('[data-wt-dayimage]');
+        if (this.hasDayimage) this.loadDayimage();
         this.hasDaylight = !!this.$root.querySelector('[x-ref="daylightChart"]');
         const observer = new ResizeObserver(() => this.layoutTiles());
         for (const group of GROUPS) {
@@ -494,6 +499,9 @@
         if (tile.kind === 'counter') {
           return tile.today ? escapeHtml(num(tile.today.sum, 1)) + unit(tile.unit) : '–';
         }
+        if (tile.kind === 'sunshine') {
+          return tile.today ? escapeHtml(num(tile.today.hours, 1)) + unit('h') : '–';
+        }
         return tile.today ? escapeHtml(num(tile.today.minutes, 0)) + unit('min') : '–';
       },
 
@@ -510,6 +518,10 @@
         if (tile.kind === 'counter') {
           const values = {value: num(tile.yesterday.sum, 1), unit: tile.unit || ''};
           return this.tilesAt ? t('Vortag {value} {unit}', values) : t('gestern {value} {unit}', values);
+        }
+        if (tile.kind === 'sunshine') {
+          const hours = {value: num(tile.yesterday.hours, 1)};
+          return this.tilesAt ? t('Vortag {value} h', hours) : t('gestern {value} h', hours);
         }
         const minutes = {value: num(tile.yesterday.minutes, 0)};
         return this.tilesAt ? t('Vortag {value} min', minutes) : t('gestern {value} min', minutes);
@@ -856,6 +868,60 @@
       },
 
       // ---- Tageslicht (Dämmerungssensor): Kurve mit Nacht-, Dämmerungs- und Tagband -----------------
+
+      // ---- Tagesbild: ein Streifen mit der Klasse je Tag --------------------------------------------
+
+      async loadDayimage() {
+        this.dayimageError = '';
+        try {
+          this.dayimage = await this.fetchJson('wetterdashboard/tagesbild');
+        } catch (e) {
+          this.dayimage = null;
+          this.dayimageError = t('Das Tagesbild konnte nicht geladen werden.');
+        }
+      },
+
+      dayimageKindName(kind) {
+        return {sunny: t('sonnig'), mixed: t('wechselhaft'), overcast: t('trüb')}[kind] || '';
+      },
+
+      dayimageCells() {
+        const data = this.dayimage;
+        if (!data) return [];
+        const picked = this.stichtag();
+        return data.days.map((day) => {
+          const label = utcDayMonth.format(new Date(`${day.date}T12:00:00Z`));
+          const name = day.today ? t('{day} (bisher)', {day: label}) : label;
+          const title = day.class
+            ? t('{day}: {kind} · {sun} h Sonne von {bright} h hell', {
+              day: name, kind: this.dayimageKindName(day.class), sun: num(day.sun_hours, 1), bright: num(day.bright_hours, 1),
+            })
+            : t('{day}: keine Klasse (zu wenig helle Stunden oder keine Werte)', {day: name});
+          return {...day, picked: picked === day.date, title};
+        });
+      },
+
+      dayimageHead() {
+        const data = this.dayimage;
+        if (!data) return '';
+        const names = {sunny: t('sonnig'), mixed: t('wechselhaft'), overcast: t('trüb')};
+        const parts = ['sunny', 'mixed', 'overcast'].filter((kind) => data.counts[kind]).map((kind) => `${data.counts[kind]} ${names[kind]}`);
+        return parts.length ? t('Die letzten {n} Tage: {parts}', {n: data.days.length, parts: parts.join(' · ')}) : '';
+      },
+
+      dayimageFirst() {
+        const days = this.dayimage && this.dayimage.days;
+        return days && days.length ? utcDayMonth.format(new Date(`${days[0].date}T12:00:00Z`)) : '';
+      },
+
+      dayimageLast() {
+        const days = this.dayimage && this.dayimage.days;
+        return days && days.length ? utcDayMonth.format(new Date(`${days[days.length - 1].date}T12:00:00Z`)) : '';
+      },
+
+      pickDay(cell) {
+        Alpine.store('dashStichtag').set(cell.today ? null : cell.date);
+      },
 
       async loadDaylight() {
         const stichtag = this.stichtag();
