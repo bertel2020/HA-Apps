@@ -862,17 +862,17 @@
         const basis = day.approx ? t('Stundenraster, auf eine Stunde genau') : t('Minutenwerte');
         return [
           {
-            label: t('Tag ab / bis'),
+            kind: 'day', label: t('Tag ab / bis'),
             value: day.from == null ? (day.to != null && this.daylightStartedBright() ? `– / ${this.daylightClock(day.to)}` : '–') : (day.to == null ? this.daylightClock(day.from) : `${this.daylightClock(day.from)} / ${this.daylightClock(day.to)}`),
             sub: this.daylightStartedBright() ? t('Aufzeichnung ab {time}', {time: this.daylightClock(day.points[0][0])}) : basis,
           },
-          {label: t('Tageslänge'), value: this.daylightDuration(day.length, day.approx), sub: t('über {n} lx', {n: num(data.day_lx, 0)})},
+          {kind: 'length', label: t('Tageslänge'), value: this.daylightDuration(day.length, day.approx), sub: t('über {n} lx', {n: num(data.day_lx, 0)})},
           {
-            label: t('Dämmerung morgens'), value: this.daylightMinutes(day.morning, day.approx),
+            kind: 'dawn', label: t('Dämmerung morgens'), value: this.daylightMinutes(day.morning, day.approx),
             sub: day.dawn != null ? t('ab {time} (über {n} lx)', {time: this.daylightClock(day.dawn), n: num(data.night_lx, 0)}) : '',
           },
           {
-            label: t('Dämmerung abends'), value: this.daylightMinutes(day.evening, day.approx),
+            kind: 'dusk', label: t('Dämmerung abends'), value: this.daylightMinutes(day.evening, day.approx),
             sub: day.dusk != null ? t('bis {time} (unter {n} lx)', {time: this.daylightClock(day.dusk), n: num(data.night_lx, 0)}) : '',
           },
         ];

@@ -193,7 +193,7 @@
     <p class="wt-headline" x-show="daylight" x-text="daylightHead()"></p>
     <div class="wt-kpis wt-kpis-soft" x-show="daylight" :style="'--wt-cols:' + kpiCols(daylightStats().length)">
       <template x-for="stat in daylightStats()" :key="stat.label">
-        <div class="wt-tile">
+        <div class="wt-tile" :data-kind="stat.kind">
           <span class="wt-tile-label" x-text="stat.label"></span>
           <span class="wt-tile-value" x-text="stat.value"></span>
           <span class="wt-tile-sub" x-text="stat.sub"></span>

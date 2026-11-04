@@ -10,6 +10,11 @@
   .wt-lage-detail{list-style:none;margin:0;padding:10px 0 0;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:4px 22px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
   .wt-lage-label{font-size:calc(11px * var(--font-scale, 1));text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);margin-right:4px;}
   .wt-kpis-soft .wt-tile{gap:4px;padding:12px 14px;border-top-width:1px;border-left:3px solid var(--wt-accent);background:var(--surface-alt);}
+  .wt-kpis-soft .wt-tile{background:radial-gradient(140% 140% at 0% 0%, color-mix(in srgb, var(--wt-accent) 16%, transparent), color-mix(in srgb, var(--wt-accent) 4%, transparent) 70%), var(--surface);border-color:color-mix(in srgb, var(--wt-accent) 28%, var(--border));border-left-color:var(--wt-accent);}
+  .wt-kpis-soft .wt-tile[data-kind="day"]{--wt-accent:var(--chart-7);}
+  .wt-kpis-soft .wt-tile[data-kind="length"]{--wt-accent:var(--chart-2);}
+  .wt-kpis-soft .wt-tile[data-kind="dawn"]{--wt-accent:var(--chart-3);}
+  .wt-kpis-soft .wt-tile[data-kind="dusk"]{--wt-accent:var(--chart-4);}
   .wt-kpis-soft .wt-tile-label{font-family:inherit;font-size:calc(11.5px * var(--font-scale, 1));letter-spacing:.05em;color:var(--ink-muted);}
   .wt-kpis-soft .wt-tile-value{font-family:inherit;font-size:calc(21px * var(--font-scale, 1));letter-spacing:-.01em;}
   .wt-kpis-soft .wt-tile-sub{font-family:inherit;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);min-height:1.3em;}
