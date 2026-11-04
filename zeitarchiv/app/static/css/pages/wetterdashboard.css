@@ -6,7 +6,9 @@
   .wt-setup-cta p{margin:0;color:var(--ink-muted);max-width:60ch;}
 
   .wt-headline{font-size:calc(15px * var(--font-scale, 1));margin:8px 0 12px;color:var(--ink);}
-  .wt-lage{font-size:calc(20px * var(--font-scale, 1));font-weight:600;line-height:1.35;text-wrap:balance;margin:4px 0 12px;}
+  .wt-lage{font-size:calc(20px * var(--font-scale, 1));font-weight:600;line-height:1.35;text-wrap:balance;margin:4px 0 14px;}
+  .wt-lage-detail{list-style:none;margin:0;padding:10px 0 0;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:4px 22px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  .wt-lage-label{font-size:calc(11px * var(--font-scale, 1));text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);margin-right:4px;}
   .wt-chart-tall{height:360px;}
   .wt-table tr.wt-row-current td{background:var(--surface-alt);font-weight:600;}
   .wt-matrix{min-height:160px;}
