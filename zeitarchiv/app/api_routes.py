@@ -83,8 +83,9 @@ EventText = Annotated[str, Field(max_length=MAX_EVENT_TEXT_LENGTH)]
 # "cards": /api/card/items und /api/card/chart existieren, gespeicherte Charts für
 # die Lovelace-Karte. "card_series": /api/card/entities und /api/card/series, die
 # Karte ohne gespeichertes Chart. "card_spark": /api/card/spark, die Sparkline unter
-# einer Kachelkarte. "card_table": /api/card/table, gespeicherte Tabellen.
-API_CAPABILITIES = ("state", "ai", "catalog", "selection", "cards", "card_series", "card_spark", "card_table")
+# einer Kachelkarte. "card_table": /api/card/table, gespeicherte Tabellen. "card_elements":
+# /api/card/elements und /api/card/element, Bausteine der Dashboards Energie und Wetter.
+API_CAPABILITIES = ("state", "ai", "catalog", "selection", "cards", "card_series", "card_spark", "card_table", "card_elements")
 
 
 class EventIn(BaseModel):

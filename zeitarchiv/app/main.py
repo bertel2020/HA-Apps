@@ -167,7 +167,7 @@ from .energiedashboard_routes import (
 )
 from .wetter_routes import WetterDependencies, WetterService, is_wetter_configured, wetter_role_count
 from . import cleanup_stats, counter_bulk, data_quality, entity_usage, value_range
-from . import dashboard_tiles, overview_tiles
+from . import card_elements, dashboard_tiles, overview_tiles
 from .dashboard_tiles import tile_metric_context as _tile_metric_context
 from .route_support import (
     MAX_FORM_FIELDS,
@@ -808,6 +808,7 @@ _wetter_service = WetterService(WetterDependencies(
     app_root_context=_app_root_context,
 ))
 app.include_router(_wetter_service.router())
+card_elements.bind(index, energie=_energiedashboard_service, wetter=_wetter_service)
 
 
 @app.exception_handler(cleanup.ResultLimitExceeded)
