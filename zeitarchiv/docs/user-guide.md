@@ -36,6 +36,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 - [Wetterdashboard](#wetterdashboard)
   - [Rollen](#rollen)
   - [Kacheln und Vergleichstabelle](#kacheln-und-vergleichstabelle)
+  - [Sonne, Licht und Wetterlage](#sonne-licht-und-wetterlage)
   - [Reiter Niederschlag](#reiter-niederschlag)
   - [Monatsvergleich](#monatsvergleich)
   - [Reiter Langzeit](#reiter-langzeit)
@@ -831,6 +832,10 @@ Entitäten des passenden Typs und lehnt falsche Zuordnungen ab.
 | Niederschlag (Menge) | Zähler | Summe, Regentage, nassester Tag |
 | Regen (ein/aus) | Schalter | Regenminuten, Regentage, regenreichster Tag |
 | Luftfeuchte, Luftdruck, Wind, Böe, Strahlung | Messwert | Max und Min mit Zeitpunkt, Ø |
+| Helligkeit (am besten der Süd-Sensor) | Messwert | Sonnenscheindauer, Sonnenstunden, Tagesklasse |
+| Helligkeit Dämmerung | Messwert | Tagesbeginn und -ende, Tageslänge |
+| Windrichtung, Sonnenhöhe | Messwert | nur für Wetterlage bzw. Tageslicht |
+| PV-Leistung (experimentell) | Messwert (W, kW, MW) | Tagesertrag gegen Erwartung aus der Helligkeit |
 
 Ein Regensensor, der nur ein und aus meldet, reicht: Dann zeigt die Seite
 Regenminuten und Regentage statt Millimeter. Habt ihr beides, stehen beide
@@ -868,6 +873,45 @@ Vorjahreszeitraum. Abgeschlossene Zeiträume (Gestern, Letzter Monat) sind in
 beiden Fällen gleich. Fehlen für einen Zeitraum Daten, steht „–“, nie 0; ein
 Tooltip nennt, ab wann das Archiv beginnt. Die Auswahl der Spalten merkt sich
 der Browser.
+
+### Sonne, Licht und Wetterlage
+
+Mit einer **Helligkeit** (lx) lässt sich aus der Wetterstation mehr herausholen. Die
+Auswertung ist keine offizielle Messgröße: Die Station trennt direktes und diffuses Licht
+nicht, und der Süd-Sensor sättigt bei etwa 98.800 lx. Die Schwellen stehen in der
+Einrichtung unter **Sonne und Tageslicht**.
+
+- **Wetterlage** (Übersicht): Symbol und ein Wort für den Himmel (trüb, bewölkt, heiter,
+  sonnig, Dämmerung, Nacht), ein kurzer Satz aus Temperatur, Wind (nach Beaufort, mit
+  Richtung, wenn **Windrichtung** zugeordnet ist) und Regen, dazu Angaben wie Böen,
+  Tageshöchst- und -tiefstwert, Sonnenstunden und „gestern hell bis …“. Die Klassengrenzen
+  folgen der Sonnen-Schwelle, lassen sich aber in der Einrichtung selbst festlegen. Bei einem
+  früheren Tag steht die Zusammenfassung dieses Tages.
+- **Sonnenscheindauer**: Eine Stunde zählt als sonnig, wenn ihr Mittel die Sonnen-Schwelle
+  erreicht (Standard 25.000 lx). Sie steht als Zeile in der Vergleichstabelle, als Kachel und
+  als Kurve **Sonnenstunden** im Reiter Wind & Sonne.
+- **Tagesbild** (Übersicht): Eine Karte je Tag für die letzten 14 Tage, sonnig, wechselhaft
+  oder trüb nach dem Anteil der hellen Stunden mit Sonne. Ein Klick wählt den Tag.
+- **Tageslicht** (Wind & Sonne): Mit der Rolle **Helligkeit Dämmerung** zeigt die Kurve
+  Nacht, Dämmerung und Tag, dazu Tagesbeginn und -ende, Tageslänge und einen Vergleich der
+  letzten Tage sowie die **Tageslänge im Jahresverlauf** (eine Linie je Jahr, stundengenau).
+  Die Zeiten zeigen, was der Sensor sieht, nicht den Sonnenstand. Mit der Rolle
+  **Sonnenhöhe** (ein Sensor mit der Höhe der Sonne in Grad, etwa ein Template-Sensor aus
+  `sun.sun`) steht zusätzlich der Sonnenstand bei Tagesbeginn und -ende in der Tabelle; ein
+  hoher Wert deutet auf Verschattung.
+- **Langzeit**: Monatsvergleich, Kenntage, Jahresübersicht und Rekorde kennen auch Sonne
+  (Sonnenstunden, sonnige und trübe Tage). Ein echter Vorjahresvergleich ist möglich, sobald
+  die Helligkeit ein Jahr archiviert ist.
+
+**Experimentell** (in der Einrichtung im Block „Experimentell“, Berechnung und Darstellung
+können sich noch ändern):
+
+- **PV und Helligkeit** (Wind & Sonne): Mit den Rollen **Helligkeit** und **PV-Leistung**
+  vergleicht die Karte den Tagesertrag der Anlage mit der Erwartung. Die Erwartung wird aus
+  den 28 Tagen davor gelernt (Median der Stundenleistung je Helligkeitsstufe). Abweichungen
+  über 15 % werden markiert, aber nur an Tagen mit nennenswerter Erwartung; das Verhältnis
+  nach Uhrzeit zeigt, ob die Anlage morgens oder abends abweicht. Es ist eine Messung, keine
+  Prognose: Temperatur, Abregelung und ein voller Akku senken die Leistung ohne Defekt.
 
 ### Reiter Niederschlag
 
@@ -955,6 +999,14 @@ fasst es zusammen. Nur abgeschlossene Tage mit ausreichend Temperaturwerten zäh
 
 Bei mehreren Zählern zeigt **Anteil je Zähler** gestapelte Balken je Monat für eine wählbare
 Heizperiode, mit dem Anteil jedes Zählers in Prozent.
+
+**Heizen und Sonne** (experimentell, mit zugeordneter Helligkeit): Mit „Punkte nach Sonne
+einfärben“ trägt das Streudiagramm Farbe und Form je Tagesklasse (sonnig, wechselhaft,
+trüb). Eine Tabelle vergleicht kWh je Gradtag nach Klasse. Ein Unterschied wird nur genannt,
+wenn er sich vom Zufall abhebt (mindestens 8 Tage je Klasse), sonst steht dort „kein klarer
+Unterschied“. Das Ergebnis gilt nur für dieses Haus: Der Sensor misst an einem Punkt,
+PV-gesteuertes Heizen kann den Effekt umdrehen, und der Wärmespeicher lässt den Vortag
+mitwirken.
 
 ## Entitäten und Verläufe
 

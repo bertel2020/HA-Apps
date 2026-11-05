@@ -36,6 +36,7 @@ internals for developers are in the other documents of this folder (see
 - [Weather dashboard](#weather-dashboard)
   - [Roles](#roles)
   - [Tiles and comparison table](#tiles-and-comparison-table)
+  - [Sun, light and weather summary](#sun-light-and-weather-summary)
   - [Precipitation tab](#precipitation-tab)
   - [Monthly comparison](#monthly-comparison)
   - [Long-term tab](#long-term-tab)
@@ -777,6 +778,10 @@ matching type for each role and rejects wrong assignments.
 | Precipitation (amount) | Counter | Sum, rain days, wettest day |
 | Rain (on/off) | Switch | Rain minutes, rain days, rainiest day |
 | Humidity, pressure, wind, gust, radiation | Measurement | Max and min with time, mean |
+| Brightness (preferably the south sensor) | Measurement | Sunshine duration, sun hours, day class |
+| Brightness dawn | Measurement | Start and end of day, day length |
+| Wind direction, sun elevation | Measurement | only for the weather summary and daylight |
+| PV power (experimental) | Measurement (W, kW, MW) | Daily yield against expectation from brightness |
 
 A rain sensor that only reports on and off is enough: the page then shows rain
 minutes and rain days instead of millimetres. If you have both, both rows are
@@ -812,6 +817,42 @@ columns with **Columns ▾**; a click on a tile opens the entity.
 year. Completed periods (yesterday, last month) are the same in both cases. If
 a period has no data it shows “–”, never 0; a tooltip tells when the archive
 begins. The browser remembers the column selection.
+
+### Sun, light and weather summary
+
+With a **brightness** (lx) the weather station gives more. The evaluation is not an official
+measure: the station does not separate direct and diffuse light, and the south sensor
+saturates at about 98,800 lx. The thresholds are in setup under **Sun and daylight**.
+
+- **Weather summary** (Overview): a symbol and one word for the sky (overcast, cloudy, fair,
+  sunny, twilight, night), a short sentence from temperature, wind (Beaufort, with direction
+  if **Wind direction** is assigned) and rain, plus details such as gusts, daily high and
+  low, sun hours and "light until … yesterday". The class limits follow the sun threshold but
+  can be set yourself in setup. For an earlier day it shows that day's summary.
+- **Sunshine duration**: an hour counts as sunny if its mean reaches the sun threshold
+  (default 25,000 lx). It appears as a row in the comparison table, as a tile and as the
+  **Sun hours** curve on the Wind & sun tab.
+- **Daily picture** (Overview): one card per day for the last 14 days, sunny, changeable or
+  overcast by the share of bright hours with sun. A click selects the day.
+- **Daylight** (Wind & sun): with the role **Brightness dawn** the curve shows night, twilight
+  and day, plus start and end of day, day length and a comparison of the last days, and the
+  **day length over the year** (one line per year, hour precision). The times show what the
+  sensor sees, not the sun position. With the role **Sun elevation** (a sensor with the
+  height of the sun in degrees, for example a template sensor from `sun.sun`) the table also
+  shows the sun position at the start and end of day; a high value points to shading.
+- **Long-term**: monthly comparison, key days, yearly overview and records also know sun
+  (sun hours, sunny and overcast days). A real comparison with the previous year is possible
+  once the brightness has been archived for a year.
+
+**Experimental** (in setup in the "Experimental" block, calculation and presentation may
+still change):
+
+- **PV and brightness** (Wind & sun): with the roles **Brightness** and **PV power** the card
+  compares the daily yield of the system with the expectation. The expectation is learned
+  from the previous 28 days (median hourly power per brightness level). Deviations above
+  15 % are marked, but only on days with a meaningful expectation; the ratio by time of day
+  shows whether the system deviates in the morning or evening. It is a measurement, not a
+  forecast: temperature, curtailment and a full battery lower the output without a defect.
 
 ### Precipitation tab
 
@@ -897,6 +938,13 @@ sums it up. Only completed days with enough temperature values count.
 
 With several counters, **Share per counter** shows stacked bars per month for a selectable
 heating season, with each counter's share in percent.
+
+**Heating and sun** (experimental, with brightness assigned): with "Colour points by
+sunshine" the scatter plot gets a colour and shape per day class (sunny, changeable,
+overcast). A table compares kWh per degree day by class. A difference is only stated if it
+stands out from chance (at least 8 days per class), otherwise it says "no clear
+difference". The result only holds for this house: the sensor measures at one point,
+PV-controlled heating can reverse the effect, and thermal mass lets the previous day count.
 
 ## Entities and histories
 

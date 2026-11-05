@@ -62,7 +62,7 @@ Zeitarchiv besteht aus zwei getrennten, unabhängig versionierten Teilen:
 | **Bleibt schnell** | Charts über Wochen, Monate oder Jahre laden zügig, auch bei sehr langer Historie |
 | **Eigene Dashboards** | Frei kombinierbare Charts (Linie, Balken, Zeitstrahl) und Vergleichstabellen auf beliebig vielen eigenen Dashboards |
 | **Energiedashboard** | Eigene Sankey-Ansicht des Energieflusses mit Autarkie-, Kosten- und CO₂-Auswertung — auf Wunsch mit einem Klick aktiviert; der Reiter Langzeit vergleicht Zeiträume über die Jahre |
-| **Wetterdashboard** | Eigene Wetterseite mit aktuellen Werten, Vorjahresvergleich, Niederschlag, Kenntagen und Heizgradtagen — ebenfalls mit einem Klick aktiviert |
+| **Wetterdashboard** | Eigene Wetterseite mit Wetterlage, aktuellen Werten, Vorjahresvergleich, Niederschlag, Kenntagen, Sonnenscheindauer, Tageslicht und Heizgradtagen — ebenfalls mit einem Klick aktiviert |
 | **Datenpflege** | Ausreißer, Lücken, Duplikate und Zählerrückgänge erkennen, korrigieren oder bereinigen — mit einer Datenqualität-Übersicht über alle Entitäten |
 | **Datenübernahme** | Bestehende Historie aus Symcon, CSV-Dateien oder direkt aus Home Assistant importieren |
 | **Sicherung** | Prüfbare, portable ZIP-Backups mit Zeitplan; die Wiederherstellung kann alles, einzelne Entitäten oder nur die Einstellungen zurückholen |

@@ -59,7 +59,7 @@ Zeitarchiv consists of two separate, independently versioned parts:
 | **Stays fast** | Charts over weeks, months or years load quickly, even with a very long history |
 | **Your own dashboards** | Freely combinable charts (line, bar, timeline) and comparison tables on any number of your own dashboards |
 | **Energy dashboard** | Dedicated Sankey view of the energy flow with self-sufficiency, cost and CO₂ analysis — enabled with one click if desired; the Long-term tab compares periods across the years |
-| **Weather dashboard** | Dedicated weather page with current values, comparison with last year, precipitation, characteristic days and heating degree days — also enabled with one click |
+| **Weather dashboard** | Dedicated weather page with weather summary, current values, comparison with last year, precipitation, characteristic days, sunshine duration, daylight and heating degree days — also enabled with one click |
 | **Data maintenance** | Detect, correct or clean up outliers, gaps, duplicates and counter decreases — with a data quality overview across all entities |
 | **Data import** | Import existing history from Symcon, CSV files or directly from Home Assistant |
 | **Backup** | Verifiable, portable ZIP backups with schedule; a restore can bring back everything, single entities or just the settings |
