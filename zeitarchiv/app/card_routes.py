@@ -13,6 +13,9 @@ frei gewählte Entitäten, ohne dass ein Chart gespeichert sein muss.
 ``GET /api/card/table?id=N`` liefert Aufbau (``table``) und fertige Abfrage (``query``) einer
 gespeicherten Vergleichstabelle; die Karte rechnet daraus mit table-compute.js dieselben Zellen wie
 die Kachel.
+``GET /api/card/elements`` listet die Dashboard-Bausteine, die in der App eingerichtet sind, und
+``GET /api/card/element?key=…`` liefert einen davon (card_elements.py, Roadmap 1.48). Ein nicht eingerichteter
+Baustein antwortet mit 409 und dem Grund.
 ``GET /api/card/spark?entity_id=…&range=…`` liefert eine kurze Reihe für die Sparkline unter
 einer Kachelkarte (höchstens ``SPARK_MAX_POINTS`` Punkte). ``spec`` trägt dieselben Werte wie die
 ``data-*``-Attribute einer Dashboard-Kachel (``_dashboard_tiles.html``), nur als
@@ -38,6 +41,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 
+from . import card_elements
 from .chart_types import effective_chart_type
 from .i18n import tr
 from .chart_period import stichtag_or_400, stichtag_window
@@ -92,7 +96,10 @@ def chart_spec(chart: dict, chart_type: str) -> dict[str, str]:
     """Die Einstellungen eines Charts so, wie ``el.dataset`` sie für eine Kachel
     liefert (alles Zeichenketten, Listen und Wörterbücher als JSON).
 
-    Nicht enthalten: Legende und Kachelgröße, die gibt es in der Karte nicht."""
+    Die Legende gehört dazu (``chartStats``, ``legendMetrics``, ``legendStyle``): die Karte
+    zeigt sie mit denselben Werten und demselben Stil wie die Kachel, die Voreinstellung des
+    Charts kann sie im Editor überschreiben. Nicht enthalten: ob die Legende sichtbar ist
+    (``showLegend``, ein Schalter der Kachel) und die Kachelgröße."""
     return {
         "entityIds": json.dumps(chart["entity_ids"]),
         "entityNames": json.dumps(chart["entity_names"]),
@@ -116,6 +123,9 @@ def chart_spec(chart: dict, chart_type: str) -> dict[str, str]:
         "stacked": _flag(chart["stacked"]),
         "normalize": _flag(chart["normalize"]),
         "horizontal": _flag(chart["horizontal"]),
+        "chartStats": _flag(chart["chart_stats"]),
+        "legendMetrics": json.dumps(chart["legend_metrics"]),
+        "legendStyle": chart["legend_style"],
         "animation": "false",
     }
 
@@ -178,6 +188,9 @@ def ad_hoc_chart(entity_ids: list[str], period: str, style: str) -> dict:
         "chart_type": "auto", "donut_aggregation": "sum", "show_values": False, "decimals": "auto",
         "average_line": False, "average_style": "flat", "area_fill": True, "show_points": False,
         "stacked": style in ("stacked", "percent"), "normalize": style == "percent", "horizontal": False,
+        # Legende wie bei einem neuen Chart mit Werten: Aktuell/Min/Max, Σ erscheint nur, wo es
+        # eine Summe gibt (Zähler, Schalter) — die Kachel lässt sie sonst ebenfalls weg.
+        "chart_stats": True, "legend_metrics": ["last", "min", "max", "sum"], "legend_style": "chips",
     }
 
 
@@ -406,6 +419,47 @@ def create_card_router(
             for row in index.list_entities()
         ]
         return {"spec_version": SPEC_VERSION, "entities": entities}
+
+    @router.get("/api/card/elements")
+    def card_elements_list(
+        request: Request,
+        authorization: str | None = Header(default=None),
+        x_zeitarchiv_integration_version: str | None = Header(default=None),
+    ) -> dict:
+        """Die eingerichteten Dashboard-Bausteine für die Auswahl im Editor."""
+        check_auth(authorization, getattr(request.state, "request_id", "-"), x_zeitarchiv_integration_version)
+        return {"spec_version": SPEC_VERSION, "elements": card_elements.listing()}
+
+    @router.get("/api/card/element")
+    def card_element(
+        request: Request,
+        key: str,
+        columns: str | None = None,
+        vorjahr: bool = True,
+        mode: str = "bis_jetzt",
+        at: str | None = None,
+        authorization: str | None = Header(default=None),
+        x_zeitarchiv_integration_version: str | None = Header(default=None),
+    ) -> dict:
+        """Ein Dashboard-Baustein mit seinen Zahlen; die Karte zeichnet sie."""
+        check_auth(authorization, getattr(request.state, "request_id", "-"), x_zeitarchiv_integration_version)
+        keys = [item for item in (columns or "").split(",") if item]
+        if any(item not in card_elements.COLUMN_KEYS for item in keys) or mode not in card_elements.MODES:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Angaben"))
+        if at:
+            stichtag_or_400(at)
+        options = card_elements.Options(columns=keys or None, vorjahr=vorjahr, mode=mode, at=at or None)
+        if not slots.acquire(blocking=False):
+            raise HTTPException(status_code=429, detail=tr("Zu viele gleichzeitige Abfragen"))
+        try:
+            result = card_elements.build(key, options)
+        except card_elements.ElementUnavailable as err:
+            raise HTTPException(status_code=409, detail=str(err)) from None
+        finally:
+            slots.release()
+        if result is None:
+            raise HTTPException(status_code=404, detail=tr("Baustein nicht gefunden"))
+        return {"spec_version": SPEC_VERSION, **result, "env": {"timezone": time_zone}}
 
     @router.get("/api/card/spark")
     def card_spark(

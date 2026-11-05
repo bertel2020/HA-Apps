@@ -23,6 +23,7 @@ def _chart(chart_id: int, entity_ids: list[str], **overrides) -> dict:
         "chart_type": "auto", "donut_aggregation": "sum", "show_values": False, "decimals": "auto",
         "average_line": False, "average_style": "flat", "area_fill": True, "show_points": False,
         "stacked": False, "normalize": False, "horizontal": False, "compare_settings": {"compare": True},
+        "chart_stats": True, "legend_metrics": ["sum"], "legend_style": "chips",
     }
     chart.update(overrides)
     return chart
@@ -214,6 +215,16 @@ def test_the_spec_is_what_a_tile_reads_from_its_dataset() -> None:
     assert all(isinstance(value, str) for value in spec.values())
 
 
+def test_the_spec_carries_the_legend_settings_of_the_chart() -> None:
+    spec = chart_spec(_chart(1, ["sensor.a"], chart_stats=False, legend_metrics=["last", "max"], legend_style="table"), "auto")
+    assert spec["chartStats"] == "false" and spec["legendStyle"] == "table"
+    assert json.loads(spec["legendMetrics"]) == ["last", "max"]
+    # Ein Ad-hoc-Chart zeigt Werte und die drei üblichen Kennzahlen (Σ nur, wo es sie gibt).
+    ad_hoc = chart_spec(ad_hoc_chart(["sensor.a"], "month", "auto"), "auto")
+    assert ad_hoc["chartStats"] == "true" and ad_hoc["legendStyle"] == "chips"
+    assert json.loads(ad_hoc["legendMetrics"]) == ["last", "min", "max", "sum"]
+
+
 def test_the_spec_covers_every_setting_the_renderer_reads() -> None:
     """readSpec() liest seine Einstellungen als ds.<name>. Fehlt hier ein Schlüssel,
     zeichnet die Karte mit dem Vorgabewert statt mit dem des Charts."""
@@ -224,14 +235,14 @@ def test_the_spec_covers_every_setting_the_renderer_reads() -> None:
     assert read <= set(chart_spec(_chart(1, ["sensor.a"]), "auto")), sorted(read - set(chart_spec(_chart(1, ["sensor.a"]), "auto")))
 
 
-def test_the_spec_covers_the_tile_attributes_except_legend_and_size() -> None:
+def test_the_spec_covers_the_tile_attributes_except_legend_switch_and_size() -> None:
     """Zieht eine Kachel ein neues data-Attribut für das Zeichnen dazu, muss die
-    Karte es auch bekommen. Legende und Kachelgröße gibt es dort nicht."""
+    Karte es auch bekommen. Kachelgröße und der Sichtbarkeitsschalter der Legende gibt es dort nicht."""
     template = template_text("_dashboard_tiles.html")
     block = template.split('data-item-type="chart"', 1)[1].split("</a>", 1)[0]
     attributes = set(re.findall(r"\bdata-([a-z-]+)=", block))
     camel = {re.sub(r"-([a-z])", lambda m: m.group(1).upper(), name) for name in attributes}
-    not_in_card = {"itemType", "itemId", "gridCols", "gridRows", "showLegend", "chartStats", "legendMetrics", "legendStyle"}
+    not_in_card = {"itemType", "itemId", "gridCols", "gridRows", "showLegend"}
     assert (camel - not_in_card) <= set(chart_spec(_chart(1, ["sensor.a"]), "auto")), sorted(
         camel - not_in_card - set(chart_spec(_chart(1, ["sensor.a"]), "auto"))
     )
