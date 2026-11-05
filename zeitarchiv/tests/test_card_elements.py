@@ -73,7 +73,7 @@ def test_only_set_up_elements_are_listed(energie: _Energie, monkeypatch: pytest.
     client = _client()
     body = client.get("/api/card/elements", headers=AUTH).json()
     assert body["spec_version"] == SPEC_VERSION
-    assert [item["key"] for item in body["elements"]] == ["energie.zeitraeume", "energie.matrix"]
+    assert [item["key"] for item in body["elements"]] == ["energie.zeitraeume", "energie.matrix", "energie.monatsvergleich"]
     assert body["elements"][0]["columns"] == ["monat", "vormonat", "jahr"]
     monkeypatch.setattr(card_elements, "_energie_config", lambda ctx: None)
     assert client.get("/api/card/elements", headers=AUTH).json()["elements"] == []
@@ -134,6 +134,12 @@ class _Wetter:
         self.bodies.append(body)
         return {"columns": [], "rows": [], "vorjahr": body.vorjahr}
 
+    def compute_matrix(self, metric: str, mode: str = "mm"):
+        return None if metric == "precip" else {"metric": metric, "years": [2026], "min": 0, "max": 1, "cells": [], "missing": []}
+
+    def compute_monthly(self, metric: str, mode: str = "mm"):
+        return None if metric == "precip" else {"metric": metric, "unit": "°C", "years": {}, "avg": [], "counts": []}
+
 
 def test_the_weather_table_is_listed_and_built_with_its_group(energie: _Energie, monkeypatch: pytest.MonkeyPatch) -> None:
     wetter = _Wetter()
@@ -155,3 +161,31 @@ def test_the_weather_table_is_not_offered_without_a_weather_dashboard(energie: _
     assert "wetter.zeitraeume" not in [item["key"] for item in client.get("/api/card/elements", headers=AUTH).json()["elements"]]
     response = client.get("/api/card/element", headers=AUTH, params={"key": "wetter.zeitraeume"})
     assert response.status_code == 409 and "Wetterdashboard" in response.json()["detail"]
+
+
+def test_the_monthly_comparisons_are_charts(energie: _Energie, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(card_elements, "CONTEXT", card_elements.Context(index=object(), energie=energie, wetter=_Wetter()))
+    monkeypatch.setattr("app.wetter_routes.is_wetter_configured", lambda index: True)
+    client = _client()
+    listed = {item["key"]: item for item in client.get("/api/card/elements", headers=AUTH).json()["elements"]}
+    assert listed["energie.monatsvergleich"]["kind"] == "chart" and listed["wetter.monatsvergleich"]["metrics"] == ["temperature", "precip", "sun"]
+    energy = client.get("/api/card/element", headers=AUTH, params={"key": "energie.monatsvergleich", "role": "netzbezug", "years": 2}).json()
+    assert energy["renderer"] == "energie.monatsvergleich" and energy["kind"] == "chart" and energy["months"]["years"] == [2026, 2025]
+    weather = client.get("/api/card/element", headers=AUTH, params={"key": "wetter.monatsvergleich", "metric": "sun"}).json()
+    assert weather["renderer"] == "wetter.monatsvergleich" and weather["monthly"]["metric"] == "sun"
+    # Ohne zugeordneten Niederschlag gibt es keinen Regen-Vergleich: 409 mit Grund.
+    assert client.get("/api/card/element", headers=AUTH, params={"key": "wetter.monatsvergleich", "metric": "precip"}).status_code == 409
+    assert client.get("/api/card/element", headers=AUTH, params={"key": "wetter.monatsvergleich", "metric": "x"}).status_code == 400
+
+
+def test_the_weather_year_overview_is_a_chart_with_its_own_metrics(energie: _Energie, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(card_elements, "CONTEXT", card_elements.Context(index=object(), energie=energie, wetter=_Wetter()))
+    monkeypatch.setattr("app.wetter_routes.is_wetter_configured", lambda index: True)
+    client = _client()
+    listed = {item["key"]: item for item in client.get("/api/card/elements", headers=AUTH).json()["elements"]}
+    assert listed["wetter.matrix"]["metrics"] == ["avg", "max", "min", "precip", "sun"]
+    body = client.get("/api/card/element", headers=AUTH, params={"key": "wetter.matrix", "metric": "max"}).json()
+    assert body["renderer"] == "wetter.matrix" and body["kind"] == "chart" and body["matrix"]["metric"] == "max"
+    # Eine Kennzahl, die nur der Monatsvergleich kennt, fällt auf die erste der Jahresübersicht zurück.
+    assert client.get("/api/card/element", headers=AUTH, params={"key": "wetter.matrix", "metric": "temperature"}).json()["metric"] == "avg"
+    assert client.get("/api/card/element", headers=AUTH, params={"key": "wetter.matrix", "metric": "precip"}).status_code == 409

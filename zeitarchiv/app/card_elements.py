@@ -25,6 +25,11 @@ ROLES = ("erzeugung", "einspeisung", "netzbezug", "verbrauch")
 MAX_YEARS = 50
 #: Gruppen der Wetter-Tabelle (Reiter Übersicht, Wind und Sonne, Temperatur und Klima).
 GROUPS = ("basis", "wind", "klima")
+#: Kennzahlen des Wetter-Monatsvergleichs (wetter_routes: temperature, precip, sun).
+METRICS = ("temperature", "precip", "sun")
+#: Kennzahlen der Wetter-Jahresübersicht (wetter_routes.compute_matrix).
+MATRIX_METRICS = ("avg", "max", "min", "precip", "sun")
+ALL_METRICS = tuple(dict.fromkeys(METRICS + MATRIX_METRICS))
 
 
 class ElementUnavailable(Exception):
@@ -42,6 +47,7 @@ class Options:
     role: str | None = None
     years: int = 10
     group: str = "basis"
+    metric: str = "temperature"
 
 
 @dataclass
@@ -72,6 +78,7 @@ class Element:
     #: Die Rollen, aus denen der Baustein wählen lässt (leer: keine Auswahl).
     roles: tuple[str, ...] = field(default_factory=tuple)
     groups: tuple[str, ...] = field(default_factory=tuple)
+    metrics: tuple[str, ...] = field(default_factory=tuple)
 
 
 def _energie_config(ctx: Context) -> dict | None:
@@ -117,6 +124,11 @@ def _energie_matrix(ctx: Context, options: Options) -> dict:
     return {"renderer": "energie.matrix", "months": {**months, "years": years, "roles": [trimmed]}, "role": role["key"]}
 
 
+def _energie_monthly(ctx: Context, options: Options) -> dict:
+    result = _energie_matrix(ctx, options)
+    return {**result, "renderer": "energie.monatsvergleich", "kind": "chart"}
+
+
 def _wetter_available(ctx: Context) -> bool:
     from .wetter_routes import is_wetter_configured
 
@@ -138,6 +150,26 @@ def _wetter_zeitraeume(ctx: Context, options: Options) -> dict:
     }
 
 
+def _wetter_matrix(ctx: Context, options: Options) -> dict:
+    if not _wetter_available(ctx):
+        raise ElementUnavailable(tr("Im Wetterdashboard nicht eingerichtet"))
+    metric = options.metric if options.metric in MATRIX_METRICS else MATRIX_METRICS[0]
+    matrix = ctx.wetter.compute_matrix(metric)
+    if matrix is None:
+        raise ElementUnavailable(tr("Kein Niederschlag zugeordnet."))
+    return {"renderer": "wetter.matrix", "matrix": matrix, "metric": metric}
+
+
+def _wetter_monthly(ctx: Context, options: Options) -> dict:
+    if not _wetter_available(ctx):
+        raise ElementUnavailable(tr("Im Wetterdashboard nicht eingerichtet"))
+    metric = options.metric if options.metric in METRICS else "temperature"
+    monthly = ctx.wetter.compute_monthly(metric)
+    if monthly is None:
+        raise ElementUnavailable(tr("Kein Niederschlag zugeordnet."))
+    return {"renderer": "wetter.monatsvergleich", "monthly": monthly, "metric": metric}
+
+
 ELEMENTS: dict[str, Element] = {
     element.key: element
     for element in (
@@ -153,6 +185,21 @@ ELEMENTS: dict[str, Element] = {
             available=_energie_zeitraeume_available, build=_energie_matrix, roles=ROLES,
         ),
         Element(
+            key="energie.monatsvergleich", group="energie", kind="chart",
+            title=lambda: tr("Energie: Monatsvergleich"),
+            available=_energie_zeitraeume_available, build=_energie_monthly, roles=ROLES,
+        ),
+        Element(
+            key="wetter.monatsvergleich", group="wetter", kind="chart",
+            title=lambda: tr("Wetter: Monatsvergleich"),
+            available=_wetter_available, build=_wetter_monthly, metrics=METRICS,
+        ),
+        Element(
+            key="wetter.matrix", group="wetter", kind="chart",
+            title=lambda: tr("Wetter: Jahresübersicht"),
+            available=_wetter_available, build=_wetter_matrix, metrics=MATRIX_METRICS,
+        ),
+        Element(
             key="wetter.zeitraeume", group="wetter", kind="table",
             title=lambda: tr("Wetter: Zeiträume im Vergleich"),
             available=_wetter_available, build=_wetter_zeitraeume,
@@ -166,7 +213,7 @@ def listing(ctx: Context | None = None) -> list[dict]:
     """Die Bausteine, die in dieser App eingerichtet sind (für die Auswahl im Editor der Karte)."""
     ctx = ctx or CONTEXT
     return [
-        {"key": element.key, "group": element.group, "kind": element.kind, "title": element.title(), "columns": list(element.columns), "roles": list(element.roles), "groups": list(element.groups)}
+        {"key": element.key, "group": element.group, "kind": element.kind, "title": element.title(), "columns": list(element.columns), "roles": list(element.roles), "groups": list(element.groups), "metrics": list(element.metrics)}
         for element in ELEMENTS.values()
         if element.available(ctx)
     ]

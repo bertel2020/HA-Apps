@@ -86,8 +86,10 @@
     Streifen; die Zahlen stehen weiter unter System → Statistik
 - **Lovelace-Karte, Dashboard-Bausteine**: Die Karte zeigt neben Charts und
   Tabellen auch fertige Ausschnitte der Dashboards (Quelle „Dashboard-Baustein“)
-  - Zeiträume im Vergleich aus Energie und Wetter sowie Jahre × Monate aus der
-    Energie, jeweils mit den Zahlen des Dashboards
+  - Tabellen: Zeiträume im Vergleich aus Energie und Wetter sowie Jahre × Monate
+    aus der Energie, jeweils mit den Zahlen des Dashboards
+  - Diagramme: Monatsvergleich aus Energie und Wetter (Jahre als Linien mit
+    Mittel und Spanne) und die Jahresübersicht des Wetters als Heatmap
   - Rollen und Formeln bleiben im Dashboard eingerichtet; nicht eingerichtete
     Bausteine fehlen in der Auswahl
   - Nur für Administratoren; braucht die aktuelle Integration
@@ -192,8 +194,10 @@
     strip; the figures are still under System → Statistics
 - **Lovelace card, dashboard elements**: Besides charts and tables, the card
   shows ready-made parts of the dashboards (source "Dashboard element")
-  - Periods compared from Energy and Weather, and years × months from Energy,
-    each with the figures of the dashboard
+  - Tables: periods compared from Energy and Weather, and years × months from
+    Energy, each with the figures of the dashboard
+  - Charts: monthly comparison from Energy and Weather (years as lines with
+    average and range) and the weather year overview as a heatmap
   - Roles and formulas stay set up in the dashboard; elements that are not set
     up are missing from the choice
   - Administrators only; needs the current integration

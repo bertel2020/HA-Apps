@@ -27,6 +27,7 @@
 
   // Vergleichstabelle und Gruppen: element-table-render.js (dieselbe Datei zeichnet die Tabelle in der Lovelace-Karte).
   const {weatherComparison: renderTable, inGroup} = window.ElementTableRender;
+  const {weatherMonthly, weatherMatrix} = window.ElementChartRender;
   // Gruppen: „wind“ = Reiter „Wind & Sonne“, „klima“ = Zusatzsensoren (Schlüssel „temperature:N“) auf „Temperatur & Klima“,
   // alles andere steht in der Übersicht.
   // Tabellen und Kachelreihen je Gruppe: x-ref-Namen wie in _wetter_view.html (tiles<Gruppe>, table[Wrap]<Gruppe>, Übersicht ohne Gruppenname).
@@ -111,14 +112,6 @@
   // Datum eines Platzes; in UTC formatiert, damit die Zeitzone des Browsers kein Datum verschiebt.
   const utcDayMonth = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', timeZone: 'UTC'});
   // Spalten der Jahr×Tag-Matrix: ein Schaltjahr, damit der 29.02. eine eigene Spalte hat.
-  const MONTH_LENGTHS_LEAP = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  const MONTH_STARTS_LEAP = MONTH_LENGTHS_LEAP.map((_len, index) => MONTH_LENGTHS_LEAP.slice(0, index).reduce((a, b) => a + b, 0));
-  function leapSlotDate(slot) {
-    let month = 11;
-    while (MONTH_STARTS_LEAP[month] > slot) month--;
-    return {month: month + 1, day: slot - MONTH_STARTS_LEAP[month] + 1};
-  }
-
   const slotLabel = (slot) => {
     const {month, day} = slotDate(slot);
     return utcDayMonth.format(new Date(Date.UTC(2025, month - 1, day)));
@@ -534,70 +527,8 @@
         const element = this.$refs.monthlyChart;
         if (!m || !element) return;
         const colors = palette();
-        const decimals = m.metric === 'temperature' ? 1 : (m.unit === 'min' || m.unit === 'h' ? 0 : 1);
-        const labels = Array.from({length: 12}, (_x, i) => monthName(i + 1, 'short'));
-        const yearKeys = Object.keys(m.years).map(Number).sort((a, b) => a - b);
-        const current = String(m.current_year);
-        const lastPast = yearKeys.filter((year) => year < m.current_year).pop();
-        const hasAvg = m.counts.some((count) => count > 0);
-        const series = [];
-        const legend = [];
-        if (this.band && hasAvg) {
-          series.push({
-            name: 'low', type: 'line', stack: 'band', data: m.low, symbol: 'none', silent: true,
-            lineStyle: {opacity: 0}, tooltip: {show: false},
-          }, {
-            name: 'band', type: 'line', stack: 'band', symbol: 'none', silent: true, lineStyle: {opacity: 0},
-            data: m.high.map((high, i) => (high == null || m.low[i] == null ? null : high - m.low[i])),
-            areaStyle: {color: colors.prev, opacity: 0.16},
-          });
-        }
-        for (const year of yearKeys) {
-          if (year >= m.current_year) continue;
-          const strong = year === lastPast;
-          series.push({
-            name: String(year), type: 'line', data: m.years[year], symbol: 'none', connectNulls: false,
-            lineStyle: {color: colors.prev, width: strong ? 2 : 1.2, opacity: strong ? 1 : 0.45},
-            itemStyle: {color: colors.prev},
-          });
-          if (strong) legend.push(String(year));
-        }
-        if (hasAvg) {
-          series.push({
-            name: 'Ø', type: 'line', data: m.avg, symbol: 'none',
-            lineStyle: {color: colors.text, width: 2, type: 'dashed'}, itemStyle: {color: colors.text},
-          });
-          legend.push('Ø');
-        }
-        if (m.years[current]) {
-          series.push({
-            name: current, type: 'line', data: m.years[current], symbol: 'circle', symbolSize: 7, z: 5,
-            lineStyle: {color: colors.cur, width: 3}, itemStyle: {color: colors.cur},
-          });
-          legend.unshift(current);
-        }
-        const unit = m.unit;
         const chart = chartFor('monthly', element);
-        chart.setOption({
-          animation: false, grid: gridFor(element), legend: legendBox(colors, legend),
-          xAxis: {type: 'category', data: labels, boundaryGap: false, ...axisStyle(colors)},
-          yAxis: {type: 'value', scale: m.metric === 'temperature', name: unit, nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
-          tooltip: tooltipBox(colors, (params) => {
-            const i = params[0].dataIndex;
-            const cell = (value) => (value == null ? '–' : `${num(value, decimals)} ${unit}`);
-            const running = i === m.current_month - 1;
-            let html = `<b>${escapeHtml(monthName(i + 1, 'long'))}</b>`;
-            const now = m.years[current] ? m.years[current][i] : null;
-            html += `<br>${current}: ${cell(now)}${running && now != null ? ' ' + escapeHtml(t('(bisher)')) : ''}`;
-            if (lastPast != null) html += `<br>${lastPast}: ${cell(m.years[lastPast][i])}`;
-            if (m.avg[i] != null) {
-              html += `<br>Ø (${m.counts[i]}): ${cell(m.avg[i])}`;
-              if (now != null && !running) html += `<br>${escapeHtml(t('Abweichung'))}: ${num(now - m.avg[i], decimals)} ${unit === '°C' ? 'K' : unit}`;
-            }
-            return html;
-          }),
-          series,
-        }, true);
+        chart.setOption(weatherMonthly(m, {colors, band: this.band, narrow: element.clientWidth < 520, font: scaledFont}), true);
         // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
         requestAnimationFrame(() => chart.resize());
       },
@@ -1849,69 +1780,8 @@
           return;
         }
         const colors = palette();
-        const isPrecip = m.metric === 'precip';
-        const decimals = isPrecip && m.unit === 'min' ? 0 : 1;
-        const unit = m.unit;
-        const isSun = m.metric === 'sun';
-        const inRange = isPrecip
-          ? [colors.surface, colors.cold]
-          : [colors.cold, colors.surface, colors.prev];
-        const sunPieces = [
-          {value: 2, label: t('sonnig'), color: colors.sun},
-          {value: 1, label: t('wechselhaft'), color: colors.sunSoft},
-          {value: 0, label: t('trüb'), color: colors.overcast},
-        ];
-        const hidden = {itemStyle: {borderWidth: 0}};
         const chart = chartFor('matrix', element);
-        chart.setOption({
-          animation: false,
-          grid: {left: 8, right: 16, top: 6, bottom: 52, containLabel: true},
-          xAxis: {
-            type: 'category', data: Array.from({length: 366}, (_x, i) => i), splitArea: {show: false},
-            axisLine: {lineStyle: {color: colors.grid}}, axisTick: {show: false},
-            axisLabel: {
-              color: colors.text, fontSize: scaledFont(11),
-              interval: (index) => MONTH_STARTS_LEAP.includes(index),
-              formatter: (_value, index) => monthName(leapSlotDate(index).month, element.clientWidth < 520 ? 'narrow' : 'short'),
-            },
-          },
-          yAxis: {
-            type: 'category', data: m.years.map(String), inverse: true,
-            axisLine: {show: false}, axisTick: {show: false}, axisLabel: {color: colors.text, fontSize: scaledFont(11)},
-          },
-          visualMap: isSun ? {
-            type: 'piecewise', pieces: sunPieces, seriesIndex: 1, orient: 'horizontal', left: 'center', bottom: 4,
-            itemWidth: 14, itemHeight: 14, textStyle: {color: colors.text, fontSize: scaledFont(11)},
-          } : {
-            type: 'continuous', min: m.min, max: m.max, seriesIndex: 1, calculable: false, orient: 'horizontal',
-            left: 'center', bottom: 4, itemWidth: 12, itemHeight: 140, inRange: {color: inRange},
-            textStyle: {color: colors.text, fontSize: scaledFont(11)},
-            text: [`${num(m.max, decimals)} ${unit}`, `${num(m.min, decimals)} ${unit}`],
-          },
-          tooltip: {
-            confine: true, backgroundColor: colors.surface, borderColor: colors.grid,
-            textStyle: {color: colors.ink, fontSize: scaledFont(12)},
-            formatter: (param) => {
-              const [slot, row, value] = param.data;
-              const when = this.matrixDate(m.years[row], slot);
-              const label = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'}).format(when);
-              if (param.seriesIndex === 0) return `<b>${escapeHtml(label)}</b><br>${escapeHtml(isSun ? t('Keine Tagesklasse') : t('Zu wenige Werte'))}`;
-              if (isSun) {
-                const hours = m.hours ? m.hours[when.toISOString().slice(0, 10)] : null;
-                return `<b>${escapeHtml(label)}</b><br>${escapeHtml(sunPieces.find((piece) => piece.value === value).label)}`
-                  + (hours == null ? '' : `<br>${escapeHtml(num(hours, 1))} ${escapeHtml(t('Sonnenstunden'))}`);
-              }
-              return `<b>${escapeHtml(label)}</b><br>${escapeHtml(num(value, decimals))} ${escapeHtml(unit === '°C' ? '°C' : unit)}`;
-            },
-          },
-          series: [
-            {
-              type: 'heatmap', data: m.missing.map(([slot, row]) => [slot, row, 0]), silent: false, ...hidden,
-              itemStyle: {color: colors.grid, borderWidth: 0},
-            },
-            {type: 'heatmap', data: m.cells, ...hidden},
-          ],
-        }, true);
+        chart.setOption(weatherMatrix(m, {colors, narrow: element.clientWidth < 520, font: scaledFont}), true);
         chart.off('click');
         chart.on('click', (param) => {
           if (param.seriesIndex !== 1) return;

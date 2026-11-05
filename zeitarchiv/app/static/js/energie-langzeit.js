@@ -64,6 +64,7 @@
   window.addEventListener('resize', () => Object.values(charts).forEach((chart) => chart.resize()));
 
   const {monthName, mean, present, monthKey, isPartialStart, monthStats, yearSum, energyMatrix} = window.ElementTableRender;
+  const {energyMonthly} = window.ElementChartRender;
 
   // Kenntage je Jahr: Beschriftung, Regel und die Tooltip-Zeile je Kenntag. Die Schwellen kommen aus dem Setup.
   const KENNTAG_GROUPS = () => ({eigenversorgung: t('Eigenversorgung'), erzeugung: t('Erzeugung'), speicher: t('Speicher')});
@@ -481,83 +482,10 @@
         const element = this.$refs.monthlyChart;
         const role = m && this.roleOf(this.monthlyRole);
         if (!role || !element) return;
-        const colors = palette();
-        const labels = Array.from({length: 12}, (_x, i) => monthName(i + 1, 'short'));
-        const {past, avg, low, high, counts} = monthStats(role, m);
-        const current = m.current.year;
-        const lastPast = past[0];
-        const hasAvg = counts.some((count) => count >= 2);
-        const series = [];
-        const legend = [];
-        if (this.band && hasAvg) {
-          series.push({
-            name: 'low', type: 'line', stack: 'band', data: low, symbol: 'none', silent: true,
-            lineStyle: {opacity: 0}, tooltip: {show: false},
-          }, {
-            name: 'band', type: 'line', stack: 'band', symbol: 'none', silent: true, lineStyle: {opacity: 0},
-            data: high.map((top, i) => (top == null || low[i] == null ? null : top - low[i])),
-            areaStyle: {color: colors.prev, opacity: 0.16},
-          });
-        }
-        for (const year of past.slice().reverse()) {
-          const strong = year === lastPast;
-          const data = role.values[year].map((value, i) => (isPartialStart(role, year, i) ? null : value));
-          series.push({
-            name: String(year), type: 'line', data, symbol: 'none', connectNulls: false,
-            lineStyle: {color: colors.prev, width: strong ? 2 : 1.2, opacity: strong ? 1 : 0.45},
-            itemStyle: {color: colors.prev},
-          });
-          if (strong) legend.push(String(year));
-        }
-        if (hasAvg) {
-          series.push({
-            name: 'Ø', type: 'line', data: avg, symbol: 'none',
-            lineStyle: {color: colors.text, width: 2, type: 'dashed'}, itemStyle: {color: colors.text},
-          });
-          legend.push('Ø');
-        }
-        if (role.values[current]) {
-          // Der laufende Monat ist erst zum Teil vergangen und würde die Linie einbrechen lassen.
-          const data = role.values[current].map((value, i) => (i + 1 >= m.current.month ? null : value));
-          series.push({
-            name: String(current), type: 'line', data, symbol: 'circle', symbolSize: 7, z: 5,
-            lineStyle: {color: colors.cur, width: 3}, itemStyle: {color: colors.cur},
-          });
-          legend.unshift(String(current));
-        }
-        const cell = (value) => (value == null ? '–' : energy(value));
         const chart = chartFor('monthly', element);
-        chart.setOption({
-          animation: false,
-          grid: {left: 8, right: 16, top: element.clientWidth < 520 ? 74 : 34, bottom: 8, containLabel: true},
-          legend: {data: legend, top: 0, textStyle: {color: colors.text, fontSize: scaledFont(12)}, itemWidth: 18, itemHeight: 8},
-          xAxis: {
-            type: 'category', data: labels, boundaryGap: false,
-            axisLine: {lineStyle: {color: colors.grid}}, axisTick: {show: false},
-            axisLabel: {color: colors.text, fontSize: scaledFont(11)}, splitLine: {lineStyle: {color: colors.grid}},
-          },
-          yAxis: {
-            type: 'value', name: t('kWh'), nameTextStyle: {color: colors.text},
-            axisLine: {lineStyle: {color: colors.grid}}, axisTick: {show: false},
-            axisLabel: {color: colors.text, fontSize: scaledFont(11)}, splitLine: {lineStyle: {color: colors.grid}},
-          },
-          tooltip: {
-            trigger: 'axis', confine: true,
-            backgroundColor: colors.surface, borderColor: colors.grid,
-            textStyle: {color: colors.ink, fontSize: scaledFont(12)},
-            formatter: (params) => {
-              const i = params[0].dataIndex;
-              const running = i + 1 === m.current.month;
-              const now = role.values[current] ? role.values[current][i] : null;
-              let html = `<b>${escapeHtml(monthName(i + 1, 'long'))}</b>`;
-              html += `<br>${current}: ${cell(now)}${running && now != null ? ' ' + escapeHtml(t('(bisher)')) : ''}`;
-              if (lastPast != null) html += `<br>${lastPast}: ${cell(role.values[lastPast][i])}`;
-              if (avg[i] != null) html += `<br>Ø (${counts[i]}): ${cell(avg[i])}`;
-              return html;
-            },
-          },
-          series,
-        }, true);
+        chart.setOption(energyMonthly(m, role, {
+          colors: palette(), band: this.band, narrow: element.clientWidth < 520, font: scaledFont,
+        }), true);
         requestAnimationFrame(() => chart.resize());
       },
 
