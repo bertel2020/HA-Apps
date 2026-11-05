@@ -137,21 +137,11 @@
         .replace(/\s+/g, '_');
     }
 
-    // "Als Bild speichern" (toolbox.feature.saveAsImage) — reines ECharts-
-    // Bordmittel, dieselbe Konfiguration für alle drei Renderpfade (render()/
-    // renderTimelineMulti()/renderDonut()), deshalb hier zentral statt
-    // dreimal dupliziert. NUR auf dieser Seite (nicht auf der Dashboard-
-    // Kachel, dashboard-tiles.js) — eine Kachel ist ohnehin nur eine
-    // Vorschau, das Icon wäre dort in der kleinen Fläche nur Ballast, und das
-    // Original mit vollem Bedienfeld steht ohnehin einen Klick entfernt.
-    function toolboxOption(exportFilename, surface, inkFaint) {
-      return {
-        show: true, right: 6, top: 0,
-        feature: {
-          saveAsImage: {title: t('Als Bild speichern'), backgroundColor: surface, name: exportFilename},
-        },
-        iconStyle: {borderColor: inkFaint},
-      };
+    // Kein "Als Bild speichern"-Icon mehr (toolbox.feature.saveAsImage): Es lag oben rechts über der
+    // obersten Beschriftung der rechten Achse, sobald ein Chart zwei Achsen hat (Forum-Feedback, 5. November
+    // 2026). Zentral statt an den Aufrufen aller Renderpfade (render()/renderTimelineMulti()/renderDonut()).
+    function toolboxOption() {
+      return {show: false};
     }
 
     function previousPeriodLabel(range) {
@@ -1934,6 +1924,10 @@
               // also keine sichtbare Wirkung gegenüber der festen Variante.
               scale: isPercentAxis ? false : axisDynamic,
               axisLabel: {formatter: v => isPercentAxis ? `${fmtNum(v, 0)} %` : (isDuration ? NumberFormat.fmtDuration(v) : (u ? `${fmtNum(v, decimals)} ${u}` : fmtNum(v, decimals)))},
+              // Gitterlinien nur von der ersten Achse und gestrichelt in Rahmenfarbe wie in der Dashboard-
+              // Kachel: ECharts' Standard zeichnet je Achse eine durchgezogene helle Linie, bei zwei Achsen
+              // (andere Teilung) lag ein zweites Gitter darüber und die Skala war nicht mehr ablesbar.
+              splitLine: {show: i === 0, lineStyle: {color: getComputedStyle(document.body).getPropertyValue('--border').trim() || '#ccc', type: 'dashed'}},
             };
           });
           // "Ausrichtung: Horizontal" tauscht Kategorie- und Werte-Achse —

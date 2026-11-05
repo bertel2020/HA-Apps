@@ -27,6 +27,11 @@ def test_axis_fit_measures_instead_of_guessing() -> None:
     assert "document.fonts.ready" in text
 
 
-@pytest.mark.parametrize("fragment", ["leftAxes === 1", "grid.length !== 1"])
+@pytest.mark.parametrize("fragment", ["counts.left !== 1 || counts.right > 1", "grid.length !== 1"])
 def test_axis_fit_leaves_multi_axis_and_multi_grid_charts_alone(fragment: str) -> None:
     assert fragment in JS.read_text(encoding="utf-8")
+
+
+def test_axis_fit_reserves_room_for_a_single_right_axis() -> None:
+    # containLabel:false nimmt auch den Platz rechter Beschriftungen weg (Werte der zweiten Achse wurden abgeschnitten).
+    assert "right: margins.right" in JS.read_text(encoding="utf-8")

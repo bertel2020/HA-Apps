@@ -73,6 +73,14 @@
     wie bisher. Bestehende Installationen behalten sie, neue starten mit dem
     Streifen; die Zahlen stehen weiter unter System → Statistik
 
+### Geändert
+
+- **Charts**: Kacheln und Chart-Seite zeigen die Y-Achsen besser.
+  - **Kachel**: Die Einheit steht oben an der jeweiligen Achse
+  - **Chart-Seite**: Bei zwei Achsen wird die rechte nicht mehr abgeschnitten,
+    und nur noch die linke zeichnet gestrichelte Hilfslinien
+  - Das Symbol „Als Bild speichern“ oben rechts im Chart entfällt
+
 ### Behoben
 
 - **Import**: Wird ein früherer Monat nachträglich importiert, zeigt der erste Tag
@@ -152,6 +160,14 @@
     shows a slim strip when something is open in Housekeeping, "Always" shows
     them as before. Existing installations keep them, new ones start with the
     strip; the figures are still under System → Statistics
+
+#### Changed
+
+- **Charts**: Tiles and the chart page show the Y axes better.
+  - **Tile**: The unit is shown at the top of each axis
+  - **Chart page**: With two axes the right one is no longer cut off, and only
+    the left one draws dashed grid lines
+  - The "Save as image" icon at the top right of the chart has been removed
 
 #### Fixed
 

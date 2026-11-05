@@ -7,8 +7,9 @@
 // daraus gesetzt. Nach dem Laden der Schriften wird nochmals gemessen, denn davor stimmt die Breite
 // nicht zwingend.
 //
-// Greift nur bei einem Diagramm mit genau einem Raster und genau einer linken Werte-Achse; alles andere
-// (mehrere Raster wie die Zustands-Panels, zwei Achsen links) bleibt bei containLabel.
+// Greift nur bei einem Diagramm mit genau einem Raster und genau einer linken Werte-Achse (höchstens eine
+// rechte, deren Rand dann ebenfalls gemessen wird); alles andere (mehrere Raster wie die Zustands-Panels,
+// zwei Achsen auf einer Seite) bleibt bei containLabel.
 window.AxisFit = (() => {
   const ctx = document.createElement('canvas').getContext('2d');
   // Abstand Beschriftung–Achse (8, ECharts-Standard) plus etwas Luft.
@@ -16,35 +17,42 @@ window.AxisFit = (() => {
   // Breiter als dieser Anteil der Diagrammbreite ergibt keinen sinnvollen Rand mehr.
   const MAX_SHARE = 0.4;
 
-  function neededLeft(chart) {
-    let width = 0;
-    let leftAxes = 0;
+  function neededMargins(chart) {
+    const widths = {left: 0, right: 0};
+    const counts = {left: 0, right: 0};
     for (const axisModel of chart.getModel().queryComponents({mainType: 'yAxis'})) {
       const axis = axisModel.axis;
-      if (!axis || axis.position !== 'left') continue;
-      leftAxes += 1;
+      if (!axis || !(axis.position in widths)) continue;
+      counts[axis.position] += 1;
       const labelModel = axisModel.getModel('axisLabel');
       if (axisModel.get('show') === false || labelModel.get('show') === false) continue;
       ctx.font = labelModel.getFont();
       for (const label of axis.getViewLabels()) {
-        width = Math.max(width, ctx.measureText(label.formattedLabel).width);
+        widths[axis.position] = Math.max(widths[axis.position], ctx.measureText(label.formattedLabel).width);
       }
     }
-    return leftAxes === 1 ? Math.ceil(width) + EXTRA : null;
+    // Mehrere Achsen auf einer Seite (versetzt) bleiben bei containLabel.
+    if (counts.left !== 1 || counts.right > 1) return null;
+    // Rechts nur mit Beschriftung vergrößern: ohne rechte Achse bleibt der bisherige Rand.
+    return {left: Math.ceil(widths.left) + EXTRA, right: counts.right === 1 ? Math.ceil(widths.right) + EXTRA : null};
   }
 
   function fit(chart) {
     if (!chart || chart.isDisposed()) return;
     const grid = chart.getOption().grid;
     if (!grid || grid.length !== 1) return;
-    const need = neededLeft(chart);
-    if (need == null) return;
+    const margins = neededMargins(chart);
+    if (margins == null) return;
+    const need = margins.left;
     // Breite des Behälters statt der des Diagramms: beim ersten Zeichnen kennt ECharts oft nur
     // seine 100-px-Vorgabe, und Breite 0 heißt, dass der Behälter noch verborgen ist.
     const width = chart.getDom().clientWidth;
-    if (width > 0 && need > width * MAX_SHARE) return;
-    if (grid[0].containLabel === false && Math.abs(grid[0].left - need) < 1) return;
-    chart.setOption({grid: {left: need, containLabel: false}});
+    if (width > 0 && (need > width * MAX_SHARE || (margins.right ?? 0) > width * MAX_SHARE)) return;
+    const rightSame = margins.right == null || Math.abs(grid[0].right - margins.right) < 1;
+    if (grid[0].containLabel === false && Math.abs(grid[0].left - need) < 1 && rightSame) return;
+    // containLabel:false schaltet auch den Platz für rechte Beschriftungen ab — dann wird er hier gesetzt,
+    // sonst werden die Werte einer zweiten (rechten) Achse abgeschnitten.
+    chart.setOption({grid: margins.right == null ? {left: need, containLabel: false} : {left: need, right: margins.right, containLabel: false}});
   }
 
   // Misst direkt nach jedem setOption() statt auf das 'finished'-Ereignis zu warten: das kommt erst
