@@ -594,7 +594,7 @@ def test_setup_form_uses_app_fields_and_info_buttons(client) -> None:
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
     html = client.get("/wetterdashboard/setup").text
     assert html.count('class="field"') >= 4 and "wt-item-add" in html
-    assert html.count("hint-toggle") == 6  # Weitere Sensoren, Heizenergie, Regentage, Sonnenschein, Tageslicht, Anzeige
+    assert html.count("hint-toggle") == 5  # Weitere Sensoren, Regentage, Sonne und Tageslicht, Anzeige, Experimentell
     assert '<p class="hint">' not in html  # lose .hint-Absätze verschwänden auf dem Telefon ohne Knopf
 
 
@@ -1193,3 +1193,17 @@ def test_longterm_page_offers_the_sun_views_only_with_the_illuminance_role(clien
     assert client.get("/wetterdashboard/monatsvergleich?metric=sun").status_code in (200, 404)
     assert client.get("/wetterdashboard/matrix?metric=wolke").status_code == 400
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
+def test_humidity_extras_get_their_own_series_apart_from_the_temperatures(service) -> None:
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(19, 12), 10.0)])
+    _add(service, "sensor.n", "sensor", "measurement", "°C", [(_ts(19, 12), 8.0)])
+    _add(service, "sensor.f", "sensor", "measurement", "%", [(_ts(19, 12), 60.0)])
+    _configure(
+        service, temperature="sensor.t",
+        extra_temperatures=[{"entity_id": "sensor.n", "name": "Nord"}, {"entity_id": "sensor.f", "name": "Keller feucht"}],
+    )
+    data = service.compute_temperatures(7, NOW)
+    assert [row["label"] for row in data["series"]] == ["Temperatur", "Nord"]
+    assert [row["label"] for row in data["humidity"]] == ["Keller feucht"]
+    assert all(row["unit"] == "%" for row in data["humidity"])

@@ -123,13 +123,24 @@
       <h2 class="wt-h2"><span x-text="conditionsTitle()">{{ _("Wetterlage") }}</span> {{ hint_button(_("Wetterlage")) }}</h2>
       {% call hint_body() %}{{ _("Die Zeile fasst den Himmel, den Wind und den Regen zusammen und zeigt immer den aktuellen Stand. Der Himmel ergibt sich aus der Helligkeit der letzten 10 Minuten, nur bei Tag (laut Dämmerungssensor); die Grenzen folgen der Sonnen-Schwelle aus der Einrichtung (Standard: trüb unter 15.000 lx, bewölkt bis 25.000, heiter bis 70.000, darüber sonnig). Der Wind nennt die Beaufort-Stufe nach dem stärksten Wert der letzten 10 Minuten; meldet der Sensor nur Stufen oder steht er geschützt, fallen die Klassen eher niedrig aus. Beim Regen zählen auch Nebel und Tau mit, wenn der Sensor sie als Regen meldet. Fehlt ein Sensor, fehlt sein Teil in der Zeile. Für einen früheren Tag fasst die Karte den Tag zusammen: häufigste Himmelsklasse zu den hellen Stunden samt Sonnenstunden, stärkster Wind, Regenmenge und Tiefst- und Höchstwert der Temperatur.") }}{% endcall %}
     </div>
-    <p class="wt-headline wt-lage" x-text="conditionsLine()"></p>
-    <div class="wt-kpis wt-kpis-soft" :style="'--wt-cols:' + kpiCols(conditionsTiles().length)">
+    <div class="wt-lage-hero" :style="'--wt-hero:' + conditionsHero().color">
+      <span class="wt-lage-icon" x-show="conditionsHero().icon" x-html="iconSvg(conditionsHero().icon)"></span>
+      <p class="wt-headline wt-lage" x-text="conditionsLine()"></p>
+      <p class="wt-lage-sentence" x-show="conditionsSentence()" x-text="conditionsSentence()"></p>
+      <div class="wt-lage-chips" x-show="conditionsChips().length">
+        <template x-for="chip in conditionsChips()" :key="chip.text">
+          <span class="wt-lage-chip"><span x-html="iconSvg(chip.icon)"></span><span x-text="chip.text"></span></span>
+        </template>
+      </div>
+    </div>
+    <div class="wt-kpis wt-kpis-soft wt-kpis-lage" :style="'--wt-cols:' + kpiCols(conditionsTiles().length)">
       <template x-for="tile in conditionsTiles()" :key="tile.label">
         <div class="wt-tile" :data-kind="tile.kind">
+          <span class="wt-tile-icon" x-html="iconSvg(tile.icon)"></span>
           <span class="wt-tile-label" x-text="tile.label"></span>
           <span class="wt-tile-value" x-text="tile.value"></span>
           <span class="wt-tile-sub" x-text="tile.sub"></span>
+          <span class="wt-tile-sub2" x-show="tile.sub2" x-text="tile.sub2"></span>
         </div>
       </template>
     </div>
@@ -224,8 +235,15 @@
           </template>
         </div>
       </div>
-      <div class="wt-chart" x-ref="tempChart"></div>
+      <div class="wt-chart" x-ref="tempChart" x-show="!tempCmp || tempCmp.series.length"></div>
       <p class="hint hint-warn" x-show="tempError" x-text="tempError" x-cloak></p>
+    </div>
+    <div class="card wt-card" x-show="tempCmp && tempCmp.humidity && tempCmp.humidity.length" x-cloak>
+      <div class="wt-controls">
+        <h2 class="wt-h2">{{ _("Luftfeuchte im Vergleich") }} {{ hint_button(_("Luftfeuchte im Vergleich")) }}</h2>
+        {% call hint_body() %}{{ _("Tagesmittel der Luftfeuchte außen und der weiteren Feuchtesensoren, im selben Zeitraum wie die Temperaturen.") }}{% endcall %}
+      </div>
+      <div class="wt-chart" x-ref="humidChart"></div>
     </div>
   </section>
   {% endif %}

@@ -13,8 +13,9 @@
     -ende, Tageslänge und einen Vergleich der letzten Tage; die Schwellen sind
     einstellbar
   - **Wetterlage**: Eine Karte auf der Übersicht fasst Himmel, Wind (Beaufort),
-    Regen und Temperatur zusammen. Bei einem früheren Tag zeigt sie die
-    Zusammenfassung dieses Tages
+    Regen und Temperatur zusammen, mit Symbol, einem kurzen Satz und Angaben wie
+    Böen, Tageshöchst- und -tiefstwert und Sonnenstunden. Bei einem früheren Tag
+    zeigt sie die Zusammenfassung dieses Tages
   - **Tagesbild**: Auf der Übersicht zeigt je eine Karte die letzten 14 Tage als
     sonnig, wechselhaft oder trüb, mit den Sonnenstunden an den hellen Stunden.
     Ein Klick wählt den Tag aus
@@ -35,6 +36,9 @@
   - **Karten ein- und ausschalten**: In der Einrichtung unter „Anzeige“ lassen
     sich die Karten einzeln ausblenden; angeboten werden nur Karten, für die eine
     Entität zugeordnet ist. Fehlt einem Reiter damit jede Karte, entfällt er
+  - **Weitere Sensoren**: Feuchtesensoren (Einheit „%“) lassen sich wie
+    Temperatursensoren hinzufügen; der Reiter Temperatur & Klima zeigt sie in
+    einem eigenen Diagramm „Luftfeuchte im Vergleich“
   - Die Kartenauswahl ist nach Reiter geordnet; der Reiter Heizen und seine
     Einstellungen stehen als „Experimentell“ in einem eigenen Block
   - Die Demo-Daten enthalten die beiden Helligkeitssensoren mit Verlauf
@@ -61,8 +65,9 @@
     day, day length and a comparison of the last days; the thresholds are
     adjustable
   - **Weather conditions**: A card on the overview summarises sky, wind
-    (Beaufort), rain and temperature. For an earlier day it shows the summary
-    of that day
+    (Beaufort), rain and temperature, with a symbol, a short sentence and
+    details such as gusts, daily high and low and sun hours. For an earlier day
+    it shows the summary of that day
   - **Day overview**: On the overview one card per day shows the last 14 days as
     sunny, changeable or overcast, with the hours of sunshine out of the bright
     hours. A click selects the day
@@ -82,6 +87,9 @@
   - **Switch cards on and off**: In the setup under "Display" the cards can be
     hidden individually; only cards with an assigned entity are offered. A tab
     without any card is dropped
+  - **Additional sensors**: Humidity sensors (unit "%") can be added like
+    temperature sensors; the Temperature & climate tab shows them in a
+    separate "Humidity comparison" chart
   - The card selection is grouped by tab; the Heating tab and its settings are
     in a separate "Experimental" block
   - The demo data contains both brightness sensors with a history

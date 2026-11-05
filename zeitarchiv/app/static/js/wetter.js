@@ -337,6 +337,22 @@
     }
   }
 
+  // Symbole der Wetterlage: feste Zeichenfolgen ohne Nutzdaten, daher als HTML einsetzbar.
+  const ICON_ATTR = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+  const LAGE_ICONS = {
+    sun: `<svg viewBox="0 0 48 48" ${ICON_ATTR}><circle cx="24" cy="24" r="8.5" fill="currentColor" fill-opacity=".18"/><path d="M24 5v6M24 37v6M5 24h6M37 24h6M10.6 10.6l4.2 4.2M33.2 33.2l4.2 4.2M37.4 10.6l-4.2 4.2M14.8 33.2l-4.2 4.2"/></svg>`,
+    part: `<svg viewBox="0 0 48 48" ${ICON_ATTR}><circle cx="19" cy="18" r="6.5" fill="currentColor" fill-opacity=".18"/><path d="M19 4.5v3M6.5 18h3M9.9 8.9l2.1 2.1M28.1 8.9L26 11M30.5 18h3"/><path d="M17 40h20a7 7 0 0 0 .8-13.9A9 9 0 0 0 20.6 28 6 6 0 0 0 17 40z" fill="var(--surface)" stroke="var(--ink-muted)"/></svg>`,
+    cloud: `<svg viewBox="0 0 48 48" ${ICON_ATTR}><path d="M14 36h21a8 8 0 0 0 .9-15.9A11 11 0 0 0 15 22.5 7 7 0 0 0 14 36z" fill="currentColor" fill-opacity=".14"/></svg>`,
+    rain: `<svg viewBox="0 0 48 48" ${ICON_ATTR}><path d="M14 30h21a8 8 0 0 0 .9-15.9A11 11 0 0 0 15 16.5 7 7 0 0 0 14 30z" fill="currentColor" fill-opacity=".14"/><path d="M17 35l-2 6M25 35l-2 6M33 35l-2 6"/></svg>`,
+    moon: `<svg viewBox="0 0 48 48" ${ICON_ATTR}><path d="M38 28.5A15 15 0 0 1 19.5 10 15 15 0 1 0 38 28.5z" fill="currentColor" fill-opacity=".16"/><path d="M33 8v5M30.5 10.5h5"/></svg>`,
+    dusk: `<svg viewBox="0 0 48 48" ${ICON_ATTR}><path d="M12 34a12 12 0 0 1 24 0z" fill="currentColor" fill-opacity=".18"/><path d="M5 34h38M24 12v4M10 18l3 3M38 18l-3 3M14 40h20"/></svg>`,
+    wind: `<svg viewBox="0 0 24 24" ${ICON_ATTR}><path d="M3 9h10a2.5 2.5 0 1 0-2.4-3.2M3 14h14a2.8 2.8 0 1 1-2.6 3.8M3 19h6"/></svg>`,
+    drop: `<svg viewBox="0 0 24 24" ${ICON_ATTR}><path d="M12 3.5c3.6 4.2 6 7.2 6 10.2a6 6 0 0 1-12 0c0-3 2.4-6 6-10.2z" fill="currentColor" fill-opacity=".16"/></svg>`,
+    temp: `<svg viewBox="0 0 24 24" ${ICON_ATTR}><path d="M10 14.2V5a2 2 0 1 1 4 0v9.2a4 4 0 1 1-4 0z"/><path d="M12 9v7"/></svg>`,
+    bright: `<svg viewBox="0 0 24 24" ${ICON_ATTR}><circle cx="12" cy="12" r="4" fill="currentColor" fill-opacity=".16"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8"/></svg>`,
+    clock: `<svg viewBox="0 0 24 24" ${ICON_ATTR}><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>`,
+  };
+
   window.wetterDashboard = function wetterDashboard(precipModes) {
     return {
       tab: 'overview',
@@ -864,14 +880,101 @@
         return `${num(c.temp.value, dec)} ${c.temp.unit}`.trim();
       },
 
+      iconSvg: (name) => LAGE_ICONS[name] || '',
+
+      // Symbol und Farbe über dem Wort: Regen vor Himmelsklasse, ohne Himmelsdaten das Regen- oder kein Symbol.
+      conditionsHero() {
+        const c = this.conditions;
+        if (!c) return {icon: '', color: ''};
+        const day = c.mode === 'day';
+        const rainy = day ? !!(c.rain && (c.rain.mm || c.rain.minutes)) : !!(c.rain && c.rain.raining);
+        if (rainy) return {icon: 'rain', color: 'var(--chart-3)'};
+        const kind = c.sky && c.sky.class;
+        const map = {
+          night: ['moon', 'var(--chart-4)'], dusk: ['dusk', 'var(--chart-4)'], day: ['sun', 'var(--chart-7)'],
+          sunny: ['sun', 'var(--chart-7)'], fair: ['part', 'var(--chart-7)'], cloudy: ['cloud', 'var(--ink-muted)'],
+          overcast: ['cloud', 'var(--ink-muted)'],
+        };
+        const [icon, color] = map[kind] || ['', ''];
+        return {icon, color};
+      },
+
+      // Ein bis zwei Sätze unter dem Wort, aus den Werten der Kacheln; fehlt ein Teil, fehlt sein Satz.
+      conditionsSentence() {
+        const c = this.conditions;
+        if (!c) return '';
+        if (c.mode === 'day') {
+          const p = this.conditionsDayParts();
+          return ['sky', 'temp', 'wind', 'rain'].filter((key) => p[key]).map((key) => (key === 'wind'
+            ? t('Wind bis Stärke {bft}', {bft: c.wind.bft}) : p[key].value)).join(' · ');
+        }
+        const parts = [];
+        const temp = c.temp ? this.conditionsTempText() : '';
+        const wind = c.wind ? this.windPhrase(c.wind.bft) : '';
+        const adj = c.temp && c.temp.unit === '°C' ? this.tempAdjective(c.temp.value) : '';
+        if (temp && wind && adj) parts.push(t('{adj} bei {temp}, {wind}.', {adj, temp, wind}));
+        else if (temp && adj) parts.push(t('{adj} bei {temp}.', {adj, temp}));
+        else if (temp && wind) parts.push(t('{temp}, {wind}.', {temp, wind}));
+        else if (temp) parts.push(`${temp}.`);
+        else if (wind) parts.push(t('{wind}.', {wind}));
+        const rain = c.rain;
+        if (rain && rain.raining) {
+          if (rain.minutes == null) parts.push(t('Es regnet seit mehr als {n} h.', {n: 48}));
+          else {
+            const minutes = Math.round(rain.minutes);
+            parts.push(minutes < 120 ? t('Es regnet seit {n} min.', {n: minutes})
+              : t('Es regnet seit {h} h {m} min.', {h: Math.floor(minutes / 60), m: String(minutes % 60).padStart(2, '0')}));
+          }
+        } else if (rain && rain.raining === false) {
+          parts.push(rain.last != null
+            ? t('Aktuell trocken, zuletzt Regen um {time}.', {time: (fmtDate(formats.dm, rain.last) === fmtDate(formats.dm, c.now) ? '' : `${fmtDate(formats.dm, rain.last)} `) + fmtDate(formats.hm, rain.last)})
+            : t('Aktuell trocken.'));
+        }
+        return parts.join(' ');
+      },
+
+      tempAdjective(value) {
+        if (value == null) return '';
+        if (value < 0) return t('Frostig');
+        if (value < 6) return t('Kalt');
+        if (value < 12) return t('Kühl');
+        if (value < 18) return t('Mild');
+        if (value < 25) return t('Warm');
+        return t('Heiß');
+      },
+
+      windPhrase(bft) {
+        if (bft <= 1) return t('kaum Wind');
+        if (bft <= 3) return t('schwacher Wind');
+        if (bft === 4) return t('mäßiger Wind');
+        if (bft === 5) return t('frischer Wind');
+        if (bft <= 7) return t('starker Wind');
+        return t('stürmischer Wind');
+      },
+
+      // Kleine Angaben unter dem Satz: Tagesbeginn oder Nachtbeginn und Sonnenstunden bis jetzt.
+      conditionsChips() {
+        const c = this.conditions;
+        if (!c || c.mode === 'day') return [];
+        const chips = [];
+        const light = c.light;
+        if (light) {
+          if (light.to != null && c.now >= light.to) chips.push({icon: 'clock', text: t('Nacht seit {time}', {time: fmtDate(formats.hm, light.to)})});
+          else chips.push({icon: 'clock', text: t('Tag seit {time}', {time: fmtDate(formats.hm, light.from)})});
+        }
+        if (c.sky && c.sky.sun_hours) chips.push({icon: 'bright', text: t('{h} Sonnenstunden', {h: num(c.sky.sun_hours, 1)})});
+        return chips;
+      },
+
       conditionsTiles() {
         const c = this.conditions;
         if (!c) return [];
         if (c.mode === 'day') {
           const p = this.conditionsDayParts();
           const labels = {sky: t('Sonnenschein'), wind: t('Wind'), rain: t('Regen'), temp: t('Temperatur')};
+          const icons = {sky: 'bright', wind: 'wind', rain: 'drop', temp: 'temp'};
           return ['sky', 'wind', 'rain', 'temp'].filter((key) => p[key]).map((key) => ({
-            kind: key === 'temp' ? 'temp' : key, label: labels[key], value: p[key].value, sub: p[key].sub,
+            kind: key, icon: icons[key], label: labels[key], value: p[key].value, sub: p[key].sub, sub2: '',
           }));
         }
         const tiles = [];
@@ -879,17 +982,29 @@
           // Die Klasse steht in der Überschrift; die Kachel zeigt die Messwerte dahinter.
           const main = c.sky.value != null ? {n: c.sky.value, unit: c.sky.unit} : {n: c.sky.dawn, unit: 'lx'};
           const sub = c.sky.value != null && c.sky.dawn != null ? t('Dämmerung {n} lx', {n: num(c.sky.dawn, 0)}) : '';
-          tiles.push({kind: 'sky', label: t('Helligkeit'), value: `${num(main.n, 0)} ${main.unit}`.trim(), sub});
+          tiles.push({kind: 'sky', icon: 'bright', label: t('Helligkeit'), value: `${num(main.n, 0)} ${main.unit}`.trim(), sub, sub2: ''});
         }
         if (c.wind) {
           tiles.push({
-            kind: 'wind', label: t('Wind'), value: this.beaufortName(c.wind.bft),
+            kind: 'wind', icon: 'wind', label: t('Wind'), value: this.beaufortName(c.wind.bft),
             sub: t('Stärke {bft} · {kmh} km/h', {bft: c.wind.bft, kmh: num(c.wind.kmh, 0)}),
+            sub2: c.wind.gust_kmh ? t('Böen bis {kmh} km/h', {kmh: num(c.wind.gust_kmh, 0)}) : '',
           });
         }
         const rain = this.conditionsRain();
-        if (rain) tiles.push({kind: 'rain', label: t('Regen'), value: rain.text, sub: rain.sub});
-        if (c.temp) tiles.push({kind: 'temp', label: t('Temperatur'), value: this.conditionsTempText(), sub: ''});
+        if (rain) {
+          const wet = c.rain && !c.rain.raining && c.rain.mm_today;
+          tiles.push({
+            kind: 'rain', icon: 'drop', label: t('Regen'), value: rain.text, sub: rain.sub,
+            sub2: wet ? t('{value} {unit} heute', {value: num(c.rain.mm_today, 1), unit: c.rain.mm_unit || 'mm'}) : '',
+          });
+        }
+        if (c.temp) {
+          const dec = c.temp.decimals == null ? 1 : c.temp.decimals;
+          const span = c.temp.min != null && c.temp.max != null
+            ? t('heute {min} bis {max} {unit}', {min: num(c.temp.min, dec), max: num(c.temp.max, dec), unit: c.temp.unit}).trim() : '';
+          tiles.push({kind: 'temp', icon: 'temp', label: t('Temperatur'), value: this.conditionsTempText(), sub: span, sub2: ''});
+        }
         return tiles;
       },
 
@@ -1216,13 +1331,19 @@
 
       drawTemps() {
         const data = this.tempCmp;
-        const element = this.$refs.tempChart;
-        if (!data || !element) return;
+        if (!data) return;
+        if (data.series.length) this.drawComparison('temps', this.$refs.tempChart, data, data.series, '°C', 1);
+        if (data.humidity && data.humidity.length) this.drawComparison('humid', this.$refs.humidChart, data, data.humidity, '%', 0);
+      },
+
+      // Linien je Sensor über die letzten Tage; die Einheit steht an der Achse (Temperatur und Feuchte nie gemischt).
+      drawComparison(name, element, data, series, fallbackUnit, decimals) {
+        if (!element) return;
         const colors = palette();
         const labels = data.dates.map((iso) => utcDayMonth.format(new Date(`${iso}T00:00:00Z`)));
-        const unit = (data.series[0] && data.series[0].unit) || '°C';
-        const names = data.series.map((row) => row.label);
-        const chart = chartFor('temps', element);
+        const unit = (series[0] && series[0].unit) || fallbackUnit;
+        const names = series.map((row) => row.label);
+        const chart = chartFor(name, element);
         chart.setOption({
           animation: false, grid: gridFor(element, {right: 8}), legend: legendBox(colors, names),
           xAxis: {type: 'category', data: labels, boundaryGap: false, ...axisStyle(colors), splitLine: {show: false}},
@@ -1230,12 +1351,12 @@
           tooltip: tooltipBox(colors, (params) => {
             let html = `<b>${escapeHtml(labels[params[0].dataIndex])}</b>`;
             for (const param of params) {
-              const value = param.value == null ? '–' : `${num(param.value, 1)} ${unit}`;
+              const value = param.value == null ? '–' : `${num(param.value, decimals)} ${unit}`;
               html += `<br>${param.marker}${escapeHtml(param.seriesName)}: ${escapeHtml(value)}`;
             }
             return html;
           }),
-          series: data.series.map((row, index) => ({
+          series: series.map((row, index) => ({
             name: row.label, type: 'line', data: row.values, symbol: 'none', connectNulls: false,
             z: index === 0 ? 5 : 2,
             lineStyle: {color: this.heatColor(index), width: index === 0 ? 3 : 2},

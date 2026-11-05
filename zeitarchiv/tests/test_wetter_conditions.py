@@ -101,6 +101,20 @@ def test_conditions_sentence_parts_by_day(service) -> None:
     assert data["temp"]["value"] == 14.2 and data["temp"]["unit"] == "°C"
 
 
+def test_conditions_carry_the_extras_for_the_hero_and_tiles(service) -> None:
+    _station(service)
+    _add(service, "sensor.gust", "sensor", "measurement", "km/h", _minutes(35.0))
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(5, 0), 3.1), (_ts(9, 0), 9.4), (_ts(11, 58), 8.3)])
+    _configure(
+        service, temperature="sensor.t", illuminance="sensor.lux", illuminance_dawn="sensor.dawn", wind="sensor.wind",
+        gust="sensor.gust", precip_dur="binary_sensor.regen",
+    )
+    data = service.compute_conditions(NOW)
+    assert data["wind"]["gust_kmh"] == pytest.approx(35.0)
+    assert data["temp"]["min"] <= 8.3 <= data["temp"]["max"]
+    assert "light" in data
+
+
 @pytest.mark.parametrize(("dawn", "expected"), [(0.0, cond.NIGHT), (100.0, cond.DUSK), (400.0, cond.SUNNY)])
 def test_conditions_sky_uses_the_dawn_sensor_for_night_and_twilight(service, dawn, expected) -> None:
     _station(service, dawn=dawn)

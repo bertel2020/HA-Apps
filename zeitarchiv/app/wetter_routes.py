@@ -774,24 +774,39 @@ class WetterService:
         """Tagesmittel der Außentemperatur und aller weiteren Sensoren für die letzten ``days`` Tage."""
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
-        specs = [spec for spec in self._row_specs(config) if spec["key"].split(":")[0] == "temperature"]
-        if not specs:
+        all_specs = self._row_specs(config)
+        # Ein weiterer Sensor mit „%“ ist ein Feuchtesensor: Er bekommt eine eigene Achse, nicht die der Temperaturen.
+        specs = [spec for spec in all_specs if spec["key"].split(":")[0] == "temperature" and spec["unit"] != "%"]
+        humidity_specs = [
+            spec for spec in all_specs
+            if (spec["key"].split(":")[0] == "temperature" and spec["unit"] == "%")
+        ]
+        if not specs and not humidity_specs:
             return None
+        if humidity_specs:
+            humidity_specs = [spec for spec in all_specs if spec["key"] == "humidity"] + humidity_specs
         today = now_local.date()
         dates = [today - timedelta(days=offset) for offset in range(days - 1, -1, -1)]
-        series = []
-        for spec in specs:
-            by_day = {
-                analysis.day_of(point, self.deps.tz): point.value
-                for point in self._daily(spec["entity_id"], now_local) if point.covered and point.value is not None
-            }
-            series.append({
-                "key": spec["key"], "entity_id": spec["entity_id"],
-                "label": tr(TILE_LABELS["temperature"]) if spec["key"] == "temperature" else spec["label"],
-                "unit": spec["unit"],
-                "values": [round(by_day[day], 1) if day in by_day else None for day in dates],
-            })
-        return {"days": days, "dates": [day.isoformat() for day in dates], "series": series}
+
+        def build(chosen: list[dict], first_key: str) -> list[dict]:
+            series = []
+            for spec in chosen:
+                by_day = {
+                    analysis.day_of(point, self.deps.tz): point.value
+                    for point in self._daily(spec["entity_id"], now_local) if point.covered and point.value is not None
+                }
+                series.append({
+                    "key": spec["key"], "entity_id": spec["entity_id"],
+                    "label": tr(TILE_LABELS[first_key]) if spec["key"] == first_key and first_key in TILE_LABELS else spec["label"],
+                    "unit": spec["unit"],
+                    "values": [round(by_day[day], 1) if day in by_day else None for day in dates],
+                })
+            return series
+
+        return {
+            "days": days, "dates": [day.isoformat() for day in dates], "series": build(specs, "temperature"),
+            "humidity": build(humidity_specs, "humidity") if humidity_specs else [],
+        }
 
     def compute_longterm(self, now_local: datetime | None = None) -> dict | None:
         config = _load_config(self.deps.index)
@@ -1179,6 +1194,10 @@ class WetterService:
             kmh = conditions.to_kmh(recent["max"], unit_of(config["wind"]))
             if kmh is not None:
                 wind = {"kmh": kmh, "bft": conditions.beaufort(kmh)}
+                gust = self._recent(config["gust"], now_local, read_cache)
+                gust_kmh = conditions.to_kmh(gust["max"], unit_of(config["gust"])) if gust is not None else None
+                if gust_kmh is not None and gust_kmh > kmh:
+                    wind["gust_kmh"] = gust_kmh
 
         rain = None
         if config["precip_dur"] and index.get_entity(config["precip_dur"]) is not None:
@@ -1197,10 +1216,33 @@ class WetterService:
         entity = index.get_entity(config["temperature"]) if config["temperature"] else None
         if recent is not None and entity is not None:
             temp = {"value": recent["last"], "unit": entity["unit"] or "", "decimals": _decimals(entity, "temperature")}
+            midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+            span = self.summarize("standard", self._rows(config["temperature"], "standard", midnight, now_local, now_local, read_cache), config)
+            if span is not None:
+                temp.update(min=span["min"], max=span["max"])
+
+        # Beiwerk für die Zeile unter dem Wort: Sonnenstunden heute und Tagesbeginn laut Dämmerungssensor.
+        if sky is not None and config["illuminance"] and index.get_entity(config["illuminance"]) is not None:
+            midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+            lux_rows = [
+                row for row in self._rows(config["illuminance"], "standard", midnight, now_local, now_local, read_cache)
+                if row.value is not None
+            ]
+            sun = self._summarize_sunshine(lux_rows, config, now_local.timestamp()) if lux_rows else None
+            if sun is not None:
+                sky["sun_hours"] = sun["hours"]
+        light = None
+        if config["illuminance_dawn"] and index.get_entity(config["illuminance_dawn"]) is not None:
+            today = self._daylight_day(config["illuminance_dawn"], now_local.date(), config, now_local, read_cache)
+            if today.get("from") is not None:
+                light = {"from": today["from"], "to": None if today.get("ongoing") else today.get("to")}
 
         if sky is None and wind is None and rain is None:
             return None
-        return {"tz": str(self.deps.tz), "now": now_local.timestamp(), "sky": sky, "wind": wind, "rain": rain, "temp": temp}
+        return {
+            "tz": str(self.deps.tz), "now": now_local.timestamp(), "sky": sky, "wind": wind, "rain": rain, "temp": temp,
+            "light": light,
+        }
 
     def compute_conditions_day(self, at: str, now_local: datetime | None = None) -> dict | None:
         """Wetter eines vergangenen Tages als Zusammenfassung: häufigste Himmelsklasse und Sonnenstunden, stärkster
