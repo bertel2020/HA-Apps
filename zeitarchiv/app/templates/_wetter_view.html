@@ -353,12 +353,24 @@
     </div>
     <div class="card wt-card" x-show="tempYears" x-cloak>
       <div class="wt-controls">
-        <h2 class="wt-h2">{{ _("Mitteltemperatur je Monat und Jahr") }} {{ hint_button(_("Mitteltemperatur je Monat und Jahr")) }}</h2>
+        <h2 class="wt-h2">
+          <span x-show="tempYearsMetric === 'temperature'">{{ _("Mitteltemperatur je Monat und Jahr") }}</span>
+          {% if precip_modes %}<span x-show="tempYearsMetric === 'precip'" x-cloak>{{ _("Niederschlag je Monat und Jahr") }}</span>{% endif %}
+          {% if has_dayimage %}<span x-show="tempYearsMetric === 'sun'" x-cloak>{{ _("Sonnenstunden je Monat und Jahr") }}</span>{% endif %}
+          {{ hint_button(_("Monatswerte je Jahr")) }}</h2>
         {% call hint_body() %}<span x-text="tempYearsNote()"></span>{% endcall %}
+        {% if precip_modes or has_dayimage %}
+        <div class="wt-seg" role="group" aria-label="{{ _('Kennzahl') }}">
+          <button type="button" :aria-pressed="(tempYearsMetric === 'temperature').toString()" @click="setTempYearsMetric('temperature')">{{ _("Temperatur") }}</button>
+          {% if precip_modes %}<button type="button" :aria-pressed="(tempYearsMetric === 'precip').toString()" @click="setTempYearsMetric('precip')">{{ _("Niederschlag") }}</button>{% endif %}
+          {% if has_dayimage %}<button type="button" :aria-pressed="(tempYearsMetric === 'sun').toString()" @click="setTempYearsMetric('sun')">{{ _("Sonne") }}</button>{% endif %}
+        </div>
+        {% endif %}
       </div>
       <div class="tbl-wrap wt-table-wrap"><table class="wt-tm" x-ref="tempYearsTable"></table></div>
+      <p class="hint hint-warn" x-show="tempYearsError" x-text="tempYearsError" x-cloak></p>
       <div class="wt-tm-legend">
-        <span>{{ _("kälter") }}</span><span class="wt-tm-scale" x-ref="tempYearsScale"></span><span>{{ _("wärmer als im Mittel der Jahre im Archiv") }}</span>
+        <span x-text="tempYearsLegend().low"></span><span class="wt-tm-scale" x-ref="tempYearsScale"></span><span x-text="tempYearsLegend().high"></span>
       </div>
     </div>
     <div class="card wt-card">

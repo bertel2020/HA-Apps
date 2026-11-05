@@ -3642,7 +3642,10 @@
     "„Sonnenhöhe“ im Namen": "“Sun elevation” in the name",
     "PV im Namen, Leistung": "PV in the name, power",
     "Geräteklasse Leistung": "Device class power",
-    "kleine Anlage": "small system"
+    "kleine Anlage": "small system",
+    "Niederschlag je Monat und Jahr": "Precipitation per month and year",
+    "Sonnenstunden je Monat und Jahr": "Hours of sunshine per month and year",
+    "Monatswerte je Jahr": "Monthly values per year"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4566,6 +4569,18 @@
     "aus Nordwesten": "from the northwest",
     "Gestern hell bis {time}": "Yesterday light until {time}",
     "Der Sensor zeigt von {first} bis {last} Tage mit Werten, am längsten {hours} h am {day}.": "The sensor shows days with values from {first} to {last}, longest {hours} h on {day}.",
-    "Ein Vorjahr zum Vergleichen gibt es noch nicht.": "There is no previous year to compare with yet."
+    "Ein Vorjahr zum Vergleichen gibt es noch nicht.": "There is no previous year to compare with yet.",
+    "Oben die Sonnenstunden des Monats (Stunden über der Sonnen-Schwelle), darunter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv (in Prozent). Leer sind Monate mit zu wenig Werten; der laufende Monat (*) zeigt nur den bisherigen Stand, ohne Vergleich. Die letzte Spalte ist die Summe kompletter Jahre, die letzte Zeile das Mittel.": "Top: the month's hours of sunshine (hours above the sun threshold); below: the deviation from the mean of this month over all completed years in the archive (in percent). Months with too few values are empty; the current month (*) shows only the figure so far, without a comparison. The last column is the total of complete years, the last row is the mean.",
+    "Oben die Regenstunden des Monats, darunter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv (in Prozent). Der laufende Monat (*) zeigt nur den bisherigen Stand, ohne Vergleich. Die letzte Spalte ist die Summe kompletter Jahre, die letzte Zeile das Mittel.": "Top: the month's hours of rain; below: the deviation from the mean of this month over all completed years in the archive (in percent). The current month (*) shows only the figure so far, without a comparison. The last column is the total of complete years, the last row is the mean.",
+    "Oben die Niederschlagssumme des Monats, darunter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv (in Prozent). Leer sind Monate mit zu wenig Werten; der laufende Monat (*) zeigt nur den bisherigen Stand, ohne Vergleich. Die letzte Spalte ist die Summe kompletter Jahre, die letzte Zeile das Mittel.": "Top: the month's total precipitation; below: the deviation from the mean of this month over all completed years in the archive (in percent). Months with too few values are empty; the current month (*) shows only the figure so far, without a comparison. The last column is the total of complete years, the last row is the mean.",
+    "trockener": "drier",
+    "nasser als im Mittel der Jahre im Archiv": "wetter than the mean of the years in the archive",
+    "weniger Sonne": "less sun",
+    "mehr Sonne als im Mittel der Jahre im Archiv": "more sun than the mean of the years in the archive",
+    "kälter": "colder",
+    "wärmer als im Mittel der Jahre im Archiv": "warmer than the mean of the years in the archive",
+    "{month} {year}: {value} {unit} bisher": "{month} {year}: {value} {unit} so far",
+    "{month} {year}: {value} {unit} ({delta} zum Mittel)": "{month} {year}: {value} {unit} ({delta} vs. mean)",
+    "Jahressumme {year}: {value} {unit}": "Annual total {year}: {value} {unit}"
   }
 }

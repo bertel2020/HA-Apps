@@ -397,6 +397,8 @@
       heatError: '',
       matrix: null,
       tempYears: null,
+      tempYearsMetric: 'temperature',
+      tempYearsError: '',
       matrixError: '',
 
       columnKeys: COLUMN_KEYS,
@@ -1819,18 +1821,50 @@
         }
       },
 
-      // Mitteltemperatur je Monat und Jahr (Tabelle, Farbe = Abweichung vom Mittel dieses Monats über die abgeschlossenen Jahre)
+      // Monatswerte je Jahr (Tabelle, Farbe = Abweichung vom Mittel dieses Monats über die abgeschlossenen Jahre).
+      // Temperatur ist ein Mittel (Abweichung in K), Niederschlag und Sonne sind Summen (Abweichung in Prozent).
       async loadTempYears() {
+        const metric = this.tempYearsMetric;
+        this.tempYearsError = '';
         try {
-          this.tempYears = await this.fetchJson('wetterdashboard/monatsvergleich?metric=temperature');
+          const data = await this.fetchJson(
+            `wetterdashboard/monatsvergleich?metric=${metric}&mode=${this.precipModes[0] || 'mm'}`,
+          );
+          if (metric !== this.tempYearsMetric) return;
+          this.tempYears = data;
           this.$nextTick(() => this.drawTempYears());
         } catch (e) {
-          this.tempYears = null;
+          if (metric !== this.tempYearsMetric) return;
+          // Fehlt die Temperatur, entfällt die Kachel wie bisher; bei den anderen Kennzahlen bleibt die Auswahl bedienbar.
+          if (metric === 'temperature') this.tempYears = null;
+          else this.tempYearsError = t('Die Monatswerte konnten nicht geladen werden.');
         }
       },
 
+      setTempYearsMetric(metric) {
+        if (metric === this.tempYearsMetric) return;
+        this.tempYearsMetric = metric;
+        this.loadTempYears();
+      },
+
       tempYearsNote() {
-        return t('Oben die Mitteltemperatur, darunter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv (in Kelvin). Die letzte Zeile ist das Mittel.');
+        const m = this.tempYears;
+        if (!m || m.metric === 'temperature') {
+          return t('Oben die Mitteltemperatur, darunter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv (in Kelvin). Die letzte Zeile ist das Mittel.');
+        }
+        if (m.metric === 'sun') {
+          return t('Oben die Sonnenstunden des Monats (Stunden über der Sonnen-Schwelle), darunter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv (in Prozent). Leer sind Monate mit zu wenig Werten; der laufende Monat (*) zeigt nur den bisherigen Stand, ohne Vergleich. Die letzte Spalte ist die Summe kompletter Jahre, die letzte Zeile das Mittel.');
+        }
+        return m.unit === 'min'
+          ? t('Oben die Regenstunden des Monats, darunter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv (in Prozent). Der laufende Monat (*) zeigt nur den bisherigen Stand, ohne Vergleich. Die letzte Spalte ist die Summe kompletter Jahre, die letzte Zeile das Mittel.')
+          : t('Oben die Niederschlagssumme des Monats, darunter die Abweichung vom Mittel dieses Monats über alle abgeschlossenen Jahre im Archiv (in Prozent). Leer sind Monate mit zu wenig Werten; der laufende Monat (*) zeigt nur den bisherigen Stand, ohne Vergleich. Die letzte Spalte ist die Summe kompletter Jahre, die letzte Zeile das Mittel.');
+      },
+
+      tempYearsLegend() {
+        const metric = this.tempYearsMetric;
+        if (metric === 'precip') return {low: t('trockener'), high: t('nasser als im Mittel der Jahre im Archiv')};
+        if (metric === 'sun') return {low: t('weniger Sonne'), high: t('mehr Sonne als im Mittel der Jahre im Archiv')};
+        return {low: t('kälter'), high: t('wärmer als im Mittel der Jahre im Archiv')};
       },
 
       drawTempYears() {
@@ -1839,52 +1873,83 @@
         if (!data || !table) return;
         const colors = palette();
         const current = String(data.current_year);
-        const years = Object.keys(data.years).sort().slice(-10);
+        const isSum = data.metric !== 'temperature';
+        // Regensensor ein/aus liefert Minuten; als Monatswert sind Stunden lesbarer.
+        const factor = isSum && data.unit === 'min' ? 1 / 60 : 1;
+        const unit = factor !== 1 ? 'h' : (data.unit || '°C');
+        const decimals = !isSum || factor !== 1 ? 1 : 0;
+        const scaled = (value) => (value == null ? null : value * factor);
+        const rows = {};
+        for (const [year, values] of Object.entries(data.years)) rows[year] = values.map(scaled);
+        const avg = data.avg.map(scaled);
+        const years = Object.keys(rows).sort().slice(-10);
         const mean = (values) => values.reduce((a, b) => a + b, 0) / values.length;
         const present = (list) => list.filter((value) => value != null);
-        // Jahres-Ø nur aus vorhandenen Monaten und erst ab sechs davon; als Vergleich zählen nur komplette, abgeschlossene Jahre.
-        const yearMean = (year) => { const values = present(data.years[year]); return values.length >= 6 ? mean(values) : null; };
+        // Temperatur: Jahres-Ø nur aus vorhandenen Monaten und erst ab sechs davon. Summen: nur kompletter, abgeschlossener
+        // Jahre (sonst wäre die Summe zu niedrig). Als Vergleich zählen jeweils nur komplette, abgeschlossene Jahre.
+        const yearValue = (year) => {
+          const values = present(rows[year]);
+          if (isSum) return year < current && values.length === 12 ? values.reduce((a, b) => a + b, 0) : null;
+          return values.length >= 6 ? mean(values) : null;
+        };
         const reference = (() => {
-          const full = Object.keys(data.years).filter((y) => y < current && present(data.years[y]).length === 12);
-          return full.length >= 2 ? mean(full.map(yearMean)) : null;
+          const full = Object.keys(rows).filter((y) => y < current && present(rows[y]).length === 12);
+          return full.length >= 2 ? mean(full.map(yearValue)) : null;
         })();
-        const unit = data.unit || '°C';
-        const sign = (value) => (Math.round(Math.abs(value) * 10) === 0 ? '±' : (value > 0 ? '+' : '−')) + num(Math.abs(value), 1);
+        const factorLimit = data.metric === 'sun' ? 0.4 : 0.6;
+        const round = Math.pow(10, decimals);
+        const zero = (value) => Math.round(Math.abs(value) * round) === 0;
+        const sign = (value) => (zero(value) ? '±' : (value > 0 ? '+' : '−')) + num(Math.abs(value), decimals);
+        // Abweichung: Kelvin bei der Temperatur, sonst Prozent des Mittels.
+        const signRel = (value) => (Math.round(Math.abs(value) * 100) === 0 ? '±' : (value > 0 ? '+' : '−')) + num(Math.abs(value) * 100, 0) + ' %';
         // Mittelwerte ohne „-0,0“: ein Wert, der auf null rundet, heißt 0,0.
-        const plain = (value) => num(Math.round(Math.abs(value) * 10) === 0 ? 0 : value, 1);
-        const cold = colors.cold, hot = colors.prev, base = cssVar('--surface-alt');
+        const plain = (value) => num(zero(value) ? 0 : value, decimals);
+        const low = data.metric === 'sun' ? colors.overcast : (data.metric === 'precip' ? colors.prev : colors.cold);
+        const high = data.metric === 'sun' ? colors.sun : (data.metric === 'precip' ? colors.cold : colors.prev);
+        const base = cssVar('--surface-alt');
+        const deltaOf = (value, ref) => (isSum ? (value - ref) / ref : value - ref);
         const cell = (value, ref, title, strong) => {
           if (value == null) return `<td class="wt-tm-na">–</td>`;
           const tip = title ? ` data-tooltip-fixed="${escapeHtml(title)}"` : '';
-          // Ohne Vergleichswert (weniger als zwei abgeschlossene Jahre für diesen Monat) bleibt die Zelle ungefärbt und einzeilig.
-          if (ref == null) return `<td class="wt-tm-plain${strong ? ' wt-tm-year' : ''}"${tip}>${escapeHtml(plain(value))}</td>`;
-          const diff = value - ref;
-          const share = Math.round(Math.min(1, Math.abs(diff) / 3.2) * 80);
-          const style = ` style="background:color-mix(in srgb, ${diff < 0 ? cold : hot} ${share}%, ${base})"`;
-          return `<td${style}${tip}${strong ? ' class="wt-tm-year"' : ''}><span class="wt-tm-v">${escapeHtml(plain(value))}</span><span class="wt-tm-d">${escapeHtml(sign(diff))}</span></td>`;
+          // Ohne Vergleichswert (weniger als zwei abgeschlossene Jahre für diesen Monat, Mittel null) bleibt die Zelle ungefärbt und einzeilig.
+          if (ref == null || (isSum && ref === 0)) return `<td class="wt-tm-plain${strong ? ' wt-tm-year' : ''}"${tip}>${escapeHtml(plain(value))}</td>`;
+          const diff = deltaOf(value, ref);
+          const share = Math.round(Math.min(1, Math.abs(diff) / (isSum ? factorLimit : 3.2)) * 80);
+          const style = ` style="background:color-mix(in srgb, ${diff < 0 ? low : high} ${share}%, ${base})"`;
+          return `<td${style}${tip}${strong ? ' class="wt-tm-year"' : ''}><span class="wt-tm-v">${escapeHtml(plain(value))}</span><span class="wt-tm-d">${escapeHtml(isSum ? signRel(diff) : sign(diff))}</span></td>`;
         };
         let html = `<thead><tr><th></th>${Array.from({length: 12}, (_x, i) => `<th>${escapeHtml(monthName(i + 1, 'short'))}</th>`).join('')}`
-          + `<th class="wt-tm-year">${escapeHtml(t('Jahr Ø'))}</th></tr></thead><tbody>`;
+          + `<th class="wt-tm-year">${escapeHtml(isSum ? t('Jahr Σ') : t('Jahr Ø'))}</th></tr></thead><tbody>`;
         for (const year of years.slice().reverse()) {
           const running = year === current;
           html += `<tr><th>${escapeHtml(year)}${running ? '*' : ''}</th>`;
-          data.years[year].forEach((value, i) => {
-            const ref = data.counts[i] >= 2 ? data.avg[i] : null;
-            const title = value == null ? '' : (ref == null
-              ? t('{month} {year}: {value} {unit}', {month: monthName(i + 1, 'short'), year, value: num(value, 1), unit})
-              : t('{month} {year}: {value} {unit} ({delta} K zum Mittel)', {month: monthName(i + 1, 'short'), year, value: num(value, 1), unit, delta: sign(value - ref)}));
+          rows[year].forEach((value, i) => {
+            const month = monthName(i + 1, 'short');
+            // Der laufende Monat einer Summe ist ein Teilwert und wird nicht gegen volle Monate verglichen.
+            const partial = isSum && running && i + 1 === data.current_month;
+            const ref = !partial && data.counts[i] >= 2 ? avg[i] : null;
+            const title = value == null ? '' : (partial
+              ? t('{month} {year}: {value} {unit} bisher', {month, year, value: num(value, decimals), unit})
+              : (ref == null || (isSum && ref === 0)
+                ? t('{month} {year}: {value} {unit}', {month, year, value: num(value, decimals), unit})
+                : (isSum
+                  ? t('{month} {year}: {value} {unit} ({delta} zum Mittel)', {month, year, value: num(value, decimals), unit, delta: signRel(deltaOf(value, ref))})
+                  : t('{month} {year}: {value} {unit} ({delta} K zum Mittel)', {month, year, value: num(value, decimals), unit, delta: sign(value - ref)}))));
             html += cell(value, ref, title, false);
           });
-          const ya = yearMean(year);
-          const complete = !running && present(data.years[year]).length === 12;
-          html += cell(ya, complete ? reference : null, ya == null ? '' : t('Jahresmittel {year}: {value} {unit}', {year, value: num(ya, 1), unit}), true);
+          const yv = yearValue(year);
+          const complete = !running && present(rows[year]).length === 12;
+          const yearTitle = yv == null ? '' : (isSum
+            ? t('Jahressumme {year}: {value} {unit}', {year, value: num(yv, decimals), unit})
+            : t('Jahresmittel {year}: {value} {unit}', {year, value: num(yv, decimals), unit}));
+          html += cell(yv, complete ? reference : null, yearTitle, true);
           html += '</tr>';
         }
-        html += `<tr class="wt-tm-avg"><th>Ø</th>${data.avg.map((value, i) => `<td>${value == null || data.counts[i] < 2 ? '–' : escapeHtml(plain(value))}</td>`).join('')}`
+        html += `<tr class="wt-tm-avg"><th>Ø</th>${avg.map((value, i) => `<td>${value == null || data.counts[i] < 2 ? '–' : escapeHtml(plain(value))}</td>`).join('')}`
           + `<td class="wt-tm-year">${reference == null ? '–' : escapeHtml(plain(reference))}</td></tr></tbody>`;
         table.innerHTML = html;
         const scale = this.$refs.tempYearsScale;
-        if (scale) scale.style.background = `linear-gradient(90deg, ${cold}, ${base}, ${hot})`;
+        if (scale) scale.style.background = `linear-gradient(90deg, ${low}, ${base}, ${high})`;
       },
 
       // Jahr×Tag-Matrix

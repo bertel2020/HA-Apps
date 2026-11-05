@@ -959,6 +959,16 @@ abgeschlossene Jahre gibt; bis dahin stehen die Werte ungefärbt da. Das Jahresm
 erscheint ab sechs Monaten mit Werten, das laufende Jahr ist mit * markiert und
 zählt nicht zum Mittel. Gezeigt werden höchstens die letzten zehn Jahre.
 
+Über die Auswahl über der Tabelle (Temperatur, Niederschlag, Sonne; je nachdem, welche
+Rollen zugeordnet sind) zeigt dieselbe Tabelle auch **Niederschlag** und **Sonnenstunden**
+je Monat und Jahr. Dort sind die Zellen Summen, und die Abweichung steht in Prozent des
+Mittels dieses Monats. Gibt es nur einen Regensensor (Ein/Aus), zählt die Tabelle
+Regenstunden. Die Jahresspalte ist die Summe und erscheint nur für komplette,
+abgeschlossene Jahre, denn bei fehlenden Monaten wäre sie zu niedrig. Der laufende Monat
+zeigt nur den bisherigen Stand und wird nicht verglichen. Monate mit zu wenig Werten
+bleiben leer. Die Farbskala unter der Tabelle zeigt, welche Seite trockener oder nasser
+(bei der Sonne: weniger oder mehr Sonne) heißt.
+
 **Jahre im Vergleich, Tag für Tag** legt alle Jahre als Matrix untereinander: eine
 Zeile je Jahr (das neueste oben), eine Spalte je Kalendertag, gefärbt nach dem
 Tageswert. Wählbar sind Ø, Max, Min der Außentemperatur und der Niederschlag

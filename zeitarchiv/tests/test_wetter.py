@@ -270,6 +270,24 @@ def test_long_term_tab_has_the_year_by_month_temperature_card(client) -> None:
     html = client.get("/wetterdashboard").text
     assert "tempYearsTable" in html
     assert client.get("/wetterdashboard/monatsvergleich?metric=temperature").status_code == 200  # Datenquelle der Karte
+    # Ohne Niederschlag und Helligkeit gibt es nichts umzuschalten.
+    assert "setTempYearsMetric(" not in html
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
+def test_year_by_month_card_offers_precipitation_and_sun_when_assigned(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp11", "sensor", "measurement", "°C")
+    index.get_or_create_entity("sensor.wetter_test_lux11", "sensor", "measurement", "lx")
+    index.set_setting(wetter_routes.SETTING_ENABLED, "1")
+    wetter_routes._save_config(  # noqa: SLF001
+        index, {**wetter_routes._empty_config(), "temperature": "sensor.wetter_test_temp11", "illuminance": "sensor.wetter_test_lux11"},
+    )
+    html = client.get("/wetterdashboard").text
+    assert "setTempYearsMetric('temperature')" in html
+    assert "setTempYearsMetric('sun')" in html
+    assert "setTempYearsMetric('precip')" not in html
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
 
 

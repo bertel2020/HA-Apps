@@ -900,6 +900,15 @@ values are shown uncoloured. The annual mean appears from six months with values
 current year is marked with * and does not count towards the mean. At most the last ten
 years are shown.
 
+The selector above the table (Temperature, Precipitation, Sun; depending on which roles are
+assigned) switches the same table to **precipitation** and **hours of sunshine** per month and
+year. There the cells are totals, and the deviation is given in percent of the mean of that
+month. If there is only a rain sensor (on/off), the table counts hours of rain. The year
+column is the total and appears only for complete, completed years, because it would be too
+low with missing months. The current month shows only the figure so far and is not compared.
+Months with too few values stay empty. The colour scale below the table shows which side
+means drier or wetter (for sun: less or more sun).
+
 **Years compared, day by day** stacks all years as a matrix: one row per year (the
 newest on top), one column per calendar day, coloured by the daily value. You can
 choose mean, max or min of the outdoor temperature, or precipitation (white to blue).
