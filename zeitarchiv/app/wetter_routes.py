@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from .i18n import N_, tr
 
+import bisect
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -35,6 +36,7 @@ from . import wetter_analysis as analysis
 from . import wetter_autofill
 from . import wetter_conditions as conditions
 from . import wetter_daylight as daylight
+from . import wetter_pv as pv_mod
 from .chart_period import calendar_bounds
 from .formatting import decimals_to_int, entity_display_name
 from .period_columns import MODES, parse_stichtag
@@ -60,6 +62,7 @@ ROLES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("radiation", N_("Strahlung"), ("standard",)),
     ("illuminance", N_("Helligkeit"), ("standard",)),
     ("illuminance_dawn", N_("Helligkeit Dämmerung"), ("standard",)),
+    ("pv_power", N_("PV-Leistung"), ("standard",)),
 )
 #: Erwartete Einheiten je Rolle: Entitäten damit stehen in der Auswahl zuerst (kein harter Filter,
 #: weil eine Einheit fehlen oder ungewöhnlich geschrieben sein kann).
@@ -73,6 +76,7 @@ ROLE_UNITS = {
     "radiation": ["W/m²"],
     "illuminance": ["lx"],
     "illuminance_dawn": ["lx"],
+    "pv_power": ["kW", "W", "MW"],
     "extra": ["°C", "°F", "K", "%"],
     "heating": ["kWh", "Wh", "MWh"],
 }
@@ -98,6 +102,7 @@ CARD_OPTIONS = (
     ("sunhours", N_("Sonnenstunden"), ("illuminance",)),
     ("daylight", N_("Tageslicht"), ("illuminance_dawn",)),
     ("dayimage", N_("Tagesbild"), ("illuminance",)),
+    ("pvlight", N_("PV und Helligkeit"), ("@pv",)),
     ("longterm", N_("Langzeit"), ("temperature", "precip_mm", "precip_dur")),
     ("heating", N_("Heizen"), ("@heating",)),
 )
@@ -118,6 +123,9 @@ TILE_LABELS = {
     "temperature": N_("Temperatur"), "precip_mm": N_("Niederschlag"), "precip_dur": N_("Regen"),
     "illuminance": N_("Sonnenschein"),
 }
+#: PV und Helligkeit: Leistungseinheiten (Faktor nach kW) und Anzahl der verglichenen Tage.
+PV_UNIT_KW = {"W": 0.001, "kW": 1.0, "MW": 1000.0}
+PV_DAYS = 14
 #: Tagesbild: Anzahl Tage im Streifen; Tage mit weniger hellen Stunden bekommen keine Klasse.
 DAYIMAGE_DAYS = 14
 DAYIMAGE_MIN_BRIGHT_HOURS = 3
@@ -178,6 +186,9 @@ def card_available(key: str, config: dict) -> bool:
                 return True
         elif token == "@heating":
             if config["heating"]:
+                return True
+        elif token == "@pv":
+            if config["pv_power"] and config["illuminance"]:
                 return True
         elif config.get(token):
             return True
@@ -714,7 +725,28 @@ class WetterService:
         return {
             "counters": [{"entity_id": c["entity_id"], "name": c["name"]} for c in counters],
             "days": days, "room": config["heating_room"], "limit": config["heating_limit"],
+            "sun": self._heating_sun(days, config, now_local),
             "today": now_local.date().isoformat(), "tz": str(self.deps.tz),
+        }
+
+    def _heating_sun(self, days: list[list], config: dict, now_local: datetime) -> dict[str, str]:
+        """Tagesklasse (``sunny``/``mixed``/``overcast``) der Heiztage, soweit die Helligkeit sie hergibt.
+
+        Dieselbe Regel wie beim Tagesbild (``_sun_days``); Tage ohne Klasse fehlen. Ohne Rolle Helligkeit oder
+        ohne Heiztage ist das Ergebnis leer, der Reiter Heizen bleibt dann unverändert."""
+        entity = self.deps.index.get_entity(config["illuminance"]) if config["illuminance"] else None
+        if entity is None or not entity["first_ts"] or not days:
+            return {}
+        archive_start = datetime.fromtimestamp(entity["first_ts"], self.deps.tz).date()
+        first = max(date.fromisoformat(days[0][0]), archive_start)
+        last = date.fromisoformat(days[-1][0])
+        if first > last:
+            return {}
+        wanted = {day[0] for day in days}
+        return {
+            entry["date"].isoformat(): entry["class"]
+            for entry in self._sun_days(first, last, config, now_local)
+            if entry["class"] and entry["date"].isoformat() in wanted
         }
 
     def compute_matrix(self, metric: str, mode: str = "mm", now_local: datetime | None = None) -> dict | None:
@@ -1038,6 +1070,56 @@ class WetterService:
             return None
         return {"tz": str(self.deps.tz), "days": out, "counts": counts, "threshold": config["sun_threshold_lx"]}
 
+    def compute_pv(self, now_local: datetime | None = None, days: int = PV_DAYS) -> dict | None:
+        """PV-Ertrag gegen Helligkeit der letzten abgeschlossenen Tage (Regeln siehe ``wetter_pv``); ``None`` ohne beide Rollen.
+
+        Ein Süd-Sensor, der sättigt, schreibt bei unverändertem Wert keine Zeile; genau die sonnigsten Stunden
+        fehlen dann. Eine Lücke bis ``SUN_MAX_GAP_HOURS`` füllt deshalb der niedrigere der beiden Nachbarwerte
+        (wie bei der Sonnenscheindauer, aber vorsichtiger: ein Lückenwert wird nie höher als beide Ränder)."""
+        config = _load_config(self.deps.index)
+        lux_id, pv_id = config["illuminance"], config["pv_power"]
+        lux_entity = self.deps.index.get_entity(lux_id) if lux_id else None
+        pv_entity = self.deps.index.get_entity(pv_id) if pv_id else None
+        if lux_entity is None or pv_entity is None:
+            return None
+        scale = PV_UNIT_KW.get(pv_entity["unit"] or "")
+        if scale is None:
+            return None
+        tz = self.deps.tz
+        now_local = now_local or datetime.now(tz)
+        today = now_local.date()
+        first = today - timedelta(days=days + pv_mod.WINDOW_DAYS)
+        start = datetime(first.year, first.month, first.day, tzinfo=tz)
+        read_cache = query_mod.QueryReadCache()
+        lux_rows = sorted(
+            (row for row in self._rows(lux_id, "standard", start, now_local, now_local, read_cache) if row.value is not None),
+            key=lambda row: row.bucket_start,
+        )
+        pv_rows = [row for row in self._rows(pv_id, "standard", start, now_local, now_local, read_cache) if row.value is not None]
+        stamps = [row.bucket_start for row in lux_rows]
+        lux_at = {row.bucket_start: row.value for row in lux_rows}
+        pairs = []
+        for row in pv_rows:
+            moment = datetime.fromtimestamp(row.bucket_start, tz)
+            if moment.date() >= today:
+                continue  # nur abgeschlossene Tage
+            lux = lux_at.get(row.bucket_start)
+            if lux is None:
+                after = bisect.bisect_left(stamps, row.bucket_start)
+                if 0 < after < len(stamps) and (stamps[after] - stamps[after - 1]) / 3600.0 <= SUN_MAX_GAP_HOURS:
+                    lux = min(lux_rows[after - 1].value, lux_rows[after].value)
+            if lux is None:
+                continue
+            pairs.append((moment.date(), moment.hour, float(lux), max(0.0, row.value * scale)))
+        shown = [today - timedelta(days=offset) for offset in range(days, 0, -1)]
+        result = pv_mod.evaluate(pairs, shown)
+        if result is None:
+            return None
+        return {
+            "tz": str(tz), **result, "window": pv_mod.WINDOW_DAYS, "limit": round(pv_mod.DEVIATION_LIMIT * 100),
+            "unit": "kWh", "pv_entity_id": pv_id,
+        }
+
     def sun_history(self, config: dict, now_local: datetime) -> list[dict]:
         """Alle abgeschlossenen Tage seit Archivbeginn der Helligkeit (Einträge wie ``_sun_days``); leer ohne Rolle."""
         entity = self.deps.index.get_entity(config["illuminance"]) if config["illuminance"] else None
@@ -1344,6 +1426,7 @@ class WetterService:
             "has_windsun": any(config[key] for key in ("wind", "gust", "radiation", "illuminance", "illuminance_dawn")),
             "has_daylight": bool(config["illuminance_dawn"]),
             "has_dayimage": bool(config["illuminance"]),
+            "has_pv": card_available("pvlight", config),
             "hidden_cards": config["hidden_cards"],
             "has_conditions": any(
                 config[key] for key in ("illuminance", "illuminance_dawn", "radiation", "wind", "precip_dur", "precip_mm")
@@ -1441,6 +1524,7 @@ class WetterService:
             radiation: str = Form(""),
             illuminance: str = Form(""),
             illuminance_dawn: str = Form(""),
+            pv_power: str = Form(""),
             extra_entity_id: list[str] = Form([]),
             extra_name: list[str] = Form([]),
             blocks_submitted: str = Form(""),
@@ -1460,7 +1544,7 @@ class WetterService:
             submitted = {
                 "temperature": temperature, "precip_mm": precip_mm, "precip_dur": precip_dur,
                 "humidity": humidity, "pressure": pressure, "wind": wind, "gust": gust, "radiation": radiation,
-                "illuminance": illuminance, "illuminance_dawn": illuminance_dawn,
+                "illuminance": illuminance, "illuminance_dawn": illuminance_dawn, "pv_power": pv_power,
             }
             config = _empty_config()
             for key, value in submitted.items():
@@ -1650,6 +1734,14 @@ class WetterService:
             data = self.compute_dayimage()
             if data is None:
                 raise HTTPException(status_code=409, detail=tr("Keine Helligkeitswerte für das Tagesbild vorhanden."))
+            return data
+
+        @router.get("/wetterdashboard/pv")
+        def wetterdashboard_pv() -> dict:
+            _require_configured()
+            data = self.compute_pv()
+            if data is None:
+                raise HTTPException(status_code=409, detail=tr("Noch keine PV-Leistung mit Helligkeit zum Vergleichen vorhanden."))
             return data
 
         @router.get("/wetterdashboard/wetterlage")

@@ -3613,7 +3613,17 @@
     "Ungültiger Zahlenwert in der Anfrage.": "Invalid number in the request.",
     "Sonne": "Sun",
     "Sonnentage": "Sunny days",
-    "Trübe Tage": "Dull days"
+    "Trübe Tage": "Dull days",
+    "Punkte nach Sonne einfärben": "Colour points by sunshine",
+    "experimentell": "experimental",
+    "Heizen und Sonne": "Heating and sun",
+    "Jeder Heiztag bekommt die Klasse aus dem Tagesbild (sonnig, wechselhaft, trüb). Verglichen wird kWh je Gradtag, nicht kWh je Tag, weil klare Tage oft kälter sind; es zählen nur Tage unter der Heizgrenze mit mindestens einem Gradtag. Ein Unterschied wird nur genannt, wenn er sich vom Zufall abhebt, und erst ab 8 Tagen je Klasse. Der Sensor misst senkrecht an einem Punkt: Was durch die Fenster kommt, hängt von Ausrichtung, Verschattung und Rollläden ab, das Ergebnis gilt also nur für dieses Haus. PV-gesteuertes Heizen kann den Effekt umdrehen, und der Wärmespeicher des Hauses lässt den Vortag mitwirken.": "Each heating day gets the class from the daily picture (sunny, changeable, overcast). The comparison uses kWh per degree day, not kWh per day, because clear days are often colder; only days below the heating limit with at least one degree day count. A difference is only stated if it stands out from chance, and only from 8 days per class. The sensor measures perpendicular at one point: what comes through the windows depends on orientation, shading and shutters, so the result only holds for this house. PV-controlled heating can reverse the effect, and the thermal mass of the house lets the previous day contribute.",
+    "PV-Leistung": "PV power",
+    "PV und Helligkeit": "PV and brightness",
+    "Vergleicht den Tagesertrag der PV-Anlage mit dem, was die Süd-Helligkeit erwarten lässt. Dazu die Rollen „Helligkeit“ und „PV-Leistung“ (unter „Weitere Messwerte“) zuordnen.": "Compares the daily yield of the PV system with what the south brightness suggests. Assign the roles “Brightness” and “PV power” (under “Further measurements”).",
+    "Die Erwartung wird aus den letzten 28 Tagen gelernt: je Helligkeitsstufe der Median der Stundenleistung. Die Karte zeigt, ob der Tagesertrag dazu passt; sie ist eine Messung, keine Prognose. Eine Abweichung über 15 % wird markiert, aber nur an Tagen mit nennenswerter Erwartung. Temperatur, Abregelung und ein voller Akku senken die Leistung, ohne dass die Anlage schlechter wird. Der Süd-Sensor misst an einem Punkt, im Sommer sättigt er mittags (98.800 lx), dann sagt die Helligkeit über die Leistung nur noch wenig. Das Verhältnis nach Uhrzeit zeigt, ob die Anlage morgens oder abends systematisch abweicht (Ausrichtung der Module, Verschattung).": "The expectation is learned from the last 28 days: the median hourly power per brightness level. The card shows whether the daily yield fits; it is a measurement, not a forecast. A deviation above 15 % is marked, but only on days with a meaningful expectation. Temperature, curtailment and a full battery lower the output without the system getting worse. The south sensor measures at one point and saturates at midday in summer (98,800 lx), where brightness says little about the output. The ratio by time of day shows whether the system deviates systematically in the morning or evening (module orientation, shading).",
+    "Verhältnis nach Uhrzeit": "Ratio by time of day",
+    "Noch keine PV-Leistung mit Helligkeit zum Vergleichen vorhanden.": "No PV power with brightness to compare yet."
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4506,6 +4516,26 @@
     "Tag seit {time}": "Day since {time}",
     "Böen bis {kmh} km/h": "Gusts up to {kmh} km/h",
     "{value} {unit} heute": "{value} {unit} today",
-    "heute {min} bis {max} {unit}": "today {min} to {max} {unit}"
+    "heute {min} bis {max} {unit}": "today {min} to {max} {unit}",
+    "ohne Klasse": "no class",
+    "Ø Außentemperatur": "Avg. outdoor temperature",
+    "Ø kWh je Tag": "Avg. kWh per day",
+    "gegen trüb": "vs. overcast",
+    "kein klarer Unterschied": "no clear difference",
+    "zu wenig Tage": "too few days",
+    "Zu wenig Tage für einen Vergleich (mindestens {min} sonnige und trübe Heiztage, jetzt {a} und {b}).": "Too few days to compare (at least {min} sunny and overcast heating days, now {a} and {b}).",
+    "Kein klarer Unterschied zwischen sonnigen und trüben Tagen ({a} gegen {b} Tage).": "No clear difference between sunny and overcast days ({a} vs. {b} days).",
+    "An sonnigen Tagen braucht das Haus {percent} % weniger je Gradtag als an trüben ({a} gegen {b} Tage).": "On sunny days the house needs {percent} % less per degree day than on overcast ones ({a} vs. {b} days).",
+    "An sonnigen Tagen braucht das Haus {percent} % mehr je Gradtag als an trüben ({a} gegen {b} Tage).": "On sunny days the house needs {percent} % more per degree day than on overcast ones ({a} vs. {b} days).",
+    "Der Vergleich von PV-Leistung und Helligkeit konnte nicht geladen werden.": "The comparison of PV power and brightness could not be loaded.",
+    "{day}: {actual} kWh, im Rahmen der Erwartung ({expected} kWh)": "{day}: {actual} kWh, within expectation ({expected} kWh)",
+    "{day}: {actual} kWh, {percent} % unter der Erwartung ({expected} kWh)": "{day}: {actual} kWh, {percent} % below expectation ({expected} kWh)",
+    "{day}: {actual} kWh, {percent} % über der Erwartung ({expected} kWh)": "{day}: {actual} kWh, {percent} % above expectation ({expected} kWh)",
+    "{n} von {total} Tagen weichen um mehr als {limit} % ab": "{n} of {total} days deviate by more than {limit} %",
+    "Um {low} Uhr liefert die Anlage {lowPct} % der Erwartung, um {high} Uhr {highPct} %.": "At {low}:00 the system delivers {lowPct} % of the expectation, at {high}:00 {highPct} %.",
+    "Ertrag": "Yield",
+    "Erwartung": "Expectation",
+    "{hour} Uhr": "{hour}:00",
+    "der Erwartung": "of expectation"
   }
 }

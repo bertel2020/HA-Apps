@@ -68,3 +68,46 @@ def test_shares_group_by_month_and_counter() -> None:
 
 def test_periods_are_listed_newest_first() -> None:
     assert _run('h.periods([["2023-11-01", 1, [1]], ["2025-02-01", 1, [1]], ["2024-12-01", 1, [1]], ["2025-07-01", 1, [1]]])') == [2024, 2023]
+
+
+def _sun_days() -> str:
+    """Zehn sonnige und zehn trübe Heiztage; sonnige verbrauchen bei gleichem Gradtag weniger."""
+    days = []
+    sun = {}
+    for i in range(10):
+        day = f"2025-12-{i + 1:02d}"
+        days.append([day, 5.0, [12.0 + (i % 2)]])  # 15 Gt, 12 bis 13 kWh
+        sun[day] = "sunny"
+        other = f"2025-12-{i + 11:02d}"
+        days.append([other, 5.0, [15.0 + (i % 2)]])  # 15 Gt, 15 bis 16 kWh
+        sun[other] = "overcast"
+    return f"{json.dumps(days)}, {json.dumps(sun)}"
+
+
+def test_class_stats_group_heating_days_by_sun_class() -> None:
+    stats = _run(f"h.classStats({_sun_days()[:_sun_days().index('], {') + 1]}, {{room: 20, limit: 15, on: [true]}}, {_sun_days()[_sun_days().index('], {') + 3:]})")
+    assert stats["sunny"]["n"] == 10 and stats["overcast"]["n"] == 10 and stats["mixed"]["n"] == 0
+    assert stats["sunny"]["temp"] == 5 and stats["sunny"]["kwh"] == 12.5
+    assert round(stats["sunny"]["q"], 3) == round(125 / 150, 3)
+
+
+def test_class_stats_skip_days_without_degree_days_or_class() -> None:
+    days = '[["2025-12-01", 14.9, [3]], ["2025-12-02", 5, [9]], ["2025-12-03", 5, [9]]]'
+    sun = '{"2025-12-01": "sunny", "2025-12-02": "sunny"}'
+    stats = _run(f'h.classStats({days}, {{room: 15.5, limit: 15, on: [true]}}, {sun})')
+    assert stats["sunny"]["n"] == 1  # 14,9 °C: nur 0,6 Gradtage, 03.12. ohne Klasse
+
+
+def test_compare_names_clear_differences_and_refuses_thin_or_noisy_ones() -> None:
+    days, sun = _sun_days().split("], {", 1)
+    days, sun = days + "]", "{" + sun
+    opts = "{room: 20, limit: 15, on: [true]}"
+    clear = _run(f"(() => {{ const s = h.classStats({days}, {opts}, {sun}); return h.compare(s.sunny, s.overcast); }})()")
+    assert clear["status"] == "clear" and clear["percent"] < -15
+    few = _run(f"(() => {{ const s = h.classStats({days}, {opts}, {sun}); return h.compare(s.mixed, s.overcast); }})()")
+    assert few == {"status": "few", "percent": None}
+    noisy = _run(
+        "(() => { const rates = [1, 9, 2, 8, 3, 7, 4, 6]; "
+        "const g = {n: 8, q: 5, rates}; const b = {n: 8, q: 5.2, rates: rates.slice().reverse()}; return h.compare(g, b); })()"
+    )
+    assert noisy["status"] == "unclear"

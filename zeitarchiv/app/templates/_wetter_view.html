@@ -81,7 +81,8 @@
 {% set show_windtiles = has_windtiles and 'wind' not in hc %}
 {% set show_sunhours = has_dayimage and 'sunhours' not in hc %}
 {% set show_daylight = has_daylight and 'daylight' not in hc %}
-{% set show_windtab = show_windtiles or show_sunhours or show_daylight %}
+{% set show_pv = has_pv and 'pvlight' not in hc %}
+{% set show_windtab = show_windtiles or show_sunhours or show_daylight or show_pv %}
 {% set show_long = 'longterm' not in hc %}
 {% set show_heat = has_heating and 'heating' not in hc %}
 <div x-data='wetterDashboard({{ precip_modes | tojson }})' data-hints="collapsed">
@@ -266,6 +267,21 @@
   </div>
   {% endif %}
 
+  {% if show_pv %}
+  <div class="card wt-card" x-show="pv || pvError" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("PV und Helligkeit") }} <span class="wt-badge">{{ _("experimentell") }}</span> {{ hint_button(_("PV und Helligkeit")) }}</h2>
+      {% call hint_body() %}{{ _("Die Erwartung wird aus den letzten 28 Tagen gelernt: je Helligkeitsstufe der Median der Stundenleistung. Die Karte zeigt, ob der Tagesertrag dazu passt; sie ist eine Messung, keine Prognose. Eine Abweichung über 15 % wird markiert, aber nur an Tagen mit nennenswerter Erwartung. Temperatur, Abregelung und ein voller Akku senken die Leistung, ohne dass die Anlage schlechter wird. Der Süd-Sensor misst an einem Punkt, im Sommer sättigt er mittags (98.800 lx), dann sagt die Helligkeit über die Leistung nur noch wenig. Das Verhältnis nach Uhrzeit zeigt, ob die Anlage morgens oder abends systematisch abweicht (Ausrichtung der Module, Verschattung).") }}{% endcall %}
+    </div>
+    <p class="wt-headline" x-show="pv" x-text="pvHead()"></p>
+    <div class="wt-chart" x-show="pv" x-ref="pvChart"></div>
+    <h3 class="wt-h3" x-show="pv && pv.hours.length">{{ _("Verhältnis nach Uhrzeit") }}</h3>
+    <div class="wt-chart wt-chart-short" x-show="pv && pv.hours.length" x-ref="pvHourChart"></div>
+    <p class="hint hint-status" x-show="pv && pv.hours.length" x-text="pvHourNote()"></p>
+    <p class="hint hint-warn" x-show="pvError" x-text="pvError" x-cloak></p>
+  </div>
+  {% endif %}
+
   {% if show_daylight %}
   <div class="card wt-card" x-show="daylight || daylightError" x-cloak>
     <div class="wt-controls">
@@ -390,6 +406,8 @@
           <input type="text" class="wt-num" x-model="heatLimit" @input="drawHeat()" inputmode="decimal" size="3"> °C</label>
       </div>
       <p class="wt-headline" x-show="heat" x-text="heatHeadline()"></p>
+      <label class="wt-check" x-show="heatHasSun()" x-cloak>
+        <input type="checkbox" x-model="heatBySun" @change="drawHeat()"> {{ _("Punkte nach Sonne einfärben") }} <span class="wt-badge">{{ _("experimentell") }}</span></label>
       {# Zähler als Auswahl-Pillen (.filter-chip aus app.css), mit Farbpunkt wie im Streudiagramm #}
       <div class="wt-chips" role="group" aria-label="{{ _('Heizzähler') }}" x-show="heat && heat.counters.length > 1" x-cloak>
         <template x-for="(counter, i) in (heat ? heat.counters : [])" :key="counter.entity_id">
@@ -407,6 +425,14 @@
         {% call hint_body() %}{{ _("Die Gradtagzahl zählt je Tag die Raumtemperatur minus Tagesmittel, aber nur an Tagen unter der Heizgrenze. kWh je Gradtag ist der witterungsbereinigte Verbrauch: Er lässt kalte und milde Winter vergleichen. Die Heizperiode ist fest 1.10. bis 30.4., und nur abgeschlossene Tage mit ausreichend Temperaturwerten zählen.") }}{% endcall %}
       </div>
       <div class="wt-table-wrap"><table class="wt-table wt-table-full wt-heat-table" x-ref="heatTable"></table></div>
+    </div>
+    <div class="card wt-card" x-show="heatHasSun()" x-cloak>
+      <div class="wt-controls">
+        <h2 class="wt-h2">{{ _("Heizen und Sonne") }} <span class="wt-badge">{{ _("experimentell") }}</span> {{ hint_button(_("Heizen und Sonne")) }}</h2>
+        {% call hint_body() %}{{ _("Jeder Heiztag bekommt die Klasse aus dem Tagesbild (sonnig, wechselhaft, trüb). Verglichen wird kWh je Gradtag, nicht kWh je Tag, weil klare Tage oft kälter sind; es zählen nur Tage unter der Heizgrenze mit mindestens einem Gradtag. Ein Unterschied wird nur genannt, wenn er sich vom Zufall abhebt, und erst ab 8 Tagen je Klasse. Der Sensor misst senkrecht an einem Punkt: Was durch die Fenster kommt, hängt von Ausrichtung, Verschattung und Rollläden ab, das Ergebnis gilt also nur für dieses Haus. PV-gesteuertes Heizen kann den Effekt umdrehen, und der Wärmespeicher des Hauses lässt den Vortag mitwirken.") }}{% endcall %}
+      </div>
+      <p class="wt-headline" x-text="heatSunSentence()"></p>
+      <div class="wt-table-wrap"><table class="wt-table wt-table-full" x-ref="heatSunTable"></table></div>
     </div>
     <div class="card wt-card" x-show="heat && heat.counters.length > 1" x-cloak>
       <div class="wt-controls">

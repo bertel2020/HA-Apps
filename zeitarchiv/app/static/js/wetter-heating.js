@@ -126,7 +126,66 @@
     return totals;
   }
 
-  const api = {MONTHS, periodOf, label, gradtage, dayKwh, stat, monthRange, periodRange, cutRange, currentPeriod, periods, fit, shares};
+  // ---- Sonne als zweite Erklärung des Verbrauchs (experimentell) ---------------------------------
+  // sun = {ISO-Datum: "sunny" | "mixed" | "overcast"} vom Server. Verglichen wird kWh je Gradtag, nicht kWh je
+  // Tag (klare Tage sind oft kälter), und nur an Heiztagen mit mindestens einem Gradtag: bei Gt knapp über 0
+  // würde der Tageswert durch eine winzige Zahl geteilt.
+  const SUN_CLASSES = ['sunny', 'mixed', 'overcast'];
+  const MIN_CLASS_DAYS = 8;
+  const MIN_CLEAR_T = 2;
+
+  function mean(values) {
+    return values.reduce((a, b) => a + b, 0) / values.length;
+  }
+
+  // Je Klasse: Tage, Ø Außentemperatur, Ø kWh je Tag, kWh je Gradtag (Summe durch Summe) und die Tageswerte.
+  function classStats(days, opts, sun) {
+    const groups = {};
+    SUN_CLASSES.forEach((kind) => { groups[kind] = {temps: [], kwh: [], gt: 0, rates: []}; });
+    for (const day of days) {
+      const kind = sun && sun[day[0]];
+      const gt = gradtage(day[1], opts.room, opts.limit);
+      if (!groups[kind] || gt < 1) continue;
+      const kwh = dayKwh(day, opts.on);
+      const group = groups[kind];
+      group.temps.push(day[1]);
+      group.kwh.push(kwh);
+      group.gt += gt;
+      group.rates.push(kwh / gt);
+    }
+    const out = {};
+    for (const kind of SUN_CLASSES) {
+      const group = groups[kind];
+      const total = group.kwh.reduce((a, b) => a + b, 0);
+      out[kind] = {
+        n: group.kwh.length,
+        temp: group.temps.length ? mean(group.temps) : null,
+        kwh: group.kwh.length ? mean(group.kwh) : null,
+        q: group.gt > 0 ? total / group.gt : null,
+        rates: group.rates,
+      };
+    }
+    return out;
+  }
+
+  // Unterschied von kWh je Gradtag gegen eine Bezugsklasse (trübe Tage). status: "few" (zu wenig Tage),
+  // "unclear" (hebt sich nicht vom Zufall ab: Welch-t unter 2) oder "clear" mit percent (negativ = weniger).
+  function compare(group, base) {
+    if (!group || !base || group.n < MIN_CLASS_DAYS || base.n < MIN_CLASS_DAYS) return {status: 'few', percent: null};
+    const variance = (values) => {
+      const m = mean(values);
+      return values.reduce((a, v) => a + (v - m) * (v - m), 0) / (values.length - 1);
+    };
+    const m1 = mean(group.rates);
+    const m2 = mean(base.rates);
+    const se = Math.sqrt(variance(group.rates) / group.rates.length + variance(base.rates) / base.rates.length);
+    const percent = group.q != null && base.q ? (group.q / base.q - 1) * 100 : null;
+    if (percent == null) return {status: 'few', percent: null};
+    if (se === 0 ? m1 === m2 : Math.abs(m1 - m2) / se < MIN_CLEAR_T) return {status: 'unclear', percent};
+    return {status: 'clear', percent};
+  }
+
+  const api = {SUN_CLASSES, MIN_CLASS_DAYS, classStats, compare, MONTHS, periodOf, label, gradtage, dayKwh, stat, monthRange, periodRange, cutRange, currentPeriod, periods, fit, shares};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.WetterHeating = api;
 })(typeof window !== 'undefined' ? window : globalThis);

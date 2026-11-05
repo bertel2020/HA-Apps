@@ -49,6 +49,7 @@
   .wt-day-bar i{display:block;height:100%;background:var(--chart-7);}
   .wt-day-sub{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);font-variant-numeric:tabular-nums;}
   .wt-chart-tall{height:360px;}
+  .wt-chart-short{height:200px;}
   .wt-table tr.wt-row-current td{background:var(--surface-alt);font-weight:600;}
   .wt-matrix{min-height:160px;}
   .wt-controls select{font:inherit;font-size:calc(13px * var(--font-scale, 1));padding:3px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink);}

@@ -375,6 +375,9 @@
       hasSunhours: false,
       sunhours: null,
       sunhoursError: '',
+      hasPv: false,
+      pv: null,
+      pvError: '',
       _sunhoursSeq: 0,
       hasDayimage: false,
       dayimage: null,
@@ -389,6 +392,7 @@
       heatRoom: '20',
       heatLimit: '15',
       heatSeason: '',
+      heatBySun: false,
       heatError: '',
       matrix: null,
       tempYears: null,
@@ -429,6 +433,7 @@
         this.hasDayimage = !!this.$root.querySelector('[data-wt-dayimage]');
         if (this.hasDayimage) this.loadDayimage();
         this.hasDaylight = !!this.$root.querySelector('[x-ref="daylightChart"]');
+        this.hasPv = !!this.$root.querySelector('[x-ref="pvChart"]');
         const observer = new ResizeObserver(() => this.layoutTiles());
         for (const group of GROUPS) {
           const ref = this.$refs[refName('tiles', group)];
@@ -610,6 +615,7 @@
         if (tab === 'long' && !this.tempYears) this.loadTempYears();
         if (tab === 'heat' && !this.heat) this.loadHeat();
         if (tab === 'wind' && this.hasSunhours) { if (!this.sunhours) this.loadSunhours(); else this.$nextTick(() => this.drawSunhours()); }
+        if (tab === 'wind' && this.hasPv) { if (!this.pv) this.loadPv(); else this.$nextTick(() => this.drawPv()); }
         if (tab === 'wind' && this.hasDaylight) { if (!this.daylight) this.loadDaylight(); else this.$nextTick(() => this.drawDaylight()); }
         // Ein Diagramm in einem eben erst sichtbaren Reiter hat noch keine Größe.
         this.$nextTick(() => {
@@ -1091,6 +1097,94 @@
           }],
         }, true);
         requestAnimationFrame(() => chart.resize());
+      },
+
+      // ---- PV und Helligkeit (experimentell): Tagesertrag gegen die Erwartung aus der Süd-Helligkeit -------
+
+      async loadPv() {
+        this.pvError = '';
+        try {
+          this.pv = await this.fetchJson('wetterdashboard/pv');
+          this.$nextTick(() => this.drawPv());
+        } catch (e) {
+          this.pvError = t('Der Vergleich von PV-Leistung und Helligkeit konnte nicht geladen werden.');
+        }
+      },
+
+      pvHead() {
+        const data = this.pv;
+        if (!data || !data.days.length) return '';
+        const last = data.days[data.days.length - 1];
+        const day = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', timeZone: 'UTC'}).format(new Date(`${last.date}T12:00:00Z`));
+        const values = {day, percent: num(Math.abs(last.deviation), 0), actual: num(last.actual, 1), expected: num(last.expected, 1)};
+        let text;
+        if (!last.flagged) text = t('{day}: {actual} kWh, im Rahmen der Erwartung ({expected} kWh)', values);
+        else if (last.deviation < 0) text = t('{day}: {actual} kWh, {percent} % unter der Erwartung ({expected} kWh)', values);
+        else text = t('{day}: {actual} kWh, {percent} % über der Erwartung ({expected} kWh)', values);
+        const flagged = data.days.filter((row) => row.flagged).length;
+        return flagged ? `${text} · ${t('{n} von {total} Tagen weichen um mehr als {limit} % ab', {n: flagged, total: data.days.length, limit: data.limit})}` : text;
+      },
+
+      pvHourNote() {
+        const hours = this.pv ? this.pv.hours : [];
+        if (hours.length < 2) return '';
+        const low = hours.reduce((a, b) => (b.ratio < a.ratio ? b : a));
+        const high = hours.reduce((a, b) => (b.ratio > a.ratio ? b : a));
+        return t('Um {low} Uhr liefert die Anlage {lowPct} % der Erwartung, um {high} Uhr {highPct} %.', {
+          low: low.hour, lowPct: num(low.ratio * 100, 0), high: high.hour, highPct: num(high.ratio * 100, 0),
+        });
+      },
+
+      drawPv() {
+        const data = this.pv;
+        if (!data) return;
+        const colors = palette();
+        const fmt = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', timeZone: 'UTC'});
+        const element = this.$refs.pvChart;
+        if (element) {
+          const labels = data.days.map((row) => fmt.format(new Date(`${row.date}T12:00:00Z`)));
+          const chart = chartFor('pv', element);
+          chart.setOption({
+            animation: false, grid: gridFor(element, {top: 28, right: 12}), legend: legendBox(colors, [t('Ertrag'), t('Erwartung')]),
+            xAxis: {type: 'category', data: labels, ...axisStyle(colors), splitLine: {show: false}},
+            yAxis: {type: 'value', min: 0, ...axisStyle(colors), axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => `${value} kWh`}},
+            tooltip: tooltipBox(colors, (params) => {
+              const row = data.days[params[0].dataIndex];
+              return `<b>${escapeHtml(params[0].axisValue)}</b><br>${escapeHtml(t('Ertrag'))}: ${escapeHtml(num(row.actual, 1))} kWh`
+                + `<br>${escapeHtml(t('Erwartung'))}: ${escapeHtml(num(row.expected, 1))} kWh<br>${escapeHtml(row.deviation >= 0 ? '+' : '−')}${escapeHtml(num(Math.abs(row.deviation), 0))} %`;
+            }),
+            series: [
+              {
+                name: t('Ertrag'), type: 'bar', barMaxWidth: 28,
+                data: data.days.map((row) => ({value: row.actual, itemStyle: {color: row.flagged ? cssVar('--chart-4') : colors.cur}})),
+              },
+              {
+                name: t('Erwartung'), type: 'line', symbol: 'diamond', symbolSize: 9, lineStyle: {width: 0},
+                itemStyle: {color: colors.ink}, data: data.days.map((row) => row.expected), z: 5,
+              },
+            ],
+          }, true);
+          requestAnimationFrame(() => chart.resize());
+        }
+        const hourElement = this.$refs.pvHourChart;
+        if (hourElement && data.hours.length) {
+          const chart = chartFor('pvHour', hourElement);
+          chart.setOption({
+            animation: false, grid: gridFor(hourElement, {top: 12, right: 12}),
+            xAxis: {type: 'category', data: data.hours.map((row) => `${row.hour}`), ...axisStyle(colors), splitLine: {show: false}},
+            yAxis: {type: 'value', min: 0, ...axisStyle(colors), axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => `${value} %`}},
+            tooltip: tooltipBox(colors, (params) => {
+              const row = data.hours[params[0].dataIndex];
+              return `<b>${escapeHtml(t('{hour} Uhr', {hour: row.hour}))}</b><br>${escapeHtml(num(row.ratio * 100, 0))} % ${escapeHtml(t('der Erwartung'))} (${escapeHtml(t('{n} Tage', {n: row.days}))})`;
+            }),
+            series: [{
+              type: 'bar', barMaxWidth: 24, itemStyle: {color: colors.cur},
+              data: data.hours.map((row) => Math.round(row.ratio * 100)),
+              markLine: {silent: true, symbol: 'none', lineStyle: {color: colors.faint, type: 'dashed'}, label: {show: false}, data: [{yAxis: 100}]},
+            }],
+          }, true);
+          requestAnimationFrame(() => chart.resize());
+        }
       },
 
       // ---- Tagesbild: ein Streifen mit der Klasse je Tag --------------------------------------------
@@ -1858,6 +1952,7 @@
           this.heatOn = data.counters.map((_c, i) => (Array.isArray(saved.on) && saved.on.length === data.counters.length ? !!saved.on[i] : true));
           this.heatRoom = String(saved.room || data.room).replace('.', ',');
           this.heatLimit = String(saved.limit || data.limit).replace('.', ',');
+          this.heatBySun = !!saved.bySun;
           this.heat = data;
           const periods = this.heatPeriods();
           this.heatSeason = String(periods.length > 1 && WetterHeating.currentPeriod(data.today) === periods[0] ? periods[1] : (periods[0] || ''));
@@ -1962,10 +2057,82 @@
 
       drawHeat() {
         if (!this.heat) return;
-        writeStore({heat: {on: this.heatOn, room: this.heatRoom, limit: this.heatLimit}});
+        writeStore({heat: {on: this.heatOn, room: this.heatRoom, limit: this.heatLimit, bySun: this.heatBySun}});
         this.drawHeatScatter();
+        this.drawHeatSun();
         this.drawHeatTable();
         this.drawHeatShare();
+      },
+
+      heatHasSun() {
+        return !!(this.heat && this.heat.sun && Object.keys(this.heat.sun).length);
+      },
+
+      heatSunNames() {
+        return {sunny: t('sonnig'), mixed: t('wechselhaft'), overcast: t('trüb')};
+      },
+
+      // Punkte nach Tagesklasse statt nach Heizperiode: Farbe und Form je Klasse, damit es auch ohne Farbe lesbar bleibt.
+      heatSunSeries(o, colors) {
+        const names = this.heatSunNames();
+        const style = {
+          sunny: {color: colors.sun, symbol: 'circle'},
+          mixed: {color: cssVar('--chart-4'), symbol: 'diamond'},
+          overcast: {color: colors.cold, symbol: 'rect'},
+        };
+        const groups = {sunny: [], mixed: [], overcast: [], none: []};
+        for (const day of this.heat.days) {
+          const kind = this.heat.sun[day[0]] || 'none';
+          groups[kind].push([day[1], Math.round(WetterHeating.dayKwh(day, o.on) * 100) / 100, day[0]]);
+        }
+        const series = WetterHeating.SUN_CLASSES.map((kind) => ({
+          name: names[kind], type: 'scatter', data: groups[kind], symbolSize: 8, symbol: style[kind].symbol,
+          itemStyle: {color: style[kind].color, opacity: 0.9},
+        }));
+        series.push({
+          name: t('ohne Klasse'), type: 'scatter', data: groups.none, symbolSize: 4, itemStyle: {color: colors.faint, opacity: 0.4},
+        });
+        return {series, legend: [...WetterHeating.SUN_CLASSES.map((kind) => names[kind]), t('ohne Klasse')]};
+      },
+
+      heatSunSentence() {
+        if (!this.heatHasSun()) return '';
+        const stats = WetterHeating.classStats(this.heat.days, this.heatOpts(), this.heat.sun);
+        const base = stats.overcast;
+        const sunny = stats.sunny;
+        const min = WetterHeating.MIN_CLASS_DAYS;
+        const result = WetterHeating.compare(sunny, base);
+        const days = {a: sunny.n, b: base.n};
+        if (result.status === 'few') return t('Zu wenig Tage für einen Vergleich (mindestens {min} sonnige und trübe Heiztage, jetzt {a} und {b}).', {...days, min});
+        if (result.status === 'unclear') return t('Kein klarer Unterschied zwischen sonnigen und trüben Tagen ({a} gegen {b} Tage).', days);
+        const values = {...days, percent: num(Math.abs(result.percent), 0)};
+        return result.percent < 0
+          ? t('An sonnigen Tagen braucht das Haus {percent} % weniger je Gradtag als an trüben ({a} gegen {b} Tage).', values)
+          : t('An sonnigen Tagen braucht das Haus {percent} % mehr je Gradtag als an trüben ({a} gegen {b} Tage).', values);
+      },
+
+      drawHeatSun() {
+        const table = this.$refs.heatSunTable;
+        if (!table || !this.heatHasSun()) return;
+        const stats = WetterHeating.classStats(this.heat.days, this.heatOpts(), this.heat.sun);
+        const names = this.heatSunNames();
+        const tag = this.heatTag();
+        const cell = (value, digits) => (value == null ? '<td class="wt-na">–</td>' : `<td>${escapeHtml(num(value, digits))}</td>`);
+        let html = `<thead><tr><th></th><th>${escapeHtml(t('Tage'))}</th><th>${escapeHtml(t('Ø Außentemperatur'))}</th>`
+          + `<th>${escapeHtml(t('Ø kWh je Tag'))}</th><th>kWh/Gt <span class="wt-sb">${escapeHtml(tag)}</span></th><th>${escapeHtml(t('gegen trüb'))}</th></tr></thead><tbody>`;
+        for (const kind of WetterHeating.SUN_CLASSES) {
+          const group = stats[kind];
+          let diff = '<td class="wt-na">–</td>';
+          if (kind !== 'overcast') {
+            const result = WetterHeating.compare(group, stats.overcast);
+            if (result.status === 'clear') diff = `<td><b>${result.percent < 0 ? '−' : '+'}${escapeHtml(num(Math.abs(result.percent), 0))} %</b></td>`;
+            else if (result.status === 'unclear') diff = `<td class="wt-na">${escapeHtml(t('kein klarer Unterschied'))}</td>`;
+            else diff = `<td class="wt-na">${escapeHtml(t('zu wenig Tage'))}</td>`;
+          }
+          html += `<tr><th scope="row">${escapeHtml(names[kind])}</th><td>${group.n}</td>${cell(group.temp, 1)}${cell(group.kwh, 1)}`
+            + `<td>${group.q == null ? '–' : `<b>${escapeHtml(num(group.q, 2))}</b>`}</td>${diff}</tr>`;
+        }
+        table.innerHTML = html + '</tbody>';
       },
 
       drawHeatScatter() {
@@ -1974,9 +2141,20 @@
         const o = this.heatOpts();
         const colors = palette();
         const periods = this.heatPeriods().slice(0, 4);
+        const sunMode = this.heatBySun && this.heatHasSun();
         const series = [];
-        const legend = [];
-        periods.forEach((period, index) => {
+        let legend = [];
+        if (sunMode) {
+          const built = this.heatSunSeries(o, colors);
+          series.push(...built.series);
+          legend = built.legend;
+          series[0].markLine = {
+            silent: true, symbol: 'none', lineStyle: {color: colors.faint, type: 'dashed'},
+            label: {formatter: () => `${t('Heizgrenze')} ${num(o.limit, 0)} °C`, color: colors.text, fontSize: scaledFont(11)},
+            data: [{xAxis: o.limit}],
+          };
+        }
+        (sunMode ? [] : periods).forEach((period, index) => {
           const color = this.heatColor(index);
           const name = WetterHeating.label(period);
           legend.push(name);

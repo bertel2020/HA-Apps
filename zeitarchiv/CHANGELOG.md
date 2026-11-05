@@ -42,6 +42,13 @@
   - Die Kartenauswahl ist nach Reiter geordnet; der Reiter Heizen und seine
     Einstellungen stehen als „Experimentell“ in einem eigenen Block
   - Die Demo-Daten enthalten die beiden Helligkeitssensoren mit Verlauf
+  - **Experimentell**: Im Reiter Heizen lassen sich die Punkte des
+    Streudiagramms nach Sonne einfärben, und eine Tabelle vergleicht kWh je
+    Gradtag an sonnigen, wechselhaften und trüben Tagen; ein Unterschied wird nur
+    genannt, wenn er sich vom Zufall abhebt
+  - **Experimentell**: Mit der neuen Rolle „PV-Leistung“ zeigt der Reiter Wind &
+    Sonne den Tagesertrag gegen die Erwartung aus der Helligkeit, mit markierten
+    Abweichungen und dem Verhältnis nach Uhrzeit
 
 ### Behoben
 
@@ -93,6 +100,12 @@
   - The card selection is grouped by tab; the Heating tab and its settings are
     in a separate "Experimental" block
   - The demo data contains both brightness sensors with a history
+  - **Experimental**: On the Heating tab the scatter plot points can be coloured
+    by sunshine, and a table compares kWh per degree day on sunny, changeable and
+    overcast days; a difference is only stated if it stands out from chance
+  - **Experimental**: With the new role "PV power" the Wind & Sun tab shows the
+    daily yield against the expectation from brightness, with marked deviations
+    and the ratio by time of day
 
 #### Fixed
 

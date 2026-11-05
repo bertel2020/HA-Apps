@@ -978,6 +978,68 @@ def test_dayimage_classifies_each_day_by_its_sun_share(service) -> None:
     assert next(row for row in data["days"] if row["date"].endswith("20"))["today"] is True  # heute noch ohne helle Stunden
 
 
+def test_heating_days_carry_the_sun_class_of_the_dayimage(service) -> None:
+    config_days = [["2026-08-10", 5.0, [1.0]], ["2026-08-17", 5.0, [1.0]], ["2026-08-18", 5.0, [1.0]], ["2026-08-19", 5.0, [1.0]]]
+    _dayimage_data(service)
+    with service.deps.index._conn:  # noqa: SLF001 — die Testdaten sind absteigend geschrieben
+        service.deps.index._conn.execute(  # noqa: SLF001
+            "UPDATE entities SET first_ts = ? WHERE entity_id = 'sensor.lux_sued'", (_ts(16, 7, 30),),
+        )
+    config = wetter_routes._load_config(service.deps.index)
+    sun = service._heating_sun(config_days, config, NOW)
+    # Tage ohne Klasse (vor dem Archivbeginn der Helligkeit) fehlen, es steht nie eine geratene Klasse da.
+    assert sun == {"2026-08-17": "mixed", "2026-08-18": "overcast", "2026-08-19": "sunny"}
+    assert service._heating_sun([], config, NOW) == {}
+    _configure(service, temperature="sensor.t")
+    assert service._heating_sun(config_days, wetter_routes._load_config(service.deps.index), NOW) == {}
+
+
+def _pv_data(service, last_factor: float = 1.0, unit: str = "W") -> None:
+    lux_rows, pv_rows = [], []
+    for day in range(10, 20):
+        for hour in range(8, 16):
+            lux = 60000.0
+            if not (day == 19 and hour == 11):  # eine Lücke: der gesättigte Süd-Sensor schreibt bei gleichem Wert nichts
+                lux_rows.append((_ts(day, hour, 30), lux))
+            factor = last_factor if day == 19 else 1.0
+            pv_rows.append((_ts(day, hour, 30), (3000.0 if unit == "W" else 3.0) * factor))
+    _add(service, "sensor.lux_sued", "sensor", "measurement", "lx", lux_rows)
+    _add(service, "sensor.pv", "sensor", "measurement", unit, pv_rows)
+    _configure(service, temperature="sensor.t", illuminance="sensor.lux_sued", pv_power="sensor.pv")
+
+
+def test_pv_compares_the_closed_days_with_the_learned_expectation(service) -> None:
+    _pv_data(service, last_factor=0.5)
+    data = service.compute_pv(NOW, days=3)
+    rows = {row["date"][-2:]: row for row in data["days"]}
+    assert sorted(rows) == ["17", "18", "19"] and rows["18"]["flagged"] is False
+    assert rows["19"]["flagged"] is True and rows["19"]["deviation"] == pytest.approx(-50.0, abs=2.0)
+    assert rows["19"]["actual"] == pytest.approx(12.0)  # acht Stunden zu 1,5 kW, die Lücke um 11 Uhr zählt mit
+    assert data["window"] == 28 and data["limit"] == 15
+
+
+def test_pv_needs_both_roles_and_a_power_unit(service) -> None:
+    _pv_data(service)
+    assert service.compute_pv(NOW, days=3) is not None
+    _configure(service, temperature="sensor.t", illuminance="sensor.lux_sued")
+    assert service.compute_pv(NOW, days=3) is None
+    _add(service, "sensor.pv_wh", "sensor", "measurement", "%", [(_ts(19, 12), 50.0)])
+    _configure(service, temperature="sensor.t", illuminance="sensor.lux_sued", pv_power="sensor.pv_wh")
+    assert service.compute_pv(NOW, days=3) is None  # keine Leistungseinheit: nicht raten
+
+
+def test_pv_card_needs_both_roles_and_a_route(client) -> None:
+    from app.main import index
+
+    config = wetter_routes._empty_config()
+    assert not wetter_routes.card_available("pvlight", {**config, "pv_power": "sensor.pv"})
+    assert wetter_routes.card_available("pvlight", {**config, "pv_power": "sensor.pv", "illuminance": "sensor.l"})
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    index.get_or_create_entity("sensor.wetter_test_temp5", "sensor", "measurement", "°C")
+    assert client.post("/wetterdashboard/setup", data={"temperature": "sensor.wetter_test_temp5"}).status_code == 200
+    assert client.get("/wetterdashboard/pv").status_code == 409  # keine PV-Rolle
+
+
 def test_dayimage_falls_back_to_the_brightness_on_days_without_dawn_rows(service) -> None:
     """Der Dämmerungssensor ist oft erst kurz im Archiv: Tage davor zählen die hellen Stunden nach der Helligkeit selbst."""
     _add(service, "sensor.lux_sued", "sensor", "measurement", "lx", [(_ts(18, hour, 30), 80000.0) for hour in range(8, 17)])

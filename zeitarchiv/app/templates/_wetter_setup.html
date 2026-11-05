@@ -52,6 +52,7 @@
   {% elif key in ('precip_mm', 'humidity') %}<path d="M12 3s6 6.4 6 11a6 6 0 0 1-12 0c0-4.6 6-11 6-11Z"/>
   {% elif key == 'precip_dur' %}<path d="M7 15a4 4 0 0 1 .6-7.9A5.5 5.5 0 0 1 18 9a3.5 3.5 0 0 1-.5 7"/><path d="M9 19l1-2M13 19l1-2"/>
   {% elif key == 'heating' %}<path d="M12 3c1 3 4 4.5 4 8.5a4 4 0 0 1-8 0c0-1.7.8-2.6 1.5-3.5.5 1 1 1.5 1.5 1.5 0-3 0-4.5 1-6.5Z"/>
+  {% elif key == 'pv_power' %}<path d="M4 7h16l-2 10H6L4 7Z"/><path d="M9.3 7 8.5 17M14.7 7l.8 10M5 12h14"/><path d="M12 17v4M8 21h8"/>
   {% elif key == 'illuminance_dawn' %}<path d="M3 18h18"/><path d="M7 18a5 5 0 0 1 10 0"/><path d="M12 6v3M5 11l1.8 1.8M19 11l-1.8 1.8"/>
   {% elif key == 'illuminance' %}<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6 19 19M5 19l1.4-1.4M17.6 6.4 19 5"/><path d="M9 12h6"/>
   {% elif key == 'pressure' %}<path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l4-5"/>
@@ -83,7 +84,8 @@
         cardNeeds: {{ card_needs | tojson }},
         cardAvailable(key) {
           return (this.cardNeeds[key] || []).some((token) => token === "@extras" ? this.extras.length > 0
-            : token === "@heating" ? this.heating.length > 0 : !!this.roleVals[token]);
+            : token === "@heating" ? this.heating.length > 0
+            : token === "@pv" ? !!(this.roleVals.pv_power && this.roleVals.illuminance) : !!this.roleVals[token]);
         },
         hints: {}, note: "", missingNote: "", suggesting: false,
         async suggest() {
@@ -199,7 +201,7 @@
   <p class="settings-section-description">{{ _("Ordnet jeder Rolle eine Entität zu. Nur die Außentemperatur ist Pflicht, alles andere bleibt leer, bis passende Sensoren vorhanden sind.") }}</p>
   <p class="wt-note" x-show="note" x-text="note" x-cloak></p>
   <p class="wt-note wt-note-missing" x-show="missingNote" x-cloak><span x-text="missingNote"></span> <a href="selection?topic=wetter">{{ _("Zum Auswahl-Assistenten") }}</a></p>
-  {% for group_title, in_group in ((_("Grundwerte"), ('temperature', 'precip_mm', 'precip_dur', 'humidity', 'pressure', 'wind')), (_("Weitere Messwerte"), ('gust', 'radiation', 'illuminance', 'illuminance_dawn'))) %}
+  {% for group_title, in_group in ((_("Grundwerte"), ('temperature', 'precip_mm', 'precip_dur', 'humidity', 'pressure', 'wind')), (_("Weitere Messwerte"), ('gust', 'radiation', 'illuminance', 'illuminance_dawn', 'pv_power'))) %}
   <h3 class="wt-group-h">{{ group_title }}</h3>
   <div class="wt-item-grid">
     {% for key, label, types in roles if key in in_group %}
@@ -367,6 +369,13 @@
       <input type="text" id="wt-heating-room" class="wt-short" name="heating_room" value="{{ config.heating_room | string | replace('.', ',') }}" inputmode="decimal"> <span class="wt-unit">°C</span></div>
     <div class="field"><label for="wt-heating-limit">{{ _("Heizgrenze") }}</label>
       <input type="text" id="wt-heating-limit" class="wt-short" name="heating_limit" value="{{ config.heating_limit | string | replace('.', ',') }}" inputmode="decimal"> <span class="wt-unit">°C</span></div>
+  </div>
+  </div>
+  <div class="wt-exp-feature">
+  <h3 class="wt-group-h">{{ _("PV und Helligkeit") }}</h3>
+  <p class="settings-section-description">{{ _("Vergleicht den Tagesertrag der PV-Anlage mit dem, was die Süd-Helligkeit erwarten lässt. Dazu die Rollen „Helligkeit“ und „PV-Leistung“ (unter „Weitere Messwerte“) zuordnen.") }}</p>
+  <div class="wt-chips">
+    <label class="filter-chip" x-show="cardAvailable('pvlight')"><input type="checkbox" name="show_card" value="pvlight" {% if 'pvlight' not in config.hidden_cards %}checked{% endif %}><span>{{ _("PV und Helligkeit") }}</span></label>
   </div>
   </div>
   </section>
