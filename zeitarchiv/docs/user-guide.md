@@ -1004,20 +1004,21 @@ Auswahl der Zähler, ohne neu zu laden; der Browser merkt sich die Werte.
 Die **Gradtagzahl** (G20/15 nach VDI 3807) zählt je Tag Raumtemperatur minus Tagesmittel,
 aber nur an Tagen unter der Heizgrenze. **kWh je Gradtag** ist der witterungsbereinigte
 Verbrauch: Er lässt kalte und milde Winter vergleichen, was die reine Summe nicht kann.
-Die Tabelle zeigt je Monat und für die ganze Heizperiode (fest 1.10. bis 30.4.) Gradtage,
-kWh und kWh je Gradtag der letzten drei Perioden, dazu die Veränderung gegenüber der
-Vorperiode. Eine Zeile „1.10.–gestern“ vergleicht die laufende Periode mit demselben
-Stück der Vorperioden, damit ein Winteranfang nicht wie ein Einbruch wirkt. Ein Satz oben
-fasst es zusammen. Nur abgeschlossene Tage mit ausreichend Temperaturwerten zählen.
+Die Tabelle zeigt je Monat und für die ganze Heizperiode (fest 1.10. bis 30.4.) kWh je
+Gradtag der letzten drei Perioden, darunter klein Gradtage und kWh, dazu die Veränderung
+gegenüber der Vorperiode als Pille (grün weniger, rot mehr, unter 1,5 % neutral). Eine Zeile
+„Gleicher Zeitraum“ (1.10.–gestern) vergleicht die laufende Periode mit demselben Stück der
+Vorperioden, damit ein Winteranfang nicht wie ein Einbruch wirkt. Nur abgeschlossene Tage mit ausreichend Temperaturwerten zählen.
 
 Bei mehreren Zählern zeigt **Anteil je Zähler** gestapelte Balken je Monat für eine wählbare
 Heizperiode, mit dem Anteil jedes Zählers in Prozent.
 
 **Heizen und Sonne** (experimentell, mit zugeordneter Helligkeit): Mit „Punkte nach Sonne
 einfärben“ trägt das Streudiagramm Farbe und Form je Tagesklasse (sonnig, wechselhaft,
-trüb). Eine Tabelle vergleicht kWh je Gradtag nach Klasse. Ein Unterschied wird nur genannt,
-wenn er sich vom Zufall abhebt (mindestens 8 Tage je Klasse), sonst steht dort „kein klarer
-Unterschied“. Das Ergebnis gilt nur für dieses Haus: Der Sensor misst an einem Punkt,
+trüb). Drei Kacheln vergleichen kWh je Gradtag nach Klasse, eine Leiste zeigt, wie sich die
+Heiztage verteilen, und ein Chip nennt das Ergebnis. Ein Unterschied wird nur genannt, wenn er
+sich vom Zufall abhebt (mindestens 8 Tage je Klasse), sonst steht dort „Kein klarer
+Unterschied“; Klassen mit unter 30 Tagen tragen einen Hinweis. Das Ergebnis gilt nur für dieses Haus: Der Sensor misst an einem Punkt,
 PV-gesteuertes Heizen kann den Effekt umdrehen, und der Wärmespeicher lässt den Vortag
 mitwirken.
 

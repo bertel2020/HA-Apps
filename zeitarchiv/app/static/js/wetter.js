@@ -2237,44 +2237,63 @@
         return {series, legend: [...WetterHeating.SUN_CLASSES.map((kind) => names[kind]), t('ohne Klasse')]};
       },
 
-      heatSunSentence() {
-        if (!this.heatHasSun()) return '';
+      // Urteil über sonnige gegen trübe Tage: kurze Marke (Chip) plus ein Satz mit den Tagezahlen.
+      heatSunVerdict() {
+        if (!this.heatHasSun()) return {chip: '', text: '', status: ''};
         const stats = WetterHeating.classStats(this.heat.days, this.heatOpts(), this.heat.sun);
         const base = stats.overcast;
         const sunny = stats.sunny;
         const min = WetterHeating.MIN_CLASS_DAYS;
         const result = WetterHeating.compare(sunny, base);
         const days = {a: sunny.n, b: base.n};
-        if (result.status === 'few') return t('Zu wenig Tage für einen Vergleich (mindestens {min} sonnige und trübe Heiztage, jetzt {a} und {b}).', {...days, min});
-        if (result.status === 'unclear') return t('Kein klarer Unterschied zwischen sonnigen und trüben Tagen ({a} gegen {b} Tage).', days);
+        if (result.status === 'few') {
+          return {status: 'few', chip: t('Zu wenig Tage'),
+            text: t('Zu wenig Tage für einen Vergleich (mindestens {min} sonnige und trübe Heiztage, jetzt {a} und {b}).', {...days, min})};
+        }
+        if (result.status === 'unclear') {
+          return {status: 'unclear', chip: t('Kein klarer Unterschied'),
+            text: t('Sonnige und trübe Tage brauchen je Gradtag etwa gleich viel ({a} gegen {b} Tage).', days)};
+        }
         const values = {...days, percent: num(Math.abs(result.percent), 0)};
-        return result.percent < 0
-          ? t('An sonnigen Tagen braucht das Haus {percent} % weniger je Gradtag als an trüben ({a} gegen {b} Tage).', values)
-          : t('An sonnigen Tagen braucht das Haus {percent} % mehr je Gradtag als an trüben ({a} gegen {b} Tage).', values);
+        return {
+          status: 'clear',
+          chip: `${result.percent < 0 ? '−' : '+'}${num(Math.abs(result.percent), 0)} % ${t('gegen trüb')}`,
+          text: result.percent < 0
+            ? t('An sonnigen Tagen braucht das Haus {percent} % weniger je Gradtag als an trüben ({a} gegen {b} Tage).', values)
+            : t('An sonnigen Tagen braucht das Haus {percent} % mehr je Gradtag als an trüben ({a} gegen {b} Tage).', values),
+        };
       },
 
+      // Anteilsleiste über alle Heiztage, darunter eine Kachel je Klasse mit kWh/Gt als Hauptzahl.
       drawHeatSun() {
-        const table = this.$refs.heatSunTable;
-        if (!table || !this.heatHasSun()) return;
+        const box = this.$refs.heatSunTiles;
+        if (!box || !this.heatHasSun()) return;
         const stats = WetterHeating.classStats(this.heat.days, this.heatOpts(), this.heat.sun);
         const names = this.heatSunNames();
-        const tag = this.heatTag();
-        const cell = (value, digits) => (value == null ? '<td class="wt-na">–</td>' : `<td>${escapeHtml(num(value, digits))}</td>`);
-        let html = `<thead><tr><th></th><th>${escapeHtml(t('Tage'))}</th><th>${escapeHtml(t('Ø Außentemperatur'))}</th>`
-          + `<th>${escapeHtml(t('Ø kWh je Tag'))}</th><th>kWh/Gt <span class="wt-sb">${escapeHtml(tag)}</span></th><th>${escapeHtml(t('gegen trüb'))}</th></tr></thead><tbody>`;
-        for (const kind of WetterHeating.SUN_CLASSES) {
-          const group = stats[kind];
-          let diff = '<td class="wt-na">–</td>';
-          if (kind !== 'overcast') {
-            const result = WetterHeating.compare(group, stats.overcast);
-            if (result.status === 'clear') diff = `<td><b>${result.percent < 0 ? '−' : '+'}${escapeHtml(num(Math.abs(result.percent), 0))} %</b></td>`;
-            else if (result.status === 'unclear') diff = `<td class="wt-na">${escapeHtml(t('kein klarer Unterschied'))}</td>`;
-            else diff = `<td class="wt-na">${escapeHtml(t('zu wenig Tage'))}</td>`;
-          }
-          html += `<tr><th scope="row">${escapeHtml(names[kind])}</th><td>${group.n}</td>${cell(group.temp, 1)}${cell(group.kwh, 1)}`
-            + `<td>${group.q == null ? '–' : `<b>${escapeHtml(num(group.q, 2))}</b>`}</td>${diff}</tr>`;
+        const kinds = WetterHeating.SUN_CLASSES;
+        const total = kinds.reduce((sum, kind) => sum + stats[kind].n, 0);
+        const percent = (n) => (total ? Math.round(n / total * 100) : 0);
+        let html = '';
+        if (total) {
+          html += `<div class="wt-ts-share" aria-hidden="true">${kinds.map((kind) => (stats[kind].n
+            ? `<i data-kind="${kind}" style="flex:${stats[kind].n}"></i>` : '')).join('')}</div>`
+            + `<div class="wt-ts-sharelab"><span>${escapeHtml(t('Verteilung der {n} Heiztage', {n: num(total, 0)}))}</span>`
+            + `<span>${escapeHtml(kinds.map((kind) => `${percent(stats[kind].n)} %`).join(' · '))}</span></div>`;
         }
-        table.innerHTML = html + '</tbody>';
+        html += '<div class="wt-ts-tiles">';
+        for (const kind of kinds) {
+          const g = stats[kind];
+          const sub = g.n
+            ? t('{n} Tage · Ø {temp} °C · {kwh} kWh/Tag', {n: g.n, temp: g.temp == null ? '–' : num(g.temp, 1), kwh: g.kwh == null ? '–' : num(g.kwh, 1)})
+            : t('Keine Tage');
+          html += `<div class="wt-ts${g.n && g.n < 30 ? ' is-thin' : ''}" data-kind="${kind}">`
+            + `<span class="wt-ts-k"><i></i>${escapeHtml(names[kind])}</span>`
+            + `<span class="wt-ts-v">${g.q == null ? '–' : escapeHtml(num(g.q, 2))}<small>kWh/Gt</small></span>`
+            + `<span class="wt-ts-s">${escapeHtml(sub)}</span>`
+            + (g.n && g.n < 30 ? `<span class="wt-ts-warn">${escapeHtml(t('wenig Tage, kaum aussagekräftig'))}</span>` : '')
+            + '</div>';
+        }
+        box.innerHTML = html + '</div>';
       },
 
       drawHeatScatter() {
@@ -2359,32 +2378,44 @@
           return;
         }
         const tag = this.heatTag();
-        const cells = (st) => (st && st.n
-          ? `<td class="wt-sep">${escapeHtml(num(st.gt, 0))}</td><td>${escapeHtml(num(st.kwh, 0))}</td><td><b>${st.q == null ? '–' : escapeHtml(num(st.q, 2))}</b></td>`
-          : '<td class="wt-na wt-sep">–</td><td class="wt-na">–</td><td class="wt-na">–</td>');
-        const change = (a, b) => (a && b && a.q && b.q
-          ? `<td class="wt-sep wt-dl">${a.q / b.q - 1 >= 0 ? '+' : '−'}${escapeHtml(num(Math.abs(a.q / b.q - 1) * 100, 0))} %</td>`
-          : '<td class="wt-na wt-sep">–</td>');
+        const isRun = (p) => info.running && p === info.current;
+        // Eine Zelle je Periode: kWh/Gt als Hauptzahl, darunter gedämpft Gradtage und kWh.
+        const cell = (st, p) => (st && st.n
+          ? `<td${isRun(p) ? ' class="wt-run"' : ''}><span class="wt-hv">${st.q == null ? '–' : escapeHtml(num(st.q, 2))}</span>`
+            + `<span class="wt-hs">${escapeHtml(num(st.gt, 0))} Gt · ${escapeHtml(num(st.kwh, 0))} kWh</span></td>`
+          : `<td class="wt-na${isRun(p) ? ' wt-run' : ''}">–</td>`);
+        const cells = (list) => list.map((st, i) => cell(st, shown[i])).join('');
+        // Veränderung als Pille: unter 1,5 % neutral, weniger kWh/Gt grün, mehr kWh/Gt rot.
+        const change = (a, b) => {
+          if (!(a && b && a.q && b.q)) return '<td class="wt-na">–</td>';
+          const pct = (a.q / b.q - 1) * 100;
+          const abs = Math.abs(pct);
+          const kind = abs < 1.5 ? 'wt-pill-n' : (pct > 0 ? 'wt-pill-bad' : 'wt-pill-good');
+          const text = abs < 0.5 ? '±0 %' : `${pct > 0 ? '+' : '−'}${num(abs, 0)} %`;
+          return `<td><span class="wt-pill ${kind}">${escapeHtml(text)}</span></td>`;
+        };
         // Spalte Δ: die zwei letzten abgeschlossenen Heizperioden; in der Zeile „bis gestern“ die laufende gegen die letzte.
         const [newer, older] = [info.complete[0], info.complete[1]];
         // Die Spalte Δ gibt es nur, wenn zwei abgeschlossene Heizperioden zum Vergleichen da sind.
         const delta = newer != null && older != null && shown.includes(newer) && shown.includes(older);
-        let html = '<thead><tr class="wt-g"><th></th>'
-          + shown.map((p) => `<th colspan="3" class="wt-sep">${escapeHtml(WetterHeating.label(p))}${info.running && p === info.current ? ' · ' + escapeHtml(t('läuft')) : ''}</th>`).join('')
-          + (delta ? '<th class="wt-sep">Δ</th>' : '') + '</tr><tr><th></th>'
-          + shown.map(() => `<th class="wt-sep"><span class="wt-sb">${escapeHtml(tag)}</span></th><th><span class="wt-sb">kWh</span></th><th><span class="wt-sb">kWh/Gt</span></th>`).join('')
-          + (delta ? `<th class="wt-sep wt-sb">${escapeHtml(t('kWh/Gt {a} gegenüber {b}', {a: WetterHeating.label(newer), b: WetterHeating.label(older)}))}</th>` : '') + '</tr></thead><tbody>';
+        let html = '<thead><tr><th></th>'
+          + shown.map((p) => `<th${isRun(p) ? ' class="wt-run"' : ''}>${escapeHtml(WetterHeating.label(p))}${isRun(p) ? ' · ' + escapeHtml(t('läuft')) : ''}`
+            + `<span class="wt-sb">kWh/Gt</span></th>`).join('')
+          + (delta ? `<th class="wt-dh">Δ<span class="wt-sb">${escapeHtml(t('kWh/Gt {a} gegenüber {b}', {a: WetterHeating.label(newer), b: WetterHeating.label(older)}))}</span></th>` : '')
+          + '</tr></thead><tbody>';
         const deltaCell = (a, b) => (delta ? change(a, b) : '');
         // Monate, in denen keine der gezeigten Heizperioden Werte hat (noch nicht erreicht), bleiben weg.
         for (const month of WetterHeating.MONTHS) {
           const stats = shown.map((p) => WetterHeating.stat(days, o, ...WetterHeating.monthRange(p, month)));
           if (!stats.some((st) => st && st.n)) continue;
           const byPeriod = (p) => stats[shown.indexOf(p)];
-          html += `<tr><th scope="row">${escapeHtml(monthName(month, 'short'))}</th>${stats.map(cells).join('')}${deltaCell(byPeriod(newer), byPeriod(older))}</tr>`;
+          const current = info.running ? stats[shown.indexOf(info.current)] : null;
+          const future = info.running && shown.includes(info.current) && !(current && current.n);
+          html += `<tr${future ? ' class="wt-future"' : ''}><th scope="row">${escapeHtml(monthName(month, 'short'))}</th>${cells(stats)}${deltaCell(byPeriod(newer), byPeriod(older))}</tr>`;
         }
         const totals = shown.map((p) => WetterHeating.stat(days, o, ...WetterHeating.periodRange(p)));
         const totalOf = (p) => totals[shown.indexOf(p)];
-        html += `<tr class="wt-sum"><th scope="row">${escapeHtml(t('Heizperiode'))}</th>${totals.map(cells).join('')}${deltaCell(totalOf(newer), totalOf(older))}</tr>`;
+        html += `<tr class="wt-sum"><th scope="row">${escapeHtml(t('Heizperiode'))}</th>${cells(totals)}${deltaCell(totalOf(newer), totalOf(older))}</tr>`;
         // Die Zeile „1.10. bis heute“ ist ohne zweite Heizperiode nur eine Wiederholung der Summe.
         if (info.running && shown.length > 1) {
           const cutOf = (p) => WetterHeating.cutRange(p, this.heat.today);
@@ -2393,7 +2424,8 @@
           const first = info.current === shown[0] ? cuts[0] : null;
           const previous = info.complete[0] != null && shown.includes(info.complete[0]) ? cuts[shown.indexOf(info.complete[0])] : null;
           if (label) {
-            html += `<tr class="wt-cut"><th scope="row">${escapeHtml(t('1.10.–{day}.{month}.', {day: label.day, month: label.month}))}</th>${cuts.map(cells).join('')}${deltaCell(first, previous)}</tr>`;
+            html += `<tr class="wt-cut"><th scope="row">${escapeHtml(t('Gleicher Zeitraum'))}`
+              + `<span class="wt-sb">${escapeHtml(t('1.10.–{day}.{month}.', {day: label.day, month: label.month}))}</span></th>${cells(cuts)}${deltaCell(first, previous)}</tr>`;
           }
         }
         table.innerHTML = html + '</tbody>';

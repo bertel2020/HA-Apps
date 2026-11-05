@@ -250,3 +250,56 @@
     [data-wt-conditions][data-layout="strip"] .wt-kpis-lage .wt-tile:nth-of-type(odd){border-left:0;}
     [data-wt-conditions][data-layout="strip"] .wt-kpis-lage .wt-tile:nth-of-type(n+3){border-top:1px solid var(--border);margin-top:8px;padding-top:10px;}
   }
+
+  /* Heizen: Gradtag-Tabelle mit kWh/Gt als Hauptzahl, Veränderung als Pille */
+  .wt-heat-table th,.wt-heat-table td{padding:6px 12px;}
+  .wt-heat-table thead th{vertical-align:bottom;font-weight:500;color:var(--ink-muted);}
+  .wt-heat-table thead th.wt-run{color:var(--accent-line);font-weight:600;}
+  .wt-heat-table .wt-sb{display:block;font-weight:400;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);white-space:normal;}
+  .wt-heat-table .wt-dh .wt-sb{max-width:15em;margin-left:auto;}
+  .wt-heat-table td.wt-run,.wt-heat-table thead th.wt-run{background:var(--accent-line-soft);}
+  .wt-heat-table tbody th:first-child{font-weight:400;color:var(--ink-muted);text-align:left;}
+  .wt-heat-table .wt-hv{display:block;font-weight:600;font-size:calc(15px * var(--font-scale, 1));line-height:1.2;color:var(--ink);}
+  .wt-heat-table .wt-hs{display:block;font-size:calc(11px * var(--font-scale, 1));line-height:1.3;color:var(--ink-muted);}
+  .wt-heat-table tr.wt-future th,.wt-heat-table tr.wt-future td{padding-top:3px;padding-bottom:3px;}
+  .wt-heat-table tr.wt-sum th,.wt-heat-table tr.wt-cut th{color:var(--ink);}
+  .wt-heat-table tr.wt-sum th{font-weight:600;}
+  .wt-heat-table tr.wt-cut th{font-weight:500;}
+  .wt-heat-table tr.wt-cut th .wt-sb{font-weight:400;}
+  .wt-heat-table tr.wt-cut td.wt-run{background:var(--accent-line-soft);}
+  .wt-pill{display:inline-block;min-width:3.2em;padding:2px 8px;border-radius:99px;font-size:calc(12px * var(--font-scale, 1));font-weight:500;text-align:center;}
+  .wt-pill-n{color:var(--ink-muted);}
+  .wt-pill-good{color:var(--positive);background:color-mix(in srgb, var(--positive) 14%, var(--surface));}
+  .wt-pill-bad{color:var(--danger);background:var(--danger-soft);}
+
+  /* Heizen und Sonne: Urteil, Anteilsleiste, drei Kacheln */
+  .wt-ts-verdict{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px;margin:0 0 14px;}
+  .wt-ts-chip{font-size:calc(13px * var(--font-scale, 1));font-weight:600;padding:3px 10px;border-radius:99px;background:var(--surface-alt);color:var(--ink);}
+  .wt-ts-chip[data-status="clear"]{background:var(--accent-line-soft);color:var(--accent-line);}
+  .wt-ts-chip[data-status="few"]{background:var(--warning-soft);color:var(--warning);}
+  .wt-ts-text{color:var(--ink-muted);max-width:62ch;}
+  .wt-ts-share{display:flex;height:10px;border-radius:5px;overflow:hidden;gap:2px;margin:0 0 6px;}
+  .wt-ts-share i{display:block;min-width:4px;}
+  .wt-ts-share i[data-kind="sunny"],.wt-ts-k i{background:var(--chart-7);}
+  .wt-ts-share i[data-kind="mixed"]{background:var(--chart-4);}
+  .wt-ts-share i[data-kind="overcast"]{background:var(--ink-muted);}
+  .wt-ts[data-kind="mixed"] .wt-ts-k i{background:var(--chart-4);}
+  .wt-ts[data-kind="overcast"] .wt-ts-k i{background:var(--ink-muted);}
+  .wt-ts-sharelab{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-muted);margin:0 0 14px;}
+  .wt-ts-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+  .wt-ts{display:flex;flex-direction:column;gap:4px;background:var(--surface-alt);border-radius:10px;padding:12px 14px;min-width:0;}
+  .wt-ts.is-thin{opacity:.85;}
+  .wt-ts-k{display:flex;align-items:center;gap:7px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+  .wt-ts-k i{display:inline-block;width:10px;height:10px;border-radius:50%;}
+  .wt-ts-v{font-size:calc(26px * var(--font-scale, 1));font-weight:600;line-height:1.15;font-variant-numeric:tabular-nums;color:var(--ink);}
+  .wt-ts-v small{font-size:calc(12px * var(--font-scale, 1));font-weight:400;color:var(--ink-muted);margin-left:4px;}
+  .wt-ts-s{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);font-variant-numeric:tabular-nums;}
+  .wt-ts-warn{font-size:calc(11px * var(--font-scale, 1));color:var(--danger);}
+  @media (max-width:640px){
+    .wt-ts-tiles{grid-template-columns:1fr;}
+    .wt-ts{display:grid;grid-template-columns:1fr auto;column-gap:12px;align-items:center;}
+    .wt-ts-v{grid-row:1 / 3;grid-column:2;text-align:right;}
+    .wt-ts-s{grid-column:1;}
+    .wt-ts-warn{grid-column:1 / -1;}
+  }
+  .wt-table-wrap:has(> .wt-heat-table){overflow-x:auto;max-width:100%;}

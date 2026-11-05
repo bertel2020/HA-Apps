@@ -452,8 +452,11 @@
         <h2 class="wt-h2">{{ _("Heizen und Sonne") }} <span class="wt-badge">{{ _("experimentell") }}</span> {{ hint_button(_("Heizen und Sonne")) }}</h2>
         {% call hint_body() %}{{ _("Jeder Heiztag bekommt die Klasse aus dem Tagesbild (sonnig, wechselhaft, trüb). Verglichen wird kWh je Gradtag, nicht kWh je Tag, weil klare Tage oft kälter sind; es zählen nur Tage unter der Heizgrenze mit mindestens einem Gradtag. Ein Unterschied wird nur genannt, wenn er sich vom Zufall abhebt, und erst ab 8 Tagen je Klasse. Der Sensor misst senkrecht an einem Punkt: Was durch die Fenster kommt, hängt von Ausrichtung, Verschattung und Rollläden ab, das Ergebnis gilt also nur für dieses Haus. PV-gesteuertes Heizen kann den Effekt umdrehen, und der Wärmespeicher des Hauses lässt den Vortag mitwirken.") }}{% endcall %}
       </div>
-      <p class="wt-headline" x-text="heatSunSentence()"></p>
-      <div class="wt-table-wrap"><table class="wt-table wt-table-full" x-ref="heatSunTable"></table></div>
+      <div class="wt-ts-verdict">
+        <span class="wt-ts-chip" :data-status="heatSunVerdict().status" x-text="heatSunVerdict().chip"></span>
+        <span class="wt-ts-text" x-text="heatSunVerdict().text"></span>
+      </div>
+      <div class="wt-ts-box" x-ref="heatSunTiles"></div>
     </div>
     <div class="card wt-card" x-show="heat && heat.counters.length > 1" x-cloak>
       <div class="wt-controls">

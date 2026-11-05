@@ -943,19 +943,20 @@ The **degree-day figure** (G20/15 to VDI 3807) counts, for each day, room temper
 daily mean, but only on days below the heating limit. **kWh per degree day** is the
 weather-adjusted consumption: it lets you compare cold and mild winters, which the plain total
 cannot. The table shows, per month and for the whole heating season (fixed 1 Oct to 30 Apr),
-degree days, kWh and kWh per degree day for the last three seasons, plus the change against
-the previous season. A "1 Oct–yesterday" row compares the running season with the same stretch
-of earlier seasons, so the start of a winter does not look like a slump. A sentence at the top
-sums it up. Only completed days with enough temperature values count.
+kWh per degree day for the last three seasons, with degree days and kWh in small type below,
+plus the change against the previous season as a pill (green less, red more, neutral under
+1.5 %). A "Same period" row (1 Oct–yesterday) compares the running season with the same
+stretch of earlier seasons, so the start of a winter does not look like a slump. Only completed days with enough temperature values count.
 
 With several counters, **Share per counter** shows stacked bars per month for a selectable
 heating season, with each counter's share in percent.
 
 **Heating and sun** (experimental, with brightness assigned): with "Colour points by
 sunshine" the scatter plot gets a colour and shape per day class (sunny, changeable,
-overcast). A table compares kWh per degree day by class. A difference is only stated if it
-stands out from chance (at least 8 days per class), otherwise it says "no clear
-difference". The result only holds for this house: the sensor measures at one point,
+overcast). Three tiles compare kWh per degree day by class, a bar shows how the heating days
+are split, and a chip states the result. A difference is only stated if it stands out from
+chance (at least 8 days per class), otherwise it says "No clear difference"; classes with
+fewer than 30 days carry a note. The result only holds for this house: the sensor measures at one point,
 PV-controlled heating can reverse the effect, and thermal mass lets the previous day count.
 
 ## Entities and histories

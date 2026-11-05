@@ -67,6 +67,10 @@
     sich auf Niederschlag und Sonnenstunden umschalten. Die Farbe zeigt die
     Abweichung vom Mittel des Monats in Prozent, die letzte Spalte ist die
     Jahressumme kompletter Jahre; der laufende Monat steht ohne Vergleich da
+  - **Heizen**: Die Gradtag-Tabelle zeigt je Periode kWh je Gradtag groß und
+    Gradtage und kWh klein darunter; die Veränderung steht als farbige Pille
+    daneben. „Heizen und Sonne“ zeigt drei Kacheln mit einer Anteilsleiste
+    und einem Ergebnis-Chip statt einer Tabelle
 - **Übersicht**: Oben stehen statt der Statistik-Kacheln jetzt Kacheln, die zu
   den Dashboards und Seiten führen, mit Farbe und einer Infozeile
   - Welche Kacheln (bis zu 8) und in welcher Reihenfolge, lässt sich unter
@@ -158,6 +162,10 @@
     be switched to precipitation and hours of sunshine. The colour shows the
     deviation from the month's mean in percent, the last column is the total of
     complete years; the current month is shown without a comparison
+  - **Heating**: The degree-day table shows kWh per degree day large for each
+    period, with degree days and kWh small below; the change sits next to it
+    as a coloured pill. "Heating and sun" shows three tiles with a share bar
+    and a result chip instead of a table
 - **Overview**: At the top, tiles that lead to the dashboards and pages replace
   the statistics tiles, with colour and an info line
   - Which tiles (up to 8) and in which order can be set under Settings →
