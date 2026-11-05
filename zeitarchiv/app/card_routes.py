@@ -34,6 +34,7 @@ dafür einen Platzhalter.
 from __future__ import annotations
 
 import json
+import re
 import threading
 from collections.abc import Callable
 from datetime import date, datetime, time, timedelta
@@ -86,6 +87,9 @@ MAX_PX = 4000
 #: beim Laden gemeinsam an; ohne Grenze hielten sie die Index-Sperren der
 #: Oberfläche. Wer darüber liegt, bekommt 429 und fragt beim nächsten Takt neu.
 MAX_CONCURRENT_QUERIES = 4
+
+#: Schlüssel eines Wertes einer Kennzahlen-Reihe (Rollen der Dashboards, auch „temperature:1“).
+_VALUE_KEY = re.compile(r"^[a-z0-9_:]{1,40}$")
 
 
 def _flag(value: object) -> str:
@@ -444,6 +448,8 @@ def create_card_router(
         range: str = "month",  # noqa: A002 - Name des Query-Parameters
         offset: int = Query(0, ge=-card_elements.MAX_OFFSET, le=0),
         side: str = "verbrauch",
+        values: str | None = None,
+        sparkline: bool = True,
         years: int = Query(10, ge=0, le=card_elements.MAX_YEARS),
         authorization: str | None = Header(default=None),
         x_zeitarchiv_integration_version: str | None = Header(default=None),
@@ -460,12 +466,15 @@ def create_card_router(
             or range not in card_elements.RANGES
             or side not in card_elements.SIDES
         )
+        value_keys = [item for item in (values or "").split(",") if item]
+        invalid = invalid or len(value_keys) > card_elements.MAX_VALUES or any(not _VALUE_KEY.fullmatch(item) for item in value_keys)
         if invalid:
             raise HTTPException(status_code=400, detail=tr("Ungültige Angaben"))
         if at:
             stichtag_or_400(at)
         options = card_elements.Options(columns=keys or None, vorjahr=vorjahr, mode=mode, at=at or None, role=role, years=years, group=group, metric=metric,
             range=range, offset=offset, side=side,
+            values=value_keys or None, sparkline=sparkline,
         )
         if not slots.acquire(blocking=False):
             raise HTTPException(status_code=429, detail=tr("Zu viele gleichzeitige Abfragen"))

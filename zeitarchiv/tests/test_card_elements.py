@@ -40,9 +40,10 @@ class _Energie:
     def __init__(self) -> None:
         self.langzeit = _Langzeit()
         self.flows: list = []
+        self.tiles: list = []
         self.heatmaps: list = []
 
-    def compute_flow(self, config: dict, range_key: str, offset: int) -> dict:
+    def compute_flow(self, config: dict, range_key: str, offset: int, **_kwargs) -> dict:
         self.flows.append((range_key, offset))
         return {
             "verbraucher_breakdown": [
@@ -52,6 +53,17 @@ class _Energie:
             "versorgung_breakdown": [{"name": "PV", "value": 8.0}, {"name": "Netz", "value": 3.0}, {"name": "Speicher", "value": -1.0}],
             "window_start": 1, "window_end": 2,
         }
+
+    def compute_period_comparison(self, config: dict, range_key: str, offset: int, current: dict, read_cache) -> tuple[dict, dict, dict]:
+        kpi = {"erzeugung": 21.3, "verbrauch": 30.0, "netzbezug": 16.0, "einspeisung": 4.1}
+        compare = {"erzeugung": {"pct": 12.0, "abs": 2.3}, "verbrauch": {"pct": None, "abs": None}, "netzbezug": {"pct": -7.0, "abs": -1.2}, "einspeisung": {"pct": 31.0, "abs": 1.0}}
+        return compare, kpi, kpi
+
+    def compute_tile(self, config: dict, key: str, range_key: str, offset: int, read_cache) -> dict:
+        self.tiles.append(key)
+        if key in ("netzbezug", "einspeisung"):
+            return {"series": [{"name": key, "values": [1.0, None, 3.0]}]}
+        return {"series": [{"values": [1.0, 2.0, None]}, {"values": [0.5, None, None]}]}
 
     def compute_heatmap(self, config: dict) -> dict:
         self.heatmaps.append("week")
@@ -67,6 +79,11 @@ class _Index:
 
     def get_heatmap_weekday_snapshot(self, range_key: str):
         return self.snapshot
+
+
+@pytest.fixture(autouse=True)
+def _weather_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.wetter_routes._load_config", lambda index: {})
 
 
 @pytest.fixture
@@ -102,7 +119,7 @@ def test_only_set_up_elements_are_listed(energie: _Energie, monkeypatch: pytest.
     body = client.get("/api/card/elements", headers=AUTH).json()
     assert body["spec_version"] == SPEC_VERSION
     assert [item["key"] for item in body["elements"]] == [
-        "energie.zeitraeume", "energie.matrix", "energie.monatsvergleich", "energie.anteile", "energie.heatmap",
+        "energie.zeitraeume", "energie.matrix", "energie.monatsvergleich", "energie.anteile", "energie.kennzahlen", "energie.heatmap",
     ]
     assert body["elements"][0]["columns"] == ["monat", "vormonat", "jahr"]
     monkeypatch.setattr(card_elements, "_energie_config", lambda ctx: None)
@@ -159,6 +176,15 @@ def test_the_matrix_sends_only_the_chosen_role_and_years(energie: _Energie) -> N
 class _Wetter:
     def __init__(self) -> None:
         self.bodies: list = []
+
+    def _row_specs(self, config: dict) -> list[dict]:
+        return [{"key": "temperature", "label": "Temperatur außen"}, {"key": "precip_mm", "label": "Niederschlag"}]
+
+    def compute_tiles(self, now_local=None, at=None) -> list[dict]:
+        return [
+            {"key": "temperature", "label": "Temperatur", "unit": "°C", "decimals": 1, "kind": "standard", "last": 8.5, "today": {"max": 10.0, "min": 2.0}, "yesterday": None},
+            {"key": "precip_mm", "label": "Niederschlag", "unit": "mm", "decimals": 1, "kind": "counter", "last": 3.0, "today": {"sum": 3.0}, "yesterday": {"sum": 1.0}},
+        ]
 
     def compute_table(self, body) -> dict:
         self.bodies.append(body)
@@ -250,3 +276,38 @@ def test_the_load_profile_uses_the_cache_for_the_running_period_only(energie: _E
         _Index.snapshot = None
     assert client.get("/api/card/element", headers=AUTH, params={"key": "energie.heatmap", "offset": 1}).status_code == 422
     assert client.get("/api/card/element", headers=AUTH, params={"key": "energie.heatmap", "range": "decade"}).status_code == 400
+
+
+def test_the_energy_key_figures_carry_value_change_and_a_sparkline(energie: _Energie) -> None:
+    client = _client()
+    listed = {item["key"]: item for item in client.get("/api/card/elements", headers=AUTH).json()["elements"]}
+    assert listed["energie.kennzahlen"]["kind"] == "kpi" and [v["key"] for v in listed["energie.kennzahlen"]["values"]] == ["erzeugung", "verbrauch", "netzbezug", "einspeisung"]
+    body = client.get("/api/card/element", headers=AUTH, params={"key": "energie.kennzahlen", "values": "erzeugung,netzbezug,unbekannt"}).json()
+    assert body["renderer"] == "energie.kennzahlen" and body["range"] == "month"
+    items = {item["key"]: item for item in body["items"]}
+    assert list(items) == ["erzeugung", "netzbezug"]  # Unbekanntes fällt weg, die Reihenfolge der Wahl bleibt
+    assert items["erzeugung"]["value"] == 21.3 and items["erzeugung"]["pct"] == 12.0 and items["erzeugung"]["better"] == "up"
+    assert items["netzbezug"]["pct"] == -7.0 and items["netzbezug"]["better"] == "down"
+    assert items["erzeugung"]["spark"] == [1.5, 2.0, None]  # Summe der Zeilen, Lücke bleibt Lücke
+    assert items["netzbezug"]["spark"] == [1.0, None, 3.0]
+    assert body["compare_label"]
+
+
+def test_the_sparkline_can_be_left_out_and_costs_nothing_then(energie: _Energie) -> None:
+    client = _client()
+    body = client.get("/api/card/element", headers=AUTH, params={"key": "energie.kennzahlen", "sparkline": "false"}).json()
+    assert all(item["spark"] == [] for item in body["items"]) and energie.tiles == []
+    assert client.get("/api/card/element", headers=AUTH, params={"key": "energie.kennzahlen", "values": "a b"}).status_code == 400
+    assert client.get("/api/card/element", headers=AUTH, params={"key": "energie.kennzahlen", "values": ",".join(["erzeugung"] * 9)}).status_code == 400
+
+
+def test_the_weather_key_figures_offer_the_set_up_values_and_filter_them(energie: _Energie, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(card_elements, "CONTEXT", card_elements.Context(index=_Index(), energie=energie, wetter=_Wetter()))
+    monkeypatch.setattr("app.wetter_routes.is_wetter_configured", lambda index: True)
+    client = _client()
+    listed = {item["key"]: item for item in client.get("/api/card/elements", headers=AUTH).json()["elements"]}
+    assert listed["wetter.kennzahlen"]["values"] == [{"key": "temperature", "label": "Temperatur außen"}, {"key": "precip_mm", "label": "Niederschlag"}]
+    everything = client.get("/api/card/element", headers=AUTH, params={"key": "wetter.kennzahlen"}).json()
+    assert [tile["key"] for tile in everything["tiles"]] == ["temperature", "precip_mm"] and everything["renderer"] == "wetter.kennzahlen"
+    chosen = client.get("/api/card/element", headers=AUTH, params={"key": "wetter.kennzahlen", "values": "precip_mm"}).json()
+    assert [tile["key"] for tile in chosen["tiles"]] == ["precip_mm"]

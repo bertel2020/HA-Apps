@@ -95,8 +95,11 @@
   - Diagramme: Monatsvergleich aus Energie und Wetter (Jahre als Linien mit
     Mittel und Spanne), die Jahresübersicht des Wetters als Heatmap sowie
     Verbraucher- oder Versorgungsanteile und das Tageslastprofil der Energie
-  - Anteile und Tageslastprofil haben einen Zeitraum (Tag, Woche, Monat, Jahr)
-    und einen Versatz in Perioden zurück
+  - Kennzahlen: Kacheln mit Wert, Veränderung zur Vorperiode und Verlauf aus der
+    Energie (Erzeugung, Verbrauch, Netzbezug, Einspeisung) und aus dem Wetter
+    (Wert mit Höchst- und Tiefstwert oder Tagessumme)
+  - Anteile, Tageslastprofil und Energie-Kennzahlen haben einen Zeitraum (Tag,
+    Woche, Monat, Jahr) und einen Versatz in Perioden zurück
   - Rollen und Formeln bleiben im Dashboard eingerichtet; nicht eingerichtete
     Bausteine fehlen in der Auswahl
   - Nur für Administratoren; braucht die aktuelle Integration
@@ -210,8 +213,11 @@
   - Charts: monthly comparison from Energy and Weather (years as lines with
     average and range), the weather year overview as a heatmap, as well as
     consumption or supply shares and the daily load profile from Energy
-  - Shares and the load profile have a period (day, week, month, year) and an
-    offset in periods back
+  - Key figures: tiles with value, change to the previous period and trend from
+    Energy (generation, consumption, grid import, feed-in) and from Weather
+    (value with high and low, or daily total)
+  - Shares, load profile and Energy key figures have a period (day, week, month,
+    year) and an offset in periods back
   - Roles and formulas stay set up in the dashboard; elements that are not set
     up are missing from the choice
   - Administrators only; needs the current integration

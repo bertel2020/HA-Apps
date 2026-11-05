@@ -35,6 +35,11 @@ ALL_METRICS = tuple(dict.fromkeys(METRICS + MATRIX_METRICS))
 RANGES = ("day", "week", "month", "year")
 SIDES = ("verbrauch", "versorgung")
 MAX_OFFSET = 60
+#: Kennzahlen der Energie-Kachelreihe (Schlüssel der KPIs in compute_flow) und wie viele eine Karte zeigt.
+KPI_VALUES = ("erzeugung", "verbrauch", "netzbezug", "einspeisung")
+#: Ob ein größerer Wert günstig ist (up) oder ungünstig (down): mehr Erzeugung und Einspeisung ja, mehr Bezug und Verbrauch nein.
+KPI_BETTER = {"erzeugung": "up", "einspeisung": "up", "verbrauch": "down", "netzbezug": "down"}
+MAX_VALUES = 8
 
 
 class ElementUnavailable(Exception):
@@ -56,6 +61,8 @@ class Options:
     range: str = "month"
     offset: int = 0
     side: str = "verbrauch"
+    values: list[str] | None = None
+    sparkline: bool = True
 
 
 @dataclass
@@ -90,6 +97,8 @@ class Element:
     #: Zeiträume, aus denen der Baustein wählen lässt, und die Seiten des Rings (leer: keine Auswahl).
     ranges: tuple[str, ...] = field(default_factory=tuple)
     sides: tuple[str, ...] = field(default_factory=tuple)
+    #: Die Werte, aus denen der Baustein wählen lässt: Schlüssel (Energie, fest) oder dazu Beschriftung (Wetter, nach Einrichtung).
+    values: Callable[[Context], list[dict]] | None = None
 
 
 def _energie_config(ctx: Context) -> dict | None:
@@ -173,6 +182,69 @@ def _energie_heatmap(ctx: Context, options: Options) -> dict:
     return {"renderer": "energie.heatmap", "heatmap": grid, "range": range_key}
 
 
+def _sparkline(tile: dict) -> list[float | None]:
+    """Der Verlauf einer Kennzahl aus den Kachel-Daten des Dashboards: bei Netzbezug und Einspeisung die eine Serie, sonst
+    die Summe aller Zeilen je Achsenposition (fehlende Buckets bleiben eine Lücke, wenn keine Zeile einen Wert hat)."""
+    series = [item["values"] for item in tile.get("series") or [] if item.get("values")]
+    if not series:
+        return []
+    columns = zip(*series, strict=False)
+    return [None if all(value is None for value in column) else round(sum(value or 0.0 for value in column), 3) for column in columns]
+
+
+def _energie_kpis(ctx: Context, options: Options) -> dict:
+    from .energiedashboard_routes import COMPARE_LABELS
+    from .storage import query as query_mod
+
+    config = _energie_config(ctx)
+    if config is None:
+        raise ElementUnavailable(tr("Im Energiedashboard nicht eingerichtet"))
+    range_key = options.range if options.range in ("day", "month", "year") else "day"
+    offset = min(0, options.offset)
+    keys = [key for key in dict.fromkeys(options.values or KPI_VALUES) if key in KPI_VALUES][:MAX_VALUES] or list(KPI_VALUES)
+    energie = ctx.energie
+    read_cache = query_mod.QueryReadCache()
+    flow = energie.compute_flow(config, range_key, offset, skip_quality=True, read_cache=read_cache)
+    compare, current, _previous = energie.compute_period_comparison(config, range_key, offset, flow, read_cache)
+    labels = {"erzeugung": tr("Erzeugung"), "verbrauch": tr("Verbrauch"), "netzbezug": tr("Netzbezug"), "einspeisung": tr("Einspeisung")}
+    items = []
+    for key in keys:
+        entry = compare.get(key) or {}
+        item = {
+            "key": key, "label": labels[key], "unit": "kWh", "value": current.get(key), "pct": entry.get("pct"),
+            "abs": entry.get("abs"), "better": KPI_BETTER[key], "spark": [],
+        }
+        if options.sparkline:
+            item["spark"] = _sparkline(energie.compute_tile(config, key, range_key, offset, read_cache))
+        items.append(item)
+    return {"renderer": "energie.kennzahlen", "items": items, "range": range_key,
+            "compare_label": tr(COMPARE_LABELS[range_key])}
+
+
+def _wetter_kpi_values(ctx: Context) -> list[dict]:
+    if not _wetter_available(ctx):
+        return []
+    from . import wetter_routes
+
+    config = wetter_routes._load_config(ctx.index)  # noqa: SLF001 - wie die Seite
+    return [{"key": spec["key"], "label": spec["label"]} for spec in ctx.wetter._row_specs(config)]  # noqa: SLF001
+
+
+def _wetter_kpis(ctx: Context, options: Options) -> dict:
+    if not _wetter_available(ctx):
+        raise ElementUnavailable(tr("Im Wetterdashboard nicht eingerichtet"))
+    tiles = ctx.wetter.compute_tiles(at=options.at)
+    wanted = [key for key in dict.fromkeys(options.values or []) if key][:MAX_VALUES]
+    if wanted:
+        by_key = {tile["key"]: tile for tile in tiles}
+        tiles = [by_key[key] for key in wanted if key in by_key]
+    return {"renderer": "wetter.kennzahlen", "tiles": tiles}
+
+
+def _energie_kpi_values(ctx: Context) -> list[dict]:
+    return [{"key": key} for key in KPI_VALUES]
+
+
 def _wetter_available(ctx: Context) -> bool:
     from .wetter_routes import is_wetter_configured
 
@@ -240,6 +312,16 @@ ELEMENTS: dict[str, Element] = {
             ranges=("day", "month", "year"), sides=SIDES,
         ),
         Element(
+            key="energie.kennzahlen", group="energie", kind="kpi",
+            title=lambda: tr("Energie: Kennzahlen"),
+            available=_energie_zeitraeume_available, build=_energie_kpis, ranges=("day", "month", "year"), values=_energie_kpi_values,
+        ),
+        Element(
+            key="wetter.kennzahlen", group="wetter", kind="kpi",
+            title=lambda: tr("Wetter: Kennzahlen"),
+            available=_wetter_available, build=_wetter_kpis, values=_wetter_kpi_values,
+        ),
+        Element(
             key="energie.heatmap", group="energie", kind="chart",
             title=lambda: tr("Energie: Tageslastprofil"),
             available=_energie_zeitraeume_available, build=_energie_heatmap,
@@ -270,7 +352,9 @@ def listing(ctx: Context | None = None) -> list[dict]:
     ctx = ctx or CONTEXT
     return [
         {"key": element.key, "group": element.group, "kind": element.kind, "title": element.title(), "columns": list(element.columns), "roles": list(element.roles), "groups": list(element.groups), "metrics": list(element.metrics),
-        "ranges": list(element.ranges), "sides": list(element.sides)}
+        "ranges": list(element.ranges), "sides": list(element.sides),
+        "values": element.values(ctx) if element.values else [],
+    }
         for element in ELEMENTS.values()
         if element.available(ctx)
     ]
