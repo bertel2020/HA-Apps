@@ -102,6 +102,8 @@
   - Kennzahlen: Kacheln mit Wert, Veränderung zur Vorperiode und Verlauf aus der
     Energie (Erzeugung, Verbrauch, Netzbezug, Einspeisung) und aus dem Wetter
     (Wert mit Höchst- und Tiefstwert oder Tagessumme)
+  - Zu den Energie-Kennzahlen lassen sich Autarkie und Eigenverbrauch wählen
+    (die Veränderung steht in Prozentpunkten)
   - Langzeit der Energie: Rekorde als Kacheln, Kenntage je Jahr (bis heute oder
     ganze Jahre) und „Was hat sich verändert?“ mit wählbarer Zahl von Verbrauchern
   - Anteile, Tageslastprofil und Energie-Kennzahlen haben einen Zeitraum (Tag,
@@ -226,6 +228,8 @@
   - Key figures: tiles with value, change to the previous period and trend from
     Energy (generation, consumption, grid import, feed-in) and from Weather
     (value with high and low, or daily total)
+  - The energy key figures can add self-sufficiency and self-consumption (the
+    change is shown in percentage points)
   - Energy long-term: records as tiles, key days per year (until today or whole
     years) and "What has changed?" with a choice of how many consumers
   - Shares, load profile and Energy key figures have a period (day, week, month,

@@ -108,6 +108,11 @@ console.log(JSON.stringify({
   range: R.changesRange(changes),
   records: win.ElementKpiRender.energyRecords({enough: true, unit: 'kWh', records: [{key: 'erzeugung', label: 'Stärkster Erzeugungstag', value: 61.234, date: '2026-06-14'}]}),
   notYet: win.ElementKpiRender.energyRecords({enough: false, records: []}),
+  quotas: win.ElementKpiRender.energyKpis([
+    {key: 'autarkie', label: 'Autarkie', unit: '%', value: 46.7, pct: null, abs: 2.5, delta_unit: 'PP', better: 'up', spark: []},
+    {key: 'speicher', label: 'Speicher', unit: 'kWh', value: -1.2, pct: null, abs: 0.8, better: null, spark: [],
+     lines: [{label: 'Ladestand', value: 72, unit: '%'}, {label: 'Ladung <b>', value: 4, unit: 'kWh'}]},
+  ], {compareLabel: 'gegen Vormonat'}),
 }));
 """
 
@@ -142,3 +147,10 @@ def test_the_changes_link_the_consumers_only_in_the_app_and_escape_names(longter
 def test_the_records_come_as_tiles_and_wait_for_a_year_of_data(longterm: dict) -> None:
     assert "Stärkster Erzeugungstag" in longterm["records"] and "61,2" in longterm["records"] and "14.06.2026" in longterm["records"]
     assert "kpi-empty" in longterm["notYet"] and "kpi-tile" not in longterm["notYet"]
+
+
+def test_quotas_change_in_percentage_points_and_the_storage_shows_its_lines(longterm: dict) -> None:
+    html = longterm["quotas"]
+    assert "46,7" in html and "▲ +2,5 PP" in html and "kpi-good" in html
+    assert "▲ +0,8 kWh" in html and html.count("kpi-delta kpi-good") == 1  # ohne better bleibt die Veränderung neutral
+    assert "Ladestand 72" in html and "Ladung &lt;b&gt; 4,0" in html and "-1,2" in html

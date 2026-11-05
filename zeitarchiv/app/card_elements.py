@@ -36,9 +36,13 @@ RANGES = ("day", "week", "month", "year")
 SIDES = ("verbrauch", "versorgung")
 MAX_OFFSET = 60
 #: Kennzahlen der Energie-Kachelreihe (Schlüssel der KPIs in compute_flow) und wie viele eine Karte zeigt.
-KPI_VALUES = ("erzeugung", "verbrauch", "netzbezug", "einspeisung")
+KPI_VALUES = ("erzeugung", "verbrauch", "netzbezug", "einspeisung", "autarkie", "eigenverbrauch")
+#: Was eine Karte ohne Auswahl zeigt: die vier Energiemengen; Quoten und Speicher wählt man dazu.
+KPI_DEFAULT = KPI_VALUES[:4]
+#: Quoten in Prozent (die Veränderung steht in Prozentpunkten, nicht in Prozent).
+KPI_QUOTAS = ("autarkie", "eigenverbrauch")
 #: Ob ein größerer Wert günstig ist (up) oder ungünstig (down): mehr Erzeugung und Einspeisung ja, mehr Bezug und Verbrauch nein.
-KPI_BETTER = {"erzeugung": "up", "einspeisung": "up", "verbrauch": "down", "netzbezug": "down"}
+KPI_BETTER = {"erzeugung": "up", "einspeisung": "up", "verbrauch": "down", "netzbezug": "down", "autarkie": "up", "eigenverbrauch": "up"}
 MAX_VALUES = 8
 #: Verbraucher der Veränderungsliste: Vorgabe (energie_langzeit.CHANGES_LIMIT) und Höchstzahl.
 CHANGES_DEFAULT = 8
@@ -231,6 +235,14 @@ def _sparkline(tile: dict) -> list[float | None]:
     return [None if all(value is None for value in column) else round(sum(value or 0.0 for value in column), 3) for column in columns]
 
 
+def _quota_item(key: str, label: str, current: dict, previous: dict) -> dict:
+    """Autarkie und Eigenverbrauch: Prozent, die Veränderung in Prozentpunkten zur Vorperiode."""
+    value, before = current.get(key), previous.get(key)
+    change = round(value - before, 1) if value is not None and before is not None else None
+    return {"key": key, "label": label, "unit": "%", "value": value, "pct": None, "abs": change, "delta_unit": tr("PP"),
+            "better": KPI_BETTER[key], "spark": []}
+
+
 def _energie_kpis(ctx: Context, options: Options) -> dict:
     from .energiedashboard_routes import COMPARE_LABELS
     from .storage import query as query_mod
@@ -240,22 +252,28 @@ def _energie_kpis(ctx: Context, options: Options) -> dict:
         raise ElementUnavailable(tr("Im Energiedashboard nicht eingerichtet"))
     range_key = options.range if options.range in ("day", "month", "year") else "day"
     offset = min(0, options.offset)
-    keys = [key for key in dict.fromkeys(options.values or KPI_VALUES) if key in KPI_VALUES][:MAX_VALUES] or list(KPI_VALUES)
+    keys = [key for key in dict.fromkeys(options.values or KPI_DEFAULT) if key in KPI_VALUES][:MAX_VALUES] or list(KPI_DEFAULT)
     energie = ctx.energie
     read_cache = query_mod.QueryReadCache()
     flow = energie.compute_flow(config, range_key, offset, skip_quality=True, read_cache=read_cache)
-    compare, current, _previous = energie.compute_period_comparison(config, range_key, offset, flow, read_cache)
-    labels = {"erzeugung": tr("Erzeugung"), "verbrauch": tr("Verbrauch"), "netzbezug": tr("Netzbezug"), "einspeisung": tr("Einspeisung")}
+    compare, current, previous = energie.compute_period_comparison(config, range_key, offset, flow, read_cache)
+    labels = {
+        "erzeugung": tr("Erzeugung"), "verbrauch": tr("Verbrauch"), "netzbezug": tr("Netzbezug"), "einspeisung": tr("Einspeisung"),
+        "autarkie": tr("Autarkie"), "eigenverbrauch": tr("Eigenverbrauch"),
+    }
     items = []
     for key in keys:
-        entry = compare.get(key) or {}
-        item = {
-            "key": key, "label": labels[key], "unit": "kWh", "value": current.get(key), "pct": entry.get("pct"),
-            "abs": entry.get("abs"), "better": KPI_BETTER[key], "spark": [],
-        }
-        if options.sparkline:
-            item["spark"] = _sparkline(energie.compute_tile(config, key, range_key, offset, read_cache))
-        items.append(item)
+        if key in KPI_QUOTAS:
+            items.append(_quota_item(key, labels[key], current, previous))
+        else:
+            entry = compare.get(key) or {}
+            item = {
+                "key": key, "label": labels[key], "unit": "kWh", "value": current.get(key), "pct": entry.get("pct"),
+                "abs": entry.get("abs"), "better": KPI_BETTER[key], "spark": [],
+            }
+            if options.sparkline:
+                item["spark"] = _sparkline(energie.compute_tile(config, key, range_key, offset, read_cache))
+            items.append(item)
     return {"renderer": "energie.kennzahlen", "items": items, "range": range_key,
             "compare_label": tr(COMPARE_LABELS[range_key])}
 
@@ -281,7 +299,12 @@ def _wetter_kpis(ctx: Context, options: Options) -> dict:
 
 
 def _energie_kpi_values(ctx: Context) -> list[dict]:
-    return [{"key": key} for key in KPI_VALUES]
+    labels = {
+        "erzeugung": tr("Erzeugung"), "verbrauch": tr("Verbrauch"), "netzbezug": tr("Netzbezug"), "einspeisung": tr("Einspeisung"),
+        "autarkie": tr("Autarkie"), "eigenverbrauch": tr("Eigenverbrauch"),
+    }
+    # "default": was die Karte ohne Auswahl zeigt.
+    return [{"key": key, "label": labels[key], "default": key in KPI_DEFAULT} for key in KPI_VALUES]
 
 
 def _wetter_available(ctx: Context) -> bool:

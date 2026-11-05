@@ -71,9 +71,11 @@ class _Energie:
         }
 
     def compute_period_comparison(self, config: dict, range_key: str, offset: int, current: dict, read_cache) -> tuple[dict, dict, dict]:
-        kpi = {"erzeugung": 21.3, "verbrauch": 30.0, "netzbezug": 16.0, "einspeisung": 4.1}
-        compare = {"erzeugung": {"pct": 12.0, "abs": 2.3}, "verbrauch": {"pct": None, "abs": None}, "netzbezug": {"pct": -7.0, "abs": -1.2}, "einspeisung": {"pct": 31.0, "abs": 1.0}}
-        return compare, kpi, kpi
+        kpi = {"erzeugung": 21.3, "verbrauch": 30.0, "netzbezug": 16.0, "einspeisung": 4.1, "autarkie": 46.7, "eigenverbrauch": 80.8,
+               "speicher_netto": 1.5, "speicher_laden": 4.0, "speicher_entladen": 2.5, "speicher_soc": 55.0, "speicher_soc_now": 72.0}
+        before = {**kpi, "autarkie": 44.2, "eigenverbrauch": None}
+        compare = {"erzeugung": {"pct": 12.0, "abs": 2.3}, "verbrauch": {"pct": None, "abs": None}, "netzbezug": {"pct": -7.0, "abs": -1.2}, "einspeisung": {"pct": 31.0, "abs": 1.0}, "speicher_netto": {"pct": None, "abs": 0.8}}
+        return compare, kpi, before
 
     def compute_tile(self, config: dict, key: str, range_key: str, offset: int, read_cache) -> dict:
         self.tiles.append(key)
@@ -298,7 +300,7 @@ def test_the_load_profile_uses_the_cache_for_the_running_period_only(energie: _E
 def test_the_energy_key_figures_carry_value_change_and_a_sparkline(energie: _Energie) -> None:
     client = _client()
     listed = {item["key"]: item for item in client.get("/api/card/elements", headers=AUTH).json()["elements"]}
-    assert listed["energie.kennzahlen"]["kind"] == "kpi" and [v["key"] for v in listed["energie.kennzahlen"]["values"]] == ["erzeugung", "verbrauch", "netzbezug", "einspeisung"]
+    assert listed["energie.kennzahlen"]["kind"] == "kpi" and [v["key"] for v in listed["energie.kennzahlen"]["values"]] == ["erzeugung", "verbrauch", "netzbezug", "einspeisung", "autarkie", "eigenverbrauch"]
     body = client.get("/api/card/element", headers=AUTH, params={"key": "energie.kennzahlen", "values": "erzeugung,netzbezug,unbekannt"}).json()
     assert body["renderer"] == "energie.kennzahlen" and body["range"] == "month"
     items = {item["key"]: item for item in body["items"]}
@@ -358,3 +360,18 @@ def test_the_changes_follow_mode_day_and_the_number_of_rows(energie: _Energie) -
     assert energie.langzeit.changes == [("bis_jetzt", None, 8), ("komplett", "2026-08-12", 3)]
     assert client.get("/api/card/element", headers=AUTH, params={"key": "energie.veraenderungen", "limit": 0}).status_code == 422
     assert client.get("/api/card/element", headers=AUTH, params={"key": "energie.veraenderungen", "limit": 21}).status_code == 422
+
+
+def test_the_quotas_change_in_percentage_points_and_are_not_part_of_the_default(energie: _Energie) -> None:
+    client = _client()
+    listed = {item["key"]: item for item in client.get("/api/card/elements", headers=AUTH).json()["elements"]}
+    values = {v["key"]: v for v in listed["energie.kennzahlen"]["values"]}
+    assert values["erzeugung"]["default"] is True and values["autarkie"]["default"] is False and "speicher" not in values  # kein Speicher eingerichtet
+    default = client.get("/api/card/element", headers=AUTH, params={"key": "energie.kennzahlen"}).json()
+    assert [item["key"] for item in default["items"]] == ["erzeugung", "verbrauch", "netzbezug", "einspeisung"]
+    body = client.get("/api/card/element", headers=AUTH, params={"key": "energie.kennzahlen", "values": "eigenverbrauch,autarkie"}).json()
+    items = {item["key"]: item for item in body["items"]}
+    assert list(items) == ["eigenverbrauch", "autarkie"]  # die Reihenfolge der Wahl bleibt
+    assert items["autarkie"]["value"] == 46.7 and items["autarkie"]["unit"] == "%" and items["autarkie"]["abs"] == 2.5 and items["autarkie"]["pct"] is None
+    assert items["autarkie"]["delta_unit"] and items["autarkie"]["better"] == "up" and items["autarkie"]["spark"] == []
+    assert items["eigenverbrauch"]["abs"] is None  # ohne Vorperiode keine Veränderung
