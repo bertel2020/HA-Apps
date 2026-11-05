@@ -354,15 +354,33 @@
       <div class="wt-rec-groups">
         <template x-for="group in recordGroups()" :key="group.key">
           <section class="wt-rec-g" :data-group="group.key">
-            <h3 class="wt-rec-h"><i></i><span x-text="{temperature: '{{ _("Temperatur") }}', wind: '{{ _("Wind und Regen") }}', sun: '{{ _("Sonne") }}'}[group.key]"></span></h3>
-            <ul class="wt-rec-list">
-              <template x-for="record in group.records" :key="record.key">
+            <div class="wt-rec-head">
+              <span class="wt-rec-badge" aria-hidden="true">
+                <svg x-show="group.key === 'temperature'" viewBox="0 0 24 24"><path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/></svg>
+                <svg x-show="group.key === 'wind'" viewBox="0 0 24 24"><path d="M3 8h10a3 3 0 1 0-3-3"/><path d="M3 12h15a3 3 0 1 1-3 3"/><path d="M3 16h7"/></svg>
+                <svg x-show="group.key === 'sun'" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/></svg>
+              </span>
+              <h3 class="wt-rec-h" x-text="{temperature: '{{ _("Temperatur") }}', wind: '{{ _("Wind und Regen") }}', sun: '{{ _("Sonne") }}'}[group.key]"></h3>
+            </div>
+            {# Große Kennzahlen; ohne href sind sie kein Link. #}
+            <div class="wt-rec-hero" :data-count="group.heroes.length">
+              <template x-for="record in group.heroes" :key="record.key">
+                <a class="wt-rec-big" :data-tone="recordTone(record.key)" :href="recordHasLink(record) ? recordLink(record) : null">
+                  <span class="wt-rec-k" x-text="recordLabel(record.key)"></span>
+                  <span class="wt-rec-bv" x-html="recordValue(record)"></span>
+                  <span class="wt-rec-chip" x-text="recordDate(record)"></span>
+                </a>
+              </template>
+            </div>
+            <ul class="wt-rec-list" x-show="group.rows.length">
+              <template x-for="record in group.rows" :key="record.key">
                 <li>
                   {# Ohne href (Sonnigster Monat) ist die Zeile kein Link: ein Monat hat keinen einzelnen Tag. #}
-                  <a class="wt-rec-row" :href="recordHasLink(record) ? recordLink(record) : null">
+                  <a class="wt-rec-row" :data-tone="recordTone(record.key)" :href="recordHasLink(record) ? recordLink(record) : null">
                     <span class="wt-rec-k" x-text="recordLabel(record.key)"></span>
                     <span class="wt-rec-v" x-html="recordValue(record)"></span>
                     <span class="wt-rec-d"><span x-text="recordDate(record)"></span><b x-show="recordHasLink(record)" x-text="record.end ? t('Ersten Tag öffnen') : t('Tag öffnen')"></b></span>
+                    <span class="wt-rec-bar" :data-kind="record.key" x-show="recordBar(record) != null"><i :style="'width:' + recordBar(record) + '%'"></i></span>
                   </a>
                 </li>
               </template>

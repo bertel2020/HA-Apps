@@ -77,8 +77,9 @@
     darunter, wie die Anlage an diesem Tag Stunde für Stunde zur Erwartung
     stand, mit einem Band für „im Rahmen“
   - **Rekorde**: Die Karte steht jetzt ganz oben im Reiter Langzeit und zeigt
-    die Rekorde in drei Gruppen (Temperatur, Wind und Regen, Sonne) als Liste;
-    jede Zeile führt zum Tag. Eine Folge, die noch läuft, endet „heute“
+    die Rekorde in drei farbigen Gruppen (Temperatur, Wind und Regen, Sonne),
+    mit den wichtigsten Werten groß; jede Zeile führt zum Tag. Eine Folge, die
+    noch läuft, endet „heute“
   - **Heizen**: Die Gradtag-Tabelle zeigt je Periode kWh je Gradtag groß und
     Gradtage und kWh klein darunter; die Veränderung steht als farbige Pille
     daneben. „Heizen und Sonne“ zeigt drei Kacheln mit einer Anteilsleiste
@@ -198,8 +199,9 @@
     against the expectation hour by hour on that day, with a band for "within
     range"
   - **Records**: The card now sits at the very top of the Long term tab and
-    shows the records in three groups (temperature, wind and rain, sun) as a
-    list; each row leads to the day. A streak that is still running ends "today"
+    shows the records in three coloured groups (temperature, wind and rain,
+    sun), with the key values large; each row leads to the day. A streak that is
+    still running ends "today"
   - **Heating**: The degree-day table shows kWh per degree day large for each
     period, with degree days and kWh small below; the change sits next to it
     as a coloured pill. "Heating and sun" shows three tiles with a share bar

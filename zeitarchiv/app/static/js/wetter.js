@@ -2310,17 +2310,32 @@
         return full(record.date);
       },
 
-      // Rekorde in drei Gruppen; ein Rekord ohne Wert in der Antwort fehlt einfach.
+      // Rekorde in drei Gruppen: große Kennzahlen (heroes) und kompakte Zeilen (rows). Ein Rekord, der in der Antwort fehlt,
+      // fehlt auch hier; fehlt eine ganze Gruppe, entfällt sie.
       recordGroups() {
         const records = this.longterm ? this.longterm.records : [];
+        const pick = (keys) => keys.map((k) => records.find((r) => r.key === k)).filter(Boolean);
         const groups = [
-          ['temperature', ['warmest_day', 'coldest_day', 'highest', 'lowest']],
-          ['wind', ['strongest_gust', 'wettest_day', 'rainiest_day']],
-          ['sun', ['sunniest_day', 'sunniest_month', 'longest_sunny_streak', 'longest_overcast_streak']],
+          ['temperature', ['highest', 'lowest'], ['warmest_day', 'coldest_day']],
+          ['wind', ['strongest_gust', 'wettest_day', 'rainiest_day'], []],
+          ['sun', ['sunniest_day'], ['sunniest_month', 'longest_sunny_streak', 'longest_overcast_streak']],
         ];
         return groups
-          .map(([key, keys]) => ({key, records: keys.map((k) => records.find((r) => r.key === k)).filter(Boolean)}))
-          .filter((group) => group.records.length);
+          .map(([key, heroes, rows]) => ({key, heroes: pick(heroes), rows: pick(rows)}))
+          .filter((group) => group.heroes.length || group.rows.length);
+      },
+
+      // Ton eines Rekords: Wärme rot, Kälte blau, alles andere in der Gruppenfarbe.
+      recordTone(key) {
+        return {highest: 'hot', warmest_day: 'hot', lowest: 'cold', coldest_day: 'cold'}[key] || '';
+      },
+
+      // Die beiden Folgen als Balken im Verhältnis zur längeren; sonst kein Balken.
+      recordBar(record) {
+        if (!record.key.endsWith('_streak')) return null;
+        const streaks = (this.longterm ? this.longterm.records : []).filter((r) => r.key.endsWith('_streak'));
+        const longest = Math.max(...streaks.map((r) => r.value), 0);
+        return longest ? Math.max(4, Math.round(record.value / longest * 100)) : null;
       },
 
       recordHasLink(record) {
