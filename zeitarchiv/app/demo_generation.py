@@ -69,6 +69,25 @@ WETTER_ENTITY_IDS = (
     "sensor.demo_windrichtung", "sensor.demo_sonnenhoehe",
 )
 
+#: Historie der Wetter-Reihen in Monaten (5 Jahre). Die Auswertungen über mehrere Jahre (Monatstabelle, Jahresmatrix,
+#: Kenntage, Rekorde, Heizen über mehrere Winter) brauchen mehr als die Sechs Monate des CLI-Standards.
+WEATHER_HISTORY_MONTHS = 60
+
+#: Reihen, die das Wetterdashboard liest und die deshalb die lange Historie bekommen: Entität -> Schlüssel in
+#: ``simulate_household()``. Alles andere der Demo behält den Zeitraum aus ``months``.
+WEATHER_HISTORY_KEYS = {
+    "sensor.demo_aussentemperatur": "outdoor_temp", "sensor.demo_luftfeuchte": "humidity", "sensor.demo_wind": "wind",
+    "sensor.demo_pv_leistung": "pv_power", "binary_sensor.demo_regensensor": "regensensor",
+    "sensor.demo_luftdruck": "luftdruck", "sensor.demo_boe": "boe", "sensor.demo_strahlung": "strahlung",
+    "sensor.demo_niederschlag": "niederschlag", "sensor.demo_aussentemperatur_nord": "outdoor_temp_nord",
+    "sensor.demo_waermepumpe_energie": "waermepumpe_energie", "sensor.demo_heizstab_energie": "heizstab_energie",
+    "sensor.demo_konvektoren_energie": "konvektoren_energie", "sensor.demo_helligkeit_sued": "helligkeit_sued",
+    "sensor.demo_helligkeit_daemmerung": "helligkeit_daemmerung", "sensor.demo_windrichtung": "windrichtung",
+    "sensor.demo_sonnenhoehe": "sonnenhoehe",
+}
+#: Zähler, die an der Nahtstelle zwischen langer Vorgeschichte und normalem Zeitraum nahtlos weiterlaufen müssen.
+_WEATHER_SEAM_COUNTERS = ("niederschlag", "waermepumpe_energie", "heizstab_energie", "konvektoren_energie")
+
 
 # Zustände der Demo-Zustands-Entitäten. Rohwerte wie Home Assistant sie
 # liefern würde (englisch), Anzeigenamen deutsch als Übersetzung — so zeigt
@@ -1936,6 +1955,7 @@ def run_generation(
     rng: random.Random,
     *,
     months: int = 36,
+    weather_months: int = 0,
     append: bool = False,
     clean: bool = False,
     on_entity: Callable[[int, str, int], None] | None = None,
@@ -2084,9 +2104,29 @@ def run_generation(
                 delete_all_values(data_dir, index, entity_id)
     migration_start = now - timedelta(days=MIGRATION_BACKFILL_DAYS) if append else start
 
-    weather = WeatherContext(start, now, rng)
+    # Längere Vorgeschichte nur der Wetter-Reihen (siehe WEATHER_HISTORY_KEYS), nur bei voller Erzeugung: ein --append
+    # kann nichts nachträglich vor den vorhandenen Anfang legen. Das Wetter (Bewölkung, Temperatur, Wind) läuft über
+    # beide Abschnitte durch, die Zähler setzen an der Nahtstelle fort.
+    weather_start: datetime | None = None
+    if (not append or fell_back_to_full_history) and weather_months * 30 > months * 30:
+        weather_start = now - timedelta(days=weather_months * 30)
+    weather = WeatherContext(weather_start or start, now, rng)
+    prehistory: dict[str, list[Row]] = {}
+    if weather_start is not None:
+        if on_status is not None:
+            on_status(f"Wetter-Reihen: {weather_months} Monate Historie statt {months}.")
+        rain_schedule = build_rain_schedule(weather_start, now, weather, rng)
+        prehistory = simulate_household(
+            weather_start, start, tz, rng, weather, build_appliance_schedules(weather_start, start, rng), rain_schedule,
+        )
+        counter_seed = {**counter_seed, **{
+            key: prehistory[key][-1][1] for key in _WEATHER_SEAM_COUNTERS if prehistory[key]
+        }}
+        if prehistory["regensensor"]:
+            rain_seed = prehistory["regensensor"][-1][1]
+    else:
+        rain_schedule = build_rain_schedule(start, now, weather, rng)
     schedules = build_appliance_schedules(start, now, rng)
-    rain_schedule = build_rain_schedule(start, now, weather, rng)
     household = simulate_household(
         start, now, tz, rng, weather, schedules, rain_schedule,
         counter_seed=counter_seed, appliance_seed=appliance_seed, rain_seed=rain_seed,
@@ -2195,6 +2235,10 @@ def run_generation(
         "sensor.demo_migration2_alt_stromverbrauch": gen_migration2_old_counter(migration_start, now, rng),
         "sensor.demo_migration2_stromverbrauch": gen_migration2_new_counter(migration_start, now, rng),
     }
+
+    for entity_id, key in WEATHER_HISTORY_KEYS.items():
+        if prehistory.get(key):
+            rows_by_key[entity_id] = prehistory[key] + rows_by_key[entity_id]
 
     if not append or fell_back_to_full_history:
         # Ein Sprachwechsel soll den Datensatz ersetzen, nicht verdoppeln: IDs der anderen Sprache entfernen.

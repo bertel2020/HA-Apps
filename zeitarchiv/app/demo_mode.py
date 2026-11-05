@@ -28,7 +28,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from .demo_generation import DEMO_ENTITIES, run_generation
+from .demo_generation import DEMO_ENTITIES, WEATHER_HISTORY_MONTHS, run_generation
 from .progress import JobProgress
 from .route_support import dir_size_and_newest_mtime
 from .storage.coordinator import StorageCoordinator
@@ -168,6 +168,7 @@ def build_demo_worker(
         with coordinator.exclusive():
             result = run_generation(
                 data_dir, index, tz, random.Random(),
+                weather_months=WEATHER_HISTORY_MONTHS,
                 append=(mode == "append"), clean=(mode == "regenerate"),
                 on_entity=lambda i, entity_id, _n: demo_progress.advance(i, entity_id),
                 language=language,

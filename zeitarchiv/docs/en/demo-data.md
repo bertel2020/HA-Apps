@@ -248,6 +248,7 @@ More examples:
 | --- | --- | --- |
 | `--data-dir` | *(required)* | Target directory; created if needed |
 | `--months` | `6` | How many months of history are generated (calculation: months × 30 days back from now) |
+| `--weather-months` | `60` | History of the series the weather dashboard reads (outdoor temperature, humidity, wind, precipitation, rain sensor, radiation, brightness, PV power, heating counters and others), in months. Five years give the long-term cards (monthly table, year matrix, key days, records, heating over several winters) enough to show; the rest of the demo keeps `--months`. Applies to the full generation only, not to `--append`; if the value is not larger than `--months`, nothing changes. The app's demo mode uses the same value |
 | `--tz` | `Europe/Berlin` | IANA time zone for month/day boundaries |
 | `--seed` | `42` | Random seed — the same seed reproducibly generates the same values |
 | `--clean` | *(off)* | Cleanly remove existing `demo_*` entities in the target directory before generating (for repeated runs) |

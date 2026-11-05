@@ -254,6 +254,7 @@ Weitere Beispiele:
 | --- | --- | --- |
 | `--data-dir` | *(erforderlich)* | Zielverzeichnis; wird bei Bedarf angelegt |
 | `--months` | `6` | Wie viele Monate Historie erzeugt werden (Rechnung: Monate × 30 Tage zurück von jetzt) |
+| `--weather-months` | `60` | Historie der Reihen, die das Wetterdashboard liest (Außentemperatur, Luftfeuchte, Wind, Niederschlag, Regensensor, Strahlung, Helligkeit, PV-Leistung, Heizzähler u. a.), in Monaten. Fünf Jahre geben den Langzeitkacheln (Monatstabelle, Jahresmatrix, Kenntage, Rekorde, Heizen über mehrere Winter) genug Stoff; der Rest der Demo behält `--months`. Gilt nur für die volle Erzeugung, nicht mit `--append`; ist der Wert nicht größer als `--months`, ändert sich nichts. Der Demo-Modus der App nutzt denselben Wert |
 | `--tz` | `Europe/Berlin` | IANA-Zeitzone für Monats-/Tagesgrenzen |
 | `--seed` | `42` | Zufalls-Seed — gleicher Seed erzeugt reproduzierbar dieselben Werte |
 | `--clean` | *(aus)* | Vorhandene `demo_*`-Entitäten im Zielverzeichnis vor dem Erzeugen sauber entfernen (für wiederholte Läufe) |

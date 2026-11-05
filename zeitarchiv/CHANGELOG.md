@@ -41,6 +41,8 @@
     einem eigenen Diagramm „Luftfeuchte im Vergleich“
   - Die Kartenauswahl ist nach Reiter geordnet; der Reiter Heizen und seine
     Einstellungen stehen als „Experimentell“ in einem eigenen Block
+  - Die Wetter-Reihen der Demo-Daten haben fünf Jahre Historie, damit die
+    Langzeitkacheln etwas zeigen; der Rest behält seinen Zeitraum
   - Die Demo-Daten enthalten die beiden Helligkeitssensoren, Windrichtung und
     Sonnenhöhe mit Verlauf; die Helligkeit schwankt nun zwischen trüben und
     sonnigen Tagen
@@ -112,6 +114,8 @@
     separate "Humidity comparison" chart
   - The card selection is grouped by tab; the Heating tab and its settings are
     in a separate "Experimental" block
+  - The weather series of the demo data have five years of history so the
+    long-term cards have something to show; everything else keeps its period
   - The demo data contains both brightness sensors, wind direction and sun
     elevation with a history; the brightness now varies between overcast and
     sunny days

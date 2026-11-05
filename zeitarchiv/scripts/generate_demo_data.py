@@ -40,7 +40,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.demo_generation import DEMO_ENTITIES, localized_id, run_generation  # noqa: E402
+from app.demo_generation import DEMO_ENTITIES, WEATHER_HISTORY_MONTHS, localized_id, run_generation  # noqa: E402
 from app.storage.entity_removal import delete_all_values, delete_entity  # noqa: E402
 from app.storage.index import Index  # noqa: E402
 
@@ -52,6 +52,7 @@ def main() -> None:
     parser.add_argument("--tz", default="Europe/Berlin", help="IANA-Zeitzone (Standard: Europe/Berlin)")
     parser.add_argument("--seed", type=int, default=42, help="Zufalls-Seed für reproduzierbare Läufe (Standard: 42)")
     parser.add_argument("--clean", action="store_true", help="Werte vorhandener demo_*-Entitäten im Zielverzeichnis zuerst bereinigen (Entitäten selbst bleiben bestehen)")
+    parser.add_argument("--weather-months", type=int, default=WEATHER_HISTORY_MONTHS, help=f"Historie der Wetter-Reihen für das Wetterdashboard in Monaten (Standard: {WEATHER_HISTORY_MONTHS}); 0 oder weniger als --months: wie --months. Wirkt nur bei voller Erzeugung, nicht mit --append")
     parser.add_argument("--append", action="store_true", help="Statt die komplette Historie neu zu würfeln: nur die Werte seit dem letzten Lauf ergänzen (--months wird dabei ignoriert) — macht aus der Demo-Instanz ein 'lebendes' System, z. B. per Cron. Ohne vorhandene Demo-Daten wird automatisch auf eine normale Vollerzeugung zurückgefallen")
     parser.add_argument(
         "--clear", nargs="?", choices=["values", "entities"], const="entities", default=None,
@@ -97,7 +98,7 @@ def main() -> None:
 
     result = run_generation(
         args.data_dir, index, tz, rng,
-        months=args.months, append=args.append, clean=args.clean,
+        months=args.months, weather_months=args.weather_months, append=args.append, clean=args.clean,
         on_entity=lambda _i, entity_id, n: print(f"{entity_id}: {n} Werte geschrieben"),
         on_status=print,
         language=args.language,
