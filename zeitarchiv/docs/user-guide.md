@@ -987,7 +987,9 @@ eine eigene Spalte.
 
 **Rekorde** (wärmster und kältester Tag, höchster und tiefster Wert, stärkste Böe,
 nassester Tag) erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte
-enthält, und gelten seit Archivbeginn. Ein einzelner Messfehler kann einen
+enthält, und gelten seit Archivbeginn. Sie stehen ganz oben im Reiter Langzeit, in drei
+Gruppen (Temperatur, Wind und Regen, Sonne); jede Zeile ist ein Link auf den Tag, bei einer
+Folge auf ihren ersten Tag, und eine noch laufende Folge endet „heute“. Ein einzelner Messfehler kann einen
 Rekord setzen: über **Tag öffnen** springt ihr direkt in die Entität an diesem
 Tag. Fehlerhafte Werte lassen sich dort markieren; erst nach dem endgültigen
 Löschen rechnen die Rekorde ohne sie.

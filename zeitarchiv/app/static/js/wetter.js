@@ -2297,14 +2297,34 @@
       },
 
       recordDate(record) {
-        const day = (iso) => new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'})
-          .format(new Date(iso + 'T12:00:00Z'));
-        if (record.key === 'sunniest_month') {
-          return new Intl.DateTimeFormat(LOCALE, {month: 'long', year: 'numeric', timeZone: 'UTC'}).format(new Date(record.date + 'T12:00:00Z'));
+        const fmt = (options) => new Intl.DateTimeFormat(LOCALE, {...options, timeZone: 'UTC'});
+        const at = (iso) => new Date(iso + 'T12:00:00Z');
+        const full = (iso) => fmt({day: '2-digit', month: '2-digit', year: 'numeric'}).format(at(iso));
+        if (record.key === 'sunniest_month') return fmt({month: 'long', year: 'numeric'}).format(at(record.date));
+        if (record.end) {
+          // Läuft die Folge noch, endet sie heute; im selben Jahr genügt beim Beginn Tag und Monat.
+          if (record.ongoing) return t('{from} bis heute', {from: full(record.date)});
+          const sameYear = record.date.slice(0, 4) === record.end.slice(0, 4);
+          return t('{from} bis {to}', {from: sameYear ? fmt({day: '2-digit', month: '2-digit'}).format(at(record.date)) : full(record.date), to: full(record.end)});
         }
-        if (record.end) return `${day(record.date)} – ${day(record.end)}`;
-        return new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'})
-          .format(new Date(record.date + 'T12:00:00Z'));
+        return full(record.date);
+      },
+
+      // Rekorde in drei Gruppen; ein Rekord ohne Wert in der Antwort fehlt einfach.
+      recordGroups() {
+        const records = this.longterm ? this.longterm.records : [];
+        const groups = [
+          ['temperature', ['warmest_day', 'coldest_day', 'highest', 'lowest']],
+          ['wind', ['strongest_gust', 'wettest_day', 'rainiest_day']],
+          ['sun', ['sunniest_day', 'sunniest_month', 'longest_sunny_streak', 'longest_overcast_streak']],
+        ];
+        return groups
+          .map(([key, keys]) => ({key, records: keys.map((k) => records.find((r) => r.key === k)).filter(Boolean)}))
+          .filter((group) => group.records.length);
+      },
+
+      recordHasLink(record) {
+        return record.key !== 'sunniest_month';
       },
 
       recordLink(record) {

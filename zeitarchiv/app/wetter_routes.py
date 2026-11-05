@@ -924,6 +924,8 @@ class WetterService:
                             "unit": {"sunniest_day": "h", "sunniest_month": "h"}.get(key, ""),
                         }
                         entry["offset_days"] = (date.fromisoformat(entry["date"]) - today).days
+                        # Die Tage reichen bis gestern: endet die Folge dort, läuft sie noch.
+                        entry["ongoing"] = key.endswith("_streak") and entry.get("end") == (today - timedelta(days=1)).isoformat()
                         entries.append(entry)
         return {
             "kenntage": analysis.kenntage(points, self.deps.tz, today, temperature_unit),

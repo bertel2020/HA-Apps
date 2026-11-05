@@ -925,7 +925,9 @@ day in the entity. 29 February has a column of its own.
 
 **Records** (warmest and coldest day, highest and lowest value, strongest gust,
 wettest day) appear once the archive holds at least a year of daily values and apply
-since the archive began. A single measurement error can set a record: **Open day**
+since the archive began. They sit at the top of the Long term tab in three groups
+(temperature, wind and rain, sun); each row links to the day, a streak to its first day,
+and a streak that is still running ends "today". A single measurement error can set a record: **Open day**
 jumps straight to the entity on that day, where faulty values can be marked; only after
 they are deleted for good do the records exclude them.
 

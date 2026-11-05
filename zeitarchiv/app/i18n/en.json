@@ -3689,7 +3689,8 @@
     "Beginn / Ende": "start / end",
     "Erwartet nach Helligkeit": "Expected from brightness",
     "Ein Tag lässt sich anklicken.": "Click a day to select it.",
-    "Ertrag": "Yield"
+    "Ertrag": "Yield",
+    "Wind und Regen": "Wind and rain"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4633,6 +4634,10 @@
     "{sign}{percent} % zur Erwartung": "{sign}{percent} % vs. expected",
     "{percent} % unter der Erwartung": "{percent} % below expected",
     "{percent} % über der Erwartung": "{percent} % above expected",
-    "Ertrag gegenüber Erwartung am {day}, je Stunde": "Yield vs. expected on {day}, by hour"
+    "Ertrag gegenüber Erwartung am {day}, je Stunde": "Yield vs. expected on {day}, by hour",
+    "Tag öffnen": "Open day",
+    "Ersten Tag öffnen": "Open first day",
+    "{from} bis heute": "{from} to today",
+    "{from} bis {to}": "{from} to {to}"
   }
 }

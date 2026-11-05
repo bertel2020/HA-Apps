@@ -346,6 +346,32 @@
 
   {% if show_long %}
   <section x-show="tab === 'long'" x-cloak role="tabpanel" id="wt-panel-long" aria-labelledby="wt-tab-long">
+    <div class="card wt-card" x-show="longterm && longterm.records.length" x-cloak>
+      <div class="wt-controls">
+        <h2 class="wt-h2">{{ _("Rekorde") }} {{ hint_button(_("Rekorde")) }}</h2>
+        {% call hint_body() %}<span x-text="recordsNote()"></span>{% endcall %}
+      </div>
+      <div class="wt-rec-groups">
+        <template x-for="group in recordGroups()" :key="group.key">
+          <section class="wt-rec-g" :data-group="group.key">
+            <h3 class="wt-rec-h"><i></i><span x-text="{temperature: '{{ _("Temperatur") }}', wind: '{{ _("Wind und Regen") }}', sun: '{{ _("Sonne") }}'}[group.key]"></span></h3>
+            <ul class="wt-rec-list">
+              <template x-for="record in group.records" :key="record.key">
+                <li>
+                  {# Ohne href (Sonnigster Monat) ist die Zeile kein Link: ein Monat hat keinen einzelnen Tag. #}
+                  <a class="wt-rec-row" :href="recordHasLink(record) ? recordLink(record) : null">
+                    <span class="wt-rec-k" x-text="recordLabel(record.key)"></span>
+                    <span class="wt-rec-v" x-html="recordValue(record)"></span>
+                    <span class="wt-rec-d"><span x-text="recordDate(record)"></span><b x-show="recordHasLink(record)" x-text="record.end ? t('Ersten Tag öffnen') : t('Tag öffnen')"></b></span>
+                  </a>
+                </li>
+              </template>
+            </ul>
+          </section>
+        </template>
+      </div>
+    </div>
+    <p class="hint hint-status" x-show="longterm && !longterm.records.length" x-cloak>{{ _("Rekorde erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte enthält.") }}</p>
     <div class="card wt-card">
       <div class="wt-controls">
         <h2 class="wt-h2">{{ _("Kenntage je Jahr") }} {{ hint_button(_("Kenntage je Jahr")) }}</h2>
@@ -406,23 +432,6 @@
       <div class="wt-chart wt-matrix" x-ref="matrixChart" :style="matrixHeight()"></div>
       <p class="hint hint-warn" x-show="matrixError" x-text="matrixError" x-cloak></p>
     </div>
-    <div class="card wt-card" x-show="longterm && longterm.records.length" x-cloak>
-      <div class="wt-controls">
-        <h2 class="wt-h2">{{ _("Rekorde") }} {{ hint_button(_("Rekorde")) }}</h2>
-        {% call hint_body() %}<span x-text="recordsNote()"></span>{% endcall %}
-      </div>
-      <div class="wt-kpis" :style="'--wt-cols:' + kpiCols(longterm ? longterm.records.length : 0)">
-        <template x-for="record in (longterm ? longterm.records : [])" :key="record.key">
-          <div class="wt-tile">
-            <span class="wt-tile-label" x-text="recordLabel(record.key)"></span>
-            <span class="wt-tile-value" x-html="recordValue(record)"></span>
-            <span class="wt-tile-sub" x-text="recordDate(record)"></span>
-            <a class="wt-record-link" x-show="record.key !== 'sunniest_month'" :href="recordLink(record)">{{ _("Tag öffnen") }}</a>
-          </div>
-        </template>
-      </div>
-    </div>
-    <p class="hint hint-status" x-show="longterm && !longterm.records.length" x-cloak>{{ _("Rekorde erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte enthält.") }}</p>
     <p class="hint hint-warn" x-show="longError" x-text="longError" x-cloak></p>
   </section>
   {% endif %}
