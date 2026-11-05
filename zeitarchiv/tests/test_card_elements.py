@@ -24,9 +24,25 @@ MONTHS = {
 }
 
 
+RECORDS = {
+    "unit": "kWh", "since": "2025-01-01", "days": 400, "span": 400, "enough": True,
+    "records": [{"key": "erzeugung", "label": "Stärkster Erzeugungstag", "value": 61.2, "date": "2026-06-14", "entity_id": "sensor.pv", "offset": -144}],
+    "kenntage": {"available": ["fast_autark"], "groups": {"fast_autark": "eigenversorgung"}, "thresholds": {"autark": 90}, "today": "2026-11-05",
+                 "years": [{"year": 2026, "fields": {}}, {"year": 2025, "fields": {}}, {"year": 2024, "fields": {}}]},
+}
+
+
 class _Langzeit:
     def __init__(self) -> None:
         self.bodies: list = []
+        self.changes: list = []
+
+    def compute_records(self, config: dict) -> dict:
+        return RECORDS
+
+    def compute_changes(self, config: dict, body, limit: int = 8) -> dict:
+        self.changes.append((body.mode, body.at, limit))
+        return {"unit": "kWh", "items": []}
 
     def compute_months(self, config: dict) -> dict:
         return MONTHS
@@ -119,7 +135,8 @@ def test_only_set_up_elements_are_listed(energie: _Energie, monkeypatch: pytest.
     body = client.get("/api/card/elements", headers=AUTH).json()
     assert body["spec_version"] == SPEC_VERSION
     assert [item["key"] for item in body["elements"]] == [
-        "energie.zeitraeume", "energie.matrix", "energie.monatsvergleich", "energie.anteile", "energie.kennzahlen", "energie.heatmap",
+        "energie.zeitraeume", "energie.matrix", "energie.monatsvergleich", "energie.anteile", "energie.kennzahlen", "energie.rekorde",
+        "energie.kenntage", "energie.veraenderungen", "energie.heatmap",
     ]
     assert body["elements"][0]["columns"] == ["monat", "vormonat", "jahr"]
     monkeypatch.setattr(card_elements, "_energie_config", lambda ctx: None)
@@ -311,3 +328,33 @@ def test_the_weather_key_figures_offer_the_set_up_values_and_filter_them(energie
     assert [tile["key"] for tile in everything["tiles"]] == ["temperature", "precip_mm"] and everything["renderer"] == "wetter.kennzahlen"
     chosen = client.get("/api/card/element", headers=AUTH, params={"key": "wetter.kennzahlen", "values": "precip_mm"}).json()
     assert [tile["key"] for tile in chosen["tiles"]] == ["precip_mm"]
+
+
+def test_the_long_term_blocks_are_listed_with_their_options(energie: _Energie) -> None:
+    listed = {item["key"]: item for item in _client().get("/api/card/elements", headers=AUTH).json()["elements"]}
+    assert listed["energie.rekorde"]["kind"] == "kpi" and not listed["energie.rekorde"]["modes"]
+    assert listed["energie.kenntage"]["kind"] == "table" and listed["energie.kenntage"]["modes"] and listed["energie.kenntage"]["year_limit"]
+    assert listed["energie.veraenderungen"]["modes"] and listed["energie.veraenderungen"]["limit"] and not listed["energie.veraenderungen"]["year_limit"]
+
+
+def test_the_records_send_only_what_the_tiles_show(energie: _Energie) -> None:
+    body = _client().get("/api/card/element", headers=AUTH, params={"key": "energie.rekorde"}).json()
+    assert body["renderer"] == "energie.rekorde" and body["enough"] is True and body["since"] == "2025-01-01"
+    assert body["records"] == [{"key": "erzeugung", "label": "Stärkster Erzeugungstag", "value": 61.2, "date": "2026-06-14"}]  # kein Verweis in die App
+
+
+def test_the_key_days_are_cut_to_the_chosen_years_and_count_until_today_by_default(energie: _Energie) -> None:
+    client = _client()
+    body = client.get("/api/card/element", headers=AUTH, params={"key": "energie.kenntage", "years": 2}).json()
+    assert [entry["year"] for entry in body["kenntage"]["years"]] == [2026, 2025] and body["ytd"] is True
+    everything = client.get("/api/card/element", headers=AUTH, params={"key": "energie.kenntage", "years": 0, "mode": "komplett"}).json()
+    assert len(everything["kenntage"]["years"]) == 3 and everything["ytd"] is False
+
+
+def test_the_changes_follow_mode_day_and_the_number_of_rows(energie: _Energie) -> None:
+    client = _client()
+    client.get("/api/card/element", headers=AUTH, params={"key": "energie.veraenderungen"})
+    client.get("/api/card/element", headers=AUTH, params={"key": "energie.veraenderungen", "mode": "komplett", "at": "2026-08-12", "limit": 3})
+    assert energie.langzeit.changes == [("bis_jetzt", None, 8), ("komplett", "2026-08-12", 3)]
+    assert client.get("/api/card/element", headers=AUTH, params={"key": "energie.veraenderungen", "limit": 0}).status_code == 422
+    assert client.get("/api/card/element", headers=AUTH, params={"key": "energie.veraenderungen", "limit": 21}).status_code == 422

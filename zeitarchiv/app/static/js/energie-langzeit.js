@@ -8,7 +8,7 @@
   const LOCALE = window.ZA_FORMAT;
   const ZT = window.ServerTime;
 
-  const {formats, fmtDate, rangeText, energy, columnName, energyComparison: renderTable} = window.ElementTableRender;
+  const {formats, fmtDate, rangeText, energy, columnName, energyComparison: renderTable, kenntagRule, kenntagLabels: KENNTAG_LABELS, energyKenntage, energyChanges, changesRange, kenntageRange} = window.ElementTableRender;
   const num = (value, decimals) => NumberFormat.fmt(value, decimals);
 
   function readStore() {
@@ -65,24 +65,6 @@
 
   const {monthName, mean, present, monthKey, isPartialStart, monthStats, yearSum, energyMatrix} = window.ElementTableRender;
   const {energyMonthly} = window.ElementChartRender;
-
-  // Kenntage je Jahr: Beschriftung, Regel und die Tooltip-Zeile je Kenntag. Die Schwellen kommen aus dem Setup.
-  const KENNTAG_GROUPS = () => ({eigenversorgung: t('Eigenversorgung'), erzeugung: t('Erzeugung'), speicher: t('Speicher')});
-  const KENNTAG_LABELS = () => ({
-    fast_autark: t('Fast autark'), ueberschuss: t('Überschusstage'), sonnig: t('Sonnentage'), truebe: t('Trübe Tage'),
-    speicher_stark: t('Speicher stark genutzt'), speicher_schwach: t('Speicher kaum genutzt'),
-  });
-
-  function kenntagRule(key, th) {
-    switch (key) {
-      case 'fast_autark': return t('Autarkie ab {value} %', {value: num(th.autark, 0)});
-      case 'ueberschuss': return t('mehr Einspeisung als Verbrauch');
-      case 'sonnig': return t('ab {value} kWh je kWp', {value: num(th.sonnig, 1)});
-      case 'truebe': return t('unter {value} % des Tagesmittels', {value: num(th.truebe, 0)});
-      case 'speicher_stark': return t('ab {value} % der Kapazität', {value: num(th.speicher_stark, 0)});
-      default: return t('unter {value} % der Kapazität', {value: num(th.speicher_schwach, 0)});
-    }
-  }
 
   function kenntagValues(key, values, average, kwp, capacity) {
     const kwh = (value) => num(value, 1);
@@ -311,10 +293,7 @@
 
       ktRange() {
         const kt = this.records && this.records.kenntage;
-        if (!kt) return '';
-        if (this.ktMode !== 'ytd') return t('Ganze Kalenderjahre. Das laufende Jahr (*) zählt bis heute.');
-        const date = fmtDate(formats.dmy, Date.parse(kt.today + 'T12:00:00Z') / 1000);
-        return t('Alle Jahre nur bis {date} gezählt, damit das laufende Jahr (*) vergleichbar ist.', {date});
+        return kt ? kenntageRange(kt, this.ktMode === 'ytd') : '';
       },
 
       setKtMode(mode) {
@@ -328,38 +307,9 @@
         const r = this.records;
         const host = this.$refs.kenntage;
         if (!r || !r.kenntage || !host) return;
-        const kt = r.kenntage;
-        const ytd = this.ktMode === 'ytd';
-        const years = this.yearLimit ? kt.years.slice(0, this.yearLimit) : kt.years;
-        const current = new Date().getFullYear();
-        const groups = KENNTAG_GROUPS();
-        const labels = KENNTAG_LABELS();
-        let html = '';
-        let lastGroup = null;
-        for (const key of kt.available) {
-          const group = kt.groups[key];
-          if (group !== lastGroup) html += `<div class="wt-kt-group">${escapeHtml(groups[group])}</div>`;
-          lastGroup = group;
-          const rows = years.map((entry) => {
-            const f = entry.fields[key];
-            const days = ytd ? f.days_ytd : f.days;
-            const hit = ytd ? f.hit_ytd : f.hit;
-            return {year: entry.year, days, hit, pct: days ? hit / days * 100 : 0};
-          }).filter((row) => row.days > 0);
-          const top = Math.max(0, ...rows.map((row) => row.pct));
-          html += `<div class="wt-kt-col"><h3 class="wt-kt-title">${escapeHtml(labels[key])}</h3>`
-            + `<p class="wt-kt-rule">${escapeHtml(kenntagRule(key, kt.thresholds))}</p>`;
-          for (const row of rows) {
-            const pct = row.hit > 0 && row.pct < 1 ? '< 1 %' : `${num(row.pct, 0)} %`;
-            const tip = `${t('Ausgewertete Tage')}: ${num(row.days, 0)}`;
-            html += `<button type="button" class="wt-kt-row" data-field="${key}" data-year="${row.year}" data-tooltip-fixed="${escapeHtml(tip)}">`
-              + `<span class="wt-kt-year">${row.year}${row.year === current ? '*' : ''}</span>`
-              + `<span class="wt-kt-bar"><i style="width:${top > 0 ? (row.pct / top * 100).toFixed(1) : 0}%"></i></span>`
-              + `<span class="wt-kt-val"><b>${escapeHtml(num(row.hit, 0))}</b> ${escapeHtml(t('Tage'))} · ${escapeHtml(pct)}</span></button>`;
-          }
-          html += '</div>';
-        }
-        host.innerHTML = html;
+        host.innerHTML = energyKenntage(r.kenntage, {
+          ytd: this.ktMode === 'ytd', years: this.yearLimit, current: new Date().getFullYear(), interactive: true,
+        });
       },
 
       kenntageClick(event) {
@@ -431,29 +381,14 @@
       },
 
       changesRange() {
-        const c = this.changes;
-        if (!c) return '';
-        return `${rangeText(c.cur.start, c.cur.end)} ${t('gegen')} ${rangeText(c.vj.start, c.vj.end)}`;
+        return this.changes ? changesRange(this.changes) : '';
       },
 
       drawChanges() {
         const c = this.changes;
         const box = this.$refs.changes;
         if (!c || !box) return;
-        const peak = Math.max(...c.items.map((item) => Math.abs(item.diff)), 0.0001);
-        box.innerHTML = c.items.map((item) => {
-          const more = item.diff > 0;
-          const width = Math.max(1, Math.round(Math.abs(item.diff) / peak * 48));
-          const side = more ? `left:50%;width:${width}%` : `right:50%;width:${width}%`;
-          const color = more ? 'var(--danger)' : 'var(--positive)';
-          const percent = item.percent == null ? '' : ` (${item.percent > 0 ? '+' : '−'}${num(Math.abs(item.percent), 0)} %)`;
-          const text = (more ? '▲ +' : '▼ −') + energy(Math.abs(item.diff)) + percent;
-          const name = item.entity_id
-            ? `<a href="entities/${encodeURIComponent(item.entity_id)}">${escapeHtml(item.name)}</a>` : escapeHtml(item.name);
-          return `<div class="wt-chg-row"><span class="wt-chg-name">${name}</span>`
-            + `<div class="wt-chg-bar"><i style="${side};background:${color}"></i></div>`
-            + `<span class="wt-chg-val" style="color:${color}">${escapeHtml(text)}</span></div>`;
-        }).join('');
+        box.innerHTML = energyChanges(c, {links: true});
       },
 
       async loadMonths() {

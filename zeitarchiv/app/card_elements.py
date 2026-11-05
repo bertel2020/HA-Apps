@@ -40,6 +40,9 @@ KPI_VALUES = ("erzeugung", "verbrauch", "netzbezug", "einspeisung")
 #: Ob ein größerer Wert günstig ist (up) oder ungünstig (down): mehr Erzeugung und Einspeisung ja, mehr Bezug und Verbrauch nein.
 KPI_BETTER = {"erzeugung": "up", "einspeisung": "up", "verbrauch": "down", "netzbezug": "down"}
 MAX_VALUES = 8
+#: Verbraucher der Veränderungsliste: Vorgabe (energie_langzeit.CHANGES_LIMIT) und Höchstzahl.
+CHANGES_DEFAULT = 8
+MAX_LIMIT = 20
 
 
 class ElementUnavailable(Exception):
@@ -63,6 +66,7 @@ class Options:
     side: str = "verbrauch"
     values: list[str] | None = None
     sparkline: bool = True
+    limit: int = CHANGES_DEFAULT
 
 
 @dataclass
@@ -99,6 +103,11 @@ class Element:
     sides: tuple[str, ...] = field(default_factory=tuple)
     #: Die Werte, aus denen der Baustein wählen lässt: Schlüssel (Energie, fest) oder dazu Beschriftung (Wetter, nach Einrichtung).
     values: Callable[[Context], list[dict]] | None = None
+    #: Ob der Baustein die Wahl „bis heute / komplett“ (mode) und die Zahl der Jahre (years) anbietet.
+    modes: bool = False
+    year_limit: bool = False
+    #: Ob der Baustein die Zahl der Zeilen (limit) wählen lässt.
+    limit: bool = False
 
 
 def _energie_config(ctx: Context) -> dict | None:
@@ -180,6 +189,36 @@ def _energie_heatmap(ctx: Context, options: Options) -> dict:
         cached = ctx.index.get_heatmap_weekday_snapshot(range_key) if offset == 0 else None
         grid = cached["grid"] if cached is not None else ctx.energie.compute_heatmap_weekday(config, range_key, offset)
     return {"renderer": "energie.heatmap", "heatmap": grid, "range": range_key}
+
+
+def _energie_records(ctx: Context, options: Options) -> dict:
+    config = _energie_config(ctx)
+    if config is None:
+        raise ElementUnavailable(tr("Im Energiedashboard nicht eingerichtet"))
+    data = ctx.energie.langzeit.compute_records(config)
+    records = [{key: record[key] for key in ("key", "label", "value", "date")} for record in data["records"]]
+    return {"renderer": "energie.rekorde", "records": records, "enough": data["enough"], "since": data["since"], "unit": data["unit"]}
+
+
+def _energie_kenntage(ctx: Context, options: Options) -> dict:
+    config = _energie_config(ctx)
+    if config is None:
+        raise ElementUnavailable(tr("Im Energiedashboard nicht eingerichtet"))
+    kenntage = ctx.energie.langzeit.compute_records(config)["kenntage"]
+    # Nur die gewählten Jahre gehen an die Karte (neueste zuerst; 0 = alle).
+    years = kenntage["years"][: options.years] if options.years else kenntage["years"]
+    return {"renderer": "energie.kenntage", "kenntage": {**kenntage, "years": years}, "ytd": options.mode != "komplett"}
+
+
+def _energie_changes(ctx: Context, options: Options) -> dict:
+    from . import energie_langzeit
+
+    config = _energie_config(ctx)
+    if config is None:
+        raise ElementUnavailable(tr("Im Energiedashboard nicht eingerichtet"))
+    body = energie_langzeit.TableRequest(mode=options.mode if options.mode in MODES else "bis_jetzt", at=options.at)
+    limit = max(1, min(options.limit, MAX_LIMIT))
+    return {"renderer": "energie.veraenderungen", "changes": ctx.energie.langzeit.compute_changes(config, body, limit=limit)}
 
 
 def _sparkline(tile: dict) -> list[float | None]:
@@ -317,6 +356,21 @@ ELEMENTS: dict[str, Element] = {
             available=_energie_zeitraeume_available, build=_energie_kpis, ranges=("day", "month", "year"), values=_energie_kpi_values,
         ),
         Element(
+            key="energie.rekorde", group="energie", kind="kpi",
+            title=lambda: tr("Energie: Rekorde"),
+            available=_energie_zeitraeume_available, build=_energie_records,
+        ),
+        Element(
+            key="energie.kenntage", group="energie", kind="table",
+            title=lambda: tr("Energie: Kenntage"),
+            available=_energie_zeitraeume_available, build=_energie_kenntage, modes=True, year_limit=True,
+        ),
+        Element(
+            key="energie.veraenderungen", group="energie", kind="table",
+            title=lambda: tr("Energie: Was hat sich verändert?"),
+            available=_energie_zeitraeume_available, build=_energie_changes, modes=True, limit=True,
+        ),
+        Element(
             key="wetter.kennzahlen", group="wetter", kind="kpi",
             title=lambda: tr("Wetter: Kennzahlen"),
             available=_wetter_available, build=_wetter_kpis, values=_wetter_kpi_values,
@@ -354,6 +408,7 @@ def listing(ctx: Context | None = None) -> list[dict]:
         {"key": element.key, "group": element.group, "kind": element.kind, "title": element.title(), "columns": list(element.columns), "roles": list(element.roles), "groups": list(element.groups), "metrics": list(element.metrics),
         "ranges": list(element.ranges), "sides": list(element.sides),
         "values": element.values(ctx) if element.values else [],
+        "modes": element.modes, "year_limit": element.year_limit, "limit": element.limit,
     }
         for element in ELEMENTS.values()
         if element.available(ctx)

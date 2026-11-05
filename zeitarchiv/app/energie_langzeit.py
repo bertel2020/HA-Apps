@@ -749,7 +749,7 @@ class EnergieLangzeitService:
 
     # -- Was hat sich verändert? -----------------------------------------------------------
 
-    def compute_changes(self, config: dict, body: TableRequest, now_local: datetime | None = None) -> dict:
+    def compute_changes(self, config: dict, body: TableRequest, now_local: datetime | None = None, limit: int = CHANGES_LIMIT) -> dict:
         """Verbraucher mit der größten Änderung gegenüber dem Vorjahr im Zeitraum „Dieses Jahr“ (gleiche Fenster
         und gleicher Stichtag wie die Vergleichstabelle). Geräte hinter einem Zwischenzähler fehlen: ihr Wert
         steckt im Zwischenzähler. Der Rest bis zum Verbrauch laut Bilanz erscheint als „Übrige (Grundlast)“."""
@@ -787,7 +787,7 @@ class EnergieLangzeitService:
             both = item["cur"] is not None and item["vj"] is not None
             item["diff"] = round(item["cur"] - item["vj"], 3) if both else None
             item["percent"] = round(item["diff"] / item["vj"] * 100, 1) if both and item["vj"] else None
-        ranked = sorted((i for i in items if i["diff"] is not None), key=lambda i: -abs(i["diff"]))[:CHANGES_LIMIT]
+        ranked = sorted((i for i in items if i["diff"] is not None), key=lambda i: -abs(i["diff"]))[:limit]
         return {
             "unit": "kWh", "mode": mode, "at": stichtag.isoformat() if stichtag else None,
             "cur": {"start": win["start"].timestamp(), "end": win["end"].timestamp()},

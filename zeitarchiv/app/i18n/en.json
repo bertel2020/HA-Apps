@@ -3690,7 +3690,10 @@
     "Erwartet nach Helligkeit": "Expected from brightness",
     "Ein Tag lässt sich anklicken.": "Click a day to select it.",
     "Ertrag": "Yield",
-    "Wind und Regen": "Wind and rain"
+    "Wind und Regen": "Wind and rain",
+    "Energie: Rekorde": "Energy: records",
+    "Energie: Kenntage": "Energy: characteristic days",
+    "Energie: Was hat sich verändert?": "Energy: what has changed?"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4638,6 +4641,8 @@
     "Tag öffnen": "Open day",
     "Ersten Tag öffnen": "Open first day",
     "{from} bis heute": "{from} to today",
-    "{from} bis {to}": "{from} to {to}"
+    "{from} bis {to}": "{from} to {to}",
+    "Rekorde erscheinen, sobald ein Jahr Daten vorliegt.": "Records appear once a year of data is available.",
+    "Keine Veränderungen zum Vorjahr gefunden.": "No changes compared with the previous year found."
   }
 }

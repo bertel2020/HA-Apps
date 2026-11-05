@@ -451,6 +451,7 @@ def create_card_router(
         values: str | None = None,
         sparkline: bool = True,
         years: int = Query(10, ge=0, le=card_elements.MAX_YEARS),
+        limit: int = Query(card_elements.CHANGES_DEFAULT, ge=1, le=card_elements.MAX_LIMIT),
         authorization: str | None = Header(default=None),
         x_zeitarchiv_integration_version: str | None = Header(default=None),
     ) -> dict:
@@ -474,7 +475,7 @@ def create_card_router(
             stichtag_or_400(at)
         options = card_elements.Options(columns=keys or None, vorjahr=vorjahr, mode=mode, at=at or None, role=role, years=years, group=group, metric=metric,
             range=range, offset=offset, side=side,
-            values=value_keys or None, sparkline=sparkline,
+            values=value_keys or None, sparkline=sparkline, limit=limit,
         )
         if not slots.acquire(blocking=False):
             raise HTTPException(status_code=429, detail=tr("Zu viele gleichzeitige Abfragen"))
