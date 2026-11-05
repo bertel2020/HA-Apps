@@ -20,6 +20,11 @@ from .storage.index import Index
 #: Alle Spaltenschlüssel der Zeitraum-Tabellen (Energie kennt davon nur die letzten drei).
 COLUMN_KEYS = ("heute", "gestern", "monat", "vormonat", "jahr")
 MODES = ("bis_jetzt", "komplett")
+#: Rollen der Monatswerte (energie_langzeit.MONTH_ROLES) und die Zahl der Jahre der Matrix (0 = alle).
+ROLES = ("erzeugung", "einspeisung", "netzbezug", "verbrauch")
+MAX_YEARS = 50
+#: Gruppen der Wetter-Tabelle (Reiter Übersicht, Wind und Sonne, Temperatur und Klima).
+GROUPS = ("basis", "wind", "klima")
 
 
 class ElementUnavailable(Exception):
@@ -34,6 +39,9 @@ class Options:
     vorjahr: bool = True
     mode: str = "bis_jetzt"
     at: str | None = None
+    role: str | None = None
+    years: int = 10
+    group: str = "basis"
 
 
 @dataclass
@@ -61,6 +69,9 @@ class Element:
     build: Callable[[Context, Options], dict]
     #: Die Spalten, aus denen der Baustein wählen lässt.
     columns: tuple[str, ...] = field(default_factory=tuple)
+    #: Die Rollen, aus denen der Baustein wählen lässt (leer: keine Auswahl).
+    roles: tuple[str, ...] = field(default_factory=tuple)
+    groups: tuple[str, ...] = field(default_factory=tuple)
 
 
 def _energie_config(ctx: Context) -> dict | None:
@@ -91,6 +102,42 @@ def _energie_zeitraeume(ctx: Context, options: Options) -> dict:
     return {"renderer": "energie.zeitraeume", "table": ctx.energie.langzeit.compute_table(config, body)}
 
 
+def _energie_matrix(ctx: Context, options: Options) -> dict:
+    config = _energie_config(ctx)
+    if config is None:
+        raise ElementUnavailable(tr("Im Energiedashboard nicht eingerichtet"))
+    months = ctx.energie.langzeit.compute_months(config)
+    roles = months["roles"]
+    # Nur die gewählte Rolle und die gewählten Jahre gehen an die Karte (die Seite schickt alle Rollen und Jahre).
+    role = next((item for item in roles if item["key"] == options.role), roles[0] if roles else None)
+    if role is None:
+        raise ElementUnavailable(tr("Im Energiedashboard nicht eingerichtet"))
+    years = months["years"][: options.years] if options.years else months["years"]
+    trimmed = {**role, "values": {str(year): role["values"][str(year)] for year in years}}
+    return {"renderer": "energie.matrix", "months": {**months, "years": years, "roles": [trimmed]}, "role": role["key"]}
+
+
+def _wetter_available(ctx: Context) -> bool:
+    from .wetter_routes import is_wetter_configured
+
+    return ctx.wetter is not None and ctx.index is not None and is_wetter_configured(ctx.index)
+
+
+def _wetter_zeitraeume(ctx: Context, options: Options) -> dict:
+    from . import wetter_routes
+
+    if not _wetter_available(ctx):
+        raise ElementUnavailable(tr("Im Wetterdashboard nicht eingerichtet"))
+    keys = [key for key in (options.columns or wetter_routes.COLUMN_KEYS) if key in wetter_routes.COLUMN_KEYS]
+    body = wetter_routes.TableRequest(
+        columns=keys, vorjahr=options.vorjahr, mode=options.mode if options.mode in MODES else "bis_jetzt", at=options.at,
+    )
+    return {
+        "renderer": "wetter.zeitraeume", "table": ctx.wetter.compute_table(body),
+        "group": options.group if options.group in GROUPS else "basis",
+    }
+
+
 ELEMENTS: dict[str, Element] = {
     element.key: element
     for element in (
@@ -100,6 +147,17 @@ ELEMENTS: dict[str, Element] = {
             available=_energie_zeitraeume_available, build=_energie_zeitraeume,
             columns=("monat", "vormonat", "jahr"),
         ),
+        Element(
+            key="energie.matrix", group="energie", kind="table",
+            title=lambda: tr("Energie: Jahre × Monate"),
+            available=_energie_zeitraeume_available, build=_energie_matrix, roles=ROLES,
+        ),
+        Element(
+            key="wetter.zeitraeume", group="wetter", kind="table",
+            title=lambda: tr("Wetter: Zeiträume im Vergleich"),
+            available=_wetter_available, build=_wetter_zeitraeume,
+            columns=("heute", "gestern", "monat", "vormonat", "jahr"), groups=GROUPS,
+        ),
     )
 }
 
@@ -108,7 +166,7 @@ def listing(ctx: Context | None = None) -> list[dict]:
     """Die Bausteine, die in dieser App eingerichtet sind (für die Auswahl im Editor der Karte)."""
     ctx = ctx or CONTEXT
     return [
-        {"key": element.key, "group": element.group, "kind": element.kind, "title": element.title(), "columns": list(element.columns)}
+        {"key": element.key, "group": element.group, "kind": element.kind, "title": element.title(), "columns": list(element.columns), "roles": list(element.roles), "groups": list(element.groups)}
         for element in ELEMENTS.values()
         if element.available(ctx)
     ]

@@ -438,17 +438,20 @@ def create_card_router(
         vorjahr: bool = True,
         mode: str = "bis_jetzt",
         at: str | None = None,
+        role: str | None = None,
+        group: str = "basis",
+        years: int = Query(10, ge=0, le=card_elements.MAX_YEARS),
         authorization: str | None = Header(default=None),
         x_zeitarchiv_integration_version: str | None = Header(default=None),
     ) -> dict:
         """Ein Dashboard-Baustein mit seinen Zahlen; die Karte zeichnet sie."""
         check_auth(authorization, getattr(request.state, "request_id", "-"), x_zeitarchiv_integration_version)
         keys = [item for item in (columns or "").split(",") if item]
-        if any(item not in card_elements.COLUMN_KEYS for item in keys) or mode not in card_elements.MODES:
+        if any(item not in card_elements.COLUMN_KEYS for item in keys) or mode not in card_elements.MODES or (role is not None and role not in card_elements.ROLES) or group not in card_elements.GROUPS:
             raise HTTPException(status_code=400, detail=tr("Ungültige Angaben"))
         if at:
             stichtag_or_400(at)
-        options = card_elements.Options(columns=keys or None, vorjahr=vorjahr, mode=mode, at=at or None)
+        options = card_elements.Options(columns=keys or None, vorjahr=vorjahr, mode=mode, at=at or None, role=role, years=years, group=group)
         if not slots.acquire(blocking=False):
             raise HTTPException(status_code=429, detail=tr("Zu viele gleichzeitige Abfragen"))
         try:

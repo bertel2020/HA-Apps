@@ -49,6 +49,15 @@ def _configure(service, **roles):
     wetter_routes._save_config(service.deps.index, {**wetter_routes._empty_config(), **roles})
 
 
+
+def _wetter_script() -> str:
+    """wetter.js samt element-table-render.js: die Vergleichstabelle wurde dorthin herausgelöst (Roadmap 1.48), damit
+    dieselbe Zeichnung in der Lovelace-Karte läuft. Die Prüfungen gelten dem Zusammenspiel beider."""
+    from _paths import APP
+
+    return "\n".join((APP / "static/js" / name).read_text(encoding="utf-8") for name in ("wetter.js", "element-table-render.js"))
+
+
 def test_config_round_trip_and_defaults(service) -> None:
     index = service.deps.index
     assert wetter_routes._load_config(index) == wetter_routes._empty_config()
@@ -556,9 +565,8 @@ def test_radiation_defaults_to_whole_numbers_and_other_roles_stay_automatic(serv
 
 
 def test_radiation_has_no_minimum_row_in_the_script() -> None:
-    from _paths import APP
 
-    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    script = _wetter_script()
     assert "row.key === 'radiation'" in script
 
 
@@ -579,10 +587,10 @@ def test_column_selection_is_a_popover_like_the_entity_list() -> None:
 
 
 def test_comparison_table_sits_in_the_app_table_frame() -> None:
-    from _paths import APP, TEMPLATES
+    from _paths import TEMPLATES
 
     assert 'class="tbl-wrap wt-table-wrap"' in (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
-    assert "is-scrollable" in (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "is-scrollable" in _wetter_script()
 
 
 def test_tiles_carry_the_entity_and_link_to_it_and_css_uses_defined_font_tokens(service) -> None:
@@ -685,31 +693,30 @@ def test_reference_day_today_or_later_means_now_and_garbage_is_rejected(service)
 
 
 def test_tiles_and_table_show_placeholders_while_loading() -> None:
-    from _paths import APP, TEMPLATES
+    from _paths import TEMPLATES
 
     text = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
     assert 'x-show="!tilesLoaded"' in text and "wt-tile is-loading" in text and 'class="wt-loading"' in text
-    assert "this.tilesLoaded = true" in (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "this.tilesLoaded = true" in _wetter_script()
 
 
 def test_day_columns_name_the_hour_not_a_minute() -> None:
-    from _paths import APP
 
-    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    script = _wetter_script()
     assert "t('{from}–{to} Uhr'" in script and "fmtDate(formats.hm, ts)" not in script
 
 
 def test_tabs_are_keyboard_operable_and_linked_to_their_panels() -> None:
     import re
 
-    from _paths import APP, TEMPLATES
+    from _paths import TEMPLATES
 
     text = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
     tabs = set(re.findall(r'role="tab" id="wt-tab-(\w+)" aria-controls="wt-panel-\1"', text))
     panels = set(re.findall(r'role="tabpanel" id="wt-panel-(\w+)" aria-labelledby="wt-tab-\1"', text))
     assert tabs == panels and {"overview", "long"} <= tabs
     assert text.count('@keydown="tabKey($event)"') == len(tabs) and text.count(":tabindex=") == len(tabs)
-    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    script = _wetter_script()
     assert all(key in script for key in ("ArrowLeft", "ArrowRight", "Home", "End"))
 
 
@@ -724,36 +731,36 @@ def test_toggles_are_app_chips_and_card_heads_keep_one_layout() -> None:
 
 
 def test_year_over_year_is_one_menu_and_not_part_of_the_column_list() -> None:
-    from _paths import APP, TEMPLATES
+    from _paths import TEMPLATES
 
     text = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
     assert "toggleDDPicker('wt-yoy-{{ sfx }}')" in text and 'id="wt-yoy-{{ sfx }}-popover"' in text
     assert 'x-model="vorjahr"' not in text and "Mit Vorjahr" not in text  # kein Haken zwischen den Spalten mehr
     assert "wt-picker-sep" not in text
-    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    script = _wetter_script()
     assert "setYoy(choice)" in script and "yoyLabel()" in script
 
 
 def test_tiles_use_short_names_and_the_layout_helper(service) -> None:
-    from _paths import APP, TEMPLATES
+    from _paths import TEMPLATES
 
     _add(service, "sensor.regen", "sensor", "total_increasing", "mm", [(_ts(19, 0), 100.0), (_ts(20, 6), 103.5)])
     _add(service, "binary_sensor.regen", "binary_sensor", None, "", [(_ts(20, 6), 1.0), (_ts(20, 6, 30), 0.0)])
     _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(20, 1), 12.0)])
     _configure(service, temperature="sensor.t", precip_mm="sensor.regen", precip_dur="binary_sensor.regen")
     assert [tile["label"] for tile in service.compute_tiles(NOW)] == ["Temperatur", "Niederschlag", "Regen"]
-    assert "WetterLayout.tileColumns" in (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "WetterLayout.tileColumns" in _wetter_script()
     assert "wetter-layout.js" in (TEMPLATES / "wetterdashboard.html").read_text(encoding="utf-8")
 
 
 def test_reference_day_uses_the_dashboard_stichtag_bar_of_the_app() -> None:
-    from _paths import APP, TEMPLATES
+    from _paths import TEMPLATES
 
     view = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
     page = (TEMPLATES / "wetterdashboard.html").read_text(encoding="utf-8")
     assert "{{ period_nav(true, true) }}" in view and "period_assets()" in page
     assert "wt-daynav" not in view and 'type="date"' not in view
-    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    script = _wetter_script()
     assert "Alpine.store('dashStichtag').date" in script and "'dashboard-stichtag'" in script
     assert "shiftStichtag" not in script and "setStichtag" not in script
 
@@ -772,20 +779,19 @@ def test_page_context_carries_the_calendar_bounds_for_the_stichtag_bar(client) -
 
 
 def test_columns_with_a_reference_day_show_the_weekday_under_the_date() -> None:
-    from _paths import APP
 
-    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    script = _wetter_script()
     assert "formats.weekday" in script and "weekday: new Intl.DateTimeFormat" in script
 
 
 def test_wind_and_sun_tab_groups_tiles_and_rows() -> None:
-    from _paths import APP, TEMPLATES
+    from _paths import TEMPLATES
 
     view = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
     assert "{% if show_windtab %}" in view and "has_windtiles" in view and 'id="wt-panel-wind"' in view
     assert 'weather_card("basis"' in view and 'weather_card("wind"' in view
     assert 'weather_card("klima"' in view and 'id="wt-panel-klima"' in view
-    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    script = _wetter_script()
     assert "const WIND_KEYS = ['wind', 'gust', 'radiation', 'illuminance']" in script and "groupOf" in script
 
 
@@ -963,9 +969,8 @@ def test_sunshine_setup_through_the_app(client) -> None:
 
 
 def test_sunshine_row_and_metrics_exist_in_the_script() -> None:
-    from _paths import APP
 
-    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    script = _wetter_script()
     assert "row.kind === 'sunshine'" in script and "field: 'hours'" in script
     assert "data.sun_threshold_lx" in script  # die Schwelle steht in der Beschriftung, nicht versteckt
 

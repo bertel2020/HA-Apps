@@ -63,31 +63,7 @@
 
   window.addEventListener('resize', () => Object.values(charts).forEach((chart) => chart.resize()));
 
-  const monthFormat = (style) => new Intl.DateTimeFormat(LOCALE, {month: style, timeZone: 'UTC'});
-  const monthName = (month, style) => monthFormat(style).format(new Date(Date.UTC(2000, month - 1, 15)));
-  const mean = (values) => values.reduce((a, b) => a + b, 0) / values.length;
-  const present = (list) => list.filter((value) => value != null);
-  const monthKey = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
-
-  // Mittel, Spanne und Anzahl je Monat über alle abgeschlossenen Jahre (mindestens zwei, sonst kein Vergleich).
-  // Der Monat, in dem das Archiv mitten im Monat beginnt, ist nur zum Teil erfasst: er geht in kein Mittel ein.
-  const isPartialStart = (role, year, index) => !!role.partial_start && role.partial_start[0] === year && role.partial_start[1] === index + 1;
-
-  function monthStats(role, months) {
-    const past = months.years.filter((year) => year < months.current.year);
-    const avg = [], low = [], high = [], counts = [];
-    for (let i = 0; i < 12; i++) {
-      const values = present(past.filter((year) => !isPartialStart(role, year, i)).map((year) => role.values[year][i]));
-      counts.push(values.length);
-      const enough = values.length >= 2;
-      avg.push(enough ? mean(values) : null);
-      low.push(enough ? Math.min(...values) : null);
-      high.push(enough ? Math.max(...values) : null);
-    }
-    return {past, avg, low, high, counts};
-  }
-
-  const yearSum = (list) => (list.every((value) => value != null) ? list.reduce((a, b) => a + b, 0) : null);
+  const {monthName, mean, present, monthKey, isPartialStart, monthStats, yearSum, energyMatrix} = window.ElementTableRender;
 
   // Kenntage je Jahr: Beschriftung, Regel und die Tooltip-Zeile je Kenntag. Die Schwellen kommen aus dem Setup.
   const KENNTAG_GROUPS = () => ({eigenversorgung: t('Eigenversorgung'), erzeugung: t('Erzeugung'), speicher: t('Speicher')});
@@ -608,68 +584,7 @@
         const role = m && this.roleOf(this.matrixRole);
         if (!role || !table) return;
         const colors = palette();
-        const {avg, counts} = monthStats(role, m);
-        const closed = m.years.filter((year) => year < m.current.year);
-        const fullSums = closed.map((year) => yearSum(role.values[year])).filter((value) => value != null);
-        const reference = fullSums.length >= 2 ? mean(fullSums) : null;
-        const sign = (diff) => (Math.round(Math.abs(diff)) === 0 ? '±' : (diff > 0 ? '+' : '−')) + num(Math.abs(diff), 0) + ' %';
-        const flagText = (flag) => {
-          const parts = [];
-          if (flag.gaps) parts.push(t('Messlücken: {n} (sonst etwa {typical})', {n: flag.gaps, typical: flag.gaps_typical || 0}));
-          if (flag.counter_decreases) parts.push(t('Zählerrückgänge: {n}', {n: flag.counter_decreases}));
-          return parts.join(', ');
-        };
-        const cell = (value, ref, tip, opts) => {
-          if (value == null) return '<td class="wt-tm-na">–</td>';
-          const attrs = (tip ? ` data-tooltip-fixed="${escapeHtml(tip)}"` : '');
-          const klass = [opts.strong ? 'wt-tm-year' : '', opts.flag ? 'wt-tm-flag' : ''].filter(Boolean).join(' ');
-          const inner = (opts.href
-            ? (content) => `<a class="wt-tm-link" href="${escapeHtml(opts.href)}">${content}</a>`
-            : (content) => content);
-          if (ref == null) {
-            return `<td class="wt-tm-plain ${klass}"${attrs}>${inner(escapeHtml(num(value, 0)))}</td>`;
-          }
-          const diff = (value - ref) / ref * 100;
-          const favorable = role.better === 'up' ? diff > 0 : diff < 0;
-          const share = Math.round(Math.min(1, Math.abs(diff) / 30) * 70);
-          const style = ` style="background:color-mix(in srgb, ${favorable ? colors.good : colors.bad} ${share}%, ${colors.base})"`;
-          return `<td${style}${attrs}${klass ? ` class="${klass}"` : ''}>${inner(
-            `<span class="wt-tm-v">${escapeHtml(num(value, 0))}</span><span class="wt-tm-d">${escapeHtml(sign(diff))}</span>`)}</td>`;
-        };
-        let html = `<thead><tr><th></th>${Array.from({length: 12}, (_x, i) => `<th>${escapeHtml(monthName(i + 1, 'short'))}</th>`).join('')}`
-          + `<th class="wt-tm-year">${escapeHtml(t('Jahr Σ'))}</th></tr></thead><tbody>`;
-        for (const year of m.years) {
-          const running = year === m.current.year;
-          html += `<tr><th>${year}${running ? '*' : ''}</th>`;
-          role.values[year].forEach((value, i) => {
-            const month = i + 1;
-            const flag = role.flags[monthKey(year, month)];
-            let tip = value == null ? '' : `${monthName(month, 'short')} ${year}: ${energy(value)}`;
-            if (value != null && avg[i] != null && !(running && month >= m.current.month) && !isPartialStart(role, year, i)) {
-              const diff = (value - avg[i]) / avg[i] * 100;
-              tip += ` (${sign(diff)} ${t('zum Mittel')})`;
-            }
-            if (running && month === m.current.month && value != null) tip += ' – ' + t('laufender Monat, noch nicht abgeschlossen');
-            const partialStart = isPartialStart(role, year, i);
-            if (partialStart && value != null) tip += ' – ' + t('das Archiv beginnt in diesem Monat');
-            if (flag) tip += ' – ' + flagText(flag);
-            const href = value == null ? '' : this.matrixLink(role, year, month);
-            // Der laufende Monat ist noch nicht abgeschlossen und bekommt keinen Vergleich.
-            const ref = (running && month >= m.current.month) || partialStart ? null : (counts[i] >= 2 ? avg[i] : null);
-            html += cell(value, ref, tip, {flag: !!flag, href});
-          });
-          const total = yearSum(role.values[year]);
-          const partial = present(role.values[year]);
-          const sum = total != null ? total : (partial.length ? partial.reduce((a, b) => a + b, 0) : null);
-          const complete = !running && total != null;
-          const tipSum = sum == null ? '' : (complete ? t('Summe {year}: {value}', {year, value: energy(sum)})
-            : t('Summe {year} bis jetzt: {value}', {year, value: energy(sum)}));
-          html += cell(sum, complete ? reference : null, tipSum, {strong: true});
-          html += '</tr>';
-        }
-        html += `<tr class="wt-tm-avg"><th>Ø</th>${avg.map((value, i) => `<td>${value == null ? '–' : escapeHtml(num(value, 0))}</td>`).join('')}`
-          + `<td class="wt-tm-year">${reference == null ? '–' : escapeHtml(num(reference, 0))}</td></tr></tbody>`;
-        table.innerHTML = html;
+        table.innerHTML = energyMatrix(m, role, {colors, href: (year, month) => this.matrixLink(role, year, month)});
         const scale = this.$refs.matrixScale;
         if (scale) scale.style.background = `linear-gradient(90deg, ${colors.bad}, ${colors.base}, ${colors.good})`;
       },
