@@ -219,6 +219,43 @@
   </div>
   {% endfor %}
 
+  <section class="settings-section wt-section-heizen wt-section-experimental">
+  <h2 class="settings-section-title">{{ _("Experimentell") }} {{ hint_button(_("Experimentell")) }}</h2>
+  <p class="settings-section-description">{{ _("Funktionen in Erprobung. Berechnung und Darstellung können sich noch ändern.") }}</p>
+  {% call hint_body() %}{{ _("Der Reiter „Heizen“ gehört dazu: Er verrechnet die Energiezähler der Heizung mit der Gradtagzahl. Ein ausgeblendeter Reiter fehlt im Dashboard.") }} {{ _("Ein oder mehrere Energiezähler der Heizung, zum Beispiel Wärmepumpe, Heizstab oder Konvektoren. Sie werden zu einer Summe addiert, der Reiter „Heizen“ zeigt auch den Anteil je Zähler.") }} {{ _("Gradtagzahl nach VDI 3807 (G20/15): Raumtemperatur minus Tagesmittel, nur an Tagen unter der Heizgrenze. Beide Werte lassen sich auf dem Reiter „Heizen“ vorübergehend ändern.") }}{% endcall %}
+  <h3 class="wt-group-h">{{ _("Reiter Heizen") }}</h3>
+  <div class="wt-chips">
+    <label class="filter-chip" x-show="cardAvailable('heating')"><input type="checkbox" name="show_card" value="heating" {% if 'heating' not in config.hidden_cards %}checked{% endif %}><span>{{ _("Heizen") }}</span></label>
+  </div>
+  <h3 class="wt-group-h">{{ _("Heizenergie") }}</h3>
+  <div class="wt-item-grid wt-item-grid-list">
+    <template x-for="(row, i) in heating" :key="i">
+      <button type="button" class="wt-item-tile" data-role="heating" @click="openRow('heating', i)">
+        <div class="wt-item-accent"></div>
+        <div class="wt-item-body">
+          <div class="wt-item-head">
+            <span class="wt-item-glyph">{{ role_glyph('heating') }}</span>
+            <span class="wt-item-name" x-text="row.name || (row.entity_id ? nameFor(row.entity_id) : t('Heizzähler'))"></span>
+          </div>
+          <div class="wt-item-bottom">
+            <span class="wt-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) : t('Nicht zugeordnet')"></span>
+          </div>
+        </div>
+      </button>
+    </template>
+    <button type="button" class="wt-item-tile wt-item-add" x-show="heating.length < maxHeating" @click="addRow('heating')">
+      <span class="wt-item-add-label">{{ _("+ Heizzähler") }}</span>
+    </button>
+  </div>
+  <template x-for="row in heating"><span><input type="hidden" name="heating_entity_id" :value="row.entity_id"><input type="hidden" name="heating_name" :value="row.name"></span></template>
+  <div class="wt-thresholds">
+    <div class="field"><label for="wt-heating-room">{{ _("Raumtemperatur") }}</label>
+      <input type="text" id="wt-heating-room" class="wt-short" name="heating_room" value="{{ config.heating_room | string | replace('.', ',') }}" inputmode="decimal"> <span class="wt-unit">°C</span></div>
+    <div class="field"><label for="wt-heating-limit">{{ _("Heizgrenze") }}</label>
+      <input type="text" id="wt-heating-limit" class="wt-short" name="heating_limit" value="{{ config.heating_limit | string | replace('.', ',') }}" inputmode="decimal"> <span class="wt-unit">°C</span></div>
+  </div>
+  </section>
+
   <dialog class="detail-dialog wt-item-dialog" x-ref="roleDlg" :data-role="activeRole" @click="if ($event.target === $el) $el.close()" @close="activeRole = null">
     <div class="detail-dialog-header">
       <h2 x-text="activeRole ? roleLabels[activeRole] : ''"></h2>
@@ -273,39 +310,6 @@
   <template x-for="row in extras"><span><input type="hidden" name="extra_entity_id" :value="row.entity_id"><input type="hidden" name="extra_name" :value="row.name"></span></template>
   </section>
 
-  <section class="settings-section wt-section-heizen">
-  <h2 class="settings-section-title">{{ _("Heizenergie") }} {{ hint_button(_("Heizenergie")) }}</h2>
-  <p class="settings-section-description">{{ _("Energiezähler der Heizung für den Reiter „Heizen“, mit Gradtagzahl und Verbrauch je Zähler.") }}</p>
-  {% call hint_body() %}{{ _("Ein oder mehrere Energiezähler der Heizung, zum Beispiel Wärmepumpe, Heizstab oder Konvektoren. Sie werden zu einer Summe addiert, der Reiter „Heizen“ zeigt auch den Anteil je Zähler.") }} {{ _("Gradtagzahl nach VDI 3807 (G20/15): Raumtemperatur minus Tagesmittel, nur an Tagen unter der Heizgrenze. Beide Werte lassen sich auf dem Reiter „Heizen“ vorübergehend ändern.") }}{% endcall %}
-  <div class="wt-item-grid wt-item-grid-list">
-    <template x-for="(row, i) in heating" :key="i">
-      <button type="button" class="wt-item-tile" data-role="heating" @click="openRow('heating', i)">
-        <div class="wt-item-accent"></div>
-        <div class="wt-item-body">
-          <div class="wt-item-head">
-            <span class="wt-item-glyph">{{ role_glyph('heating') }}</span>
-            <span class="wt-item-name" x-text="row.name || (row.entity_id ? nameFor(row.entity_id) : t('Heizzähler'))"></span>
-          </div>
-          <div class="wt-item-bottom">
-            <span class="wt-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) : t('Nicht zugeordnet')"></span>
-          </div>
-        </div>
-      </button>
-    </template>
-    <button type="button" class="wt-item-tile wt-item-add" x-show="heating.length < maxHeating" @click="addRow('heating')">
-      <span class="wt-item-add-label">{{ _("+ Heizzähler") }}</span>
-    </button>
-  </div>
-  <template x-for="row in heating"><span><input type="hidden" name="heating_entity_id" :value="row.entity_id"><input type="hidden" name="heating_name" :value="row.name"></span></template>
-  <div class="wt-thresholds">
-    <div class="field"><label for="wt-heating-room">{{ _("Raumtemperatur") }}</label>
-      <input type="text" id="wt-heating-room" class="wt-short" name="heating_room" value="{{ config.heating_room | string | replace('.', ',') }}" inputmode="decimal"> <span class="wt-unit">°C</span></div>
-    <div class="field"><label for="wt-heating-limit">{{ _("Heizgrenze") }}</label>
-      <input type="text" id="wt-heating-limit" class="wt-short" name="heating_limit" value="{{ config.heating_limit | string | replace('.', ',') }}" inputmode="decimal"> <span class="wt-unit">°C</span></div>
-  </div>
-
-  </section>
-
   <section class="settings-section wt-section-regen">
   <h2 class="settings-section-title">{{ _("Regentage") }} {{ hint_button(_("Regentage")) }}</h2>
   <p class="settings-section-description">{{ _("Ab wann ein Tag als Regentag zählt.") }}</p>
@@ -319,21 +323,13 @@
 
   </section>
 
-  <section class="settings-section wt-section-sonne">
-  <h2 class="settings-section-title">{{ _("Sonnenschein") }} {{ hint_button(_("Sonnenschein")) }}</h2>
-  <p class="settings-section-description">{{ _("Ab welcher Helligkeit eine Stunde als sonnig zählt.") }}</p>
-  {% call hint_body() %}{{ _("Gezählt werden Stunden, deren Mittel der Helligkeit (Rolle „Helligkeit“, am besten der Süd-Sensor) die Schwelle erreicht. Das ist kein offizieller Wert des Wetterdienstes: Die Station trennt direktes und diffuses Licht nicht. Als Anhalt lagen trübe Tage mittags bei etwa 4.000 bis 15.000 lx, klare Tage bei 50.000 lx und mehr.") }}{% endcall %}
+  <section class="settings-section wt-section-sonne wt-section-tageslicht">
+  <h2 class="settings-section-title">{{ _("Sonne und Tageslicht") }} {{ hint_button(_("Sonne und Tageslicht")) }}</h2>
+  <p class="settings-section-description">{{ _("Schwellen der Helligkeit für Sonnenschein sowie Nacht, Dämmerung und Tag.") }}</p>
+  {% call hint_body() %}{{ _("Gezählt werden Stunden, deren Mittel der Helligkeit (Rolle „Helligkeit“, am besten der Süd-Sensor) die Schwelle erreicht. Das ist kein offizieller Wert des Wetterdienstes: Die Station trennt direktes und diffuses Licht nicht. Als Anhalt lagen trübe Tage mittags bei etwa 4.000 bis 15.000 lx, klare Tage bei 50.000 lx und mehr.") }} {{ _("Gilt für die Rolle „Helligkeit Dämmerung“. Nacht liegt unter der unteren Schwelle (etwa das Ende der bürgerlichen Dämmerung), Tag beginnt bei der oberen (etwa Sonnenauf- und -untergang). Die Zeiten zeigen, was der Sensor sieht, nicht den Sonnenstand: Dichte Wolken verschieben den Tagesbeginn nach hinten, Ausrichtung und Verschattung wirken ebenfalls.") }}{% endcall %}
   <div class="wt-thresholds">
     <div class="field"><label for="wt-sun-lx">{{ _("Sonne ab einer Helligkeit von") }}</label>
       <input type="text" id="wt-sun-lx" class="wt-short" name="sun_threshold_lx" value="{{ config.sun_threshold_lx | int }}" inputmode="numeric"> <span class="wt-unit">lx</span></div>
-  </div>
-  </section>
-
-  <section class="settings-section wt-section-sonne wt-section-tageslicht">
-  <h2 class="settings-section-title">{{ _("Tageslicht") }} {{ hint_button(_("Tageslicht")) }}</h2>
-  <p class="settings-section-description">{{ _("Ab welcher Helligkeit der Dämmerungssensor Nacht, Dämmerung und Tag unterscheidet.") }}</p>
-  {% call hint_body() %}{{ _("Gilt für die Rolle „Helligkeit Dämmerung“. Nacht liegt unter der unteren Schwelle (etwa das Ende der bürgerlichen Dämmerung), Tag beginnt bei der oberen (etwa Sonnenauf- und -untergang). Die Zeiten zeigen, was der Sensor sieht, nicht den Sonnenstand: Dichte Wolken verschieben den Tagesbeginn nach hinten, Ausrichtung und Verschattung wirken ebenfalls.") }}{% endcall %}
-  <div class="wt-thresholds">
     <div class="field"><label for="wt-night-lx">{{ _("Nacht unter") }}</label>
       <input type="text" id="wt-night-lx" class="wt-short" name="daylight_night_lx" value="{{ config.daylight_night_lx | int }}" inputmode="numeric"> <span class="wt-unit">lx</span></div>
     <div class="field"><label for="wt-day-lx">{{ _("Tag ab") }}</label>
@@ -347,11 +343,16 @@
   {% call hint_body() %}{{ _("Eine ausgeblendete Karte fehlt im Dashboard samt ihrem Reiter, wenn der Reiter sonst leer wäre. Ein ausgeblendeter Block fehlt in der Tabelle auf allen Reitern; die Kacheln oben bleiben unverändert. Die Außentemperatur und weitere Sensoren sind immer in der Tabelle.") }}{% endcall %}
   <h3 class="wt-group-h">{{ _("Karten") }}</h3>
   <input type="hidden" name="cards_submitted" value="1">
-  <div class="wt-chips">
-    {% for key, label in card_options %}
-    <label class="filter-chip" x-show="cardAvailable('{{ key }}')"><input type="checkbox" name="show_card" value="{{ key }}" {% if key not in config.hidden_cards %}checked{% endif %}><span>{{ label }}</span></label>
-    {% endfor %}
+  {% for tab_label, cards in card_groups %}
+  <div class="wt-chip-group" x-show="{{ cards | map(attribute=0) | list | tojson | forceescape }}.some(k => cardAvailable(k))">
+    <span class="wt-chip-tab">{{ tab_label }}</span>
+    <div class="wt-chips">
+      {% for key, label in cards %}
+      <label class="filter-chip" x-show="cardAvailable('{{ key }}')"><input type="checkbox" name="show_card" value="{{ key }}" {% if key not in config.hidden_cards %}checked{% endif %}><span>{{ label }}</span></label>
+      {% endfor %}
+    </div>
   </div>
+  {% endfor %}
   <h3 class="wt-group-h">{{ _("Blöcke der Vergleichstabelle") }}</h3>
   <input type="hidden" name="blocks_submitted" value="1">
   <div class="wt-chips">

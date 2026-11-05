@@ -35,6 +35,8 @@
   - **Karten ein- und ausschalten**: In der Einrichtung unter „Anzeige“ lassen
     sich die Karten einzeln ausblenden; angeboten werden nur Karten, für die eine
     Entität zugeordnet ist. Fehlt einem Reiter damit jede Karte, entfällt er
+  - Die Kartenauswahl ist nach Reiter geordnet; der Reiter Heizen und seine
+    Einstellungen stehen als „Experimentell“ in einem eigenen Block
   - Die Demo-Daten enthalten die beiden Helligkeitssensoren mit Verlauf
 
 ### Behoben
@@ -80,6 +82,8 @@
   - **Switch cards on and off**: In the setup under "Display" the cards can be
     hidden individually; only cards with an assigned entity are offered. A tab
     without any card is dropped
+  - The card selection is grouped by tab; the Heating tab and its settings are
+    in a separate "Experimental" block
   - The demo data contains both brightness sensors with a history
 
 #### Fixed

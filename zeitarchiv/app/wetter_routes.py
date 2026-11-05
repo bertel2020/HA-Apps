@@ -102,6 +102,15 @@ CARD_OPTIONS = (
     ("heating", N_("Heizen"), ("@heating",)),
 )
 CARD_KEYS = tuple(key for key, _label, _needs in CARD_OPTIONS)
+#: Gliederung der Kartenauswahl nach Reiter des Dashboards (Reitername, Karten). „heating“ fehlt hier
+#: absichtlich: Der Reiter „Heizen“ ist experimentell und steht in der Einrichtung in einem eigenen Block.
+CARD_GROUPS = (
+    (N_("Übersicht"), ("conditions", "basis", "dayimage", "monthly")),
+    (N_("Niederschlag"), ("precip",)),
+    (N_("Temperatur & Klima"), ("klima",)),
+    (N_("Wind & Sonne"), ("wind", "sunhours", "daylight")),
+    (N_("Langzeit"), ("longterm",)),
+)
 #: Nachkommastellen, wenn die Entität „automatisch“ eingestellt ist: Strahlung in ganzen W/m².
 ROLE_DEFAULT_DECIMALS = {"radiation": 0}
 #: Kurze Namen für die Kacheln (in der Tabelle stehen die ausführlichen Rollennamen).
@@ -1348,7 +1357,11 @@ class WetterService:
                     "roles": [(key, label, types) for key, label, types in ROLES],
                     "role_types": {key: list(types) for key, _label, types in ROLES},
                     "role_units": ROLE_UNITS,
-                    "card_options": [(key, tr(label)) for key, label, _needs in CARD_OPTIONS],
+                    "card_groups": [
+                        (tr(tab), [(key, tr(labels[key])) for key in keys])
+                        for tab, keys in CARD_GROUPS
+                        for labels in [{key: label for key, label, _needs in CARD_OPTIONS}]
+                    ],
                     "card_needs": {key: list(needs) for key, _label, needs in CARD_OPTIONS},
                     "block_options": [("kenntage", tr("Kenntage"))] + [
                         (key, tr("Sonnenscheindauer") if key == "illuminance" else tr(ROLE_LABELS[key]))
