@@ -66,6 +66,7 @@ WETTER_ENTITY_IDS = (
     "sensor.demo_luftdruck", "sensor.demo_boe", "sensor.demo_strahlung", "sensor.demo_niederschlag",
     "sensor.demo_aussentemperatur_nord", "sensor.demo_waermepumpe_energie", "sensor.demo_heizstab_energie",
     "sensor.demo_konvektoren_energie", "sensor.demo_helligkeit_sued", "sensor.demo_helligkeit_daemmerung",
+    "sensor.demo_windrichtung", "sensor.demo_sonnenhoehe",
 )
 
 
@@ -278,6 +279,10 @@ DEMO_ENTITIES = [
     # Helligkeit wie bei einer Eltako-Wetterstation: Süd (Sonnenschein, Wetterlage) und Dämmerung (Tageslichtkurve).
     DemoEntity("sensor.demo_helligkeit_sued", "Demo Helligkeit Süd", "sensor", "measurement", "lx"),
     DemoEntity("sensor.demo_helligkeit_daemmerung", "Demo Helligkeit Dämmerung", "sensor", "measurement", "lx"),
+    # Windrichtung (Wetterlage) und Sonnenhöhe (Tageslicht, Sonnenstand beim Tagesbeginn); die PV-Leistung für
+    # „PV und Helligkeit“ ist die vorhandene sensor.demo_pv_leistung.
+    DemoEntity("sensor.demo_windrichtung", "Demo Windrichtung", "sensor", "measurement", "°"),
+    DemoEntity("sensor.demo_sonnenhoehe", "Demo Sonnenhöhe", "sensor", "measurement", "°"),
 ]
 
 
@@ -670,8 +675,32 @@ def gen_south_lux(radiation_wm2: float, rng: random.Random) -> float:
     der echte Sensor. Mittags im Sommer liegt sie an der Sättigung, trübe Tage bleiben unter 15.000 lx."""
     if radiation_wm2 <= 0:
         return 0.0
-    lux = radiation_wm2 * LUX_PER_WM2 * rng.uniform(0.9, 1.1)
+    # Dünne Strahlung ergibt überproportional wenig Licht (Schleier, tiefer Sonnenstand): So gibt es trübe, heitere und
+    # sonnige Tage statt fast nur sonniger.
+    lux = radiation_wm2 * LUX_PER_WM2 * (0.35 + 0.65 * min(1.0, radiation_wm2 / 700.0)) * rng.uniform(0.9, 1.1)
     return min(SUED_LUX_MAX, round(lux / SUED_LUX_STEP) * SUED_LUX_STEP)
+
+
+def gen_wind_direction(dt: datetime, rng: random.Random) -> float:
+    """Windrichtung in Grad (Herkunft): meist Südwest bis West, je Tag ein anderer Schwerpunkt, tagsüber eine
+    langsame Drehung, ganzzahlig wie bei einer Wetterstation."""
+    day = dt.toordinal()
+    base = 240.0 + 55.0 * math.sin(day * 1.7) + 35.0 * math.sin(day * 0.43)
+    drift = 15.0 * math.sin(2 * math.pi * (dt.hour + dt.minute / 60) / 24)
+    return float(round((base + drift + rng.uniform(-8, 8)) % 360.0))
+
+
+#: Breite des Demo-Standorts (Mitteleuropa) für die Sonnenhöhe; die Sonne steht wie bei den anderen Reihen um 12:00 am höchsten.
+DEMO_LATITUDE = 48.0
+
+
+def gen_sun_elevation(dt: datetime) -> float:
+    """Sonnenhöhe in Grad über dem Horizont (negativ in der Nacht), aus Tag im Jahr und Uhrzeit."""
+    declination = math.radians(23.44 * math.sin(2 * math.pi * (dt.timetuple().tm_yday - 81) / 365))
+    hour_angle = math.radians((dt.hour + dt.minute / 60 - 12.0) * 15.0)
+    latitude = math.radians(DEMO_LATITUDE)
+    value = math.sin(latitude) * math.sin(declination) + math.cos(latitude) * math.cos(declination) * math.cos(hour_angle)
+    return round(math.degrees(math.asin(max(-1.0, min(1.0, value)))), 1)
 
 
 def gen_dawn_lux(dt: datetime, weather: WeatherContext, rng: random.Random) -> float:
@@ -875,7 +904,7 @@ def simulate_household(
         "pv_power": [], "pv_ertrag": [], "stromzaehler_bezug": [], "stromzaehler_einspeisung": [],
         "pv_prognose_rest_heute": [], "pv_prognose_morgen": [], "co2_intensitaet": [],
         "luftdruck": [], "boe": [], "strahlung": [], "niederschlag": [], "outdoor_temp_nord": [],
-        "helligkeit_sued": [], "helligkeit_daemmerung": [],
+        "helligkeit_sued": [], "helligkeit_daemmerung": [], "windrichtung": [], "sonnenhoehe": [],
         "waermepumpe_energie": [], "heizstab_energie": [], "konvektoren_energie": [],
         "balkon_pv": [], "balkon_ladeleistung": [], "balkon_entladeleistung": [],
         "balkon_soc_pct": [], "balkon_speicher_stand": [], "balkon_hausabgabe": [],
@@ -920,6 +949,7 @@ def simulate_household(
     wetter_rng = random.Random(int(start.timestamp()))
     # Eigener Zufallsstrom für die Helligkeit: die Werte der übrigen Wetterreihen bleiben dadurch unverändert.
     licht_rng = random.Random(int(start.timestamp()) + 1)
+    richtung_rng = random.Random(int(start.timestamp()) + 2)
     niederschlag_total = counter_seed.get("niederschlag", 842.3)
     waermepumpe_total = counter_seed.get("waermepumpe_energie", 1480.0)
     heizstab_total = counter_seed.get("heizstab_energie", 160.0)
@@ -1048,6 +1078,8 @@ def simulate_household(
         series["strahlung"].append((ts, radiation_now))
         series["helligkeit_sued"].append((ts, gen_south_lux(radiation_now, licht_rng)))
         series["helligkeit_daemmerung"].append((ts, gen_dawn_lux(dt, weather, licht_rng)))
+        series["windrichtung"].append((ts, gen_wind_direction(dt, richtung_rng)))
+        series["sonnenhoehe"].append((ts, gen_sun_elevation(dt)))
 
         series["co2_intensitaet"].append((ts, gen_co2_intensity(dt, weather, rng)))
 
@@ -1689,7 +1721,7 @@ _DEMO_CATEGORY_RULES = (
     (4, ("gesamtwirkleistung", "waschmaschine", "spuelmaschine", "trockner", "kuehlschrank", "herd", "homeoffice",
          "entertainment", "boiler", "werkstatt", "waermepumpe", "heizstab", "konvektoren")),
     (5, ("aussentemperatur", "luftfeuchte", "wind", "regensensor", "luftdruck", "boe", "strahlung", "niederschlag",
-         "helligkeit")),
+         "helligkeit", "sonnenhoehe")),
 )
 
 
@@ -2147,6 +2179,8 @@ def run_generation(
         "sensor.demo_konvektoren_energie": household["konvektoren_energie"],
         "sensor.demo_helligkeit_sued": household["helligkeit_sued"],
         "sensor.demo_helligkeit_daemmerung": household["helligkeit_daemmerung"],
+        "sensor.demo_windrichtung": household["windrichtung"],
+        "sensor.demo_sonnenhoehe": household["sonnenhoehe"],
         "sensor.demo_saugroboter_status": gen_saugroboter_status(start, now, rng),
         "sensor.demo_waschmaschine_programm": gen_waschmaschine_programm(
             start, now, household["waschmaschine_an"], rng,

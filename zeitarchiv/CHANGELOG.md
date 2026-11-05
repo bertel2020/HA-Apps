@@ -41,7 +41,10 @@
     einem eigenen Diagramm „Luftfeuchte im Vergleich“
   - Die Kartenauswahl ist nach Reiter geordnet; der Reiter Heizen und seine
     Einstellungen stehen als „Experimentell“ in einem eigenen Block
-  - Die Demo-Daten enthalten die beiden Helligkeitssensoren mit Verlauf
+  - Die Demo-Daten enthalten die beiden Helligkeitssensoren, Windrichtung und
+    Sonnenhöhe mit Verlauf; die Helligkeit schwankt nun zwischen trüben und
+    sonnigen Tagen
+  - **Vorschlagen** erkennt auch Windrichtung, Sonnenhöhe und die PV-Leistung
   - **Experimentell**: Im Reiter Heizen lassen sich die Punkte des
     Streudiagramms nach Sonne einfärben, und eine Tabelle vergleicht kWh je
     Gradtag an sonnigen, wechselhaften und trüben Tagen; ein Unterschied wird nur
@@ -105,7 +108,10 @@
     separate "Humidity comparison" chart
   - The card selection is grouped by tab; the Heating tab and its settings are
     in a separate "Experimental" block
-  - The demo data contains both brightness sensors with a history
+  - The demo data contains both brightness sensors, wind direction and sun
+    elevation with a history; the brightness now varies between overcast and
+    sunny days
+  - **Suggest** also recognises wind direction, sun elevation and PV power
   - **Experimental**: On the Heating tab the scatter plot points can be coloured
     by sunshine, and a table compares kWh per degree day on sunny, changeable and
     overcast days; a difference is only stated if it stands out from chance

@@ -22,7 +22,7 @@ from .selection_topics import WEATHER_PLATFORMS, _DEVICE_TEMP, is_outdoor
 #: Rollen, für die Vorschläge berechnet werden (Reihenfolge wie in der Einrichtung).
 ROLE_KEYS = (
     "temperature", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation", "illuminance",
-    "illuminance_dawn",
+    "illuminance_dawn", "wind_direction", "sun_elevation", "pv_power",
 )
 
 _TEMP_UNITS = {"°c", "°f", "k"}
@@ -40,6 +40,14 @@ _ABSOLUTE = re.compile(r"(absolut|absolute)", re.IGNORECASE)
 _SOUTH = re.compile(r"(s[üu]d|south|central|zentral)", re.IGNORECASE)
 _DAWN = re.compile(r"(dawn|d[äa]mmerung|twilight)", re.IGNORECASE)
 _MOON = re.compile(r"(moon|mond)", re.IGNORECASE)
+_DIRECTION = re.compile(r"(richtung|direction|bearing)", re.IGNORECASE)
+_WIND_WORD = re.compile(r"(wind)", re.IGNORECASE)
+_ELEVATION = re.compile(r"(sonnenh[öo]he|sonnenstand|elevation|altitude|sun height)", re.IGNORECASE)
+_AZIMUTH = re.compile(r"(azimut)", re.IGNORECASE)
+_PV = re.compile(r"(\bpv\b|solar|photovoltaik|wechselrichter|inverter)", re.IGNORECASE)
+_PV_NOT = re.compile(r"(prognose|forecast|prediction|erwartung|estimate|string|bezug|einspeis|grid|netz)", re.IGNORECASE)
+_PV_SMALL = re.compile(r"(balkon|stecker|plug|micro|mikro)", re.IGNORECASE)
+_POWER_UNITS = {"w", "kw", "mw"}
 _HEATING = re.compile(r"(heiz|w[äa]rmepumpe|waermepumpe|heat ?pump|heatpump|konvektor|heizstab|therme|fu(ß|ss)boden)", re.IGNORECASE)
 _HINT_FIELDS = ("name", "device", "area")
 
@@ -134,6 +142,30 @@ def _score(role: str, row: dict[str, Any], anchor: dict[str, Any] | None) -> tup
                 add(2, tr("Dämmerungs-Sensor"))
             elif points and _SOUTH.search(text):
                 add(2, tr("Süd-Sensor"))
+    elif role in ("wind_direction", "sun_elevation", "pv_power"):
+        if kind != "standard" or row["domain"] != "sensor":
+            return 0, []
+        if role == "wind_direction":
+            if not (_DIRECTION.search(text) and _WIND_WORD.search(text)):
+                return 0, []
+            add(3, tr("„Windrichtung“ im Namen"))
+            if unit == "°":
+                add(1, tr("Einheit {unit}", unit=row.get("unit")))
+        elif role == "sun_elevation":
+            if not _ELEVATION.search(text) or _AZIMUTH.search(text):
+                return 0, []
+            add(3, tr("„Sonnenhöhe“ im Namen"))
+            if unit == "°":
+                add(1, tr("Einheit {unit}", unit=row.get("unit")))
+        else:
+            if not _PV.search(text) or _PV_NOT.search(text) or unit not in _POWER_UNITS:
+                return 0, []
+            add(3, tr("PV im Namen, Leistung"))
+            if dc == "power":
+                add(1, tr("Geräteklasse Leistung"))
+            if _PV_SMALL.search(text):
+                points -= 1  # ein Balkonkraftwerk ist selten die Anlage, deren Ertrag man mit der Helligkeit vergleicht
+                reasons.append(tr("kleine Anlage"))
     elif role == "precip_mm":
         if kind != "counter" or row["domain"] != "sensor":
             return 0, []

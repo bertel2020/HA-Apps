@@ -142,3 +142,25 @@ def test_illuminance_prefers_the_south_sensor_of_the_station_and_skips_the_moon(
     assert pick["entity_id"] == "sensor.station_illuminance_central"
     assert pick["confidence"] == "ok"
     assert "sensor.wolfegg_moon_illuminance" not in {pick["entity_id"], *(c["entity_id"] for c in pick["candidates"])}
+
+
+def test_direction_elevation_and_pv_power_are_suggested_by_name_and_unit() -> None:
+    archived = [
+        _entity("sensor.station_wind", "km/h"),
+        _entity("sensor.station_windrichtung", "°"),
+        _entity("sensor.sonne_hoehe", "°"),
+        _entity("sensor.sun_solar_azimuth", "°"),
+        _entity("sensor.sun_solar_elevation", "°"),
+        _entity("sensor.dach_pv_leistung", "W"),
+        _entity("sensor.balkonkraftwerk_pv_leistung", "W"),
+        _entity("sensor.pv_prognose_leistung", "W"),
+        _entity("sensor.pv_ertrag", "kWh", "counter", "total_increasing"),
+        _entity("sensor.wohnzimmer_leistung", "W"),
+    ]
+    labels = {row["entity_id"]: row["entity_id"].split(".", 1)[1].replace("_", " ") for row in archived}
+    roles = wetter_autofill.suggest(archived, labels)["roles"]
+    assert roles["wind_direction"]["entity_id"] == "sensor.station_windrichtung"
+    assert roles["wind"]["entity_id"] == "sensor.station_wind"  # die Richtung wird nicht als Windstärke vorgeschlagen
+    assert roles["sun_elevation"]["entity_id"] == "sensor.sun_solar_elevation"  # Azimut ist keine Höhe
+    assert roles["pv_power"]["entity_id"] == "sensor.dach_pv_leistung"  # Dachanlage vor Balkonkraftwerk, keine Prognose
+    assert roles["pv_power"]["confidence"] == "ok"

@@ -3373,6 +3373,8 @@
     "Demo Sonneneinstrahlung": "Demo Solar Radiation",
     "Demo Helligkeit Süd": "Demo Illuminance South",
     "Demo Helligkeit Dämmerung": "Demo Illuminance Dusk Dawn",
+    "Demo Windrichtung": "Demo Wind Direction",
+    "Demo Sonnenhöhe": "Demo Sun Elevation",
     "Demo Niederschlag": "Demo Precipitation",
     "Demo Außentemperatur Nord": "Demo Outdoor Temperature North",
     "Demo Wärmepumpe Energie": "Demo Heat Pump Energy",
@@ -3635,7 +3637,12 @@
     "Sonnenhöhe bei Tagesbeginn": "Sun elevation at start of day",
     "Sonnenhöhe bei Tagesende": "Sun elevation at end of day",
     "Tageslänge im Jahresverlauf": "Day length over the year",
-    "Noch keine Tageslänge aus dem Dämmerungssensor vorhanden.": "No day length from the dawn sensor yet."
+    "Noch keine Tageslänge aus dem Dämmerungssensor vorhanden.": "No day length from the dawn sensor yet.",
+    "„Windrichtung“ im Namen": "“Wind direction” in the name",
+    "„Sonnenhöhe“ im Namen": "“Sun elevation” in the name",
+    "PV im Namen, Leistung": "PV in the name, power",
+    "Geräteklasse Leistung": "Device class power",
+    "kleine Anlage": "small system"
   },
   "js": {
     "Ladestand": "State of charge",

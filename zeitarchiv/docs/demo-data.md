@@ -115,6 +115,8 @@ wiederzuerkennen und gezielt löschbar):
 | `sensor.demo_konvektoren_energie` | Zähler (`total_increasing`) | kWh | Wetterdashboard (Heizen): der Rest von `demo_heizung` (28 % abzüglich Heizstab), z. B. Bad und Übergangszeit |
 | `sensor.demo_helligkeit_sued` | Standard | lx | Wetterdashboard (Sonnenscheindauer, Wetterlage): aus der Globalstrahlung (rund 110 lx je W/m²), gestuft in 590-lx-Schritten und bei 98.824 lx gekappt wie der Süd-Sensor einer Eltako-Station; nachts 0, an trüben Tagen unter 15.000 lx |
 | `sensor.demo_helligkeit_daemmerung` | Standard | lx | Wetterdashboard (Tageslichtkurve, Wetterlage): 0 bis 1.000 lx in 4er-Stufen, Rampe über rund 80 Minuten um Sonnenauf- und -untergang; dichte Bewölkung dämpft sie, „Tag ab 400 lx“ beginnt dann später |
+| `sensor.demo_windrichtung` | Standard | ° | Wetterdashboard (Wetterlage): Herkunft des Windes, meist Südwest bis West, je Tag ein anderer Schwerpunkt, tagsüber eine langsame Drehung; ganzzahlig |
+| `sensor.demo_sonnenhoehe` | Standard | ° | Wetterdashboard (Tageslicht): Sonnenhöhe über dem Horizont für 48° Breite, negativ in der Nacht; für die Rolle „Sonnenhöhe“. Für „PV und Helligkeit“ dient die vorhandene `sensor.demo_pv_leistung` |
 
 Waschmaschine, Spülmaschine, Trockner und Wallbox haben je zwei bzw. drei
 Entitäten — Momentanleistung (W), Energiezähler (kWh) und bei den drei

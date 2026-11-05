@@ -35,6 +35,8 @@ WETTER_IDS = {
     "sensor.demo_konvektoren_energie": ("total_increasing", "kWh"),
     "sensor.demo_helligkeit_sued": ("measurement", "lx"),
     "sensor.demo_helligkeit_daemmerung": ("measurement", "lx"),
+    "sensor.demo_windrichtung": ("measurement", "°"),
+    "sensor.demo_sonnenhoehe": ("measurement", "°"),
 }
 
 
@@ -81,7 +83,7 @@ def test_same_seed_gives_the_same_weather(winter) -> None:
     again = _simulate(5, datetime(2024, 1, 1, tzinfo=TZ), 30)
     for key in (
         "luftdruck", "boe", "strahlung", "niederschlag", "outdoor_temp_nord", "waermepumpe_energie",
-        "helligkeit_sued", "helligkeit_daemmerung",
+        "helligkeit_sued", "helligkeit_daemmerung", "windrichtung", "sonnenhoehe",
     ):
         assert again[key] == winter[key], key
 
@@ -178,3 +180,20 @@ def test_dawn_curve_gives_a_longer_day_in_summer_than_in_winter(summer, winter) 
     long_day = _day_length_hours(summer, datetime(2024, 7, 10, tzinfo=TZ))
     short_day = _day_length_hours(winter, datetime(2024, 1, 10, tzinfo=TZ))
     assert 14.0 < long_day < 17.0 and 7.0 < short_day < 10.5
+
+
+def test_wind_direction_stays_within_the_compass_and_sun_elevation_follows_the_season(summer, winter) -> None:
+    for household in (summer, winter):
+        assert all(0.0 <= value < 360.0 and value == int(value) for _ts, value in household["windrichtung"])
+    noon = lambda household: max(value for _ts, value in household["sonnenhoehe"])  # noqa: E731
+    assert noon(summer) > 55.0 > 25.0 > noon(winter) > 10.0  # Mitteleuropa: etwa 62° im Sommer, 19° im Winter
+    assert min(value for _ts, value in summer["sonnenhoehe"]) < -10.0  # nachts unter dem Horizont
+
+
+def test_south_illuminance_has_all_sky_classes_over_a_summer_month(summer) -> None:
+    peaks = {}
+    for ts, lux in summer["helligkeit_sued"]:
+        day = datetime.fromtimestamp(ts, TZ).date()
+        peaks[day] = max(peaks.get(day, 0.0), lux)
+    classes = {"trueb" if p < 15000 else "bewoelkt" if p < 25000 else "heiter" if p < 70000 else "sonnig" for p in peaks.values()}
+    assert len(classes) >= 3, classes  # nicht fast nur sonnige Tage, damit Tagesbild und Heizen+Sonne etwas zeigen
