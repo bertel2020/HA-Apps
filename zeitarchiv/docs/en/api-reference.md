@@ -234,6 +234,29 @@ with `Retry-After`), `504` `timeout` (after 20 s). A response is limited to abou
 `ai_config_rev`; when it changes, the integration re-fetches `/api/ai/config`.
 `/api/health` and `/api/notices` announce the capability `"ai"`.
 
+## `/api/card/*` — Lovelace card (port `8127`)
+
+Routes for the integration's card (`custom:zeitarchiv-card`); implemented in `app/card_routes.py`. Unlike the
+Ingress-internal query routes they check the API token, because the port is reachable from outside. Each route has its
+own exact `location =` in `nginx.conf`. The capabilities appear in `/api/health` (`cards`, `card_series`, `card_spark`, `card_table`,
+`card_elements`).
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/card/items` | saved charts and tables for the choice |
+| `GET /api/card/chart?id=`, `GET /api/card/table?id=` | one chart with data or one saved comparison table |
+| `GET /api/card/entities`, `GET /api/card/series` | archived entities and data without a saved chart |
+| `GET /api/card/spark` | short series for the trend line under a tile card |
+| `GET /api/card/elements` | the dashboard elements set up in this app, with their options |
+| `GET /api/card/element?key=` | one element with its figures |
+
+`/api/card/element` takes the key (`energie.kennzahlen`, `wetter.matrix` …) and fixed words as options: `columns`,
+`vorjahr`, `mode` (`bis_jetzt`/`komplett`), `at`, `role`, `years`, `group`, `metric`, `range`
+(`day`/`week`/`month`/`year`), `offset` (0 to −60), `side`, `values`, `sparkline`, `limit` (1 to 20). An element ignores
+what it does not know. The response carries `renderer`, `kind` (`table`, `chart`, `kpi`) and the figures from the same
+functions as the dashboards (`app/card_elements.py`); drawing happens in the card. If the element is not set up, the
+route answers `409` with the reason, `404` for an unknown key, `400` for invalid values.
+
 ## Error formats
 
 FastAPI standard: `4xx`/`5xx` with `{"detail": "..."}`. Auth errors always

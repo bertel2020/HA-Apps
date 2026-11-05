@@ -251,6 +251,29 @@ etwa 8.000 Zeichen begrenzt und sagt `truncated`, wenn sie gekürzt wurde.
 `/api/notices` trägt `ai_config_rev`; ändert sich der Wert, holt die Integration
 `/api/ai/config` neu. `/api/health` und `/api/notices` melden die Fähigkeit `"ai"`.
 
+## `/api/card/*` — Lovelace-Karte (Port `8127`)
+
+Routen für die Karte der Integration (`custom:zeitarchiv-card`); implementiert in `app/card_routes.py`. Anders als die
+Ingress-internen Abfrage-Routen prüfen sie den API-Token, denn der Port ist von außen erreichbar. Jede Route hat in
+`nginx.conf` einen eigenen exakten `location =`. Die Fähigkeiten stehen in `/api/health` (`cards`, `card_series`, `card_spark`, `card_table`,
+`card_elements`).
+
+| Endpunkt | Zweck |
+|---|---|
+| `GET /api/card/items` | gespeicherte Charts und Tabellen für die Auswahl |
+| `GET /api/card/chart?id=`, `GET /api/card/table?id=` | ein Chart mit Daten bzw. eine gespeicherte Vergleichstabelle |
+| `GET /api/card/entities`, `GET /api/card/series` | archivierte Entitäten und Daten ohne gespeichertes Chart |
+| `GET /api/card/spark` | kurze Reihe für die Verlaufslinie unter einer Kachelkarte |
+| `GET /api/card/elements` | die Dashboard-Bausteine, die in dieser App eingerichtet sind, mit ihren Optionen |
+| `GET /api/card/element?key=` | ein Baustein mit seinen Zahlen |
+
+`/api/card/element` nimmt den Schlüssel (`energie.kennzahlen`, `wetter.matrix` …) und feste Wörter als Optionen:
+`columns`, `vorjahr`, `mode` (`bis_jetzt`/`komplett`), `at`, `role`, `years`, `group`, `metric`, `range`
+(`day`/`week`/`month`/`year`), `offset` (0 bis −60), `side`, `values`, `sparkline`, `limit` (1 bis 20). Was ein Baustein
+nicht kennt, ignoriert er. Die Antwort trägt `renderer`, `kind` (`table`, `chart`, `kpi`) und die Zahlen derselben
+Funktionen wie die Dashboards (`app/card_elements.py`); gezeichnet wird in der Karte. Ist der Baustein nicht eingerichtet,
+antwortet die Route `409` mit dem Grund, bei unbekanntem Schlüssel `404`, bei ungültigen Angaben `400`.
+
 ## Fehlerformate
 
 FastAPI-Standard: `4xx`/`5xx` mit `{"detail": "..."}`. Auth-Fehler immer
