@@ -167,7 +167,7 @@ from .energiedashboard_routes import (
 )
 from .wetter_routes import WetterDependencies, WetterService, is_wetter_configured, wetter_role_count
 from . import cleanup_stats, counter_bulk, data_quality, entity_usage, value_range
-from . import dashboard_tiles
+from . import dashboard_tiles, overview_tiles
 from .dashboard_tiles import tile_metric_context as _tile_metric_context
 from .route_support import (
     MAX_FORM_FIELDS,
@@ -947,6 +947,7 @@ def entities_view(request: Request) -> HTMLResponse:
         "size_sparkline": _sparkline_paths([s["total_size_bytes"] for s in snapshots]),
         **_dashboard_tiles_context(index.get_default_dashboard_id()),
     }
+    context.update(overview_tiles.page_context(index, TZ, context["total_rows"], context["total_size"]))
     return templates.TemplateResponse(request, "entities.html", context)
 
 
@@ -1058,6 +1059,7 @@ def _settings_darstellung_context(saved: bool = False) -> dict:
         "dashboard_animation_options": list(DASHBOARD_ANIMATION_LABELS.items()),
         "startseite": startseite,
         "startseite_options": list(STARTSEITE_LABELS.items()),
+        **overview_tiles.settings_context(index),
         # Globale Defaults für das Optionen-Menü der Entität-eigenen Chart-Seite
         # (entity_detail.html) — siehe _get_entity_chart_defaults()/
         # _resolve_entity_chart_options() weiter unten in dieser Datei. Bool-
@@ -1563,6 +1565,10 @@ async def settings_darstellung(request: Request) -> HTMLResponse:
             raise HTTPException(status_code=400, detail=tr("Ungültige Startseite"))
         if startseite is not None:
             index.set_setting("startseite", str(startseite))
+        try:
+            overview_tiles.apply_form(index, form)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         # Globale Defaults für das Optionen-Menü der Entität-eigenen Chart-Seite
         # (entity_detail.html) — jedes Feld postet wie oben einzeln für sich,
@@ -1751,6 +1757,7 @@ register_source("backup", N_("Backup"), lambda: notices_mod.backup_activity(_bac
 
 @asynccontextmanager
 async def _lifespan(_: FastAPI):
+    overview_tiles.ensure_defaults(index)
     _background.start()
     yield
     _background.stop()

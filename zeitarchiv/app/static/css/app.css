@@ -2557,3 +2557,25 @@ button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
 @media (max-width:640px){
   .wt-kpis{--wt-cols:2 !important;}
 }
+
+/* Einstellungen → Darstellung → Kacheln der Übersicht (overview_tiles.py): sortierbare Liste mit Schalter. */
+.ov-set-row{flex-wrap:wrap;}
+.ov-set-count{font-weight:400;color:var(--ink-faint);font-size:calc(12px * var(--font-scale, 1));margin-left:6px;}
+.ov-set-list{list-style:none;margin:0;padding:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;
+  flex:1 1 100%;min-width:0;}
+.ov-set-list li{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--border);background:var(--surface);
+  font-size:calc(13.5px * var(--font-scale, 1));}
+.ov-set-list li:last-child{border-bottom:0;}
+.ov-set-list li.is-off{color:var(--ink-faint);background:var(--surface-alt);}
+.ov-set-list .sw{width:10px;height:10px;border-radius:3px;flex:none;}
+.ov-set-list .nm{flex:1;min-width:0;overflow-wrap:break-word;}
+.ov-set-list .tag{font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);margin-left:4px;white-space:nowrap;}
+.ov-set-move{border:1px solid var(--border);background:var(--surface);color:var(--ink-muted);border-radius:6px;width:26px;height:26px;
+  padding:0;cursor:pointer;line-height:1;}
+.ov-set-move:hover:not(:disabled){border-color:var(--accent-line);color:var(--accent-line);}
+.ov-set-move:disabled{opacity:.3;cursor:default;}
+.ov-set-toggle{position:relative;flex:none;width:30px;height:17px;border:0;border-radius:999px;background:var(--border-strong);cursor:pointer;padding:0;}
+.ov-set-toggle::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:999px;background:var(--surface);transition:left .15s;}
+.ov-set-toggle.is-on{background:var(--accent-line);}
+.ov-set-toggle.is-on::after{left:15px;}
+.ov-set-toggle:disabled{opacity:.4;cursor:default;}

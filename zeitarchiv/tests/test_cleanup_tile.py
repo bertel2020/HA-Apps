@@ -144,6 +144,14 @@ def test_the_status_tile_leads_with_inactive_entities_and_keeps_number_and_word_
 
 
 def test_the_overview_shows_the_status_tile_as_the_fourth_stat(client) -> None:
-    html = client.get("/").text
+    # Die vier Statistik-Kacheln sind seit 1.47 eine Einstellung; neue Installationen starten ohne sie.
+    from app.main import index
+
+    previous = index.get_setting("overview_stats")
+    index.set_setting("overview_stats", "always")
+    try:
+        html = client.get("/").text
+    finally:
+        index.set_setting("overview_stats", previous or "alert")
     assert html.count('class="stat"') == 4
     assert ">Status<" in html or ">Status</div>" in html

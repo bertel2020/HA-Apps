@@ -483,3 +483,35 @@
     .dtile,.dtile[data-grid-cols="2"],.dtile[data-grid-cols="3"]{grid-column:span 1;}
     .dashboard-grid.is-precise .dtile{grid-column:span 1;}
   }
+
+/* Auswahl-Kacheln der Übersicht (overview_tiles.py). Fläche, Schatten und Hover wie die Dashboard-
+   Kacheln (dashboards.css): Farbverlauf-Kante oben, Symbol im getönten Quadrat, Titel, eine Infozeile.
+   Das Raster bricht von selbst um (auto-fill), bei größerer Schrift also schon früher zweireihig. */
+.ov-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:22px;}
+.ov-tile{--tc:var(--chart-1);--tc2:var(--chart-2);display:flex;flex-direction:column;padding:0;overflow:hidden;position:relative;
+  text-decoration:none;color:inherit;background:var(--tile-wash), var(--surface);box-shadow:var(--shadow);
+  transition:background .16s ease,border-color .16s ease;}
+.ov-tile:hover{background:var(--tile-wash-hover), var(--surface);border-color:color-mix(in srgb, var(--accent-line) 30%, var(--border));}
+.ov-tile .acc{height:4px;flex:none;background:linear-gradient(90deg, var(--tc), var(--tc2));}
+.ov-tile .body{padding:13px 15px 14px;display:flex;flex-direction:column;gap:10px;flex:1;min-width:0;}
+.ov-tile .row{display:flex;align-items:center;gap:10px;min-width:0;}
+.ov-tile .ico{flex:none;width:32px;height:32px;border-radius:9px;display:grid;place-items:center;color:var(--tc);
+  background:color-mix(in srgb, var(--tc) 14%, transparent);}
+.ov-tile .ico svg{width:18px;height:18px;}
+.ov-tile .ttl{font-weight:600;font-size:calc(14.5px * var(--font-scale, 1));line-height:1.3;overflow-wrap:break-word;}
+.ov-tile:hover .ttl{color:var(--accent-line);}
+.ov-tile .meta{font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);margin-top:auto;}
+/* Hinweisstreifen statt der Statistik-Kacheln: nur, wenn in Housekeeping etwas offen ist. */
+.ov-alert{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding:9px 14px;border-radius:10px;
+  border:1px solid color-mix(in srgb, var(--warning) 35%, var(--border));background:var(--warning-soft);color:var(--ink);
+  font-size:calc(13px * var(--font-scale, 1));text-decoration:none;}
+.ov-alert svg{width:16px;height:16px;flex:none;color:var(--warning);}
+.ov-alert .go{margin-left:auto;color:var(--accent-line);font-weight:600;white-space:nowrap;}
+.ov-alert:hover{border-color:var(--warning);}
+@media (max-width:640px){
+  .ov-tiles{grid-template-columns:repeat(2, minmax(0, 1fr));gap:10px;}
+  .ov-tile .body{padding:11px 12px 12px;}
+  .ov-tile .ico{width:28px;height:28px;}
+  /* Symbol über den Titel: lange Namen (Energiedashboard) brauchen die ganze Kachelbreite. */
+  .ov-tile .row{flex-direction:column;align-items:flex-start;gap:8px;}
+}

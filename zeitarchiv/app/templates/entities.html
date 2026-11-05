@@ -8,6 +8,7 @@
 {% block content %}
   
   <div class="page">
+    {% if overview_stats | default('always') == 'always' %}
     <div class="stat-row">
       <a class="stat" href="entities">
         <div class="label">{{ _("Entitäten") }}</div>
@@ -42,6 +43,8 @@
       </a>
       {% endif %}
     </div>
+    {% endif %}
+    {% include "_overview_tiles.html" %}
 
     <div class="dashboard-section">
       <div class="dashboard-head">

@@ -64,6 +64,14 @@
     sich auf Niederschlag und Sonnenstunden umschalten. Die Farbe zeigt die
     Abweichung vom Mittel des Monats in Prozent, die letzte Spalte ist die
     Jahressumme kompletter Jahre; der laufende Monat steht ohne Vergleich da
+- **Übersicht**: Oben stehen statt der Statistik-Kacheln jetzt Kacheln, die zu
+  den Dashboards und Seiten führen, mit Farbe und einer Infozeile
+  - Welche Kacheln (bis zu 8) und in welcher Reihenfolge, lässt sich unter
+    Einstellungen → Darstellung einstellen
+  - Die Statistik-Kacheln sind optional: „Nur bei Auffälligkeit“ zeigt einen
+    schmalen Streifen, wenn in Housekeeping etwas offen ist, „Immer“ zeigt sie
+    wie bisher. Bestehende Installationen behalten sie, neue starten mit dem
+    Streifen; die Zahlen stehen weiter unter System → Statistik
 
 ### Behoben
 
@@ -136,6 +144,14 @@
     be switched to precipitation and hours of sunshine. The colour shows the
     deviation from the month's mean in percent, the last column is the total of
     complete years; the current month is shown without a comparison
+- **Overview**: At the top, tiles that lead to the dashboards and pages replace
+  the statistics tiles, with colour and an info line
+  - Which tiles (up to 8) and in which order can be set under Settings →
+    Appearance
+  - The statistics tiles are optional: "Only when something needs attention"
+    shows a slim strip when something is open in Housekeeping, "Always" shows
+    them as before. Existing installations keep them, new ones start with the
+    strip; the figures are still under System → Statistics
 
 #### Fixed
 
