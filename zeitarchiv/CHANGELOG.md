@@ -79,6 +79,13 @@
     schmalen Streifen, wenn in Housekeeping etwas offen ist, „Immer“ zeigt sie
     wie bisher. Bestehende Installationen behalten sie, neue starten mit dem
     Streifen; die Zahlen stehen weiter unter System → Statistik
+- **Lovelace-Karte, Dashboard-Bausteine**: Die Karte zeigt neben Charts und
+  Tabellen auch fertige Ausschnitte der Dashboards (Quelle „Dashboard-Baustein“)
+  - Zeiträume im Vergleich aus Energie und Wetter sowie Jahre × Monate aus der
+    Energie, jeweils mit den Zahlen des Dashboards
+  - Rollen und Formeln bleiben im Dashboard eingerichtet; nicht eingerichtete
+    Bausteine fehlen in der Auswahl
+  - Nur für Administratoren; braucht die aktuelle Integration
 
 ### Geändert
 
@@ -174,6 +181,13 @@
     shows a slim strip when something is open in Housekeeping, "Always" shows
     them as before. Existing installations keep them, new ones start with the
     strip; the figures are still under System → Statistics
+- **Lovelace card, dashboard elements**: Besides charts and tables, the card
+  shows ready-made parts of the dashboards (source "Dashboard element")
+  - Periods compared from Energy and Weather, and years × months from Energy,
+    each with the figures of the dashboard
+  - Roles and formulas stay set up in the dashboard; elements that are not set
+    up are missing from the choice
+  - Administrators only; needs the current integration
 
 #### Changed
 
