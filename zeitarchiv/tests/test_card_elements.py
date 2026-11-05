@@ -79,6 +79,8 @@ class _Energie:
 
     def compute_tile(self, config: dict, key: str, range_key: str, offset: int, read_cache) -> dict:
         self.tiles.append(key)
+        if key == "speicher":
+            return {"soc": [40.0, None, 72.0] if range_key == "day" else None}
         if key in ("netzbezug", "einspeisung"):
             return {"series": [{"name": key, "values": [1.0, None, 3.0]}]}
         return {"series": [{"values": [1.0, 2.0, None]}, {"values": [0.5, None, None]}]}
@@ -389,3 +391,20 @@ def test_the_storage_is_offered_only_with_a_storage_and_shows_balance_and_charge
     assert [(line["value"], line["unit"]) for line in now["lines"]] == [(72.0, "%"), (4.0, "kWh"), (2.5, "kWh")]  # Ladestand jetzt
     past = client.get("/api/card/element", headers=AUTH, params={"key": "energie.kennzahlen", "values": "speicher", "range": "day", "offset": -1}).json()["items"][0]
     assert past["lines"][0]["value"] == 55.0  # in einer vergangenen Periode der Durchschnitt
+
+
+def test_the_storage_card_is_offered_with_a_storage_and_carries_the_charge_curve_for_a_day(energie: _Energie, monkeypatch: pytest.MonkeyPatch) -> None:
+    client = _client()
+    listed = [item["key"] for item in client.get("/api/card/elements", headers=AUTH).json()["elements"]]
+    assert "energie.speicher" not in listed
+    assert client.get("/api/card/element", headers=AUTH, params={"key": "energie.speicher"}).status_code == 409
+    monkeypatch.setattr(card_elements, "_energie_config", lambda ctx: {"erzeuger": [], "speicher": [{"name": "Akku"}]})
+    listed = {item["key"]: item for item in client.get("/api/card/elements", headers=AUTH).json()["elements"]}
+    assert listed["energie.speicher"]["kind"] == "kpi" and listed["energie.speicher"]["ranges"] == ["day", "month", "year"]
+    day = client.get("/api/card/element", headers=AUTH, params={"key": "energie.speicher", "range": "day"}).json()
+    assert day["renderer"] == "energie.speicher" and day["level"] == 72.0 and day["soc"] == [40.0, None, 72.0]
+    assert day["item"]["value"] == 1.5 and day["compare_label"]
+    month = client.get("/api/card/element", headers=AUTH, params={"key": "energie.speicher", "range": "month"}).json()
+    assert month["soc"] == [] and month["level"] == 72.0
+    past = client.get("/api/card/element", headers=AUTH, params={"key": "energie.speicher", "range": "day", "offset": -1, "sparkline": "false"}).json()
+    assert past["level"] == 55.0 and past["soc"] == []  # vergangen: Durchschnitt; ohne Verlauf keine Kurve

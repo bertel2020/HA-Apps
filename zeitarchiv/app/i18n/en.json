@@ -3696,7 +3696,8 @@
     "Energie: Was hat sich verändert?": "Energy: what has changed?",
     "Ladestand": "State of charge",
     "Ø Ladestand": "Avg. state of charge",
-    "PP": "pp"
+    "PP": "pp",
+    "Energie: Speicher": "Energy: storage"
   },
   "js": {
     "Ladestand": "State of charge",

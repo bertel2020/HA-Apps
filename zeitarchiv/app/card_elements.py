@@ -258,6 +258,36 @@ def _storage_item(label: str, entry: dict, current: dict, offset: int) -> dict:
             "abs": entry.get("abs"), "better": None, "spark": [], "lines": lines}
 
 
+def _energie_storage_available(ctx: Context) -> bool:
+    config = _energie_config(ctx)
+    return config is not None and bool(config.get("speicher"))
+
+
+def _energie_storage(ctx: Context, options: Options) -> dict:
+    """Die größere Speicher-Karte: Saldo, Ladestand, Ladung und Entladung wie die Kennzahl, dazu bei einem Tag die Kurve
+    des Ladestands (nur dort ist sie ein Verlauf; bei Monat und Jahr wäre es ein grober Mittelwert je Bucket)."""
+    from .energiedashboard_routes import COMPARE_LABELS
+    from .storage import query as query_mod
+
+    config = _energie_config(ctx)
+    if config is None or not config.get("speicher"):
+        raise ElementUnavailable(tr("Im Energiedashboard nicht eingerichtet"))
+    range_key = options.range if options.range in ("day", "month", "year") else "day"
+    offset = min(0, options.offset)
+    energie = ctx.energie
+    read_cache = query_mod.QueryReadCache()
+    flow = energie.compute_flow(config, range_key, offset, skip_quality=True, read_cache=read_cache)
+    compare, current, _previous = energie.compute_period_comparison(config, range_key, offset, flow, read_cache)
+    item = _storage_item(tr("Speicher"), compare.get("speicher_netto") or {}, current, offset)
+    soc = []
+    if range_key == "day" and options.sparkline:
+        soc = (energie.compute_tile(config, "speicher", range_key, offset, read_cache).get("soc")) or []
+    now = offset == 0
+    level = current.get("speicher_soc_now") if now else current.get("speicher_soc")
+    return {"renderer": "energie.speicher", "item": item, "level": level, "soc": soc, "range": range_key,
+            "compare_label": tr(COMPARE_LABELS[range_key])}
+
+
 def _energie_kpis(ctx: Context, options: Options) -> dict:
     from .energiedashboard_routes import COMPARE_LABELS
     from .storage import query as query_mod
@@ -397,6 +427,11 @@ ELEMENTS: dict[str, Element] = {
             key="energie.kennzahlen", group="energie", kind="kpi",
             title=lambda: tr("Energie: Kennzahlen"),
             available=_energie_zeitraeume_available, build=_energie_kpis, ranges=("day", "month", "year"), values=_energie_kpi_values,
+        ),
+        Element(
+            key="energie.speicher", group="energie", kind="kpi",
+            title=lambda: tr("Energie: Speicher"),
+            available=_energie_storage_available, build=_energie_storage, ranges=("day", "month", "year"),
         ),
         Element(
             key="energie.rekorde", group="energie", kind="kpi",

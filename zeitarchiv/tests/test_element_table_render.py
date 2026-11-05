@@ -108,6 +108,7 @@ console.log(JSON.stringify({
   range: R.changesRange(changes),
   records: win.ElementKpiRender.energyRecords({enough: true, unit: 'kWh', records: [{key: 'erzeugung', label: 'Stärkster Erzeugungstag', value: 61.234, date: '2026-06-14'}]}),
   notYet: win.ElementKpiRender.energyRecords({enough: false, records: []}),
+  storage: win.ElementKpiRender.energyStorage({level: 72, soc: [40, 55, 72], compare_label: 'x', item: {label: 'Speicher', unit: 'kWh', value: 1.5, abs: 0.8, better: null, lines: [{label: 'Ladung', value: 4, unit: 'kWh'}]}}),
   quotas: win.ElementKpiRender.energyKpis([
     {key: 'autarkie', label: 'Autarkie', unit: '%', value: 46.7, pct: null, abs: 2.5, delta_unit: 'PP', better: 'up', spark: []},
     {key: 'speicher', label: 'Speicher', unit: 'kWh', value: -1.2, pct: null, abs: 0.8, better: null, spark: [],
@@ -154,3 +155,9 @@ def test_quotas_change_in_percentage_points_and_the_storage_shows_its_lines(long
     assert "46,7" in html and "▲ +2,5 PP" in html and "kpi-good" in html
     assert "▲ +0,8 kWh" in html and html.count("kpi-delta kpi-good") == 1  # ohne better bleibt die Veränderung neutral
     assert "Ladestand 72" in html and "Ladung &lt;b&gt; 4,0" in html and "-1,2" in html
+
+
+def test_the_storage_card_fills_the_battery_by_the_charge_and_draws_the_curve(longterm: dict) -> None:
+    html = longterm["storage"]
+    assert 'class="stor-batt"' in html and 'width="30.2"' in html  # 72 % von 42 Einheiten
+    assert "1,5" in html and "▲ +0,8 kWh" in html and "Ladung 4,0" in html and "<polyline" in html
