@@ -307,18 +307,24 @@
         <thead><tr>
           <th>{{ _("Tag") }}</th><th>{{ _("Hell von–bis") }}</th><th>{{ _("Tageslänge") }}</th>
           <th>{{ _("Dämmerung morgens") }}</th><th>{{ _("Dämmerung abends") }}</th>
+          <th x-show="daylight && daylight.has_elevation" x-cloak>{{ _("Sonnenhöhe bei Tagesbeginn") }}</th>
+          <th x-show="daylight && daylight.has_elevation" x-cloak>{{ _("Sonnenhöhe bei Tagesende") }}</th>
         </tr></thead>
         <tbody>
           <template x-for="row in daylightRows()" :key="row.date">
             <tr :class="{'wt-row-current': row.current}">
               <td x-text="row.day"></td><td x-text="row.span"></td><td x-text="row.length"></td>
               <td x-text="row.morning"></td><td x-text="row.evening"></td>
+              <td x-show="daylight.has_elevation" x-cloak x-text="row.sunFrom"></td><td x-show="daylight.has_elevation" x-cloak x-text="row.sunTo"></td>
             </tr>
           </template>
         </tbody>
       </table>
     </div>
     <p class="wt-hint" x-show="daylight && daylightHistoryNote()" x-text="daylightHistoryNote()" x-cloak></p>
+    <h3 class="wt-h3" x-show="daylength" x-cloak>{{ _("Tageslänge im Jahresverlauf") }}</h3>
+    <div class="wt-chart wt-chart-short" x-show="daylength" x-cloak x-ref="daylengthChart"></div>
+    <p class="hint hint-status" x-show="daylength" x-text="daylengthNote()" x-cloak></p>
   </div>
   {% endif %}
   </section>

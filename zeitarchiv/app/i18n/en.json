@@ -3623,7 +3623,19 @@
     "Vergleicht den Tagesertrag der PV-Anlage mit dem, was die Süd-Helligkeit erwarten lässt. Dazu die Rollen „Helligkeit“ und „PV-Leistung“ (unter „Weitere Messwerte“) zuordnen.": "Compares the daily yield of the PV system with what the south brightness suggests. Assign the roles “Brightness” and “PV power” (under “Further measurements”).",
     "Die Erwartung wird aus den letzten 28 Tagen gelernt: je Helligkeitsstufe der Median der Stundenleistung. Die Karte zeigt, ob der Tagesertrag dazu passt; sie ist eine Messung, keine Prognose. Eine Abweichung über 15 % wird markiert, aber nur an Tagen mit nennenswerter Erwartung. Temperatur, Abregelung und ein voller Akku senken die Leistung, ohne dass die Anlage schlechter wird. Der Süd-Sensor misst an einem Punkt, im Sommer sättigt er mittags (98.800 lx), dann sagt die Helligkeit über die Leistung nur noch wenig. Das Verhältnis nach Uhrzeit zeigt, ob die Anlage morgens oder abends systematisch abweicht (Ausrichtung der Module, Verschattung).": "The expectation is learned from the last 28 days: the median hourly power per brightness level. The card shows whether the daily yield fits; it is a measurement, not a forecast. A deviation above 15 % is marked, but only on days with a meaningful expectation. Temperature, curtailment and a full battery lower the output without the system getting worse. The south sensor measures at one point and saturates at midday in summer (98,800 lx), where brightness says little about the output. The ratio by time of day shows whether the system deviates systematically in the morning or evening (module orientation, shading).",
     "Verhältnis nach Uhrzeit": "Ratio by time of day",
-    "Noch keine PV-Leistung mit Helligkeit zum Vergleichen vorhanden.": "No PV power with brightness to compare yet."
+    "Noch keine PV-Leistung mit Helligkeit zum Vergleichen vorhanden.": "No PV power with brightness to compare yet.",
+    "Windrichtung": "Wind direction",
+    "Bewölkt ab": "Cloudy from",
+    "Heiter ab": "Fair from",
+    "Sonnig ab": "Sunny from",
+    "Die Himmelsklassen der Wetterlage (trüb, bewölkt, heiter, sonnig) folgen der Sonnen-Schwelle: bewölkt ab 60 %, heiter ab 100 % und sonnig ab 280 % davon. Wer eigene Grenzen eintragen will, füllt die drei letzten Felder; leer bedeutet automatisch. Die Grenzen müssen von unten nach oben ansteigen.": "The sky classes of the weather summary (overcast, cloudy, fair, sunny) follow the sun threshold: cloudy from 60 %, fair from 100 % and sunny from 280 % of it. To enter your own limits, fill the last three fields; empty means automatic. The limits must rise from bottom to top.",
+    "Die Grenzen der Himmelsklassen müssen von unten nach oben ansteigen.": "The limits of the sky classes must rise from bottom to top.",
+    "Sonnenhöhe": "Sun elevation",
+    "Die Rolle „Sonnenhöhe“ ist ein Sensor mit der Höhe der Sonne in Grad, zum Beispiel ein Template-Sensor aus dem Attribut „elevation“ von sun.sun. Der Reiter Wind & Sonne zeigt damit, bei welchem Sonnenstand der Dämmerungssensor Tag meldet: Ein hoher Wert am Morgen oder Abend deutet auf Verschattung hin.": "The role “Sun elevation” is a sensor with the height of the sun in degrees, for example a template sensor from the “elevation” attribute of sun.sun. The Wind & Sun tab then shows at which sun position the dawn sensor reports day: a high value in the morning or evening points to shading.",
+    "Sonnenhöhe bei Tagesbeginn": "Sun elevation at start of day",
+    "Sonnenhöhe bei Tagesende": "Sun elevation at end of day",
+    "Tageslänge im Jahresverlauf": "Day length over the year",
+    "Noch keine Tageslänge aus dem Dämmerungssensor vorhanden.": "No day length from the dawn sensor yet."
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4536,6 +4548,17 @@
     "Ertrag": "Yield",
     "Erwartung": "Expectation",
     "{hour} Uhr": "{hour}:00",
-    "der Erwartung": "of expectation"
+    "der Erwartung": "of expectation",
+    "aus Norden": "from the north",
+    "aus Nordosten": "from the northeast",
+    "aus Osten": "from the east",
+    "aus Südosten": "from the southeast",
+    "aus Süden": "from the south",
+    "aus Südwesten": "from the southwest",
+    "aus Westen": "from the west",
+    "aus Nordwesten": "from the northwest",
+    "Gestern hell bis {time}": "Yesterday light until {time}",
+    "Der Sensor zeigt von {first} bis {last} Tage mit Werten, am längsten {hours} h am {day}.": "The sensor shows days with values from {first} to {last}, longest {hours} h on {day}.",
+    "Ein Vorjahr zum Vergleichen gibt es noch nicht.": "There is no previous year to compare with yet."
   }
 }

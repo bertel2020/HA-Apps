@@ -235,3 +235,41 @@ def test_daylight_chart_exists_in_the_script() -> None:
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "wetterdashboard/tageslicht" in script and "drawDaylight" in script and "markArea" in script
     assert "'dashboard-stichtag'" in script and "this.hasDaylight" in script
+
+
+def _hourly_day(day: int, bright_from: int, bright_to: int) -> list[tuple[float, float]]:
+    """Stundenwerte eines Tages: hell (1000 lx) von ``bright_from`` bis ``bright_to`` (einschließlich), sonst 0."""
+    return [(_ts(day, hour, 30), 1000.0 if bright_from <= hour <= bright_to else 0.0) for hour in range(24)]
+
+
+def test_daylength_counts_the_bright_hours_per_closed_day(service) -> None:
+    _add(service, "sensor.daemm", "lx", _hourly_day(17, 7, 17) + _hourly_day(18, 7, 18) + _hourly_day(19, 7, 19))
+    _configure(service, temperature="sensor.t", illuminance_dawn="sensor.daemm")
+    with service.deps.index._conn:  # noqa: SLF001 — die Testdaten sind absteigend geschrieben
+        service.deps.index._conn.execute("UPDATE entities SET first_ts = ? WHERE entity_id = 'sensor.daemm'", (_ts(17, 0, 30),))
+    data = service.compute_daylength(NOW)
+    assert data["days"] == [["2026-08-17", 11.0], ["2026-08-18", 12.0], ["2026-08-19", 13.0]]  # heute zählt nicht
+
+
+def test_daylength_skips_days_with_too_few_values_and_needs_the_role(service) -> None:
+    _add(service, "sensor.daemm", "lx", [(_ts(19, hour, 30), 1000.0) for hour in range(9, 13)])  # nur vier Stunden
+    _configure(service, temperature="sensor.t", illuminance_dawn="sensor.daemm")
+    assert service.compute_daylength(NOW) is None
+    _configure(service, temperature="sensor.t")
+    assert service.compute_daylength(NOW) is None
+
+
+def test_daylight_compare_adds_the_sun_elevation_at_start_and_end(service) -> None:
+    _add(service, "sensor.t", "°C", [(_ts(19, 8), 10.0)])
+    _add(service, "sensor.daemm", "lx", RAMP)
+    # Sonnenhöhe: linear von −6° (5:30) auf 40° (12:30) und wieder auf −6° (19:30), Stundenmittel
+    elevation = [(_ts(19, h, 30), -6.0 + (46.0 / 7.0) * min(h - 5, 19 - h)) for h in range(5, 22)]
+    _add(service, "sensor.hoehe", "°", elevation)
+    _configure(service, temperature="sensor.t", illuminance_dawn="sensor.daemm", sun_elevation="sensor.hoehe")
+    data = service.compute_daylight("2026-08-19", NOW)
+    assert data["has_elevation"] is True
+    row = data["compare"][0]
+    assert row["sun_from"] is not None and -6.0 < row["sun_from"] < 12.0 and row["sun_to"] is not None
+    assert data["compare"][1]["sun_from"] is None  # Tag ohne Werte: keine Höhe
+    _configure(service, temperature="sensor.t", illuminance_dawn="sensor.daemm")
+    assert service.compute_daylight("2026-08-19", NOW)["has_elevation"] is False

@@ -375,6 +375,7 @@
       hasSunhours: false,
       sunhours: null,
       sunhoursError: '',
+      daylength: null,
       hasPv: false,
       pv: null,
       pvError: '',
@@ -616,7 +617,7 @@
         if (tab === 'heat' && !this.heat) this.loadHeat();
         if (tab === 'wind' && this.hasSunhours) { if (!this.sunhours) this.loadSunhours(); else this.$nextTick(() => this.drawSunhours()); }
         if (tab === 'wind' && this.hasPv) { if (!this.pv) this.loadPv(); else this.$nextTick(() => this.drawPv()); }
-        if (tab === 'wind' && this.hasDaylight) { if (!this.daylight) this.loadDaylight(); else this.$nextTick(() => this.drawDaylight()); }
+        if (tab === 'wind' && this.hasDaylight) { if (!this.daylight) this.loadDaylight(); else this.$nextTick(() => this.drawDaylight()); this.loadDaylength(); }
         // Ein Diagramm in einem eben erst sichtbaren Reiter hat noch keine Größe.
         this.$nextTick(() => {
           this.layoutTiles();
@@ -916,7 +917,7 @@
         }
         const parts = [];
         const temp = c.temp ? this.conditionsTempText() : '';
-        const wind = c.wind ? this.windPhrase(c.wind.bft) : '';
+        const wind = c.wind ? [this.windPhrase(c.wind.bft), this.windFrom(c.wind.dir_deg)].filter(Boolean).join(' ') : '';
         const adj = c.temp && c.temp.unit === '°C' ? this.tempAdjective(c.temp.value) : '';
         if (temp && wind && adj) parts.push(t('{adj} bei {temp}, {wind}.', {adj, temp, wind}));
         else if (temp && adj) parts.push(t('{adj} bei {temp}.', {adj, temp}));
@@ -949,6 +950,13 @@
         return t('Heiß');
       },
 
+      // Himmelsrichtung, aus der der Wind weht (acht Sektoren zu je 45°, Nord von 337,5° bis 22,5°).
+      windFrom(degrees) {
+        if (degrees == null) return '';
+        const names = [t('aus Norden'), t('aus Nordosten'), t('aus Osten'), t('aus Südosten'), t('aus Süden'), t('aus Südwesten'), t('aus Westen'), t('aus Nordwesten')];
+        return names[Math.floor(((degrees % 360) + 360 + 22.5) % 360 / 45)];
+      },
+
       windPhrase(bft) {
         if (bft <= 1) return t('kaum Wind');
         if (bft <= 3) return t('schwacher Wind');
@@ -967,6 +975,7 @@
         if (light) {
           if (light.to != null && c.now >= light.to) chips.push({icon: 'clock', text: t('Nacht seit {time}', {time: fmtDate(formats.hm, light.to)})});
           else chips.push({icon: 'clock', text: t('Tag seit {time}', {time: fmtDate(formats.hm, light.from)})});
+          if (light.yesterday_to != null && !(light.to != null && c.now >= light.to)) chips.push({icon: 'dusk', text: t('Gestern hell bis {time}', {time: fmtDate(formats.hm, light.yesterday_to)})});
         }
         if (c.sky && c.sky.sun_hours) chips.push({icon: 'bright', text: t('{h} Sonnenstunden', {h: num(c.sky.sun_hours, 1)})});
         return chips;
@@ -994,7 +1003,7 @@
           tiles.push({
             kind: 'wind', icon: 'wind', label: t('Wind'), value: this.beaufortName(c.wind.bft),
             sub: t('Stärke {bft} · {kmh} km/h', {bft: c.wind.bft, kmh: num(c.wind.kmh, 0)}),
-            sub2: c.wind.gust_kmh ? t('Böen bis {kmh} km/h', {kmh: num(c.wind.gust_kmh, 0)}) : '',
+            sub2: [this.windFrom(c.wind.dir_deg), c.wind.gust_kmh ? t('Böen bis {kmh} km/h', {kmh: num(c.wind.gust_kmh, 0)}) : ''].filter(Boolean).join(' · '),
           });
         }
         const rain = this.conditionsRain();
@@ -1247,6 +1256,7 @@
           if (seq !== this._daylightSeq) return;  // ein neuerer Tag hat überholt
           this.daylight = data;
           this.$nextTick(() => this.drawDaylight());
+          if (!this.daylength) this.loadDaylength();
         } catch (e) {
           if (seq === this._daylightSeq) this.daylightError = t('Das Tageslicht konnte nicht geladen werden.');
         }
@@ -1349,7 +1359,69 @@
           length: row.resolution ? this.daylightDuration(row.length, row.approx) : '–',
           morning: row.resolution ? this.daylightMinutes(row.morning, row.approx) : '–',
           evening: row.resolution ? this.daylightMinutes(row.evening, row.approx) : '–',
+          sunFrom: row.sun_from == null ? '–' : `${num(row.sun_from, 1)}°`,
+          sunTo: row.sun_to == null ? '–' : `${num(row.sun_to, 1)}°`,
         }));
+      },
+
+      // Jahresverlauf der Tageslänge: eine Linie je Jahr über denselben Kalendertagen, stundengenau.
+      async loadDaylength() {
+        if (this.daylength) { this.$nextTick(() => this.drawDaylength()); return; }
+        try {
+          this.daylength = await this.fetchJson('wetterdashboard/tageslaenge');
+          this.$nextTick(() => this.drawDaylength());
+        } catch (e) {
+          this.daylength = null;
+        }
+      },
+
+      daylengthNote() {
+        const data = this.daylength;
+        if (!data || !data.days.length) return '';
+        const years = [...new Set(data.days.map((row) => row[0].slice(0, 4)))];
+        const longest = data.days.reduce((a, b) => (b[1] > a[1] ? b : a));
+        const full = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'});
+        const at = (iso) => full.format(new Date(`${iso}T12:00:00Z`));
+        const text = t('Der Sensor zeigt von {first} bis {last} Tage mit Werten, am längsten {hours} h am {day}.', {
+          first: at(data.days[0][0]), last: at(data.days[data.days.length - 1][0]), hours: num(longest[1], 0), day: at(longest[0]),
+        });
+        return years.length > 1 ? text : `${text} ${t('Ein Vorjahr zum Vergleichen gibt es noch nicht.')}`;
+      },
+
+      drawDaylength() {
+        const data = this.daylength;
+        const element = this.$refs.daylengthChart;
+        if (!data || !element) return;
+        const colors = palette();
+        // Alle Jahre auf ein Schaltjahr (2000) abbilden, damit gleiche Kalendertage übereinander liegen.
+        const byYear = new Map();
+        for (const [iso, hours] of data.days) {
+          const year = iso.slice(0, 4);
+          if (!byYear.has(year)) byYear.set(year, []);
+          byYear.get(year).push([Date.UTC(2000, Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10))), hours, iso]);
+        }
+        const years = [...byYear.keys()].sort();
+        const latest = years[years.length - 1];
+        const chart = chartFor('daylength', element);
+        chart.setOption({
+          animation: false, grid: gridFor(element, {top: 28, right: 12}), legend: legendBox(colors, years),
+          xAxis: {
+            type: 'time', min: Date.UTC(2000, 0, 1), max: Date.UTC(2000, 11, 31), ...axisStyle(colors), splitLine: {show: false},
+            axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (ms) => monthName(new Date(ms).getUTCMonth() + 1, 'short')},
+          },
+          yAxis: {type: 'value', min: 0, max: 18, interval: 3, ...axisStyle(colors), axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => `${value} h`}},
+          tooltip: {
+            trigger: 'item', confine: true, backgroundColor: colors.surface, borderColor: colors.grid,
+            textStyle: {color: colors.ink, fontSize: scaledFont(12)},
+            formatter: (param) => `<b>${escapeHtml(utcDayMonth.format(new Date(`${param.data[2]}T12:00:00Z`)))}.${escapeHtml(param.data[2].slice(0, 4))}</b><br>${escapeHtml(num(param.data[1], 0))} h`,
+          },
+          series: years.map((year, index) => ({
+            name: year, type: 'line', symbol: 'none', data: byYear.get(year), connectNulls: false,
+            lineStyle: {width: year === latest ? 2.6 : 1.6, opacity: year === latest ? 1 : 0.6},
+            itemStyle: {color: this.heatColor(index)},
+          })),
+        }, true);
+        requestAnimationFrame(() => chart.resize());
       },
 
       drawDaylight() {

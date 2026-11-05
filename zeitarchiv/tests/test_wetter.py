@@ -1269,3 +1269,17 @@ def test_humidity_extras_get_their_own_series_apart_from_the_temperatures(servic
     assert [row["label"] for row in data["series"]] == ["Temperatur", "Nord"]
     assert [row["label"] for row in data["humidity"]] == ["Keller feucht"]
     assert all(row["unit"] == "%" for row in data["humidity"])
+
+
+def test_sky_limits_form_fills_missing_fields_and_rejects_unordered_ones(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp6", "sensor", "measurement", "°C")
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    base = {"temperature": "sensor.wetter_test_temp6", "sun_threshold_lx": "25000"}
+    assert client.post("/wetterdashboard/setup", data={**base, "sky_sunny_lx": "90000"}).status_code == 200
+    assert wetter_routes._load_config(index)["sky_cuts_lx"] == [15000.0, 25000.0, 90000.0]  # leere Felder: automatisch
+    assert client.post("/wetterdashboard/setup", data={**base, "sky_cloudy_lx": "30000", "sky_fair_lx": "20000"}).status_code == 400
+    assert wetter_routes._load_config(index)["sky_cuts_lx"] == [15000.0, 25000.0, 90000.0]  # abgelehnt, nichts überschrieben
+    assert client.post("/wetterdashboard/setup", data=base).status_code == 200
+    assert wetter_routes._load_config(index)["sky_cuts_lx"] == []

@@ -235,3 +235,36 @@ def test_conditions_route_takes_a_date(client) -> None:
     assert client.post("/wetterdashboard/setup", data=data).status_code == 200
     body = client.get("/wetterdashboard/wetterlage?date=2020-01-01")
     assert body.status_code == 200 and body.json()["wind"] is None
+
+
+def test_conditions_name_the_wind_direction_only_with_wind(service) -> None:
+    _station(service)
+    _add(service, "sensor.richtung", "sensor", "measurement", "°", _minutes(225.0))
+    _configure(
+        service, temperature="sensor.t", illuminance="sensor.lux", illuminance_dawn="sensor.dawn", wind="sensor.wind",
+        wind_direction="sensor.richtung",
+    )
+    assert service.compute_conditions(NOW)["wind"]["dir_deg"] == pytest.approx(225.0)
+    _add(service, "sensor.flaute", "sensor", "measurement", "km/h", _minutes(0.4))
+    _configure(service, temperature="sensor.t", wind="sensor.flaute", wind_direction="sensor.richtung")
+    assert "dir_deg" not in service.compute_conditions(NOW)["wind"]  # bei Flaute sagt die Richtung nichts
+
+
+def test_conditions_remember_yesterdays_end_of_daylight(service) -> None:
+    _station(service)
+    ramp = [(6, 30, 0.0), (7, 30, 500.0), (8, 0, 1000.0), (16, 0, 1000.0), (16, 40, 300.0), (17, 30, 0.0)]
+    _add(service, "sensor.dawn", "sensor", "measurement", "lx", [(_ts(h, m, day=19), v) for h, m, v in ramp] + [(_ts(6, 30), 0.0), (_ts(7, 30), 1000.0)] + _minutes(1000.0))
+    light = service.compute_conditions(NOW)["light"]
+    assert light is not None and _ts(16, 0, day=19) <= light["yesterday_to"] <= _ts(17, 0, day=19)
+
+
+def test_own_sky_limits_replace_the_automatic_ones(service) -> None:
+    _station(service, lux=80000.0)
+    assert service.compute_conditions(NOW)["sky"]["class"] == cond.SUNNY
+    config = wetter_routes._load_config(service.deps.index)
+    wetter_routes._save_config(service.deps.index, {**config, "sky_cuts_lx": [20000.0, 40000.0, 90000.0]})
+    assert service.compute_conditions(NOW)["sky"]["class"] == cond.FAIR
+    # ungültig gespeicherte Grenzen (nicht aufsteigend) fallen auf automatisch zurück
+    wetter_routes._save_config(service.deps.index, {**config, "sky_cuts_lx": [90000.0, 40000.0, 20000.0]})
+    assert wetter_routes._load_config(service.deps.index)["sky_cuts_lx"] == []
+    assert wetter_routes.sky_cuts({**config, "sky_cuts_lx": []}) == pytest.approx(cond.lx_cuts(config["sun_threshold_lx"]))

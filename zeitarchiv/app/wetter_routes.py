@@ -62,6 +62,8 @@ ROLES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("radiation", N_("Strahlung"), ("standard",)),
     ("illuminance", N_("Helligkeit"), ("standard",)),
     ("illuminance_dawn", N_("Helligkeit Dämmerung"), ("standard",)),
+    ("wind_direction", N_("Windrichtung"), ("standard",)),
+    ("sun_elevation", N_("Sonnenhöhe"), ("standard",)),
     ("pv_power", N_("PV-Leistung"), ("standard",)),
 )
 #: Erwartete Einheiten je Rolle: Entitäten damit stehen in der Auswahl zuerst (kein harter Filter,
@@ -76,6 +78,8 @@ ROLE_UNITS = {
     "radiation": ["W/m²"],
     "illuminance": ["lx"],
     "illuminance_dawn": ["lx"],
+    "wind_direction": ["°"],
+    "sun_elevation": ["°"],
     "pv_power": ["kW", "W", "MW"],
     "extra": ["°C", "°F", "K", "%"],
     "heating": ["kWh", "Wh", "MWh"],
@@ -153,6 +157,8 @@ DEFAULT_DAYLIGHT_DAY_LX = 400.0
 DAYLIGHT_NIGHT_RANGE_LX = (1.0, 200.0)
 DAYLIGHT_DAY_RANGE_LX = (50.0, 990.0)
 DAYLIGHT_COMPARE_DAYS = 7  # Tage in der Vergleichstabelle unter der Kurve
+DAYLENGTH_MIN_HOURS = 12  # Stunden mit Werten, ab denen ein Tag für den Jahresverlauf zählt
+DAYLENGTH_MAX_DAYS = 800  # so weit reicht der Jahresverlauf höchstens zurück (laufendes Jahr, Vorjahr und etwas mehr)
 #: Süd-Helligkeit der Eltako-Station sättigt hier; darüber steht „ab“ statt eines Messwerts.
 SUN_SENSOR_SATURATION_LX = 98800
 SUN_MAX_GAP_HOURS = 6  # längste Lücke ohne Zeilen, die zwischen zwei sonnigen Stunden als sonnig gilt
@@ -172,6 +178,7 @@ def _empty_config() -> dict:
         "sun_threshold_lx": DEFAULT_SUN_THRESHOLD_LX,
         "daylight_night_lx": DEFAULT_DAYLIGHT_NIGHT_LX,
         "daylight_day_lx": DEFAULT_DAYLIGHT_DAY_LX,
+        "sky_cuts_lx": [],
         "hidden_blocks": [],
         "hidden_cards": [],
     }
@@ -240,6 +247,14 @@ def _load_config(index: Index) -> dict:
     value = data.get("sun_threshold_lx")
     if isinstance(value, (int, float)) and not isinstance(value, bool) and SUN_THRESHOLD_RANGE_LX[0] <= value <= SUN_THRESHOLD_RANGE_LX[1]:
         config["sun_threshold_lx"] = float(value)
+    cuts = data.get("sky_cuts_lx")
+    if (
+        isinstance(cuts, list) and len(cuts) == 3
+        and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in cuts)
+        and all(SUN_THRESHOLD_RANGE_LX[0] <= v <= SUN_THRESHOLD_RANGE_LX[1] for v in cuts)
+        and cuts[0] < cuts[1] < cuts[2]
+    ):
+        config["sky_cuts_lx"] = [float(v) for v in cuts]
     night, day = data.get("daylight_night_lx"), data.get("daylight_day_lx")
     if (
         all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in (night, day))
@@ -249,6 +264,14 @@ def _load_config(index: Index) -> dict:
     ):
         config["daylight_night_lx"], config["daylight_day_lx"] = float(night), float(day)
     return config
+
+
+def sky_cuts(config: dict) -> tuple[float, float, float]:
+    """Untergrenzen von bewölkt, heiter und sonnig in lx: die eigenen, sonst Vielfache der Sonnen-Schwelle."""
+    own = config.get("sky_cuts_lx")
+    if own:
+        return (own[0], own[1], own[2])
+    return conditions.lx_cuts(config["sun_threshold_lx"])
 
 
 def _save_config(index: Index, config: dict) -> None:
@@ -1184,6 +1207,8 @@ class WetterService:
         days = [selected - timedelta(days=offset) for offset in range(DAYLIGHT_COMPARE_DAYS)]
         results = [self._daylight_day(entity_id, day, config, now_local, read_cache) for day in days]
         compare_keys = ("date", "resolution", "from", "to", "length", "morning", "evening", "approx", "ongoing")
+        compare = [{key: row[key] for key in compare_keys} for row in results]
+        has_elevation = self._add_sun_elevation(compare, config, days[-1], now_local, read_cache)
         return {
             "tz": str(self.deps.tz),
             "unit": "lx",
@@ -1191,8 +1216,82 @@ class WetterService:
             "day_lx": config["daylight_day_lx"],
             "now": now_local.timestamp(),
             "day": results[0],
-            "compare": [{key: row[key] for key in compare_keys} for row in results],
+            "compare": compare,
+            "has_elevation": has_elevation,
         }
+
+    def _add_sun_elevation(
+        self, compare: list[dict], config: dict, first: date, now_local: datetime, read_cache: query_mod.QueryReadCache,
+    ) -> bool:
+        """Sonnenhöhe (Grad) zum Tagesbeginn und -ende jedes Vergleichstags, wenn die Rolle ``sun_elevation`` belegt ist.
+
+        Sie zeigt, was der Sensor „Tag“ nennt, gemessen am Sonnenstand: Steht die Sonne beim Tagesbeginn erst hoch, ist
+        der Sensor beschattet oder wolkenverhangen; ungefähr null Grad wäre Sonnenaufgang. Zwischen den Stundenmitteln
+        wird linear interpoliert (die Höhe ändert sich am Horizont um rund 10 Grad je Stunde)."""
+        entity_id = config["sun_elevation"]
+        if not entity_id or self.deps.index.get_entity(entity_id) is None:
+            return False
+        tz = self.deps.tz
+        start = datetime(first.year, first.month, first.day, tzinfo=tz) - timedelta(hours=2)
+        rows = sorted(
+            (row for row in self._rows(entity_id, "standard", start, now_local, now_local, read_cache) if row.value is not None),
+            key=lambda row: row.bucket_start,
+        )
+        points = [(row.bucket_start + 1800.0, row.value) for row in rows]
+
+        def elevation_at(moment: float | None) -> float | None:
+            if moment is None or len(points) < 2:
+                return None
+            after = bisect.bisect_left([point[0] for point in points], moment)
+            if after == 0 or after >= len(points):
+                return None
+            (t0, v0), (t1, v1) = points[after - 1], points[after]
+            if t1 - t0 > 3 * 3600:
+                return None  # Lücke in den Werten: nichts raten
+            return round(v0 + (v1 - v0) * (moment - t0) / (t1 - t0), 1)
+
+        for row in compare:
+            row["sun_from"] = elevation_at(row["from"])
+            row["sun_to"] = elevation_at(None if row["ongoing"] else row["to"])
+        return True
+
+    def compute_daylength(self, now_local: datetime | None = None) -> dict | None:
+        """Tageslänge je abgeschlossenem Tag laut Dämmerungssensor (Stunden, stundengenau), für den Jahresverlauf.
+
+        Ein Tag zählt nur mit mindestens ``DAYLENGTH_MIN_HOURS`` Stunden Werten; die Archive der Dämmerungssensoren
+        sind oft jung, Tage davor fehlen einfach. ``None`` ohne Rolle oder ohne auswertbaren Tag."""
+        config = _load_config(self.deps.index)
+        entity_id = config["illuminance_dawn"]
+        entity = self.deps.index.get_entity(entity_id) if entity_id else None
+        if entity is None or not entity["first_ts"]:
+            return None
+        tz = self.deps.tz
+        now_local = now_local or datetime.now(tz)
+        today = now_local.date()
+        first = max(datetime.fromtimestamp(entity["first_ts"], tz).date(), today - timedelta(days=DAYLENGTH_MAX_DAYS))
+        start = datetime(first.year, first.month, first.day, tzinfo=tz)
+        rows = self._rows(entity_id, "standard", start, now_local, now_local, query_mod.QueryReadCache())
+        by_hour = {
+            round(row.bucket_start): (row.value, row.max_value if row.max_value is not None else row.value)
+            for row in rows if row.value is not None
+        }
+        night_lx, day_lx = config["daylight_night_lx"], config["daylight_day_lx"]
+        out = []
+        for offset in range((today - first).days):
+            day = first + timedelta(days=offset)
+            following = day + timedelta(days=1)
+            midnight = datetime(day.year, day.month, day.day, tzinfo=tz).timestamp()
+            end = datetime(following.year, following.month, following.day, tzinfo=tz).timestamp()
+            hour_starts = [midnight + 3600.0 * i for i in range(round((end - midnight) / 3600))]
+            measured = {hour: by_hour[round(hour)] for hour in hour_starts if round(hour) in by_hour}
+            if len(measured) < DAYLENGTH_MIN_HOURS:
+                continue
+            summary = daylight.summarize_hours(hour_starts, daylight.hour_classes(hour_starts, measured, night_lx, day_lx))
+            if summary["length"] is not None:
+                out.append([day.isoformat(), round(summary["length"] / 3600.0, 1)])
+        if not out:
+            return None
+        return {"tz": str(tz), "days": out, "today": today.isoformat(), "approx": True}
 
     # -- Wetterlage ----------------------------------------------------------------------
 
@@ -1254,7 +1353,7 @@ class WetterService:
         dawn = self._recent(config["illuminance_dawn"], now_local, read_cache)
         if main is not None or dawn is not None:
             if main_role == "illuminance" and main is not None:
-                cuts, unit = conditions.lx_cuts(config["sun_threshold_lx"]), "lx"
+                cuts, unit = sky_cuts(config), "lx"
             else:
                 cuts, unit = conditions.CLASS_CUTS_WM2, unit_of(config["radiation"]) or "W/m²"
             if dawn is not None:
@@ -1280,6 +1379,9 @@ class WetterService:
                 gust_kmh = conditions.to_kmh(gust["max"], unit_of(config["gust"])) if gust is not None else None
                 if gust_kmh is not None and gust_kmh > kmh:
                     wind["gust_kmh"] = gust_kmh
+                direction = self._recent(config["wind_direction"], now_local, read_cache) if config["wind_direction"] else None
+                if direction is not None and direction["last"] is not None and kmh >= 1:
+                    wind["dir_deg"] = float(direction["last"]) % 360.0  # bei Flaute sagt die Richtung nichts
 
         rain = None
         if config["precip_dur"] and index.get_entity(config["precip_dur"]) is not None:
@@ -1318,6 +1420,12 @@ class WetterService:
             today = self._daylight_day(config["illuminance_dawn"], now_local.date(), config, now_local, read_cache)
             if today.get("from") is not None:
                 light = {"from": today["from"], "to": None if today.get("ongoing") else today.get("to")}
+            # Das Tagesende des laufenden Tages kennt der Sensor erst danach; gestern ist die beste Näherung.
+            yesterday = self._daylight_day(
+                config["illuminance_dawn"], now_local.date() - timedelta(days=1), config, now_local, read_cache,
+            )
+            if light is not None and yesterday.get("to") is not None and not yesterday.get("ongoing"):
+                light["yesterday_to"] = yesterday["to"]
 
         if sky is None and wind is None and rain is None:
             return None
@@ -1359,7 +1467,7 @@ class WetterService:
         main_rows = [row for row in rows_of(config[main_role]) if row.value is not None]
         if main_rows:
             lux = main_role == "illuminance"
-            cuts = conditions.lx_cuts(config["sun_threshold_lx"]) if lux else conditions.CLASS_CUTS_WM2
+            cuts = sky_cuts(config) if lux else conditions.CLASS_CUTS_WM2
             dawn = {row.bucket_start: row.value for row in rows_of(config["illuminance_dawn"]) if row.value is not None}
             counts: dict[str, int] = {}
             for row in main_rows:
@@ -1525,6 +1633,8 @@ class WetterService:
             illuminance: str = Form(""),
             illuminance_dawn: str = Form(""),
             pv_power: str = Form(""),
+            wind_direction: str = Form(""),
+            sun_elevation: str = Form(""),
             extra_entity_id: list[str] = Form([]),
             extra_name: list[str] = Form([]),
             blocks_submitted: str = Form(""),
@@ -1540,11 +1650,14 @@ class WetterService:
             sun_threshold_lx: str = Form(""),
             daylight_night_lx: str = Form(""),
             daylight_day_lx: str = Form(""),
+            sky_cloudy_lx: str = Form(""),
+            sky_fair_lx: str = Form(""),
+            sky_sunny_lx: str = Form(""),
         ) -> HTMLResponse:
             submitted = {
                 "temperature": temperature, "precip_mm": precip_mm, "precip_dur": precip_dur,
                 "humidity": humidity, "pressure": pressure, "wind": wind, "gust": gust, "radiation": radiation,
-                "illuminance": illuminance, "illuminance_dawn": illuminance_dawn, "pv_power": pv_power,
+                "illuminance": illuminance, "illuminance_dawn": illuminance_dawn, "pv_power": pv_power, "wind_direction": wind_direction, "sun_elevation": sun_elevation,
             }
             config = _empty_config()
             for key, value in submitted.items():
@@ -1644,6 +1757,15 @@ class WetterService:
                     detail=tr("Die Nacht-Schwelle muss unter der Tag-Schwelle liegen."),
                 )
             config["daylight_night_lx"], config["daylight_day_lx"] = night, day
+            own = [sky_cloudy_lx, sky_fair_lx, sky_sunny_lx]
+            if any(raw.strip() for raw in own):
+                automatic = conditions.lx_cuts(threshold)
+                cuts = [_parse_bounded(raw, automatic[i], SUN_THRESHOLD_RANGE_LX) for i, raw in enumerate(own)]
+                if not cuts[0] < cuts[1] < cuts[2]:
+                    raise HTTPException(status_code=400, detail=tr("Die Grenzen der Himmelsklassen müssen von unten nach oben ansteigen."))
+                config["sky_cuts_lx"] = cuts
+            else:
+                config["sky_cuts_lx"] = []
             _save_config(deps.index, config)
             context = self._page_context(request)
             return deps.templates.TemplateResponse(request, "_wetter_view.html", context)
@@ -1734,6 +1856,14 @@ class WetterService:
             data = self.compute_dayimage()
             if data is None:
                 raise HTTPException(status_code=409, detail=tr("Keine Helligkeitswerte für das Tagesbild vorhanden."))
+            return data
+
+        @router.get("/wetterdashboard/tageslaenge")
+        def wetterdashboard_daylength() -> dict:
+            _require_configured()
+            data = self.compute_daylength()
+            if data is None:
+                raise HTTPException(status_code=409, detail=tr("Noch keine Tageslänge aus dem Dämmerungssensor vorhanden."))
             return data
 
         @router.get("/wetterdashboard/pv")

@@ -49,6 +49,12 @@
   - **Experimentell**: Mit der neuen Rolle „PV-Leistung“ zeigt der Reiter Wind &
     Sonne den Tagesertrag gegen die Erwartung aus der Helligkeit, mit markierten
     Abweichungen und dem Verhältnis nach Uhrzeit
+  - **Wetterlage**: Mit der neuen Rolle „Windrichtung“ nennt sie, woher der Wind
+    weht; ein Chip zeigt, bis wann es gestern hell war. Die Grenzen von trüb,
+    bewölkt, heiter und sonnig lassen sich in der Einrichtung selbst festlegen
+  - **Tageslicht**: Eine Linie je Jahr zeigt die Tageslänge im Jahresverlauf.
+    Mit der neuen Rolle „Sonnenhöhe“ steht im Vergleich der letzten Tage auch,
+    bei welchem Sonnenstand der Sensor Tag meldet (Hinweis auf Verschattung)
 
 ### Behoben
 
@@ -106,6 +112,12 @@
   - **Experimental**: With the new role "PV power" the Wind & Sun tab shows the
     daily yield against the expectation from brightness, with marked deviations
     and the ratio by time of day
+  - **Weather summary**: With the new role "Wind direction" it names where the
+    wind comes from; a chip shows how long it was light yesterday. The limits of
+    overcast, cloudy, fair and sunny can be set in the setup
+  - **Daylight**: One line per year shows the day length over the year. With the
+    new role "Sun elevation" the comparison of the last days also shows at which
+    sun position the sensor reports day (a hint of shading)
 
 #### Fixed
 
