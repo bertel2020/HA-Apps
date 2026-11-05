@@ -1263,7 +1263,10 @@ class WetterService:
         return True
 
     def compute_daylength(self, now_local: datetime | None = None) -> dict | None:
-        """Tageslänge je abgeschlossenem Tag laut Dämmerungssensor (Stunden, stundengenau), für den Jahresverlauf.
+        """Tageslänge je abgeschlossenem Tag laut Dämmerungssensor (Stunden), für den Jahresverlauf.
+
+        Die Archivwerte sind Stundenmittel; der Übergang über die Tag-Schwelle wird zwischen zwei Stunden
+        interpoliert. Fehlt ein Übergang (der Sensor beginnt mitten am Tag), zählt die Zahl heller Stunden.
 
         Ein Tag zählt nur mit mindestens ``DAYLENGTH_MIN_HOURS`` Stunden Werten; die Archive der Dämmerungssensoren
         sind oft jung, Tage davor fehlen einfach. ``None`` ohne Rolle oder ohne auswertbaren Tag."""
@@ -1295,7 +1298,12 @@ class WetterService:
                 continue
             summary = daylight.summarize_hours(hour_starts, daylight.hour_classes(hour_starts, measured, night_lx, day_lx))
             if summary["length"] is not None:
-                out.append([day.isoformat(), round(summary["length"] / 3600.0, 1)])
+                # Stundenmittel als Punkte in der Stundenmitte; der Schwellenübergang wird zwischen zwei Stunden
+                # interpoliert, statt auf volle Stunden zu springen (sonst bildet die Kurve Treppen).
+                points = [(hour + 1800.0, measured[hour][0]) for hour in hour_starts if hour in measured]
+                up, down = daylight.crossings(points, day_lx)
+                length = down - up if up is not None and down is not None and down > up else summary["length"]
+                out.append([day.isoformat(), round(length / 3600.0, 2)])
         if not out:
             return None
         return {"tz": str(tz), "days": out, "today": today.isoformat(), "approx": True}

@@ -67,6 +67,11 @@
     sich auf Niederschlag und Sonnenstunden umschalten. Die Farbe zeigt die
     Abweichung vom Mittel des Monats in Prozent, die letzte Spalte ist die
     Jahressumme kompletter Jahre; der laufende Monat steht ohne Vergleich da
+  - **Tageslicht** (experimentell): Die Tabelle der letzten Tage hat weniger
+    Spalten (Dämmerung und Sonnenhöhe jeweils als Paar) und zeigt die Änderung der
+    Tageslänge zum Vortag; der heutige Tag steht als „läuft“. Die Kurve der
+    Tageslänge im Jahresverlauf wird glatter und beginnt je nach Standort erst
+    oberhalb von 0 h
   - **Heizen**: Die Gradtag-Tabelle zeigt je Periode kWh je Gradtag groß und
     Gradtage und kWh klein darunter; die Veränderung steht als farbige Pille
     daneben. „Heizen und Sonne“ zeigt drei Kacheln mit einer Anteilsleiste
@@ -169,6 +174,10 @@
     be switched to precipitation and hours of sunshine. The colour shows the
     deviation from the month's mean in percent, the last column is the total of
     complete years; the current month is shown without a comparison
+  - **Daylight** (experimental): The table of the last days has fewer columns
+    (twilight and sun elevation as pairs) and shows the change in day length
+    from the previous day; today is shown as "ongoing". The day-length curve over
+    the year gets smoother and, depending on location, starts above 0 h
   - **Heating**: The degree-day table shows kWh per degree day large for each
     period, with degree days and kWh small below; the change sits next to it
     as a coloured pill. "Heating and sun" shows three tiles with a share bar

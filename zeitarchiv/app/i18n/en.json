@@ -3482,8 +3482,6 @@
     "Die letzten Tage im Vergleich": "The last days compared",
     "Hell von–bis": "Light from–to",
     "Tageslänge": "Day length",
-    "Dämmerung morgens": "Twilight in the morning",
-    "Dämmerung abends": "Twilight in the evening",
     "Die Nacht-Schwelle muss unter der Tag-Schwelle liegen.": "The night threshold must be below the day threshold.",
     "Keine Entität für „Helligkeit Dämmerung“ zugeordnet.": "No entity assigned to “Illuminance dusk/dawn”.",
     "Sonne ab einer Helligkeit von": "Sun from an illuminance of",
@@ -3640,8 +3638,6 @@
     "Die Grenzen der Himmelsklassen müssen von unten nach oben ansteigen.": "The limits of the sky classes must rise from bottom to top.",
     "Sonnenhöhe": "Sun elevation",
     "Die Rolle „Sonnenhöhe“ ist ein Sensor mit der Höhe der Sonne in Grad, zum Beispiel ein Template-Sensor aus dem Attribut „elevation“ von sun.sun. Der Reiter Wind & Sonne zeigt damit, bei welchem Sonnenstand der Dämmerungssensor Tag meldet: Ein hoher Wert am Morgen oder Abend deutet auf Verschattung hin.": "The role “Sun elevation” is a sensor with the height of the sun in degrees, for example a template sensor from the “elevation” attribute of sun.sun. The Wind & Sun tab then shows at which sun position the dawn sensor reports day: a high value in the morning or evening points to shading.",
-    "Sonnenhöhe bei Tagesbeginn": "Sun elevation at start of day",
-    "Sonnenhöhe bei Tagesende": "Sun elevation at end of day",
     "Tageslänge im Jahresverlauf": "Day length over the year",
     "Noch keine Tageslänge aus dem Dämmerungssensor vorhanden.": "No day length from the dawn sensor yet.",
     "„Windrichtung“ im Namen": "“Wind direction” in the name",
@@ -3680,7 +3676,11 @@
     "Kompakt": "Compact",
     "Leiste": "Strip",
     "Groß zeigt den Kopf zentriert über vier Kacheln. Kompakt setzt den Kopf in eine Zeile und macht die Kacheln niedriger. Leiste fasst die Kacheln zu einer Zeile ohne Kästen zusammen. Die Angaben sind in allen drei dieselben; auf dem Handy bleiben es zwei Kacheln je Zeile.": "Large shows the header centred above four tiles. Compact puts the header on one row and makes the tiles lower. Strip merges the tiles into one row without boxes. The information is the same in all three; on a phone there are two tiles per row.",
-    "Ungültige Darstellung: {value}": "Invalid layout: {value}"
+    "Ungültige Darstellung: {value}": "Invalid layout: {value}",
+    "Dämmerung": "Twilight",
+    "Änderung zum Vortag": "Change from previous day",
+    "morgens / abends": "morning / evening",
+    "Beginn / Ende": "start / end"
   },
   "js": {
     "Ladestand": "State of charge",

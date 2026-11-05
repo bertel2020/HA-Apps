@@ -1194,16 +1194,27 @@
       daylightRows() {
         const data = this.daylight;
         if (!data) return [];
-        return data.compare.filter((row) => row.resolution).map((row) => ({
-          date: row.date, current: row.date === data.day.date,
-          day: utcDayMonth.format(new Date(`${row.date}T12:00:00Z`)),
-          span: row.resolution ? this.daylightSpan(row) : '–',
-          length: row.resolution ? this.daylightDuration(row.length, row.approx) : '–',
-          morning: row.resolution ? this.daylightMinutes(row.morning, row.approx) : '–',
-          evening: row.resolution ? this.daylightMinutes(row.evening, row.approx) : '–',
-          sunFrom: row.sun_from == null ? '–' : `${num(row.sun_from, 1)}°`,
-          sunTo: row.sun_to == null ? '–' : `${num(row.sun_to, 1)}°`,
-        }));
+        const rows = data.compare.filter((row) => row.resolution);
+        return rows.map((row, i) => {
+          const running = !!row.ongoing;
+          // Änderung zum Vortag nur bei minutengenauen Tagen, auf Stundenwerten wäre sie nur Rauschen.
+          const prev = rows[i + 1];
+          let delta = '';
+          if (!running && !row.approx && row.length != null && prev && !prev.ongoing && !prev.approx && prev.length != null) {
+            const minutes = Math.round((row.length - prev.length) / 60);
+            delta = (minutes > 0 ? '+' : minutes < 0 ? '−' : '±') + t('{n} min', {n: num(Math.abs(minutes), 0)});
+          }
+          return {
+            date: row.date, current: row.date === data.day.date, running, delta,
+            day: utcDayMonth.format(new Date(`${row.date}T12:00:00Z`)),
+            span: this.daylightSpan(row),
+            length: running ? t('läuft') : this.daylightDuration(row.length, row.approx),
+            morning: this.daylightMinutes(row.morning, row.approx),
+            evening: this.daylightMinutes(row.evening, row.approx),
+            sunFrom: row.sun_from == null ? '–' : `${num(row.sun_from, 1)}°`,
+            sunTo: row.sun_to == null ? '–' : `${num(row.sun_to, 1)}°`,
+          };
+        });
       },
 
       // Jahresverlauf der Tageslänge: eine Linie je Jahr über denselben Kalendertagen, stundengenau.
@@ -1244,6 +1255,10 @@
         }
         const years = [...byYear.keys()].sort();
         const latest = years[years.length - 1];
+        // Achse ab dem nächsten Vielfachen von 3 h unter der kürzesten Tageslänge: im Winter bei uns ab 6 h,
+        // weiter im Norden bleibt Platz bis 0 h.
+        const shortest = Math.min(...data.days.map((row) => row[1]));
+        const floor = Math.max(0, Math.floor((shortest - 1) / 3) * 3);
         const chart = chartFor('daylength', element);
         chart.setOption({
           animation: false, grid: gridFor(element, {top: 28, right: 12}), legend: legendBox(colors, years),
@@ -1251,11 +1266,11 @@
             type: 'time', min: Date.UTC(2000, 0, 1), max: Date.UTC(2000, 11, 31), ...axisStyle(colors), splitLine: {show: false},
             axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (ms) => monthName(new Date(ms).getUTCMonth() + 1, 'short')},
           },
-          yAxis: {type: 'value', min: 0, max: 18, interval: 3, ...axisStyle(colors), axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => `${value} h`}},
+          yAxis: {type: 'value', min: floor, max: 18, interval: 3, ...axisStyle(colors), axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => `${value} h`}},
           tooltip: {
             trigger: 'item', confine: true, backgroundColor: colors.surface, borderColor: colors.grid,
             textStyle: {color: colors.ink, fontSize: scaledFont(12)},
-            formatter: (param) => `<b>${escapeHtml(utcDayMonth.format(new Date(`${param.data[2]}T12:00:00Z`)))}.${escapeHtml(param.data[2].slice(0, 4))}</b><br>${escapeHtml(num(param.data[1], 0))} h`,
+            formatter: (param) => `<b>${escapeHtml(utcDayMonth.format(new Date(`${param.data[2]}T12:00:00Z`)))}.${escapeHtml(param.data[2].slice(0, 4))}</b><br>${escapeHtml(this.daylightDuration(param.data[1] * 3600, true))}`,
           },
           series: years.map((year, index) => ({
             name: year, type: 'line', symbol: 'none', data: byYear.get(year), connectNulls: false,

@@ -897,7 +897,9 @@ Einrichtung unter **Sonne und Tageslicht**.
   oder trüb nach dem Anteil der hellen Stunden mit Sonne. Ein Klick wählt den Tag.
 - **Tageslicht** (Wind & Sonne): Mit der Rolle **Helligkeit Dämmerung** zeigt die Kurve
   Nacht, Dämmerung und Tag, dazu Tagesbeginn und -ende, Tageslänge und einen Vergleich der
-  letzten Tage sowie die **Tageslänge im Jahresverlauf** (eine Linie je Jahr, stundengenau).
+  letzten Tage (mit der Änderung der Tageslänge zum Vortag) sowie die **Tageslänge im
+  Jahresverlauf** (eine Linie je Jahr, aus Stundenwerten mit interpoliertem Übergang). Beide
+  Teile sind experimentell.
   Die Zeiten zeigen, was der Sensor sieht, nicht den Sonnenstand. Mit der Rolle
   **Sonnenhöhe** (ein Sensor mit der Höhe der Sonne in Grad, etwa ein Template-Sensor aus
   `sun.sun`) steht zusätzlich der Sonnenstand bei Tagesbeginn und -ende in der Tabelle; ein

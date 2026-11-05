@@ -839,7 +839,8 @@ saturates at about 98,800 lx. The thresholds are in setup under **Sun and daylig
   overcast by the share of bright hours with sun. A click selects the day.
 - **Daylight** (Wind & sun): with the role **Brightness dawn** the curve shows night, twilight
   and day, plus start and end of day, day length and a comparison of the last days, and the
-  **day length over the year** (one line per year, hour precision). The times show what the
+  **day length over the year** (one line per year, from hourly values with an interpolated
+  threshold crossing). Both parts are experimental. The times show what the
   sensor sees, not the sun position. With the role **Sun elevation** (a sensor with the
   height of the sun in degrees, for example a template sensor from `sun.sun`) the table also
   shows the sun position at the start and end of day; a high value points to shading.

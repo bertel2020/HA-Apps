@@ -242,13 +242,23 @@ def _hourly_day(day: int, bright_from: int, bright_to: int) -> list[tuple[float,
     return [(_ts(day, hour, 30), 1000.0 if bright_from <= hour <= bright_to else 0.0) for hour in range(24)]
 
 
-def test_daylength_counts_the_bright_hours_per_closed_day(service) -> None:
+def test_daylength_interpolates_the_threshold_between_two_hours(service) -> None:
     _add(service, "sensor.daemm", "lx", _hourly_day(17, 7, 17) + _hourly_day(18, 7, 18) + _hourly_day(19, 7, 19))
     _configure(service, temperature="sensor.t", illuminance_dawn="sensor.daemm")
     with service.deps.index._conn:  # noqa: SLF001 — die Testdaten sind absteigend geschrieben
         service.deps.index._conn.execute("UPDATE entities SET first_ts = ? WHERE entity_id = 'sensor.daemm'", (_ts(17, 0, 30),))
     data = service.compute_daylength(NOW)
-    assert data["days"] == [["2026-08-17", 11.0], ["2026-08-18", 12.0], ["2026-08-19", 13.0]]  # heute zählt nicht
+    # heute zählt nicht; statt voller Stunden (11, 12, 13) liegt der Übergang zwischen zwei Stundenwerten
+    assert data["days"] == [["2026-08-17", 11.2], ["2026-08-18", 12.2], ["2026-08-19", 13.2]]
+
+
+def test_daylength_falls_back_to_bright_hours_without_a_crossing(service) -> None:
+    """Beginnt der Sensor mitten am hellen Tag, fehlt der Anstieg: dann zählen die hellen Stunden."""
+    _add(service, "sensor.daemm", "lx", _hourly_day(19, 0, 17))  # hell von Mitternacht an, dunkel ab 18 Uhr
+    _configure(service, temperature="sensor.t", illuminance_dawn="sensor.daemm")
+    with service.deps.index._conn:  # noqa: SLF001
+        service.deps.index._conn.execute("UPDATE entities SET first_ts = ? WHERE entity_id = 'sensor.daemm'", (_ts(19, 0, 30),))
+    assert service.compute_daylength(NOW)["days"] == [["2026-08-19", 18.0]]
 
 
 def test_daylength_skips_days_with_too_few_values_and_needs_the_role(service) -> None:
