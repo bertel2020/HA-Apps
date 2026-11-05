@@ -33,9 +33,8 @@
     scaledFont,
     tileMultiYear,
     viewTypeFor,
-    withOpacity,
   } = window.ChartTileRender;
-  const {buildStatsItem, renderLegendHtml} = window.LegendRender;
+  const {buildLegendItems, renderLegendHtml} = window.LegendRender;
 
 
   const instances = new Map();  // chartId -> echarts instance
@@ -206,8 +205,6 @@
     // bekommt sonst beim ersten Rendern die volle (noch legendenlose)
     // Kachelhöhe gemessen und die Legende schiebt ihn erst beim nächsten
     // Resize-Event auf seine endgültige Höhe.
-    const statsItem = (s, points, name, color) =>
-      buildStatsItem(s, points, name, color, {windowEnd: data.window_end, timeline, effectiveDecimals});
     const tileEl = el.closest('.dtile');
     // Langzeit-Kachel: Größenwechsel über 1×1 hinweg zeichnet neu (siehe
     // setupSizePickers()), weil 1×1 nur das angezeigte Jahr und den Ø zeigt.
@@ -219,39 +216,7 @@
       })
       : null;
     el.dataset.longtermActive = multiYear ? 'true' : 'false';
-    let legendItems;
-    if (multiYear) {
-      // Entschieden: nur das angezeigte Jahr und der Ø, die übrigen Jahre als
-      // "+N Jahre" (die Tabellen-Legende zeigt nur die beiden Zeilen).
-      const s = series[0];
-      legendItems = [statsItem(s, s.points, multiYear.series[0].name, multiYear.series[0].color)];
-      if (multiYear.averageSeries) {
-        legendItems.push({
-          ...statsItem(s, multiYear.averageSeries.monthly.filter(v => v != null).map(v => ({value: v})),
-            multiYear.averageSeries.name, multiYear.averageSeries.color),
-          dash: true,
-        });
-      }
-      if (multiYear.hiddenYears > 0) legendItems.push({more: t('+{n} Jahre', {n: multiYear.hiddenYears})});
-    } else if (compare?.yearsCompare) {
-      // Wie die Balkenpaare: je Entität angezeigtes Jahr und Vorjahr, die
-      // Soll-Entität als eigene Zeile — Namen wie die Serien, damit das
-      // Umschalten per Legende greift.
-      const currentYear = data.window_start ? new Date(data.window_start * 1000).getFullYear() : new Date().getFullYear();
-      legendItems = [];
-      series.forEach(s => {
-        if (!s.compare_points) return;
-        const color = colorFor(s.entity_id);
-        const displayName = entityNames[s.entity_id] || s.friendly_name;
-        if (s.entity_id === compare.target) { legendItems.push(statsItem(s, s.points, displayName, color)); return; }
-        legendItems.push(statsItem(s, s.points, `${displayName} (${currentYear})`, color));
-        legendItems.push(statsItem(s, s.compare_points, `${displayName} (${currentYear - 1})`, withOpacity(color, 0.55)));
-      });
-    } else {
-      legendItems = series.map(s => statsItem(
-        s, s.points, entityNames[s.entity_id] || s.friendly_name, colorFor(s.entity_id)
-      ));
-    }
+    const legendItems = buildLegendItems({series, data, spec, multiYear});
     const legendMetrics = JSON.parse(el.dataset.legendMetrics || '["sum"]');
     const showStats = el.dataset.chartStats === 'true';
     const legendStyle = el.dataset.legendStyle || 'chips';

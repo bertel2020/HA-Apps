@@ -30,6 +30,9 @@ def test_tile_requests_the_comparison_like_the_editor() -> None:
 def test_longterm_tile_reduces_small_tiles_and_legend() -> None:
     assert "small: tileEl?.dataset.gridCols === '1' && tileEl?.dataset.gridRows === '1'" in TILES_JS
     assert "const shown = small ? years.slice(0, 1) : years;" in TILES_JS
-    assert "legendItems.push({more: t('+{n} Jahre', {n: multiYear.hiddenYears})});" in TILES_JS
+    # Die Legenden-Einträge baut seit Roadmap 1.49 legend-render.js (Kachel und Karte teilen sie).
+    legend_js = (APP / "static/js/legend-render.js").read_text(encoding="utf-8")
+    assert "items.push({more: t('+{n} Jahre', {n: multiYear.hiddenYears})});" in legend_js
+    assert "buildLegendItems({series, data, spec, multiYear})" in TILES_JS
     # Größenwechsel über 1×1 hinweg zeichnet die Langzeit-Kachel neu.
     assert "if (dtileBody?.dataset.longtermActive === 'true') await renderTile(dtileBody);" in TILES_JS
