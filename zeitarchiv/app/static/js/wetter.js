@@ -909,13 +909,18 @@
       },
 
       // Ein bis zwei Sätze unter dem Wort, aus den Werten der Kacheln; fehlt ein Teil, fehlt sein Satz.
+      // Der Satz als Liste ganzer Sätze: Die Karte bricht nur dazwischen um, nicht mitten in „3,4 °C“ oder einem Datum.
       conditionsSentence() {
         const c = this.conditions;
-        if (!c) return '';
+        if (!c) return [];
+        const together = (text) => text
+          .replace(/(\d) (°C|°F|km\/h|m\/s|mph|kn|%|mm|lx|h|min)(?![\p{L}])/gu, '$1\u00a0$2')
+          .replace(/(\d{1,2}\.\d{1,2}\.) (\d{1,2}:\d{2})/g, '$1\u00a0$2');
         if (c.mode === 'day') {
           const p = this.conditionsDayParts();
-          return ['sky', 'temp', 'wind', 'rain'].filter((key) => p[key]).map((key) => (key === 'wind'
+          const line = ['sky', 'temp', 'wind', 'rain'].filter((key) => p[key]).map((key) => (key === 'wind'
             ? t('Wind bis Stärke {bft}', {bft: c.wind.bft}) : p[key].value)).join(' · ');
+          return line ? [together(line)] : [];
         }
         const parts = [];
         const temp = c.temp ? this.conditionsTempText() : '';
@@ -939,7 +944,7 @@
             ? t('Aktuell trocken, zuletzt Regen um {time}.', {time: (fmtDate(formats.dm, rain.last) === fmtDate(formats.dm, c.now) ? '' : `${fmtDate(formats.dm, rain.last)} `) + fmtDate(formats.hm, rain.last)})
             : t('Aktuell trocken.'));
         }
-        return parts.join(' ');
+        return parts.map(together);
       },
 
       tempAdjective(value) {

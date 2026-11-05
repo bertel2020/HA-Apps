@@ -886,7 +886,10 @@ Einrichtung unter **Sonne und Tageslicht**.
   Richtung, wenn **Windrichtung** zugeordnet ist) und Regen, dazu Angaben wie Böen,
   Tageshöchst- und -tiefstwert, Sonnenstunden und „gestern hell bis …“. Die Klassengrenzen
   folgen der Sonnen-Schwelle, lassen sich aber in der Einrichtung selbst festlegen. Bei einem
-  früheren Tag steht die Zusammenfassung dieses Tages.
+  früheren Tag steht die Zusammenfassung dieses Tages. Unter **Anzeige** wählt ihr die
+  Darstellung: **Groß** (zentrierter Kopf über vier Kacheln), **Kompakt** (Kopf in einer
+  Zeile, niedrigere Kacheln) oder **Leiste** (Kopf in einer Zeile, die Kacheln als eine
+  Zeile ohne Kästen; Standard). Die Angaben sind überall dieselben.
 - **Sonnenscheindauer**: Eine Stunde zählt als sonnig, wenn ihr Mittel die Sonnen-Schwelle
   erreicht (Standard 25.000 lx). Sie steht als Zeile in der Vergleichstabelle, als Kachel und
   als Kurve **Sonnenstunden** im Reiter Wind & Sonne.

@@ -60,6 +60,9 @@
   - **Tageslicht**: Eine Linie je Jahr zeigt die Tageslänge im Jahresverlauf.
     Mit der neuen Rolle „Sonnenhöhe“ steht im Vergleich der letzten Tage auch,
     bei welchem Sonnenstand der Sensor Tag meldet (Hinweis auf Verschattung)
+  - **Wetterlage**: Die Karte gibt es in drei Darstellungen (Groß, Kompakt,
+    Leiste), einstellbar unter „Anzeige“; der Satz bricht nur zwischen den
+    Sätzen um
   - **Monatsübersicht**: Die Tabelle „Mitteltemperatur je Monat und Jahr“ lässt
     sich auf Niederschlag und Sonnenstunden umschalten. Die Farbe zeigt die
     Abweichung vom Mittel des Monats in Prozent, die letzte Spalte ist die
@@ -148,6 +151,9 @@
   - **Daylight**: One line per year shows the day length over the year. With the
     new role "Sun elevation" the comparison of the last days also shows at which
     sun position the sensor reports day (a hint of shading)
+  - **Weather summary**: The card comes in three layouts (Large, Compact,
+    Strip), selectable under "Display"; the sentence only wraps between
+    sentences
   - **Monthly overview**: The "Mean temperature per month and year" table can
     be switched to precipitation and hours of sunshine. The colour shows the
     deviation from the month's mean in percent, the last column is the total of

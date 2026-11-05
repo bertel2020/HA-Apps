@@ -179,3 +179,74 @@
     .wt-item-name{white-space:normal;overflow:visible;text-overflow:unset;overflow-wrap:break-word;line-height:1.2;flex:1 1 100%;font-size:calc(12.5px * var(--font-scale, 1));}
     .wt-item-glyph{display:none;}
   }
+
+  /* Karte Wetterlage: Darstellung nach Einstellung (data-layout). "large" ist der Aufbau oben; "compact" und "strip" setzen
+     dieselben Angaben niedriger: Kopf in einer Zeile (Symbol, Satz, Chips), darunter Kacheln oder eine Leiste. */
+  .wt-lage-text{min-width:0;}
+  .wt-lage-s{display:inline-block;max-width:100%;}
+  .wt-lage-s + .wt-lage-s{margin-left:.35em;}
+  [data-wt-conditions][data-layout="compact"] .wt-lage-s,
+  [data-wt-conditions][data-layout="strip"] .wt-lage-s{display:block;margin-left:0;}
+  .wt-lage-chip{white-space:nowrap;}
+  .wt-tile-subs{display:contents;}
+
+  [data-wt-conditions][data-layout="compact"] .wt-lage-hero,
+  [data-wt-conditions][data-layout="strip"] .wt-lage-hero{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:4px 16px;text-align:left;padding:10px 14px;margin-bottom:10px;
+    background:linear-gradient(90deg, color-mix(in srgb, var(--wt-hero, var(--ink-faint)) 13%, transparent), transparent 70%);}
+  [data-wt-conditions][data-layout="compact"] .wt-lage-icon,
+  [data-wt-conditions][data-layout="strip"] .wt-lage-icon{width:44px;height:34px;margin:0;}
+  [data-wt-conditions][data-layout="compact"] .wt-lage-hero .wt-lage,
+  [data-wt-conditions][data-layout="strip"] .wt-lage-hero .wt-lage{font-size:calc(26px * var(--font-scale, 1));letter-spacing:-.01em;line-height:1.15;margin:0;}
+  [data-wt-conditions][data-layout="compact"] .wt-lage-sentence,
+  [data-wt-conditions][data-layout="strip"] .wt-lage-sentence{margin:2px 0 0;max-width:none;font-size:calc(14px * var(--font-scale, 1));line-height:1.4;text-align:left;text-wrap:balance;}
+  [data-wt-conditions][data-layout="compact"] .wt-lage-chips,
+  [data-wt-conditions][data-layout="strip"] .wt-lage-chips{margin:0;justify-content:flex-end;}
+
+  [data-wt-conditions][data-layout="compact"] .wt-lage-icon,
+  [data-wt-conditions][data-layout="strip"] .wt-lage-icon{grid-column:1;}
+  [data-wt-conditions][data-layout="compact"] .wt-lage-text,
+  [data-wt-conditions][data-layout="strip"] .wt-lage-text{grid-column:2;}
+  [data-wt-conditions][data-layout="compact"] .wt-lage-chips,
+  [data-wt-conditions][data-layout="strip"] .wt-lage-chips{grid-column:3;}
+
+  /* compact: niedrigere Kacheln, Symbol und Beschriftung in einer Zeile */
+  [data-wt-conditions][data-layout="compact"] .wt-kpis-lage{margin:0 0 4px;}
+  [data-wt-conditions][data-layout="compact"] .wt-kpis-lage .wt-tile{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:8px;row-gap:1px;align-items:center;align-content:start;justify-items:start;text-align:left;padding:8px 12px;border-left-width:1px;}
+  [data-wt-conditions][data-layout="compact"] .wt-tile-icon{width:18px;height:18px;margin:0;}
+  [data-wt-conditions][data-layout="compact"] .wt-kpis-soft .wt-tile-value{grid-column:1 / -1;font-size:calc(19px * var(--font-scale, 1));line-height:1.25;}
+  [data-wt-conditions][data-layout="compact"] .wt-tile-subs,
+  [data-wt-conditions][data-layout="strip"] .wt-tile-subs{display:block;grid-column:1 / -1;min-width:0;text-wrap:balance;}
+  [data-wt-conditions][data-layout="compact"] .wt-kpis-soft .wt-tile-sub,
+  [data-wt-conditions][data-layout="strip"] .wt-kpis-soft .wt-tile-sub,
+  [data-wt-conditions][data-layout="compact"] .wt-kpis-soft .wt-tile-sub2,
+  [data-wt-conditions][data-layout="strip"] .wt-kpis-soft .wt-tile-sub2{display:inline;min-height:0;font-size:calc(11.5px * var(--font-scale, 1));}
+  [data-wt-conditions][data-layout="compact"] .wt-tile-sub2::before,
+  [data-wt-conditions][data-layout="strip"] .wt-tile-sub2::before{content:"· ";}
+
+  /* strip: eine zusammenhängende Leiste, keine Kästen; die Beschriftung bleibt für Hilfsmittel erhalten */
+  [data-wt-conditions][data-layout="strip"] .wt-kpis-lage{gap:0;margin:0 0 4px;border-top:1px solid var(--border);}
+  [data-wt-conditions][data-layout="strip"] .wt-kpis-lage .wt-tile{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:8px;row-gap:0;align-items:center;align-content:start;justify-items:start;text-align:left;
+    padding:10px 12px 2px;background:none;border:0;border-radius:0;}
+  [data-wt-conditions][data-layout="strip"] .wt-kpis-lage .wt-tile + .wt-tile{border-left:1px solid var(--border);}
+  [data-wt-conditions][data-layout="strip"] .wt-tile-icon{width:20px;height:20px;margin:0;grid-row:1 / 3;}
+  [data-wt-conditions][data-layout="strip"] .wt-tile-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+  [data-wt-conditions][data-layout="strip"] .wt-kpis-soft .wt-tile-value{font-size:calc(17px * var(--font-scale, 1));line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;max-width:100%;}
+  [data-wt-conditions][data-layout="strip"] .wt-tile-subs{grid-column:2;}
+
+  @media (max-width:640px){
+    [data-wt-conditions][data-layout="compact"] .wt-lage-hero,
+    [data-wt-conditions][data-layout="strip"] .wt-lage-hero{grid-template-columns:auto minmax(0,1fr);}
+    [data-wt-conditions][data-layout="compact"] .wt-lage-hero .wt-lage,
+    [data-wt-conditions][data-layout="strip"] .wt-lage-hero .wt-lage{font-size:calc(24px * var(--font-scale, 1));}
+    [data-wt-conditions][data-layout="compact"] .wt-lage-chips,
+    [data-wt-conditions][data-layout="strip"] .wt-lage-chips{grid-column:1 / -1;justify-content:flex-start;max-width:none;}
+    [data-wt-conditions][data-layout="compact"] .wt-lage-icon,
+    [data-wt-conditions][data-layout="strip"] .wt-lage-icon{width:34px;height:28px;}
+    [data-wt-conditions][data-layout="compact"] .wt-lage-hero,
+    [data-wt-conditions][data-layout="strip"] .wt-lage-hero{gap:4px 10px;}
+    [data-wt-conditions][data-layout="strip"] .wt-tile-icon{grid-row:auto;}
+    [data-wt-conditions][data-layout="strip"] .wt-kpis-soft .wt-tile-value{white-space:normal;overflow:visible;line-height:1.2;}
+    [data-wt-conditions][data-layout="strip"] .wt-tile-subs{grid-column:1 / -1;text-wrap:pretty;}
+    [data-wt-conditions][data-layout="strip"] .wt-kpis-lage .wt-tile:nth-of-type(odd){border-left:0;}
+    [data-wt-conditions][data-layout="strip"] .wt-kpis-lage .wt-tile:nth-of-type(n+3){border-top:1px solid var(--border);margin-top:8px;padding-top:10px;}
+  }

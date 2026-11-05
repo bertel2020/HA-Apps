@@ -3670,7 +3670,12 @@
     "{count} doppelter Zeitstempel": "{count} duplicate timestamp",
     "{count} doppelte Zeitstempel": "{count} duplicate timestamps",
     "{count} markierter Wert": "{count} marked value",
-    "{count} markierte Werte": "{count} marked values"
+    "{count} markierte Werte": "{count} marked values",
+    "Darstellung der Wetterlage": "Weather summary layout",
+    "Kompakt": "Compact",
+    "Leiste": "Strip",
+    "Groß zeigt den Kopf zentriert über vier Kacheln. Kompakt setzt den Kopf in eine Zeile und macht die Kacheln niedriger. Leiste fasst die Kacheln zu einer Zeile ohne Kästen zusammen. Die Angaben sind in allen drei dieselben; auf dem Handy bleiben es zwei Kacheln je Zeile.": "Large shows the header centred above four tiles. Compact puts the header on one row and makes the tiles lower. Strip merges the tiles into one row without boxes. The information is the same in all three; on a phone there are two tiles per row.",
+    "Ungültige Darstellung: {value}": "Invalid layout: {value}"
   },
   "js": {
     "Ladestand": "State of charge",

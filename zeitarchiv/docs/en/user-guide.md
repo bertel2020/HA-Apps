@@ -828,7 +828,10 @@ saturates at about 98,800 lx. The thresholds are in setup under **Sun and daylig
   sunny, twilight, night), a short sentence from temperature, wind (Beaufort, with direction
   if **Wind direction** is assigned) and rain, plus details such as gusts, daily high and
   low, sun hours and "light until … yesterday". The class limits follow the sun threshold but
-  can be set yourself in setup. For an earlier day it shows that day's summary.
+  can be set yourself in setup. For an earlier day it shows that day's summary. Under
+  **Display** you choose the layout: **Large** (centred header above four tiles),
+  **Compact** (header on one row, lower tiles) or **Strip** (header on one row, the tiles as
+  one row without boxes; default). The information is the same in all of them.
 - **Sunshine duration**: an hour counts as sunny if its mean reaches the sun threshold
   (default 25,000 lx). It appears as a row in the comparison table, as a tile and as the
   **Sun hours** curve on the Wind & sun tab.

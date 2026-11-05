@@ -162,6 +162,10 @@ DAYLENGTH_MAX_DAYS = 800  # so weit reicht der Jahresverlauf höchstens zurück 
 #: Süd-Helligkeit der Eltako-Station sättigt hier; darüber steht „ab“ statt eines Messwerts.
 SUN_SENSOR_SATURATION_LX = 98800
 SUN_MAX_GAP_HOURS = 6  # längste Lücke ohne Zeilen, die zwischen zwei sonnigen Stunden als sonnig gilt
+#: Darstellung der Karte Wetterlage: ``large`` (zentrierter Kopf, vier Kacheln), ``compact`` (Kopf in einer Zeile,
+#: niedrigere Kacheln), ``strip`` (Kopf in einer Zeile, Kacheln als eine Leiste). Dieselben Angaben, nur anders gesetzt.
+LAGE_LAYOUTS = ("large", "compact", "strip")
+DEFAULT_LAGE_LAYOUT = "strip"
 DEFAULT_RAIN_DAY_MM = 1.0  # DWD: Niederschlagstag ab 1 mm
 DEFAULT_RAIN_DAY_MINUTES = 10
 
@@ -181,6 +185,7 @@ def _empty_config() -> dict:
         "sky_cuts_lx": [],
         "hidden_blocks": [],
         "hidden_cards": [],
+        "lage_layout": DEFAULT_LAGE_LAYOUT,
     }
 
 
@@ -236,6 +241,8 @@ def _load_config(index: Index) -> dict:
     hidden_cards = data.get("hidden_cards")
     if isinstance(hidden_cards, list):
         config["hidden_cards"] = [key for key in CARD_KEYS if key in hidden_cards]
+    if data.get("lage_layout") in LAGE_LAYOUTS:
+        config["lage_layout"] = data["lage_layout"]
     for key in ("heating_room", "heating_limit"):
         value = data.get(key)
         if isinstance(value, (int, float)) and not isinstance(value, bool) and 0 < value < 40:
@@ -1653,6 +1660,7 @@ class WetterService:
             sky_cloudy_lx: str = Form(""),
             sky_fair_lx: str = Form(""),
             sky_sunny_lx: str = Form(""),
+            lage_layout: str = Form(""),
         ) -> HTMLResponse:
             submitted = {
                 "temperature": temperature, "precip_mm": precip_mm, "precip_dur": precip_dur,
@@ -1701,6 +1709,11 @@ class WetterService:
                 ]
             else:
                 config["hidden_cards"] = previous_cards
+            # Ohne Angabe (ältere Aufrufer) bleibt die bisherige Darstellung.
+            layout = lage_layout.strip()
+            if layout and layout not in LAGE_LAYOUTS:
+                raise HTTPException(status_code=400, detail=tr("Ungültige Darstellung: {value}", value=layout))
+            config["lage_layout"] = layout or _load_config(deps.index)["lage_layout"]
             heating = []
             for position, entity_id in enumerate(heating_entity_id):
                 entity_id = entity_id.strip()

@@ -616,6 +616,29 @@ def test_setup_form_uses_app_fields_and_info_buttons(client) -> None:
     assert '<p class="hint">' not in html  # lose .hint-Absätze verschwänden auf dem Telefon ohne Knopf
 
 
+def test_conditions_layout_setting_defaults_saves_and_rejects_unknown_values(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp12", "sensor", "measurement", "°C")
+    index.get_or_create_entity("sensor.wetter_test_wind12", "sensor", "measurement", "km/h")
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    base = {"temperature": "sensor.wetter_test_temp12", "wind": "sensor.wetter_test_wind12"}
+    assert wetter_routes.DEFAULT_LAGE_LAYOUT in wetter_routes.LAGE_LAYOUTS
+    assert client.post("/wetterdashboard/setup", data={**base, "lage_layout": "riesig"}).status_code == 400
+    page = client.post("/wetterdashboard/setup", data=base)  # ohne Angabe: Standard
+    assert f'data-layout="{wetter_routes.DEFAULT_LAGE_LAYOUT}"' in page.text
+    for layout in wetter_routes.LAGE_LAYOUTS:
+        saved = client.post("/wetterdashboard/setup", data={**base, "lage_layout": layout})
+        assert saved.status_code == 200 and f'data-layout="{layout}"' in saved.text
+    # Ein Aufruf ohne das Feld (ältere Aufrufer) behält die letzte Wahl.
+    assert 'data-layout="large"' in client.post("/wetterdashboard/setup", data={**base, "lage_layout": "large"}).text
+    assert 'data-layout="large"' in client.post("/wetterdashboard/setup", data=base).text
+    # Die Auswahl steht in der Einrichtung, mit der gespeicherten Wahl vorbelegt.
+    setup = client.get("/wetterdashboard/setup").text
+    assert 'name="lage_layout" value="large" checked' in setup
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
 # -- Stichtag ---------------------------------------------------------------------------------
 
 
