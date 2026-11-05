@@ -375,3 +375,17 @@ def test_the_quotas_change_in_percentage_points_and_are_not_part_of_the_default(
     assert items["autarkie"]["value"] == 46.7 and items["autarkie"]["unit"] == "%" and items["autarkie"]["abs"] == 2.5 and items["autarkie"]["pct"] is None
     assert items["autarkie"]["delta_unit"] and items["autarkie"]["better"] == "up" and items["autarkie"]["spark"] == []
     assert items["eigenverbrauch"]["abs"] is None  # ohne Vorperiode keine Veränderung
+
+
+def test_the_storage_is_offered_only_with_a_storage_and_shows_balance_and_charge(energie: _Energie, monkeypatch: pytest.MonkeyPatch) -> None:
+    client = _client()
+    without = client.get("/api/card/element", headers=AUTH, params={"key": "energie.kennzahlen", "values": "speicher"}).json()
+    assert [item["key"] for item in without["items"]] == ["erzeugung", "verbrauch", "netzbezug", "einspeisung"]  # unbekannt fällt auf die Vorgabe zurück
+    monkeypatch.setattr(card_elements, "_energie_config", lambda ctx: {"erzeuger": [], "speicher": [{"name": "Akku"}]})
+    listed = {item["key"]: item for item in client.get("/api/card/elements", headers=AUTH).json()["elements"]}
+    assert "speicher" in [v["key"] for v in listed["energie.kennzahlen"]["values"]]
+    now = client.get("/api/card/element", headers=AUTH, params={"key": "energie.kennzahlen", "values": "speicher", "range": "day"}).json()["items"][0]
+    assert now["value"] == 1.5 and now["abs"] == 0.8 and now["better"] is None and now["spark"] == []
+    assert [(line["value"], line["unit"]) for line in now["lines"]] == [(72.0, "%"), (4.0, "kWh"), (2.5, "kWh")]  # Ladestand jetzt
+    past = client.get("/api/card/element", headers=AUTH, params={"key": "energie.kennzahlen", "values": "speicher", "range": "day", "offset": -1}).json()["items"][0]
+    assert past["lines"][0]["value"] == 55.0  # in einer vergangenen Periode der Durchschnitt

@@ -36,13 +36,13 @@ RANGES = ("day", "week", "month", "year")
 SIDES = ("verbrauch", "versorgung")
 MAX_OFFSET = 60
 #: Kennzahlen der Energie-Kachelreihe (Schlüssel der KPIs in compute_flow) und wie viele eine Karte zeigt.
-KPI_VALUES = ("erzeugung", "verbrauch", "netzbezug", "einspeisung", "autarkie", "eigenverbrauch")
+KPI_VALUES = ("erzeugung", "verbrauch", "netzbezug", "einspeisung", "autarkie", "eigenverbrauch", "speicher")
 #: Was eine Karte ohne Auswahl zeigt: die vier Energiemengen; Quoten und Speicher wählt man dazu.
 KPI_DEFAULT = KPI_VALUES[:4]
 #: Quoten in Prozent (die Veränderung steht in Prozentpunkten, nicht in Prozent).
 KPI_QUOTAS = ("autarkie", "eigenverbrauch")
 #: Ob ein größerer Wert günstig ist (up) oder ungünstig (down): mehr Erzeugung und Einspeisung ja, mehr Bezug und Verbrauch nein.
-KPI_BETTER = {"erzeugung": "up", "einspeisung": "up", "verbrauch": "down", "netzbezug": "down", "autarkie": "up", "eigenverbrauch": "up"}
+KPI_BETTER = {"erzeugung": "up", "einspeisung": "up", "verbrauch": "down", "netzbezug": "down", "autarkie": "up", "eigenverbrauch": "up", "speicher": None}
 MAX_VALUES = 8
 #: Verbraucher der Veränderungsliste: Vorgabe (energie_langzeit.CHANGES_LIMIT) und Höchstzahl.
 CHANGES_DEFAULT = 8
@@ -243,6 +243,21 @@ def _quota_item(key: str, label: str, current: dict, previous: dict) -> dict:
             "better": KPI_BETTER[key], "spark": []}
 
 
+def _storage_item(label: str, entry: dict, current: dict, offset: int) -> dict:
+    """Speicher: der Saldo (Ladung minus Entladung) mit seiner Veränderung, darunter Ladestand, Ladung und Entladung.
+    Der Ladestand ist der jetzige in der laufenden Periode, sonst der Durchschnitt der Periode."""
+    now = offset == 0
+    soc = current.get("speicher_soc_now") if now else current.get("speicher_soc")
+    lines = []
+    if soc is not None:
+        lines.append({"label": tr("Ladestand") if now else tr("Ø Ladestand"), "value": soc, "unit": "%"})
+    for text, key in ((tr("Ladung"), "speicher_laden"), (tr("Entladung"), "speicher_entladen")):
+        if current.get(key) is not None:
+            lines.append({"label": text, "value": current[key], "unit": "kWh"})
+    return {"key": "speicher", "label": label, "unit": "kWh", "value": current.get("speicher_netto"), "pct": None,
+            "abs": entry.get("abs"), "better": None, "spark": [], "lines": lines}
+
+
 def _energie_kpis(ctx: Context, options: Options) -> dict:
     from .energiedashboard_routes import COMPARE_LABELS
     from .storage import query as query_mod
@@ -253,18 +268,22 @@ def _energie_kpis(ctx: Context, options: Options) -> dict:
     range_key = options.range if options.range in ("day", "month", "year") else "day"
     offset = min(0, options.offset)
     keys = [key for key in dict.fromkeys(options.values or KPI_DEFAULT) if key in KPI_VALUES][:MAX_VALUES] or list(KPI_DEFAULT)
+    if not config.get("speicher"):
+        keys = [key for key in keys if key != "speicher"] or list(KPI_DEFAULT)
     energie = ctx.energie
     read_cache = query_mod.QueryReadCache()
     flow = energie.compute_flow(config, range_key, offset, skip_quality=True, read_cache=read_cache)
     compare, current, previous = energie.compute_period_comparison(config, range_key, offset, flow, read_cache)
     labels = {
         "erzeugung": tr("Erzeugung"), "verbrauch": tr("Verbrauch"), "netzbezug": tr("Netzbezug"), "einspeisung": tr("Einspeisung"),
-        "autarkie": tr("Autarkie"), "eigenverbrauch": tr("Eigenverbrauch"),
+        "autarkie": tr("Autarkie"), "eigenverbrauch": tr("Eigenverbrauch"), "speicher": tr("Speicher"),
     }
     items = []
     for key in keys:
         if key in KPI_QUOTAS:
             items.append(_quota_item(key, labels[key], current, previous))
+        elif key == "speicher":
+            items.append(_storage_item(labels[key], compare.get("speicher_netto") or {}, current, offset))
         else:
             entry = compare.get(key) or {}
             item = {
@@ -299,12 +318,13 @@ def _wetter_kpis(ctx: Context, options: Options) -> dict:
 
 
 def _energie_kpi_values(ctx: Context) -> list[dict]:
+    config = _energie_config(ctx) or {}
     labels = {
         "erzeugung": tr("Erzeugung"), "verbrauch": tr("Verbrauch"), "netzbezug": tr("Netzbezug"), "einspeisung": tr("Einspeisung"),
-        "autarkie": tr("Autarkie"), "eigenverbrauch": tr("Eigenverbrauch"),
+        "autarkie": tr("Autarkie"), "eigenverbrauch": tr("Eigenverbrauch"), "speicher": tr("Speicher"),
     }
-    # "default": was die Karte ohne Auswahl zeigt.
-    return [{"key": key, "label": labels[key], "default": key in KPI_DEFAULT} for key in KPI_VALUES]
+    # "default": was die Karte ohne Auswahl zeigt; der Speicher nur, wenn in der App einer eingerichtet ist.
+    return [{"key": key, "label": labels[key], "default": key in KPI_DEFAULT} for key in KPI_VALUES if key != "speicher" or config.get("speicher")]
 
 
 def _wetter_available(ctx: Context) -> bool:

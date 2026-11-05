@@ -3694,6 +3694,8 @@
     "Energie: Rekorde": "Energy: records",
     "Energie: Kenntage": "Energy: characteristic days",
     "Energie: Was hat sich verändert?": "Energy: what has changed?",
+    "Ladestand": "State of charge",
+    "Ø Ladestand": "Avg. state of charge",
     "PP": "pp"
   },
   "js": {
