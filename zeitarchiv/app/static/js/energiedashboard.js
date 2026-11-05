@@ -231,6 +231,7 @@
   // ebenfalls 60s) — ohne das blieb ein offen gelassenes Energiedashboard
   // beliebig lange auf dem Stand des letzten manuellen Reloads stehen.
   const ENERGIEDASHBOARD_REFRESH_INTERVAL_MS = 60000;
+  const {energyHeatmap, energyShares} = window.ElementChartRender;
   const SHARE_COLORS = ['--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5', '--chart-6', '--chart-7', '--chart-8'];
   // Dieselbe Breakpoint-Zahl wie die übrigen @media(max-width:560px)-Regeln
   // auf dieser Seite. Sankey-Orientierung wechselt nur bei tatsächlichem
@@ -1171,44 +1172,10 @@
         if (!el || typeof echarts === 'undefined' || !data.rows || !data.rows.length) return;
         if (!heatmapChartInstance) heatmapChartInstance = echarts.init(el);
         const palette = colors();
-        const accent = cssVar('--accent-line');
-        const surfaceAlt = cssVar('--surface-alt');
-        const dayLabels = data.rows.map((row) => row.label);
-        const hourLabels = Array.from({length: 24}, (_, h) => String(h));
-        const cells = [];
-        data.rows.forEach((row, rIdx) => {
-          row.hours.forEach((value, hIdx) => {
-            if (value != null) cells.push([hIdx, rIdx, value]);
-          });
-        });
-        const fmt = (value) => this.fmt(value, value < 10 ? 2 : 1);
-        heatmapChartInstance.setOption({
-          tooltip: {
-            trigger: 'item',
-            formatter: (p) => `${p.marker}${dayLabels[p.value[1]]} ${p.value[0]}:00: <strong>${fmt(p.value[2])} kWh</strong>`,
-          },
-          grid: {containLabel: true, left: 4, right: 8, top: 8, bottom: 4},
-          xAxis: {
-            type: 'category', data: hourLabels, position: 'top',
-            splitArea: {show: false}, axisLine: {show: false}, axisTick: {show: false},
-            axisLabel: {
-              color: palette.ink, fontFamily: fontMono(), fontSize: scaledFont(9), interval: 2, margin: 4,
-              formatter: (value) => value + ':00',
-            },
-          },
-          yAxis: {
-            type: 'category', data: dayLabels, inverse: true,
-            axisLine: {show: false}, axisTick: {show: false},
-            axisLabel: {color: palette.ink, fontSize: scaledFont(10.5)},
-          },
-          visualMap: {show: false, min: 0, max: data.max_value || 1, inRange: {color: [surfaceAlt, accent]}},
-          series: [{
-            type: 'heatmap',
-            data: cells,
-            itemStyle: {borderColor: cssVar('--surface'), borderWidth: 1, borderRadius: 2},
-            emphasis: {itemStyle: {shadowBlur: 8, shadowColor: 'rgba(0,0,0,0.25)'}},
-          }],
-        }, true);
+        heatmapChartInstance.setOption(energyHeatmap(data, {
+          colors: {ink: palette.ink, accent: cssVar('--accent-line'), surfaceAlt: cssVar('--surface-alt'), surface: cssVar('--surface'), mono: fontMono()},
+          font: scaledFont,
+        }), true);
         // Robuster als der $nextTick()-Zeitpunkt allein (der die Karte nur
         // beim JETZIGEN Sichtbarwerden trifft): ResizeObserver feuert bei
         // JEDER tatsächlichen Größenänderung des Containers — u. a. genau
@@ -1645,31 +1612,9 @@
         const el = this.$refs.shareChartEl;
         if (!el || typeof echarts === 'undefined' || !breakdown.length) return;
         if (!shareChartInstance) shareChartInstance = echarts.init(el);
-        const surface = cssVar('--surface');
-        const fmt = (value) => this.fmt(value, value < 10 ? 2 : 1);
-        shareChartInstance.setOption({
-          tooltip: {
-            trigger: 'item',
-            formatter: (p) => `${p.marker}${escapeHtml(p.name)}: <strong>${fmt(p.value)} kWh</strong> (${this.fmt(p.percent, 0)} %)`,
-          },
-          series: [{
-            type: 'pie',
-            radius: ['52%', '85%'],
-            center: ['50%', '50%'],
-            avoidLabelOverlap: true,
-            itemStyle: {borderColor: surface, borderWidth: 2},
-            label: {show: false},
-            labelLine: {show: false},
-            emphasis: {
-              scaleSize: 6,
-              itemStyle: {shadowBlur: 12, shadowColor: 'rgba(0,0,0,0.25)'},
-            },
-            data: breakdown.map((item, idx) => ({
-              name: item.name, value: item.value,
-              itemStyle: {color: this.shareColor(idx)},
-            })),
-          }],
-        }, true);
+        shareChartInstance.setOption(energyShares(breakdown, {
+          colorAt: (idx) => this.shareColor(idx), surface: cssVar('--surface'),
+        }), true);
         // Dasselbe ResizeObserver-Muster wie renderHeatmap()/#storage-pie:
         // die Kachel steht unter x-show und ist beim ersten setOption() oft
         // noch display:none — ECharts fällt dann auf seine 100px-Standard-
@@ -1706,40 +1651,11 @@
         const el = this.$refs.versorgungChartEl;
         if (!el || typeof echarts === 'undefined' || !breakdown.length) return;
         if (!versorgungChartInstance) versorgungChartInstance = echarts.init(el);
-        const surface = cssVar('--surface');
-        const fmt = (value) => this.fmt(value, value < 10 ? 2 : 1);
-        versorgungChartInstance.setOption({
-          tooltip: {
-            trigger: 'item',
-            formatter: (p) => `${p.marker}${escapeHtml(p.name)}: <strong>${fmt(p.value)} kWh</strong> (${this.fmt(p.percent, 0)} %)`,
-          },
-          series: [{
-            type: 'pie',
-            radius: ['52%', '85%'],
-            center: ['50%', '50%'],
-            avoidLabelOverlap: true,
-            itemStyle: {borderColor: surface, borderWidth: 2},
-            label: {show: false},
-            labelLine: {show: false},
-            emphasis: {
-              scaleSize: 6,
-              itemStyle: {shadowBlur: 12, shadowColor: 'rgba(0,0,0,0.25)'},
-            },
-            // Negative/Null-Werte (Speichernutzung in einer überwiegend
-            // ladenden Periode, siehe compute_flow()) ergäben ein
-            // negatives Tortenstück — ECharts kann das nicht sinnvoll
-            // zeichnen. Nur aus dem Donut ausgefiltert, die Tabelle zeigt
-            // die Zeile weiterhin. Da versorgungBreakdown serverseitig
-            // absteigend sortiert ist, kann ein solcher Wert nur am Ende
-            // stehen — herausfiltern verschiebt also nicht den Index der
-            // übrigen Einträge, shareColor(idx) bleibt zur Tabellenzeile
-            // konsistent.
-            data: breakdown.filter((item) => item.value > 0).map((item, idx) => ({
-              name: item.name, value: item.value,
-              itemStyle: {color: this.shareColor(idx)},
-            })),
-          }],
-        }, true);
+        // Negative/Null-Werte (Speichernutzung in einer überwiegend ladenden Periode) ergäben ein negatives Tortenstück;
+        // sie fehlen nur im Ring, die Tabelle zeigt die Zeile weiter (absteigend sortiert, die Farben bleiben konsistent).
+        versorgungChartInstance.setOption(energyShares(breakdown.filter((item) => item.value > 0), {
+          colorAt: (idx) => this.shareColor(idx), surface: cssVar('--surface'),
+        }), true);
         if (typeof ResizeObserver !== 'undefined') {
           if (versorgungResizeObserver) versorgungResizeObserver.disconnect();
           versorgungResizeObserver = new ResizeObserver(() => {

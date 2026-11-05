@@ -93,7 +93,10 @@
   - Tabellen: Zeiträume im Vergleich aus Energie und Wetter sowie Jahre × Monate
     aus der Energie, jeweils mit den Zahlen des Dashboards
   - Diagramme: Monatsvergleich aus Energie und Wetter (Jahre als Linien mit
-    Mittel und Spanne) und die Jahresübersicht des Wetters als Heatmap
+    Mittel und Spanne), die Jahresübersicht des Wetters als Heatmap sowie
+    Verbraucher- oder Versorgungsanteile und das Tageslastprofil der Energie
+  - Anteile und Tageslastprofil haben einen Zeitraum (Tag, Woche, Monat, Jahr)
+    und einen Versatz in Perioden zurück
   - Rollen und Formeln bleiben im Dashboard eingerichtet; nicht eingerichtete
     Bausteine fehlen in der Auswahl
   - Nur für Administratoren; braucht die aktuelle Integration
@@ -205,7 +208,10 @@
   - Tables: periods compared from Energy and Weather, and years × months from
     Energy, each with the figures of the dashboard
   - Charts: monthly comparison from Energy and Weather (years as lines with
-    average and range) and the weather year overview as a heatmap
+    average and range), the weather year overview as a heatmap, as well as
+    consumption or supply shares and the daily load profile from Energy
+  - Shares and the load profile have a period (day, week, month, year) and an
+    offset in periods back
   - Roles and formulas stay set up in the dashboard; elements that are not set
     up are missing from the choice
   - Administrators only; needs the current integration

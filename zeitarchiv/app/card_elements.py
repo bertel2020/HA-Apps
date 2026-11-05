@@ -30,6 +30,11 @@ METRICS = ("temperature", "precip", "sun")
 #: Kennzahlen der Wetter-Jahresübersicht (wetter_routes.compute_matrix).
 MATRIX_METRICS = ("avg", "max", "min", "precip", "sun")
 ALL_METRICS = tuple(dict.fromkeys(METRICS + MATRIX_METRICS))
+#: Zeiträume der Bausteine, die einen brauchen (Ring: Tag, Monat, Jahr; Lastprofil: Woche, Monat, Jahr), und die Seite
+#: des Rings. offset zählt in Perioden zurück (0 = laufende, -1 = die davor), wie in den Dashboards.
+RANGES = ("day", "week", "month", "year")
+SIDES = ("verbrauch", "versorgung")
+MAX_OFFSET = 60
 
 
 class ElementUnavailable(Exception):
@@ -48,6 +53,9 @@ class Options:
     years: int = 10
     group: str = "basis"
     metric: str = "temperature"
+    range: str = "month"
+    offset: int = 0
+    side: str = "verbrauch"
 
 
 @dataclass
@@ -79,6 +87,9 @@ class Element:
     roles: tuple[str, ...] = field(default_factory=tuple)
     groups: tuple[str, ...] = field(default_factory=tuple)
     metrics: tuple[str, ...] = field(default_factory=tuple)
+    #: Zeiträume, aus denen der Baustein wählen lässt, und die Seiten des Rings (leer: keine Auswahl).
+    ranges: tuple[str, ...] = field(default_factory=tuple)
+    sides: tuple[str, ...] = field(default_factory=tuple)
 
 
 def _energie_config(ctx: Context) -> dict | None:
@@ -127,6 +138,39 @@ def _energie_matrix(ctx: Context, options: Options) -> dict:
 def _energie_monthly(ctx: Context, options: Options) -> dict:
     result = _energie_matrix(ctx, options)
     return {**result, "renderer": "energie.monatsvergleich", "kind": "chart"}
+
+
+def _energie_shares(ctx: Context, options: Options) -> dict:
+    config = _energie_config(ctx)
+    if config is None:
+        raise ElementUnavailable(tr("Im Energiedashboard nicht eingerichtet"))
+    range_key = options.range if options.range in ("day", "month", "year") else "month"
+    flow = ctx.energie.compute_flow(config, range_key, min(0, options.offset))
+    side = options.side if options.side in SIDES else SIDES[0]
+    if side == "verbrauch":
+        # Wie der Ring der Seite: nur die Blätter; Zähler- und Gruppensummen stünden neben ihren Mitgliedern doppelt.
+        items = [item for item in flow.get("verbraucher_breakdown") or [] if item.get("kind") not in ("meter", "group")]
+    else:
+        items = [item for item in flow.get("versorgung_breakdown") or [] if item["value"] > 0]
+    return {
+        "renderer": "energie.anteile", "side": side, "range": range_key,
+        "items": [{"name": item["name"], "value": item["value"]} for item in items],
+        "window": {key: flow.get(key) for key in ("window_start", "window_end", "label") if key in flow},
+    }
+
+
+def _energie_heatmap(ctx: Context, options: Options) -> dict:
+    config = _energie_config(ctx)
+    if config is None:
+        raise ElementUnavailable(tr("Im Energiedashboard nicht eingerichtet"))
+    range_key = options.range if options.range in ("week", "month", "year") else "week"
+    if range_key == "week":
+        grid = ctx.energie.compute_heatmap(config)
+    else:
+        offset = min(0, options.offset)
+        cached = ctx.index.get_heatmap_weekday_snapshot(range_key) if offset == 0 else None
+        grid = cached["grid"] if cached is not None else ctx.energie.compute_heatmap_weekday(config, range_key, offset)
+    return {"renderer": "energie.heatmap", "heatmap": grid, "range": range_key}
 
 
 def _wetter_available(ctx: Context) -> bool:
@@ -190,6 +234,18 @@ ELEMENTS: dict[str, Element] = {
             available=_energie_zeitraeume_available, build=_energie_monthly, roles=ROLES,
         ),
         Element(
+            key="energie.anteile", group="energie", kind="chart",
+            title=lambda: tr("Energie: Anteile"),
+            available=_energie_zeitraeume_available, build=_energie_shares,
+            ranges=("day", "month", "year"), sides=SIDES,
+        ),
+        Element(
+            key="energie.heatmap", group="energie", kind="chart",
+            title=lambda: tr("Energie: Tageslastprofil"),
+            available=_energie_zeitraeume_available, build=_energie_heatmap,
+            ranges=("week", "month", "year"),
+        ),
+        Element(
             key="wetter.monatsvergleich", group="wetter", kind="chart",
             title=lambda: tr("Wetter: Monatsvergleich"),
             available=_wetter_available, build=_wetter_monthly, metrics=METRICS,
@@ -213,7 +269,8 @@ def listing(ctx: Context | None = None) -> list[dict]:
     """Die Bausteine, die in dieser App eingerichtet sind (für die Auswahl im Editor der Karte)."""
     ctx = ctx or CONTEXT
     return [
-        {"key": element.key, "group": element.group, "kind": element.kind, "title": element.title(), "columns": list(element.columns), "roles": list(element.roles), "groups": list(element.groups), "metrics": list(element.metrics)}
+        {"key": element.key, "group": element.group, "kind": element.kind, "title": element.title(), "columns": list(element.columns), "roles": list(element.roles), "groups": list(element.groups), "metrics": list(element.metrics),
+        "ranges": list(element.ranges), "sides": list(element.sides)}
         for element in ELEMENTS.values()
         if element.available(ctx)
     ]

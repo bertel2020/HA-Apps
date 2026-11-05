@@ -441,6 +441,9 @@ def create_card_router(
         role: str | None = None,
         group: str = "basis",
         metric: str = "temperature",
+        range: str = "month",  # noqa: A002 - Name des Query-Parameters
+        offset: int = Query(0, ge=-card_elements.MAX_OFFSET, le=0),
+        side: str = "verbrauch",
         years: int = Query(10, ge=0, le=card_elements.MAX_YEARS),
         authorization: str | None = Header(default=None),
         x_zeitarchiv_integration_version: str | None = Header(default=None),
@@ -448,11 +451,22 @@ def create_card_router(
         """Ein Dashboard-Baustein mit seinen Zahlen; die Karte zeichnet sie."""
         check_auth(authorization, getattr(request.state, "request_id", "-"), x_zeitarchiv_integration_version)
         keys = [item for item in (columns or "").split(",") if item]
-        if any(item not in card_elements.COLUMN_KEYS for item in keys) or mode not in card_elements.MODES or (role is not None and role not in card_elements.ROLES) or group not in card_elements.GROUPS or metric not in card_elements.ALL_METRICS:
+        invalid = (
+            any(item not in card_elements.COLUMN_KEYS for item in keys)
+            or mode not in card_elements.MODES
+            or (role is not None and role not in card_elements.ROLES)
+            or group not in card_elements.GROUPS
+            or metric not in card_elements.ALL_METRICS
+            or range not in card_elements.RANGES
+            or side not in card_elements.SIDES
+        )
+        if invalid:
             raise HTTPException(status_code=400, detail=tr("Ungültige Angaben"))
         if at:
             stichtag_or_400(at)
-        options = card_elements.Options(columns=keys or None, vorjahr=vorjahr, mode=mode, at=at or None, role=role, years=years, group=group, metric=metric)
+        options = card_elements.Options(columns=keys or None, vorjahr=vorjahr, mode=mode, at=at or None, role=role, years=years, group=group, metric=metric,
+            range=range, offset=offset, side=side,
+        )
         if not slots.acquire(blocking=False):
             raise HTTPException(status_code=429, detail=tr("Zu viele gleichzeitige Abfragen"))
         try:

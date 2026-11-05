@@ -39,12 +39,40 @@ class _Langzeit:
 class _Energie:
     def __init__(self) -> None:
         self.langzeit = _Langzeit()
+        self.flows: list = []
+        self.heatmaps: list = []
+
+    def compute_flow(self, config: dict, range_key: str, offset: int) -> dict:
+        self.flows.append((range_key, offset))
+        return {
+            "verbraucher_breakdown": [
+                {"name": "Zähler", "value": 9.0, "kind": "meter"}, {"name": "Herd", "value": 4.0, "kind": "entity"},
+                {"name": "Grundlast", "value": 5.0},
+            ],
+            "versorgung_breakdown": [{"name": "PV", "value": 8.0}, {"name": "Netz", "value": 3.0}, {"name": "Speicher", "value": -1.0}],
+            "window_start": 1, "window_end": 2,
+        }
+
+    def compute_heatmap(self, config: dict) -> dict:
+        self.heatmaps.append("week")
+        return {"rows": [{"label": "Mo", "hours": [1.0] * 24}], "max_value": 1.0}
+
+    def compute_heatmap_weekday(self, config: dict, range_key: str, offset: int) -> dict:
+        self.heatmaps.append((range_key, offset))
+        return {"rows": [{"label": "Mo", "hours": [2.0] * 24}], "max_value": 2.0}
+
+
+class _Index:
+    snapshot: dict | None = None
+
+    def get_heatmap_weekday_snapshot(self, range_key: str):
+        return self.snapshot
 
 
 @pytest.fixture
 def energie(monkeypatch: pytest.MonkeyPatch) -> _Energie:
     service = _Energie()
-    monkeypatch.setattr(card_elements, "CONTEXT", card_elements.Context(index=object(), energie=service))
+    monkeypatch.setattr(card_elements, "CONTEXT", card_elements.Context(index=_Index(), energie=service))
     monkeypatch.setattr(card_elements, "_energie_config", lambda ctx: {"erzeuger": []})
     return service
 
@@ -73,7 +101,9 @@ def test_only_set_up_elements_are_listed(energie: _Energie, monkeypatch: pytest.
     client = _client()
     body = client.get("/api/card/elements", headers=AUTH).json()
     assert body["spec_version"] == SPEC_VERSION
-    assert [item["key"] for item in body["elements"]] == ["energie.zeitraeume", "energie.matrix", "energie.monatsvergleich"]
+    assert [item["key"] for item in body["elements"]] == [
+        "energie.zeitraeume", "energie.matrix", "energie.monatsvergleich", "energie.anteile", "energie.heatmap",
+    ]
     assert body["elements"][0]["columns"] == ["monat", "vormonat", "jahr"]
     monkeypatch.setattr(card_elements, "_energie_config", lambda ctx: None)
     assert client.get("/api/card/elements", headers=AUTH).json()["elements"] == []
@@ -189,3 +219,34 @@ def test_the_weather_year_overview_is_a_chart_with_its_own_metrics(energie: _Ene
     # Eine Kennzahl, die nur der Monatsvergleich kennt, fällt auf die erste der Jahresübersicht zurück.
     assert client.get("/api/card/element", headers=AUTH, params={"key": "wetter.matrix", "metric": "temperature"}).json()["metric"] == "avg"
     assert client.get("/api/card/element", headers=AUTH, params={"key": "wetter.matrix", "metric": "precip"}).status_code == 409
+
+
+def test_the_share_ring_sends_only_the_leaves_or_the_positive_supply(energie: _Energie) -> None:
+    client = _client()
+    listed = {item["key"]: item for item in client.get("/api/card/elements", headers=AUTH).json()["elements"]}
+    assert listed["energie.anteile"]["ranges"] == ["day", "month", "year"] and listed["energie.anteile"]["sides"] == ["verbrauch", "versorgung"]
+    use = client.get("/api/card/element", headers=AUTH, params={"key": "energie.anteile", "range": "year", "offset": -1}).json()
+    assert use["renderer"] == "energie.anteile" and use["side"] == "verbrauch"
+    assert [item["name"] for item in use["items"]] == ["Herd", "Grundlast"]  # ohne die Zählersumme
+    assert energie.flows[-1] == ("year", -1)
+    supply = client.get("/api/card/element", headers=AUTH, params={"key": "energie.anteile", "side": "versorgung"}).json()
+    assert [item["name"] for item in supply["items"]] == ["PV", "Netz"]  # ohne den negativen Speicher
+    # Die Woche gibt es beim Ring nicht: sie fällt auf den Monat zurück.
+    client.get("/api/card/element", headers=AUTH, params={"key": "energie.anteile", "range": "week"})
+    assert energie.flows[-1] == ("month", 0)
+
+
+def test_the_load_profile_uses_the_cache_for_the_running_period_only(energie: _Energie, monkeypatch: pytest.MonkeyPatch) -> None:
+    client = _client()
+    week = client.get("/api/card/element", headers=AUTH, params={"key": "energie.heatmap", "range": "week"}).json()
+    assert week["range"] == "week" and energie.heatmaps == ["week"]
+    _Index.snapshot = {"grid": {"rows": [], "max_value": 0, "cached": True}}
+    try:
+        cached = client.get("/api/card/element", headers=AUTH, params={"key": "energie.heatmap", "range": "month"}).json()
+        assert cached["heatmap"]["cached"] is True and energie.heatmaps == ["week"]
+        previous = client.get("/api/card/element", headers=AUTH, params={"key": "energie.heatmap", "range": "month", "offset": -2}).json()
+        assert previous["heatmap"]["max_value"] == 2.0 and energie.heatmaps[-1] == ("month", -2)
+    finally:
+        _Index.snapshot = None
+    assert client.get("/api/card/element", headers=AUTH, params={"key": "energie.heatmap", "offset": 1}).status_code == 422
+    assert client.get("/api/card/element", headers=AUTH, params={"key": "energie.heatmap", "range": "decade"}).status_code == 400
