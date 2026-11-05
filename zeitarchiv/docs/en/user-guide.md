@@ -854,8 +854,10 @@ still change):
 - **PV and brightness** (Wind & sun): with the roles **Brightness** and **PV power** the card
   compares the daily yield of the system with the expectation. The expectation is learned
   from the previous 28 days (median hourly power per brightness level). Deviations above
-  15 % are marked, but only on days with a meaningful expectation; the ratio by time of day
-  shows whether the system deviates in the morning or evening. It is a measurement, not a
+  15 % are marked, but only on days with a meaningful expectation. The expectation is a
+  dashed frame behind the bar. Clicking a day selects it: the chip at the top names its
+  deviation, the chart below shows by hour whether the system deviates in the morning or
+  evening (green band: within range). It is a measurement, not a
   forecast: temperature, curtailment and a full battery lower the output without a defect.
 
 ### Precipitation tab

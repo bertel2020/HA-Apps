@@ -72,6 +72,10 @@
     Tageslänge zum Vortag; der heutige Tag steht als „läuft“. Die Kurve der
     Tageslänge im Jahresverlauf wird glatter und beginnt je nach Standort erst
     oberhalb von 0 h
+  - **PV und Helligkeit**: Die Erwartung steht als gestrichelter Rahmen hinter
+    dem Ertrag, eine Marke nennt die Abweichung. Ein Klick auf einen Tag zeigt
+    darunter, wie die Anlage an diesem Tag Stunde für Stunde zur Erwartung
+    stand, mit einem Band für „im Rahmen“
   - **Heizen**: Die Gradtag-Tabelle zeigt je Periode kWh je Gradtag groß und
     Gradtage und kWh klein darunter; die Veränderung steht als farbige Pille
     daneben. „Heizen und Sonne“ zeigt drei Kacheln mit einer Anteilsleiste
@@ -180,6 +184,10 @@
     (twilight and sun elevation as pairs) and shows the change in day length
     from the previous day; today is shown as "ongoing". The day-length curve over
     the year gets smoother and, depending on location, starts above 0 h
+  - **PV and brightness**: The expectation is a dashed frame behind the yield, a
+    chip names the deviation. Clicking a day shows below how the system did
+    against the expectation hour by hour on that day, with a band for "within
+    range"
   - **Heating**: The degree-day table shows kWh per degree day large for each
     period, with degree days and kWh small below; the change sits next to it
     as a coloured pill. "Heating and sun" shows three tiles with a share bar

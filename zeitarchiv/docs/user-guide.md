@@ -914,8 +914,10 @@ können sich noch ändern):
 - **PV und Helligkeit** (Wind & Sonne): Mit den Rollen **Helligkeit** und **PV-Leistung**
   vergleicht die Karte den Tagesertrag der Anlage mit der Erwartung. Die Erwartung wird aus
   den 28 Tagen davor gelernt (Median der Stundenleistung je Helligkeitsstufe). Abweichungen
-  über 15 % werden markiert, aber nur an Tagen mit nennenswerter Erwartung; das Verhältnis
-  nach Uhrzeit zeigt, ob die Anlage morgens oder abends abweicht. Es ist eine Messung, keine
+  über 15 % werden markiert, aber nur an Tagen mit nennenswerter Erwartung. Die Erwartung
+  steht als gestrichelter Rahmen hinter dem Balken. Ein Klick auf einen Tag wählt ihn: Die
+  Marke oben nennt seine Abweichung, das Diagramm darunter zeigt je Stunde, ob die Anlage
+  morgens oder abends abweicht (grünes Band: im Rahmen). Es ist eine Messung, keine
   Prognose: Temperatur, Abregelung und ein voller Akku senken die Leistung ohne Defekt.
 
 ### Reiter Niederschlag

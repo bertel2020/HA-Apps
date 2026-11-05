@@ -3631,7 +3631,6 @@
     "PV und Helligkeit": "PV and brightness",
     "Vergleicht den Tagesertrag der PV-Anlage mit dem, was die Süd-Helligkeit erwarten lässt. Dazu die Rollen „Helligkeit“ und „PV-Leistung“ (unter „Weitere Messwerte“) zuordnen.": "Compares the daily yield of the PV system with what the south brightness suggests. Assign the roles “Brightness” and “PV power” (under “Further measurements”).",
     "Die Erwartung wird aus den letzten 28 Tagen gelernt: je Helligkeitsstufe der Median der Stundenleistung. Die Karte zeigt, ob der Tagesertrag dazu passt; sie ist eine Messung, keine Prognose. Eine Abweichung über 15 % wird markiert, aber nur an Tagen mit nennenswerter Erwartung. Temperatur, Abregelung und ein voller Akku senken die Leistung, ohne dass die Anlage schlechter wird. Der Süd-Sensor misst an einem Punkt, im Sommer sättigt er mittags (98.800 lx), dann sagt die Helligkeit über die Leistung nur noch wenig. Das Verhältnis nach Uhrzeit zeigt, ob die Anlage morgens oder abends systematisch abweicht (Ausrichtung der Module, Verschattung).": "The expectation is learned from the last 28 days: the median hourly power per brightness level. The card shows whether the daily yield fits; it is a measurement, not a forecast. A deviation above 15 % is marked, but only on days with a meaningful expectation. Temperature, curtailment and a full battery lower the output without the system getting worse. The south sensor measures at one point and saturates at midday in summer (98,800 lx), where brightness says little about the output. The ratio by time of day shows whether the system deviates systematically in the morning or evening (module orientation, shading).",
-    "Verhältnis nach Uhrzeit": "Ratio by time of day",
     "Noch keine PV-Leistung mit Helligkeit zum Vergleichen vorhanden.": "No PV power with brightness to compare yet.",
     "Windrichtung": "Wind direction",
     "Bewölkt ab": "Cloudy from",
@@ -3683,7 +3682,10 @@
     "Dämmerung": "Twilight",
     "Änderung zum Vortag": "Change from previous day",
     "morgens / abends": "morning / evening",
-    "Beginn / Ende": "start / end"
+    "Beginn / Ende": "start / end",
+    "Erwartet nach Helligkeit": "Expected from brightness",
+    "Ein Tag lässt sich anklicken.": "Click a day to select it.",
+    "Ertrag": "Yield"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4588,7 +4590,6 @@
     "{n} von {total} Tagen weichen um mehr als {limit} % ab": "{n} of {total} days deviate by more than {limit} %",
     "Um {low} Uhr liefert die Anlage {lowPct} % der Erwartung, um {high} Uhr {highPct} %.": "At {low}:00 the system delivers {lowPct} % of the expectation, at {high}:00 {highPct} %.",
     "Ertrag": "Yield",
-    "Erwartung": "Expectation",
     "{hour} Uhr": "{hour}:00",
     "der Erwartung": "of expectation",
     "aus Norden": "from the north",
@@ -4621,6 +4622,13 @@
     "{n} Tage · Ø {temp} °C · {kwh} kWh/Tag": "{n} days · avg. {temp} °C · {kwh} kWh/day",
     "Keine Tage": "No days",
     "wenig Tage, kaum aussagekräftig": "few days, hardly meaningful",
-    "Gleicher Zeitraum": "Same period"
+    "Gleicher Zeitraum": "Same period",
+    "Erwartet nach Helligkeit": "Expected from brightness",
+    "mehr als {limit} % darunter": "more than {limit} % below",
+    "mehr als {limit} % darüber": "more than {limit} % above",
+    "{sign}{percent} % zur Erwartung": "{sign}{percent} % vs. expected",
+    "{percent} % unter der Erwartung": "{percent} % below expected",
+    "{percent} % über der Erwartung": "{percent} % above expected",
+    "Ertrag gegenüber Erwartung am {day}, je Stunde": "Yield vs. expected on {day}, by hour"
   }
 }

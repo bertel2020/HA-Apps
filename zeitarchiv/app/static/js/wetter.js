@@ -207,6 +207,7 @@
       hasPv: false,
       pv: null,
       pvError: '',
+      pvSel: null,
       _sunhoursSeq: 0,
       hasDayimage: false,
       dayimage: null,
@@ -887,28 +888,63 @@
         this.pvError = '';
         try {
           this.pv = await this.fetchJson('wetterdashboard/pv');
+          for (const row of this.pv.days) row.hours = row.hours || [];
           this.$nextTick(() => this.drawPv());
         } catch (e) {
           this.pvError = t('Der Vergleich von PV-Leistung und Helligkeit konnte nicht geladen werden.');
         }
       },
 
-      pvHead() {
+      // Der gewählte Tag der Karte; ohne Auswahl der letzte.
+      pvDay() {
+        const days = this.pv ? this.pv.days : [];
+        if (!days.length) return null;
+        return days[this.pvSel != null && days[this.pvSel] ? this.pvSel : days.length - 1];
+      },
+
+      // Gibt es Tage, die mehr als die Grenze unter (low) oder über (high) der Erwartung liegen?
+      pvHas(kind) {
+        return !!(this.pv && this.pv.days.some((row) => row.flagged && (kind === 'low' ? row.deviation < 0 : row.deviation > 0)));
+      },
+
+      pvDayLabel(row) {
+        return new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', timeZone: 'UTC'}).format(new Date(`${row.date}T12:00:00Z`));
+      },
+
+      // Marke und Satz für den gewählten Tag: grün im Rahmen, bernsteinfarben darunter, blau darüber.
+      pvStatus() {
         const data = this.pv;
-        if (!data || !data.days.length) return '';
-        const last = data.days[data.days.length - 1];
-        const day = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', timeZone: 'UTC'}).format(new Date(`${last.date}T12:00:00Z`));
-        const values = {day, percent: num(Math.abs(last.deviation), 0), actual: num(last.actual, 1), expected: num(last.expected, 1)};
+        const row = this.pvDay();
+        if (!data || !row) return {chip: '', text: '', kind: ''};
+        const values = {day: this.pvDayLabel(row), percent: num(Math.abs(row.deviation), 0), actual: num(row.actual, 1), expected: num(row.expected, 1)};
+        let chip;
         let text;
-        if (!last.flagged) text = t('{day}: {actual} kWh, im Rahmen der Erwartung ({expected} kWh)', values);
-        else if (last.deviation < 0) text = t('{day}: {actual} kWh, {percent} % unter der Erwartung ({expected} kWh)', values);
-        else text = t('{day}: {actual} kWh, {percent} % über der Erwartung ({expected} kWh)', values);
-        const flagged = data.days.filter((row) => row.flagged).length;
-        return flagged ? `${text} · ${t('{n} von {total} Tagen weichen um mehr als {limit} % ab', {n: flagged, total: data.days.length, limit: data.limit})}` : text;
+        let kind = 'ok';
+        if (!row.flagged) {
+          chip = t('{sign}{percent} % zur Erwartung', {sign: row.deviation > 0.5 ? '+' : row.deviation < -0.5 ? '−' : '±', percent: values.percent});
+          text = t('{day}: {actual} kWh, im Rahmen der Erwartung ({expected} kWh)', values);
+        } else if (row.deviation < 0) {
+          kind = 'low';
+          chip = t('{percent} % unter der Erwartung', values);
+          text = t('{day}: {actual} kWh, {percent} % unter der Erwartung ({expected} kWh)', values);
+        } else {
+          kind = 'high';
+          chip = t('{percent} % über der Erwartung', values);
+          text = t('{day}: {actual} kWh, {percent} % über der Erwartung ({expected} kWh)', values);
+        }
+        const flagged = data.days.filter((entry) => entry.flagged).length;
+        if (flagged) text += ` · ${t('{n} von {total} Tagen weichen um mehr als {limit} % ab', {n: flagged, total: data.days.length, limit: data.limit})}`;
+        return {chip, text, kind};
+      },
+
+      pvHourTitle() {
+        const row = this.pvDay();
+        return row ? t('Ertrag gegenüber Erwartung am {day}, je Stunde', {day: this.pvDayLabel(row)}) : '';
       },
 
       pvHourNote() {
-        const hours = this.pv ? this.pv.hours : [];
+        const row = this.pvDay();
+        const hours = row ? row.hours : [];
         if (hours.length < 2) return '';
         const low = hours.reduce((a, b) => (b.ratio < a.ratio ? b : a));
         const high = hours.reduce((a, b) => (b.ratio > a.ratio ? b : a));
@@ -917,52 +953,103 @@
         });
       },
 
+      pvSelect(index) {
+        if (this.pvSel === index) return;
+        this.pvSel = index;
+        this.drawPv();
+      },
+
       drawPv() {
         const data = this.pv;
         if (!data) return;
         const colors = palette();
         const fmt = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', timeZone: 'UTC'});
+        const warn = cssVar('--warning');
+        const good = cssVar('--positive');
+        const picked = data.days.indexOf(this.pvDay());
+        // Gleicher linker Rand in beiden Diagrammen, damit die Spalten untereinander liegen.
+        const left = 58;
         const element = this.$refs.pvChart;
         if (element) {
           const labels = data.days.map((row) => fmt.format(new Date(`${row.date}T12:00:00Z`)));
           const chart = chartFor('pv', element);
+          const barColor = (row) => (row.flagged ? (row.deviation < 0 ? warn : good) : colors.cur);
           chart.setOption({
-            animation: false, grid: gridFor(element, {top: 28, right: 12}), legend: legendBox(colors, [t('Ertrag'), t('Erwartung')]),
-            xAxis: {type: 'category', data: labels, ...axisStyle(colors), splitLine: {show: false}},
+            animation: false, grid: {left, right: 12, top: 26, bottom: 26, containLabel: false},
+            xAxis: [
+              {type: 'category', data: labels, ...axisStyle(colors), splitLine: {show: false}},
+              {type: 'category', data: labels, show: false},
+            ],
             yAxis: {type: 'value', min: 0, ...axisStyle(colors), axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => `${value} kWh`}},
             tooltip: tooltipBox(colors, (params) => {
               const row = data.days[params[0].dataIndex];
               return `<b>${escapeHtml(params[0].axisValue)}</b><br>${escapeHtml(t('Ertrag'))}: ${escapeHtml(num(row.actual, 1))} kWh`
-                + `<br>${escapeHtml(t('Erwartung'))}: ${escapeHtml(num(row.expected, 1))} kWh<br>${escapeHtml(row.deviation >= 0 ? '+' : '−')}${escapeHtml(num(Math.abs(row.deviation), 0))} %`;
+                + `<br>${escapeHtml(t('Erwartet nach Helligkeit'))}: ${escapeHtml(num(row.expected, 1))} kWh<br>${escapeHtml(row.deviation >= 0 ? '+' : '−')}${escapeHtml(num(Math.abs(row.deviation), 0))} %`;
             }),
             series: [
               {
-                name: t('Ertrag'), type: 'bar', barMaxWidth: 28,
-                data: data.days.map((row) => ({value: row.actual, itemStyle: {color: row.flagged ? cssVar('--chart-4') : colors.cur}})),
+                name: t('Ertrag'), type: 'bar', barWidth: '46%', cursor: 'pointer', xAxisIndex: 0,
+                markArea: picked >= 0 ? {silent: true, itemStyle: {color: colors.grid, opacity: 0.55}, data: [[{xAxis: labels[picked]}, {xAxis: labels[picked]}]]} : undefined,
+                data: data.days.map((row, i) => ({
+                  value: row.actual, itemStyle: {color: barColor(row)},
+                  label: i === picked ? {
+                    show: true, position: 'top', color: colors.ink, fontWeight: 600, fontSize: scaledFont(12),
+                    // Nur die Abweichung: die kWh stehen in der Marke darüber, und mehr passt nicht in die Spalte.
+                    formatter: () => `${row.deviation >= 0 ? '+' : '−'}${num(Math.abs(row.deviation), 0)} %`,
+                  } : {show: false},
+                })),
               },
               {
-                name: t('Erwartung'), type: 'line', symbol: 'diamond', symbolSize: 9, lineStyle: {width: 0},
-                itemStyle: {color: colors.ink}, data: data.days.map((row) => row.expected), z: 5,
+                // Die Erwartung als gestrichelter Rahmen, etwas breiter als der Ertrag; so sieht man, was fehlt oder darüber liegt.
+                name: t('Erwartet nach Helligkeit'), type: 'bar', barWidth: '62%', xAxisIndex: 1, silent: true, z: 5,
+                itemStyle: {color: 'transparent', borderColor: colors.text, borderWidth: 1.5, borderType: 'dashed'},
+                data: data.days.map((row) => row.expected),
               },
             ],
           }, true);
+          // Klick irgendwo in die Spalte eines Tages wählt ihn, nicht nur auf den Balken.
+          const zr = chart.getZr();
+          zr.off('click');
+          zr.on('click', (event) => {
+            const point = [event.offsetX, event.offsetY];
+            if (!chart.containPixel({gridIndex: 0}, point)) return;
+            const index = Math.round(chart.convertFromPixel({gridIndex: 0}, point)[0]);
+            if (index >= 0 && index < data.days.length) this.pvSelect(index);
+          });
           requestAnimationFrame(() => chart.resize());
         }
         const hourElement = this.$refs.pvHourChart;
-        if (hourElement && data.hours.length) {
+        const day = this.pvDay();
+        if (hourElement && day && day.hours.length) {
+          const limit = data.limit;
           const chart = chartFor('pvHour', hourElement);
+          // Abweichung von 100 % als Balken um die Nulllinie; die Achse trägt wieder Prozent.
           chart.setOption({
-            animation: false, grid: gridFor(hourElement, {top: 12, right: 12}),
-            xAxis: {type: 'category', data: data.hours.map((row) => `${row.hour}`), ...axisStyle(colors), splitLine: {show: false}},
-            yAxis: {type: 'value', min: 0, ...axisStyle(colors), axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => `${value} %`}},
-            tooltip: tooltipBox(colors, (params) => {
-              const row = data.hours[params[0].dataIndex];
-              return `<b>${escapeHtml(t('{hour} Uhr', {hour: row.hour}))}</b><br>${escapeHtml(num(row.ratio * 100, 0))} % ${escapeHtml(t('der Erwartung'))} (${escapeHtml(t('{n} Tage', {n: row.days}))})`;
-            }),
+            animation: false, grid: {left, right: 12, top: 12, bottom: 26, containLabel: false},
+            xAxis: {type: 'category', data: day.hours.map((row) => t('{hour} Uhr', {hour: row.hour})), ...axisStyle(colors), splitLine: {show: false}, axisLabel: {color: colors.text, fontSize: scaledFont(11), hideOverlap: true}, axisPointer: {type: 'none'}},
+            yAxis: {type: 'value', min: -50, max: 50, interval: 25, ...axisStyle(colors), axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => `${value + 100} %`}},
+            tooltip: {
+              trigger: 'axis', confine: true, backgroundColor: colors.surface, borderColor: colors.grid,
+              textStyle: {color: colors.ink, fontSize: scaledFont(12)},
+              formatter: (params) => {
+                const row = day.hours[params[0].dataIndex];
+                return `<b>${escapeHtml(t('{hour} Uhr', {hour: row.hour}))}</b><br>${escapeHtml(num(row.ratio * 100, 0))} % ${escapeHtml(t('der Erwartung'))}`;
+              },
+            },
             series: [{
-              type: 'bar', barMaxWidth: 24, itemStyle: {color: colors.cur},
-              data: data.hours.map((row) => Math.round(row.ratio * 100)),
-              markLine: {silent: true, symbol: 'none', lineStyle: {color: colors.faint, type: 'dashed'}, label: {show: false}, data: [{yAxis: 100}]},
+              type: 'bar', barMaxWidth: 26,
+              data: day.hours.map((row) => {
+                const deviation = Math.round(row.ratio * 100) - 100;
+                return {
+                  value: deviation,
+                  itemStyle: {color: deviation < -limit ? warn : colors.cur},
+                  label: Math.abs(deviation) >= limit * 0.4
+                    ? {show: true, position: deviation >= 0 ? 'top' : 'bottom', color: colors.text, fontSize: scaledFont(11), formatter: () => `${deviation + 100} %`}
+                    : {show: false},
+                };
+              }),
+              markArea: {silent: true, itemStyle: {color: good, opacity: 0.12}, data: [[{yAxis: -limit}, {yAxis: limit}]]},
+              markLine: {silent: true, symbol: 'none', lineStyle: {color: good, type: 'solid', width: 1.5}, label: {show: false}, data: [{yAxis: 0}]},
             }],
           }, true);
           requestAnimationFrame(() => chart.resize());

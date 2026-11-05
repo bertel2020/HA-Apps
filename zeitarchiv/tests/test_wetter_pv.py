@@ -76,3 +76,13 @@ def test_ratio_by_hour_exposes_a_systematic_morning_shortfall() -> None:
     result = pv.evaluate(pairs, shown)
     ratio = {row["hour"]: row["ratio"] for row in result["hours"]}
     assert ratio[8] < 0.6 and ratio[12] == pytest.approx(1.0, abs=0.02)
+
+
+def test_each_day_carries_its_hourly_ratio_and_skips_hours_with_tiny_expectation() -> None:
+    bad = DAY0 + timedelta(days=30)
+    pairs = _pairs(31, {bad: 0.6})
+    pairs += [(DAY0 + timedelta(days=o), 7, 3000.0, 0.01) for o in range(31)]  # Dämmerungsstunde: Erwartung 0,01 kW
+    row = {r["date"]: r for r in pv.evaluate(pairs, [bad])["days"]}[bad.isoformat()]
+    hours = {entry["hour"]: entry["ratio"] for entry in row["hours"]}
+    assert 7 not in hours  # Erwartung unter 5 % der Spitze
+    assert all(ratio == pytest.approx(0.6, abs=0.01) for hour, ratio in hours.items() if hour >= 8)

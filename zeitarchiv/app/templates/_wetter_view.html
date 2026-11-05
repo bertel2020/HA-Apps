@@ -276,11 +276,21 @@
       <h2 class="wt-h2">{{ _("PV und Helligkeit") }} <span class="wt-badge">{{ _("experimentell") }}</span> {{ hint_button(_("PV und Helligkeit")) }}</h2>
       {% call hint_body() %}{{ _("Die Erwartung wird aus den letzten 28 Tagen gelernt: je Helligkeitsstufe der Median der Stundenleistung. Die Karte zeigt, ob der Tagesertrag dazu passt; sie ist eine Messung, keine Prognose. Eine Abweichung über 15 % wird markiert, aber nur an Tagen mit nennenswerter Erwartung. Temperatur, Abregelung und ein voller Akku senken die Leistung, ohne dass die Anlage schlechter wird. Der Süd-Sensor misst an einem Punkt, im Sommer sättigt er mittags (98.800 lx), dann sagt die Helligkeit über die Leistung nur noch wenig. Das Verhältnis nach Uhrzeit zeigt, ob die Anlage morgens oder abends systematisch abweicht (Ausrichtung der Module, Verschattung).") }}{% endcall %}
     </div>
-    <p class="wt-headline" x-show="pv" x-text="pvHead()"></p>
-    <div class="wt-chart" x-show="pv" x-ref="pvChart"></div>
-    <h3 class="wt-h3" x-show="pv && pv.hours.length">{{ _("Verhältnis nach Uhrzeit") }}</h3>
-    <div class="wt-chart wt-chart-short" x-show="pv && pv.hours.length" x-ref="pvHourChart"></div>
-    <p class="hint hint-status" x-show="pv && pv.hours.length" x-text="pvHourNote()"></p>
+    <div class="wt-pv-status" x-show="pv" x-cloak>
+      <span class="wt-pv-chip" :data-kind="pvStatus().kind" x-text="pvStatus().chip"></span>
+      <span class="wt-pv-text" x-text="pvStatus().text"></span>
+    </div>
+    <div class="wt-pv-legend" x-show="pv" x-cloak>
+      <span><i class="wt-pv-sw" data-kind="actual"></i>{{ _("Ertrag") }}</span>
+      <span><i class="wt-pv-sw" data-kind="expected"></i>{{ _("Erwartet nach Helligkeit") }}</span>
+      <span x-show="pvHas('low')"><i class="wt-pv-sw" data-kind="low"></i><span x-text="pv ? t('mehr als {limit} % darunter', {limit: pv.limit}) : ''"></span></span>
+      <span x-show="pvHas('high')"><i class="wt-pv-sw" data-kind="high"></i><span x-text="pv ? t('mehr als {limit} % darüber', {limit: pv.limit}) : ''"></span></span>
+    </div>
+    <div class="wt-chart wt-pv-chart" x-show="pv" x-ref="pvChart"></div>
+    <p class="hint hint-status" x-show="pv">{{ _("Ein Tag lässt sich anklicken.") }}</p>
+    <h3 class="wt-h3" x-show="pv && pvDay() && pvDay().hours.length" x-text="pvHourTitle()"></h3>
+    <div class="wt-chart wt-chart-short wt-pv-chart" x-show="pv && pvDay() && pvDay().hours.length" x-ref="pvHourChart"></div>
+    <p class="hint hint-status" x-show="pv && pvDay() && pvDay().hours.length" x-text="pvHourNote()"></p>
     <p class="hint hint-warn" x-show="pvError" x-text="pvError" x-cloak></p>
   </div>
   {% endif %}

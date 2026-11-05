@@ -25,6 +25,7 @@ MIN_DAY_HOURS = 6  # Stunden mit Erwartung, ab denen ein Tag verglichen wird
 DEVIATION_LIMIT = 0.15  # darüber (nach oben oder unten) wird der Tag markiert
 MIN_EXPECTED_PEAK_HOURS = 1.5  # Erwartung mindestens so viele Volllaststunden der Anlage, sonst ist die Abweichung zu zufällig
 MIN_RATIO_DAYS = 5  # Tage je Uhrzeit für das Verhältnis nach Uhrzeit
+MIN_HOUR_EXPECTED_SHARE = 0.05  # Stunden mit weniger Erwartung (Anteil der Spitze) zeigen kein Verhältnis: es wäre Rauschen
 
 
 def bin_of(lux: float) -> int:
@@ -83,6 +84,11 @@ def evaluate(pairs: list[tuple[date, int, float, float]], show_days: list[date])
             "date": day.isoformat(), "actual": round(actual, 2), "expected": round(expected, 2),
             "deviation": round(deviation * 100, 1),
             "flagged": expected >= min_expected and abs(deviation) > DEVIATION_LIMIT,
+            # Verhältnis je Stunde dieses Tages, für die Anzeige des gewählten Tages.
+            "hours": [
+                {"hour": hour, "ratio": round(power / reference, 3)}
+                for hour, power, reference in sorted(counted) if reference >= peak * MIN_HOUR_EXPECTED_SHARE
+            ],
         })
         for hour, power, reference in counted:
             hour_actual[hour] += power
