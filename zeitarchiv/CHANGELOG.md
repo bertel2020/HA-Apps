@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased
+
+### Neu
+
+- **Wetterdashboard**: Ein Klick auf eine Kachel im Tagesbild öffnet den Tag im
+  Detail.
+  - Helligkeitsverlauf mit der Sonnen-Schwelle
+  - Temperatur, Niederschlag und Wind des Tages, soweit zugeordnet
+  - „Als Stichtag setzen“ übernimmt den Tag für die ganze Seite
+
+### Behoben
+
+- Die Knöpfe am Ende von Dialogen im Wetter- und Energiedashboard sowie in der
+  Migration saßen ohne Abstand nebeneinander
+
+---
+
+### English
+
+#### New
+
+- **Weather dashboard**: Clicking a tile in the day overview opens the day in
+  detail.
+  - Light curve with the sun threshold
+  - Temperature, precipitation and wind of the day, where assigned
+  - "Set as reference day" applies the day to the whole page
+
+#### Fixed
+
+- The buttons at the bottom of dialogs in the weather and energy dashboards and
+  in the migration had no gap between them
+
 ## 1.30.0 - 2026-11-05
 
 ### Neu
