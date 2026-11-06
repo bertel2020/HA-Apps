@@ -212,6 +212,7 @@
       hasDayimage: false,
       dayimage: null,
       dayimageError: '',
+      dayDlg: null,          // Dialog zu einer Tagesbild-Kachel: {cell, loading, error, data}
       hasDaylight: false,
       daylight: null,
       daylightError: '',
@@ -828,9 +829,8 @@
         return text;
       },
 
-      drawSunhours() {
-        const data = this.sunhours;
-        const element = this.$refs.sunChart;
+      // Ohne Argumente der Verlauf des Stichtags (Wind & Sonne); der Tagesbild-Dialog zeichnet seinen eigenen Tag.
+      drawSunhours(data = this.sunhours, element = this.$refs.sunChart, key = 'sunhours') {
         if (!data || !element || !data.hours.length) return;
         const colors = palette();
         const byStart = new Map(data.hours.map((row) => [row[0], row]));
@@ -840,7 +840,7 @@
           points.push([(stamp + 1800) * 1000, row ? row[1] : null]);
         }
         const peak = Math.max(data.threshold * 1.2, ...data.hours.map((row) => row[1]));
-        const chart = chartFor('sunhours', element);
+        const chart = chartFor(key, element);
         chart.setOption({
           animation: false, grid: gridFor(element, {top: 16, right: 12}),
           xAxis: {
@@ -1103,8 +1103,67 @@
         return parts.length ? t('Die letzten {n} Tage: {parts}', {n: data.days.length, parts: parts.join(' · ')}) : '';
       },
 
-      pickDay(cell) {
+      // Ein Klick auf die Kachel öffnet den Dialog zum Tag; der Stichtag wird erst dort gesetzt.
+      async openDay(cell) {
+        this.dayDlg = {cell, loading: true, error: '', data: null};
+        this.$nextTick(() => this.$refs.dayDlg.showModal());
+        try {
+          const data = await this.fetchJson(`wetterdashboard/tagesbild/tag?date=${encodeURIComponent(cell.date)}`);
+          if (!this.dayDlg || this.dayDlg.cell.date !== cell.date) return;  // inzwischen geschlossen oder ein anderer Tag
+          this.dayDlg = {cell, loading: false, error: '', data};
+          this.$nextTick(() => this.drawSunhours(data.sun, this.$refs.dayChart, 'dayimage'));
+        } catch (e) {
+          if (this.dayDlg && this.dayDlg.cell.date === cell.date) {
+            this.dayDlg = {cell, loading: false, error: t('Der Tag konnte nicht geladen werden.'), data: null};
+          }
+        }
+      },
+
+      closeDay() {
+        if (this.$refs.dayDlg.open) this.$refs.dayDlg.close();
+      },
+
+      onDayClose() {
+        if (charts.dayimage) { charts.dayimage.dispose(); delete charts.dayimage; }
+        if (observers.dayimage) { observers.dayimage.disconnect(); delete observers.dayimage; }
+        this.dayDlg = null;
+      },
+
+      // Der Stichtag-Knopf des Dialogs: gewählt ist der Tag, wenn er der Stichtag ist (heute: kein Stichtag gesetzt).
+      dayDlgAction() {
+        const cell = this.dayDlg && this.dayDlg.cell;
+        if (!cell) return null;
+        if (cell.picked) return cell.today ? null : {label: t('Zurück zu heute'), today: true};
+        return {label: cell.today ? t('Zurück zu heute') : t('Als Stichtag setzen'), today: cell.today};
+      },
+
+      applyDay() {
+        const cell = this.dayDlg.cell;
         Alpine.store('dashStichtag').set(cell.today ? null : cell.date);
+        this.closeDay();
+      },
+
+      dayDlgTitle() {
+        const cell = this.dayDlg && this.dayDlg.cell;
+        return cell ? cell.label : '';
+      },
+
+      // Eckwerte des Tages: nur, was die belegten Rollen liefern.
+      dayDlgFacts() {
+        const c = this.dayDlg && this.dayDlg.data && this.dayDlg.data.conditions;
+        if (!c) return [];
+        const facts = [];
+        if (c.temp) {
+          const d = c.temp.decimals;
+          facts.push({label: t('Temperatur'), value: `${num(c.temp.min, d)} … ${num(c.temp.max, d)} ${c.temp.unit}`.trim(), sub: t('Tiefst- und Höchstwert')});
+        }
+        if (c.rain) {
+          const mm = c.rain.mm != null ? `${num(c.rain.mm, 1)} ${c.rain.mm_unit}`.trim() : null;
+          const minutes = c.rain.minutes != null ? t('{n} min', {n: num(c.rain.minutes, 0)}) : null;
+          facts.push({label: t('Niederschlag'), value: mm || minutes, sub: mm && minutes ? minutes : ''});
+        }
+        if (c.wind) facts.push({label: t('Wind'), value: `${num(c.wind.kmh, 0)} km/h`, sub: t('Maximum, Stärke {bft}', {bft: c.wind.bft})});
+        return facts;
       },
 
       async loadDaylight() {

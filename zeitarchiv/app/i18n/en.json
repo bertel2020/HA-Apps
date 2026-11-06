@@ -3472,7 +3472,7 @@
     "Keine Entität für „Helligkeit“ zugeordnet.": "No entity assigned for “Illuminance”.",
     "Sonnenstunden": "Hours of sunshine",
     "Die Kurve zeigt das Stundenmittel der Süd-Helligkeit. Hinterlegt sind die Stunden über der Sonnen-Schwelle; sie zählen als Sonnenscheindauer. Das ist kein offizieller Wert des Wetterdienstes (der DWD zählt ab 120 W/m² direkter Strahlung, und die Station trennt direktes und diffuses Licht nicht). Der Süd-Sensor sättigt bei 98.800 lx. Die Schwelle steht in der Einrichtung.": "The curve shows the hourly mean of the south brightness. The hours above the sun threshold are shaded; they count as sunshine duration. This is not an official weather service value (the DWD counts from 120 W/m² of direct radiation, and the station does not separate direct and diffuse light). The south sensor saturates at 98,800 lx. The threshold is set in the setup.",
-    "Jede Karte ist ein Tag. Der Sonnenanteil ist die Zeit über der Sonnen-Schwelle geteilt durch die hellen Stunden des Tages (Dämmerungssensor ab der Tag-Schwelle): sonnig ab 50 %, wechselhaft ab 20 %, sonst trüb. Tage mit weniger als drei hellen Stunden oder ohne Werte bleiben leer. Ein Klick wählt den Tag aus. Das ist kein Wert des Wetterdienstes: Die Station trennt direktes und diffuses Licht nicht.": "Each card is one day. The sun share is the time above the sun threshold divided by the bright hours of the day (twilight sensor from the day threshold): sunny from 50 %, changeable from 20 %, otherwise overcast. Days with fewer than three bright hours or without values stay empty. A click selects the day. This is not an official weather service value: the station does not separate direct and diffuse light.",
+    "Jede Karte ist ein Tag. Der Sonnenanteil ist die Zeit über der Sonnen-Schwelle geteilt durch die hellen Stunden des Tages (Dämmerungssensor ab der Tag-Schwelle): sonnig ab 50 %, wechselhaft ab 20 %, sonst trüb. Tage mit weniger als drei hellen Stunden oder ohne Werte bleiben leer. Ein Klick öffnet den Tag mit Helligkeitsverlauf und Eckwerten; dort lässt er sich als Stichtag setzen. Das ist kein Wert des Wetterdienstes: Die Station trennt direktes und diffuses Licht nicht.": "Each card is one day. The sun share is the time above the sun threshold divided by the bright hours of the day (twilight sensor from the day threshold): sunny from 50 %, changeable from 20 %, otherwise overcast. Days with fewer than three bright hours or without values stay empty. A click opens the day with its light curve and key figures; there it can be set as the reference day. This is not an official weather service value: the station does not separate direct and diffuse light.",
     "sonnig": "sunny",
     "wechselhaft": "changeable",
     "trüb": "overcast",
@@ -3697,7 +3697,11 @@
     "Ladestand": "State of charge",
     "Ø Ladestand": "Avg. state of charge",
     "PP": "pp",
-    "Energie: Speicher": "Energy: storage"
+    "Energie: Speicher": "Energy: storage",
+    "Wird geladen …": "Loading …",
+    "Helligkeit, Stundenmittel": "Brightness, hourly mean",
+    "Eckwerte des Tages": "Key figures of the day",
+    "Für diesen Tag liegen keine Werte vor.": "There are no values for this day."
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4647,6 +4651,11 @@
     "{from} bis heute": "{from} to today",
     "{from} bis {to}": "{from} to {to}",
     "Rekorde erscheinen, sobald ein Jahr Daten vorliegt.": "Records appear once a year of data is available.",
-    "Keine Veränderungen zum Vorjahr gefunden.": "No changes compared with the previous year found."
+    "Keine Veränderungen zum Vorjahr gefunden.": "No changes compared with the previous year found.",
+    "Der Tag konnte nicht geladen werden.": "The day could not be loaded.",
+    "Als Stichtag setzen": "Set as reference day",
+    "Tiefst- und Höchstwert": "Low and high",
+    "Maximum, Stärke {bft}": "Maximum, force {bft}",
+    "Niederschlag": "Precipitation"
   }
 }

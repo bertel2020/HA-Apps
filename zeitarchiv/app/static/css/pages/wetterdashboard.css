@@ -47,6 +47,24 @@
   .wt-day[data-class="none"] .wt-day-pill{color:var(--ink-faint);background:transparent;padding-left:0;}
   .wt-day-bar{align-self:stretch;height:6px;border-radius:3px;background:var(--border);overflow:hidden;}
   .wt-day-bar i{display:block;height:100%;background:var(--chart-7);}
+  .wt-day-dialog{width:min(560px, calc(100vw - 32px));--dialog-accent:var(--border-strong);}
+  .wt-day-dialog[data-class="sunny"]{--dialog-accent:var(--chart-7);}
+  .wt-day-dialog[data-class="overcast"]{--dialog-accent:var(--ink-faint);}
+  .wt-day-dialog::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;border-radius:14px 14px 0 0;background:var(--dialog-accent);}
+  .wt-day-dialog .wt-day-pill[data-class="sunny"]{background:color-mix(in srgb, var(--chart-7) 38%, var(--surface));}
+  .wt-day-dialog .wt-day-pill[data-class="mixed"]{background:color-mix(in srgb, var(--chart-7) 16%, var(--surface));}
+  .wt-day-dialog .wt-day-pill[data-class="overcast"]{background:color-mix(in srgb, var(--ink-faint) 24%, var(--surface));}
+  .wt-day-dialog .wt-day-pill[data-class="none"]{color:var(--ink-faint);background:transparent;padding-left:0;}
+  .wt-day-dialog-sub{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin-top:6px;}
+  .wt-day-dialog-label{margin:16px 0 6px;font-size:calc(12px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);}
+  .wt-day-dialog .wt-day-bar{height:8px;}
+  .wt-day-dialog .wt-chart{height:220px;}
+  .wt-day-facts{display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:8px;}
+  .wt-day-fact{display:flex;flex-direction:column;gap:2px;min-width:0;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--surface-alt);}
+  .wt-day-fact-label{font-size:calc(11.5px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-muted);}
+  .wt-day-fact-value{font-size:calc(17px * var(--font-scale, 1));font-weight:600;font-variant-numeric:tabular-nums;}
+  .wt-day-fact-sub{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+  @media (max-width:480px){.wt-day-dialog .wt-dialog-footer{flex-direction:column-reverse;}.wt-day-dialog .wt-dialog-footer .btn{width:100%;}}
   .wt-day-sub{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);font-variant-numeric:tabular-nums;}
   .wt-chart-tall{height:360px;}
   .wt-chart-short{height:200px;}

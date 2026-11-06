@@ -159,12 +159,12 @@
   <div class="card wt-card" data-wt-dayimage x-show="dayimage || dayimageError" x-cloak>
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Tagesbild") }} {{ hint_button(_("Tagesbild")) }}</h2>
-      {% call hint_body() %}{{ _("Jede Karte ist ein Tag. Der Sonnenanteil ist die Zeit über der Sonnen-Schwelle geteilt durch die hellen Stunden des Tages (Dämmerungssensor ab der Tag-Schwelle): sonnig ab 50 %, wechselhaft ab 20 %, sonst trüb. Tage mit weniger als drei hellen Stunden oder ohne Werte bleiben leer. Ein Klick wählt den Tag aus. Das ist kein Wert des Wetterdienstes: Die Station trennt direktes und diffuses Licht nicht.") }}{% endcall %}
+      {% call hint_body() %}{{ _("Jede Karte ist ein Tag. Der Sonnenanteil ist die Zeit über der Sonnen-Schwelle geteilt durch die hellen Stunden des Tages (Dämmerungssensor ab der Tag-Schwelle): sonnig ab 50 %, wechselhaft ab 20 %, sonst trüb. Tage mit weniger als drei hellen Stunden oder ohne Werte bleiben leer. Ein Klick öffnet den Tag mit Helligkeitsverlauf und Eckwerten; dort lässt er sich als Stichtag setzen. Das ist kein Wert des Wetterdienstes: Die Station trennt direktes und diffuses Licht nicht.") }}{% endcall %}
     </div>
     <p class="wt-headline" x-show="dayimage" x-text="dayimageHead()"></p>
     <div class="wt-days" x-show="dayimage" role="list">
       <template x-for="cell in dayimageCells()" :key="cell.date">
-        <button type="button" role="listitem" class="wt-day" :class="{'is-today': cell.today, 'is-picked': cell.picked}" :data-class="cell.class || 'none'" :title="cell.title" @click="pickDay(cell)">
+        <button type="button" role="listitem" class="wt-day" :class="{'is-today': cell.today, 'is-picked': cell.picked}" :data-class="cell.class || 'none'" :title="cell.title" @click="openDay(cell)" aria-haspopup="dialog">
           <span class="wt-day-date" x-text="cell.label"></span>
           <span class="wt-day-pill" x-text="cell.kindName"></span>
           <span class="wt-day-bar"><i :style="'width:' + cell.percent + '%'"></i></span>
@@ -173,6 +173,53 @@
       </template>
     </div>
     <p class="hint hint-warn" x-show="dayimageError" x-text="dayimageError" x-cloak></p>
+
+    <dialog class="detail-dialog wt-item-dialog wt-day-dialog" x-ref="dayDlg" :data-class="dayDlg && dayDlg.cell.class || 'none'" @click="if ($event.target === $el) $el.close()" @close="onDayClose()">
+      <template x-if="dayDlg">
+        <div>
+          <div class="detail-dialog-header">
+            <div>
+              <h2 x-text="dayDlgTitle()"></h2>
+              <div class="wt-day-dialog-sub">
+                <span class="wt-day-pill" :data-class="dayDlg.cell.class || 'none'" x-text="dayDlg.cell.kindName"></span>
+                <span class="wt-day-sub" x-text="dayDlg.cell.sub"></span>
+              </div>
+            </div>
+            <button type="button" class="btn" @click="closeDay()" aria-label="{{ _('Schließen') }}">✕</button>
+          </div>
+          <div class="wt-day-bar" x-show="dayDlg.cell.class"><i :style="'width:' + dayDlg.cell.percent + '%'"></i></div>
+          <p class="hint" x-show="dayDlg.loading">{{ _("Wird geladen …") }}</p>
+          <p class="hint hint-warn" x-show="dayDlg.error" x-text="dayDlg.error" x-cloak></p>
+          <template x-if="dayDlg.data">
+            <div>
+              <h3 class="wt-day-dialog-label">{{ _("Helligkeit, Stundenmittel") }}</h3>
+              <p class="hint" x-show="!dayDlg.data.sun.hours.length" x-cloak>{{ _("Für diesen Tag liegen keine Werte vor.") }}</p>
+              <div class="wt-chart" x-show="dayDlg.data.sun.hours.length" x-ref="dayChart"></div>
+              <template x-if="dayDlgFacts().length">
+                <div>
+                  <h3 class="wt-day-dialog-label">{{ _("Eckwerte des Tages") }}</h3>
+                  <div class="wt-day-facts">
+                    <template x-for="fact in dayDlgFacts()" :key="fact.label">
+                      <div class="wt-day-fact">
+                        <span class="wt-day-fact-label" x-text="fact.label"></span>
+                        <span class="wt-day-fact-value" x-text="fact.value"></span>
+                        <span class="wt-day-fact-sub" x-text="fact.sub" x-show="fact.sub"></span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+          <div class="wt-dialog-footer">
+            <button type="button" class="btn" @click="closeDay()">{{ _("Schließen") }}</button>
+            <template x-if="dayDlgAction()">
+              <button type="button" class="btn primary" @click="applyDay()" x-text="dayDlgAction().label"></button>
+            </template>
+          </div>
+        </div>
+      </template>
+    </dialog>
   </div>
   {% endif %}
 

@@ -1163,6 +1163,44 @@ def test_dayimage_card_and_route_through_the_app(client) -> None:
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
 
 
+def test_dayimage_detail_combines_the_light_curve_and_the_key_figures_of_the_day(service) -> None:
+    _add(service, "sensor.lux_sued", "sensor", "measurement", "lx", [(_ts(18, hour, 30), 60000.0) for hour in range(9, 14)])
+    _add(service, "sensor.t_aussen", "sensor", "measurement", "°C", [(_ts(18, 6, 30), 3.0), (_ts(18, 14, 30), 11.5)])
+    _configure(service, temperature="sensor.t_aussen", illuminance="sensor.lux_sued")
+    data = service.compute_dayimage_detail("2026-08-18", NOW)
+    assert data["sun"]["date"] == "2026-08-18" and data["sun"]["sun_hours"] == pytest.approx(5.0)
+    assert len(data["sun"]["hours"]) == 5 and data["sun"]["threshold"] == 25000.0
+    assert data["conditions"]["date"] == "2026-08-18"
+    assert data["conditions"]["temp"]["min"] == pytest.approx(3.0) and data["conditions"]["temp"]["max"] == pytest.approx(11.5)
+
+
+def test_dayimage_detail_accepts_today_and_needs_the_illuminance_role(service) -> None:
+    assert service.compute_dayimage_detail("2026-08-18", NOW) is None
+    _add(service, "sensor.lux_sued", "sensor", "measurement", "lx", [(_ts(19, 9, 30), 60000.0)])
+    _add(service, "sensor.t_aussen", "sensor", "measurement", "°C", [(_ts(19, 8, 30), 7.0)])
+    _configure(service, temperature="sensor.t_aussen", illuminance="sensor.lux_sued")
+    now = datetime(2026, 8, 19, 15, 0, tzinfo=TZ)
+    today = now.date().isoformat()
+    data = service.compute_dayimage_detail(today, now)
+    assert data["sun"]["date"] == today and data["conditions"]["date"] == today  # heute zählt als Tag („bisher“)
+    assert data["conditions"]["temp"]["min"] == pytest.approx(7.0)  # auch nur mit Temperatur gibt es Eckwerte
+
+
+def test_dayimage_detail_route_and_dialog_markup(client) -> None:
+    from app.main import index
+
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    index.get_or_create_entity("sensor.td_temp", "sensor", "measurement", "°C")
+    index.get_or_create_entity("sensor.td_lux", "sensor", "measurement", "lx")
+    base = {"temperature": "sensor.td_temp", "illuminance": "sensor.td_lux"}
+    assert client.post("/wetterdashboard/setup", data=base).status_code == 200
+    page = client.get("/wetterdashboard").text
+    assert 'x-ref="dayDlg"' in page and 'openDay(cell)' in page and "pickDay" not in page
+    assert client.get("/wetterdashboard/tagesbild/tag?date=2026-01-05").status_code == 200
+    assert client.get("/wetterdashboard/tagesbild/tag?date=kaputt").status_code == 400
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
 def test_card_availability_follows_the_assigned_roles() -> None:
     config = wetter_routes._empty_config()
     assert not any(wetter_routes.card_available(key, config) for key in wetter_routes.CARD_KEYS)

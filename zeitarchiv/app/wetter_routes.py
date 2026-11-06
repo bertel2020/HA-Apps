@@ -1102,6 +1102,16 @@ class WetterService:
             return None
         return {"tz": str(self.deps.tz), "days": out, "counts": counts, "threshold": config["sun_threshold_lx"]}
 
+    def compute_dayimage_detail(self, at: str, now_local: datetime | None = None) -> dict | None:
+        """Einzelner Tag aus dem Tagesbild für den Dialog: Helligkeitsverlauf mit den Stunden über der Sonnen-Schwelle
+        (wie „Sonnenstunden“) und die Eckwerte des Tages (Temperatur, Regen, Wind, soweit Rollen belegt sind)."""
+        now_local = now_local or datetime.now(self.deps.tz)
+        sun = self.compute_sunhours(at, now_local)
+        if sun is None:
+            return None
+        conditions = self.compute_conditions_day(sun["date"], now_local, include_today=True)
+        return {"sun": sun, "conditions": conditions}
+
     def compute_pv(self, now_local: datetime | None = None, days: int = PV_DAYS) -> dict | None:
         """PV-Ertrag gegen Helligkeit der letzten abgeschlossenen Tage (Regeln siehe ``wetter_pv``); ``None`` ohne beide Rollen.
 
@@ -1451,13 +1461,14 @@ class WetterService:
             "light": light,
         }
 
-    def compute_conditions_day(self, at: str, now_local: datetime | None = None) -> dict | None:
+    def compute_conditions_day(self, at: str, now_local: datetime | None = None, include_today: bool = False) -> dict | None:
         """Wetter eines vergangenen Tages als Zusammenfassung: häufigste Himmelsklasse und Sonnenstunden, stärkster
         Wind, Regenmenge und -dauer, Tiefst- und Höchstwert. Ein „Jetzt“ gibt es dort nicht (am Tagesende ist
-        immer Nacht); fehlt eine Rolle oder haben ihre Werte keine Zeilen, fehlt ihr Teil."""
+        immer Nacht); fehlt eine Rolle oder haben ihre Werte keine Zeilen, fehlt ihr Teil. Mit ``include_today`` gilt
+        auch der heutige Tag (bisher) als Tag statt als „jetzt“."""
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
-        stichtag = parse_stichtag(at, now_local.date())
+        stichtag = parse_stichtag(at, now_local.date() + timedelta(days=1) if include_today else now_local.date())
         if stichtag is None:
             return None
         tz = self.deps.tz
@@ -1535,7 +1546,7 @@ class WetterService:
                     "decimals": _decimals(entity, "temperature"),
                 }
 
-        if sky is None and wind is None and rain is None:
+        if sky is None and wind is None and rain is None and temp is None:
             return None
         return {"mode": "day", "date": stichtag.isoformat(), "tz": str(tz), "sky": sky, "wind": wind, "rain": rain, "temp": temp}
 
@@ -1877,6 +1888,14 @@ class WetterService:
         def wetterdashboard_dayimage() -> dict:
             _require_configured()
             data = self.compute_dayimage()
+            if data is None:
+                raise HTTPException(status_code=409, detail=tr("Keine Helligkeitswerte für das Tagesbild vorhanden."))
+            return data
+
+        @router.get("/wetterdashboard/tagesbild/tag")
+        def wetterdashboard_dayimage_day(date: str) -> dict:
+            _require_configured()
+            data = self.compute_dayimage_detail(date)
             if data is None:
                 raise HTTPException(status_code=409, detail=tr("Keine Helligkeitswerte für das Tagesbild vorhanden."))
             return data
