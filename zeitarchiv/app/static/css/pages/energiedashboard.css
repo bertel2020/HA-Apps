@@ -1023,7 +1023,7 @@
   /* "Entfernen"-Button nutzt bewusst die app-weite .btn-danger-Klasse (siehe
      app.css) statt einer eigenen Farbe — dieselbe Bestätigung wie beim
      Gruppen-Löschen (window.appConfirm, siehe removeRow() im Root-x-data). */
-  .edash-dialog-footer{display:flex;justify-content:flex-end;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);}
+  .edash-dialog-footer{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);}
 
   /* Feld-Erklärungen einmal zentral über den Kacheln (siehe Template) statt
      in jeder Karte wiederholt — bei mehreren Speichern stünde derselbe

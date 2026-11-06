@@ -83,7 +83,7 @@
 .migrate-radio strong{display:block;font-size:calc(13px * var(--font-scale, 1));}
 .migrate-radio-hint{display:block;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
 
-.migrate-footer-row{display:flex;justify-content:space-between;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);}
+.migrate-footer-row{display:flex;justify-content:space-between;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid var(--border);}
 
 /* Ergebnis-Ansicht nach erfolgreicher Übertragung (kein eigener
    Stepper-Schritt, siehe entity_migrate.js showResult() — löst den
