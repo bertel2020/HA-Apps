@@ -766,6 +766,42 @@ def query_hourly_counter_series(
 #: Sonst entstünden Frosttage, Rekorde und Tagesmittel aus Lückentagen (ROADMAP 1.43).
 DAILY_MIN_HOURS = 18
 
+#: Messwerte werden nur bei Änderung gespeichert: Bleibt der Wert (etwa bei Frost um 0 °C und ganzen
+#: Grad) stundenlang gleich, gibt es für diese Stunden keine Zeile, obwohl er galt. Für die Tageswerte
+#: gilt ein Wert deshalb höchstens so viele Stunden über seine eigene hinaus weiter. Längere Stille
+#: bleibt Lücke, damit ein Ausfall nicht als gleichbleibende Temperatur erscheint.
+DAILY_CARRY_HOURS = 12
+
+
+def _carry_forward_hours(
+    rows: list[rollup.FineRow], window_end_ts: float, now_ts: float, max_hours: int = DAILY_CARRY_HOURS,
+) -> list[rollup.FineRow]:
+    """Ergänzt Stundenzeilen ohne Änderung um den zuletzt bekannten Wert (höchstens ``max_hours`` Stunden).
+
+    Es wird nie über die nächste echte Zeile, das Fensterende oder die aktuelle Stunde hinaus ergänzt.
+    Angenommen wird der Stunden-Ø der letzten Zeile (der letzte Rohwert steckt nicht im Rollup); Min und
+    Max der ergänzten Stunde sind dieser Wert."""
+    filled: list[rollup.FineRow] = []
+    last: rollup.FineRow | None = None
+    for row in sorted(rows, key=lambda r: r.bucket_start):
+        if row.value is None:
+            continue
+        if last is not None:
+            for step in range(1, max_hours + 1):
+                slot = last.bucket_start + step * 3600.0
+                if slot >= row.bucket_start:
+                    break
+                filled.append(rollup.FineRow(bucket_start=slot, value=last.value, min_value=last.value, max_value=last.value))
+        filled.append(row)
+        last = row
+    if last is not None:
+        for step in range(1, max_hours + 1):
+            slot = last.bucket_start + step * 3600.0
+            if slot >= window_end_ts or slot > now_ts:
+                break
+            filled.append(rollup.FineRow(bucket_start=slot, value=last.value, min_value=last.value, max_value=last.value))
+    return filled
+
 
 @dataclass(frozen=True)
 class DailyPoint:
@@ -808,6 +844,8 @@ def _daily_points(
     # je zehn Jahre, deshalb nicht zweimal berechnen (einmal zum Zählen, einmal in der Verdichtung).
     key_fn = rollup.named_bucket_key(tz, "tag")
     is_switch = aggregation_type == "switch"
+    if not is_switch:
+        rows = _carry_forward_hours(rows, window_end.timestamp(), now_local.timestamp())
     grouped: dict[float, list[rollup.FineRow]] = {}
     for row in rows:
         if (row.on_seconds is None) if is_switch else (row.value is None):

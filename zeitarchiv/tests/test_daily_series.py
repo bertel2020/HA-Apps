@@ -59,8 +59,9 @@ def test_measurement_days_aggregate_hours_and_flag_thin_days(env) -> None:
     start = datetime(2026, 10, 1, tzinfo=TZ)
     rows = []
     for day in range(31):
-        # 1. Oktober: nur 17 Stunden Werte (zu dünn); alle anderen Tage voll. Wert = Tagesnummer + Stunde/100.
-        hours = 17 if day == 0 else 24
+        # 1. Oktober: nur 5 Stunden Werte; mit der Fortschreibung (12 h) bleiben 17 Stunden, das ist zu dünn.
+        # Alle anderen Tage voll. Wert = Tagesnummer + Stunde/100.
+        hours = 5 if day == 0 else 24
         for hour in range(hours):
             ts = (start + timedelta(days=day, hours=hour)).timestamp()
             rows.append(rollup.FineRow(bucket_start=ts, value=day + hour / 100, min_value=day - 1.0, max_value=day + 1.0))
@@ -80,13 +81,56 @@ def test_exactly_the_minimum_number_of_hours_counts_as_covered(env) -> None:
     tmp, index = env
     index.get_or_create_entity("sensor.t", "sensor", "measurement", "°C")
     start = datetime(2026, 10, 1, tzinfo=TZ)
+    # Sechs Stunden mit Wert plus zwölf fortgeschriebene ergeben genau die Mindestzahl.
+    real = query.DAILY_MIN_HOURS - query.DAILY_CARRY_HOURS
     rows = [
         rollup.FineRow(bucket_start=(start + timedelta(hours=hour)).timestamp(), value=5.0, min_value=5.0, max_value=5.0)
-        for hour in range(query.DAILY_MIN_HOURS)
+        for hour in range(real)
     ]
     rollup._append_table(rollup.rollup_path(tmp, "sensor.t", "stunde"), rollup._fine_rows_to_table(rows, "standard"), "2026-10")
     (point,) = query.query_daily_series(tmp, index, "sensor.t", start, datetime(2026, 10, 2, tzinfo=TZ), TZ, NOW)
     assert (point.hours, point.covered) == (query.DAILY_MIN_HOURS, True)
+
+
+def _write_hours(tmp: Path, hours: list[tuple[datetime, float]]) -> None:
+    rows = [rollup.FineRow(bucket_start=ts.timestamp(), value=v, min_value=v, max_value=v) for ts, v in hours]
+    rollup._append_table(rollup.rollup_path(tmp, "sensor.t", "stunde"), rollup._fine_rows_to_table(rows, "standard"), "2026-10")
+
+
+def test_quiet_hours_carry_the_last_value_forward(env) -> None:
+    tmp, index = env
+    index.get_or_create_entity("sensor.t", "sensor", "measurement", "°C")
+    day = datetime(2026, 10, 4, tzinfo=TZ)
+    # Wie ein Frosttag mit ganzen Graden: nur Änderungen sind gespeichert, dazwischen stundenlang Stille.
+    _write_hours(tmp, [(day.replace(hour=h), v) for h, v in ((3, 0.0), (4, 1.0), (8, 2.0), (16, 1.0), (21, -1.0), (23, 0.0))])
+    (point,) = query.query_daily_series(tmp, index, "sensor.t", day, day + timedelta(days=1), TZ, NOW)
+    assert point.covered and point.hours == 21  # Stunden 3 bis 23
+    # 3:0 | 4-7:1 | 8-15:2 | 16-20:1 | 21-22:-1 | 23:0, Stunden 0 bis 2 bleiben leer
+    assert point.value == pytest.approx((0 + 4 * 1 + 8 * 2 + 5 * 1 + 2 * -1 + 0) / 21)
+    assert (point.min_value, point.max_value) == (-1.0, 2.0)
+
+
+def test_carry_forward_stops_after_twelve_hours_and_never_bridges_an_outage(env) -> None:
+    tmp, index = env
+    index.get_or_create_entity("sensor.t", "sensor", "measurement", "°C")
+    start = datetime(2026, 10, 4, 6, tzinfo=TZ)
+    _write_hours(tmp, [(start, 3.0), (start + timedelta(days=2), 4.0)])  # zwei Tage Ausfall dazwischen
+    points = query.query_daily_series(tmp, index, "sensor.t", datetime(2026, 10, 4, tzinfo=TZ), datetime(2026, 10, 8, tzinfo=TZ), TZ, NOW)
+    by_day = {datetime.fromtimestamp(p.day_start, TZ).day: p for p in points}
+    assert sorted(by_day) == [4, 6]  # der 5. bleibt leer: 6 Uhr + 12 h endet am 4. um 18 Uhr
+    assert by_day[4].hours == 13 and not by_day[4].covered  # 6 bis 18 Uhr
+    assert by_day[6].hours == 13 and by_day[6].value == pytest.approx(3.0 * 0 + 4.0)
+
+
+def test_carry_forward_does_not_run_past_the_current_hour(env) -> None:
+    tmp, index = env
+    index.get_or_create_entity("sensor.t", "sensor", "measurement", "°C")
+    now = datetime(2026, 10, 4, 9, 30, tzinfo=TZ)
+    ts = datetime(2026, 10, 4, 8, 10, tzinfo=TZ)
+    hotbuffer.append(tmp, "sensor.t", ts.timestamp(), 2.0, TZ)  # laufender Monat: kommt aus dem Hot Buffer
+    index.record_write("sensor.t", ts.timestamp(), 2.0)
+    (point,) = query.query_daily_series(tmp, index, "sensor.t", datetime(2026, 10, 4, tzinfo=TZ), datetime(2026, 10, 5, tzinfo=TZ), TZ, now)
+    assert point.hours == 2  # 8 und 9 Uhr, nicht die Zukunft
 
 
 def test_days_without_rows_are_missing_not_zero(env) -> None:
