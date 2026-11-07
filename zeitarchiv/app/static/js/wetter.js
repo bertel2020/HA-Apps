@@ -178,6 +178,8 @@
     drop: `<svg viewBox="0 0 24 24" ${ICON_ATTR}><path d="M12 3.5c3.6 4.2 6 7.2 6 10.2a6 6 0 0 1-12 0c0-3 2.4-6 6-10.2z" fill="currentColor" fill-opacity=".16"/></svg>`,
     temp: `<svg viewBox="0 0 24 24" ${ICON_ATTR}><path d="M10 14.2V5a2 2 0 1 1 4 0v9.2a4 4 0 1 1-4 0z"/><path d="M12 9v7"/></svg>`,
     bright: `<svg viewBox="0 0 24 24" ${ICON_ATTR}><circle cx="12" cy="12" r="4" fill="currentColor" fill-opacity=".16"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8"/></svg>`,
+    humid: `<svg viewBox="0 0 24 24" ${ICON_ATTR}><path d="M12 3.5c3.6 4.2 6 7.2 6 10.2a6 6 0 0 1-12 0c0-3 2.4-6 6-10.2z" fill="currentColor" fill-opacity=".16"/><path d="M9.5 15.5l5-4M9.7 12.2h.01M14.3 15.3h.01"/></svg>`,
+    gauge: `<svg viewBox="0 0 24 24" ${ICON_ATTR}><path d="M4.5 17a8.5 8.5 0 1 1 15 0"/><path d="M12 13.5l3.6-4.2"/><circle cx="12" cy="14" r="1.4" fill="currentColor"/></svg>`,
     clock: `<svg viewBox="0 0 24 24" ${ICON_ATTR}><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>`,
   };
 
@@ -367,6 +369,15 @@
       standText() {
         if (this.tilesAt) return t('Tagesende · Tiefstwert ▼ und Höchstwert ▲ des Tages');
         return t('Stand {time}', {time: this.tilesStand}) + ' · ' + t('Tiefstwert ▼ und Höchstwert ▲ von heute');
+      },
+
+      // Icon einer Kachel nach ihrer Rolle (Zusatztemperaturen heißen „temperature:N“).
+      tileIcon(tile) {
+        const icons = {
+          temperature: 'temp', precip_mm: 'drop', precip_dur: 'rain', humidity: 'humid', pressure: 'gauge',
+          wind: 'wind', gust: 'wind', radiation: 'bright', illuminance: 'sun',
+        };
+        return icons[String(tile.key).split(':')[0]] || 'temp';
       },
 
       tileValue(tile) {
@@ -1163,6 +1174,24 @@
           facts.push({label: t('Niederschlag'), value: mm || minutes, sub: mm && minutes ? minutes : ''});
         }
         if (c.wind) facts.push({label: t('Wind'), value: `${num(c.wind.kmh, 0)} km/h`, sub: t('Maximum, Stärke {bft}', {bft: c.wind.bft})});
+        // Vierte Kachel: die erste Größe, die zugeordnet ist (Luftdruck, Luftfeuchte, Spitzenhelligkeit).
+        if (c.pressure) {
+          const p = c.pressure;
+          const trend = {rising: t('Tendenz: steigend'), falling: t('Tendenz: fallend'), steady: t('Tendenz: stabil')}[p.trend];
+          facts.push({label: t('Luftdruck'), value: `${num(p.avg, p.decimals)} ${p.unit}`.trim(), sub: trend || ''});
+        } else if (c.humidity) {
+          const h = c.humidity;
+          facts.push({
+            label: t('Luftfeuchte'), value: `Ø ${num(h.avg, h.decimals)} ${h.unit}`.trim(),
+            sub: `${num(h.min, h.decimals)} – ${num(h.max, h.decimals)} ${h.unit}`.trim(),
+          });
+        } else if (c.light) {
+          const l = c.light;
+          facts.push({
+            label: t('Spitzenhelligkeit'), value: `${num(l.max, 0)} ${l.unit}`.trim(),
+            sub: t('um {time}', {time: fmtDate(formats.hm, l.max_ts)}),
+          });
+        }
         return facts;
       },
 
@@ -1233,17 +1262,17 @@
         const basis = day.approx ? t('Stundenraster, auf eine Stunde genau') : t('Minutenwerte');
         return [
           {
-            kind: 'day', label: t('Tag ab / bis'),
+            kind: 'day', icon: 'sun', label: t('Tag ab / bis'),
             value: day.from == null ? (day.to != null && this.daylightStartedBright() ? `– / ${this.daylightClock(day.to)}` : '–') : (day.to == null ? this.daylightClock(day.from) : `${this.daylightClock(day.from)} / ${this.daylightClock(day.to)}`),
             sub: this.daylightStartedBright() ? t('Aufzeichnung ab {time}', {time: this.daylightClock(day.points[0][0])}) : basis,
           },
-          {kind: 'length', label: t('Tageslänge'), value: this.daylightDuration(day.length, day.approx), sub: t('über {n} lx', {n: num(data.day_lx, 0)})},
+          {kind: 'length', icon: 'clock', label: t('Tageslänge'), value: this.daylightDuration(day.length, day.approx), sub: t('über {n} lx', {n: num(data.day_lx, 0)})},
           {
-            kind: 'dawn', label: t('Dämmerung morgens'), value: this.daylightMinutes(day.morning, day.approx),
+            kind: 'dawn', icon: 'dusk', label: t('Dämmerung morgens'), value: this.daylightMinutes(day.morning, day.approx),
             sub: day.dawn != null ? t('ab {time} (über {n} lx)', {time: this.daylightClock(day.dawn), n: num(data.night_lx, 0)}) : '',
           },
           {
-            kind: 'dusk', label: t('Dämmerung abends'), value: this.daylightMinutes(day.evening, day.approx),
+            kind: 'dusk', icon: 'dusk', label: t('Dämmerung abends'), value: this.daylightMinutes(day.evening, day.approx),
             sub: day.dusk != null ? t('bis {time} (unter {n} lx)', {time: this.daylightClock(day.dusk), n: num(data.night_lx, 0)}) : '',
           },
         ];
@@ -1526,26 +1555,26 @@
         const kpis = [];
         const asDate = (iso) => utcDayMonth.format(new Date(iso + 'T12:00:00Z'));
         if (p.mode === 'dur') {
-          kpis.push({label: t('Regenminuten'), value: escapeHtml(num(p.total, 0)) + '<small>min</small>', sub: ''});
+          kpis.push({icon: 'rain', label: t('Regenminuten'), value: escapeHtml(num(p.total, 0)) + '<small>min</small>', sub: ''});
         }
         kpis.push({
-          label: p.mode === 'dur' ? t('Regentage (ab {n} min)', {n: num(p.threshold, 0)}) : t('Regentage (ab {n} mm)', {n: num(p.threshold, 1)}),
+          icon: 'drop', label: p.mode === 'dur' ? t('Regentage (ab {n} min)', {n: num(p.threshold, 0)}) : t('Regentage (ab {n} mm)', {n: num(p.threshold, 1)}),
           value: escapeHtml(String(p.wet_days)), sub: t('seit Jahresbeginn'),
         });
         if (p.wettest) {
           kpis.push({
-            label: p.mode === 'dur' ? t('Regenreichster Tag') : t('Nassester Tag'),
+            icon: 'rain', label: p.mode === 'dur' ? t('Regenreichster Tag') : t('Nassester Tag'),
             value: escapeHtml(num(p.wettest.value * this.precipScale(), 1)) + `<small>${escapeHtml(this.precipUnit())}</small>`,
             sub: asDate(p.wettest.date),
           });
         }
         kpis.push({
-          label: t('Längste Trockenphase'),
+          icon: 'sun', label: t('Längste Trockenphase'),
           value: escapeHtml(String(p.longest_dry_days)) + `<small>${escapeHtml(t('Tage'))}</small>`,
           sub: p.longest_dry_end ? t('bis {date}', {date: asDate(p.longest_dry_end)}) : '',
         });
         if (p.current_dry_days > 0) {
-          kpis.push({label: t('Aktuell trocken'), value: escapeHtml(String(p.current_dry_days)) + `<small>${escapeHtml(t('Tage'))}</small>`, sub: ''});
+          kpis.push({icon: 'sun', label: t('Aktuell trocken'), value: escapeHtml(String(p.current_dry_days)) + `<small>${escapeHtml(t('Tage'))}</small>`, sub: ''});
         }
         return kpis;
       },

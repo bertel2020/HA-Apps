@@ -391,3 +391,45 @@
   .wt-rec-bar{grid-column:1 / -1;height:5px;border-radius:3px;margin-top:6px;overflow:hidden;background:color-mix(in srgb, var(--c) 14%, transparent);}
   .wt-rec-bar i{display:block;height:100%;border-radius:3px;background:var(--c);}
   .wt-rec-bar[data-kind="longest_overcast_streak"] i{background:color-mix(in srgb, var(--ink-muted) 70%, var(--surface));}
+
+  /* Kachelstil (Einstellung „Kachelstil“ in der Wetter-Einrichtung): gilt für die Kacheln der Übersicht und die Kennzahlen
+     unter Niederschlag und Tageslicht. Die Wetterlage hat eigene Layouts (siehe oben) und bleibt ausgenommen, ebenso
+     die Rekordkacheln im Energie-Langzeitvergleich, die dieselbe Klasse nutzen, aber nicht unter [data-tile-style] stehen. */
+  [data-tile-style] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile{
+    position:relative;overflow:hidden;container-type:inline-size;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"icon label" "value value" "sub sub";
+    align-items:center;column-gap:10px;row-gap:12px;padding:16px;border:1px solid var(--border);border-radius:14px;
+    background:var(--tile-wash), var(--surface);box-shadow:var(--shadow);
+    transition:transform .12s, border-color .12s, box-shadow .12s;}
+  [data-tile-style] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) a.wt-tile:hover{transform:translateY(-2px);border-color:color-mix(in srgb, var(--wt-accent) 55%, var(--border));box-shadow:0 6px 16px color-mix(in srgb, var(--wt-accent) 14%, transparent), var(--shadow);}
+  [data-tile-style] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) a.wt-tile:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px;}
+  [data-tile-style] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile-icon{grid-area:icon;margin:0;}
+  [data-tile-style] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile-label{grid-area:label;font-family:inherit;font-size:calc(13.5px * var(--font-scale, 1));font-weight:600;letter-spacing:0;text-transform:none;line-height:1.25;color:var(--ink-muted);min-width:0;overflow-wrap:anywhere;}
+  [data-tile-style] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile-value{grid-area:value;font-family:inherit;font-size:calc(clamp(22px, 17cqi, 30px) * var(--font-scale, 1));font-weight:700;letter-spacing:-.01em;line-height:1.05;}
+  [data-tile-style] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile-value small{display:inline-block;white-space:nowrap;font-size:calc(15px * var(--font-scale, 1));margin-left:4px;letter-spacing:0;color:var(--ink-muted);}
+  [data-tile-style] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile-sub{grid-area:sub;margin-top:-6px;font-family:inherit;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-faint);min-height:0;}
+  [data-tile-style] .wt-tiles .wt-tile.is-loading{background:var(--surface);}
+  [data-tile-style] .wt-tiles .wt-tile.is-loading .wt-tile-label{grid-column:1 / -1;}
+  [data-tile-style] .wt-kpis-soft .wt-tile{border-left-width:1px;}
+
+  /* Plakette: Icon in einer getönten Plakette in der Farbe der Größe. */
+  [data-tile-style="plate"] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile-icon{width:36px;height:36px;padding:8px;border-radius:10px;color:var(--wt-accent);background:color-mix(in srgb, var(--wt-accent) 14%, var(--surface));}
+  [data-tile-style="plate"] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile-icon:empty{display:none;}
+  [data-tile-style="plate"] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile:has(.wt-tile-icon:empty) .wt-tile-label{grid-column:1 / -1;}
+
+  /* Getönte Fläche: ganze Kachel in der Farbe der Größe, das Icon steht blass als Wasserzeichen unten rechts. */
+  [data-tile-style="tint"] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile{row-gap:8px;border-color:color-mix(in srgb, var(--wt-accent) 28%, var(--border));
+    background:linear-gradient(160deg, color-mix(in srgb, var(--wt-accent) 15%, var(--surface)) 0%, color-mix(in srgb, var(--wt-accent) 5%, var(--surface)) 70%);}
+  [data-tile-style="tint"] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile-icon{position:absolute;grid-area:1 / 1 / -1 / -1;inset:auto -6px -8px auto;width:76px;height:76px;color:var(--wt-accent);opacity:.14;pointer-events:none;}
+  [data-tile-style="tint"] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile-label{grid-column:1 / -1;color:color-mix(in srgb, var(--wt-accent) 70%, var(--ink));}
+  [data-tile-style="tint"] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile-sub{color:var(--ink-muted);}
+
+  @media (max-width:640px){
+    [data-tile-style] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile{padding:12px;row-gap:10px;}
+    [data-tile-style="plate"] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile{column-gap:6px;}
+    [data-tile-style="plate"] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile-icon{width:26px;height:26px;padding:5px;border-radius:8px;}
+    [data-tile-style] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile-label{font-size:calc(12.5px * var(--font-scale, 1));}
+  }
+  @media (prefers-reduced-motion:reduce){
+    [data-tile-style] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile{transition:none;}
+    [data-tile-style] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) a.wt-tile:hover{transform:none;}
+  }

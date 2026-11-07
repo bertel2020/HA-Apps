@@ -3679,6 +3679,11 @@
     "{count} markierter Wert": "{count} marked value",
     "{count} markierte Werte": "{count} marked values",
     "Darstellung der Wetterlage": "Weather summary layout",
+    "Kachelstil": "Tile style",
+    "Plakette": "Badge",
+    "Getönte Fläche": "Tinted surface",
+    "Ungültiger Kachelstil: {value}": "Invalid tile style: {value}",
+    "Der Kachelstil gilt für die Kacheln der Übersicht und die Kennzahlen unter Niederschlag und Tageslicht: Plakette zeigt das Icon in einer getönten Plakette, Getönte Fläche färbt die ganze Kachel in der Farbe der Größe.": "The tile style applies to the tiles of the overview and the figures under precipitation and daylight: Badge shows the icon in a tinted badge, Tinted surface colours the whole tile in the colour of the measurement.",
     "Kompakt": "Compact",
     "Leiste": "Strip",
     "Groß zeigt den Kopf zentriert über vier Kacheln. Kompakt setzt den Kopf in eine Zeile und macht die Kacheln niedriger. Leiste fasst die Kacheln zu einer Zeile ohne Kästen zusammen. Die Angaben sind in allen drei dieselben; auf dem Handy bleiben es zwei Kacheln je Zeile.": "Large shows the header centred above four tiles. Compact puts the header on one row and makes the tiles lower. Strip merges the tiles into one row without boxes. The information is the same in all three; on a phone there are two tiles per row.",
@@ -4671,6 +4676,13 @@
     "Als Stichtag setzen": "Set as reference day",
     "Tiefst- und Höchstwert": "Low and high",
     "Maximum, Stärke {bft}": "Maximum, force {bft}",
+    "Luftdruck": "Air pressure",
+    "Luftfeuchte": "Humidity",
+    "Tendenz: steigend": "Trend: rising",
+    "Tendenz: fallend": "Trend: falling",
+    "Tendenz: stabil": "Trend: steady",
+    "Spitzenhelligkeit": "Peak illuminance",
+    "um {time}": "at {time}",
     "Niederschlag": "Precipitation"
   }
 }

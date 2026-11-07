@@ -147,6 +147,9 @@ TILE_LABELS = {
 #: PV und Helligkeit: Leistungseinheiten (Faktor nach kW) und Anzahl der verglichenen Tage.
 PV_UNIT_KW = {"W": 0.001, "kW": 1.0, "MW": 1000.0}
 PV_DAYS = 14
+#: Luftdruck: Faktor nach hPa und Schwelle, unter der die Tagestendenz als „stabil“ gilt.
+PRESSURE_UNIT_HPA = {"hPa": 1.0, "mbar": 1.0, "Pa": 0.01, "kPa": 10.0, "inHg": 33.8639}
+PRESSURE_STEADY_HPA = 1.0
 #: Tagesbild: Anzahl Tage im Streifen; Tage mit weniger hellen Stunden bekommen keine Klasse.
 DAYIMAGE_DAYS = 14
 DAYIMAGE_MIN_BRIGHT_HOURS = 3
@@ -183,6 +186,9 @@ SUN_MAX_GAP_HOURS = 6  # längste Lücke ohne Zeilen, die zwischen zwei sonnigen
 #: niedrigere Kacheln), ``strip`` (Kopf in einer Zeile, Kacheln als eine Leiste). Dieselben Angaben, nur anders gesetzt.
 LAGE_LAYOUTS = ("large", "compact", "strip")
 DEFAULT_LAGE_LAYOUT = "strip"
+#: Stil der Kacheln auf den Wetterseiten: ``plate`` (Icon in getönter Plakette) oder ``tint`` (Fläche in der Rollenfarbe).
+TILE_STYLES = ("plate", "tint")
+DEFAULT_TILE_STYLE = "plate"
 DEFAULT_RAIN_DAY_MM = 1.0  # DWD: Niederschlagstag ab 1 mm
 DEFAULT_RAIN_DAY_MINUTES = 10
 
@@ -203,6 +209,7 @@ def _empty_config() -> dict:
         "hidden_blocks": [],
         "hidden_cards": [],
         "lage_layout": DEFAULT_LAGE_LAYOUT,
+        "tile_style": DEFAULT_TILE_STYLE,
     }
 
 
@@ -260,6 +267,8 @@ def _load_config(index: Index) -> dict:
         config["hidden_cards"] = [key for key in CARD_KEYS if key in hidden_cards]
     if data.get("lage_layout") in LAGE_LAYOUTS:
         config["lage_layout"] = data["lage_layout"]
+    if data.get("tile_style") in TILE_STYLES:
+        config["tile_style"] = data["tile_style"]
     for key in ("heating_room", "heating_limit"):
         value = data.get(key)
         if isinstance(value, (int, float)) and not isinstance(value, bool) and 0 < value < 40:
@@ -1563,9 +1572,47 @@ class WetterService:
                     "decimals": _decimals(entity, "temperature"),
                 }
 
-        if sky is None and wind is None and rain is None and temp is None:
+        pressure = None
+        entity = index.get_entity(config["pressure"]) if config["pressure"] else None
+        if entity is not None:
+            press_rows = sorted(
+                (row for row in rows_of(config["pressure"]) if row.value is not None), key=lambda row: row.bucket_start,
+            )
+            summary = self.summarize("standard", press_rows, config)
+            if summary is not None:
+                unit = entity["unit"] or ""
+                # Tendenz über den Tag in hPa; „stabil“ innerhalb von ±1 hPa (andere Einheiten umgerechnet).
+                change = (press_rows[-1].value - press_rows[0].value) * PRESSURE_UNIT_HPA.get(unit, 1.0)
+                trend = "steady" if abs(change) < PRESSURE_STEADY_HPA else ("rising" if change > 0 else "falling")
+                pressure = {
+                    "avg": summary["avg"], "min": summary["min"], "max": summary["max"], "unit": unit,
+                    "decimals": _decimals(entity, "pressure"), "trend": trend,
+                }
+
+        humidity = None
+        entity = index.get_entity(config["humidity"]) if config["humidity"] else None
+        if entity is not None:
+            summary = self.summarize("standard", rows_of(config["humidity"]), config)
+            if summary is not None:
+                humidity = {
+                    "avg": summary["avg"], "min": summary["min"], "max": summary["max"], "unit": entity["unit"] or "",
+                    "decimals": _decimals(entity, "humidity"),
+                }
+
+        # Spitzenhelligkeit: höchstes Stundenmittel, passend zur Kurve im Dialog.
+        light = None
+        if config["illuminance"] and index.get_entity(config["illuminance"]) is not None:
+            lux_rows = [row for row in main_rows if main_role == "illuminance"]
+            if lux_rows:
+                top = max(lux_rows, key=lambda row: (row.value, -row.bucket_start))
+                light = {"max": top.value, "max_ts": top.bucket_start, "unit": unit_of(config["illuminance"])}
+
+        if sky is None and wind is None and rain is None and temp is None and pressure is None and humidity is None and light is None:
             return None
-        return {"mode": "day", "date": stichtag.isoformat(), "tz": str(tz), "sky": sky, "wind": wind, "rain": rain, "temp": temp}
+        return {
+            "mode": "day", "date": stichtag.isoformat(), "tz": str(tz), "sky": sky, "wind": wind, "rain": rain, "temp": temp,
+            "pressure": pressure, "humidity": humidity, "light": light,
+        }
 
     # -- Seite -------------------------------------------------------------------------
 
@@ -1700,6 +1747,7 @@ class WetterService:
             sky_fair_lx: str = Form(""),
             sky_sunny_lx: str = Form(""),
             lage_layout: str = Form(""),
+            tile_style: str = Form(""),
         ) -> HTMLResponse:
             submitted = {
                 "temperature": temperature, "precip_mm": precip_mm, "precip_dur": precip_dur,
@@ -1753,6 +1801,10 @@ class WetterService:
             if layout and layout not in LAGE_LAYOUTS:
                 raise HTTPException(status_code=400, detail=tr("Ungültige Darstellung: {value}", value=layout))
             config["lage_layout"] = layout or _load_config(deps.index)["lage_layout"]
+            style = tile_style.strip()
+            if style and style not in TILE_STYLES:
+                raise HTTPException(status_code=400, detail=tr("Ungültiger Kachelstil: {value}", value=style))
+            config["tile_style"] = style or _load_config(deps.index)["tile_style"]
             heating = []
             for position, entity_id in enumerate(heating_entity_id):
                 entity_id = entity_id.strip()

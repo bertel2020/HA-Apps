@@ -20,6 +20,7 @@
   <div class="wt-tiles" x-ref="tiles{{ group | capitalize }}" :style="'--wt-cols:' + tileCols.{{ group }}" x-show="tilesFor('{{ group }}').length" x-cloak>
     <template x-for="(tile, i) in tilesFor('{{ group }}')" :key="tile.key">
       <a class="wt-tile" :class="{'wt-tile-wide': tileCols.{{ group }} > 1 && i === tilesFor('{{ group }}').length - 1 && tilesFor('{{ group }}').length % tileCols.{{ group }} === 1}" :data-role="tile.key" :href="'entities/' + encodeURIComponent(tile.entity_id)" :title="tileTitle(tile)">
+        <span class="wt-tile-icon" x-html="iconSvg(tileIcon(tile))"></span>
         <span class="wt-tile-label" x-text="tile.label"></span>
         <span class="wt-tile-value" x-html="tileValue(tile)"></span>
         <span class="wt-tile-sub" x-text="tileSub(tile)"></span>
@@ -85,7 +86,7 @@
 {% set show_windtab = show_windtiles or show_sunhours or show_daylight or show_pv %}
 {% set show_long = 'longterm' not in hc %}
 {% set show_heat = has_heating and 'heating' not in hc %}
-<div x-data='wetterDashboard({{ precip_modes | tojson }})' data-hints="collapsed">
+<div x-data='wetterDashboard({{ precip_modes | tojson }})' data-hints="collapsed" data-tile-style="{{ config.tile_style }}">
   <div class="wt-title-row">
     <h1>{{ _("Wetterdashboard") }}</h1>
     <button type="button" class="wt-title-edit" title="{{ _('Rollen bearbeiten') }}"
@@ -260,7 +261,8 @@
       <p class="wt-headline" x-show="precip" x-text="precipHeadline()"></p>
       <div class="wt-kpis" x-show="precip" :style="'--wt-cols:' + kpiCols(precipKpis().length)">
         <template x-for="kpi in precipKpis()" :key="kpi.label">
-          <div class="wt-tile">
+          <div class="wt-tile" style="--wt-accent:var(--chart-3)">
+            <span class="wt-tile-icon" x-html="iconSvg(kpi.icon)"></span>
             <span class="wt-tile-label" x-text="kpi.label"></span>
             <span class="wt-tile-value" x-html="kpi.value"></span>
             <span class="wt-tile-sub" x-text="kpi.sub"></span>
@@ -352,6 +354,7 @@
     <div class="wt-kpis wt-kpis-soft" x-show="daylight" :style="'--wt-cols:' + kpiCols(daylightStats().length)">
       <template x-for="stat in daylightStats()" :key="stat.label">
         <div class="wt-tile" :data-kind="stat.kind">
+          <span class="wt-tile-icon" x-html="iconSvg(stat.icon)"></span>
           <span class="wt-tile-label" x-text="stat.label"></span>
           <span class="wt-tile-value" x-text="stat.value"></span>
           <span class="wt-tile-sub" x-text="stat.sub"></span>

@@ -647,6 +647,27 @@ def test_conditions_layout_setting_defaults_saves_and_rejects_unknown_values(cli
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
 
 
+def test_tile_style_setting_defaults_saves_and_rejects_unknown_values(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp13", "sensor", "measurement", "°C")
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    base = {"temperature": "sensor.wetter_test_temp13"}
+    assert wetter_routes.DEFAULT_TILE_STYLE in wetter_routes.TILE_STYLES
+    assert client.post("/wetterdashboard/setup", data={**base, "tile_style": "neon"}).status_code == 400
+    page = client.post("/wetterdashboard/setup", data=base)  # ohne Angabe: Standard
+    assert f'data-tile-style="{wetter_routes.DEFAULT_TILE_STYLE}"' in page.text
+    for style in wetter_routes.TILE_STYLES:
+        saved = client.post("/wetterdashboard/setup", data={**base, "tile_style": style})
+        assert saved.status_code == 200 and f'data-tile-style="{style}"' in saved.text
+    # Ein Aufruf ohne das Feld (ältere Aufrufer) behält die letzte Wahl.
+    assert 'data-tile-style="tint"' in client.post("/wetterdashboard/setup", data={**base, "tile_style": "tint"}).text
+    assert 'data-tile-style="tint"' in client.post("/wetterdashboard/setup", data=base).text
+    setup = client.get("/wetterdashboard/setup").text
+    assert 'name="tile_style" value="tint" checked' in setup
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
 # -- Stichtag ---------------------------------------------------------------------------------
 
 

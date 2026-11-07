@@ -8,7 +8,17 @@
   Detail.
   - Helligkeitsverlauf mit der Sonnen-Schwelle
   - Temperatur, Niederschlag und Wind des Tages, soweit zugeordnet
+  - Vierte Kachel: Luftdruck, sonst Luftfeuchte, sonst Spitzenhelligkeit
   - „Als Stichtag setzen“ übernimmt den Tag für die ganze Seite
+- **Wetterdashboard**: Die Einrichtung erklärt, was eine Rolle erwartet.
+  - Kurzhilfe mit Beispielen je Rolle im Auswahldialog
+  - „Niederschlag (Menge)“ braucht einen Zähler (Tages- oder Gesamtmenge);
+    Sensoren, die nur Momentanwerte liefern, stehen ausgegraut unter
+    „Nicht wählbar“
+- **Wetterdashboard**: Die Kacheln sehen neu aus, mit Icon und größerem Wert.
+  - Kachelstil in der Einrichtung wählbar: „Plakette“ oder „Getönte Fläche“
+  - Gilt für die Übersicht sowie die Kennzahlen unter Niederschlag und
+    Tageslicht
 
 ### Behoben
 
@@ -25,7 +35,18 @@
   detail.
   - Light curve with the sun threshold
   - Temperature, precipitation and wind of the day, where assigned
+  - Fourth tile: air pressure, otherwise humidity, otherwise peak illuminance
   - "Set as reference day" applies the day to the whole page
+- **Weather dashboard**: The setup explains what each role expects.
+  - Short help with examples for each role in the selection dialog
+  - "Precipitation (amount)" needs a counter (daily or total amount); sensors
+    that only provide instantaneous values are shown greyed out under "Not
+    selectable"
+- **Weather dashboard**: The tiles have a new look, with an icon and a larger
+  value.
+  - Tile style selectable in the setup: "Badge" or "Tinted surface"
+  - Applies to the overview and to the figures under precipitation and
+    daylight
 
 #### Fixed
 
