@@ -181,6 +181,8 @@
     humid: `<svg viewBox="0 0 24 24" ${ICON_ATTR}><path d="M12 3.5c3.6 4.2 6 7.2 6 10.2a6 6 0 0 1-12 0c0-3 2.4-6 6-10.2z" fill="currentColor" fill-opacity=".16"/><path d="M9.5 15.5l5-4M9.7 12.2h.01M14.3 15.3h.01"/></svg>`,
     gauge: `<svg viewBox="0 0 24 24" ${ICON_ATTR}><path d="M4.5 17a8.5 8.5 0 1 1 15 0"/><path d="M12 13.5l3.6-4.2"/><circle cx="12" cy="14" r="1.4" fill="currentColor"/></svg>`,
     clock: `<svg viewBox="0 0 24 24" ${ICON_ATTR}><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>`,
+    flame: `<svg viewBox="0 0 24 24" ${ICON_ATTR}><path d="M12 3c.5 3-3.5 5-3.5 9.2a3.5 3.5 0 0 0 7 0c0-1.4-.6-2.4-1.3-3.3 2.4.9 4.3 3.3 4.3 6.1a6.5 6.5 0 0 1-13 0C5.5 9 12 7 12 3z" fill="currentColor" fill-opacity=".16"/></svg>`,
+    calendar: `<svg viewBox="0 0 24 24" ${ICON_ATTR}><rect x="4" y="5.5" width="16" height="14.5" rx="2.5" fill="currentColor" fill-opacity=".12"/><path d="M8 3.5v4M16 3.5v4M4 10h16"/></svg>`,
   };
 
   window.wetterDashboard = function wetterDashboard(precipModes) {
@@ -1992,7 +1994,7 @@
           this.heatBySun = !!saved.bySun;
           this.heat = data;
           const periods = this.heatPeriods();
-          this.heatSeason = String(periods.length > 1 && WetterHeating.currentPeriod(data.today) === periods[0] ? periods[1] : (periods[0] || ''));
+          this.heatSeason = String(periods[0] || '');
           this.$nextTick(() => this.drawHeat());
         } catch (e) {
           this.heatError = t('Die Heizwerte konnten nicht geladen werden.');
@@ -2078,6 +2080,44 @@
           }
         }
         return text || t('Noch nicht genug Heiztage für einen Vergleich.');
+      },
+
+      // Kacheln über dem Streudiagramm: Verbrauch, kWh je Gradtag, Gradtagzahl und Heiztage der gewählten Heizperiode.
+      // Eine laufende Periode zählt bis gestern und wird mit demselben Ausschnitt der Vorperiode verglichen, sonst wäre
+      // jede laufende Periode gegen eine ganze automatisch „viel weniger“.
+      heatKpis() {
+        if (!this.heat || !this.heatSeason) return [];
+        const o = this.heatOpts();
+        const period = Number(this.heatSeason);
+        const {now, before} = WetterHeating.summary(this.heat.days, o, period, this.heat.today);
+        if (!now.n) return [];
+        const other = WetterHeating.label(period - 1);
+        const change = (a, b) => {
+          if (a == null || b == null || !(b > 0)) return '';
+          const percent = (a / b - 1) * 100;
+          const sign = Math.round(Math.abs(percent)) === 0 ? '±' : (percent > 0 ? '+' : '−');
+          return t('{delta} % zu {other}', {delta: sign + num(Math.abs(percent), 0), other});
+        };
+        const active = this.heat.counters.map((c, i) => ({c, i})).filter(({i}) => this.heatOn[i]);
+        const parts = active.length > 1 ? active.map(({c, i}) => `${c.name} ${num(now.perCounter[i] || 0, 0)}`).join(' · ') : '';
+        return [
+          {
+            icon: 'flame', accent: 'var(--chart-2)', label: active.length > 1 ? t('Verbrauch gesamt') : t('Verbrauch'),
+            value: escapeHtml(num(now.kwh, 0)) + '<small>kWh</small>', sub: parts || change(now.kwh, before && before.kwh),
+          },
+          {
+            icon: 'gauge', accent: 'var(--chart-3)', label: t('kWh je Gradtag'),
+            value: escapeHtml(now.q == null ? '–' : num(now.q, 2)), sub: change(now.q, before && before.q),
+          },
+          {
+            icon: 'temp', accent: 'var(--chart-1)', label: t('Gradtagzahl'),
+            value: escapeHtml(num(now.gt, 0)) + '<small>Kd</small>', sub: change(now.gt, before && before.gt),
+          },
+          {
+            icon: 'calendar', accent: 'var(--chart-8)', label: t('Heiztage'),
+            value: escapeHtml(String(now.heatDays)), sub: t('unter {limit} °C Heizgrenze', {limit: num(o.limit, 0)}),
+          },
+        ];
       },
 
       heatReadout() {

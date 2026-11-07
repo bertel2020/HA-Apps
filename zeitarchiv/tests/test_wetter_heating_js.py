@@ -111,3 +111,24 @@ def test_compare_names_clear_differences_and_refuses_thin_or_noisy_ones() -> Non
         "const g = {n: 8, q: 5, rates}; const b = {n: 8, q: 5.2, rates: rates.slice().reverse()}; return h.compare(g, b); })()"
     )
     assert noisy["status"] == "unclear"
+
+
+def test_summary_of_a_running_period_is_compared_with_the_same_cut_of_the_previous_one() -> None:
+    days = (
+        '[["2024-10-01", 5, [10, 1]], ["2024-10-02", 16, [2, 1]], ["2024-12-01", 0, [50, 5]],'
+        ' ["2025-10-01", 5, [8, 2]], ["2025-10-02", 10, [6, 3]], ["2025-10-03", 20, [1, 1]]]'
+    )
+    got = _run(f'h.summary({days}, {{room: 20, limit: 15, on: [true, true]}}, 2025, "2025-10-03")')
+    # Heute ist der 3.10.: die laufende Periode zählt bis gestern, die Vorperiode bis zum 2.10. (ohne den 1.12.).
+    assert got["running"] is True
+    assert (got["now"]["kwh"], got["now"]["gt"], got["now"]["heatDays"], got["now"]["n"]) == (19, 25, 2, 2)
+    assert got["now"]["perCounter"] == [14, 5]
+    assert (got["before"]["kwh"], got["before"]["heatDays"]) == (14, 1)
+
+
+def test_summary_of_a_finished_period_uses_the_whole_period_and_none_without_a_predecessor() -> None:
+    days = '[["2024-10-01", 5, [10]], ["2024-12-01", 0, [50]], ["2025-10-01", 5, [8]]]'
+    done = _run(f'h.summary({days}, {{room: 20, limit: 15, on: [true]}}, 2024, "2026-06-10")')
+    assert done["running"] is False and done["now"]["kwh"] == 60 and done["before"] is None
+    full = _run(f'h.summary({days}, {{room: 20, limit: 15, on: [true]}}, 2025, "2026-06-10")')
+    assert full["before"]["kwh"] == 60  # ganze Vorperiode, nicht gekürzt

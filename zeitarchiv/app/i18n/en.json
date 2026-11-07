@@ -4683,6 +4683,12 @@
     "Tendenz: stabil": "Trend: steady",
     "Spitzenhelligkeit": "Peak illuminance",
     "um {time}": "at {time}",
-    "Niederschlag": "Precipitation"
+    "Niederschlag": "Precipitation",
+    "Verbrauch gesamt": "Total consumption",
+    "kWh je Gradtag": "kWh per degree day",
+    "Heiztage": "Heating days",
+    "{delta} % zu {other}": "{delta} % vs. {other}",
+    "unter {limit} °C Heizgrenze": "below {limit} °C heating limit",
+    "Gradtagzahl": "Degree days"
   }
 }

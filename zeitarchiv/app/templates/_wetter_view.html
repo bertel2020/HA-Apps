@@ -509,12 +509,29 @@
     <div class="card wt-card">
       <div class="wt-controls">
         <h2 class="wt-h2">{{ _("Heizen und Wetter") }}</h2>
+        <label class="wt-check" x-show="heat" x-cloak>{{ _("Heizperiode") }}
+          <select x-model="heatSeason" @change="drawHeat()">
+            <template x-for="period in heatPeriods()" :key="period"><option :value="period" x-text="heatLabel(period)"></option></template>
+          </select>
+        </label>
         <label class="wt-check" x-show="heat" x-cloak>{{ _("Raumtemperatur") }}
           <input type="text" class="wt-num" x-model="heatRoom" @input="drawHeat()" inputmode="decimal" size="3"> °C</label>
         <label class="wt-check" x-show="heat" x-cloak>{{ _("Heizgrenze") }}
           <input type="text" class="wt-num" x-model="heatLimit" @input="drawHeat()" inputmode="decimal" size="3"> °C</label>
       </div>
       <p class="wt-headline" x-show="heat" x-text="heatHeadline()"></p>
+    </div>
+    <div class="wt-kpis" x-show="heatKpis().length" x-cloak :style="'--wt-cols:' + kpiCols(heatKpis().length)">
+      <template x-for="kpi in heatKpis()" :key="kpi.label">
+        <div class="wt-tile" :style="'--wt-accent:' + kpi.accent">
+          <span class="wt-tile-icon" x-html="iconSvg(kpi.icon)"></span>
+          <span class="wt-tile-label" x-text="kpi.label"></span>
+          <span class="wt-tile-value" x-html="kpi.value"></span>
+          <span class="wt-tile-sub" x-text="kpi.sub"></span>
+        </div>
+      </template>
+    </div>
+    <div class="card wt-card">
       <label class="wt-check" x-show="heatHasSun()" x-cloak>
         <input type="checkbox" x-model="heatBySun" @change="drawHeat()"> {{ _("Punkte nach Sonne einfärben") }} <span class="wt-badge">{{ _("experimentell") }}</span></label>
       {# Zähler als Auswahl-Pillen (.filter-chip aus app.css), mit Farbpunkt wie im Streudiagramm #}
@@ -548,12 +565,7 @@
     </div>
     <div class="card wt-card" x-show="heat && heat.counters.length > 1" x-cloak>
       <div class="wt-controls">
-        <h2 class="wt-h2">{{ _("Anteil je Zähler") }}</h2>
-        <label class="wt-check">{{ _("Heizperiode") }}
-          <select x-model="heatSeason" @change="drawHeat()">
-            <template x-for="period in heatPeriods()" :key="period"><option :value="period" x-text="heatLabel(period)"></option></template>
-          </select>
-        </label>
+        <h2 class="wt-h2"><span>{{ _("Anteil je Zähler") }}</span> <span x-text="heatLabel(heatSeason)"></span></h2>
       </div>
       <div class="wt-chart" x-ref="heatShareChart"></div>
       <p class="hint hint-status" x-text="heatShareText()"></p>

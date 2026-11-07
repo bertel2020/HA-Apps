@@ -19,9 +19,19 @@
   - Kachelstil in der Einrichtung wählbar: „Plakette“ oder „Getönte Fläche“
   - Gilt für die Übersicht sowie die Kennzahlen unter Niederschlag und
     Tageslicht
+- **Wetterdashboard**: Der Reiter Heizen beginnt mit vier Kacheln.
+  - Verbrauch, kWh je Gradtag, Gradtagzahl und Heiztage der gewählten Heizperiode,
+    jeweils im Vergleich zur Vorperiode
+  - Die laufende Periode wird mit demselben Ausschnitt der Vorperiode verglichen
+  - Die Auswahl der Heizperiode steht jetzt oben und gilt für die ganze Seite
 
 ### Behoben
 
+- **Wetterdashboard**: Wintermonate fehlten in der Monatsübersicht und in den
+  Kenntagen, wenn die Temperatur lange gleich blieb
+  - Der letzte Wert gilt jetzt bis zu 12 Stunden weiter; ein längerer Ausfall
+    bleibt eine Lücke
+  - Tagesmittel werden dadurch genauer
 - Die Knöpfe am Ende von Dialogen im Wetter- und Energiedashboard sowie in der
   Migration saßen ohne Abstand nebeneinander
 
@@ -47,9 +57,19 @@
   - Tile style selectable in the setup: "Badge" or "Tinted surface"
   - Applies to the overview and to the figures under precipitation and
     daylight
+- **Weather dashboard**: The Heating tab starts with four tiles.
+  - Consumption, kWh per degree day, degree days and heating days of the
+    selected heating season, each compared with the previous season
+  - The running season is compared with the same stretch of the previous one
+  - The heating season selection is now at the top and applies to the whole page
 
 #### Fixed
 
+- **Weather dashboard**: Winter months were missing from the monthly overview
+  and from the notable days when the temperature stayed the same for a long
+  time
+  - The last value now counts for up to 12 hours; a longer outage stays a gap
+  - Daily means become more accurate as a result
 - The buttons at the bottom of dialogs in the weather and energy dashboards and
   in the migration had no gap between them
 

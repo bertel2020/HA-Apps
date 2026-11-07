@@ -86,6 +86,29 @@
     return [...new Set(days.map((day) => periodOf(day[0])).filter((p) => p != null))].sort((a, b) => b - a);
   }
 
+  // Kennzahlen einer Heizperiode für die Kacheln: Summe, Heiztage (Tage unter der Heizgrenze) und kWh je Zähler.
+  // Die laufende Periode zählt bis gestern und wird gegen denselben Ausschnitt der Vorperiode gestellt, jede andere
+  // als ganze Periode gegen die ganze Vorperiode. before ist null, wenn es keine Vorperiode mit Daten gibt.
+  function summary(days, opts, period, todayIso) {
+    const live = MONTHS.includes(Number(todayIso.slice(5, 7))) && period === currentPeriod(todayIso);
+    const measure = (p) => {
+      let [from, to] = periodRange(p);
+      if (live) ({from, to} = cutRange(p, todayIso));
+      const base = stat(days, opts, from, to);
+      let heatDays = 0;
+      const perCounter = [];
+      for (const day of days) {
+        if (day[0] < from || day[0] > to) continue;
+        if (day[1] < opts.limit) heatDays += 1;
+        day[2].forEach((value, index) => { perCounter[index] = (perCounter[index] || 0) + value; });
+      }
+      return {...base, heatDays, perCounter};
+    };
+    const now = measure(period);
+    const hasBefore = periods(days).includes(period - 1);
+    return {now, before: hasBefore ? measure(period - 1) : null, running: live};
+  }
+
   // Ausgleichsgerade (kleinste Quadrate) über die Tage unter der Heizgrenze einer Periode:
   // kWh je Tag gegen Tages-Ø. slope ist negativ; -slope sind kWh je Kelvin. Null ohne tragfähige Grundlage.
   function fit(days, opts, period) {
@@ -185,7 +208,7 @@
     return {status: 'clear', percent};
   }
 
-  const api = {SUN_CLASSES, MIN_CLASS_DAYS, classStats, compare, MONTHS, periodOf, label, gradtage, dayKwh, stat, monthRange, periodRange, cutRange, currentPeriod, periods, fit, shares};
+  const api = {SUN_CLASSES, MIN_CLASS_DAYS, classStats, compare, MONTHS, periodOf, label, gradtage, dayKwh, stat, monthRange, periodRange, cutRange, currentPeriod, periods, fit, shares, summary};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.WetterHeating = api;
 })(typeof window !== 'undefined' ? window : globalThis);
