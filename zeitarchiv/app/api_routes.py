@@ -716,7 +716,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                 offset=offset if compare_mode == "year" else offset - 1,
                 continuous=continuous,
-                year_over_year=compare_mode == "year",
+                year_over_year=compare_mode == "year", full_period=True,
                 chart_type=chart_type,
                 read_cache=read_cache,
             )
@@ -841,7 +841,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                     offset=offset if compare_mode == "year" else offset - 1,
                     continuous=continuous,
-                    year_over_year=compare_mode == "year",
+                    year_over_year=compare_mode == "year", full_period=True,
                 )
                 entry.update(
                     compare_points=compare_result["points"],

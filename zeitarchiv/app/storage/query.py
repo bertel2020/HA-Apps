@@ -1158,8 +1158,14 @@ def query_series(
     read_cache: QueryReadCache | None = None,
     same_elapsed: bool = False,
     cap_to: timedelta | None = None,
+    full_period: bool = False,
 ) -> dict:
-    """cap_to: deckelt eine bereits vergangene Periode (offset<0) auf diesen
+    """full_period: nur mit year_over_year — das Vorjahresfenster läuft bis zum Ende
+    der Vorjahresperiode statt nur bis zum Abstand, den die laufende Periode gerade
+    hat. Für die Vergleichsreihe im Chart (zeigt den ganzen Vergleichszeitraum); der
+    faire Vergleichswert der Tabellen bleibt beim gekappten Fenster.
+
+    cap_to: deckelt eine bereits vergangene Periode (offset<0) auf diesen
     Abstand vom Periodenanfang — nur für den fairen "Gleicher Zeitpunkt"-
     Vergleichswert (siehe unten), nicht für die Anzeige der Periode selbst."""
     if range_key not in RANGE_KEYS:
@@ -1209,6 +1215,8 @@ def query_series(
         window_start = _shift_year(window_start, -1)
         window_end = _shift_year(window_end, -1)
         period_end = _shift_year(period_end, -1)
+        if full_period:
+            window_end = period_end
 
     if range_key in ("hour", "day"):
         fine = _query_live_fine(
