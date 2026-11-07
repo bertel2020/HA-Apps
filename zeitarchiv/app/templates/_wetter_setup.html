@@ -73,6 +73,8 @@
 <p class="sub">{{ _("Wie euer Wetter war — Messwerte, Regen und Heizbedarf an einem Ort.") }}</p>
 
 <form class="wt-setup" hx-post="wetterdashboard/setup" hx-target="#wetter-root" hx-swap="innerHTML"
+      {# Enter in einem Textfeld (Name, Suche im Picker) darf das Formular nicht absenden, sonst ist die Einrichtung gespeichert, aber der Entwurf nie übernommen. #}
+      @keydown.enter="if ($event.target.tagName === 'INPUT') $event.preventDefault()"
       x-data='{
         entityOptions: {{ entity_options | tojson }},
         roleTypes: {{ role_types | tojson }},

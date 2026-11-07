@@ -248,6 +248,10 @@
       error: '',
       _seq: 0,
       _tilesSeq: 0,
+      _monthlySeq: 0,
+      _tempsSeq: 0,
+      _precipSeq: 0,
+      _matrixSeq: 0,
 
       init() {
         const saved = readStore();
@@ -271,13 +275,15 @@
         if (this.hasDayimage) this.loadDayimage();
         this.hasDaylight = !!this.$root.querySelector('[x-ref="daylightChart"]');
         this.hasPv = !!this.$root.querySelector('[x-ref="pvChart"]');
-        const observer = new ResizeObserver(() => this.layoutTiles());
+        const observer = new ResizeObserver(() => { if (this.$root.isConnected) this.layoutTiles(); });
         for (const group of GROUPS) {
           const ref = this.$refs[refName('tiles', group)];
           if (ref) observer.observe(ref);
         }
         // Stichtag-Leiste des App-Standards: bei jeder Änderung die Tabelle neu laden.
         window.addEventListener('dashboard-stichtag', () => {
+          // Nach dem Austausch der Seite (Einrichtung gespeichert) darf das alte Objekt nicht mehr zeichnen.
+          if (!this.$root.isConnected) return;
           this.loadTiles();
           this.loadTable();
           // Die Karte liegt im Reiter „Wind & Sonne“: dort sofort neu laden, sonst beim nächsten Öffnen.
@@ -493,13 +499,16 @@
 
       // Monatsvergleich
       async loadMonthly() {
+        const seq = ++this._monthlySeq;
         try {
-          this.monthly = await this.fetchJson(
+          const data = await this.fetchJson(
             `wetterdashboard/monatsvergleich?metric=${this.monthlyMetric}&mode=${this.precipModes[0] || 'mm'}`,
           );
+          if (seq !== this._monthlySeq) return;  // eine neuere Anfrage hat überholt
+          this.monthly = data;
           this.$nextTick(() => this.drawMonthly());
         } catch (e) {
-          this.monthly = null;
+          if (seq === this._monthlySeq) this.monthly = null;
         }
       },
 
@@ -1447,11 +1456,14 @@
       // Temperaturen im Vergleich (Reiter „Temperatur & Klima“)
       async loadTemps() {
         this.tempError = '';
+        const seq = ++this._tempsSeq;
         try {
-          this.tempCmp = await this.fetchJson(`wetterdashboard/temperaturen?days=${this.tempDays}`);
+          const data = await this.fetchJson(`wetterdashboard/temperaturen?days=${this.tempDays}`);
+          if (seq !== this._tempsSeq) return;  // eine neuere Anfrage hat überholt
+          this.tempCmp = data;
           this.$nextTick(() => this.drawTemps());
         } catch (e) {
-          this.tempError = t('Die Temperaturen konnten nicht geladen werden.');
+          if (seq === this._tempsSeq) this.tempError = t('Die Temperaturen konnten nicht geladen werden.');
         }
       },
 
@@ -1500,11 +1512,14 @@
       // Niederschlag
       async loadPrecip() {
         this.precipError = '';
+        const seq = ++this._precipSeq;
         try {
-          this.precip = await this.fetchJson(`wetterdashboard/niederschlag?mode=${this.precipMode}`);
+          const data = await this.fetchJson(`wetterdashboard/niederschlag?mode=${this.precipMode}`);
+          if (seq !== this._precipSeq) return;  // eine neuere Anfrage hat überholt
+          this.precip = data;
           this.$nextTick(() => this.drawPrecip());
         } catch (e) {
-          this.precipError = t('Der Niederschlag konnte nicht geladen werden.');
+          if (seq === this._precipSeq) this.precipError = t('Der Niederschlag konnte nicht geladen werden.');
         }
       },
 
@@ -1918,13 +1933,16 @@
       // Jahr×Tag-Matrix
       async loadMatrix() {
         this.matrixError = '';
+        const seq = ++this._matrixSeq;
         try {
-          this.matrix = await this.fetchJson(
+          const data = await this.fetchJson(
             `wetterdashboard/matrix?metric=${this.matrixMetric}&mode=${this.precipModes[0] || 'mm'}`,
           );
+          if (seq !== this._matrixSeq) return;  // eine neuere Anfrage hat überholt
+          this.matrix = data;
           this.$nextTick(() => this.drawMatrix());
         } catch (e) {
-          this.matrixError = t('Die Jahresübersicht konnte nicht geladen werden.');
+          if (seq === this._matrixSeq) this.matrixError = t('Die Jahresübersicht konnte nicht geladen werden.');
         }
       },
 

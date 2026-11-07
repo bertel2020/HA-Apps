@@ -91,6 +91,8 @@
       error: '',
       opened: false,
       _seq: 0,
+      _changesSeq: 0,
+      _kenntageSeq: 0,
       months: null,
       monthsError: '',
       changes: null,
@@ -114,6 +116,7 @@
         // Geladen wird erst beim ersten Öffnen des Reiters: Die Übersicht ist die Startansicht und
         // soll nicht auf eine verborgene Tabelle warten.
         window.addEventListener('energie-tab', (event) => {
+          if (!this.$root.isConnected) return;
           if (event.detail === 'long' && !this.opened) {
             this.opened = true;
             this.loadTable();
@@ -126,7 +129,7 @@
           }
         });
         // Stichtag-Leiste des App-Standards: bei jeder Änderung die Tabelle neu laden.
-        window.addEventListener('dashboard-stichtag', () => { if (this.opened) { this.loadTable(); if (shown('veraenderungen')) this.loadChanges(); } });
+        window.addEventListener('dashboard-stichtag', () => { if (this.$root.isConnected && this.opened) { this.loadTable(); if (shown('veraenderungen')) this.loadChanges(); } });
       },
 
       columnName,
@@ -323,10 +326,12 @@
         const dialog = this.$refs.kenntageDialog;
         this.ktDialog = {title: `${KENNTAG_LABELS()[field]} · ${year}`, sub: kenntagRule(field, kt.thresholds), html: '', error: ''};
         dialog.showModal();
+        const seq = ++this._kenntageSeq;
         try {
           const res = await fetch(`energiedashboard/langzeit/kenntage?field=${encodeURIComponent(field)}&year=${year}`);
           if (!res.ok) throw new Error(String(res.status));
           const data = await res.json();
+          if (seq !== this._kenntageSeq) return;  // ein anderes Jahr wurde inzwischen geöffnet
           const byDate = new Map(data.days.map((d) => [d.date, d]));
           const since = this.records.since;
           const cutoff = this.ktMode === 'ytd' ? kt.today.slice(5) : null;
@@ -356,12 +361,13 @@
           this.ktDialog.html = html + '</tbody>';
           this.ktDialog.sub = `${kenntagRule(field, kt.thresholds)} · ${t('{hits} von {days} ausgewerteten Tagen', {hits: num(hits, 0), days: num(days, 0)})}`;
         } catch (e) {
-          this.ktDialog.error = t('Die Tage konnten nicht geladen werden.');
+          if (seq === this._kenntageSeq) this.ktDialog.error = t('Die Tage konnten nicht geladen werden.');
         }
       },
 
       // Verbraucher mit der größten Änderung; Stichtag und Vorjahr-Modus wie die Vergleichstabelle.
       async loadChanges() {
+        const seq = ++this._changesSeq;
         try {
           const res = await fetch('energiedashboard/langzeit/changes', {
             method: 'POST',
@@ -369,10 +375,12 @@
             body: JSON.stringify({mode: this.mode, at: this.stichtag()}),
           });
           if (!res.ok) throw new Error(String(res.status));
-          this.changes = await res.json();
+          const data = await res.json();
+          if (seq !== this._changesSeq) return;  // eine neuere Anfrage hat überholt
+          this.changes = data;
           this.$nextTick(() => this.drawChanges());
         } catch (e) {
-          this.changes = null;
+          if (seq === this._changesSeq) this.changes = null;
         }
       },
 
