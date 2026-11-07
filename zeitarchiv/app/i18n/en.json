@@ -3701,7 +3701,20 @@
     "Wird geladen …": "Loading …",
     "Helligkeit, Stundenmittel": "Brightness, hourly mean",
     "Eckwerte des Tages": "Key figures of the day",
-    "Für diesen Tag liegen keine Werte vor.": "There are no values for this day."
+    "Für diesen Tag liegen keine Werte vor.": "There are no values for this day.",
+    "Ein Außenthermometer, zum Beispiel „Station Temperatur“ in °C.": "An outdoor thermometer, for example “Station temperature” in °C.",
+    "Braucht einen Zähler: eine Regenmenge, die über den Tag oder insgesamt hochzählt (state_class „total“ oder „total_increasing“), zum Beispiel „Regenmenge (täglich)“ oder „Regen gesamt“. Ein Momentanwert (state_class „measurement“), etwa eine Regenrate oder eine Menge je Intervall, steht hier nicht zur Wahl.": "Needs a counter: a rain amount that counts up over the day or in total (state_class “total” or “total_increasing”), for example “Rain amount (daily)” or “Rain total”. An instantaneous value (state_class “measurement”), such as a rain rate or an amount per interval, is not offered here.",
+    "Ein Ein/Aus-Sensor, der meldet, ob es regnet, zum Beispiel „Regen“ oder „Regensensor“.": "An on/off sensor that reports whether it is raining, for example “Rain” or “Rain sensor”.",
+    "Relative Luftfeuchte in %, zum Beispiel „Außen Luftfeuchtigkeit“.": "Relative humidity in %, for example “Outdoor humidity”.",
+    "Luftdruck, zum Beispiel „Luftdruck relativ“ in hPa.": "Air pressure, for example “Relative pressure” in hPa.",
+    "Mittlere Windgeschwindigkeit, zum Beispiel „Windgeschwindigkeit“ in km/h.": "Average wind speed, for example “Wind speed” in km/h.",
+    "Windböe, zum Beispiel „Windböen“ in km/h.": "Wind gust, for example “Wind gusts” in km/h.",
+    "Sonneneinstrahlung in W/m², zum Beispiel „Sonneneinstrahlung“.": "Solar radiation in W/m², for example “Solar radiation”.",
+    "Helligkeit in lx, am besten vom Süd-Sensor, zum Beispiel „Helligkeit Süd“.": "Brightness in lx, ideally from the south-facing sensor, for example “Brightness south”.",
+    "Ein Helligkeitssensor für Tag und Nacht in lx, zum Beispiel ein Dämmerungs- oder Lichtsensor.": "A brightness sensor for day and night in lx, for example a twilight or light sensor.",
+    "Windrichtung in Grad, zum Beispiel „Windrichtung“.": "Wind direction in degrees, for example “Wind direction”.",
+    "Höhe der Sonne in Grad, zum Beispiel ein Template-Sensor aus dem Attribut „elevation“ von sun.sun.": "Elevation of the sun in degrees, for example a template sensor from the “elevation” attribute of sun.sun.",
+    "Aktuelle Leistung der PV-Anlage in W oder kW, zum Beispiel „Solarleistung“.": "Current output of the PV system in W or kW, for example “Solar power”."
   },
   "js": {
     "Ladestand": "State of charge",

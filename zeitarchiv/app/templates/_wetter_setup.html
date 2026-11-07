@@ -76,6 +76,7 @@
         entityOptions: {{ entity_options | tojson }},
         roleTypes: {{ role_types | tojson }},
         roleUnits: {{ role_units | tojson }},
+        roleHelp: {{ role_help | tojson }},
         roleVals: { {% for key, label, types in roles %}{{ key | tojson }}: {{ (config[key] or '') | tojson }}{{ ',' if not loop.last }}{% endfor %} },
         roleLabels: { {% for key, label, types in roles %}{{ key | tojson }}: {{ _(label) | tojson }}{{ ',' if not loop.last }}{% endfor %} },
         activeRole: null, draftRole: "",
@@ -241,6 +242,7 @@
             <label>{{ _("Entität") }}</label>
             {{ role_picker() }}
           </div>
+          <p class="wt-why" x-show="roleHelp[activeRole]" x-text="roleHelp[activeRole]"></p>
           <p class="wt-why" x-show="hints[activeRole]" x-cloak>
             <span class="wt-badge" :class="{'is-check': hints[activeRole] && hints[activeRole].confidence === 'check'}" x-text="hints[activeRole] && hints[activeRole].confidence === 'check' ? t('prüfen') : t('Vorschlag')"></span>
             <span x-text="hintText(activeRole)"></span>

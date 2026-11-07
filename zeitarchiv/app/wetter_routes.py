@@ -84,6 +84,23 @@ ROLE_UNITS = {
     "extra": ["°C", "°F", "K", "%"],
     "heating": ["kWh", "Wh", "MWh"],
 }
+#: Kurzhilfe je Rolle im Auswahldialog: was gemeint ist, mit Beispielen. Bei „Niederschlag (Menge)“
+#: steht der Typ-Grund dabei, weil dort Sensoren mit Momentanwert (state_class „measurement“) fehlen.
+ROLE_HELP = {
+    "temperature": N_("Ein Außenthermometer, zum Beispiel „Station Temperatur“ in °C."),
+    "precip_mm": N_("Braucht einen Zähler: eine Regenmenge, die über den Tag oder insgesamt hochzählt (state_class „total“ oder „total_increasing“), zum Beispiel „Regenmenge (täglich)“ oder „Regen gesamt“. Ein Momentanwert (state_class „measurement“), etwa eine Regenrate oder eine Menge je Intervall, steht hier nicht zur Wahl."),
+    "precip_dur": N_("Ein Ein/Aus-Sensor, der meldet, ob es regnet, zum Beispiel „Regen“ oder „Regensensor“."),
+    "humidity": N_("Relative Luftfeuchte in %, zum Beispiel „Außen Luftfeuchtigkeit“."),
+    "pressure": N_("Luftdruck, zum Beispiel „Luftdruck relativ“ in hPa."),
+    "wind": N_("Mittlere Windgeschwindigkeit, zum Beispiel „Windgeschwindigkeit“ in km/h."),
+    "gust": N_("Windböe, zum Beispiel „Windböen“ in km/h."),
+    "radiation": N_("Sonneneinstrahlung in W/m², zum Beispiel „Sonneneinstrahlung“."),
+    "illuminance": N_("Helligkeit in lx, am besten vom Süd-Sensor, zum Beispiel „Helligkeit Süd“."),
+    "illuminance_dawn": N_("Ein Helligkeitssensor für Tag und Nacht in lx, zum Beispiel ein Dämmerungs- oder Lichtsensor."),
+    "wind_direction": N_("Windrichtung in Grad, zum Beispiel „Windrichtung“."),
+    "sun_elevation": N_("Höhe der Sonne in Grad, zum Beispiel ein Template-Sensor aus dem Attribut „elevation“ von sun.sun."),
+    "pv_power": N_("Aktuelle Leistung der PV-Anlage in W oder kW, zum Beispiel „Solarleistung“."),
+}
 ROLE_KEYS = tuple(key for key, _label, _types in ROLES)
 ROLE_TYPES = {key: types for key, _label, types in ROLES}
 ROLE_LABELS = {key: label for key, label, _types in ROLES}
@@ -1618,6 +1635,7 @@ class WetterService:
                     "roles": [(key, label, types) for key, label, types in ROLES],
                     "role_types": {key: list(types) for key, _label, types in ROLES},
                     "role_units": ROLE_UNITS,
+                    "role_help": {key: tr(text) for key, text in ROLE_HELP.items()},
                     "card_groups": [
                         (tr(tab), [(key, tr(labels[key])) for key in keys])
                         for tab, keys in CARD_GROUPS
