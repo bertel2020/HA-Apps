@@ -180,6 +180,9 @@
   .wt-setup .dd-picker-popover{left:0;right:auto;width:100%;box-sizing:border-box;}
   .wt-opt-unit{margin-left:8px;font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);}
   .wt-setup .dd-picker-row{display:block;}
+  .wt-setup .dd-picker-row.is-disabled{color:var(--ink-faint);cursor:not-allowed;}
+  .wt-setup .dd-picker-row.is-disabled:hover{background:none;}
+  .wt-opt-why{display:block;font-size:calc(11px * var(--font-scale, 1));font-style:italic;color:var(--ink-faint);}
   .wt-opt-sep{display:block;margin:-2px -4px 4px;padding:4px 4px 3px;border-top:1px solid var(--border-strong);font-size:calc(11px * var(--font-scale, 1));text-transform:uppercase;letter-spacing:.07em;color:var(--ink-faint);}
   .wt-thresholds{display:flex;flex-wrap:wrap;gap:0 28px;margin-top:6px;}
   .wt-thresholds .field{margin-bottom:12px;}

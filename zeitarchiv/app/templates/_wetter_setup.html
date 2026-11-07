@@ -12,9 +12,10 @@
     <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:260px;overflow-y:auto;">
       <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="{{ _('Suchen …') }}">
       <template x-for="opt in filtered()" :key="opt.entity_id">
-        <div class="dd-picker-row" :class="{active: entityId === opt.entity_id}" @click="select(opt.entity_id)">
-          <span class="wt-opt-sep" x-show="opt.sep && !search" x-cloak>{{ _("Weitere Entitäten") }}</span>
+        <div class="dd-picker-row" :class="{active: entityId === opt.entity_id, 'is-disabled': opt.disabled}" :aria-disabled="opt.disabled ? 'true' : null" @click="opt.disabled || select(opt.entity_id)">
+          <span class="wt-opt-sep" x-show="opt.sep && !search" x-cloak x-text="opt.disabled ? '{{ _("Nicht wählbar") }}' : '{{ _("Weitere Entitäten") }}'"></span>
           <span x-text="opt.label"></span><span class="wt-opt-unit" x-show="opt.unit" x-text="opt.unit"></span>
+          <span class="wt-opt-why" x-show="opt.disabled" x-cloak>{{ _("Messwert, kein Zähler") }}</span>
         </div>
       </template>
     </div>
@@ -152,7 +153,19 @@
         },
         optionsFor(role) {
           const allowed = this.roleTypes[role] || ["standard"];
-          return this.preferUnits(this.entityOptions.filter(o => allowed.includes(o.aggregation_type)), role);
+          const options = this.preferUnits(this.entityOptions.filter(o => allowed.includes(o.aggregation_type)), role);
+          return options.concat(this.nearMisses(role, allowed));
+        },
+        // Rollen mit festem Typ (Niederschlag: Zähler): Sensoren mit der passenden Einheit, die als Messwert geführt
+        // werden, stehen ausgegraut am Ende. So sieht man, dass der Sensor erkannt wurde und nur der Typ nicht passt.
+        nearMisses(role, allowed) {
+          const units = this.roleUnits[role] || [];
+          if (allowed.includes("standard") || !units.length) return [];
+          const rest = this.entityOptions
+            .filter(o => o.aggregation_type === "standard" && units.includes(o.unit))
+            .map(o => ({...o, disabled: true}));
+          if (rest.length) rest[0].sep = true;
+          return rest;
         },
         preferUnits(opts, role) {
           const units = this.roleUnits[role] || [];

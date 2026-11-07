@@ -3714,7 +3714,9 @@
     "Ein Helligkeitssensor für Tag und Nacht in lx, zum Beispiel ein Dämmerungs- oder Lichtsensor.": "A brightness sensor for day and night in lx, for example a twilight or light sensor.",
     "Windrichtung in Grad, zum Beispiel „Windrichtung“.": "Wind direction in degrees, for example “Wind direction”.",
     "Höhe der Sonne in Grad, zum Beispiel ein Template-Sensor aus dem Attribut „elevation“ von sun.sun.": "Elevation of the sun in degrees, for example a template sensor from the “elevation” attribute of sun.sun.",
-    "Aktuelle Leistung der PV-Anlage in W oder kW, zum Beispiel „Solarleistung“.": "Current output of the PV system in W or kW, for example “Solar power”."
+    "Aktuelle Leistung der PV-Anlage in W oder kW, zum Beispiel „Solarleistung“.": "Current output of the PV system in W or kW, for example “Solar power”.",
+    "Nicht wählbar": "Not selectable",
+    "Messwert, kein Zähler": "Measurement, not a counter"
   },
   "js": {
     "Ladestand": "State of charge",
