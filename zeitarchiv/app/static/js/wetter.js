@@ -1644,7 +1644,7 @@
           ],
           tooltip: tooltipBox(colors, (params) => {
             const i = params[0].dataIndex;
-            const cell = (value) => (value == null ? '–' : `${num(value, 1)} ${unit}`);
+            const cell = (value) => (value == null ? '–' : `${num(value, 1)} ${escapeHtml(unit)}`);
             let html = `<b>${escapeHtml(labels[i])}</b>`;
             html += `<br>${escapeHtml(t('Tageswert'))}: ${cell(p.daily[i] == null ? null : p.daily[i] * scale)}`;
             html += `<br>${p.year}: ${cell(cumulative[i])}`;
