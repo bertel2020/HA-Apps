@@ -1148,6 +1148,11 @@
   .wt-vr-spark{grid-area:spark;}
   .wt-vr-num{font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
   .wt-vr-head .wt-vr-num,.wt-vr-head .wt-vr-spark{font-family:inherit;font-size:inherit;color:inherit;}
+  /* Sortierbare Köpfe: Knopf und Pfeil der Tabelle Verbraucher × Jahre (.wt-vt-yh), der Name linksbündig. */
+  .wt-vr-head .wt-vt-yh button{text-transform:inherit;letter-spacing:inherit;}
+  .wt-vr-head .wt-vr-name.wt-vt-yh button{align-items:flex-start;text-align:left;}
+  /* Sortier-Umschalter nur mobil, wo die Köpfe ausgeblendet sind. */
+  .wt-controls .wt-vr-msort{display:none;}
   .wt-vr-delta .wt-dl{display:block;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
   .wt-vr-delta .wt-dl.wt-dl-good{color:var(--positive);}
   .wt-vr-delta .wt-dl.wt-dl-bad{color:var(--danger);}
@@ -1168,6 +1173,7 @@
     /* Feste Zahlenspalten, damit kWh und Anteil über alle Zeilen bündig stehen; die Änderung nutzt beide. */
     .wt-vr-row{grid-template-columns:minmax(0,1fr) 64px 52px;grid-template-areas:"name kwh pct" "bar delta delta";gap:3px 10px;padding:7px 6px;}
     .wt-vr-spark,.wt-vr-head{display:none;}
+    .wt-controls .wt-vr-msort{display:inline-flex;}
     .wt-vr-sum{grid-template-areas:"name kwh pct" ". delta delta";}
   }
 

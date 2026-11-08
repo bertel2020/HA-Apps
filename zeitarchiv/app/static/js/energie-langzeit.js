@@ -216,18 +216,53 @@
     return `<span class="wt-vr-sp" role="img" aria-label="${escapeHtml(tip)}" title="${escapeHtml(tip)}">${bars}</span>`;
   }
 
+  // Gemeinsame Sortierung von Rangliste und Tabelle: stabil (Gleichstand behält die Setup-Reihenfolge), nach Zahl oder Text;
+  // ohne Wert (null) in beiden Richtungen ans Ende.
+  function sortByValue(list, value, dir) {
+    const sign = dir === 'asc' ? 1 : -1;
+    return list.sort((a, b) => {
+      const va = value(a);
+      const vb = value(b);
+      if (va == null || vb == null) return (va == null) - (vb == null);
+      return sign * (typeof va === 'string' ? va.localeCompare(vb, undefined, {sensitivity: 'base'}) : va - vb);
+    });
+  }
+
+  const ariaSort = (on, dir) => (on ? (dir === 'desc' ? 'descending' : 'ascending') : 'none');
+
+  // Kopf einer sortierbaren Spalte (Rangliste und Tabelle): Knopf mit Beschriftung (labelHtml, schon maskiert) und Pfeil.
+  function sortHead(labelHtml, on, dir, attrs, aria, sub = '') {
+    const arrow = on ? (dir === 'desc' ? '▼' : '▲') : '↕';
+    return `<button type="button" ${attrs} aria-label="${escapeHtml(aria)}">`
+      + `<span><span class="wt-vt-yl">${labelHtml}</span><span class="wt-vt-arrow${on ? '' : ' is-off'}" aria-hidden="true">${arrow}</span></span>`
+      + `${sub ? `<small>${escapeHtml(sub)}</small>` : ''}</button>`;
+  }
+
+  // Sortierwerte der Rangliste; kWh und Anteil sortieren gleich, die Änderung mit Vorzeichen (Anstieg oben bei 'desc').
+  const RANK_SORT = {
+    name: (e) => e.item.name,
+    kwh: (e) => e.cur,
+    chg: (e) => e.delta,
+  };
+
+  // sort: {col: 'name'|'kwh'|'chg', dir}. „Übrige (Grundlast)“ und die Bilanz bleiben immer unten.
   function rankHtml(data, rank, sort, selected) {
-    const list = rank.entries.filter((e) => !e.item.rest);
+    const list = sortByValue(rank.entries.filter((e) => !e.item.rest), RANK_SORT[sort.col], sort.dir);
     const rest = rank.entries.filter((e) => e.item.rest);
-    if (sort === 'chg') list.sort((a, b) => (b.delta == null ? -1 : Math.abs(b.delta)) - (a.delta == null ? -1 : Math.abs(a.delta)));
-    else list.sort((a, b) => b.cur - a.cur);
     const rows = [...list, ...rest];
     const total = rank.total;
     const share = (value) => (total ? value / total * 100 : null);
     const top = Math.max(0, ...rows.map((e) => share(e.cur) || 0)) || 1;
-    let html = `<div class="wt-vr-row wt-vr-head" aria-hidden="true"><span class="wt-vr-name">${escapeHtml(t('Verbraucher'))}</span><span></span>`
-      + `<span class="wt-vr-num wt-vr-kwh">kWh</span><span class="wt-vr-num wt-vr-pct">${escapeHtml(t('Anteil'))}</span>`
-      + `<span class="wt-vr-num wt-vr-delta">${escapeHtml(t('Vorjahr'))}</span><span class="wt-vr-spark">${escapeHtml(t('Verlauf'))}</span></div>`;
+    const head = (col, label, cls, aria) => {
+      const on = sort.col === col;
+      return `<span class="${cls} wt-vt-yh${on ? ' is-sorted' : ''}" role="columnheader" aria-sort="${ariaSort(on, sort.dir)}">`
+        + `${sortHead(escapeHtml(label), on, sort.dir, `data-sort="${col}"`, aria)}</span>`;
+    };
+    let html = `<div class="wt-vr-row wt-vr-head">${head('name', t('Verbraucher'), 'wt-vr-name', t('Nach Name sortieren'))}<span></span>`
+      + head('kwh', t('kWh'), 'wt-vr-num wt-vr-kwh', t('Nach Verbrauch sortieren'))
+      + head('kwh', t('Anteil'), 'wt-vr-num wt-vr-pct', t('Nach Verbrauch sortieren'))
+      + head('chg', t('Vorjahr'), 'wt-vr-num wt-vr-delta', t('Nach Änderung zum Vorjahr sortieren'))
+      + `<span class="wt-vr-spark">${escapeHtml(t('Verlauf'))}</span></div>`;
     for (const entry of rows) {
       const item = entry.item;
       const part = share(entry.cur);
@@ -346,26 +381,18 @@
     const pctText = (value) => `${num(value, 1)} %`;
     const rows = consumerRows(data);
     const list = rows.filter((item) => !item.rest);
-    // Ohne Wert im sortierten Jahr ans Ende; sonst bleibt bei Gleichstand die Setup-Reihenfolge (stabile Sortierung).
-    list.sort((a, b) => {
-      const ea = entryOf(sort.year, a.key);
-      const eb = entryOf(sort.year, b.key);
-      if (!ea || !eb) return (eb ? 1 : 0) - (ea ? 1 : 0);
-      return sort.dir === 'asc' ? ea.cur - eb.cur : eb.cur - ea.cur;
-    });
+    // Ohne Wert im sortierten Jahr ans Ende.
+    sortByValue(list, (item) => (entryOf(sort.year, item.key) || {cur: null}).cur, sort.dir);
     const sorted = (year) => (year === sort.year ? ' wt-vt-sorted' : '');
 
     let html = `<thead><tr><th scope="col">${escapeHtml(t('Verbraucher'))}<small>${escapeHtml(pct ? t('Anteil, darunter kWh') : t('kWh, darunter Anteil'))}</small></th>`;
     for (const year of cols) {
       const on = year === sort.year;
-      const arrow = on ? (sort.dir === 'desc' ? '▼' : '▲') : '↕';
       let sub = '';
       if (year === data.window.year) sub = t('bis {date}', {date: until});
       else if (year === firstYear) sub = t('ab {date}', {date: fmtDate(formats.dm, data.rest.first_ts)});
-      html += `<th scope="col" class="wt-vt-yh${on ? ' is-sorted' : ''}" aria-sort="${on ? (sort.dir === 'desc' ? 'descending' : 'ascending') : 'none'}">`
-        + `<button type="button" data-year="${year}" aria-label="${escapeHtml(t('Nach {year} sortieren', {year}))}">`
-        + `<span><span class="wt-vt-yl">${year}${year === firstYear ? '*' : ''}</span><span class="wt-vt-arrow${on ? '' : ' is-off'}" aria-hidden="true">${arrow}</span></span>`
-        + `${sub ? `<small>${escapeHtml(sub)}</small>` : ''}</button></th>`;
+      html += `<th scope="col" class="wt-vt-yh${on ? ' is-sorted' : ''}" aria-sort="${ariaSort(on, sort.dir)}">`
+        + `${sortHead(`${year}${year === firstYear ? '*' : ''}`, on, sort.dir, `data-year="${year}"`, t('Nach {year} sortieren', {year}), sub)}</th>`;
     }
     html += '</tr></thead><tbody>';
 
@@ -485,7 +512,9 @@
       consumers: null,
       consumersError: '',
       _consumersSeq: 0,
-      rankSort: 'kwh',
+      // Sortierung der Rangliste: Spalte ('name', 'kwh' für kWh und Anteil, 'chg') und Richtung.
+      rankSortCol: 'kwh',
+      rankSortDir: 'desc',
       // Gewähltes Jahr der Rangliste; null = das Jahr des Stichtags (folgt dann der Stichtag-Leiste).
       rankYearSel: null,
       sharesMode: 'pct',
@@ -504,7 +533,13 @@
       init() {
         const saved = readStore();
         if (hasConsumers && (saved.view === 'sum' || saved.view === 'verb')) this.lzView = saved.view;
-        if (saved.rankSort === 'kwh' || saved.rankSort === 'chg') this.rankSort = saved.rankSort;
+        // Früher ein Umschalter 'use'/'kwh' (Verbrauch) oder 'chg' (Änderung, jetzt nach Vorzeichen), heute {col, dir}.
+        const rankSort = saved.rankSort;
+        if (rankSort === 'chg') this.rankSortCol = 'chg';
+        else if (rankSort && ['name', 'kwh', 'chg'].includes(rankSort.col) && ['asc', 'desc'].includes(rankSort.dir)) {
+          this.rankSortCol = rankSort.col;
+          this.rankSortDir = rankSort.dir;
+        }
         if (saved.sharesMode === 'pct' || saved.sharesMode === 'kwh') this.sharesMode = saved.sharesMode;
         // Jahre ohne Daten fallen erst beim Zeichnen weg (sharesTableYears), wenn die Jahre des Archivs bekannt sind.
         if (Array.isArray(saved.tblCols) && saved.tblCols.length && saved.tblCols.every(Number.isInteger)) this.tblCols = saved.tblCols;
@@ -786,6 +821,11 @@
 
       rankClick(event) {
         if (event.target.closest('a')) return;  // der Name öffnet die Entität
+        const head = event.target.closest('button[data-sort]');
+        if (head) {
+          this.sortRank(head.dataset.sort);
+          return;
+        }
         const row = event.target.closest('.wt-vr-pick');
         if (row) this.pickConsumer(row.dataset.key, true);
       },
@@ -867,10 +907,19 @@
         this.drawRank();
       },
 
-      setRankSort(sort) {
-        this.rankSort = sort;
-        writeStore({rankSort: sort});
+      // Klick auf einen Spaltenkopf (mobil auf den Sortier-Umschalter): ein zweiter Klick dreht die Richtung. Der Name beginnt
+      // aufsteigend, Zahlen absteigend (bei der Änderung: größter Anstieg zuerst).
+      sortRank(col) {
+        if (col === this.rankSortCol) this.rankSortDir = this.rankSortDir === 'desc' ? 'asc' : 'desc';
+        else this.rankSortDir = col === 'name' ? 'asc' : 'desc';
+        this.rankSortCol = col;
+        writeStore({rankSort: {col, dir: this.rankSortDir}});
         this.drawRank();
+      },
+
+      rankSortArrow(col) {
+        if (col !== this.rankSortCol) return '';
+        return this.rankSortDir === 'desc' ? ' ▼' : ' ▲';
       },
 
       rankRange() {
@@ -895,7 +944,7 @@
         if (!data || !host) return;
         const rank = consumerRank(data, this.rankYear(), this.yearLimit);
         host.style.setProperty('--vr-years', String(sparkYears(data, rank.limit).length));
-        host.innerHTML = rankHtml(data, rank, this.rankSort, this.matrixKey());
+        host.innerHTML = rankHtml(data, rank, {col: this.rankSortCol, dir: this.rankSortDir}, this.matrixKey());
         if (this.$refs.rankCover) this.$refs.rankCover.innerHTML = coverHtml(rank);
       },
 

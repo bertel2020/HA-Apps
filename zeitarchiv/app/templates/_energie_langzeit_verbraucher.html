@@ -21,15 +21,17 @@
           <button type="button" :aria-pressed="(rankYear() === option.year).toString()" @click="setRankYear(option.year)" x-text="option.label"></button>
         </template>
       </div>
-      <div class="wt-seg wt-controls-end" role="group" aria-label="{{ _('Sortierung') }}">
-        <button type="button" :aria-pressed="(rankSort === 'kwh').toString()" @click="setRankSort('kwh')">{{ _("Verbrauch") }}</button>
-        <button type="button" :aria-pressed="(rankSort === 'chg').toString()" @click="setRankSort('chg')">{{ _("Änderung") }}</button>
+      {# Sortiert wird über die Spaltenköpfe der Liste; mobil sind die Köpfe ausgeblendet, dann sortiert dieser Umschalter. #}
+      <div class="wt-seg wt-controls-end wt-vr-msort" role="group" aria-label="{{ _('Sortierung') }}">
+        <button type="button" :aria-pressed="(rankSortCol === 'kwh').toString()" @click="sortRank('kwh')">{{ _("Verbrauch") }}<span x-text="rankSortArrow('kwh')"></span></button>
+        <button type="button" :aria-pressed="(rankSortCol === 'chg').toString()" @click="sortRank('chg')">{{ _("Änderung") }}<span x-text="rankSortArrow('chg')"></span></button>
+        <button type="button" :aria-pressed="(rankSortCol === 'name').toString()" @click="sortRank('name')">{{ _("Name") }}<span x-text="rankSortArrow('name')"></span></button>
       </div>
     </div>
     <p class="wt-stand wt-vr-range" x-text="rankRange()"></p>
     <div class="wt-vr-list" x-ref="rank" @click="rankClick($event)" @keydown="rankKey($event)"><p class="wt-stand">{{ _("Lädt …") }}</p></div>
     <div class="wt-vr-cover" x-ref="rankCover"></div>
-    <p class="wt-foot">{{ _("Anteil am Verbrauch laut Bilanz (Erzeugung + Netzbezug + Speicherentladung − Einspeisung − Speicherladung). Die Änderung vergleicht mit demselben Stück des Vorjahres; rot: mehr Verbrauch, grün: weniger, „–“, wenn der Verbraucher im Vorjahr noch nicht ganz erfasst war. „Übrige (Grundlast)“ ist der Rest bis zur Bilanz, nie negativ. Das Dreieck nennt Messlücken und Zählerrückgänge im Zeitraum. Der Name öffnet die Entität, ein Klick auf die Zeile zeigt ihre Monate unten. Der kleine Verlauf rechts zeigt die Jahressummen, das gewählte Jahr kräftig.") }}</p>
+    <p class="wt-foot">{{ _("Anteil am Verbrauch laut Bilanz (Erzeugung + Netzbezug + Speicherentladung − Einspeisung − Speicherladung). Die Änderung vergleicht mit demselben Stück des Vorjahres; rot: mehr Verbrauch, grün: weniger, „–“, wenn der Verbraucher im Vorjahr noch nicht ganz erfasst war. „Übrige (Grundlast)“ ist der Rest bis zur Bilanz, nie negativ. Das Dreieck nennt Messlücken und Zählerrückgänge im Zeitraum. Der Name öffnet die Entität, ein Klick auf die Zeile zeigt ihre Monate unten. Der kleine Verlauf rechts zeigt die Jahressummen, das gewählte Jahr kräftig. Ein Klick auf einen Spaltenkopf sortiert, ein zweiter dreht die Reihenfolge; „Vorjahr“ sortiert nach der Änderung in kWh, „Übrige (Grundlast)“ und die Bilanz stehen immer unten.") }}</p>
 
     {# Verbraucher × Jahre: jede Spalte ist die Rangliste ihres Jahres, deshalb gilt auch hier der Stichtag der Karte.
        Sortierbar nach einem Jahr, ein Klick auf eine Zeile wählt den Verbraucher der Matrix. #}

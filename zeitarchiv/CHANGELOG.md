@@ -7,8 +7,9 @@
 - **Energiedashboard**: Der Reiter „Langzeit“ zeigt mit dem Umschalter
   „Summen | Verbraucher“ auch die Verbraucher über die Jahre
   - „Verbraucher im Jahr“: Rangliste mit Anteil am Verbrauch, Änderung zum
-    Vorjahr und kleinem Verlauf, sortierbar nach Verbrauch oder Änderung;
-    der Stichtag gilt wie in der Vergleichstabelle
+    Vorjahr und kleinem Verlauf; der Stichtag gilt wie in der
+    Vergleichstabelle
+    - Rangliste nach Spalten sortierbar (Name, Verbrauch, Änderung)
   - „Gemessen“ nennt, wie viel des Verbrauchs eigene Zähler erfassen; der Rest
     steht als „Übrige (Grundlast)“
   - „Verbraucher × Jahre“: Tabelle unter der Rangliste mit der Änderung zum
@@ -28,8 +29,9 @@
 - **Energy dashboard**: With the "Totals | Consumers" switch, the "Long-term"
   tab also shows the consumers over the years
   - "Consumers in the year": ranking with share of consumption, change from
-    the previous year and a small trend, sortable by consumption or change;
-    the reference date applies as in the comparison table
+    the previous year and a small trend; the reference date applies as in the
+    comparison table
+    - Ranking sortable by column (name, consumption, change)
   - "Measured" shows how much of the consumption your own meters record; the
     remainder is shown as "Other (base load)"
   - "Consumers × years": table below the ranking with the change from the
