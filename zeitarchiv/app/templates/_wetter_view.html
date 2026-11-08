@@ -39,6 +39,10 @@
         <template x-for="key in columnKeys" :key="key">
           <label class="dd-picker-row"><input type="checkbox" :checked="columns.includes(key)" @change="toggleColumn(key)"><span x-text="columnName(key)"></span></label>
         </template>
+        <div class="menu-section-label wt-vt-menu-sep" x-show="yearKeys.length" x-cloak>{{ _("Einzelne Jahre") }}</div>
+        <template x-for="key in yearKeys" :key="key">
+          <label class="dd-picker-row"><input type="checkbox" :checked="columns.includes(key)" @change="toggleColumn(key)"><span x-text="key.slice(1)"></span></label>
+        </template>
       </div>
     </div>
     {# Vorjahresvergleich als ein Menü wie „Vergleichen ▾“ auf der Entitätenseite: Aus / Bis jetzt / Komplett.

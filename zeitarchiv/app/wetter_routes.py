@@ -20,6 +20,7 @@ from .i18n import N_, tr
 
 import bisect
 import json
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
@@ -174,6 +175,8 @@ COLUMN_WINDOWS = {
     "vormonat": ("month", -1),
     "jahr": ("year", 0),
 }
+#: Einzelne abgeschlossene Jahre als Spalten: „j2024“ (frühestens dieses Jahr im Archiv, nie das laufende Jahr).
+YEAR_COLUMN = re.compile(r"^j(\d{4})$")
 #: Sonnenschein zählt, wenn die Süd-Helligkeit im Stundenmittel über dieser Schwelle liegt (lx). Kein
 #: offizieller DWD-Wert (der zählt ab 120 W/m² direkter Strahlung): die Station trennt direktes und diffuses
 #: Licht nicht. Startwert aus den Oktoberdaten des Nutzers: trübe Tage mittags bis etwa 15.000 lx, klare ab 50.000 lx.
@@ -576,15 +579,31 @@ class WetterService:
 
     def column_windows(self, key: str, now_local: datetime, mode: str, anchor: datetime | None = None) -> dict:
         """Zeitfenster einer Spalte und ihres Vorjahrespartners (Rechnung in period_columns)."""
+        match = YEAR_COLUMN.match(key)
+        if match:
+            # Ein einzelnes Jahr: Versatz zum laufenden Jahr (bzw. dem des Stichtags), das Vorjahr ist das Jahr davor.
+            offset = int(match.group(1)) - (anchor or now_local).year
+            return period_columns.column_windows({key: ("year", offset)}, key, now_local, mode, anchor)
         return period_columns.column_windows(COLUMN_WINDOWS, key, now_local, mode, anchor)
+
+    def table_years(self, config: dict, now_local: datetime, anchor: datetime | None) -> list[int]:
+        """Abgeschlossene Jahre, die als einzelne Spalten wählbar sind: ab dem ersten Jahr der Außentemperatur im
+        Archiv bis zum Jahr vor dem laufenden (bzw. dem des Stichtags), neueste zuerst."""
+        entity = self.deps.index.get_entity(config["temperature"]) if config.get("temperature") else None
+        if not entity or not entity["first_ts"]:
+            return []
+        first = datetime.fromtimestamp(entity["first_ts"], self.deps.tz).year
+        return list(range((anchor or now_local).year - 1, first - 1, -1))
 
     def compute_table(self, body: TableRequest, now_local: datetime | None = None) -> dict:
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
-        columns = [key for key in COLUMN_KEYS if key in body.columns]
         mode = body.mode if body.mode in MODES else "bis_jetzt"
         stichtag = parse_stichtag(body.at, now_local.date())
         anchor = datetime(stichtag.year, stichtag.month, stichtag.day, 12, tzinfo=self.deps.tz) if stichtag else None
+        years = self.table_years(config, now_local, anchor)
+        columns = [key for key in COLUMN_KEYS if key in body.columns]
+        columns += [f"j{year}" for year in years if f"j{year}" in body.columns]
         windows = [self.column_windows(key, now_local, mode, anchor) for key in columns]
         read_cache = query_mod.QueryReadCache()
         rows_out = []
@@ -621,6 +640,7 @@ class WetterService:
             "mode": mode,
             "at": stichtag.isoformat() if stichtag else None,
             "today": now_local.date().isoformat(),
+            "years": years,
             "vorjahr": body.vorjahr,
             "rain_day_mm": config["rain_day_mm"],
             "rain_day_minutes": config["rain_day_minutes"],

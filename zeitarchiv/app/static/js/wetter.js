@@ -239,6 +239,7 @@
 
       columnKeys: COLUMN_KEYS,
       columns: [...COLUMN_KEYS],
+      yearKeys: [],  // wählbare einzelne Jahre (vom Server, neueste zuerst)
       vorjahr: true,
       diff: true,
       mode: 'bis_jetzt',
@@ -257,7 +258,7 @@
 
       init() {
         const saved = readStore();
-        if (Array.isArray(saved.columns)) this.columns = COLUMN_KEYS.filter((key) => saved.columns.includes(key));
+        if (Array.isArray(saved.columns)) this.columns = saved.columns.filter((key) => COLUMN_KEYS.includes(key) || /^j\d{4}$/.test(key));
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
         if (saved.kenntageRange === '5' || saved.kenntageRange === 'all') this.kenntageRange = saved.kenntageRange;
@@ -300,7 +301,7 @@
       toggleColumn(key) {
         this.columns = this.columns.includes(key)
           ? this.columns.filter((k) => k !== key)
-          : COLUMN_KEYS.filter((k) => k === key || this.columns.includes(k));
+          : [...this.columns, key];
         this.saveAndLoad();
       },
 
@@ -2539,6 +2540,7 @@
           const data = await res.json();
           if (seq !== this._seq) return;  // eine neuere Anfrage hat überholt
           lastTable = data;
+          this.yearKeys = (data.years || []).map((year) => `j${year}`);
           this.paintTables(data);
         } catch (e) {
           if (seq === this._seq) this.error = t('Die Tabelle konnte nicht geladen werden.');

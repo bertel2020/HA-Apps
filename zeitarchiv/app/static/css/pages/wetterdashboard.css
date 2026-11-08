@@ -435,3 +435,6 @@
     [data-tile-style] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile{transition:none;}
     [data-tile-style] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) a.wt-tile:hover{transform:none;}
   }
+
+/* Spaltenmenü der Vergleichstabelle: die einzelnen Jahre stehen abgesetzt unter den Zeiträumen. */
+.wt-controls .menu-section-label.wt-vt-menu-sep{margin-top:6px;border-top:1px solid var(--border);padding-top:6px;}
