@@ -38,6 +38,8 @@
   - Neue Kenntage: „Tage ohne Netzbezug“ und „Hohe Einspeisung“ (die
     Schwelle stellst du im Setup ein); Jahre ohne Speicher stehen bei den
     Speicher-Kenntagen als „kein Speicher“
+  - Bei einem Verbraucher zeigt „Monatswerte je Jahr“ zusätzlich einen
+    kleinen Verlauf der Jahressummen
 
 ### Geändert
 
@@ -94,6 +96,8 @@
   - New notable days: "Days without grid import" and "High feed-in" (you set
     the threshold in the setup); years without storage show as "no storage"
     for the storage-related days
+  - For a consumer, "Monthly values per year" also shows a small trend of the
+    annual totals
 
 #### Changed
 

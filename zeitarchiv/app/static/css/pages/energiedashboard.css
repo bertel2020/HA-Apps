@@ -1223,3 +1223,4 @@
 /* Reiter „Langzeit“: kleinere Diagramme der Jahresbilanz (Anteile, Quoten) und ihre Zwischenüberschriften. */
 .wt-chart.wt-chart-sm{height:200px;}
 .wt-sub{margin:10px 0 0;font-size:13px;font-weight:600;color:var(--ink-muted);}
+.el-spark{width:96px;height:30px;}

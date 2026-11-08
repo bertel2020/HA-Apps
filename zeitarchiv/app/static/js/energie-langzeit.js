@@ -1333,6 +1333,52 @@
       drawSize() {
         if (this.lzView === 'tab') this.drawMatrix();
         else this.drawMonthly();
+        this.$nextTick(() => this.drawSpark());
+      },
+
+      // Jahressummen des gewählten Verbrauchers (ältestes Jahr links, höchstens die gewählten Jahre); null bei Bilanzgrößen
+      // oder wenn weniger als zwei Jahre einen Wert haben.
+      sparkRows() {
+        const size = this.size();
+        if (!size || !size.consumer || !this.cons) return null;
+        const item = consumerRows(this.cons).find((row) => `c:${row.key}` === this.sizeSel);
+        if (!item || !item.year_sums) return null;
+        const rows = size.m.years.slice().reverse().map((year) => ({
+          year, value: yearValue(item, year), running: year === this.cons.current.year,
+        }));
+        return rows.filter((row) => row.value != null).length >= 2 ? rows : null;
+      },
+
+      sparkShown() {
+        return !!this.sparkRows();
+      },
+
+      // Kleiner Verlauf der Jahressummen neben der Auswahl; das laufende Jahr (bis heute) als offener Punkt.
+      drawSpark() {
+        const rows = this.sparkRows();
+        const element = this.$refs.sizeSpark;
+        if (!rows || !element) return;
+        const colors = palette();
+        const chart = chartFor('spark', element);
+        chart.setOption({
+          animation: false,
+          grid: {left: 6, right: 6, top: 6, bottom: 6},
+          xAxis: {type: 'category', show: false, data: rows.map((row) => String(row.year))},
+          yAxis: {type: 'value', show: false, min: 0},
+          tooltip: {
+            trigger: 'axis', confine: true, backgroundColor: colors.surface, borderColor: colors.grid,
+            textStyle: {color: colors.ink, fontSize: scaledFont(12)},
+            formatter: (params) => {
+              const row = rows[params[0].dataIndex];
+              return `${escapeHtml(row.year + (row.running ? '*' : ''))}: ${row.value == null ? '–' : escapeHtml(energy(row.value))}`;
+            },
+          },
+          series: [{
+            type: 'line', symbolSize: 6, lineStyle: {color: colors.cur, width: 2}, itemStyle: {color: colors.cur},
+            data: rows.map((row) => ({value: row.value, symbol: row.running ? 'emptyCircle' : 'circle'})),
+          }],
+        }, true);
+        requestAnimationFrame(() => chart.resize());
       },
 
       // Rekorde und Kenntage je Jahr: einmal je Seitenaufruf, sie hängen nicht am Zeitraum der Tabelle.

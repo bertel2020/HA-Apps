@@ -547,7 +547,7 @@ def test_reiter_uebersicht_vergleich_langzeit_und_wohin_die_karten_gehoeren(clie
         assert 'x-ref="table"' in vergleich and "dashStichtag" in vergleich              # Tabelle mit Stichtag-Leiste
         langzeit = ohne[ohne.index('id="ed-panel-long"'):]
         assert 'x-ref="table"' not in langzeit
-        for karte in ('x-ref="kenntage"', 'x-ref="matrixTable"', 'x-ref="monthlyChart"'):
+        for karte in ('x-ref="kenntage"', 'x-ref="matrixTable"', 'x-ref="monthlyChart"', 'x-ref="sizeSpark"'):
             assert karte in langzeit, karte
         assert "Was hat sich verändert?" not in ohne                       # die Karte gibt es nicht mehr
         # Mit Verbrauchern kommen Filter, Gruppe und „Aufteilung des Verbrauchs“ in den Reiter „Vergleich“.

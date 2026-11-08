@@ -86,6 +86,8 @@
       <h2 class="wt-h2"><span x-text="sizeTitle()"></span> {{ hint_button(_("Monatswerte je Jahr")) }}</h2>
       {% call hint_body() %}<span x-text="sizeNote()"></span>{% endcall %}
       <div class="wt-controls-end">
+        {# Verlauf der Jahressummen des gewählten Verbrauchers (mit Tooltip); bei Bilanzgrößen nicht sichtbar. #}
+        <div class="el-spark" x-ref="sizeSpark" x-show="sparkShown()" role="img" aria-label="{{ _('Jahressummen des Verbrauchers') }}" x-cloak></div>
         <select aria-label="{{ _('Größe') }}" @change="pickSize($event.target.value)">
           <optgroup label="{{ _('Bilanz') }}">
             <template x-for="option in balanceOptions()" :key="option.key">
