@@ -884,6 +884,15 @@ HEIM_CHARGE_EFFICIENCY = 0.97
 HEIM_DISCHARGE_EFFICIENCY = 0.95
 
 
+def join_prehistory(prehistory: list[Row], rows: list[Row]) -> list[Row]:
+    """Hängt die Vorgeschichte vor die Reihe. Beide Abschnitte erzeugen den Zeitstempel der Nahtstelle (die Zeitschleife
+    schließt Anfang und Ende ein); dort gilt der Wert der Reihe, die Vorgeschichte endet davor."""
+    if not rows:
+        return list(prehistory)
+    seam = rows[0][0]
+    return [row for row in prehistory if row[0] < seam] + rows
+
+
 def simulate_household(
     start: datetime, end: datetime, tz: ZoneInfo, rng: random.Random,
     weather: WeatherContext, schedules: dict[str, dict[str, list[ApplianceCycle]]],
@@ -2238,7 +2247,7 @@ def run_generation(
 
     for entity_id, key in WEATHER_HISTORY_KEYS.items():
         if prehistory.get(key):
-            rows_by_key[entity_id] = prehistory[key] + rows_by_key[entity_id]
+            rows_by_key[entity_id] = join_prehistory(prehistory[key], rows_by_key[entity_id])
 
     if not append or fell_back_to_full_history:
         # Ein Sprachwechsel soll den Datensatz ersetzen, nicht verdoppeln: IDs der anderen Sprache entfernen.

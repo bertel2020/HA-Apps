@@ -79,3 +79,30 @@ def test_no_extension_when_weather_months_is_not_larger(tmp_path: Path, captured
 
 def test_weather_history_is_five_years() -> None:
     assert WEATHER_HISTORY_MONTHS == 60
+
+
+def test_the_seam_timestamp_appears_once_in_the_joined_series() -> None:
+    """Vorgeschichte und Haushalt erzeugen beide den Zeitstempel der Nahtstelle (die Zeitschleife schließt Anfang und Ende
+    ein). Absichtlich eingestreute Doppelzeilen der Demo (DUPLICATE_CHANCE) bleiben davon unberührt, darum wird hier die
+    Nahtstelle selbst geprüft und nicht die ganze Reihe."""
+    from datetime import datetime, timedelta
+
+    rng = random.Random(1)
+    now = datetime(2026, 11, 8, 12, 0, tzinfo=TZ)
+    start, weather_start = now - timedelta(days=60), now - timedelta(days=150)
+    weather = demo_generation.WeatherContext(weather_start, now, rng)
+    rain = demo_generation.build_rain_schedule(weather_start, now, weather, rng)
+    pre = demo_generation.simulate_household(
+        weather_start, start, TZ, rng, weather, demo_generation.build_appliance_schedules(weather_start, start, rng), rain)
+    household = demo_generation.simulate_household(
+        start, now, TZ, rng, weather, demo_generation.build_appliance_schedules(start, now, rng), rain)
+    assert pre["outdoor_temp"][-1][0] == household["outdoor_temp"][0][0]  # die Voraussetzung: beide tragen den Randpunkt
+    joined = demo_generation.join_prehistory(pre["outdoor_temp"], household["outdoor_temp"])
+    seam = household["outdoor_temp"][0][0]
+    assert [row[0] for row in joined].count(seam) == 1
+
+
+def test_join_prehistory_keeps_the_value_of_the_series_at_the_seam() -> None:
+    joined = demo_generation.join_prehistory([(1.0, 1), (2.0, 2), (3.0, 3)], [(3.0, 30), (4.0, 4)])
+    assert joined == [(1.0, 1), (2.0, 2), (3.0, 30), (4.0, 4)]
+    assert demo_generation.join_prehistory([(1.0, 1)], []) == [(1.0, 1)]
