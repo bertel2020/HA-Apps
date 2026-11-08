@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## 1.31.1 - 2026-11-08
+
+### Geändert
+
+- **Charts**: Der Vorjahresvergleich zeigt die Vergleichsreihe über den ganzen
+  Vorjahreszeitraum (bei einem laufenden Monat also den ganzen Vorjahresmonat)
+  - Die Summe „bis zum gleichen Tag“ und die Vergleichstabellen bleiben beim
+    gleichen Stichtag
 
 ### Behoben
 
@@ -41,6 +48,14 @@
 ---
 
 ### English
+
+#### Changed
+
+- **Charts**: The previous-year comparison shows the comparison series over the
+  whole previous-year period (for a running month, the whole month of last
+  year)
+  - The "up to the same day" total and the comparison tables stay on the same
+    reference day
 
 #### Fixed
 
