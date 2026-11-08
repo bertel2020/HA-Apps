@@ -385,8 +385,9 @@
         if (tab === 'over') this.$nextTick(() => window.dispatchEvent(new Event('resize')));
       },
 
-      // Meldet den Tag, bis zu dem der Energiefluss zeigt, an „Zeiträume im Vergleich“ (energie-langzeit.js, energieVergleich):
-      // der letzte Tag des Zeitraums, oder null für „jetzt“, wenn er heute oder später ist.
+      // Meldet den Tag, bis zu dem der Energiefluss zeigt, an den Reiter „Vergleich“ (energie-langzeit.js, energieVergleich): der
+      // letzte Tag des Zeitraums, oder null für „jetzt“, wenn er heute oder später ist. Er wird dort zum gemeinsamen Stichtag. Nur eine
+      // Änderung wird gemeldet, damit das Nachladen der Daten einen im Reiter „Vergleich“ gewählten Stichtag nicht zurücksetzt.
       announceWindow(data) {
         const ZT = window.ServerTime;
         const iso = (ts) => {
@@ -395,13 +396,13 @@
         };
         const day = iso(data.window_end_ts - 1);
         const at = day < iso(Date.now() / 1000) ? day : null;
+        if (window.energieWindowAt === at) return;
         window.energieWindowAt = at;
         window.dispatchEvent(new CustomEvent('energie-window', {detail: {at}}));
       },
 
       tabKey(event) {
-        // „Verbraucher“ gibt es nur mit eingerichteten Verbrauchern.
-        const keys = ['over', 'cons', 'long'].filter((key) => document.getElementById('ed-tab-' + key));
+        const keys = ['over', 'cmp', 'long'].filter((key) => document.getElementById('ed-tab-' + key));
         const step = {ArrowRight: 1, ArrowLeft: -1}[event.key];
         if (!step) return;
         const next = keys[(keys.indexOf(this.tab) + step + keys.length) % keys.length];
@@ -411,6 +412,10 @@
       },
 
       init() {
+        // Der Reiter „Vergleich“ schickt in den Reiter „Langzeit“ (Knopf unter der Tabelle bei einer ausgewählten Zeile).
+        window.addEventListener('energie-goto', (event) => {
+          if (this.$root.isConnected) this.showTab(event.detail);
+        });
         // Nach einem htmx-Swap (z. B. Rollen gespeichert → zurück zur
         // Ansicht) mountet Alpine diese Komponente NEU auf einem frischen
         // DOM-Knoten, aber chartInstance ist eine modulweite Closure-

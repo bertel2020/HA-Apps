@@ -1117,62 +1117,29 @@
   /* Setup: Geräte hinter einem Zwischenzähler wirken etwas zurückgenommen. */
   .edash-item-tile.is-child .edash-item-accent{opacity:.5;}
 
-  /* Reiter „Verbraucher“ (Roadmap 1.49). */
-  /* Rangliste „Verbraucher im Jahr“: Name, Balken (Anteil im Maßstab des größten), kWh, Anteil, Änderung, Verlauf. */
-  .wt-vr-list{display:flex;flex-direction:column;gap:2px;margin-top:6px;}
-  .wt-vr-row{display:grid;grid-template-columns:minmax(130px,220px) minmax(60px,1fr) 86px 58px 112px min(calc(var(--vr-years, 0) * 31px), 32%);
-    grid-template-areas:"name bar kwh pct delta spark";gap:4px 12px;align-items:center;padding:5px 8px;border-radius:7px;
-    font-size:calc(13.5px * var(--font-scale, 1));}
-  .wt-vr-pick{cursor:pointer;}
-  .wt-vr-pick:hover{background:var(--surface-alt);}
-  .wt-vr-pick:focus-visible{outline:2px solid var(--accent-line);outline-offset:1px;}
-  .wt-vr-pick.is-sel{background:color-mix(in srgb, var(--accent-line) 9%, transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--accent-line) 35%, transparent);}
-  .wt-vr-head{font-size:calc(11px * var(--font-scale, 1));letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);padding-bottom:2px;}
-  .wt-vr-sum{border-top:1px solid var(--border-strong);border-radius:0;margin-top:4px;padding-top:8px;font-weight:600;}
-  .wt-vr-name{grid-area:name;display:flex;gap:8px;align-items:center;min-width:0;}
-  .wt-vr-name a{color:inherit;text-decoration:none;overflow-wrap:anywhere;}
-  .wt-vr-name a:hover,.wt-vr-name a:focus-visible{color:var(--accent-line);text-decoration:underline;}
+  /* Reiter „Vergleich“: Bausteine der Verbraucher-Zeilen (Punkt, Beginn, Dreieck, Schraffur). */
   .wt-vr-dot{width:10px;height:10px;border-radius:3px;flex:none;}
   .wt-vr-from{font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);white-space:nowrap;}
   /* Dasselbe Dreieck wie in der Matrix „Jahre × Monate“ (Messlücken, Zählerrückgänge, verzerrter Vergleich). */
   .wt-vr-warn{display:inline-block;flex:none;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;
     border-bottom:10px solid var(--chart-7);cursor:help;}
-  .wt-vr-bar{grid-area:bar;height:12px;background:var(--surface-alt);border-radius:3px;overflow:hidden;}
-  .wt-vr-bar i{display:block;height:100%;border-radius:3px;}
-  .wt-vr-kwh{grid-area:kwh;}
-  .wt-vr-pct{grid-area:pct;color:var(--ink-muted);}
-  .wt-vr-delta{grid-area:delta;line-height:1.2;}
-  .wt-vr-spark{grid-area:spark;}
-  .wt-vr-num{font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
-  .wt-vr-head .wt-vr-num,.wt-vr-head .wt-vr-spark{font-family:inherit;font-size:inherit;color:inherit;}
-  /* Sortierbare Köpfe: Knopf und Pfeil der Tabelle Verbraucher × Jahre (.wt-vt-yh), der Name linksbündig. */
-  .wt-vr-head .wt-vt-yh button{text-transform:inherit;letter-spacing:inherit;}
-  .wt-vr-head .wt-vr-name.wt-vt-yh button{align-items:flex-start;text-align:left;}
-  /* Sortier-Umschalter nur mobil, wo die Köpfe ausgeblendet sind. */
-  .wt-controls .wt-vr-msort{display:none;}
-  .wt-vr-delta .wt-dl{display:block;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
-  .wt-vr-delta .wt-dl.wt-dl-good{color:var(--positive);}
-  .wt-vr-delta .wt-dl.wt-dl-bad{color:var(--danger);}
-  .wt-vr-delta small{display:block;font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);white-space:normal;}
-  .wt-vr-sp{display:flex;align-items:flex-end;gap:3px;height:26px;}
-  .wt-vr-sp i{flex:1 1 0;max-width:28px;min-width:2px;border-radius:2px;}
-  .wt-vr-sp .wt-vr-sp-none{height:1px;background:var(--border-strong);}
   /* „Übrige (Grundlast)“: schraffiert, weil kein eigener Zähler dahintersteht. */
   .wt-vr-hatch{background:repeating-linear-gradient(135deg, var(--chart-8) 0 3px, color-mix(in srgb, var(--chart-8) 30%, var(--surface)) 3px 6px) !important;}
-  .wt-vr-cover{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
-  .wt-vr-cover b{color:var(--ink);font-weight:600;}
-  .wt-vr-cover-bar{flex:1 1 160px;align-self:center;min-width:0;height:6px;border-radius:3px;background:var(--surface-alt);overflow:hidden;}
-  .wt-vr-cover-bar i{display:block;height:100%;background:var(--accent-line);}
-  @media (max-width:900px){
-    .wt-vr-row{grid-template-columns:minmax(110px,170px) minmax(60px,1fr) 80px 54px 100px min(calc(var(--vr-years, 0) * 31px), 24%);}
-  }
-  @media (max-width:640px){
-    /* Feste Zahlenspalten, damit kWh und Anteil über alle Zeilen bündig stehen; die Änderung nutzt beide. */
-    .wt-vr-row{grid-template-columns:minmax(0,1fr) 64px 52px;grid-template-areas:"name kwh pct" "bar delta delta";gap:3px 10px;padding:7px 6px;}
-    .wt-vr-spark,.wt-vr-head{display:none;}
-    .wt-controls .wt-vr-msort{display:inline-flex;}
-    .wt-vr-sum{grid-template-areas:"name kwh pct" ". delta delta";}
-  }
+  /* Link unter dem Energiefluss der Übersicht auf den Reiter „Vergleich“. */
+  .edash-cmp-link{margin:10px 2px 0;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
+  /* Ausgewählte Zeile der Vergleichstabelle: Name, Sprung in den Reiter „Langzeit“, Auswahl aufheben. */
+  .wt-cmp-sel{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:12px;padding:8px 10px;border-radius:8px;
+    background:color-mix(in srgb, var(--accent-line) 9%, var(--surface));font-size:calc(13px * var(--font-scale, 1));}
+  .wt-cmp-sel-name{display:inline-flex;align-items:center;gap:8px;min-width:0;margin-right:auto;}
+  .wt-cmp-sel-x{padding-left:10px;padding-right:10px;}
+  /* Kopfzeile der Gruppe „Verbraucher“ mit dem Umschalter kWh | Anteil; bleibt beim waagerechten Scrollen sichtbar. */
+  .wt-table tr.wt-grp .wt-grp-row{position:sticky;left:8px;display:inline-flex;align-items:center;gap:12px;}
+  .wt-grp-seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:6px;overflow:hidden;background:var(--surface);}
+  .wt-grp-seg button{margin:0;padding:2px 9px;border:0;background:none;color:var(--ink-muted);font:inherit;font-size:calc(11.5px * var(--font-scale, 1));
+    letter-spacing:.02em;text-transform:none;cursor:pointer;}
+  .wt-grp-seg button+button{border-left:1px solid var(--border);}
+  .wt-grp-seg button[aria-pressed="true"]{background:var(--accent-line);color:var(--accent-contrast);}
+  .wt-grp-seg button:focus-visible{outline:2px solid var(--accent-line);outline-offset:-2px;}
 
   /* Anteile je Jahr: ein gestapelter Balken je Jahr, rechts Jahressumme und gemessener Anteil. */
   .wt-vs-rows{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
@@ -1181,6 +1148,8 @@
   .wt-vs-year small{display:block;font-weight:400;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
   .wt-vs-trackwrap{min-width:0;}
   .wt-vs-track{display:flex;height:28px;border-radius:5px;overflow:hidden;background:var(--surface-alt);}
+  .wt-vs-track-vj{height:8px;margin-top:4px;opacity:.55;}
+  .wt-vs-cmp .wt-vs-row{grid-template-columns:128px minmax(0,1fr) 210px;}
   .wt-vs-seg{display:flex;align-items:center;justify-content:center;height:100%;overflow:hidden;white-space:nowrap;cursor:pointer;
     font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--surface);box-shadow:inset -1px 0 0 var(--surface);
     transition:opacity .15s;}
@@ -1197,10 +1166,11 @@
   @media (prefers-reduced-motion: reduce){.wt-vs-seg{transition:none;}}
   @media (max-width:640px){
     .wt-vs-row{grid-template-columns:56px minmax(0,1fr);gap:2px 10px;}
+    .wt-vs-cmp .wt-vs-row{grid-template-columns:92px minmax(0,1fr);}
     .wt-vs-total{grid-column:2;text-align:left;}
   }
 
-  /* Tabelle „Zeiträume im Vergleich je Verbraucher“: Basis .wt-table der Vergleichstabelle (erste Spalte sticky, die Spalten
+  /* Tabelle „Zeiträume im Vergleich“ (Bilanz und Verbraucher): Basis .wt-table der Vergleichstabelle (erste Spalte sticky, die Spalten
      scrollen waagerecht), Kopf und Vorjahr-Spalten wie dort; je Feld Hauptzahl, darunter klein der andere Wert und die Änderung. */
   .wt-vt-wrap{margin-top:12px;}
   /* Spaltenmenü der Tabelle: die einzelnen Jahre stehen abgesetzt unter den Zeiträumen (.menu-section-label). */

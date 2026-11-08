@@ -377,13 +377,11 @@
 
   {# Reiterzeile des App-Standards (.entity-tabs), wie beim Wetterdashboard: Schaltflächen statt Links, weil die
      Reiter nur umschalten und die Seite nicht wechseln. „Übersicht“ ist der bisherige Energiefluss, unverändert. #}
-  {# Verbraucher der obersten Ebene (wie energie_langzeit.top_consumers): ohne sie gibt es den Reiter „Verbraucher“ nicht. #}
-  {% set consumer_count = (config.verbraucher or []) | selectattr('entity_id') | rejectattr('parent') | list | length %}
+  {# Der Name des Reiters „Vergleich“ steht nur hier (und im Link der Übersicht); der Schlüssel des Reiters bleibt „cmp“. #}
+  {% set compare_tab = _("Vergleich") %}
   <nav class="entity-tabs wt-tabs" role="tablist" aria-label="{{ _('Ansichten des Energiedashboards') }}" style="margin-top:14px;" @keydown="tabKey($event)">
     <button type="button" role="tab" id="ed-tab-over" aria-controls="ed-panel-over" class="entity-tab" :class="{'is-active': tab === 'over'}" :aria-selected="(tab === 'over').toString()" :tabindex="tab === 'over' ? 0 : -1" @click="showTab('over')">{{ _("Übersicht") }}</button>
-{% if consumer_count %}
-    <button type="button" role="tab" id="ed-tab-cons" aria-controls="ed-panel-cons" class="entity-tab" :class="{'is-active': tab === 'cons'}" :aria-selected="(tab === 'cons').toString()" :tabindex="tab === 'cons' ? 0 : -1" @click="showTab('cons')">{{ _("Verbraucher") }}</button>
-{% endif %}
+    <button type="button" role="tab" id="ed-tab-cmp" aria-controls="ed-panel-cmp" class="entity-tab" :class="{'is-active': tab === 'cmp'}" :aria-selected="(tab === 'cmp').toString()" :tabindex="tab === 'cmp' ? 0 : -1" @click="showTab('cmp')">{{ compare_tab }}</button>
     <button type="button" role="tab" id="ed-tab-long" aria-controls="ed-panel-long" class="entity-tab" :class="{'is-active': tab === 'long'}" :aria-selected="(tab === 'long').toString()" :tabindex="tab === 'long' ? 0 : -1" @click="showTab('long')">{{ _("Langzeit") }}</button>
   </nav>
 
@@ -564,8 +562,9 @@
     {% endif %}
   </div>
 
-  {# Zeiträume im Vergleich: direkt unter dem Energiefluss, für den Tag, den der Energiefluss zeigt. #}
-  {% include "_energie_vergleich.html" %}
+  {# Die Zeiträume im Vergleich (gegen das Vorjahr, mit Verbrauchern) stehen im eigenen Reiter und folgen dem Tag des Energieflusses. #}
+  <p class="edash-cmp-link">{{ _("Gegenüber dem Vorjahr und mit weiteren Zeiträumen:") }}
+    <button type="button" class="btn" @click="showTab('cmp')">{{ _("Im Reiter „{name}“ ansehen ›", name=compare_tab) }}</button></p>
 
   <div class="edash-grid" style="margin-top:14px;">
     {% if config.show_verbraucheranteile or config.show_versorgungsanteile %}
@@ -731,11 +730,9 @@
   </div>
   </section>
 
-{% if consumer_count %}
-  <section x-show="tab === 'cons'" x-cloak role="tabpanel" id="ed-panel-cons" aria-labelledby="ed-tab-cons">
-    {% include "_energie_verbraucher.html" %}
+  <section x-show="tab === 'cmp'" x-cloak role="tabpanel" id="ed-panel-cmp" aria-labelledby="ed-tab-cmp" data-hints="collapsed">
+    {% include "_energie_vergleich.html" %}
   </section>
-{% endif %}
 
   <section x-show="tab === 'long'" x-cloak role="tabpanel" id="ed-panel-long" aria-labelledby="ed-tab-long" data-hints="collapsed">
     {% include "_energie_langzeit.html" %}

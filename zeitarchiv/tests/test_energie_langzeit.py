@@ -507,7 +507,7 @@ def test_bereiche_des_reiters_werden_im_setup_gespeichert_und_nicht_gerendert(cl
     try:
         alles = client.post("/energiedashboard/setup", data={
             "netzbezug": "sensor.setup_netz",
-            "langzeit_zeigen": ["quoten", "speicher", "pv", "monatsvergleich", "matrix", "rekorde", "kenntage"],
+            "langzeit_zeigen": ["quoten", "speicher", "pv", "verbraucher", "monatsvergleich", "matrix", "rekorde", "kenntage"],
         })
         assert ed._load_config(index)["langzeit_ausblenden"] == []
         assert 'x-ref="monthlyChart"' in alles.text and 'x-ref="kenntage"' in alles.text
@@ -516,7 +516,7 @@ def test_bereiche_des_reiters_werden_im_setup_gespeichert_und_nicht_gerendert(cl
             "netzbezug": "sensor.setup_netz", "langzeit_zeigen": ["quoten", "rekorde"],
         })
         assert ed._load_config(index)["langzeit_ausblenden"] == [
-            "speicher", "pv", "monatsvergleich", "matrix", "kenntage",
+            "speicher", "pv", "monatsvergleich", "matrix", "kenntage", "verbraucher",
         ]
         for ref in ('x-ref="monthlyChart"', 'x-ref="matrixTable"', 'x-ref="kenntage"'):
             assert ref not in wenig.text, ref
@@ -527,28 +527,37 @@ def test_bereiche_des_reiters_werden_im_setup_gespeichert_und_nicht_gerendert(cl
         index.set_setting(ed.SETTING_CONFIG, "")
 
 
-def test_reiter_uebersicht_verbraucher_langzeit_und_wohin_die_karten_gehoeren(client) -> None:
+def test_reiter_uebersicht_vergleich_langzeit_und_wohin_die_karten_gehoeren(client) -> None:
     from app.main import index
 
     index.set_setting(ed.SETTING_CONFIG, "")
     try:
-        # Ohne Verbraucher: Übersicht und Langzeit; die Vergleichstabelle steht in der Übersicht, nicht in der Langzeit.
+        # Ohne Verbraucher: drei Reiter, die Vergleichstabelle steht im Reiter „Vergleich“, nicht in der Übersicht oder in der Langzeit.
         ed._save_config(index, _config(netzbezug="sensor.setup_netz"))
         ohne = client.get("/energiedashboard").text
-        assert 'id="ed-tab-over"' in ohne and 'id="ed-tab-long"' in ohne and 'id="ed-tab-cons"' not in ohne
-        assert 'x-data="energieVergleich()"' in ohne and "energieVerbraucher" not in ohne
-        assert ohne.index('x-data="energieVergleich()"') < ohne.index('id="ed-panel-long"')
+        assert ohne.index('id="ed-tab-over"') < ohne.index('id="ed-tab-cmp"') < ohne.index('id="ed-tab-long"')
+        assert 'id="ed-tab-cons"' not in ohne and "energieVerbraucher" not in ohne
+        assert "energieVergleich({" in ohne and '"consumers": false' in ohne
+        assert 'x-ref="sharesTable"' not in ohne and 'x-ref="rank"' not in ohne          # keine Aufteilung ohne Verbraucher
+        assert 'x-ref="shares"' not in ohne
+        übersicht = ohne[ohne.index('id="ed-panel-over"'):ohne.index('id="ed-panel-cmp"')]
+        assert 'x-ref="table"' not in übersicht and "edash-cmp-link" in übersicht        # nur der Link auf den Reiter
+        vergleich = ohne[ohne.index('id="ed-panel-cmp"'):ohne.index('id="ed-panel-long"')]
+        assert 'x-ref="table"' in vergleich and "dashStichtag" in vergleich              # Tabelle mit Stichtag-Leiste
         langzeit = ohne[ohne.index('id="ed-panel-long"'):]
-        assert 'x-ref="table"' not in langzeit and "lzView" not in ohne
+        assert 'x-ref="table"' not in langzeit
         for karte in ('x-ref="kenntage"', 'x-ref="matrixTable"', 'x-ref="monthlyChart"'):
             assert karte in langzeit, karte
         assert "Was hat sich verändert?" not in ohne                       # die Karte gibt es nicht mehr
-        # Mit Verbrauchern kommt der Reiter dazu, zwischen Übersicht und Langzeit.
+        # Mit Verbrauchern kommen Filter, Gruppe und „Aufteilung des Verbrauchs“ in den Reiter „Vergleich“.
         ed._save_config(index, _config(netzbezug="sensor.setup_netz", verbraucher=[{"entity_id": "sensor.waerme", "name": "Wärme"}]))
         mit = client.get("/energiedashboard").text
-        assert mit.index('id="ed-tab-over"') < mit.index('id="ed-tab-cons"') < mit.index('id="ed-tab-long"')
-        assert 'x-data="energieVerbraucher()"' in mit and 'x-ref="rank"' in mit and 'x-ref="sharesTable"' in mit
-        assert "wt-yearbar" not in mit and "Summen oder Verbraucher" not in mit
+        assert '"consumers": true' in mit and 'x-ref="shares"' in mit and 'x-ref="sharesLegend"' in mit
+        assert "setFilter('cons')" in mit and "wt-yearbar" not in mit and "Summen oder Verbraucher" not in mit
+        # Das Setup blendet die Gruppe samt Aufteilung aus.
+        ed._save_config(index, _config(netzbezug="sensor.setup_netz", verbraucher=[{"entity_id": "sensor.waerme", "name": "Wärme"}], langzeit_ausblenden=["verbraucher"]))
+        weg = client.get("/energiedashboard").text
+        assert 'x-ref="shares"' not in weg and "setFilter('cons')" not in weg
     finally:
         index.set_setting(ed.SETTING_CONFIG, "")
 

@@ -58,7 +58,7 @@ def test_the_pages_that_use_buttons_load_the_script() -> None:
     Seite, in die sie hineingerendert werden."""
     seiten = {
         "entity_config.html": ["_entity_config_form.html", "_counter_decrease_field.html"],
-        "energiedashboard.html": ["_energiedashboard_setup.html", "_energie_vergleich.html", "_energie_langzeit.html", "_energie_verbraucher.html"],
+        "energiedashboard.html": ["_energiedashboard_setup.html", "_energie_vergleich.html", "_energie_langzeit.html"],
         "backup.html": ["_settings_backup_ready.html"],
         "housekeeping.html": [
             "_settings_storage_index_form.html",
