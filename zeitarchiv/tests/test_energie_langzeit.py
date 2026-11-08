@@ -485,7 +485,7 @@ def test_bereiche_des_reiters_werden_im_setup_gespeichert_und_nicht_gerendert(cl
         ]
         for ref in ('x-ref="monthlyChart"', 'x-ref="matrixTable"', 'x-ref="changes"', 'x-ref="kenntage"', "wt-yearbar"):
             assert ref not in wenig.text, ref
-        assert "wt-kpis" in wenig.text                                   # die Rekorde sind angehakt geblieben
+        assert "el-rec-big" in wenig.text                                  # die Rekorde sind angehakt geblieben
         assert 'x-ref="table"' in wenig.text                              # die Tabelle gibt es immer
         assert '"monatsvergleich"' in wenig.text                          # das Frontend lädt die abgewählten Daten nicht
     finally:
