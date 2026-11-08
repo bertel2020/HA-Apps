@@ -403,5 +403,5 @@ Monate an Daten neu zu berechnen:
   Demo-Modus) erzeugt den Preisverlauf deshalb rückwirkend ab dem Beginn der
   übrigen Historie, auch wenn sonst nichts zu ergänzen wäre. Die Reihe hängt nur
   an Zeitstempel und Datum und passt daher nahtlos an spätere Läufe an. Die
-  Zuordnung als Netzbezug-Preis im Energiedashboard legt die Demo nicht an,
-  die trägst du in der Einrichtung selbst ein.
+  Zuordnung als Netzbezug-Preis im Energiedashboard legt der Demo-Modus der App
+  mit an (`app/demo_seed.py`); das CLI-Skript erzeugt nur Messwerte.

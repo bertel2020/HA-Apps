@@ -2927,9 +2927,16 @@ echten archivierten Werte liegen unverändert in einem komplett eigenen
 Verzeichnis (`<Datenverzeichnis>/demo` statt des echten
 Datenverzeichnisses) und werden zu keinem Zeitpunkt gelesen, verändert oder
 überschrieben. Ist beim ersten Start in diesem Modus noch keine Demo-Historie
-vorhanden, erzeugt die App sie automatisch (rund 3 Jahre, dauert im
-Hintergrund rund eine Minute — die App ist währenddessen normal erreichbar,
-zeigt aber erst danach vollständige Werte).
+vorhanden, erzeugt die App sie automatisch (5 Jahre, dauert im Hintergrund einige
+Minuten — die App ist währenddessen normal erreichbar, zeigt aber erst danach
+vollständige Werte).
+
+Dazu legt die App eine fertige Oberfläche an: das Energie- und das
+Wetterdashboard sind eingerichtet (inklusive Speicher, dynamischem Strompreis,
+CO₂ und Heizzählern), drei Dashboards („Übersicht“, „Energie“, „Wetter“) zeigen
+gespeicherte Charts und Vergleichstabellen. Beim Erststart und bei „Neu
+erzeugen“ entsteht das alles komplett neu; bei „Jetzt ergänzen“ nur, wenn es
+noch nie angelegt wurde — eigene Änderungen bleiben dort erhalten.
 
 Eine Änderung der Option braucht **immer** einen Neustart, wie jede
 Add-on-Konfigurationsänderung — es gibt keinen Umschalter, der ohne
@@ -2952,8 +2959,10 @@ Ergänzung ansteht. Drei Bedienelemente:
   die vorhandene Historie anzutasten. Dasselbe passiert automatisch, wenn
   „Automatisch ergänzen" fällig wird.
 - **Neu erzeugen** — verwirft die komplette Demo-Historie und würfelt sie
-  neu (mit Sicherheitsabfrage). Nützlich, um wieder bei „frischen" 3 Jahren
-  anzufangen.
+  neu (mit Sicherheitsabfrage). Nützlich, um wieder bei „frischen" 5 Jahren
+  anzufangen. Die vordefinierten Dashboards, Charts, Tabellen und die Einrichtung
+  von Energie- und Wetterdashboard werden dabei ebenfalls neu angelegt (eigene
+  Charts und Tabellen bleiben).
 
 Ein „Entfernen" gibt es hier bewusst nicht: Solange die Instanz selbst im
 Demo-Modus läuft, würde ein Löschen die eigene laufende Datenbank unter sich

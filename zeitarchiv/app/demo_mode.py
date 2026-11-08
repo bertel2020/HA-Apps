@@ -28,6 +28,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from . import demo_seed
 from .demo_generation import DEMO_ENTITIES, WEATHER_HISTORY_MONTHS, run_generation
 from .progress import JobProgress
 from .route_support import dir_size_and_newest_mtime
@@ -36,6 +37,9 @@ from .storage.index import Index
 from .storage.paths import storage_area_dir
 
 DEMO_DIR_NAME = "demo"
+
+#: Historie der Demo-Instanz in Monaten: fünf Jahre, damit auch Jahresvergleiche und Langzeitansichten gefüllt sind.
+DEMO_HISTORY_MONTHS = max(60, WEATHER_HISTORY_MONTHS)
 
 #: Fortschritt der Demo-Daten-Erzeugung — EIN gemeinsames Objekt für alle drei
 #: Auslöser (housekeeping_routes.py: "Jetzt ergänzen"/"Neu erzeugen",
@@ -168,12 +172,15 @@ def build_demo_worker(
         with coordinator.exclusive():
             result = run_generation(
                 data_dir, index, tz, random.Random(),
-                weather_months=WEATHER_HISTORY_MONTHS,
+                months=DEMO_HISTORY_MONTHS, weather_months=WEATHER_HISTORY_MONTHS,
                 append=(mode == "append"), clean=(mode == "regenerate"),
                 on_entity=lambda i, entity_id, _n: demo_progress.advance(i, entity_id),
                 language=language,
             )
         index.set_setting("demo_append_last_run", str(time.time()))
+        # „Neu erzeugen“ und Erststart legen die Demo-Oberfläche komplett neu an; „Jetzt ergänzen“
+        # nur, falls es sie noch nie gab (eigene Änderungen in der Demo bleiben sonst stehen).
+        demo_seed.seed(index, language, reset=(mode != "append"))
         if result.skipped:
             return result.skip_reason
         return tr("{rows_written} Werte über {entity_count} Entitäten geschrieben.", rows_written=result.rows_written, entity_count=result.entity_count)

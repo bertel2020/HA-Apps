@@ -4,6 +4,14 @@
 
 ### Neu
 
+- **Demo-Modus**: Die Demo bringt jetzt eine fertige Oberfläche mit und
+  umfasst 5 Jahre Historie
+  - Energie- und Wetterdashboard sind eingerichtet
+  - Drei Dashboards („Übersicht“, „Energie“, „Wetter“) mit Charts und
+    Vergleichstabellen
+  - „Neu erzeugen“ legt alles komplett neu an; eigene Charts und Tabellen
+    bleiben erhalten
+
 - **Energiedashboard**: Der Reiter „Langzeit“ zeigt mit dem Umschalter
   „Summen | Verbraucher“ auch die Verbraucher über die Jahre
   - „Verbraucher im Jahr“: Rangliste mit Anteil am Verbrauch, Änderung zum

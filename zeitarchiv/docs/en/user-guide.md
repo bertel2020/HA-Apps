@@ -2714,9 +2714,14 @@ After the restart, the app works exclusively with the demo data — the real
 archived values remain unchanged in a completely separate directory
 (`<data directory>/demo` instead of the real data directory) and are never
 read, changed or overwritten at any time. If no demo history exists yet at the
-first start in this mode, the app generates it automatically (about 3 years,
-takes about a minute in the background — the app is reachable normally in the
+first start in this mode, the app generates it automatically (5 years,
+takes a few minutes in the background — the app is reachable normally in the
 meantime but shows complete values only afterwards).
+
+The app also sets up a ready-made interface: the energy and weather dashboards are configured (including
+storage, dynamic electricity price, CO₂ and heating counters), and three dashboards ("Overview", "Energy",
+"Weather") show saved charts and comparison tables. On first start and on "Regenerate" all of it is created
+anew; on "Supplement now" only if it was never created — your own changes stay.
 
 Changing the option **always** requires a restart, like any add-on
 configuration change — there is no switch that changes between real and demo
@@ -2739,7 +2744,8 @@ next supplement is due. Three controls:
   without touching the existing history. The same happens automatically when
   "Supplement automatically" becomes due.
 - **Regenerate** — discards the complete demo history and rolls it anew (with a
-  confirmation prompt). Useful for starting again with "fresh" 3 years.
+  confirmation prompt). Useful for starting again with "fresh" 5 years. The predefined dashboards, charts, tables and the setup of the
+  energy and weather dashboards are created anew as well (your own charts and tables stay).
 
 There is deliberately no "Remove" here: as long as the instance itself runs in
 demo mode, deleting would pull its own running database out from under it. For

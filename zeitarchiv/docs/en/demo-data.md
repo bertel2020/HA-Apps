@@ -390,5 +390,5 @@ the current date, without recalculating months of data on every run:
   therefore generates the price history retroactively from the start of the
   remaining history, even if there is otherwise nothing to add. The series
   depends only on timestamp and date, so it joins later runs seamlessly. The demo
-  does not set up the assignment as grid import price in the energy dashboard;
-  you enter that in the setup yourself.
+  mode of the app sets up the assignment as grid import price in the energy dashboard
+  (`app/demo_seed.py`); the CLI script only generates measurements.
