@@ -370,7 +370,7 @@
   // years: neueste zuerst; sort: {year, dir}; main 'pct' oder 'kwh' bestimmt die Hauptzahl, der andere Wert steht klein darunter;
   // chg 'off', 'pct' oder 'kwh' die Änderungszeile.
   function sharesTableHtml(data, years, {main, chg}, sort, selected, limit = 0) {
-    const cols = [...years].reverse();
+    const cols = [...years];
     const ranks = {};
     for (const year of cols) ranks[year] = consumerRank(data, year, limit);
     const entryOf = (year, key) => ranks[year].entries.find((e) => e.item.key === key) || null;
@@ -400,7 +400,7 @@
       const name = item.entity_id
         ? `<a href="entities/${encodeURIComponent(item.entity_id)}?range=year&offset=0">${escapeHtml(item.name)}</a>`
         : `<span>${escapeHtml(item.name)}</span>`;
-      const from = item.late && item.first_ts != null && ZT.parts(item.first_ts).year >= cols[0]
+      const from = item.late && item.first_ts != null && ZT.parts(item.first_ts).year >= cols[cols.length - 1]
         ? `<span class="wt-vr-from">${escapeHtml(t('ab {date}', {date: monthYear(item.first_ts)}))}</span>` : '';
       const hatch = item.rest ? ' wt-vr-hatch' : '';
       html += `<tr class="wt-vt-row${item.rest ? ' wt-vt-rest' : ''}${selected === item.key ? ' is-sel' : ''}" data-key="${escapeHtml(item.key)}"`
@@ -750,6 +750,7 @@
           return;
         }
         const sort = this.sharesSort();
+        table.style.setProperty('--n', years.length);
         table.innerHTML = sharesTableHtml(data, years, {main: this.tblMain, chg: this.tblChg}, sort, this.matrixKey(), this.yearLimit);
         if (this.$refs.sharesTableFoot) this.$refs.sharesTableFoot.textContent = sharesTableFoot(data, years, sort, this.tblChg);
         // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
