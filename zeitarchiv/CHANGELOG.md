@@ -12,6 +12,8 @@
   - „Gemessen“ nennt, wie viel des Verbrauchs eigene Zähler erfassen; der Rest
     steht als „Übrige (Grundlast)“
   - „Anteile je Jahr“: ein gestapelter Balken je Jahr, in Prozent oder kWh
+  - „Jahre × Monate je Verbraucher“: die Matrix aus „Summen“ für einen
+    gewählten Verbraucher; ein Klick auf ein Feld öffnet den Monat
 
 ---
 
@@ -27,6 +29,8 @@
   - "Measured" shows how much of the consumption your own meters record; the
     remainder is shown as "Other (base load)"
   - "Shares per year": one stacked bar per year, in percent or kWh
+  - "Years × months per consumer": the matrix from "Totals" for a selected
+    consumer; a click on a cell opens that month
 
 ## 1.31.1 - 2026-11-08
 

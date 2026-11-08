@@ -198,7 +198,7 @@
     return svg + '</svg>';
   }
 
-  function rankHtml(data, rank, sort) {
+  function rankHtml(data, rank, sort, selected) {
     const list = rank.entries.filter((e) => !e.item.rest);
     const rest = rank.entries.filter((e) => e.item.rest);
     if (sort === 'chg') list.sort((a, b) => (b.delta == null ? -1 : Math.abs(b.delta)) - (a.delta == null ? -1 : Math.abs(a.delta)));
@@ -222,7 +222,10 @@
       const from = item.late && item.first_ts != null && ZT.parts(item.first_ts).year >= rank.prevYear
         ? `<span class="wt-vr-from">${escapeHtml(t('ab {date}', {date: monthYear(item.first_ts)}))}</span>` : '';
       const hatch = item.rest ? ' wt-vr-hatch' : '';
-      html += `<div class="wt-vr-row${item.rest ? ' wt-vr-rest' : ''}">`
+      // Ein Klick auf die Zeile zeigt die Monate des Verbrauchers in der Matrix darunter.
+      const label = escapeHtml(t('{name}: Monate unten zeigen', {name: item.name}));
+      html += `<div class="wt-vr-row wt-vr-pick${item.rest ? ' wt-vr-rest' : ''}${selected === item.key ? ' is-sel' : ''}"`
+        + ` data-key="${escapeHtml(item.key)}" tabindex="0" role="button" aria-label="${label}">`
         + `<span class="wt-vr-name"><i class="wt-vr-dot${hatch}" style="background:${item.color}"></i>${name}${warn}${from}</span>`
         + `<span class="wt-vr-bar"><i class="${hatch.trim()}" style="width:${part == null ? 0 : (part / top * 100).toFixed(1)}%;background:${item.color}"></i></span>`
         + `<span class="wt-vr-num wt-vr-kwh">${escapeHtml(kwhText(entry.cur))}</span>`
@@ -340,6 +343,8 @@
       sharesMode: 'pct',
       // Hervorgehobener Verbraucher (Schlüssel aus langzeit/consumers, „rest“ für Übrige) oder null.
       pick: null,
+      // Verbraucher der Matrix „Jahre × Monate je Verbraucher“ (null = der erste).
+      matrixSel: null,
 
       init() {
         const saved = readStore();
@@ -439,6 +444,7 @@
       drawConsumers() {
         this.drawRank();
         this.drawShares();
+        this.drawConsumerMatrix();
       },
 
       // Anteile je Jahr in Prozent oder kWh; die Jahre wie in der Leiste „Jahre“ gewählt.
@@ -485,9 +491,72 @@
         this.pickConsumer(this.pick === key && target.tagName === 'BUTTON' ? null : key);
       },
 
-      pickConsumer(key) {
+      // Wählt einen Verbraucher für die Hervorhebung in „Anteile je Jahr“ und für die Matrix (null hebt nur die Hervorhebung auf).
+      pickConsumer(key, scroll = false) {
         this.pick = key;
+        if (key) this.matrixSel = key;
+        this.drawRank();
         this.drawShares();
+        this.drawConsumerMatrix();
+        if (scroll && this.$refs.matrixCard) {
+          const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          this.$refs.matrixCard.scrollIntoView({behavior: reduce ? 'auto' : 'smooth', block: 'start'});
+        }
+      },
+
+      rankClick(event) {
+        if (event.target.closest('a')) return;  // der Name öffnet die Entität
+        const row = event.target.closest('.wt-vr-pick');
+        if (row) this.pickConsumer(row.dataset.key, true);
+      },
+
+      rankKey(event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        if (event.target.closest('a')) return;
+        const row = event.target.closest('.wt-vr-pick');
+        if (!row) return;
+        event.preventDefault();
+        this.pickConsumer(row.dataset.key, true);
+      },
+
+      // Verbraucher der Matrix: der gewählte, sonst der erste der Liste.
+      matrixKey() {
+        const data = this.consumers;
+        if (!data) return null;
+        const keys = consumerRows(data).map((item) => item.key);
+        return keys.includes(this.matrixSel) ? this.matrixSel : keys[0];
+      },
+
+      consumerOptions() {
+        return this.consumers ? consumerRows(this.consumers).map((item) => ({key: item.key, name: item.name})) : [];
+      },
+
+      consumerMatrixNote() {
+        let text = t('Monatswerte des gewählten Verbrauchers in kWh, darunter die Abweichung vom Mittel dieses Monats über die abgeschlossenen Jahre. Rot: mehr Verbrauch, grün: weniger. Die letzte Zeile ist das Mittel.');
+        const item = this.consumers && consumerRows(this.consumers).find((row) => row.key === this.matrixKey());
+        if (item && item.unchecked) text += ' ' + t('{n} Entität(en) sind noch nicht auf Lücken und Zählersprünge geprüft.', {n: item.unchecked});
+        return text;
+      },
+
+      // Dieselbe Matrix wie „Jahre × Monate“ der Summen (energyMatrix), mit dem Verbraucher als Zeile; mehr ist ungünstig.
+      drawConsumerMatrix() {
+        const data = this.consumers;
+        const table = this.$refs.consumerMatrix;
+        if (!data || !data.years || !table) return;
+        const item = consumerRows(data).find((row) => row.key === this.matrixKey());
+        if (!item || !item.values) return;
+        const years = this.yearLimit ? data.years.slice(0, this.yearLimit) : data.years;
+        const m = {years, current: data.current};
+        const role = {values: item.values, flags: item.flags || {}, partial_start: item.partial_start, better: 'down'};
+        const href = (year, month) => {
+          if (!item.entity_id) return '';
+          const back = (data.current.year - year) * 12 + (data.current.month - month);
+          return `entities/${encodeURIComponent(item.entity_id)}?range=month&offset=${-back}`;
+        };
+        const colors = palette();
+        table.innerHTML = energyMatrix(m, role, {colors, href});
+        const scale = this.$refs.consumerMatrixScale;
+        if (scale) scale.style.background = `linear-gradient(90deg, ${colors.bad}, ${colors.base}, ${colors.good})`;
       },
 
       // Jahre der Rangliste: vom Jahr des Stichtags zurück bis zum Beginn des Archivs.
@@ -538,7 +607,7 @@
         const host = this.$refs.rank;
         if (!data || !host) return;
         const rank = consumerRank(data, this.rankYear());
-        host.innerHTML = rankHtml(data, rank, this.rankSort);
+        host.innerHTML = rankHtml(data, rank, this.rankSort, this.matrixKey());
         if (this.$refs.rankCover) this.$refs.rankCover.innerHTML = coverHtml(rank);
       },
 
@@ -567,6 +636,7 @@
         this.drawMatrix();
         this.drawKenntage();
         this.drawShares();
+        this.drawConsumerMatrix();
       },
 
       // Die Monatswerte mit den gewählten Jahren, für Diagramm und Matrix.
