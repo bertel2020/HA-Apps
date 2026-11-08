@@ -26,6 +26,9 @@
       Rest steht als „Übrige (Grundlast)“
     - Ein Klick auf eine Zeile wählt sie aus und hebt sie in der Aufteilung
       hervor; „Langzeit“ zeigt sie danach vorgewählt
+    - Der Stichtag gilt auch für den Energiefluss in der Übersicht: Wählst du
+      im Vergleich einen Tag, zeigt die Übersicht ihn (Zeitraum „Tag“), und
+      umgekehrt
   - „Aufteilung des Verbrauchs“: ein gestapelter Balken je Zeitraum (das
     Vorjahr dünn darunter) oder je Jahr, in Prozent oder kWh
 
@@ -87,6 +90,9 @@
       remainder is shown as "Other (base load)"
     - A click on a row selects it and highlights it in the breakdown; "Long
       term" then shows it preselected
+    - The reference date also applies to the energy flow in the overview: pick
+      a day in "Comparison" and the overview shows it (period "Day"), and vice
+      versa
   - "Consumption breakdown": one stacked bar per period (the previous year
     thinly below) or per year, in percent or kWh
 

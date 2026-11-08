@@ -300,6 +300,15 @@
     history.replaceState(null, '', url);
   }
 
+  // Versatz (in Tagen, ≤ 0) des Tages JJJJ-MM-TT zu heute in der Server-Zeitzone; null/heute/Zukunft = 0.
+  function dayOffsetFor(dateStr) {
+    if (!dateStr) return 0;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const now = window.ServerTime.parts(Date.now() / 1000);
+    const days = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(now.year, now.month - 1, now.day)) / 86400000);
+    return Math.min(0, days);
+  }
+
   window.energieFlow = function energieFlow() {
     const initialPeriod = readInitialRangeOffset();
     return {
@@ -401,6 +410,19 @@
         window.dispatchEvent(new CustomEvent('energie-window', {detail: {at}}));
       },
 
+      // Gegenstück zu announceWindow(): Der Stichtag der Seite (Alpine-Store dashStichtag, im Reiter „Vergleich“ mit Pfeilen,
+      // Kalender und „Heute“ bedienbar) gilt auch für den Energiefluss. Wechselt dort der Tag, zeigt er diesen Tag (Zeitraum
+      // „Tag“); „Heute“ führt zur laufenden Periode zurück. Zeigt der Energiefluss den Tag schon (er hat ihn selbst gemeldet,
+      // etwa als Ende eines Monats), bleibt er, wie er ist: so überschreibt die Meldung des Energieflusses nicht seine eigene Periode.
+      followStichtag() {
+        const store = window.Alpine && Alpine.store('dashStichtag');
+        if (!store || store.date === (window.energieWindowAt || null)) return;
+        this.range = 'day';
+        this.offset = dayOffsetFor(store.date);
+        syncUrlWithPeriod(this.range, this.offset);
+        this.load();
+      },
+
       tabKey(event) {
         const keys = ['over', 'cmp', 'long'].filter((key) => document.getElementById('ed-tab-' + key));
         const step = {ArrowRight: 1, ArrowLeft: -1}[event.key];
@@ -416,6 +438,16 @@
         window.addEventListener('energie-goto', (event) => {
           if (this.$root.isConnected) this.showTab(event.detail);
         });
+        // Gemeinsamer Stichtag: im Reiter „Vergleich“ gewählt, gilt er auch für den Energiefluss (followStichtag).
+        window.addEventListener('dashboard-stichtag', () => {
+          if (this.$root.isConnected) this.followStichtag();
+        });
+        // Ein Link mit ?date=… (ohne Zeitraum) öffnet den Energiefluss an diesem Tag.
+        const startParams = new URLSearchParams(window.location.search);
+        if (window.DashboardStichtag && !startParams.has('range') && !startParams.has('offset')) {
+          this.range = 'day';
+          this.offset = dayOffsetFor(window.DashboardStichtag);
+        }
         // Nach einem htmx-Swap (z. B. Rollen gespeichert → zurück zur
         // Ansicht) mountet Alpine diese Komponente NEU auf einem frischen
         // DOM-Knoten, aber chartInstance ist eine modulweite Closure-
