@@ -3722,7 +3722,16 @@
     "Höhe der Sonne in Grad, zum Beispiel ein Template-Sensor aus dem Attribut „elevation“ von sun.sun.": "Elevation of the sun in degrees, for example a template sensor from the “elevation” attribute of sun.sun.",
     "Aktuelle Leistung der PV-Anlage in W oder kW, zum Beispiel „Solarleistung“.": "Current output of the PV system in W or kW, for example “Solar power”.",
     "Nicht wählbar": "Not selectable",
-    "Messwert, kein Zähler": "Measurement, not a counter"
+    "Messwert, kein Zähler": "Measurement, not a counter",
+    "Anteil am Verbrauch laut Bilanz (Erzeugung + Netzbezug + Speicherentladung − Einspeisung − Speicherladung). Die Änderung vergleicht mit demselben Stück des Vorjahres; rot: mehr Verbrauch, grün: weniger, „–“, wenn der Verbraucher im Vorjahr noch nicht ganz erfasst war. „Übrige (Grundlast)“ ist der Rest bis zur Bilanz, nie negativ. Das Dreieck nennt Messlücken und Zählerrückgänge im Zeitraum. Der Name öffnet die Entität. Der kleine Verlauf rechts zeigt die Jahressummen, das gewählte Jahr kräftig.": "Share of consumption according to the balance (generation + grid import + battery discharge − feed-in − battery charge). The change compares with the same part of the previous year; red: more consumption, green: less, “–” if the consumer was not fully recorded in the previous year. “Other (base load)” is the remainder up to the balance, never negative. The triangle names measurement gaps and meter decreases in the period. The name opens the entity. The small trend on the right shows the yearly totals, the selected year in full colour.",
+    "Der Stichtag gilt für die Rangliste; die übrigen Karten zeigen alle Jahre.": "The reference date applies to the ranking; the other cards show all years.",
+    "Erzeugung, Einspeisung, Netzbezug, Verbrauch und Speicher als Summen.": "Generation, feed-in, grid import, consumption and storage as totals.",
+    "Summen": "Totals",
+    "Summen oder Verbraucher": "Totals or consumers",
+    "Verbraucher im Jahr": "Consumers in the year",
+    "Zeigen": "Show",
+    "{n} Verbraucher eingerichtet. Geräte hinter einem Zwischenzähler stehen in ihrem Zwischenzähler.": "{n} consumer(s) set up. Devices behind a sub-meter are counted in their sub-meter.",
+    "Änderung": "Change"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4692,6 +4701,23 @@
     "unter {limit} °C Heizgrenze": "below {limit} °C heating limit",
     "Gradtagzahl": "Degree days",
     "Maximal {max} Entitäten pro Chart.": "At most {max} entities per chart.",
-    "Maximal {max} Entitäten pro Chart. Bitte Entitäten entfernen, bevor du speicherst.": "At most {max} entities per chart. Please remove some before saving."
+    "Maximal {max} Entitäten pro Chart. Bitte Entitäten entfernen, bevor du speicherst.": "At most {max} entities per chart. Please remove some before saving.",
+    "Die Verbraucher konnten nicht geladen werden.": "The consumers could not be loaded.",
+    "Ganzes Jahr {year} gegen das ganze Jahr {prev}.": "Full year {year} against the full year {prev}.",
+    "Ganzes Jahr {year}, ohne Vorjahr im Archiv.": "Full year {year}, no previous year in the archive.",
+    "Gemessen:": "Measured:",
+    "Hinweis: {text}": "Note: {text}",
+    "Verbrauch (Bilanz)": "Consumption (balance)",
+    "Verbraucher der obersten Ebene; Geräte hinter einem Zwischenzähler stecken im Zwischenzähler. Im Jahr des Stichtags zählt der 1. Januar bis zum Stichtag, in den Jahren davor das ganze Jahr. Verbraucher, die später als die Bilanz erfasst werden, stecken vorher in „Übrige (Grundlast)“, das Dreieck dort nennt sie. Gelöschte Verbraucher fehlen auch in den Vorjahren, ihr Verbrauch steht dort in „Übrige“.": "Top-level consumers; devices behind a sub-meter are counted in the sub-meter. In the year of the reference date, 1 January up to the reference date counts, in earlier years the full year. Consumers recorded later than the balance are part of “Other (base load)” before that; the triangle there names them. Deleted consumers are also missing in earlier years; their consumption is counted in “Other” there.",
+    "Verlauf": "Trend",
+    "Vorjahr erst ab {date}": "previous year only from {date}",
+    "Vorjahr {percent} %": "previous year {percent} %",
+    "ab {date}": "from {date}",
+    "des Verbrauchs ({measured} von {total} kWh)": "of consumption ({measured} of {total} kWh)",
+    "kein Vorjahr": "no previous year",
+    "neu ab {date}": "new from {date}",
+    "{name} wird erst ab {date} gemessen und steckt vorher in „Übrige“. Der Vergleich mit dem Vorjahr ist dadurch verzerrt.": "{name} is only measured from {date} and is part of “Other” before that. The comparison with the previous year is therefore distorted.",
+    "{year} ab Beginn des Archivs am {date}, ohne Vorjahr.": "{year} from the start of the archive on {date}, no previous year.",
+    "{year} bis {date}": "{year} to {date}"
   }
 }

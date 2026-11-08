@@ -77,10 +77,183 @@
     }
   }
 
+  // ---- Ansicht „Verbraucher“ (Roadmap 1.49) -----------------------------------------------------
+  // Der Server liefert Fenster, Monatswerte und Jahressummen je Verbraucher (POST energiedashboard/langzeit/consumers);
+  // hier entstehen daraus nur Anteile, Änderungen und das HTML.
+
+  // Farben nach der Reihenfolge im Setup; die achte Farbe bleibt „Übrige (Grundlast)“ vorbehalten (dort schraffiert).
+  const consumerColor = (index) => (index < 0 ? 'var(--chart-8)' : `var(--chart-${index % 7 + 1})`);
+  const yearStart = (year) => ZT.toEpoch(year, 1, 1, 0);
+  const monthYear = (ts) => {
+    const p = ZT.parts(ts);
+    return `${String(p.month).padStart(2, '0')}/${p.year}`;
+  };
+  const kwhText = (value) => num(value, Math.abs(value) < 100 ? 1 : 0);
+  // Ein Monat am Archivbeginn zählt wie in partial_start (Server) als ganz, wenn das Archiv am 1. beginnt.
+  const coversYear = (item, year) => item.first_ts != null && item.first_ts < yearStart(year) + 86400;
+
+  // Verbraucher und „Übrige“ in Setup-Reihenfolge, mit Farbe.
+  function consumerRows(data) {
+    return [
+      ...data.consumers.map((item, i) => ({...item, color: consumerColor(i), rest: false})),
+      {...data.rest, color: consumerColor(-1), rest: true},
+    ];
+  }
+
+  const yearValue = (item, year) => {
+    const value = item.year_sums ? item.year_sums[String(year)] : null;
+    return value == null ? null : value;
+  };
+
+  // Befunde eines Verbrauchers in den Monaten des Zeitraums (Jahr bis einschließlich lastMonth), als Sätze für das Dreieck.
+  function flagTexts(flags, year, lastMonth) {
+    const out = [];
+    for (let month = 1; month <= lastMonth; month++) {
+      const flag = flags[monthKey(year, month)];
+      if (!flag) continue;
+      const parts = [];
+      if (flag.gaps) parts.push(t('Messlücken: {n} (sonst etwa {typical})', {n: flag.gaps, typical: flag.gaps_typical || 0}));
+      if (flag.counter_decreases) parts.push(t('Zählerrückgänge: {n}', {n: flag.counter_decreases}));
+      out.push(`${monthName(month, 'short')} ${year}: ${parts.join(', ')}`);
+    }
+    return out;
+  }
+
+  // Rangliste eines Jahres: im Jahr des Stichtags das Fenster bis zum Stichtag, sonst ganze Jahre. Eine Änderung gibt es nur,
+  // wenn der Verbraucher das ganze Vorjahr erfasst war; sonst steht ein kurzer Grund statt des Pfeils.
+  function consumerRank(data, year) {
+    const inWindow = year === data.window.year;
+    const prevYear = year - 1;
+    const years = data.years || [];
+    const lastMonth = inWindow ? ZT.parts(data.window.cur.end - 1).month : 12;
+    const windowEnd = inWindow ? data.window.cur.end : yearStart(year + 1);
+    const entries = [];
+    for (const item of consumerRows(data)) {
+      const cur = inWindow ? item.cur : yearValue(item, year);
+      if (cur == null) continue;
+      const prev = inWindow ? item.vj : yearValue(item, prevYear);
+      const comparable = prev != null && coversYear(item, prevYear);
+      let note = '';
+      if (!comparable) {
+        const started = item.first_ts != null ? ZT.parts(item.first_ts).year : null;
+        if (!years.includes(prevYear)) note = t('kein Vorjahr');
+        else if (started != null && started >= year) note = t('neu ab {date}', {date: monthYear(item.first_ts)});
+        else if (started === prevYear) note = t('Vorjahr erst ab {date}', {date: monthYear(item.first_ts)});
+      }
+      const flags = flagTexts(item.flags || {}, year, lastMonth);
+      if (item.rest) {
+        // Später begonnene Verbraucher steckten vorher in „Übrige“: der Vergleich über diesen Zeitpunkt ist verzerrt.
+        for (const c of data.consumers) {
+          if (c.late && c.first_ts > yearStart(prevYear) && c.first_ts < windowEnd) {
+            flags.push(t('{name} wird erst ab {date} gemessen und steckt vorher in „Übrige“. Der Vergleich mit dem Vorjahr ist dadurch verzerrt.', {name: c.name, date: monthYear(c.first_ts)}));
+          }
+        }
+      }
+      entries.push({item, cur, prev: comparable ? prev : null, delta: comparable ? cur - prev : null, note, flags});
+    }
+    const rest = data.rest;
+    const total = inWindow ? data.window.total.cur : yearValue({year_sums: data.total ? data.total.year_sums : null}, year);
+    const restComparable = coversYear(rest, prevYear);
+    const totalPrev = !restComparable ? null
+      : (inWindow ? data.window.total.vj : yearValue({year_sums: data.total ? data.total.year_sums : null}, prevYear));
+    const measured = entries.filter((e) => !e.item.rest).reduce((sum, e) => sum + e.cur, 0);
+    const measuredPrev = totalPrev == null ? null
+      : (inWindow ? data.window.measured.vj : data.consumers.reduce((sum, c) => sum + (yearValue(c, prevYear) || 0), 0));
+    return {year, inWindow, prevYear, entries, total, totalPrev, measured, measuredPrev};
+  }
+
+  function rankDelta(entry) {
+    if (entry.delta == null) {
+      return `<span class="wt-dl">–</span>${entry.note ? `<small>${escapeHtml(entry.note)}</small>` : ''}`;
+    }
+    const percent = entry.prev ? entry.delta / entry.prev * 100 : null;
+    const zero = percent != null ? Math.round(Math.abs(percent)) === 0 : Math.round(Math.abs(entry.delta) * 10) === 0;
+    const cls = zero ? '' : (entry.delta > 0 ? ' wt-dl-bad' : ' wt-dl-good');
+    let head = zero ? '± 0 %' : (entry.delta > 0 ? '▲' : '▼');
+    if (!zero && percent != null) head += ` ${entry.delta > 0 ? '+' : '−'}${num(Math.abs(percent), 0)} %`;
+    const sign = zero ? '±' : (entry.delta > 0 ? '+' : '−');
+    return `<span class="wt-dl${cls}">${escapeHtml(head)}</span><small>${escapeHtml(`${sign}${kwhText(Math.abs(entry.delta))} kWh`)}</small>`;
+  }
+
+  // Jahressummen als kleine Balken, ältestes Jahr links, das gewählte kräftig.
+  function rankSpark(data, item, color, year) {
+    const years = [...(data.years || [])].reverse();
+    if (years.length < 2) return '';
+    const values = years.map((y) => yearValue(item, y));
+    const top = Math.max(...values.map((v) => v || 0)) || 1;
+    const w = 64, h = 20, gap = 2;
+    const bw = Math.max(2, (w - gap * (years.length - 1)) / years.length);
+    const tip = years.map((y, i) => `${y}: ${values[i] == null ? '–' : energy(values[i])}`).join(' · ');
+    let svg = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${escapeHtml(tip)}"><title>${escapeHtml(tip)}</title>`;
+    years.forEach((y, i) => {
+      const x = (i * (bw + gap)).toFixed(1);
+      const v = values[i];
+      if (v == null) {
+        svg += `<rect x="${x}" y="${h - 1}" width="${bw.toFixed(1)}" height="1" fill="var(--border-strong)"/>`;
+        return;
+      }
+      const bh = Math.max(1.5, v / top * (h - 1));
+      svg += `<rect x="${x}" y="${(h - bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="1.5" fill="${color}" opacity="${y === year ? 1 : 0.38}"/>`;
+    });
+    return svg + '</svg>';
+  }
+
+  function rankHtml(data, rank, sort) {
+    const list = rank.entries.filter((e) => !e.item.rest);
+    const rest = rank.entries.filter((e) => e.item.rest);
+    if (sort === 'chg') list.sort((a, b) => (b.delta == null ? -1 : Math.abs(b.delta)) - (a.delta == null ? -1 : Math.abs(a.delta)));
+    else list.sort((a, b) => b.cur - a.cur);
+    const rows = [...list, ...rest];
+    const total = rank.total;
+    const share = (value) => (total ? value / total * 100 : null);
+    const top = Math.max(0, ...rows.map((e) => share(e.cur) || 0)) || 1;
+    let html = `<div class="wt-vr-row wt-vr-head" aria-hidden="true"><span class="wt-vr-name">${escapeHtml(t('Verbraucher'))}</span><span></span>`
+      + `<span class="wt-vr-num wt-vr-kwh">kWh</span><span class="wt-vr-num wt-vr-pct">${escapeHtml(t('Anteil'))}</span>`
+      + `<span class="wt-vr-num wt-vr-delta">${escapeHtml(t('Vorjahr'))}</span><span class="wt-vr-spark">${escapeHtml(t('Verlauf'))}</span></div>`;
+    for (const entry of rows) {
+      const item = entry.item;
+      const part = share(entry.cur);
+      const offset = rank.year - data.current.year;
+      const name = item.entity_id
+        ? `<a href="entities/${encodeURIComponent(item.entity_id)}?range=year&offset=${offset}">${escapeHtml(item.name)}</a>`
+        : `<span>${escapeHtml(item.name)}</span>`;
+      const warn = entry.flags.length
+        ? `<span class="wt-vr-warn" data-tooltip-fixed="${escapeHtml(entry.flags.join('\n'))}" role="img" aria-label="${escapeHtml(t('Hinweis: {text}', {text: entry.flags.join('; ')}))}"></span>` : '';
+      const from = item.late && item.first_ts != null && ZT.parts(item.first_ts).year >= rank.prevYear
+        ? `<span class="wt-vr-from">${escapeHtml(t('ab {date}', {date: monthYear(item.first_ts)}))}</span>` : '';
+      const hatch = item.rest ? ' wt-vr-hatch' : '';
+      html += `<div class="wt-vr-row${item.rest ? ' wt-vr-rest' : ''}">`
+        + `<span class="wt-vr-name"><i class="wt-vr-dot${hatch}" style="background:${item.color}"></i>${name}${warn}${from}</span>`
+        + `<span class="wt-vr-bar"><i class="${hatch.trim()}" style="width:${part == null ? 0 : (part / top * 100).toFixed(1)}%;background:${item.color}"></i></span>`
+        + `<span class="wt-vr-num wt-vr-kwh">${escapeHtml(kwhText(entry.cur))}</span>`
+        + `<span class="wt-vr-num wt-vr-pct">${part == null ? '–' : escapeHtml(num(part, 1) + ' %')}</span>`
+        + `<span class="wt-vr-num wt-vr-delta">${rankDelta(entry)}</span>`
+        + `<span class="wt-vr-spark">${rankSpark(data, item, item.color, rank.year)}</span></div>`;
+    }
+    if (total != null) {
+      const sum = {delta: rank.totalPrev != null ? total - rank.totalPrev : null, prev: rank.totalPrev, note: ''};
+      html += `<div class="wt-vr-row wt-vr-sum"><span class="wt-vr-name">${escapeHtml(t('Verbrauch (Bilanz)'))}</span><span></span>`
+        + `<span class="wt-vr-num wt-vr-kwh">${escapeHtml(kwhText(total))}</span><span class="wt-vr-num wt-vr-pct">100 %</span>`
+        + `<span class="wt-vr-num wt-vr-delta">${rankDelta(sum)}</span><span class="wt-vr-spark"></span></div>`;
+    }
+    return html;
+  }
+
+  // „Gemessen: x % des Verbrauchs“: wie viel davon eigene Zähler erfassen, mit dem Vorjahr zum Vergleich.
+  function coverHtml(rank) {
+    if (!rank.total) return '';
+    const cover = Math.min(100, rank.measured / rank.total * 100);
+    let text = `${escapeHtml(t('Gemessen:'))} <b>${escapeHtml(num(cover, 0))} %</b> `
+      + escapeHtml(t('des Verbrauchs ({measured} von {total} kWh)', {measured: kwhText(rank.measured), total: kwhText(rank.total)}));
+    if (rank.totalPrev) text += ` · ${escapeHtml(t('Vorjahr {percent} %', {percent: num(Math.min(100, rank.measuredPrev / rank.totalPrev * 100), 0)}))}`;
+    return `<span>${text}</span><span class="wt-vr-cover-bar" aria-hidden="true"><i style="width:${cover.toFixed(1)}%"></i></span>`;
+  }
+
   let lastTable = null;
 
   // hidden: im Setup abgewählte Bereiche (Schlüssel wie energie_langzeit.CARD_BLOCKS); deren Daten werden gar nicht erst geladen.
-  window.energieLangzeit = function energieLangzeit(hidden = []) {
+  // hasConsumers: es gibt Verbraucher der obersten Ebene, dann steht der Umschalter „Summen | Verbraucher“ über dem Reiter.
+  window.energieLangzeit = function energieLangzeit(hidden = [], hasConsumers = false) {
     const shown = (key) => !hidden.includes(key);
     return {
       columnKeys: COLUMN_KEYS,
@@ -104,9 +277,19 @@
       yearLimit: 10,
       ktMode: 'full',
       ktDialog: {title: '', sub: '', html: '', error: ''},
+      lzView: 'sum',
+      sumLoaded: false,
+      consumers: null,
+      consumersError: '',
+      _consumersSeq: 0,
+      rankSort: 'kwh',
+      // Gewähltes Jahr der Rangliste; null = das Jahr des Stichtags (folgt dann der Stichtag-Leiste).
+      rankYearSel: null,
 
       init() {
         const saved = readStore();
+        if (hasConsumers && (saved.view === 'sum' || saved.view === 'verb')) this.lzView = saved.view;
+        if (saved.rankSort === 'kwh' || saved.rankSort === 'chg') this.rankSort = saved.rankSort;
         if (Array.isArray(saved.columns)) this.columns = COLUMN_KEYS.filter((key) => saved.columns.includes(key));
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
@@ -119,17 +302,136 @@
           if (!this.$root.isConnected) return;
           if (event.detail === 'long' && !this.opened) {
             this.opened = true;
-            this.loadTable();
-            if (shown('monatsvergleich') || shown('matrix')) this.loadMonths();
-            if (shown('rekorde') || shown('kenntage')) this.loadRecords();
-            if (shown('veraenderungen')) this.loadChanges();
+            this.loadView();
           } else if (event.detail === 'long' && this.months) {
             // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
             this.$nextTick(() => Object.values(charts).forEach((chart) => chart.resize()));
           }
         });
-        // Stichtag-Leiste des App-Standards: bei jeder Änderung die Tabelle neu laden.
-        window.addEventListener('dashboard-stichtag', () => { if (this.$root.isConnected && this.opened) { this.loadTable(); if (shown('veraenderungen')) this.loadChanges(); } });
+        // Stichtag-Leiste des App-Standards: bei jeder Änderung Tabelle und Rangliste neu laden (was schon geladen ist).
+        window.addEventListener('dashboard-stichtag', () => {
+          if (!this.$root.isConnected || !this.opened) return;
+          if (this.sumLoaded) {
+            this.loadTable();
+            if (shown('veraenderungen')) this.loadChanges();
+          }
+          if (this.consumers) {
+            // Stand die Rangliste auf dem Jahr des bisherigen Stichtags, folgt sie dem neuen.
+            if (this.rankYearSel != null && this.rankYearSel >= this.consumers.window.year) this.rankYearSel = null;
+            this.loadConsumers(false);
+          }
+        });
+      },
+
+      // Lädt die Daten der gewählten Ansicht, jede nur beim ersten Zeigen.
+      loadView() {
+        if (this.lzView === 'verb') {
+          if (!this.consumers) this.loadConsumers(true);
+          return;
+        }
+        if (this.sumLoaded) return;
+        this.sumLoaded = true;
+        this.loadTable();
+        if (shown('monatsvergleich') || shown('matrix')) this.loadMonths();
+        if (shown('rekorde') || shown('kenntage')) this.loadRecords();
+        if (shown('veraenderungen')) this.loadChanges();
+      },
+
+      setView(view) {
+        if (!hasConsumers) return;
+        this.lzView = view;
+        writeStore({view});
+        if (this.opened) this.loadView();
+        // Diagramme, die verborgen angelegt wurden, kennen ihre Breite erst jetzt.
+        if (view === 'sum') this.$nextTick(() => Object.values(charts).forEach((chart) => chart.resize()));
+      },
+
+      // Verbraucher über die Jahre. withMonths=false lädt nur das Fenster der Rangliste (Stichtag) und behält die Monatswerte.
+      async loadConsumers(withMonths) {
+        const seq = ++this._consumersSeq;
+        const months = withMonths || !this.consumers;
+        this.consumersError = '';
+        try {
+          const res = await fetch('energiedashboard/langzeit/consumers', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({at: this.stichtag(), months}),
+          });
+          if (!res.ok) throw new Error(String(res.status));
+          const data = await res.json();
+          if (seq !== this._consumersSeq) return;  // eine neuere Anfrage hat überholt
+          if (!months && this.consumers) {
+            const old = this.consumers;
+            const keep = (from, to) => {
+              if (!from) return;
+              for (const key of ['values', 'year_sums', 'flags', 'unchecked']) if (key in from) to[key] = from[key];
+            };
+            data.consumers.forEach((item) => keep(old.consumers.find((o) => o.key === item.key), item));
+            keep(old.rest, data.rest);
+            data.years = old.years;
+            data.total = old.total;
+          }
+          this.consumers = data;
+          this.$nextTick(() => this.drawConsumers());
+        } catch (e) {
+          if (seq === this._consumersSeq) this.consumersError = t('Die Verbraucher konnten nicht geladen werden.');
+        }
+      },
+
+      drawConsumers() {
+        this.drawRank();
+      },
+
+      // Jahre der Rangliste: vom Jahr des Stichtags zurück bis zum Beginn des Archivs.
+      rankYears() {
+        const data = this.consumers;
+        if (!data || !data.years) return [];
+        const until = fmtDate(formats.dm, data.window.cur.end - 1);
+        return data.years.filter((year) => year <= data.window.year).map((year) => ({
+          year, label: year === data.window.year ? t('{year} bis {date}', {year, date: until}) : String(year),
+        }));
+      },
+
+      rankYear() {
+        const data = this.consumers;
+        if (!data) return null;
+        return this.rankYearSel != null && this.rankYearSel < data.window.year ? this.rankYearSel : data.window.year;
+      },
+
+      setRankYear(year) {
+        this.rankYearSel = this.consumers && year >= this.consumers.window.year ? null : year;
+        this.drawRank();
+      },
+
+      setRankSort(sort) {
+        this.rankSort = sort;
+        writeStore({rankSort: sort});
+        this.drawRank();
+      },
+
+      rankRange() {
+        const data = this.consumers;
+        if (!data) return '';
+        const year = this.rankYear();
+        if (year === data.window.year) return changesRange(data.window);
+        if (data.rest.first_ts != null && !coversYear(data.rest, year)) {
+          return t('{year} ab Beginn des Archivs am {date}, ohne Vorjahr.', {year, date: fmtDate(formats.dmy, data.rest.first_ts)});
+        }
+        if (!(data.years || []).includes(year - 1)) return t('Ganzes Jahr {year}, ohne Vorjahr im Archiv.', {year});
+        return t('Ganzes Jahr {year} gegen das ganze Jahr {prev}.', {year, prev: year - 1});
+      },
+
+      rankNote() {
+        return t('Verbraucher der obersten Ebene; Geräte hinter einem Zwischenzähler stecken im Zwischenzähler. Im Jahr des Stichtags zählt der 1. Januar bis zum Stichtag, in den Jahren davor das ganze Jahr. Verbraucher, die später als die Bilanz erfasst werden, stecken vorher in „Übrige (Grundlast)“, das Dreieck dort nennt sie. Gelöschte Verbraucher fehlen auch in den Vorjahren, ihr Verbrauch steht dort in „Übrige“.');
+      },
+
+      drawRank() {
+        const data = this.consumers;
+        const host = this.$refs.rank;
+        if (!data || !host) return;
+        const rank = consumerRank(data, this.rankYear());
+        host.innerHTML = rankHtml(data, rank, this.rankSort);
+        if (this.$refs.rankCover) this.$refs.rankCover.innerHTML = coverHtml(rank);
       },
 
       columnName,

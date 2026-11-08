@@ -1116,3 +1116,48 @@
 
   /* Setup: Geräte hinter einem Zwischenzähler wirken etwas zurückgenommen. */
   .edash-item-tile.is-child .edash-item-accent{opacity:.5;}
+
+  /* Reiter „Langzeit“, Ansicht „Verbraucher“ (Roadmap 1.49). Umschalter „Summen | Verbraucher“ in der Leiste der
+     Jahre-Auswahl (.wt-yearbar), hier mit dem Schalter direkt hinter der Beschriftung. */
+  .wt-viewbar{margin-top:0;}
+  .wt-viewbar .wt-seg{margin-left:0;}
+  /* Rangliste „Verbraucher im Jahr“: Name, Balken (Anteil im Maßstab des größten), kWh, Anteil, Änderung, Verlauf. */
+  .wt-vr-list{display:flex;flex-direction:column;gap:2px;margin-top:6px;}
+  .wt-vr-row{display:grid;grid-template-columns:minmax(130px,220px) minmax(0,1fr) 86px 58px 112px 64px;
+    grid-template-areas:"name bar kwh pct delta spark";gap:4px 12px;align-items:center;padding:5px 8px;border-radius:7px;
+    font-size:calc(13.5px * var(--font-scale, 1));}
+  .wt-vr-head{font-size:calc(11px * var(--font-scale, 1));letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);padding-bottom:2px;}
+  .wt-vr-sum{border-top:1px solid var(--border-strong);border-radius:0;margin-top:4px;padding-top:8px;font-weight:600;}
+  .wt-vr-name{grid-area:name;display:flex;gap:8px;align-items:center;min-width:0;}
+  .wt-vr-name a{color:inherit;text-decoration:none;overflow-wrap:anywhere;}
+  .wt-vr-name a:hover,.wt-vr-name a:focus-visible{color:var(--accent-line);text-decoration:underline;}
+  .wt-vr-dot{width:10px;height:10px;border-radius:3px;flex:none;}
+  .wt-vr-from{font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);white-space:nowrap;}
+  /* Dasselbe Dreieck wie in der Matrix „Jahre × Monate“ (Messlücken, Zählerrückgänge, verzerrter Vergleich). */
+  .wt-vr-warn{display:inline-block;flex:none;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;
+    border-bottom:10px solid var(--chart-7);cursor:help;}
+  .wt-vr-bar{grid-area:bar;height:12px;background:var(--surface-alt);border-radius:3px;overflow:hidden;}
+  .wt-vr-bar i{display:block;height:100%;border-radius:3px;}
+  .wt-vr-kwh{grid-area:kwh;}
+  .wt-vr-pct{grid-area:pct;color:var(--ink-muted);}
+  .wt-vr-delta{grid-area:delta;line-height:1.2;}
+  .wt-vr-spark{grid-area:spark;}
+  .wt-vr-num{font-family:var(--font-mono);font-size:calc(12.5px * var(--font-scale, 1));text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .wt-vr-head .wt-vr-num,.wt-vr-head .wt-vr-spark{font-family:inherit;font-size:inherit;color:inherit;}
+  .wt-vr-delta .wt-dl{display:block;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
+  .wt-vr-delta .wt-dl.wt-dl-good{color:var(--positive);}
+  .wt-vr-delta .wt-dl.wt-dl-bad{color:var(--danger);}
+  .wt-vr-delta small{display:block;font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);white-space:normal;}
+  .wt-vr-spark svg{display:block;width:64px;height:20px;}
+  /* „Übrige (Grundlast)“: schraffiert, weil kein eigener Zähler dahintersteht. */
+  .wt-vr-hatch{background:repeating-linear-gradient(135deg, var(--chart-8) 0 3px, color-mix(in srgb, var(--chart-8) 30%, var(--surface)) 3px 6px) !important;}
+  .wt-vr-cover{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
+  .wt-vr-cover b{color:var(--ink);font-weight:600;}
+  .wt-vr-cover-bar{flex:1 1 160px;align-self:center;min-width:0;height:6px;border-radius:3px;background:var(--surface-alt);overflow:hidden;}
+  .wt-vr-cover-bar i{display:block;height:100%;background:var(--accent-line);}
+  @media (max-width:640px){
+    /* Feste Zahlenspalten, damit kWh und Anteil über alle Zeilen bündig stehen; die Änderung nutzt beide. */
+    .wt-vr-row{grid-template-columns:minmax(0,1fr) 64px 52px;grid-template-areas:"name kwh pct" "bar delta delta";gap:3px 10px;padding:7px 6px;}
+    .wt-vr-spark,.wt-vr-head{display:none;}
+    .wt-vr-sum{grid-template-areas:"name kwh pct" ". delta delta";}
+  }

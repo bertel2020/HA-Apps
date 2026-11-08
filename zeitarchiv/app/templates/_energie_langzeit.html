@@ -5,7 +5,22 @@
    App-Standards, darunter Spalten- und Vorjahres-Menü und die Tabelle. Die Daten kommen von
    POST energiedashboard/langzeit/table; energie-langzeit.js formatiert und zeichnet nur. #}
 {% set hidden = config.langzeit_ausblenden or [] %}
-<div x-data="energieLangzeit({{ hidden | tojson }})">
+{# Verbraucher der obersten Ebene (wie energie_langzeit.top_consumers); ohne sie gibt es nur die Summen. #}
+{% set consumer_count = (config.verbraucher or []) | selectattr('entity_id') | rejectattr('parent') | list | length %}
+<div x-data="energieLangzeit({{ hidden | tojson }}, {{ (consumer_count > 0) | tojson }})">
+{% if consumer_count %}
+  {# Ansicht „Summen“ (Rollen, Roadmap 1.45) oder „Verbraucher“ (Roadmap 1.49), im Browser gemerkt. #}
+  <div class="wt-yearbar wt-viewbar">
+    <span class="wt-yearbar-label">{{ _("Zeigen") }}</span>
+    <div class="wt-seg" role="group" aria-label="{{ _('Summen oder Verbraucher') }}">
+      <button type="button" :aria-pressed="(lzView === 'sum').toString()" @click="setView('sum')">{{ _("Summen") }}</button>
+      <button type="button" :aria-pressed="(lzView === 'verb').toString()" @click="setView('verb')">{{ _("Verbraucher") }}</button>
+    </div>
+    <span class="wt-yearbar-note" x-show="lzView === 'sum'">{{ _("Erzeugung, Einspeisung, Netzbezug, Verbrauch und Speicher als Summen.") }}</span>
+    <span class="wt-yearbar-note" x-show="lzView === 'verb'" x-cloak>{{ _("{n} Verbraucher eingerichtet. Geräte hinter einem Zwischenzähler stehen in ihrem Zwischenzähler.", n=consumer_count) }}</span>
+  </div>
+{% endif %}
+  <div x-show="lzView === 'sum'">
   <div class="card wt-card">
     <div class="wt-controls wt-card-head">
       {# Der Titel nennt den Tag („Heute“, „Gestern“, sonst „Rückblick“); in der Vergangenheit springt ein Klick auf heute. #}
@@ -166,5 +181,9 @@
     </div>
   </dialog>
 {% endif %}
+  </div>
 
+{% if consumer_count %}
+  {% include "_energie_langzeit_verbraucher.html" %}
+{% endif %}
 </div>

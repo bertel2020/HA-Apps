@@ -1,0 +1,34 @@
+{% from "_dashboard_period_nav.html" import nav as period_nav with context %}
+{% from "_hints.html" import hint_button, hint_body %}
+{# Reiter „Langzeit“, Ansicht „Verbraucher“ (Roadmap 1.49): Verbraucher der obersten Ebene über die Jahre. Die Daten kommen
+   von POST energiedashboard/langzeit/consumers; energie-langzeit.js rechnet daraus nur Anteile und Änderungen. #}
+<div x-show="lzView === 'verb'" x-cloak>
+  <p class="hint hint-warn" x-show="consumersError" x-text="consumersError" x-cloak></p>
+
+  {# Verbraucher im Jahr: Rangliste mit Stichtag-Leiste wie die Vergleichstabelle. #}
+  <div class="card wt-card">
+    <div class="wt-controls wt-card-head">
+      <h2 class="wt-h2" :class="{'wt-h2-jump': stichtag()}" x-text="cardTitle()" @click="if (stichtag()) $store.dashStichtag.set(null)" :title="stichtag() ? t('Zurück zu heute') : ''"></h2>
+      {{ period_nav(true, true) }}
+    </div>
+    <p class="wt-stand">{{ _("Der Stichtag gilt für die Rangliste; die übrigen Karten zeigen alle Jahre.") }}</p>
+    <div class="wt-card-sep"></div>
+    <div class="wt-controls">
+      <h3 class="wt-h3">{{ _("Verbraucher im Jahr") }} {{ hint_button(_("Verbraucher im Jahr")) }}</h3>
+      {% call hint_body() %}<span x-text="rankNote()"></span>{% endcall %}
+      <div class="wt-seg" role="group" aria-label="{{ _('Jahr') }}">
+        <template x-for="option in rankYears()" :key="option.year">
+          <button type="button" :aria-pressed="(rankYear() === option.year).toString()" @click="setRankYear(option.year)" x-text="option.label"></button>
+        </template>
+      </div>
+      <div class="wt-seg wt-controls-end" role="group" aria-label="{{ _('Sortierung') }}">
+        <button type="button" :aria-pressed="(rankSort === 'kwh').toString()" @click="setRankSort('kwh')">{{ _("Verbrauch") }}</button>
+        <button type="button" :aria-pressed="(rankSort === 'chg').toString()" @click="setRankSort('chg')">{{ _("Änderung") }}</button>
+      </div>
+    </div>
+    <p class="wt-stand wt-vr-range" x-text="rankRange()"></p>
+    <div class="wt-vr-list" x-ref="rank"><p class="wt-stand">{{ _("Lädt …") }}</p></div>
+    <div class="wt-vr-cover" x-ref="rankCover"></div>
+    <p class="wt-foot">{{ _("Anteil am Verbrauch laut Bilanz (Erzeugung + Netzbezug + Speicherentladung − Einspeisung − Speicherladung). Die Änderung vergleicht mit demselben Stück des Vorjahres; rot: mehr Verbrauch, grün: weniger, „–“, wenn der Verbraucher im Vorjahr noch nicht ganz erfasst war. „Übrige (Grundlast)“ ist der Rest bis zur Bilanz, nie negativ. Das Dreieck nennt Messlücken und Zählerrückgänge im Zeitraum. Der Name öffnet die Entität. Der kleine Verlauf rechts zeigt die Jahressummen, das gewählte Jahr kräftig.") }}</p>
+  </div>
+</div>
