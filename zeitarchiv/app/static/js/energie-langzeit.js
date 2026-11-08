@@ -311,7 +311,7 @@
         const host = this.$refs.kenntage;
         if (!r || !r.kenntage || !host) return;
         host.innerHTML = energyKenntage(r.kenntage, {
-          ytd: this.ktMode === 'ytd', years: this.yearLimit, current: new Date().getFullYear(), interactive: true,
+          ytd: this.ktMode === 'ytd', years: this.yearLimit, current: window.ServerTime.parts(Date.now() / 1000).year, interactive: true,
         });
       },
 
