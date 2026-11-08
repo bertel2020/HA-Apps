@@ -1236,6 +1236,10 @@
 
         toggleEntity(entityId, checked) {
           const idx = this.selectedEntityIds.indexOf(entityId);
+          if (checked && idx === -1 && this.selectedEntityIds.length >= MAX_ENTITIES) {
+            appAlert(t('Maximal {max} Entitäten pro Chart.', {max: MAX_ENTITIES}));
+            return;
+          }
           if (checked) { if (idx === -1) this.selectedEntityIds.push(entityId); }
           else if (idx !== -1) this.selectedEntityIds.splice(idx, 1);
           // Eine abgewählte Entität bleibt sonst als tote Referenz im
@@ -1594,6 +1598,10 @@
           // weder gezeichnet noch in der Statistik gezählt werden, und eine
           // Abfrage für Daten, die niemand sieht, wäre reine Last.
           if (this.visibleEntityIds.length === 0) {
+            // Eine noch laufende Abfrage gilt nicht mehr: sonst schreibt sie ihre Daten nach dem Leeren zurück.
+            this._requestId += 1;
+            this.loading = false;
+            this.loadError = false;
             this.series = [];
             this.autoResolutionLabel = '';
             this.$nextTick(() => this.render());
@@ -1647,7 +1655,15 @@
             columnsData = columnsRes && columnsRes.ok ? await columnsRes.json() : null;
             // Die Rohabfrage bricht bei zu vielen Wechseln mit einem Fehler ab: dann gilt die
             // Spaltenantwort (Fenster, Zustandsliste und Spalten je Zustands-Entität).
-            data = res.ok ? await res.json() : (columnsData || {});
+            if (!res.ok && !columnsData) {
+              // Weder Rohabfrage noch Spalten-Rückfall: ein Fehler, kein leerer Bestand (sonst „Keine Daten“ ohne Wiederholen).
+              if (requestId === this._requestId) {
+                this.loading = false;
+                this.loadError = true;
+              }
+              return;
+            }
+            data = res.ok ? await res.json() : columnsData;
             heatmapData = heatmapRes && heatmapRes.ok ? await heatmapRes.json() : null;
           } catch (error) {
             // Netzwerkfehler oder ein 502 vom Proxy mit HTML statt JSON: sonst bliebe "Lädt …" für immer stehen.
@@ -3046,6 +3062,11 @@
           if (this.saving) return;
           if (!this.name.trim()) { appAlert(t('Bitte einen Namen für das Chart angeben.')); return; }
           if (this.selectedEntityIds.length === 0) { appAlert(t('Bitte mindestens eine Entität auswählen.')); return; }
+          // Ein bestehendes, zu großes Chart bleibt bearbeitbar: hier wird nur das Speichern mit klarer Meldung gesperrt.
+          if (this.selectedEntityIds.length > MAX_ENTITIES) {
+            appAlert(t('Maximal {max} Entitäten pro Chart. Bitte Entitäten entfernen, bevor du speicherst.', {max: MAX_ENTITIES}));
+            return;
+          }
           this.saving = true;
           this.savedMessage = '';
           // Nur Namen tatsächlich ausgewählter Entitäten mitschicken — eine

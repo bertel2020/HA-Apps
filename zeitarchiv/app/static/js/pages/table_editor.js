@@ -290,6 +290,7 @@
         isCurrent: {},  // col.uid -> offset===0 (siehe currentPeriodNote() in table-compute.js)
         elapsedSeconds: {},  // col.uid -> same_elapsed-Kappung ab windowStarts[uid] (Sekunden) | null
         loading: false,
+        loadError: false,
         saving: false,
         savedMessage: '',
         _loadSeq: 0,
@@ -779,6 +780,7 @@
           }
           const requestId = ++this._loadSeq;
           this.loading = true;
+          this.loadError = false;
           const plainColumns = this.columns.map(c => ({
             range_key: c.range_key, offset: c.offset, year_over_year: c.year_over_year,
             hidden: !!c.hidden, in_sum: c.in_sum !== false,
@@ -788,9 +790,16 @@
             formula_unit: r.formula_unit || '', aggregation: r.aggregation || 'auto',
             percent_of_total: !!r.percent_of_total,
           }));
-          const {values: computed, windowStarts, windowEnds, isCurrent, elapsedSeconds, summable} =
-            await TableCompute.computeValues(BASE, plainColumns, plainRows);
+          let result;
+          try {
+            result = await TableCompute.computeValues(BASE, plainColumns, plainRows);
+          } catch (error) {
+            // Abfragefehler (HTTP-Status, Netz): als Fehler anzeigen, nicht als leere Tabelle.
+            if (requestId === this._loadSeq) { this.loading = false; this.loadError = true; }
+            return;
+          }
           if (requestId !== this._loadSeq) return;  // überholt von einer neueren Anfrage
+          const {values: computed, windowStarts, windowEnds, isCurrent, elapsedSeconds, summable} = result;
           const newValues = {};
           const newWindowStarts = {};
           const newWindowEnds = {};

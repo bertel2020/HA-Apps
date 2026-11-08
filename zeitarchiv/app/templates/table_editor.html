@@ -478,6 +478,10 @@
         </div>
         </div>
         <p class="tbl-hint hint-status" x-show="loading" style="margin-top:8px;">{{ _("Lädt …") }}</p>
+        <p class="tbl-hint hint-status" x-show="loadError && !loading" x-cloak style="margin-top:8px;">
+          <span x-text="t('Die Daten konnten nicht geladen werden.')"></span>
+          <button type="button" class="btn" @click="load()">{{ _("Erneut versuchen") }}</button>
+        </p>
 
         <div class="save-row" x-show="editing">
           <input type="text" placeholder="{{ _('Name der Tabelle …') }}" maxlength="{{ max_name_length }}" x-model="name">

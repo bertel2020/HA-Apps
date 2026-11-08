@@ -1008,6 +1008,8 @@
     const PERIOD_ANCHOR = {{ period_anchor | tojson }};
     const CONTINUOUS = {{ continuous | tojson }};
     const SELECTED_ENTITY_IDS = {{ selected_entity_ids | tojson }};
+    // Höchstzahl Entitäten je Chart: dieselbe Grenze wie die Abfrage /api/query-multi (limits.py).
+    const MAX_ENTITIES = {{ max_entities | tojson }};
     const ENTITY_NAMES = {{ entity_names | tojson }};
     const HIDDEN_ENTITY_IDS = {{ hidden_entity_ids | tojson }};
     // Gezeichneter Zustand je Zustands-Entität der Heatmap (Rohtext).

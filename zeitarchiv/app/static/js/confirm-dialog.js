@@ -14,6 +14,9 @@
 //      angezeigt") über der eigentlichen Nachricht.
 (function () {
   let overlay = null;
+  // Schließ-Timer der Transition: Der Dialog wird wiederverwendet, ein noch ausstehender Timer darf den
+  // unmittelbar folgenden Dialog nicht schließen (appConfirm(...).then(() => appAlert(...))).
+  let closeTimer = null;
 
   // <dialog> statt eines reinen position:fixed-Divs: landet damit im
   // Top-Layer des Browsers und erscheint zuverlässig ÜBER bereits offenen
@@ -41,6 +44,8 @@
   window.appConfirm = function (message, opts) {
     opts = opts || {};
     if (!overlay) build();
+    clearTimeout(closeTimer);
+    closeTimer = null;
     // Gegliederter Inhalt: opts.template ist ein <template>-Element der Seite (serverseitig
     // gerendert, also bereits escaped); sein Inhalt ersetzt den reinen Text.
     const messageEl = overlay.querySelector('.confirm-message');
@@ -75,7 +80,7 @@
         okBtn.onclick = null; cancelBtn.onclick = null; overlay.onclick = null;
         // Kurze Verzögerung, damit die Schließen-Transition noch sichtbar
         // abläuft, bevor close() den Dialog aus dem Top-Layer entfernt.
-        setTimeout(() => overlay.close(), 120);
+        closeTimer = setTimeout(() => { closeTimer = null; overlay.close(); }, 120);
         resolve(result);
       }
       // Natives Escape-Verhalten (dialog schließt sofort UND feuert 'cancel')

@@ -3656,6 +3656,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "chart_id": chart["id"] if chart else None,
         "chart_name": chart["name"] if chart else prefill.get("name", ""),
         "selected_entity_ids": chart["entity_ids"] if chart else prefill.get("entity_ids", []),
+        "max_entities": MAX_MULTI_QUERY_ENTITIES,
         "range_key": chart["range_key"] if chart else prefill.get("range_key", "day"),
         "continuous": chart["continuous"] if chart else prefill.get("continuous", False),
         "resolution_preset": chart["resolution_preset"] if chart else prefill.get("resolution_preset", "auto"),
@@ -3769,6 +3770,11 @@ def charts_create(body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail=tr("Bitte einen Namen für das Chart angeben"))
     if not body.entity_ids:
         raise HTTPException(status_code=400, detail=tr("Bitte mindestens eine Entität auswählen"))
+    if len(body.entity_ids) > MAX_MULTI_QUERY_ENTITIES:
+        raise HTTPException(
+            status_code=400,
+            detail=tr("Maximal {MAX_MULTI_QUERY_ENTITIES} Entitäten pro Abfrage", MAX_MULTI_QUERY_ENTITIES=MAX_MULTI_QUERY_ENTITIES),
+        )
     if body.range_key not in dict(_CHART_RANGE_OPTIONS):
         raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
     if body.resolution_preset not in _CHART_RESOLUTION_PRESETS:
@@ -3819,6 +3825,11 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail=tr("Bitte einen Namen für das Chart angeben"))
     if not body.entity_ids:
         raise HTTPException(status_code=400, detail=tr("Bitte mindestens eine Entität auswählen"))
+    if len(body.entity_ids) > MAX_MULTI_QUERY_ENTITIES:
+        raise HTTPException(
+            status_code=400,
+            detail=tr("Maximal {MAX_MULTI_QUERY_ENTITIES} Entitäten pro Abfrage", MAX_MULTI_QUERY_ENTITIES=MAX_MULTI_QUERY_ENTITIES),
+        )
     if body.range_key not in dict(_CHART_RANGE_OPTIONS):
         raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum"))
     if body.resolution_preset not in _CHART_RESOLUTION_PRESETS:

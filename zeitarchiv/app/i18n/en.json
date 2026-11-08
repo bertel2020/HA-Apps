@@ -4689,6 +4689,8 @@
     "Heiztage": "Heating days",
     "{delta} % zu {other}": "{delta} % vs. {other}",
     "unter {limit} °C Heizgrenze": "below {limit} °C heating limit",
-    "Gradtagzahl": "Degree days"
+    "Gradtagzahl": "Degree days",
+    "Maximal {max} Entitäten pro Chart.": "At most {max} entities per chart.",
+    "Maximal {max} Entitäten pro Chart. Bitte Entitäten entfernen, bevor du speicherst.": "At most {max} entities per chart. Please remove some before saving."
   }
 }
