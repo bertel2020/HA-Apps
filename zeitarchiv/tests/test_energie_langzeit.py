@@ -846,7 +846,7 @@ def test_verbraucher_zeitraeume_monat_und_vormonat_gegen_denselben_zeitraum_des_
         ("sensor.auto", 2026, 7): 50.0, ("sensor.auto", 2025, 7): 70.0,
     })
     daten = service.compute_consumers(_verbraucher_config(), lz.ConsumersRequest(months=False), NOW)
-    assert [p["key"] for p in daten["periods"]] == ["heute", "gestern", "monat", "vormonat"]
+    assert [p["key"] for p in daten["periods"]] == ["heute", "gestern", "monat", "vormonat", "jahr"]
     perioden = {p["key"]: p for p in daten["periods"]}
     monat, vormonat = perioden["monat"], perioden["vormonat"]
     # Der laufende Monat zählt bis jetzt (20. August 12 Uhr) gegen dasselbe Stück des Vorjahres, der Vormonat ganz.
@@ -869,8 +869,40 @@ def test_verbraucher_zeitraeume_monat_und_vormonat_gegen_denselben_zeitraum_des_
     # Übrige: Rest bis zur Bilanz je Seite, nie negativ.
     assert daten["rest"]["periods"]["monat"] == {"cur": 320.0, "vj": 300.0}
     assert daten["rest"]["periods"]["vormonat"] == {"cur": 650.0, "vj": 540.0}
-    # Das Fenster des laufenden Jahres bleibt unverändert, „Dieses Jahr“ gibt es nicht als Zeitraum.
+    # Das Fenster des laufenden Jahres bleibt unverändert.
     assert daten["window"]["year"] == 2026
+
+
+def test_verbraucher_zeitraum_jahr_und_vorjahr_komplett(service, monkeypatch) -> None:
+    _archiv(service, "sensor.netz", _monat(2024, 1))
+    for eid in ("sensor.waerme", "sensor.auto", "sensor.herd"):
+        service.index.get_or_create_entity(eid, "sensor", "total_increasing", "kWh")
+    _reihen_nach_monat(service, monkeypatch, {
+        ("sensor.netz", 2026, 1): 5000.0, ("sensor.netz", 2025, 1): 4500.0,
+        ("sensor.waerme", 2026, 1): 900.0, ("sensor.waerme", 2025, 1): 800.0,
+    })
+    daten = service.compute_consumers(_verbraucher_config(), lz.ConsumersRequest(months=False), NOW)
+    assert [p["key"] for p in daten["periods"]] == list(lz.CONSUMER_PERIODS) and daten["mode"] == "bis_jetzt"
+    jahr = {p["key"]: p for p in daten["periods"]}["jahr"]
+    # „Dieses Jahr“ ist das Fenster der Rangliste: bis jetzt gegen dasselbe Stück des Vorjahres, dieselben Werte.
+    assert jahr["partial"] is True and jahr["total"] == {"cur": 5000.0, "vj": 4500.0}
+    waerme = _verbraucher(daten, "sensor.waerme")
+    assert waerme["periods"]["jahr"] == {"cur": 900.0, "vj": 800.0}
+    assert (waerme["cur"], waerme["vj"]) == (900.0, 800.0)
+    assert datetime.fromtimestamp(jahr["vj"]["end"], TZ) == datetime(2025, 8, 20, 12, tzinfo=TZ)
+
+    # „Komplett“ stellt laufende Zeiträume dem ganzen Vorjahreszeitraum gegenüber, abgeschlossene bleiben gleich.
+    komplett = service.compute_consumers(_verbraucher_config(), lz.ConsumersRequest(months=False, mode="komplett"), NOW)
+    assert komplett["mode"] == "komplett"
+    perioden = {p["key"]: p for p in komplett["periods"]}
+    assert datetime.fromtimestamp(perioden["jahr"]["vj"]["end"], TZ) == datetime(2026, 1, 1, tzinfo=TZ)
+    assert datetime.fromtimestamp(perioden["monat"]["vj"]["end"], TZ) == datetime(2025, 9, 1, tzinfo=TZ)
+    assert datetime.fromtimestamp(perioden["vormonat"]["vj"]["end"], TZ) == datetime(2025, 8, 1, tzinfo=TZ)
+    assert datetime.fromtimestamp(perioden["jahr"]["cur"]["end"], TZ) == NOW
+    # Die Rangliste „Verbraucher im Jahr“ bleibt bei „bis jetzt“.
+    assert datetime.fromtimestamp(komplett["window"]["vj"]["end"], TZ) == datetime(2025, 8, 20, 12, tzinfo=TZ)
+    # Ein unbekannter Modus gilt als „bis jetzt“.
+    assert service.compute_consumers(_verbraucher_config(), lz.ConsumersRequest(months=False, mode="x"), NOW)["mode"] == "bis_jetzt"
 
 
 def test_verbraucher_zeitraeume_am_monatsanfang_und_abwaehlbar(service, monkeypatch) -> None:

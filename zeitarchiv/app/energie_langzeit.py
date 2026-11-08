@@ -39,9 +39,9 @@ from .storage.index import Index
 #: Spalten der Tabelle „Zeiträume im Vergleich“ (dieselben Schlüssel wie im Wetterdashboard) und die vorgewählten.
 COLUMN_KEYS = ("heute", "gestern", "monat", "vormonat", "jahr")
 DEFAULT_COLUMNS = ("monat", "vormonat", "jahr")
-#: Zeiträume, die die Verbraucher-Tabelle zusätzlich zu den Jahren anbietet. „Dieses Jahr“ fehlt: Es ist das
-#: laufende Jahr, das als Jahresspalte schon bis heute zählt (dasselbe Fenster, dieselben Werte).
-CONSUMER_PERIODS = ("heute", "gestern", "monat", "vormonat")
+#: Zeiträume der Verbraucher-Tabelle: dieselben Spalten wie in „Zeiträume im Vergleich“ (COLUMN_KEYS). Die einzelnen
+#: Jahre davor rechnet der Browser aus den Monatswerten.
+CONSUMER_PERIODS = COLUMN_KEYS
 #: Spalte -> (Zeitraum für query_mod._window, Versatz)
 COLUMN_WINDOWS = {
     "heute": ("day", 0),
@@ -142,8 +142,11 @@ class ConsumersRequest(BaseModel):
     at: str | None = None
     #: Ohne Monatswerte nur das Fenster der Rangliste: Die Stichtag-Leiste lädt dann nicht alle Jahre neu.
     months: bool = True
-    #: Zeiträume (aus CONSUMER_PERIODS) für die Tabelle „Verbraucher × Jahre“: je Verbraucher Wert und Vorjahreswert.
+    #: Zeiträume (aus CONSUMER_PERIODS) für die Tabelle „Zeiträume im Vergleich je Verbraucher“: je Verbraucher Wert
+    #: und Vorjahreswert.
     periods: list[str] = Field(default_factory=lambda: list(CONSUMER_PERIODS))
+    #: Vorjahresvergleich der Zeiträume wie in TableRequest: „bis_jetzt“ (dasselbe Stück) oder „komplett“ (ganzer Zeitraum).
+    mode: str = "bis_jetzt"
 
 
 def role_entities(config: dict) -> dict[str, list[str]]:
@@ -899,8 +902,12 @@ class EnergieLangzeitService:
             "consumers": items, "rest": rest,
         }
         periods = [key for key in CONSUMER_PERIODS if key in body.periods]
+        mode = body.mode if body.mode in period_columns.MODES else "bis_jetzt"
+        out["mode"] = mode
         if periods:
-            out["periods"] = self._consumer_periods(periods, items, rest, roles, now_local, read_cache)
+            # „Dieses Jahr“ bis jetzt ist das Fenster der Rangliste: schon gerechnet, nicht noch einmal lesen.
+            base = (win, values, measured, total, rest_values)
+            out["periods"] = self._consumer_periods(periods, items, rest, roles, now_local, read_cache, mode, anchor, base)
         if body.months:
             self._consumer_months(out, roles, balance_ids, now_local, read_cache)
         return out
@@ -930,17 +937,23 @@ class EnergieLangzeitService:
 
     def _consumer_periods(
         self, keys: list[str], items: list[dict], rest: dict, roles: dict[str, list[str]], now_local: datetime,
-        read_cache: query_mod.QueryReadCache,
+        read_cache: query_mod.QueryReadCache, mode: str = "bis_jetzt", anchor: datetime | None = None,
+        base: tuple | None = None,
     ) -> list[dict]:
-        """Monat und Vormonat je Verbraucher gegen denselben Zeitraum des Vorjahres („bis jetzt“ wie die Jahre):
-        trägt je Verbraucher und für „Übrige“ ``periods[key] = {cur, vj}`` ein und liefert die Fenster und Summen."""
+        """Zeiträume je Verbraucher gegen ihr Vorjahr: trägt je Verbraucher und für „Übrige“ ``periods[key] = {cur, vj}``
+        ein und liefert die Fenster und Summen. mode wie in der Summen-Tabelle: „bis_jetzt“ vergleicht einen laufenden
+        Zeitraum mit demselben Stück des Vorjahres, „komplett“ mit dem ganzen Vorjahreszeitraum. base: die schon
+        gerechneten Werte des Jahresfensters („Dieses Jahr“ bis jetzt) der Rangliste."""
         entity_ids = [item["entity_id"] for item in items]
         for item in (*items, rest):
             item["periods"] = {}
         out: list[dict] = []
         for key in keys:
-            win = period_columns.column_windows(COLUMN_WINDOWS, key, now_local, "bis_jetzt")
-            values, measured, total, rest_values = self._consumer_window(win, entity_ids, roles, now_local, read_cache)
+            win = period_columns.column_windows(COLUMN_WINDOWS, key, now_local, mode, anchor)
+            if key == "jahr" and base is not None and mode == "bis_jetzt":
+                _win, values, measured, total, rest_values = base
+            else:
+                values, measured, total, rest_values = self._consumer_window(win, entity_ids, roles, now_local, read_cache)
             for item in items:
                 item["periods"][key] = values[item["entity_id"]]
             rest["periods"][key] = rest_values

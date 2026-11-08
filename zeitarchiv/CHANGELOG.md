@@ -19,12 +19,13 @@
     - Rangliste nach Spalten sortierbar (Name, Verbrauch, Änderung)
   - „Gemessen“ nennt, wie viel des Verbrauchs eigene Zähler erfassen; der Rest
     steht als „Übrige (Grundlast)“
-  - „Zeiträume im Vergleich je Verbraucher“: Tabelle mit der Änderung zum
-    Vorjahr, sortierbar nach jeder Spalte
-    - Im Menü „Spalten“ Jahre sowie Heute, Gestern, Dieser Monat und Letzter
-      Monat, verglichen mit demselben Zeitraum des Vorjahres
-    - Anteil oder kWh und die Änderung zum Vorjahr (Aus, % oder kWh) wählbar;
-      Auswahl und Sortierung merkt sich der Browser
+  - „Zeiträume im Vergleich je Verbraucher“: Tabelle wie „Zeiträume im
+    Vergleich“, sortierbar nach jeder Spalte
+    - Spalten Heute, Gestern, Dieser Monat, Letzter Monat und Dieses Jahr, je
+      mit einer Vorjahr-Spalte daneben; einzelne Jahre im Menü „Spalten“
+    - Dasselbe Vorjahr-Menü (Aus, Bis jetzt, Komplett, Differenz anzeigen);
+      dazu Anteil oder kWh als Hauptwert
+    - Auswahl und Sortierung merkt sich der Browser
   - „Anteile je Jahr“: ein gestapelter Balken je Jahr, in Prozent oder kWh
   - „Monatswerte je Jahr“: die Matrix aus „Langzeit“ für einen gewählten
     Verbraucher; ein Klick auf ein Feld öffnet den Monat
@@ -57,12 +58,14 @@
     - Ranking sortable by column (name, consumption, change)
   - "Measured" shows how much of the consumption your own meters record; the
     remainder is shown as "Other (base load)"
-  - "Periods compared by consumer": table with the change from the previous
-    year, sortable by any column
-    - The "Columns" menu offers years as well as Today, Yesterday, This month
-      and Last month, compared with the same period of the previous year
-    - Share or kWh and the change from the previous year (off, % or kWh) can
-      be chosen; the browser remembers the selection and sorting
+  - "Periods compared by consumer": table like "Periods compared", sortable
+    by any column
+    - Columns Today, Yesterday, This month, Last month and This year, each
+      with a previous-year column next to it; single years in the "Columns"
+      menu
+    - The same previous-year menu (off, so far, complete, show difference);
+      plus share or kWh as the main value
+    - The browser remembers the selection and sorting
   - "Shares per year": one stacked bar per year, in percent or kWh
   - "Monthly values per year": the matrix from "Long term" for a selected
     consumer; a click on a cell opens that month

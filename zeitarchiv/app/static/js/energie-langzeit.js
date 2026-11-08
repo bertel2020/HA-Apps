@@ -10,7 +10,7 @@
   const LOCALE = window.ZA_FORMAT;
   const ZT = window.ServerTime;
 
-  const {formats, fmtDate, rangeText, energy, columnName, energyComparison: renderTable, kenntagRule, kenntagLabels: KENNTAG_LABELS, energyKenntage, energyChanges, changesRange, kenntageRange} = window.ElementTableRender;
+  const {formats, fmtDate, rangeText, energy, columnName, delta: cellDelta, comparisonHead, energyComparison: renderTable, kenntagRule, kenntagLabels: KENNTAG_LABELS, energyKenntage, energyChanges, changesRange, kenntageRange} = window.ElementTableRender;
   const num = (value, decimals) => NumberFormat.fmt(value, decimals);
 
   function readStore() {
@@ -186,12 +186,6 @@
     return `<span class="wt-dl${cls}">${escapeHtml(head)}</span>${kwh}`;
   }
 
-  // Änderungszeile eines Tabellenfelds: chg 'off' zeigt nur den Grund für eine fehlende Änderung („neu ab …“).
-  function tableDelta(entry, chg) {
-    if (chg !== 'off') return rankDelta(entry, {withKwh: false, unit: chg});
-    return entry.delta == null && entry.note ? `<small>${escapeHtml(entry.note)}</small>` : '';
-  }
-
   // Die Änderung als kurzer Text für Tooltips („+120 kWh“).
   const deltaKwh = (delta) => `${delta > 0 ? '+' : delta < 0 ? '−' : '±'}${kwhText(Math.abs(delta))} kWh`;
 
@@ -359,20 +353,14 @@
       + `<i class="${item.rest ? 'wt-vr-hatch' : ''}" style="background:${item.color}"></i>${escapeHtml(item.name)}</button>`).join('');
   }
 
-  // Zeiträume der Tabelle neben den Jahren (Schlüssel wie energie_langzeit.CONSUMER_PERIODS); „Dieses Jahr“ ist die Jahresspalte.
-  const PERIOD_KEYS = ['heute', 'gestern', 'monat', 'vormonat'];
+  // Zeiträume der Tabelle (Schlüssel wie energie_langzeit.CONSUMER_PERIODS, dieselben wie in „Zeiträume im Vergleich“); dazu
+  // optional einzelne Jahre (Zahlen). Das laufende Jahr ist die Spalte „Dieses Jahr“.
+  const PERIOD_KEYS = ['heute', 'gestern', 'monat', 'vormonat', 'jahr'];
   const isPeriod = (col) => PERIOD_KEYS.includes(col);
   const isColumn = (col) => Number.isInteger(col) || isPeriod(col);
   const periodOf = (data, key) => (data.periods || []).find((period) => period.key === key) || null;
-
-  // Spaltenkopf eines Zeitraums: Name wie in „Summen“, darunter „bis 08.11.“ (laufend) oder Monat und Jahr (abgeschlossen).
-  function periodHead(data, key) {
-    const period = periodOf(data, key);
-    let sub = '';
-    if (period && (key === 'heute' || key === 'gestern')) sub = fmtDate(formats.dm, period.cur.start);
-    else if (period) sub = period.partial ? t('bis {date}', {date: fmtDate(formats.dm, period.cur.end - 1)}) : monthYear(period.cur.start);
-    return {title: columnName(key), sub};
-  }
+  // Änderung zum Vorjahr wie in „Zeiträume im Vergleich“: mehr Verbrauch ist ungünstig.
+  const CONSUMPTION_ROW = {kind: 'energy', better: 'down'};
 
   // Rangliste eines Zeitraums im Format von consumerRank: Monat bis heute gegen dasselbe Stück des Vorjahres, der Vormonat
   // ganz. Der Server liefert je Verbraucher {cur, vj}; ohne Vorjahreswert steht wie bei den Jahren ein kurzer Grund.
@@ -421,50 +409,71 @@
     return coversYear(rest, year) ? null : year;
   }
 
-  // Tabelle Verbraucher × Jahre, neueste Spalte links. Jede Spalte ist die Rangliste ihres Jahres
-  // (consumerRank): das laufende Jahr bis heute gegen dasselbe Stück des Vorjahres, die Jahre davor ganz; ein Zeitraum
-  // (Dieser/Letzter Monat) ist die Rangliste dieses Monats (periodRank).
-  // columns: Zeiträume zuerst, dann die Jahre neueste zuerst; sort: {col, dir}; main 'pct' oder 'kwh' bestimmt die Hauptzahl, der andere Wert steht klein darunter;
-  // chg 'off', 'pct' oder 'kwh' die Änderungszeile.
-  function sharesTableHtml(data, columns, {main, chg}, sort, selected, limit = 0) {
-    const cols = [...columns];
-    const ranks = {};
-    for (const col of cols) ranks[col] = isPeriod(col) ? periodRank(data, col) : consumerRank(data, col, limit);
-    const entryOf = (col, key) => ranks[col].entries.find((e) => e.item.key === key) || null;
-    // Bei einem Zeitraum entscheidet jede Zelle selbst (Hinweis „Vorjahr erst ab …“), bei einem Jahr das Archiv.
-    const hasPrev = (col) => isPeriod(col) || (data.years || []).includes(col - 1);
-    // Ausführlicher Name für Tooltips: „2026 bis 08.11.“, „Dieser Monat (bis 08.11.)“.
-    const colName = (col) => {
-      if (isPeriod(col)) {
-        const head = periodHead(data, col);
-        return head.sub ? `${head.title} (${head.sub})` : head.title;
-      }
-      return col === data.window.year ? t('{year} bis {date}', {year: col, date: until}) : String(col);
-    };
-    const years = cols.filter(Number.isInteger);
-    const oldestYear = years.length ? Math.min(...years) : data.window.year;
+  // Spalten der Tabelle als Objekte für den gemeinsamen Kopf (comparisonHead): ein Zeitraum mit seinen Fenstern vom Server, ein
+  // einzelnes Jahr mit „Jahr“ und der Jahreszahl; das erste, nicht ganz erfasste Jahr des Archivs trägt ein Sternchen.
+  // Spalten ohne Daten vom Server entfallen.
+  function tableColumns(data, columns) {
     const firstYear = partialFirstYear(data);
-    const until = fmtDate(formats.dm, data.window.cur.end - 1);
+    const out = [];
+    for (const id of columns) {
+      if (isPeriod(id)) {
+        const period = periodOf(data, id);
+        if (period) out.push({id, key: id, cur: period.cur, vj: period.vj});
+        continue;
+      }
+      const end = yearStart(id + 1);
+      const col = {id, key: 'jahr', cur: {start: yearStart(id), end}, vj: {start: yearStart(id - 1), end: yearStart(id)}};
+      if (id === firstYear) {
+        col.sub = `${id}*`;
+        col.tip = rangeText(data.rest.first_ts, end);
+      }
+      out.push(col);
+    }
+    return out;
+  }
+
+  // Tabelle „Zeiträume im Vergleich je Verbraucher“ im Aufbau der Vergleichstabelle (Wetter, Übersicht): je Spalte der Zeitraum
+  // und, wenn vorjahr gilt, daneben sein Vorjahr. Jede Spalte ist die Rangliste ihres Zeitraums (periodRank) oder Jahres
+  // (consumerRank). columns: Zeiträume (Schlüssel) und Jahre (Zahlen) in Anzeigereihenfolge; sort: {col, dir}; opts.main 'pct' oder
+  // 'kwh' bestimmt die Hauptzahl, der andere Wert steht klein darunter; opts.vorjahr schaltet die Vorjahr-Spalten, opts.diff die
+  // Änderung unter dem Wert.
+  function sharesTableHtml(data, columns, {main, vorjahr, diff}, sort, selected) {
+    const cols = tableColumns(data, columns);
+    const ranks = {};
+    for (const col of cols) ranks[col.id] = isPeriod(col.id) ? periodRank(data, col.id) : consumerRank(data, col.id);
+    const entryOf = (id, key) => ranks[id].entries.find((e) => e.item.key === key) || null;
+    const label = (id) => (isPeriod(id) ? columnName(id) : String(id));
+    const years = columns.filter(Number.isInteger);
+    const oldestYear = years.length ? Math.min(...years) : data.window.year;
     const pct = main === 'pct';
     const pctText = (value) => `${num(value, 1)} %`;
     const rows = consumerRows(data);
     const list = rows.filter((item) => !item.rest);
     // Ohne Wert in der sortierten Spalte ans Ende.
     sortByValue(list, (item) => (entryOf(sort.col, item.key) || {cur: null}).cur, sort.dir);
-    const sorted = (col) => (col === sort.col ? ' wt-vt-sorted' : '');
+    const sorted = (id) => (id === sort.col ? ' wt-vt-sorted' : '');
 
-    let html = `<thead><tr><th scope="col">${escapeHtml(t('Verbraucher'))}<small>${escapeHtml(pct ? t('Anteil, darunter kWh') : t('kWh, darunter Anteil'))}</small></th>`;
+    // Kopf wie in der Summen-Tabelle; der Titel ist der Sortierknopf der Spalte.
     for (const col of cols) {
-      const on = col === sort.col;
-      let label = String(col);
-      let sub = '';
-      if (isPeriod(col)) ({title: label, sub} = periodHead(data, col));
-      else if (col === data.window.year) sub = t('bis {date}', {date: until});
-      else if (col === firstYear) sub = t('ab {date}', {date: fmtDate(formats.dm, data.rest.first_ts)});
-      html += `<th scope="col" class="wt-vt-yh${on ? ' is-sorted' : ''}" aria-sort="${ariaSort(on, sort.dir)}">`
-        + `${sortHead(`${escapeHtml(label)}${col === firstYear ? '*' : ''}`, on, sort.dir, `data-col="${col}"`, t('Nach {year} sortieren', {year: label}), sub)}</th>`;
+      const on = col.id === sort.col;
+      col.headClass = ` wt-vt-yh${on ? ' is-sorted' : ''}`;
+      col.headAttrs = ` aria-sort="${ariaSort(on, sort.dir)}"`;
     }
-    html += '</tr></thead><tbody>';
+    const head = comparisonHead({columns: cols, vorjahr, at: null, now: data.now}, {
+      corner: {title: escapeHtml(t('Verbraucher')), sub: escapeHtml(pct ? t('Anteil, darunter kWh') : t('kWh, darunter Anteil'))},
+      titleHtml: (col, title) => sortHead(title, col.id === sort.col, sort.dir, `data-col="${col.id}"`, t('Nach {year} sortieren', {year: label(col.id)})),
+    });
+    let html = `${head}<tbody>`;
+
+    // Hauptwert und kleiner darunter der andere Wert; ohne Wert ein Strich (und optional der Grund).
+    const valueHtml = (kwh, share, warn = '') => {
+      if (kwh == null) return '<span class="wt-v">–</span>';
+      const shareText = share == null ? '–' : pctText(share);
+      return `<span class="wt-v">${warn}${escapeHtml(pct ? shareText : energy(kwh))}</span>`
+        + `<span class="wt-vt-sub">${escapeHtml(pct ? energy(kwh) : shareText)}</span>`;
+    };
+    const naHtml = (cls, tip, note = '') => `<td class="${cls} wt-na"${tip ? ` data-tooltip-fixed="${escapeHtml(tip)}"` : ''}>`
+      + `<span class="wt-v">–</span>${note ? `<small>${escapeHtml(note)}</small>` : ''}</td>`;
 
     for (const item of [...list, ...rows.filter((row) => row.rest)]) {
       const name = item.entity_id
@@ -477,23 +486,27 @@
         + ` tabindex="0" aria-label="${escapeHtml(t('{name}: Monate unten zeigen', {name: item.name}))}">`
         + `<th scope="row"><span class="wt-vt-name"><i class="wt-vr-dot${hatch}" style="background:${item.color}"></i><span>${name}${from}</span></span></th>`;
       for (const col of cols) {
-        const entry = entryOf(col, item.key);
+        const entry = entryOf(col.id, item.key);
         if (!entry) {
-          const missing = t('{name} {year}: noch nicht erfasst', {name: item.name, year: colName(col)});
-          html += `<td class="wt-vt-na${sorted(col)}" data-tooltip-fixed="${escapeHtml(missing)}"><span class="wt-vt-main">–</span></td>`;
+          const missing = t('{name} {year}: noch nicht erfasst', {name: item.name, year: label(col.id)});
+          html += naHtml(`wt-sep${sorted(col.id)}`, missing);
+          if (vorjahr) html += naHtml(`wt-vj${sorted(col.id)}`, '');
           continue;
         }
-        const total = ranks[col].total;
-        const share = total ? entry.cur / total * 100 : null;
+        const rank = ranks[col.id];
+        const share = rank.total ? entry.cur / rank.total * 100 : null;
         const shareText = share == null ? '–' : pctText(share);
         const warn = entry.flags.length
           ? `<span class="wt-vr-warn" data-tooltip-fixed="${escapeHtml(entry.flags.join('\n'))}" role="img" aria-label="${escapeHtml(t('Hinweis: {text}', {text: entry.flags.join('; ')}))}"></span>` : '';
-        let tip = `${item.name} ${colName(col)}: ${energy(entry.cur)} · ${shareText}`;
+        let tip = `${item.name} ${label(col.id)}: ${energy(entry.cur)} · ${shareText}`;
         if (entry.delta != null) tip += ` · ${t('Vorjahr {value}', {value: deltaKwh(entry.delta)})}`;
-        html += `<td class="wt-vt-c${sorted(col)}" data-tooltip-fixed="${escapeHtml(tip)}">`
-          + `<span class="wt-vt-main">${warn}${escapeHtml(pct ? shareText : kwhText(entry.cur))}</span>`
-          + `<span class="wt-vt-sub">${escapeHtml(pct ? `${kwhText(entry.cur)} kWh` : shareText)}</span>`
-          + `${hasPrev(col) ? tableDelta(entry, chg) : ''}</td>`;
+        html += `<td class="wt-sep${sorted(col.id)}" data-tooltip-fixed="${escapeHtml(tip)}">${valueHtml(entry.cur, share, warn)}`
+          + `${vorjahr && diff ? cellDelta(entry.cur, entry.prev, CONSUMPTION_ROW) : ''}</td>`;
+        if (vorjahr) {
+          html += entry.prev == null
+            ? naHtml(`wt-vj${sorted(col.id)}`, '', entry.note)
+            : `<td class="wt-vj${sorted(col.id)}">${valueHtml(entry.prev, rank.totalPrev ? entry.prev / rank.totalPrev * 100 : null)}</td>`;
+        }
       }
       html += '</tr>';
     }
@@ -501,52 +514,54 @@
     // Verbrauch laut Bilanz mit seiner Änderung; ohne vergleichbares Vorjahr nennt „Übrige“ den Grund.
     html += `<tr class="wt-vt-sum"><th scope="row">${escapeHtml(t('Verbrauch (Bilanz)'))}</th>`;
     for (const col of cols) {
-      const rank = ranks[col];
+      const rank = ranks[col.id];
       if (rank.total == null) {
-        html += `<td class="${sorted(col).trim()}"><span class="wt-vt-main">–</span></td>`;
+        html += naHtml(`wt-sep${sorted(col.id)}`, '');
+        if (vorjahr) html += naHtml(`wt-vj${sorted(col.id)}`, '');
         continue;
       }
-      const rest = entryOf(col, data.rest.key);
-      const sum = {delta: rank.totalPrev != null ? rank.total - rank.totalPrev : null, prev: rank.totalPrev, note: rest ? rest.note : ''};
-      html += `<td class="${sorted(col).trim()}" data-tooltip-fixed="${escapeHtml(`${t('Verbrauch (Bilanz)')} ${colName(col)}: ${energy(rank.total)}`)}">`
-        + `<span class="wt-vt-main">${escapeHtml(pct ? '100 %' : kwhText(rank.total))}</span>`
-        + `<span class="wt-vt-sub">${escapeHtml(pct ? `${kwhText(rank.total)} kWh` : '100 %')}</span>`
-        + `${hasPrev(col) && chg !== 'off' ? rankDelta(sum, {withKwh: false, unit: chg}) : ''}</td>`;
+      const note = (entryOf(col.id, data.rest.key) || {}).note || '';
+      html += `<td class="wt-sep${sorted(col.id)}" data-tooltip-fixed="${escapeHtml(`${t('Verbrauch (Bilanz)')} ${label(col.id)}: ${energy(rank.total)}`)}">`
+        + `<span class="wt-v">${escapeHtml(pct ? '100 %' : energy(rank.total))}</span>`
+        + `<span class="wt-vt-sub">${escapeHtml(pct ? energy(rank.total) : '100 %')}</span>`
+        + `${vorjahr && diff ? cellDelta(rank.total, rank.totalPrev, CONSUMPTION_ROW) : ''}</td>`;
+      if (vorjahr) {
+        html += rank.totalPrev == null ? naHtml(`wt-vj${sorted(col.id)}`, '', note)
+          : `<td class="wt-vj${sorted(col.id)}"><span class="wt-v">${escapeHtml(pct ? '100 %' : energy(rank.totalPrev))}</span>`
+            + `<span class="wt-vt-sub">${escapeHtml(pct ? energy(rank.totalPrev) : '100 %')}</span></td>`;
+      }
     }
     html += `</tr><tr class="wt-vt-cov"><th scope="row">${escapeHtml(t('Gemessen'))}</th>`;
     for (const col of cols) {
-      const rank = ranks[col];
+      const rank = ranks[col.id];
       if (!rank.total) {
-        html += `<td class="${sorted(col).trim()}"><span class="wt-vt-main">–</span></td>`;
+        html += naHtml(`wt-sep${sorted(col.id)}`, '');
+        if (vorjahr) html += naHtml(`wt-vj${sorted(col.id)}`, '');
         continue;
       }
       const tip = t('Eigene Zähler erfassen {measured} von {total} kWh', {measured: kwhText(rank.measured), total: kwhText(rank.total)});
-      html += `<td class="${sorted(col).trim()}" data-tooltip-fixed="${escapeHtml(tip)}">`
-        + `<span class="wt-vt-main">${escapeHtml(`${num(Math.min(100, rank.measured / rank.total * 100), 0)} %`)}</span>`
-        + `<span class="wt-vt-sub">${escapeHtml(`${kwhText(rank.measured)} kWh`)}</span></td>`;
+      html += `<td class="wt-sep${sorted(col.id)}" data-tooltip-fixed="${escapeHtml(tip)}"><span class="wt-v">${escapeHtml(`${num(Math.min(100, rank.measured / rank.total * 100), 0)} %`)}</span>`
+        + `<span class="wt-vt-sub">${escapeHtml(energy(rank.measured))}</span></td>`;
+      if (vorjahr) {
+        html += rank.totalPrev && rank.measuredPrev != null
+          ? `<td class="wt-vj${sorted(col.id)}"><span class="wt-v">${escapeHtml(`${num(Math.min(100, rank.measuredPrev / rank.totalPrev * 100), 0)} %`)}</span>`
+            + `<span class="wt-vt-sub">${escapeHtml(energy(rank.measuredPrev))}</span></td>`
+          : naHtml(`wt-vj${sorted(col.id)}`, '');
+      }
     }
     return `${html}</tr></tbody>`;
   }
 
-  // Fußzeile der Tabelle: Sortierung, Änderung und die Teiljahre, soweit sie in der Tabelle stehen.
-  function sharesTableFoot(data, columns, sort, chg) {
+  // Fußzeile der Tabelle: Sortierung, Änderung und das Teiljahr, soweit es in der Tabelle steht.
+  function sharesTableFoot(data, columns, sort, diff) {
     const years = columns.filter(Number.isInteger);
-    const sortName = isPeriod(sort.col) ? periodHead(data, sort.col).title : sort.col;
     const parts = [
-      sort.dir === 'desc' ? t('Sortiert nach {year}, größter zuerst.', {year: sortName}) : t('Sortiert nach {year}, kleinster zuerst.', {year: sortName}),
+      sort.dir === 'desc' ? t('Sortiert nach {year}, größter zuerst.', {year: isPeriod(sort.col) ? columnName(sort.col) : sort.col})
+        : t('Sortiert nach {year}, kleinster zuerst.', {year: isPeriod(sort.col) ? columnName(sort.col) : sort.col}),
       t('Ein Klick auf einen Spaltenkopf sortiert nach dieser Spalte, ein zweiter dreht die Reihenfolge. „Übrige (Grundlast)“ und die Summen stehen immer unten.'),
     ];
-    if (columns.some((col) => col === 'monat' || col === 'vormonat')) {
-      parts.push(t('Dieser Monat zählt bis heute und vergleicht mit demselben Stück des Vorjahres, Letzter Monat mit dem ganzen Monat des Vorjahres.'));
-    }
-    if (columns.some((col) => col === 'heute' || col === 'gestern')) {
-      parts.push(t('Heute zählt bis jetzt, Gestern den ganzen Tag; beide vergleichen mit demselben Tag des Vorjahres.'));
-    }
-    if (chg !== 'off') {
+    if (diff) {
       parts.push(t('Die Änderung zum Vorjahr ist in kWh gerechnet; rot: mehr Verbrauch, grün: weniger, „–“ mit Grund, wenn das Vorjahr nicht ganz erfasst ist.'));
-    }
-    if (years.includes(data.window.year)) {
-      parts.push(t('{year} zählt bis {date} und vergleicht mit demselben Stück des Vorjahres.', {year: data.window.year, date: fmtDate(formats.dm, data.window.cur.end - 1)}));
     }
     const firstYear = partialFirstYear(data);
     if (firstYear != null && years.includes(firstYear)) {
@@ -719,14 +734,16 @@
       // Gewähltes Jahr der Rangliste; null = das laufende Jahr.
       rankYearSel: null,
       sharesMode: 'pct',
-      // Tabelle „Zeiträume im Vergleich je Verbraucher“: sortiert nach einer Spalte (null = dem neuesten Jahr); Spalten als Liste
-      // von Zeiträumen (Schlüssel) und Jahren (null = die Jahre laut Jahre-Auswahl), Hauptwert 'pct'/'kwh', Änderung zum Vorjahr
-      // 'off'/'pct'/'kwh'.
+      // Tabelle „Zeiträume im Vergleich je Verbraucher“: sortiert nach einer Spalte (null = „Dieses Jahr“); Spalten als Liste von
+      // Zeiträumen (Schlüssel) und einzelnen Jahren (null = Monat, Vormonat, Jahr), Hauptwert 'pct'/'kwh'; Vorjahr-Spalten,
+      // Vergleich ('bis_jetzt'/'komplett') und Änderung unter dem Wert wie in „Zeiträume im Vergleich“ der Übersicht.
       sharesSortCol: null,
       sharesSortDir: 'desc',
       tblCols: null,
       tblMain: 'pct',
-      tblChg: 'pct',
+      vorjahr: true,
+      mode: 'bis_jetzt',
+      diff: true,
       // Hervorgehobener Verbraucher (Schlüssel aus langzeit/consumers, „rest“ für Übrige) oder null.
       pick: null,
       // Verbraucher der Matrix „Monatswerte je Jahr“ (null = der erste).
@@ -747,7 +764,10 @@
         // Gespeichert sind Jahre (Zahlen) und Zeiträume (Schlüssel); frühere Stände kannten nur Jahre.
         if (Array.isArray(saved.tblCols) && saved.tblCols.length && saved.tblCols.every(isColumn)) this.tblCols = saved.tblCols;
         if (saved.tblMain === 'pct' || saved.tblMain === 'kwh') this.tblMain = saved.tblMain;
-        if (['off', 'pct', 'kwh'].includes(saved.tblChg)) this.tblChg = saved.tblChg;
+        if (typeof saved.consVorjahr === 'boolean') this.vorjahr = saved.consVorjahr;
+        if (typeof saved.consDiff === 'boolean') this.diff = saved.consDiff;
+        else if (saved.tblChg === 'off') this.diff = false;  // frühere Änderungszeile „Aus“
+        if (saved.consMode === 'bis_jetzt' || saved.consMode === 'komplett') this.mode = saved.consMode;
         const savedSortCol = saved.tblSort ? (saved.tblSort.col ?? saved.tblSort.year) : null;
         if (isColumn(savedSortCol) && ['asc', 'desc'].includes(saved.tblSort.dir)) {
           this.sharesSortCol = savedSortCol;
@@ -773,7 +793,7 @@
           const res = await fetch('energiedashboard/langzeit/consumers', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({months}),
+            body: JSON.stringify({months, mode: this.mode}),
           });
           if (!res.ok) throw new Error(String(res.status));
           const data = await res.json();
@@ -817,28 +837,50 @@
       },
 
       sharesTableNote() {
-        const text = this.tblMain === 'pct'
-          ? t('Je Feld der Anteil am Verbrauch des Jahres laut Bilanz, darunter die kWh und die Änderung zum Vorjahr.')
-          : t('Je Feld die kWh des Jahres, darunter der Anteil am Verbrauch laut Bilanz und die Änderung zum Vorjahr.');
         const parts = [
-          text,
-          t('Jede Spalte ist die Rangliste ihres Jahres; das laufende Jahr zählt bis heute.'),
-          t('„Spalten“ wählt Zeiträume und Jahre; Voreinstellung sind die letzten Jahre, eine andere Jahre-Auswahl setzt die Spalten zurück. „Vorjahr“ wählt die Änderung zum Vorjahr, Anteil | kWh den Hauptwert. Auswahl und Sortierung merkt sich der Browser.'),
+          this.tblMain === 'pct'
+            ? t('Je Feld der Anteil am Verbrauch des Zeitraums laut Bilanz, darunter die kWh.')
+            : t('Je Feld die kWh des Zeitraums, darunter der Anteil am Verbrauch laut Bilanz.'),
         ];
-        // Sortierung, Änderung und Teiljahre der gezeigten Spalten.
+        if (this.vorjahr) parts.push(this.modeHint());
+        parts.push(
+          t('Jede Spalte ist die Rangliste ihres Zeitraums.'),
+          t('„Spalten“ wählt Zeiträume und einzelne Jahre, „Vorjahr“ den Vergleich wie in „Zeiträume im Vergleich“ der Übersicht, Anteil | kWh den Hauptwert. Auswahl und Sortierung merkt sich der Browser.'),
+        );
+        // Sortierung, Änderung und Teiljahr der gezeigten Spalten.
         const data = this.consumers;
         if (data && data.years) {
           const cols = this.sharesTableCols();
-          if (cols.length) parts.push(sharesTableFoot(data, cols, this.sharesSort(), this.tblChg));
+          if (cols.length) parts.push(sharesTableFoot(data, cols, this.sharesSort(), this.vorjahr && this.diff));
         }
         return parts.join(' ');
       },
 
-      // Spalten für das Menü „Spalten“: die Zeiträume (Dieser und Letzter Monat), dann alle Jahre bis heute, unabhängig von
-      // der Leiste „Jahre“. „Dieses Jahr“ fehlt, es ist die Spalte des laufenden Jahres.
+      modeHint() {
+        return this.mode === 'bis_jetzt'
+          ? t('Laufende Zeiträume werden mit demselben Stück des Vorjahres verglichen. Abgeschlossene Zeiträume (Gestern, Letzter Monat) sind in beiden Fällen gleich.')
+          : t('Laufende Zeiträume stehen neben dem kompletten Vorjahreszeitraum. Das Vorjahr hat dadurch meist höhere Summen.');
+      },
+
+      // Spalten für das Menü „Spalten“: die Zeiträume wie in „Zeiträume im Vergleich“, dann die einzelnen Jahre davor, neueste
+      // zuerst (das laufende Jahr ist „Dieses Jahr“). Zeiträume, die der Server nicht liefert, fehlen.
+      tablePeriodOptions() {
+        return ((this.consumers && this.consumers.periods) || []).map((period) => ({col: period.key, label: columnName(period.key)}));
+      },
+
+      tableYearOptions() {
+        const data = this.consumers;
+        if (!data || !data.years) return [];
+        return data.years.filter((year) => year < data.window.year).map((year) => ({col: year, label: String(year)}));
+      },
+
       sharesTableOptions() {
-        const periods = ((this.consumers && this.consumers.periods) || []).map((period) => ({col: period.key, label: columnName(period.key)}));
-        return [...periods, ...this.pastYears().map((option) => ({col: option.year, label: option.label}))];
+        return [...this.tablePeriodOptions(), ...this.tableYearOptions()];
+      },
+
+      // Das laufende Jahr als Zahl (frühere Stände) gilt als „Dieses Jahr“.
+      canonCol(col) {
+        return Number.isInteger(col) && this.consumers && col >= this.consumers.window.year ? 'jahr' : col;
       },
 
       // Eine Spalte an- oder abwählen; die letzte gewählte bleibt (das Kästchen ist dann gesperrt).
@@ -857,15 +899,30 @@
         this.drawSharesTable();
       },
 
-      setTableChg(chg) {
-        this.tblChg = chg;
-        writeStore({tblChg: chg});
-        this.drawSharesTable();
+      // Vorjahresvergleich: 'off' oder der Modus ('bis_jetzt'/'komplett'); schließt das Popover. Ein anderer Modus verschiebt die
+      // Fenster des Vorjahres, die Daten kommen dann neu vom Server.
+      setYoy(choice) {
+        const before = this.mode;
+        if (choice === 'off') this.vorjahr = false;
+        else {
+          this.vorjahr = true;
+          this.mode = choice;
+        }
+        document.querySelectorAll('.wt-yoy-popover').forEach((popover) => popover.classList.remove('open'));
+        writeStore({consVorjahr: this.vorjahr, consMode: this.mode});
+        if (this.mode !== before) this.loadConsumers(false);
+        else this.drawSharesTable();
       },
 
-      tableValueLabel() {
-        const chg = {off: t('Vorjahr: Aus'), pct: t('Vorjahr in %'), kwh: t('Vorjahr in kWh')}[this.tblChg];
-        return `${chg} ▾`;
+      yoyLabel() {
+        if (!this.vorjahr) return t('Vorjahr: Aus ▾');
+        return (this.mode === 'komplett' ? t('Vorjahr: komplett') : t('Vorjahr: bis jetzt')) + ' ▾';
+      },
+
+      toggleDiff() {
+        this.diff = !this.diff;
+        writeStore({consDiff: this.diff});
+        this.drawSharesTable();
       },
 
       drawShares() {
@@ -879,22 +936,25 @@
         if (this.$refs.sharesLegend) this.$refs.sharesLegend.innerHTML = sharesLegendHtml(data, this.pick);
       },
 
-      // Spalten der Tabelle (Zeiträume zuerst, dann die Jahre neueste zuerst): die im Menü „Spalten“ gewählten, soweit es
-      // sie gibt; sonst wie in der Rangliste so viele Jahre wie in der Leiste „Jahre“ gewählt.
+      // Spalten der Tabelle (Zeiträume zuerst, dann die Jahre neueste zuerst): die im Menü „Spalten“ gewählten, soweit es sie
+      // gibt; sonst Monat, Vormonat und Jahr wie in den Summen.
       sharesTableCols() {
-        const preset = this.rankYears().map((option) => option.year);
+        const options = this.sharesTableOptions().map((option) => option.col);
+        const preset = DEFAULT_COLUMNS.filter((col) => options.includes(col));
         if (!this.tblCols) return preset;
-        const chosen = this.sharesTableOptions().map((option) => option.col).filter((col) => this.tblCols.includes(col));
+        const wanted = this.tblCols.map((col) => this.canonCol(col));
+        const chosen = options.filter((col) => wanted.includes(col));
         return chosen.length ? chosen : preset;
       },
 
-      // Sortierung der Tabelle; eine Spalte, die nicht mehr gezeigt wird, fällt auf das neueste Jahr zurück.
+      // Sortierung der Tabelle; eine Spalte, die nicht mehr gezeigt wird, fällt auf „Dieses Jahr“ zurück.
       sharesSort() {
         const cols = this.sharesTableCols();
-        if (!cols.includes(this.sharesSortCol)) {
-          return {col: cols.find(Number.isInteger) ?? cols[0], dir: this.sharesSortCol == null ? this.sharesSortDir : 'desc'};
+        const col = this.canonCol(this.sharesSortCol);
+        if (!cols.includes(col)) {
+          return {col: cols.includes('jahr') ? 'jahr' : (cols.find(Number.isInteger) ?? cols[0]), dir: this.sharesSortCol == null ? this.sharesSortDir : 'desc'};
         }
-        return {col: this.sharesSortCol, dir: this.sharesSortDir};
+        return {col, dir: this.sharesSortDir};
       },
 
       drawSharesTable() {
@@ -902,7 +962,7 @@
         const table = this.$refs.sharesTable;
         if (!data || !data.years || !table) return;
         const cols = this.sharesTableCols();
-        if (this.sharesSortCol != null && !cols.includes(this.sharesSortCol)) {
+        if (this.sharesSortCol != null && !cols.includes(this.canonCol(this.sharesSortCol))) {
           this.sharesSortCol = null;
           this.sharesSortDir = 'desc';
         }
@@ -911,8 +971,9 @@
           return;
         }
         const sort = this.sharesSort();
-        table.style.setProperty('--n', cols.length);
-        table.innerHTML = sharesTableHtml(data, cols, {main: this.tblMain, chg: this.tblChg}, sort, this.matrixKey(), this.yearLimit);
+        // Zeitraum und Vorjahr sind je eine Spalte gleicher Breite.
+        table.style.setProperty('--n', cols.length * (this.vorjahr ? 2 : 1));
+        table.innerHTML = sharesTableHtml(data, cols, {main: this.tblMain, vorjahr: this.vorjahr, diff: this.diff}, sort, this.matrixKey());
         // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
         const wrap = this.$refs.sharesTableWrap;
         if (wrap) requestAnimationFrame(() => wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1));
@@ -1127,10 +1188,7 @@
 
       setYearLimit(value) {
         this.yearLimit = value;
-        // Die Spalten der Tabelle fallen auf die neue Voreinstellung zurück.
-        this.tblCols = null;
-        writeStore({consYearLimit: value, tblCols: null});
-        this.drawSharesTable();
+        writeStore({consYearLimit: value});
         this.drawShares();
         this.drawConsumerMatrix();
         this.drawRank();
