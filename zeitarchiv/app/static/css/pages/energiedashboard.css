@@ -1210,7 +1210,7 @@
   .wt-vt-menu .menu-section-label{padding:4px 4px 3px;}
   .wt-vt-menu .wt-vt-menu-sep{margin-top:6px;padding-top:8px;border-top:1px solid var(--border);}
   /* Feste Aufteilung: alle Jahresspalten gleich breit, unabhängig von Hinweistexten in einzelnen Zellen; --n setzt das Skript. */
-  .wt-table.wt-vt{width:100%;table-layout:fixed;min-width:calc(170px + var(--n, 4) * 94px);}
+  .wt-table.wt-vt{width:100%;table-layout:fixed;min-width:calc(170px + var(--n, 4) * 106px);}
   .wt-vt thead th{vertical-align:top;white-space:nowrap;}
   .wt-vt thead th small{display:block;font-weight:400;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
   .wt-vt-yh button{display:inline-flex;flex-direction:column;align-items:flex-end;margin:0;padding:0;border:0;background:none;
@@ -1227,7 +1227,7 @@
   .wt-vt-name .wt-vr-from{display:block;}
   .wt-vt-name a{color:inherit;text-decoration:none;overflow-wrap:break-word;}
   .wt-vt-name a:hover,.wt-vt-name a:focus-visible{color:var(--accent-line);text-decoration:underline;}
-  .wt-vt td{min-width:94px;}
+  .wt-vt td{min-width:106px;}
   .wt-vt-main{display:flex;justify-content:flex-end;align-items:center;gap:6px;font-family:var(--font-mono);
     font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);}
   .wt-vt-sub{display:block;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}

@@ -37,6 +37,9 @@ from .storage import rollup as rollup_mod
 from .storage.index import Index
 
 COLUMN_KEYS = ("monat", "vormonat", "jahr")
+#: Zeiträume, die die Tabelle „Verbraucher × Jahre“ zusätzlich zu den Jahren anbietet. „Dieses Jahr“ fehlt: Es ist das
+#: laufende Jahr, das als Jahresspalte schon bis heute zählt (dasselbe Fenster, dieselben Werte).
+CONSUMER_PERIODS = ("monat", "vormonat")
 #: Spalte -> (Zeitraum für query_mod._window, Versatz)
 COLUMN_WINDOWS = {
     "vormonat": ("month", -1),
@@ -135,6 +138,8 @@ class ConsumersRequest(BaseModel):
     at: str | None = None
     #: Ohne Monatswerte nur das Fenster der Rangliste: Die Stichtag-Leiste lädt dann nicht alle Jahre neu.
     months: bool = True
+    #: Zeiträume (aus CONSUMER_PERIODS) für die Tabelle „Verbraucher × Jahre“: je Verbraucher Wert und Vorjahreswert.
+    periods: list[str] = Field(default_factory=lambda: list(CONSUMER_PERIODS))
 
 
 def role_entities(config: dict) -> dict[str, list[str]]:
@@ -850,41 +855,31 @@ class EnergieLangzeitService:
         stichtag = period_columns.parse_stichtag(body.at, now_local.date())
         anchor = period_columns.stichtag_anchor(stichtag, self.tz)
         win = period_columns.column_windows(COLUMN_WINDOWS, "jahr", now_local, "bis_jetzt", anchor)
-        sides = (("cur", win["start"], win["end"]), ("vj", win["vj_start"], win["vj_end"]))
         roles = role_entities(config)
         consumers = top_consumers(config)
         read_cache = query_mod.QueryReadCache()
         balance_ids = sorted({e for role in BALANCE_ROLES for e in roles[role]})
         balance_start = self._latest_start(balance_ids)
+        entity_ids = [consumer["entity_id"] for consumer in consumers]
+        values, measured, total, rest_values = self._consumer_window(win, entity_ids, roles, now_local, read_cache)
 
         items: list[dict] = []
-        measured = {"cur": 0.0, "vj": 0.0}
         for consumer in consumers:
             entity_id = consumer["entity_id"]
             entity = self.index.get_entity(entity_id)
             first_ts = entity["first_ts"] if entity is not None and entity["first_ts"] else None
-            item: dict = {
+            items.append({
                 "key": entity_id, "name": self._consumer_name(consumer), "entity_id": entity_id,
                 "first_ts": first_ts, "partial_start": self._partial_start([entity_id]),
                 # Ein Tag Spielraum: Zähler, die am selben Tag wie die Bilanz begonnen haben, verzerren nichts.
                 "late": bool(first_ts and balance_start and first_ts > balance_start + 86400),
-            }
-            for side, start, end in sides:
-                item[side], _first = self.window_total([entity_id], start, end, now_local, read_cache)
-                measured[side] += item[side] or 0.0
-            items.append(item)
-
-        total: dict[str, float | None] = {}
-        for side, start, end in sides:
-            sums, _froms = self.side_values(roles, start, end, now_local, read_cache)
-            value = balance(sums)
-            total[side] = round(value, 3) if value is not None else None
+                **values[entity_id],
+            })
         rest: dict = {
             "key": "rest", "name": tr("Übrige (Grundlast)"), "entity_id": None,
             "first_ts": balance_start, "partial_start": self._partial_start(balance_ids), "late": False,
+            **rest_values,
         }
-        for side in ("cur", "vj"):
-            rest[side] = round(max(total[side] - measured[side], 0.0), 3) if total[side] is not None else None
 
         out: dict = {
             "tz": str(self.tz), "now": now_local.timestamp(), "unit": "kWh",
@@ -899,8 +894,58 @@ class EnergieLangzeitService:
             },
             "consumers": items, "rest": rest,
         }
+        periods = [key for key in CONSUMER_PERIODS if key in body.periods]
+        if periods:
+            out["periods"] = self._consumer_periods(periods, items, rest, roles, now_local, read_cache)
         if body.months:
             self._consumer_months(out, roles, balance_ids, now_local, read_cache)
+        return out
+
+    def _consumer_window(
+        self, win: dict, entity_ids: list[str], roles: dict[str, list[str]], now_local: datetime,
+        read_cache: query_mod.QueryReadCache,
+    ) -> tuple[dict[str, dict], dict[str, float], dict[str, float | None], dict[str, float | None]]:
+        """Werte der Verbraucher für ein Fenster und dessen Vorjahr: (je Verbraucher {cur, vj}, Summe der Verbraucher,
+        Verbrauch laut Bilanz, „Übrige“ = Rest bis zur Bilanz, nie negativ). Je Seite, „cur“ und „vj“."""
+        sides = (("cur", win["start"], win["end"]), ("vj", win["vj_start"], win["vj_end"]))
+        values: dict[str, dict] = {entity_id: {} for entity_id in entity_ids}
+        measured = {"cur": 0.0, "vj": 0.0}
+        total: dict[str, float | None] = {}
+        for side, start, end in sides:
+            for entity_id in entity_ids:
+                values[entity_id][side], _first = self.window_total([entity_id], start, end, now_local, read_cache)
+                measured[side] += values[entity_id][side] or 0.0
+            sums, _froms = self.side_values(roles, start, end, now_local, read_cache)
+            balanced = balance(sums)
+            total[side] = round(balanced, 3) if balanced is not None else None
+        rest = {
+            side: round(max(total[side] - measured[side], 0.0), 3) if total[side] is not None else None
+            for side in ("cur", "vj")
+        }
+        return values, measured, total, rest
+
+    def _consumer_periods(
+        self, keys: list[str], items: list[dict], rest: dict, roles: dict[str, list[str]], now_local: datetime,
+        read_cache: query_mod.QueryReadCache,
+    ) -> list[dict]:
+        """Monat und Vormonat je Verbraucher gegen denselben Zeitraum des Vorjahres („bis jetzt“ wie die Jahre):
+        trägt je Verbraucher und für „Übrige“ ``periods[key] = {cur, vj}`` ein und liefert die Fenster und Summen."""
+        entity_ids = [item["entity_id"] for item in items]
+        for item in (*items, rest):
+            item["periods"] = {}
+        out: list[dict] = []
+        for key in keys:
+            win = period_columns.column_windows(COLUMN_WINDOWS, key, now_local, "bis_jetzt")
+            values, measured, total, rest_values = self._consumer_window(win, entity_ids, roles, now_local, read_cache)
+            for item in items:
+                item["periods"][key] = values[item["entity_id"]]
+            rest["periods"][key] = rest_values
+            out.append({
+                "key": key, "partial": win["partial"],
+                "cur": {"start": win["start"].timestamp(), "end": win["end"].timestamp()},
+                "vj": {"start": win["vj_start"].timestamp(), "end": win["vj_end"].timestamp()},
+                "total": total, "measured": {side: round(value, 3) for side, value in measured.items()},
+            })
         return out
 
     def _consumer_months(

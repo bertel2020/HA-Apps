@@ -15,6 +15,8 @@
     Vorjahr, sortierbar nach jedem Jahr
     - Spalten (Jahre), Hauptwert (Anteil oder kWh) und Änderung (Aus, % oder
       kWh) wählbar; Auswahl und Sortierung merkt sich der Browser
+    - Zusätzlich als Spalten „Dieser Monat“ und „Letzter Monat“, verglichen mit
+      demselben Zeitraum des Vorjahres
   - „Anteile je Jahr“: ein gestapelter Balken je Jahr, in Prozent oder kWh
   - „Jahre × Monate je Verbraucher“: die Matrix aus „Summen“ für einen
     gewählten Verbraucher; ein Klick auf ein Feld öffnet den Monat
@@ -41,6 +43,8 @@
     previous year, sortable by any year
     - Selectable columns (years), main value (share or kWh) and change (off,
       % or kWh); the browser remembers the selection and sorting
+    - Also available as columns: "This month" and "Last month", compared with
+      the same period of the previous year
   - "Shares per year": one stacked bar per year, in percent or kWh
   - "Years × months per consumer": the matrix from "Totals" for a selected
     consumer; a click on a cell opens that month

@@ -357,6 +357,59 @@
       + `<i class="${item.rest ? 'wt-vr-hatch' : ''}" style="background:${item.color}"></i>${escapeHtml(item.name)}</button>`).join('');
   }
 
+  // Zeiträume der Tabelle neben den Jahren (Schlüssel wie energie_langzeit.CONSUMER_PERIODS); „Dieses Jahr“ ist die Jahresspalte.
+  const PERIOD_KEYS = ['monat', 'vormonat'];
+  const isPeriod = (col) => PERIOD_KEYS.includes(col);
+  const isColumn = (col) => Number.isInteger(col) || isPeriod(col);
+  const periodOf = (data, key) => (data.periods || []).find((period) => period.key === key) || null;
+
+  // Spaltenkopf eines Zeitraums: Name wie in „Summen“, darunter „bis 08.11.“ (laufend) oder Monat und Jahr (abgeschlossen).
+  function periodHead(data, key) {
+    const period = periodOf(data, key);
+    let sub = '';
+    if (period) sub = period.partial ? t('bis {date}', {date: fmtDate(formats.dm, period.cur.end - 1)}) : monthYear(period.cur.start);
+    return {title: columnName(key), sub};
+  }
+
+  // Rangliste eines Zeitraums im Format von consumerRank: Monat bis heute gegen dasselbe Stück des Vorjahres, der Vormonat
+  // ganz. Der Server liefert je Verbraucher {cur, vj}; ohne Vorjahreswert steht wie bei den Jahren ein kurzer Grund.
+  function periodRank(data, key) {
+    const period = periodOf(data, key);
+    const empty = {key, inWindow: false, entries: [], total: null, totalPrev: null, measured: 0, measuredPrev: null};
+    if (!period) return empty;
+    // Ein Tag Spielraum wie coversYear: Ein Archiv, das am Beginn des Vorjahresfensters anfängt, deckt es ganz ab.
+    const covers = (item) => item.first_ts != null && item.first_ts < period.vj.start + 86400;
+    const entries = [];
+    for (const item of consumerRows(data)) {
+      const values = item.periods ? item.periods[key] : null;
+      if (!values || values.cur == null) continue;
+      const comparable = values.vj != null && covers(item);
+      let note = '';
+      if (!comparable) {
+        if (item.first_ts != null && !covers(item)) {
+          note = item.first_ts >= period.cur.start
+            ? t('neu ab {date}', {date: monthYear(item.first_ts)})
+            : t('Vorjahr erst ab {date}', {date: monthYear(item.first_ts)});
+        } else note = t('kein Vorjahr');
+      }
+      const flags = [];
+      if (item.rest) {
+        for (const c of data.consumers) {
+          if (c.late && c.first_ts > period.vj.start && c.first_ts < period.cur.end) {
+            flags.push(t('{name} wird erst ab {date} gemessen und steckt vorher in „Übrige“. Der Vergleich mit dem Vorjahr ist dadurch verzerrt.', {name: c.name, date: monthYear(c.first_ts)}));
+          }
+        }
+      }
+      entries.push({item, cur: values.cur, prev: comparable ? values.vj : null, delta: comparable ? values.cur - values.vj : null, note, flags});
+    }
+    const totalPrev = covers(data.rest) ? period.total.vj : null;
+    return {
+      key, inWindow: false, entries, total: period.total.cur, totalPrev,
+      measured: entries.filter((e) => !e.item.rest).reduce((sum, e) => sum + e.cur, 0),
+      measuredPrev: totalPrev == null ? null : period.measured.vj,
+    };
+  }
+
   // Erstes Jahr des Archivs, wenn es nicht am 1. Januar beginnt (dann kein ganzes Jahr), sonst null.
   function partialFirstYear(data) {
     const rest = data.rest;
@@ -365,34 +418,48 @@
     return coversYear(rest, year) ? null : year;
   }
 
-  // Tabelle Verbraucher × Jahre, ältestes Jahr links. Jede Spalte ist die Rangliste ihres Jahres
-  // (consumerRank): das laufende Jahr bis heute gegen dasselbe Stück des Vorjahres, die Jahre davor ganz.
-  // years: neueste zuerst; sort: {year, dir}; main 'pct' oder 'kwh' bestimmt die Hauptzahl, der andere Wert steht klein darunter;
+  // Tabelle Verbraucher × Jahre, neueste Spalte links. Jede Spalte ist die Rangliste ihres Jahres
+  // (consumerRank): das laufende Jahr bis heute gegen dasselbe Stück des Vorjahres, die Jahre davor ganz; ein Zeitraum
+  // (Dieser/Letzter Monat) ist die Rangliste dieses Monats (periodRank).
+  // columns: Zeiträume zuerst, dann die Jahre neueste zuerst; sort: {col, dir}; main 'pct' oder 'kwh' bestimmt die Hauptzahl, der andere Wert steht klein darunter;
   // chg 'off', 'pct' oder 'kwh' die Änderungszeile.
-  function sharesTableHtml(data, years, {main, chg}, sort, selected, limit = 0) {
-    const cols = [...years];
+  function sharesTableHtml(data, columns, {main, chg}, sort, selected, limit = 0) {
+    const cols = [...columns];
     const ranks = {};
-    for (const year of cols) ranks[year] = consumerRank(data, year, limit);
-    const entryOf = (year, key) => ranks[year].entries.find((e) => e.item.key === key) || null;
-    const hasPrev = (year) => (data.years || []).includes(year - 1);
+    for (const col of cols) ranks[col] = isPeriod(col) ? periodRank(data, col) : consumerRank(data, col, limit);
+    const entryOf = (col, key) => ranks[col].entries.find((e) => e.item.key === key) || null;
+    // Bei einem Zeitraum entscheidet jede Zelle selbst (Hinweis „Vorjahr erst ab …“), bei einem Jahr das Archiv.
+    const hasPrev = (col) => isPeriod(col) || (data.years || []).includes(col - 1);
+    // Ausführlicher Name für Tooltips: „2026 bis 08.11.“, „Dieser Monat (bis 08.11.)“.
+    const colName = (col) => {
+      if (isPeriod(col)) {
+        const head = periodHead(data, col);
+        return head.sub ? `${head.title} (${head.sub})` : head.title;
+      }
+      return col === data.window.year ? t('{year} bis {date}', {year: col, date: until}) : String(col);
+    };
+    const years = cols.filter(Number.isInteger);
+    const oldestYear = years.length ? Math.min(...years) : data.window.year;
     const firstYear = partialFirstYear(data);
     const until = fmtDate(formats.dm, data.window.cur.end - 1);
     const pct = main === 'pct';
     const pctText = (value) => `${num(value, 1)} %`;
     const rows = consumerRows(data);
     const list = rows.filter((item) => !item.rest);
-    // Ohne Wert im sortierten Jahr ans Ende.
-    sortByValue(list, (item) => (entryOf(sort.year, item.key) || {cur: null}).cur, sort.dir);
-    const sorted = (year) => (year === sort.year ? ' wt-vt-sorted' : '');
+    // Ohne Wert in der sortierten Spalte ans Ende.
+    sortByValue(list, (item) => (entryOf(sort.col, item.key) || {cur: null}).cur, sort.dir);
+    const sorted = (col) => (col === sort.col ? ' wt-vt-sorted' : '');
 
     let html = `<thead><tr><th scope="col">${escapeHtml(t('Verbraucher'))}<small>${escapeHtml(pct ? t('Anteil, darunter kWh') : t('kWh, darunter Anteil'))}</small></th>`;
-    for (const year of cols) {
-      const on = year === sort.year;
+    for (const col of cols) {
+      const on = col === sort.col;
+      let label = String(col);
       let sub = '';
-      if (year === data.window.year) sub = t('bis {date}', {date: until});
-      else if (year === firstYear) sub = t('ab {date}', {date: fmtDate(formats.dm, data.rest.first_ts)});
+      if (isPeriod(col)) ({title: label, sub} = periodHead(data, col));
+      else if (col === data.window.year) sub = t('bis {date}', {date: until});
+      else if (col === firstYear) sub = t('ab {date}', {date: fmtDate(formats.dm, data.rest.first_ts)});
       html += `<th scope="col" class="wt-vt-yh${on ? ' is-sorted' : ''}" aria-sort="${ariaSort(on, sort.dir)}">`
-        + `${sortHead(`${year}${year === firstYear ? '*' : ''}`, on, sort.dir, `data-year="${year}"`, t('Nach {year} sortieren', {year}), sub)}</th>`;
+        + `${sortHead(`${escapeHtml(label)}${col === firstYear ? '*' : ''}`, on, sort.dir, `data-col="${col}"`, t('Nach {year} sortieren', {year: label}), sub)}</th>`;
     }
     html += '</tr></thead><tbody>';
 
@@ -400,59 +467,58 @@
       const name = item.entity_id
         ? `<a href="entities/${encodeURIComponent(item.entity_id)}?range=year&offset=0">${escapeHtml(item.name)}</a>`
         : `<span>${escapeHtml(item.name)}</span>`;
-      const from = item.late && item.first_ts != null && ZT.parts(item.first_ts).year >= cols[cols.length - 1]
+      const from = item.late && item.first_ts != null && ZT.parts(item.first_ts).year >= oldestYear
         ? `<span class="wt-vr-from">${escapeHtml(t('ab {date}', {date: monthYear(item.first_ts)}))}</span>` : '';
       const hatch = item.rest ? ' wt-vr-hatch' : '';
       html += `<tr class="wt-vt-row${item.rest ? ' wt-vt-rest' : ''}${selected === item.key ? ' is-sel' : ''}" data-key="${escapeHtml(item.key)}"`
         + ` tabindex="0" aria-label="${escapeHtml(t('{name}: Monate unten zeigen', {name: item.name}))}">`
         + `<th scope="row"><span class="wt-vt-name"><i class="wt-vr-dot${hatch}" style="background:${item.color}"></i><span>${name}${from}</span></span></th>`;
-      for (const year of cols) {
-        const entry = entryOf(year, item.key);
+      for (const col of cols) {
+        const entry = entryOf(col, item.key);
         if (!entry) {
-          const missing = t('{name} {year}: noch nicht erfasst', {name: item.name, year});
-          html += `<td class="wt-vt-na${sorted(year)}" data-tooltip-fixed="${escapeHtml(missing)}"><span class="wt-vt-main">–</span></td>`;
+          const missing = t('{name} {year}: noch nicht erfasst', {name: item.name, year: colName(col)});
+          html += `<td class="wt-vt-na${sorted(col)}" data-tooltip-fixed="${escapeHtml(missing)}"><span class="wt-vt-main">–</span></td>`;
           continue;
         }
-        const total = ranks[year].total;
+        const total = ranks[col].total;
         const share = total ? entry.cur / total * 100 : null;
         const shareText = share == null ? '–' : pctText(share);
         const warn = entry.flags.length
           ? `<span class="wt-vr-warn" data-tooltip-fixed="${escapeHtml(entry.flags.join('\n'))}" role="img" aria-label="${escapeHtml(t('Hinweis: {text}', {text: entry.flags.join('; ')}))}"></span>` : '';
-        let tip = `${item.name} ${year === data.window.year ? t('{year} bis {date}', {year, date: until}) : year}: ${energy(entry.cur)} · ${shareText}`;
+        let tip = `${item.name} ${colName(col)}: ${energy(entry.cur)} · ${shareText}`;
         if (entry.delta != null) tip += ` · ${t('Vorjahr {value}', {value: deltaKwh(entry.delta)})}`;
-        html += `<td class="wt-vt-c${sorted(year)}" data-tooltip-fixed="${escapeHtml(tip)}">`
+        html += `<td class="wt-vt-c${sorted(col)}" data-tooltip-fixed="${escapeHtml(tip)}">`
           + `<span class="wt-vt-main">${warn}${escapeHtml(pct ? shareText : kwhText(entry.cur))}</span>`
           + `<span class="wt-vt-sub">${escapeHtml(pct ? `${kwhText(entry.cur)} kWh` : shareText)}</span>`
-          + `${hasPrev(year) ? tableDelta(entry, chg) : ''}</td>`;
+          + `${hasPrev(col) ? tableDelta(entry, chg) : ''}</td>`;
       }
       html += '</tr>';
     }
 
     // Verbrauch laut Bilanz mit seiner Änderung; ohne vergleichbares Vorjahr nennt „Übrige“ den Grund.
     html += `<tr class="wt-vt-sum"><th scope="row">${escapeHtml(t('Verbrauch (Bilanz)'))}</th>`;
-    for (const year of cols) {
-      const rank = ranks[year];
+    for (const col of cols) {
+      const rank = ranks[col];
       if (rank.total == null) {
-        html += `<td class="${sorted(year).trim()}"><span class="wt-vt-main">–</span></td>`;
+        html += `<td class="${sorted(col).trim()}"><span class="wt-vt-main">–</span></td>`;
         continue;
       }
-      const rest = entryOf(year, data.rest.key);
+      const rest = entryOf(col, data.rest.key);
       const sum = {delta: rank.totalPrev != null ? rank.total - rank.totalPrev : null, prev: rank.totalPrev, note: rest ? rest.note : ''};
-      const label = year === data.window.year ? t('{year} bis {date}', {year, date: until}) : year;
-      html += `<td class="${sorted(year).trim()}" data-tooltip-fixed="${escapeHtml(`${t('Verbrauch (Bilanz)')} ${label}: ${energy(rank.total)}`)}">`
+      html += `<td class="${sorted(col).trim()}" data-tooltip-fixed="${escapeHtml(`${t('Verbrauch (Bilanz)')} ${colName(col)}: ${energy(rank.total)}`)}">`
         + `<span class="wt-vt-main">${escapeHtml(pct ? '100 %' : kwhText(rank.total))}</span>`
         + `<span class="wt-vt-sub">${escapeHtml(pct ? `${kwhText(rank.total)} kWh` : '100 %')}</span>`
-        + `${hasPrev(year) && chg !== 'off' ? rankDelta(sum, {withKwh: false, unit: chg}) : ''}</td>`;
+        + `${hasPrev(col) && chg !== 'off' ? rankDelta(sum, {withKwh: false, unit: chg}) : ''}</td>`;
     }
     html += `</tr><tr class="wt-vt-cov"><th scope="row">${escapeHtml(t('Gemessen'))}</th>`;
-    for (const year of cols) {
-      const rank = ranks[year];
+    for (const col of cols) {
+      const rank = ranks[col];
       if (!rank.total) {
-        html += `<td class="${sorted(year).trim()}"><span class="wt-vt-main">–</span></td>`;
+        html += `<td class="${sorted(col).trim()}"><span class="wt-vt-main">–</span></td>`;
         continue;
       }
       const tip = t('Eigene Zähler erfassen {measured} von {total} kWh', {measured: kwhText(rank.measured), total: kwhText(rank.total)});
-      html += `<td class="${sorted(year).trim()}" data-tooltip-fixed="${escapeHtml(tip)}">`
+      html += `<td class="${sorted(col).trim()}" data-tooltip-fixed="${escapeHtml(tip)}">`
         + `<span class="wt-vt-main">${escapeHtml(`${num(Math.min(100, rank.measured / rank.total * 100), 0)} %`)}</span>`
         + `<span class="wt-vt-sub">${escapeHtml(`${kwhText(rank.measured)} kWh`)}</span></td>`;
     }
@@ -460,11 +526,16 @@
   }
 
   // Fußzeile der Tabelle: Sortierung, Änderung und die Teiljahre, soweit sie in der Tabelle stehen.
-  function sharesTableFoot(data, years, sort, chg) {
+  function sharesTableFoot(data, columns, sort, chg) {
+    const years = columns.filter(Number.isInteger);
+    const sortName = isPeriod(sort.col) ? periodHead(data, sort.col).title : sort.col;
     const parts = [
-      sort.dir === 'desc' ? t('Sortiert nach {year}, größter zuerst.', {year: sort.year}) : t('Sortiert nach {year}, kleinster zuerst.', {year: sort.year}),
-      t('Ein Klick auf einen Jahreskopf sortiert nach diesem Jahr, ein zweiter dreht die Reihenfolge. „Übrige (Grundlast)“ und die Summen stehen immer unten.'),
+      sort.dir === 'desc' ? t('Sortiert nach {year}, größter zuerst.', {year: sortName}) : t('Sortiert nach {year}, kleinster zuerst.', {year: sortName}),
+      t('Ein Klick auf einen Spaltenkopf sortiert nach dieser Spalte, ein zweiter dreht die Reihenfolge. „Übrige (Grundlast)“ und die Summen stehen immer unten.'),
     ];
+    if (columns.some(isPeriod)) {
+      parts.push(t('Dieser Monat zählt bis heute und vergleicht mit demselben Stück des Vorjahres, Letzter Monat mit dem ganzen Monat des Vorjahres.'));
+    }
     if (chg !== 'off') {
       parts.push(t('Die Änderung zum Vorjahr ist in kWh gerechnet; rot: mehr Verbrauch, grün: weniger, „–“ mit Grund, wenn das Vorjahr nicht ganz erfasst ist.'));
     }
@@ -520,7 +591,7 @@
       sharesMode: 'pct',
       // Tabelle „Verbraucher × Jahre“: sortiert nach einem Jahr (null = dem neuesten); Spalten als Liste von Jahren
       // (null = die Jahre laut Leiste „Jahre“), Hauptwert 'pct'/'kwh', Änderung zum Vorjahr 'off'/'pct'/'kwh'.
-      sharesSortYear: null,
+      sharesSortCol: null,
       sharesSortDir: 'desc',
       tblCols: null,
       tblMain: 'pct',
@@ -541,12 +612,14 @@
           this.rankSortDir = rankSort.dir;
         }
         if (saved.sharesMode === 'pct' || saved.sharesMode === 'kwh') this.sharesMode = saved.sharesMode;
-        // Jahre ohne Daten fallen erst beim Zeichnen weg (sharesTableYears), wenn die Jahre des Archivs bekannt sind.
-        if (Array.isArray(saved.tblCols) && saved.tblCols.length && saved.tblCols.every(Number.isInteger)) this.tblCols = saved.tblCols;
+        // Spalten ohne Daten fallen erst beim Zeichnen weg (sharesTableCols), wenn die Jahre des Archivs bekannt sind.
+        // Gespeichert sind Jahre (Zahlen) und Zeiträume (Schlüssel); frühere Stände kannten nur Jahre.
+        if (Array.isArray(saved.tblCols) && saved.tblCols.length && saved.tblCols.every(isColumn)) this.tblCols = saved.tblCols;
         if (saved.tblMain === 'pct' || saved.tblMain === 'kwh') this.tblMain = saved.tblMain;
         if (['off', 'pct', 'kwh'].includes(saved.tblChg)) this.tblChg = saved.tblChg;
-        if (saved.tblSort && Number.isInteger(saved.tblSort.year) && ['asc', 'desc'].includes(saved.tblSort.dir)) {
-          this.sharesSortYear = saved.tblSort.year;
+        const savedSortCol = saved.tblSort ? (saved.tblSort.col ?? saved.tblSort.year) : null;
+        if (isColumn(savedSortCol) && ['asc', 'desc'].includes(saved.tblSort.dir)) {
+          this.sharesSortCol = savedSortCol;
           this.sharesSortDir = saved.tblSort.dir;
         }
         if (Array.isArray(saved.columns)) this.columns = COLUMN_KEYS.filter((key) => saved.columns.includes(key));
@@ -658,21 +731,23 @@
         return [
           text,
           t('Jede Spalte ist die Rangliste ihres Jahres; das laufende Jahr zählt bis heute.'),
-          t('„Spalten“ wählt die Jahre; Voreinstellung sind die Jahre der Leiste „Jahre“, eine Änderung dort setzt die Auswahl zurück. Das zweite Menü wählt Hauptwert und Änderung zum Vorjahr. Auswahl und Sortierung merkt sich der Browser.'),
+          t('„Spalten“ wählt Zeiträume und Jahre; Voreinstellung sind die Jahre der Leiste „Jahre“, eine Änderung dort setzt die Auswahl zurück. Das zweite Menü wählt Hauptwert und Änderung zum Vorjahr. Auswahl und Sortierung merkt sich der Browser.'),
         ].join(' ');
       },
 
-      // Jahre für das Menü „Spalten“: alle Jahre bis heute, unabhängig von der Leiste „Jahre“.
+      // Spalten für das Menü „Spalten“: die Zeiträume (Dieser und Letzter Monat), dann alle Jahre bis heute, unabhängig von
+      // der Leiste „Jahre“. „Dieses Jahr“ fehlt, es ist die Spalte des laufenden Jahres.
       sharesTableOptions() {
-        return this.pastYears();
+        const periods = ((this.consumers && this.consumers.periods) || []).map((period) => ({col: period.key, label: columnName(period.key)}));
+        return [...periods, ...this.pastYears().map((option) => ({col: option.year, label: option.label}))];
       },
 
-      // Ein Jahr an- oder abwählen; das letzte gewählte bleibt (das Kästchen ist dann gesperrt).
-      toggleTableYear(year) {
-        const current = this.sharesTableYears();
-        if (current.includes(year) && current.length === 1) return;
-        const next = current.includes(year) ? current.filter((y) => y !== year) : [...current, year];
-        this.tblCols = this.sharesTableOptions().map((option) => option.year).filter((y) => next.includes(y));
+      // Eine Spalte an- oder abwählen; die letzte gewählte bleibt (das Kästchen ist dann gesperrt).
+      toggleTableCol(col) {
+        const current = this.sharesTableCols();
+        if (current.includes(col) && current.length === 1) return;
+        const next = current.includes(col) ? current.filter((c) => c !== col) : [...current, col];
+        this.tblCols = this.sharesTableOptions().map((option) => option.col).filter((c) => next.includes(c));
         writeStore({tblCols: this.tblCols});
         this.drawSharesTable();
       },
@@ -706,57 +781,60 @@
         if (this.$refs.sharesLegend) this.$refs.sharesLegend.innerHTML = sharesLegendHtml(data, this.pick);
       },
 
-      // Jahre der Tabelle (neueste zuerst): die im Menü „Spalten“ gewählten, soweit es sie gibt; sonst wie in
-      // der Rangliste so viele wie in der Leiste „Jahre“ gewählt.
-      sharesTableYears() {
+      // Spalten der Tabelle (Zeiträume zuerst, dann die Jahre neueste zuerst): die im Menü „Spalten“ gewählten, soweit es
+      // sie gibt; sonst wie in der Rangliste so viele Jahre wie in der Leiste „Jahre“ gewählt.
+      sharesTableCols() {
         const preset = this.rankYears().map((option) => option.year);
         if (!this.tblCols) return preset;
-        const chosen = this.pastYears().map((option) => option.year).filter((year) => this.tblCols.includes(year));
+        const chosen = this.sharesTableOptions().map((option) => option.col).filter((col) => this.tblCols.includes(col));
         return chosen.length ? chosen : preset;
       },
 
-      // Sortierung der Tabelle; ein Jahr, das nicht mehr gezeigt wird, fällt auf das neueste zurück.
+      // Sortierung der Tabelle; eine Spalte, die nicht mehr gezeigt wird, fällt auf das neueste Jahr zurück.
       sharesSort() {
-        const years = this.sharesTableYears();
-        if (!years.includes(this.sharesSortYear)) return {year: years[0], dir: this.sharesSortYear == null ? this.sharesSortDir : 'desc'};
-        return {year: this.sharesSortYear, dir: this.sharesSortDir};
+        const cols = this.sharesTableCols();
+        if (!cols.includes(this.sharesSortCol)) {
+          return {col: cols.find(Number.isInteger) ?? cols[0], dir: this.sharesSortCol == null ? this.sharesSortDir : 'desc'};
+        }
+        return {col: this.sharesSortCol, dir: this.sharesSortDir};
       },
 
       drawSharesTable() {
         const data = this.consumers;
         const table = this.$refs.sharesTable;
         if (!data || !data.years || !table) return;
-        const years = this.sharesTableYears();
-        if (this.sharesSortYear != null && !years.includes(this.sharesSortYear)) {
-          this.sharesSortYear = null;
+        const cols = this.sharesTableCols();
+        if (this.sharesSortCol != null && !cols.includes(this.sharesSortCol)) {
+          this.sharesSortCol = null;
           this.sharesSortDir = 'desc';
         }
-        if (!years.length) {
+        if (!cols.length) {
           table.innerHTML = '';
           if (this.$refs.sharesTableFoot) this.$refs.sharesTableFoot.textContent = '';
           return;
         }
         const sort = this.sharesSort();
-        table.style.setProperty('--n', years.length);
-        table.innerHTML = sharesTableHtml(data, years, {main: this.tblMain, chg: this.tblChg}, sort, this.matrixKey(), this.yearLimit);
-        if (this.$refs.sharesTableFoot) this.$refs.sharesTableFoot.textContent = sharesTableFoot(data, years, sort, this.tblChg);
+        table.style.setProperty('--n', cols.length);
+        table.innerHTML = sharesTableHtml(data, cols, {main: this.tblMain, chg: this.tblChg}, sort, this.matrixKey(), this.yearLimit);
+        if (this.$refs.sharesTableFoot) this.$refs.sharesTableFoot.textContent = sharesTableFoot(data, cols, sort, this.tblChg);
         // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
         const wrap = this.$refs.sharesTableWrap;
         if (wrap) requestAnimationFrame(() => wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1));
       },
 
-      // Klick auf einen Jahreskopf sortiert nach diesem Jahr (ein zweiter dreht die Reihenfolge), auf eine Zeile wählt den
+      // Klick auf einen Spaltenkopf sortiert nach dieser Spalte (ein zweiter dreht die Reihenfolge), auf eine Zeile wählt den
       // Verbraucher für die Matrix wie ein Klick auf die Balken; der Name öffnet die Entität.
       sharesTableClick(event) {
         if (event.target.closest('a')) return;
-        const head = event.target.closest('button[data-year]');
+        const head = event.target.closest('button[data-col]');
         if (head) {
-          const year = Number(head.dataset.year);
+          const raw = head.dataset.col;
+          const col = /^\d+$/.test(raw) ? Number(raw) : raw;
           const sort = this.sharesSort();
-          if (year === sort.year) this.sharesSortDir = sort.dir === 'desc' ? 'asc' : 'desc';
+          if (col === sort.col) this.sharesSortDir = sort.dir === 'desc' ? 'asc' : 'desc';
           else this.sharesSortDir = 'desc';
-          this.sharesSortYear = year;
-          writeStore({tblSort: {year, dir: this.sharesSortDir}});
+          this.sharesSortCol = col;
+          writeStore({tblSort: {col, dir: this.sharesSortDir}});
           this.drawSharesTable();
           return;
         }

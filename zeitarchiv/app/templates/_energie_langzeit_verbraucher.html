@@ -39,10 +39,10 @@
         <div class="dd-picker-wrap wt-controls-end">
           <button type="button" class="btn" onclick="toggleDDPicker('el-vt-cols')">{{ _("Spalten ▾") }}</button>
           <div class="dd-picker-popover" id="el-vt-cols-popover">
-            <template x-for="option in sharesTableOptions()" :key="option.year">
-              <label class="dd-picker-row"><input type="checkbox" :checked="sharesTableYears().includes(option.year)"
-                :disabled="sharesTableYears().length === 1 && sharesTableYears().includes(option.year)"
-                @change="toggleTableYear(option.year)"><span x-text="option.label"></span></label>
+            <template x-for="option in sharesTableOptions()" :key="option.col">
+              <label class="dd-picker-row"><input type="checkbox" :checked="sharesTableCols().includes(option.col)"
+                :disabled="sharesTableCols().length === 1 && sharesTableCols().includes(option.col)"
+                @change="toggleTableCol(option.col)"><span x-text="option.label"></span></label>
             </template>
           </div>
         </div>
