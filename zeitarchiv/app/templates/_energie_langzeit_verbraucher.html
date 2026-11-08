@@ -11,7 +11,7 @@
       <h2 class="wt-h2" :class="{'wt-h2-jump': stichtag()}" x-text="cardTitle()" @click="if (stichtag()) $store.dashStichtag.set(null)" :title="stichtag() ? t('Zurück zu heute') : ''"></h2>
       {{ period_nav(true, true) }}
     </div>
-    <p class="wt-stand">{{ _("Der Stichtag gilt für die Rangliste; die übrigen Karten zeigen alle Jahre.") }}</p>
+    <p class="wt-stand">{{ _("Der Stichtag gilt für die Rangliste und die Tabelle in „Anteile je Jahr“; Balken und Jahre × Monate zeigen alle Jahre.") }}</p>
     <div class="wt-card-sep"></div>
     <div class="wt-controls">
       <h3 class="wt-h3">{{ _("Verbraucher im Jahr") }} {{ hint_button(_("Verbraucher im Jahr")) }}</h3>
@@ -43,19 +43,32 @@
     </div>
   </div>
 
-  {# Anteile je Jahr: ein gestapelter Balken je Jahr, Abschnitte in der Reihenfolge des Setups, „Übrige“ schraffiert. #}
+  {# Anteile je Jahr: ein gestapelter Balken je Jahr, Abschnitte in der Reihenfolge des Setups, „Übrige“ schraffiert;
+     wahlweise als Tabelle Verbraucher × Jahre (Spalten wie die Rangliste je Jahr, sortierbar nach einem Jahr). #}
   <div class="card wt-card" x-show="consumers && consumers.years" x-cloak>
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Anteile je Jahr") }} {{ hint_button(_("Anteile je Jahr")) }}</h2>
       {% call hint_body() %}<span x-text="sharesNote()"></span>{% endcall %}
+      <div class="wt-seg" role="group" aria-label="{{ _('Balken oder Tabelle') }}">
+        <button type="button" :aria-pressed="(sharesView === 'bar').toString()" @click="setSharesView('bar')">{{ _("Balken") }}</button>
+        <button type="button" :aria-pressed="(sharesView === 'tbl').toString()" @click="setSharesView('tbl')">{{ _("Tabelle") }}</button>
+      </div>
       <div class="wt-seg wt-controls-end" role="group" aria-label="{{ _('Anteile oder kWh') }}">
         <button type="button" :aria-pressed="(sharesMode === 'pct').toString()" @click="setSharesMode('pct')">{{ _("Anteile (%)") }}</button>
         <button type="button" :aria-pressed="(sharesMode === 'kwh').toString()" @click="setSharesMode('kwh')">kWh</button>
       </div>
     </div>
-    <div class="wt-vs-rows" x-ref="shares" @mouseover="sharesHover($event)" @mouseleave="highlight(pick)" @click="sharesClick($event)"></div>
-    <div class="wt-vs-leg" role="group" aria-label="{{ _('Verbraucher hervorheben') }}" x-ref="sharesLegend" @click="sharesClick($event)"></div>
-    <p class="wt-foot">{{ _("Anteil jedes Verbrauchers am Verbrauch des Jahres laut Bilanz; rechts die Jahressumme und wie viel davon eigene Zähler erfassen. * laufendes Jahr. Die Reihenfolge folgt der Verbraucherliste im Setup. Schraffiert: „Übrige (Grundlast)“, alles ohne eigenen Zähler. Ein Klick auf einen Verbraucher hebt ihn in allen Jahren hervor und zeigt seine Monate unten.") }}</p>
+    <div x-show="sharesView === 'bar'">
+      <div class="wt-vs-rows" x-ref="shares" @mouseover="sharesHover($event)" @mouseleave="highlight(pick)" @click="sharesClick($event)"></div>
+      <div class="wt-vs-leg" role="group" aria-label="{{ _('Verbraucher hervorheben') }}" x-ref="sharesLegend" @click="sharesClick($event)"></div>
+      <p class="wt-foot">{{ _("Anteil jedes Verbrauchers am Verbrauch des Jahres laut Bilanz; rechts die Jahressumme und wie viel davon eigene Zähler erfassen. * laufendes Jahr. Die Reihenfolge folgt der Verbraucherliste im Setup. Schraffiert: „Übrige (Grundlast)“, alles ohne eigenen Zähler. Ein Klick auf einen Verbraucher hebt ihn in allen Jahren hervor und zeigt seine Monate unten.") }}</p>
+    </div>
+    <div x-show="sharesView === 'tbl'" x-cloak>
+      <div class="tbl-wrap wt-table-wrap wt-vt-wrap" x-ref="sharesTableWrap">
+        <table class="wt-table wt-vt" x-ref="sharesTable" @click="sharesTableClick($event)" @keydown="sharesTableKey($event)"></table>
+      </div>
+      <p class="wt-foot" x-ref="sharesTableFoot"></p>
+    </div>
   </div>
   {# Jahre × Monate je Verbraucher: dieselbe Matrix wie in der Ansicht „Summen“ (energyMatrix), für den gewählten Verbraucher. #}
   <div class="card wt-card" x-show="consumers && consumers.years" x-cloak x-ref="matrixCard">

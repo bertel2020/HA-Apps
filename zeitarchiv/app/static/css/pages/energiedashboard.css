@@ -1197,6 +1197,53 @@
     .wt-vs-total{grid-column:2;text-align:left;}
   }
 
+  /* Anteile je Jahr als Tabelle Verbraucher × Jahre: Basis .wt-table der Vergleichstabelle (erste Spalte sticky, die
+     Jahre scrollen waagerecht), je Feld Hauptzahl, darunter klein der andere Wert und die Änderung zum Vorjahr. */
+  .wt-vt-wrap{margin-top:12px;}
+  .wt-table.wt-vt{width:100%;}
+  .wt-vt thead th{vertical-align:bottom;white-space:nowrap;}
+  .wt-vt thead th small{display:block;font-weight:400;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
+  .wt-vt-yh button{display:inline-flex;flex-direction:column;align-items:flex-end;margin:0;padding:0;border:0;background:none;
+    font:inherit;color:inherit;text-align:right;cursor:pointer;}
+  .wt-vt-yh button:hover .wt-vt-yl{text-decoration:underline;}
+  .wt-vt-yh.is-sorted{color:var(--accent-line);}
+  .wt-vt-arrow{margin-left:3px;font-size:calc(10px * var(--font-scale, 1));color:var(--accent-line);}
+  .wt-vt-arrow.is-off{color:var(--ink-faint);opacity:.55;}
+  .wt-table.wt-vt tbody th{font-weight:400;color:var(--ink);white-space:normal;}
+  .wt-vt tbody th,.wt-vt thead th:first-child{width:170px;min-width:170px;}
+  .wt-vt th:first-child,.wt-vt td:first-child{box-shadow:inset -1px 0 0 var(--border);}
+  .wt-vt-name{display:flex;gap:8px;align-items:flex-start;min-width:0;}
+  .wt-vt-name .wt-vr-dot{margin-top:5px;}
+  .wt-vt-name .wt-vr-from{display:block;}
+  .wt-vt-name a{color:inherit;text-decoration:none;overflow-wrap:break-word;}
+  .wt-vt-name a:hover,.wt-vt-name a:focus-visible{color:var(--accent-line);text-decoration:underline;}
+  .wt-vt td{min-width:94px;}
+  .wt-vt-main{display:flex;justify-content:flex-end;align-items:center;gap:6px;font-family:var(--font-mono);
+    font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);}
+  .wt-vt-sub{display:block;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
+  .wt-table.wt-vt td .wt-dl{margin-top:3px;color:var(--ink-faint);}
+  .wt-table.wt-vt td .wt-dl.wt-dl-good{color:var(--positive);}
+  .wt-table.wt-vt td .wt-dl.wt-dl-bad{color:var(--danger);}
+  /* Grund für „–“ (neu ab …, Vorjahr erst ab …) aus der Rangliste. */
+  .wt-vt tbody td small{display:block;max-width:140px;margin-left:auto;font-size:calc(10.5px * var(--font-scale, 1));line-height:1.2;
+    color:var(--ink-faint);white-space:normal;}
+  .wt-vt-na .wt-vt-main{color:var(--ink-faint);}
+  .wt-vt td.wt-vt-sorted{background:color-mix(in srgb, var(--accent-line) 5%, var(--surface));}
+  .wt-vt tr.wt-vt-row{cursor:pointer;}
+  .wt-vt tr.wt-vt-row td[data-tooltip-fixed]{cursor:pointer;}
+  .wt-vt tr.wt-vt-row:hover th,.wt-vt tr.wt-vt-row:hover td{background:var(--surface-alt);}
+  .wt-vt tr.wt-vt-row:focus-visible th,.wt-vt tr.wt-vt-row:focus-visible td{outline:2px solid var(--accent-line);outline-offset:-2px;}
+  .wt-vt tr.is-sel th,.wt-vt tr.is-sel td{background:color-mix(in srgb, var(--accent-line) 9%, var(--surface));}
+  .wt-vt tr.wt-vt-sum th,.wt-vt tr.wt-vt-sum td{font-weight:600;color:var(--ink);border-top:1.5px solid var(--border-strong);}
+  .wt-vt tr.wt-vt-sum .wt-vt-main{font-weight:600;}
+  .wt-vt tr.wt-vt-sum small{font-weight:400;}
+  .wt-vt tr.wt-vt-cov th,.wt-vt tr.wt-vt-cov .wt-vt-main{color:var(--ink-muted);}
+  @media (max-width:640px){
+    .wt-vt tbody th,.wt-vt thead th:first-child{width:132px;min-width:132px;padding-left:8px;padding-right:8px;}
+    .wt-vt-name{gap:6px;font-size:calc(13px * var(--font-scale, 1));}
+    .wt-vt td{min-width:86px;}
+  }
+
   /* Jahre × Monate je Verbraucher: Auswahlliste rechts in der Titelzeile. */
   .wt-mx-pick{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
   .wt-mx-pick select{min-width:200px;max-width:100%;}
