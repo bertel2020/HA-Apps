@@ -1,9 +1,11 @@
-// Energiedashboard, Reiter „Langzeit“ (Roadmap 1.45): Zeiträume im Vergleich mit dem Vorjahr. Der Server
-// rechnet alle Summen (POST energiedashboard/langzeit/table); dieses Skript formatiert und zeichnet nur.
-// Aufbau und Bedienung wie die Vergleichstabelle des Wetterdashboards (wetter.js). Kalenderangaben laufen
-// über ServerTime in der Zeitzone des Servers.
+// Energiedashboard: die Vergleichstabelle der Übersicht („Zeiträume im Vergleich“, energieVergleich), der Reiter
+// „Verbraucher“ (energieVerbraucher) und der Reiter „Langzeit“ (energieLangzeit). Der Server rechnet alle Summen
+// (POST energiedashboard/langzeit/table, /consumers, /records, /months); dieses Skript formatiert und zeichnet nur.
+// Aufbau und Bedienung wie das Wetterdashboard (wetter.js). Kalenderangaben laufen über ServerTime in der Zeitzone des Servers.
+// Die drei Komponenten teilen sich die Hilfsfunktionen in diesem Block und den Browser-Speicher (STORE_KEY).
 (function () {
-  const COLUMN_KEYS = ['monat', 'vormonat', 'jahr'];
+  const COLUMN_KEYS = ['heute', 'gestern', 'monat', 'vormonat', 'jahr'];
+  const DEFAULT_COLUMNS = ['monat', 'vormonat', 'jahr'];
   const STORE_KEY = 'zeitarchiv.energie.langzeit';
   const LOCALE = window.ZA_FORMAT;
   const ZT = window.ServerTime;
@@ -358,7 +360,7 @@
   }
 
   // Zeiträume der Tabelle neben den Jahren (Schlüssel wie energie_langzeit.CONSUMER_PERIODS); „Dieses Jahr“ ist die Jahresspalte.
-  const PERIOD_KEYS = ['monat', 'vormonat'];
+  const PERIOD_KEYS = ['heute', 'gestern', 'monat', 'vormonat'];
   const isPeriod = (col) => PERIOD_KEYS.includes(col);
   const isColumn = (col) => Number.isInteger(col) || isPeriod(col);
   const periodOf = (data, key) => (data.periods || []).find((period) => period.key === key) || null;
@@ -367,7 +369,8 @@
   function periodHead(data, key) {
     const period = periodOf(data, key);
     let sub = '';
-    if (period) sub = period.partial ? t('bis {date}', {date: fmtDate(formats.dm, period.cur.end - 1)}) : monthYear(period.cur.start);
+    if (period && (key === 'heute' || key === 'gestern')) sub = fmtDate(formats.dm, period.cur.start);
+    else if (period) sub = period.partial ? t('bis {date}', {date: fmtDate(formats.dm, period.cur.end - 1)}) : monthYear(period.cur.start);
     return {title: columnName(key), sub};
   }
 
@@ -533,8 +536,11 @@
       sort.dir === 'desc' ? t('Sortiert nach {year}, größter zuerst.', {year: sortName}) : t('Sortiert nach {year}, kleinster zuerst.', {year: sortName}),
       t('Ein Klick auf einen Spaltenkopf sortiert nach dieser Spalte, ein zweiter dreht die Reihenfolge. „Übrige (Grundlast)“ und die Summen stehen immer unten.'),
     ];
-    if (columns.some(isPeriod)) {
+    if (columns.some((col) => col === 'monat' || col === 'vormonat')) {
       parts.push(t('Dieser Monat zählt bis heute und vergleicht mit demselben Stück des Vorjahres, Letzter Monat mit dem ganzen Monat des Vorjahres.'));
+    }
+    if (columns.some((col) => col === 'heute' || col === 'gestern')) {
+      parts.push(t('Heute zählt bis jetzt, Gestern den ganzen Tag; beide vergleichen mit demselben Tag des Vorjahres.'));
     }
     if (chg !== 'off') {
       parts.push(t('Die Änderung zum Vorjahr ist in kWh gerechnet; rot: mehr Verbrauch, grün: weniger, „–“ mit Grund, wenn das Vorjahr nicht ganz erfasst ist.'));
@@ -550,36 +556,160 @@
     return parts.join(' ');
   }
 
+  // Jahre-Auswahl der Karten: „Letzte 5“ oder „Alle“, nur ab mehr als fünf Jahren im Archiv. Früher gab es auch „Letzte 10“
+  // (gespeichert als 10); das gilt jetzt als „Alle“.
+  const YEAR_STEP = 5;
+  const storedYearLimit = (value) => (value === YEAR_STEP ? YEAR_STEP : 0);
+  const yearChoices = (count) => [
+    {value: YEAR_STEP, label: t('Letzte 5')},
+    {value: 0, label: t('Alle ({n})', {n: count})},
+  ];
+
+  // Der Reiter „Langzeit“ und der Reiter „Verbraucher“ laden ihre Daten erst beim ersten Zeigen (Ereignis „energie-tab“).
+  function onFirstShow(tabName, component, load) {
+    window.addEventListener('energie-tab', (event) => {
+      if (!component.$root.isConnected || event.detail !== tabName) return;
+      if (!component.opened) {
+        component.opened = true;
+        load();
+      } else {
+        // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
+        component.$nextTick(() => Object.values(charts).forEach((chart) => chart.resize()));
+      }
+    });
+  }
+
+  // ---- Übersicht: „Zeiträume im Vergleich“ -----------------------------------------------------
+  // Eine Karte unter dem Energiefluss mit Spalten- und Vorjahres-Menü, wie die Vergleichstabelle des Wetterdashboards.
+  // Sie folgt dem Tag des Energieflusses (Ereignis „energie-window“ mit dem Stichtag); heute oder später heißt „jetzt“.
   let lastTable = null;
 
-  // hidden: im Setup abgewählte Bereiche (Schlüssel wie energie_langzeit.CARD_BLOCKS); deren Daten werden gar nicht erst geladen.
-  // hasConsumers: es gibt Verbraucher der obersten Ebene, dann steht der Umschalter „Summen | Verbraucher“ über dem Reiter.
-  window.energieLangzeit = function energieLangzeit(hidden = [], hasConsumers = false) {
-    const shown = (key) => !hidden.includes(key);
+  window.energieVergleich = function energieVergleich() {
     return {
       columnKeys: COLUMN_KEYS,
-      columns: [...COLUMN_KEYS],
+      columns: [...DEFAULT_COLUMNS],
       vorjahr: true,
       diff: true,
       mode: 'bis_jetzt',
       error: '',
-      opened: false,
+      at: null,
+      standText: '',
       _seq: 0,
-      _changesSeq: 0,
-      _kenntageSeq: 0,
-      months: null,
-      monthsError: '',
-      changes: null,
-      records: null,
-      recordsError: '',
-      monthlyRole: 'erzeugung',
-      matrixRole: 'erzeugung',
-      band: true,
-      yearLimit: 10,
-      ktMode: 'full',
-      ktDialog: {title: '', sub: '', html: '', error: ''},
-      lzView: 'sum',
-      sumLoaded: false,
+      _started: false,
+
+      init() {
+        const saved = readStore();
+        // Spalten ohne Daten gibt es nicht; frühere Stände kannten nur Monat, Vormonat und Jahr.
+        if (Array.isArray(saved.columns)) {
+          const known = COLUMN_KEYS.filter((key) => saved.columns.includes(key));
+          if (known.length) this.columns = known;
+        }
+        if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
+        if (typeof saved.diff === 'boolean') this.diff = saved.diff;
+        if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
+        window.addEventListener('energie-window', (event) => {
+          if (!this.$root.isConnected) return;
+          this.at = event.detail && event.detail.at ? event.detail.at : null;
+          this._started = true;
+          this.loadTable();
+        });
+        // Der Energiefluss meldet seinen Tag, sobald er geladen ist. Kam die Meldung schon vor diesem Aufbau oder bleibt sie
+        // aus (Ladefehler), startet die Tabelle trotzdem, dann mit „jetzt“.
+        if (window.energieWindowAt !== undefined) {
+          this.at = window.energieWindowAt;
+          this._started = true;
+          this.loadTable();
+        } else {
+          setTimeout(() => {
+            if (!this._started && this.$root.isConnected) {
+              this._started = true;
+              this.loadTable();
+            }
+          }, 2500);
+        }
+      },
+
+      toggleColumn(key) {
+        this.columns = this.columns.includes(key)
+          ? this.columns.filter((k) => k !== key)
+          : COLUMN_KEYS.filter((k) => k === key || this.columns.includes(k));
+        this.saveAndLoad();
+      },
+
+      // Vorjahresvergleich: 'off' oder der Modus ('bis_jetzt'/'komplett'); schließt das Popover.
+      setYoy(choice) {
+        if (choice === 'off') this.vorjahr = false;
+        else {
+          this.vorjahr = true;
+          this.mode = choice;
+        }
+        document.querySelectorAll('.wt-yoy-popover').forEach((popover) => popover.classList.remove('open'));
+        this.saveAndLoad();
+      },
+
+      yoyLabel() {
+        if (!this.vorjahr) return t('Vorjahr: Aus ▾');
+        return (this.mode === 'komplett' ? t('Vorjahr: komplett') : t('Vorjahr: bis jetzt')) + ' ▾';
+      },
+
+      // Differenzzeile unter den Werten ein- oder ausblenden; die Daten bleiben, nur die Tabelle wird neu gezeichnet.
+      toggleDiff() {
+        this.diff = !this.diff;
+        writeStore({diff: this.diff});
+        if (lastTable) this.paintTable(lastTable);
+      },
+
+      columnName,
+
+      paintTable(data) {
+        const table = this.$refs.table;
+        const wrap = this.$refs.tableWrap;
+        if (!table) return;
+        table.innerHTML = renderTable(data, this.diff);
+        // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
+        wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1);
+      },
+
+      saveAndLoad() {
+        writeStore({columns: this.columns, vorjahr: this.vorjahr, mode: this.mode});
+        this.loadTable();
+      },
+
+      modeHint() {
+        return this.mode === 'bis_jetzt'
+          ? t('Laufende Zeiträume werden mit demselben Stück des Vorjahres verglichen. Abgeschlossene Zeiträume (Gestern, Letzter Monat) sind in beiden Fällen gleich.')
+          : t('Laufende Zeiträume stehen neben dem kompletten Vorjahreszeitraum. Das Vorjahr hat dadurch meist höhere Summen.');
+      },
+
+      async loadTable() {
+        const seq = ++this._seq;
+        this.error = '';
+        try {
+          const res = await fetch('energiedashboard/langzeit/table', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({columns: this.columns, vorjahr: this.vorjahr, mode: this.mode, at: this.at}),
+          });
+          if (!res.ok) throw new Error(String(res.status));
+          const data = await res.json();
+          if (seq !== this._seq) return;  // eine neuere Anfrage hat überholt
+          lastTable = data;
+          // „Stand“: der Tag, bis zu dem die Zeiträume zählen (ein früherer Tag oder heute).
+          const day = data.at || data.today;
+          this.standText = day ? t('Stand {date}', {date: fmtDate(formats.dmy, Date.parse(`${day}T12:00:00Z`) / 1000)}) : '';
+          this.paintTable(data);
+        } catch (e) {
+          if (seq === this._seq) this.error = t('Die Tabelle konnte nicht geladen werden.');
+        }
+      },
+    };
+  };
+
+  // ---- Reiter „Verbraucher“ ----------------------------------------------------------------------
+  window.energieVerbraucher = function energieVerbraucher() {
+    return {
+      opened: false,
+      yearLimit: 0,
       consumers: null,
       consumersError: '',
       _consumersSeq: 0,
@@ -589,8 +719,9 @@
       // Gewähltes Jahr der Rangliste; null = das laufende Jahr.
       rankYearSel: null,
       sharesMode: 'pct',
-      // Tabelle „Verbraucher × Jahre“: sortiert nach einem Jahr (null = dem neuesten); Spalten als Liste von Jahren
-      // (null = die Jahre laut Leiste „Jahre“), Hauptwert 'pct'/'kwh', Änderung zum Vorjahr 'off'/'pct'/'kwh'.
+      // Tabelle „Zeiträume im Vergleich je Verbraucher“: sortiert nach einer Spalte (null = dem neuesten Jahr); Spalten als Liste
+      // von Zeiträumen (Schlüssel) und Jahren (null = die Jahre laut Jahre-Auswahl), Hauptwert 'pct'/'kwh', Änderung zum Vorjahr
+      // 'off'/'pct'/'kwh'.
       sharesSortCol: null,
       sharesSortDir: 'desc',
       tblCols: null,
@@ -598,12 +729,12 @@
       tblChg: 'pct',
       // Hervorgehobener Verbraucher (Schlüssel aus langzeit/consumers, „rest“ für Übrige) oder null.
       pick: null,
-      // Verbraucher der Matrix „Jahre × Monate je Verbraucher“ (null = der erste).
+      // Verbraucher der Matrix „Monatswerte je Jahr“ (null = der erste).
       matrixSel: null,
 
       init() {
         const saved = readStore();
-        if (hasConsumers && (saved.view === 'sum' || saved.view === 'verb')) this.lzView = saved.view;
+        this.yearLimit = storedYearLimit(saved.consYearLimit);
         // Früher ein Umschalter 'use'/'kwh' (Verbrauch) oder 'chg' (Änderung, jetzt nach Vorzeichen), heute {col, dir}.
         const rankSort = saved.rankSort;
         if (rankSort === 'chg') this.rankSortCol = 'chg';
@@ -622,24 +753,8 @@
           this.sharesSortCol = savedSortCol;
           this.sharesSortDir = saved.tblSort.dir;
         }
-        if (Array.isArray(saved.columns)) this.columns = COLUMN_KEYS.filter((key) => saved.columns.includes(key));
-        if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
-        if (typeof saved.diff === 'boolean') this.diff = saved.diff;
-        if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
-        if ([0, 5, 10].includes(saved.yearLimit)) this.yearLimit = saved.yearLimit;
-        if (saved.ktMode === 'full' || saved.ktMode === 'ytd') this.ktMode = saved.ktMode;
-        // Geladen wird erst beim ersten Öffnen des Reiters: Die Übersicht ist die Startansicht und
-        // soll nicht auf eine verborgene Tabelle warten.
-        window.addEventListener('energie-tab', (event) => {
-          if (!this.$root.isConnected) return;
-          if (event.detail === 'long' && !this.opened) {
-            this.opened = true;
-            this.loadView();
-          } else if (event.detail === 'long' && this.months) {
-            // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
-            this.$nextTick(() => Object.values(charts).forEach((chart) => chart.resize()));
-          }
-        });
+        // Geladen wird erst beim ersten Öffnen des Reiters.
+        onFirstShow('cons', this, () => this.loadConsumers(true));
         // Nach einer Größenänderung neu zeichnen: welche Beschriftung in ihren Abschnitt passt, hängt von der Breite ab.
         // Die Tabelle braucht dabei nur den Scroll-Hinweis neu, der ebenfalls an der Breite hängt.
         window.addEventListener('resize', () => {
@@ -647,29 +762,6 @@
           this.drawShares();
           this.drawSharesTable();
         });
-      },
-
-      // Lädt die Daten der gewählten Ansicht, jede nur beim ersten Zeigen.
-      loadView() {
-        if (this.lzView === 'verb') {
-          if (!this.consumers) this.loadConsumers(true);
-          return;
-        }
-        if (this.sumLoaded) return;
-        this.sumLoaded = true;
-        this.loadTable();
-        if (shown('monatsvergleich') || shown('matrix')) this.loadMonths();
-        if (shown('rekorde') || shown('kenntage')) this.loadRecords();
-        if (shown('veraenderungen')) this.loadChanges();
-      },
-
-      setView(view) {
-        if (!hasConsumers) return;
-        this.lzView = view;
-        writeStore({view});
-        if (this.opened) this.loadView();
-        // Diagramme, die verborgen angelegt wurden, kennen ihre Breite erst jetzt.
-        if (view === 'sum') this.$nextTick(() => Object.values(charts).forEach((chart) => chart.resize()));
       },
 
       // Verbraucher über die Jahre. withMonths=false lädt nur das Fenster der Rangliste und behält die Monatswerte.
@@ -728,11 +820,18 @@
         const text = this.tblMain === 'pct'
           ? t('Je Feld der Anteil am Verbrauch des Jahres laut Bilanz, darunter die kWh und die Änderung zum Vorjahr.')
           : t('Je Feld die kWh des Jahres, darunter der Anteil am Verbrauch laut Bilanz und die Änderung zum Vorjahr.');
-        return [
+        const parts = [
           text,
           t('Jede Spalte ist die Rangliste ihres Jahres; das laufende Jahr zählt bis heute.'),
-          t('„Spalten“ wählt Zeiträume und Jahre; Voreinstellung sind die Jahre der Leiste „Jahre“, eine Änderung dort setzt die Auswahl zurück. Das zweite Menü wählt Hauptwert und Änderung zum Vorjahr. Auswahl und Sortierung merkt sich der Browser.'),
-        ].join(' ');
+          t('„Spalten“ wählt Zeiträume und Jahre; Voreinstellung sind die letzten Jahre, eine andere Jahre-Auswahl setzt die Spalten zurück. „Vorjahr“ wählt die Änderung zum Vorjahr, Anteil | kWh den Hauptwert. Auswahl und Sortierung merkt sich der Browser.'),
+        ];
+        // Sortierung, Änderung und Teiljahre der gezeigten Spalten.
+        const data = this.consumers;
+        if (data && data.years) {
+          const cols = this.sharesTableCols();
+          if (cols.length) parts.push(sharesTableFoot(data, cols, this.sharesSort(), this.tblChg));
+        }
+        return parts.join(' ');
       },
 
       // Spalten für das Menü „Spalten“: die Zeiträume (Dieser und Letzter Monat), dann alle Jahre bis heute, unabhängig von
@@ -765,9 +864,8 @@
       },
 
       tableValueLabel() {
-        const main = this.tblMain === 'pct' ? t('Anteil') : t('kWh');
         const chg = {off: t('Vorjahr: Aus'), pct: t('Vorjahr in %'), kwh: t('Vorjahr in kWh')}[this.tblChg];
-        return `${main} · ${chg} ▾`;
+        return `${chg} ▾`;
       },
 
       drawShares() {
@@ -810,13 +908,11 @@
         }
         if (!cols.length) {
           table.innerHTML = '';
-          if (this.$refs.sharesTableFoot) this.$refs.sharesTableFoot.textContent = '';
           return;
         }
         const sort = this.sharesSort();
         table.style.setProperty('--n', cols.length);
         table.innerHTML = sharesTableHtml(data, cols, {main: this.tblMain, chg: this.tblChg}, sort, this.matrixKey(), this.yearLimit);
-        if (this.$refs.sharesTableFoot) this.$refs.sharesTableFoot.textContent = sharesTableFoot(data, cols, sort, this.tblChg);
         // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
         const wrap = this.$refs.sharesTableWrap;
         if (wrap) requestAnimationFrame(() => wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1));
@@ -1016,34 +1112,83 @@
 
       columnName,
 
-      // Anzahl der Jahre für Monatsvergleich, Jahre × Monate und Kenntage (0 = alle); die Jahre stehen neueste zuerst.
+      // Anzahl der Jahre im Archiv (0 = noch nicht geladen); die Jahre-Auswahl erscheint erst ab mehr als fünf.
       yearCount() {
-        const m = this.months ? this.months.years.length : 0;
-        const k = this.records && this.records.kenntage ? this.records.kenntage.years.length : 0;
-        const c = this.consumers && this.consumers.years ? this.consumers.years.length : 0;
-        return Math.max(m, k, c);
+        return this.consumers && this.consumers.years ? this.consumers.years.length : 0;
       },
 
       yearOptions() {
-        return [
-          {value: 5, label: t('Letzte 5')},
-          {value: 10, label: t('Letzte 10')},
-          {value: 0, label: t('Alle ({n})', {n: this.yearCount()})},
-        ];
+        return yearChoices(this.yearCount());
+      },
+
+      showYearChoice() {
+        return this.yearCount() > YEAR_STEP;
       },
 
       setYearLimit(value) {
         this.yearLimit = value;
-        // Die Spalten von „Verbraucher × Jahre“ fallen auf die neue Voreinstellung zurück.
+        // Die Spalten der Tabelle fallen auf die neue Voreinstellung zurück.
         this.tblCols = null;
-        writeStore({yearLimit: value, tblCols: null});
+        writeStore({consYearLimit: value, tblCols: null});
+        this.drawSharesTable();
+        this.drawShares();
+        this.drawConsumerMatrix();
+        this.drawRank();
+      },
+    };
+  };
+
+  // ---- Reiter „Langzeit“ -------------------------------------------------------------------------
+  // hidden: im Setup abgewählte Karten (Schlüssel wie energie_langzeit.CARD_BLOCKS); deren Daten werden gar nicht erst geladen.
+  window.energieLangzeit = function energieLangzeit(hidden = []) {
+    const shown = (key) => !hidden.includes(key);
+    return {
+      opened: false,
+      months: null,
+      monthsError: '',
+      records: null,
+      recordsError: '',
+      monthlyRole: 'erzeugung',
+      matrixRole: 'erzeugung',
+      band: true,
+      yearLimit: 0,
+      ktMode: 'full',
+      ktDialog: {title: '', sub: '', html: '', error: ''},
+      _kenntageSeq: 0,
+
+      init() {
+        const saved = readStore();
+        this.yearLimit = storedYearLimit(saved.yearLimit);
+        if (saved.ktMode === 'full' || saved.ktMode === 'ytd') this.ktMode = saved.ktMode;
+        // Geladen wird erst beim ersten Öffnen des Reiters: Die Übersicht ist die Startansicht.
+        onFirstShow('long', this, () => {
+          if (shown('monatsvergleich') || shown('matrix')) this.loadMonths();
+          if (shown('rekorde') || shown('kenntage')) this.loadRecords();
+        });
+      },
+
+      // Anzahl der Jahre im Archiv (0 = noch nicht geladen); die Jahre-Auswahl erscheint erst ab mehr als fünf.
+      yearCount() {
+        const m = this.months ? this.months.years.length : 0;
+        const k = this.records && this.records.kenntage ? this.records.kenntage.years.length : 0;
+        return Math.max(m, k);
+      },
+
+      yearOptions() {
+        return yearChoices(this.yearCount());
+      },
+
+      showYearChoice() {
+        return this.yearCount() > YEAR_STEP;
+      },
+
+      // Gilt für Kenntage, Monatswerte je Jahr und Monatsvergleich, damit alle dieselben Jahre und dieselbe Basis für Ø zeigen.
+      setYearLimit(value) {
+        this.yearLimit = value;
+        writeStore({yearLimit: value});
         this.drawMonthly();
         this.drawMatrix();
         this.drawKenntage();
-        this.drawShares();
-        this.drawSharesTable();
-        this.drawConsumerMatrix();
-        this.drawRank();
       },
 
       // Die Monatswerte mit den gewählten Jahren, für Diagramm und Matrix.
@@ -1070,57 +1215,6 @@
       setMatrixRole(key) {
         this.matrixRole = key;
         this.drawMatrix();
-      },
-
-      toggleColumn(key) {
-        this.columns = this.columns.includes(key)
-          ? this.columns.filter((k) => k !== key)
-          : COLUMN_KEYS.filter((k) => k === key || this.columns.includes(k));
-        this.saveAndLoad();
-      },
-
-      // Vorjahresvergleich: 'off' oder der Modus ('bis_jetzt'/'komplett'); schließt das Popover.
-      setYoy(choice) {
-        if (choice === 'off') this.vorjahr = false;
-        else {
-          this.vorjahr = true;
-          this.mode = choice;
-        }
-        document.querySelectorAll('.wt-yoy-popover').forEach((popover) => popover.classList.remove('open'));
-        this.saveAndLoad();
-      },
-
-      yoyLabel() {
-        if (!this.vorjahr) return t('Vorjahr: Aus ▾');
-        return (this.mode === 'komplett' ? t('Vorjahr: komplett') : t('Vorjahr: bis jetzt')) + ' ▾';
-      },
-
-      // Differenzzeile unter den Werten ein- oder ausblenden; die Daten bleiben, nur die Tabelle wird neu gezeichnet.
-      toggleDiff() {
-        this.diff = !this.diff;
-        writeStore({diff: this.diff});
-        if (lastTable) this.paintTable(lastTable);
-      },
-
-      paintTable(data) {
-        const table = this.$refs.table;
-        const wrap = this.$refs.tableWrap;
-        if (!table) return;
-        table.innerHTML = renderTable(data, this.diff);
-        // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
-        wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1);
-      },
-
-      saveAndLoad() {
-        writeStore({columns: this.columns, vorjahr: this.vorjahr, mode: this.mode});
-        this.loadTable();
-        this.loadChanges();
-      },
-
-      modeHint() {
-        return this.mode === 'bis_jetzt'
-          ? t('Laufende Zeiträume werden mit demselben Stück des Vorjahres verglichen. Der letzte Monat ist in beiden Fällen gleich.')
-          : t('Laufende Zeiträume stehen neben dem kompletten Vorjahreszeitraum. Das Vorjahr hat dadurch meist höhere Summen.');
       },
 
       // Rekorde und Kenntage je Jahr: einmal je Seitenaufruf, sie hängen nicht am Zeitraum der Tabelle.
@@ -1233,40 +1327,6 @@
         }
       },
 
-      // Verbraucher mit der größten Änderung; Vorjahr-Modus wie die Vergleichstabelle.
-      async loadChanges() {
-        const seq = ++this._changesSeq;
-        try {
-          const res = await fetch('energiedashboard/langzeit/changes', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({mode: this.mode}),
-          });
-          if (!res.ok) throw new Error(String(res.status));
-          const data = await res.json();
-          if (seq !== this._changesSeq) return;  // eine neuere Anfrage hat überholt
-          this.changes = data;
-          this.$nextTick(() => this.drawChanges());
-        } catch (e) {
-          if (seq === this._changesSeq) this.changes = null;
-        }
-      },
-
-      changesNote() {
-        return t('Verbraucher mit der größten Änderung gegenüber dem Vorjahr, im Zeitraum Dieses Jahr (Vorjahr wie in der Vergleichstabelle). Rot: mehr Verbrauch, grün: weniger. Geräte hinter einem Zwischenzähler stehen im Zwischenzähler. „Übrige (Grundlast)“ ist der Rest bis zum Verbrauch laut Bilanz.');
-      },
-
-      changesRange() {
-        return this.changes ? changesRange(this.changes) : '';
-      },
-
-      drawChanges() {
-        const c = this.changes;
-        const box = this.$refs.changes;
-        if (!c || !box) return;
-        box.innerHTML = energyChanges(c, {links: true});
-      },
-
       async loadMonths() {
         this.monthsError = '';
         try {
@@ -1326,25 +1386,6 @@
         table.innerHTML = energyMatrix(m, role, {colors, href: (year, month) => this.matrixLink(role, year, month)});
         const scale = this.$refs.matrixScale;
         if (scale) scale.style.background = `linear-gradient(90deg, ${colors.bad}, ${colors.base}, ${colors.good})`;
-      },
-
-      async loadTable() {
-        const seq = ++this._seq;
-        this.error = '';
-        try {
-          const res = await fetch('energiedashboard/langzeit/table', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({columns: this.columns, vorjahr: this.vorjahr, mode: this.mode}),
-          });
-          if (!res.ok) throw new Error(String(res.status));
-          const data = await res.json();
-          if (seq !== this._seq) return;  // eine neuere Anfrage hat überholt
-          lastTable = data;
-          this.paintTable(data);
-        } catch (e) {
-          if (seq === this._seq) this.error = t('Die Tabelle konnte nicht geladen werden.');
-        }
       },
     };
   };

@@ -303,7 +303,7 @@
   window.energieFlow = function energieFlow() {
     const initialPeriod = readInitialRangeOffset();
     return {
-      // Reiter „Übersicht“ (der Energiefluss) und „Langzeit“ (Vergleich mit dem Vorjahr, energie-langzeit.js).
+      // Reiter „Übersicht“ (der Energiefluss), „Verbraucher“ und „Langzeit“ (energie-langzeit.js).
       tab: 'over',
       ranges: [{key: 'hour', label: t('Stunde')}, {key: 'day', label: t('Tag')}, {key: 'month', label: t('Monat')}, {key: 'year', label: t('Jahr')}],
       range: initialPeriod.range,
@@ -385,8 +385,23 @@
         if (tab === 'over') this.$nextTick(() => window.dispatchEvent(new Event('resize')));
       },
 
+      // Meldet den Tag, bis zu dem der Energiefluss zeigt, an „Zeiträume im Vergleich“ (energie-langzeit.js, energieVergleich):
+      // der letzte Tag des Zeitraums, oder null für „jetzt“, wenn er heute oder später ist.
+      announceWindow(data) {
+        const ZT = window.ServerTime;
+        const iso = (ts) => {
+          const p = ZT.parts(ts);
+          return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+        };
+        const day = iso(data.window_end_ts - 1);
+        const at = day < iso(Date.now() / 1000) ? day : null;
+        window.energieWindowAt = at;
+        window.dispatchEvent(new CustomEvent('energie-window', {detail: {at}}));
+      },
+
       tabKey(event) {
-        const keys = ['over', 'long'];
+        // „Verbraucher“ gibt es nur mit eingerichteten Verbrauchern.
+        const keys = ['over', 'cons', 'long'].filter((key) => document.getElementById('ed-tab-' + key));
         const step = {ArrowRight: 1, ArrowLeft: -1}[event.key];
         if (!step) return;
         const next = keys[(keys.indexOf(this.tab) + step + keys.length) % keys.length];
@@ -1064,6 +1079,7 @@
           this.quality = data.quality;
           this.periodText = periodLabel(data);
           this.windowStart = data.window_start_ts;
+          this.announceWindow(data);
           this.hasFlow = data.nodes.some(n => n.role !== 'bus' && n.value > 0);
           this.verbraucherBreakdown = data.verbraucher_breakdown || [];
           this.versorgungBreakdown = data.versorgung_breakdown || [];

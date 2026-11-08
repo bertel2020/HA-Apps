@@ -1117,10 +1117,7 @@
   /* Setup: Geräte hinter einem Zwischenzähler wirken etwas zurückgenommen. */
   .edash-item-tile.is-child .edash-item-accent{opacity:.5;}
 
-  /* Reiter „Langzeit“, Ansicht „Verbraucher“ (Roadmap 1.49). Umschalter „Summen | Verbraucher“ in der Leiste der
-     Jahre-Auswahl (.wt-yearbar), hier mit dem Schalter direkt hinter der Beschriftung. */
-  .wt-viewbar{margin-top:0;}
-  .wt-viewbar .wt-seg{margin-left:0;}
+  /* Reiter „Verbraucher“ (Roadmap 1.49). */
   /* Rangliste „Verbraucher im Jahr“: Name, Balken (Anteil im Maßstab des größten), kWh, Anteil, Änderung, Verlauf. */
   .wt-vr-list{display:flex;flex-direction:column;gap:2px;margin-top:6px;}
   .wt-vr-row{display:grid;grid-template-columns:minmax(130px,220px) minmax(60px,1fr) 86px 58px 112px min(calc(var(--vr-years, 0) * 31px), 32%);
@@ -1206,9 +1203,8 @@
   /* Tabelle Verbraucher × Jahre (Abschnitt unter der Rangliste): Basis .wt-table der Vergleichstabelle (erste Spalte sticky, die
      Jahre scrollen waagerecht), je Feld Hauptzahl, darunter klein der andere Wert und die Änderung zum Vorjahr. */
   .wt-vt-wrap{margin-top:12px;}
-  /* Werte-Menü der Tabelle: zwei Gruppen mit der Überschrift der Menüs (.menu-section-label), Abstand wie die Zeilen. */
+  /* Vorjahr-Menü der Tabelle: die Überschrift der Menüs (.menu-section-label), Abstand wie die Zeilen. */
   .wt-vt-menu .menu-section-label{padding:4px 4px 3px;}
-  .wt-vt-menu .wt-vt-menu-sep{margin-top:6px;padding-top:8px;border-top:1px solid var(--border);}
   /* Feste Aufteilung: alle Jahresspalten gleich breit, unabhängig von Hinweistexten in einzelnen Zellen; --n setzt das Skript. */
   .wt-table.wt-vt{width:100%;table-layout:fixed;min-width:calc(170px + var(--n, 4) * 106px);}
   .wt-vt thead th{vertical-align:top;white-space:nowrap;}

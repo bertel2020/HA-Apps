@@ -36,22 +36,26 @@ from .storage import query as query_mod
 from .storage import rollup as rollup_mod
 from .storage.index import Index
 
-COLUMN_KEYS = ("monat", "vormonat", "jahr")
-#: Zeiträume, die die Tabelle „Verbraucher × Jahre“ zusätzlich zu den Jahren anbietet. „Dieses Jahr“ fehlt: Es ist das
+#: Spalten der Tabelle „Zeiträume im Vergleich“ (dieselben Schlüssel wie im Wetterdashboard) und die vorgewählten.
+COLUMN_KEYS = ("heute", "gestern", "monat", "vormonat", "jahr")
+DEFAULT_COLUMNS = ("monat", "vormonat", "jahr")
+#: Zeiträume, die die Verbraucher-Tabelle zusätzlich zu den Jahren anbietet. „Dieses Jahr“ fehlt: Es ist das
 #: laufende Jahr, das als Jahresspalte schon bis heute zählt (dasselbe Fenster, dieselben Werte).
-CONSUMER_PERIODS = ("monat", "vormonat")
+CONSUMER_PERIODS = ("heute", "gestern", "monat", "vormonat")
 #: Spalte -> (Zeitraum für query_mod._window, Versatz)
 COLUMN_WINDOWS = {
+    "heute": ("day", 0),
+    "gestern": ("day", -1),
     "vormonat": ("month", -1),
     "monat": ("month", 0),
     "jahr": ("year", 0),
 }
 #: Zeilen: Schlüssel, Gruppe, Beschriftung, Art (energy = kWh, pct = Prozent mit Differenz in Prozentpunkten, spec =
 #: kWh je kWp) und ob mehr davon günstig ("up"), ungünstig ("down") oder neutral (None) ist.
-#: Ausblendbare Bereiche des Reiters „Langzeit“ (Setup, `langzeit_ausblenden`): Blöcke der Vergleichstabelle und Karten.
-#: Der Block „energie“ bleibt immer, sonst wäre die Tabelle leer.
+#: Ausblendbare Bereiche (Setup, `langzeit_ausblenden`): Blöcke der Vergleichstabelle (Übersicht) und Karten des Reiters
+#: „Langzeit“. Der Block „energie“ bleibt immer, sonst wäre die Tabelle leer.
 TABLE_BLOCKS = ("energie", "quoten", "speicher", "pv")
-CARD_BLOCKS = ("monatsvergleich", "matrix", "veraenderungen", "rekorde", "kenntage")
+CARD_BLOCKS = ("monatsvergleich", "matrix", "rekorde", "kenntage")
 BLOCK_BY_GROUP = {"Energie": "energie", "Quoten": "quoten", "Speicher": "speicher", "PV-Anlage, wetterbereinigt": "pv"}
 
 
@@ -126,7 +130,7 @@ RECORDS: tuple[tuple[str, str, str], ...] = (
 
 
 class TableRequest(BaseModel):
-    columns: list[str] = Field(default_factory=lambda: list(COLUMN_KEYS))
+    columns: list[str] = Field(default_factory=lambda: list(DEFAULT_COLUMNS))
     vorjahr: bool = True
     mode: str = "bis_jetzt"
     #: Stichtag (JJJJ-MM-TT): die Tabelle zeigt dann die Zeiträume zu diesem Tag statt zu „jetzt“.

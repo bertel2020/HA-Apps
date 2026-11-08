@@ -135,7 +135,7 @@ def _energie_zeitraeume(ctx: Context, options: Options) -> dict:
     config = _energie_config(ctx)
     if config is None:
         raise ElementUnavailable(tr("Im Energiedashboard nicht eingerichtet"))
-    keys = [key for key in (options.columns or energie_langzeit.COLUMN_KEYS) if key in energie_langzeit.COLUMN_KEYS]
+    keys = [key for key in (options.columns or energie_langzeit.DEFAULT_COLUMNS) if key in energie_langzeit.COLUMN_KEYS]
     body = energie_langzeit.TableRequest(
         columns=keys, vorjahr=options.vorjahr, mode=options.mode if options.mode in MODES else "bis_jetzt", at=options.at,
     )

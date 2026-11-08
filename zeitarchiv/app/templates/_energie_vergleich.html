@@ -1,0 +1,33 @@
+{% from "_hints.html" import hint_button, hint_body %}
+{# „Zeiträume im Vergleich“ in der Übersicht (Roadmap 1.45): die Zeiträume gegen das Vorjahr, direkt unter dem Energiefluss.
+   Die Tabelle gilt für den Tag des Energieflusses (Ereignis „energie-window“, siehe energiedashboard.js), wie die Vergleichstabelle
+   des Wetterdashboards für ihren Stichtag. Die Daten kommen von POST energiedashboard/langzeit/table; energie-langzeit.js
+   (energieVergleich) formatiert und zeichnet nur. #}
+<div class="card wt-card" style="margin-top:14px;" x-data="energieVergleich()" data-hints="collapsed">
+  <div class="wt-controls">
+    <h2 class="wt-h2">{{ _("Zeiträume im Vergleich") }} {{ hint_button(_("Zeiträume im Vergleich")) }}</h2>
+    {% call hint_body() %}<span x-show="vorjahr" x-text="modeHint()"></span> {{ _("Die Zeiträume richten sich nach dem Tag des Energieflusses darüber; heute und später heißt „jetzt“. Grün: günstig (mehr Erzeugung und Einspeisung, weniger Netzbezug und Verbrauch), rot: ungünstig. „Dieses Jahr“ vergleicht kalendarisch, die Kacheln darüber vergleichen rollierend über 365 Tage. Der Verbrauch ist die Bilanz: Erzeugung + Netzbezug + Speicherentladung − Einspeisung − Speicherladung. Quoten ändern sich in Prozentpunkten (PP). Spezifischer Ertrag und Ertrag je Einstrahlung erscheinen, wenn bei den Erzeugern eine Anlagenleistung (kWp) steht; der Ertrag je Einstrahlung braucht außerdem die Strahlung aus dem Wetterdashboard.") }}{% endcall %}
+    <div class="dd-picker-wrap wt-controls-end">
+      <button type="button" class="btn" onclick="toggleDDPicker('el-cols')">{{ _("Spalten ▾") }}</button>
+      <div class="dd-picker-popover" id="el-cols-popover">
+        <template x-for="key in columnKeys" :key="key">
+          <label class="dd-picker-row"><input type="checkbox" :checked="columns.includes(key)" @change="toggleColumn(key)"><span x-text="columnName(key)"></span></label>
+        </template>
+      </div>
+    </div>
+    <div class="dd-picker-wrap">
+      <button type="button" class="btn" :class="{'wt-btn-on': vorjahr}" onclick="toggleDDPicker('el-yoy')" x-text="yoyLabel()"></button>
+      <div class="dd-picker-popover wt-yoy-popover" id="el-yoy-popover">
+        <div class="dd-picker-row" role="button" tabindex="0" :class="{active: !vorjahr}" @click="setYoy('off')">{{ _("Aus") }}</div>
+        <div class="dd-picker-row" role="button" tabindex="0" :class="{active: vorjahr && mode === 'bis_jetzt'}" @click="setYoy('bis_jetzt')">{{ _("Bis jetzt") }}</div>
+        <div class="dd-picker-row" role="button" tabindex="0" :class="{active: vorjahr && mode === 'komplett'}" @click="setYoy('komplett')">{{ _("Komplett") }}</div>
+        <div class="dd-picker-row wt-yoy-toggle" role="button" tabindex="0" :class="{active: diff}" :aria-pressed="diff.toString()" @click="toggleDiff()">{{ _("Differenz anzeigen") }}</div>
+      </div>
+    </div>
+  </div>
+  <p class="wt-stand" x-text="standText"></p>
+  <p class="hint hint-warn" x-show="error" x-text="error" x-cloak></p>
+  <div class="tbl-wrap wt-table-wrap" x-ref="tableWrap">
+    <table class="wt-table wt-table-full" x-ref="table"><tbody><tr><td class="wt-loading">{{ _("Lädt …") }}</td></tr></tbody></table>
+  </div>
+</div>

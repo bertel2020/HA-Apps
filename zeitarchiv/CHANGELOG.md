@@ -12,27 +12,38 @@
   - „Neu erzeugen“ legt alles komplett neu an; eigene Charts und Tabellen
     bleiben erhalten
 
-- **Energiedashboard**: Der Reiter „Langzeit“ zeigt mit dem Umschalter
-  „Summen | Verbraucher“ auch die Verbraucher über die Jahre
+- **Energiedashboard**: Neuer Reiter „Verbraucher“ zeigt die Verbraucher über
+  die Jahre
   - „Verbraucher im Jahr“: Rangliste mit Anteil am Verbrauch, Änderung zum
     Vorjahr und kleinem Verlauf
     - Rangliste nach Spalten sortierbar (Name, Verbrauch, Änderung)
   - „Gemessen“ nennt, wie viel des Verbrauchs eigene Zähler erfassen; der Rest
     steht als „Übrige (Grundlast)“
-  - „Verbraucher × Jahre“: Tabelle unter der Rangliste mit der Änderung zum
-    Vorjahr, sortierbar nach jedem Jahr
-    - Spalten (Jahre), Hauptwert (Anteil oder kWh) und Änderung (Aus, % oder
-      kWh) wählbar; Auswahl und Sortierung merkt sich der Browser
-    - Zusätzlich als Spalten „Dieser Monat“ und „Letzter Monat“, verglichen mit
-      demselben Zeitraum des Vorjahres
+  - „Zeiträume im Vergleich je Verbraucher“: Tabelle mit der Änderung zum
+    Vorjahr, sortierbar nach jeder Spalte
+    - Im Menü „Spalten“ Jahre sowie Heute, Gestern, Dieser Monat und Letzter
+      Monat, verglichen mit demselben Zeitraum des Vorjahres
+    - Anteil oder kWh und die Änderung zum Vorjahr (Aus, % oder kWh) wählbar;
+      Auswahl und Sortierung merkt sich der Browser
   - „Anteile je Jahr“: ein gestapelter Balken je Jahr, in Prozent oder kWh
-  - „Jahre × Monate je Verbraucher“: die Matrix aus „Summen“ für einen
-    gewählten Verbraucher; ein Klick auf ein Feld öffnet den Monat
+  - „Monatswerte je Jahr“: die Matrix aus „Langzeit“ für einen gewählten
+    Verbraucher; ein Klick auf ein Feld öffnet den Monat
 
 ### Geändert
 
-- **Energiedashboard**: Im Reiter „Langzeit“ entfällt der Stichtag; alle
-  Karten rechnen immer bis heute
+- **Energiedashboard**: Aufbau wie im Wetterdashboard
+  - „Zeiträume im Vergleich“ steht jetzt in der Übersicht unter dem
+    Energiefluss und gilt für den dort gewählten Tag
+    - Neue Spalten „Heute“ und „Gestern“ im Menü „Spalten“
+  - „Langzeit“ zeigt nur noch die Jahressicht: Rekorde, Kenntage je Jahr,
+    Monatswerte je Jahr („Jahre × Monate“) und Monatsvergleich
+    - Der Stichtag entfällt, ebenso die Jahre-Leiste zwischen den Karten
+    - „Letzte 5 | Alle“ steht in den Karten, sobald mehr als fünf Jahre
+      vorliegen
+    - Kenntage: „Komplett“ und „Bis jetzt“ statt „Ganzes Jahr“ und „Bis heute“
+  - „Was hat sich verändert?“ entfällt; die Rangliste im Reiter „Verbraucher“
+    zeigt die Änderung je Verbraucher
+    - Die Auswahl der Karten im Setup bleibt sonst unverändert
 
 ---
 
@@ -40,27 +51,37 @@
 
 #### New
 
-- **Energy dashboard**: With the "Totals | Consumers" switch, the "Long-term"
-  tab also shows the consumers over the years
+- **Energy dashboard**: New "Consumers" tab shows the consumers over the years
   - "Consumers in the year": ranking with share of consumption, change from
     the previous year and a small trend
     - Ranking sortable by column (name, consumption, change)
   - "Measured" shows how much of the consumption your own meters record; the
     remainder is shown as "Other (base load)"
-  - "Consumers × years": table below the ranking with the change from the
-    previous year, sortable by any year
-    - Selectable columns (years), main value (share or kWh) and change (off,
-      % or kWh); the browser remembers the selection and sorting
-    - Also available as columns: "This month" and "Last month", compared with
-      the same period of the previous year
+  - "Periods compared by consumer": table with the change from the previous
+    year, sortable by any column
+    - The "Columns" menu offers years as well as Today, Yesterday, This month
+      and Last month, compared with the same period of the previous year
+    - Share or kWh and the change from the previous year (off, % or kWh) can
+      be chosen; the browser remembers the selection and sorting
   - "Shares per year": one stacked bar per year, in percent or kWh
-  - "Years × months per consumer": the matrix from "Totals" for a selected
+  - "Monthly values per year": the matrix from "Long term" for a selected
     consumer; a click on a cell opens that month
 
 #### Changed
 
-- **Energy dashboard**: The "Long-term" tab no longer has a reference date; all
-  cards always calculate up to today
+- **Energy dashboard**: Layout like the weather dashboard
+  - "Periods compared" now sits in the overview below the energy flow and
+    applies to the day selected there
+    - New columns "Today" and "Yesterday" in the "Columns" menu
+  - "Long term" now shows only the yearly view: records, notable days per
+    year, monthly values per year ("Years × months") and monthly comparison
+    - The reference date is gone, and so is the years bar between the cards
+    - "Last 5 | All" sits in the cards once more than five years are available
+    - Notable days: "Complete" and "So far" instead of "Full year" and "Until
+      today"
+  - "What has changed?" is gone; the ranking in the "Consumers" tab shows the
+    change per consumer
+    - The card selection in the setup is otherwise unchanged
 
 ## 1.31.1 - 2026-11-08
 

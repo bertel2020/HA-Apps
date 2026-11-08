@@ -1099,12 +1099,12 @@
       </dialog>
     </section>
 
-    {# Reiter „Langzeit“: welche Bereiche sichtbar sind und die Schwellen der Kenntage. Ein leeres Schwellenfeld heißt „Vorgabe“
+    {# Tabelle „Zeiträume im Vergleich“ (Übersicht) und Reiter „Langzeit“: welche Bereiche sichtbar sind und die Schwellen der Kenntage. Ein leeres Schwellenfeld heißt „Vorgabe“
        (steht als Platzhalter); gespeichert werden nur geänderte Werte (siehe energie_langzeit.KENNTAGE_DEFAULTS). Abgewählt
        ist, was nicht angehakt ist (`langzeit_ausblenden`); der Block „Energie“ bleibt immer. #}
     <section class="settings-section edash-section-neutral">
       <h2 class="settings-section-title">{{ _("Langzeit") }} {{ hint_button(_('Langzeit-Anzeige')) }}</h2>
-      <p class="settings-section-description">{{ _("Welche Bereiche der Reiter „Langzeit“ zeigt, und die Schwellen der Kenntage.") }}</p>
+      <p class="settings-section-description">{{ _("Welche Bereiche der Tabelle „Zeiträume im Vergleich“ und des Reiters „Langzeit“ erscheinen, und die Schwellen der Kenntage.") }}</p>
       {% call hint_body() %}{{ _("Bereiche ohne passende Einrichtung (zum Beispiel Speicher ohne Speicher-Rolle) erscheinen ohnehin nicht. Energie in der Tabelle bleibt immer sichtbar.") }}{% endcall %}
       {% set hidden = config.langzeit_ausblenden or [] %}
       <div class="field" style="margin-bottom:0;">
@@ -1117,11 +1117,10 @@
         </div>
       </div>
       <div class="field" style="margin-bottom:0;margin-top:14px;">
-        <label>{{ _("Karten") }}</label>
+        <label>{{ _("Karten im Reiter „Langzeit“") }}</label>
         <div class="edash-toggle-list">
           <label class="filter-chip"><input type="checkbox" name="langzeit_zeigen" value="monatsvergleich" {% if 'monatsvergleich' not in hidden %}checked{% endif %}><span>{{ _("Monatsvergleich") }}</span></label>
-          <label class="filter-chip"><input type="checkbox" name="langzeit_zeigen" value="matrix" {% if 'matrix' not in hidden %}checked{% endif %}><span>{{ _("Jahre × Monate") }}</span></label>
-          <label class="filter-chip"><input type="checkbox" name="langzeit_zeigen" value="veraenderungen" {% if 'veraenderungen' not in hidden %}checked{% endif %}><span>{{ _("Was hat sich verändert?") }}</span></label>
+          <label class="filter-chip"><input type="checkbox" name="langzeit_zeigen" value="matrix" {% if 'matrix' not in hidden %}checked{% endif %}><span>{{ _("Monatswerte je Jahr") }}</span></label>
           <label class="filter-chip"><input type="checkbox" name="langzeit_zeigen" value="rekorde" {% if 'rekorde' not in hidden %}checked{% endif %}><span>{{ _("Rekorde") }}</span></label>
           <label class="filter-chip"><input type="checkbox" name="langzeit_zeigen" value="kenntage" {% if 'kenntage' not in hidden %}checked{% endif %}><span>{{ _("Kenntage je Jahr") }}</span></label>
         </div>

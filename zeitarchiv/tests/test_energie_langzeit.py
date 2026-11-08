@@ -126,6 +126,41 @@ def test_stichtag_begrenzt_das_fenster_auf_das_ende_dieses_tages(service) -> Non
     assert datetime.fromtimestamp(spalte["cur"]["end"], TZ) == datetime(2026, 8, 11, tzinfo=TZ)
 
 
+def test_tabelle_kennt_heute_und_gestern_wie_das_wetterdashboard(service) -> None:
+    _zaehler(service, "sensor.netz", (_ts(2), 100.0), (_ts(8), 104.0), (_ts(15), 111.0))
+    config = _config(netzbezug="sensor.netz")
+    assert lz.COLUMN_KEYS == ("heute", "gestern", "monat", "vormonat", "jahr")
+    daten = service.compute_table(config, lz.TableRequest(columns=["jahr", "gestern", "heute"], vorjahr=True), NOW)
+    spalten = {c["key"]: c for c in daten["columns"]}
+    assert [c["key"] for c in daten["columns"]] == ["heute", "gestern", "jahr"]       # in der Reihenfolge der Spaltenschlüssel
+    heute, gestern = spalten["heute"], spalten["gestern"]
+    # Heute zählt vom Tagesbeginn bis jetzt, Gestern den ganzen Vortag; das Vorjahr ist derselbe Tag des Vorjahres.
+    assert heute["partial"] is True and gestern["partial"] is False
+    assert datetime.fromtimestamp(heute["cur"]["start"], TZ) == datetime(2026, 8, 20, tzinfo=TZ)
+    assert datetime.fromtimestamp(heute["cur"]["end"], TZ) == NOW
+    assert datetime.fromtimestamp(heute["vj"]["end"], TZ) == datetime(2025, 8, 20, 12, tzinfo=TZ)
+    assert datetime.fromtimestamp(gestern["cur"]["start"], TZ) == datetime(2026, 8, 19, tzinfo=TZ)
+    assert datetime.fromtimestamp(gestern["cur"]["end"], TZ) == datetime(2026, 8, 20, tzinfo=TZ)
+    assert datetime.fromtimestamp(gestern["vj"]["start"], TZ) == datetime(2025, 8, 19, tzinfo=TZ)
+
+
+def test_tabelle_laesst_heute_und_gestern_ohne_wunsch_weg(service) -> None:
+    # Ohne Angabe bleiben es Monat, Vormonat und Jahr; Heute und Gestern gibt es nur auf Wunsch.
+    assert lz.TableRequest().columns == ["monat", "vormonat", "jahr"]
+    config = _anlage(service)
+    daten = service.compute_table(config, lz.TableRequest(), NOW)
+    assert [c["key"] for c in daten["columns"]] == ["monat", "vormonat", "jahr"]
+
+
+def test_stichtag_verschiebt_heute_und_gestern_auf_den_gewaehlten_tag(service) -> None:
+    config = _anlage(service)
+    daten = service.compute_table(config, lz.TableRequest(columns=["heute", "gestern"], vorjahr=False, at="2026-08-10"), NOW)
+    spalten = {c["key"]: c for c in daten["columns"]}
+    assert datetime.fromtimestamp(spalten["heute"]["cur"]["start"], TZ) == datetime(2026, 8, 10, tzinfo=TZ)
+    assert datetime.fromtimestamp(spalten["heute"]["cur"]["end"], TZ) == datetime(2026, 8, 11, tzinfo=TZ)
+    assert datetime.fromtimestamp(spalten["gestern"]["cur"]["start"], TZ) == datetime(2026, 8, 9, tzinfo=TZ)
+
+
 def test_ungueltiger_stichtag_und_unbekannte_spalten(service) -> None:
     from fastapi import HTTPException
 
@@ -472,7 +507,7 @@ def test_bereiche_des_reiters_werden_im_setup_gespeichert_und_nicht_gerendert(cl
     try:
         alles = client.post("/energiedashboard/setup", data={
             "netzbezug": "sensor.setup_netz",
-            "langzeit_zeigen": ["quoten", "speicher", "pv", "monatsvergleich", "matrix", "veraenderungen", "rekorde", "kenntage"],
+            "langzeit_zeigen": ["quoten", "speicher", "pv", "monatsvergleich", "matrix", "rekorde", "kenntage"],
         })
         assert ed._load_config(index)["langzeit_ausblenden"] == []
         assert 'x-ref="monthlyChart"' in alles.text and 'x-ref="kenntage"' in alles.text
@@ -481,13 +516,39 @@ def test_bereiche_des_reiters_werden_im_setup_gespeichert_und_nicht_gerendert(cl
             "netzbezug": "sensor.setup_netz", "langzeit_zeigen": ["quoten", "rekorde"],
         })
         assert ed._load_config(index)["langzeit_ausblenden"] == [
-            "speicher", "pv", "monatsvergleich", "matrix", "veraenderungen", "kenntage",
+            "speicher", "pv", "monatsvergleich", "matrix", "kenntage",
         ]
-        for ref in ('x-ref="monthlyChart"', 'x-ref="matrixTable"', 'x-ref="changes"', 'x-ref="kenntage"', "wt-yearbar"):
+        for ref in ('x-ref="monthlyChart"', 'x-ref="matrixTable"', 'x-ref="kenntage"'):
             assert ref not in wenig.text, ref
         assert "el-rec-big" in wenig.text                                  # die Rekorde sind angehakt geblieben
         assert 'x-ref="table"' in wenig.text                              # die Tabelle gibt es immer
         assert '"monatsvergleich"' in wenig.text                          # das Frontend lädt die abgewählten Daten nicht
+    finally:
+        index.set_setting(ed.SETTING_CONFIG, "")
+
+
+def test_reiter_uebersicht_verbraucher_langzeit_und_wohin_die_karten_gehoeren(client) -> None:
+    from app.main import index
+
+    index.set_setting(ed.SETTING_CONFIG, "")
+    try:
+        # Ohne Verbraucher: Übersicht und Langzeit; die Vergleichstabelle steht in der Übersicht, nicht in der Langzeit.
+        ed._save_config(index, _config(netzbezug="sensor.setup_netz"))
+        ohne = client.get("/energiedashboard").text
+        assert 'id="ed-tab-over"' in ohne and 'id="ed-tab-long"' in ohne and 'id="ed-tab-cons"' not in ohne
+        assert 'x-data="energieVergleich()"' in ohne and "energieVerbraucher" not in ohne
+        assert ohne.index('x-data="energieVergleich()"') < ohne.index('id="ed-panel-long"')
+        langzeit = ohne[ohne.index('id="ed-panel-long"'):]
+        assert 'x-ref="table"' not in langzeit and "lzView" not in ohne
+        for karte in ('x-ref="kenntage"', 'x-ref="matrixTable"', 'x-ref="monthlyChart"'):
+            assert karte in langzeit, karte
+        assert "Was hat sich verändert?" not in ohne                       # die Karte gibt es nicht mehr
+        # Mit Verbrauchern kommt der Reiter dazu, zwischen Übersicht und Langzeit.
+        ed._save_config(index, _config(netzbezug="sensor.setup_netz", verbraucher=[{"entity_id": "sensor.waerme", "name": "Wärme"}]))
+        mit = client.get("/energiedashboard").text
+        assert mit.index('id="ed-tab-over"') < mit.index('id="ed-tab-cons"') < mit.index('id="ed-tab-long"')
+        assert 'x-data="energieVerbraucher()"' in mit and 'x-ref="rank"' in mit and 'x-ref="sharesTable"' in mit
+        assert "wt-yearbar" not in mit and "Summen oder Verbraucher" not in mit
     finally:
         index.set_setting(ed.SETTING_CONFIG, "")
 
@@ -785,10 +846,15 @@ def test_verbraucher_zeitraeume_monat_und_vormonat_gegen_denselben_zeitraum_des_
         ("sensor.auto", 2026, 7): 50.0, ("sensor.auto", 2025, 7): 70.0,
     })
     daten = service.compute_consumers(_verbraucher_config(), lz.ConsumersRequest(months=False), NOW)
-    assert [p["key"] for p in daten["periods"]] == ["monat", "vormonat"]
-    monat, vormonat = daten["periods"]
+    assert [p["key"] for p in daten["periods"]] == ["heute", "gestern", "monat", "vormonat"]
+    perioden = {p["key"]: p for p in daten["periods"]}
+    monat, vormonat = perioden["monat"], perioden["vormonat"]
     # Der laufende Monat zählt bis jetzt (20. August 12 Uhr) gegen dasselbe Stück des Vorjahres, der Vormonat ganz.
     assert monat["partial"] is True and vormonat["partial"] is False
+    # Heute zählt bis jetzt, Gestern den ganzen Vortag; beide gegen denselben Tag des Vorjahres.
+    assert perioden["heute"]["partial"] is True and perioden["gestern"]["partial"] is False
+    assert datetime.fromtimestamp(perioden["heute"]["cur"]["start"], TZ) == datetime(2026, 8, 20, tzinfo=TZ)
+    assert datetime.fromtimestamp(perioden["gestern"]["vj"]["start"], TZ) == datetime(2025, 8, 19, tzinfo=TZ)
     assert datetime.fromtimestamp(monat["cur"]["start"], TZ) == datetime(2026, 8, 1, tzinfo=TZ)
     assert datetime.fromtimestamp(monat["cur"]["end"], TZ) == NOW
     assert datetime.fromtimestamp(monat["vj"]["end"], TZ) == datetime(2025, 8, 20, 12, tzinfo=TZ)
@@ -814,7 +880,8 @@ def test_verbraucher_zeitraeume_am_monatsanfang_und_abwaehlbar(service, monkeypa
     _reihen_nach_monat(service, monkeypatch, {("sensor.netz", 2026, 9): 10.0, ("sensor.netz", 2026, 8): 700.0})
     erster = datetime(2026, 9, 1, 0, 30, tzinfo=TZ)
     daten = service.compute_consumers(_verbraucher_config(), lz.ConsumersRequest(months=False), erster)
-    monat, vormonat = daten["periods"]
+    perioden = {p["key"]: p for p in daten["periods"]}
+    monat, vormonat = perioden["monat"], perioden["vormonat"]
     # Eine halbe Stunde nach Monatsbeginn: der laufende Monat ist ein kurzes Stück, der Vormonat der ganze August.
     assert datetime.fromtimestamp(monat["cur"]["end"], TZ) == erster and monat["partial"] is True
     assert datetime.fromtimestamp(vormonat["cur"]["start"], TZ) == datetime(2026, 8, 1, tzinfo=TZ)

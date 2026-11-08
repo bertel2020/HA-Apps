@@ -1,24 +1,11 @@
 {% from "_hints.html" import hint_button, hint_body %}
-{# Reiter „Langzeit“ des Energiedashboards (Roadmap 1.45): Zeiträume im Vergleich mit dem Vorjahr.
-   Eine Karte mit Spalten- und Vorjahres-Menü und der Tabelle, immer bis heute. Die Daten kommen von
-   POST energiedashboard/langzeit/table; energie-langzeit.js formatiert und zeichnet nur. #}
+{% from "_energie_macros.html" import year_choice %}
+{# Reiter „Langzeit“ des Energiedashboards (Roadmap 1.45): die Jahressicht der Summen, aufgebaut wie der Reiter „Langzeit“ des
+   Wetterdashboards: Rekorde, Kenntage je Jahr, Monatswerte je Jahr, Monatsvergleich. Die Zeiträume im Vergleich stehen in der
+   Übersicht (_energie_vergleich.html), die Verbraucher im eigenen Reiter (_energie_verbraucher.html). Die Daten kommen von
+   POST energiedashboard/langzeit/records und GET .../months; energie-langzeit.js (energieLangzeit) formatiert und zeichnet nur. #}
 {% set hidden = config.langzeit_ausblenden or [] %}
-{# Verbraucher der obersten Ebene (wie energie_langzeit.top_consumers); ohne sie gibt es nur die Summen. #}
-{% set consumer_count = (config.verbraucher or []) | selectattr('entity_id') | rejectattr('parent') | list | length %}
-<div x-data="energieLangzeit({{ hidden | tojson }}, {{ (consumer_count > 0) | tojson }})">
-{% if consumer_count %}
-  {# Ansicht „Summen“ (Rollen, Roadmap 1.45) oder „Verbraucher“ (Roadmap 1.49), im Browser gemerkt. #}
-  <div class="wt-yearbar wt-viewbar">
-    <span class="wt-yearbar-label">{{ _("Zeigen") }}</span>
-    <div class="wt-seg" role="group" aria-label="{{ _('Summen oder Verbraucher') }}">
-      <button type="button" :aria-pressed="(lzView === 'sum').toString()" @click="setView('sum')">{{ _("Summen") }}</button>
-      <button type="button" :aria-pressed="(lzView === 'verb').toString()" @click="setView('verb')">{{ _("Verbraucher") }}</button>
-    </div>
-    <span class="wt-yearbar-note" x-show="lzView === 'sum'">{{ _("Erzeugung, Einspeisung, Netzbezug, Verbrauch und Speicher als Summen.") }}</span>
-    <span class="wt-yearbar-note" x-show="lzView === 'verb'" x-cloak>{{ _("{n} Verbraucher eingerichtet. Geräte hinter einem Zwischenzähler stehen in ihrem Zwischenzähler.", n=consumer_count) }}</span>
-  </div>
-{% endif %}
-  <div x-show="lzView === 'sum'">
+<div x-data="energieLangzeit({{ hidden | tojson }})">
 {% if 'rekorde' not in hidden %}
   {# Rekorde: höchste Tageswerte seit Archivbeginn, wie im Wetterdashboard die erste Karte des Langzeit-Reiters. #}
   <p class="hint hint-warn" x-show="recordsError" x-text="recordsError" x-cloak></p>
@@ -48,101 +35,7 @@
   <p class="hint hint-status" x-show="records && !records.enough" x-cloak>{{ _("Rekorde erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte enthält.") }}</p>
 {% endif %}
 
-  <div class="card wt-card">
-    <div class="wt-controls">
-      <h2 class="wt-h2">{{ _("Zeiträume im Vergleich") }} {{ hint_button(_("Zeiträume im Vergleich")) }}</h2>
-      {% call hint_body() %}<span x-show="vorjahr" x-text="modeHint()"></span>{% endcall %}
-      <div class="dd-picker-wrap wt-controls-end">
-        <button type="button" class="btn" onclick="toggleDDPicker('el-cols')">{{ _("Spalten ▾") }}</button>
-        <div class="dd-picker-popover" id="el-cols-popover">
-          <template x-for="key in columnKeys" :key="key">
-            <label class="dd-picker-row"><input type="checkbox" :checked="columns.includes(key)" @change="toggleColumn(key)"><span x-text="columnName(key)"></span></label>
-          </template>
-        </div>
-      </div>
-      <div class="dd-picker-wrap">
-        <button type="button" class="btn" :class="{'wt-btn-on': vorjahr}" onclick="toggleDDPicker('el-yoy')" x-text="yoyLabel()"></button>
-        <div class="dd-picker-popover wt-yoy-popover" id="el-yoy-popover">
-          <div class="dd-picker-row" role="button" tabindex="0" :class="{active: !vorjahr}" @click="setYoy('off')">{{ _("Aus") }}</div>
-          <div class="dd-picker-row" role="button" tabindex="0" :class="{active: vorjahr && mode === 'bis_jetzt'}" @click="setYoy('bis_jetzt')">{{ _("Bis jetzt") }}</div>
-          <div class="dd-picker-row" role="button" tabindex="0" :class="{active: vorjahr && mode === 'komplett'}" @click="setYoy('komplett')">{{ _("Komplett") }}</div>
-          <div class="dd-picker-row wt-yoy-toggle" role="button" tabindex="0" :class="{active: diff}" :aria-pressed="diff.toString()" @click="toggleDiff()">{{ _("Differenz anzeigen") }}</div>
-        </div>
-      </div>
-    </div>
-    <p class="hint hint-warn" x-show="error" x-text="error" x-cloak></p>
-    <div class="tbl-wrap wt-table-wrap" x-ref="tableWrap">
-      <table class="wt-table wt-table-full" x-ref="table"><tbody><tr><td class="wt-loading">{{ _("Lädt …") }}</td></tr></tbody></table>
-    </div>
-    <p class="wt-foot">{{ _("Grün: günstig (mehr Erzeugung und Einspeisung, weniger Netzbezug und Verbrauch), rot: ungünstig. „Dieses Jahr“ vergleicht kalendarisch, die Kacheln der Übersicht vergleichen rollierend über 365 Tage. Der Verbrauch ist die Bilanz: Erzeugung + Netzbezug + Speicherentladung − Einspeisung − Speicherladung. Quoten ändern sich in Prozentpunkten (PP). Spezifischer Ertrag und Ertrag je Einstrahlung erscheinen, wenn bei den Erzeugern eine Anlagenleistung (kWp) steht; der Ertrag je Einstrahlung braucht außerdem die Strahlung aus dem Wetterdashboard.") }}</p>
-  </div>
-
   <p class="hint hint-warn" x-show="monthsError" x-text="monthsError" x-cloak></p>
-
-{% if 'monatsvergleich' not in hidden or 'matrix' not in hidden or 'kenntage' not in hidden %}
-  {# Anzahl der Jahre: gilt gemeinsam für Monatsvergleich, Jahre × Monate und Kenntage, damit alle drei dieselben Jahre
-     und dieselbe Basis für Ø zeigen. Rekorde zählen immer seit Archivbeginn. #}
-  <div class="wt-yearbar" x-show="months || records" x-cloak>
-    <span class="wt-yearbar-label">{{ _("Jahre") }}</span>
-    <span class="wt-yearbar-note">{{ _("Gilt für Monatsvergleich, Jahre × Monate und Kenntage.") }}</span>
-    <div class="wt-seg" role="group" aria-label="{{ _('Anzahl der Jahre') }}">
-      <template x-for="option in yearOptions()" :key="option.value">
-        <button type="button" :aria-pressed="(yearLimit === option.value).toString()" @click="setYearLimit(option.value)" x-text="option.label"></button>
-      </template>
-    </div>
-  </div>
-{% endif %}
-
-{% if 'monatsvergleich' not in hidden %}
-  {# Monatsvergleich: eine Linie je Jahr über Jan–Dez, wie der Monatsvergleich des Wetterdashboards. #}
-  <div class="card wt-card" x-show="months" x-cloak>
-    <div class="wt-controls">
-      <h2 class="wt-h2">{{ _("Monatsvergleich") }} {{ hint_button(_("Monatsvergleich")) }}</h2>
-      {% call hint_body() %}<span x-text="monthlyNote()"></span>{% endcall %}
-      <div class="wt-seg" role="group" aria-label="{{ _('Kennzahl') }}">
-        <template x-for="role in monthRoles()" :key="role.key">
-          <button type="button" :aria-pressed="(monthlyRole === role.key).toString()" @click="setMonthlyRole(role.key)" x-text="role.label"></button>
-        </template>
-      </div>
-      <label class="filter-chip"><input type="checkbox" x-model="band" @change="drawMonthly()"><span>{{ _("Spanne der Vorjahre") }}</span></label>
-    </div>
-    <div class="wt-chart" x-ref="monthlyChart"></div>
-  </div>
-{% endif %}
-
-{% if 'matrix' not in hidden %}
-  {# Jahre × Monate: dieselbe Tabelle wie „Mitteltemperatur je Monat und Jahr“ im Wetterdashboard. #}
-  <div class="card wt-card" x-show="months" x-cloak>
-    <div class="wt-controls">
-      <h2 class="wt-h2">{{ _("Jahre × Monate") }} {{ hint_button(_("Jahre × Monate")) }}</h2>
-      {% call hint_body() %}<span x-text="matrixNote()"></span>{% endcall %}
-      <div class="wt-seg" role="group" aria-label="{{ _('Kennzahl') }}">
-        <template x-for="role in monthRoles()" :key="role.key">
-          <button type="button" :aria-pressed="(matrixRole === role.key).toString()" @click="setMatrixRole(role.key)" x-text="role.label"></button>
-        </template>
-      </div>
-    </div>
-    <div class="tbl-wrap wt-table-wrap"><table class="wt-tm" x-ref="matrixTable"></table></div>
-    <div class="wt-tm-legend">
-      <span>{{ _("ungünstiger") }}</span><span class="wt-tm-scale" x-ref="matrixScale"></span><span>{{ _("günstiger als im Mittel der Jahre im Archiv") }}</span>
-    </div>
-    <p class="wt-foot">{{ _("Ein Klick auf ein Feld öffnet den Monat der Entität (bei Rollen mit genau einer Entität). Das Dreieck oben rechts markiert Messlücken oder Zählersprünge, der Tooltip nennt sie. * laufendes Jahr, der laufende Monat zählt im Mittel nicht mit.") }}</p>
-
-  </div>
-{% endif %}
-
-{% if 'veraenderungen' not in hidden %}
-  {# Was hat sich verändert? Verbraucher mit der größten Änderung gegenüber dem Vorjahr (Vorjahr-Modus wie die Tabelle). #}
-  <div class="card wt-card" x-show="changes && changes.consumers" x-cloak>
-    <div class="wt-controls">
-      <h2 class="wt-h2">{{ _("Was hat sich verändert?") }} {{ hint_button(_("Was hat sich verändert?")) }}</h2>
-      {% call hint_body() %}<span x-text="changesNote()"></span>{% endcall %}
-    </div>
-    <p class="wt-stand" x-text="changesRange()"></p>
-    <div class="wt-chg" x-ref="changes"></div>
-    <p class="hint hint-status" x-show="changes && !changes.items.length" x-cloak>{{ _("Noch keine Verbraucher mit Werten in beiden Zeiträumen.") }}</p>
-  </div>
-{% endif %}
 
 {% if 'kenntage' not in hidden %}
   {# Kenntage je Jahr: sechs Kenntage in drei Paaren, je Jahr ein Balken (Anteil an den ausgewerteten Tagen). Ein Klick auf
@@ -150,15 +43,15 @@
   <div class="card wt-card" x-show="records && records.kenntage && records.kenntage.available.length" x-cloak>
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Kenntage je Jahr") }} {{ hint_button(_("Kenntage je Jahr")) }}</h2>
-      {% call hint_body() %}<span x-text="kenntageNote()"></span>{% endcall %}
+      {% call hint_body() %}<span x-text="kenntageNote()"></span> {{ _("Die Länge der Balken zeigt den Anteil an den ausgewerteten Tagen, im Maßstab des größten Anteils im Feld. Ein Klick auf eine Zeile zeigt die Tage im Jahreskalender.") }}{% endcall %}
       <div class="wt-seg" role="group" aria-label="{{ _('Zählung') }}">
-        <button type="button" :aria-pressed="(ktMode === 'full').toString()" @click="setKtMode('full')">{{ _("Ganzes Jahr") }}</button>
-        <button type="button" :aria-pressed="(ktMode === 'ytd').toString()" @click="setKtMode('ytd')">{{ _("Bis heute") }}</button>
+        <button type="button" :aria-pressed="(ktMode === 'full').toString()" @click="setKtMode('full')">{{ _("Komplett") }}</button>
+        <button type="button" :aria-pressed="(ktMode === 'ytd').toString()" @click="setKtMode('ytd')">{{ _("Bis jetzt") }}</button>
       </div>
+      {{ year_choice() }}
     </div>
     <p class="wt-stand" x-text="ktRange()"></p>
     <div class="wt-kt" x-ref="kenntage" @click="kenntageClick($event)"></div>
-    <p class="wt-foot">{{ _("Die Länge der Balken zeigt den Anteil an den ausgewerteten Tagen, im Maßstab des größten Anteils im Feld. Ein Klick auf eine Zeile zeigt die Tage im Jahreskalender. Die Schwellen stellst du im Setup unter „Kenntage“ ein.") }}</p>
   </div>
 
   {# Jahreskalender eines Kenntags. #}
@@ -178,9 +71,42 @@
     </div>
   </dialog>
 {% endif %}
-  </div>
 
-{% if consumer_count %}
-  {% include "_energie_langzeit_verbraucher.html" %}
+{% if 'matrix' not in hidden %}
+  {# Jahre × Monate: dieselbe Tabelle wie „Mitteltemperatur je Monat und Jahr“ im Wetterdashboard. #}
+  <div class="card wt-card" x-show="months" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Monatswerte je Jahr") }} {{ hint_button(_("Monatswerte je Jahr")) }}</h2>
+      {% call hint_body() %}<span x-text="matrixNote()"></span> {{ _("Ein Klick auf ein Feld öffnet den Monat der Entität (bei Rollen mit genau einer Entität). Das Dreieck oben rechts markiert Messlücken oder Zählersprünge, der Tooltip nennt sie. * laufendes Jahr, der laufende Monat zählt im Mittel nicht mit.") }}{% endcall %}
+      <div class="wt-seg" role="group" aria-label="{{ _('Kennzahl') }}">
+        <template x-for="role in monthRoles()" :key="role.key">
+          <button type="button" :aria-pressed="(matrixRole === role.key).toString()" @click="setMatrixRole(role.key)" x-text="role.label"></button>
+        </template>
+      </div>
+      {{ year_choice() }}
+    </div>
+    <div class="tbl-wrap wt-table-wrap"><table class="wt-tm" x-ref="matrixTable"></table></div>
+    <div class="wt-tm-legend">
+      <span>{{ _("ungünstiger") }}</span><span class="wt-tm-scale" x-ref="matrixScale"></span><span>{{ _("günstiger als im Mittel der Jahre im Archiv") }}</span>
+    </div>
+  </div>
+{% endif %}
+
+{% if 'monatsvergleich' not in hidden %}
+  {# Monatsvergleich: eine Linie je Jahr über Jan–Dez, wie der Monatsvergleich des Wetterdashboards. #}
+  <div class="card wt-card" x-show="months" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Monatsvergleich") }} {{ hint_button(_("Monatsvergleich")) }}</h2>
+      {% call hint_body() %}<span x-text="monthlyNote()"></span>{% endcall %}
+      <div class="wt-seg" role="group" aria-label="{{ _('Kennzahl') }}">
+        <template x-for="role in monthRoles()" :key="role.key">
+          <button type="button" :aria-pressed="(monthlyRole === role.key).toString()" @click="setMonthlyRole(role.key)" x-text="role.label"></button>
+        </template>
+      </div>
+      <label class="filter-chip"><input type="checkbox" x-model="band" @change="drawMonthly()"><span>{{ _("Spanne der Vorjahre") }}</span></label>
+      {{ year_choice() }}
+    </div>
+    <div class="wt-chart" x-ref="monthlyChart"></div>
+  </div>
 {% endif %}
 </div>
