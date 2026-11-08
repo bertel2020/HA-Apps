@@ -3790,7 +3790,14 @@
     "Vergleich und Langzeit": "Comparison and long-term",
     "Welche Bereiche der Reiter „Vergleich“ und „Langzeit“ erscheinen, und die Schwellen der Kenntage.": "Which areas of the “Comparison” and “Long-term” tabs are shown, and the thresholds for notable days.",
     "Zeilen der Aufteilung": "Breakdown rows",
-    "Zeiträume": "Periods"
+    "Zeiträume": "Periods",
+    "Jahresbilanz": "Annual balance",
+    "Autarkie und Eigenverbrauch je Jahr": "Self-sufficiency and self-consumption per year",
+    "Woher kam der Verbrauch?": "Where did the consumption come from?",
+    "Wohin ging die Erzeugung?": "Where did the generation go?",
+    "kWh oder Anteile": "kWh or shares",
+    "Beste Autarkie im Monat": "Best self-sufficiency in a month",
+    "Längste Serie fast autark": "Longest streak of almost self-sufficient days"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4792,6 +4799,15 @@
     "Rechts die Summe und wie viel davon eigene Zähler erfassen. Schraffiert: „Übrige (Grundlast)“, alles ohne eigenen Zähler. Ein Klick auf einen Verbraucher hebt ihn hervor und wählt ihn in der Tabelle aus.": "On the right the total and how much of it own meters record. Hatched: “Remaining (base load)”, everything without its own meter. Clicking a consumer highlights it and selects it in the table.",
     "{name} je Monat und Jahr": "{name} by month and year",
     "{name}: Monatswerte in Langzeit zeigen": "{name}: show monthly values in Long-term",
-    "„Spalten“ wählt Zeiträume und einzelne Jahre. Einzelne Jahre zeigen Erzeugung, Einspeisung, Netzbezug, Verbrauch und die Verbraucher.": "“Columns” selects periods and single years. Single years show generation, feed-in, grid import, consumption and the consumers."
+    "„Spalten“ wählt Zeiträume und einzelne Jahre. Einzelne Jahre zeigen Erzeugung, Einspeisung, Netzbezug, Verbrauch und die Verbraucher.": "“Columns” selects periods and single years. Single years show generation, feed-in, grid import, consumption and the consumers.",
+    "Archiv ab {date}": "Archive from {date}",
+    "Autarkie": "Self-sufficiency",
+    "Eigenverbrauch": "Self-consumption",
+    "Die Jahresbilanz konnte nicht geladen werden.": "The annual balance could not be loaded.",
+    "Erzeugung, Netzbezug, Einspeisung und Verbrauch je Kalenderjahr, darunter Autarkie und Eigenverbrauch. „Bis jetzt“ zählt jedes Jahr nur bis zum selben Kalendertag, „Komplett“ ganze Jahre; das laufende Jahr (*) zählt immer bis heute. „Anteile“ zeigt, woher der Verbrauch kam und wohin die Erzeugung ging. Der Verbrauch ist die Bilanz aus Erzeugung, Bezug, Speicher und Einspeisung. Ein Jahr, in dem das Archiv erst nach dem 1. Januar beginnt, ist nur zum Teil erfasst; der Tooltip nennt den Beginn.": "Generation, grid import, feed-in and consumption per calendar year, with self-sufficiency and self-consumption below. “So far” counts every year only up to the same calendar day, “Complete” counts full years; the current year (*) always counts up to today. “Shares” shows where the consumption came from and where the generation went. Consumption is the balance of generation, import, storage and feed-in. A year in which the archive starts after 1 January is only partly covered; the tooltip names the start.",
+    "aus eigener Erzeugung": "from own generation",
+    "aus dem Netz": "from the grid",
+    "selbst genutzt": "used on site",
+    "eingespeist": "fed in"
   }
 }

@@ -57,7 +57,7 @@ COLUMN_WINDOWS = {
 #: Verbrauchs“ aus, „matrix“ und „monatsvergleich“ sind die beiden Darstellungen (Tabelle, Linien) der Karte mit den Monatswerten.
 #: Der Block „energie“ bleibt immer, sonst wäre die Tabelle leer.
 TABLE_BLOCKS = ("energie", "quoten", "speicher", "pv")
-CARD_BLOCKS = ("monatsvergleich", "matrix", "rekorde", "kenntage", "verbraucher")
+CARD_BLOCKS = ("jahresbilanz", "monatsvergleich", "matrix", "rekorde", "kenntage", "verbraucher")
 BLOCK_BY_GROUP = {"Energie": "energie", "Quoten": "quoten", "Speicher": "speicher", "PV-Anlage, wetterbereinigt": "pv"}
 
 
@@ -290,6 +290,28 @@ def balance(parts: dict[str, float | None]) -> float | None:
     )
 
 
+def flow_metrics(sums: dict[str, float | None]) -> dict[str, float | None]:
+    """Kennzahlen aus den Summen je Rolle: die Energiezeilen, der Verbrauch als Bilanz sowie Autarkie und Eigenverbrauch
+    (dieselben Formeln wie in compute_flow, auf 0 bis 100 begrenzt wegen Rundungsrauschen kleiner Summen)."""
+    metrics: dict[str, float | None] = {
+        "erzeugung": sums["erzeugung"],
+        "einspeisung": max(sums["einspeisung"], 0.0) if sums["einspeisung"] is not None else None,
+        "netzbezug": max(sums["netzbezug"], 0.0) if sums["netzbezug"] is not None else None,
+        "ladung": sums["ladung"],
+        "entladung": sums["entladung"],
+    }
+    verbrauch = balance(sums)
+    metrics["verbrauch"] = round(verbrauch, 3) if verbrauch is not None else None
+    metrics["autarkie"] = None
+    if metrics["verbrauch"] and metrics["verbrauch"] > 0 and metrics["netzbezug"] is not None:
+        metrics["autarkie"] = round(max(0.0, min(1.0, 1 - metrics["netzbezug"] / metrics["verbrauch"])) * 100, 1)
+    metrics["eigenverbrauch"] = None
+    if metrics["erzeugung"] and metrics["erzeugung"] > 0:
+        export = metrics["einspeisung"] or 0.0
+        metrics["eigenverbrauch"] = round(max(0.0, min(1.0, (metrics["erzeugung"] - export) / metrics["erzeugung"])) * 100, 1)
+    return metrics
+
+
 class EnergieLangzeitService:
     def _consumer_name(self, consumer: dict) -> str:
         """Eigener Name, sonst Friendly-Name der Entität, die rohe ID nur als letzter Ausweg."""
@@ -320,6 +342,8 @@ class EnergieLangzeitService:
         self.storage_capacity = storage_capacity
         #: (Schlüssel, Zeitpunkt, Tage): die Tageswerte, die der Jahreskalender der Kenntage nach den Kenntagen noch einmal braucht.
         self._days_cache: tuple[tuple, float, list[dict]] | None = None
+        #: Wie _days_cache, für die Jahressummen der Jahresbilanz.
+        self._years_cache: tuple[tuple, float, dict] | None = None
 
     def _rows(
         self, entity_id: str, start: datetime, end: datetime, now_local: datetime,
@@ -386,23 +410,7 @@ class EnergieLangzeitService:
     ) -> tuple[dict[str, float | None], dict[str, float | None]]:
         """Alle Kennzahlen eines Fensters (Zeilenschlüssel -> Wert) plus Archivbeginn je Rolle."""
         sums, froms = self.side_values(roles, start, end, now_local, read_cache)
-        metrics: dict[str, float | None] = {
-            "erzeugung": sums["erzeugung"],
-            "einspeisung": max(sums["einspeisung"], 0.0) if sums["einspeisung"] is not None else None,
-            "netzbezug": max(sums["netzbezug"], 0.0) if sums["netzbezug"] is not None else None,
-            "ladung": sums["ladung"],
-            "entladung": sums["entladung"],
-        }
-        verbrauch = balance(sums)
-        metrics["verbrauch"] = round(verbrauch, 3) if verbrauch is not None else None
-        # Dieselben Formeln wie in compute_flow, auf 0 bis 100 begrenzt (Rundungsrauschen bei kleinen Summen).
-        metrics["autarkie"] = None
-        if metrics["verbrauch"] and metrics["verbrauch"] > 0 and metrics["netzbezug"] is not None:
-            metrics["autarkie"] = round(max(0.0, min(1.0, 1 - metrics["netzbezug"] / metrics["verbrauch"])) * 100, 1)
-        metrics["eigenverbrauch"] = None
-        if metrics["erzeugung"] and metrics["erzeugung"] > 0:
-            export = metrics["einspeisung"] or 0.0
-            metrics["eigenverbrauch"] = round(max(0.0, min(1.0, (metrics["erzeugung"] - export) / metrics["erzeugung"])) * 100, 1)
+        metrics = flow_metrics(sums)
         metrics["spezifisch"] = None
         metrics["einstrahlung"] = None
         pv = pv_entities(config)
@@ -616,6 +624,52 @@ class EnergieLangzeitService:
             "years": years, "roles": out_roles,
         }
 
+    # -- Jahresbilanz -------------------------------------------------------------------
+
+    def compute_years(self, config: dict, now_local: datetime | None = None) -> dict:
+        """Jahressummen je Kalenderjahr (neuestes zuerst) für die Karte „Jahresbilanz“ im Reiter „Langzeit“: Erzeugung,
+        Einspeisung, Netzbezug, Verbrauch (Bilanz) sowie Autarkie und Eigenverbrauch, einmal „komplett“ (ganzes Jahr, das
+        laufende bis jetzt) und einmal „bis jetzt“ (jedes Jahr vom 1.1. bis zum selben Kalendertag wie heute, die Rechnung
+        der Spalte „Dieses Jahr“ in der Vergleichstabelle). Ein Wert ohne Daten ist None, nie 0. ``partial_from`` nennt den
+        Archivbeginn, wenn er in diesem Jahr nach dem 1.1. liegt: das Jahr ist dann nur zum Teil erfasst."""
+        now_local = now_local or datetime.now(self.tz)
+        roles = role_entities(config)
+        key = (tuple((role, tuple(ids)) for role, ids in sorted(roles.items())), now_local.date())
+        cached = self._years_cache
+        if cached and cached[0] == key and time.monotonic() - cached[1] < DAYS_CACHE_SECONDS:
+            return cached[2]
+        every = {e for ids in roles.values() for e in ids}
+        years = self._years(every, now_local)
+        balance_ids = sorted({e for role in BALANCE_ROLES for e in roles[role]})
+        latest = self._latest_start(balance_ids)
+        first_day = datetime.fromtimestamp(latest, self.tz).date() if latest else None
+        read_cache = query_mod.QueryReadCache()
+        used = {role: ids for role, ids in roles.items() if ids}
+        keep = ("erzeugung", "einspeisung", "netzbezug", "verbrauch", "autarkie", "eigenverbrauch")
+        out_years = []
+        for year in years:
+            start = datetime(year, 1, 1, tzinfo=self.tz)
+            full_end = min(datetime(year + 1, 1, 1, tzinfo=self.tz), now_local)
+            ytd_end = min(query_mod._shift_year(now_local, year - now_local.year), full_end)  # noqa: SLF001
+            entry: dict = {"year": year, "partial_from": None}
+            for name, end in (("full", full_end), ("ytd", ytd_end)):
+                sums, _froms = self.side_values(used, start, end, now_local, read_cache)
+                sums = {role: sums.get(role) for role in BALANCE_ROLES}
+                metrics = flow_metrics(sums)
+                entry[name] = {k: metrics[k] for k in keep}
+            if first_day and first_day.year == year and (first_day.month, first_day.day) > (1, 1):
+                entry["partial_from"] = first_day.isoformat()
+            out_years.append(entry)
+        have_bus = bool(roles["erzeugung"] or roles["netzbezug"])
+        shown = [role for role in MONTH_ROLES if have_bus and (role == "verbrauch" or roles[role])]
+        result = {
+            "tz": str(self.tz), "now": now_local.timestamp(), "unit": "kWh",
+            "today": now_local.date().isoformat(), "current": now_local.year,
+            "roles": shown, "years": out_years,
+        }
+        self._years_cache = (key, time.monotonic(), result)
+        return result
+
     # -- Tageswerte: Rekorde und Kenntage -------------------------------------------------
 
     def _daily_roles(
@@ -732,6 +786,7 @@ class EnergieLangzeitService:
                     "key": key, "label": tr(label), "value": round(top[key], 3), "date": top["date"].isoformat(),
                     "entity_id": single, "offset": (top["date"] - today).days,
                 })
+            records.extend(self._streak_records(config, roles, days))
         kenntage = self.compute_kenntage(config, days, today)
         return {
             "unit": "kWh",
@@ -740,6 +795,56 @@ class EnergieLangzeitService:
             "records": records,
             "kenntage": kenntage,
         }
+
+    def _streak_records(self, config: dict, roles: dict[str, list[str]], days: list[dict]) -> list[dict]:
+        """Rekorde, die aus mehreren Tagen entstehen (brauchen den Netzbezug): der Monat mit der besten Autarkie (nur ganze
+        Monate mit allen Tagen; an einzelnen Sommertagen sind 100 % häufig) und die längste Folge „fast autarker“ Tage
+        (Schwelle aus dem Setup). Gleichstand: der frühere Monat beziehungsweise die frühere Folge."""
+        if not roles["netzbezug"]:
+            return []
+        out: list[dict] = []
+        by_month: dict[tuple[int, int], list[dict]] = {}
+        for d in days:
+            by_month.setdefault((d["date"].year, d["date"].month), []).append(d)
+        best: tuple[float, tuple[int, int]] | None = None
+        for (year, month), group in sorted(by_month.items()):
+            length = (date(year + (month == 12), month % 12 + 1, 1) - date(year, month, 1)).days
+            if len(group) != length or any(d["netzbezug"] is None for d in group):
+                continue
+            use = sum(d["verbrauch"] for d in group)
+            if use <= 0:
+                continue
+            value = max(0.0, min(1.0, 1 - sum(d["netzbezug"] for d in group) / use)) * 100
+            if best is None or value > best[0]:
+                best = (value, (year, month))
+        if best is not None:
+            out.append({
+                "key": "autarkie_monat", "label": tr(N_("Beste Autarkie im Monat")), "value": round(best[0], 1),
+                "unit": "pct", "span": "month", "date": date(best[1][0], best[1][1], 1).isoformat(),
+                "entity_id": None, "offset": None,
+            })
+        thresholds = kenntage_thresholds(config)
+        run_start = run_end = None
+        run = 0
+        top: tuple[int, date, date] | None = None
+        for d in days:
+            hit = kenntag_hit("fast_autark", d, thresholds, None, None)
+            if hit and run and run_end is not None and (d["date"] - run_end).days == 1:
+                run += 1
+            elif hit:
+                run, run_start = 1, d["date"]
+            else:
+                run = 0
+            if hit:
+                run_end = d["date"]
+                if top is None or run > top[0]:
+                    top = (run, run_start, run_end)
+        if top is not None:
+            out.append({
+                "key": "autark_serie", "label": tr(N_("Längste Serie fast autark")), "value": top[0], "unit": "days",
+                "date": top[1].isoformat(), "date_end": top[2].isoformat(), "entity_id": None, "offset": None,
+            })
+        return out
 
     def compute_kenntage(self, config: dict, days: list[dict], today: date) -> dict:
         """Kenntage je Jahr: Tage mit einer Eigenschaft (Schwellen aus dem Setup) und die Tage, an denen sie sich prüfen

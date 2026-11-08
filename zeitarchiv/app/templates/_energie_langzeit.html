@@ -10,6 +10,44 @@
 {# Einfache Anführungszeichen, weil tojson doppelte liefert (sonst bricht das Attribut, sobald ein Bereich abgewählt ist). #}
 <div x-data='energieLangzeit({{ hidden | tojson }}, {{ (consumer_count > 0) | tojson }})'>
   <p class="hint hint-warn" x-show="monthsError" x-text="monthsError" x-cloak></p>
+{% if 'jahresbilanz' not in hidden %}
+  {# Jahresbilanz: Summen je Kalenderjahr (Erzeugung, Netzbezug, Einspeisung, Verbrauch), darunter Autarkie und Eigenverbrauch.
+     „Bis jetzt“ zählt jedes Jahr nur bis zum heutigen Kalendertag, „Komplett“ ganze Jahre. Daten: GET energiedashboard/langzeit/years. #}
+  <p class="hint hint-warn" x-show="yearsError" x-text="yearsError" x-cloak></p>
+  <div class="card wt-card" x-show="years && years.years.length" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Jahresbilanz") }} {{ hint_button(_("Jahresbilanz")) }}</h2>
+      {% call hint_body() %}<span x-text="yearsNote()"></span>{% endcall %}
+      <div class="wt-controls-end">
+        {{ year_choice() }}
+        <div class="wt-seg" role="group" aria-label="{{ _('Zählung') }}">
+          <button type="button" :aria-pressed="(jbCount === 'ytd').toString()" @click="setJbCount('ytd')">{{ _("Bis jetzt") }}</button>
+          <button type="button" :aria-pressed="(jbCount === 'full').toString()" @click="setJbCount('full')">{{ _("Komplett") }}</button>
+        </div>
+        <div class="wt-seg" role="group" aria-label="{{ _('kWh oder Anteile') }}">
+          <button type="button" :aria-pressed="(jbMode === 'kwh').toString()" @click="setJbMode('kwh')">kWh</button>
+          <button type="button" :aria-pressed="(jbMode === 'pct').toString()" @click="setJbMode('pct')">{{ _("Anteile (%)") }}</button>
+        </div>
+      </div>
+    </div>
+    <p class="wt-stand" x-text="jbRange()"></p>
+    <div x-show="jbMode === 'kwh'">
+      <div class="wt-chart" x-ref="jbBars"></div>
+    </div>
+    <div x-show="jbMode === 'pct'" x-cloak>
+      <h3 class="wt-sub">{{ _("Woher kam der Verbrauch?") }}</h3>
+      <div class="wt-chart wt-chart-sm" x-ref="jbFrom"></div>
+      <template x-if="years && years.roles.includes('erzeugung')">
+        <div>
+          <h3 class="wt-sub">{{ _("Wohin ging die Erzeugung?") }}</h3>
+          <div class="wt-chart wt-chart-sm" x-ref="jbTo"></div>
+        </div>
+      </template>
+    </div>
+    <h3 class="wt-sub">{{ _("Autarkie und Eigenverbrauch je Jahr") }}</h3>
+    <div class="wt-chart wt-chart-sm" x-ref="jbTrend"></div>
+  </div>
+{% endif %}
 {% if 'rekorde' not in hidden %}
   {# Rekorde: höchste Tageswerte seit Archivbeginn, wie im Wetterdashboard die erste Karte des Langzeit-Reiters. #}
   <p class="hint hint-warn" x-show="recordsError" x-text="recordsError" x-cloak></p>
@@ -18,7 +56,7 @@
       <h2 class="wt-h2">{{ _("Rekorde") }} {{ hint_button(_("Rekorde")) }}</h2>
       {% call hint_body() %}<span x-text="recordsNote()"></span>{% endcall %}
     </div>
-    <div class="el-rec" :style="'--el-rec-cols:' + Math.min(4, records ? records.records.length : 1)">
+    <div class="el-rec" :style="'--el-rec-cols:' + (records && records.records.length > 4 ? 3 : Math.max(1, records ? records.records.length : 1))">
       <template x-for="record in (records ? records.records : [])" :key="record.key">
         <a class="el-rec-big" :style="'--c:' + recordAccent(record.key)" :href="record.entity_id ? recordLink(record) : null">
           <span class="el-rec-head">
@@ -27,6 +65,8 @@
               <svg x-show="record.key === 'verbrauch'" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg>
               <svg x-show="record.key === 'einspeisung'" viewBox="0 0 24 24"><path d="M12 20V6M6 12l6-6 6 6"/></svg>
               <svg x-show="record.key === 'netzbezug'" viewBox="0 0 24 24"><path d="M12 4v14M6 12l6 6 6-6"/></svg>
+              <svg x-show="record.key === 'autarkie_monat'" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 7.6-8 9-4.8-1.4-8-4.5-8-9V6z"/></svg>
+              <svg x-show="record.key === 'autark_serie'" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>
             </span>
             <span class="el-rec-k" x-text="record.label"></span>
           </span>

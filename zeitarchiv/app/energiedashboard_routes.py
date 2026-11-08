@@ -3980,6 +3980,15 @@ class EnergieDashboardService:
                 raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
             return self.langzeit.compute_months(config)
 
+        @router.get("/energiedashboard/langzeit/years")
+        def energiedashboard_langzeit_years() -> dict:
+            # Jahressummen je Kalenderjahr für die Karte „Jahresbilanz“ (Reiter „Langzeit“), komplett und bis zum
+            # selben Kalendertag wie heute. Das Frontend holt sie genau einmal beim ersten Öffnen des Reiters.
+            config = _load_config(deps.index)
+            if not energie_langzeit.is_configured(config):
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
+            return self.langzeit.compute_years(config)
+
         @router.get("/energiedashboard/langzeit/records")
         def energiedashboard_langzeit_records() -> dict:
             # Rekordtage und Kenntage je Jahr aus den Tageswerten aller Rollen (Reiter „Langzeit“).

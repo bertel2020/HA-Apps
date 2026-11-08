@@ -29,6 +29,13 @@
   - „Aufteilung des Verbrauchs“: ein gestapelter Balken je Zeitraum (das
     Vorjahr dünn darunter) oder je Jahr, in Prozent oder kWh
 
+- **Energiedashboard**: „Langzeit“ zeigt die Jahre jetzt auch im Überblick
+  - „Jahresbilanz“: Erzeugung, Netzbezug, Einspeisung und Verbrauch je Jahr,
+    darunter Autarkie und Eigenverbrauch; „Bis jetzt“ vergleicht jedes Jahr
+    bis zum heutigen Kalendertag, „Komplett“ zeigt ganze Jahre
+  - Zwei neue Rekorde: der Monat mit der besten Autarkie und die längste
+    Folge fast autarker Tage
+
 ### Geändert
 
 - **Energiedashboard**: Aufbau wie im Wetterdashboard
@@ -74,6 +81,13 @@
       term" then shows it preselected
   - "Consumption breakdown": one stacked bar per period (the previous year
     thinly below) or per year, in percent or kWh
+
+- **Energy dashboard**: "Long term" now also gives an overview of the years
+  - "Annual balance": generation, grid import, feed-in and consumption per
+    year, with self-sufficiency and self-consumption below; "So far" compares
+    every year up to today's calendar day, "Complete" shows full years
+  - Two new records: the month with the best self-sufficiency and the longest
+    streak of almost self-sufficient days
 
 #### Changed
 

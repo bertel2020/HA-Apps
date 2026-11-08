@@ -507,18 +507,18 @@ def test_bereiche_des_reiters_werden_im_setup_gespeichert_und_nicht_gerendert(cl
     try:
         alles = client.post("/energiedashboard/setup", data={
             "netzbezug": "sensor.setup_netz",
-            "langzeit_zeigen": ["quoten", "speicher", "pv", "verbraucher", "monatsvergleich", "matrix", "rekorde", "kenntage"],
+            "langzeit_zeigen": ["quoten", "speicher", "pv", "verbraucher", "jahresbilanz", "monatsvergleich", "matrix", "rekorde", "kenntage"],
         })
         assert ed._load_config(index)["langzeit_ausblenden"] == []
-        assert 'x-ref="monthlyChart"' in alles.text and 'x-ref="kenntage"' in alles.text
+        assert 'x-ref="monthlyChart"' in alles.text and 'x-ref="kenntage"' in alles.text and 'x-ref="jbBars"' in alles.text
 
         wenig = client.post("/energiedashboard/setup", data={
             "netzbezug": "sensor.setup_netz", "langzeit_zeigen": ["quoten", "rekorde"],
         })
         assert ed._load_config(index)["langzeit_ausblenden"] == [
-            "speicher", "pv", "monatsvergleich", "matrix", "kenntage", "verbraucher",
+            "speicher", "pv", "jahresbilanz", "monatsvergleich", "matrix", "kenntage", "verbraucher",
         ]
-        for ref in ('x-ref="monthlyChart"', 'x-ref="matrixTable"', 'x-ref="kenntage"'):
+        for ref in ('x-ref="monthlyChart"', 'x-ref="matrixTable"', 'x-ref="kenntage"', 'x-ref="jbBars"'):
             assert ref not in wenig.text, ref
         assert "el-rec-big" in wenig.text                                  # die Rekorde sind angehakt geblieben
         assert 'x-ref="table"' in wenig.text                              # die Tabelle gibt es immer
@@ -619,6 +619,89 @@ def test_rekorde_erst_ab_einem_jahr_archiv_und_der_fruehere_tag_bei_gleichstand(
     assert rekorde["erzeugung"]["offset"] == (tage[100] - NOW.date()).days
     kurz = service.compute_records(config, datetime(2025, 12, 1, tzinfo=TZ))
     assert kurz["enough"] is False and kurz["records"] == []   # unter einem Jahr gibt es keine Rekorde
+
+
+def test_zusatzrekorde_bester_autarkiemonat_und_laengste_serie_fast_autarker_tage(service, monkeypatch) -> None:
+    config = _zwei_zaehler(service, _monat(2025, 7))
+    tage = [_tag(i) for i in range(400)]                    # 1.7.2025 bis 4.8.2026
+    pv = {tag: 5.0 for tag in tage}
+    netz = {tag: 3.0 for tag in tage}                       # Verbrauch 8, Bezug 3: weit von „fast autark“ entfernt
+    for tag in tage:
+        if tag.year == 2025 and tag.month == 7:
+            pv[tag], netz[tag] = 20.0, 0.5                  # ganzer Juli 2025: Autarkie 97,6 %, jeder Tag fast autark
+        if tag.year == 2025 and tag.month == 10 and tag.day <= 5:
+            pv[tag], netz[tag] = 20.0, 0.5                  # kürzere Folge im Oktober
+    _tagesreihen(monkeypatch, {"sensor.pv": pv, "sensor.netz": netz})
+    rekorde = {r["key"]: r for r in service.compute_records(config, NOW)["records"]}
+    monat = rekorde["autarkie_monat"]
+    assert monat["unit"] == "pct" and monat["span"] == "month" and monat["date"] == "2025-07-01"
+    assert monat["value"] == pytest.approx(97.6, abs=0.1) and monat["entity_id"] is None
+    serie = rekorde["autark_serie"]
+    assert serie["value"] == 31 and serie["unit"] == "days"
+    assert serie["date"] == "2025-07-01" and serie["date_end"] == "2025-07-31"
+
+
+def test_serie_bricht_an_einem_fehlenden_tag_und_der_unvollstaendige_monat_zaehlt_nicht(service, monkeypatch) -> None:
+    config = _zwei_zaehler(service, _monat(2025, 7))
+    tage = [_tag(i) for i in range(400)]
+    pv = {tag: 20.0 for tag in tage}
+    netz = {tag: 0.5 for tag in tage}
+    del pv[_tag(10)], netz[_tag(10)]                       # 11.7.2025 fehlt: auch der Tag danach zählt nicht
+    _tagesreihen(monkeypatch, {"sensor.pv": pv, "sensor.netz": netz})
+    rekorde = {r["key"]: r for r in service.compute_records(config, NOW)["records"]}
+    assert rekorde["autark_serie"]["date"] == "2025-07-13"                 # die Folge vor der Lücke (10 Tage) ist kürzer als die danach
+    ende = datetime.fromisoformat(rekorde["autark_serie"]["date_end"])
+    assert rekorde["autark_serie"]["value"] == (ende - datetime(2025, 7, 13)).days + 1
+    assert rekorde["autarkie_monat"]["date"] == "2025-08-01"               # Juli 2025 hat eine Lücke und ist kein ganzer Monat; Gleichstand: der frühere
+    ohne_netz = _config(erzeuger=[{"entity_id": "sensor.pv"}])
+    assert all(r["key"] not in ("autarkie_monat", "autark_serie") for r in service.compute_records(ohne_netz, NOW)["records"])
+
+
+def test_jahresbilanz_komplett_und_bis_jetzt_je_jahr(service, monkeypatch) -> None:
+    for entity_id in ("sensor.pv", "sensor.netz", "sensor.einsp"):
+        _archiv(service, entity_id, datetime(2024, 3, 15, tzinfo=TZ).timestamp())
+    config = _config(netzbezug="sensor.netz", einspeisung="sensor.einsp", erzeuger=[{"entity_id": "sensor.pv"}])
+    taeglich = {"sensor.pv": 10.0, "sensor.netz": 4.0, "sensor.einsp": 3.0}
+
+    def fenster(entity_ids, start, end, now_local, read_cache):
+        # Ersatz für window_total: je Tag ein fester Wert, gezählt werden die Tage des Fensters.
+        tage = (end - start).total_seconds() / 86400
+        return round(sum(taeglich[e] for e in entity_ids) * tage, 3), None
+    monkeypatch.setattr(service, "window_total", fenster)
+    daten = service.compute_years(config, NOW)
+    assert [j["year"] for j in daten["years"]] == [2026, 2025, 2024]
+    assert daten["roles"] == ["erzeugung", "einspeisung", "netzbezug", "verbrauch"] and daten["current"] == 2026
+    j2025 = next(j for j in daten["years"] if j["year"] == 2025)
+    assert j2025["full"]["erzeugung"] == pytest.approx(3650.0)                     # ganzes Jahr: 365 Tage
+    bis = (NOW.replace(year=2025) - datetime(2025, 1, 1, tzinfo=TZ)).total_seconds() / 86400
+    assert j2025["ytd"]["erzeugung"] == pytest.approx(10.0 * bis, rel=1e-6)         # bis zum selben Kalendertag wie heute
+    assert j2025["ytd"]["erzeugung"] < j2025["full"]["erzeugung"]
+    j2026 = daten["years"][0]
+    assert j2026["full"] == j2026["ytd"]                                            # das laufende Jahr zählt immer bis jetzt
+    assert j2025["full"]["verbrauch"] == pytest.approx(3650 + 1460 - 1095)           # Bilanz: 10 + 4 − 3 je Tag
+    assert j2025["full"]["autarkie"] == pytest.approx(round((1 - 1460 / 4015) * 100, 1))
+    assert j2025["full"]["eigenverbrauch"] == pytest.approx(round((1 - 1095 / 3650) * 100, 1))
+    assert daten["years"][2]["partial_from"] == "2024-03-15" and j2025["partial_from"] is None
+
+
+def test_jahresbilanz_ohne_wert_ist_leer_statt_null_und_zeigt_nur_vorhandene_rollen(service) -> None:
+    _archiv(service, "sensor.netz", datetime(2026, 1, 1, tzinfo=TZ).timestamp())
+    daten = service.compute_years(_config(netzbezug="sensor.netz"), NOW)
+    assert daten["roles"] == ["netzbezug", "verbrauch"]
+    assert daten["years"][0]["full"]["netzbezug"] is None and daten["years"][0]["full"]["autarkie"] is None
+
+
+def test_years_route(client) -> None:
+    from app.main import index
+
+    index.set_setting(ed.SETTING_CONFIG, "")
+    assert client.get("/energiedashboard/langzeit/years").status_code == 409
+    ed._save_config(index, _config(netzbezug="sensor.langzeit_test_netz"))
+    try:
+        antwort = client.get("/energiedashboard/langzeit/years")
+        assert antwort.status_code == 200 and antwort.json()["roles"] == ["netzbezug", "verbrauch"]
+    finally:
+        index.set_setting(ed.SETTING_CONFIG, "")
 
 
 def test_kenntage_je_jahr(service, monkeypatch) -> None:

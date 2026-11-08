@@ -1002,6 +1002,121 @@
     };
   };
 
+  // ---- Jahresbilanz (Reiter „Langzeit“) ---------------------------------------------------------
+  // Zeilen der Karte, ältestes Jahr links: Summen je Jahr für „Komplett“ (full) oder „Bis jetzt“ (ytd), höchstens `limit` Jahre.
+  function yearRows(data, count, limit) {
+    const list = limit ? data.years.slice(0, limit) : data.years;
+    return list.slice().reverse().map((entry) => ({
+      year: entry.year, partialFrom: entry.partial_from, m: entry[count],
+      // Das laufende Jahr ist nur in „Komplett“ unvollständig; „Bis jetzt“ zählt alle Jahre gleich weit.
+      running: count === 'full' && entry.year === data.current,
+    }));
+  }
+
+  const yearLabel = (row) => `${row.year}${row.running ? '*' : ''}`;
+  const percentText = (value) => `${num(value, 1)} %`;
+
+  function yearTip(row) {
+    const labels = {erzeugung: t('Erzeugung'), netzbezug: t('Netzbezug'), einspeisung: t('Einspeisung'), verbrauch: t('Verbrauch')};
+    let html = `<b>${escapeHtml(yearLabel(row))}</b>`;
+    for (const key of Object.keys(labels)) {
+      if (row.m[key] != null) html += `<br>${escapeHtml(labels[key])}: ${escapeHtml(energy(row.m[key]))}`;
+    }
+    if (row.m.autarkie != null) html += `<br>${escapeHtml(t('Autarkie'))}: ${escapeHtml(percentText(row.m.autarkie))}`;
+    if (row.m.eigenverbrauch != null) html += `<br>${escapeHtml(t('Eigenverbrauch'))}: ${escapeHtml(percentText(row.m.eigenverbrauch))}`;
+    if (row.partialFrom) {
+      html += `<br>${escapeHtml(t('Archiv ab {date}', {date: fmtDate(formats.dmy, Date.parse(row.partialFrom + 'T12:00:00Z') / 1000)}))}`;
+    }
+    return html;
+  }
+
+  const yearAxis = (colors, font) => ({
+    axisLine: {lineStyle: {color: colors.grid}}, axisTick: {show: false},
+    axisLabel: {color: colors.text, fontSize: font}, splitLine: {lineStyle: {color: colors.grid}},
+  });
+
+  function yearTooltip(rows, colors) {
+    return {
+      trigger: 'axis', confine: true, axisPointer: {type: 'shadow'},
+      backgroundColor: colors.surface, borderColor: colors.grid, textStyle: {color: colors.ink, fontSize: scaledFont(12)},
+      formatter: (params) => yearTip(rows[params[0].dataIndex]),
+    };
+  }
+
+  // Vier Balken je Jahr; das laufende Jahr in „Komplett“ blass und gestrichelt.
+  function yearBars(data, rows, colors) {
+    const defs = [
+      ['erzeugung', t('Erzeugung'), cssVar('--energy-solar')], ['netzbezug', t('Netzbezug'), cssVar('--energy-grid')],
+      ['einspeisung', t('Einspeisung'), cssVar('--energy-export')], ['verbrauch', t('Verbrauch'), cssVar('--ink-faint')],
+    ].filter(([key]) => data.roles.includes(key));
+    return {
+      animation: false,
+      grid: {left: 8, right: 12, top: 36, bottom: 8, containLabel: true},
+      legend: {top: 0, textStyle: {color: colors.text, fontSize: scaledFont(12)}, itemWidth: 12, itemHeight: 8},
+      xAxis: {type: 'category', data: rows.map(yearLabel), ...yearAxis(colors, scaledFont(11)), splitLine: {show: false}},
+      yAxis: {
+        type: 'value', name: t('kWh'), nameTextStyle: {color: colors.text}, ...yearAxis(colors, scaledFont(11)),
+        axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => num(value, 0)},
+      },
+      tooltip: yearTooltip(rows, colors),
+      series: defs.map(([key, name, color]) => ({
+        name, type: 'bar', barMaxWidth: 18, itemStyle: {color, borderRadius: [2, 2, 0, 0]},
+        data: rows.map((row) => ({
+          value: row.m[key],
+          itemStyle: row.running ? {color, opacity: 0.55, borderColor: color, borderType: 'dashed', borderWidth: 1} : {color},
+        })),
+      })),
+    };
+  }
+
+  // Anteile: „from“ = woher der Verbrauch kam (eigene Erzeugung, Netz), „to“ = wohin die Erzeugung ging (selbst genutzt, eingespeist).
+  function yearShares(rows, colors, which) {
+    const parts = which === 'from'
+      ? [[t('aus eigener Erzeugung'), cssVar('--energy-solar'), (m) => (m.verbrauch > 0 && m.netzbezug != null ? m.verbrauch - m.netzbezug : null), (m) => m.verbrauch],
+        [t('aus dem Netz'), cssVar('--energy-grid'), (m) => m.netzbezug, (m) => m.verbrauch]]
+      : [[t('selbst genutzt'), cssVar('--energy-solar'), (m) => (m.erzeugung > 0 ? m.erzeugung - (m.einspeisung || 0) : null), (m) => m.erzeugung],
+        [t('eingespeist'), cssVar('--energy-export'), (m) => (m.erzeugung > 0 ? (m.einspeisung || 0) : null), (m) => m.erzeugung]];
+    const newest = rows.slice().reverse();
+    return {
+      animation: false,
+      grid: {left: 8, right: 16, top: 30, bottom: 8, containLabel: true},
+      legend: {top: 0, textStyle: {color: colors.text, fontSize: scaledFont(12)}, itemWidth: 12, itemHeight: 8},
+      xAxis: {type: 'value', min: 0, max: 100, ...yearAxis(colors, scaledFont(11)), axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: '{value} %'}},
+      yAxis: {type: 'category', inverse: true, data: newest.map(yearLabel), ...yearAxis(colors, scaledFont(11)), splitLine: {show: false}},
+      tooltip: {...yearTooltip(newest, colors), axisPointer: {type: 'shadow'}},
+      series: parts.map(([name, color, value, total]) => ({
+        name, type: 'bar', stack: 'share', barMaxWidth: 20, itemStyle: {color},
+        label: {show: true, color: colors.surface, fontSize: scaledFont(11), formatter: (p) => (p.value >= 8 ? `${num(p.value, 0)} %` : '')},
+        data: newest.map((row) => {
+          const v = value(row.m), all = total(row.m);
+          return {
+            value: v == null || !all ? null : v / all * 100,
+            itemStyle: row.running ? {color, opacity: 0.55} : {color},
+            label: row.running ? {color: colors.ink} : {},
+          };
+        }),
+      })),
+    };
+  }
+
+  // Autarkie und Eigenverbrauch je Jahr; das laufende Jahr in „Komplett“ als offener Punkt.
+  function yearQuotas(rows, colors) {
+    const defs = [['autarkie', t('Autarkie'), cssVar('--chart-1'), 'bottom'], ['eigenverbrauch', t('Eigenverbrauch'), cssVar('--chart-2'), 'top']];
+    return {
+      animation: false,
+      grid: {left: 8, right: 16, top: 30, bottom: 8, containLabel: true},
+      legend: {top: 0, textStyle: {color: colors.text, fontSize: scaledFont(12)}, itemWidth: 18, itemHeight: 8},
+      xAxis: {type: 'category', data: rows.map(yearLabel), ...yearAxis(colors, scaledFont(11)), splitLine: {show: false}},
+      yAxis: {type: 'value', min: 0, max: 100, ...yearAxis(colors, scaledFont(11)), axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: '{value} %'}},
+      tooltip: {...yearTooltip(rows, colors), axisPointer: {type: 'line'}},
+      series: defs.map(([key, name, color, position]) => ({
+        name, type: 'line', symbolSize: 8, lineStyle: {color, width: 2}, itemStyle: {color},
+        label: {show: rows.length <= 8, color: colors.text, fontSize: scaledFont(11), formatter: (p) => (p.value == null ? '' : `${num(p.value, 0)} %`), position},
+        data: rows.map((row) => ({value: row.m[key], symbol: row.running ? 'emptyCircle' : 'circle'})),
+      })),
+    };
+  }
+
   // ---- Reiter „Langzeit“ -------------------------------------------------------------------------
   // hidden: im Setup abgewählte Karten (Schlüssel wie energie_langzeit.CARD_BLOCKS); deren Daten werden gar nicht erst geladen.
   // hasConsumers: Verbraucher der obersten Ebene eingerichtet (dann stehen sie neben der Bilanz in der Auswahl der Größe).
@@ -1016,6 +1131,11 @@
       monthsError: '',
       records: null,
       recordsError: '',
+      // Jahresbilanz: Jahressummen je Kalenderjahr; „Bis jetzt“ (ytd) ist vorgewählt, weil nur so das laufende Jahr vergleichbar ist.
+      years: null,
+      yearsError: '',
+      jbCount: 'ytd',
+      jbMode: 'kwh',
       // Gewählte Größe: „r:<Rolle>“ (Bilanz) oder „c:<Verbraucher>“; die Auswahl im Reiter „Vergleich“ gilt auch hier.
       sizeSel: 'r:erzeugung',
       // Darstellung der Monatswerte: 'tab' (Jahre × Monate) oder 'line' (eine Linie je Jahr).
@@ -1030,11 +1150,14 @@
         const saved = readStore();
         this.yearLimit = storedYearLimit(saved.yearLimit);
         if (saved.ktMode === 'full' || saved.ktMode === 'ytd') this.ktMode = saved.ktMode;
+        if (saved.jbCount === 'full' || saved.jbCount === 'ytd') this.jbCount = saved.jbCount;
+        if (saved.jbMode === 'kwh' || saved.jbMode === 'pct') this.jbMode = saved.jbMode;
         if ((saved.lzView === 'tab' && shown('matrix')) || (saved.lzView === 'line' && shown('monatsvergleich'))) this.lzView = saved.lzView;
         if (typeof saved.sizeSel === 'string') this.sizeSel = saved.sizeSel;
         // Geladen wird erst beim ersten Öffnen des Reiters: Die Übersicht ist die Startansicht.
         onFirstShow('long', this, () => {
           this.takeSelection();
+          if (shown('jahresbilanz')) this.loadYears();
           if (withMonths) this.loadMonths();
           if (withMonths && withConsumers) this.loadConsumers();
           if (shown('rekorde') || shown('kenntage')) this.loadRecords();
@@ -1059,7 +1182,8 @@
         const m = this.months ? this.months.years.length : 0;
         const c = this.cons && this.cons.years ? this.cons.years.length : 0;
         const k = this.records && this.records.kenntage ? this.records.kenntage.years.length : 0;
-        return Math.max(m, c, k);
+        const y = this.years ? this.years.years.length : 0;
+        return Math.max(m, c, k, y);
       },
 
       yearOptions() {
@@ -1070,12 +1194,67 @@
         return this.yearCount() > YEAR_STEP;
       },
 
-      // Gilt für Kenntage und die Monatswerte, damit alle dieselben Jahre und dieselbe Basis für Ø zeigen.
+      // Gilt für Jahresbilanz, Kenntage und die Monatswerte, damit alle dieselben Jahre und dieselbe Basis für Ø zeigen.
       setYearLimit(value) {
         this.yearLimit = value;
         writeStore({yearLimit: value});
+        this.drawYears();
         this.drawSize();
         this.drawKenntage();
+      },
+
+      // ---- Jahresbilanz: Summen je Kalenderjahr, Verlauf von Autarkie und Eigenverbrauch ----
+
+      async loadYears() {
+        this.yearsError = '';
+        try {
+          const res = await fetch('energiedashboard/langzeit/years');
+          if (!res.ok) throw new Error(String(res.status));
+          this.years = await res.json();
+          this.$nextTick(() => this.drawYears());
+        } catch (e) {
+          this.yearsError = t('Die Jahresbilanz konnte nicht geladen werden.');
+        }
+      },
+
+      yearsNote() {
+        return t('Erzeugung, Netzbezug, Einspeisung und Verbrauch je Kalenderjahr, darunter Autarkie und Eigenverbrauch. „Bis jetzt“ zählt jedes Jahr nur bis zum selben Kalendertag, „Komplett“ ganze Jahre; das laufende Jahr (*) zählt immer bis heute. „Anteile“ zeigt, woher der Verbrauch kam und wohin die Erzeugung ging. Der Verbrauch ist die Bilanz aus Erzeugung, Bezug, Speicher und Einspeisung. Ein Jahr, in dem das Archiv erst nach dem 1. Januar beginnt, ist nur zum Teil erfasst; der Tooltip nennt den Beginn.');
+      },
+
+      jbRange() {
+        return this.years ? kenntageRange({today: this.years.today}, this.jbCount === 'ytd') : '';
+      },
+
+      setJbCount(mode) {
+        this.jbCount = mode;
+        writeStore({jbCount: mode});
+        this.drawYears();
+      },
+
+      setJbMode(mode) {
+        this.jbMode = mode;
+        writeStore({jbMode: mode});
+        this.$nextTick(() => this.drawYears());
+      },
+
+      drawYears() {
+        const data = this.years;
+        if (!data || !data.years.length) return;
+        const rows = yearRows(data, this.jbCount, this.yearLimit);
+        const colors = palette();
+        const draw = (key, option) => {
+          const element = this.$refs[key];
+          if (!element) return;
+          const chart = chartFor(key, element);
+          chart.setOption(option, true);
+          requestAnimationFrame(() => chart.resize());
+        };
+        if (this.jbMode === 'kwh') draw('jbBars', yearBars(data, rows, colors));
+        else {
+          draw('jbFrom', yearShares(rows, colors, 'from'));
+          if (data.roles.includes('erzeugung')) draw('jbTo', yearShares(rows, colors, 'to'));
+        }
+        draw('jbTrend', yearQuotas(rows, colors));
       },
 
       // ---- Monatswerte einer Größe: Tabelle „Jahre × Monate“ oder Linien ----
@@ -1172,17 +1351,26 @@
       },
 
       recordAccent(key) {
-        return {erzeugung: 'var(--chart-7)', einspeisung: 'var(--chart-4)', verbrauch: 'var(--chart-2)', netzbezug: 'var(--chart-3)'}[key] || 'var(--chart-8)';
+        return {
+          erzeugung: 'var(--chart-7)', einspeisung: 'var(--chart-4)', verbrauch: 'var(--chart-2)', netzbezug: 'var(--chart-3)',
+          autarkie_monat: 'var(--chart-1)', autark_serie: 'var(--chart-1)',
+        }[key] || 'var(--chart-8)';
       },
 
       recordValue(record) {
-        const text = energy(record.value);
+        const text = record.unit === 'pct' ? `${num(record.value, 1)}\u00a0%`
+          : record.unit === 'days' ? `${num(record.value, 0)}\u00a0${t('Tage')}` : energy(record.value);
         const [value, unit] = text.split('\u00a0');
         return `${escapeHtml(value)}<small>${escapeHtml(unit)}</small>`;
       },
 
       recordDate(record) {
-        return fmtDate(formats.dmy, Date.parse(record.date + 'T12:00:00Z') / 1000);
+        const day = (iso) => fmtDate(formats.dmy, Date.parse(iso + 'T12:00:00Z') / 1000);
+        if (record.span === 'month') {
+          const [year, month] = record.date.split('-').map(Number);
+          return `${monthName(month, 'long')} ${year}`;
+        }
+        return record.date_end ? `${day(record.date)} – ${day(record.date_end)}` : day(record.date);
       },
 
       recordLink(record) {
