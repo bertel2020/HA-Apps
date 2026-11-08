@@ -146,6 +146,15 @@ TILE_LABELS = {
 }
 #: PV und Helligkeit: Leistungseinheiten (Faktor nach kW) und Anzahl der verglichenen Tage.
 PV_UNIT_KW = {"W": 0.001, "kW": 1.0, "MW": 1000.0}
+
+
+def pv_scale_kw(unit: str | None) -> float | None:
+    """Faktor nach kW. Die genaue Schreibweise gilt zuerst; „w“ und „kw“ in beliebiger Groß-/Kleinschreibung zählen auch.
+    „mW“ (Milliwatt) und „MW“ (Megawatt) unterscheiden sich nur durch die Schreibweise, deshalb gilt nur das genaue „MW“."""
+    unit = (unit or "").strip()
+    if unit in PV_UNIT_KW:
+        return PV_UNIT_KW[unit]
+    return {"w": PV_UNIT_KW["W"], "kw": PV_UNIT_KW["kW"]}.get(unit.lower())
 PV_DAYS = 14
 #: Luftdruck: Faktor nach hPa und Schwelle, unter der die Tagestendenz als „stabil“ gilt.
 PRESSURE_UNIT_HPA = {"hPa": 1.0, "mbar": 1.0, "Pa": 0.01, "kPa": 10.0, "inHg": 33.8639}
@@ -1150,7 +1159,7 @@ class WetterService:
         pv_entity = self.deps.index.get_entity(pv_id) if pv_id else None
         if lux_entity is None or pv_entity is None:
             return None
-        scale = PV_UNIT_KW.get(pv_entity["unit"] or "")
+        scale = pv_scale_kw(pv_entity["unit"])
         if scale is None:
             return None
         tz = self.deps.tz

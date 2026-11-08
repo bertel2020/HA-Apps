@@ -1413,3 +1413,11 @@ def test_pressure_trend_needs_a_known_unit(service) -> None:
         data = service.compute_conditions_day("2026-08-19", NOW)
         trends[entity] = data["pressure"]["trend"] if data and data.get("pressure") else "fehlt"
     assert trends == {"sensor.p_bar": None, "sensor.p_low": "rising", "sensor.p_none": "rising"}
+
+
+def test_pv_unit_ignores_case_for_watt_and_kilowatt_but_not_for_milli_and_mega() -> None:
+    """„KW“ oder „w“ wurden früher als unbekannte Einheit behandelt und schalteten die PV-Auswertung ohne Hinweis ab;
+    „mW“ (Milliwatt) und „MW“ (Megawatt) unterscheiden sich nur durch die Schreibweise und bleiben streng."""
+    scale = wetter_routes.pv_scale_kw
+    assert [scale(u) for u in ("W", "w", "kW", "KW", " kw ", "MW")] == [0.001, 0.001, 1.0, 1.0, 1.0, 1000.0]
+    assert [scale(u) for u in ("mW", "mw", "", None, "kWh")] == [None, None, None, None, None]
