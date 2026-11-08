@@ -833,9 +833,16 @@ def _daily_points(
     und gehören nicht in Kenntage oder Rekorde. Zustands-Entitäten haben keine Tagesreihe (leer).
     Der laufende Tag ist enthalten, aber meist unvollständig: der Aufrufer entscheidet.
     """
+    # Ein Wert, der seit dem Vorabend gilt, soll auch die Stunden am Anfang des Fensters füllen: Die Fortschreibung
+    # braucht deshalb die letzte Zeile VOR dem Fenster (höchstens DAILY_CARRY_HOURS davor). Ohne sie hing das Ergebnis
+    # des ersten Tages davon ab, wo das Fenster beginnt (1. Januar, Monatsanfang der Kenntage).
+    carries = aggregation_type not in ("counter", "switch")
+    read_start = (
+        datetime.fromtimestamp(window_start.timestamp() - DAILY_CARRY_HOURS * 3600.0, tz) if carries else window_start
+    )
     rows = _query_completed_plus_live_fine(
         data_dir, index, entity_id, aggregation_type, "line",
-        window_start, window_end, tz, now_local, read_cache,
+        read_start, window_end, tz, now_local, read_cache,
     )
     if aggregation_type == "counter":
         return [DailyPoint(day_start=row.bucket_start, value=row.value or 0.0) for row in rows]
@@ -846,6 +853,7 @@ def _daily_points(
     is_switch = aggregation_type == "switch"
     if not is_switch:
         rows = _carry_forward_hours(rows, window_end.timestamp(), now_local.timestamp())
+        rows = [row for row in rows if row.bucket_start >= window_start.timestamp()]  # der Vorlauf gehört nicht zum Fenster
     grouped: dict[float, list[rollup.FineRow]] = {}
     for row in rows:
         if (row.on_seconds is None) if is_switch else (row.value is None):
@@ -891,7 +899,8 @@ def _rollup_year_fingerprint(
     directory = rollup.rollup_path(data_dir, entity_id, FINE_LEVEL[aggregation_type])
     if not directory.is_dir():
         return None
-    names = [rollup.segment_name(year, month) for month in range(1, 13)] + ["legacy.parquet"]
+    # Der Dezember des Vorjahres steht mit drin: Die Fortschreibung am 1. Januar liest den Wert vom Vorabend.
+    names = [rollup.segment_name(year - 1, 12)] + [rollup.segment_name(year, month) for month in range(1, 13)] + ["legacy.parquet"]
     parts = []
     for name in names:
         try:

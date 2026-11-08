@@ -202,7 +202,9 @@ def test_completed_years_are_cached_and_the_current_year_is_not(env, monkeypatch
     calls.clear()
     second = query.query_daily_series(tmp, index, "sensor.t", *window, TZ, NOW)
     assert second == first and [start.year for start, _end in calls] == [2026]
-    assert len(first) == 366 + 365  # das laufende Jahr hat keine Daten
+    # Das laufende Jahr hat keine Daten; nur der 1. Januar 2026 erscheint, rein aus dem Wert vom Silvesterabend fortgeschrieben
+    # (elf Stunden, nie abgedeckt) wie jeder andere Tag nach der letzten Zeile auch.
+    assert len(first) == 366 + 365 + 1 and not first[-1].covered
 
 
 def test_partial_years_and_years_without_december_are_not_cached(env, monkeypatch) -> None:
@@ -258,7 +260,88 @@ def test_ten_years_of_hourly_data_are_one_cheap_call_once_cached(env, monkeypatc
     began = time.perf_counter()
     cold = query.query_daily_series(tmp, index, "sensor.t", *window, TZ, NOW)
     assert time.perf_counter() - began < 10.0
-    assert len(cold) == 3653 and all(point.covered for point in cold)
+    assert len(cold) == 3653 + 1 and sum(point.covered for point in cold) == 3653  # plus 1.1.2026, nur fortgeschrieben
     calls.clear()
     assert query.query_daily_series(tmp, index, "sensor.t", *window, TZ, NOW) == cold
     assert [start.year for start, _end in calls] == [2026]
+
+
+def _write_changes(tmp: Path, entity_id: str, changes: list[tuple[datetime, float]]) -> None:
+    """Stundenzeilen nur zu den Änderungszeitpunkten (wie gespeichert), je Monatssegment."""
+    by_month: dict[str, list[rollup.FineRow]] = {}
+    for ts, value in changes:
+        by_month.setdefault(f"{ts.year:04d}-{ts.month:02d}", []).append(
+            rollup.FineRow(bucket_start=ts.timestamp(), value=value, min_value=value, max_value=value)
+        )
+    for label in sorted(by_month):
+        table = rollup._fine_rows_to_table(by_month[label], "standard")
+        rollup._append_table(rollup.rollup_path(tmp, entity_id, "stunde"), table, label)
+
+
+def _by_day(points) -> dict:
+    return {
+        datetime.fromtimestamp(p.day_start, TZ).date(): (p.hours, p.covered, round(p.value, 6), p.min_value, p.max_value)
+        for p in points
+    }
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        # Mitten im Monat: seit 22:00 am Vortag 0 °C, erste Änderung um 09:00.
+        [(datetime(2026, 10, 14, 22), 0.0), (datetime(2026, 10, 15, 9), 1.0), (datetime(2026, 10, 15, 20), 0.5)],
+        # Monatswechsel (zwei Segmente): Ruhe von 20:00 am 30.9. bis 08:00 am 1.10.
+        [(datetime(2026, 9, 30, 20), -1.0), (datetime(2026, 10, 1, 8), 2.0), (datetime(2026, 10, 1, 18), 1.0)],
+        # Jahreswechsel: das abgeschlossene Jahr 2025 liegt im Zwischenspeicher, der 1.1. hängt vom Dezember ab.
+        [(datetime(2025, 12, 31, 21), 0.0), (datetime(2026, 1, 1, 7), 1.0), (datetime(2026, 1, 1, 19), 0.0)],
+    ],
+    ids=["tagesgrenze", "monatsgrenze", "jahresgrenze"],
+)
+def test_a_day_has_the_same_values_whichever_day_the_window_starts_on(env, changes) -> None:
+    """Ein Wert, der seit dem Vorabend gilt, zählt auch für die Stunden am Tagesanfang, wenn das Fenster genau an diesem
+    Tag beginnt (bisher fehlten dann die Stunden vor der ersten Änderung, der Tag galt als nicht abgedeckt)."""
+    tmp, index = env
+    index.get_or_create_entity("sensor.t", "sensor", "measurement", "°C")
+    changes = [(ts.replace(tzinfo=TZ), value) for ts, value in changes]
+    _write_changes(tmp, "sensor.t", changes)
+    first_day = changes[0][0].replace(hour=0, minute=0)
+    last_day = changes[-1][0].replace(hour=0, minute=0) + timedelta(days=1)
+    whole = _by_day(query.query_daily_series(tmp, index, "sensor.t", first_day, last_day + timedelta(days=1), TZ, NOW))
+    assert len(whole) >= 2
+    for day, expected in whole.items():
+        start = datetime(day.year, day.month, day.day, tzinfo=TZ)
+        alone = _by_day(query.query_daily_series(tmp, index, "sensor.t", start, start + timedelta(days=1), TZ, NOW))
+        assert alone == {day: expected}, f"{day}: {alone.get(day)} statt {expected}"
+    # Das Fenster ab dem zweiten Tag sieht den Wert des Vorabends und füllt die Stunden am Tagesanfang.
+    second = sorted(whole)[1]
+    assert whole[second][0] > 12
+
+
+def test_nothing_is_carried_in_from_before_the_first_value(env) -> None:
+    """Vor dem ersten gespeicherten Wert gibt es nichts, was fortgeschrieben werden könnte."""
+    tmp, index = env
+    index.get_or_create_entity("sensor.t", "sensor", "measurement", "°C")
+    _write_changes(tmp, "sensor.t", [(datetime(2026, 10, 15, 9, tzinfo=TZ), 1.0)])
+    day = datetime(2026, 10, 15, tzinfo=TZ)
+    (point,) = query.query_daily_series(tmp, index, "sensor.t", day, day + timedelta(days=1), TZ, NOW)
+    assert point.hours == 13 and point.min_value == 1.0  # 9 Uhr plus zwölf fortgeschriebene Stunden, nichts davor
+
+
+def test_the_cached_year_follows_the_december_before_it(env, monkeypatch) -> None:
+    """Der 1. Januar hängt vom Dezember des Vorjahres ab; ändert sich dessen Segment, gilt der Zwischenspeicher nicht mehr."""
+    tmp, index = env
+    index.get_or_create_entity("sensor.t", "sensor", "measurement", "°C")
+    _write_year(tmp, "sensor.t", 2025, lambda hour: 10.0)
+    _write_year(tmp, "sensor.t", 2024, lambda hour: 10.0)
+    calls = _calls(monkeypatch)
+    window = (datetime(2025, 1, 1, tzinfo=TZ), datetime(2026, 1, 1, tzinfo=TZ))
+    query.query_daily_series(tmp, index, "sensor.t", *window, TZ, NOW)
+    calls.clear()
+    query.query_daily_series(tmp, index, "sensor.t", *window, TZ, NOW)
+    assert calls == []  # unverändert: aus dem Zwischenspeicher
+    segment = rollup.rollup_path(tmp, "sensor.t", "stunde") / rollup.segment_name(2024, 12)
+    segment.touch()
+    time.sleep(0.01)
+    segment.write_bytes(segment.read_bytes())  # neue Änderungszeit: der Dezember des Vorjahres wurde neu geschrieben
+    query.query_daily_series(tmp, index, "sensor.t", *window, TZ, NOW)
+    assert [start.year for start, _end in calls] == [2025]
