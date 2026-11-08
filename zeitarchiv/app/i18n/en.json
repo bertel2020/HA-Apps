@@ -3593,7 +3593,6 @@
     "Schwellen der Kenntage": "Key day thresholds",
     "Tabelle „Zeiträume im Vergleich“": "Table “Periods compared”",
     "% der Kapazität": "% of capacity",
-    "Fast autark zählt Tage, an denen der Netzbezug höchstens (100 − Wert) % des Verbrauchs ausmacht. Sonnentage brauchen bei jedem Erzeuger die Anlagenleistung (kWp). Trübe Tage vergleichen mit dem Tagesmittel des Jahres. Die beiden Speicher-Schwellen sind Prozent der Speicherkapazität und gelten für die Entladung je Tag; ohne bekannte Kapazität erscheinen die beiden Felder nicht.": "Almost self-sufficient counts days on which grid import is at most (100 − value) % of consumption. Sunny days need the system size (kWp) on every generator. Dull days compare with the year’s daily average. The two battery thresholds are percentages of the battery capacity and apply to discharge per day; without a known capacity the two boxes do not appear.",
     "Die CSV-Datei lässt sich nicht lesen ({reason}). Sie wurde entfernt.": "The CSV file cannot be read ({reason}). It was removed.",
     "Ein CSV-Import oder eine Vorschau läuft gerade. Bitte warten, bis sie fertig ist.": "A CSV import or preview is running. Please wait until it has finished.",
     "{count} Backup(s) gelöscht, {kept} noch nicht auf das externe Ziel übertragene bleiben liegen.": "{count} backup(s) deleted, {kept} not yet transferred to the external target remain.",
@@ -3797,7 +3796,10 @@
     "Wohin ging die Erzeugung?": "Where did the generation go?",
     "kWh oder Anteile": "kWh or shares",
     "Beste Autarkie im Monat": "Best self-sufficiency in a month",
-    "Längste Serie fast autark": "Longest streak of almost self-sufficient days"
+    "Längste Serie fast autark": "Longest streak of almost self-sufficient days",
+    "Fast autark zählt Tage, an denen der Netzbezug höchstens (100 − Wert) % des Verbrauchs ausmacht. Sonnentage brauchen bei jedem Erzeuger die Anlagenleistung (kWp). Trübe Tage vergleichen mit dem Tagesmittel des Jahres. Die beiden Speicher-Schwellen sind Prozent der Speicherkapazität und gelten für die Entladung je Tag; ohne bekannte Kapazität erscheinen die beiden Felder nicht. „Tage ohne Netzbezug“ zählt Tage mit höchstens 0,1 kWh Netzbezug und hat keine Schwelle zum Einstellen.": "Almost self-sufficient counts days on which grid import is at most (100 − value) % of consumption. Sunny days need the system size (kWp) on every generator. Dull days compare with the year’s daily average. The two battery thresholds are percentages of the battery capacity and apply to discharge per day; without a known capacity the two boxes do not appear. “Days without grid import” counts days with at most 0.1 kWh of grid import and has no threshold to set.",
+    "Hohe Einspeisung über": "High feed-in above",
+    "kWh am Tag": "kWh per day"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4808,6 +4810,12 @@
     "aus eigener Erzeugung": "from own generation",
     "aus dem Netz": "from the grid",
     "selbst genutzt": "used on site",
-    "eingespeist": "fed in"
+    "eingespeist": "fed in",
+    "Einspeisung {feed} kWh": "Feed-in {feed} kWh",
+    "Hohe Einspeisung": "High feed-in",
+    "Netzbezug höchstens 0,1 kWh": "grid import at most 0.1 kWh",
+    "Tage ohne Netzbezug": "Days without grid import",
+    "kein Speicher": "no storage",
+    "mehr als {value} kWh am Tag eingespeist": "more than {value} kWh fed in per day"
   }
 }

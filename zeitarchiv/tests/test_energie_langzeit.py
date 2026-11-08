@@ -461,13 +461,14 @@ def test_kenntage_schwellen_werden_im_setup_gespeichert(client) -> None:
     index.set_setting(ed.SETTING_CONFIG, "")
     antwort = client.post("/energiedashboard/setup", data={
         "netzbezug": "sensor.setup_netz",
-        "kt_autark": "95", "kt_sonnig": "4,5", "kt_truebe": "", "kt_stark": "5", "kt_schwach": "10",
+        "kt_autark": "95", "kt_sonnig": "4,5", "kt_truebe": "", "kt_stark": "5", "kt_schwach": "10", "kt_einsp": "30",
     })
     try:
         assert antwort.status_code == 200
         # Gespeichert wird nur, was gültig ist und von der Vorgabe abweicht: leer, außerhalb der Grenzen und Vorgabe fallen weg.
-        assert ed._load_config(index)["kenntage"] == {"autark": 95.0, "sonnig": 4.5}
+        assert ed._load_config(index)["kenntage"] == {"autark": 95.0, "sonnig": 4.5, "einspeisung": 30.0}
         assert 'name="kt_autark"' in client.get("/energiedashboard/setup").text
+        assert 'name="kt_einsp"' in client.get("/energiedashboard/setup").text
     finally:
         index.set_setting(ed.SETTING_CONFIG, "")
 
@@ -719,12 +720,18 @@ def test_kenntage_je_jahr(service, monkeypatch) -> None:
     einsp[tage[3]] = 20.0                                  # mehr eingespeist als verbraucht (10 + 2 − 20 < 0)
     _tagesreihen(monkeypatch, {"sensor.pv": pv, "sensor.netz": netz, "sensor.einsp": einsp})
     kenntage = service.compute_records(config, NOW)["kenntage"]
-    assert kenntage["available"] == ["fast_autark", "ueberschuss", "truebe"]   # ohne kWp keine Sonnentage, ohne Speicher kein Paar
+    # ohne kWp keine Sonnentage, ohne Speicher kein Paar
+    assert kenntage["available"] == ["fast_autark", "ohne_netz", "ueberschuss", "einspeisung_hoch", "truebe"]
     felder = kenntage["years"][0]["fields"]
     assert kenntage["years"][0]["year"] == 2025
     assert felder["fast_autark"]["hit"] == 2 and felder["fast_autark"]["days"] == 10
     assert felder["truebe"]["hit"] == 1                    # 0,4 kWh sind unter 10 % des Tagesmittels
     assert felder["ueberschuss"]["hit"] == 0               # Verbrauch negativ: unplausibler Tag zählt nicht als „mehr eingespeist“
+    assert felder["ohne_netz"]["hit"] == 1 and felder["ohne_netz"]["days"] == 10   # nur der Tag ohne Netzbezug
+    assert felder["einspeisung_hoch"]["hit"] == 0          # 20 kWh sind nicht „über“ der Vorgabeschwelle von 20 kWh
+    gesenkt = service.compute_records(_config(**{**config, "kenntage": {"einspeisung": 10}}), NOW)["kenntage"]
+    assert gesenkt["years"][0]["fields"]["einspeisung_hoch"]["hit"] == 1
+    assert gesenkt["thresholds"]["einspeisung"] == 10.0
 
 
 def _kenntage_anlage(service, monkeypatch, **extra):
@@ -751,7 +758,7 @@ def _kenntage_anlage(service, monkeypatch, **extra):
 def test_kenntage_sonnentage_und_speicherpaar(service, monkeypatch) -> None:
     config, _tage = _kenntage_anlage(service, monkeypatch)
     kenntage = service.compute_records(config, NOW)["kenntage"]
-    assert kenntage["available"] == ["fast_autark", "sonnig", "truebe", "speicher_stark", "speicher_schwach"]
+    assert kenntage["available"] == ["fast_autark", "ohne_netz", "sonnig", "truebe", "speicher_stark", "speicher_schwach"]
     assert kenntage["kwp"] == 5.0
     felder = kenntage["years"][0]["fields"]
     assert felder["sonnig"]["hit"] == 18 and felder["sonnig"]["days"] == 19   # der 1. September folgt auf einen fehlenden Tag
@@ -773,7 +780,9 @@ def test_kenntage_schwellen_aus_dem_setup(service, monkeypatch) -> None:
     assert felder["speicher_stark"]["hit"] == 0            # 6 kWh Entladung bei 6 kWh Kapazität sind 100 %, nicht 120 %
     assert felder["speicher_schwach"]["hit"] == 0          # 0,5 kWh sind 8 % der Kapazität, nicht unter 5 %
     schwellen = lz.kenntage_thresholds(_config(kenntage={"autark": 3, "sonnig": "x", "truebe": 99, "stark": 7}))
-    assert schwellen == {"autark": 50.0, "sonnig": 4.0, "truebe": 50.0, "speicher_stark": 80.0, "speicher_schwach": 10.0}
+    assert schwellen == {
+        "autark": 50.0, "sonnig": 4.0, "truebe": 50.0, "speicher_stark": 80.0, "speicher_schwach": 10.0, "einspeisung": 20.0,
+    }
 
 
 def test_kenntage_kalender_liefert_die_tage_mit_werten(service, monkeypatch) -> None:

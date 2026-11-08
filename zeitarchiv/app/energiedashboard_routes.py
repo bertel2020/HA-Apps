@@ -3616,6 +3616,7 @@ class EnergieDashboardService:
             kt_truebe: str = Form(""),
             kt_stark: str = Form(""),
             kt_schwach: str = Form(""),
+            kt_einsp: str = Form(""),
             langzeit_zeigen: list[str] = Form([]),
         ) -> HTMLResponse:
             if not netzbezug.strip():
@@ -3631,7 +3632,7 @@ class EnergieDashboardService:
             kenntage: dict[str, float] = {}
             for key, raw in (
                 ("autark", kt_autark), ("sonnig", kt_sonnig), ("truebe", kt_truebe),
-                ("speicher_stark", kt_stark), ("speicher_schwach", kt_schwach),
+                ("speicher_stark", kt_stark), ("speicher_schwach", kt_schwach), ("einspeisung", kt_einsp),
             ):
                 value = _parse_float(raw)
                 low, high = energie_langzeit.KENNTAGE_LIMITS[key]

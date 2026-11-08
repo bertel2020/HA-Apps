@@ -35,6 +35,9 @@
     bis zum heutigen Kalendertag, „Komplett“ zeigt ganze Jahre
   - Zwei neue Rekorde: der Monat mit der besten Autarkie und die längste
     Folge fast autarker Tage
+  - Neue Kenntage: „Tage ohne Netzbezug“ und „Hohe Einspeisung“ (die
+    Schwelle stellst du im Setup ein); Jahre ohne Speicher stehen bei den
+    Speicher-Kenntagen als „kein Speicher“
 
 ### Geändert
 
@@ -88,6 +91,9 @@
     every year up to today's calendar day, "Complete" shows full years
   - Two new records: the month with the best self-sufficiency and the longest
     streak of almost self-sufficient days
+  - New notable days: "Days without grid import" and "High feed-in" (you set
+    the threshold in the setup); years without storage show as "no storage"
+    for the storage-related days
 
 #### Changed
 

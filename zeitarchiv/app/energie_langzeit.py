@@ -104,15 +104,22 @@ CONSUMPTION_MIN = 0.5
 #: Schwellen der Kenntage (Setup des Energiedashboards, leer = Vorgabe): Autarkie ab … %, Sonnentage ab … kWh je kWp,
 #: trübe Tage unter … % des Tagesmittels, Speicher stark genutzt ab … kWh Entladung, kaum genutzt unter … kWh.
 #: 100 % Autarkie kommt ohne großen Speicher praktisch nie vor, deshalb Vorgabe 90.
-KENNTAGE_DEFAULTS = {"autark": 90.0, "sonnig": 4.0, "truebe": 10.0, "speicher_stark": 80.0, "speicher_schwach": 10.0}
+#: Dazu „Einspeisung über … kWh am Tag“ (hohe Einspeisung). „Ohne Netzbezug“ hat keine Schwelle im Setup: NO_GRID_MAX.
+KENNTAGE_DEFAULTS = {
+    "autark": 90.0, "sonnig": 4.0, "truebe": 10.0, "speicher_stark": 80.0, "speicher_schwach": 10.0, "einspeisung": 20.0,
+}
 KENNTAGE_LIMITS = {
     "autark": (50.0, 100.0), "sonnig": (1.0, 8.0), "truebe": (1.0, 50.0),
-    "speicher_stark": (10.0, 300.0), "speicher_schwach": (1.0, 50.0),
+    "speicher_stark": (10.0, 300.0), "speicher_schwach": (1.0, 50.0), "einspeisung": (1.0, 200.0),
 }
+#: Höchster Netzbezug in kWh, den ein Tag „ohne Netzbezug“ haben darf (Zählerrauschen und Standby-Reste).
+NO_GRID_MAX = 0.1
 #: Kenntage in Anzeigereihenfolge: Schlüssel, Gruppe, Rollen, deren Wert der Tag braucht. Die Felder bilden Paare.
 KENNTAGE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("fast_autark", "eigenversorgung", ("netzbezug",)),
+    ("ohne_netz", "eigenversorgung", ("netzbezug",)),
     ("ueberschuss", "eigenversorgung", ("einspeisung",)),
+    ("einspeisung_hoch", "eigenversorgung", ("einspeisung",)),
     ("sonnig", "erzeugung", ("erzeugung",)),
     ("truebe", "erzeugung", ("erzeugung",)),
     ("speicher_stark", "speicher", ("entladung",)),
@@ -225,8 +232,14 @@ def kenntag_hit(
         if day["netzbezug"] is None:
             return None
         return day["verbrauch"] >= CONSUMPTION_MIN and day["netzbezug"] <= day["verbrauch"] * (100 - thresholds["autark"]) / 100 + 1e-9
+    if key == "ohne_netz":
+        if day["netzbezug"] is None:
+            return None
+        return day["verbrauch"] >= CONSUMPTION_MIN and day["netzbezug"] <= NO_GRID_MAX
     if key == "ueberschuss":
         return None if day["einspeisung"] is None else day["einspeisung"] > day["verbrauch"] > 0
+    if key == "einspeisung_hoch":
+        return None if day["einspeisung"] is None else day["einspeisung"] > thresholds["einspeisung"]
     if key == "sonnig":
         return None if day["erzeugung"] is None or not kwp else day["erzeugung"] / kwp >= thresholds["sonnig"]
     if key == "truebe":

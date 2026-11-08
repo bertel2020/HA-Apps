@@ -1131,7 +1131,7 @@
         <label>{{ _("Schwellen der Kenntage") }} {{ hint_button(_('Kenntage-Schwellen')) }}</label>
       </div>
       <p class="settings-section-description">{{ _("Ein leeres Feld verwendet die Vorgabe.") }}</p>
-      {% call hint_body() %}{{ _("Fast autark zählt Tage, an denen der Netzbezug höchstens (100 − Wert) % des Verbrauchs ausmacht. Sonnentage brauchen bei jedem Erzeuger die Anlagenleistung (kWp). Trübe Tage vergleichen mit dem Tagesmittel des Jahres. Die beiden Speicher-Schwellen sind Prozent der Speicherkapazität und gelten für die Entladung je Tag; ohne bekannte Kapazität erscheinen die beiden Felder nicht.") }}{% endcall %}
+      {% call hint_body() %}{{ _("Fast autark zählt Tage, an denen der Netzbezug höchstens (100 − Wert) % des Verbrauchs ausmacht. Sonnentage brauchen bei jedem Erzeuger die Anlagenleistung (kWp). Trübe Tage vergleichen mit dem Tagesmittel des Jahres. Die beiden Speicher-Schwellen sind Prozent der Speicherkapazität und gelten für die Entladung je Tag; ohne bekannte Kapazität erscheinen die beiden Felder nicht. „Tage ohne Netzbezug“ zählt Tage mit höchstens 0,1 kWh Netzbezug und hat keine Schwelle zum Einstellen.") }}{% endcall %}
       {% set kt = config.kenntage or {} %}
       <div class="edash-field-grid">
         <div class="field">
@@ -1153,6 +1153,10 @@
         <div class="field">
           <label>{{ _("Speicher kaum genutzt unter") }}</label>
           {{ number_field('kt_schwach', kt.get('speicher_schwach'), '10', '', _('% der Kapazität')) }}
+        </div>
+        <div class="field">
+          <label>{{ _("Hohe Einspeisung über") }}</label>
+          {{ number_field('kt_einsp', kt.get('einspeisung'), '20', '', _('kWh am Tag')) }}
         </div>
       </div>
     </section>
