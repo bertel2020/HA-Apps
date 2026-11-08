@@ -1200,6 +1200,9 @@
   /* Tabelle Verbraucher × Jahre (Abschnitt unter der Rangliste): Basis .wt-table der Vergleichstabelle (erste Spalte sticky, die
      Jahre scrollen waagerecht), je Feld Hauptzahl, darunter klein der andere Wert und die Änderung zum Vorjahr. */
   .wt-vt-wrap{margin-top:12px;}
+  /* Werte-Menü der Tabelle: zwei Gruppen mit der Überschrift der Menüs (.menu-section-label), Abstand wie die Zeilen. */
+  .wt-vt-menu .menu-section-label{padding:4px 4px 3px;}
+  .wt-vt-menu .wt-vt-menu-sep{margin-top:6px;padding-top:8px;border-top:1px solid var(--border);}
   .wt-table.wt-vt{width:100%;}
   .wt-vt thead th{vertical-align:top;white-space:nowrap;}
   .wt-vt thead th small{display:block;font-weight:400;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}

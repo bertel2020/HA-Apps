@@ -13,6 +13,8 @@
     steht als „Übrige (Grundlast)“
   - „Verbraucher × Jahre“: Tabelle unter der Rangliste mit der Änderung zum
     Vorjahr, sortierbar nach jedem Jahr; der Stichtag gilt wie dort
+    - Spalten (Jahre), Hauptwert (Anteil oder kWh) und Änderung (Aus, % oder
+      kWh) wählbar; Auswahl und Sortierung merkt sich der Browser
   - „Anteile je Jahr“: ein gestapelter Balken je Jahr, in Prozent oder kWh
   - „Jahre × Monate je Verbraucher“: die Matrix aus „Summen“ für einen
     gewählten Verbraucher; ein Klick auf ein Feld öffnet den Monat
@@ -32,6 +34,8 @@
     remainder is shown as "Other (base load)"
   - "Consumers × years": table below the ranking with the change from the
     previous year, sortable by any year; the reference date applies as there
+    - Selectable columns (years), main value (share or kWh) and change (off,
+      % or kWh); the browser remembers the selection and sorting
   - "Shares per year": one stacked bar per year, in percent or kWh
   - "Years × months per consumer": the matrix from "Totals" for a selected
     consumer; a click on a cell opens that month

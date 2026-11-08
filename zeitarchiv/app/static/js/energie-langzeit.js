@@ -162,19 +162,32 @@
     return {year, inWindow, prevYear, entries, total, totalPrev, measured, measuredPrev, limit};
   }
 
-  // Änderung zum Vorjahr als Pfeil mit Prozent, darunter die kWh (withKwh) oder der Grund für „–“.
-  function rankDelta(entry, withKwh = true) {
+  // Änderung zum Vorjahr als Pfeil mit Prozent (unit 'pct') oder kWh (unit 'kwh'), darunter die kWh (withKwh) oder der
+  // Grund für „–“.
+  function rankDelta(entry, {withKwh = true, unit = 'pct'} = {}) {
     if (entry.delta == null) {
       return `<span class="wt-dl">–</span>${entry.note ? `<small>${escapeHtml(entry.note)}</small>` : ''}`;
     }
     const percent = entry.prev ? entry.delta / entry.prev * 100 : null;
-    const zero = percent != null ? Math.round(Math.abs(percent)) === 0 : Math.round(Math.abs(entry.delta) * 10) === 0;
+    const byPct = unit === 'pct' && percent != null;
+    const zero = byPct ? Math.round(Math.abs(percent)) === 0 : Math.round(Math.abs(entry.delta) * 10) === 0;
     const cls = zero ? '' : (entry.delta > 0 ? ' wt-dl-bad' : ' wt-dl-good');
-    let head = zero ? '± 0 %' : (entry.delta > 0 ? '▲' : '▼');
-    if (!zero && percent != null) head += ` ${entry.delta > 0 ? '+' : '−'}${num(Math.abs(percent), 0)} %`;
     const sign = zero ? '±' : (entry.delta > 0 ? '+' : '−');
-    const kwh = withKwh ? `<small>${escapeHtml(`${sign}${kwhText(Math.abs(entry.delta))} kWh`)}</small>` : '';
+    const kwhAbs = `${sign}${kwhText(Math.abs(entry.delta))} kWh`;
+    let head;
+    if (unit === 'kwh') head = zero ? '± 0 kWh' : `${entry.delta > 0 ? '▲' : '▼'} ${kwhAbs}`;
+    else {
+      head = zero ? '± 0 %' : (entry.delta > 0 ? '▲' : '▼');
+      if (!zero && percent != null) head += ` ${sign}${num(Math.abs(percent), 0)} %`;
+    }
+    const kwh = withKwh ? `<small>${escapeHtml(kwhAbs)}</small>` : '';
     return `<span class="wt-dl${cls}">${escapeHtml(head)}</span>${kwh}`;
+  }
+
+  // Änderungszeile eines Tabellenfelds: chg 'off' zeigt nur den Grund für eine fehlende Änderung („neu ab …“).
+  function tableDelta(entry, chg) {
+    if (chg !== 'off') return rankDelta(entry, {withKwh: false, unit: chg});
+    return entry.delta == null && entry.note ? `<small>${escapeHtml(entry.note)}</small>` : '';
   }
 
   // Die Änderung als kurzer Text für Tooltips („+120 kWh“).
@@ -319,8 +332,9 @@
 
   // Tabelle Verbraucher × Jahre, ältestes Jahr links. Jede Spalte ist die Rangliste ihres Jahres
   // (consumerRank): das Jahr des Stichtags bis zum Stichtag gegen dasselbe Stück des Vorjahres, die Jahre davor ganz.
-  // years: neueste zuerst; sort: {year, dir}; mode 'pct' oder 'kwh' bestimmt die Hauptzahl, der andere Wert steht klein darunter.
-  function sharesTableHtml(data, years, mode, sort, selected, limit = 0) {
+  // years: neueste zuerst; sort: {year, dir}; main 'pct' oder 'kwh' bestimmt die Hauptzahl, der andere Wert steht klein darunter;
+  // chg 'off', 'pct' oder 'kwh' die Änderungszeile.
+  function sharesTableHtml(data, years, {main, chg}, sort, selected, limit = 0) {
     const cols = [...years].reverse();
     const ranks = {};
     for (const year of cols) ranks[year] = consumerRank(data, year, limit);
@@ -328,7 +342,7 @@
     const hasPrev = (year) => (data.years || []).includes(year - 1);
     const firstYear = partialFirstYear(data);
     const until = fmtDate(formats.dm, data.window.cur.end - 1);
-    const pct = mode === 'pct';
+    const pct = main === 'pct';
     const pctText = (value) => `${num(value, 1)} %`;
     const rows = consumerRows(data);
     const list = rows.filter((item) => !item.rest);
@@ -382,7 +396,7 @@
         html += `<td class="wt-vt-c${sorted(year)}" data-tooltip-fixed="${escapeHtml(tip)}">`
           + `<span class="wt-vt-main">${warn}${escapeHtml(pct ? shareText : kwhText(entry.cur))}</span>`
           + `<span class="wt-vt-sub">${escapeHtml(pct ? `${kwhText(entry.cur)} kWh` : shareText)}</span>`
-          + `${hasPrev(year) ? rankDelta(entry, false) : ''}</td>`;
+          + `${hasPrev(year) ? tableDelta(entry, chg) : ''}</td>`;
       }
       html += '</tr>';
     }
@@ -401,7 +415,7 @@
       html += `<td class="${sorted(year).trim()}" data-tooltip-fixed="${escapeHtml(`${t('Verbrauch (Bilanz)')} ${label}: ${energy(rank.total)}`)}">`
         + `<span class="wt-vt-main">${escapeHtml(pct ? '100 %' : kwhText(rank.total))}</span>`
         + `<span class="wt-vt-sub">${escapeHtml(pct ? `${kwhText(rank.total)} kWh` : '100 %')}</span>`
-        + `${hasPrev(year) ? rankDelta(sum, false) : ''}</td>`;
+        + `${hasPrev(year) && chg !== 'off' ? rankDelta(sum, {withKwh: false, unit: chg}) : ''}</td>`;
     }
     html += `</tr><tr class="wt-vt-cov"><th scope="row">${escapeHtml(t('Gemessen'))}</th>`;
     for (const year of cols) {
@@ -419,12 +433,14 @@
   }
 
   // Fußzeile der Tabelle: Sortierung, Änderung und die Teiljahre, soweit sie in der Tabelle stehen.
-  function sharesTableFoot(data, years, sort) {
+  function sharesTableFoot(data, years, sort, chg) {
     const parts = [
       sort.dir === 'desc' ? t('Sortiert nach {year}, größter zuerst.', {year: sort.year}) : t('Sortiert nach {year}, kleinster zuerst.', {year: sort.year}),
       t('Ein Klick auf einen Jahreskopf sortiert nach diesem Jahr, ein zweiter dreht die Reihenfolge. „Übrige (Grundlast)“ und die Summen stehen immer unten.'),
-      t('Die Änderung zum Vorjahr ist in kWh gerechnet; rot: mehr Verbrauch, grün: weniger, „–“ mit Grund, wenn das Vorjahr nicht ganz erfasst ist.'),
     ];
+    if (chg !== 'off') {
+      parts.push(t('Die Änderung zum Vorjahr ist in kWh gerechnet; rot: mehr Verbrauch, grün: weniger, „–“ mit Grund, wenn das Vorjahr nicht ganz erfasst ist.'));
+    }
     if (years.includes(data.window.year)) {
       parts.push(t('{year} zählt bis {date} und vergleicht mit demselben Stück des Vorjahres.', {year: data.window.year, date: fmtDate(formats.dm, data.window.cur.end - 1)}));
     }
@@ -473,9 +489,13 @@
       // Gewähltes Jahr der Rangliste; null = das Jahr des Stichtags (folgt dann der Stichtag-Leiste).
       rankYearSel: null,
       sharesMode: 'pct',
-      // Tabelle „Verbraucher × Jahre“: sortiert nach einem Jahr (null = dem neuesten).
+      // Tabelle „Verbraucher × Jahre“: sortiert nach einem Jahr (null = dem neuesten); Spalten als Liste von Jahren
+      // (null = die Jahre laut Leiste „Jahre“), Hauptwert 'pct'/'kwh', Änderung zum Vorjahr 'off'/'pct'/'kwh'.
       sharesSortYear: null,
       sharesSortDir: 'desc',
+      tblCols: null,
+      tblMain: 'pct',
+      tblChg: 'pct',
       // Hervorgehobener Verbraucher (Schlüssel aus langzeit/consumers, „rest“ für Übrige) oder null.
       pick: null,
       // Verbraucher der Matrix „Jahre × Monate je Verbraucher“ (null = der erste).
@@ -486,6 +506,14 @@
         if (hasConsumers && (saved.view === 'sum' || saved.view === 'verb')) this.lzView = saved.view;
         if (saved.rankSort === 'kwh' || saved.rankSort === 'chg') this.rankSort = saved.rankSort;
         if (saved.sharesMode === 'pct' || saved.sharesMode === 'kwh') this.sharesMode = saved.sharesMode;
+        // Jahre ohne Daten fallen erst beim Zeichnen weg (sharesTableYears), wenn die Jahre des Archivs bekannt sind.
+        if (Array.isArray(saved.tblCols) && saved.tblCols.length && saved.tblCols.every(Number.isInteger)) this.tblCols = saved.tblCols;
+        if (saved.tblMain === 'pct' || saved.tblMain === 'kwh') this.tblMain = saved.tblMain;
+        if (['off', 'pct', 'kwh'].includes(saved.tblChg)) this.tblChg = saved.tblChg;
+        if (saved.tblSort && Number.isInteger(saved.tblSort.year) && ['asc', 'desc'].includes(saved.tblSort.dir)) {
+          this.sharesSortYear = saved.tblSort.year;
+          this.sharesSortDir = saved.tblSort.dir;
+        }
         if (Array.isArray(saved.columns)) this.columns = COLUMN_KEYS.filter((key) => saved.columns.includes(key));
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
@@ -593,7 +621,6 @@
         this.sharesMode = mode;
         writeStore({sharesMode: mode});
         this.drawShares();
-        this.drawSharesTable();
       },
 
       sharesNote() {
@@ -603,10 +630,47 @@
       },
 
       sharesTableNote() {
-        const text = this.sharesMode === 'pct'
+        const text = this.tblMain === 'pct'
           ? t('Je Feld der Anteil am Verbrauch des Jahres laut Bilanz, darunter die kWh und die Änderung zum Vorjahr.')
           : t('Je Feld die kWh des Jahres, darunter der Anteil am Verbrauch laut Bilanz und die Änderung zum Vorjahr.');
-        return `${text} ${t('Jede Spalte ist die Rangliste ihres Jahres: Es gilt der Stichtag oben, das Jahr des Stichtags zählt bis zu diesem Tag.')}`;
+        return [
+          text,
+          t('Jede Spalte ist die Rangliste ihres Jahres: Es gilt der Stichtag oben, das Jahr des Stichtags zählt bis zu diesem Tag.'),
+          t('„Spalten“ wählt die Jahre; Voreinstellung sind die Jahre der Leiste „Jahre“, eine Änderung dort setzt die Auswahl zurück. Das zweite Menü wählt Hauptwert und Änderung zum Vorjahr. Auswahl und Sortierung merkt sich der Browser.'),
+        ].join(' ');
+      },
+
+      // Jahre für das Menü „Spalten“: alle Jahre bis zum Stichtag, unabhängig von der Leiste „Jahre“.
+      sharesTableOptions() {
+        return this.pastYears();
+      },
+
+      // Ein Jahr an- oder abwählen; das letzte gewählte bleibt (das Kästchen ist dann gesperrt).
+      toggleTableYear(year) {
+        const current = this.sharesTableYears();
+        if (current.includes(year) && current.length === 1) return;
+        const next = current.includes(year) ? current.filter((y) => y !== year) : [...current, year];
+        this.tblCols = this.sharesTableOptions().map((option) => option.year).filter((y) => next.includes(y));
+        writeStore({tblCols: this.tblCols});
+        this.drawSharesTable();
+      },
+
+      setTableMain(main) {
+        this.tblMain = main;
+        writeStore({tblMain: main});
+        this.drawSharesTable();
+      },
+
+      setTableChg(chg) {
+        this.tblChg = chg;
+        writeStore({tblChg: chg});
+        this.drawSharesTable();
+      },
+
+      tableValueLabel() {
+        const main = this.tblMain === 'pct' ? t('Anteil') : t('kWh');
+        const chg = {off: t('Vorjahr: Aus'), pct: t('Vorjahr in %'), kwh: t('Vorjahr in kWh')}[this.tblChg];
+        return `${main} · ${chg} ▾`;
       },
 
       drawShares() {
@@ -620,9 +684,13 @@
         if (this.$refs.sharesLegend) this.$refs.sharesLegend.innerHTML = sharesLegendHtml(data, this.pick);
       },
 
-      // Jahre der Tabelle: wie in der Rangliste bis zum Jahr des Stichtags, so viele wie in der Leiste „Jahre“ gewählt.
+      // Jahre der Tabelle (neueste zuerst): die im Menü „Spalten“ gewählten, soweit es sie bis zum Stichtag gibt; sonst wie in
+      // der Rangliste so viele wie in der Leiste „Jahre“ gewählt.
       sharesTableYears() {
-        return this.rankYears().map((option) => option.year);
+        const preset = this.rankYears().map((option) => option.year);
+        if (!this.tblCols) return preset;
+        const chosen = this.pastYears().map((option) => option.year).filter((year) => this.tblCols.includes(year));
+        return chosen.length ? chosen : preset;
       },
 
       // Sortierung der Tabelle; ein Jahr, das nicht mehr gezeigt wird, fällt auf das neueste zurück.
@@ -647,8 +715,8 @@
           return;
         }
         const sort = this.sharesSort();
-        table.innerHTML = sharesTableHtml(data, years, this.sharesMode, sort, this.matrixKey(), this.yearLimit);
-        if (this.$refs.sharesTableFoot) this.$refs.sharesTableFoot.textContent = sharesTableFoot(data, years, sort);
+        table.innerHTML = sharesTableHtml(data, years, {main: this.tblMain, chg: this.tblChg}, sort, this.matrixKey(), this.yearLimit);
+        if (this.$refs.sharesTableFoot) this.$refs.sharesTableFoot.textContent = sharesTableFoot(data, years, sort, this.tblChg);
         // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
         const wrap = this.$refs.sharesTableWrap;
         if (wrap) requestAnimationFrame(() => wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1));
@@ -665,6 +733,7 @@
           if (year === sort.year) this.sharesSortDir = sort.dir === 'desc' ? 'asc' : 'desc';
           else this.sharesSortDir = 'desc';
           this.sharesSortYear = year;
+          writeStore({tblSort: {year, dir: this.sharesSortDir}});
           this.drawSharesTable();
           return;
         }
@@ -770,15 +839,20 @@
         if (scale) scale.style.background = `linear-gradient(90deg, ${colors.bad}, ${colors.base}, ${colors.good})`;
       },
 
-      // Jahre der Rangliste: vom Jahr des Stichtags zurück bis zum Beginn des Archivs.
-      rankYears() {
+      // Alle Jahre vom Jahr des Stichtags zurück bis zum Beginn des Archivs, mit Beschriftung.
+      pastYears() {
         const data = this.consumers;
         if (!data || !data.years) return [];
         const until = fmtDate(formats.dm, data.window.cur.end - 1);
-        const past = data.years.filter((year) => year <= data.window.year);
-        return (this.yearLimit ? past.slice(0, this.yearLimit) : past).map((year) => ({
+        return data.years.filter((year) => year <= data.window.year).map((year) => ({
           year, label: year === data.window.year ? t('{year} bis {date}', {year, date: until}) : String(year),
         }));
+      },
+
+      // Jahre der Rangliste: so viele wie in der Leiste „Jahre“ gewählt.
+      rankYears() {
+        const past = this.pastYears();
+        return this.yearLimit ? past.slice(0, this.yearLimit) : past;
       },
 
       rankYear() {
@@ -845,7 +919,9 @@
 
       setYearLimit(value) {
         this.yearLimit = value;
-        writeStore({yearLimit: value});
+        // Die Spalten von „Verbraucher × Jahre“ fallen auf die neue Voreinstellung zurück.
+        this.tblCols = null;
+        writeStore({yearLimit: value, tblCols: null});
         this.drawMonthly();
         this.drawMatrix();
         this.drawKenntage();
