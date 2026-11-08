@@ -508,18 +508,19 @@ def test_bereiche_des_reiters_werden_im_setup_gespeichert_und_nicht_gerendert(cl
     try:
         alles = client.post("/energiedashboard/setup", data={
             "netzbezug": "sensor.setup_netz",
-            "langzeit_zeigen": ["quoten", "speicher", "pv", "verbraucher", "jahresbilanz", "monatsvergleich", "matrix", "rekorde", "kenntage", "tagfuertag"],
+            "langzeit_zeigen": ["quoten", "speicher", "pv", "verbraucher", "jahresbilanz", "monatsvergleich", "matrix", "rekorde", "kenntage", "tagfuertag", "wetter"],
         })
         assert ed._load_config(index)["langzeit_ausblenden"] == []
         assert 'x-ref="monthlyChart"' in alles.text and 'x-ref="kenntage"' in alles.text and 'x-ref="jbBars"' in alles.text and 'x-ref="dayChart"' in alles.text
+        assert 'x-ref="wxChart"' in alles.text
 
         wenig = client.post("/energiedashboard/setup", data={
             "netzbezug": "sensor.setup_netz", "langzeit_zeigen": ["quoten", "rekorde"],
         })
         assert ed._load_config(index)["langzeit_ausblenden"] == [
-            "speicher", "pv", "jahresbilanz", "monatsvergleich", "matrix", "kenntage", "tagfuertag", "verbraucher",
+            "speicher", "pv", "jahresbilanz", "monatsvergleich", "matrix", "kenntage", "tagfuertag", "verbraucher", "wetter",
         ]
-        for ref in ('x-ref="monthlyChart"', 'x-ref="matrixTable"', 'x-ref="kenntage"', 'x-ref="jbBars"', 'x-ref="dayChart"'):
+        for ref in ('x-ref="monthlyChart"', 'x-ref="matrixTable"', 'x-ref="kenntage"', 'x-ref="jbBars"', 'x-ref="dayChart"', 'x-ref="wxChart"'):
             assert ref not in wenig.text, ref
         assert "el-rec-big" in wenig.text                                  # die Rekorde sind angehakt geblieben
         assert 'x-ref="table"' in wenig.text                              # die Tabelle gibt es immer
@@ -1142,3 +1143,144 @@ def test_consumers_route(client) -> None:
         assert client.post("/energiedashboard/langzeit/consumers", json={"at": "quatsch"}).status_code == 400
     finally:
         index.set_setting(ed.SETTING_CONFIG, "")
+
+
+# -- Ertrag und Wetter ----------------------------------------------------------------------------
+
+
+def _sonnentage(tage: dict):
+    """Ersatz für die Sonnentage des Wetterdashboards: {date: Sonnenstunden}."""
+    return lambda now: [{"date": tag, "hours": stunden} for tag, stunden in sorted(tage.items())]
+
+
+def _tage_ab(jahr: int, monat: int, anzahl: int):
+    from datetime import date, timedelta
+
+    return [date(jahr, monat, 1) + timedelta(days=i) for i in range(anzahl)]
+
+
+def test_ertrag_je_sonnenstunde_ist_summe_erzeugung_durch_summe_sonnenstunden_der_gemeinsamen_tage(service, monkeypatch) -> None:
+    config = _zwei_zaehler(service, _monat(2025, 7))
+    juli = _tage_ab(2025, 7, 20)
+    pv = {tag: 10.0 for tag in juli}
+    pv.update({tag: 4.0 for tag in _tage_ab(2025, 9, 20)})
+    netz = {tag: 2.0 for tag in pv}
+    _tagesreihen(monkeypatch, {"sensor.pv": pv, "sensor.netz": netz})
+    sonne = {tag: 5.0 for tag in juli}                                          # 10 kWh in 5 h = 2,0 kWh/h
+    sonne.update({tag: 2.0 for tag in _tage_ab(2025, 9, 20)})                   # 4 kWh in 2 h = 2,0 kWh/h
+    sonne.update({tag: None for tag in _tage_ab(2025, 7, 20)[:3]})              # ohne Sonnenwert zählt der Tag nicht
+    service.sun_days = _sonnentage(sonne)
+    service.temperature_entity = lambda: ""
+    daten = service.compute_weather(config, NOW)
+    assert daten["sun"] is True and daten["unit"] == "kWh/h"
+    jahre = daten["yield"]["years"]
+    assert jahre["2025"][6] == pytest.approx(2.0)
+    assert jahre["2025"][8] == pytest.approx(0.0 + 2.0)                         # 20 Tage, 40 Stunden Sonne: Grenze erreicht
+    assert jahre["2025"][7] is None                                             # kein Monat ohne Daten
+    assert daten["temperature"] == {
+        "available": False, "configured": False, "unit": "°C", "sizes": [], "min_days": lz.TEMPERATURE_MIN_DAYS,
+    }
+
+
+def test_ertrag_je_sonnenstunde_laesst_monate_mit_zu_wenigen_tagen_oder_zu_wenig_sonne_aus(service, monkeypatch) -> None:
+    config = _zwei_zaehler(service, _monat(2025, 7))
+    zu_kurz = _tage_ab(2025, 7, lz.YIELD_MIN_DAYS - 1)
+    dunkel = _tage_ab(2025, 9, 20)
+    pv = {tag: 3.0 for tag in zu_kurz + dunkel}
+    _tagesreihen(monkeypatch, {"sensor.pv": pv, "sensor.netz": {tag: 1.0 for tag in pv}})
+    sonne = {tag: 5.0 for tag in zu_kurz}
+    sonne.update({tag: 0.5 for tag in dunkel})                                  # 10 Stunden: unter der Mindestsonne
+    service.sun_days = _sonnentage(sonne)
+    assert service.compute_weather(config, NOW)["yield"] is None
+
+
+def test_ertrag_ohne_helligkeit_oder_erzeugung_entfaellt_und_die_temperatur_bleibt_unabhaengig(service, monkeypatch) -> None:
+    config = _zwei_zaehler(service, _monat(2025, 7))
+    ohne = service.compute_weather(config, NOW)                                  # kein Wetterdashboard angebunden
+    assert ohne["sun"] is False and ohne["yield"] is None
+    service.sun_days = lambda now: None
+    assert service.compute_weather(config, NOW)["sun"] is False
+    service.sun_days = _sonnentage({})
+    service.temperature_entity = lambda: "sensor.aussen"                         # nicht archiviert
+    assert service.compute_weather(config, NOW)["temperature"]["available"] is False
+    _archiv(service, "sensor.aussen", _monat(2025, 7))
+    verfuegbar = service.compute_weather(config, NOW)
+    assert verfuegbar["temperature"]["available"] is True
+    assert [g["key"] for g in verfuegbar["temperature"]["sizes"]] == ["r:verbrauch", "r:netzbezug"]
+
+
+def _temperatur_service(service, monkeypatch, temperatur: dict, verbrauch: dict, abgedeckt=None):
+    from types import SimpleNamespace
+
+    service.index.get_or_create_entity("sensor.aussen", "sensor", "measurement", "°C")
+    service.index.set_first_ts_and_add_rows("sensor.aussen", _monat(2026, 7), 0)
+    _archiv(service, "sensor.waerme", _monat(2026, 7))
+    service.temperature_entity = lambda: "sensor.aussen"
+    config = _config(netzbezug="sensor.waerme", verbraucher=[{"entity_id": "sensor.waerme", "name": "Wärme"}])
+    abgedeckt = abgedeckt or set()
+
+    def reihe(data_dir, index, entity_id, start, end, tz, now_local, read_cache=None):
+        quelle = temperatur if entity_id == "sensor.aussen" else verbrauch
+        return [
+            SimpleNamespace(
+                day_start=datetime(tag.year, tag.month, tag.day, tzinfo=tz).timestamp(), value=wert,
+                covered=tag not in abgedeckt,
+            )
+            for tag, wert in sorted(quelle.items())
+            if start <= datetime(tag.year, tag.month, tag.day, tzinfo=tz) < end
+        ]
+    monkeypatch.setattr(lz.query_mod, "query_daily_series", reihe)
+    return config
+
+
+def test_temperaturdiagramm_nimmt_tage_mit_beiden_werten_ohne_heute_und_den_archivbeginn(service, monkeypatch) -> None:
+    tage = _tage_ab(2026, 7, 50)
+    temperatur = {tag: 20.0 - i * 0.5 for i, tag in enumerate(tage)}
+    verbrauch = {tag: 5.0 + i * 0.1 for i, tag in enumerate(tage)}
+    verbrauch.pop(tage[10])                                                      # kein Wert: der Tag fehlt
+    config = _temperatur_service(service, monkeypatch, temperatur, verbrauch, abgedeckt={tage[11]})
+    daten = service.compute_temperature_days(config, "c:sensor.waerme", NOW)
+    assert daten["label"] == "Wärme" and daten["unit"] == "kWh" and daten["temperature_unit"] == "°C"
+    gezeigt = [entry[0] for entry in daten["days"]]
+    assert "2026-07-11" not in gezeigt and "2026-07-12" not in gezeigt          # kein Verbrauch, Temperatur nicht abgedeckt
+    assert "2026-08-20" not in gezeigt                                           # heute zählt nicht
+    assert daten["days"][0] == ["2026-07-02", 19.5, 5.1]                        # der erste Tag des Verbrauchers ist ein halber
+    assert daten["years"] == [2026] and daten["enough"] is True
+    assert service.compute_temperature_days(config, "r:netzbezug", NOW)["label"] == "Netzbezug"
+
+
+def test_temperaturdiagramm_meldet_zu_wenige_tage_und_lehnt_unbekannte_groessen_ab(service, monkeypatch) -> None:
+    tage = _tage_ab(2026, 7, 5)
+    config = _temperatur_service(service, monkeypatch, {t: 10.0 for t in tage}, {t: 3.0 for t in tage})
+    assert service.compute_temperature_days(config, "c:sensor.waerme", NOW)["enough"] is False
+    with pytest.raises(ValueError):
+        service.compute_temperature_days(config, "c:sensor.gibtsnicht", NOW)
+    with pytest.raises(ValueError):
+        service.compute_temperature_days(_config(), "r:verbrauch", NOW)           # ohne Temperatur und Rollen
+
+
+def test_weather_und_temperature_routen(client) -> None:
+    from app.main import index
+
+    index.set_setting(ed.SETTING_CONFIG, "")
+    assert client.get("/energiedashboard/langzeit/weather").status_code == 409
+    assert client.get("/energiedashboard/langzeit/temperature?size=r:verbrauch").status_code == 409
+    ed._save_config(index, _config(netzbezug="sensor.langzeit_test_netz"))
+    try:
+        antwort = client.get("/energiedashboard/langzeit/weather")
+        assert antwort.status_code == 200
+        daten = antwort.json()
+        assert daten["sun"] is False and daten["yield"] is None and daten["temperature"]["available"] is False
+        assert client.get("/energiedashboard/langzeit/temperature?size=r:verbrauch").status_code == 422
+    finally:
+        index.set_setting(ed.SETTING_CONFIG, "")
+
+
+def test_wetterdashboard_stellt_temperatur_und_sonnentage_nur_im_eingeschalteten_zustand_bereit(service) -> None:
+    from app import wetter_routes as wr
+
+    index = service.index
+    wr._save_config(index, {**wr._empty_config(), "temperature": "sensor.aussen", "illuminance": "sensor.lux"})
+    assert wr.temperature_entity(index) == ""                                    # Wetterdashboard aus
+    index.set_setting(wr.SETTING_ENABLED, "1")
+    assert wr.temperature_entity(index) == "sensor.aussen"

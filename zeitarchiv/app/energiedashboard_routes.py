@@ -545,7 +545,16 @@ class EnergieDashboardService:
             deps.data_dir, deps.index, deps.tz, entity_series=self._entity_series,
             radiation_entity=lambda: wetter_routes.radiation_entity(deps.index),
             storage_capacity=self._storage_capacity,
+            sun_days=self._wetter_sun_days,
+            temperature_entity=lambda: wetter_routes.temperature_entity(deps.index),
         )
+
+    #: Der Wetter-Dienst entsteht in main.py nach diesem Dienst und wird dort nachgereicht (wie ``_background.energiedashboard_service``).
+    wetter: wetter_routes.WetterService | None = None
+
+    def _wetter_sun_days(self, now: datetime) -> list[dict] | None:
+        """Sonnentage des Wetterdashboards für „Ertrag und Wetter“ (Reiter „Langzeit“); None ohne Wetterdienst oder Helligkeit."""
+        return self.wetter.archive_sun_days(now) if self.wetter is not None else None
 
     def _storage_capacity(self, config: dict) -> float | None:
         """Summe der Kapazität aller Speicher mit Entlade-Entität in kWh (für die Kenntage im Reiter „Langzeit“); None, wenn sie
@@ -4017,6 +4026,26 @@ class EnergieDashboardService:
             if field not in energie_langzeit.DAY_FIELDS:
                 raise HTTPException(status_code=422, detail=tr("Unbekannte Größe: {value}", value=field))
             return self.langzeit.compute_day_matrix(config, field)
+
+        @router.get("/energiedashboard/langzeit/weather")
+        def energiedashboard_langzeit_weather() -> dict:
+            # Karte „Ertrag und Wetter“ (Reiter „Langzeit“): Erzeugung je Sonnenstunde je Monat und Jahr und die Größen, die sich
+            # gegen die Außentemperatur auftragen lassen. Helligkeit und Temperatur stammen aus dem Wetterdashboard.
+            config = _load_config(deps.index)
+            if not energie_langzeit.is_configured(config):
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
+            return self.langzeit.compute_weather(config)
+
+        @router.get("/energiedashboard/langzeit/temperature")
+        def energiedashboard_langzeit_temperature(size: str) -> dict:
+            # Tage mit Außentemperatur und Tageswert einer Größe (Streudiagramm „Verbrauch gegen Temperatur“).
+            config = _load_config(deps.index)
+            if not energie_langzeit.is_configured(config):
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
+            try:
+                return self.langzeit.compute_temperature_days(config, size)
+            except ValueError:
+                raise HTTPException(status_code=422, detail=tr("Unbekannte Größe: {value}", value=size)) from None
 
         @router.post("/energiedashboard/langzeit/changes")
         def energiedashboard_langzeit_changes(body: energie_langzeit.TableRequest) -> dict:

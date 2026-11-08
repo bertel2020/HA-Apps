@@ -57,7 +57,7 @@ COLUMN_WINDOWS = {
 #: Verbrauchs“ aus, „matrix“ und „monatsvergleich“ sind die beiden Darstellungen (Tabelle, Linien) der Karte mit den Monatswerten.
 #: Der Block „energie“ bleibt immer, sonst wäre die Tabelle leer.
 TABLE_BLOCKS = ("energie", "quoten", "speicher", "pv")
-CARD_BLOCKS = ("jahresbilanz", "monatsvergleich", "matrix", "rekorde", "kenntage", "tagfuertag", "verbraucher")
+CARD_BLOCKS = ("jahresbilanz", "monatsvergleich", "matrix", "rekorde", "kenntage", "tagfuertag", "verbraucher", "wetter")
 BLOCK_BY_GROUP = {"Energie": "energie", "Quoten": "quoten", "Speicher": "speicher", "PV-Anlage, wetterbereinigt": "pv"}
 
 
@@ -131,6 +131,13 @@ DAY_FIELDS = ("erzeugung", "verbrauch", "netzbezug")
 DAY_SCALE_PERCENTILE = 0.99
 #: Lebensdauer des Tage-Zwischenspeichers (der Kalender liest dieselben Tage noch einmal).
 DAYS_CACHE_SECONDS = 300
+
+#: Ertrag je Sonnenstunde: Ein Monat zählt ab so vielen Tagen mit Erzeugung und Sonnenstunden, und die Sonnenstunden dieser Tage
+#: müssen für einen Quotienten reichen (im Winter sind es wenige, ein paar Minuten Sonne ergäben Ausreißer).
+YIELD_MIN_DAYS = 10
+YIELD_MIN_SUN_HOURS = 20.0
+#: Verbrauch gegen Außentemperatur: unter so vielen Tagen mit beiden Werten bleibt das Diagramm leer.
+TEMPERATURE_MIN_DAYS = 30
 #: Verbraucher der Veränderungsliste (nach Betrag der Änderung).
 CHANGES_LIMIT = 8
 #: Rekordzeilen: Schlüssel, Rolle (Verbrauch rechnet sich aus der Bilanz), Beschriftung.
@@ -345,6 +352,8 @@ class EnergieLangzeitService:
         entity_series: Callable[..., tuple[dict[float, float], bool]] | None = None,
         radiation_entity: Callable[[], str] | None = None,
         storage_capacity: Callable[[dict], float | None] | None = None,
+        sun_days: Callable[[datetime], list[dict] | None] | None = None,
+        temperature_entity: Callable[[], str] | None = None,
     ) -> None:
         self.data_dir = data_dir
         self.index = index
@@ -357,10 +366,18 @@ class EnergieLangzeitService:
         #: config -> Summe der Speicherkapazität in kWh (None, wenn sie nicht bei jedem Speicher bekannt ist). Ohne sie entfällt
         #: das Speicherpaar der Kenntage.
         self.storage_capacity = storage_capacity
+        #: now -> Sonnentage der abgeschlossenen Tage aus dem Wetterdashboard (Einträge mit ``date`` und ``hours``); None, wenn dort
+        #: keine Helligkeit zugeordnet ist. Ohne sie entfällt der Ertrag je Sonnenstunde.
+        self.sun_days = sun_days
+        #: Entität der Außentemperatur aus dem Wetterdashboard (leer, wenn keine zugeordnet ist). Ohne sie entfällt das Diagramm
+        #: Verbrauch gegen Temperatur.
+        self.temperature_entity = temperature_entity
         #: (Schlüssel, Zeitpunkt, Tage): die Tageswerte, die der Jahreskalender der Kenntage nach den Kenntagen noch einmal braucht.
         self._days_cache: tuple[tuple, float, list[dict]] | None = None
         #: Wie _days_cache, für die Jahressummen der Jahresbilanz.
         self._years_cache: tuple[tuple, float, dict] | None = None
+        #: Wie _days_cache, für die Sonnentage des Wetterdashboards (das Lesen der Helligkeit über alle Jahre ist teuer).
+        self._sun_cache: tuple[date, float, list[dict] | None] | None = None
 
     def _rows(
         self, entity_id: str, start: datetime, end: datetime, now_local: datetime,
@@ -972,6 +989,137 @@ class EnergieLangzeitService:
             top = shown[min(len(shown) - 1, int(DAY_SCALE_PERCENTILE * len(shown)))]
             out["min"], out["max"] = 0.0, max(round(top, 1), 1.0)
         return out
+
+    # -- Ertrag und Wetter ------------------------------------------------------------------
+
+    def _sun_days_cached(self, now_local: datetime) -> list[dict] | None:
+        """sun_days mit kurzem Zwischenspeicher (gleicher Tag); None, wenn das Wetterdashboard keine Helligkeit kennt."""
+        if self.sun_days is None:
+            return None
+        cached = self._sun_cache
+        if cached and cached[0] == now_local.date() and time.monotonic() - cached[1] < DAYS_CACHE_SECONDS:
+            return cached[2]
+        days = self.sun_days(now_local)
+        self._sun_cache = (now_local.date(), time.monotonic(), days)
+        return days
+
+    def temperature_sizes(self, config: dict) -> list[dict]:
+        """Größen, die sich gegen die Außentemperatur auftragen lassen: der Verbrauch laut Bilanz, der Netzbezug und die
+        Verbraucher der obersten Ebene. Schlüssel wie in der Auswahl der Karte „Monatswerte je Jahr“ („r:“ Bilanz, „c:“ Verbraucher)."""
+        roles = role_entities(config)
+        sizes: list[dict] = []
+        if roles["erzeugung"] or roles["netzbezug"]:
+            sizes.append({"key": "r:verbrauch", "label": tr("Verbrauch"), "group": "balance"})
+        if roles["netzbezug"]:
+            sizes.append({"key": "r:netzbezug", "label": tr("Netzbezug"), "group": "balance"})
+        for consumer in top_consumers(config):
+            entity = self.index.get_entity(consumer["entity_id"])
+            if entity is not None and entity["first_ts"]:
+                sizes.append({"key": f"c:{consumer['entity_id']}", "label": self._consumer_name(consumer), "group": "consumer"})
+        return sizes
+
+    def _temperature_archive(self) -> tuple[str, dict] | None:
+        """(Entität, Eintrag) der Außentemperatur, wenn sie archiviert wird; sonst None."""
+        entity_id = (self.temperature_entity() if self.temperature_entity else "") or ""
+        entity = self.index.get_entity(entity_id) if entity_id else None
+        return (entity_id, entity) if entity is not None and entity["first_ts"] else None
+
+    def compute_weather(self, config: dict, now_local: datetime | None = None) -> dict:
+        """Daten der Karte „Ertrag und Wetter“ im Reiter „Langzeit“; sie nutzt Rollen aus dem Wetterdashboard (Helligkeit und
+        Außentemperatur), ohne sie neu abzufragen.
+
+        ``yield``: Erzeugung je Sonnenstunde (kWh/h) je Monat und Jahr, None ohne Helligkeit oder Erzeugung. Berechnet wird sie
+        aus den Tagen, an denen beides vorliegt (Erzeugung nur an vollständigen Tagen, Sonnenstunden nur dort, wo der Sensor Werte
+        hat): Summe der Erzeugung durch Summe der Sonnenstunden dieser Tage. So verzerrt eine Lücke des einen Sensors den Monat
+        nicht. Ein Quotient bleibt auch im laufenden Monat gültig, dort zählen die Tage bis gestern. ``temperature`` sagt, ob das
+        Diagramm Verbrauch gegen Temperatur möglich ist, und nennt die wählbaren Größen."""
+        now_local = now_local or datetime.now(self.tz)
+        roles = role_entities(config)
+        archive = self._temperature_archive()
+        sizes = self.temperature_sizes(config) if archive else []
+        out: dict = {
+            "unit": "kWh/h", "min_days": YIELD_MIN_DAYS, "min_sun_hours": YIELD_MIN_SUN_HOURS,
+            "current": {"year": now_local.year, "month": now_local.month},
+            "sun": False, "yield": None,
+            "temperature": {
+                "available": bool(archive and sizes), "configured": archive is not None,
+                "unit": (archive[1]["unit"] if archive else None) or "°C", "sizes": sizes,
+                "min_days": TEMPERATURE_MIN_DAYS,
+            },
+        }
+        sun = self._sun_days_cached(now_local)
+        out["sun"] = sun is not None
+        if not sun or not roles["erzeugung"]:
+            return out
+        hours = {entry["date"]: entry["hours"] for entry in sun if entry.get("hours") is not None}
+        per_month: dict[tuple[int, int], list[tuple[float, float]]] = {}
+        for day in self.usable_days(config, now_local):
+            kwh = day["erzeugung"]
+            if kwh is not None and day["date"] in hours:
+                per_month.setdefault((day["date"].year, day["date"].month), []).append((kwh, hours[day["date"]]))
+        years: dict[int, list[float | None]] = {}
+        for (year, month), pairs in per_month.items():
+            sun_hours = sum(hours_ for _kwh, hours_ in pairs)
+            if len(pairs) < YIELD_MIN_DAYS or sun_hours < YIELD_MIN_SUN_HOURS:
+                continue
+            years.setdefault(year, [None] * 12)[month - 1] = round(sum(kwh for kwh, _h in pairs) / sun_hours, 3)
+        if years:
+            keep = sorted(years, reverse=True)[:MAX_YEARS]
+            out["yield"] = {"years": {str(year): years[year] for year in sorted(keep)}}
+        return out
+
+    def compute_temperature_days(self, config: dict, size: str, now_local: datetime | None = None) -> dict:
+        """Tage mit Tagesmittel der Außentemperatur und Tageswert einer Größe (kWh), für das Streudiagramm „Verbrauch gegen
+        Temperatur“. ``size`` ist ein Schlüssel aus ``temperature_sizes``; sonst ValueError. Es zählen abgeschlossene Tage, an
+        denen die Temperatur genug Stunden Werte hat (wie im Wetterdashboard) und die Größe einen Wert; der Archivbeginn
+        der Größe ist ein halber Tag und fehlt."""
+        now_local = now_local or datetime.now(self.tz)
+        archive = self._temperature_archive()
+        sizes = {entry["key"]: entry for entry in self.temperature_sizes(config)}
+        if archive is None or size not in sizes:
+            raise ValueError(size)
+        temperature_id, temperature = archive
+        today = now_local.date()
+        midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        floor_year = today.year - MAX_YEARS + 1
+        read_cache = query_mod.QueryReadCache()
+
+        def first_day(entity: dict) -> date:
+            return max(datetime.fromtimestamp(entity["first_ts"], self.tz).date(), date(floor_year, 1, 1))
+
+        def daily(entity_id: str, entity: dict) -> list:
+            start = datetime(*first_day(entity).timetuple()[:3], tzinfo=self.tz)
+            return query_mod.query_daily_series(
+                self.data_dir, self.index, entity_id, start, midnight, self.tz, now_local, read_cache,
+            )
+
+        def day_of(point) -> date:
+            return datetime.fromtimestamp(point.day_start, self.tz).date()
+
+        values: dict[date, float] = {}
+        if size.startswith("r:"):
+            role = size[2:]
+            values = {d["date"]: d[role] for d in self.usable_days(config, now_local) if d.get(role) is not None}
+        else:
+            entity_id = size[2:]
+            entity = self.index.get_entity(entity_id)
+            first = datetime.fromtimestamp(entity["first_ts"], self.tz).date()
+            values = {
+                day_of(point): point.value or 0.0 for point in daily(entity_id, entity)
+                if day_of(point) > first  # der Archivbeginn ist ein halber Tag
+            }
+        days: list[list] = []
+        for point in daily(temperature_id, temperature):
+            day = day_of(point)
+            if point.covered and point.value is not None and day in values and day < today:
+                days.append([day.isoformat(), round(point.value, 1), round(values[day], 2)])
+        days.sort()
+        years = sorted({int(entry[0][:4]) for entry in days}, reverse=True)
+        return {
+            "size": size, "label": sizes[size]["label"], "unit": "kWh", "temperature_unit": temperature["unit"] or "°C",
+            "days": days, "years": years, "enough": len(days) >= TEMPERATURE_MIN_DAYS, "min_days": TEMPERATURE_MIN_DAYS,
+            "today": today.isoformat(),
+        }
 
     # -- Was hat sich verändert? -----------------------------------------------------------
 

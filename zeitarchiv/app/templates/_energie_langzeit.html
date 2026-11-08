@@ -182,4 +182,39 @@
   </div>
 {% endif %}
 
+{% if 'wetter' not in hidden %}
+  {# Ertrag und Wetter: Erzeugung je Sonnenstunde (Monatslinien) und Verbrauch gegen Außentemperatur (ein Punkt je Tag). Helligkeit und
+     Temperatur stammen aus dem Wetterdashboard. Daten: GET energiedashboard/langzeit/weather und .../temperature?size=…; ohne die
+     Rollen erscheint die Karte nicht, mit nur einer nur der passende Teil. #}
+  <p class="hint hint-warn" x-show="wxError" x-text="wxError" x-cloak></p>
+  <div class="card wt-card" x-show="showWeather()" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Ertrag und Wetter") }} {{ hint_button(_("Ertrag und Wetter")) }}</h2>
+      {% call hint_body() %}<span x-text="wxNote()"></span>{% endcall %}
+      <div class="wt-controls-end">
+        <select x-show="wxPart === 'temp'" x-cloak aria-label="{{ _('Größe') }}" @change="pickTemp($event.target.value)">
+          <optgroup label="{{ _('Bilanz') }}" x-show="tempSizes('balance').length">
+            <template x-for="option in tempSizes('balance')" :key="option.key">
+              <option :value="option.key" :selected="option.key === tempKey()" x-text="option.label"></option>
+            </template>
+          </optgroup>
+          <optgroup label="{{ _('Verbraucher') }}" x-show="tempSizes('consumer').length">
+            <template x-for="option in tempSizes('consumer')" :key="option.key">
+              <option :value="option.key" :selected="option.key === tempKey()" x-text="option.label"></option>
+            </template>
+          </optgroup>
+        </select>
+        <div class="wt-seg el-wx-seg" role="group" aria-label="{{ _('Darstellung') }}" x-show="wxParts().length > 1" x-cloak>
+          <button type="button" :aria-pressed="(wxPart === 'yield').toString()" @click="setWxPart('yield')">{{ _("Ertrag je Sonnenstunde") }}</button>
+          <button type="button" :aria-pressed="(wxPart === 'temp').toString()" @click="setWxPart('temp')">{{ _("Verbrauch gegen Temperatur") }}</button>
+        </div>
+        {{ year_choice() }}
+      </div>
+    </div>
+    <p class="wt-stand" x-text="wxSub()"></p>
+    <p class="wt-stand" x-show="wxMissing()" x-text="wxMissing()" x-cloak></p>
+    <div class="wt-chart" x-ref="wxChart"></div>
+  </div>
+{% endif %}
+
 </div>

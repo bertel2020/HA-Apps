@@ -66,7 +66,7 @@
   window.addEventListener('resize', () => Object.values(charts).forEach((chart) => chart.resize()));
 
   const {monthName, mean, present, monthKey, isPartialStart, monthStats, yearSum, energyMatrix} = window.ElementTableRender;
-  const {energyMonthly, weatherMatrix} = window.ElementChartRender;
+  const {energyMonthly, weatherMonthly, weatherMatrix} = window.ElementChartRender;
 
   function kenntagValues(key, values, average, kwp, capacity) {
     const kwh = (value) => num(value, 1);
@@ -1122,6 +1122,81 @@
   // ---- Reiter „Langzeit“ -------------------------------------------------------------------------
   // hidden: im Setup abgewählte Karten (Schlüssel wie energie_langzeit.CARD_BLOCKS); deren Daten werden gar nicht erst geladen.
   // hasConsumers: Verbraucher der obersten Ebene eingerichtet (dann stehen sie neben der Bilanz in der Auswahl der Größe).
+  // ---- Ertrag und Wetter: Erzeugung je Sonnenstunde und Verbrauch gegen Außentemperatur --------------
+
+  // Mittel, Spanne und Anzahl der abgeschlossenen Jahre je Monat (dieselbe Form wie der Monatsvergleich des Wetterdashboards).
+  function monthSpan(years, currentYear) {
+    const past = Object.keys(years).map(Number).filter((year) => year < currentYear);
+    const avg = [], low = [], high = [], counts = [];
+    for (let i = 0; i < 12; i++) {
+      const column = past.map((year) => years[year][i]).filter((value) => value != null);
+      counts.push(column.length);
+      avg.push(column.length ? Math.round(column.reduce((sum, value) => sum + value, 0) / column.length * 1000) / 1000 : null);
+      low.push(column.length ? Math.min(...column) : null);
+      high.push(column.length ? Math.max(...column) : null);
+    }
+    return {avg, low, high, counts};
+  }
+
+  // Ausgleichsgerade y = intercept + slope · x der Tage (x Temperatur, y kWh) samt Bestimmtheitsmaß; null unter zwei Punkten oder ohne Streuung.
+  function linearFit(points) {
+    const n = points.length;
+    if (n < 2) return null;
+    const mx = points.reduce((sum, p) => sum + p[0], 0) / n;
+    const my = points.reduce((sum, p) => sum + p[1], 0) / n;
+    let sxx = 0, sxy = 0, syy = 0;
+    for (const [x, y] of points) {
+      sxx += (x - mx) ** 2;
+      sxy += (x - mx) * (y - my);
+      syy += (y - my) ** 2;
+    }
+    if (!sxx || !syy) return null;
+    const slope = sxy / sxx;
+    return {slope, intercept: my - slope * mx, r2: (sxy * sxy) / (sxx * syy), n};
+  }
+
+  // Farbe eines Jahres im Streudiagramm: das neueste in der ersten Farbe des Schemas, ältere der Reihe nach.
+  const yearColor = (index) => cssVar(`--chart-${index % 7 + 1}`);
+
+  // ECharts-Optionen des Streudiagramms: ein Punkt je Tag (Temperatur, Tageswert), je Jahr eine Farbe, dazu die Ausgleichsgerade.
+  function temperatureScatter(data, years, fit, colors, options) {
+    const font = options.font;
+    const unit = data.temperature_unit;
+    const dayText = (iso) => fmtDate(formats.dmy, Date.parse(iso + 'T12:00:00Z') / 1000);
+    const series = years.map((year, index) => ({
+      name: String(year), type: 'scatter', symbolSize: 6, z: 3,
+      itemStyle: {color: yearColor(index), opacity: 0.75},
+      data: data.days.filter((day) => Number(day[0].slice(0, 4)) === year).map((day) => ({value: [day[1], day[2]], date: day[0]})),
+    }));
+    if (fit) {
+      const xs = data.days.filter((day) => years.includes(Number(day[0].slice(0, 4)))).map((day) => day[1]);
+      const x0 = Math.min(...xs), x1 = Math.max(...xs);
+      series.push({
+        name: t('Trendlinie'), type: 'line', symbol: 'none', silent: true, z: 4,
+        lineStyle: {color: colors.ink, width: 2, type: 'dashed'}, itemStyle: {color: colors.ink},
+        data: [[x0, fit.intercept + fit.slope * x0], [x1, fit.intercept + fit.slope * x1]],
+      });
+    }
+    const axis = {axisLine: {lineStyle: {color: colors.grid}}, axisTick: {show: false}, axisLabel: {color: colors.text, fontSize: font(11)}, splitLine: {lineStyle: {color: colors.grid}}};
+    return {
+      animation: false,
+      grid: {left: 8, right: 16, top: options.narrow ? 74 : 34, bottom: 28, containLabel: true},
+      legend: {data: series.map((entry) => entry.name), top: 0, textStyle: {color: colors.text, fontSize: font(12)}, itemWidth: 18, itemHeight: 8},
+      xAxis: {type: 'value', scale: true, name: unit, nameLocation: 'middle', nameGap: 26, nameTextStyle: {color: colors.text}, ...axis},
+      yAxis: {type: 'value', name: t('kWh je Tag'), nameTextStyle: {color: colors.text}, ...axis},
+      tooltip: {
+        trigger: 'item', confine: true, backgroundColor: colors.surface, borderColor: colors.grid,
+        textStyle: {color: colors.ink, fontSize: font(12)},
+        formatter: (param) => {
+          if (!param.data || !param.data.date) return '';
+          return `<b>${escapeHtml(dayText(param.data.date))}</b><br>${escapeHtml(num(param.value[0], 1))} ${escapeHtml(unit)}`
+            + `<br>${escapeHtml(num(param.value[1], 1))} ${escapeHtml(t('kWh'))}`;
+        },
+      },
+      series,
+    };
+  }
+
   window.energieLangzeit = function energieLangzeit(hidden = [], hasConsumers = false) {
     const shown = (key) => !hidden.includes(key);
     const withConsumers = hasConsumers && shown('verbraucher');
@@ -1152,6 +1227,14 @@
       ktMode: 'full',
       ktDialog: {title: '', sub: '', html: '', error: ''},
       _kenntageSeq: 0,
+      // Ertrag und Wetter: die Daten der Karte, der gewählte Teil ('yield' oder 'temp') und die Tage des Streudiagramms.
+      wx: null,
+      wxError: '',
+      wxPart: 'yield',
+      temp: null,
+      tempSel: null,
+      tempLoading: false,
+      _tempSeq: 0,
 
       init() {
         const saved = readStore();
@@ -1162,9 +1245,12 @@
         if (['erzeugung', 'verbrauch', 'netzbezug'].includes(saved.dayField)) this.dayField = saved.dayField;
         if ((saved.lzView === 'tab' && shown('matrix')) || (saved.lzView === 'line' && shown('monatsvergleich'))) this.lzView = saved.lzView;
         if (typeof saved.sizeSel === 'string') this.sizeSel = saved.sizeSel;
+        if (saved.wxPart === 'yield' || saved.wxPart === 'temp') this.wxPart = saved.wxPart;
+        if (typeof saved.tempSel === 'string') this.tempSel = saved.tempSel;
         // Geladen wird erst beim ersten Öffnen des Reiters: Die Übersicht ist die Startansicht.
         onFirstShow('long', this, () => {
           this.takeSelection();
+          if (shown('wetter')) this.loadWeather();
           if (shown('jahresbilanz')) this.loadYears();
           if (shown('tagfuertag')) this.loadDays();
           if (withMonths) this.loadMonths();
@@ -1193,7 +1279,9 @@
         const k = this.records && this.records.kenntage ? this.records.kenntage.years.length : 0;
         const y = this.years ? this.years.years.length : 0;
         const d = this.days ? this.days.years.length : 0;
-        return Math.max(m, c, k, y, d);
+        const w = this.wx && this.wx.yield ? Object.keys(this.wx.yield.years).length : 0;
+        const x = this.temp ? this.temp.years.length : 0;
+        return Math.max(m, c, k, y, d, w, x);
       },
 
       yearOptions() {
@@ -1212,6 +1300,7 @@
         this.drawSize();
         this.drawKenntage();
         this.$nextTick(() => this.drawDays());
+        this.$nextTick(() => this.drawWeather());
       },
 
       // ---- Jahre im Vergleich, Tag für Tag: Matrix Jahr × Kalendertag, gefärbt nach dem Tageswert ----
@@ -1291,6 +1380,156 @@
           const day = String(leapDay.getUTCDate()).padStart(2, '0');
           window.location.href = `energiedashboard?date=${years[row]}-${month}-${day}`;
         });
+        requestAnimationFrame(() => chart.resize());
+      },
+
+      // ---- Ertrag und Wetter ----
+
+      async loadWeather() {
+        this.wxError = '';
+        try {
+          const res = await fetch('energiedashboard/langzeit/weather');
+          if (!res.ok) throw new Error(String(res.status));
+          this.wx = await res.json();
+          const parts = this.wxParts();
+          if (!parts.includes(this.wxPart)) this.wxPart = parts[0] || 'yield';
+          if (this.wxPart === 'temp') this.loadTemperature();
+          this.$nextTick(() => this.drawWeather());
+        } catch (e) {
+          this.wxError = t('Ertrag und Wetter konnten nicht geladen werden.');
+        }
+      },
+
+      // Die Teile der Karte, die es gibt: der Ertrag braucht Helligkeit und Erzeugung, das Streudiagramm Temperatur und eine Größe.
+      wxParts() {
+        if (!this.wx) return [];
+        return [...(this.wx.yield ? ['yield'] : []), ...(this.wx.temperature.available ? ['temp'] : [])];
+      },
+
+      showWeather() {
+        return this.wxParts().length > 0;
+      },
+
+      // Sagt, was fehlt, wenn nur ein Teil der Karte zu sehen ist.
+      wxMissing() {
+        const wx = this.wx;
+        if (!wx || this.wxParts().length !== 1) return '';
+        if (!wx.yield) {
+          return wx.sun
+            ? t('Der Ertrag je Sonnenstunde erscheint, sobald es mindestens {n} Tage mit Erzeugung und Sonnenstunden in einem Monat gibt.', {n: wx.min_days})
+            : t('Der Ertrag je Sonnenstunde braucht im Wetterdashboard eine Helligkeit (Sonnenscheindauer).');
+        }
+        return wx.temperature.configured
+          ? t('Verbrauch gegen Temperatur braucht eine Erzeugung, einen Netzbezug oder einen Verbraucher mit Archiv.')
+          : t('Verbrauch gegen Temperatur braucht im Wetterdashboard eine Außentemperatur.');
+      },
+
+      setWxPart(part) {
+        this.wxPart = part;
+        writeStore({wxPart: part});
+        if (part === 'temp' && !this.temp) this.loadTemperature();
+        this.$nextTick(() => this.drawWeather());
+      },
+
+      // Größen des Streudiagramms: Verbrauch und Netzbezug aus der Bilanz, dazu die Verbraucher.
+      tempSizes(group) {
+        return this.wx ? this.wx.temperature.sizes.filter((size) => size.group === group) : [];
+      },
+
+      // Vorgewählt ist die Größe der Karte „Monatswerte je Jahr“, wenn es sie hier gibt, sonst der Verbrauch.
+      tempKey() {
+        const keys = this.wx ? this.wx.temperature.sizes.map((size) => size.key) : [];
+        for (const key of [this.tempSel, this.sizeSel, 'r:verbrauch']) if (keys.includes(key)) return key;
+        return keys[0] || '';
+      },
+
+      pickTemp(key) {
+        this.tempSel = key;
+        writeStore({tempSel: key});
+        this.loadTemperature();
+      },
+
+      async loadTemperature() {
+        const key = this.tempKey();
+        if (!key) return;
+        const seq = ++this._tempSeq;
+        this.tempLoading = true;
+        this.wxError = '';
+        try {
+          const res = await fetch(`energiedashboard/langzeit/temperature?size=${encodeURIComponent(key)}`);
+          if (!res.ok) throw new Error(String(res.status));
+          const data = await res.json();
+          if (seq !== this._tempSeq) return;  // eine neuere Auswahl hat überholt
+          this.temp = data;
+          this.tempLoading = false;
+          this.$nextTick(() => this.drawWeather());
+        } catch (e) {
+          if (seq === this._tempSeq) {
+            this.tempLoading = false;
+            this.wxError = t('Die Tage konnten nicht geladen werden.');
+          }
+        }
+      },
+
+      wxNote() {
+        if (this.wxPart === 'yield') {
+          return t('Erzeugung geteilt durch die Sonnenstunden derselben Tage, je Monat und Jahr. Die Sonnenstunden kommen aus der Helligkeit im Wetterdashboard. So sieht man, ob die Anlage über die Jahre nachlässt, unabhängig davon, wie sonnig ein Jahr war: Verschmutzung, Verschattung oder ein Defekt lassen die Linie sinken. Monate mit weniger als {n} Tagen mit beiden Werten oder sehr wenig Sonne fehlen. Der laufende Monat zählt bis gestern.', {n: this.wx ? this.wx.min_days : 10});
+        }
+        return t('Jeder Punkt ist ein Tag: Tagesmittel der Außentemperatur gegen den Tagesverbrauch der gewählten Größe, jedes Jahr in einer Farbe. Die gestrichelte Linie ist die Ausgleichsgerade; das Bestimmtheitsmaß R² sagt, wie gut die Temperatur den Verbrauch erklärt (1 = vollständig). Ein Klick auf einen Punkt öffnet den Tag in der Übersicht.');
+      },
+
+      // Zeile unter dem Kartenkopf: was gezeigt wird, beim Streudiagramm die Trendlinie in Worten.
+      wxSub() {
+        if (this.wxPart === 'yield') return t('Erzeugung je Sonnenstunde (kWh/h), je Monat und Jahr');
+        if (!this.temp) return this.tempLoading ? t('Lädt …') : '';
+        if (!this.temp.enough) return t('Zu wenige Tage mit Außentemperatur und Wert (mindestens {n}).', {n: this.temp.min_days});
+        const fit = linearFit(this.tempPoints());
+        if (!fit) return '';
+        const sign = fit.slope > 0 ? '+' : fit.slope < 0 ? '−' : '±';
+        return t('Trendlinie: {value} kWh je Tag je 1 {unit} Außentemperatur (R² {r2}, {n} Tage)', {
+          value: `${sign}${num(Math.abs(fit.slope), 2)}`, unit: this.temp.temperature_unit, r2: num(fit.r2, 2), n: num(fit.n, 0),
+        });
+      },
+
+      // Die gezeigten Jahre des Streudiagramms (neuestes zuerst), begrenzt durch „Letzte 5 | Alle“.
+      tempYears() {
+        if (!this.temp) return [];
+        return this.yearLimit ? this.temp.years.slice(0, this.yearLimit) : this.temp.years;
+      },
+
+      tempPoints() {
+        if (!this.temp) return [];
+        const years = this.tempYears();
+        return this.temp.days.filter((day) => years.includes(Number(day[0].slice(0, 4)))).map((day) => [day[1], day[2]]);
+      },
+
+      drawWeather() {
+        const element = this.$refs.wxChart;
+        if (!element || !this.wx) return;
+        const colors = palette();
+        const chart = chartFor('wx', element);
+        if (this.wxPart === 'yield' && this.wx.yield) {
+          const yearsAll = this.wx.yield.years;
+          const keys = Object.keys(yearsAll).map(Number).sort((a, b) => b - a);
+          const shownKeys = (this.yearLimit ? keys.slice(0, this.yearLimit) : keys).sort((a, b) => a - b);
+          const years = Object.fromEntries(shownKeys.map((year) => [year, yearsAll[year]]));
+          const current = this.wx.current;
+          const m = {
+            metric: 'yield', unit: this.wx.unit, decimals: 2, years, current_year: current.year, current_month: current.month,
+            ...monthSpan(years, current.year),
+          };
+          chart.setOption(weatherMonthly(m, {colors, band: true, narrow: element.clientWidth < 520, font: scaledFont}), true);
+        } else if (this.wxPart === 'temp' && this.temp && this.temp.enough) {
+          const years = this.tempYears();
+          const fit = linearFit(this.tempPoints());
+          chart.setOption(temperatureScatter(this.temp, years, fit, colors, {narrow: element.clientWidth < 520, font: scaledFont}), true);
+          chart.off('click');
+          chart.on('click', (param) => {
+            if (param.seriesType === 'scatter' && param.data && param.data.date) window.location.href = `energiedashboard?date=${param.data.date}`;
+          });
+        } else {
+          chart.clear();
+        }
         requestAnimationFrame(() => chart.resize());
       },
 

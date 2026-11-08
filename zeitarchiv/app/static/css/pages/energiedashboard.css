@@ -1222,5 +1222,8 @@
 
 /* Reiter „Langzeit“: kleinere Diagramme der Jahresbilanz (Anteile, Quoten) und ihre Zwischenüberschriften. */
 .wt-chart.wt-chart-sm{height:200px;}
+/* Ertrag und Wetter: Die beiden langen Beschriftungen des Umschalters umbrechen, statt am Handy aus der Karte zu laufen. */
+.el-wx-seg{max-width:100%;}
+.el-wx-seg button{flex:1 1 0;min-width:0;white-space:normal;}
 .wt-sub{margin:10px 0 0;font-size:13px;font-weight:600;color:var(--ink-muted);}
 .el-spark{width:96px;height:30px;}

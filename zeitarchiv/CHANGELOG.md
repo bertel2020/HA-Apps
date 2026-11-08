@@ -45,6 +45,14 @@
     kleinen Verlauf der Jahressummen
   - „Jahre im Vergleich, Tag für Tag“: jeder Tag als Farbfeld, eine Zeile je
     Jahr, für Erzeugung, Verbrauch und Netzbezug; ein Klick öffnet den Tag
+  - „Ertrag und Wetter“, sobald das Wetterdashboard eine Helligkeit oder eine
+    Außentemperatur kennt
+    - „Ertrag je Sonnenstunde“: Erzeugung geteilt durch die Sonnenstunden, je
+      Monat und Jahr; so zeigt sich, ob die Anlage nachlässt, auch wenn ein
+      Jahr sonniger war
+    - „Verbrauch gegen Temperatur“: ein Punkt je Tag mit Trendlinie, für den
+      Verbrauch, den Netzbezug oder einen Verbraucher, etwa die Wärmepumpe
+    - Im Setup lässt sich die Karte abwählen
   - Die Karten stehen jetzt in der Reihenfolge des Wetterdashboards
 
 ### Geändert
@@ -109,6 +117,14 @@
     annual totals
   - "Years compared, day by day": every day as a colour cell, one row per
     year, for generation, consumption and grid import; a click opens the day
+  - "Yield and weather", as soon as the weather dashboard knows a brightness
+    or an outdoor temperature
+    - "Yield per sun hour": generation divided by the sun hours, per month and
+      year; it shows whether the system is losing output, even if a year was
+      sunnier
+    - "Consumption against temperature": one point per day with a trend line,
+      for consumption, grid import or a consumer such as the heat pump
+    - The card can be switched off in the setup
   - The cards now follow the order of the weather dashboard
 
 #### Changed

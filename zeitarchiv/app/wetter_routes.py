@@ -343,6 +343,12 @@ def wetter_role_count(index: Index) -> int:
     )
 
 
+def temperature_entity(index: Index) -> str:
+    """Entität der Außentemperatur oder leer (auch bei ausgeschaltetem Wetterdashboard); das Energiedashboard braucht sie für
+    „Verbrauch gegen Temperatur“ in der Karte „Ertrag und Wetter“."""
+    return (_load_config(index).get("temperature") or "") if _is_enabled(index) else ""
+
+
 def radiation_entity(index: Index) -> str:
     """Entität der Strahlung (W/m²) oder leer; das Energiedashboard braucht sie für den Ertrag je Einstrahlung."""
     return _load_config(index).get("radiation") or ""
@@ -1216,6 +1222,17 @@ class WetterService:
             "tz": str(tz), **result, "window": pv_mod.WINDOW_DAYS, "limit": round(pv_mod.DEVIATION_LIMIT * 100),
             "unit": "kWh", "pv_entity_id": pv_id,
         }
+
+    def archive_sun_days(self, now_local: datetime) -> list[dict] | None:
+        """Sonnentage aller abgeschlossenen Tage seit Archivbeginn der Helligkeit (siehe ``sun_history``) für die Karte „Ertrag
+        und Wetter“ des Energiedashboards; None, wenn das Wetterdashboard aus ist oder keine Helligkeit zugeordnet ist."""
+        if not _is_enabled(self.deps.index):
+            return None
+        config = _load_config(self.deps.index)
+        entity_id = config["illuminance"]
+        if not entity_id or self.deps.index.get_entity(entity_id) is None:
+            return None
+        return self.sun_history(config, now_local)
 
     def sun_history(self, config: dict, now_local: datetime) -> list[dict]:
         """Alle abgeschlossenen Tage seit Archivbeginn der Helligkeit (Einträge wie ``_sun_days``); leer ohne Rolle."""

@@ -808,6 +808,8 @@ _wetter_service = WetterService(WetterDependencies(
     app_root_context=_app_root_context,
 ))
 app.include_router(_wetter_service.router())
+# Nachgereicht: Die Karte „Ertrag und Wetter“ im Energiedashboard liest Sonnenstunden aus dem Wetter-Dienst.
+_energiedashboard_service.wetter = _wetter_service
 card_elements.bind(index, energie=_energiedashboard_service, wetter=_wetter_service)
 
 
