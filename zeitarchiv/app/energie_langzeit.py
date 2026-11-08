@@ -130,6 +130,13 @@ class TableRequest(BaseModel):
     at: str | None = None
 
 
+class ConsumersRequest(BaseModel):
+    #: Stichtag (JJJJ-MM-TT) der Rangliste „Verbraucher im Jahr“, wie in der Vergleichstabelle.
+    at: str | None = None
+    #: Ohne Monatswerte nur das Fenster der Rangliste: Die Stichtag-Leiste lädt dann nicht alle Jahre neu.
+    months: bool = True
+
+
 def role_entities(config: dict) -> dict[str, list[str]]:
     """Entitäten je Zählerrolle aus der Konfiguration des Energiedashboards."""
     speicher = config.get("speicher") or []
@@ -215,6 +222,43 @@ def kenntag_hit(
     if key == "speicher_schwach":
         return None if day.get("entladung") is None or not capacity else day["entladung"] / capacity * 100 < thresholds["speicher_schwach"]
     return None
+
+
+def top_consumers(config: dict) -> list[dict]:
+    """Verbraucher der obersten Ebene (ohne Zwischenzähler darüber). Geräte hinter einem Zwischenzähler fehlen:
+    ihr Wert steckt im Zwischenzähler und zählte sonst doppelt."""
+    return [c for c in config.get("verbraucher") or [] if c.get("entity_id") and not c.get("parent")]
+
+
+def merge_findings(
+    findings: dict[str, dict], entity_ids, value_months: set[str],
+) -> tuple[dict[str, dict[str, int]], int]:
+    """Befunde mehrerer Entitäten je Monat zusammengefasst (``data_quality.monthly_findings``) plus die Zahl der
+    noch nicht geprüften Entitäten. Lücken bleiben nur in Monaten stehen, die deutlich über dem üblichen Wert der
+    Monate mit Werten (value_months, „JJJJ-MM“) liegen, siehe GAP_FACTOR; Zählerrückgänge bleiben immer."""
+    months: dict[str, dict[str, int]] = {}
+    unchecked = 0
+    for entity_id in sorted(set(entity_ids)):
+        info = findings.get(entity_id)
+        if info is None or not info["measured"]:
+            unchecked += 1
+            continue
+        for month_key, counts in info["months"].items():
+            bucket = months.setdefault(month_key, {})
+            for kind, amount in counts.items():
+                bucket[kind] = bucket.get(kind, 0) + amount
+    typical = statistics.median([months.get(key, {}).get("gaps", 0) for key in value_months] or [0])
+    limit = max(GAP_MIN, GAP_FACTOR * typical)
+    for key in list(months):
+        counts = months[key]
+        if "gaps" in counts:
+            if counts["gaps"] < limit:
+                del counts["gaps"]
+            else:
+                counts["gaps_typical"] = int(typical)
+        if not counts:
+            del months[key]
+    return months, unchecked
 
 
 def balance(parts: dict[str, float | None]) -> float | None:
@@ -456,21 +500,37 @@ class EnergieLangzeitService:
                     values[(year, month)] = by_month.get(month, 0.0)
         return values
 
-    def compute_months(self, config: dict, now_local: datetime | None = None) -> dict:
-        """Monatswerte je Rolle über alle Jahre des Archivs (neuestes Jahr zuerst), dazu Messlücken und
-        Zählersprünge je Monat. Ein Monat ohne Daten ist None, nie 0."""
-        now_local = now_local or datetime.now(self.tz)
-        roles = role_entities(config)
+    def _latest_start(self, entity_ids) -> float | None:
+        """Beginn des Archivs der zuletzt begonnenen Entität (erst ab da sind alle zusammen erfasst)."""
+        starts = [
+            entity["first_ts"] for entity_id in set(entity_ids)
+            if (entity := self.index.get_entity(entity_id)) is not None and entity["first_ts"]
+        ]
+        return max(starts) if starts else None
+
+    def _partial_start(self, entity_ids) -> list[int] | None:
+        """Monat, in dem das Archiv beginnt, wenn er nicht am 1. anfängt: er ist nur zum Teil erfasst und taugt
+        nicht für einen Vergleich. Bei mehreren Entitäten gilt die zuletzt begonnene."""
+        latest = self._latest_start(entity_ids)
+        if latest is None:
+            return None
+        moment = datetime.fromtimestamp(latest, self.tz)
+        return [moment.year, moment.month] if moment.day > 1 else None
+
+    def _years(self, entity_ids, now_local: datetime) -> list[int]:
+        """Jahre ab dem frühesten Archivbeginn der Entitäten bis heute, neuestes zuerst, höchstens MAX_YEARS."""
         first_years = [
             datetime.fromtimestamp(entity["first_ts"], self.tz).year
-            for entity_id in {e for ids in roles.values() for e in ids}
+            for entity_id in set(entity_ids)
             if (entity := self.index.get_entity(entity_id)) is not None and entity["first_ts"]
         ]
         first_year = max(min(first_years, default=now_local.year), now_local.year - MAX_YEARS + 1)
-        years = list(range(now_local.year, first_year - 1, -1))
-        read_cache = query_mod.QueryReadCache()
+        return list(range(now_local.year, first_year - 1, -1))
 
-        # Summe je Rolle und Monat; None, wenn keine Entität der Rolle in diesem Monat Daten hatte.
+    def _role_month_sums(
+        self, roles: dict[str, list[str]], years: list[int], now_local: datetime, read_cache: query_mod.QueryReadCache,
+    ) -> dict[str, dict[tuple[int, int], float]]:
+        """Summe je Rolle und Monat; ein Monat fehlt, wenn keine Entität der Rolle in ihm archiviert war."""
         sums: dict[str, dict[tuple[int, int], float]] = {}
         for role, entity_ids in roles.items():
             merged: dict[tuple[int, int], float] = {}
@@ -478,6 +538,18 @@ class EnergieLangzeitService:
                 for key, value in self._entity_months(entity_id, years, now_local, read_cache).items():
                     merged[key] = merged.get(key, 0.0) + value
             sums[role] = merged
+        return sums
+
+    def compute_months(self, config: dict, now_local: datetime | None = None) -> dict:
+        """Monatswerte je Rolle über alle Jahre des Archivs (neuestes Jahr zuerst), dazu Messlücken und
+        Zählersprünge je Monat. Ein Monat ohne Daten ist None, nie 0."""
+        now_local = now_local or datetime.now(self.tz)
+        roles = role_entities(config)
+        years = self._years({e for ids in roles.values() for e in ids}, now_local)
+        read_cache = query_mod.QueryReadCache()
+
+        # Summe je Rolle und Monat; None, wenn keine Entität der Rolle in diesem Monat Daten hatte.
+        sums = self._role_month_sums(roles, years, now_local, read_cache)
 
         def month_values(role: str, year: int) -> list[float | None]:
             out: list[float | None] = []
@@ -499,43 +571,11 @@ class EnergieLangzeitService:
             return {f"{year}-{month:02d}" for key in role_keys for (year, month) in sums[key]}
 
         def partial_start(role_keys: tuple[str, ...]) -> list[int] | None:
-            """Monat, in dem das Archiv der Rolle beginnt, wenn er nicht am 1. anfängt: er ist nur zum Teil
-            erfasst und taugt nicht für einen Vergleich. Bei mehreren Entitäten gilt die zuletzt begonnene."""
-            starts = [
-                datetime.fromtimestamp(entity["first_ts"], self.tz)
-                for entity_id in {e for key in role_keys for e in roles[key]}
-                if (entity := self.index.get_entity(entity_id)) is not None and entity["first_ts"]
-            ]
-            if not starts:
-                return None
-            latest = max(starts)
-            return [latest.year, latest.month] if latest.day > 1 else None
+            return self._partial_start({e for key in role_keys for e in roles[key]})
 
         def role_findings(role_keys: tuple[str, ...]) -> tuple[dict[str, dict[str, int]], int]:
-            months: dict[str, dict[str, int]] = {}
-            unchecked = 0
-            for entity_id in sorted({e for key in role_keys for e in roles[key]}):
-                info = findings.get(entity_id)
-                if info is None or not info["measured"]:
-                    unchecked += 1
-                    continue
-                for month_key, counts in info["months"].items():
-                    bucket = months.setdefault(month_key, {})
-                    for kind, amount in counts.items():
-                        bucket[kind] = bucket.get(kind, 0) + amount
             # Nur auffällige Lücken stehen drin, siehe GAP_FACTOR.
-            typical = statistics.median([months.get(key, {}).get("gaps", 0) for key in month_keys(role_keys)] or [0])
-            limit = max(GAP_MIN, GAP_FACTOR * typical)
-            for key in list(months):
-                counts = months[key]
-                if "gaps" in counts:
-                    if counts["gaps"] < limit:
-                        del counts["gaps"]
-                    else:
-                        counts["gaps_typical"] = int(typical)
-                if not counts:
-                    del months[key]
-            return months, unchecked
+            return merge_findings(findings, {e for key in role_keys for e in roles[key]}, month_keys(role_keys))
 
         out_roles = []
         for row in ROWS:
@@ -760,9 +800,7 @@ class EnergieLangzeitService:
         win = period_columns.column_windows(COLUMN_WINDOWS, "jahr", now_local, mode, anchor)
         roles = role_entities(config)
         read_cache = query_mod.QueryReadCache()
-        consumers = [
-            c for c in config.get("verbraucher") or [] if c.get("entity_id") and not c.get("parent")
-        ]
+        consumers = top_consumers(config)
         items: list[dict] = []
         measured = {"cur": 0.0, "vj": 0.0}
         for consumer in consumers:
@@ -794,3 +832,128 @@ class EnergieLangzeitService:
             "vj": {"start": win["vj_start"].timestamp(), "end": win["vj_end"].timestamp()},
             "items": ranked, "consumers": len(consumers),
         }
+
+    # -- Verbraucher über die Jahre ------------------------------------------------------
+
+    def compute_consumers(self, config: dict, body: ConsumersRequest, now_local: datetime | None = None) -> dict:
+        """Verbraucher der obersten Ebene über die Jahre (Reiter „Langzeit“, Ansicht „Verbraucher“).
+
+        Fenster: „Dieses Jahr“ bis zum Stichtag gegen dasselbe Stück des Vorjahres (wie compute_changes, immer
+        „bis jetzt“), je Verbraucher und für den Verbrauch laut Bilanz. „Übrige (Grundlast)“ ist der Rest bis zur
+        Bilanz, nie negativ. Mit ``months`` dazu je Verbraucher die Monatswerte aller Jahre, die Jahressummen,
+        Befunde je Monat (Messlücken, Zählerrückgänge) und der Teilmonat am Archivbeginn.
+
+        Ein gelöschter Verbraucher fehlt auch in den Vorjahren; sein Verbrauch steckt dann dort in „Übrige“.
+        ``late`` markiert Verbraucher, deren Archiv erst nach dem der Bilanz beginnt: davor steckt ihr Verbrauch in
+        „Übrige“, ein Vergleich über diesen Zeitpunkt hinweg ist dort verzerrt."""
+        now_local = now_local or datetime.now(self.tz)
+        stichtag = period_columns.parse_stichtag(body.at, now_local.date())
+        anchor = period_columns.stichtag_anchor(stichtag, self.tz)
+        win = period_columns.column_windows(COLUMN_WINDOWS, "jahr", now_local, "bis_jetzt", anchor)
+        sides = (("cur", win["start"], win["end"]), ("vj", win["vj_start"], win["vj_end"]))
+        roles = role_entities(config)
+        consumers = top_consumers(config)
+        read_cache = query_mod.QueryReadCache()
+        balance_ids = sorted({e for role in BALANCE_ROLES for e in roles[role]})
+        balance_start = self._latest_start(balance_ids)
+
+        items: list[dict] = []
+        measured = {"cur": 0.0, "vj": 0.0}
+        for consumer in consumers:
+            entity_id = consumer["entity_id"]
+            entity = self.index.get_entity(entity_id)
+            first_ts = entity["first_ts"] if entity is not None and entity["first_ts"] else None
+            item: dict = {
+                "key": entity_id, "name": self._consumer_name(consumer), "entity_id": entity_id,
+                "first_ts": first_ts, "partial_start": self._partial_start([entity_id]),
+                # Ein Tag Spielraum: Zähler, die am selben Tag wie die Bilanz begonnen haben, verzerren nichts.
+                "late": bool(first_ts and balance_start and first_ts > balance_start + 86400),
+            }
+            for side, start, end in sides:
+                item[side], _first = self.window_total([entity_id], start, end, now_local, read_cache)
+                measured[side] += item[side] or 0.0
+            items.append(item)
+
+        total: dict[str, float | None] = {}
+        for side, start, end in sides:
+            sums, _froms = self.side_values(roles, start, end, now_local, read_cache)
+            value = balance(sums)
+            total[side] = round(value, 3) if value is not None else None
+        rest: dict = {
+            "key": "rest", "name": tr("Übrige (Grundlast)"), "entity_id": None,
+            "first_ts": balance_start, "partial_start": self._partial_start(balance_ids), "late": False,
+        }
+        for side in ("cur", "vj"):
+            rest[side] = round(max(total[side] - measured[side], 0.0), 3) if total[side] is not None else None
+
+        out: dict = {
+            "tz": str(self.tz), "now": now_local.timestamp(), "unit": "kWh",
+            "at": stichtag.isoformat() if stichtag else None, "today": now_local.date().isoformat(),
+            "current": {"year": now_local.year, "month": now_local.month, "day": now_local.day},
+            "window": {
+                "year": win["start"].year,
+                "cur": {"start": win["start"].timestamp(), "end": win["end"].timestamp()},
+                "vj": {"start": win["vj_start"].timestamp(), "end": win["vj_end"].timestamp()},
+                "total": total,
+                "measured": {side: round(value, 3) for side, value in measured.items()},
+            },
+            "consumers": items, "rest": rest,
+        }
+        if body.months:
+            self._consumer_months(out, roles, balance_ids, now_local, read_cache)
+        return out
+
+    def _consumer_months(
+        self, out: dict, roles: dict[str, list[str]], balance_ids: list[str], now_local: datetime,
+        read_cache: query_mod.QueryReadCache,
+    ) -> None:
+        """Monatswerte, Jahressummen und Befunde je Verbraucher, für „Übrige“ und den Verbrauch laut Bilanz."""
+        items, rest = out["consumers"], out["rest"]
+        years = self._years(set(balance_ids) | {item["entity_id"] for item in items}, now_local)
+        sums = self._role_month_sums({role: roles[role] for role in BALANCE_ROLES}, years, now_local, read_cache)
+
+        def present_sum(values: list[float | None]) -> float | None:
+            present = [value for value in values if value is not None]
+            return round(sum(present), 3) if present else None
+
+        total_values: dict[str, list[float | None]] = {}
+        for year in years:
+            row: list[float | None] = []
+            for month in range(1, 13):
+                value = balance({part: sums[part].get((year, month)) for part in BALANCE_ROLES})
+                row.append(round(value, 3) if value is not None else None)
+            total_values[str(year)] = row
+        findings = data_quality.monthly_findings(self.index, sorted(set(balance_ids) | {i["entity_id"] for i in items}))
+
+        measured_months = {str(year): [0.0] * 12 for year in years}
+        for item in items:
+            months = self._entity_months(item["entity_id"], years, now_local, read_cache)
+            item["values"] = {
+                str(year): [round(months[(year, m)], 3) if (year, m) in months else None for m in range(1, 13)]
+                for year in years
+            }
+            item["year_sums"] = {year: present_sum(values) for year, values in item["values"].items()}
+            for (year, month), value in months.items():
+                measured_months[str(year)][month - 1] += value
+            item["flags"], item["unchecked"] = merge_findings(
+                findings, [item["entity_id"]], {f"{year}-{month:02d}" for (year, month) in months},
+            )
+
+        # „Übrige“ je Monat ist der Rest dieses Monats, je Jahr der Rest der Jahressummen (ein Monat mit
+        # rechnerisch negativem Rest zieht das Jahr nicht unter die Summe der Verbraucher).
+        rest["values"] = {
+            year: [round(max(t - measured_months[year][i], 0.0), 3) if t is not None else None for i, t in enumerate(row)]
+            for year, row in total_values.items()
+        }
+        total_sums = {year: present_sum(row) for year, row in total_values.items()}
+        rest["year_sums"] = {
+            year: (
+                round(max(value - sum(item["year_sums"][year] or 0.0 for item in items), 0.0), 3)
+                if value is not None else None
+            )
+            for year, value in total_sums.items()
+        }
+        balance_months = {f"{year}-{month:02d}" for part in BALANCE_ROLES for (year, month) in sums[part]}
+        rest["flags"], rest["unchecked"] = merge_findings(findings, balance_ids, balance_months)
+        out["years"] = years
+        out["total"] = {"values": total_values, "year_sums": total_sums}

@@ -686,3 +686,119 @@ def test_records_und_changes_routen(client) -> None:
         assert changes.status_code == 200 and changes.json()["items"] == []
     finally:
         index.set_setting(ed.SETTING_CONFIG, "")
+
+
+# -- Verbraucher über die Jahre (ROADMAP 1.49, P0) ------------------------------------------------
+
+
+def _verbraucher_config() -> dict:
+    return _config(netzbezug="sensor.netz", verbraucher=[
+        {"entity_id": "sensor.waerme", "name": "Wärmepumpe"},
+        {"entity_id": "sensor.auto", "name": "Wallbox"},
+        {"entity_id": "sensor.herd", "name": "Herd", "parent": "sensor.waerme"},   # hinter einem Zwischenzähler
+    ])
+
+
+def _verbraucher(daten: dict, key: str) -> dict:
+    return next(c for c in daten["consumers"] if c["key"] == key)
+
+
+def test_verbraucher_monatswerte_jahressummen_und_rest(service) -> None:
+    for eid in ("sensor.netz", "sensor.waerme", "sensor.auto", "sensor.herd"):
+        _archiv(service, eid, _monat(2025, 1))
+    monate_2025 = [(2025, m) for m in range(1, 13)]
+    monate_2026 = [(2026, m) for m in range(1, 9)]
+    daten = {
+        "sensor.netz": {k: 100.0 for k in monate_2025 + monate_2026},
+        "sensor.waerme": {k: 30.0 for k in monate_2025 + monate_2026} | {(2025, 2): 120.0},
+        "sensor.auto": {k: 20.0 for k in monate_2025 + monate_2026},
+        "sensor.herd": {k: 5.0 for k in monate_2025 + monate_2026},
+    }
+    ergebnis = _monate_service(service, daten).compute_consumers(_verbraucher_config(), lz.ConsumersRequest(), NOW)
+    assert ergebnis["years"] == [2026, 2025]
+    assert [c["key"] for c in ergebnis["consumers"]] == ["sensor.waerme", "sensor.auto"]   # Herd steckt in der Wärmepumpe
+    wp = _verbraucher(ergebnis, "sensor.waerme")
+    assert wp["name"] == "Wärmepumpe" and wp["entity_id"] == "sensor.waerme"
+    assert wp["values"]["2026"] == [30.0] * 8 + [None] * 4                 # Zukunft leer, nicht 0
+    assert wp["year_sums"] == {"2026": 240.0, "2025": 450.0}
+    assert ergebnis["total"]["year_sums"] == {"2026": 800.0, "2025": 1200.0}
+    rest = ergebnis["rest"]
+    assert rest["name"] == "Übrige (Grundlast)" and rest["entity_id"] is None
+    # Je Monat der Rest dieses Monats (Februar 2025: Verbraucher über der Bilanz, Rest 0 statt negativ) ...
+    assert rest["values"]["2025"][:3] == [50.0, 0.0, 50.0]
+    # ... je Jahr der Rest der Jahressummen: 1200 − 450 − 240.
+    assert rest["year_sums"]["2025"] == 510.0
+    assert rest["year_sums"]["2026"] == 800.0 - 240.0 - 160.0
+
+
+def test_verbraucher_rangliste_zum_stichtag_gegen_dasselbe_stueck_des_vorjahres(service, monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    _archiv(service, "sensor.netz", _monat(2025, 1))
+    for eid in ("sensor.waerme", "sensor.auto", "sensor.herd"):
+        service.index.get_or_create_entity(eid, "sensor", "total_increasing", "kWh")
+    werte = {
+        ("sensor.netz", 2026): 1100.0, ("sensor.netz", 2025): 300.0,
+        ("sensor.waerme", 2026): 300.0, ("sensor.waerme", 2025): 250.0,
+        ("sensor.auto", 2026): 100.0, ("sensor.auto", 2025): 150.0,
+    }
+
+    def reihen(entity_id, start, end, now_local, read_cache):
+        wert = werte.get((entity_id, start.year))
+        return [SimpleNamespace(value=wert)] if wert is not None else []
+
+    monkeypatch.setattr(service, "_rows", reihen)
+    daten = service.compute_consumers(_verbraucher_config(), lz.ConsumersRequest(at="2026-08-12", months=False), NOW)
+    assert "years" not in daten and "values" not in daten["consumers"][0]
+    assert daten["at"] == "2026-08-12" and daten["window"]["year"] == 2026
+    assert datetime.fromtimestamp(daten["window"]["cur"]["end"], TZ) == datetime(2026, 8, 13, tzinfo=TZ)
+    assert datetime.fromtimestamp(daten["window"]["vj"]["end"], TZ) == datetime(2025, 8, 13, tzinfo=TZ)
+    wp = _verbraucher(daten, "sensor.waerme")
+    assert (wp["cur"], wp["vj"]) == (300.0, 250.0)
+    assert daten["window"]["total"] == {"cur": 1100.0, "vj": 300.0}
+    assert daten["window"]["measured"] == {"cur": 400.0, "vj": 400.0}
+    # Übrige: Rest bis zur Bilanz, im Vorjahr nicht negativ (300 − 400).
+    assert (daten["rest"]["cur"], daten["rest"]["vj"]) == (700.0, 0.0)
+
+
+def test_spaeter_begonnener_verbraucher_ist_markiert_und_hat_einen_teilmonat(service) -> None:
+    _archiv(service, "sensor.netz", _monat(2025, 1))
+    _archiv(service, "sensor.waerme", _monat(2025, 1) + 3600)                 # am selben Tag wie die Bilanz
+    _archiv(service, "sensor.auto", _monat(2025, 6) + 14 * 86400)             # erst ab dem 15. Juni
+    daten = _monate_service(service, {}).compute_consumers(_verbraucher_config(), lz.ConsumersRequest(), NOW)
+    wp, auto = _verbraucher(daten, "sensor.waerme"), _verbraucher(daten, "sensor.auto")
+    assert wp["late"] is False and wp["partial_start"] is None
+    assert auto["late"] is True and auto["partial_start"] == [2025, 6]
+    assert auto["first_ts"] == _monat(2025, 6) + 14 * 86400
+    assert auto["values"]["2025"][:5] == [None] * 5                             # vor dem Archivbeginn leer, nicht 0
+    assert daten["rest"]["first_ts"] == _monat(2025, 1)
+
+
+def test_verbraucher_tragen_luecken_und_zaehlerrueckgaenge_je_monat(service) -> None:
+    for eid in ("sensor.netz", "sensor.waerme", "sensor.auto"):
+        _archiv(service, eid, _monat(2025, 1))
+    _tageszaehler(service, "sensor.waerme", {"2025-03-20": {"counter_decreases": 1}, "2025-04-02": {"gaps": 4}})
+    daten = {"sensor.waerme": {(2025, m): 30.0 for m in range(1, 13)}, "sensor.netz": {(2025, m): 90.0 for m in range(1, 13)}}
+    ergebnis = _monate_service(service, daten).compute_consumers(_verbraucher_config(), lz.ConsumersRequest(), NOW)
+    wp = _verbraucher(ergebnis, "sensor.waerme")
+    assert wp["flags"] == {"2025-03": {"counter_decreases": 1}} and wp["unchecked"] == 0   # 4 Lücken sind unauffällig
+    auto = _verbraucher(ergebnis, "sensor.auto")
+    assert auto["flags"] == {} and auto["unchecked"] == 1                                   # nicht geprüft, nicht „ohne Befund“
+    assert ergebnis["rest"]["unchecked"] == 1                                               # der Netzbezug
+
+
+def test_consumers_route(client) -> None:
+    from app.main import index
+
+    index.set_setting(ed.SETTING_CONFIG, "")
+    assert client.post("/energiedashboard/langzeit/consumers", json={}).status_code == 409
+    ed._save_config(index, _config(netzbezug="sensor.langzeit_test_netz"))
+    try:
+        antwort = client.post("/energiedashboard/langzeit/consumers", json={"months": True})
+        assert antwort.status_code == 200
+        daten = antwort.json()
+        assert daten["consumers"] == [] and daten["rest"]["key"] == "rest"
+        assert daten["years"][0] == daten["current"]["year"]
+        assert client.post("/energiedashboard/langzeit/consumers", json={"at": "quatsch"}).status_code == 400
+    finally:
+        index.set_setting(ed.SETTING_CONFIG, "")

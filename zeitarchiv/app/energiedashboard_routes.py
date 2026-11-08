@@ -4006,6 +4006,15 @@ class EnergieDashboardService:
                 raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
             return self.langzeit.compute_changes(config, body)
 
+        @router.post("/energiedashboard/langzeit/consumers")
+        def energiedashboard_langzeit_consumers(body: energie_langzeit.ConsumersRequest) -> dict:
+            # Ansicht „Verbraucher“ im Reiter „Langzeit“: Rangliste zum Stichtag, mit months=True dazu Monatswerte
+            # je Verbraucher über alle Jahre (Anteile je Jahr, Jahre × Monate je Verbraucher).
+            config = _load_config(deps.index)
+            if not energie_langzeit.is_configured(config):
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
+            return self.langzeit.compute_consumers(config, body)
+
         @router.get("/energiedashboard/heatmap")
         def energiedashboard_heatmap(range: str = "week", offset: int = 0) -> dict:  # noqa: A002
             config = _load_config(deps.index)
