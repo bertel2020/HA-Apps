@@ -253,6 +253,7 @@ More examples:
 | `--seed` | `42` | Random seed — the same seed reproducibly generates the same values |
 | `--clean` | *(off)* | Cleanly remove existing `demo_*` entities in the target directory before generating (for repeated runs) |
 | `--append` | *(off)* | Instead of the complete history, only add the values since the last run (`--months` is ignored) — see [Living demo instance](#living-demo-instance---append). Mutually exclusive with `--clean` |
+| `--setup-ui` | *(off)* | Additionally sets up the demo interface like the app's demo mode: energy and weather dashboards configured, 15 charts, 3 comparison tables and the dashboards "Overview", "Energy", "Weather". Without `--append`, previously created objects are removed and created anew (your own charts and tables stay); with `--append` only if it was never created |
 | `--language {de,en}` | `de` | Language of the demo entities — names **and** `entity_id`s (`en`: `sensor.demo_living_room_temperature` instead of `sensor.demo_wohnzimmer_temperatur`). A run in the other language replaces the existing dataset (entities of the other language are removed, dashboards referencing them point to nothing). In the app's demo mode the interface language applies. The names live in the translation catalog (`app/i18n/en.json`) |
 | `--clear {values,entities}` | *(off)* | Standalone action instead of generating — see [Deleting demo data](#deleting-demo-data---clear) |
 
@@ -391,4 +392,4 @@ the current date, without recalculating months of data on every run:
   remaining history, even if there is otherwise nothing to add. The series
   depends only on timestamp and date, so it joins later runs seamlessly. The demo
   mode of the app sets up the assignment as grid import price in the energy dashboard
-  (`app/demo_seed.py`); the CLI script only generates measurements.
+  (`app/demo_seed.py`); the CLI script only with `--setup-ui`.

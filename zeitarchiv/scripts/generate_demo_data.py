@@ -40,6 +40,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from app import demo_seed  # noqa: E402
 from app.demo_generation import DEMO_ENTITIES, WEATHER_HISTORY_MONTHS, localized_id, run_generation  # noqa: E402
 from app.storage.entity_removal import delete_all_values, delete_entity  # noqa: E402
 from app.storage.index import Index  # noqa: E402
@@ -70,6 +71,7 @@ def main() -> None:
         ),
     )
     parser.add_argument("--language", choices=["de", "en"], default="de", help="Sprache der Demo-Entitäten (Namen und entity_ids) (Standard: de). Die entity_ids folgen dem Namen (en: sensor.demo_living_room_temperature); ein Lauf in der anderen Sprache ersetzt den vorhandenen Datensatz")
+    parser.add_argument("--setup-ui", action="store_true", help="Zusätzlich die Demo-Oberfläche anlegen wie der Demo-Modus der App: Energie- und Wetterdashboard einrichten, Charts, Tabellen und die Dashboards „Übersicht“, „Energie“, „Wetter“. Ohne --append wird zuvor Angelegtes abgeräumt und neu angelegt (eigene Objekte bleiben); mit --append nur, wenn noch nie angelegt wurde")
     args = parser.parse_args()
     if args.append and args.clean:
         parser.error("--append und --clean schließen sich gegenseitig aus.")
@@ -107,6 +109,11 @@ def main() -> None:
     if result.skipped:
         print(result.skip_reason)
         return
+
+    if args.setup_ui:
+        created = demo_seed.seed(index, args.language, reset=not args.append)
+        print("Demo-Oberfläche angelegt (Dashboards, Charts, Tabellen, Energie- und Wetterdashboard)." if created
+              else "Demo-Oberfläche war schon angelegt, nichts geändert.")
 
     print(f"Indexabgleich: {result.entities_checked} Entität(en) geprüft, "
           f"{result.mismatches_repaired} Abweichung(en) repariert.")

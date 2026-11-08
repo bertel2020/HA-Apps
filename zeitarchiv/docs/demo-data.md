@@ -259,6 +259,7 @@ Weitere Beispiele:
 | `--seed` | `42` | Zufalls-Seed — gleicher Seed erzeugt reproduzierbar dieselben Werte |
 | `--clean` | *(aus)* | Vorhandene `demo_*`-Entitäten im Zielverzeichnis vor dem Erzeugen sauber entfernen (für wiederholte Läufe) |
 | `--append` | *(aus)* | Statt der kompletten Historie nur die Werte seit dem letzten Lauf ergänzen (`--months` wird dabei ignoriert) — siehe [Lebende Demo-Instanz](#lebende-demo-instanz-append). Schließt sich mit `--clean` gegenseitig aus |
+| `--setup-ui` | *(aus)* | Legt zusätzlich die Demo-Oberfläche an wie der Demo-Modus der App: Energie- und Wetterdashboard eingerichtet, 15 Charts, 3 Vergleichstabellen und die Dashboards „Übersicht“, „Energie“, „Wetter“. Ohne `--append` wird zuvor Angelegtes abgeräumt und neu angelegt (eigene Charts und Tabellen bleiben), mit `--append` nur, wenn es noch nie angelegt wurde |
 | `--language {de,en}` | `de` | Sprache der Demo-Entitäten — Namen **und** `entity_id`s (`en`: `sensor.demo_living_room_temperature` statt `sensor.demo_wohnzimmer_temperatur`). Ein Lauf in der anderen Sprache ersetzt den vorhandenen Datensatz (Entitäten der anderen Sprache werden entfernt, Dashboards darauf zeigen ins Leere). Im Demo-Modus der App gilt die Sprache der Oberfläche. Die Namen stehen im Übersetzungskatalog (`app/i18n/en.json`) |
 | `--clear {values,entities}` | *(aus)* | Eigenständige Aktion statt Erzeugen — siehe [Demo-Daten löschen](#demo-daten-löschen---clear) |
 
@@ -404,4 +405,4 @@ Monate an Daten neu zu berechnen:
   übrigen Historie, auch wenn sonst nichts zu ergänzen wäre. Die Reihe hängt nur
   an Zeitstempel und Datum und passt daher nahtlos an spätere Läufe an. Die
   Zuordnung als Netzbezug-Preis im Energiedashboard legt der Demo-Modus der App
-  mit an (`app/demo_seed.py`); das CLI-Skript erzeugt nur Messwerte.
+  mit an (`app/demo_seed.py`); das CLI-Skript nur mit `--setup-ui`.
