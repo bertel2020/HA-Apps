@@ -175,28 +175,27 @@
     return `<span class="wt-dl${cls}">${escapeHtml(head)}</span><small>${escapeHtml(`${sign}${kwhText(Math.abs(entry.delta))} kWh`)}</small>`;
   }
 
-  // Jahressummen als kleine Balken, ältestes Jahr links, das gewählte kräftig.
-  function rankSpark(data, item, color, year, limit = 0) {
+  // Jahre im Verlauf der Rangliste (ältestes zuerst); weniger als zwei zeigen keinen Verlauf.
+  function sparkYears(data, limit = 0) {
     const shown = limit ? (data.years || []).slice(0, limit) : (data.years || []);
-    const years = [...shown].reverse();
-    if (years.length < 2) return '';
+    return shown.length < 2 ? [] : [...shown].reverse();
+  }
+
+  // Jahressummen als kleine Balken, ältestes Jahr links, das gewählte kräftig. Die Balken teilen sich die Spaltenbreite,
+  // die Spalte wächst mit der Zahl der Jahre (--vr-years), der Anteilsbalken daneben wird dafür kürzer.
+  function rankSpark(data, item, color, year, limit = 0) {
+    const years = sparkYears(data, limit);
+    if (!years.length) return '';
     const values = years.map((y) => yearValue(item, y));
     const top = Math.max(...values.map((v) => v || 0)) || 1;
-    const w = 120, h = 20, gap = 2;
-    const bw = Math.min(16, Math.max(2, (w - gap * (years.length - 1)) / years.length));
     const tip = years.map((y, i) => `${y}: ${values[i] == null ? '–' : energy(values[i])}`).join(' · ');
-    let svg = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${escapeHtml(tip)}"><title>${escapeHtml(tip)}</title>`;
-    years.forEach((y, i) => {
-      const x = (i * (bw + gap)).toFixed(1);
+    const bars = years.map((y, i) => {
       const v = values[i];
-      if (v == null) {
-        svg += `<rect x="${x}" y="${h - 1}" width="${bw.toFixed(1)}" height="1" fill="var(--border-strong)"/>`;
-        return;
-      }
-      const bh = Math.max(1.5, v / top * (h - 1));
-      svg += `<rect x="${x}" y="${(h - bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="1.5" fill="${color}" opacity="${y === year ? 1 : 0.38}"/>`;
-    });
-    return svg + '</svg>';
+      if (v == null) return '<i class="wt-vr-sp-none"></i>';
+      const pct = Math.max(6, v / top * 100);
+      return `<i style="height:${pct.toFixed(1)}%;background:${color};opacity:${y === year ? 1 : 0.38}"></i>`;
+    }).join('');
+    return `<span class="wt-vr-sp" role="img" aria-label="${escapeHtml(tip)}" title="${escapeHtml(tip)}">${bars}</span>`;
   }
 
   function rankHtml(data, rank, sort, selected) {
@@ -610,6 +609,7 @@
         const host = this.$refs.rank;
         if (!data || !host) return;
         const rank = consumerRank(data, this.rankYear(), this.yearLimit);
+        host.style.setProperty('--vr-years', String(sparkYears(data, rank.limit).length));
         host.innerHTML = rankHtml(data, rank, this.rankSort, this.matrixKey());
         if (this.$refs.rankCover) this.$refs.rankCover.innerHTML = coverHtml(rank);
       },

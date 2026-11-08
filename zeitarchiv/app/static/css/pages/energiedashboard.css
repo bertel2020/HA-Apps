@@ -1123,7 +1123,7 @@
   .wt-viewbar .wt-seg{margin-left:0;}
   /* Rangliste „Verbraucher im Jahr“: Name, Balken (Anteil im Maßstab des größten), kWh, Anteil, Änderung, Verlauf. */
   .wt-vr-list{display:flex;flex-direction:column;gap:2px;margin-top:6px;}
-  .wt-vr-row{display:grid;grid-template-columns:minmax(130px,220px) minmax(60px,.55fr) 86px 58px 112px minmax(120px,1fr);
+  .wt-vr-row{display:grid;grid-template-columns:minmax(130px,220px) minmax(60px,1fr) 86px 58px 112px min(calc(var(--vr-years, 0) * 31px), 32%);
     grid-template-areas:"name bar kwh pct delta spark";gap:4px 12px;align-items:center;padding:5px 8px;border-radius:7px;
     font-size:calc(13.5px * var(--font-scale, 1));}
   .wt-vr-pick{cursor:pointer;}
@@ -1152,13 +1152,18 @@
   .wt-vr-delta .wt-dl.wt-dl-good{color:var(--positive);}
   .wt-vr-delta .wt-dl.wt-dl-bad{color:var(--danger);}
   .wt-vr-delta small{display:block;font-size:calc(10.5px * var(--font-scale, 1));color:var(--ink-faint);white-space:normal;}
-  .wt-vr-spark svg{display:block;width:120px;height:20px;}
+  .wt-vr-sp{display:flex;align-items:flex-end;gap:3px;height:26px;}
+  .wt-vr-sp i{flex:1 1 0;max-width:28px;min-width:2px;border-radius:2px;}
+  .wt-vr-sp .wt-vr-sp-none{height:1px;background:var(--border-strong);}
   /* „Übrige (Grundlast)“: schraffiert, weil kein eigener Zähler dahintersteht. */
   .wt-vr-hatch{background:repeating-linear-gradient(135deg, var(--chart-8) 0 3px, color-mix(in srgb, var(--chart-8) 30%, var(--surface)) 3px 6px) !important;}
   .wt-vr-cover{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:10px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
   .wt-vr-cover b{color:var(--ink);font-weight:600;}
   .wt-vr-cover-bar{flex:1 1 160px;align-self:center;min-width:0;height:6px;border-radius:3px;background:var(--surface-alt);overflow:hidden;}
   .wt-vr-cover-bar i{display:block;height:100%;background:var(--accent-line);}
+  @media (max-width:900px){
+    .wt-vr-row{grid-template-columns:minmax(110px,170px) minmax(60px,1fr) 80px 54px 100px min(calc(var(--vr-years, 0) * 31px), 24%);}
+  }
   @media (max-width:640px){
     /* Feste Zahlenspalten, damit kWh und Anteil über alle Zeilen bündig stehen; die Änderung nutzt beide. */
     .wt-vr-row{grid-template-columns:minmax(0,1fr) 64px 52px;grid-template-areas:"name kwh pct" "bar delta delta";gap:3px 10px;padding:7px 6px;}
