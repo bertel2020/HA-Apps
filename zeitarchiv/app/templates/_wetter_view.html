@@ -175,12 +175,12 @@
     </div>
     <p class="hint hint-warn" x-show="dayimageError" x-text="dayimageError" x-cloak></p>
 
-    <dialog class="detail-dialog wt-item-dialog wt-day-dialog" x-ref="dayDlg" :data-class="dayDlg && dayDlg.cell.class || 'none'" @click="if ($event.target === $el) $el.close()" @close="onDayClose()">
+    <dialog class="detail-dialog wt-item-dialog wt-day-dialog" x-ref="dayDlg" aria-labelledby="wt-day-dialog-title" :data-class="dayDlg && dayDlg.cell.class || 'none'" @click="if ($event.target === $el) $el.close()" @close="onDayClose()">
       <template x-if="dayDlg">
         <div>
           <div class="detail-dialog-header">
             <div>
-              <h2 x-text="dayDlgTitle()"></h2>
+              <h2 id="wt-day-dialog-title" x-text="dayDlgTitle()"></h2>
               <div class="wt-day-dialog-sub">
                 <span class="wt-day-pill" :data-class="dayDlg.cell.class || 'none'" x-text="dayDlg.cell.kindName"></span>
                 <span class="wt-day-sub" x-text="dayDlg.cell.sub"></span>
@@ -226,7 +226,7 @@
 
 
   {% if show_monthly %}
-  <div class="card wt-card" x-show="monthly" x-cloak>
+  <div class="card wt-card" x-show="monthly || monthlyError" x-cloak>
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Monatsvergleich") }} {{ hint_button(_("Monatsvergleich")) }}</h2>
       {% call hint_body() %}<span x-text="monthlyNote()"></span>{% endcall %}
@@ -240,7 +240,8 @@
       <label class="filter-chip"><input type="checkbox" x-model="band" @change="drawMonthly()"><span>{{ _("Spanne der Vorjahre") }}</span></label>
     </div>
     <p class="wt-headline" x-show="monthlyMetric === 'temperature' && headline()" x-text="headline()"></p>
-    <div class="wt-chart" x-ref="monthlyChart"></div>
+    <p class="hint hint-warn" x-show="monthlyError" x-cloak>{{ _("Der Monatsvergleich konnte nicht geladen werden.") }} <button type="button" class="btn" @click="loadMonthly()">{{ _("Erneut versuchen") }}</button></p>
+    <div class="wt-chart" x-ref="monthlyChart" x-show="monthly"></div>
   </div>
   {% endif %}
   </section>

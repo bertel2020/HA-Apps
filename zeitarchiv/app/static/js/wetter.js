@@ -196,6 +196,8 @@
       tempDays: 30,
       tempError: '',
       monthly: null,
+      monthlyLoaded: false,  // einmal erfolgreich geladen: erst dann bleibt die Karte nach einem Ladefehler sichtbar
+      monthlyError: false,
       monthlyMetric: 'temperature',
       band: true,
       longterm: null,
@@ -500,15 +502,20 @@
       // Monatsvergleich
       async loadMonthly() {
         const seq = ++this._monthlySeq;
+        this.monthlyError = false;
         try {
           const data = await this.fetchJson(
             `wetterdashboard/monatsvergleich?metric=${this.monthlyMetric}&mode=${this.precipModes[0] || 'mm'}`,
           );
           if (seq !== this._monthlySeq) return;  // eine neuere Anfrage hat überholt
           this.monthly = data;
+          this.monthlyLoaded = true;
           this.$nextTick(() => this.drawMonthly());
         } catch (e) {
-          if (seq === this._monthlySeq) this.monthly = null;
+          if (seq !== this._monthlySeq) return;
+          this.monthly = null;
+          // Nach einem Ladefehler bleibt die Karte samt Kennzahl-Auswahl stehen (sonst käme man nur per Neuladen zurück).
+          this.monthlyError = this.monthlyLoaded;
         }
       },
 

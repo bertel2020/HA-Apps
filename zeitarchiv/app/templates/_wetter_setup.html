@@ -245,9 +245,9 @@
   {% endfor %}
 
 
-  <dialog class="detail-dialog wt-item-dialog" x-ref="roleDlg" :data-role="activeRole" @click="if ($event.target === $el) $el.close()" @close="activeRole = null">
+  <dialog class="detail-dialog wt-item-dialog" x-ref="roleDlg" aria-labelledby="wt-role-dialog-title" :data-role="activeRole" @click="if ($event.target === $el) $el.close()" @close="activeRole = null">
     <div class="detail-dialog-header">
-      <h2 x-text="activeRole ? roleLabels[activeRole] : ''"></h2>
+      <h2 id="wt-role-dialog-title" x-text="activeRole ? roleLabels[activeRole] : ''"></h2>
       <button type="button" class="btn" @click="$refs.roleDlg.close()" aria-label="{{ _('Schließen') }}">✕</button>
     </div>
     <template x-if="activeRole">
@@ -419,9 +419,9 @@
   </div>
   </section>
 
-  <dialog class="detail-dialog wt-item-dialog" x-ref="rowDlg" :data-role="listKind" @click="if ($event.target === $el) $el.close()" @close="onRowClose()">
+  <dialog class="detail-dialog wt-item-dialog" x-ref="rowDlg" aria-labelledby="wt-row-dialog-title" :data-role="listKind" @click="if ($event.target === $el) $el.close()" @close="onRowClose()">
     <div class="detail-dialog-header">
-      <h2 x-text="listKind === 'heating' ? t('Heizzähler') : t('Weiterer Sensor')"></h2>
+      <h2 id="wt-row-dialog-title" x-text="listKind === 'heating' ? t('Heizzähler') : t('Weiterer Sensor')"></h2>
       <button type="button" class="btn" @click="$refs.rowDlg.close()" aria-label="{{ _('Schließen') }}">✕</button>
     </div>
     <template x-if="listKind">
