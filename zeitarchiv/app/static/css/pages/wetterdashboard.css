@@ -374,6 +374,8 @@
   a.wt-rec-big[href]:focus-visible,a.wt-rec-row[href]:focus-visible{outline:2px solid var(--c);outline-offset:-2px;}
   .wt-rec-k{display:block;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
   .wt-rec-bv{display:block;font-size:calc(34px * var(--font-scale, 1));font-weight:700;line-height:1.1;letter-spacing:-.01em;font-variant-numeric:tabular-nums;white-space:nowrap;color:color-mix(in srgb, var(--c) 82%, var(--ink));}
+  /* Drei Gruppen mit je zwei Hero-Werten: bei etwa 870 bis 1100 px bleiben ~100 px je Wert, "−12,3 °C" in 34 px braucht ~120 px. */
+  @media (min-width:861px) and (max-width:1100px){.wt-rec-bv{font-size:calc(26px * var(--font-scale, 1));}}
   .wt-rec-bv small{font-size:calc(14px * var(--font-scale, 1));font-weight:500;letter-spacing:0;color:var(--ink-muted);margin-left:3px;}
   .wt-rec-big[data-tone="hot"] .wt-rec-bv,.wt-rec-row[data-tone="hot"] .wt-rec-v{color:color-mix(in srgb, var(--danger) 80%, var(--ink));}
   .wt-rec-big[data-tone="cold"] .wt-rec-bv,.wt-rec-row[data-tone="cold"] .wt-rec-v{color:color-mix(in srgb, var(--chart-1) 80%, var(--ink));}
