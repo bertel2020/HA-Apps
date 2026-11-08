@@ -2,7 +2,7 @@
 {% from "_hints.html" import hint_button, hint_body %}
 {# Reiter „Langzeit“, Ansicht „Verbraucher“ (Roadmap 1.49): Verbraucher der obersten Ebene über die Jahre. Die Daten kommen
    von POST energiedashboard/langzeit/consumers; energie-langzeit.js rechnet daraus nur Anteile und Änderungen. #}
-<div x-show="lzView === 'verb'" x-cloak>
+<div x-show="lzView === 'verb'" data-hints="collapsed" x-cloak>
   <p class="hint hint-warn" x-show="consumersError" x-text="consumersError" x-cloak></p>
 
   {# Verbraucher im Jahr: Rangliste mit Stichtag-Leiste wie die Vergleichstabelle. #}
