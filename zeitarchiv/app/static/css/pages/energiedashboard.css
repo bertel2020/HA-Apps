@@ -1201,7 +1201,7 @@
      Jahre scrollen waagerecht), je Feld Hauptzahl, darunter klein der andere Wert und die Änderung zum Vorjahr. */
   .wt-vt-wrap{margin-top:12px;}
   .wt-table.wt-vt{width:100%;}
-  .wt-vt thead th{vertical-align:bottom;white-space:nowrap;}
+  .wt-vt thead th{vertical-align:top;white-space:nowrap;}
   .wt-vt thead th small{display:block;font-weight:400;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
   .wt-vt-yh button{display:inline-flex;flex-direction:column;align-items:flex-end;margin:0;padding:0;border:0;background:none;
     font:inherit;color:inherit;text-align:right;cursor:pointer;}
