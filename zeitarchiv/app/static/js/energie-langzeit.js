@@ -1324,7 +1324,8 @@
       setDayField(field) {
         this.dayField = field;
         writeStore({dayField: field});
-        this.days = null;
+        // Die alte Matrix bleibt stehen, bis die neue da ist: Die Karte ausblenden ließ sie flackern, und beim Neuzeichnen direkt
+        // danach fehlte der Verweis auf das Diagramm, sodass die alte Größe stehen blieb.
         this.loadDays();
       },
 
@@ -1353,7 +1354,7 @@
 
       drawDays() {
         const data = this.days;
-        const element = this.$refs.dayChart;
+        const element = this.$refs.dayChart || this.$root.querySelector('.el-day-chart');
         if (!data || !element) return;
         if (!data.years.length || data.max == null) {
           if (charts.days) charts.days.clear();
