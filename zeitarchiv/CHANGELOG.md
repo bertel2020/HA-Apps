@@ -1,5 +1,82 @@
 # Changelog
 
+## Unreleased
+
+### Behoben
+
+- **Sicherheit**: Die Einheit eines Sensors wird in den Hinweisen der Diagramme
+  jetzt maskiert (Monatsvergleich und Niederschlag im Wetterdashboard)
+- **Charts**: Ein Chart lässt sich nicht mehr mit mehr als 25 Entitäten
+  speichern; so ein Chart war danach nicht mehr darstellbar
+  - Der Editor sperrt die 26. Auswahl mit einem Hinweis
+  - Ein schon zu großes Chart bleibt bearbeitbar
+- **Chart-Editor**: Ein Serverfehler erscheint als Fehler mit „Erneut
+  versuchen“ statt als „Keine Daten“; nach dem Leeren der Auswahl zeigt eine
+  noch laufende Abfrage nichts mehr an
+- **Tabellen**: Ein Ladefehler im Tabelleneditor erscheint als Fehler statt als
+  leere Zellen
+- **Meldungen**: Eine Meldung, die direkt auf eine Bestätigung folgte,
+  verschwand sofort wieder
+- **Mobiles Menü**: Das geschlossene Menü ist nicht mehr per Tab erreichbar
+- **Jahresvergleich**: Die Legende rechnet das Vorjahr bis zum gleichen Tag
+  und nennt das richtige Jahr, auch wenn der Browser in einer anderen
+  Zeitzone steht
+- **Wetterdashboard**:
+  - Eine langsame frühere Auswahl überschreibt keine spätere mehr
+  - Enter in einem Textfeld der Einrichtung sendet das Formular nicht mehr ab
+  - Der Monatsvergleich bleibt nach einem Ladefehler mit „Erneut versuchen“
+    stehen
+  - Die Grenzen der Himmelsklassen lassen sich auch bei sehr niedriger oder
+    hoher Sonnenschwelle leer lassen
+  - Eine unbekannte Einheit des Luftdrucks ergibt keine Tendenz mehr; PV-Leistung
+    wird auch mit „KW“ oder „w“ erkannt
+  - Ein Wert, der seit dem Vorabend gilt, füllt auch den Tagesanfang, wenn eine
+    Auswertung genau an diesem Tag beginnt (1. Januar, Monatsanfang der
+    Kenntage)
+  - Rekord-Werte laufen bei mittlerer Breite nicht mehr aus ihrer Kachel
+  - Die Dialoge haben einen Namen für Screenreader
+- **Demo-Modus**: Die Wetter-Historie hatte an einer Stelle einen doppelten
+  Messpunkt
+
+---
+
+### English
+
+#### Fixed
+
+- **Security**: A sensor's unit is now escaped in chart tooltips (monthly
+  comparison and precipitation in the weather dashboard)
+- **Charts**: A chart can no longer be saved with more than 25 entities; such a
+  chart could not be displayed afterwards
+  - The editor blocks the 26th selection with a notice
+  - A chart that is already too large stays editable
+- **Chart editor**: A server error is shown as an error with "Try again"
+  instead of "No data"; after clearing the selection, a request still in
+  progress no longer shows anything
+- **Tables**: A loading error in the table editor is shown as an error instead
+  of empty cells
+- **Messages**: A message that directly followed a confirmation disappeared
+  immediately
+- **Mobile menu**: The closed menu can no longer be reached with the Tab key
+- **Year comparison**: The legend calculates the previous year up to the same
+  day and shows the correct year, even if the browser is in a different time
+  zone
+- **Weather dashboard**:
+  - A slow earlier selection no longer overwrites a later one
+  - Enter in a text field of the setup no longer submits the form
+  - The monthly comparison stays visible with "Try again" after a loading
+    error
+  - The limits of the sky classes can be left empty even with a very low or
+    high sun threshold
+  - An unknown pressure unit no longer produces a trend; PV power is also
+    recognised with "KW" or "w"
+  - A value that has held since the evening before now also fills the start of
+    the day when an evaluation begins on exactly that day (1 January, the
+    start of a month for the notable days)
+  - Record values no longer overflow their tile at medium widths
+  - The dialogs have a name for screen readers
+- **Demo mode**: The weather history had a duplicate data point at one spot
+
 ## 1.31.0 - 2026-11-07
 
 ### Neu
