@@ -1181,7 +1181,7 @@
     return {
       animation: false,
       grid: {left: 8, right: 16, top: options.narrow ? 74 : 34, bottom: 28, containLabel: true},
-      legend: {data: series.map((entry) => entry.name), top: 0, textStyle: {color: colors.text, fontSize: font(12)}, itemWidth: 18, itemHeight: 8},
+      legend: {data: series.map((entry) => entry.name), top: 0, right: 8, textStyle: {color: colors.text, fontSize: font(12)}, itemWidth: 18, itemHeight: 8},
       xAxis: {type: 'value', scale: true, name: unit, nameLocation: 'middle', nameGap: 26, nameTextStyle: {color: colors.text}, ...axis},
       yAxis: {type: 'value', name: t('kWh je Tag'), nameTextStyle: {color: colors.text}, ...axis},
       tooltip: {

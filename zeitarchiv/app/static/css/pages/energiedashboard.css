@@ -1226,4 +1226,4 @@
 .el-wx-seg{max-width:100%;}
 .el-wx-seg button{flex:1 1 0;min-width:0;white-space:normal;}
 .wt-sub{margin:10px 0 0;font-size:13px;font-weight:600;color:var(--ink-muted);}
-.el-spark{width:96px;height:30px;}
+.el-spark{display:inline-block;vertical-align:middle;width:96px;height:30px;margin-right:8px;}
