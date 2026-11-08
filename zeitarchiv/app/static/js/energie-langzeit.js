@@ -249,6 +249,58 @@
     return `<span>${text}</span><span class="wt-vr-cover-bar" aria-hidden="true"><i style="width:${cover.toFixed(1)}%"></i></span>`;
   }
 
+  // Anteile je Jahr: ein gestapelter Balken je Jahr (neuestes oben), Abschnitte in Setup-Reihenfolge, „Übrige“ zuletzt.
+  // mode 'pct': jeder Balken volle Breite; 'kwh': alle Balken im Maßstab des größten Jahres.
+  function sharesHtml(data, years, mode, pick) {
+    const rows = consumerRows(data);
+    const current = data.current.year;
+    const rest = data.rest;
+    const per = years.map((year) => {
+      const items = rows.map((item) => ({item, value: yearValue(item, year)})).filter((e) => e.value != null && e.value > 0);
+      const total = yearValue({year_sums: data.total ? data.total.year_sums : null}, year);
+      const sum = items.reduce((a, e) => a + e.value, 0);
+      const measured = items.filter((e) => !e.item.rest).reduce((a, e) => a + e.value, 0);
+      return {year, items, total, base: Math.max(total || 0, sum), measured};
+    }).filter((d) => d.base > 0);
+    const peak = Math.max(0, ...per.map((d) => d.base)) || 1;
+    let html = '';
+    for (const d of per) {
+      let sub = '';
+      if (d.year === current) sub = t('bis {date}', {date: fmtDate(formats.dm, data.now)});
+      else if (rest.first_ts != null && !coversYear(rest, d.year) && ZT.parts(rest.first_ts).year === d.year) {
+        sub = t('ab {date}', {date: fmtDate(formats.dm, rest.first_ts)});
+      }
+      const width = mode === 'kwh' ? ` style="width:${(d.base / peak * 100).toFixed(1)}%"` : '';
+      html += `<div class="wt-vs-row"><span class="wt-vs-year">${d.year}${d.year === current ? '*' : ''}${sub ? `<small>${escapeHtml(sub)}</small>` : ''}</span>`
+        + `<div class="wt-vs-trackwrap"><div class="wt-vs-track"${width}>`;
+      for (const e of d.items) {
+        const pct = e.value / d.base * 100;
+        let label = '';
+        if (mode === 'pct' && pct >= 7) label = `${num(pct, 0)} %`;
+        if (mode === 'kwh' && pct >= 7 && e.value / peak * 100 >= 9) label = kwhText(e.value);
+        const tip = `${e.item.name} ${d.year}: ${energy(e.value)} · ${num(pct, 1)} %`;
+        const cls = `wt-vs-seg${e.item.rest ? ' wt-vr-hatch' : ''}${pick === e.item.key ? ' is-hl' : ''}`;
+        html += `<span class="${cls}" data-key="${escapeHtml(e.item.key)}" style="width:${pct.toFixed(2)}%;background:${e.item.color}" data-tooltip-fixed="${escapeHtml(tip)}">`
+          + (label ? (e.item.rest ? `<b>${escapeHtml(label)}</b>` : escapeHtml(label)) : '') + '</span>';
+      }
+      const covered = d.total ? ` · ${escapeHtml(t('{percent} % gemessen', {percent: num(Math.min(100, d.measured / d.total * 100), 0)}))}` : '';
+      html += `</div></div><span class="wt-vs-total"><b>${escapeHtml(d.total != null ? energy(d.total) : '–')}</b>${covered}</span></div>`;
+    }
+    return html;
+  }
+
+  // Beschriftungen, die in ihrem Abschnitt keinen Platz haben (schmale Fenster), entfallen; der Tooltip nennt den Wert.
+  function fitShareLabels(host) {
+    host.querySelectorAll('.wt-vs-seg').forEach((seg) => {
+      if (seg.scrollWidth > seg.clientWidth + 1) seg.textContent = '';
+    });
+  }
+
+  function sharesLegendHtml(data, pick) {
+    return consumerRows(data).map((item) => `<button type="button" data-key="${escapeHtml(item.key)}" aria-pressed="${pick === item.key}">`
+      + `<i class="${item.rest ? 'wt-vr-hatch' : ''}" style="background:${item.color}"></i>${escapeHtml(item.name)}</button>`).join('');
+  }
+
   let lastTable = null;
 
   // hidden: im Setup abgewählte Bereiche (Schlüssel wie energie_langzeit.CARD_BLOCKS); deren Daten werden gar nicht erst geladen.
@@ -285,11 +337,15 @@
       rankSort: 'kwh',
       // Gewähltes Jahr der Rangliste; null = das Jahr des Stichtags (folgt dann der Stichtag-Leiste).
       rankYearSel: null,
+      sharesMode: 'pct',
+      // Hervorgehobener Verbraucher (Schlüssel aus langzeit/consumers, „rest“ für Übrige) oder null.
+      pick: null,
 
       init() {
         const saved = readStore();
         if (hasConsumers && (saved.view === 'sum' || saved.view === 'verb')) this.lzView = saved.view;
         if (saved.rankSort === 'kwh' || saved.rankSort === 'chg') this.rankSort = saved.rankSort;
+        if (saved.sharesMode === 'pct' || saved.sharesMode === 'kwh') this.sharesMode = saved.sharesMode;
         if (Array.isArray(saved.columns)) this.columns = COLUMN_KEYS.filter((key) => saved.columns.includes(key));
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
@@ -309,6 +365,8 @@
           }
         });
         // Stichtag-Leiste des App-Standards: bei jeder Änderung Tabelle und Rangliste neu laden (was schon geladen ist).
+        // Nach einer Größenänderung neu zeichnen: welche Beschriftung in ihren Abschnitt passt, hängt von der Breite ab.
+        window.addEventListener('resize', () => { if (this.$root.isConnected && this.consumers) this.drawShares(); });
         window.addEventListener('dashboard-stichtag', () => {
           if (!this.$root.isConnected || !this.opened) return;
           if (this.sumLoaded) {
@@ -380,6 +438,56 @@
 
       drawConsumers() {
         this.drawRank();
+        this.drawShares();
+      },
+
+      // Anteile je Jahr in Prozent oder kWh; die Jahre wie in der Leiste „Jahre“ gewählt.
+      setSharesMode(mode) {
+        this.sharesMode = mode;
+        writeStore({sharesMode: mode});
+        this.drawShares();
+      },
+
+      sharesNote() {
+        return this.sharesMode === 'pct'
+          ? t('Anteil jedes Verbrauchers am Verbrauch des Jahres laut Bilanz. Das laufende Jahr (*) und das erste Jahr des Archivs sind nicht vollständig.')
+          : t('Jahressummen in kWh, alle Balken im selben Maßstab. Das laufende Jahr (*) und das erste Jahr des Archivs sind nicht vollständig.');
+      },
+
+      drawShares() {
+        const data = this.consumers;
+        const host = this.$refs.shares;
+        if (!data || !data.years || !host) return;
+        const years = this.yearLimit ? data.years.slice(0, this.yearLimit) : data.years;
+        host.innerHTML = sharesHtml(data, years, this.sharesMode, this.pick);
+        host.classList.toggle('has-hl', !!this.pick);
+        requestAnimationFrame(() => fitShareLabels(host));
+        if (this.$refs.sharesLegend) this.$refs.sharesLegend.innerHTML = sharesLegendHtml(data, this.pick);
+      },
+
+      // Hervorhebung eines Verbrauchers in allen Jahren (Zeiger darüber vorübergehend, Klick bleibt).
+      highlight(key) {
+        const host = this.$refs.shares;
+        if (!host) return;
+        host.classList.toggle('has-hl', !!key);
+        host.querySelectorAll('.wt-vs-seg').forEach((seg) => seg.classList.toggle('is-hl', seg.dataset.key === key));
+      },
+
+      sharesHover(event) {
+        const seg = event.target.closest('.wt-vs-seg');
+        if (seg) this.highlight(seg.dataset.key);
+      },
+
+      sharesClick(event) {
+        const target = event.target.closest('[data-key]');
+        if (!target) return;
+        const key = target.dataset.key;
+        this.pickConsumer(this.pick === key && target.tagName === 'BUTTON' ? null : key);
+      },
+
+      pickConsumer(key) {
+        this.pick = key;
+        this.drawShares();
       },
 
       // Jahre der Rangliste: vom Jahr des Stichtags zurück bis zum Beginn des Archivs.
@@ -440,7 +548,8 @@
       yearCount() {
         const m = this.months ? this.months.years.length : 0;
         const k = this.records && this.records.kenntage ? this.records.kenntage.years.length : 0;
-        return Math.max(m, k);
+        const c = this.consumers && this.consumers.years ? this.consumers.years.length : 0;
+        return Math.max(m, k, c);
       },
 
       yearOptions() {
@@ -457,6 +566,7 @@
         this.drawMonthly();
         this.drawMatrix();
         this.drawKenntage();
+        this.drawShares();
       },
 
       // Die Monatswerte mit den gewählten Jahren, für Diagramm und Matrix.

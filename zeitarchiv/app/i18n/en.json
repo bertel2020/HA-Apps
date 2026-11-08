@@ -3731,7 +3731,12 @@
     "Verbraucher im Jahr": "Consumers in the year",
     "Zeigen": "Show",
     "{n} Verbraucher eingerichtet. Geräte hinter einem Zwischenzähler stehen in ihrem Zwischenzähler.": "{n} consumer(s) set up. Devices behind a sub-meter are counted in their sub-meter.",
-    "Änderung": "Change"
+    "Änderung": "Change",
+    "Anteil jedes Verbrauchers am Verbrauch des Jahres laut Bilanz; rechts die Jahressumme und wie viel davon eigene Zähler erfassen. * laufendes Jahr. Die Reihenfolge folgt der Verbraucherliste im Setup. Schraffiert: „Übrige (Grundlast)“, alles ohne eigenen Zähler. Ein Klick auf einen Verbraucher hebt ihn in allen Jahren hervor.": "Share of each consumer in the year’s consumption according to the balance; on the right the yearly total and how much of it your own meters record. * current year. The order follows the consumer list in the setup. Hatched: “Other (base load)”, everything without its own meter. A click on a consumer highlights it in all years.",
+    "Anteile je Jahr": "Shares per year",
+    "Anteile oder kWh": "Shares or kWh",
+    "Gilt für Anteile je Jahr.": "Applies to shares per year.",
+    "Verbraucher hervorheben": "Highlight consumer"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4718,6 +4723,9 @@
     "neu ab {date}": "new from {date}",
     "{name} wird erst ab {date} gemessen und steckt vorher in „Übrige“. Der Vergleich mit dem Vorjahr ist dadurch verzerrt.": "{name} is only measured from {date} and is part of “Other” before that. The comparison with the previous year is therefore distorted.",
     "{year} ab Beginn des Archivs am {date}, ohne Vorjahr.": "{year} from the start of the archive on {date}, no previous year.",
-    "{year} bis {date}": "{year} to {date}"
+    "{year} bis {date}": "{year} to {date}",
+    "Anteil jedes Verbrauchers am Verbrauch des Jahres laut Bilanz. Das laufende Jahr (*) und das erste Jahr des Archivs sind nicht vollständig.": "Share of each consumer in the year’s consumption according to the balance. The current year (*) and the first year of the archive are incomplete.",
+    "Jahressummen in kWh, alle Balken im selben Maßstab. Das laufende Jahr (*) und das erste Jahr des Archivs sind nicht vollständig.": "Yearly totals in kWh, all bars on the same scale. The current year (*) and the first year of the archive are incomplete.",
+    "{percent} % gemessen": "{percent} % measured"
   }
 }

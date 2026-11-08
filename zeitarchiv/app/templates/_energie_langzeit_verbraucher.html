@@ -31,4 +31,30 @@
     <div class="wt-vr-cover" x-ref="rankCover"></div>
     <p class="wt-foot">{{ _("Anteil am Verbrauch laut Bilanz (Erzeugung + Netzbezug + Speicherentladung − Einspeisung − Speicherladung). Die Änderung vergleicht mit demselben Stück des Vorjahres; rot: mehr Verbrauch, grün: weniger, „–“, wenn der Verbraucher im Vorjahr noch nicht ganz erfasst war. „Übrige (Grundlast)“ ist der Rest bis zur Bilanz, nie negativ. Das Dreieck nennt Messlücken und Zählerrückgänge im Zeitraum. Der Name öffnet die Entität. Der kleine Verlauf rechts zeigt die Jahressummen, das gewählte Jahr kräftig.") }}</p>
   </div>
+
+  {# Anzahl der Jahre: dieselbe Auswahl wie in der Ansicht „Summen“ (im Browser gemerkt). #}
+  <div class="wt-yearbar" x-show="consumers && consumers.years" x-cloak>
+    <span class="wt-yearbar-label">{{ _("Jahre") }}</span>
+    <span class="wt-yearbar-note">{{ _("Gilt für Anteile je Jahr.") }}</span>
+    <div class="wt-seg" role="group" aria-label="{{ _('Anzahl der Jahre') }}">
+      <template x-for="option in yearOptions()" :key="option.value">
+        <button type="button" :aria-pressed="(yearLimit === option.value).toString()" @click="setYearLimit(option.value)" x-text="option.label"></button>
+      </template>
+    </div>
+  </div>
+
+  {# Anteile je Jahr: ein gestapelter Balken je Jahr, Abschnitte in der Reihenfolge des Setups, „Übrige“ schraffiert. #}
+  <div class="card wt-card" x-show="consumers && consumers.years" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Anteile je Jahr") }} {{ hint_button(_("Anteile je Jahr")) }}</h2>
+      {% call hint_body() %}<span x-text="sharesNote()"></span>{% endcall %}
+      <div class="wt-seg wt-controls-end" role="group" aria-label="{{ _('Anteile oder kWh') }}">
+        <button type="button" :aria-pressed="(sharesMode === 'pct').toString()" @click="setSharesMode('pct')">{{ _("Anteile (%)") }}</button>
+        <button type="button" :aria-pressed="(sharesMode === 'kwh').toString()" @click="setSharesMode('kwh')">kWh</button>
+      </div>
+    </div>
+    <div class="wt-vs-rows" x-ref="shares" @mouseover="sharesHover($event)" @mouseleave="highlight(pick)" @click="sharesClick($event)"></div>
+    <div class="wt-vs-leg" role="group" aria-label="{{ _('Verbraucher hervorheben') }}" x-ref="sharesLegend" @click="sharesClick($event)"></div>
+    <p class="wt-foot">{{ _("Anteil jedes Verbrauchers am Verbrauch des Jahres laut Bilanz; rechts die Jahressumme und wie viel davon eigene Zähler erfassen. * laufendes Jahr. Die Reihenfolge folgt der Verbraucherliste im Setup. Schraffiert: „Übrige (Grundlast)“, alles ohne eigenen Zähler. Ein Klick auf einen Verbraucher hebt ihn in allen Jahren hervor.") }}</p>
+  </div>
 </div>

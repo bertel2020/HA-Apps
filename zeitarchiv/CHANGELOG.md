@@ -11,6 +11,7 @@
     der Stichtag gilt wie in der Vergleichstabelle
   - „Gemessen“ nennt, wie viel des Verbrauchs eigene Zähler erfassen; der Rest
     steht als „Übrige (Grundlast)“
+  - „Anteile je Jahr“: ein gestapelter Balken je Jahr, in Prozent oder kWh
 
 ---
 
@@ -25,6 +26,7 @@
     the reference date applies as in the comparison table
   - "Measured" shows how much of the consumption your own meters record; the
     remainder is shown as "Other (base load)"
+  - "Shares per year": one stacked bar per year, in percent or kWh
 
 ## 1.31.1 - 2026-11-08
 
