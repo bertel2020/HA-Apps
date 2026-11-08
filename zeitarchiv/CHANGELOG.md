@@ -40,6 +40,9 @@
     Speicher-Kenntagen als „kein Speicher“
   - Bei einem Verbraucher zeigt „Monatswerte je Jahr“ zusätzlich einen
     kleinen Verlauf der Jahressummen
+  - „Jahre im Vergleich, Tag für Tag“: jeder Tag als Farbfeld, eine Zeile je
+    Jahr, für Erzeugung, Verbrauch und Netzbezug; ein Klick öffnet den Tag
+  - Die Karten stehen jetzt in der Reihenfolge des Wetterdashboards
 
 ### Geändert
 
@@ -98,6 +101,9 @@
     for the storage-related days
   - For a consumer, "Monthly values per year" also shows a small trend of the
     annual totals
+  - "Years compared, day by day": every day as a colour cell, one row per
+    year, for generation, consumption and grid import; a click opens the day
+  - The cards now follow the order of the weather dashboard
 
 #### Changed
 

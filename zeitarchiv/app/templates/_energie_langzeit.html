@@ -78,6 +78,41 @@
   </div>
   <p class="hint hint-status" x-show="records && !records.enough" x-cloak>{{ _("Rekorde erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte enthält.") }}</p>
 {% endif %}
+{% if 'kenntage' not in hidden %}
+  {# Kenntage je Jahr: sechs Kenntage in drei Paaren, je Jahr ein Balken (Anteil an den ausgewerteten Tagen). Ein Klick auf
+     eine Zeile öffnet den Jahreskalender. #}
+  <div class="card wt-card" x-show="records && records.kenntage && records.kenntage.available.length" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Kenntage je Jahr") }} {{ hint_button(_("Kenntage je Jahr")) }}</h2>
+      {% call hint_body() %}<span x-text="kenntageNote()"></span> {{ _("Die Länge der Balken zeigt den Anteil an den ausgewerteten Tagen, im Maßstab des größten Anteils im Feld. Ein Klick auf eine Zeile zeigt die Tage im Jahreskalender.") }}{% endcall %}
+      <div class="wt-seg" role="group" aria-label="{{ _('Zählung') }}">
+        <button type="button" :aria-pressed="(ktMode === 'full').toString()" @click="setKtMode('full')">{{ _("Komplett") }}</button>
+        <button type="button" :aria-pressed="(ktMode === 'ytd').toString()" @click="setKtMode('ytd')">{{ _("Bis jetzt") }}</button>
+      </div>
+      {{ year_choice() }}
+    </div>
+    <p class="wt-stand" x-text="ktRange()"></p>
+    <div class="wt-kt" x-ref="kenntage" @click="kenntageClick($event)"></div>
+  </div>
+
+  {# Jahreskalender eines Kenntags. #}
+  <dialog class="detail-dialog wt-ktcal-dialog" x-ref="kenntageDialog" aria-labelledby="kt-dialog-title" @click="if ($event.target === $el) $el.close()">
+    <div class="detail-dialog-header">
+      <h2 id="kt-dialog-title" x-text="ktDialog.title"></h2>
+      <button type="button" class="btn" onclick="this.closest('dialog').close()" aria-label="{{ _('Schließen') }}">✕</button>
+    </div>
+    <p class="wt-stand" x-text="ktDialog.sub"></p>
+    <p class="hint hint-warn" x-show="ktDialog.error" x-text="ktDialog.error" x-cloak></p>
+    <div class="tbl-wrap wt-table-wrap"><table class="wt-ktcal" x-html="ktDialog.html"></table></div>
+    <div class="wt-ktcal-legend">
+      <span><i class="wt-ktcal-hit"></i>{{ _("Kenntag (Klick öffnet den Tag)") }}</span>
+      <span><i class="wt-ktcal-none"></i>{{ _("kein Kenntag") }}</span>
+      <span><i class="wt-ktcal-gap"></i>{{ _("nicht ausgewertet") }}</span>
+      <span><i class="wt-ktcal-off"></i>{{ _("außerhalb des Zeitraums") }}</span>
+    </div>
+  </dialog>
+{% endif %}
+
 {% if 'matrix' not in hidden or 'monatsvergleich' not in hidden %}
   {# Eine Größe über alle Jahre: dieselbe Tabelle wie „Mitteltemperatur je Monat und Jahr“ im Wetterdashboard oder, als Linien, wie der
      Monatsvergleich dort. #}
@@ -126,39 +161,25 @@
   </div>
 {% endif %}
 
-{% if 'kenntage' not in hidden %}
-  {# Kenntage je Jahr: sechs Kenntage in drei Paaren, je Jahr ein Balken (Anteil an den ausgewerteten Tagen). Ein Klick auf
-     eine Zeile öffnet den Jahreskalender. #}
-  <div class="card wt-card" x-show="records && records.kenntage && records.kenntage.available.length" x-cloak>
+{% if 'tagfuertag' not in hidden %}
+  {# Jahre im Vergleich, Tag für Tag: wie im Wetterdashboard eine Zeile je Jahr, eine Spalte je Kalendertag, gefärbt nach dem Tageswert.
+     Daten: GET energiedashboard/langzeit/days (je Größe eine Anfrage). #}
+  <p class="hint hint-warn" x-show="daysError" x-text="daysError" x-cloak></p>
+  <div class="card wt-card" x-show="days && days.fields.length" x-cloak>
     <div class="wt-controls">
-      <h2 class="wt-h2">{{ _("Kenntage je Jahr") }} {{ hint_button(_("Kenntage je Jahr")) }}</h2>
-      {% call hint_body() %}<span x-text="kenntageNote()"></span> {{ _("Die Länge der Balken zeigt den Anteil an den ausgewerteten Tagen, im Maßstab des größten Anteils im Feld. Ein Klick auf eine Zeile zeigt die Tage im Jahreskalender.") }}{% endcall %}
-      <div class="wt-seg" role="group" aria-label="{{ _('Zählung') }}">
-        <button type="button" :aria-pressed="(ktMode === 'full').toString()" @click="setKtMode('full')">{{ _("Komplett") }}</button>
-        <button type="button" :aria-pressed="(ktMode === 'ytd').toString()" @click="setKtMode('ytd')">{{ _("Bis jetzt") }}</button>
+      <h2 class="wt-h2">{{ _("Jahre im Vergleich, Tag für Tag") }} {{ hint_button(_("Jahre im Vergleich, Tag für Tag")) }}</h2>
+      {% call hint_body() %}<span x-text="dayNote()"></span>{% endcall %}
+      <div class="wt-controls-end">
+        {{ year_choice() }}
+        <div class="wt-seg" role="group" aria-label="{{ _('Größe') }}">
+          <template x-for="key in dayFields()" :key="key">
+            <button type="button" :aria-pressed="(dayField === key).toString()" @click="setDayField(key)" x-text="dayFieldLabel(key)"></button>
+          </template>
+        </div>
       </div>
-      {{ year_choice() }}
     </div>
-    <p class="wt-stand" x-text="ktRange()"></p>
-    <div class="wt-kt" x-ref="kenntage" @click="kenntageClick($event)"></div>
+    <div class="wt-chart" x-ref="dayChart" :style="dayHeight()"></div>
   </div>
-
-  {# Jahreskalender eines Kenntags. #}
-  <dialog class="detail-dialog wt-ktcal-dialog" x-ref="kenntageDialog" aria-labelledby="kt-dialog-title" @click="if ($event.target === $el) $el.close()">
-    <div class="detail-dialog-header">
-      <h2 id="kt-dialog-title" x-text="ktDialog.title"></h2>
-      <button type="button" class="btn" onclick="this.closest('dialog').close()" aria-label="{{ _('Schließen') }}">✕</button>
-    </div>
-    <p class="wt-stand" x-text="ktDialog.sub"></p>
-    <p class="hint hint-warn" x-show="ktDialog.error" x-text="ktDialog.error" x-cloak></p>
-    <div class="tbl-wrap wt-table-wrap"><table class="wt-ktcal" x-html="ktDialog.html"></table></div>
-    <div class="wt-ktcal-legend">
-      <span><i class="wt-ktcal-hit"></i>{{ _("Kenntag (Klick öffnet den Tag)") }}</span>
-      <span><i class="wt-ktcal-none"></i>{{ _("kein Kenntag") }}</span>
-      <span><i class="wt-ktcal-gap"></i>{{ _("nicht ausgewertet") }}</span>
-      <span><i class="wt-ktcal-off"></i>{{ _("außerhalb des Zeitraums") }}</span>
-    </div>
-  </dialog>
 {% endif %}
 
 </div>

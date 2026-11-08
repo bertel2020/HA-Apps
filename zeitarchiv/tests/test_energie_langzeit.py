@@ -508,18 +508,18 @@ def test_bereiche_des_reiters_werden_im_setup_gespeichert_und_nicht_gerendert(cl
     try:
         alles = client.post("/energiedashboard/setup", data={
             "netzbezug": "sensor.setup_netz",
-            "langzeit_zeigen": ["quoten", "speicher", "pv", "verbraucher", "jahresbilanz", "monatsvergleich", "matrix", "rekorde", "kenntage"],
+            "langzeit_zeigen": ["quoten", "speicher", "pv", "verbraucher", "jahresbilanz", "monatsvergleich", "matrix", "rekorde", "kenntage", "tagfuertag"],
         })
         assert ed._load_config(index)["langzeit_ausblenden"] == []
-        assert 'x-ref="monthlyChart"' in alles.text and 'x-ref="kenntage"' in alles.text and 'x-ref="jbBars"' in alles.text
+        assert 'x-ref="monthlyChart"' in alles.text and 'x-ref="kenntage"' in alles.text and 'x-ref="jbBars"' in alles.text and 'x-ref="dayChart"' in alles.text
 
         wenig = client.post("/energiedashboard/setup", data={
             "netzbezug": "sensor.setup_netz", "langzeit_zeigen": ["quoten", "rekorde"],
         })
         assert ed._load_config(index)["langzeit_ausblenden"] == [
-            "speicher", "pv", "jahresbilanz", "monatsvergleich", "matrix", "kenntage", "verbraucher",
+            "speicher", "pv", "jahresbilanz", "monatsvergleich", "matrix", "kenntage", "tagfuertag", "verbraucher",
         ]
-        for ref in ('x-ref="monthlyChart"', 'x-ref="matrixTable"', 'x-ref="kenntage"', 'x-ref="jbBars"'):
+        for ref in ('x-ref="monthlyChart"', 'x-ref="matrixTable"', 'x-ref="kenntage"', 'x-ref="jbBars"', 'x-ref="dayChart"'):
             assert ref not in wenig.text, ref
         assert "el-rec-big" in wenig.text                                  # die Rekorde sind angehakt geblieben
         assert 'x-ref="table"' in wenig.text                              # die Tabelle gibt es immer
@@ -701,6 +701,64 @@ def test_years_route(client) -> None:
     try:
         antwort = client.get("/energiedashboard/langzeit/years")
         assert antwort.status_code == 200 and antwort.json()["roles"] == ["netzbezug", "verbrauch"]
+    finally:
+        index.set_setting(ed.SETTING_CONFIG, "")
+
+
+def _spalte(tag) -> int:
+    from datetime import date
+
+    return (date(2000, tag.month, tag.day) - date(2000, 1, 1)).days
+
+
+def test_tagesmatrix_jahre_als_zeilen_kalendertage_als_spalten_und_luecken(service, monkeypatch) -> None:
+    config = _zwei_zaehler(service, _monat(2025, 7))
+    tage = [_tag(i) for i in range(400)]                    # 1.7.2025 bis 4.8.2026
+    pv = {tag: 5.0 for tag in tage}
+    pv[tage[10]] = 50.0                                      # Ausreißer: die Farbskala endet beim 99. Perzentil
+    netz = {tag: 2.0 for tag in tage}
+    del pv[tage[20]], netz[tage[20]]                         # 21.7.2025 fehlt, damit auch der 22.7.
+    _tagesreihen(monkeypatch, {"sensor.pv": pv, "sensor.netz": netz})
+    daten = service.compute_day_matrix(config, "erzeugung", NOW)
+    assert daten["field"] == "erzeugung" and daten["fields"] == ["erzeugung", "verbrauch", "netzbezug"]
+    assert daten["years"] == [2026, 2025] and daten["unit"] == "kWh" and daten["since"] == "2025-07-01"
+    zellen = {(spalte, zeile): wert for spalte, zeile, wert in daten["cells"]}
+    luecken = {(spalte, zeile) for spalte, zeile in daten["missing"]}
+    assert zellen[(_spalte(tage[10]), 1)] == 50.0 and zellen[(_spalte(tage[0]), 1)] == 5.0
+    assert (_spalte(tage[20]), 1) in luecken and (_spalte(tage[21]), 1) in luecken
+    assert (_spalte(tage[20]), 1) not in zellen
+    heute = NOW.date()
+    assert (_spalte(heute), 0) not in zellen and (_spalte(heute), 0) not in luecken   # heute zählt nicht
+    assert not any(spalte == 59 for spalte, zeile, _wert in daten["cells"] if zeile == 0)   # 2026 hat keinen 29.2.
+    from datetime import timedelta
+
+    assert (_spalte(tage[-1] + timedelta(days=1)), 0) in luecken                     # der Tag nach der letzten Messung bis gestern ist leer
+    assert (_spalte(tage[0] - timedelta(days=1)), 1) not in luecken                  # vor dem Archivbeginn bleibt das Feld ganz leer
+    assert daten["min"] == 0.0 and daten["max"] == 5.0
+    verbrauch = service.compute_day_matrix(config, "verbrauch", NOW)
+    assert next(w for sp, ze, w in verbrauch["cells"] if (sp, ze) == (_spalte(tage[0]), 1)) == 7.0   # 5 + 2
+
+
+def test_tagesmatrix_faellt_auf_eine_vorhandene_groesse_zurueck_und_ist_ohne_einrichtung_leer(service, monkeypatch) -> None:
+    _archiv(service, "sensor.pv", _monat(2025, 7))
+    config = _config(erzeuger=[{"entity_id": "sensor.pv"}])
+    _tagesreihen(monkeypatch, {"sensor.pv": {_tag(i): 5.0 for i in range(10)}})
+    daten = service.compute_day_matrix(config, "netzbezug", NOW)      # ohne Netzbezug-Rolle
+    assert daten["fields"] == ["erzeugung", "verbrauch"] and daten["field"] == "erzeugung"
+    leer = service.compute_day_matrix(_config(), "erzeugung", NOW)
+    assert leer["fields"] == [] and leer["field"] is None and leer["cells"] == [] and leer["max"] is None
+
+
+def test_days_route(client) -> None:
+    from app.main import index
+
+    index.set_setting(ed.SETTING_CONFIG, "")
+    assert client.get("/energiedashboard/langzeit/days").status_code == 409
+    ed._save_config(index, _config(netzbezug="sensor.langzeit_test_netz"))
+    try:
+        assert client.get("/energiedashboard/langzeit/days?field=gibtsnicht").status_code == 422
+        antwort = client.get("/energiedashboard/langzeit/days?field=netzbezug")
+        assert antwort.status_code == 200 and antwort.json()["field"] == "netzbezug" and antwort.json()["years"] == []
     finally:
         index.set_setting(ed.SETTING_CONFIG, "")
 

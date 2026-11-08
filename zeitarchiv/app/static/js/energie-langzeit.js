@@ -66,7 +66,7 @@
   window.addEventListener('resize', () => Object.values(charts).forEach((chart) => chart.resize()));
 
   const {monthName, mean, present, monthKey, isPartialStart, monthStats, yearSum, energyMatrix} = window.ElementTableRender;
-  const {energyMonthly} = window.ElementChartRender;
+  const {energyMonthly, weatherMatrix} = window.ElementChartRender;
 
   function kenntagValues(key, values, average, kwp, capacity) {
     const kwh = (value) => num(value, 1);
@@ -1136,6 +1136,11 @@
       // Jahresbilanz: Jahressummen je Kalenderjahr; „Bis jetzt“ (ytd) ist vorgewählt, weil nur so das laufende Jahr vergleichbar ist.
       years: null,
       yearsError: '',
+      // Jahre im Vergleich, Tag für Tag: die gewählte Größe und die Matrix dazu (eine Anfrage je Größe).
+      dayField: 'erzeugung',
+      days: null,
+      daysError: '',
+      _daysSeq: 0,
       jbCount: 'ytd',
       jbMode: 'kwh',
       // Gewählte Größe: „r:<Rolle>“ (Bilanz) oder „c:<Verbraucher>“; die Auswahl im Reiter „Vergleich“ gilt auch hier.
@@ -1154,12 +1159,14 @@
         if (saved.ktMode === 'full' || saved.ktMode === 'ytd') this.ktMode = saved.ktMode;
         if (saved.jbCount === 'full' || saved.jbCount === 'ytd') this.jbCount = saved.jbCount;
         if (saved.jbMode === 'kwh' || saved.jbMode === 'pct') this.jbMode = saved.jbMode;
+        if (['erzeugung', 'verbrauch', 'netzbezug'].includes(saved.dayField)) this.dayField = saved.dayField;
         if ((saved.lzView === 'tab' && shown('matrix')) || (saved.lzView === 'line' && shown('monatsvergleich'))) this.lzView = saved.lzView;
         if (typeof saved.sizeSel === 'string') this.sizeSel = saved.sizeSel;
         // Geladen wird erst beim ersten Öffnen des Reiters: Die Übersicht ist die Startansicht.
         onFirstShow('long', this, () => {
           this.takeSelection();
           if (shown('jahresbilanz')) this.loadYears();
+          if (shown('tagfuertag')) this.loadDays();
           if (withMonths) this.loadMonths();
           if (withMonths && withConsumers) this.loadConsumers();
           if (shown('rekorde') || shown('kenntage')) this.loadRecords();
@@ -1185,7 +1192,8 @@
         const c = this.cons && this.cons.years ? this.cons.years.length : 0;
         const k = this.records && this.records.kenntage ? this.records.kenntage.years.length : 0;
         const y = this.years ? this.years.years.length : 0;
-        return Math.max(m, c, k, y);
+        const d = this.days ? this.days.years.length : 0;
+        return Math.max(m, c, k, y, d);
       },
 
       yearOptions() {
@@ -1203,6 +1211,87 @@
         this.drawYears();
         this.drawSize();
         this.drawKenntage();
+        this.$nextTick(() => this.drawDays());
+      },
+
+      // ---- Jahre im Vergleich, Tag für Tag: Matrix Jahr × Kalendertag, gefärbt nach dem Tageswert ----
+
+      async loadDays() {
+        this.daysError = '';
+        const seq = ++this._daysSeq;
+        try {
+          const res = await fetch(`energiedashboard/langzeit/days?field=${encodeURIComponent(this.dayField)}`);
+          if (!res.ok) throw new Error(String(res.status));
+          const data = await res.json();
+          if (seq !== this._daysSeq) return;  // eine neuere Anfrage hat überholt
+          if (data.field) this.dayField = data.field;
+          this.days = data;
+          this.$nextTick(() => this.drawDays());
+        } catch (e) {
+          if (seq === this._daysSeq) this.daysError = t('Die Tageswerte konnten nicht geladen werden.');
+        }
+      },
+
+      setDayField(field) {
+        this.dayField = field;
+        writeStore({dayField: field});
+        this.days = null;
+        this.loadDays();
+      },
+
+      dayFields() {
+        return this.days ? this.days.fields : [];
+      },
+
+      dayFieldLabel(key) {
+        return {erzeugung: t('Erzeugung'), verbrauch: t('Verbrauch'), netzbezug: t('Netzbezug')}[key] || key;
+      },
+
+      // Die gezeigten Jahre (neuestes zuerst), begrenzt durch „Letzte 5 | Alle“.
+      dayYears() {
+        if (!this.days) return [];
+        return this.yearLimit ? this.days.years.slice(0, this.yearLimit) : this.days.years;
+      },
+
+      // Eine Zeile je Jahr: 20 Pixel plus Platz für Achse und Farbskala (wie im Wetterdashboard).
+      dayHeight() {
+        return `height: ${Math.max(160, (this.dayYears().length || 3) * 20 + 90)}px`;
+      },
+
+      dayNote() {
+        return t('Neuestes Jahr oben, eine Spalte je Kalendertag, gefärbt nach dem Tageswert; die Farbstufen gelten für alle Jahre gleich. Graue Felder sind Tage ohne vollständige Werte (auch der Tag nach einem fehlenden Tag), leer ist es vor dem Archivbeginn und ab heute. Ein Klick öffnet den Tag in der Übersicht.');
+      },
+
+      drawDays() {
+        const data = this.days;
+        const element = this.$refs.dayChart;
+        if (!data || !element) return;
+        if (!data.years.length || data.max == null) {
+          if (charts.days) charts.days.clear();
+          return;
+        }
+        const years = this.dayYears();
+        const m = {
+          ...data, years,
+          cells: data.cells.filter(([, row]) => row < years.length),
+          missing: data.missing.filter(([, row]) => row < years.length),
+        };
+        const accent = {erzeugung: '--energy-solar', netzbezug: '--energy-grid', verbrauch: '--chart-1'}[data.field] || '--chart-1';
+        const colors = {...palette(), cold: cssVar(accent)};
+        const chart = chartFor('days', element);
+        chart.setOption(weatherMatrix(m, {
+          colors, sequential: true, missingLabel: t('Keine vollständigen Werte'), narrow: element.clientWidth < 520, font: scaledFont,
+        }), true);
+        chart.off('click');
+        chart.on('click', (param) => {
+          if (param.seriesIndex !== 1) return;
+          const [slot, row] = param.data;
+          const leapDay = new Date(Date.UTC(2024, 0, 1 + slot));
+          const month = String(leapDay.getUTCMonth() + 1).padStart(2, '0');
+          const day = String(leapDay.getUTCDate()).padStart(2, '0');
+          window.location.href = `energiedashboard?date=${years[row]}-${month}-${day}`;
+        });
+        requestAnimationFrame(() => chart.resize());
       },
 
       // ---- Jahresbilanz: Summen je Kalenderjahr, Verlauf von Autarkie und Eigenverbrauch ----

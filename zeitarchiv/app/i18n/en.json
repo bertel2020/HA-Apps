@@ -3800,7 +3800,8 @@
     "Fast autark zählt Tage, an denen der Netzbezug höchstens (100 − Wert) % des Verbrauchs ausmacht. Sonnentage brauchen bei jedem Erzeuger die Anlagenleistung (kWp). Trübe Tage vergleichen mit dem Tagesmittel des Jahres. Die beiden Speicher-Schwellen sind Prozent der Speicherkapazität und gelten für die Entladung je Tag; ohne bekannte Kapazität erscheinen die beiden Felder nicht. „Tage ohne Netzbezug“ zählt Tage mit höchstens 0,1 kWh Netzbezug und hat keine Schwelle zum Einstellen.": "Almost self-sufficient counts days on which grid import is at most (100 − value) % of consumption. Sunny days need the system size (kWp) on every generator. Dull days compare with the year’s daily average. The two battery thresholds are percentages of the battery capacity and apply to discharge per day; without a known capacity the two boxes do not appear. “Days without grid import” counts days with at most 0.1 kWh of grid import and has no threshold to set.",
     "Hohe Einspeisung über": "High feed-in above",
     "kWh am Tag": "kWh per day",
-    "Jahressummen des Verbrauchers": "Annual totals of the consumer"
+    "Jahressummen des Verbrauchers": "Annual totals of the consumer",
+    "Unbekannte Größe: {value}": "Unknown size: {value}"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4817,6 +4818,9 @@
     "Netzbezug höchstens 0,1 kWh": "grid import at most 0.1 kWh",
     "Tage ohne Netzbezug": "Days without grid import",
     "kein Speicher": "no storage",
-    "mehr als {value} kWh am Tag eingespeist": "more than {value} kWh fed in per day"
+    "mehr als {value} kWh am Tag eingespeist": "more than {value} kWh fed in per day",
+    "Die Tageswerte konnten nicht geladen werden.": "The daily values could not be loaded.",
+    "Keine vollständigen Werte": "No complete values",
+    "Neuestes Jahr oben, eine Spalte je Kalendertag, gefärbt nach dem Tageswert; die Farbstufen gelten für alle Jahre gleich. Graue Felder sind Tage ohne vollständige Werte (auch der Tag nach einem fehlenden Tag), leer ist es vor dem Archivbeginn und ab heute. Ein Klick öffnet den Tag in der Übersicht.": "Newest year on top, one column per calendar day, coloured by the daily value; the colour steps are the same for all years. Grey cells are days without complete values (including the day after a missing day), blank means before the archive began and from today on. A click opens the day in the overview."
   }
 }

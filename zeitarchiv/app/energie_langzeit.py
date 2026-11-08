@@ -57,7 +57,7 @@ COLUMN_WINDOWS = {
 #: Verbrauchs“ aus, „matrix“ und „monatsvergleich“ sind die beiden Darstellungen (Tabelle, Linien) der Karte mit den Monatswerten.
 #: Der Block „energie“ bleibt immer, sonst wäre die Tabelle leer.
 TABLE_BLOCKS = ("energie", "quoten", "speicher", "pv")
-CARD_BLOCKS = ("jahresbilanz", "monatsvergleich", "matrix", "rekorde", "kenntage", "verbraucher")
+CARD_BLOCKS = ("jahresbilanz", "monatsvergleich", "matrix", "rekorde", "kenntage", "tagfuertag", "verbraucher")
 BLOCK_BY_GROUP = {"Energie": "energie", "Quoten": "quoten", "Speicher": "speicher", "PV-Anlage, wetterbereinigt": "pv"}
 
 
@@ -125,6 +125,10 @@ KENNTAGE: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("speicher_stark", "speicher", ("entladung",)),
     ("speicher_schwach", "speicher", ("entladung",)),
 )
+#: Größen der Karte „Jahre im Vergleich, Tag für Tag“ (Tageswerte aus usable_days).
+DAY_FIELDS = ("erzeugung", "verbrauch", "netzbezug")
+#: Die Farbskala der Tagesfelder endet beim 99. Perzentil, damit ein einzelner Ausreißertag nicht alle anderen blass macht.
+DAY_SCALE_PERCENTILE = 0.99
 #: Lebensdauer des Tage-Zwischenspeichers (der Kalender liest dieselben Tage noch einmal).
 DAYS_CACHE_SECONDS = 300
 #: Verbraucher der Veränderungsliste (nach Betrag der Änderung).
@@ -918,6 +922,56 @@ class EnergieLangzeitService:
                 "values": {k: round(d[k], 2) for k in ("erzeugung", "einspeisung", "netzbezug", "verbrauch", "entladung") if d.get(k) is not None},
             })
         return {"field": field, "year": year, "days": out, "average": round(average, 2) if average is not None else None}
+
+    # -- Jahre im Vergleich, Tag für Tag ----------------------------------------------------
+
+    def compute_day_matrix(self, config: dict, field: str = "erzeugung", now_local: datetime | None = None) -> dict:
+        """Tageswerte einer Größe als Matrix Jahr × Kalendertag (Karte „Jahre im Vergleich, Tag für Tag“ im Reiter „Langzeit“).
+
+        Dasselbe Format wie die Jahresübersicht des Wetterdashboards (``cells`` = [Spalte, Zeile, Wert], ``missing`` = Tage
+        ohne vollständige Werte, ``min``/``max`` für die Farbskala), damit derselbe Renderer sie zeichnet. Die Spalte ist der
+        Kalendertag in einem Schaltjahr (Spalte 59 = 29.02.), die Zeile das Jahr, das neueste zuerst. Es zählen nur Tage mit
+        allen Werten (usable_days, ohne den Tag nach einem fehlenden Tag); als ``missing`` gelten die übrigen Tage ab dem
+        ersten auswertbaren bis gestern. Eine nicht verfügbare Größe fällt auf die erste verfügbare zurück."""
+        now_local = now_local or datetime.now(self.tz)
+        roles = role_entities(config)
+        have_bus = bool(roles["erzeugung"] or roles["netzbezug"])
+        available = [key for key in DAY_FIELDS if (have_bus if key == "verbrauch" else bool(roles[key]))]
+        out: dict = {
+            "unit": "kWh", "fields": available, "field": None, "years": [], "cells": [], "missing": [],
+            "min": None, "max": None, "today": now_local.date().isoformat(), "since": None,
+        }
+        if not available:
+            return out
+        field = field if field in available else available[0]
+        out["field"] = field
+        days = self.usable_days(config, now_local)
+        values = {d["date"]: d[field] for d in days if d[field] is not None}
+        if not values:
+            return out
+        today = now_local.date()
+        first = min(values)
+        out["since"] = first.isoformat()
+        years = list(range(today.year, max(first.year, today.year - MAX_YEARS + 1) - 1, -1))
+        out["years"] = years
+
+        def slot(day: date) -> int:
+            return (date(2000, day.month, day.day) - date(2000, 1, 1)).days
+
+        for row, year in enumerate(years):
+            start, stop = max(date(year, 1, 1), first), min(date(year, 12, 31), today - timedelta(days=1))
+            day = start
+            while day <= stop:
+                if day in values:
+                    out["cells"].append([slot(day), row, round(values[day], 1)])
+                else:
+                    out["missing"].append([slot(day), row])
+                day += timedelta(days=1)
+        shown = sorted(cell[2] for cell in out["cells"])
+        if shown:
+            top = shown[min(len(shown) - 1, int(DAY_SCALE_PERCENTILE * len(shown)))]
+            out["min"], out["max"] = 0.0, max(round(top, 1), 1.0)
+        return out
 
     # -- Was hat sich verändert? -----------------------------------------------------------
 

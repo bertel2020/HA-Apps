@@ -4008,6 +4008,16 @@ class EnergieDashboardService:
                 raise HTTPException(status_code=422, detail=tr("Unbekannter Kenntag: {value}", value=field))
             return self.langzeit.compute_kenntage_days(config, field, year)
 
+        @router.get("/energiedashboard/langzeit/days")
+        def energiedashboard_langzeit_days(field: str = "erzeugung") -> dict:
+            # „Jahre im Vergleich, Tag für Tag“ (Reiter „Langzeit“): Tageswerte einer Größe als Matrix Jahr × Kalendertag.
+            config = _load_config(deps.index)
+            if not energie_langzeit.is_configured(config):
+                raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
+            if field not in energie_langzeit.DAY_FIELDS:
+                raise HTTPException(status_code=422, detail=tr("Unbekannte Größe: {value}", value=field))
+            return self.langzeit.compute_day_matrix(config, field)
+
         @router.post("/energiedashboard/langzeit/changes")
         def energiedashboard_langzeit_changes(body: energie_langzeit.TableRequest) -> dict:
             # „Was hat sich verändert?“: Verbraucher mit der größten Änderung gegenüber dem Vorjahr.
