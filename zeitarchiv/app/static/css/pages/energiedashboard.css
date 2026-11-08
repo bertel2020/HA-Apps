@@ -1197,7 +1197,7 @@
     .wt-vs-total{grid-column:2;text-align:left;}
   }
 
-  /* Anteile je Jahr als Tabelle Verbraucher × Jahre: Basis .wt-table der Vergleichstabelle (erste Spalte sticky, die
+  /* Tabelle Verbraucher × Jahre (Abschnitt unter der Rangliste): Basis .wt-table der Vergleichstabelle (erste Spalte sticky, die
      Jahre scrollen waagerecht), je Feld Hauptzahl, darunter klein der andere Wert und die Änderung zum Vorjahr. */
   .wt-vt-wrap{margin-top:12px;}
   .wt-table.wt-vt{width:100%;}

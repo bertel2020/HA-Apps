@@ -11,9 +11,9 @@
     der Stichtag gilt wie in der Vergleichstabelle
   - „Gemessen“ nennt, wie viel des Verbrauchs eigene Zähler erfassen; der Rest
     steht als „Übrige (Grundlast)“
+  - „Verbraucher × Jahre“: Tabelle unter der Rangliste mit der Änderung zum
+    Vorjahr, sortierbar nach jedem Jahr; der Stichtag gilt wie dort
   - „Anteile je Jahr“: ein gestapelter Balken je Jahr, in Prozent oder kWh
-    - wahlweise als Tabelle Verbraucher × Jahre mit der Änderung zum Vorjahr,
-      sortierbar nach jedem Jahr
   - „Jahre × Monate je Verbraucher“: die Matrix aus „Summen“ für einen
     gewählten Verbraucher; ein Klick auf ein Feld öffnet den Monat
 
@@ -30,9 +30,9 @@
     the reference date applies as in the comparison table
   - "Measured" shows how much of the consumption your own meters record; the
     remainder is shown as "Other (base load)"
+  - "Consumers × years": table below the ranking with the change from the
+    previous year, sortable by any year; the reference date applies as there
   - "Shares per year": one stacked bar per year, in percent or kWh
-    - optionally as a consumers × years table with the change from the
-      previous year, sortable by any year
   - "Years × months per consumer": the matrix from "Totals" for a selected
     consumer; a click on a cell opens that month
 

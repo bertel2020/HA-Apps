@@ -317,7 +317,7 @@
     return coversYear(rest, year) ? null : year;
   }
 
-  // Anteile je Jahr als Tabelle Verbraucher × Jahre, ältestes Jahr links. Jede Spalte ist die Rangliste ihres Jahres
+  // Tabelle Verbraucher × Jahre, ältestes Jahr links. Jede Spalte ist die Rangliste ihres Jahres
   // (consumerRank): das Jahr des Stichtags bis zum Stichtag gegen dasselbe Stück des Vorjahres, die Jahre davor ganz.
   // years: neueste zuerst; sort: {year, dir}; mode 'pct' oder 'kwh' bestimmt die Hauptzahl, der andere Wert steht klein darunter.
   function sharesTableHtml(data, years, mode, sort, selected, limit = 0) {
@@ -473,8 +473,7 @@
       // Gewähltes Jahr der Rangliste; null = das Jahr des Stichtags (folgt dann der Stichtag-Leiste).
       rankYearSel: null,
       sharesMode: 'pct',
-      // Anteile je Jahr als Balken ('bar') oder Tabelle ('tbl'); die Tabelle sortiert nach einem Jahr (null = dem neuesten).
-      sharesView: 'bar',
+      // Tabelle „Verbraucher × Jahre“: sortiert nach einem Jahr (null = dem neuesten).
       sharesSortYear: null,
       sharesSortDir: 'desc',
       // Hervorgehobener Verbraucher (Schlüssel aus langzeit/consumers, „rest“ für Übrige) oder null.
@@ -487,7 +486,6 @@
         if (hasConsumers && (saved.view === 'sum' || saved.view === 'verb')) this.lzView = saved.view;
         if (saved.rankSort === 'kwh' || saved.rankSort === 'chg') this.rankSort = saved.rankSort;
         if (saved.sharesMode === 'pct' || saved.sharesMode === 'kwh') this.sharesMode = saved.sharesMode;
-        if (saved.sharesView === 'bar' || saved.sharesView === 'tbl') this.sharesView = saved.sharesView;
         if (Array.isArray(saved.columns)) this.columns = COLUMN_KEYS.filter((key) => saved.columns.includes(key));
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
@@ -508,7 +506,12 @@
         });
         // Stichtag-Leiste des App-Standards: bei jeder Änderung Tabelle und Rangliste neu laden (was schon geladen ist).
         // Nach einer Größenänderung neu zeichnen: welche Beschriftung in ihren Abschnitt passt, hängt von der Breite ab.
-        window.addEventListener('resize', () => { if (this.$root.isConnected && this.consumers) this.drawShares(); });
+        // Die Tabelle braucht dabei nur den Scroll-Hinweis neu, der ebenfalls an der Breite hängt.
+        window.addEventListener('resize', () => {
+          if (!this.$root.isConnected || !this.consumers) return;
+          this.drawShares();
+          this.drawSharesTable();
+        });
         window.addEventListener('dashboard-stichtag', () => {
           if (!this.$root.isConnected || !this.opened) return;
           if (this.sumLoaded) {
@@ -580,6 +583,7 @@
 
       drawConsumers() {
         this.drawRank();
+        this.drawSharesTable();
         this.drawShares();
         this.drawConsumerMatrix();
       },
@@ -589,25 +593,20 @@
         this.sharesMode = mode;
         writeStore({sharesMode: mode});
         this.drawShares();
-      },
-
-      setSharesView(view) {
-        this.sharesView = view;
-        writeStore({sharesView: view});
-        // Erst sichtbar hat der Kasten eine Breite: Beschriftungen der Balken und der Scroll-Hinweis der Tabelle hängen daran.
-        this.$nextTick(() => this.drawShares());
+        this.drawSharesTable();
       },
 
       sharesNote() {
-        if (this.sharesView === 'tbl') {
-          return this.sharesMode === 'pct'
-            ? t('Je Feld der Anteil am Verbrauch des Jahres laut Bilanz, darunter die kWh und die Änderung zum Vorjahr.')
-            : t('Je Feld die kWh des Jahres, darunter der Anteil am Verbrauch laut Bilanz und die Änderung zum Vorjahr.');
-        }
-        const text = this.sharesMode === 'pct'
+        return this.sharesMode === 'pct'
           ? t('Anteil jedes Verbrauchers am Verbrauch des Jahres laut Bilanz. Das laufende Jahr (*) und das erste Jahr des Archivs sind nicht vollständig.')
           : t('Jahressummen in kWh, alle Balken im selben Maßstab. Das laufende Jahr (*) und das erste Jahr des Archivs sind nicht vollständig.');
-        return `${text} ${t('„Tabelle“ zeigt dieselben Zahlen als Verbraucher × Jahre, mit der Änderung zum Vorjahr.')}`;
+      },
+
+      sharesTableNote() {
+        const text = this.sharesMode === 'pct'
+          ? t('Je Feld der Anteil am Verbrauch des Jahres laut Bilanz, darunter die kWh und die Änderung zum Vorjahr.')
+          : t('Je Feld die kWh des Jahres, darunter der Anteil am Verbrauch laut Bilanz und die Änderung zum Vorjahr.');
+        return `${text} ${t('Jede Spalte ist die Rangliste ihres Jahres: Es gilt der Stichtag oben, das Jahr des Stichtags zählt bis zu diesem Tag.')}`;
       },
 
       drawShares() {
@@ -619,7 +618,6 @@
         host.classList.toggle('has-hl', !!this.pick);
         requestAnimationFrame(() => fitShareLabels(host));
         if (this.$refs.sharesLegend) this.$refs.sharesLegend.innerHTML = sharesLegendHtml(data, this.pick);
-        this.drawSharesTable();
       },
 
       // Jahre der Tabelle: wie in der Rangliste bis zum Jahr des Stichtags, so viele wie in der Leiste „Jahre“ gewählt.
@@ -708,6 +706,7 @@
         this.pick = key;
         if (key) this.matrixSel = key;
         this.drawRank();
+        this.drawSharesTable();
         this.drawShares();
         this.drawConsumerMatrix();
         if (scroll && this.$refs.matrixCard) {
@@ -851,6 +850,7 @@
         this.drawMatrix();
         this.drawKenntage();
         this.drawShares();
+        this.drawSharesTable();
         this.drawConsumerMatrix();
         this.drawRank();
       },
