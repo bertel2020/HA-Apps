@@ -121,7 +121,7 @@
 
   // Rangliste eines Jahres: im Jahr des Stichtags das Fenster bis zum Stichtag, sonst ganze Jahre. Eine Änderung gibt es nur,
   // wenn der Verbraucher das ganze Vorjahr erfasst war; sonst steht ein kurzer Grund statt des Pfeils.
-  function consumerRank(data, year) {
+  function consumerRank(data, year, limit = 0) {
     const inWindow = year === data.window.year;
     const prevYear = year - 1;
     const years = data.years || [];
@@ -159,7 +159,7 @@
     const measured = entries.filter((e) => !e.item.rest).reduce((sum, e) => sum + e.cur, 0);
     const measuredPrev = totalPrev == null ? null
       : (inWindow ? data.window.measured.vj : data.consumers.reduce((sum, c) => sum + (yearValue(c, prevYear) || 0), 0));
-    return {year, inWindow, prevYear, entries, total, totalPrev, measured, measuredPrev};
+    return {year, inWindow, prevYear, entries, total, totalPrev, measured, measuredPrev, limit};
   }
 
   function rankDelta(entry) {
@@ -176,13 +176,14 @@
   }
 
   // Jahressummen als kleine Balken, ältestes Jahr links, das gewählte kräftig.
-  function rankSpark(data, item, color, year) {
-    const years = [...(data.years || [])].reverse();
+  function rankSpark(data, item, color, year, limit = 0) {
+    const shown = limit ? (data.years || []).slice(0, limit) : (data.years || []);
+    const years = [...shown].reverse();
     if (years.length < 2) return '';
     const values = years.map((y) => yearValue(item, y));
     const top = Math.max(...values.map((v) => v || 0)) || 1;
-    const w = 64, h = 20, gap = 2;
-    const bw = Math.max(2, (w - gap * (years.length - 1)) / years.length);
+    const w = 120, h = 20, gap = 2;
+    const bw = Math.min(16, Math.max(2, (w - gap * (years.length - 1)) / years.length));
     const tip = years.map((y, i) => `${y}: ${values[i] == null ? '–' : energy(values[i])}`).join(' · ');
     let svg = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${escapeHtml(tip)}"><title>${escapeHtml(tip)}</title>`;
     years.forEach((y, i) => {
@@ -231,7 +232,7 @@
         + `<span class="wt-vr-num wt-vr-kwh">${escapeHtml(kwhText(entry.cur))}</span>`
         + `<span class="wt-vr-num wt-vr-pct">${part == null ? '–' : escapeHtml(num(part, 1) + ' %')}</span>`
         + `<span class="wt-vr-num wt-vr-delta">${rankDelta(entry)}</span>`
-        + `<span class="wt-vr-spark">${rankSpark(data, item, item.color, rank.year)}</span></div>`;
+        + `<span class="wt-vr-spark">${rankSpark(data, item, item.color, rank.year, rank.limit)}</span></div>`;
     }
     if (total != null) {
       const sum = {delta: rank.totalPrev != null ? total - rank.totalPrev : null, prev: rank.totalPrev, note: ''};
@@ -564,7 +565,8 @@
         const data = this.consumers;
         if (!data || !data.years) return [];
         const until = fmtDate(formats.dm, data.window.cur.end - 1);
-        return data.years.filter((year) => year <= data.window.year).map((year) => ({
+        const past = data.years.filter((year) => year <= data.window.year);
+        return (this.yearLimit ? past.slice(0, this.yearLimit) : past).map((year) => ({
           year, label: year === data.window.year ? t('{year} bis {date}', {year, date: until}) : String(year),
         }));
       },
@@ -572,7 +574,8 @@
       rankYear() {
         const data = this.consumers;
         if (!data) return null;
-        return this.rankYearSel != null && this.rankYearSel < data.window.year ? this.rankYearSel : data.window.year;
+        const shown = this.rankYears().map((option) => option.year);
+        return this.rankYearSel != null && this.rankYearSel < data.window.year && shown.includes(this.rankYearSel) ? this.rankYearSel : data.window.year;
       },
 
       setRankYear(year) {
@@ -606,7 +609,7 @@
         const data = this.consumers;
         const host = this.$refs.rank;
         if (!data || !host) return;
-        const rank = consumerRank(data, this.rankYear());
+        const rank = consumerRank(data, this.rankYear(), this.yearLimit);
         host.innerHTML = rankHtml(data, rank, this.rankSort, this.matrixKey());
         if (this.$refs.rankCover) this.$refs.rankCover.innerHTML = coverHtml(rank);
       },
@@ -637,6 +640,7 @@
         this.drawKenntage();
         this.drawShares();
         this.drawConsumerMatrix();
+        this.drawRank();
       },
 
       // Die Monatswerte mit den gewählten Jahren, für Diagramm und Matrix.

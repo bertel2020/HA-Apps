@@ -35,7 +35,7 @@
   {# Anzahl der Jahre: dieselbe Auswahl wie in der Ansicht „Summen“ (im Browser gemerkt). #}
   <div class="wt-yearbar" x-show="consumers && consumers.years" x-cloak>
     <span class="wt-yearbar-label">{{ _("Jahre") }}</span>
-    <span class="wt-yearbar-note">{{ _("Gilt für Anteile je Jahr und Jahre × Monate je Verbraucher.") }}</span>
+    <span class="wt-yearbar-note">{{ _("Gilt für Rangliste, Anteile je Jahr und Jahre × Monate je Verbraucher.") }}</span>
     <div class="wt-seg" role="group" aria-label="{{ _('Anzahl der Jahre') }}">
       <template x-for="option in yearOptions()" :key="option.value">
         <button type="button" :aria-pressed="(yearLimit === option.value).toString()" @click="setYearLimit(option.value)" x-text="option.label"></button>
