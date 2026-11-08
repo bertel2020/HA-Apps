@@ -1388,3 +1388,28 @@ def test_sky_limits_form_fills_missing_fields_and_rejects_unordered_ones(client)
     assert wetter_routes._load_config(index)["sky_cuts_lx"] == [15000.0, 25000.0, 90000.0]  # abgelehnt, nichts überschrieben
     assert client.post("/wetterdashboard/setup", data=base).status_code == 200
     assert wetter_routes._load_config(index)["sky_cuts_lx"] == []
+
+
+def test_sky_limits_form_with_an_extreme_threshold_does_not_reject_empty_fields(client) -> None:
+    """Die automatischen Grenzen (0,6x / 1x / 2,8x der Sonnenschwelle) liegen bei 1000 lx oder 50000 lx außerhalb des
+    erlaubten Bereichs; ein leeres Feld lieferte dann einen 400 mit leerem Wert statt den Rand zu nehmen."""
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp7", "sensor", "measurement", "°C")
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    base = {"temperature": "sensor.wetter_test_temp7"}
+    assert client.post("/wetterdashboard/setup", data={**base, "sun_threshold_lx": "50000", "sky_cloudy_lx": "20000"}).status_code == 200
+    assert wetter_routes._load_config(index)["sky_cuts_lx"] == [20000.0, 50000.0, 100000.0]  # 2,8 x 50000 -> Obergrenze
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
+def test_pressure_trend_needs_a_known_unit(service) -> None:
+    """Die Tendenz rechnet in hPa um. Eine unbekannte Einheit (hier bar) gab früher eine Tendenz aus der Rohdifferenz,
+    als wäre es hPa; jetzt gibt es keine. Eine fehlende oder anders geschriebene bekannte Einheit zählt weiter."""
+    trends: dict[str, object] = {}
+    for entity, unit, first, last in (("sensor.p_bar", "bar", 1.000, 1.020), ("sensor.p_low", "hpa", 1000.0, 1004.0), ("sensor.p_none", "", 1000.0, 1004.0)):
+        _add(service, entity, "sensor", "measurement", unit, [(_ts(19, 6), first), (_ts(19, 18), last)])
+        _configure(service, pressure=entity)
+        data = service.compute_conditions_day("2026-08-19", NOW)
+        trends[entity] = data["pressure"]["trend"] if data and data.get("pressure") else "fehlt"
+    assert trends == {"sensor.p_bar": None, "sensor.p_low": "rising", "sensor.p_none": "rising"}

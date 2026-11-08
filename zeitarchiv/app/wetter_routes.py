@@ -1582,8 +1582,12 @@ class WetterService:
             if summary is not None:
                 unit = entity["unit"] or ""
                 # Tendenz über den Tag in hPa; „stabil“ innerhalb von ±1 hPa (andere Einheiten umgerechnet).
-                change = (press_rows[-1].value - press_rows[0].value) * PRESSURE_UNIT_HPA.get(unit, 1.0)
-                trend = "steady" if abs(change) < PRESSURE_STEADY_HPA else ("rising" if change > 0 else "falling")
+                # Eine fehlende Einheit gilt als hPa; eine andere, unbekannte (bar, mmHg …) gibt keine Tendenz statt einer geratenen.
+                factor = {key.lower(): value for key, value in PRESSURE_UNIT_HPA.items()}.get(unit.strip().lower() or "hpa")
+                trend = None
+                if factor is not None:
+                    change = (press_rows[-1].value - press_rows[0].value) * factor
+                    trend = "steady" if abs(change) < PRESSURE_STEADY_HPA else ("rising" if change > 0 else "falling")
                 pressure = {
                     "avg": summary["avg"], "min": summary["min"], "max": summary["max"], "unit": unit,
                     "decimals": _decimals(entity, "pressure"), "trend": trend,
@@ -1864,7 +1868,10 @@ class WetterService:
             own = [sky_cloudy_lx, sky_fair_lx, sky_sunny_lx]
             if any(raw.strip() for raw in own):
                 automatic = conditions.lx_cuts(threshold)
-                cuts = [_parse_bounded(raw, automatic[i], SUN_THRESHOLD_RANGE_LX) for i, raw in enumerate(own)]
+                # Ein leeres Feld nimmt den automatischen Wert, in den erlaubten Bereich gezogen: Bei einer niedrigen oder hohen
+                # Sonnenschwelle läge er sonst außerhalb, und die Ablehnung nennte einen leeren Wert.
+                bounds = SUN_THRESHOLD_RANGE_LX
+                cuts = [_parse_bounded(raw, min(max(automatic[i], bounds[0]), bounds[1]), bounds) for i, raw in enumerate(own)]
                 if not cuts[0] < cuts[1] < cuts[2]:
                     raise HTTPException(status_code=400, detail=tr("Die Grenzen der Himmelsklassen müssen von unten nach oben ansteigen."))
                 config["sky_cuts_lx"] = cuts
