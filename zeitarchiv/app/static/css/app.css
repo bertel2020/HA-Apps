@@ -632,8 +632,9 @@ h2{font-size:calc(16.8px * var(--font-scale, 1));font-weight:700;margin:28px 0 1
 /* Mobiles Menü: Hamburger öffnet ein Slide-in-Drawer von rechts statt des
    Hover-Dropdowns oben, da "System" auf Touch keinen Hover-Zustand hat. */
 .topnav-drawer-backdrop.is-open{display:block;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:30;}
-.topnav-drawer{position:fixed;top:0;right:0;bottom:0;width:min(300px,84vw);background:var(--surface);box-shadow:var(--shadow);z-index:31;transform:translateX(100%);transition:transform .18s ease;overflow-y:auto;}
-.topnav-drawer.is-open{transform:translateX(0);}
+.topnav-drawer{position:fixed;top:0;right:0;bottom:0;width:min(300px,84vw);background:var(--surface);box-shadow:var(--shadow);z-index:31;transform:translateX(100%);visibility:hidden;transition:transform .18s ease,visibility 0s .18s;overflow-y:auto;}
+/* visibility:hidden nimmt den geschlossenen Drawer aus der Tab-Reihenfolge; die Verzögerung lässt die Schließanimation noch sichtbar auslaufen. */
+.topnav-drawer.is-open{transform:translateX(0);visibility:visible;transition:transform .18s ease,visibility 0s;}
 .topnav-drawer-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);}
 .topnav-drawer-head span{font-weight:600;font-size:calc(14.5px * var(--font-scale, 1));color:var(--ink);}
 .topnav-drawer-close{background:none;border:0;color:var(--ink-muted);cursor:pointer;padding:4px;}
