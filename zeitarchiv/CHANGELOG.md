@@ -7,18 +7,22 @@
 - **Energiedashboard**: Der Reiter „Langzeit“ zeigt mit dem Umschalter
   „Summen | Verbraucher“ auch die Verbraucher über die Jahre
   - „Verbraucher im Jahr“: Rangliste mit Anteil am Verbrauch, Änderung zum
-    Vorjahr und kleinem Verlauf; der Stichtag gilt wie in der
-    Vergleichstabelle
+    Vorjahr und kleinem Verlauf
     - Rangliste nach Spalten sortierbar (Name, Verbrauch, Änderung)
   - „Gemessen“ nennt, wie viel des Verbrauchs eigene Zähler erfassen; der Rest
     steht als „Übrige (Grundlast)“
   - „Verbraucher × Jahre“: Tabelle unter der Rangliste mit der Änderung zum
-    Vorjahr, sortierbar nach jedem Jahr; der Stichtag gilt wie dort
+    Vorjahr, sortierbar nach jedem Jahr
     - Spalten (Jahre), Hauptwert (Anteil oder kWh) und Änderung (Aus, % oder
       kWh) wählbar; Auswahl und Sortierung merkt sich der Browser
   - „Anteile je Jahr“: ein gestapelter Balken je Jahr, in Prozent oder kWh
   - „Jahre × Monate je Verbraucher“: die Matrix aus „Summen“ für einen
     gewählten Verbraucher; ein Klick auf ein Feld öffnet den Monat
+
+### Geändert
+
+- **Energiedashboard**: Im Reiter „Langzeit“ entfällt der Stichtag; alle
+  Karten rechnen immer bis heute
 
 ---
 
@@ -29,18 +33,22 @@
 - **Energy dashboard**: With the "Totals | Consumers" switch, the "Long-term"
   tab also shows the consumers over the years
   - "Consumers in the year": ranking with share of consumption, change from
-    the previous year and a small trend; the reference date applies as in the
-    comparison table
+    the previous year and a small trend
     - Ranking sortable by column (name, consumption, change)
   - "Measured" shows how much of the consumption your own meters record; the
     remainder is shown as "Other (base load)"
   - "Consumers × years": table below the ranking with the change from the
-    previous year, sortable by any year; the reference date applies as there
+    previous year, sortable by any year
     - Selectable columns (years), main value (share or kWh) and change (off,
       % or kWh); the browser remembers the selection and sorting
   - "Shares per year": one stacked bar per year, in percent or kWh
   - "Years × months per consumer": the matrix from "Totals" for a selected
     consumer; a click on a cell opens that month
+
+#### Changed
+
+- **Energy dashboard**: The "Long-term" tab no longer has a reference date; all
+  cards always calculate up to today
 
 ## 1.31.1 - 2026-11-08
 

@@ -1,8 +1,6 @@
-{% from "_dashboard_period_nav.html" import nav as period_nav with context %}
 {% from "_hints.html" import hint_button, hint_body %}
 {# Reiter „Langzeit“ des Energiedashboards (Roadmap 1.45): Zeiträume im Vergleich mit dem Vorjahr.
-   Aufbau wie die Wetter-Übersicht (_wetter_view.html): eine Karte, oben Titel und Stichtag-Leiste des
-   App-Standards, darunter Spalten- und Vorjahres-Menü und die Tabelle. Die Daten kommen von
+   Eine Karte mit Spalten- und Vorjahres-Menü und der Tabelle, immer bis heute. Die Daten kommen von
    POST energiedashboard/langzeit/table; energie-langzeit.js formatiert und zeichnet nur. #}
 {% set hidden = config.langzeit_ausblenden or [] %}
 {# Verbraucher der obersten Ebene (wie energie_langzeit.top_consumers); ohne sie gibt es nur die Summen. #}
@@ -51,15 +49,8 @@
 {% endif %}
 
   <div class="card wt-card">
-    <div class="wt-controls wt-card-head">
-      {# Der Titel nennt den Tag („Heute“, „Gestern“, sonst „Rückblick“); in der Vergangenheit springt ein Klick auf heute. #}
-      <h2 class="wt-h2" :class="{'wt-h2-jump': stichtag()}" x-text="cardTitle()" @click="if (stichtag()) $store.dashStichtag.set(null)" :title="stichtag() ? t('Zurück zu heute') : ''"></h2>
-      {{ period_nav(true, true) }}
-    </div>
-    <p class="wt-stand">{{ _("Der Stichtag gilt für die Vergleichstabelle.") }}</p>
-    <div class="wt-card-sep"></div>
     <div class="wt-controls">
-      <h3 class="wt-h3">{{ _("Zeiträume im Vergleich") }} {{ hint_button(_("Zeiträume im Vergleich")) }}</h3>
+      <h2 class="wt-h2">{{ _("Zeiträume im Vergleich") }} {{ hint_button(_("Zeiträume im Vergleich")) }}</h2>
       {% call hint_body() %}<span x-show="vorjahr" x-text="modeHint()"></span>{% endcall %}
       <div class="dd-picker-wrap wt-controls-end">
         <button type="button" class="btn" onclick="toggleDDPicker('el-cols')">{{ _("Spalten ▾") }}</button>
@@ -141,7 +132,7 @@
 {% endif %}
 
 {% if 'veraenderungen' not in hidden %}
-  {# Was hat sich verändert? Verbraucher mit der größten Änderung gegenüber dem Vorjahr (Stichtag und Vorjahr-Modus wie die Tabelle). #}
+  {# Was hat sich verändert? Verbraucher mit der größten Änderung gegenüber dem Vorjahr (Vorjahr-Modus wie die Tabelle). #}
   <div class="card wt-card" x-show="changes && changes.consumers" x-cloak>
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Was hat sich verändert?") }} {{ hint_button(_("Was hat sich verändert?")) }}</h2>

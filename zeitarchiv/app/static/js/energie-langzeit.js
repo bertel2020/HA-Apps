@@ -119,7 +119,7 @@
     return out;
   }
 
-  // Rangliste eines Jahres: im Jahr des Stichtags das Fenster bis zum Stichtag, sonst ganze Jahre. Eine Änderung gibt es nur,
+  // Rangliste eines Jahres: im laufenden Jahr das Fenster bis heute, sonst ganze Jahre. Eine Änderung gibt es nur,
   // wenn der Verbraucher das ganze Vorjahr erfasst war; sonst steht ein kurzer Grund statt des Pfeils.
   function consumerRank(data, year, limit = 0) {
     const inWindow = year === data.window.year;
@@ -366,7 +366,7 @@
   }
 
   // Tabelle Verbraucher × Jahre, ältestes Jahr links. Jede Spalte ist die Rangliste ihres Jahres
-  // (consumerRank): das Jahr des Stichtags bis zum Stichtag gegen dasselbe Stück des Vorjahres, die Jahre davor ganz.
+  // (consumerRank): das laufende Jahr bis heute gegen dasselbe Stück des Vorjahres, die Jahre davor ganz.
   // years: neueste zuerst; sort: {year, dir}; main 'pct' oder 'kwh' bestimmt die Hauptzahl, der andere Wert steht klein darunter;
   // chg 'off', 'pct' oder 'kwh' die Änderungszeile.
   function sharesTableHtml(data, years, {main, chg}, sort, selected, limit = 0) {
@@ -515,7 +515,7 @@
       // Sortierung der Rangliste: Spalte ('name', 'kwh' für kWh und Anteil, 'chg') und Richtung.
       rankSortCol: 'kwh',
       rankSortDir: 'desc',
-      // Gewähltes Jahr der Rangliste; null = das Jahr des Stichtags (folgt dann der Stichtag-Leiste).
+      // Gewähltes Jahr der Rangliste; null = das laufende Jahr.
       rankYearSel: null,
       sharesMode: 'pct',
       // Tabelle „Verbraucher × Jahre“: sortiert nach einem Jahr (null = dem neuesten); Spalten als Liste von Jahren
@@ -567,25 +567,12 @@
             this.$nextTick(() => Object.values(charts).forEach((chart) => chart.resize()));
           }
         });
-        // Stichtag-Leiste des App-Standards: bei jeder Änderung Tabelle und Rangliste neu laden (was schon geladen ist).
         // Nach einer Größenänderung neu zeichnen: welche Beschriftung in ihren Abschnitt passt, hängt von der Breite ab.
         // Die Tabelle braucht dabei nur den Scroll-Hinweis neu, der ebenfalls an der Breite hängt.
         window.addEventListener('resize', () => {
           if (!this.$root.isConnected || !this.consumers) return;
           this.drawShares();
           this.drawSharesTable();
-        });
-        window.addEventListener('dashboard-stichtag', () => {
-          if (!this.$root.isConnected || !this.opened) return;
-          if (this.sumLoaded) {
-            this.loadTable();
-            if (shown('veraenderungen')) this.loadChanges();
-          }
-          if (this.consumers) {
-            // Stand die Rangliste auf dem Jahr des bisherigen Stichtags, folgt sie dem neuen.
-            if (this.rankYearSel != null && this.rankYearSel >= this.consumers.window.year) this.rankYearSel = null;
-            this.loadConsumers(false);
-          }
         });
       },
 
@@ -612,7 +599,7 @@
         if (view === 'sum') this.$nextTick(() => Object.values(charts).forEach((chart) => chart.resize()));
       },
 
-      // Verbraucher über die Jahre. withMonths=false lädt nur das Fenster der Rangliste (Stichtag) und behält die Monatswerte.
+      // Verbraucher über die Jahre. withMonths=false lädt nur das Fenster der Rangliste und behält die Monatswerte.
       async loadConsumers(withMonths) {
         const seq = ++this._consumersSeq;
         const months = withMonths || !this.consumers;
@@ -621,7 +608,7 @@
           const res = await fetch('energiedashboard/langzeit/consumers', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({at: this.stichtag(), months}),
+            body: JSON.stringify({months}),
           });
           if (!res.ok) throw new Error(String(res.status));
           const data = await res.json();
@@ -670,12 +657,12 @@
           : t('Je Feld die kWh des Jahres, darunter der Anteil am Verbrauch laut Bilanz und die Änderung zum Vorjahr.');
         return [
           text,
-          t('Jede Spalte ist die Rangliste ihres Jahres: Es gilt der Stichtag oben, das Jahr des Stichtags zählt bis zu diesem Tag.'),
+          t('Jede Spalte ist die Rangliste ihres Jahres; das laufende Jahr zählt bis heute.'),
           t('„Spalten“ wählt die Jahre; Voreinstellung sind die Jahre der Leiste „Jahre“, eine Änderung dort setzt die Auswahl zurück. Das zweite Menü wählt Hauptwert und Änderung zum Vorjahr. Auswahl und Sortierung merkt sich der Browser.'),
         ].join(' ');
       },
 
-      // Jahre für das Menü „Spalten“: alle Jahre bis zum Stichtag, unabhängig von der Leiste „Jahre“.
+      // Jahre für das Menü „Spalten“: alle Jahre bis heute, unabhängig von der Leiste „Jahre“.
       sharesTableOptions() {
         return this.pastYears();
       },
@@ -719,7 +706,7 @@
         if (this.$refs.sharesLegend) this.$refs.sharesLegend.innerHTML = sharesLegendHtml(data, this.pick);
       },
 
-      // Jahre der Tabelle (neueste zuerst): die im Menü „Spalten“ gewählten, soweit es sie bis zum Stichtag gibt; sonst wie in
+      // Jahre der Tabelle (neueste zuerst): die im Menü „Spalten“ gewählten, soweit es sie gibt; sonst wie in
       // der Rangliste so viele wie in der Leiste „Jahre“ gewählt.
       sharesTableYears() {
         const preset = this.rankYears().map((option) => option.year);
@@ -880,7 +867,7 @@
         if (scale) scale.style.background = `linear-gradient(90deg, ${colors.bad}, ${colors.base}, ${colors.good})`;
       },
 
-      // Alle Jahre vom Jahr des Stichtags zurück bis zum Beginn des Archivs, mit Beschriftung.
+      // Alle Jahre vom laufenden Jahr zurück bis zum Beginn des Archivs, mit Beschriftung.
       pastYears() {
         const data = this.consumers;
         if (!data || !data.years) return [];
@@ -936,7 +923,7 @@
       },
 
       rankNote() {
-        return t('Verbraucher der obersten Ebene; Geräte hinter einem Zwischenzähler stecken im Zwischenzähler. Im Jahr des Stichtags zählt der 1. Januar bis zum Stichtag, in den Jahren davor das ganze Jahr. Verbraucher, die später als die Bilanz erfasst werden, stecken vorher in „Übrige (Grundlast)“, das Dreieck dort nennt sie. Gelöschte Verbraucher fehlen auch in den Vorjahren, ihr Verbrauch steht dort in „Übrige“.');
+        return t('Verbraucher der obersten Ebene; Geräte hinter einem Zwischenzähler stecken im Zwischenzähler. Im laufenden Jahr zählt der 1. Januar bis heute, in den Jahren davor das ganze Jahr. Verbraucher, die später als die Bilanz erfasst werden, stecken vorher in „Übrige (Grundlast)“, das Dreieck dort nennt sie. Gelöschte Verbraucher fehlen auch in den Vorjahren, ihr Verbrauch steht dort in „Übrige“.');
       },
 
       drawRank() {
@@ -1014,11 +1001,6 @@
         this.saveAndLoad();
       },
 
-      // Gewählter Stichtag (JJJJ-MM-TT) oder null für heute — vom Store der Stichtag-Leiste.
-      stichtag() {
-        return Alpine.store('dashStichtag').date;
-      },
-
       // Vorjahresvergleich: 'off' oder der Modus ('bis_jetzt'/'komplett'); schließt das Popover.
       setYoy(choice) {
         if (choice === 'off') this.vorjahr = false;
@@ -1058,28 +1040,12 @@
       },
 
       modeHint() {
-        const base = this.mode === 'bis_jetzt'
+        return this.mode === 'bis_jetzt'
           ? t('Laufende Zeiträume werden mit demselben Stück des Vorjahres verglichen. Der letzte Monat ist in beiden Fällen gleich.')
           : t('Laufende Zeiträume stehen neben dem kompletten Vorjahreszeitraum. Das Vorjahr hat dadurch meist höhere Summen.');
-        const stichtag = this.stichtag();
-        if (!stichtag) return base;
-        const date = fmtDate(formats.dmy, Date.parse(stichtag + 'T12:00:00Z') / 1000);
-        return `${base} ${t('Die Tabelle zeigt die Zeiträume zum {date}.', {date})}`;
       },
 
-      // Titel der Karte: der gewählte Tag, in der Vergangenheit „Gestern“ oder „Rückblick“.
-      cardTitle() {
-        const stichtag = this.stichtag();
-        if (!stichtag) return t('Heute');
-        // "Gestern" nach dem Kalender des Servers, nicht des Browsers: Der Stichtag kommt vom Server (Mittag als Anker,
-        // damit eine Zeitumstellung das Datum nicht verschiebt).
-        const today = ZT.parts(Date.now() / 1000);
-        const yesterday = ZT.parts(ZT.toEpoch(today.year, today.month, today.day - 1, 12));
-        const iso = `${yesterday.year}-${String(yesterday.month).padStart(2, '0')}-${String(yesterday.day).padStart(2, '0')}`;
-        return stichtag === iso ? t('Gestern') : t('Rückblick');
-      },
-
-      // Rekorde und Kenntage je Jahr: einmal je Seitenaufruf, sie hängen nicht am Stichtag.
+      // Rekorde und Kenntage je Jahr: einmal je Seitenaufruf, sie hängen nicht am Zeitraum der Tabelle.
       async loadRecords() {
         this.recordsError = '';
         try {
@@ -1189,14 +1155,14 @@
         }
       },
 
-      // Verbraucher mit der größten Änderung; Stichtag und Vorjahr-Modus wie die Vergleichstabelle.
+      // Verbraucher mit der größten Änderung; Vorjahr-Modus wie die Vergleichstabelle.
       async loadChanges() {
         const seq = ++this._changesSeq;
         try {
           const res = await fetch('energiedashboard/langzeit/changes', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({mode: this.mode, at: this.stichtag()}),
+            body: JSON.stringify({mode: this.mode}),
           });
           if (!res.ok) throw new Error(String(res.status));
           const data = await res.json();
@@ -1209,7 +1175,7 @@
       },
 
       changesNote() {
-        return t('Verbraucher mit der größten Änderung gegenüber dem Vorjahr, im Zeitraum Dieses Jahr (Stichtag und Vorjahr wie in der Vergleichstabelle). Rot: mehr Verbrauch, grün: weniger. Geräte hinter einem Zwischenzähler stehen im Zwischenzähler. „Übrige (Grundlast)“ ist der Rest bis zum Verbrauch laut Bilanz.');
+        return t('Verbraucher mit der größten Änderung gegenüber dem Vorjahr, im Zeitraum Dieses Jahr (Vorjahr wie in der Vergleichstabelle). Rot: mehr Verbrauch, grün: weniger. Geräte hinter einem Zwischenzähler stehen im Zwischenzähler. „Übrige (Grundlast)“ ist der Rest bis zum Verbrauch laut Bilanz.');
       },
 
       changesRange() {
@@ -1291,7 +1257,7 @@
           const res = await fetch('energiedashboard/langzeit/table', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({columns: this.columns, vorjahr: this.vorjahr, mode: this.mode, at: this.stichtag()}),
+            body: JSON.stringify({columns: this.columns, vorjahr: this.vorjahr, mode: this.mode}),
           });
           if (!res.ok) throw new Error(String(res.status));
           const data = await res.json();

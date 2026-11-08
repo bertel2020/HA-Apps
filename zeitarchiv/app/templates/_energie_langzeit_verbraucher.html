@@ -1,20 +1,13 @@
-{% from "_dashboard_period_nav.html" import nav as period_nav with context %}
 {% from "_hints.html" import hint_button, hint_body %}
 {# Reiter „Langzeit“, Ansicht „Verbraucher“ (Roadmap 1.49): Verbraucher der obersten Ebene über die Jahre. Die Daten kommen
    von POST energiedashboard/langzeit/consumers; energie-langzeit.js rechnet daraus nur Anteile und Änderungen. #}
 <div x-show="lzView === 'verb'" data-hints="collapsed" x-cloak>
   <p class="hint hint-warn" x-show="consumersError" x-text="consumersError" x-cloak></p>
 
-  {# Verbraucher im Jahr: Rangliste mit Stichtag-Leiste wie die Vergleichstabelle. #}
+  {# Verbraucher im Jahr: Rangliste, das laufende Jahr bis heute. #}
   <div class="card wt-card">
-    <div class="wt-controls wt-card-head">
-      <h2 class="wt-h2" :class="{'wt-h2-jump': stichtag()}" x-text="cardTitle()" @click="if (stichtag()) $store.dashStichtag.set(null)" :title="stichtag() ? t('Zurück zu heute') : ''"></h2>
-      {{ period_nav(true, true) }}
-    </div>
-    <p class="wt-stand">{{ _("Der Stichtag gilt für die Rangliste und die Tabelle Verbraucher × Jahre; Anteile je Jahr und Jahre × Monate zeigen alle Jahre.") }}</p>
-    <div class="wt-card-sep"></div>
     <div class="wt-controls">
-      <h3 class="wt-h3">{{ _("Verbraucher im Jahr") }} {{ hint_button(_("Verbraucher im Jahr")) }}</h3>
+      <h2 class="wt-h2">{{ _("Verbraucher im Jahr") }} {{ hint_button(_("Verbraucher im Jahr")) }}</h2>
       {% call hint_body() %}<span x-text="rankNote()"></span>{% endcall %}
       <div class="wt-seg" role="group" aria-label="{{ _('Jahr') }}">
         <template x-for="option in rankYears()" :key="option.year">
@@ -33,12 +26,14 @@
     <div class="wt-vr-cover" x-ref="rankCover"></div>
     <p class="wt-foot">{{ _("Anteil am Verbrauch laut Bilanz (Erzeugung + Netzbezug + Speicherentladung − Einspeisung − Speicherladung). Die Änderung vergleicht mit demselben Stück des Vorjahres; rot: mehr Verbrauch, grün: weniger, „–“, wenn der Verbraucher im Vorjahr noch nicht ganz erfasst war. „Übrige (Grundlast)“ ist der Rest bis zur Bilanz, nie negativ. Das Dreieck nennt Messlücken und Zählerrückgänge im Zeitraum. Der Name öffnet die Entität, ein Klick auf die Zeile zeigt ihre Monate unten. Der kleine Verlauf rechts zeigt die Jahressummen, das gewählte Jahr kräftig. Ein Klick auf einen Spaltenkopf sortiert, ein zweiter dreht die Reihenfolge; „Vorjahr“ sortiert nach der Änderung in kWh, „Übrige (Grundlast)“ und die Bilanz stehen immer unten.") }}</p>
 
-    {# Verbraucher × Jahre: jede Spalte ist die Rangliste ihres Jahres, deshalb gilt auch hier der Stichtag der Karte.
-       Sortierbar nach einem Jahr, ein Klick auf eine Zeile wählt den Verbraucher der Matrix. #}
-    <div x-show="consumers && consumers.years" x-cloak>
-      <div class="wt-card-sep"></div>
+  </div>
+
+  {# Verbraucher × Jahre: jede Spalte ist die Rangliste ihres Jahres, das laufende Jahr zählt bis heute.
+     Sortierbar nach einem Jahr, ein Klick auf eine Zeile wählt den Verbraucher der Matrix. #}
+  <div class="card wt-card" x-show="consumers && consumers.years" x-cloak>
+    <div>
       <div class="wt-controls">
-        <h3 class="wt-h3">{{ _("Verbraucher × Jahre") }} {{ hint_button(_("Verbraucher × Jahre")) }}</h3>
+        <h2 class="wt-h2">{{ _("Verbraucher × Jahre") }} {{ hint_button(_("Verbraucher × Jahre")) }}</h2>
         {% call hint_body() %}<span x-text="sharesTableNote()"></span>{% endcall %}
         {# Bedienleiste wie „Zeiträume im Vergleich“ in „Summen“: Spalten zum Ankreuzen, Werte wie das Vorjahr-Menü. #}
         <div class="dd-picker-wrap wt-controls-end">
