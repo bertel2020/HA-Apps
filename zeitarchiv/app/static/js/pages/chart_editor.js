@@ -993,7 +993,10 @@
               key: `${s.entity_id}-${previousYear}`,
               color,
               name: `${name} (${previousYear})`,
-              ...this.seriesStatsFor(s, s.compare_points, s.compare_window_end),
+              // Bis zum selben Tag wie das laufende Jahr (compare_cut_points, nur Zähler/Schalter), nicht das ganze Vorjahr.
+              ...(s.compare_cut_points
+                ? this.seriesStatsFor(s, s.compare_cut_points, s.compare_cut_end)
+                : this.seriesStatsFor(s, s.compare_points, s.compare_window_end)),
             });
             out.push({
               key: `${s.entity_id}-${currentYear}`,
