@@ -461,6 +461,10 @@
     // Bewusst außerhalb von x-data (siehe entity_detail.html: ECharts verlässt
     // sich auf `this` als echtes Objekt, nicht Alpines reaktiven Proxy).
     let chartInstance = null;
+    // Legendenname der Hauptserie -> Namen ihrer Begleitserien (Vorjahr/Vorperiode,
+    // gleitender Ø). Sie folgen dem Legenden-Umschalter der Hauptserie, siehe
+    // toggleLegendItem() und render().
+    let legendCompanions = {};
     // Schichten der verdichteten Spalten im Zeitstrahl, je Element über den Index im sechsten Wert
     // (ECharts führt in Werten keine Listen), siehe renderTimelineMulti().
     let timelineParts = [];
@@ -1486,7 +1490,13 @@
           const idx = this.legendHiddenIds.indexOf(entityId);
           if (idx === -1) this.legendHiddenIds.push(entityId);
           else this.legendHiddenIds.splice(idx, 1);
-          if (chartInstance) chartInstance.dispatchAction({type: 'legendToggleSelect', name: seriesName});
+          if (!chartInstance) return;
+          // Begleitserien (Vorjahr/Vorperiode, gleitender Ø) folgen der Hauptserie —
+          // wer eine Serie ausblendet, will deren Vergleichswerte nicht mehr sehen.
+          const type = idx === -1 ? 'legendUnSelect' : 'legendSelect';
+          [seriesName, ...(legendCompanions[seriesName] || [])].forEach(name => {
+            chartInstance.dispatchAction({type, name});
+          });
         },
         // Hover auf eine Legendenzeile hebt bei aktivem Donut den zugehörigen
         // Slice hervor — dasselbe highlight/showTip- bzw. downplay/hideTip-
@@ -2009,10 +2019,14 @@
           // wenn die Serie am Cursor keinen eigenen Punkt hat (tooltip-hold.js).
           const holdSeries = [];
           // Für legend.selected unten — nur die Hauptserie ist über die
-          // eigene Legende (siehe HTML-Template) umschaltbar, nicht die
-          // Vergleichs-Nebenserie (die folgt dem "Vergleichen"-Menü als
-          // Ganzes, siehe setCompareMode()/disableCompare()).
+          // eigene Legende (siehe HTML-Template) umschaltbar; Vergleichs-
+          // Nebenserie und gleitender Ø folgen ihr (addCompanion()).
           const legendSelected = {};
+          legendCompanions = {};
+          const addCompanion = (owner, name) => {
+            (legendCompanions[owner] ||= []).push(name);
+            legendSelected[name] = legendSelected[owner];
+          };
           chartSeries.forEach((s, i) => {
             const color = this.colorFor(s.entity_id);
             // chart_type kommt vom Server (query.py: "bar" für Zähler/Schalter,
@@ -2199,8 +2213,10 @@
               // verbundene, aber eigenständige Linie. Nicht über die Legende
               // einzeln umschaltbar (wie cmp auch nicht) — sie gehört
               // sichtbar zur Hauptserie, kein eigener Umschalt-Anspruch.
+              const rollingName = t('{name} (Ø gleitend)',{name: displayName});
+              addCompanion(displayName, rollingName);
               echartsSeries.push({
-                name: t('{name} (Ø gleitend)',{name: displayName}),
+                name: rollingName,
                 type: 'line',
                 yAxisIndex: units.indexOf(axisKey(s)),
                 data: rollingData,
@@ -2238,8 +2254,10 @@
                 const last = compareData[compareData.length - 1];
                 compareData.push([this.windowEnd * 1000, last[1], last[2], last[3], last[4], last[5]]);
               }
+              const cmpName = `${displayName} (${seriesLabel}${compareLabel ? ', ' + compareLabel : ''})`;
+              addCompanion(displayName, cmpName);
               const cmp = {
-                name: `${displayName} (${seriesLabel}${compareLabel ? ', ' + compareLabel : ''})`,
+                name: cmpName,
                 type: chartType,
                 yAxisIndex: units.indexOf(axisKey(s)),
                 data: compareData,

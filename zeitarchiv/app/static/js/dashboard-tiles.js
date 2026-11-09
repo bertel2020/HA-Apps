@@ -157,7 +157,11 @@
       if (!hiddenSet) { hiddenSet = new Set(); legendHidden.set(chartId, hiddenSet); }
       if (hiddenSet.has(seriesName)) hiddenSet.delete(seriesName); else hiddenSet.add(seriesName);
       item.classList.toggle('inactive', hiddenSet.has(seriesName));
-      chart.dispatchAction({type: 'legendToggleSelect', name: seriesName});
+      // Begleitserien (Vorjahr/Vorperiode, gleitender Ø) folgen der Hauptserie.
+      const type = hiddenSet.has(seriesName) ? 'legendUnSelect' : 'legendSelect';
+      const companions = (chart.getOption().series || [])
+        .filter(x => x.legendOwner === seriesName).map(x => x.name);
+      [seriesName, ...companions].forEach(name => chart.dispatchAction({type, name}));
     };
   }
 
