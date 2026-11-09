@@ -524,12 +524,13 @@
     return `${html}</tbody>`;
   }
 
-  // Jahre-Auswahl der Karten: „Letzte 5“ oder „Alle“, nur ab mehr als fünf Jahren im Archiv. Früher gab es auch „Letzte 10“
-  // (gespeichert als 10); das gilt jetzt als „Alle“.
+  // Jahre-Auswahl der Karten: „Letzte 5“, „Letzte 10“ oder „Alle“, nur ab mehr als fünf Jahren im Archiv; „Letzte 10“ erst ab mehr
+  // als zehn (sonst wäre es dasselbe wie „Alle“).
   const YEAR_STEP = 5;
-  const storedYearLimit = (value) => (value === YEAR_STEP ? YEAR_STEP : 0);
+  const storedYearLimit = (value) => (value === YEAR_STEP || value === 10 ? value : 0);
   const yearChoices = (count) => [
     {value: YEAR_STEP, label: t('Letzte 5')},
+    ...(count > 10 ? [{value: 10, label: t('Letzte 10')}] : []),
     {value: 0, label: t('Alle ({n})', {n: count})},
   ];
 

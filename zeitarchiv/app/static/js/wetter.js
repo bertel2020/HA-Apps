@@ -261,7 +261,7 @@
         if (Array.isArray(saved.columns)) this.columns = saved.columns.filter((key) => COLUMN_KEYS.includes(key) || /^j\d{4}$/.test(key));
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
-        if (saved.kenntageRange === '5' || saved.kenntageRange === 'all') this.kenntageRange = saved.kenntageRange;
+        if (['5', '10', 'all'].includes(saved.kenntageRange)) this.kenntageRange = saved.kenntageRange;
         if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
         // Ausgeblendete Karten fehlen im Dokument: der erste vorhandene Reiter ist der Start, Diagramme ohne Karte laden nicht.
         const firstTab = this.$root.querySelector('[role="tab"]');
@@ -1692,10 +1692,10 @@
         }
       },
 
-      // Jahre der Karte „Kenntage je Jahr“: alle oder die letzten fünf.
+      // Jahre der Karte „Kenntage je Jahr“: alle oder die letzten fünf bzw. zehn.
       kenntageYears() {
         const years = this.longterm ? Object.keys(this.longterm.kenntage).sort() : [];
-        return this.kenntageRange === '5' ? years.slice(-5) : years;
+        return this.kenntageRange === 'all' ? years : years.slice(-Number(this.kenntageRange));
       },
 
       setKenntageRange(range) {

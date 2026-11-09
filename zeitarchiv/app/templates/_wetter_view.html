@@ -450,8 +450,9 @@
         <h2 class="wt-h2">{{ _("Kenntage je Jahr") }} {{ hint_button(_("Kenntage je Jahr")) }}</h2>
         {% call hint_body() %}<span x-text="kenntageNote()"></span>{% endcall %}
         <div class="wt-seg" role="group" aria-label="{{ _('Zeitraum') }}">
-          <button type="button" :aria-pressed="(kenntageRange === 'all').toString()" @click="setKenntageRange('all')">{{ _("Alle Jahre") }}</button>
           <button type="button" :aria-pressed="(kenntageRange === '5').toString()" @click="setKenntageRange('5')">{{ _("Letzte 5") }}</button>
+          <button type="button" :aria-pressed="(kenntageRange === '10').toString()" @click="setKenntageRange('10')">{{ _("Letzte 10") }}</button>
+          <button type="button" :aria-pressed="(kenntageRange === 'all').toString()" @click="setKenntageRange('all')">{{ _("Alle Jahre") }}</button>
         </div>
       </div>
       <div class="wt-kk-grid">
