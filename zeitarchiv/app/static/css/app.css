@@ -2406,7 +2406,10 @@ button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
 .wt-scope{position:sticky;top:57px;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:8px 14px;flex-wrap:wrap;padding:8px 12px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);}
 .wt-scope-lab{font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
 .wt-scope-lab b{color:var(--ink);font-weight:600;font-size:calc(14px * var(--font-scale, 1));}
-@media (max-width:640px){.wt-scope{flex-wrap:nowrap;}.wt-scope-more{display:none;}}
+@media (max-width:640px){
+  .wt-scope{flex-wrap:nowrap;}
+  .wt-scope-more{display:none;}
+}
 .wt-stand{margin:0 0 10px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
 .wt-table td.wt-loading{text-align:left;color:var(--ink-faint);padding:18px 12px;}
 /* Steuerung über der Tabelle */
