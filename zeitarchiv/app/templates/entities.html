@@ -7,7 +7,7 @@
 {% endblock %}
 {% block content %}
   
-  <div class="page">
+  <div class="page page-wide"{% if dashboard_grid_columns == 4 %} data-columns="4"{% endif %}>
     {% if overview_stats | default('always') == 'always' %}
     <div class="stat-row">
       <a class="stat" href="entities">

@@ -697,8 +697,8 @@ sodass ohne Schalter nichts anders aussieht als vorher.
   schlägt an, wenn eine Regel außerhalb steht.
 - **Tokens:** `--page-max` (1120 px; mit Schalter ab 1200 px 1920 px) und `--page-narrow` (1120 px).
   Seiten ohne Opt-in (Formulare, Einstellungen, Energiedashboard) und die Backup-Leiste (`.rw-bar-in`) bleiben
-  bei `--page-narrow`, mittig. Opt-in ist die Klasse `.page-wide` (genau sechs
-  Templates: Charts, Tabellen, Tabelleneditor, Chart-Editor, Entitätenliste, Dashboard).
+  bei `--page-narrow`, mittig. Opt-in ist die Klasse `.page-wide` (genau sieben
+  Templates: Charts, Tabellen, Tabelleneditor, Chart-Editor, Entitätenliste, Dashboard, Übersicht).
 - **Dashboard:** das Raster ist bis 1440 px breit (`--dash-max`) und mittig; die Zeilenhöhe wächst mit der
   Fensterbreite (`max(--dashboard-row-height, Spaltenbreite × .58)`, aus `vw` berechnet). Auf `.dgroup` und
   `.dashboard-grid` darf **nie** `container-type` stehen: Die `position:fixed`-Überlagerungen der Kacheln

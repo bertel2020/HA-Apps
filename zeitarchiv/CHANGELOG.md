@@ -64,7 +64,7 @@
     Charts ohne eigene Einstellung
 - **Darstellung**: Breite Darstellung (experimentell) unter Einstellungen →
   Darstellung, standardmäßig aus
-  - Dashboards, Charts, Tabellen und Entitäten nutzen auf großen Bildschirmen
+  - Übersicht, Dashboards, Charts, Tabellen und Entitäten nutzen auf großen Bildschirmen
     mehr Breite (ab 1200 px bis 1920 px, darüber zentriert)
   - Je Dashboard umschaltbar: 4 Kacheln pro Zeile (ab 1500 px)
 
@@ -156,7 +156,7 @@
     without their own setting
 - **Appearance**: Wide layout (experimental) under Settings → Appearance, off
   by default
-  - Dashboards, charts, tables and entities use more width on large screens
+  - Overview, dashboards, charts, tables and entities use more width on large screens
     (from 1200 px up to 1920 px, centered beyond that)
   - Per dashboard: 4 tiles per row (from 1500 px)
 

@@ -538,3 +538,33 @@
   /* Symbol über den Titel: lange Namen (Energiedashboard) brauchen die ganze Kachelbreite. */
   .ov-tile .row{flex-direction:column;align-items:flex-start;gap:8px;}
 }
+
+/* Breite Darstellung (experimentell) — Spiegel der Regeln aus dashboard_detail.css (Übersicht): Titel, Zeitraum-Leiste und Kachelraster stehen bis 1440px
+   breit mittig im Rahmen (--page-max, app.css), mehr Platz bekommen die Kacheln nicht — bei 1920px
+   wären drei Spalten sonst über 600px breit. Die Zeilenhöhe wächst mit der Spaltenbreite (Faktor
+   --dash-row-factor, bei 1120px Rahmen ergibt das etwa die bisherigen 210px) und fällt nie unter
+   --dashboard-row-height (Schriftgröße). Die Spaltenbreite kommt aus vw statt aus einem Container:
+   container-type auf .dgroup/.dashboard-grid würde position:fixed-Überlagerungen der Kacheln
+   (Menü, Popup) am Raster festhalten. 48px = Seitenpolster von body, 14px = eine Lücke. */
+@media (min-width:1200px){
+  :root[data-page-layout="wide"]{--dash-max:1440px;--dash-row-factor:.58;--dash-cols:3;}
+  :root[data-page-layout="wide"] .page-wide > *{max-width:var(--dash-max);margin-inline:auto;}
+  :root[data-page-layout="wide"] .dashboard-grid{
+    --dash-row:max(var(--dashboard-row-height), calc((min(var(--dash-max), 100vw - 48px) - (var(--dash-cols) - 1) * 14px) / var(--dash-cols) * var(--dash-row-factor)));
+    grid-auto-rows:var(--dash-row);
+  }
+  :root[data-page-layout="wide"] .dashboard-grid.is-precise{grid-auto-rows:calc(var(--dash-row) / 2);}
+}
+
+/* Kacheln pro Zeile = 4 (Dashboard-Einstellung): ab 1500px vier Spalten (präzise acht) und die Breite wächst
+   auf 4 × 480px = 1920px, damit die Kacheln nicht schmaler werden als bei drei Spalten (1440px). Darunter
+   bleibt es bei drei (sechs); die Kappung zu breiter Kacheln steht oben ohne Schalter-Bedingung. Titel und
+   Zeitraum-Leiste folgen über data-columns an .page. */
+@media (min-width:1500px){
+  :root[data-page-layout="wide"] .page[data-columns="4"]{--dash-max:1920px;--dash-cols:4;}
+  :root[data-page-layout="wide"] .dashboard-grid[data-columns="4"]{grid-template-columns:repeat(4,minmax(0,1fr));}
+  :root[data-page-layout="wide"] .dashboard-grid.is-precise[data-columns="4"]{grid-template-columns:repeat(8,minmax(0,1fr));}
+  :root[data-page-layout="wide"] .dashboard-grid:not(.is-precise)[data-columns="4"] .dtile[data-grid-cols="4"]{grid-column:span 4;}
+  :root[data-page-layout="wide"] .dashboard-grid.is-precise[data-columns="4"] .dtile[data-grid-cols="7"]{grid-column:span 7;}
+  :root[data-page-layout="wide"] .dashboard-grid.is-precise[data-columns="4"] .dtile[data-grid-cols="8"]{grid-column:span 8;}
+}
