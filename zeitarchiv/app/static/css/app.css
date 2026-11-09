@@ -1580,6 +1580,12 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
 }
 .dash-period-banner strong{font-weight:600;}
 .dash-period-banner-sep{opacity:.6;}
+/* Hinweis „4 Kacheln pro Zeile“: wird nur bei breiter Darstellung gerendert (Server), sichtbar ab 1500px. */
+.dash-hint-four{display:none;align-items:center;gap:10px;margin:10px 0 12px;padding:8px 12px;background:var(--accent-line-soft, var(--surface));border:1px solid var(--accent-line);border-radius:8px;font-size:calc(13px * var(--font-scale, 1));}
+.dash-hint-four-text{flex:1;}
+.dash-hint-four-sub{display:block;color:var(--ink-faint);font-size:calc(12px * var(--font-scale, 1));}
+.dash-hint-four-close{font:inherit;font-size:calc(18px * var(--font-scale, 1));line-height:1;background:none;border:none;color:var(--ink-faint);cursor:pointer;padding:0 4px;}
+@media (min-width:1500px){.dash-hint-four{display:flex;}}
 .dash-period-banner-back{
   font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;
   text-decoration:underline;text-underline-offset:2px;

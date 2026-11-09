@@ -9,7 +9,7 @@ from __future__ import annotations
 import time
 from zoneinfo import ZoneInfo
 
-from . import cleanup_tile, entity_usage, i18n
+from . import cleanup_tile, dashboard_grid, entity_usage, i18n, page_layout
 from .chart_period import calendar_bounds
 from .chart_types import effective_chart_type
 from .formatting import decimals_to_int, entity_display_name, format_uptime, format_value
@@ -337,6 +337,8 @@ def tiles_context(
         # Kacheln pro Zeile (3 oder 4): bei 4 trägt das Raster data-columns="4" (breite Darstellung,
         # ab 1500 px vier Spalten, darunter kappt das CSS zu breite Kacheln) und das Größenmenü geht bis 4 (8).
         "dashboard_grid_columns": dashboard_grid_columns,
+        # Wegklickbarer Hinweis auf „4 Kacheln pro Zeile“ (_four_columns_hint.html).
+        "four_columns_hint": dashboard_grid.four_columns_hint_open(index, page_layout.current(index), dashboard_grid_columns),
         # Zeitraum-Navigation: Stichtag-Leiste über den Kacheln (_dashboard_period_nav.html),
         # der Kalender reicht über das ganze Archiv wie im Chart-Editor.
         "dashboard_period_nav": bool(dashboard["period_nav"]) if dashboard else False, **calendar_bounds(entity_rows, tz),

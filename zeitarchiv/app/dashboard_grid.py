@@ -23,6 +23,15 @@ def size_limits(dashboard: dict | None) -> tuple[int, int]:
     return columns * precise, 3 * precise
 
 
+HINT_SETTING = "hint_four_columns_dismissed"
+
+
+def four_columns_hint_open(index: Index, layout: str, columns: int) -> bool:
+    """Hinweis „4 Kacheln pro Zeile“: nur bei breiter Darstellung, bei einem Dashboard mit 3 Spalten und
+    solange er nicht für die ganze Installation weggeklickt wurde (die Fensterbreite prüft das CSS)."""
+    return layout == "wide" and columns == 3 and index.get_setting(HINT_SETTING, "") != "1"
+
+
 class _GridColumnsBody(BaseModel):
     grid_columns: int
 
@@ -39,5 +48,10 @@ def make_router(get_index: Callable[[], Index]) -> APIRouter:
         if not found:
             raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
         return {"ok": True, "grid_columns": body.grid_columns}
+
+    @router.post("/dashboard-hints/four-columns")
+    def dismiss_four_columns_hint() -> dict:
+        get_index().set_setting(HINT_SETTING, "1")
+        return {"ok": True}
 
     return router

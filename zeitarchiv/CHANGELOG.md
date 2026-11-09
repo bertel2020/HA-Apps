@@ -8,7 +8,8 @@
   Darstellung, standardmäßig aus
   - Übersicht, Dashboards, Charts, Tabellen und Entitäten nutzen auf großen Bildschirmen
     mehr Breite (ab 1200 px bis 1920 px, darüber zentriert)
-  - Je Dashboard umschaltbar: 4 Kacheln pro Zeile (ab 1500 px)
+  - Je Dashboard umschaltbar: 4 Kacheln pro Zeile (ab 1500 px); ein Hinweis
+    schlägt es bei breitem Fenster vor und lässt sich wegklicken
 
 - **Wetterdashboard**: Weitere Sensoren nach Raum und Etage
   - Bis zu 20 weitere Sensoren (vorher 5); der Dialog bietet nur Temperatur-
@@ -154,7 +155,8 @@
   by default
   - Overview, dashboards, charts, tables and entities use more width on large screens
     (from 1200 px up to 1920 px, centered beyond that)
-  - Per dashboard: 4 tiles per row (from 1500 px)
+  - Per dashboard: 4 tiles per row (from 1500 px); a hint suggests it on a
+    wide window and can be dismissed
 
 - **Weather dashboard**: More sensors by room and floor
   - Up to 20 additional sensors (was 5); the dialog offers only temperature

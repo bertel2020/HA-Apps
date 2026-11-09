@@ -173,3 +173,42 @@ def test_precise_tablet_block_keeps_a_four_wide_tile_full_width() -> None:
         css = (PAGE_CSS / name).read_text(encoding="utf-8")
         start = css.index("@media (min-width:521px) and (max-width:820px){")
         assert '.dashboard-grid.is-precise .dtile[data-grid-cols="4"]{grid-column:span 4;}' in css[start: css.index("\n  }", start)]
+
+
+def test_four_columns_hint_logic(index: Index) -> None:
+    assert dashboard_grid.four_columns_hint_open(index, "wide", 3)
+    assert not dashboard_grid.four_columns_hint_open(index, "standard", 3)
+    assert not dashboard_grid.four_columns_hint_open(index, "wide", 4)
+    index.set_setting(dashboard_grid.HINT_SETTING, "1")
+    assert not dashboard_grid.four_columns_hint_open(index, "wide", 3)
+
+
+def test_four_columns_hint_page_and_route(client) -> None:
+    from app.main import index as app_index
+
+    created = client.post("/dashboards", json={"name": "Hinweis-Test"}).json()["id"]
+    old_layout = app_index.get_setting("page_layout", "standard")
+    old_hint = app_index.get_setting(dashboard_grid.HINT_SETTING, "")
+    try:
+        app_index.set_setting(dashboard_grid.HINT_SETTING, "")
+        app_index.set_setting("page_layout", "standard")
+        assert "dash-hint-four" not in client.get(f"/dashboards/{created}").text.replace(".dash-hint-four", "")
+        app_index.set_setting("page_layout", "wide")
+        page = client.get(f"/dashboards/{created}").text
+        assert 'class="dash-hint-four"' in page and "4 Kacheln nutzen" in page
+        assert 'class="dash-hint-four"' in client.get("/uebersicht").text
+        client.post(f"/dashboards/{created}/grid-columns", json={"grid_columns": 4})
+        assert 'class="dash-hint-four"' not in client.get(f"/dashboards/{created}").text
+        client.post(f"/dashboards/{created}/grid-columns", json={"grid_columns": 3})
+        assert client.post("/dashboard-hints/four-columns").status_code == 200
+        assert 'class="dash-hint-four"' not in client.get(f"/dashboards/{created}").text
+    finally:
+        app_index.set_setting("page_layout", old_layout or "standard")
+        app_index.set_setting(dashboard_grid.HINT_SETTING, old_hint or "")
+        client.post(f"/dashboards/{created}/delete")
+
+
+def test_four_columns_hint_is_hidden_below_1500px_by_css() -> None:
+    css = (APP / "static" / "css" / "app.css").read_text(encoding="utf-8")
+    assert ".dash-hint-four{display:none;" in css
+    assert "@media (min-width:1500px){.dash-hint-four{display:flex;}}" in css

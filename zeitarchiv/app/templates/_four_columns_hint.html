@@ -1,0 +1,20 @@
+{% if four_columns_hint %}
+<div class="dash-hint-four" role="note" data-error="{{ _('Speichern der Spaltenzahl fehlgeschlagen.') }}" x-data="{
+  open: true,
+  async send(url, body) {
+    const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+    return r.ok;
+  },
+  async use() {
+    if (await this.send('{{ app_root }}/dashboards/{{ dashboard_id }}/grid-columns', {grid_columns: 4})) { location.reload(); }
+    else { appAlert(this.$el.dataset.error); }
+  },
+  async never() { await this.send('{{ app_root }}/dashboard-hints/four-columns', {}); this.open = false; }
+}" x-show="open" x-cloak>
+  <span class="dash-hint-four-text">{{ _("Dieses Fenster ist breit genug für 4 Kacheln pro Zeile.") }}
+    <span class="dash-hint-four-sub">{{ _("Gilt nur für dieses Dashboard und lässt sich im Editor wieder umstellen.") }}</span></span>
+  <button type="button" class="btn btn-sm" @click="use()">{{ _("4 Kacheln nutzen") }}</button>
+  <button type="button" class="btn btn-sm" @click="never()">{{ _("Nicht mehr zeigen") }}</button>
+  <button type="button" class="dash-hint-four-close" @click="open = false" aria-label="{{ _('Schließen') }}">×</button>
+</div>
+{% endif %}
