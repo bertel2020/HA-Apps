@@ -4,6 +4,12 @@
 
 ### Neu
 
+- **Darstellung**: Breite Darstellung (experimentell) unter Einstellungen →
+  Darstellung, standardmäßig aus
+  - Übersicht, Dashboards, Charts, Tabellen und Entitäten nutzen auf großen Bildschirmen
+    mehr Breite (ab 1200 px bis 1920 px, darüber zentriert)
+  - Je Dashboard umschaltbar: 4 Kacheln pro Zeile (ab 1500 px)
+
 - **Wetterdashboard**: Weitere Sensoren nach Raum und Etage
   - Bis zu 20 weitere Sensoren (vorher 5); der Dialog bietet nur Temperatur-
     und Feuchtesensoren an und blendet schon eingetragene aus
@@ -100,11 +106,6 @@
     Dashboard-Kacheln
   - Einstellungen, Darstellung: Die Legendengröße gilt als Standard für alle
     Charts ohne eigene Einstellung
-- **Darstellung**: Breite Darstellung (experimentell) unter Einstellungen →
-  Darstellung, standardmäßig aus
-  - Übersicht, Dashboards, Charts, Tabellen und Entitäten nutzen auf großen Bildschirmen
-    mehr Breite (ab 1200 px bis 1920 px, darüber zentriert)
-  - Je Dashboard umschaltbar: 4 Kacheln pro Zeile (ab 1500 px)
 
 ### Geändert
 
@@ -143,6 +144,12 @@
 ### English
 
 #### New
+
+- **Appearance**: Wide layout (experimental) under Settings → Appearance, off
+  by default
+  - Overview, dashboards, charts, tables and entities use more width on large screens
+    (from 1200 px up to 1920 px, centered beyond that)
+  - Per dashboard: 4 tiles per row (from 1500 px)
 
 - **Weather dashboard**: More sensors by room and floor
   - Up to 20 additional sensors (was 5); the dialog offers only temperature
@@ -236,11 +243,6 @@
   - Legend size "Normal" or "Small", per chart, also on the dashboard tiles
   - Settings, Appearance: the legend size is the default for all charts
     without their own setting
-- **Appearance**: Wide layout (experimental) under Settings → Appearance, off
-  by default
-  - Overview, dashboards, charts, tables and entities use more width on large screens
-    (from 1200 px up to 1920 px, centered beyond that)
-  - Per dashboard: 4 tiles per row (from 1500 px)
 
 #### Changed
 
