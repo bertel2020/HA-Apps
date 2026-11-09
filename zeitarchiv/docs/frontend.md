@@ -708,6 +708,8 @@ sodass ohne Schalter nichts anders aussieht als vorher.
   in der Anzeige (CSS-Attributregeln, `span min()` gibt es nicht). Präziser Modus rechnet mit
   `grid_columns × 2` bzw. `grid_columns` (`dashboard_grid.size_limits()`). Das Raster steht in
   `dashboard_detail.css` **und** `entities.css`; jede Änderung gehört in beide, Tests prüfen beide.
+- **Kachelraster der Übersicht und der Dashboard-Liste** (`.ov-tiles`, `.dash-grid`): ab 1500 px höchstens fünf Spalten
+  (Mindestbreite `max(230px/240px, (100 % − 4 · 14px) / 5)`); darunter und ohne Schalter bleibt es beim `auto-fill`.
 - **Neuzeichnen:** Chart-Kacheln hören mit einem `ResizeObserver` (eine Instanz je Seite,
   `dashboard-tiles.js`) statt nur auf `window.resize`. Wetter-, Langzeit- und die meisten Energie-Diagramme haben
   schon eigene Beobachter; nur das Sankey des Energiedashboards hängt am Fenster und rechnet seine Mindesthöhe

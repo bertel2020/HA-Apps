@@ -159,3 +159,12 @@ def test_chart_heights_grow_only_inside_the_1500px_switch_block() -> None:
         block = css[start: css.index("\n}", start)]
         assert block.count("height:") >= 3 and all(f"{root} " in line for line in block.splitlines()[1:])
     assert ':root[data-page-layout="wide"] #wetter-root .wt-table{min-width:100%;}' in (PAGE_CSS / "wetterdashboard.css").read_text(encoding="utf-8")
+
+
+def test_overview_tiles_and_dashboard_list_show_at_most_five_per_row_only_in_the_switch_block() -> None:
+    for name, sel, minimum in (("entities.css", ".ov-tiles", 230), ("dashboards.css", ".dash-grid", 240)):
+        css = (PAGE_CSS / name).read_text(encoding="utf-8")
+        rule = (f':root[data-page-layout="wide"] {sel}{{grid-template-columns:repeat(auto-fill,'
+                f'minmax(max({minimum}px, calc((100% - 4 * 14px) / 5)),1fr));}}')
+        assert css.count(rule) == 1, name
+        assert css[: css.index(rule)].rstrip().endswith("@media (min-width:1500px){"), name

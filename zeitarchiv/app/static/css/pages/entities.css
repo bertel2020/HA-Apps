@@ -568,3 +568,9 @@
   :root[data-page-layout="wide"] .dashboard-grid.is-precise[data-columns="4"] .dtile[data-grid-cols="7"]{grid-column:span 7;}
   :root[data-page-layout="wide"] .dashboard-grid.is-precise[data-columns="4"] .dtile[data-grid-cols="8"]{grid-column:span 8;}
 }
+
+/* Breite Darstellung (experimentell): höchstens 5 Kacheln pro Zeile. Die Mindestbreite einer Spalte wird nie kleiner als
+   ein Fünftel der Zeile, so passen höchstens fünf nebeneinander; bei weniger Platz bleibt es beim bisherigen auto-fill. */
+@media (min-width:1500px){
+  :root[data-page-layout="wide"] .ov-tiles{grid-template-columns:repeat(auto-fill,minmax(max(230px, calc((100% - 4 * 14px) / 5)),1fr));}
+}
