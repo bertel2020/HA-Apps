@@ -1233,4 +1233,14 @@
    zu flachen Streifen. Nur ab 1200px und nur mit Schalter, sonst bleibt alles wie bisher. */
 @media (min-width:1200px){
   :root[data-page-layout="wide"] #energiedashboard-root{max-width:1440px;margin-inline:auto;}
+  /* Tooltips am rechten Kartenrand (Speicherstand, die letzten zwei KPI-Kacheln) ragten bei 1440px-Rahmen über das
+     Fenster und erzeugten waagrechten Überlauf: wie .notice-mute-btn rechtsbündig öffnen. */
+  :root[data-page-layout="wide"] .edash-soc-now[data-tooltip]::after{left:auto;right:0;}
+  :root[data-page-layout="wide"] .edash-kpi-row .edash-kpi-button:nth-last-child(-n+2)[data-tooltip]::after{left:auto;right:0;}
+}
+/* Ab 1500px etwas mehr Höhe, damit Diagramme und Heatmap im breiteren Rahmen nicht zu flachen Streifen werden. */
+@media (min-width:1500px){
+  :root[data-page-layout="wide"] #energiedashboard-root .wt-chart{height:340px;}
+  :root[data-page-layout="wide"] #energiedashboard-root .wt-chart.wt-chart-sm{height:230px;}
+  :root[data-page-layout="wide"] #energiedashboard-root .edash-heatmap-wrap{height:240px;}
 }

@@ -474,4 +474,15 @@
    zu flachen Streifen. Nur ab 1200px und nur mit Schalter, sonst bleibt alles wie bisher. */
 @media (min-width:1200px){
   :root[data-page-layout="wide"] #wetter-root{max-width:1440px;margin-inline:auto;}
+  /* Tabellen in ihrer Inhaltsbreite (z. B. 987px) ließen im 1440px-Rahmen rechts eine leere Fläche: auf die Kartenbreite
+     ziehen. min-width statt width, damit breitere Tabellen weiter im Wrapper scrollen. */
+  :root[data-page-layout="wide"] #wetter-root .wt-table{min-width:100%;}
+}
+/* Ab 1500px etwas mehr Höhe, damit die Diagramme im breiteren Rahmen nicht zu flachen Streifen werden. */
+@media (min-width:1500px){
+  :root[data-page-layout="wide"] #wetter-root .wt-chart{height:340px;}
+  :root[data-page-layout="wide"] #wetter-root .wt-chart.wt-chart-tall{height:400px;}
+  :root[data-page-layout="wide"] #wetter-root .wt-chart.wt-chart-short{height:230px;}
+  :root[data-page-layout="wide"] #wetter-root .wt-chart.wt-kk-chart{height:190px;}
+  :root[data-page-layout="wide"] #wetter-root .wt-day-dialog .wt-chart{height:220px;}
 }

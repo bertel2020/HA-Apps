@@ -697,8 +697,9 @@ sodass ohne Schalter nichts anders aussieht als vorher.
   schlägt an, wenn eine Regel außerhalb steht.
 - **Tokens:** `--page-max` (1120 px; mit Schalter ab 1200 px 1920 px) und `--page-narrow` (1120 px).
   Seiten ohne Opt-in (Formulare, Einstellungen, Energiedashboard) und die Backup-Leiste (`.rw-bar-in`) bleiben
-  bei `--page-narrow`, mittig. Opt-in ist die Klasse `.page-wide` (genau acht
-  Templates: Charts, Tabellen, Tabelleneditor, Chart-Editor, Entitätenliste, Dashboard, Dashboard-Liste, Übersicht).
+  bei `--page-narrow`, mittig. Opt-in ist die Klasse `.page-wide` (genau zehn
+  Templates: Charts, Tabellen, Tabelleneditor, Chart-Editor, Entitätenliste, Dashboard, Dashboard-Liste, Übersicht,
+  Energie- und Wetterdashboard).
 - **Dashboard:** das Raster ist bis 1440 px breit (`--dash-max`) und mittig; die Zeilenhöhe wächst mit der
   Fensterbreite (`max(--dashboard-row-height, Spaltenbreite × .58)`, aus `vw` berechnet). Auf `.dgroup` und
   `.dashboard-grid` darf **nie** `container-type` stehen: Die `position:fixed`-Überlagerungen der Kacheln
@@ -708,8 +709,16 @@ sodass ohne Schalter nichts anders aussieht als vorher.
   `grid_columns × 2` bzw. `grid_columns` (`dashboard_grid.size_limits()`). Das Raster steht in
   `dashboard_detail.css` **und** `entities.css`; jede Änderung gehört in beide, Tests prüfen beide.
 - **Neuzeichnen:** Chart-Kacheln hören mit einem `ResizeObserver` (eine Instanz je Seite,
-  `dashboard-tiles.js`) statt nur auf `window.resize`. Energie-, Wetter- und Langzeit-Skripte nutzen weiter
-  `window.resize`.
+  `dashboard-tiles.js`) statt nur auf `window.resize`. Wetter-, Langzeit- und die meisten Energie-Diagramme haben
+  schon eigene Beobachter; nur das Sankey des Energiedashboards hängt am Fenster und rechnet seine Mindesthöhe
+  (≈ Breite / 3, nur bei breiter Darstellung) bei Größenänderung neu.
+- **Energie- und Wetterdashboard:** `.page-wide`, aber der Inhalt (`#energiedashboard-root`, `#wetter-root`) bleibt in
+  allen Reitern bei 1440 px und steht mittig (breiter würden Sankey, Heatmap und Diagramme mit fester Höhe zu
+  flachen Streifen; ein Rahmen für alle Reiter, damit nichts beim Reiterwechsel springt). Ab 1500 px sind die
+  Diagramme etwas höher (340/400 px, Heatmap 240 px), die Wetter-Tabellen füllen die Karte (`min-width:100%`).
+  Tooltips am rechten Kartenrand (Speicherstand, letzte zwei KPI-Kacheln) öffnen nach links, sonst entsteht bei
+  1500–1920 px waagrechter Überlauf. Die Regeln stehen je Seiten-CSS, nicht in `app.css`: `.wt-chart`, `.wt-card`
+  u. a. werden auch anderswo genutzt.
 - **Breakpoints:** 480/640/820 (Mobil), neu 1200/1500/1920 (nur mit Schalter), dazu die Sonderfälle
   520/560/700/760/900.
 - **Prüfen:** `scripts/layout_shots.py` (Playwright, nur lokal, nicht in der CI) nimmt Screenshots und die

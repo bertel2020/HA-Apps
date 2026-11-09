@@ -8,6 +8,8 @@
   Darstellung, standardmäßig aus
   - Übersicht, Dashboards, Charts, Tabellen und Entitäten nutzen auf großen Bildschirmen
     mehr Breite (ab 1200 px bis 1920 px, darüber zentriert)
+  - Energie- und Wetterdashboard nutzen bis 1440 px, mit etwas höheren
+    Diagrammen
   - Je Dashboard umschaltbar: 4 Kacheln pro Zeile (ab 1500 px); ein Hinweis
     schlägt es bei breitem Fenster vor und lässt sich wegklicken
 
@@ -167,6 +169,8 @@
   by default
   - Overview, dashboards, charts, tables and entities use more width on large screens
     (from 1200 px up to 1920 px, centered beyond that)
+  - Energy and weather dashboard use up to 1440 px, with slightly taller
+    charts
   - Per dashboard: 4 tiles per row (from 1500 px); a hint suggests it on a
     wide window and can be dismissed
 

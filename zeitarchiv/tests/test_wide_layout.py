@@ -146,5 +146,16 @@ def test_energy_and_weather_pages_cap_their_content_at_1440px_inside_the_switch_
         rule = f':root[data-page-layout="wide"] {root}{{max-width:1440px;margin-inline:auto;}}'
         assert css.count(rule) == 1, name
         assert css[: css.index(rule)].rstrip().endswith("@media (min-width:1200px){"), name
+    energy = (PAGE_CSS / "energiedashboard.css").read_text(encoding="utf-8")
+    assert energy.count(':root[data-page-layout="wide"] .edash-soc-now[data-tooltip]::after{left:auto;right:0;}') == 1
     js = (STATIC / "js" / "energiedashboard.js").read_text(encoding="utf-8")
     assert "sankeyWideMinHeight" in js and "isWideLayout() && wrap ? wrap.clientWidth / 3 : 0" in js
+
+
+def test_chart_heights_grow_only_inside_the_1500px_switch_block() -> None:
+    for name, root in (("energiedashboard", "#energiedashboard-root"), ("wetterdashboard", "#wetter-root")):
+        css = (PAGE_CSS / f"{name}.css").read_text(encoding="utf-8")
+        start = css.index("@media (min-width:1500px){\n  :root[data-page-layout=\"wide\"] " + root + " .wt-chart{height:340px;}")
+        block = css[start: css.index("\n}", start)]
+        assert block.count("height:") >= 3 and all(f"{root} " in line for line in block.splitlines()[1:])
+    assert ':root[data-page-layout="wide"] #wetter-root .wt-table{min-width:100%;}' in (PAGE_CSS / "wetterdashboard.css").read_text(encoding="utf-8")
