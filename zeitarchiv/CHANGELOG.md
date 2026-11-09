@@ -76,6 +76,8 @@
 
 - **Energiedashboard**: Der Reiter „Langzeit“ funktionierte nicht mehr, sobald
   im Setup ein Bereich abgewählt war
+- **Charts**: Die Werte in der Legende laufen bei schmaler Breite nicht mehr
+  über den Rand, sondern brechen in eine zweite Zeile um
 
 ---
 
@@ -148,6 +150,8 @@
 
 - **Energy dashboard**: The "Long term" tab stopped working as soon as an
   area was switched off in the setup
+- **Charts**: The values in the legend no longer run past the edge on narrow
+  screens but wrap onto a second line
 
 ## 1.31.1 - 2026-11-08
 
