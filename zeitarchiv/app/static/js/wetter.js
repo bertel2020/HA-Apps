@@ -507,6 +507,64 @@
         return this.tiles.filter((tile) => inGroup(tile.key, group));
       },
 
+      // Kacheln der verschmolzenen Karte „Heute“ (Wetterlage + Kacheln): Temperatur und Regen groß und vorn, dann Helligkeit
+      // und Wind aus der Wetterlage, dann die übrigen Kacheln der Gruppe. Temperatur und Regen stehen in beiden Quellen;
+      // hier werden sie zu je einer Kachel zusammengeführt (Kurztext der Wetterlage plus Tief/Hoch bzw. Gestern-Vergleich).
+      displayTiles() {
+        const basis = this.tilesFor('basis');
+        const byKey = (key) => basis.find((tile) => tile.key === key);
+        const c = this.conditions;
+        const live = !!c && c.mode !== 'day';
+        const out = [];
+        const link = (tile) => (tile ? 'entities/' + encodeURIComponent(tile.entity_id) : '');
+
+        const temp = byKey('temperature');
+        if (temp) {
+          const adjective = live && c.temp && c.temp.unit === '°C' ? this.tempAdjective(c.temp.value).toLowerCase() : '';
+          out.push({
+            key: 'temperature', role: 'temperature', icon: 'temp', label: temp.label, big: true, href: link(temp), title: this.tileTitle(temp),
+            value: this.tileValue(temp), sub: [adjective, this.tileSub(temp)].filter(Boolean).join('\n'),
+          });
+        }
+
+        const mm = byKey('precip_mm');
+        const dur = byKey('precip_dur');
+        const rain = live ? this.conditionsRain() : null;
+        if (mm || dur || rain) {
+          const first = mm || dur;
+          const today = [];
+          if (mm && mm.today && (rain || first !== mm)) today.push(`${num(mm.today.sum, 1)} ${mm.unit || 'mm'}`);
+          if (dur && dur.today && (rain || first !== dur)) today.push(`${num(dur.today.minutes, 0)} min`);
+          const lines = [];
+          if (rain && rain.sub) lines.push(rain.sub);
+          if (today.length) lines.push(today.join(' · '));
+          const before = [mm, dur].map((tile) => (tile ? this.tileSub(tile) : '')).filter(Boolean);
+          if (before.length) lines.push(before.join(' · '));
+          out.push({
+            key: 'rain', role: 'precip_mm', icon: 'drop', label: t('Regen'), big: true, href: link(first), title: this.tileTitle(first),
+            value: rain ? escapeHtml(rain.text) : this.tileValue(first), sub: lines.join('\n'),
+          });
+        }
+
+        // Helligkeit und Wind kennt nur die Wetterlage; die Kacheln dort sind keine Verweise auf eine Entität.
+        if (c) {
+          this.conditionsTiles().filter((tile) => tile.kind === 'sky' || tile.kind === 'wind').forEach((tile) => {
+            out.push({
+              key: tile.kind, role: tile.kind === 'sky' ? 'illuminance' : 'wind', icon: tile.icon, label: tile.label, big: false, href: '',
+              title: '', value: escapeHtml(tile.value), sub: [tile.sub, tile.sub2].filter(Boolean).join('\n'),
+            });
+          });
+        }
+
+        basis.filter((tile) => !['temperature', 'precip_mm', 'precip_dur'].includes(tile.key)).forEach((tile) => {
+          out.push({
+            key: tile.key, role: tile.key, icon: this.tileIcon(tile), label: tile.label, big: false, href: link(tile),
+            title: this.tileTitle(tile), value: this.tileValue(tile), sub: this.tileSub(tile),
+          });
+        });
+        return out;
+      },
+
       // ---- Reiter und Diagramme (Phase 2) ----------------------------------------------------
 
       showTab(tab) {

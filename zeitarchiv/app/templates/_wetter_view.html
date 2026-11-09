@@ -3,20 +3,62 @@
 
 {# Eine Karte je Reiter („basis“ = Übersicht, „klima“, „wind“): oben Titel und Stichtag-Leiste, darunter die Kacheln, dann die
    Vergleichstabelle. Der Stichtag gilt für Kacheln und Tabelle; die Daten laden einmal, wetter.js filtert je Gruppe. #}
-{% macro weather_card(group, placeholders) %}
+{% macro lage_knopf() %}{{ hint_button(_("Wetterlage")) }}{% endmacro %}
+{% macro lage_hint() %}{% call hint_body() %}{{ _("Die Zeile fasst den Himmel, den Wind und den Regen zusammen und zeigt immer den aktuellen Stand. Der Himmel ergibt sich aus der Helligkeit der letzten 10 Minuten, nur bei Tag (laut Dämmerungssensor); die Grenzen folgen der Sonnen-Schwelle aus der Einrichtung (Standard: trüb unter 15.000 lx, bewölkt bis 25.000, heiter bis 70.000, darüber sonnig). Der Wind nennt die Beaufort-Stufe nach dem stärksten Wert der letzten 10 Minuten; meldet der Sensor nur Stufen oder steht er geschützt, fallen die Klassen eher niedrig aus. Beim Regen zählen auch Nebel und Tau mit, wenn der Sensor sie als Regen meldet. Fehlt ein Sensor, fehlt sein Teil in der Zeile. Für einen früheren Tag fasst die Karte den Tag zusammen: häufigste Himmelsklasse zu den hellen Stunden samt Sonnenstunden, stärkster Wind, Regenmenge und Tiefst- und Höchstwert der Temperatur.") }}{% endcall %}{% endmacro %}
+
+{# Kopf der Wetterlage: Symbol, Wort, Satz und Chips. Gleich in der eigenen Karte und in der verschmolzenen Karte. #}
+{% macro lage_hero() %}
+    <div class="wt-lage-hero" :style="'--wt-hero:' + conditionsHero().color">
+      <span class="wt-lage-icon" x-show="conditionsHero().icon" x-html="iconSvg(conditionsHero().icon)"></span>
+      <div class="wt-lage-text">
+        <p class="wt-headline wt-lage" x-text="conditionsLine()"></p>
+        <p class="wt-lage-sentence" x-show="conditionsSentence().length">
+          <template x-for="(part, i) in conditionsSentence()" :key="i"><span class="wt-lage-s" x-text="part"></span></template>
+        </p>
+      </div>
+      <div class="wt-lage-chips" x-show="conditionsChips().length">
+        <template x-for="chip in conditionsChips()" :key="chip.text">
+          <span class="wt-lage-chip"><span x-html="iconSvg(chip.icon)"></span><span x-text="chip.text"></span></span>
+        </template>
+      </div>
+    </div>
+{% endmacro %}
+
+{# lage=true (nur „basis“, wenn auch die Wetterlage gezeigt wird): Der Satz der Wetterlage steht in dieser Karte, und die Kacheln
+   („Temperatur“, „Regen“ groß, dann Helligkeit, Wind und der Rest) kommen aus displayTiles(); eine eigene Wetterlage-Karte gibt es dann nicht. #}
+{% macro weather_card(group, placeholders, lage=false) %}
 {% set sfx = group %}
 <div class="card wt-card wt-tilecard">
   <div class="wt-controls wt-card-head">
     {# Der Titel nennt den Tag („Heute“, „Gestern“, sonst „Rückblick“); in der Vergangenheit springt ein Klick auf heute. #}
     <h2 class="wt-h2" :class="{'wt-h2-jump': stichtag()}" x-text="cardTitle()" @click="if (stichtag()) $store.dashStichtag.set(null)" :title="stichtag() ? t('Zurück zu heute') : ''"></h2>
+    {% if lage %}{{ lage_knopf() }}{% endif %}
     {# Stichtag-Leiste des App-Standards (wie bei den Dashboards: ‹ Datum ›, Kalender, „Heute“; ohne Schrittweiten-Knöpfe). Der Alpine-Store
        dashStichtag hält den Tag und stellt ihn als ?date=… in die Adresse; wetter.js lädt Kacheln und Tabelle bei „dashboard-stichtag“ neu. #}
     {{ period_nav(true, true) }}
+    {% if lage %}{{ lage_hint() }}{% endif %}
   </div>
   <p class="wt-stand" x-show="tilesStand" x-cloak x-text="standText()"></p>
+  {% if lage %}
+  <div data-wt-conditions data-layout="{{ config.lage_layout }}" x-show="conditions" x-cloak>
+    {{ lage_hero() }}
+  </div>
+  {% endif %}
   <div class="wt-tiles" style="--wt-cols:{{ placeholders }}" x-show="!tilesLoaded" aria-hidden="true">
     {% for n in range(placeholders) %}<span class="wt-tile is-loading"><span class="wt-tile-label">&nbsp;</span><span class="wt-tile-value">–</span><span class="wt-tile-sub">&nbsp;</span></span>{% endfor %}
   </div>
+  {% if lage %}
+  <div class="wt-tiles wt-tiles-lage" x-ref="tiles{{ group | capitalize }}" x-show="displayTiles().length" x-cloak>
+    <template x-for="tile in displayTiles()" :key="tile.key">
+      <a class="wt-tile" :class="{'wt-tile-big': tile.big, 'wt-tile-static': !tile.href}" :data-role="tile.role" :href="tile.href || null" :title="tile.title">
+        <span class="wt-tile-icon" x-html="iconSvg(tile.icon)"></span>
+        <span class="wt-tile-label" x-text="tile.label"></span>
+        <span class="wt-tile-value" x-html="tile.value"></span>
+        <span class="wt-tile-sub" x-text="tile.sub"></span>
+      </a>
+    </template>
+  </div>
+  {% else %}
   <div class="wt-tiles" x-ref="tiles{{ group | capitalize }}" :style="'--wt-cols:' + tileCols.{{ group }}" x-show="tilesFor('{{ group }}').length" x-cloak>
     <template x-for="(tile, i) in tilesFor('{{ group }}')" :key="tile.key">
       <a class="wt-tile" :class="{'wt-tile-wide': tileCols.{{ group }} > 1 && i === tilesFor('{{ group }}').length - 1 && tilesFor('{{ group }}').length % tileCols.{{ group }} === 1}" :data-role="tile.key" :href="'entities/' + encodeURIComponent(tile.entity_id)" :title="tileTitle(tile)">
@@ -27,6 +69,7 @@
       </a>
     </template>
   </div>
+  {% endif %}
 
   <div class="wt-card-sep"></div>
   <div class="wt-controls">
@@ -136,26 +179,13 @@
 
   {% if show_overview %}
   <section x-show="tab === 'overview'" role="tabpanel" id="wt-panel-overview" aria-labelledby="wt-tab-overview">
-  {% if show_conditions %}
+  {% if show_conditions and not show_basis %}
   <div class="card wt-card" data-wt-conditions data-layout="{{ config.lage_layout }}" x-show="conditions" x-cloak>
     <div class="wt-controls">
-      <h2 class="wt-h2"><span x-text="conditionsTitle()">{{ _("Wetterlage") }}</span> {{ hint_button(_("Wetterlage")) }}</h2>
-      {% call hint_body() %}{{ _("Die Zeile fasst den Himmel, den Wind und den Regen zusammen und zeigt immer den aktuellen Stand. Der Himmel ergibt sich aus der Helligkeit der letzten 10 Minuten, nur bei Tag (laut Dämmerungssensor); die Grenzen folgen der Sonnen-Schwelle aus der Einrichtung (Standard: trüb unter 15.000 lx, bewölkt bis 25.000, heiter bis 70.000, darüber sonnig). Der Wind nennt die Beaufort-Stufe nach dem stärksten Wert der letzten 10 Minuten; meldet der Sensor nur Stufen oder steht er geschützt, fallen die Klassen eher niedrig aus. Beim Regen zählen auch Nebel und Tau mit, wenn der Sensor sie als Regen meldet. Fehlt ein Sensor, fehlt sein Teil in der Zeile. Für einen früheren Tag fasst die Karte den Tag zusammen: häufigste Himmelsklasse zu den hellen Stunden samt Sonnenstunden, stärkster Wind, Regenmenge und Tiefst- und Höchstwert der Temperatur.") }}{% endcall %}
+      <h2 class="wt-h2"><span x-text="conditionsTitle()">{{ _("Wetterlage") }}</span> {{ lage_knopf() }}</h2>
+      {{ lage_hint() }}
     </div>
-    <div class="wt-lage-hero" :style="'--wt-hero:' + conditionsHero().color">
-      <span class="wt-lage-icon" x-show="conditionsHero().icon" x-html="iconSvg(conditionsHero().icon)"></span>
-      <div class="wt-lage-text">
-        <p class="wt-headline wt-lage" x-text="conditionsLine()"></p>
-        <p class="wt-lage-sentence" x-show="conditionsSentence().length">
-          <template x-for="(part, i) in conditionsSentence()" :key="i"><span class="wt-lage-s" x-text="part"></span></template>
-        </p>
-      </div>
-      <div class="wt-lage-chips" x-show="conditionsChips().length">
-        <template x-for="chip in conditionsChips()" :key="chip.text">
-          <span class="wt-lage-chip"><span x-html="iconSvg(chip.icon)"></span><span x-text="chip.text"></span></span>
-        </template>
-      </div>
-    </div>
+    {{ lage_hero() }}
     <div class="wt-kpis wt-kpis-soft wt-kpis-lage" :style="'--wt-cols:' + kpiCols(conditionsTiles().length)">
       <template x-for="tile in conditionsTiles()" :key="tile.label">
         <div class="wt-tile" :data-kind="tile.kind" :title="[tile.sub, tile.sub2].filter(Boolean).join(' · ')">
@@ -170,7 +200,7 @@
   {% endif %}
 
   {% if show_basis %}
-  {{ weather_card("basis", 5) }}
+  {{ weather_card("basis", 5, show_conditions) }}
   {% endif %}
 
   {% if show_dayimage %}
