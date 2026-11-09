@@ -1230,7 +1230,7 @@ def test_card_availability_follows_the_assigned_roles() -> None:
     assert not any(wetter_routes.card_available(key, config) for key in wetter_routes.CARD_KEYS)
     config.update(temperature="sensor.t", illuminance_dawn="sensor.d", heating=[{"entity_id": "sensor.h", "name": ""}])
     available = {key for key in wetter_routes.CARD_KEYS if wetter_routes.card_available(key, config)}
-    assert available == {"basis", "monthly", "longterm", "conditions", "daylight", "heating"}  # ohne Helligkeit kein Tagesbild
+    assert available == {"basis", "compare", "monthly", "longterm", "daylight", "heating"}  # ohne Helligkeit kein Tagesbild
 
 
 def test_hidden_cards_are_saved_only_for_available_cards_and_hide_cards_and_tabs(client) -> None:
@@ -1243,16 +1243,16 @@ def test_hidden_cards_are_saved_only_for_available_cards_and_hide_cards_and_tabs
     page = client.get("/wetterdashboard/setup").text
     assert 'name="show_card"' in page and "cardAvailable(" in page
     # alles angehakt: nichts ausgeblendet
-    shown = ["conditions", "basis", "monthly", "wind", "longterm", "daylight", "heating"]
+    shown = ["basis", "compare", "monthly", "wind", "longterm", "daylight", "heating"]
     assert client.post("/wetterdashboard/setup", data={**base, "show_card": shown}).status_code == 200
     assert wetter_routes._load_config(index)["hidden_cards"] == []
     html = client.get("/wetterdashboard").text
     assert 'id="wt-tab-wind"' in html and 'id="wt-tab-long"' in html and "data-wt-conditions" in html
-    # Wetterlage, Wind & Sonne, Langzeit abgewählt; Tageslicht (keine Rolle) und Heizen (kein Zähler) sind nicht wählbar
+    # Vergleichstabelle, Wind & Sonne, Langzeit abgewählt; Tageslicht (keine Rolle) und Heizen (kein Zähler) sind nicht wählbar
     assert client.post("/wetterdashboard/setup", data={**base, "show_card": ["basis", "monthly"]}).status_code == 200
-    assert wetter_routes._load_config(index)["hidden_cards"] == ["conditions", "wind", "longterm"]
+    assert wetter_routes._load_config(index)["hidden_cards"] == ["compare", "wind", "longterm"]
     html = client.get("/wetterdashboard").text
-    assert 'id="wt-tab-wind"' not in html and 'id="wt-tab-long"' not in html and "data-wt-conditions" not in html
+    assert 'id="wt-tab-wind"' not in html and 'id="wt-tab-long"' not in html and "data-wt-conditions" in html and 'x-ref="table"' not in html
     assert 'id="wt-tab-overview"' in html
     # alles abgewählt: auch die Übersicht fehlt
     assert client.post("/wetterdashboard/setup", data={**base, "show_card": []}).status_code == 200

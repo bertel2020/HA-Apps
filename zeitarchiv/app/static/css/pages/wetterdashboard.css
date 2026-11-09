@@ -439,18 +439,15 @@
 /* Spaltenmenü der Vergleichstabelle: die einzelnen Jahre stehen abgesetzt unter den Zeiträumen. */
 .wt-controls .menu-section-label.wt-vt-menu-sep{margin-top:6px;border-top:1px solid var(--border);padding-top:6px;}
 
-/* Verschmolzene Karte „Heute“ (Wetterlage + Kacheln): vier Spalten, Temperatur und Regen als große Kacheln über zwei Spalten. */
-.wt-tiles-lage{--wt-cols:4;}
-.wt-tiles-lage .wt-tile-big{grid-column:span 2;}
+/* Kacheln der Karte „Wetterlage“: drei Spalten, zwei Reihen (bei mehr Kacheln weitere Reihen). */
+.wt-tiles-lage{--wt-cols:3;}
 .wt-tiles-lage .wt-tile-sub{white-space:pre-line;}
-.wt-tiles-lage .wt-tile-big .wt-tile-value{font-size:calc(34px * var(--font-scale, 1));}
-[data-tile-style] .wt-tiles-lage .wt-tile-big .wt-tile-value{font-size:calc(clamp(30px, 8cqi, 38px) * var(--font-scale, 1));}
 .wt-tiles-lage .wt-tile-static{cursor:default;}
 [data-tile-style] .wt-tiles-lage a.wt-tile-static:hover{transform:none;box-shadow:none;}
-.wt-tiles-lage[style]{--wt-cols:4;}
-@media (max-width:900px){
+.wt-tiles-lage[style]{--wt-cols:3;}
+@media (max-width:760px){
   .wt-tiles-lage{--wt-cols:2;}
 }
-@media (max-width:520px){
-  .wt-tiles-lage .wt-tile-big{grid-column:1 / -1;}
+@media (max-width:420px){
+  .wt-tiles-lage{--wt-cols:1;}
 }

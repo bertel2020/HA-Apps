@@ -117,8 +117,8 @@ BLOCK_KEYS = ("kenntage", "precip_mm", "precip_dur", "humidity", "pressure", "wi
 #: Karten, die sich in der Einrichtung ein- und ausblenden lassen: (Schlüssel, Name, Rollen, von denen mindestens
 #: eine zugeordnet sein muss; „@extras“ und „@heating“ stehen für die Listen weiterer Sensoren und Heizzähler).
 CARD_OPTIONS = (
-    ("conditions", N_("Wetterlage"), ("illuminance", "illuminance_dawn", "radiation", "wind", "precip_dur", "precip_mm")),
-    ("basis", N_("Heute und Vergleichstabelle"), ("temperature", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation", "illuminance")),
+    ("basis", N_("Wetterlage"), ("temperature", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation", "illuminance", "illuminance_dawn")),
+    ("compare", N_("Zeiträume im Vergleich"), ("temperature", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation", "illuminance")),
     ("monthly", N_("Monatsvergleich"), ("temperature", "precip_mm", "precip_dur")),
     ("precip", N_("Niederschlag"), ("precip_mm", "precip_dur")),
     ("klima", N_("Temperatur & Klima"), ("@extras",)),
@@ -134,7 +134,7 @@ CARD_KEYS = tuple(key for key, _label, _needs in CARD_OPTIONS)
 #: Gliederung der Kartenauswahl nach Reiter des Dashboards (Reitername, Karten). „heating“ fehlt hier
 #: absichtlich: Der Reiter „Heizen“ ist experimentell und steht in der Einrichtung in einem eigenen Block.
 CARD_GROUPS = (
-    (N_("Übersicht"), ("conditions", "basis", "dayimage", "monthly")),
+    (N_("Übersicht"), ("basis", "compare", "dayimage", "monthly")),
     (N_("Niederschlag"), ("precip",)),
     (N_("Temperatur & Klima"), ("klima",)),
     (N_("Wind & Sonne"), ("wind", "sunhours", "daylight")),
@@ -222,6 +222,7 @@ def _empty_config() -> dict:
         "sky_cuts_lx": [],
         "hidden_blocks": [],
         "hidden_cards": [],
+        "cards_split": False,
         "lage_layout": DEFAULT_LAGE_LAYOUT,
         "tile_style": DEFAULT_TILE_STYLE,
     }
@@ -278,7 +279,12 @@ def _load_config(index: Index) -> dict:
         config["hidden_blocks"] = [key for key in BLOCK_KEYS if key in hidden]
     hidden_cards = data.get("hidden_cards")
     if isinstance(hidden_cards, list):
+        # Bis 1.31 hieß die Karte „Heute und Vergleichstabelle“ (basis): Wer sie ausgeblendet hatte, hatte auch die Tabelle weg.
+        # Die Wetterlage (conditions) ist seither Teil der Karte „Wetterlage“ (basis).
+        if "basis" in hidden_cards and "compare" not in hidden_cards and not data.get("cards_split"):
+            hidden_cards = [*hidden_cards, "compare"]
         config["hidden_cards"] = [key for key in CARD_KEYS if key in hidden_cards]
+        config["cards_split"] = True
     if data.get("lage_layout") in LAGE_LAYOUTS:
         config["lage_layout"] = data["lage_layout"]
     if data.get("tile_style") in TILE_STYLES:
@@ -1861,6 +1867,7 @@ class WetterService:
                 ]
             else:
                 config["hidden_cards"] = previous_cards
+            config["cards_split"] = True  # die Karten „Wetterlage“ und „Zeiträume im Vergleich“ sind getrennt (siehe _load_config)
             # Ohne Angabe (ältere Aufrufer) bleibt die bisherige Darstellung.
             layout = lage_layout.strip()
             if layout and layout not in LAGE_LAYOUTS:

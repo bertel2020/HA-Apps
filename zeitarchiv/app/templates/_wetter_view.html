@@ -24,56 +24,12 @@
     </div>
 {% endmacro %}
 
-{# lage=true (nur „basis“, wenn auch die Wetterlage gezeigt wird): Der Satz der Wetterlage steht in dieser Karte, und die Kacheln
-   („Temperatur“, „Regen“ groß, dann Helligkeit, Wind und der Rest) kommen aus displayTiles(); eine eigene Wetterlage-Karte gibt es dann nicht. #}
-{% macro weather_card(group, placeholders, lage=false) %}
+{# Vergleichstabelle samt Spalten- und Vorjahresmenü. Auf „basis“ eine eigene Karte (own), bei „wind“ und „klima“ unter den Kacheln. #}
+{% macro compare_block(group, own) %}
 {% set sfx = group %}
-<div class="card wt-card wt-tilecard">
-  <div class="wt-controls wt-card-head">
-    {# Der Titel nennt den Tag („Heute“, „Gestern“, sonst „Rückblick“); in der Vergangenheit springt ein Klick auf heute. #}
-    <h2 class="wt-h2" :class="{'wt-h2-jump': stichtag()}" x-text="cardTitle()" @click="if (stichtag()) $store.dashStichtag.set(null)" :title="stichtag() ? t('Zurück zu heute') : ''"></h2>
-    {% if lage %}{{ lage_knopf() }}{% endif %}
-    {# Stichtag-Leiste des App-Standards (wie bei den Dashboards: ‹ Datum ›, Kalender, „Heute“; ohne Schrittweiten-Knöpfe). Der Alpine-Store
-       dashStichtag hält den Tag und stellt ihn als ?date=… in die Adresse; wetter.js lädt Kacheln und Tabelle bei „dashboard-stichtag“ neu. #}
-    {{ period_nav(true, true) }}
-    {% if lage %}{{ lage_hint() }}{% endif %}
-  </div>
-  <p class="wt-stand" x-show="tilesStand" x-cloak x-text="standText()"></p>
-  {% if lage %}
-  <div data-wt-conditions data-layout="{{ config.lage_layout }}" x-show="conditions" x-cloak>
-    {{ lage_hero() }}
-  </div>
-  {% endif %}
-  <div class="wt-tiles" style="--wt-cols:{{ placeholders }}" x-show="!tilesLoaded" aria-hidden="true">
-    {% for n in range(placeholders) %}<span class="wt-tile is-loading"><span class="wt-tile-label">&nbsp;</span><span class="wt-tile-value">–</span><span class="wt-tile-sub">&nbsp;</span></span>{% endfor %}
-  </div>
-  {% if lage %}
-  <div class="wt-tiles wt-tiles-lage" x-ref="tiles{{ group | capitalize }}" x-show="displayTiles().length" x-cloak>
-    <template x-for="tile in displayTiles()" :key="tile.key">
-      <a class="wt-tile" :class="{'wt-tile-big': tile.big, 'wt-tile-static': !tile.href}" :data-role="tile.role" :href="tile.href || null" :title="tile.title">
-        <span class="wt-tile-icon" x-html="iconSvg(tile.icon)"></span>
-        <span class="wt-tile-label" x-text="tile.label"></span>
-        <span class="wt-tile-value" x-html="tile.value"></span>
-        <span class="wt-tile-sub" x-text="tile.sub"></span>
-      </a>
-    </template>
-  </div>
-  {% else %}
-  <div class="wt-tiles" x-ref="tiles{{ group | capitalize }}" :style="'--wt-cols:' + tileCols.{{ group }}" x-show="tilesFor('{{ group }}').length" x-cloak>
-    <template x-for="(tile, i) in tilesFor('{{ group }}')" :key="tile.key">
-      <a class="wt-tile" :class="{'wt-tile-wide': tileCols.{{ group }} > 1 && i === tilesFor('{{ group }}').length - 1 && tilesFor('{{ group }}').length % tileCols.{{ group }} === 1}" :data-role="tile.key" :href="'entities/' + encodeURIComponent(tile.entity_id)" :title="tileTitle(tile)">
-        <span class="wt-tile-icon" x-html="iconSvg(tileIcon(tile))"></span>
-        <span class="wt-tile-label" x-text="tile.label"></span>
-        <span class="wt-tile-value" x-html="tileValue(tile)"></span>
-        <span class="wt-tile-sub" x-text="tileSub(tile)"></span>
-      </a>
-    </template>
-  </div>
-  {% endif %}
-
-  <div class="wt-card-sep"></div>
+  {% if not own %}<div class="wt-card-sep"></div>{% endif %}
   <div class="wt-controls">
-    <h3 class="wt-h3">{{ _("Zeiträume im Vergleich") }} {{ hint_button(_("Zeiträume im Vergleich")) }}</h3>
+    <{{ "h2" if own else "h3" }} class="{{ 'wt-h2' if own else 'wt-h3' }}">{{ _("Zeiträume im Vergleich") }} {{ hint_button(_("Zeiträume im Vergleich")) }}</{{ "h2" if own else "h3" }}>
     {% call hint_body() %}<span x-show="vorjahr" x-text="modeHint()"></span>{% endcall %}
     {# Spaltenauswahl wie in der Entitätenliste: Knopf „Spalten ▾“ mit Popover (dd-picker). #}
     <div class="dd-picker-wrap wt-controls-end">
@@ -105,6 +61,56 @@
   <div class="tbl-wrap wt-table-wrap" x-ref="tableWrap{{ group | capitalize if group != 'basis' else '' }}">
     <table class="wt-table" x-ref="table{{ group | capitalize if group != 'basis' else '' }}"><tbody><tr><td class="wt-loading">{{ _("Lädt …") }}</td></tr></tbody></table>
   </div>
+{% endmacro %}
+
+{# lage=true (nur „basis“, wenn auch die Wetterlage gezeigt wird): Der Satz der Wetterlage steht in dieser Karte, und die Kacheln
+   („Temperatur“, „Regen“ groß, dann Helligkeit, Wind und der Rest) kommen aus displayTiles(); eine eigene Wetterlage-Karte gibt es dann nicht. #}
+{% macro weather_card(group, placeholders, lage=false, hero=false) %}
+{% set sfx = group %}
+<div class="card wt-card wt-tilecard">
+  <div class="wt-controls wt-card-head">
+    {# Der Titel nennt den Tag („Heute“, „Gestern“, sonst „Rückblick“); in der Vergangenheit springt ein Klick auf heute. #}
+    <h2 class="wt-h2" :class="{'wt-h2-jump': stichtag()}" x-text="{{ 'conditionsTitle()' if lage else 'cardTitle()' }}" @click="if (stichtag()) $store.dashStichtag.set(null)" :title="stichtag() ? t('Zurück zu heute') : ''"></h2>
+    {% if hero %}{{ lage_knopf() }}{% endif %}
+    {# Stichtag-Leiste des App-Standards (wie bei den Dashboards: ‹ Datum ›, Kalender, „Heute“; ohne Schrittweiten-Knöpfe). Der Alpine-Store
+       dashStichtag hält den Tag und stellt ihn als ?date=… in die Adresse; wetter.js lädt Kacheln und Tabelle bei „dashboard-stichtag“ neu. #}
+    {{ period_nav(true, true) }}
+    {% if hero %}{{ lage_hint() }}{% endif %}
+  </div>
+  <p class="wt-stand" x-show="tilesStand" x-cloak x-text="standText()"></p>
+  {% if hero %}
+  <div data-wt-conditions data-layout="{{ config.lage_layout }}" x-show="conditions" x-cloak>
+    {{ lage_hero() }}
+  </div>
+  {% endif %}
+  <div class="wt-tiles" style="--wt-cols:{{ placeholders }}" x-show="!tilesLoaded" aria-hidden="true">
+    {% for n in range(placeholders) %}<span class="wt-tile is-loading"><span class="wt-tile-label">&nbsp;</span><span class="wt-tile-value">–</span><span class="wt-tile-sub">&nbsp;</span></span>{% endfor %}
+  </div>
+  {% if lage %}
+  <div class="wt-tiles wt-tiles-lage" x-ref="tiles{{ group | capitalize }}" x-show="displayTiles().length" x-cloak>
+    <template x-for="tile in displayTiles()" :key="tile.key">
+      <a class="wt-tile" :class="{'wt-tile-big': tile.big, 'wt-tile-static': !tile.href}" :data-role="tile.role" :href="tile.href || null" :title="tile.title">
+        <span class="wt-tile-icon" x-html="iconSvg(tile.icon)"></span>
+        <span class="wt-tile-label" x-text="tile.label"></span>
+        <span class="wt-tile-value" x-html="tile.value"></span>
+        <span class="wt-tile-sub" x-text="tile.sub"></span>
+      </a>
+    </template>
+  </div>
+  {% else %}
+  <div class="wt-tiles" x-ref="tiles{{ group | capitalize }}" :style="'--wt-cols:' + tileCols.{{ group }}" x-show="tilesFor('{{ group }}').length" x-cloak>
+    <template x-for="(tile, i) in tilesFor('{{ group }}')" :key="tile.key">
+      <a class="wt-tile" :class="{'wt-tile-wide': tileCols.{{ group }} > 1 && i === tilesFor('{{ group }}').length - 1 && tilesFor('{{ group }}').length % tileCols.{{ group }} === 1}" :data-role="tile.key" :href="'entities/' + encodeURIComponent(tile.entity_id)" :title="tileTitle(tile)">
+        <span class="wt-tile-icon" x-html="iconSvg(tileIcon(tile))"></span>
+        <span class="wt-tile-label" x-text="tile.label"></span>
+        <span class="wt-tile-value" x-html="tileValue(tile)"></span>
+        <span class="wt-tile-sub" x-text="tileSub(tile)"></span>
+      </a>
+    </template>
+  </div>
+  {% endif %}
+
+  {% if group != 'basis' %}{{ compare_block(group, false) }}{% endif %}
 </div>
 {% endmacro %}
 {# Auswahl der Räume über den Vergleichsdiagrammen (nur bei mindestens zwei Räumen); die Außenwerte bleiben immer. #}
@@ -132,11 +138,12 @@
 {# Kein x-init="init()": Alpine ruft init() des x-data-Objekts selbst auf (siehe
    _energiedashboard_view.html — mit x-init liefe es doppelt). #}
 {% set hc = hidden_cards %}
-{% set show_conditions = has_conditions and 'conditions' not in hc %}
+{% set show_conditions = has_conditions %}
 {% set show_basis = 'basis' not in hc %}
+{% set show_compare = 'compare' not in hc %}
 {% set show_monthly = 'monthly' not in hc %}
 {% set show_dayimage = has_dayimage and 'dayimage' not in hc %}
-{% set show_overview = show_conditions or show_basis or show_dayimage or show_monthly %}
+{% set show_overview = show_basis or show_compare or show_dayimage or show_monthly %}
 {% set show_precip = precip_modes and 'precip' not in hc %}
 {% set show_klima = has_klima and 'klima' not in hc %}
 {% set show_windtiles = has_windtiles and 'wind' not in hc %}
@@ -179,28 +186,12 @@
 
   {% if show_overview %}
   <section x-show="tab === 'overview'" role="tabpanel" id="wt-panel-overview" aria-labelledby="wt-tab-overview">
-  {% if show_conditions and not show_basis %}
-  <div class="card wt-card" data-wt-conditions data-layout="{{ config.lage_layout }}" x-show="conditions" x-cloak>
-    <div class="wt-controls">
-      <h2 class="wt-h2"><span x-text="conditionsTitle()">{{ _("Wetterlage") }}</span> {{ lage_knopf() }}</h2>
-      {{ lage_hint() }}
-    </div>
-    {{ lage_hero() }}
-    <div class="wt-kpis wt-kpis-soft wt-kpis-lage" :style="'--wt-cols:' + kpiCols(conditionsTiles().length)">
-      <template x-for="tile in conditionsTiles()" :key="tile.label">
-        <div class="wt-tile" :data-kind="tile.kind" :title="[tile.sub, tile.sub2].filter(Boolean).join(' · ')">
-          <span class="wt-tile-icon" x-html="iconSvg(tile.icon)"></span>
-          <span class="wt-tile-label" x-text="tile.label"></span>
-          <span class="wt-tile-value" x-text="tile.value"></span>
-          <span class="wt-tile-subs"><span class="wt-tile-sub" x-text="tile.sub"></span> <span class="wt-tile-sub2" x-show="tile.sub2" x-text="tile.sub2"></span></span>
-        </div>
-      </template>
-    </div>
-  </div>
+  {% if show_basis %}
+  {{ weather_card("basis", 5, true, show_conditions) }}
   {% endif %}
 
-  {% if show_basis %}
-  {{ weather_card("basis", 5, show_conditions) }}
+  {% if show_compare %}
+  <div class="card wt-card wt-tilecard">{{ compare_block("basis", true) }}</div>
   {% endif %}
 
   {% if show_dayimage %}
