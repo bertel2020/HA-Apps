@@ -65,3 +65,32 @@ def test_table_page_has_chip_menu_and_pause_logic() -> None:
     # Hintergrund-Laden zeigt keine "Lädt …"-Zeile und keinen Fehler.
     assert "async load({silent = false} = {})" in script
     assert "if (requestId === this._loadSeq && !silent)" in script
+
+
+def test_chart_page_has_chip_menu_and_quiet_refresh() -> None:
+    page = (TEMPLATES / "chart_editor.html").read_text(encoding="utf-8")
+    script = (APP / "static/js/pages/chart_editor.js").read_text(encoding="utf-8")
+    # Chip nur auf einem gespeicherten Chart, mit Menü und Schalter für diese Seite.
+    assert "{% if chart_id %}" in page and 'class="refresh-chip"' in page
+    assert "refreshNow()" in page and "refreshOn = !refreshOn" in page
+    # Takt, Pausen und Bedingungen wie bei der Tabellen-Seite; ein vergangener Zeitraum pausiert.
+    assert "const REFRESH_INTERVAL_MS = 60000;" in script
+    assert "if (!this.refreshOn) return 'off';" in script
+    assert "if (this.editing) return 'edit';" in script
+    assert "if (!this.isCurrent) return 'past';" in script
+    assert "document.visibilityState === 'visible'" in script
+    assert "!this.loading && !this.saving" in script
+    # Stilles Nachladen: keine "Lädt …"-Anzeige, kein Fehlerzustand, gezeichnet ohne Animation.
+    assert "async load({silent = false} = {})" in script
+    assert script.count("!silent") >= 3
+    assert "{...option, animation: false}" in script
+    assert "quietRender = silent;" in script
+    # Alle Zeichenpfade legen den Chart über denselben Wrapper an, sonst liefe die Animation weiter.
+    assert "echarts.init(" not in script.replace("const instance = echarts.init(", "")
+
+
+def test_refresh_chip_styles_are_shared_between_table_and_chart_page() -> None:
+    app_css = (APP / "static/css/app.css").read_text(encoding="utf-8")
+    table_css = (APP / "static/css/pages/table_editor.css").read_text(encoding="utf-8")
+    assert ".refresh-chip{" in app_css and ".refresh-menu{" in app_css
+    assert ".refresh-chip" not in table_css

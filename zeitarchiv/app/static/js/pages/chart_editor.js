@@ -461,6 +461,18 @@
     // Bewusst außerhalb von x-data (siehe entity_detail.html: ECharts verlässt
     // sich auf `this` als echtes Objekt, nicht Alpines reaktiven Proxy).
     let chartInstance = null;
+    // Beim stillen Nachladen (Chip) wird ohne Animation neu gezeichnet: setOption(…, true) ersetzt die Serien,
+    // und ECharts würde den Chart sonst jede Minute neu einwachsen lassen. Ein Wrapper statt einer Option an
+    // jedem der vielen setOption-Aufrufe der Zeichenpfade.
+    let quietRender = false;
+    function newChartInstance() {
+      const instance = echarts.init(document.getElementById('chart'));
+      const rawSetOption = instance.setOption.bind(instance);
+      instance.setOption = (option, ...rest) => rawSetOption(quietRender ? {...option, animation: false} : option, ...rest);
+      return instance;
+    }
+    // Takt des automatischen Nachladens, wie die Dashboard-Kacheln (dashboard-tiles.js).
+    const REFRESH_INTERVAL_MS = 60000;
     // Legendenname der Hauptserie -> Namen ihrer Begleitserien (Vorjahr/Vorperiode,
     // gleitender Ø). Sie folgen dem Legenden-Umschalter der Hauptserie, siehe
     // toggleLegendItem() und render().
@@ -733,6 +745,12 @@
         droppedStateIds: [],
         loading: false,
         loadError: false,
+        // Automatisches Nachladen (Chip neben "CSV"): Standard aus der Installation (Einstellungen,
+        // Darstellung, data-page-refresh an <html>), der Schalter im Chip-Menü gilt nur für diese Seite.
+        refreshOn: document.documentElement.dataset.pageRefresh !== 'off',
+        refreshMenuOpen: false,
+        refreshAge: 0,  // Sekunden seit dem letzten Laden, nur gepflegt, solange das Chip-Menü offen ist
+        _lastRefresh: Date.now(),
         saving: false,
         savedMessage: '',
         _requestId: 0,
@@ -1618,7 +1636,9 @@
           this.render();
         },
 
-        async load() {
+        // silent: Nachladen im Hintergrund (Chip) — keine "Lädt …"-Anzeige, ein Fehler lässt den Chart
+        // stehen, und gezeichnet wird ohne Animation.
+        async load({silent = false} = {}) {
           // Ausgeblendete Serien werden gar nicht erst geholt — sie sollen
           // weder gezeichnet noch in der Statistik gezählt werden, und eine
           // Abfrage für Daten, die niemand sieht, wäre reine Last.
@@ -1645,8 +1665,10 @@
           // weiterzutragen. Ein Ort statt je einer Prüfung in jedem Umschalter.
           if (this.compare && this.compareMode === 'longterm' && !this.longtermAvailable) this.compareMode = 'previous';
           const requestId = ++this._requestId;
-          this.loading = true;
-          this.loadError = false;
+          if (!silent) {
+            this.loading = true;
+            this.loadError = false;
+          }
           const params = new URLSearchParams({
             entity_ids: this.visibleEntityIds.join(','),
             range: this.range, offset: String(this.offset), continuous: String(this.continuous),
@@ -1682,7 +1704,7 @@
             // Spaltenantwort (Fenster, Zustandsliste und Spalten je Zustands-Entität).
             if (!res.ok && !columnsData) {
               // Weder Rohabfrage noch Spalten-Rückfall: ein Fehler, kein leerer Bestand (sonst „Keine Daten“ ohne Wiederholen).
-              if (requestId === this._requestId) {
+              if (requestId === this._requestId && !silent) {
                 this.loading = false;
                 this.loadError = true;
               }
@@ -1692,7 +1714,7 @@
             heatmapData = heatmapRes && heatmapRes.ok ? await heatmapRes.json() : null;
           } catch (error) {
             // Netzwerkfehler oder ein 502 vom Proxy mit HTML statt JSON: sonst bliebe "Lädt …" für immer stehen.
-            if (requestId === this._requestId) {
+            if (requestId === this._requestId && !silent) {
               this.loading = false;
               this.loadError = true;
             }
@@ -1730,7 +1752,7 @@
             if (this.timeline && !this.raw) {
               this.raw = true;
               this.loading = false;
-              return this.load();
+              return this.load({silent});
             }
           }
           // Mit Zustands-Entitäten gibt es außer dem Donut nur den Zeitstrahl.
@@ -1738,7 +1760,7 @@
             this.timeline = true;
             this.raw = this.stateMode === 'timeline';
             this.loading = false;
-            return this.load();
+            return this.load({silent});
           }
           // Standard für reine Schalter-Charts: Zeitstrahl. Die Serien kamen
           // ohne Rohwerte, deshalb einmal neu laden.
@@ -1747,7 +1769,7 @@
             this.timeline = true;
             this.raw = true;
             this.loading = false;
-            return this.load();
+            return this.load({silent});
           }
           this.autoResolutionLabel = this.computeAutoResolutionLabel();
           this.windowStart = data.window_start ?? null;
@@ -1755,12 +1777,59 @@
           this.periodEnd = data.period_end ?? null;
           this.isCurrent = data.is_current ?? true;
           this.loading = false;
-          this.$nextTick(() => this.render());
+          this._lastRefresh = Date.now();
+          this.$nextTick(() => {
+            quietRender = silent;
+            try { this.render(); } finally { quietRender = false; }
+          });
+        },
+
+        // Grund, warum das Nachladen gerade ruht: null (läuft), 'off' (abgeschaltet), 'edit' (Editor offen)
+        // oder 'past' (ein abgeschlossener Zeitraum, dessen Werte sich nicht mehr ändern).
+        refreshPause() {
+          if (!this.refreshOn) return 'off';
+          if (this.editing) return 'edit';
+          if (!this.isCurrent) return 'past';
+          return null;
+        },
+        refreshChipText() {
+          const pause = this.refreshPause();
+          if (pause === 'off') return t('Aus');
+          if (pause === 'edit') return t('Pausiert · Editor');
+          if (pause === 'past') return t('Pausiert · vergangen');
+          return t('Aktuell');
+        },
+        refreshChipTitle() {
+          const pause = this.refreshPause();
+          if (pause === 'off') return t('Die automatische Aktualisierung ist ausgeschaltet.');
+          if (pause === 'edit') return t('Im Editor würde ein Nachladen deine Eingaben stören. Nach dem Speichern geht es weiter.');
+          if (pause === 'past') return t('Der Zeitraum ist abgeschlossen, die Werte ändern sich nicht mehr.');
+          return t('Zuletzt aktualisiert vor {s} s', {s: this.refreshAge});
+        },
+        refreshInfo() {
+          if (this.refreshPause()) return t('Keine automatische Aktualisierung.');
+          return t('Zuletzt vor {s} s · nächste in {n} s', {s: this.refreshAge, n: Math.max(0, REFRESH_INTERVAL_MS / 1000 - this.refreshAge)});
+        },
+        async refreshNow() {
+          this.refreshMenuOpen = false;
+          await this.load({silent: true});
+          this.refreshAge = 0;
+        },
+        // Einmal pro Sekunde geprüft, alle 60 s nachgeladen — nur bei sichtbarem Tab und ohne Pause. Kehrt man
+        // nach längerer Zeit in den Tab zurück, lädt der nächste Takt sofort.
+        refreshTick() {
+          if (!this.$root.isConnected) { clearInterval(this._refreshTimer); return; }
+          const age = Date.now() - this._lastRefresh;
+          if (this.refreshMenuOpen) this.refreshAge = Math.round(age / 1000);
+          if (age >= REFRESH_INTERVAL_MS && document.visibilityState === 'visible'
+              && !this.refreshPause() && !this.loading && !this.saving) {
+            this.refreshNow();
+          }
         },
 
         render() {
           if (!chartInstance) {
-            chartInstance = echarts.init(document.getElementById('chart'));
+            chartInstance = newChartInstance();
             AxisFit.attach(chartInstance);
           }
           if (!this.hasData) { chartInstance.clear(); return; }
@@ -2872,7 +2941,7 @@
         // über Entitäten, das lässt sich nicht in dieselbe Reihe stellen.
         // Anteile oder Wechsel je Zustands-Entität (state-entities.js barPanels()).
         renderStateBarPanels() {
-          if (!chartInstance) chartInstance = echarts.init(document.getElementById('chart'));
+          if (!chartInstance) chartInstance = newChartInstance();
           const css = getComputedStyle(document.body);
           const rows = this.series
             .filter(s => s.aggregation_type === 'state' && !this.legendHiddenIds.includes(s.entity_id))
@@ -2895,7 +2964,7 @@
         },
         // Heatmap: eine je Zustands-Entität (state-entities.js heatmapPanels()).
         renderStateHeatmapPanels() {
-          if (!chartInstance) chartInstance = echarts.init(document.getElementById('chart'));
+          if (!chartInstance) chartInstance = newChartInstance();
           const css = getComputedStyle(document.body);
           const rows = this.heatmapRows;
           // Ab zwei Entitäten wächst die Höhe mit, wie bei Anteilen/Wechsel.
@@ -2984,7 +3053,7 @@
           chartInstance.resize();
         },
         renderDonut() {
-          if (!chartInstance) chartInstance = echarts.init(document.getElementById('chart'));
+          if (!chartInstance) chartInstance = newChartInstance();
           if (this.hasState) { this.renderStateDonuts(); return; }
           const surface = getComputedStyle(document.body).getPropertyValue('--surface');
           const inkFaint = getComputedStyle(document.body).getPropertyValue('--ink-faint');
@@ -3209,6 +3278,10 @@
           // bereinigen, statt das bei jedem Rendern erneut zu maskieren.
           if (this.resolutionPreset === 'full' && this.continuous) this.continuous = false;
           this.load();
+          if (CHART_ID) {
+            this._refreshTimer = setInterval(() => this.refreshTick(), 1000);
+            document.addEventListener('visibilitychange', () => this.refreshTick());
+          }
           window.addEventListener('resize', () => chartInstance && chartInstance.resize());
           new ResizeObserver(() => chartInstance && chartInstance.resize()).observe(document.getElementById('chart'));
           this.$nextTick(() => setupEntityDrag(this));

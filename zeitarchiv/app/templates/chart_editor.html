@@ -12,7 +12,22 @@
     <div class="settings-panel">
         <div class="chart-title-row">
           <h2 x-text="editing ? (chartId ? t('Chart bearbeiten') : t('Neuer Chart')) : (name || t('Neuer Chart'))"></h2>
-          <div style="display:flex;gap:8px;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            {% if chart_id %}
+            <span class="refresh-wrap" x-show="hasData" x-cloak @click.outside="refreshMenuOpen = false">
+              <button type="button" class="refresh-chip" :class="{paused: refreshPause()}" aria-haspopup="menu" :aria-expanded="refreshMenuOpen"
+                      :title="refreshChipTitle()" @click="refreshMenuOpen = !refreshMenuOpen; refreshAge = Math.round((Date.now() - _lastRefresh) / 1000)">
+                <span class="refresh-dot"></span><span x-text="refreshChipText()"></span>
+              </button>
+              <div class="menu-popover menu-popover-narrow refresh-menu" x-show="refreshMenuOpen" x-cloak role="menu">
+                <div class="refresh-info" x-text="refreshInfo()"></div>
+                <button type="button" class="menu-row" role="menuitem" @click="refreshNow()">{{ _("Jetzt aktualisieren") }}</button>
+                <button type="button" class="menu-row" role="menuitem" @click="refreshOn = !refreshOn">
+                  <span>{{ _("Automatisch aktualisieren") }}</span><span class="refresh-state" x-text="refreshOn ? t('An') : t('Aus')"></span>
+                </button>
+              </div>
+            </span>
+            {% endif %}
             <button type="button" class="btn" x-show="hasData" data-tooltip="{{ _('Aktuell angezeigte Chart-Daten als CSV herunterladen') }}" @click="exportCsv()">{{ _("CSV") }}</button>
             {% if chart_id %}
             <button type="button" class="btn" x-show="!editing" @click="editing = true">{{ _("Anpassen") }}</button>
