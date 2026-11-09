@@ -24,16 +24,16 @@
   </div>
   <div class="entity-fact">
     <dt>{{ _("Letzter Wert") }}</dt>
-    <dd>{{ facts.last_ts }}{% if facts.last_ts_time or facts.last_ago %}<small>{{ facts.last_ts_time }}{% if facts.last_ts_time and facts.last_ago %} &middot; {% endif %}{{ facts.last_ago }}</small>{% endif %}</dd>
+    <dd data-fact="last">{{ facts.last_ts }}{% if facts.last_ts_time or facts.last_ago %}<small>{{ facts.last_ts_time }}{% if facts.last_ts_time and facts.last_ago %} &middot; {% endif %}{{ facts.last_ago }}</small>{% endif %}</dd>
   </div>
   <div class="entity-fact">
     <dt>{{ _("Datensätze") }}</dt>
-    <dd>{{ facts.row_count }}<small>{{ facts.size }}</small></dd>
+    <dd data-fact="count">{{ facts.row_count }}<small>{{ facts.size }}</small></dd>
   </div>
   {% if facts.extra %}
   <div class="entity-fact">
     <dt>{{ facts.extra.label }}</dt>
-    <dd{% if facts.extra.pending %} data-value-range-url="{{ app_root }}/entities/{{ entity_id }}/value-range"{% endif %}><span class="entity-fact-text">{{ facts.extra.text if not facts.extra.pending else "…" }}</span>{% if facts.extra.note %}<small>{{ facts.extra.note }}</small>{% endif %}</dd>
+    <dd data-fact="extra"{% if facts.extra.pending %} data-value-range-url="{{ app_root }}/entities/{{ entity_id }}/value-range"{% endif %}><span class="entity-fact-text">{{ facts.extra.text if not facts.extra.pending else "…" }}</span>{% if facts.extra.note %}<small>{{ facts.extra.note }}</small>{% endif %}</dd>
   </div>
   {% endif %}
 </dl>

@@ -121,6 +121,8 @@
   - Ein Chip zeigt den Stand und erklärt Pausen (Editor, gezoomter Ausschnitt,
     vergangene Zeiträume); „Jetzt aktualisieren“ und ein Schalter für die Seite
     stehen im Menü des Chips
+  - Auf der Entitätsseite ziehen die Kennzahlen über dem Verlauf (Letzter Wert,
+    Datensätze, Min/Max bzw. Zählerstand) mit
   - Abschaltbar unter Einstellungen → Darstellung
 
 ### Geändert
@@ -272,6 +274,8 @@
   every minute while the tab is visible
   - A chip shows the state and explains pauses (editor, zoomed section, past
     periods); "Refresh now" and a switch for the page are in the chip's menu
+  - On the entity page the figures above the history (last value, records,
+    min/max or meter reading) follow along
   - Can be switched off under Settings → Appearance
 
 #### Changed

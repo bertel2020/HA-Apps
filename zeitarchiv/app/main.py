@@ -3105,6 +3105,14 @@ def entity_value_range(entity_id: str) -> dict:
     return {"text": _value_range_text(entry, decimals_to_int(entity["decimals"]), entity)}
 
 
+@app.get("/entities/{entity_id}/facts")
+@_storage_locked(lambda args: args["entity_id"])
+def entity_facts_values(entity_id: str) -> dict:
+    """Bewegliche Felder der Kennzahlen-Leiste für das Nachladen des Verlaufs (entity_detail.js, refreshFacts()); Min/Max nur aus dem Zwischenspeicher."""
+    facts = _entity_facts(_require_entity(entity_id))
+    return {key: facts[key] for key in ("last_ts", "last_ts_time", "last_ago", "row_count", "size", "extra")}
+
+
 @app.get("/entities/{entity_id}/config", response_class=HTMLResponse)
 @_storage_locked(lambda args: args["entity_id"])
 def entity_config_page(request: Request, entity_id: str) -> HTMLResponse:

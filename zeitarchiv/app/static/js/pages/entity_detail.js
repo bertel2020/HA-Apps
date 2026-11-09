@@ -1219,10 +1219,62 @@ function selectBrush() {
           this.markedTotal = data.marked_total || 0;
           this.loading = false;
           this._lastRefresh = Date.now();
+          if (silent) this.refreshFacts();
           this.$nextTick(() => {
             quietRender = silent;
             try { this.render(); } finally { quietRender = false; }
           });
+        },
+
+        // Kennzahlen-Leiste über dem Verlauf (_entity_facts.html) mit erneuern: Letzter Wert, Datensätze und die
+        // letzte Zelle. Ohne das stünde dort bis zum nächsten Seitenaufbau „vor 1 Std.“, während der Chart neue
+        // Werte zeigt. Geänderte Felder leuchten kurz auf; ein Fehler lässt die Leiste einfach stehen.
+        async refreshFacts() {
+          let data;
+          try {
+            const res = await fetch(`${BASE}/entities/${encodeURIComponent(ENTITY_ID)}/facts`, {headers: {Accept: 'application/json'}});
+            if (!res.ok) return;
+            data = await res.json();
+          } catch (error) {
+            return;
+          }
+          const flash = (dd) => {
+            const fact = dd.closest('.entity-fact');
+            if (!fact) return;
+            fact.classList.remove('fact-flash');
+            void fact.offsetWidth;
+            fact.classList.add('fact-flash');
+            setTimeout(() => fact.classList.remove('fact-flash'), 1700);
+          };
+          const setSmall = (dd, small) => {
+            let el = dd.querySelector('small');
+            if (!small) { if (el) el.remove(); return; }
+            if (!el) { el = document.createElement('small'); dd.appendChild(el); }
+            el.textContent = small;
+          };
+          const fields = {
+            last: {text: data.last_ts, small: [data.last_ts_time, data.last_ago].filter(Boolean).join(' · ')},
+            count: {text: data.row_count, small: data.size},
+          };
+          for (const key of ['last', 'count']) {
+            const dd = document.querySelector(`.entity-fact dd[data-fact="${key}"]`);
+            const value = fields[key];
+            if (!dd || !value) continue;
+            const before = dd.textContent;
+            dd.replaceChildren(document.createTextNode(value.text));
+            setSmall(dd, value.small);
+            if (dd.textContent !== before) flash(dd);
+          }
+          const extraDd = document.querySelector('.entity-fact dd[data-fact="extra"]');
+          const extra = data.extra;
+          // Min/Max ohne Zwischenspeicher: der alte Text bleibt stehen (siehe entity_facts_values in main.py).
+          if (extraDd && extra && !extra.pending) {
+            const target = extraDd.querySelector('.entity-fact-text');
+            if (target && target.textContent !== extra.text) {
+              target.textContent = extra.text;
+              flash(extraDd);
+            }
+          }
         },
 
         // Grund, warum das Nachladen gerade ruht: null (läuft), 'off' (abgeschaltet), 'zoom' (ein Ausschnitt ist

@@ -1964,6 +1964,10 @@ button[data-tooltip]{cursor:pointer;}
   font-weight:500;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;
 }
 .entity-fact-cat{display:block;margin-top:4px;}
+/* Geändertes Feld der Kennzahlen-Leiste nach dem Nachladen des Verlaufs: kurz hervorheben, dann ausblenden. */
+.entity-fact.fact-flash{animation:fact-flash 1.6s ease-out;}
+@keyframes fact-flash{from{background:var(--accent-bar-soft);}to{background:transparent;}}
+@media (prefers-reduced-motion:reduce){.entity-fact.fact-flash{animation:none;}}
 .entity-fact dd small{
   display:block;font-size:calc(11.5px * var(--font-scale, 1));font-weight:400;color:var(--ink-faint);
 }

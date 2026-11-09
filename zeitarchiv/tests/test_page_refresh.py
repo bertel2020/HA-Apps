@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 from _paths import APP
 
 TEMPLATES = APP / "templates"
@@ -113,3 +115,23 @@ def test_entity_page_has_chip_menu_and_quiet_refresh() -> None:
     assert "{...option, animation: false}" in script
     assert "quietRender = silent;" in script
     assert "echarts.init(" not in script.replace("const instance = echarts.init(", "")
+
+
+def test_entity_facts_follow_the_refresh(client) -> None:
+    from app.main import index as app_index
+
+    entity_id = "sensor.page_refresh_test"
+    app_index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+    app_index.record_write(entity_id, time.time() - 600, 21.5)
+    page = client.get(f"/entities/{entity_id}")
+    assert page.status_code == 200
+    for key in ("last", "count", "extra"):
+        assert f'data-fact="{key}"' in page.text
+    data = client.get(f"/entities/{entity_id}/facts").json()
+    assert set(data) == {"last_ts", "last_ts_time", "last_ago", "row_count", "size", "extra"}
+    assert data["last_ts"] and data["row_count"]
+    assert data["extra"] is None or {"text", "note", "pending"} <= set(data["extra"])
+    assert client.get("/entities/gibt.es_nicht/facts").status_code == 404
+    script = (APP / "static/js/pages/entity_detail.js").read_text(encoding="utf-8")
+    assert "if (silent) this.refreshFacts();" in script
+    assert "/facts`" in script
