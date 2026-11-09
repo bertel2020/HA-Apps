@@ -33,7 +33,7 @@
    Kein <body> im Bestand trägt Attribute — geprüft über alle 23 —, deshalb
    steht es hier ohne Block. #}
 <!doctype html>
-<html lang="{{ lang | default('de') }}" data-format="{{ format_locale | default('de-DE') }}" data-currency='{{ currency_info | default({"code": "EUR", "symbol": "€", "spaced": false, "position": "after", "short": "Ct"}) | tojson }}' data-tz="{{ server_tz }}" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}" data-legend-size="{{ legend_size_global | default('normal') }}"{% if page_layout == 'wide' %} data-page-layout="wide"{% endif %}>
+<html lang="{{ lang | default('de') }}" data-format="{{ format_locale | default('de-DE') }}" data-currency='{{ currency_info | default({"code": "EUR", "symbol": "€", "spaced": false, "position": "after", "short": "Ct"}) | tojson }}' data-tz="{{ server_tz }}" data-color-scheme="{{ color_scheme | default('zeitarchiv') }}" data-color-mode="{{ color_mode | default('auto') }}" data-legend-size="{{ legend_size_global | default('normal') }}"{% if page_layout == 'wide' %} data-page-layout="wide"{% endif %}{% if page_refresh == 'off' %} data-page-refresh="off"{% endif %}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

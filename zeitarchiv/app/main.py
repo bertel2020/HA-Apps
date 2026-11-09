@@ -167,7 +167,7 @@ from .energiedashboard_routes import (
 )
 from .wetter_routes import WetterDependencies, WetterService, is_wetter_configured, wetter_role_count
 from . import cleanup_stats, counter_bulk, data_quality, entity_usage, value_range
-from . import card_elements, dashboard_tiles, overview_tiles, page_layout
+from . import card_elements, dashboard_tiles, overview_tiles, page_layout, page_refresh
 from .dashboard_tiles import tile_metric_context as _tile_metric_context
 from .route_support import (
     MAX_FORM_FIELDS,
@@ -345,6 +345,7 @@ def _font_scale_context(request: Request) -> dict:
         "font_scale_value": FONT_SCALE[font_scale],
         "legend_size_global": _current_legend_size(),
         "page_layout": page_layout.current(index),
+        "page_refresh": page_refresh.current(index),
         "dashboard_row_height": DASHBOARD_ROW_HEIGHT[font_scale],
         "color_scheme": color_scheme,
         "color_mode": color_mode,
@@ -1072,6 +1073,7 @@ def _settings_darstellung_context(saved: bool = False) -> dict:
         "dashboard_animation": dashboard_animation,
         "dashboard_animation_options": list(DASHBOARD_ANIMATION_LABELS.items()),
         **page_layout.settings_context(),
+        **page_refresh.settings_context(),
         "startseite": startseite,
         "startseite_options": list(STARTSEITE_LABELS.items()),
         **overview_tiles.settings_context(index),
@@ -1588,6 +1590,7 @@ async def settings_darstellung(request: Request) -> HTMLResponse:
         try:
             overview_tiles.apply_form(index, form)
             page_layout.apply_form(index, form)
+            page_refresh.apply_form(index, form)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

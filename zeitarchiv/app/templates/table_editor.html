@@ -14,7 +14,22 @@
     <div class="settings-panel">
         <div class="chart-title-row">
           <h2 x-text="editing ? (tableId ? t('Tabelle bearbeiten') : t('Neue Tabelle')) : (name || t('Neue Tabelle'))"></h2>
-          <div style="display:flex;gap:8px;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            {% if table_id %}
+            <span class="refresh-wrap" x-show="rows.length && columns.length" x-cloak @click.outside="refreshMenuOpen = false">
+              <button type="button" class="refresh-chip" :class="{paused: refreshPause()}" aria-haspopup="menu" :aria-expanded="refreshMenuOpen"
+                      :title="refreshChipTitle()" @click="refreshMenuOpen = !refreshMenuOpen; refreshAge = Math.round((Date.now() - _lastRefresh) / 1000)">
+                <span class="refresh-dot"></span><span x-text="refreshChipText()"></span>
+              </button>
+              <div class="menu-popover menu-popover-narrow refresh-menu" x-show="refreshMenuOpen" x-cloak role="menu">
+                <div class="refresh-info" x-text="refreshInfo()"></div>
+                <button type="button" class="menu-row" role="menuitem" @click="refreshNow()">{{ _("Jetzt aktualisieren") }}</button>
+                <button type="button" class="menu-row" role="menuitem" @click="refreshOn = !refreshOn">
+                  <span>{{ _("Automatisch aktualisieren") }}</span><span class="refresh-state" x-text="refreshOn ? t('An') : t('Aus')"></span>
+                </button>
+              </div>
+            </span>
+            {% endif %}
             <button type="button" class="btn" x-show="rows.length && columns.length" data-tooltip="{{ _('Aktuell berechnete Tabelle als CSV herunterladen') }}" @click="exportCsv()">{{ _("CSV") }}</button>
             {% if table_id %}
             <button type="button" class="btn" x-show="!editing" @click="editing = true">{{ _("Anpassen") }}</button>
@@ -464,7 +479,7 @@
                     <span class="tbl-cell"><span class="tbl-cell-number"><span class="tbl-number-whole" x-text="sumNumberParts(row).whole"></span><span class="tbl-number-separator" x-text="sumNumberParts(row).separator"></span><span class="tbl-number-fraction" x-text="sumNumberParts(row).fraction"></span></span><span class="tbl-cell-unit" x-show="style.show_units && sumUnit(row)" x-text="sumUnit(row)"></span></span>
                   </td>
                   <template x-for="col in columns" :key="col.uid">
-                    <td x-show="row.row_type !== 'separator' && !col.hidden" class="tbl-num" :class="{'tbl-error': cellError(row, col), 'tbl-comparison-col': isComparisonColumn(col)}" :style="colWidthStyle(col) + heatmapStyleFor(row, col)">
+                    <td x-show="row.row_type !== 'separator' && !col.hidden" class="tbl-num" :class="{'tbl-error': cellError(row, col), 'tbl-comparison-col': isComparisonColumn(col), 'tbl-flash': flashed[col.uid + ':' + row.uid]}" :style="colWidthStyle(col) + heatmapStyleFor(row, col)">
                       <span class="tbl-cell"><span class="tbl-cell-number"><span class="tbl-number-whole" x-text="cellNumberParts(row, col).whole"></span><span class="tbl-number-separator" x-text="cellNumberParts(row, col).separator"></span><span class="tbl-number-fraction" x-text="cellNumberParts(row, col).fraction"></span></span><span class="tbl-cell-unit" x-show="style.show_units && cellUnit(row, col)" x-text="cellUnit(row, col)"></span></span>
                       <span class="tbl-cell-deviation" x-show="style.show_deviation && !row.percent_of_total && deviationText(row, col)" :data-tooltip-fixed="deviationTitle(row, col)" x-text="deviationText(row, col)"></span>
                     </td>

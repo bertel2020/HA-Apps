@@ -112,6 +112,7 @@ GENERAL_SETTINGS: list[tuple[str, str]] = [
     ("startseite", N_("Startseite")),
     ("dashboard_animation", N_("Dashboard-Animation")),
     ("page_layout", N_("Breite Darstellung")),
+    ("page_refresh", N_("Automatisch aktualisieren")),
     ("entities_columns", N_("Spalten der Entitätenliste")),
     ("entity_chart_defaults", N_("Chart-Voreinstellungen je Entität")),
     ("default_resolution", N_("Standard-Auflösung")),

@@ -24,6 +24,8 @@
     // praktisch nie ändert und die anderen Picker in dieser Datei (BORDER_
     // OPTIONS, DENSITY_OPTIONS, …) genauso lokal statt aus Jinja befüllt sind.
     const DECIMALS_LABELS = {auto: t('Automatisch'), '0': t('0 Nachkommastellen'), '1': t('1 Nachkommastelle'), '2': t('2 Nachkommastellen'), '3': t('3 Nachkommastellen'), '4': t('4 Nachkommastellen')};
+    // Takt des automatischen Nachladens, wie die Dashboard-Kacheln (dashboard-tiles.js).
+    const REFRESH_INTERVAL_MS = 60000;
     const RANGE_LABELS = {hour: t('Stunde'), day: t('Tag'), week: t('Woche'), month: t('Monat'), year: t('Jahr'), decade: t('Dekade')};
     const PREVIOUS_LABELS = {hour: t('Vorherige Stunde'), day: t('Vortag'), week: t('Vorwoche'), month: t('Vormonat'), year: t('Vorjahr'), decade: t('Vorherige Dekade')};
     const PLURAL_UNITS = {hour: t('Stunden'), day: t('Tagen'), week: t('Wochen'), month: t('Monaten'), year: t('Jahren'), decade: t('Dekaden')};
@@ -301,6 +303,13 @@
         elapsedSeconds: {},  // col.uid -> same_elapsed-Kappung ab windowStarts[uid] (Sekunden) | null
         loading: false,
         loadError: false,
+        // Automatisches Nachladen (Chip neben "CSV"): Standard aus der Installation (Einstellungen,
+        // Darstellung, data-page-refresh an <html>), der Schalter im Chip-Menü gilt nur für diese Seite.
+        refreshOn: document.documentElement.dataset.pageRefresh !== 'off',
+        refreshMenuOpen: false,
+        refreshAge: 0,  // Sekunden seit dem letzten Laden, nur gepflegt, solange das Chip-Menü offen ist
+        _lastRefresh: Date.now(),
+        flashed: {},  // "col.uid:row.uid" -> true, kurz nach einem Nachladen für geänderte Zellen
         saving: false,
         savedMessage: '',
         _loadSeq: 0,
@@ -784,14 +793,18 @@
         // Index-basierten Arrays statt der hier üblichen uid-Objekte, deshalb
         // hier nur die Umwandlung dorthin und die Ergebnisse zurück in
         // this.values[col.uid][row.uid].
-        async load() {
+        // silent: Nachladen im Hintergrund (Chip) — keine "Lädt …"-Zeile, ein Fehler lässt die
+        // alten Werte stehen, geänderte Zellen leuchten kurz auf.
+        async load({silent = false} = {}) {
           if (!this.columns.length || !this.rows.length) {
             this.values = {}; this.windowStarts = {}; this.windowEnds = {}; this.isCurrent = {}; this.elapsedSeconds = {};
             return;
           }
           const requestId = ++this._loadSeq;
-          this.loading = true;
-          this.loadError = false;
+          if (!silent) {
+            this.loading = true;
+            this.loadError = false;
+          }
           const plainColumns = this.columns.map(c => ({
             range_key: c.range_key, offset: c.offset, year_over_year: c.year_over_year,
             hidden: !!c.hidden, in_sum: c.in_sum !== false,
@@ -806,7 +819,7 @@
             result = await TableCompute.computeValues(BASE, plainColumns, plainRows);
           } catch (error) {
             // Abfragefehler (HTTP-Status, Netz): als Fehler anzeigen, nicht als leere Tabelle.
-            if (requestId === this._loadSeq) { this.loading = false; this.loadError = true; }
+            if (requestId === this._loadSeq && !silent) { this.loading = false; this.loadError = true; }
             return;
           }
           if (requestId !== this._loadSeq) return;  // überholt von einer neueren Anfrage
@@ -827,6 +840,7 @@
           // Rohdaten für die Σ-Spalte merken, damit ein Umschalten von
           // "in Σ"/"ausgeblendet" ohne neue Serverabfrage neu summiert (siehe
           // recomputeRowSums()).
+          if (silent) this.markChangedCells(newValues);
           this._computedValues = computed;
           this._summable = summable;
           this.values = newValues;
@@ -836,6 +850,65 @@
           this.elapsedSeconds = newElapsedSeconds;
           this.recomputeRowSums();
           this.loading = false;
+          this._lastRefresh = Date.now();
+        },
+
+        // Zellen, deren Wert sich gegenüber dem bisherigen geändert hat, für ~1,5 s markieren.
+        markChangedCells(newValues) {
+          const changed = {};
+          this.columns.forEach(col => {
+            this.rows.forEach(row => {
+              const before = this.values[col.uid] && this.values[col.uid][row.uid];
+              const after = newValues[col.uid] && newValues[col.uid][row.uid];
+              if (before && after && before.value !== after.value) changed[col.uid + ':' + row.uid] = true;
+            });
+          });
+          this.flashed = changed;
+          if (Object.keys(changed).length) setTimeout(() => { this.flashed = {}; }, 1500);
+        },
+
+        // Grund, warum das Nachladen gerade ruht: null (läuft), 'off' (abgeschaltet), 'edit' (Editor offen)
+        // oder 'past' (alle Spalten vergangene Zeiträume, die sich nicht mehr ändern).
+        refreshPause() {
+          if (!this.refreshOn) return 'off';
+          if (this.editing) return 'edit';
+          const flags = Object.values(this.isCurrent);
+          if (flags.length && !flags.some(Boolean)) return 'past';
+          return null;
+        },
+        refreshChipText() {
+          const pause = this.refreshPause();
+          if (pause === 'off') return t('Aus');
+          if (pause === 'edit') return t('Pausiert · Editor');
+          if (pause === 'past') return t('Pausiert · vergangen');
+          return t('Aktuell');
+        },
+        refreshChipTitle() {
+          const pause = this.refreshPause();
+          if (pause === 'off') return t('Die automatische Aktualisierung ist ausgeschaltet.');
+          if (pause === 'edit') return t('Im Editor würde ein Nachladen deine Eingaben stören. Nach dem Speichern geht es weiter.');
+          if (pause === 'past') return t('Die Zeiträume sind abgeschlossen, die Werte ändern sich nicht mehr.');
+          return t('Zuletzt aktualisiert vor {s} s', {s: this.refreshAge});
+        },
+        refreshInfo() {
+          if (this.refreshPause()) return t('Keine automatische Aktualisierung.');
+          return t('Zuletzt vor {s} s · nächste in {n} s', {s: this.refreshAge, n: Math.max(0, REFRESH_INTERVAL_MS / 1000 - this.refreshAge)});
+        },
+        async refreshNow() {
+          this.refreshMenuOpen = false;
+          await this.load({silent: true});
+          this.refreshAge = 0;
+        },
+        // Einmal pro Sekunde geprüft, alle 60 s nachgeladen — nur bei sichtbarem Tab und ohne Pause. Kehrt man
+        // nach längerer Zeit in den Tab zurück, lädt der nächste Takt sofort.
+        refreshTick() {
+          if (!this.$root.isConnected) { clearInterval(this._refreshTimer); return; }
+          const age = Date.now() - this._lastRefresh;
+          if (this.refreshMenuOpen) this.refreshAge = Math.round(age / 1000);
+          if (age >= REFRESH_INTERVAL_MS && document.visibilityState === 'visible'
+              && !this.refreshPause() && !this.loading && !this.saving) {
+            this.refreshNow();
+          }
         },
 
         // Σ-Spalte (style.show_row_sum): reine Client-Rechnung auf den schon
@@ -1065,6 +1138,10 @@
 
         init() {
           this.load();
+          if (TABLE_ID) {
+            this._refreshTimer = setInterval(() => this.refreshTick(), 1000);
+            document.addEventListener('visibilitychange', () => this.refreshTick());
+          }
           // .tbl-columns/.tbl-rows stecken in einem x-if="editing" — bei
           // jedem Wechsel auf "editing" wird der Container neu erzeugt (der
           // dragBound-Marker geht dabei verloren), deshalb hier neu binden,

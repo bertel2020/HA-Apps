@@ -200,6 +200,22 @@
       </div>
     </span>
   </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">{{ _("Seiten automatisch aktualisieren") }} {{ hint_button(_('Seiten automatisch aktualisieren')) }}</div>
+      {% call hint_body('settings-compact-hint') %}{{ _("Lädt die Werte einer geöffneten Tabelle jede Minute nach, solange der Tab sichtbar ist. Dashboards laden unabhängig davon nach. Gilt für alle Geräte dieser Installation.") }}{% endcall %}
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="page-refresh-btn" onclick="toggleDDPicker('page-refresh')">{% for k, l in page_refresh_options %}{% if k == page_refresh %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="page_refresh" id="page-refresh-input" value="{{ page_refresh }}"
+             hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="page-refresh-popover">
+        {% for key, label in page_refresh_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('page-refresh', '{{ key }}', '{{ label }}'); {% if key == 'off' %}document.documentElement.dataset.pageRefresh = 'off';{% else %}delete document.documentElement.dataset.pageRefresh;{% endif %}">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
 </div>
 
 <div class="settings-minor-section">
