@@ -857,7 +857,9 @@ def load_settings_overview(source: BackupSource, index: Index, data_dir: Path) -
             parts = []
             if pins != cur_pins:
                 parts.append(tr("Kacheln {a} → {b}", a=len(cur_pins), b=len(pins)))
-            if any(row.get(k) != cur.get(k) for k in ("precise_mode", "fill_gaps", "period_nav")):
+            # grid_columns fehlt in Backups von vor der breiten Darstellung: gilt dort als 3.
+            if (any(row.get(k) != cur.get(k) for k in ("precise_mode", "fill_gaps", "period_nav"))
+                    or (row.get("grid_columns") or 3) != (cur.get("grid_columns") or 3)):
                 parts.append(tr("Einstellungen"))
             status = "diff" if parts else "same"
             detail = " · ".join(parts) if parts else tr("Kacheln: {n}", n=n_pins)
@@ -1116,8 +1118,9 @@ def apply_settings(
                 journal.append({"op": "replace_children", "table": "dashboard_pins", "col": "dashboard_id",
                                 "val": cur["id"], "rows": _rows(conn, "SELECT * FROM dashboard_pins WHERE dashboard_id = ?", (cur["id"],))})
                 conn.execute("DELETE FROM dashboard_pins WHERE dashboard_id = ?", (cur["id"],))
-                conn.execute("UPDATE dashboards SET precise_mode = ?, fill_gaps = ?, period_nav = ? WHERE id = ?",
-                             (row.get("precise_mode", 0), row.get("fill_gaps", 0), row.get("period_nav", 0), cur["id"]))
+                conn.execute("UPDATE dashboards SET precise_mode = ?, fill_gaps = ?, period_nav = ?, grid_columns = ? WHERE id = ?",
+                             (row.get("precise_mode", 0), row.get("fill_gaps", 0), row.get("period_nav", 0),
+                              row.get("grid_columns", 3), cur["id"]))
                 skipped_pins += copy_pins(item["id"], cur["id"])
 
             b_entities = {r["entity_id"]: r for r in _rows(bconn, "SELECT * FROM entities")}

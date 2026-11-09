@@ -4,6 +4,8 @@
         name: DASHBOARD.name,
         locked: DASHBOARD.locked,
         preciseMode: DASHBOARD.preciseMode,
+        // Der Schalter steht nur bei eingeschalteter breiter Darstellung im Formular; sonst bleibt der gespeicherte Wert.
+        fourColumns: DASHBOARD.gridColumns === 4,
         fillGaps: DASHBOARD.fillGaps,
         periodNav: DASHBOARD.periodNav,
         saving: false,
@@ -32,6 +34,13 @@
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({locked: this.locked}),
               });
               if (!lockRes.ok) { appAlert(t('Speichern der Fixierung fehlgeschlagen.')); return; }
+              // Vor dem Präzisen Modus: dessen Umrechnung der Kachelgrößen richtet sich nach der Spaltenzahl.
+              if (document.getElementById('dash-four-columns')) {
+                const columnsRes = await fetch(`${BASE}/dashboards/${this.dashboardId}/grid-columns`, {
+                  method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({grid_columns: this.fourColumns ? 4 : 3}),
+                });
+                if (!columnsRes.ok) { appAlert(t('Speichern der Spaltenzahl fehlgeschlagen.')); return; }
+              }
               const preciseRes = await fetch(`${BASE}/dashboards/${this.dashboardId}/precise-mode`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({precise_mode: this.preciseMode}),
               });

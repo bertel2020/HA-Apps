@@ -681,7 +681,8 @@ CREATE TABLE IF NOT EXISTS dashboards (
     is_favorite INTEGER NOT NULL DEFAULT 0,
     precise_mode INTEGER NOT NULL DEFAULT 0,
     fill_gaps INTEGER NOT NULL DEFAULT 0,
-    period_nav INTEGER NOT NULL DEFAULT 0
+    period_nav INTEGER NOT NULL DEFAULT 0,
+    grid_columns INTEGER NOT NULL DEFAULT 3
 );
 
 -- dashboard_id verweist auf dashboards.id — mehrere, unabhängige Dashboards
@@ -1587,6 +1588,10 @@ class Index:
             # Zeitraum-Navigation (Stichtag-Leiste über den Kacheln) — Standard
             # aus, damit kein bestehendes Dashboard ungefragt eine Leiste bekommt.
             self._conn.execute("ALTER TABLE dashboards ADD COLUMN period_nav INTEGER NOT NULL DEFAULT 0")
+        if "grid_columns" not in dashboards_columns:
+            # Kacheln pro Zeile (3 oder 4, breite Darstellung): nur die Anzeige ab großer
+            # Fensterbreite richtet sich danach; Standard 3 lässt jedes Dashboard wie bisher.
+            self._conn.execute("ALTER TABLE dashboards ADD COLUMN grid_columns INTEGER NOT NULL DEFAULT 3")
 
         # Einmalige Anlage des migrierten Default-Dashboards ("Übersicht", fest
         # verankert an id=1, siehe dashboard_pins-Migration oben) — nur beim
@@ -2935,7 +2940,7 @@ class Index:
         angehefteten Kachel (Gitter/Zeilenhöhe halbieren sich gleichzeitig,
         siehe .dashboard-grid.is-precise) — ohne das würden alle Kacheln beim
         Umschalten plötzlich nur noch halb so groß wirken. Beim Ausschalten
-        umgekehrt auf die alte Obergrenze (3) gekappt statt rechnerisch
+        umgekehrt auf die alte Obergrenze (Spaltenzahl des Dashboards, 3 oder 4; Zeilen 3) gekappt statt rechnerisch
         halbiert — eine im Präzisen Modus z. B. auf 5 gesetzte Kachel hat
         kein eindeutiges "halbes" Äquivalent im gröberen Gitter.
 
@@ -2949,7 +2954,7 @@ class Index:
         ein Wert außer der Reihe zustande kommt."""
         with self._lock, self._conn:
             row = self._conn.execute(
-                "SELECT precise_mode FROM dashboards WHERE id = ?", (dashboard_id,)
+                "SELECT precise_mode, grid_columns FROM dashboards WHERE id = ?", (dashboard_id,)
             ).fetchone()
             if row is None:
                 return False
@@ -2957,18 +2962,28 @@ class Index:
             self._conn.execute(
                 "UPDATE dashboards SET precise_mode = ? WHERE id = ?", (1 if precise else 0, dashboard_id)
             )
+            columns = int(row["grid_columns"])
             if precise and not was_precise:
                 self._conn.execute(
                     "UPDATE dashboard_pins SET "
-                    "grid_cols = MIN(grid_cols * 2, 6), grid_rows = MIN(grid_rows * 2, 6) "
-                    "WHERE dashboard_id = ?", (dashboard_id,),
+                    "grid_cols = MIN(grid_cols * 2, ?), grid_rows = MIN(grid_rows * 2, 6) "
+                    "WHERE dashboard_id = ?", (columns * 2, dashboard_id),
                 )
             elif not precise:
                 self._conn.execute(
-                    "UPDATE dashboard_pins SET grid_cols = MIN(grid_cols, 3), grid_rows = MIN(grid_rows, 3) "
-                    "WHERE dashboard_id = ?", (dashboard_id,),
+                    "UPDATE dashboard_pins SET grid_cols = MIN(grid_cols, ?), grid_rows = MIN(grid_rows, 3) "
+                    "WHERE dashboard_id = ?", (columns, dashboard_id),
                 )
             return True
+
+    def set_dashboard_grid_columns(self, dashboard_id: int, columns: int) -> bool:
+        """Kacheln pro Zeile (3 oder 4). Die gespeicherten Kachelgrößen bleiben unberührt: Bei 3 Spalten
+        kappt die Anzeige eine zu breite Kachel nur, damit sie bei 4 wieder ihre Breite hat."""
+        if columns not in (3, 4):
+            raise ValueError(tr("Ungültige Spaltenzahl"))
+        with self._lock, self._conn:
+            cursor = self._conn.execute("UPDATE dashboards SET grid_columns = ? WHERE id = ?", (columns, dashboard_id))
+            return cursor.rowcount > 0
 
     def set_dashboard_fill_gaps(self, dashboard_id: int, fill_gaps: bool) -> bool:
         with self._lock, self._conn:
@@ -2992,14 +3007,19 @@ class Index:
         frisch angelegtes."""
         with self._lock, self._conn:
             row = self._conn.execute(
-                "SELECT name FROM dashboards WHERE id = ?", (dashboard_id,)
+                "SELECT name, precise_mode, fill_gaps, period_nav, grid_columns FROM dashboards WHERE id = ?",
+                (dashboard_id,),
             ).fetchone()
             if row is None:
                 return None
             max_pos = self._conn.execute("SELECT MAX(position) FROM dashboards").fetchone()[0]
+            # Die Kachelgrößen unten sind im Präzisen Modus verdoppelt und reichen bis zur Spaltenzahl;
+            # die Kopie braucht dieselben Modi, sonst stünden Spannen bis 6 in einem 3-Spalten-Raster.
             cursor = self._conn.execute(
-                "INSERT INTO dashboards (name, position) VALUES (?, ?)",
-                (self._copy_name_locked("dashboards", row["name"]), (max_pos or 0) + 1),
+                "INSERT INTO dashboards (name, position, precise_mode, fill_gaps, period_nav, grid_columns) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (self._copy_name_locked("dashboards", row["name"]), (max_pos or 0) + 1,
+                 row["precise_mode"], row["fill_gaps"], row["period_nav"], row["grid_columns"]),
             )
             new_id = cursor.lastrowid
             pins = self._conn.execute(
@@ -3138,21 +3158,22 @@ class Index:
             return True
 
     def set_dashboard_pin_size(
-        self, dashboard_id: int, item_type: str, item_id: int, grid_cols: int, grid_rows: int, max_size: int = 3
+        self, dashboard_id: int, item_type: str, item_id: int, grid_cols: int, grid_rows: int,
+        max_cols: int = 3, max_rows: int = 3,
     ) -> bool:
         """Speichert die Rastergröße einer angehefteten Dashboard-Kachel.
 
         Die Validierung lebt zusätzlich zur API auch hier, damit kein anderer
-        Aufrufer ungültige CSS-Grid-Spannen persistieren kann. max_size ist 3
-        normal, 6 im Präzisen Modus (siehe dashboard_size() in main.py, das
-        anhand des Dashboards entscheidet) — der Picker in
+        Aufrufer ungültige CSS-Grid-Spannen persistieren kann. Die Grenzen
+        richten sich nach dem Dashboard (dashboard_grid.size_limits(): Spalten
+        3 oder 4, Zeilen 3, im Präzisen Modus je das Doppelte) — der Picker in
         _dashboard_tile_menu.html geht entsprechend weit. False bedeutet: Die
         angegebene Kachel ist nicht (mehr) angeheftet.
         """
         if item_type not in {"chart", "table"}:
             raise ValueError(tr("Ungültiger Dashboard-Kacheltyp"))
-        if not 1 <= int(grid_cols) <= max_size or not 1 <= int(grid_rows) <= max_size:
-            raise ValueError(tr("Dashboard-Kachelgröße muss zwischen 1 und {max_size} liegen", max_size=max_size))
+        if not 1 <= int(grid_cols) <= max_cols or not 1 <= int(grid_rows) <= max_rows:
+            raise ValueError(tr("Dashboard-Kachelgröße muss zwischen 1 und {max_size} liegen", max_size=max(max_cols, max_rows)))
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE dashboard_pins SET grid_cols = ?, grid_rows = ? "
@@ -3359,10 +3380,10 @@ class Index:
             return [dict(row) for row in rows]
 
     def set_dashboard_entity_pin_size(
-        self, dashboard_id: int, pin_id: int, grid_cols: int, grid_rows: int, max_size: int = 6
+        self, dashboard_id: int, pin_id: int, grid_cols: int, grid_rows: int, max_cols: int = 6, max_rows: int = 6
     ) -> bool:
-        if not 1 <= int(grid_cols) <= max_size or not 1 <= int(grid_rows) <= max_size:
-            raise ValueError(tr("Dashboard-Kachelgröße muss zwischen 1 und {max_size} liegen", max_size=max_size))
+        if not 1 <= int(grid_cols) <= max_cols or not 1 <= int(grid_rows) <= max_rows:
+            raise ValueError(tr("Dashboard-Kachelgröße muss zwischen 1 und {max_size} liegen", max_size=max(max_cols, max_rows)))
         with self._lock, self._conn:
             cursor = self._conn.execute(
                 "UPDATE dashboard_pins SET grid_cols = ?, grid_rows = ? "
@@ -4462,7 +4483,7 @@ class Index:
             self._conn.execute("DELETE FROM dashboards WHERE id != 1")
             self._conn.execute(
                 "UPDATE dashboards SET name = 'Übersicht', position = 0, is_default = 1, "
-                "locked = 0, is_favorite = 0, precise_mode = 0, fill_gaps = 0, period_nav = 0 WHERE id = 1"
+                "locked = 0, is_favorite = 0, precise_mode = 0, fill_gaps = 0, period_nav = 0, grid_columns = 3 WHERE id = 1"
             )
             if keep_setting_prefixes:
                 clause = " AND ".join("key NOT LIKE ?" for _ in keep_setting_prefixes)

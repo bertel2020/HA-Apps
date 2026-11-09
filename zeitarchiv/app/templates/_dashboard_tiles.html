@@ -99,7 +99,7 @@
       {% endif %}
     </div>
     {% endif %}
-    <div class="dashboard-grid{{ ' is-precise' if dashboard_precise else '' }}{{ ' is-dense' if dashboard_fill_gaps else '' }}{{ ' has-anchored-add' if is_last_group and can_add_tile else '' }}" data-section-grid>
+    <div class="dashboard-grid{{ ' is-precise' if dashboard_precise else '' }}{{ ' is-dense' if dashboard_fill_gaps else '' }}{{ ' has-anchored-add' if is_last_group and can_add_tile else '' }}" data-section-grid{% if dashboard_grid_columns == 4 %} data-columns="4"{% endif %}>
       {% for tile in group.tiles %}
       {% if tile.kind == 'chart' %}
       <div class="dtile" draggable="{{ 'false' if dashboard_locked else 'true' }}" data-item-type="chart" data-item-id="{{ tile.id }}"

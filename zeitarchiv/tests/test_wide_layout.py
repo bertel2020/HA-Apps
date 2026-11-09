@@ -34,7 +34,8 @@ def test_wide_rules_live_only_inside_min_width_1200_media_blocks() -> None:
             before = text[: match.start()]
             media = before.rfind("@media")
             assert media != -1, f"{css.name}: Wide-Regel ohne @media"
-            assert "min-width:1200px" in before[media: media + 60], f"{css.name}: Wide-Regel außerhalb von min-width:1200px"
+            head = before[media: media + 60]
+            assert "min-width:1200px" in head or "min-width:1500px" in head, f"{css.name}: Wide-Regel außerhalb von min-width:1200/1500px"
             assert before.count("{") - before.count("}") >= 1, f"{css.name}: Wide-Regel nicht im @media-Block"
 
 

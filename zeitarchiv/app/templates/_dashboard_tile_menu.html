@@ -1,6 +1,7 @@
-{% set size_max = 6 if dashboard_precise else 3 %}
+{% set size_max_rows = 6 if dashboard_precise else 3 %}
+{% set size_max_cols = size_max_rows + (size_max_rows // 3 if dashboard_grid_columns == 4 else 0) %}
 {% set legend_threshold = 3 if dashboard_precise else 2 %}
-<div class="dtile-menu{{ ' is-precise' if dashboard_precise else '' }}"
+<div class="dtile-menu{{ ' is-precise' if dashboard_precise else '' }}{{ ' cols-4' if dashboard_grid_columns == 4 else '' }}"
      x-data="{menuOpen: {{ 'true' if tile.kind == 'entity' and auto_open_pin_id == tile.pin_id else 'false' }}}"
      :class="{'is-open': menuOpen}">
   <button type="button" class="dtile-menu-btn" draggable="false"
@@ -76,9 +77,9 @@
 
         <div class="dtile-settings-section">
           <div class="dtile-size-picker-head">{{ _("Kachelgröße <strong>{grid_cols}×{grid_rows}</strong>", grid_cols=tile.grid_cols, grid_rows=tile.grid_rows) }}</div>
-          <div class="dtile-size-grid" role="grid" aria-label="{{ _('Kachelgröße bis {size_max} mal {size_max2} auswählen', size_max=size_max, size_max2=size_max) }}">
-            {% for row in range(1, size_max + 1) %}
-            {% for col in range(1, size_max + 1) %}
+          <div class="dtile-size-grid" role="grid" aria-label="{{ _('Kachelgröße bis {size_max} mal {size_max2} auswählen', size_max=size_max_cols, size_max2=size_max_rows) }}">
+            {% for row in range(1, size_max_rows + 1) %}
+            {% for col in range(1, size_max_cols + 1) %}
             <button type="button"
                     class="dtile-size-cell{% if col <= tile.grid_cols and row <= tile.grid_rows %} is-selected{% endif %}"
                     role="gridcell" draggable="false" data-cols="{{ col }}" data-rows="{{ row }}"
@@ -87,6 +88,7 @@
             {% endfor %}
           </div>
           <div class="dtile-size-preview" aria-live="polite">{{ tile.grid_cols }}×{{ tile.grid_rows }}</div>
+{% if dashboard_grid_columns == 4 %}<div class="dtile-size-note">{{ _("Vier Kacheln pro Zeile gelten ab großer Fensterbreite.") }}</div>{% endif %}
         </div>
 
         {% if tile.is_state %}
@@ -229,9 +231,9 @@
   <div class="dtile-menu-popover" x-show="menuOpen" x-cloak role="menu"
        @pointerdown.stop @click.outside="menuOpen = false">
     <div class="dtile-size-picker-head">{{ _("Kachelgröße <strong>{grid_cols}×{grid_rows}</strong>", grid_cols=tile.grid_cols, grid_rows=tile.grid_rows) }}</div>
-    <div class="dtile-size-grid" role="grid" aria-label="{{ _('Kachelgröße bis {size_max} mal {size_max2} auswählen', size_max=size_max, size_max2=size_max) }}">
-      {% for row in range(1, size_max + 1) %}
-      {% for col in range(1, size_max + 1) %}
+    <div class="dtile-size-grid" role="grid" aria-label="{{ _('Kachelgröße bis {size_max} mal {size_max2} auswählen', size_max=size_max_cols, size_max2=size_max_rows) }}">
+      {% for row in range(1, size_max_rows + 1) %}
+      {% for col in range(1, size_max_cols + 1) %}
       <button type="button"
               class="dtile-size-cell{% if col <= tile.grid_cols and row <= tile.grid_rows %} is-selected{% endif %}"
               role="gridcell" draggable="false" data-cols="{{ col }}" data-rows="{{ row }}"
@@ -241,6 +243,7 @@
       {% endfor %}
     </div>
     <div class="dtile-size-preview" aria-live="polite">{{ tile.grid_cols }}×{{ tile.grid_rows }}</div>
+{% if dashboard_grid_columns == 4 %}<div class="dtile-size-note">{{ _("Vier Kacheln pro Zeile gelten ab großer Fensterbreite.") }}</div>{% endif %}
     {% if tile.kind == 'chart' %}
     <!-- Divider UND Zeile stecken zusammen in einem Wrapper, der als Ganzes
          versteckt wird (statt nur die Zeile selbst) — sonst bliebe der

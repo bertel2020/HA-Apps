@@ -353,6 +353,10 @@
      breit bleiben kann. */
   .dtile-menu.is-precise .dtile-size-grid{grid-template-columns:repeat(6,18px);grid-template-rows:repeat(6,18px);}
   .dtile-menu.is-precise .dtile-size-cell{width:18px;height:18px;}
+  /* Dashboards mit vier Kacheln pro Zeile: vier (präzise acht) Spalten im Größenwähler. */
+  .dtile-menu.cols-4 .dtile-size-grid{grid-template-columns:repeat(4,24px);}
+  .dtile-menu.is-precise.cols-4 .dtile-size-grid{grid-template-columns:repeat(8,18px);}
+  .dtile-size-note{margin-top:5px;text-align:center;color:var(--ink-faint);font-size:calc(10.5px * var(--font-scale, 1));white-space:normal;}
   /* Nachkommastellen-Override (Werte-Kacheln) — dieselbe Zellen-Optik wie
      die Kachelgröße oben, nur als eine einzelne Reihe mit Ziffern statt
      eines Rasters. */
@@ -544,7 +548,7 @@
   .tbl-style-align-numbers .tbl-number-fraction{text-align:left;}
   @media (max-width:820px){
     .dashboard-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
-    .dtile[data-grid-cols="3"]{grid-column:span 2;}
+    .dtile[data-grid-cols="3"],.dtile[data-grid-cols="4"]{grid-column:span 2;}
   }
   /* Tablet im Präzisen Modus: .dashboard-grid.is-precise (6 Spalten) ist spezifischer als die
      2-Spalten-Regel oben und blieb deshalb auch hier bei sechs schmalen Spalten. Vier Spalten
@@ -553,7 +557,16 @@
   @media (min-width:521px) and (max-width:820px){
     .dashboard-grid.is-precise{grid-template-columns:repeat(4,minmax(0,1fr));}
     .dashboard-grid.is-precise .dtile[data-grid-cols="3"]{grid-column:span 3;}
-    .dashboard-grid.is-precise .dtile[data-grid-cols="5"],.dashboard-grid.is-precise .dtile[data-grid-cols="6"]{grid-column:span 4;}
+    .dashboard-grid.is-precise .dtile[data-grid-cols="5"],.dashboard-grid.is-precise .dtile[data-grid-cols="6"],
+    .dashboard-grid.is-precise .dtile[data-grid-cols="7"],.dashboard-grid.is-precise .dtile[data-grid-cols="8"]{grid-column:span 4;}
+  }
+  /* Kacheln pro Zeile (Dashboard-Einstellung, wirkt als Raster erst in der breiten Darstellung ab 1500px, siehe
+     dashboard_detail.css): Bis dahin hat das Raster drei (präzise sechs) Spalten, und eine auf vier (acht)
+     Spalten gestellte Kachel wird nur in der Anzeige schmaler gezeigt, gespeichert bleibt ihre Größe. Zwischen
+     521 und 820px gelten die Regeln oben (zwei bzw. vier Spalten). */
+  @media (min-width:821px){
+    .dashboard-grid:not(.is-precise)[data-columns="4"] .dtile[data-grid-cols="4"]{grid-column:span 3;}
+    .dashboard-grid.is-precise[data-columns="4"] .dtile[data-grid-cols="7"],.dashboard-grid.is-precise[data-columns="4"] .dtile[data-grid-cols="8"]{grid-column:span 6;}
   }
   @media (max-width:520px){
     /* Die Desktop-Regel .dashboard-grid.is-precise ist spezifischer als die
@@ -562,7 +575,7 @@
        dort durch die präzisere 2-Spalten-Regel Vorrang. Mobil werden daher
        Raster und sämtliche Kacheln ausdrücklich auf eine Spalte gesetzt. */
     .dashboard-grid,.dashboard-grid.is-precise{grid-template-columns:minmax(0,1fr);}
-    .dtile,.dtile[data-grid-cols="2"],.dtile[data-grid-cols="3"]{grid-column:span 1;}
+    .dtile,.dtile[data-grid-cols="2"],.dtile[data-grid-cols="3"],.dtile[data-grid-cols="4"]{grid-column:span 1;}
     .dashboard-grid.is-precise .dtile{grid-column:span 1;}
   }
   .dash-title-row{display:flex;align-items:center;gap:10px;}
@@ -576,13 +589,26 @@
    --dash-row-factor, bei 1120px Rahmen ergibt das etwa die bisherigen 210px) und fällt nie unter
    --dashboard-row-height (Schriftgröße). Die Spaltenbreite kommt aus vw statt aus einem Container:
    container-type auf .dgroup/.dashboard-grid würde position:fixed-Überlagerungen der Kacheln
-   (Menü, Popup) am Raster festhalten. 48px = Seitenpolster von body, 28px = zwei Lücken. */
+   (Menü, Popup) am Raster festhalten. 48px = Seitenpolster von body, 14px = eine Lücke. */
 @media (min-width:1200px){
-  :root[data-page-layout="wide"]{--dash-max:1440px;--dash-row-factor:.58;}
+  :root[data-page-layout="wide"]{--dash-max:1440px;--dash-row-factor:.58;--dash-cols:3;}
   :root[data-page-layout="wide"] .page-wide > *{max-width:var(--dash-max);margin-inline:auto;}
   :root[data-page-layout="wide"] .dashboard-grid{
-    --dash-row:max(var(--dashboard-row-height), calc((min(var(--dash-max), 100vw - 48px) - 28px) / 3 * var(--dash-row-factor)));
+    --dash-row:max(var(--dashboard-row-height), calc((min(var(--dash-max), 100vw - 48px) - (var(--dash-cols) - 1) * 14px) / var(--dash-cols) * var(--dash-row-factor)));
     grid-auto-rows:var(--dash-row);
   }
   :root[data-page-layout="wide"] .dashboard-grid.is-precise{grid-auto-rows:calc(var(--dash-row) / 2);}
+}
+
+/* Kacheln pro Zeile = 4 (Dashboard-Einstellung): ab 1500px vier Spalten (präzise acht) und die Breite wächst
+   auf 4 × 480px = 1920px, damit die Kacheln nicht schmaler werden als bei drei Spalten (1440px). Darunter
+   bleibt es bei drei (sechs); die Kappung zu breiter Kacheln steht oben ohne Schalter-Bedingung. Titel und
+   Zeitraum-Leiste folgen über data-columns an .page. */
+@media (min-width:1500px){
+  :root[data-page-layout="wide"] .page[data-columns="4"]{--dash-max:1920px;--dash-cols:4;}
+  :root[data-page-layout="wide"] .dashboard-grid[data-columns="4"]{grid-template-columns:repeat(4,minmax(0,1fr));}
+  :root[data-page-layout="wide"] .dashboard-grid.is-precise[data-columns="4"]{grid-template-columns:repeat(8,minmax(0,1fr));}
+  :root[data-page-layout="wide"] .dashboard-grid:not(.is-precise)[data-columns="4"] .dtile[data-grid-cols="4"]{grid-column:span 4;}
+  :root[data-page-layout="wide"] .dashboard-grid.is-precise[data-columns="4"] .dtile[data-grid-cols="7"]{grid-column:span 7;}
+  :root[data-page-layout="wide"] .dashboard-grid.is-precise[data-columns="4"] .dtile[data-grid-cols="8"]{grid-column:span 8;}
 }

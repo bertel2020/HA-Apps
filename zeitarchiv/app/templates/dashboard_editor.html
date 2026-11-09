@@ -44,6 +44,19 @@
         {% call hint_body() %}{{ _("Feineres Kachelraster (6 statt 3 Spalten) für genauere Größen und Anordnung. Bestehende Kacheln behalten dabei ihre bisherige Größe.") }}{% endcall %}
       </div>
 
+      {% if page_layout == 'wide' %}
+      <div class="field">
+        <div class="field-switch-row">
+          <span class="menu-toggle">
+            <input type="checkbox" id="dash-four-columns" x-model="fourColumns">
+            <span class="track"><span class="thumb"></span></span>
+          </span>
+          <label for="dash-four-columns">{{ _("4 Kacheln pro Zeile") }} {{ hint_button(_('4 Kacheln pro Zeile')) }}</label>
+        </div>
+        {% call hint_body() %}{{ _("Auf großen Bildschirmen (ab etwa 1500 px Fensterbreite) vier statt drei Kacheln nebeneinander, im Präzisen Modus acht Spalten. Auf kleineren Bildschirmen bleibt es bei drei; zu breite Kacheln werden dort nur verkleinert angezeigt.") }}{% endcall %}
+      </div>
+      {% endif %}
+
       <div class="field">
         <div class="field-switch-row">
           <span class="menu-toggle">
@@ -91,6 +104,7 @@
       name: {{ (dashboard.name if dashboard else '') | tojson }},
       locked: {{ 'true' if dashboard and dashboard.locked else 'false' }},
       preciseMode: {{ 'true' if dashboard and dashboard.precise_mode else 'false' }},
+      gridColumns: {{ dashboard.grid_columns if dashboard else 3 }},
       fillGaps: {{ 'true' if dashboard and dashboard.fill_gaps else 'false' }},
       periodNav: {{ 'true' if dashboard and dashboard.period_nav else 'false' }},
     };

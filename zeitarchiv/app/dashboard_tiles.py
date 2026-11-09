@@ -313,6 +313,7 @@ def tiles_context(
     dashboard_locked = bool(dashboard["locked"]) if dashboard else False
     dashboard_precise = bool(dashboard["precise_mode"]) if dashboard else False
     dashboard_fill_gaps = bool(dashboard["fill_gaps"]) if dashboard else False
+    dashboard_grid_columns = int(dashboard["grid_columns"]) if dashboard else 3
     entity_rows = index.list_entities()
     all_entities = [
         {
@@ -333,6 +334,9 @@ def tiles_context(
         # Lücken auffüllen: grid-auto-flow: dense (.dashboard-grid.is-dense) —
         # unabhängig vom Präzisen Modus, beide lassen sich frei kombinieren.
         "dashboard_fill_gaps": dashboard_fill_gaps,
+        # Kacheln pro Zeile (3 oder 4): bei 4 trägt das Raster data-columns="4" (breite Darstellung,
+        # ab 1500 px vier Spalten, darunter kappt das CSS zu breite Kacheln) und das Größenmenü geht bis 4 (8).
+        "dashboard_grid_columns": dashboard_grid_columns,
         # Zeitraum-Navigation: Stichtag-Leiste über den Kacheln (_dashboard_period_nav.html),
         # der Kalender reicht über das ganze Archiv wie im Chart-Editor.
         "dashboard_period_nav": bool(dashboard["period_nav"]) if dashboard else False, **calendar_bounds(entity_rows, tz),

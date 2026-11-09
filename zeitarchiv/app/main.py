@@ -139,7 +139,7 @@ from .storage.coordinator import CoordinatorBusy, StorageCoordinator
 from .storage.paths import ENTITY_ID_MAX_LENGTH, ENTITY_ID_PATTERN, InvalidEntityIdError, validate_entity_id
 from .timezone_config import load_timezone
 from .version import APP_VERSION
-from . import ai_settings_routes, api_routes, entity_category_routes, ha_integration, selection_routes
+from . import ai_settings_routes, api_routes, dashboard_grid, entity_category_routes, ha_integration, selection_routes
 from .import_routes import ImportDependencies, ImportService
 from .index_optimization import (
     build_index_detail_context,
@@ -438,6 +438,7 @@ app.include_router(i18n.make_router(lambda: index))
 app.include_router(ai_settings_routes.make_router(lambda: index, templates, TZ))
 app.include_router(selection_routes.make_router(lambda: index, templates, DATA_DIR, TZ))
 app.include_router(entity_category_routes.make_router(lambda: index, templates, lambda: _add_category_column()))
+app.include_router(dashboard_grid.make_router(lambda: index))
 
 
 class RequestLoggingMiddleware:
@@ -4036,9 +4037,9 @@ class _ResizeDashboardTileBody(BaseModel):
     dashboard_id: int = 1
     item_type: str
     item_id: int
-    # Obergrenze 6 (Präziser Modus) statt 3 — die eigentliche, vom aktuellen
-    # Modus abhängige Grenze prüft index.set_dashboard_pin_size() (max_size).
-    grid_cols: int = Field(ge=1, le=6)
+    # Obergrenzen des größten Falls (8 Spalten präzise bei 4 Kacheln pro Zeile) — die vom Dashboard
+    # abhängigen Grenzen prüft index.set_dashboard_pin_size() (dashboard_grid.size_limits()).
+    grid_cols: int = Field(ge=1, le=8)
     grid_rows: int = Field(ge=1, le=6)
 
 
@@ -4061,10 +4062,10 @@ def dashboard_size(body: _ResizeDashboardTileBody) -> dict:
         raise HTTPException(status_code=422, detail=tr("Ungültiger Dashboard-Kacheltyp"))
     _require_dashboard_unlocked(body.dashboard_id)
     dashboard = index.get_dashboard(body.dashboard_id)
-    max_size = 6 if dashboard and dashboard["precise_mode"] else 3
+    max_cols, max_rows = dashboard_grid.size_limits(dashboard)
     try:
         updated = index.set_dashboard_pin_size(
-            body.dashboard_id, body.item_type, body.item_id, body.grid_cols, body.grid_rows, max_size=max_size
+            body.dashboard_id, body.item_type, body.item_id, body.grid_cols, body.grid_rows, max_cols=max_cols, max_rows=max_rows
         )
     except ValueError as err:
         raise HTTPException(status_code=422, detail=str(err)) from err
@@ -4158,7 +4159,7 @@ def dashboard_unpin_entity(request: Request, pin_id: int, dashboard_id: int = 1)
 class _ResizeDashboardEntityTileBody(BaseModel):
     dashboard_id: int = 1
     pin_id: int
-    grid_cols: int = Field(ge=1, le=6)
+    grid_cols: int = Field(ge=1, le=8)
     grid_rows: int = Field(ge=1, le=6)
 
 
@@ -4166,10 +4167,10 @@ class _ResizeDashboardEntityTileBody(BaseModel):
 def dashboard_entity_size(body: _ResizeDashboardEntityTileBody) -> dict:
     _require_dashboard_unlocked(body.dashboard_id)
     dashboard = index.get_dashboard(body.dashboard_id)
-    max_size = 6 if dashboard and dashboard["precise_mode"] else 3
+    max_cols, max_rows = dashboard_grid.size_limits(dashboard)
     try:
         updated = index.set_dashboard_entity_pin_size(
-            body.dashboard_id, body.pin_id, body.grid_cols, body.grid_rows, max_size=max_size
+            body.dashboard_id, body.pin_id, body.grid_cols, body.grid_rows, max_cols=max_cols, max_rows=max_rows
         )
     except ValueError as err:
         raise HTTPException(status_code=422, detail=str(err)) from err
