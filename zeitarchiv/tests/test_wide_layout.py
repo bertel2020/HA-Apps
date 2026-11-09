@@ -124,3 +124,15 @@ def test_wide_frame_rules_apply_only_at_1200px_and_keep_narrow_pages_left() -> N
     editor = (PAGE_CSS / "chart_editor.css").read_text(encoding="utf-8")
     assert editor.count("#chart{height:max(420px,min(33vw,640px));}") == 1
     assert "#chart{width:100%;height:420px;max-width:100%;}" in editor
+
+
+def test_dashboard_width_and_row_height_rules_live_in_the_switch_block() -> None:
+    css = (PAGE_CSS / "dashboard_detail.css").read_text(encoding="utf-8")
+    assert "cqw" not in css  # container-type auf .dgroup/.dashboard-grid prüft der Test oben
+    assert css.count("--dash-max:1440px") == 1 and css.count("--dash-row-factor:.58") == 1
+    start = css.index("@media (min-width:1200px){\n  :root[data-page-layout=\"wide\"]{--dash-max")
+    block = css[start:]
+    assert block.count("grid-auto-rows") == 2
+    # Außerhalb des Schalter-Blocks bleibt die Zeilenhöhe wie bisher an der Schriftgröße.
+    assert "grid-auto-rows:var(--dashboard-row-height)" in css[:start]
+    assert "max(var(--dashboard-row-height)" in block

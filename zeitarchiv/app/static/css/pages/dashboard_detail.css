@@ -569,3 +569,20 @@
   .dash-rename-btn{color:var(--ink-faint);text-decoration:none;padding:2px;}
   .dash-rename-btn:hover{color:var(--accent-line);}
   .dash-locked-badge{font-size:calc(16px * var(--font-scale, 1));cursor:default;opacity:.75;}
+
+/* Breite Darstellung (experimentell): Titel, Zeitraum-Leiste und Kachelraster stehen bis 1440px
+   breit mittig im Rahmen (--page-max, app.css), mehr Platz bekommen die Kacheln nicht — bei 1920px
+   wären drei Spalten sonst über 600px breit. Die Zeilenhöhe wächst mit der Spaltenbreite (Faktor
+   --dash-row-factor, bei 1120px Rahmen ergibt das etwa die bisherigen 210px) und fällt nie unter
+   --dashboard-row-height (Schriftgröße). Die Spaltenbreite kommt aus vw statt aus einem Container:
+   container-type auf .dgroup/.dashboard-grid würde position:fixed-Überlagerungen der Kacheln
+   (Menü, Popup) am Raster festhalten. 48px = Seitenpolster von body, 28px = zwei Lücken. */
+@media (min-width:1200px){
+  :root[data-page-layout="wide"]{--dash-max:1440px;--dash-row-factor:.58;}
+  :root[data-page-layout="wide"] .page-wide > *{max-width:var(--dash-max);margin-inline:auto;}
+  :root[data-page-layout="wide"] .dashboard-grid{
+    --dash-row:max(var(--dashboard-row-height), calc((min(var(--dash-max), 100vw - 48px) - 28px) / 3 * var(--dash-row-factor)));
+    grid-auto-rows:var(--dash-row);
+  }
+  :root[data-page-layout="wide"] .dashboard-grid.is-precise{grid-auto-rows:calc(var(--dash-row) / 2);}
+}
