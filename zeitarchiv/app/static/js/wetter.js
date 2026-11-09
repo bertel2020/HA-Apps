@@ -569,6 +569,12 @@
             title: this.tileTitle(tile), value: this.tileValue(tile), sub: this.tileSub(tile),
           });
         });
+        // Kurzfassung für die Leiste: nur die erste Zeile; die ganze Angabe steht im Tooltip.
+        out.forEach((tile) => {
+          const lines = String(tile.sub || '').split('\n').filter(Boolean);
+          tile.k = lines[0] || '';
+          tile.title = lines.join(' · ');
+        });
         return out;
       },
 

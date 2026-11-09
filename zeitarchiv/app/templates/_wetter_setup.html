@@ -379,7 +379,7 @@
     </div>
   </div>
   {% endfor %}
-  <div x-show="cardAvailable('conditions')">
+  <div x-show="cardAvailable('basis')">
   <h3 class="wt-group-h">{{ _("Darstellung der Wetterlage") }}</h3>
   <div class="wt-chips" role="radiogroup" aria-label="{{ _('Darstellung der Wetterlage') }}">
     {% for key, label in (("large", _("Groß")), ("compact", _("Kompakt")), ("strip", _("Leiste"))) %}

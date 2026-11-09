@@ -444,10 +444,27 @@
 .wt-tiles-lage .wt-tile-sub{white-space:pre-line;}
 .wt-tiles-lage .wt-tile-static{cursor:default;}
 [data-tile-style] .wt-tiles-lage a.wt-tile-static:hover{transform:none;box-shadow:none;}
-.wt-tiles-lage[style]{--wt-cols:3;}
+.wt-tile-k{display:none;}
 @media (max-width:760px){
   .wt-tiles-lage{--wt-cols:2;}
 }
 @media (max-width:420px){
   .wt-tiles-lage{--wt-cols:1;}
+}
+
+/* Darstellung „Leiste“: alle Kacheln in einer Reihe, nur Symbol, Wert und eine Zeile Kurztext; der Rest steht im Tooltip. */
+[data-tile-style] .wt-tiles-lage[data-layout="strip"]{--wt-cols:6;gap:0;border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+[data-tile-style] .wt-tiles-lage[data-layout="strip"] .wt-tile{grid-template-areas:"icon value" "icon k";grid-template-columns:auto minmax(0,1fr);row-gap:0;column-gap:8px;
+  padding:10px 12px;border:0;border-left:1px solid var(--border);border-top:1px solid var(--border);margin:-1px 0 0 -1px;border-radius:0;background:var(--surface);box-shadow:none;}
+[data-tile-style] .wt-tiles-lage[data-layout="strip"] .wt-tile-icon{position:static;grid-area:icon;inset:auto;width:20px;height:20px;padding:0;opacity:1;background:none;color:var(--wt-accent);}
+[data-tile-style] .wt-tiles-lage[data-layout="strip"] .wt-tile-label,
+[data-tile-style] .wt-tiles-lage[data-layout="strip"] .wt-tile-sub{display:none;}
+[data-tile-style] .wt-tiles-lage[data-layout="strip"] .wt-tile-value{font-size:calc(16.5px * var(--font-scale, 1));line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+[data-tile-style] .wt-tiles-lage[data-layout="strip"] .wt-tile-value small{font-size:calc(12px * var(--font-scale, 1));margin-left:2px;}
+.wt-tiles-lage[data-layout="strip"] .wt-tile-k{display:block;grid-area:k;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+@media (max-width:1000px){
+  [data-tile-style] .wt-tiles-lage[data-layout="strip"]{--wt-cols:3;}
+}
+@media (max-width:420px){
+  [data-tile-style] .wt-tiles-lage[data-layout="strip"]{--wt-cols:2;}
 }

@@ -87,13 +87,14 @@
     {% for n in range(placeholders) %}<span class="wt-tile is-loading"><span class="wt-tile-label">&nbsp;</span><span class="wt-tile-value">–</span><span class="wt-tile-sub">&nbsp;</span></span>{% endfor %}
   </div>
   {% if lage %}
-  <div class="wt-tiles wt-tiles-lage" x-ref="tiles{{ group | capitalize }}" x-show="displayTiles().length" x-cloak>
+  <div class="wt-tiles wt-tiles-lage" data-layout="{{ config.lage_layout }}" x-ref="tiles{{ group | capitalize }}" x-show="displayTiles().length" x-cloak>
     <template x-for="tile in displayTiles()" :key="tile.key">
-      <a class="wt-tile" :class="{'wt-tile-big': tile.big, 'wt-tile-static': !tile.href}" :data-role="tile.role" :href="tile.href || null" :title="tile.title">
+      <a class="wt-tile" :class="{'wt-tile-static': !tile.href}" :data-role="tile.role" :href="tile.href || null" :title="tile.title">
         <span class="wt-tile-icon" x-html="iconSvg(tile.icon)"></span>
         <span class="wt-tile-label" x-text="tile.label"></span>
         <span class="wt-tile-value" x-html="tile.value"></span>
         <span class="wt-tile-sub" x-text="tile.sub"></span>
+        <span class="wt-tile-k" x-text="tile.k"></span>
       </a>
     </template>
   </div>
