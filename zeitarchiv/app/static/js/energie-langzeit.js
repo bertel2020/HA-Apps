@@ -1046,14 +1046,15 @@
   }
 
   // Vier Balken je Jahr; das laufende Jahr in „Komplett“ blass und gestrichelt.
-  function yearBars(data, rows, colors) {
+  function yearBars(data, rows, colors, narrow) {
     const defs = [
       ['erzeugung', t('Erzeugung'), cssVar('--energy-solar')], ['netzbezug', t('Netzbezug'), cssVar('--energy-grid')],
       ['einspeisung', t('Einspeisung'), cssVar('--energy-export')], ['verbrauch', t('Verbrauch'), cssVar('--ink-faint')],
     ].filter(([key]) => data.roles.includes(key));
     return {
       animation: false,
-      grid: {left: 8, right: 12, top: 36, bottom: 8, containLabel: true},
+      // Schmal bricht die Legende in zwei Zeilen um: Platz nach oben, sonst überdeckt sie die Einheit.
+      grid: {left: 8, right: 12, top: narrow ? 80 : 36, bottom: 8, containLabel: true},
       legend: {top: 0, textStyle: {color: colors.text, fontSize: scaledFont(12)}, itemWidth: 12, itemHeight: 8},
       xAxis: {type: 'category', data: rows.map(yearLabel), ...yearAxis(colors, scaledFont(11)), splitLine: {show: false}},
       yAxis: {
@@ -1580,7 +1581,7 @@
           chart.setOption(option, true);
           requestAnimationFrame(() => chart.resize());
         };
-        if (this.jbMode === 'kwh') draw('jbBars', yearBars(data, rows, colors));
+        if (this.jbMode === 'kwh') draw('jbBars', yearBars(data, rows, colors, (this.$refs.jbBars || {}).clientWidth < 520));
         else {
           draw('jbFrom', yearShares(rows, colors, 'from'));
           if (data.roles.includes('erzeugung')) draw('jbTo', yearShares(rows, colors, 'to'));
