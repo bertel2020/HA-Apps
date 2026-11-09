@@ -106,7 +106,7 @@ ROLE_KEYS = tuple(key for key, _label, _types in ROLES)
 ROLE_TYPES = {key: types for key, _label, types in ROLES}
 ROLE_LABELS = {key: label for key, label, _types in ROLES}
 
-MAX_EXTRA_TEMPERATURES = 10
+MAX_EXTRA_TEMPERATURES = 20
 #: Blöcke der Vergleichstabelle, die sich in der Einrichtung ausblenden lassen (die Außentemperatur
 #: und Zusatzsensoren bleiben immer sichtbar).
 #: Zeiträume (Tage) des Temperaturvergleichs auf dem Reiter „Temperatur & Klima“.
