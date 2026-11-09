@@ -178,7 +178,7 @@ const rooms = {...base, rows: [
 ]};
 const flat = {...base, rows: rooms.rows.map((r) => ({...r, room: ''}))};
 const count = (html, needle) => html.split(needle).length - 1;
-const heads = (html) => [...html.matchAll(/<tr class="wt-grp"><th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]);
+const heads = (html) => [...html.matchAll(/<tr class="wt-grp[^"]*"><th[^>]*>(?:<span[^>]*>[^<]*<\/span> )?([^<]*)<\/th>/g)].map((m) => m[1]);
 const subs = (html) => [...html.matchAll(/<tr class="wt-sub"><th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]);
 const labels = (html) => [...html.matchAll(/<th scope="row">([^<]*)/g)].map((m) => m[1]);
 const grouped = R.weatherComparison(rooms, 'klima', true);
@@ -191,6 +191,7 @@ const floorHeads = (html) => [...html.matchAll(/<tr class="wt-floor[^"]*"><th[^>
 const floorsOpen = R.weatherComparison(onFloors, 'klima', true, {interactive: true});
 const floorsClosed = R.weatherComparison(onFloors, 'klima', true, {interactive: true, closedFloors: ['Obergeschoss', '']});
 const floorsCard = R.weatherComparison(onFloors, 'klima', true);
+const roomsClosed = R.weatherComparison(onFloors, 'klima', true, {interactive: true, closedRooms: ['Bad']});
 const averages = R.weatherComparison(rooms, 'klima', true, {avgOnly: true});
 const unchanged = R.weatherComparison(flat, 'klima', true);
 const flatAvg = R.weatherComparison(flat, 'klima', true, {avgOnly: true});
@@ -202,6 +203,9 @@ console.log(JSON.stringify({
   floorHeads: floorHeads(floorsOpen), floorRoomHeads: heads(floorsOpen), floorToggles: count(floorsOpen, 'data-floor='),
   closedFloorHeads: floorHeads(floorsClosed), closedRoomHeads: heads(floorsClosed), closedMarked: count(floorsClosed, 'is-closed'),
   cardToggles: count(floorsCard, 'data-floor='), cardFloorHeads: floorHeads(floorsCard), noFloorHeads: floorHeads(grouped),
+  roomToggles: count(floorsOpen, 'data-room='), cardRoomToggles: count(floorsCard, 'data-room='),
+  roomRowsOpen: count(floorsOpen, '<th scope="row">'), roomRowsClosed: count(roomsClosed, '<th scope="row">'),
+  closedRoomMarked: count(roomsClosed, 'is-closed'), closedRoomStillListed: heads(roomsClosed),
   basisUntouched: R.weatherComparison({...rooms, rows: rooms.rows.map((r) => ({...r, key: 'temperature'}))}, 'basis', true, {avgOnly: true}).includes('Max'),
 }));
 """
@@ -246,6 +250,14 @@ def test_closed_floors_hide_their_rooms_and_the_card_gets_headers_without_button
     assert output["closedRoomHeads"] == ["Keller", "Küche"]
     assert output["closedMarked"] == 2
     assert output["cardToggles"] == 0 and output["cardFloorHeads"] == output["floorHeads"]
+
+
+def test_a_closed_room_keeps_its_header_and_hides_its_rows(output) -> None:
+    assert output["roomToggles"] == 4 and output["cardRoomToggles"] == 0
+    assert output["closedRoomStillListed"] == ["Bad", "Keller", "Küche", "Ohne Raum"]
+    assert output["closedRoomMarked"] == 1
+    # Bad hat zwei Sensoren (Temperatur, Feuchte) mit je drei Zeilen
+    assert output["roomRowsOpen"] - output["roomRowsClosed"] == 2 * 3
 
 
 def test_without_floors_there_are_no_floor_headers(output) -> None:

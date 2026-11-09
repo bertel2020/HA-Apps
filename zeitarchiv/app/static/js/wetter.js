@@ -197,6 +197,7 @@
       roomsOff: [],
       // Eingeklappte Etagen in der Tabelle „Zeiträume im Vergleich“ (Namen).
       floorsClosed: [],
+      roomsClosed: [],
       tempDays: 30,
       tempError: '',
       monthly: null,
@@ -270,6 +271,7 @@
         if (typeof saved.avgOnly === 'boolean') this.avgOnly = saved.avgOnly;
         if (Array.isArray(saved.roomsOff)) this.roomsOff = saved.roomsOff.filter((name) => typeof name === 'string');
         if (Array.isArray(saved.floorsClosed)) this.floorsClosed = saved.floorsClosed.filter((name) => typeof name === 'string');
+        if (Array.isArray(saved.roomsClosed)) this.roomsClosed = saved.roomsClosed.filter((name) => typeof name === 'string');
         if (['5', '10', 'all'].includes(saved.kenntageRange)) this.kenntageRange = saved.kenntageRange;
         if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
         // Ausgeblendete Karten fehlen im Dokument: der erste vorhandene Reiter ist der Start, Diagramme ohne Karte laden nicht.
@@ -347,21 +349,28 @@
         if (lastTable) this.paintTables(lastTable);
       },
 
-      // Klick oder Enter auf den Kopf einer Etage klappt sie ein oder aus; ein Handler je Tabelle genügt, sie wird neu gezeichnet.
+      // Klick oder Enter auf den Kopf einer Etage oder eines Raums klappt ihn ein oder aus; ein Handler je Tabelle genügt, sie wird neu gezeichnet.
       bindFloors(table) {
         if (table._floorsBound) return;
         table._floorsBound = true;
         const toggle = (event) => {
-          const head = event.target.closest('[data-floor]');
+          const head = event.target.closest('[data-floor], [data-room]');
           if (!head) return;
           if (event.type === 'keydown') {
             if (event.key !== 'Enter' && event.key !== ' ') return;
             event.preventDefault();
           }
-          this.toggleFloor(head.dataset.floor);
+          if (head.dataset.room !== undefined) this.toggleTableRoom(head.dataset.room);
+          else this.toggleFloor(head.dataset.floor);
         };
         table.addEventListener('click', toggle);
         table.addEventListener('keydown', toggle);
+      },
+
+      toggleTableRoom(name) {
+        this.roomsClosed = this.roomsClosed.includes(name) ? this.roomsClosed.filter((n) => n !== name) : [...this.roomsClosed, name];
+        writeStore({roomsClosed: this.roomsClosed});
+        if (lastTable) this.paintTables(lastTable);
       },
 
       toggleFloor(name) {
@@ -381,7 +390,7 @@
           const table = this.$refs[refName('table', group)];
           const wrap = this.$refs[refName('tableWrap', group)];
           if (!table) continue;
-          table.innerHTML = renderTable(data, group, this.diff, {avgOnly: this.avgOnly, closedFloors: this.floorsClosed, interactive: true});
+          table.innerHTML = renderTable(data, group, this.diff, {avgOnly: this.avgOnly, closedFloors: this.floorsClosed, closedRooms: this.roomsClosed, interactive: true});
           this.bindFloors(table);
           // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
           wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1);

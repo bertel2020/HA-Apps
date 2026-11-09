@@ -2460,10 +2460,10 @@ button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
 .wt-room-item{display:contents;}
 .wt-room-floor{flex:0 0 100%;font-size:calc(11px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);margin-top:2px;}
 .wt-table tr.wt-floor th{font-size:calc(12px * var(--font-scale, 1));font-weight:600;color:var(--ink);text-align:left;padding:8px 10px;background:var(--surface-alt);border-bottom:1px solid var(--border-strong);white-space:nowrap;}
-.wt-table tr.wt-floor.is-toggle th{cursor:pointer;}
-.wt-table tr.wt-floor.is-toggle th:focus-visible{outline:2px solid var(--accent-line);outline-offset:-2px;}
+.wt-table tr.is-toggle th{cursor:pointer;}
+.wt-table tr.is-toggle th:focus-visible{outline:2px solid var(--accent-line);outline-offset:-2px;}
 .wt-floor-chev{display:inline-block;color:var(--ink-muted);transition:transform .15s;}
-.wt-floor.is-closed .wt-floor-chev{transform:rotate(-90deg);}
+.wt-floor.is-closed .wt-floor-chev,.wt-room.is-closed .wt-floor-chev{transform:rotate(-90deg);}
 .wt-room-chip:focus-visible,.wt-room-all:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px;}
 .wt-seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
 .wt-seg button{background:var(--surface);border:0;padding:5px 12px;font:inherit;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);cursor:pointer;}
