@@ -475,6 +475,15 @@
     .dashboard-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
     .dtile[data-grid-cols="3"]{grid-column:span 2;}
   }
+  /* Tablet im Präzisen Modus: .dashboard-grid.is-precise (6 Spalten) ist spezifischer als die
+     2-Spalten-Regel oben und blieb deshalb auch hier bei sechs schmalen Spalten. Vier Spalten
+     entsprechen den zwei des normalen Modus (eine Spalte = zwei präzise); Spannen über 4 würden
+     implizite Spalten anlegen. Nur ab 521px, damit der Block darunter (eine Spalte) weiter gewinnt. */
+  @media (min-width:521px) and (max-width:820px){
+    .dashboard-grid.is-precise{grid-template-columns:repeat(4,minmax(0,1fr));}
+    .dashboard-grid.is-precise .dtile[data-grid-cols="3"]{grid-column:span 3;}
+    .dashboard-grid.is-precise .dtile[data-grid-cols="5"],.dashboard-grid.is-precise .dtile[data-grid-cols="6"]{grid-column:span 4;}
+  }
   @media (max-width:520px){
     /* Im Präzisen Modus überschreibt die spezifischere Desktop-Regel sonst
        die mobile Einspalten-Darstellung; auch die Hinzufügen-Kachel behielte

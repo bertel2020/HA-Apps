@@ -82,3 +82,19 @@ def test_setting_is_part_of_the_selective_restore() -> None:
 
     assert "page_layout" in dict(GENERAL_SETTINGS)
     assert (APP / "main.py").read_text(encoding="utf-8").count("page_layout.") >= 3
+
+
+def test_precise_mode_uses_four_columns_on_tablets() -> None:
+    """Phase 2: zwischen 521 und 820px nicht sechs schmale Spalten, in beiden Kopien der Rasterregeln."""
+    blocks = []
+    for name in ("dashboard_detail.css", "entities.css"):
+        css = (PAGE_CSS / name).read_text(encoding="utf-8")
+        start = css.index("@media (min-width:521px) and (max-width:820px){")
+        block = css[start: css.index("\n  }", start)]
+        assert ".dashboard-grid.is-precise{grid-template-columns:repeat(4,minmax(0,1fr));}" in block
+        spans = [int(n) for n in re.findall(r"grid-column:span (\d+)", block)]
+        assert spans and max(spans) <= 4, name
+        # Der Block für Telefone (eine Spalte) bleibt unverändert und kommt danach.
+        assert css.index("@media (max-width:520px){", start) > start
+        blocks.append(block)
+    assert blocks[0] == blocks[1]
