@@ -2153,7 +2153,7 @@
         this.drawHeat();
       },
 
-      // Wärmste und kälteste Periode für Kopfsatz und Tabelle: running = die laufende Heizperiode.
+      // Wärmste und kälteste Periode für die Tabelle: running = die laufende Heizperiode.
       heatPeriodInfo() {
         const periods = this.heatPeriods();
         const current = WetterHeating.currentPeriod(this.heat.today);
@@ -2161,48 +2161,6 @@
         const running = WetterHeating.MONTHS.includes(month);
         const complete = periods.filter((p) => !running || p !== current);
         return {periods, current, running, complete};
-      },
-
-      heatHeadline() {
-        if (!this.heat) return '';
-        const o = this.heatOpts();
-        const info = this.heatPeriodInfo();
-        const q = (period) => {
-          const [from, to] = WetterHeating.periodRange(period);
-          return WetterHeating.stat(this.heat.days, o, from, to).q;
-        };
-        let text = '';
-        if (info.complete.length) {
-          const latest = info.complete[0];
-          const a = q(latest);
-          const b = info.complete[1] != null ? q(info.complete[1]) : null;
-          if (a != null && b != null) {
-            const change = (a / b - 1) * 100;
-            const values = {period: WetterHeating.label(latest), value: num(a, 2), percent: num(Math.abs(change), 0), other: WetterHeating.label(info.complete[1]), before: num(b, 2)};
-            text = Math.round(Math.abs(change)) === 0
-              ? t('Heizperiode {period}: {value} kWh je Gradtag, genauso viel wie {other} ({before})', values)
-              : change < 0
-                ? t('Heizperiode {period}: {value} kWh je Gradtag, {percent} % weniger als {other} ({before})', values)
-                : t('Heizperiode {period}: {value} kWh je Gradtag, {percent} % mehr als {other} ({before})', values);
-          } else if (a != null) {
-            text = t('Heizperiode {period}: {value} kWh je Gradtag', {period: WetterHeating.label(latest), value: num(a, 2)});
-          }
-        }
-        if (info.running) {
-          const cut = WetterHeating.cutRange(info.current, this.heat.today);
-          const now = WetterHeating.stat(this.heat.days, o, cut.from, cut.to);
-          const earlier = info.complete[0] != null ? WetterHeating.cutRange(info.complete[0], this.heat.today) : null;
-          const before = earlier ? WetterHeating.stat(this.heat.days, o, earlier.from, earlier.to) : null;
-          if (now.q != null && before && before.q != null) {
-            const change = (now.q / before.q - 1) * 100;
-            const part = t('{period} bisher {value} kWh je Gradtag ({percent} % {direction} als im gleichen Ausschnitt von {other})', {
-              period: WetterHeating.label(info.current), value: num(now.q, 2), percent: num(Math.abs(change), 0),
-              direction: change < 0 ? t('weniger') : t('mehr'), other: WetterHeating.label(info.complete[0]),
-            });
-            text = text ? `${text}. ${part}` : part;
-          }
-        }
-        return text || t('Noch nicht genug Heiztage für einen Vergleich.');
       },
 
       // Kacheln über dem Streudiagramm: Verbrauch, kWh je Gradtag, Gradtagzahl und Heiztage der gewählten Heizperiode.

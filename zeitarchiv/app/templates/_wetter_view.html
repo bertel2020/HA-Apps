@@ -540,7 +540,6 @@
         <label class="wt-check" x-show="heat" x-cloak>{{ _("Heizgrenze") }}
           <input type="text" class="wt-num" x-model="heatLimit" @input="drawHeat()" inputmode="decimal" size="3"> °C</label>
       </div>
-      <p class="wt-headline" x-show="heat" x-text="heatHeadline()"></p>
     </div>
     <div class="wt-kpis" x-show="heatKpis().length" x-cloak :style="'--wt-cols:' + kpiCols(heatKpis().length)">
       <template x-for="kpi in heatKpis()" :key="kpi.label">
