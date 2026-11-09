@@ -4270,6 +4270,8 @@
     "Serie einblenden": "Show series",
     "Serie ausblenden": "Hide series",
     "Versatz ({unit})": "Offset ({unit})",
+    "Die Beschriftung sagt „{name}“, der Zeitraum ist aber {type}.": "The label says \"{name}\", but the period is {type}.",
+    "Auf {name} stellen": "Set to {name}",
     "Spalte einblenden": "Show column",
     "Spalte ausblenden": "Hide column",
     "Zeile einblenden": "Show row",

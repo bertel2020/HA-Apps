@@ -112,6 +112,9 @@
   - Zeigt den zuletzt erfassten Wert des Zeitraums statt Durchschnitt, Min, Max
     oder Summe, z. B. den Akkustand wie auf dem Desktop
   - Steht die Spalte auf „Auto“, gelten die Nachkommastellen der Entität
+  - Tabelleneditor: Nennt die Beschriftung einer Spalte einen anderen Zeitraum
+    als der Zeitraum-Typ (z. B. „Tag“ bei Stunde), erscheint ein Hinweis mit
+    Link zum Umstellen
 
 ### Geändert
 
@@ -255,6 +258,8 @@
   - Shows the last recorded value of the period instead of average, min, max
     or sum, e.g. the battery level as on the desktop
   - If the column is set to "Auto", the entity's decimal places apply
+  - Table editor: If a column's label names a different period than its period
+    type (e.g. "Day" on Hour), a hint with a link to switch it appears
 
 #### Changed
 

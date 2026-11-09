@@ -84,6 +84,16 @@
       return UNIT_PLURAL_SIMPLE[col.range_key] || t('Perioden');
     }
 
+    // Beschriftung nennt einen Zeitraum (Stunde, Tag, …), der Zeitraum-Typ ist ein anderer:
+    // liefert den Schlüssel, den die Beschriftung meint, sonst null. Rein ein Hinweis im Editor,
+    // gespeichert und berechnet wird die Spalte wie eingestellt.
+    function rangeLabelMismatch(col) {
+      const label = (col.label || '').trim().toLowerCase();
+      if (!label) return null;
+      const hit = Object.entries(RANGE_LABELS).find(([, name]) => name.toLowerCase() === label);
+      return hit && hit[0] !== col.range_key ? hit[0] : null;
+    }
+
     // Namensvorschlag für eine Entität-Zeile ohne eigene Beschriftung — der
     // friendly_name der gewählten Entität. Gruppen/Formeln haben keine
     // einzelne Entität, die dafür herhalten könnte, deshalb dort kein
@@ -621,6 +631,7 @@
           return '';
         },
         versatzUnit(col) { return versatzUnit(col); },
+        rangeLabelMismatch(col) { return rangeLabelMismatch(col); },
         insertColumnVariable(col, token, inputEl) { insertColumnVariable(col, token, inputEl); },
         clampOffset(col) { if (col.offset > 0) col.offset = 0; },
         // Tatsächlich angezeigter/gespeicherter Name — eigene Beschriftung,

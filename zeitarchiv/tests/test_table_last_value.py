@@ -69,3 +69,11 @@ def test_last_value_and_entity_decimals_in_the_browser() -> None:
     assert entity_decimals == "89 %"  # Spalte "Auto": Entität sagt 0 Stellen
     assert column_wins == "89.0 %"  # eigene Spalten-Einstellung hat Vorrang
     assert standard == "89.04 %"  # beides "Auto": bisherige Standardformatierung
+
+
+def test_editor_hints_when_the_label_names_another_period() -> None:
+    editor_js = (APP / "static/js/pages/table_editor.js").read_text(encoding="utf-8")
+    editor = (APP / "templates/table_editor.html").read_text(encoding="utf-8")
+    assert "function rangeLabelMismatch(col)" in editor_js
+    assert 'x-show="rangeLabelMismatch(col)"' in editor
+    assert "Auf {name} stellen" in editor

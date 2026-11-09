@@ -58,6 +58,15 @@
     display:block;font-family:var(--font-mono);font-size:calc(10px * var(--font-scale, 1));text-transform:uppercase;letter-spacing:.04em;
     color:var(--ink-faint);margin-bottom:-3px;
   }
+  /* Hinweis, wenn die Beschriftung einen anderen Zeitraum nennt als der Zeitraum-Typ (nur Editor). */
+  .tbl-range-hint{
+    display:block;background:var(--warning-soft);color:var(--warning);border-radius:6px;padding:6px 8px;
+    font-size:calc(11.5px * var(--font-scale, 1));line-height:1.4;
+  }
+  .tbl-range-hint-fix{
+    display:inline;background:none;border:0;padding:0;margin-left:4px;font:inherit;font-weight:600;color:inherit;
+    text-decoration:underline;cursor:pointer;
+  }
   .tbl-col-top{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;}
   /* Ziehgriff + Nummer als EIN Flex-Kind, statt beide lose neben den
      Aktions-Buttons zu setzen — sonst verteilt justify-content:space-between

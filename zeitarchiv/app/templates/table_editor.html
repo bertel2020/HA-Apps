@@ -90,6 +90,12 @@
                       </template>
                     </div>
                   </span>
+                  <span class="tbl-range-hint" role="note" x-show="rangeLabelMismatch(col)" x-cloak>
+                    <span x-text="t('Die Beschriftung sagt „{name}“, der Zeitraum ist aber {type}.', {name: RANGE_LABELS[rangeLabelMismatch(col)], type: RANGE_LABELS[col.range_key]})"></span>
+                    <button type="button" class="tbl-range-hint-fix"
+                            @click="col.range_key = rangeLabelMismatch(col); clampOffset(col); load()"
+                            x-text="t('Auf {name} stellen', {name: RANGE_LABELS[rangeLabelMismatch(col)]})"></button>
+                  </span>
                   <span class="tbl-field-label" x-text="t('Versatz ({unit})', {unit: versatzUnit(col)})"></span>
                   <input type="number" max="0" x-model.number="col.offset" @change="clampOffset(col); load()">
                   <label class="cbx">
