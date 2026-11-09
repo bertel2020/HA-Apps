@@ -31,7 +31,7 @@ also genau die Dateien, die auch eine echte Instanz anlegen würde.
 
 Die Tabellen unten nennen die deutschen `entity_id`s; mit `--language en` heißen sie wie der englische Name (`sensor.demo_gesamtwirkleistung` → `sensor.demo_total_active_power`).
 
-85 Entitäten, thematisch ein einzelner Haushalt mit Dach-PV-Anlage
+97 Entitäten, thematisch ein einzelner Haushalt mit Dach-PV-Anlage
 (inkl. Ertrags-Prognose), Wallbox, einem zusätzlichen Balkonkraftwerk mit
 eigenem Speicher, einem größeren Heimspeicher an der Dachanlage und der
 Netz-CO2-Intensität, alle mit dem Präfix `demo_` in der Entity-ID (leicht
@@ -117,6 +117,10 @@ wiederzuerkennen und gezielt löschbar):
 | `sensor.demo_helligkeit_daemmerung` | Standard | lx | Wetterdashboard (Tageslichtkurve, Wetterlage): 0 bis 1.000 lx in 4er-Stufen, Rampe über rund 80 Minuten um Sonnenauf- und -untergang; dichte Bewölkung dämpft sie, „Tag ab 400 lx“ beginnt dann später |
 | `sensor.demo_windrichtung` | Standard | ° | Wetterdashboard (Wetterlage): Herkunft des Windes, meist Südwest bis West, je Tag ein anderer Schwerpunkt, tagsüber eine langsame Drehung; ganzzahlig |
 | `sensor.demo_sonnenhoehe` | Standard | ° | Wetterdashboard (Tageslicht): Sonnenhöhe über dem Horizont für 48° Breite, negativ in der Nacht; für die Rolle „Sonnenhöhe“. Für „PV und Helligkeit“ dient die vorhandene `sensor.demo_pv_leistung` |
+| `sensor.demo_schlafzimmer_temperatur` / `_luftfeuchte` | Standard | °C / % | Wetterdashboard, „Temperatur & Klima“ (Raum „Schlafzimmer“): kühl (etwa 17 bis 20 °C), nachts etwas feuchter (etwa 45 bis 60 %) |
+| `sensor.demo_kueche_temperatur` / `_luftfeuchte` | Standard | °C / % | Raum „Küche“: Spitzen zu den Mahlzeiten (Frühstück am Wochenende später), Dampf zieht nach dem Abendessen langsam ab |
+| `sensor.demo_bad_temperatur` / `_luftfeuchte` | Standard | °C / % | Raum „Bad“: Duschspitzen morgens (am Wochenende später) und abends, Feuchte kurz bis über 80 % |
+| `sensor.demo_keller_temperatur` / `_luftfeuchte` | Standard | °C / % | Raum „Keller“: träge Jahreskurve (etwa 11 bis 17 °C), im Sommer deutlich feuchter (etwa 55 bis 72 %) |
 
 Waschmaschine, Spülmaschine, Trockner und Wallbox haben je zwei bzw. drei
 Entitäten — Momentanleistung (W), Energiezähler (kWh) und bei den drei
@@ -234,7 +238,7 @@ cd addon
 .venv/bin/python3 scripts/generate_demo_data.py --data-dir /pfad/zum/datenverzeichnis
 ```
 
-Erzeugt mit den Standardwerten 6 Monate Historie für alle 85 Demo-
+Erzeugt mit den Standardwerten 6 Monate Historie für alle 97 Demo-
 Entitäten in einem frischen (oder leeren) Zielverzeichnis.
 
 Weitere Beispiele:
@@ -308,7 +312,7 @@ Fall dringend empfohlen.
 
 ## Demo-Daten neu erzeugen (`--clean`)
 
-`--clean` bereinigt vor dem Neuschreiben die Werte aller 85 `demo_*`-
+`--clean` bereinigt vor dem Neuschreiben die Werte aller 97 `demo_*`-
 Entitäten — wie **Housekeeping → Speicherplatz** in der App, nur für alle
 Demo-Entitäten auf einmal, ohne die App zu öffnen. Bewusst
 `delete_all_values()` statt `delete_entity()`: die Entitäten selbst bleiben
@@ -399,6 +403,13 @@ Monate an Daten neu zu berechnen:
   startet `pv_prognose_rest_heute` mit einer frischen Tagesschätzung statt
   exakt dort weiterzumachen, wo der letzte Lauf aufgehört hat. Kosmetischer
   Sprung, kein Zählersprung.
+- Die Raum-Sensoren (`sensor.demo_schlafzimmer_…`, `_kueche_…`, `_bad_…`, `_keller_…`, je Temperatur und Feuchte) fehlen
+  in Demo-Instanzen, die vor ihnen angelegt wurden. Ein `--append`-Lauf (bzw. „Jetzt ergänzen“ im Demo-Modus) trägt
+  sie mit 36 Monaten Historie nach, auch wenn sonst nichts zu ergänzen wäre; vorhandene laufen wie die übrigen
+  Reihen weiter. Das Wetter dieser nachgetragenen Zeit ist unabhängig vom Wetter der übrigen Reihen (die Kopplung an die
+  Außentemperatur ist lose und fällt nicht auf). Bei voller Erzeugung bekommen sie wie die übrigen Wetter-Reihen
+  `--weather-months`. Der Demo-Modus der App ordnet sie den Räumen „Schlafzimmer“, „Küche“, „Bad“, „Keller“ und
+  „Wohnzimmer“ zu (Wetterdashboard, „Zeiträume im Vergleich“ auf „Temperatur & Klima“).
 - `sensor.demo_strompreis_dynamisch` fehlt in Demo-Instanzen, die vor dieser
   Entität angelegt wurden. Ein `--append`-Lauf (bzw. „Jetzt ergänzen“ im
   Demo-Modus) erzeugt den Preisverlauf deshalb rückwirkend ab dem Beginn der

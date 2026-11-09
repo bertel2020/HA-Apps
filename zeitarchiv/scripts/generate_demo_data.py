@@ -28,6 +28,10 @@ knüpfen dabei an ihren zuletzt gespeicherten Wert an (kein Zählersprung/
 import_rows() ohnehin dedupliziert, ein Sicherheitsabstand ist also
 unkritisch. Ohne vorhandene Demo-Daten fällt --append automatisch auf eine
 normale Vollerzeugung (--months) zurück.
+
+Fehlen in der vorhandenen Demo die Raum-Sensoren für „Temperatur & Klima“ (sensor.demo_schlafzimmer_…,
+_kueche_…, _bad_…, _keller_…, je Temperatur und Feuchte), trägt --append sie mit 36 Monaten Historie nach
+(auch wenn sonst nichts zu ergänzen wäre); vorhandene laufen normal weiter.
 """
 
 from __future__ import annotations

@@ -49,7 +49,7 @@ def test_the_most_specific_entry_wins(language) -> None:
 def test_unknown_texts_and_empty_values_stay_untouched(language) -> None:
     language("en")
     assert i18n.retranslate("sensor.x: [Errno 2] No such file or directory") == "sensor.x: [Errno 2] No such file or directory"
-    assert i18n.retranslate("Wohnzimmer Temperatur") == "Wohnzimmer Temperatur"
+    assert i18n.retranslate("Gartenhaus Temperatur") == "Gartenhaus Temperatur"
     assert i18n.retranslate("") == ""
     assert i18n.retranslate(None) is None
 

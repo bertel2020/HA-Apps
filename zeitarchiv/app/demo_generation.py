@@ -21,7 +21,7 @@ import contextvars
 import math
 import random
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -85,6 +85,22 @@ WEATHER_HISTORY_KEYS = {
     "sensor.demo_helligkeit_daemmerung": "helligkeit_daemmerung", "sensor.demo_windrichtung": "windrichtung",
     "sensor.demo_sonnenhoehe": "sonnenhoehe",
 }
+#: Räume für „Temperatur & Klima“ im Wetterdashboard (ROADMAP 1.51): je Raum ein Temperatur- und ein Feuchtesensor, zusätzlich zum
+#: Wohnzimmer. Schlüssel -> deutsche Raumnamen für die Anzeigenamen. Die Entitäten stehen am Ende von DEMO_ENTITIES.
+ROOM_NAMES = {"schlafzimmer": "Schlafzimmer", "kueche": "Küche", "bad": "Bad", "keller": "Keller"}
+ROOM_ENTITY_IDS = tuple(
+    f"sensor.demo_{room}_{kind}" for room in ROOM_NAMES for kind in ("temperatur", "luftfeuchte")
+)
+#: Entität -> Schlüssel in ``simulate_rooms()``.
+ROOM_SERIES_KEYS = {
+    f"sensor.demo_{room}_{kind}": f"{room}_{'temp' if kind == 'temperatur' else 'feuchte'}"
+    for room in ROOM_NAMES for kind in ("temperatur", "luftfeuchte")
+}
+#: Historie der Raum-Sensoren in Monaten, wenn sie in einer bestehenden Demo fehlen: ``--append`` trägt sie so weit zurück
+#: nach (mindestens drei Jahre; die Auswertungen über mehrere Jahre brauchen mehr als die Zeit seit dem letzten Lauf).
+#: Bei voller Erzeugung gilt wie für die übrigen Wetter-Reihen ``weather_months``.
+ROOM_HISTORY_MONTHS = 36
+
 #: Zähler, die an der Nahtstelle zwischen langer Vorgeschichte und normalem Zeitraum nahtlos weiterlaufen müssen.
 _WEATHER_SEAM_COUNTERS = ("niederschlag", "waermepumpe_energie", "heizstab_energie", "konvektoren_energie")
 
@@ -302,6 +318,15 @@ DEMO_ENTITIES = [
     # „PV und Helligkeit“ ist die vorhandene sensor.demo_pv_leistung.
     DemoEntity("sensor.demo_windrichtung", "Demo Windrichtung", "sensor", "measurement", "°"),
     DemoEntity("sensor.demo_sonnenhoehe", "Demo Sonnenhöhe", "sensor", "measurement", "°"),
+    # Räume für „Temperatur & Klima“ (ROADMAP 1.51), wieder am Ende: Die Zufallsfolge der früheren Entitäten bleibt gleich.
+    DemoEntity("sensor.demo_schlafzimmer_temperatur", "Demo Schlafzimmer Temperatur", "sensor", "measurement", "°C"),
+    DemoEntity("sensor.demo_schlafzimmer_luftfeuchte", "Demo Schlafzimmer Luftfeuchte", "sensor", "measurement", "%"),
+    DemoEntity("sensor.demo_kueche_temperatur", "Demo Küche Temperatur", "sensor", "measurement", "°C"),
+    DemoEntity("sensor.demo_kueche_luftfeuchte", "Demo Küche Luftfeuchte", "sensor", "measurement", "%"),
+    DemoEntity("sensor.demo_bad_temperatur", "Demo Bad Temperatur", "sensor", "measurement", "°C"),
+    DemoEntity("sensor.demo_bad_luftfeuchte", "Demo Bad Luftfeuchte", "sensor", "measurement", "%"),
+    DemoEntity("sensor.demo_keller_temperatur", "Demo Keller Temperatur", "sensor", "measurement", "°C"),
+    DemoEntity("sensor.demo_keller_luftfeuchte", "Demo Keller Luftfeuchte", "sensor", "measurement", "%"),
 ]
 
 
@@ -1736,6 +1761,107 @@ def write_entity(
         import_rows(data_dir, index, current_rows, entity_id, tz, source_label="demo", accepts_state=True)
 
 
+def _hour_gap(hour: float, center: float) -> float:
+    """Abstand zweier Uhrzeiten über Mitternacht hinweg, in Stunden (negativ = vor der Mitte)."""
+    return (hour - center + 12) % 24 - 12
+
+
+def _peak(hour: float, center: float, width: float, tail: float | None = None) -> float:
+    """Spitze um ``center``: glockenförmig, mit ``tail`` fällt sie nach der Mitte langsamer ab (Dampf zieht nur langsam ab)."""
+    gap = _hour_gap(hour, center)
+    if tail is not None and gap > 0:
+        return math.exp(-gap / tail)
+    return math.exp(-0.5 * (gap / width) ** 2)
+
+
+def gen_room_values(room: str, dt: datetime, outdoor: float, rng: random.Random) -> tuple[float, float]:
+    """Temperatur und relative Feuchte eines Raums zum Zeitpunkt ``dt``. ``outdoor`` ist die Außentemperatur ohne Rauschen.
+
+    Schlafzimmer: kühl, nachts etwas feuchter. Küche: Spitzen zu den Mahlzeiten. Bad: Duschspitzen morgens (am Wochenende
+    später) und abends, Feuchte bis über 80 %. Keller: träge Jahreskurve, im Sommer feuchter."""
+    hour = dt.hour + dt.minute / 60
+    doy = dt.timetuple().tm_yday
+    weekend = dt.weekday() >= 5
+    summer = math.cos(2 * math.pi * (doy - 200) / 365)
+    damp = 0.18 * (outdoor - 9.0)  # lose Kopplung an das Wetter: im Winter trockener
+    if room == "schlafzimmer":
+        temp = 18.2 + 0.9 * summer + 0.7 * math.cos(2 * math.pi * (hour - 21) / 24) + rng.uniform(-0.2, 0.2)
+        humidity = 51.0 + 4.0 * summer + damp + 4.5 * _peak(hour, 3.0, 3.5) + rng.uniform(-1.5, 1.5)
+    elif room == "kueche":
+        morning = 9.0 if weekend else 7.6
+        cooking = 1.8 * _peak(hour, morning, 0.5, 0.8) + 1.2 * _peak(hour, 12.4, 0.5, 0.8) + 2.4 * _peak(hour, 18.3, 0.6, 1.0)
+        steam = 8.0 * _peak(hour, morning, 0.4, 0.8) + 6.0 * _peak(hour, 12.4, 0.4, 0.8) + 13.0 * _peak(hour, 18.3, 0.5, 1.0)
+        temp = 21.4 + 0.8 * summer + cooking + rng.uniform(-0.2, 0.2)
+        humidity = 49.0 + 3.0 * summer + damp + steam + rng.uniform(-1.5, 1.5)
+    elif room == "bad":
+        shower = 8.3 if weekend else 6.9
+        temp = 22.0 + 0.7 * summer + 2.6 * _peak(hour, shower, 0.45, 0.9) + 2.2 * _peak(hour, 21.0, 0.6, 1.0) + rng.uniform(-0.2, 0.2)
+        humidity = (
+            56.0 + 3.0 * summer + damp + 27.0 * _peak(hour, shower, 0.4, 1.2) + 22.0 * _peak(hour, 21.0, 0.5, 1.2)
+            + rng.uniform(-1.5, 1.5)
+        )
+    else:  # keller
+        season = math.cos(2 * math.pi * (doy - 215) / 365)  # hinkt dem Sommer hinterher
+        temp = 14.0 + 3.6 * season + rng.uniform(-0.08, 0.08)
+        humidity = 63.0 + 9.0 * season + 0.1 * (outdoor - 9.0) + rng.uniform(-0.8, 0.8)
+    return round(temp, 2), round(max(25.0, min(95.0, humidity)), 1)
+
+
+def simulate_rooms(start: datetime, end: datetime, weather: WeatherContext, rng: random.Random) -> dict[str, list[Row]]:
+    """Alle Raum-Reihen für ``start`` bis ``end`` in einem Durchlauf (Schlüssel ``<raum>_temp`` und ``<raum>_feuchte``).
+
+    Bewusst unabhängig von ``simulate_household()``: eigener Zufallsstrom, damit die Werte der übrigen Entitäten für
+    denselben Seed unverändert bleiben. ``weather`` muss die Tage von ``start`` bis ``end`` kennen."""
+    series: dict[str, list[Row]] = {f"{room}_{part}": [] for room in ROOM_NAMES for part in ("temp", "feuchte")}
+    for dt in _time_range(start, end, CONTINUOUS_STEP_MINUTES):
+        ts = dt.timestamp()
+        outdoor = _outdoor_temp_at(dt, weather)
+        for room in ROOM_NAMES:
+            temp, humidity = gen_room_values(room, dt, outdoor, rng)
+            series[f"{room}_temp"].append((ts, temp))
+            series[f"{room}_feuchte"].append((ts, humidity))
+    return series
+
+
+def room_rows_for(
+    ids: Sequence[str], start: datetime, now: datetime, weather: WeatherContext | None, weather_from: datetime | None,
+) -> dict[str, list[Row]]:
+    """Zeilen der gewünschten Raum-Entitäten von ``start`` bis ``now``. Reicht der Wetterkontext der Demo (``weather``,
+    gültig ab ``weather_from``) so weit zurück, läuft das Wetter durch; sonst bekommt der Zeitraum einen eigenen."""
+    if not ids:
+        return {}
+    if weather is None or weather_from is None or weather_from > start:
+        weather = WeatherContext(start, now, random.Random(int(start.timestamp()) + 11))
+    series = simulate_rooms(start, now, weather, random.Random(int(start.timestamp()) + 3))
+    return {entity_id: series[ROOM_SERIES_KEYS[entity_id]] for entity_id in ids}
+
+
+def missing_room_ids(index: Index, language: str) -> list[str]:
+    """Raum-Entitäten, die in dieser Demo noch keine Werte haben (eine ältere Demo kennt sie nicht)."""
+    missing = []
+    for entity_id in ROOM_ENTITY_IDS:
+        entity = index.get_entity(localized_id(entity_id, language))
+        if entity is None or entity["last_ts"] is None:
+            missing.append(entity_id)
+    return missing
+
+
+def backfill_rooms(
+    data_dir: Path, index: Index, tz: ZoneInfo, now: datetime, language: str, rng: random.Random, missing: Sequence[str],
+) -> int:
+    """Schreibt die fehlenden Raum-Entitäten mit ihrer Historie (``ROOM_HISTORY_MONTHS``), wenn sonst nichts zu ergänzen ist.
+    Gibt die Zahl der Zeilen zurück."""
+    rows_by_id = room_rows_for(missing, now - timedelta(days=ROOM_HISTORY_MONTHS * 30), now, None, None)
+    boundary = month_start(now).timestamp()
+    total = 0
+    for entity in DEMO_ENTITIES:
+        if entity.entity_id in rows_by_id:
+            rows = inject_data_quality_issues(entity, rows_by_id[entity.entity_id], rng, boundary)
+            write_entity(data_dir, index, tz, entity, rows, language)
+            total += len(rows)
+    return total
+
+
 # Kategorien der Demo (ROADMAP 1.42), in der Reihenfolge der Liste. Zugeordnet wird
 # nach dem Namensteil der Entitäts-ID, ohne Domain; was keine Regel trifft (Heizung,
 # Wasserzähler, Anwesenheit, Migrationspaare), bleibt ohne Kategorie.
@@ -2026,6 +2152,7 @@ def run_generation(
 
     fell_back_to_full_history = False
     price_backfill_start: datetime | None = None
+    missing_rooms: list[str] = []
     if append:
         anchor = index.get_entity(localized_id(APPEND_ANCHOR_ENTITY_ID, language))
         if anchor is None or anchor["last_ts"] is None:
@@ -2051,18 +2178,32 @@ def run_generation(
                     datetime.fromtimestamp(anchor["first_ts"], tz) if anchor["first_ts"] is not None
                     else now - timedelta(days=months * 30)
                 )
+            # Raum-Sensoren, die eine ältere Demo noch nicht kennt: sie bekommen ihre Historie nachgetragen.
+            missing_rooms = missing_room_ids(index, language)
             if start >= now and price_backfill_start is not None:
                 price_entity_def = next(e for e in DEMO_ENTITIES if e.entity_id == DYNAMIC_PRICE_ENTITY_ID)
                 price_rows = gen_dynamic_price(price_backfill_start, now, tz)
                 write_entity(data_dir, index, tz, price_entity_def, price_rows, language)
-                report = reconcile.audit_storage_metadata(
-                    data_dir, index, tz, entity_ids=[localized_id(DYNAMIC_PRICE_ENTITY_ID, language)], repair=True,
-                )
+                room_row_count = backfill_rooms(data_dir, index, tz, now, language, rng, missing_rooms)
+                audited = [localized_id(DYNAMIC_PRICE_ENTITY_ID, language)] + [localized_id(i, language) for i in missing_rooms]
+                report = reconcile.audit_storage_metadata(data_dir, index, tz, entity_ids=audited, repair=True)
                 if on_entity is not None:
                     on_entity(1, localized_id(DYNAMIC_PRICE_ENTITY_ID, language), len(price_rows))
                 return GenerationResult(
-                    entity_count=1, rows_written=len(price_rows), cleaned_count=cleaned_count,
-                    start=price_backfill_start, now=now,
+                    entity_count=1 + len(missing_rooms), rows_written=len(price_rows) + room_row_count,
+                    cleaned_count=cleaned_count, start=price_backfill_start, now=now,
+                    mismatches_repaired=len(report["mismatches"]), entities_checked=report["entities_checked"],
+                )
+            if start >= now and missing_rooms:
+                if on_status is not None:
+                    on_status(f"Die Raum-Sensoren fehlen in dieser Demo: trage {ROOM_HISTORY_MONTHS} Monate Historie nach.")
+                room_row_count = backfill_rooms(data_dir, index, tz, now, language, rng, missing_rooms)
+                report = reconcile.audit_storage_metadata(
+                    data_dir, index, tz, entity_ids=[localized_id(i, language) for i in missing_rooms], repair=True,
+                )
+                return GenerationResult(
+                    entity_count=len(missing_rooms), rows_written=room_row_count, cleaned_count=cleaned_count,
+                    start=now - timedelta(days=ROOM_HISTORY_MONTHS * 30), now=now,
                     mismatches_repaired=len(report["mismatches"]), entities_checked=report["entities_checked"],
                 )
             if start >= now:
@@ -2089,6 +2230,8 @@ def run_generation(
                         "Die Wetter-Entitäten für das Wetterdashboard fehlen in dieser Demo und starten nur ab jetzt; "
                         "für ihre Historie die Demo-Daten neu erzeugen (--clean)."
                     )
+                if missing_rooms:
+                    on_status(f"Die Raum-Sensoren fehlen in dieser Demo: trage {ROOM_HISTORY_MONTHS} Monate Historie nach.")
     else:
         start = now - timedelta(days=months * 30)
 
@@ -2144,6 +2287,17 @@ def run_generation(
         heim_seed=heim_seed, heim_heute_seed=heim_heute_seed,
         heim_online_seed=heim_online_seed,
     )
+
+    # Raum-Sensoren: bei voller Erzeugung wie die übrigen Wetter-Reihen (Standard 60 Monate, das Wetter läuft durch); bei
+    # --append laufen vorhandene weiter, fehlende bekommen ihre Historie von mindestens ROOM_HISTORY_MONTHS.
+    backfill_start = now - timedelta(days=ROOM_HISTORY_MONTHS * 30)
+    weather_from = weather_start or start
+    if not append or fell_back_to_full_history:
+        room_rows = room_rows_for(ROOM_ENTITY_IDS, weather_from, now, weather, weather_from)
+    else:
+        present_rooms = [i for i in ROOM_ENTITY_IDS if i not in missing_rooms]
+        room_rows = room_rows_for(present_rooms, start, now, weather, weather_from)
+        room_rows.update(room_rows_for(missing_rooms, backfill_start, now, weather, weather_from))
 
     rows_by_key = {
         "sensor.demo_wohnzimmer_temperatur": household["indoor_temp"],
@@ -2230,6 +2384,7 @@ def run_generation(
         "sensor.demo_helligkeit_daemmerung": household["helligkeit_daemmerung"],
         "sensor.demo_windrichtung": household["windrichtung"],
         "sensor.demo_sonnenhoehe": household["sonnenhoehe"],
+        **room_rows,
         "sensor.demo_saugroboter_status": gen_saugroboter_status(start, now, rng),
         "sensor.demo_waschmaschine_programm": gen_waschmaschine_programm(
             start, now, household["waschmaschine_an"], rng,

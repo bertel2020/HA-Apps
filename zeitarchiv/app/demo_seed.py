@@ -142,7 +142,17 @@ def _weather_config(lid, tr) -> dict:
         "pv_power": lid(_sensor("pv_leistung")),
         "extra_temperatures": [
             {"entity_id": lid(_sensor("aussentemperatur_nord")), "name": tr(N_("Nordseite"))},
-            {"entity_id": lid(_sensor("wohnzimmer_temperatur")), "name": tr(N_("Wohnzimmer"))},
+            # Räume (ROADMAP 1.51): je Raum Temperatur und Feuchte, in „Zeiträume im Vergleich“ unter dem Raum zusammengefasst.
+            {"entity_id": lid(_sensor("wohnzimmer_temperatur")), "name": tr(N_("Wohnzimmer Temperatur")), "room": tr(N_("Wohnzimmer"))},
+            {"entity_id": lid(_sensor("wohnzimmer_luftfeuchte")), "name": tr(N_("Wohnzimmer Feuchte")), "room": tr(N_("Wohnzimmer"))},
+            {"entity_id": lid(_sensor("schlafzimmer_temperatur")), "name": tr(N_("Schlafzimmer Temperatur")), "room": tr(N_("Schlafzimmer"))},
+            {"entity_id": lid(_sensor("schlafzimmer_luftfeuchte")), "name": tr(N_("Schlafzimmer Feuchte")), "room": tr(N_("Schlafzimmer"))},
+            {"entity_id": lid(_sensor("kueche_temperatur")), "name": tr(N_("Küche Temperatur")), "room": tr(N_("Küche"))},
+            {"entity_id": lid(_sensor("kueche_luftfeuchte")), "name": tr(N_("Küche Feuchte")), "room": tr(N_("Küche"))},
+            {"entity_id": lid(_sensor("bad_temperatur")), "name": tr(N_("Bad Temperatur")), "room": tr(N_("Bad"))},
+            {"entity_id": lid(_sensor("bad_luftfeuchte")), "name": tr(N_("Bad Feuchte")), "room": tr(N_("Bad"))},
+            {"entity_id": lid(_sensor("keller_temperatur")), "name": tr(N_("Keller Temperatur")), "room": tr(N_("Keller"))},
+            {"entity_id": lid(_sensor("keller_luftfeuchte")), "name": tr(N_("Keller Feuchte")), "room": tr(N_("Keller"))},
         ],
         "heating": [
             {"entity_id": lid(_sensor("waermepumpe_energie")), "name": tr(N_("Wärmepumpe"))},

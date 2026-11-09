@@ -14,6 +14,7 @@ from app.demo_generation import (
     DEMO_ENTITIES,
     SUED_LUX_MAX,
     SUED_LUX_STEP,
+    ROOM_ENTITY_IDS,
     WETTER_ENTITY_IDS,
     WeatherContext,
     build_appliance_schedules,
@@ -67,7 +68,9 @@ def test_weather_entities_are_registered_with_the_right_type_and_unit() -> None:
     assert demo_category_index("sensor.demo_niederschlag") == 5
     assert demo_category_index("sensor.demo_waermepumpe_energie") == 4
     # Neue Entitäten stehen am Ende, damit die Zufallsfolge der früheren unverändert bleibt.
-    assert [e.entity_id for e in DEMO_ENTITIES[-len(WETTER_IDS):]] == list(WETTER_IDS) == list(WETTER_ENTITY_IDS)
+    rooms = len(ROOM_ENTITY_IDS)
+    assert [e.entity_id for e in DEMO_ENTITIES[-rooms:]] == list(ROOM_ENTITY_IDS)
+    assert [e.entity_id for e in DEMO_ENTITIES[-(len(WETTER_IDS) + rooms):-rooms]] == list(WETTER_IDS) == list(WETTER_ENTITY_IDS)
 
 
 def test_english_ids_are_unique_and_translated() -> None:
