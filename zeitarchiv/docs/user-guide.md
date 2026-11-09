@@ -336,6 +336,13 @@ etwas kommt; er erscheint nur, wenn es tatsächlich etwas zu scrollen gibt.
   (⋮) Größe ändern, duplizieren (Charts/Tabellen) oder entfernen. Das
   Entfernen einer Kachel löscht nur die Platzierung, nicht das zugrunde
   liegende Chart oder die Tabelle.
+- **4 Kacheln pro Zeile:** Ist unter **Einstellungen → Darstellung** die
+  **Breite Darstellung (experimentell)** eingeschaltet, bietet der
+  Dashboard-Editor den Schalter „4 Kacheln pro Zeile“. Er gilt je Dashboard und
+  wirkt ab 1500 px Fensterbreite (im Präzisen Modus sind es dann acht Spalten);
+  darunter bleiben es drei. Gespeicherte Größen gehen beim Umschalten nicht
+  verloren: Eine 4 breite Kachel erscheint bei drei Spalten über die ganze
+  Zeile, das Größenmenü weist darauf hin.
 - **Sektionen** gliedern viele Kacheln in benannte Abschnitte: über die
   "+"-Kachel, Reiter "Sektion", einen Namen vergeben. Ein Sektionskopf lässt
   sich per Chevron ein-/ausklappen (nur lokal im Browser gemerkt) und über
@@ -3036,7 +3043,7 @@ will, lädt es vorher herunter.
 
 | Bereich | Enthält |
 | --- | --- |
-| **Darstellung** | Sprache (Automatisch/Deutsch/English — Standard Deutsch; „Automatisch“ folgt der Browsersprache; nicht übersetzte Stellen erscheinen auf Deutsch), Zahlen- und Datumsformat (Automatisch/Deutsch/English UK/English US — „Automatisch“ folgt dem Browser: `en-GB` → `1,234.5` und `07/10/2026`, `en-US` → `10/07/2026` mit 12-Stunden-Uhr, `de-*` → `1.234,5` und `07.10.2026`; unabhängig von der Sprache; CSV-Exporte und Dateinamen bleiben unverändert), Währung (Automatisch/EUR/GBP/USD/CHF — „Automatisch“ übernimmt sie aus Home Assistant, sonst Euro; Beträge werden nicht umgerechnet, nach einem Wechsel die Preise neu eintragen), Startseite (Übersicht/Energiedashboard/Wetterdashboard), Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
+| **Darstellung** | Sprache (Automatisch/Deutsch/English — Standard Deutsch; „Automatisch“ folgt der Browsersprache; nicht übersetzte Stellen erscheinen auf Deutsch), Zahlen- und Datumsformat (Automatisch/Deutsch/English UK/English US — „Automatisch“ folgt dem Browser: `en-GB` → `1,234.5` und `07/10/2026`, `en-US` → `10/07/2026` mit 12-Stunden-Uhr, `de-*` → `1.234,5` und `07.10.2026`; unabhängig von der Sprache; CSV-Exporte und Dateinamen bleiben unverändert), Währung (Automatisch/EUR/GBP/USD/CHF — „Automatisch“ übernimmt sie aus Home Assistant, sonst Euro; Beträge werden nicht umgerechnet, nach einem Wechsel die Preise neu eintragen), Startseite (Übersicht/Energiedashboard/Wetterdashboard), Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Breite Darstellung (experimentell; Aus/An, Standard Aus — ab 1200 px Fensterbreite nutzen Dashboards, Charts, Tabellen und Entitäten bis 1920 px, darüber zentriert; gilt für die ganze Installation; andere Seiten wie Einstellungen und Energiedashboard bleiben bei 1120 px), Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
 | **Archivierung** | Standardwerte für neu erkannte Entitäten (wirken nie rückwirkend auf bestehende Entitäten): Auflösung, Aufbewahrung, Nachkommastellen, Wertänderungsfilter, Lücken-/Ausreißer-Erkennung |
 | **Meldungen** | Tipp-Anzeige an-/ausschalten und Dialog mit allen Tipps (siehe [Housekeeping](#housekeeping)); Übersicht stummgeschalteter Systemmeldungen mit verbleibender Dauer, einzeln vorzeitig wieder aktivierbar |
 | **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start, verbundene Integrationsversion mit Zeitpunkt "zuletzt gesehen" (Hinweis bei veralteter oder neu verfügbarer Version) |

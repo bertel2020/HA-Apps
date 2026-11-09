@@ -62,6 +62,11 @@
     Dashboard-Kacheln
   - Einstellungen, Darstellung: Die Legendengröße gilt als Standard für alle
     Charts ohne eigene Einstellung
+- **Darstellung**: Breite Darstellung (experimentell) unter Einstellungen →
+  Darstellung, standardmäßig aus
+  - Dashboards, Charts, Tabellen und Entitäten nutzen auf großen Bildschirmen
+    mehr Breite (ab 1200 px bis 1920 px, darüber zentriert)
+  - Je Dashboard umschaltbar: 4 Kacheln pro Zeile (ab 1500 px)
 
 ### Geändert
 
@@ -86,6 +91,12 @@
   im Setup ein Bereich abgewählt war
 - **Charts**: Die Werte in der Legende laufen bei schmaler Breite nicht mehr
   über den Rand, sondern brechen in eine zweite Zeile um
+- **Dashboards**: Im Präzisen Modus zeigt ein Tablet hochkant (521–820 px)
+  jetzt zwei statt drei Kacheln pro Zeile, wie im normalen Modus
+- **Dashboards**: Der Zustands-Donut passt seine Größe an, wenn sich die
+  Kachel ändert
+- **Dashboards**: Eine Kopie übernimmt jetzt Präzisen Modus, „Lücken
+  auffüllen“ und Zeitraum-Navigation des Originals
 
 ---
 
@@ -143,6 +154,11 @@
   - Legend size "Normal" or "Small", per chart, also on the dashboard tiles
   - Settings, Appearance: the legend size is the default for all charts
     without their own setting
+- **Appearance**: Wide layout (experimental) under Settings → Appearance, off
+  by default
+  - Dashboards, charts, tables and entities use more width on large screens
+    (from 1200 px up to 1920 px, centered beyond that)
+  - Per dashboard: 4 tiles per row (from 1500 px)
 
 #### Changed
 
@@ -167,6 +183,11 @@
   area was switched off in the setup
 - **Charts**: The values in the legend no longer run past the edge on narrow
   screens but wrap onto a second line
+- **Dashboards**: In precise mode a tablet in portrait (521–820 px) now shows
+  two instead of three tiles per row, as in normal mode
+- **Dashboards**: The state donut adjusts its size when the tile changes
+- **Dashboards**: A copy now takes over precise mode, "Fill gaps" and period
+  navigation from the original
 
 ## 1.31.1 - 2026-11-08
 

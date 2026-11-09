@@ -311,6 +311,12 @@ something to scroll.
   Arrange them by drag and drop; via the tile menu (⋮) resize, duplicate
   (charts/tables) or remove. Removing a tile only deletes the placement, not
   the underlying chart or table.
+- **4 tiles per row:** If **Wide layout (experimental)** is switched on under
+  **Settings → Appearance**, the dashboard editor offers the switch "4 tiles per
+  row". It applies per dashboard and takes effect from 1500 px window width
+  (eight columns in Precise mode); below that it stays at three. Stored sizes
+  are not lost when switching: a tile 4 wide shows across the whole row with
+  three columns, and the size menu says so.
 - **Sections** organize many tiles into named blocks: via the "+" tile, "Section"
   tab, assign a name. A section header can be collapsed/expanded via a chevron
   (remembered only locally in the browser) and removed via its own menu (⋮) —
@@ -2815,7 +2821,7 @@ If you want to look something up later, download it first.
 
 | Area | Contains |
 | --- | --- |
-| **Appearance** | Language (Automatic/German/English — default German; "Automatic" follows the browser language; untranslated places appear in German), number and date format (Automatic/German/English UK/English US — "Automatic" follows the browser: `en-GB` → `1,234.5` and `07/10/2026`, `en-US` → `10/07/2026` with a 12-hour clock, `de-*` → `1.234,5` and `07.10.2026`; independent of the language; CSV exports and file names stay unchanged), currency (Automatic/EUR/GBP/USD/CHF — "Automatic" takes it from Home Assistant, otherwise euro; amounts are not converted, enter your prices again after changing it), start page (overview/energy dashboard/weather dashboard), color scheme (Zeitarchiv/Home Assistant/Modern), light/dark/automatic, font size, dashboard tile fade animation, starting values for the chart options of the entity history view |
+| **Appearance** | Language (Automatic/German/English — default German; "Automatic" follows the browser language; untranslated places appear in German), number and date format (Automatic/German/English UK/English US — "Automatic" follows the browser: `en-GB` → `1,234.5` and `07/10/2026`, `en-US` → `10/07/2026` with a 12-hour clock, `de-*` → `1.234,5` and `07.10.2026`; independent of the language; CSV exports and file names stay unchanged), currency (Automatic/EUR/GBP/USD/CHF — "Automatic" takes it from Home Assistant, otherwise euro; amounts are not converted, enter your prices again after changing it), start page (overview/energy dashboard/weather dashboard), color scheme (Zeitarchiv/Home Assistant/Modern), light/dark/automatic, font size, dashboard tile fade animation, wide layout (experimental; Off/On, default Off — from 1200 px window width dashboards, charts, tables and entities use up to 1920 px, centered beyond that; applies to the whole installation; other pages such as settings and the energy dashboard stay at 1120 px), starting values for the chart options of the entity history view |
 | **Archiving** | Default values for newly detected entities (never act retroactively on existing entities): resolution, retention, decimal places, value change filter, gap/outlier detection |
 | **Notices** | Switch the tip display on/off and dialog with all tips (see [Housekeeping](#housekeeping)); overview of muted system notices with remaining duration, individually re-enableable early |
 | **Connection** | Show/regenerate API token, last received value, number of writes and auth errors since start, connected integration version with "last seen" time (notice for outdated or newly available version) |
