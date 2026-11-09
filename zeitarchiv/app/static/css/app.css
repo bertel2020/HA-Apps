@@ -333,7 +333,8 @@ body::before{
    <canvas> oder eine Maus-Koordinate. Skaliert bewusst nur Schriftgrößen,
    nicht Abstände/Breiten (bleiben in px). */
 body{background:var(--bg);color:var(--ink);font-family:var(--font-display);margin:0;padding:32px 24px 64px;font-size:calc(15px * var(--font-scale, 1));line-height:1.5;-webkit-font-smoothing:antialiased;}
-.page{max-width:1120px;margin:0 auto;min-width:0;}
+:root{--page-max:1120px;--page-narrow:1120px;}
+.page{max-width:var(--page-max);margin:0 auto;min-width:0;}
 button{font-family:inherit;}
 code,.mono{font-family:var(--font-mono);}
 /* Tastatur-Fokusring in der Akzentfarbe statt des browsereigenen (meist
@@ -407,7 +408,7 @@ h2{font-size:calc(16.8px * var(--font-scale, 1));font-weight:700;margin:28px 0 1
    mehr hier, sondern eine Ebene höher auf .page-sticky-header (s. o.) —
    beide zusammen sollen oben kleben bleiben, nicht nur die Topnav allein. */
 .topnav{margin:-32px -24px 28px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--border);}
-.topnav-bar{max-width:1120px;margin:0 auto;height:56px;display:flex;align-items:center;gap:28px;}
+.topnav-bar{max-width:var(--page-max);margin:0 auto;height:56px;display:flex;align-items:center;gap:28px;}
 .topnav-brand{display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;flex-shrink:0;}
 /* 30px statt 26px — das Logo wirkte neben der 15px-Wortmarke zu zurückhaltend.
    border-radius zieht proportional mit: das SVG selbst rundet mit rx="14" auf

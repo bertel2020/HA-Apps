@@ -168,6 +168,22 @@
       </div>
     </span>
   </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">{{ _("Breite Darstellung (experimentell)") }} {{ hint_button(_('Breite Darstellung')) }}</div>
+      {% call hint_body('settings-compact-hint') %}{{ _("Nutzt auf großen Bildschirmen mehr Breite für Dashboards, Charts und Tabellen. Gilt für alle Geräte dieser Installation.") }}{% endcall %}
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="page-layout-btn" onclick="toggleDDPicker('page-layout')">{% for k, l in page_layout_options %}{% if k == page_layout %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="page_layout" id="page-layout-input" value="{{ page_layout }}"
+             hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="page-layout-popover">
+        {% for key, label in page_layout_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('page-layout', '{{ key }}', '{{ label }}'); {% if key == 'wide' %}document.documentElement.dataset.pageLayout = 'wide';{% else %}delete document.documentElement.dataset.pageLayout;{% endif %}">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
 </div>
 
 <div class="settings-minor-section">

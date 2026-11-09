@@ -111,6 +111,7 @@ GENERAL_SETTINGS: list[tuple[str, str]] = [
     ("font_scale", N_("Schriftgröße")),
     ("startseite", N_("Startseite")),
     ("dashboard_animation", N_("Dashboard-Animation")),
+    ("page_layout", N_("Breite Darstellung")),
     ("entities_columns", N_("Spalten der Entitätenliste")),
     ("entity_chart_defaults", N_("Chart-Voreinstellungen je Entität")),
     ("default_resolution", N_("Standard-Auflösung")),

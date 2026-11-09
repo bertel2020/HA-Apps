@@ -132,7 +132,7 @@ Trennung ist der größte einzelne Lesbarkeits-Hebel aus dem Redesign.
 ## Seiten-Grundgerüst
 
 ```css
-.page{max-width:1120px;margin:0 auto;min-width:0;}
+.page{max-width:var(--page-max);margin:0 auto;min-width:0;}
 ```
 
 Eine einzige Breite für alle Seiten — vorher zwischen 720px (Konfiguration) und
