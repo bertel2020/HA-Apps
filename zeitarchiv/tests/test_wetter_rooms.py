@@ -139,6 +139,15 @@ def test_hidden_rooms_drop_their_lines_but_never_the_outdoor_line_and_colors_sta
     assert len(_node(f"r.visible({CMP}.series, [])")) == 4
 
 
+def test_the_app_keeps_the_floor_of_a_received_catalog() -> None:
+    from app import selection_catalog
+
+    rows = selection_catalog.clean_entities([
+        {"entity_id": "sensor.a", "area": "Bad", "floor": " Obergeschoss "}, {"entity_id": "sensor.b", "area": "Keller"},
+    ])
+    assert [(row["area"], row["floor"]) for row in rows] == [("Bad", "Obergeschoss"), ("Keller", None)]
+
+
 SCRIPT = r"""
 const fs = require('fs');
 const D = process.argv[1];
@@ -173,6 +182,15 @@ const heads = (html) => [...html.matchAll(/<tr class="wt-grp"><th[^>]*>([^<]*)<\
 const subs = (html) => [...html.matchAll(/<tr class="wt-sub"><th[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]);
 const labels = (html) => [...html.matchAll(/<th scope="row">([^<]*)/g)].map((m) => m[1]);
 const grouped = R.weatherComparison(rooms, 'klima', true);
+const onFloors = {...base, rows: [
+  row('temperature:0', 'Bad Temperatur', '°C', 'Bad', 23), row('temperature:1', 'Keller Sensor', '°C', 'Keller', 14),
+  row('temperature:2', 'Bad Feuchte', '%', 'Bad', 66), row('temperature:3', 'Küche Sensor', '°C', 'Küche', 21),
+  row('temperature:4', 'Dachboden', '°C', '', 9),
+].map((r) => ({...r, floor: {Bad: 'Obergeschoss', Keller: 'Keller', Küche: 'Erdgeschoss'}[r.room] || ''}))};
+const floorHeads = (html) => [...html.matchAll(/<tr class="wt-floor[^"]*"><th[^>]*>(?:<span[^>]*>[^<]*<\/span> )?([^<]*)<\/th>/g)].map((m) => m[1]);
+const floorsOpen = R.weatherComparison(onFloors, 'klima', true, {interactive: true});
+const floorsClosed = R.weatherComparison(onFloors, 'klima', true, {interactive: true, closedFloors: ['Obergeschoss', '']});
+const floorsCard = R.weatherComparison(onFloors, 'klima', true);
 const averages = R.weatherComparison(rooms, 'klima', true, {avgOnly: true});
 const unchanged = R.weatherComparison(flat, 'klima', true);
 const flatAvg = R.weatherComparison(flat, 'klima', true, {avgOnly: true});
@@ -181,6 +199,9 @@ console.log(JSON.stringify({
   avgHeads: heads(averages), avgLabels: labels(averages), avgSubs: subs(averages),
   flatHeads: heads(unchanged), flatSubs: subs(unchanged), flatRows: count(unchanged, '<th scope="row">'),
   flatAvgLabels: labels(flatAvg),
+  floorHeads: floorHeads(floorsOpen), floorRoomHeads: heads(floorsOpen), floorToggles: count(floorsOpen, 'data-floor='),
+  closedFloorHeads: floorHeads(floorsClosed), closedRoomHeads: heads(floorsClosed), closedMarked: count(floorsClosed, 'is-closed'),
+  cardToggles: count(floorsCard, 'data-floor='), cardFloorHeads: floorHeads(floorsCard), noFloorHeads: floorHeads(grouped),
   basisUntouched: R.weatherComparison({...rooms, rows: rooms.rows.map((r) => ({...r, key: 'temperature'}))}, 'basis', true, {avgOnly: true}).includes('Max'),
 }));
 """
@@ -212,3 +233,20 @@ def test_without_rooms_the_table_stays_one_block_per_sensor(output) -> None:
     assert output["flatSubs"] == [] and output["flatRows"] == 5 * 3
     assert output["flatAvgLabels"] == ["Ø"] * 5
     assert output["basisUntouched"] is True
+
+
+def test_floors_group_the_rooms_with_unassigned_rooms_last(output) -> None:
+    assert output["floorHeads"] == ["Obergeschoss", "Keller", "Erdgeschoss", "Ohne Etage"]
+    assert output["floorRoomHeads"] == ["Bad", "Keller", "Küche", "Ohne Raum"]
+    assert output["floorToggles"] == 4
+
+
+def test_closed_floors_hide_their_rooms_and_the_card_gets_headers_without_buttons(output) -> None:
+    assert output["closedFloorHeads"] == ["Obergeschoss", "Keller", "Erdgeschoss", "Ohne Etage"]
+    assert output["closedRoomHeads"] == ["Keller", "Küche"]
+    assert output["closedMarked"] == 2
+    assert output["cardToggles"] == 0 and output["cardFloorHeads"] == output["floorHeads"]
+
+
+def test_without_floors_there_are_no_floor_headers(output) -> None:
+    assert output["noFloorHeads"] == []

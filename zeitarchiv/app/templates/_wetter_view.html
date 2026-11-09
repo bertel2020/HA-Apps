@@ -68,7 +68,10 @@
 {% macro room_chips() %}
 <div class="wt-rooms" role="group" aria-label="{{ _('Räume im Diagramm') }}" x-show="roomChips().length" x-cloak>
   <template x-for="chip in roomChips()" :key="chip.name">
-    <button type="button" class="wt-room-chip" :aria-pressed="chip.on.toString()" @click="toggleRoom(chip.name)" x-text="chip.label"></button>
+    <span class="wt-room-item">
+      <span class="wt-room-floor" x-show="chip.floorLabel" x-text="chip.floorLabel"></span>
+      <button type="button" class="wt-room-chip" :aria-pressed="chip.on.toString()" @click="toggleRoom(chip.name)" x-text="chip.label"></button>
+    </span>
   </template>
   <button type="button" class="wt-room-all" x-show="roomsOff.length" x-cloak @click="showAllRooms()">{{ _("Alle") }}</button>
 </div>

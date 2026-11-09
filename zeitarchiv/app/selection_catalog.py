@@ -55,7 +55,7 @@ MAX_PATTERN_LENGTH = 128
 
 _TEXT_FIELDS = {
     "name": 200, "device_class": 40, "state_class": 40, "unit": 40, "platform": 80,
-    "device": 200, "area": 200, "entity_category": 20, "energy_role": 40,
+    "device": 200, "area": 200, "floor": 200, "entity_category": 20, "energy_role": 40,
 }
 _FLAG_FIELDS = ("hidden", "selected", "excluded", "text", "drifted")
 _VALUE_WAYS = {"pattern", "area", "device", "label"}

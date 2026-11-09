@@ -4845,6 +4845,7 @@
     "aus Home Assistant: {area}": "from Home Assistant: {area}",
     "Raum (optional)": "Room (optional)",
     "Feuchte": "Humidity",
-    "Ohne Raum": "No room"
+    "Ohne Raum": "No room",
+    "Ohne Etage": "No floor"
   }
 }
