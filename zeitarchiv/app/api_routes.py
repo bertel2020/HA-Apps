@@ -224,7 +224,7 @@ def _validate_entity_id_or_400(entity_id: str) -> None:
 
 
 def _table_aggregates(result: dict) -> dict[str, float | None]:
-    """Verdichtet eine Chart-Serie auf die fünf Tabellen-Aggregationen."""
+    """Verdichtet eine Chart-Serie auf die sechs Tabellen-Aggregationen."""
     points = result["points"]
     total = sum((point["value"] or 0.0) for point in points)
     average = total / len(points) if points else 0.0
@@ -239,7 +239,11 @@ def _table_aggregates(result: dict) -> dict[str, float | None]:
         if point["max"] is not None or point["value"] is not None
     ]
     automatic = total if result["aggregation_type"] in ("counter", "switch") else average
+    # Zuletzt erfasster Wert des Zeitraums (letzter Punkt mit Wert); bei Standard-
+    # Linien trägt der Randpunkt am Fensteranfang den Wert auch ohne neue Messung.
+    last_values = [point["value"] for point in points if point["value"] is not None]
     return {
+        "last": last_values[-1] if last_values else None,
         "auto": automatic,
         "avg": average,
         "min": min(minima) if minima else None,

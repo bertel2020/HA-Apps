@@ -107,6 +107,11 @@
   - Einstellungen, Darstellung: Die Legendengröße gilt als Standard für alle
     Charts ohne eigene Einstellung
 
+- **Tabellen**: Neue Zeilen-Aggregation „Aktueller Wert“
+  - Zeigt den zuletzt erfassten Wert des Zeitraums statt Durchschnitt, Min, Max
+    oder Summe, z. B. den Akkustand wie auf dem Desktop
+  - Steht die Spalte auf „Auto“, gelten die Nachkommastellen der Entität
+
 ### Geändert
 
 - **Wetterdashboard**: „Temperaturen im Vergleich“ zeigt 7 Tage, 30 Tage oder
@@ -243,6 +248,11 @@
   - Legend size "Normal" or "Small", per chart, also on the dashboard tiles
   - Settings, Appearance: the legend size is the default for all charts
     without their own setting
+
+- **Tables**: New row aggregation "Current value"
+  - Shows the last recorded value of the period instead of average, min, max
+    or sum, e.g. the battery level as on the desktop
+  - If the column is set to "Auto", the entity's decimal places apply
 
 #### Changed
 

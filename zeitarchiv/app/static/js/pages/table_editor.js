@@ -248,15 +248,15 @@
     // siehe TableCompute.computeValues()/memberValueFor(). Kurze
     // Button-Labels (siehe .tbl-agg-picker-Kommentar oben im CSS), volle
     // Bezeichnung im Popover UND als title-Tooltip auf dem Button.
-    const AGG_OPTIONS = [['auto', t('Automatisch')], ['avg', t('Ø Durchschnitt')], ['min', t('Min')], ['max', t('Max')], ['sum', t('Σ Summe')]];
+    const AGG_OPTIONS = [['auto', t('Automatisch')], ['avg', t('Ø Durchschnitt')], ['min', t('Min')], ['max', t('Max')], ['sum', t('Σ Summe')], ['last', t('Aktueller Wert')]];
     // Summenzeile kennt nur Summe/Durchschnitt — t("Automatisch")/"Min"/"Max"
     // ergeben für eine Summenzeile keinen Sinn (die bezieht sich immer auf
     // MEHRERE bereits aggregierte Zeilen, nicht auf einzelne Rohwerte).
     const SUMMARY_AGG_OPTIONS = [['sum', t('Σ Summe')], ['avg', t('Ø Durchschnitt')]];
-    const AGG_SHORT_LABELS = {auto: t('Auto'), avg: 'Ø', min: t('Min'), max: t('Max'), sum: 'Σ'};
+    const AGG_SHORT_LABELS = {auto: t('Auto'), avg: 'Ø', min: t('Min'), max: t('Max'), sum: 'Σ', last: t('Akt')};
     const AGG_TITLES = {
       auto: t('Automatisch (Zähler/Schalter → Summe, sonst Durchschnitt)'),
-      avg: t('Durchschnitt'), min: t('Minimum'), max: t('Maximum'), sum: t('Summe'),
+      avg: t('Durchschnitt'), min: t('Minimum'), max: t('Maximum'), sum: t('Summe'), last: t('Zuletzt erfasster Wert im Zeitraum'),
     };
     const BORDER_OPTIONS = [['horizontal', t('Horizontal')], ['grid', t('Gitter')], ['none', t('Ohne Rahmen')]];
     const BORDER_LABELS = Object.fromEntries(BORDER_OPTIONS);

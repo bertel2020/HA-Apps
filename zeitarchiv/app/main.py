@@ -4608,7 +4608,7 @@ class _TableColumnBody(BaseModel):
     in_sum: bool = True
 
 
-_TABLE_ROW_AGGREGATIONS = ("auto", "avg", "min", "max", "sum")
+_TABLE_ROW_AGGREGATIONS = ("auto", "avg", "min", "max", "sum", "last")
 # Zeilenbeschriftung/Abschnittsname — dieselbe Zahl wie das maxlength-Attribut
 # des Felds in table_editor.html, hier zusätzlich serverseitig durchgesetzt
 # (ein Request kann das clientseitige maxlength umgehen).
