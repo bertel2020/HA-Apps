@@ -4,6 +4,84 @@
 
 ### Neu
 
+- **Wetterdashboard**: Weitere Sensoren nach Raum und Etage
+  - Bis zu 20 weitere Sensoren (vorher 5); der Dialog bietet nur Temperatur-
+    und Feuchtesensoren an und blendet schon eingetragene aus
+  - „Zeiträume im Vergleich“ (Reiter „Temperatur & Klima“): ein Block je Raum
+    mit Temperatur und Feuchte
+    - Der Raum kommt aus der Area in Home Assistant; im Dialog des Sensors
+      lässt er sich von Hand setzen, Sensoren ohne Raum stehen unter „Ohne
+      Raum“
+    - Jeder Raum lässt sich einklappen
+    - „Nur Mittelwerte“ im Menü der Tabelle zeigt je Sensor eine Zeile statt
+      Max, Min und Ø
+    - Mit Etagen in Home Assistant stehen die Räume unter ihrer Etage, die
+      sich ebenfalls einklappen lässt (braucht die neue Version der
+      Integration)
+    - Die Lovelace-Karte zeigt die Räume und Etagen ebenfalls, ohne
+      Einklappen
+  - „Temperaturen im Vergleich“ und „Luftfeuchte im Vergleich“: die Räume
+    lassen sich ein- und ausblenden
+
+- **Energiedashboard**
+  - Neuer Reiter „Vergleich“, aufgebaut wie im
+    Wetterdashboard
+    - „Zeiträume im Vergleich“ mit Stichtag-Leiste: die Bilanz (Energie,
+      Quoten, Speicher, PV-Anlage) und die Verbraucher in einer Tabelle
+      - Spalten Heute, Gestern, Dieser Monat, Letzter Monat und Dieses Jahr, je
+        mit einer Vorjahr-Spalte daneben; einzelne Jahre im Menü „Spalten“
+      - Das Vorjahr-Menü (Aus, Bis jetzt, Komplett, Differenz anzeigen) und der
+        Stichtag wie im Wetterdashboard
+      - Filter „Alle | Bilanz | Verbraucher“; die Verbraucher lassen sich nach
+        jeder Spalte sortieren und als Anteil oder kWh anzeigen
+      - „Gemessen“ nennt, wie viel des Verbrauchs eigene Zähler erfassen; der
+        Rest steht als „Übrige (Grundlast)“
+      - Ein Klick auf eine Zeile wählt sie aus und hebt sie in der Aufteilung
+        hervor; „Langzeit“ zeigt sie danach vorgewählt
+      - Der Stichtag gilt auch für den Energiefluss in der Übersicht: Wählst du
+        im Vergleich einen Tag, zeigt die Übersicht ihn (Zeitraum „Tag“), und
+        umgekehrt
+    - „Aufteilung des Verbrauchs“: ein gestapelter Balken je Zeitraum (das
+      Vorjahr dünn darunter) oder je Jahr, in Prozent oder kWh
+  - „Langzeit“ zeigt die Jahre jetzt auch im Überblick
+    - „Jahresbilanz“: Erzeugung, Netzbezug, Einspeisung und Verbrauch je Jahr,
+      darunter Autarkie und Eigenverbrauch; „Bis jetzt“ vergleicht jedes Jahr
+      bis zum heutigen Kalendertag, „Komplett“ zeigt ganze Jahre
+    - Zwei neue Rekorde: der Monat mit der besten Autarkie und die längste
+      Folge fast autarker Tage
+    - Neue Kenntage: „Tage ohne Netzbezug“ und „Hohe Einspeisung“ (die
+      Schwelle stellst du im Setup ein); Jahre ohne Speicher stehen bei den
+      Speicher-Kenntagen als „kein Speicher“
+    - Bei einem Verbraucher zeigt „Monatswerte je Jahr“ zusätzlich einen
+      kleinen Verlauf der Jahressummen
+    - „Jahre im Vergleich, Tag für Tag“: jeder Tag als Farbfeld, eine Zeile je
+      Jahr, für Erzeugung, Verbrauch und Netzbezug; ein Klick öffnet den Tag
+    - „Ertrag und Wetter“, sobald das Wetterdashboard eine Helligkeit oder eine
+      Außentemperatur kennt
+      - „Ertrag je Sonnenstunde“: Erzeugung geteilt durch die Sonnenstunden, je
+        Monat und Jahr; so zeigt sich, ob die Anlage nachlässt, auch wenn ein
+        Jahr sonniger war
+      - „Verbrauch gegen Temperatur“: ein Punkt je Tag mit Trendlinie, für den
+        Verbrauch, den Netzbezug oder einen Verbraucher, etwa die Wärmepumpe
+      - Im Setup lässt sich die Karte abwählen
+    - Die Karten stehen jetzt in der Reihenfolge des Wetterdashboards
+  - Aufbau wie im Wetterdashboard
+    - „Zeiträume im Vergleich“ steht jetzt im Reiter „Vergleich“; die Übersicht
+      verweist mit einem Link darauf
+    - „Langzeit“ zeigt eine Größe über alle Jahre, Monat für Monat
+      - Eine Auswahl nimmt Erzeugung, Einspeisung, Netzbezug, Verbrauch oder
+        einen Verbraucher; Darstellung als Tabelle oder als Linien
+      - Der Stichtag entfällt, ebenso die Jahre-Leiste zwischen den Karten
+      - „Letzte 5 | Alle“ steht in den Karten, sobald mehr als fünf Jahre
+        vorliegen
+      - Kenntage: „Komplett“ und „Bis jetzt“ statt „Ganzes Jahr“ und „Bis heute“
+    - „Was hat sich verändert?“ entfällt; die Verbraucher-Tabelle im Reiter
+      „Vergleich“ zeigt die Änderung je Verbraucher
+    - Setup: Neuer Haken für die Verbraucher und die Aufteilung; die
+      Monatswerte lassen sich als Tabelle und als Linien einzeln abwählen
+  - Der Reiter „Langzeit“ funktionierte nicht mehr, sobald
+    im Setup ein Bereich abgewählt war
+
 - **Demo-Modus**: Die Demo bringt jetzt eine fertige Oberfläche mit und
   umfasst 5 Jahre Historie
   - Energie- und Wetterdashboard sind eingerichtet
@@ -11,49 +89,9 @@
     Vergleichstabellen
   - „Neu erzeugen“ legt alles komplett neu an; eigene Charts und Tabellen
     bleiben erhalten
-
-- **Energiedashboard**: Neuer Reiter „Vergleich“, aufgebaut wie im
-  Wetterdashboard
-  - „Zeiträume im Vergleich“ mit Stichtag-Leiste: die Bilanz (Energie,
-    Quoten, Speicher, PV-Anlage) und die Verbraucher in einer Tabelle
-    - Spalten Heute, Gestern, Dieser Monat, Letzter Monat und Dieses Jahr, je
-      mit einer Vorjahr-Spalte daneben; einzelne Jahre im Menü „Spalten“
-    - Das Vorjahr-Menü (Aus, Bis jetzt, Komplett, Differenz anzeigen) und der
-      Stichtag wie im Wetterdashboard
-    - Filter „Alle | Bilanz | Verbraucher“; die Verbraucher lassen sich nach
-      jeder Spalte sortieren und als Anteil oder kWh anzeigen
-    - „Gemessen“ nennt, wie viel des Verbrauchs eigene Zähler erfassen; der
-      Rest steht als „Übrige (Grundlast)“
-    - Ein Klick auf eine Zeile wählt sie aus und hebt sie in der Aufteilung
-      hervor; „Langzeit“ zeigt sie danach vorgewählt
-    - Der Stichtag gilt auch für den Energiefluss in der Übersicht: Wählst du
-      im Vergleich einen Tag, zeigt die Übersicht ihn (Zeitraum „Tag“), und
-      umgekehrt
-  - „Aufteilung des Verbrauchs“: ein gestapelter Balken je Zeitraum (das
-    Vorjahr dünn darunter) oder je Jahr, in Prozent oder kWh
-
-- **Energiedashboard**: „Langzeit“ zeigt die Jahre jetzt auch im Überblick
-  - „Jahresbilanz“: Erzeugung, Netzbezug, Einspeisung und Verbrauch je Jahr,
-    darunter Autarkie und Eigenverbrauch; „Bis jetzt“ vergleicht jedes Jahr
-    bis zum heutigen Kalendertag, „Komplett“ zeigt ganze Jahre
-  - Zwei neue Rekorde: der Monat mit der besten Autarkie und die längste
-    Folge fast autarker Tage
-  - Neue Kenntage: „Tage ohne Netzbezug“ und „Hohe Einspeisung“ (die
-    Schwelle stellst du im Setup ein); Jahre ohne Speicher stehen bei den
-    Speicher-Kenntagen als „kein Speicher“
-  - Bei einem Verbraucher zeigt „Monatswerte je Jahr“ zusätzlich einen
-    kleinen Verlauf der Jahressummen
-  - „Jahre im Vergleich, Tag für Tag“: jeder Tag als Farbfeld, eine Zeile je
-    Jahr, für Erzeugung, Verbrauch und Netzbezug; ein Klick öffnet den Tag
-  - „Ertrag und Wetter“, sobald das Wetterdashboard eine Helligkeit oder eine
-    Außentemperatur kennt
-    - „Ertrag je Sonnenstunde“: Erzeugung geteilt durch die Sonnenstunden, je
-      Monat und Jahr; so zeigt sich, ob die Anlage nachlässt, auch wenn ein
-      Jahr sonniger war
-    - „Verbrauch gegen Temperatur“: ein Punkt je Tag mit Trendlinie, für den
-      Verbrauch, den Netzbezug oder einen Verbraucher, etwa die Wärmepumpe
-    - Im Setup lässt sich die Karte abwählen
-  - Die Karten stehen jetzt in der Reihenfolge des Wetterdashboards
+  - Fünf Räume mit Temperatur und Feuchte für „Temperatur & Klima“
+    (Wohnzimmer, Schlafzimmer, Küche, Bad, Keller); eine ältere Demo bekommt
+    die neuen Sensoren beim Ergänzen mit drei Jahren Historie nachgetragen
 
 - **Charts**: Die Legende lässt sich ausschalten und in zwei Größen zeigen
   - Legenden-Stil „Aus“ blendet die Legende ganz aus; „Statistik in Legende“
@@ -70,6 +108,8 @@
 
 ### Geändert
 
+- **Wetterdashboard**: „Temperaturen im Vergleich“ zeigt 7 Tage, 30 Tage oder
+  12 Monate (vorher 7, 30 oder 90 Tage)
 - **Energiedashboard**: Aufbau wie im Wetterdashboard
   - „Zeiträume im Vergleich“ steht jetzt im Reiter „Vergleich“; die Übersicht
     verweist mit einem Link darauf
@@ -104,49 +144,91 @@
 
 #### New
 
-- **Energy dashboard**: New "Comparison" tab, laid out like the weather
-  dashboard
-  - "Periods compared" with a reference-date bar: the balance (energy,
-    ratios, storage, PV system) and the consumers in one table
-    - Columns Today, Yesterday, This month, Last month and This year, each
-      with a previous-year column next to it; single years in the "Columns"
-      menu
-    - The previous-year menu (off, so far, complete, show difference) and the
-      reference date work as in the weather dashboard
-    - Filter "All | Balance | Consumers"; the consumers can be sorted by any
-      column and shown as share or kWh
-    - "Measured" shows how much of the consumption your own meters record; the
-      remainder is shown as "Other (base load)"
-    - A click on a row selects it and highlights it in the breakdown; "Long
-      term" then shows it preselected
-    - The reference date also applies to the energy flow in the overview: pick
-      a day in "Comparison" and the overview shows it (period "Day"), and vice
-      versa
-  - "Consumption breakdown": one stacked bar per period (the previous year
-    thinly below) or per year, in percent or kWh
+- **Weather dashboard**: More sensors by room and floor
+  - Up to 20 additional sensors (was 5); the dialog offers only temperature
+    and humidity sensors and hides ones that are already entered
+  - "Periods compared" (tab "Temperature & climate"): one block per room with
+    temperature and humidity
+    - The room comes from the area in Home Assistant; it can be set by hand in
+      the sensor's dialog, sensors without a room are listed under "No room"
+    - Every room can be collapsed
+    - "Averages only" in the table menu shows one row per sensor instead of
+      max, min and average
+    - With floors in Home Assistant the rooms sit under their floor, which can
+      be collapsed too (needs the new version of the integration)
+    - The Lovelace card shows the rooms and floors as well, without collapsing
+  - "Temperatures compared" and "Humidity compared": rooms can be shown and
+    hidden
 
-- **Energy dashboard**: "Long term" now also gives an overview of the years
-  - "Annual balance": generation, grid import, feed-in and consumption per
-    year, with self-sufficiency and self-consumption below; "So far" compares
-    every year up to today's calendar day, "Complete" shows full years
-  - Two new records: the month with the best self-sufficiency and the longest
-    streak of almost self-sufficient days
-  - New notable days: "Days without grid import" and "High feed-in" (you set
-    the threshold in the setup); years without storage show as "no storage"
-    for the storage-related days
-  - For a consumer, "Monthly values per year" also shows a small trend of the
-    annual totals
-  - "Years compared, day by day": every day as a colour cell, one row per
-    year, for generation, consumption and grid import; a click opens the day
-  - "Yield and weather", as soon as the weather dashboard knows a brightness
-    or an outdoor temperature
-    - "Yield per sun hour": generation divided by the sun hours, per month and
-      year; it shows whether the system is losing output, even if a year was
-      sunnier
-    - "Consumption against temperature": one point per day with a trend line,
-      for consumption, grid import or a consumer such as the heat pump
-    - The card can be switched off in the setup
-  - The cards now follow the order of the weather dashboard
+- **Energy dashboard**
+  - New "Comparison" tab, laid out like the weather
+    dashboard
+    - "Periods compared" with a reference-date bar: the balance (energy,
+      ratios, storage, PV system) and the consumers in one table
+      - Columns Today, Yesterday, This month, Last month and This year, each
+        with a previous-year column next to it; single years in the "Columns"
+        menu
+      - The previous-year menu (off, so far, complete, show difference) and the
+        reference date work as in the weather dashboard
+      - Filter "All | Balance | Consumers"; the consumers can be sorted by any
+        column and shown as share or kWh
+      - "Measured" shows how much of the consumption your own meters record; the
+        remainder is shown as "Other (base load)"
+      - A click on a row selects it and highlights it in the breakdown; "Long
+        term" then shows it preselected
+      - The reference date also applies to the energy flow in the overview: pick
+        a day in "Comparison" and the overview shows it (period "Day"), and vice
+        versa
+    - "Consumption breakdown": one stacked bar per period (the previous year
+      thinly below) or per year, in percent or kWh
+  - "Long term" now also gives an overview of the years
+    - "Annual balance": generation, grid import, feed-in and consumption per
+      year, with self-sufficiency and self-consumption below; "So far" compares
+      every year up to today's calendar day, "Complete" shows full years
+    - Two new records: the month with the best self-sufficiency and the longest
+      streak of almost self-sufficient days
+    - New notable days: "Days without grid import" and "High feed-in" (you set
+      the threshold in the setup); years without storage show as "no storage"
+      for the storage-related days
+    - For a consumer, "Monthly values per year" also shows a small trend of the
+      annual totals
+    - "Years compared, day by day": every day as a colour cell, one row per
+      year, for generation, consumption and grid import; a click opens the day
+    - "Yield and weather", as soon as the weather dashboard knows a brightness
+      or an outdoor temperature
+      - "Yield per sun hour": generation divided by the sun hours, per month and
+        year; it shows whether the system is losing output, even if a year was
+        sunnier
+      - "Consumption against temperature": one point per day with a trend line,
+        for consumption, grid import or a consumer such as the heat pump
+      - The card can be switched off in the setup
+    - The cards now follow the order of the weather dashboard
+  - Layout like the weather dashboard
+    - "Periods compared" now sits in the "Comparison" tab; the overview links
+      to it
+    - "Long term" shows one quantity over all years, month by month
+      - A selection offers generation, feed-in, grid import, consumption or a
+        consumer; shown as a table or as lines
+      - The reference date is gone, and so is the years bar between the cards
+      - "Last 5 | All" sits in the cards once more than five years are available
+      - Notable days: "Complete" and "So far" instead of "Full year" and "Until
+        today"
+    - "What has changed?" is gone; the consumer table in the "Comparison" tab
+      shows the change per consumer
+    - Setup: New checkbox for the consumers and the breakdown; the monthly
+      values can be switched off separately as table and as lines
+  - The "Long term" tab stopped working as soon as an
+    area was switched off in the setup
+
+- **Demo mode**: The demo now comes with a ready-made interface and covers 5
+  years of history
+  - Energy and weather dashboards are set up
+  - Three dashboards ("Overview", "Energy", "Weather") with charts and
+    comparison tables
+  - "Regenerate" recreates everything; your own charts and tables are kept
+  - Five rooms with temperature and humidity for "Temperature & climate"
+    (living room, bedroom, kitchen, bathroom, basement); an older demo gets
+    the new sensors added with three years of history when supplemented
 
 - **Charts**: The legend can be switched off and shown in two sizes
   - Legend style "Off" hides the legend completely; "Statistics in legend" and
@@ -162,6 +244,8 @@
 
 #### Changed
 
+- **Weather dashboard**: "Temperatures compared" shows 7 days, 30 days or 12
+  months (was 7, 30 or 90 days)
 - **Energy dashboard**: Layout like the weather dashboard
   - "Periods compared" now sits in the "Comparison" tab; the overview links
     to it
