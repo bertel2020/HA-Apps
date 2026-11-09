@@ -115,10 +115,13 @@
   - Tabelleneditor: Nennt die Beschriftung einer Spalte einen anderen Zeitraum
     als der Zeitraum-Typ (z. B. „Tag“ bei Stunde), erscheint ein Hinweis mit
     Link zum Umstellen
-  - Gespeicherte Tabellen und Charts laden ihre Werte jede Minute von selbst nach,
-    solange der Tab sichtbar ist; ein Chip neben „CSV“ zeigt den Stand und
-    erklärt Pausen (Editor, vergangene Zeiträume). Abschaltbar unter
-    Einstellungen → Darstellung
+
+- **Aktualisierung**: Geöffnete Tabellen, Charts und der Verlauf einer Entität laden
+  ihre Werte jede Minute von selbst nach, solange der Tab sichtbar ist
+  - Ein Chip zeigt den Stand und erklärt Pausen (Editor, gezoomter Ausschnitt,
+    vergangene Zeiträume); „Jetzt aktualisieren“ und ein Schalter für die Seite
+    stehen im Menü des Chips
+  - Abschaltbar unter Einstellungen → Darstellung
 
 ### Geändert
 
@@ -264,9 +267,12 @@
   - If the column is set to "Auto", the entity's decimal places apply
   - Table editor: If a column's label names a different period than its period
     type (e.g. "Day" on Hour), a hint with a link to switch it appears
-  - Saved tables and charts reload their values every minute while the tab is
-    visible; a chip next to "CSV" shows the state and explains pauses (editor,
-    past periods). Can be switched off under Settings → Appearance
+
+- **Refresh**: Open tables, charts and an entity's history reload their values
+  every minute while the tab is visible
+  - A chip shows the state and explains pauses (editor, zoomed section, past
+    periods); "Refresh now" and a switch for the page are in the chip's menu
+  - Can be switched off under Settings → Appearance
 
 #### Changed
 

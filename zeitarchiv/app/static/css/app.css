@@ -364,6 +364,8 @@ h1.raw{font-family:var(--font-mono);font-size:calc(20px * var(--font-scale, 1));
    niemand mehr gleichzeitig arbeitet. */
 .h1-row{display:flex;align-items:center;gap:10px;}
 .h1-row h1{margin:0;}
+/* Chip für das automatische Nachladen sitzt am rechten Rand der Titelzeile (Entitätsseite). */
+.h1-row .refresh-wrap{margin-left:auto;}
 .h1-row .fav-star{
   background:none;border:none;cursor:pointer;font-size:calc(22px * var(--font-scale, 1));line-height:1;padding:2px;
   color:var(--ink-faint);opacity:.5;

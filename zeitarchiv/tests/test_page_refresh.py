@@ -94,3 +94,22 @@ def test_refresh_chip_styles_are_shared_between_table_and_chart_page() -> None:
     table_css = (APP / "static/css/pages/table_editor.css").read_text(encoding="utf-8")
     assert ".refresh-chip{" in app_css and ".refresh-menu{" in app_css
     assert ".refresh-chip" not in table_css
+
+
+def test_entity_page_has_chip_menu_and_quiet_refresh() -> None:
+    page = (TEMPLATES / "entity_detail.html").read_text(encoding="utf-8")
+    script = (APP / "static/js/pages/entity_detail.js").read_text(encoding="utf-8")
+    # Chip in der Titelzeile, mit Menü und Schalter für diese Seite.
+    assert 'class="refresh-chip"' in page and "refreshNow()" in page and "refreshOn = !refreshOn" in page
+    # Takt, Pausen (aus, Ausschnitt gewählt, abgeschlossener Zeitraum) und Bedingungen.
+    assert "const REFRESH_INTERVAL_MS = 60000;" in script
+    assert "if (!this.refreshOn) return 'off';" in script
+    assert "if (this.zoomRange) return 'zoom';" in script
+    assert "if (!this.isCurrent) return 'past';" in script
+    assert "document.visibilityState === 'visible'" in script
+    # Stilles Nachladen ohne "Lädt …", ohne Fehlerzustand und ohne Animation.
+    assert "async load({silent = false} = {})" in script
+    assert script.count("!silent") >= 2
+    assert "{...option, animation: false}" in script
+    assert "quietRender = silent;" in script
+    assert "echarts.init(" not in script.replace("const instance = echarts.init(", "")

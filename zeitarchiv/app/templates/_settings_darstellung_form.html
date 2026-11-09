@@ -203,7 +203,7 @@
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
       <div class="settings-compact-label">{{ _("Seiten automatisch aktualisieren") }} {{ hint_button(_('Seiten automatisch aktualisieren')) }}</div>
-      {% call hint_body('settings-compact-hint') %}{{ _("Lädt die Werte einer geöffneten Tabelle oder eines Charts jede Minute nach, solange der Tab sichtbar ist. Dashboards laden unabhängig davon nach. Gilt für alle Geräte dieser Installation.") }}{% endcall %}
+      {% call hint_body('settings-compact-hint') %}{{ _("Lädt die Werte einer geöffneten Tabelle, eines Charts oder des Verlaufs einer Entität jede Minute nach, solange der Tab sichtbar ist. Dashboards laden unabhängig davon nach. Gilt für alle Geräte dieser Installation.") }}{% endcall %}
     </div>
     <span class="dd-picker-wrap">
       <button type="button" class="btn btn-sm" id="page-refresh-btn" onclick="toggleDDPicker('page-refresh')">{% for k, l in page_refresh_options %}{% if k == page_refresh %}{{ l }}{% endif %}{% endfor %} ▾</button>

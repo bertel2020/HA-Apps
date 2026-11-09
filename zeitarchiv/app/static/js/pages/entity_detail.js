@@ -237,6 +237,18 @@
     // bei jedem Redraw. Ein normaler Closure-Variable reicht hier, weil es genau
     // eine Chart-Instanz pro Seite gibt.
     let chartInstance = null;
+    // Beim stillen Nachladen (Chip) wird ohne Animation neu gezeichnet: setOption(…, true) ersetzt die Serien,
+    // und ECharts würde den Chart sonst jede Minute neu einwachsen lassen. Ein Wrapper statt einer Option an
+    // jedem Zeichenpfad (wie in chart_editor.js).
+    let quietRender = false;
+    function newChartInstance() {
+      const instance = echarts.init(document.getElementById('chart'));
+      const rawSetOption = instance.setOption.bind(instance);
+      instance.setOption = (option, ...rest) => rawSetOption(quietRender ? {...option, animation: false} : option, ...rest);
+      return instance;
+    }
+    // Takt des automatischen Nachladens, wie die Dashboard-Kacheln (dashboard-tiles.js).
+    const REFRESH_INTERVAL_MS = 60000;
     // Schichten der verdichteten Spalten des Zeitstrahls, je Element der Serie
     // 'main' über den Index im sechsten Wert (-1 = ein einzelner Abschnitt).
     // Außerhalb der Daten, weil ECharts in Werten keine Listen führt.
@@ -483,6 +495,12 @@ function selectBrush() {
         isCurrent: true,
         loading: false,
         loadError: false,
+        // Automatisches Nachladen (Chip neben dem Titel): Standard aus der Installation (Einstellungen,
+        // Darstellung, data-page-refresh an <html>), der Schalter im Chip-Menü gilt nur für diese Seite.
+        refreshOn: document.documentElement.dataset.pageRefresh !== 'off',
+        refreshMenuOpen: false,
+        refreshAge: 0,  // Sekunden seit dem letzten Laden, nur gepflegt, solange das Chip-Menü offen ist
+        _lastRefresh: Date.now(),
         _requestId: 0,
         // Bleibt über mehrere reine Auflösungswechsel hinweg erhalten. Ohne
         // diesen separaten Anker würde z. B. der 22. eines laufenden Monats
@@ -1111,14 +1129,18 @@ function selectBrush() {
           this.saveChartOptions();
         },
 
-        async load() {
+        // silent: Nachladen im Hintergrund (Chip) — keine "Lädt …"-Anzeige, ein Fehler lässt den Chart
+        // stehen, und gezeichnet wird ohne Animation.
+        async load({silent = false} = {}) {
           // Schutz gegen Race-Bedingungen: wenn schnell zwischen Zeiträumen geklickt
           // wird, kann eine ältere Anfrage nach einer neueren zurückkommen — ohne
           // diese Prüfung würde dann kurzzeitig der falsche Zeitraum gerendert
           // (Achsen-Skalierung/Daten aus zwei verschiedenen Anfragen gemischt).
           const requestId = ++this._requestId;
-          this.loading = true;
-          this.loadError = false;
+          if (!silent) {
+            this.loading = true;
+            this.loadError = false;
+          }
           const params = new URLSearchParams({
             entity_id: ENTITY_ID, range: this.range, offset: String(this.offset),
             continuous: String(this.continuous), compare: String(this.compare),
@@ -1168,7 +1190,7 @@ function selectBrush() {
             columnsData = columnsRes && columnsRes.ok ? await columnsRes.json() : null;
           } catch (error) {
             // Netzwerkfehler oder ein 502 vom Proxy mit HTML statt JSON: sonst bliebe "Lädt …" für immer stehen.
-            if (requestId === this._requestId) {
+            if (requestId === this._requestId && !silent) {
               this.loading = false;
               this.loadError = true;
             }
@@ -1196,13 +1218,61 @@ function selectBrush() {
           this.markedRanges = data.marked_ranges || [];
           this.markedTotal = data.marked_total || 0;
           this.loading = false;
-          this.$nextTick(() => this.render());
+          this._lastRefresh = Date.now();
+          this.$nextTick(() => {
+            quietRender = silent;
+            try { this.render(); } finally { quietRender = false; }
+          });
+        },
+
+        // Grund, warum das Nachladen gerade ruht: null (läuft), 'off' (abgeschaltet), 'zoom' (ein Ausschnitt ist
+        // gewählt, ein Neuzeichnen würde ihn verwerfen) oder 'past' (abgeschlossener Zeitraum, die Werte
+        // ändern sich nicht mehr).
+        refreshPause() {
+          if (!this.refreshOn) return 'off';
+          if (this.zoomRange) return 'zoom';
+          if (!this.isCurrent) return 'past';
+          return null;
+        },
+        refreshChipText() {
+          const pause = this.refreshPause();
+          if (pause === 'off') return t('Aus');
+          if (pause === 'zoom') return t('Pausiert · gezoomt');
+          if (pause === 'past') return t('Pausiert · vergangen');
+          return t('Aktuell');
+        },
+        refreshChipTitle() {
+          const pause = this.refreshPause();
+          if (pause === 'off') return t('Die automatische Aktualisierung ist ausgeschaltet.');
+          if (pause === 'zoom') return t('Ein Neuzeichnen würde deinen Ausschnitt verwerfen. Setze den Ausschnitt zurück, dann läuft es weiter.');
+          if (pause === 'past') return t('Der Zeitraum ist abgeschlossen, die Werte ändern sich nicht mehr.');
+          return t('Zuletzt aktualisiert vor {s} s', {s: this.refreshAge});
+        },
+        refreshInfo() {
+          if (this.refreshPause()) return t('Keine automatische Aktualisierung.');
+          return t('Zuletzt vor {s} s · nächste in {n} s', {s: this.refreshAge, n: Math.max(0, REFRESH_INTERVAL_MS / 1000 - this.refreshAge)});
+        },
+        async refreshNow() {
+          this.refreshMenuOpen = false;
+          await this.load({silent: true});
+          this.refreshAge = 0;
+        },
+        // Einmal pro Sekunde geprüft, alle 60 s nachgeladen — nur bei sichtbarem Tab und ohne Pause. Kehrt man
+        // nach längerer Zeit in den Tab zurück, lädt der nächste Takt sofort.
+        refreshTick() {
+          if (!this.$root.isConnected) { clearInterval(this._refreshTimer); return; }
+          const age = Date.now() - this._lastRefresh;
+          if (this.refreshMenuOpen) this.refreshAge = Math.round(age / 1000);
+          if (age >= REFRESH_INTERVAL_MS && document.visibilityState === 'visible'
+              && !this.refreshPause() && !this.loading) {
+            this.refreshNow();
+          }
         },
 
         render() {
           if (!this.hasData) return;
           if (!chartInstance) {
-            chartInstance = echarts.init(document.getElementById('chart'));
+            chartInstance = newChartInstance();
             AxisFit.attach(chartInstance);
             // Einmalig bei der Instanzerzeugung registriert, nicht bei jedem
             // Rendern — sonst stapeln sich mit jedem Neuzeichnen weitere
@@ -1949,6 +2019,8 @@ function selectBrush() {
           // Der Zeitstrahl (Standard für Schalter) braucht immer Rohwerte.
           if (this.chartType === 'timeline') this.raw = true;
           this.load();
+          this._refreshTimer = setInterval(() => this.refreshTick(), 1000);
+          document.addEventListener('visibilitychange', () => this.refreshTick());
           window.addEventListener('resize', () => chartInstance && chartInstance.resize());
           // ResizeObserver zusätzlich zu window-resize: die Kartenbreite kann sich
           // auch ohne Fenster-Resize ändern (z. B. wenn die Toolbar umbricht).

@@ -12,6 +12,20 @@
       <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon(_('App-eigener Anzeigename — HA: ') ~ (friendly_name or entity_id)) }}{% endif %}</h1>
       <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
               title="{{ _('Favorit') }}" onclick="toggleFavorite('{{ app_root }}/entities/{{ entity_id }}/favorite', this)">★</button>
+      {# Chip für das automatische Nachladen des Verlaufs (Reiter "Verlauf"), rechts neben dem Titel. #}
+      <span class="refresh-wrap" @click.outside="refreshMenuOpen = false">
+        <button type="button" class="refresh-chip" :class="{paused: refreshPause()}" aria-haspopup="menu" :aria-expanded="refreshMenuOpen"
+                :title="refreshChipTitle()" @click="refreshMenuOpen = !refreshMenuOpen; refreshAge = Math.round((Date.now() - _lastRefresh) / 1000)">
+          <span class="refresh-dot"></span><span x-text="refreshChipText()"></span>
+        </button>
+        <div class="menu-popover menu-popover-narrow refresh-menu" x-show="refreshMenuOpen" x-cloak role="menu">
+          <div class="refresh-info" x-text="refreshInfo()"></div>
+          <button type="button" class="menu-row" role="menuitem" @click="refreshNow()">{{ _("Jetzt aktualisieren") }}</button>
+          <button type="button" class="menu-row" role="menuitem" @click="refreshOn = !refreshOn">
+            <span>{{ _("Automatisch aktualisieren") }}</span><span class="refresh-state" x-text="refreshOn ? t('An') : t('Aus')"></span>
+          </button>
+        </div>
+      </span>
     </div>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
