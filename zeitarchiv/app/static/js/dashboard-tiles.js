@@ -38,12 +38,50 @@
 
 
   const instances = new Map();  // chartId -> echarts instance
-  // Einmal für die ganze Seite statt in setup(): das läuft nach jedem
-  // htmx-Austausch des Dashboard-Gitters erneut, und jeder Lauf legte einen
-  // weiteren Listener an — nach n Austauschen n Resize-Durchläufe je Ereignis.
-  // Die Sammlung wird beim Austausch geleert und neu befüllt, der eine
-  // Listener sieht so immer die aktuellen Instanzen.
-  window.addEventListener('resize', () => instances.forEach(c => c.resize()));
+  // Charts folgen der Größe IHRES Containers, nicht der des Fensters: Ein
+  // Spaltenwechsel, die Seitenleiste von Home Assistant oder eine neue
+  // Rahmenbreite ändern die Kachel, ohne dass window.resize feuert. Ein
+  // einziger ResizeObserver für die ganze Seite statt in setup() — das läuft
+  // nach jedem htmx-Austausch des Dashboard-Gitters erneut, und ein Observer
+  // je Lauf hieße n Durchläufe je Größenänderung. Beobachtet werden die
+  // Chart-Elemente (auch die der Zustands-Donuts, die nicht in `instances`
+  // stehen); chartHosts ordnet jedem Element seine ECharts-Instanz zu.
+  // Die Aufrufe werden auf einen Animationsframe gebündelt, und ein Element
+  // ohne Fläche (versteckt, 0×0) oder mit unveränderter Größe zeichnet nicht.
+  const chartHosts = new WeakMap();  // Element -> {chart, w, h}
+  const resizePending = new Set();
+  let resizeQueued = false;
+  const resizeObserver = typeof ResizeObserver === 'function'
+    ? new ResizeObserver(entries => {
+      entries.forEach(entry => resizePending.add(entry.target));
+      if (resizeQueued) return;
+      resizeQueued = true;
+      requestAnimationFrame(() => {
+        resizeQueued = false;
+        resizePending.forEach(el => {
+          const host = chartHosts.get(el);
+          if (!host || host.chart.isDisposed() || !el.clientWidth || !el.clientHeight) return;
+          if (el.clientWidth === host.w && el.clientHeight === host.h) return;
+          host.w = el.clientWidth;
+          host.h = el.clientHeight;
+          host.chart.resize();
+        });
+        resizePending.clear();
+      });
+    })
+    : null;
+  // Rückfall für Browser ohne ResizeObserver (heute keiner der unterstützten):
+  // wie früher bei jedem Fenster-Resize, nur für die Instanzen in `instances`.
+  if (!resizeObserver) window.addEventListener('resize', () => instances.forEach(c => c.resize()));
+  function observeChart(chart, el) {
+    chartHosts.set(el, {chart, w: el.clientWidth, h: el.clientHeight});
+    if (resizeObserver) resizeObserver.observe(el);
+  }
+  function disposeChart(chart) {
+    const el = chart.getDom();
+    if (resizeObserver && el) resizeObserver.unobserve(el);
+    chart.dispose();
+  }
   // chartId -> {items, legendMetrics, showStats} — die zuletzt geladenen und
   // berechneten Legenden-Kennzahlen einer Chart-Kachel, unabhängig vom
   // aktuellen Sichtbarkeitszustand der Legende zwischengespeichert. Ein
@@ -235,7 +273,7 @@
     // wird nur ohne intakte Instanz, z. B. nach einem "Keine Daten"-
     // Platzhalter, der das Canvas ersetzt hat.
     if (chart && chart.getDom() === chartEl && !chartEl.querySelector('canvas, svg')) {
-      chart.dispose();
+      disposeChart(chart);
       chart = null;
     }
     // Ein htmx-Swap von #dashboard-grid (Pin/Unpin/Reorder) ersetzt chartEl
@@ -247,13 +285,14 @@
     // bestehen, statt neu an den aktuellen Container gebunden zu werden —
     // sichtbar als sich über die Zeit ansammelnde verwaiste Tooltips.
     if (chart && chart.getDom() !== chartEl) {
-      chart.dispose();
+      disposeChart(chart);
       chart = null;
     }
     if (!chart) {
       chartEl.innerHTML = '';
       chart = echarts.init(chartEl);
       instances.set(chartId, chart);
+      observeChart(chart, chartEl);
     }
     // Canvas kennt keine CSS-Variablen — anders als im übrigen CSS dieser
     // Seite müssen Farben hier erst über getComputedStyle in konkrete Werte
@@ -560,6 +599,7 @@
     const style = getComputedStyle(document.body);
     const pattern = StateEntities.unavailablePattern();
     const chart = echarts.init(chartEl);
+    observeChart(chart, chartEl);
     chart.setOption({
       animation: false,
       tooltip: {
@@ -600,7 +640,7 @@
     const visualEl = el.querySelector('.dtile-state-visual');
     if (!visualEl) return;
     const instance = echarts.getInstanceByDom(visualEl.querySelector('.dtile-state-donut-chart') || visualEl);
-    if (instance) instance.dispose();
+    if (instance) disposeChart(instance);
     if (el.dataset.stateView === 'donut') { renderStateDonut(visualEl, st); return; }
     const wide = parseInt(el.closest('.dtile')?.dataset.gridCols || '1', 10) >= 2;
     visualEl.innerHTML = wide ? stateDaysHtml(st) : stateStripHtml(st);
@@ -1548,7 +1588,7 @@
   // erneuten setup() ihre eigene frische Instanz.
   document.body.addEventListener('htmx:afterSettle', (e) => {
     if (e.target && e.target.id === 'dashboard-grid') {
-      instances.forEach(c => c.dispose());
+      instances.forEach(disposeChart);
       instances.clear();
       setup();
       applySectionCollapseState(document);
