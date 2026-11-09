@@ -7,7 +7,7 @@
 {% block content %}
   {% from "_icons.html" import custom_name_icon %}
   
-  <div class="page" x-data="tableEditor()">
+  <div class="page page-wide" x-data="tableEditor()">
     <h1>{{ _("Tabellen") }}</h1>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">{{ _("Mehrere Größen über mehrere Zeiträume nebeneinander vergleichen. &middot;") }} <a href="{{ app_root }}/tables">{{ _("&larr; zurück zu Tabellen") }}</a></p>
 

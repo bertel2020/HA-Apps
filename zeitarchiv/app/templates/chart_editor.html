@@ -5,7 +5,7 @@
 {% endblock %}
 {% block content %}
   
-  <div class="page" x-data="chartEditor()" :data-legend-size="legendSize || null">
+  <div class="page page-wide" x-data="chartEditor()" :data-legend-size="legendSize || null">
     <h1>{{ _("Charts") }}</h1>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">{{ _("Eigene Charts über eine oder mehrere Entitäten hinweg zusammenstellen und dauerhaft ablegen. &middot;") }} <a href="{{ app_root }}/charts">{{ _("&larr; zurück zu Charts") }}</a></p>
 

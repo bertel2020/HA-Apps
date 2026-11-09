@@ -7,7 +7,7 @@
 {% endblock %}
 {% block content %}
   
-  <div class="page">
+  <div class="page page-wide">
     <div class="dash-title-row">
       <h1>{{ (dashboard.name | retranslate) if dashboard.is_default else dashboard.name }}</h1>
       {% if dashboard.locked %}

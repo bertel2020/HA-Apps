@@ -176,6 +176,10 @@
   .soll-entity-picker > .btn{width:100%;}
   .soll-entity-picker .dd-picker-popover{width:100%;}
   #chart{width:100%;height:420px;max-width:100%;}
+  /* Breite Darstellung: das Diagramm wächst mit der Breite (etwa 3 : 1), höchstens 640px. */
+  @media (min-width:1200px){
+    :root[data-page-layout="wide"] #chart{height:max(420px,min(33vw,640px));}
+  }
   .card{overflow:hidden;}
   /* .chart-legend/.chart-legend-item: siehe app.css — von der Entität-eigenen
      Chart-Seite (entity_detail.html) mitgenutzt, deshalb zentral statt hier

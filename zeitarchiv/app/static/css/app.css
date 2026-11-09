@@ -2631,3 +2631,16 @@ a.el-rec-big[href]:focus-visible{outline:2px solid var(--c);outline-offset:-2px;
 .ov-set-toggle.is-on{background:var(--accent-line);}
 .ov-set-toggle.is-on::after{left:15px;}
 .ov-set-toggle:disabled{opacity:.4;cursor:default;}
+
+/* Breite Darstellung (experimentell, Einstellungen → Darstellung): Rahmen von Kopfzeile, Seiten mit
+   .page-wide und Backup-Leiste wachsen auf --page-max (1920px), darüber stehen sie mittig. Alle
+   anderen Seiten (Formulare, Einstellungen, Energie- und Wetterdashboard, Übersicht) behalten
+   --page-narrow und sitzen linksbündig an der Rahmenkante, damit Logo und Inhalt fluchten. Die
+   Kante ist (100vw − 48px − Rahmenbreite) / 2: so weit steht der Rahmen vom Fensterrand ab, wenn
+   das Fenster breiter als der Rahmen ist (48px = Seitenpolster von body; 100vw enthält eine
+   Scrollleiste, unter macOS mit Überlagerung unsichtbar). Nur ab 1200px, darunter alles wie bisher. */
+@media (min-width:1200px){
+  :root[data-page-layout="wide"]{--page-max:1920px;}
+  :root[data-page-layout="wide"] .page:not(.page-wide),
+  :root[data-page-layout="wide"] .rw-bar-in{max-width:var(--page-narrow);margin-left:max(0px,calc((100vw - 48px - var(--page-max)) / 2));margin-right:auto;}
+}

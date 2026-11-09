@@ -98,3 +98,29 @@ def test_precise_mode_uses_four_columns_on_tablets() -> None:
         assert css.index("@media (max-width:520px){", start) > start
         blocks.append(block)
     assert blocks[0] == blocks[1]
+
+
+WIDE_TEMPLATES = {"charts", "tables", "table_editor", "chart_editor", "entities_list", "dashboard_detail"}
+
+
+def test_only_the_planned_pages_opt_into_the_wide_frame() -> None:
+    """Exakt die Seiten aus dem Plan; Formulare und Einstellungen bleiben schmal."""
+    found = {
+        path.stem for path in TEMPLATES.glob("*.html")
+        if re.search(r'class="page page-wide"', path.read_text(encoding="utf-8"))
+    }
+    assert found == WIDE_TEMPLATES
+    for name in ("settings", "energiedashboard", "wetterdashboard", "entities"):
+        assert "page-wide" not in (TEMPLATES / f"{name}.html").read_text(encoding="utf-8")
+
+
+def test_wide_frame_rules_apply_only_at_1200px_and_keep_narrow_pages_left() -> None:
+    css = APP_CSS.read_text(encoding="utf-8")
+    block = css[css.index("@media (min-width:1200px){\n  :root[data-page-layout=\"wide\"]{--page-max:1920px;}"):]
+    block = block[: block.index("\n}")]
+    assert '.page:not(.page-wide)' in block and ".rw-bar-in" in block
+    assert "max-width:var(--page-narrow)" in block and "margin-right:auto" in block
+    # Der Chart-Editor bekommt die höhere Fläche nur im Schalter-Block.
+    editor = (PAGE_CSS / "chart_editor.css").read_text(encoding="utf-8")
+    assert editor.count("#chart{height:max(420px,min(33vw,640px));}") == 1
+    assert "#chart{width:100%;height:420px;max-width:100%;}" in editor
