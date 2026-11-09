@@ -1698,6 +1698,29 @@
         return this.kenntageRange === 'all' ? years : years.slice(-Number(this.kenntageRange));
       },
 
+      // Jahre-Auswahl wie im Energiedashboard (Reiter Langzeit): „Letzte 5“, „Letzte 10“, „Alle (n)“; erst ab mehr als fünf Jahren,
+      // „Letzte 10“ erst ab mehr als zehn. Ein gemerkter Wert, der nichts mehr kürzt, zeigt „Alle“.
+      kenntageCount() {
+        return this.longterm ? Object.keys(this.longterm.kenntage).length : 0;
+      },
+
+      kenntageOptions() {
+        const count = this.kenntageCount();
+        return [
+          {value: '5', label: t('Letzte 5')},
+          ...(count > 10 ? [{value: '10', label: t('Letzte 10')}] : []),
+          {value: 'all', label: t('Alle ({n})', {n: count})},
+        ];
+      },
+
+      showKenntageChoice() {
+        return this.kenntageCount() > 5;
+      },
+
+      kenntageShownRange() {
+        return this.kenntageRange !== 'all' && Number(this.kenntageRange) < this.kenntageCount() ? this.kenntageRange : 'all';
+      },
+
       setKenntageRange(range) {
         this.kenntageRange = range;
         writeStore({kenntageRange: range});

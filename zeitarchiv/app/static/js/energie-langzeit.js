@@ -1007,6 +1007,11 @@
         return yearChoices(this.yearCount());
       },
 
+      // Ein gemerkter Wert, der nichts mehr kürzt (zehn bei höchstens zehn Jahren), zeigt „Alle“.
+      shownYearLimit() {
+        return this.yearLimit && this.yearLimit < this.yearCount() ? this.yearLimit : 0;
+      },
+
       showYearChoice() {
         return this.shView === 'years' && this.yearCount() > YEAR_STEP;
       },
@@ -1302,6 +1307,11 @@
 
       yearOptions() {
         return yearChoices(this.yearCount());
+      },
+
+      // Ein gemerkter Wert, der nichts mehr kürzt (zehn bei höchstens zehn Jahren), zeigt „Alle“.
+      shownYearLimit() {
+        return this.yearLimit && this.yearLimit < this.yearCount() ? this.yearLimit : 0;
       },
 
       showYearChoice() {

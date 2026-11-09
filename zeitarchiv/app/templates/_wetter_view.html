@@ -449,10 +449,10 @@
       <div class="wt-controls">
         <h2 class="wt-h2">{{ _("Kenntage je Jahr") }} {{ hint_button(_("Kenntage je Jahr")) }}</h2>
         {% call hint_body() %}<span x-text="kenntageNote()"></span>{% endcall %}
-        <div class="wt-seg" role="group" aria-label="{{ _('Zeitraum') }}">
-          <button type="button" :aria-pressed="(kenntageRange === '5').toString()" @click="setKenntageRange('5')">{{ _("Letzte 5") }}</button>
-          <button type="button" :aria-pressed="(kenntageRange === '10').toString()" @click="setKenntageRange('10')">{{ _("Letzte 10") }}</button>
-          <button type="button" :aria-pressed="(kenntageRange === 'all').toString()" @click="setKenntageRange('all')">{{ _("Alle Jahre") }}</button>
+        <div class="wt-seg" role="group" aria-label="{{ _('Anzahl der Jahre') }}" x-show="showKenntageChoice()" x-cloak>
+          <template x-for="option in kenntageOptions()" :key="option.value">
+            <button type="button" :aria-pressed="(kenntageShownRange() === option.value).toString()" @click="setKenntageRange(option.value)" x-text="option.label"></button>
+          </template>
         </div>
       </div>
       <div class="wt-kk-grid">
