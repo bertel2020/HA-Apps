@@ -115,12 +115,12 @@ def test_only_the_planned_pages_opt_into_the_wide_frame() -> None:
         assert "page-wide" not in (TEMPLATES / f"{name}.html").read_text(encoding="utf-8")
 
 
-def test_wide_frame_rules_apply_only_at_1200px_and_keep_narrow_pages_left() -> None:
+def test_wide_frame_rules_apply_only_at_1200px_and_center_narrow_pages() -> None:
     css = APP_CSS.read_text(encoding="utf-8")
     block = css[css.index("@media (min-width:1200px){\n  :root[data-page-layout=\"wide\"]{--page-max:1920px;}"):]
     block = block[: block.index("\n}")]
     assert '.page:not(.page-wide)' in block and ".rw-bar-in" in block
-    assert "max-width:var(--page-narrow)" in block and "margin-right:auto" in block
+    assert "max-width:var(--page-narrow)" in block and "margin-left" not in block
     # Der Chart-Editor bekommt die höhere Fläche nur im Schalter-Block.
     editor = (PAGE_CSS / "chart_editor.css").read_text(encoding="utf-8")
     assert editor.count("#chart{height:max(420px,min(33vw,640px));}") == 1
