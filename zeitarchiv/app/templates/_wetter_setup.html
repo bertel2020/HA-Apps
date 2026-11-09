@@ -115,7 +115,7 @@
             const taken = new Set(Object.values(this.roleVals).filter(Boolean));
             const extras = (data.extras || []).filter((e) => !taken.has(e.entity_id));
             if (!this.extras.length && extras.length) {
-              this.extras = extras.slice(0, this.maxExtra).map((e) => ({entity_id: e.entity_id, name: ""}));
+              this.extras = extras.slice(0, this.maxExtra).map((e) => ({entity_id: e.entity_id, name: "", room: ""}));
               filled += 1;
             }
             this.hints = hints;
@@ -151,11 +151,32 @@
         // Ein weiterer Sensor mit „%“ ist ein Feuchtesensor (eigenes Symbol, eigene Farbe, eigenes Diagramm).
         extraKind(row) {
           const option = this.entityOptions.find((o) => o.entity_id === row.entity_id);
-          return option && option.unit === "%" ? "humidity" : "extra";
+          return option && (option.device_class === "humidity" || option.unit === "%") ? "humidity" : "extra";
+        },
+        // Weitere Sensoren sind Temperatur oder Luftfeuchte: mit bekannter Geräteklasse entscheidet sie (Akku mit „%“ fällt
+        // heraus), ohne sie die Einheit. Der gerade gewählte Eintrag bleibt immer in der Liste.
+        isClimate(o) {
+          if (["temperature", "humidity"].includes(o.device_class)) return true;
+          return !o.device_class && ["°C", "°F", "K", "%"].includes(o.unit);
+        },
+        // Raum eines Eintrags: Handeingabe, sonst die Area aus Home Assistant (leer = „Ohne Raum“).
+        roomOf(row) {
+          if (row.room) return row.room;
+          const option = this.entityOptions.find((o) => o.entity_id === row.entity_id);
+          return option ? option.area : "";
+        },
+        roomNames() {
+          return [...new Set([...this.extras.map((r) => this.roomOf(r)), ...this.entityOptions.map((o) => o.area)].filter(Boolean))].sort();
+        },
+        areaOf(id) {
+          const option = this.entityOptions.find((o) => o.entity_id === id);
+          return option ? option.area : "";
         },
         optionsFor(role) {
           const allowed = this.roleTypes[role] || ["standard"];
-          const options = this.preferUnits(this.entityOptions.filter(o => allowed.includes(o.aggregation_type)), role);
+          const fits = (o) => allowed.includes(o.aggregation_type)
+            && (role !== "extra" || this.isClimate(o) || o.entity_id === this.draft.entity_id);
+          const options = this.preferUnits(this.entityOptions.filter(fits), role);
           return options.concat(this.nearMisses(role, allowed));
         },
         // Rollen mit festem Typ (Niederschlag: Zähler): Sensoren mit der passenden Einheit, die als Messwert geführt
@@ -179,18 +200,18 @@
         },
         // Listen (weitere Sensoren, Heizzähler): Kachel je Eintrag, ein gemeinsamer Dialog bearbeitet eine Kopie (draft),
         // „Übernehmen“ schreibt sie zurück. Ein neuer Eintrag, der ohne Übernehmen geschlossen wird, verschwindet wieder.
-        listKind: null, listIdx: -1, listNew: false, draft: {entity_id: "", name: ""},
+        listKind: null, listIdx: -1, listNew: false, draft: {entity_id: "", name: "", room: ""},
         listRows(kind) { return kind === "extra" ? this.extras : this.heating; },
         openRow(kind, idx) {
           const row = this.listRows(kind)[idx];
           this.listKind = kind; this.listIdx = idx; this.listNew = false;
-          this.draft = {entity_id: row.entity_id, name: row.name};
+          this.draft = {entity_id: row.entity_id, name: row.name, room: row.room || ""};
           this.$nextTick(() => this.$refs.rowDlg.showModal());
         },
         addRow(kind) {
           const rows = this.listRows(kind);
           if (rows.length >= (kind === "extra" ? this.maxExtra : this.maxHeating)) return;
-          rows.push({entity_id: "", name: ""});
+          rows.push({entity_id: "", name: "", room: ""});
           this.openRow(kind, rows.length - 1);
           this.listNew = true;
         },
@@ -198,6 +219,7 @@
           if (!this.draft.entity_id) { this.removeRow(); return; }
           const row = this.listRows(this.listKind)[this.listIdx];
           row.entity_id = this.draft.entity_id; row.name = this.draft.name.trim();
+          row.room = this.listKind === "extra" ? this.draft.room.trim() : "";
           this.listNew = false;
           this.$refs.rowDlg.close();
         },
@@ -277,7 +299,7 @@
   <section class="settings-section wt-section-neutral">
   <h2 class="settings-section-title">{{ _("Weitere Sensoren") }} {{ hint_button(_("Weitere Sensoren")) }}</h2>
   <p class="settings-section-description">{{ _("Zusätzliche Temperatur- oder Feuchtesensoren, zum Beispiel Keller, Dachboden oder Nordseite. Sie erscheinen auf dem Reiter „Temperatur &amp; Klima“.") }}</p>
-  {% call hint_body() %}{{ _("Jeder weitere Sensor bekommt eine eigene Zeile in der Tabelle, er wird nie mit der Außentemperatur gemittelt. Sensoren mit der Einheit „%“ gelten als Feuchtesensoren und bekommen auf dem Reiter ein eigenes Diagramm.") }}{% endcall %}
+  {% call hint_body() %}{{ _("Weitere Sensoren werden nie mit der Außentemperatur gemittelt. Ohne Raum bekommt jeder einen eigenen Block in der Tabelle; mit Raum stehen die Sensoren desselben Raums in einem Block. Sensoren mit der Geräteklasse Luftfeuchte oder der Einheit „%“ gelten als Feuchtesensoren und bekommen auf dem Reiter ein eigenes Diagramm.") }}{% endcall %}
   <div class="wt-item-grid wt-item-grid-list">
     <template x-for="(row, i) in extras" :key="i">
       <button type="button" class="wt-item-tile" :data-role="extraKind(row)" @click="openRow('extra', i)">
@@ -289,7 +311,7 @@
             <span class="wt-item-name" x-text="row.name || (row.entity_id ? nameFor(row.entity_id) : t('Sensor'))"></span>
           </div>
           <div class="wt-item-bottom">
-            <span class="wt-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) : t('Nicht zugeordnet')"></span>
+            <span class="wt-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) + (roomOf(row) ? ' · ' + roomOf(row) : '') : t('Nicht zugeordnet')"></span>
           </div>
         </div>
       </button>
@@ -298,7 +320,7 @@
       <span class="wt-item-add-label">{{ _("+ Sensor") }}</span>
     </button>
   </div>
-  <template x-for="row in extras"><span><input type="hidden" name="extra_entity_id" :value="row.entity_id"><input type="hidden" name="extra_name" :value="row.name"></span></template>
+  <template x-for="row in extras"><span><input type="hidden" name="extra_entity_id" :value="row.entity_id"><input type="hidden" name="extra_name" :value="row.name"><input type="hidden" name="extra_room" :value="row.room || ''"></span></template>
   </section>
 
   <section class="settings-section wt-section-regen">
@@ -434,6 +456,13 @@
           <div class="field">
             <label>{{ _("Entität") }}</label>
             {{ row_picker() }}
+          </div>
+          <div class="field" x-show="listKind === 'extra'">
+            <label for="wt-room-input">{{ _("Raum") }}</label>
+            <input type="text" id="wt-room-input" x-model="draft.room" maxlength="60" list="wt-room-list"
+                   :placeholder="areaOf(draft.entity_id) ? t('aus Home Assistant: {area}', {area: areaOf(draft.entity_id)}) : t('Raum (optional)')">
+            <datalist id="wt-room-list"><template x-for="name in roomNames()" :key="name"><option :value="name"></option></template></datalist>
+            <p class="wt-why">{{ _("Sensoren desselben Raums stehen in der Tabelle „Zeiträume im Vergleich“ zusammen. Leer lassen übernimmt den Raum aus Home Assistant.") }}</p>
           </div>
         </div>
         <div class="wt-dialog-footer wt-dialog-footer-split">

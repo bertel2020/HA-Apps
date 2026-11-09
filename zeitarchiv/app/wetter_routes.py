@@ -38,6 +38,7 @@ from . import wetter_autofill
 from . import wetter_conditions as conditions
 from . import wetter_daylight as daylight
 from . import wetter_pv as pv_mod
+from . import wetter_rooms
 from .chart_period import calendar_bounds
 from .formatting import decimals_to_int, entity_display_name
 from .period_columns import MODES, parse_stichtag
@@ -260,7 +261,7 @@ def _load_config(index: Index) -> dict:
     extras = data.get("extra_temperatures")
     if isinstance(extras, list):
         config["extra_temperatures"] = [
-            {"entity_id": str(row.get("entity_id") or ""), "name": str(row.get("name") or "")}
+            wetter_rooms.entry(str(row.get("entity_id") or ""), str(row.get("name") or ""), str(row.get("room") or ""))
             for row in extras
             if isinstance(row, dict) and row.get("entity_id")
         ][:MAX_EXTRA_TEMPERATURES]
@@ -438,6 +439,7 @@ class WetterService:
         # Anzeigename statt Rollenname: Kacheln und Tabellengruppen stehen in Großbuchstaben, und aus
         # „Außentemperatur“ würde „AUSSENTEMPERATUR“, was wie ein Tippfehler aussieht.
         add("temperature", config["temperature"], tr("Temperatur außen"), "standard")
+        known = wetter_rooms.places(self.deps.data_dir)
         for position, extra in enumerate(config["extra_temperatures"]):
             entity = index.get_entity(extra["entity_id"])
             name = extra["name"] or (
@@ -445,6 +447,10 @@ class WetterService:
                 if entity else extra["entity_id"]
             )
             add(f"temperature:{position}", extra["entity_id"], name, "standard")
+            # Raum und Etage nur zur Darstellung: Schlüssel und Reihenfolge bleiben die der Einträge.
+            if specs and specs[-1]["key"] == f"temperature:{position}":
+                specs[-1]["room"] = wetter_rooms.room_of(extra, known)
+                specs[-1]["floor"] = wetter_rooms.floor_of(extra, known)
         add("precip_mm", config["precip_mm"], role_label("precip_mm"), "counter")
         add("precip_dur", config["precip_dur"], role_label("precip_dur"), "switch")
         for key in ("humidity", "pressure", "wind", "gust", "radiation"):
@@ -1689,6 +1695,7 @@ class WetterService:
         }
 
     def _entity_options(self) -> list[dict]:
+        known = wetter_rooms.places(self.deps.data_dir)
         return [
             {
                 "entity_id": row["entity_id"],
@@ -1698,6 +1705,9 @@ class WetterService:
                 "unit": row["unit"],
                 "aggregation_type": row["aggregation_type"],
                 "last_value": row["last_value"],
+                "area": known.get(row["entity_id"], {}).get("area") or "",
+                "floor": known.get(row["entity_id"], {}).get("floor") or "",
+                "device_class": known.get(row["entity_id"], {}).get("device_class"),
             }
             for row in self.deps.index.list_entities()
         ]
@@ -1780,6 +1790,7 @@ class WetterService:
             sun_elevation: str = Form(""),
             extra_entity_id: list[str] = Form([]),
             extra_name: list[str] = Form([]),
+            extra_room: list[str] = Form([]),
             blocks_submitted: str = Form(""),
             show_block: list[str] = Form([]),
             cards_submitted: str = Form(""),
@@ -1827,7 +1838,8 @@ class WetterService:
                 if entity is None or entity["aggregation_type"] != "standard":
                     raise HTTPException(status_code=400, detail=tr("Unbekannte Entität: {entity_id}", entity_id=entity_id))
                 name = extra_name[position].strip() if position < len(extra_name) else ""
-                extras.append({"entity_id": entity_id, "name": name[:60]})
+                room = extra_room[position].strip() if position < len(extra_room) else ""
+                extras.append(wetter_rooms.entry(entity_id, name[:60], room))
             config["extra_temperatures"] = extras[:MAX_EXTRA_TEMPERATURES]
             # Ohne das Marker-Feld (ältere Aufrufer) bleibt die bisherige Auswahl erhalten.
             if blocks_submitted:

@@ -3497,7 +3497,7 @@
     "Wind &amp; Sonne": "Wind &amp; sun",
     "Weitere Sensoren": "More sensors",
     "Zusätzliche Temperatur- oder Feuchtesensoren, zum Beispiel Keller, Dachboden oder Nordseite. Sie erscheinen auf dem Reiter „Temperatur &amp; Klima“.": "Additional temperature or humidity sensors, for example cellar, attic or north side. They appear on the “Temperature &amp; climate” tab.",
-    "Jeder weitere Sensor bekommt eine eigene Zeile in der Tabelle, er wird nie mit der Außentemperatur gemittelt. Sensoren mit der Einheit „%“ gelten als Feuchtesensoren und bekommen auf dem Reiter ein eigenes Diagramm.": "Each additional sensor gets its own row in the table; it is never averaged with the outdoor temperature. Sensors with the unit “%” count as humidity sensors and get their own chart on the tab.",
+    "Weitere Sensoren werden nie mit der Außentemperatur gemittelt. Ohne Raum bekommt jeder einen eigenen Block in der Tabelle; mit Raum stehen die Sensoren desselben Raums in einem Block. Sensoren mit der Geräteklasse Luftfeuchte oder der Einheit „%“ gelten als Feuchtesensoren und bekommen auf dem Reiter ein eigenes Diagramm.": "Additional sensors are never averaged with the outdoor temperature. Without a room each one gets its own block in the table; with a room, the sensors of the same room share one block. Sensors with the device class humidity or the unit “%” count as humidity sensors and get their own chart on the tab.",
     "Luftfeuchte im Vergleich": "Humidity comparison",
     "Tagesmittel der Luftfeuchte außen und der weiteren Feuchtesensoren, im selben Zeitraum wie die Temperaturen.": "Daily mean of the outdoor humidity and the additional humidity sensors, over the same period as the temperatures.",
     "+ Sensor": "+ Sensor",
@@ -3804,7 +3804,10 @@
     "Hohe Einspeisung über": "High feed-in above",
     "kWh am Tag": "kWh per day",
     "Jahressummen der Größe": "Annual totals of the selected item",
-    "Unbekannte Größe: {value}": "Unknown size: {value}"
+    "Unbekannte Größe: {value}": "Unknown size: {value}",
+    "Raum": "Room",
+    "Sensoren desselben Raums stehen in der Tabelle „Zeiträume im Vergleich“ zusammen. Leer lassen übernimmt den Raum aus Home Assistant.": "Sensors of the same room are grouped in the “Periods compared” table. Leave empty to use the room from Home Assistant.",
+    "Nur Mittelwerte": "Averages only"
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4837,6 +4840,10 @@
     "Zu wenige Tage mit Außentemperatur und Wert (mindestens {n}).": "Too few days with outdoor temperature and value (at least {n}).",
     "Trendlinie: {value} kWh je Tag je 1 {unit} Außentemperatur (R² {r2}, {n} Tage)": "Trend line: {value} kWh per day per 1 {unit} of outdoor temperature (R² {r2}, {n} days)",
     "Keine vollständigen Werte": "No complete values",
-    "Neuestes Jahr oben, eine Spalte je Kalendertag, gefärbt nach dem Tageswert; die Farbstufen gelten für alle Jahre gleich. Graue Felder sind Tage ohne vollständige Werte (auch der Tag nach einem fehlenden Tag), leer ist es vor dem Archivbeginn und ab heute. Ein Klick öffnet den Tag in der Übersicht.": "Newest year on top, one column per calendar day, coloured by the daily value; the colour steps are the same for all years. Grey cells are days without complete values (including the day after a missing day), blank means before the archive began and from today on. A click opens the day in the overview."
+    "Neuestes Jahr oben, eine Spalte je Kalendertag, gefärbt nach dem Tageswert; die Farbstufen gelten für alle Jahre gleich. Graue Felder sind Tage ohne vollständige Werte (auch der Tag nach einem fehlenden Tag), leer ist es vor dem Archivbeginn und ab heute. Ein Klick öffnet den Tag in der Übersicht.": "Newest year on top, one column per calendar day, coloured by the daily value; the colour steps are the same for all years. Grey cells are days without complete values (including the day after a missing day), blank means before the archive began and from today on. A click opens the day in the overview.",
+    "aus Home Assistant: {area}": "from Home Assistant: {area}",
+    "Raum (optional)": "Room (optional)",
+    "Feuchte": "Humidity",
+    "Ohne Raum": "No room"
   }
 }

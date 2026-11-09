@@ -242,6 +242,8 @@
       yearKeys: [],  // wählbare einzelne Jahre (vom Server, neueste zuerst)
       vorjahr: true,
       diff: true,
+      // Nur der Mittelwert je Sensor statt Max, Min und Ø (Tabelle „Temperatur & Klima“).
+      avgOnly: false,
       mode: 'bis_jetzt',
       tiles: [],
       tilesLoaded: false,
@@ -261,6 +263,7 @@
         if (Array.isArray(saved.columns)) this.columns = saved.columns.filter((key) => COLUMN_KEYS.includes(key) || /^j\d{4}$/.test(key));
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
+        if (typeof saved.avgOnly === 'boolean') this.avgOnly = saved.avgOnly;
         if (['5', '10', 'all'].includes(saved.kenntageRange)) this.kenntageRange = saved.kenntageRange;
         if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
         // Ausgeblendete Karten fehlen im Dokument: der erste vorhandene Reiter ist der Start, Diagramme ohne Karte laden nicht.
@@ -338,12 +341,18 @@
         if (lastTable) this.paintTables(lastTable);
       },
 
+      toggleAvg() {
+        this.avgOnly = !this.avgOnly;
+        writeStore({avgOnly: this.avgOnly});
+        if (lastTable) this.paintTables(lastTable);
+      },
+
       paintTables(data) {
         for (const group of GROUPS) {
           const table = this.$refs[refName('table', group)];
           const wrap = this.$refs[refName('tableWrap', group)];
           if (!table) continue;
-          table.innerHTML = renderTable(data, group, this.diff);
+          table.innerHTML = renderTable(data, group, this.diff, {avgOnly: this.avgOnly});
           // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
           wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1);
         }

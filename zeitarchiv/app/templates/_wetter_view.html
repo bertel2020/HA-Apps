@@ -54,6 +54,7 @@
         <div class="dd-picker-row" role="button" tabindex="0" :class="{active: vorjahr && mode === 'bis_jetzt'}" @click="setYoy('bis_jetzt')">{{ _("Bis jetzt") }}</div>
         <div class="dd-picker-row" role="button" tabindex="0" :class="{active: vorjahr && mode === 'komplett'}" @click="setYoy('komplett')">{{ _("Komplett") }}</div>
         <div class="dd-picker-row wt-yoy-toggle" role="button" tabindex="0" :class="{active: diff}" :aria-pressed="diff.toString()" @click="toggleDiff()">{{ _("Differenz anzeigen") }}</div>
+        {% if group == 'klima' %}<div class="dd-picker-row wt-yoy-toggle" role="button" tabindex="0" :class="{active: avgOnly}" :aria-pressed="avgOnly.toString()" @click="toggleAvg()">{{ _("Nur Mittelwerte") }}</div>{% endif %}
       </div>
     </div>
   </div>
