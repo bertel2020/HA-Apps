@@ -1666,16 +1666,27 @@
         this.$nextTick(() => this.drawSpark());
       },
 
-      // Jahressummen des gewählten Verbrauchers (ältestes Jahr links, höchstens die gewählten Jahre); null bei Bilanzgrößen
-      // oder wenn weniger als zwei Jahre einen Wert haben.
+      // Jahressummen der gewählten Größe (ältestes Jahr links, höchstens die gewählten Jahre); null, wenn weniger als zwei Jahre
+      // einen Wert haben. Verbraucher: die Jahressummen der Antwort; Bilanzgrößen: die Summe ihrer Monatswerte je Jahr.
       sparkRows() {
         const size = this.size();
-        if (!size || !size.consumer || !this.cons) return null;
-        const item = consumerRows(this.cons).find((row) => `c:${row.key}` === this.sizeSel);
-        if (!item || !item.year_sums) return null;
-        const rows = size.m.years.slice().reverse().map((year) => ({
-          year, value: yearValue(item, year), running: year === this.cons.current.year,
-        }));
+        if (!size) return null;
+        let value, current;
+        if (size.consumer) {
+          const item = this.cons && consumerRows(this.cons).find((row) => `c:${row.key}` === this.sizeSel);
+          if (!item || !item.year_sums) return null;
+          value = (year) => yearValue(item, year);
+          current = this.cons.current.year;
+        } else {
+          const sum = (year) => {
+            const months = (size.role.values || {})[String(year)] || [];
+            const have = months.filter((v) => v != null);
+            return have.length ? have.reduce((a, b) => a + b, 0) : null;
+          };
+          value = sum;
+          current = this.months.current.year;
+        }
+        const rows = size.m.years.slice().reverse().map((year) => ({year, value: value(year), running: year === current}));
         return rows.filter((row) => row.value != null).length >= 2 ? rows : null;
       },
 
