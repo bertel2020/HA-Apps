@@ -12,6 +12,7 @@
   // den ersten Treffer. Ergänzen für weitere Herkunftsseiten reicht als
   // neuer Eintrag.
   const ROUTES = [
+    {re: /^\/uebersicht(\/|$)/, text: t('zur Übersicht')},
     {re: /^\/energiedashboard(\/|$)/, text: t('zum Energiedashboard')},
     {re: /^\/dashboards\/\d+/, text: t('zum Dashboard')},
     {re: /^\/dashboards(\/|$)/, text: t('zu den Dashboards')},
