@@ -699,6 +699,18 @@
         // wird — wie legendMetrics ein gespeichertes Chart-Feld (siehe
         // save()), damit sie beim erneuten Öffnen erhalten bleibt.
         legendStyle: LEGEND_STYLE,
+        // '' = folgt der globalen Legendengröße (Einstellungen → Darstellung), sonst 'normal' | 'small'.
+        legendSize: LEGEND_SIZE || '',
+        get legendSizeShown() { return this.legendSize || document.documentElement.dataset.legendSize || 'normal'; },
+        // Bei 'off' fällt der Serien-Umschalter der Legende weg: Ausblendungen per Klick
+        // (nur Ansicht) werden zurückgesetzt, die im Chart gespeicherte Ausblendung bleibt.
+        setLegendStyle(style) {
+          this.legendStyle = style;
+          if (style === 'off' && this.legendHiddenIds.length) {
+            this.legendHiddenIds = [];
+            this.render();
+          }
+        },
         decimals: DECIMALS,
         legendHiddenIds: [],
         optionsMenuOpen: false,
@@ -3102,6 +3114,7 @@
             chart_stats: this.chartStats,
             legend_metrics: this.legendMetrics,
             legend_style: this.legendStyle,
+            legend_size: this.legendSize,
             chart_type: this.donut ? 'donut' : (this.timeline ? (this.hasState ? (this.heatmapWanted ? 'heatmap' : (this.stateChosen ? this.stateMode : 'auto')) : 'timeline') : (this.allSwitch ? 'bar' : 'auto')),
             heatmap_states: this.heatmapStates,
             series_colors: this.seriesColors,

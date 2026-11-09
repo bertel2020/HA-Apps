@@ -23,7 +23,7 @@ def _chart(chart_id: int, entity_ids: list[str], **overrides) -> dict:
         "chart_type": "auto", "donut_aggregation": "sum", "show_values": False, "decimals": "auto",
         "average_line": False, "average_style": "flat", "area_fill": True, "show_points": False,
         "stacked": False, "normalize": False, "horizontal": False, "compare_settings": {"compare": True},
-        "chart_stats": True, "legend_metrics": ["sum"], "legend_style": "chips",
+        "chart_stats": True, "legend_metrics": ["sum"], "legend_style": "chips", "legend_size": "",
     }
     chart.update(overrides)
     return chart
@@ -216,12 +216,12 @@ def test_the_spec_is_what_a_tile_reads_from_its_dataset() -> None:
 
 
 def test_the_spec_carries_the_legend_settings_of_the_chart() -> None:
-    spec = chart_spec(_chart(1, ["sensor.a"], chart_stats=False, legend_metrics=["last", "max"], legend_style="table"), "auto")
-    assert spec["chartStats"] == "false" and spec["legendStyle"] == "table"
+    spec = chart_spec(_chart(1, ["sensor.a"], chart_stats=False, legend_metrics=["last", "max"], legend_style="table", legend_size="small"), "auto")
+    assert spec["chartStats"] == "false" and spec["legendStyle"] == "table" and spec["legendSize"] == "small"
     assert json.loads(spec["legendMetrics"]) == ["last", "max"]
     # Ein Ad-hoc-Chart zeigt Werte und die drei üblichen Kennzahlen (Σ nur, wo es sie gibt).
     ad_hoc = chart_spec(ad_hoc_chart(["sensor.a"], "month", "auto"), "auto")
-    assert ad_hoc["chartStats"] == "true" and ad_hoc["legendStyle"] == "chips"
+    assert ad_hoc["chartStats"] == "true" and ad_hoc["legendStyle"] == "chips" and ad_hoc["legendSize"] == ""
     assert json.loads(ad_hoc["legendMetrics"]) == ["last", "min", "max", "sum"]
 
 

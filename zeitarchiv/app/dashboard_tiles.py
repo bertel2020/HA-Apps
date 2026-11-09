@@ -203,7 +203,7 @@ def tiles_context(
                 # gezeigt werden, und Chips vs. Tabelle sind dort konfiguriert,
                 # nicht hier erneut.
                 "chart_stats": c["chart_stats"], "legend_metrics": c["legend_metrics"],
-                "legend_style": c["legend_style"], "chart_type": effective_chart_type(c, aggregation_types),
+                "legend_style": c["legend_style"], "legend_size": c["legend_size"], "chart_type": effective_chart_type(c, aggregation_types),
                 "show_values": c["show_values"], "decimals": c["decimals"],
                 "average_line": c["average_line"], "area_fill": c["area_fill"], "show_points": c["show_points"],
                 "stacked": c["stacked"], "normalize": c["normalize"], "average_style": c["average_style"],

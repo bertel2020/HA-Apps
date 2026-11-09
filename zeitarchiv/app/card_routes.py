@@ -130,6 +130,7 @@ def chart_spec(chart: dict, chart_type: str) -> dict[str, str]:
         "chartStats": _flag(chart["chart_stats"]),
         "legendMetrics": json.dumps(chart["legend_metrics"]),
         "legendStyle": chart["legend_style"],
+        "legendSize": chart["legend_size"],
         "animation": "false",
     }
 
@@ -195,6 +196,7 @@ def ad_hoc_chart(entity_ids: list[str], period: str, style: str) -> dict:
         # Legende wie bei einem neuen Chart mit Werten: Aktuell/Min/Max, Σ erscheint nur, wo es
         # eine Summe gibt (Zähler, Schalter) — die Kachel lässt sie sonst ebenfalls weg.
         "chart_stats": True, "legend_metrics": ["last", "min", "max", "sum"], "legend_style": "chips",
+        "legend_size": "",
     }
 
 

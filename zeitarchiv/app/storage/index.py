@@ -634,6 +634,7 @@ CREATE TABLE IF NOT EXISTS saved_charts (
     chart_stats INTEGER NOT NULL DEFAULT 1,
     legend_metrics TEXT NOT NULL DEFAULT '["sum"]',
     legend_style TEXT NOT NULL DEFAULT 'chips',
+    legend_size TEXT NOT NULL DEFAULT '',
     chart_type TEXT NOT NULL DEFAULT 'auto',
     is_favorite INTEGER NOT NULL DEFAULT 0,
     created_at REAL NOT NULL,
@@ -1199,6 +1200,12 @@ class Index:
             # legend_metrics oben, dieselbe Konfigurierbarkeit pro Chart.
             self._conn.execute(
                 "ALTER TABLE saved_charts ADD COLUMN legend_style TEXT NOT NULL DEFAULT 'chips'"
+            )
+        if "legend_size" not in sc_columns:
+            # Legendengröße je Chart (ROADMAP 1.52): leer = folgt der globalen
+            # Einstellung "Legendengröße", sonst "normal" oder "small".
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN legend_size TEXT NOT NULL DEFAULT ''"
             )
         if "chart_type" not in sc_columns:
             # "auto" (Linie/Balken je Serie automatisch, siehe query.py) oder
@@ -2676,6 +2683,7 @@ class Index:
         chart_stats: bool = True,
         legend_metrics: list[str] | None = None,
         legend_style: str = "chips",
+        legend_size: str = "",
         chart_type: str = "auto",
         decimals: str = "auto",
         show_values: bool = False,
@@ -2699,18 +2707,18 @@ class Index:
                 "INSERT INTO saved_charts "
                 "(name, entity_ids, range_key, continuous, entity_names, hidden_entity_ids, "
                 "resolution_preset, "
-                "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, "
+                "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, legend_size, "
                 "chart_type, decimals, show_values, average_line, area_fill, show_points, stacked, normalize, "
                 "average_style, horizontal, donut_aggregation, period_anchor, compare_settings, "
                 "heatmap_states, series_colors, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
                     resolution_preset,
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
-                    legend_style, chart_type, decimals, int(show_values),
+                    legend_style, legend_size, chart_type, decimals, int(show_values),
                     int(average_line), int(area_fill), int(show_points), int(stacked), int(normalize),
                     average_style, int(horizontal), donut_aggregation, period_anchor,
                     json.dumps(compare_settings or {}), json.dumps(heatmap_states or {}),
@@ -2734,6 +2742,7 @@ class Index:
         chart_stats: bool = True,
         legend_metrics: list[str] | None = None,
         legend_style: str = "chips",
+        legend_size: str = "",
         chart_type: str = "auto",
         decimals: str = "auto",
         show_values: bool = False,
@@ -2756,7 +2765,7 @@ class Index:
                 "UPDATE saved_charts SET name = ?, entity_ids = ?, range_key = ?, continuous = ?, "
                 "entity_names = ?, hidden_entity_ids = ?, resolution_preset = ?, "
                 "dynamic_y_axis = ?, dashboard_animation = ?, "
-                "chart_stats = ?, legend_metrics = ?, legend_style = ?, chart_type = ?, decimals = ?, "
+                "chart_stats = ?, legend_metrics = ?, legend_style = ?, legend_size = ?, chart_type = ?, decimals = ?, "
                 "show_values = ?, average_line = ?, area_fill = ?, show_points = ?, stacked = ?, normalize = ?, "
                 "average_style = ?, horizontal = ?, donut_aggregation = ?, period_anchor = ?, "
                 "compare_settings = ?, heatmap_states = ?, series_colors = ?, updated_at = ? WHERE id = ?",
@@ -2766,7 +2775,7 @@ class Index:
                     resolution_preset,
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
-                    legend_style, chart_type, decimals, int(show_values),
+                    legend_style, legend_size, chart_type, decimals, int(show_values),
                     int(average_line), int(area_fill), int(show_points), int(stacked), int(normalize),
                     average_style, int(horizontal), donut_aggregation, period_anchor,
                     json.dumps(compare_settings or {}), json.dumps(heatmap_states or {}),
@@ -2783,6 +2792,7 @@ class Index:
         d["chart_stats"] = bool(d.get("chart_stats", 1))
         d["legend_metrics"] = json.loads(d["legend_metrics"]) if d.get("legend_metrics") else ["sum"]
         d["legend_style"] = d.get("legend_style") or "chips"
+        d["legend_size"] = d.get("legend_size") or ""
         d["chart_type"] = d.get("chart_type") or "auto"
         d["decimals"] = d.get("decimals") or "auto"
         d["show_values"] = bool(d.get("show_values", 0))

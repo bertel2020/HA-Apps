@@ -5,7 +5,7 @@
 {% endblock %}
 {% block content %}
   
-  <div class="page" x-data="chartEditor()">
+  <div class="page" x-data="chartEditor()" :data-legend-size="legendSize || null">
     <h1>{{ _("Charts") }}</h1>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">{{ _("Eigene Charts über eine oder mehrere Entitäten hinweg zusammenstellen und dauerhaft ablegen. &middot;") }} <a href="{{ app_root }}/charts">{{ _("&larr; zurück zu Charts") }}</a></p>
 
@@ -524,14 +524,14 @@
                     <button :class="{active: averageStyle === 'rolling'}" @click="averageStyle = 'rolling'; render()">{{ _("Gleitend") }}</button>
                   </div>
                 </div>
-                <label class="menu-row" x-show="!hasState">
+                <label class="menu-row" :class="{'is-disabled': legendStyle === 'off'}" x-show="!hasState">
                   <span class="menu-row-label">{{ _("Statistik in Legende") }}</span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="chartStats" @change="chartStats = !chartStats; render()">
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
-                <div class="menu-row legend-metrics-row" x-show="chartStats && !hasState">
+                <div class="menu-row legend-metrics-row" :class="{'is-disabled': legendStyle === 'off'}" x-show="chartStats && !hasState">
                   <template x-for="metric in legendMetricOptions" :key="metric.value">
                     {# Siehe entity_detail.html: .filter-chip ist der app-weite
                        Standard für Chip-Mehrfachauswahl. #}
@@ -541,11 +541,19 @@
                     </label>
                   </template>
                 </div>
-                <div class="menu-row" x-show="statsShown">
+                <div class="menu-row">
                   <span class="menu-row-label">{{ _("Legenden-Stil") }}</span>
                   <div class="seg">
-                    <button :class="{active: legendStyle === 'chips'}" @click="legendStyle = 'chips'">{{ _("Chips") }}</button>
-                    <button :class="{active: legendStyle === 'table'}" @click="legendStyle = 'table'">{{ _("Tabelle") }}</button>
+                    <button :class="{active: legendStyle === 'chips'}" @click="setLegendStyle('chips')">{{ _("Chips") }}</button>
+                    <button :class="{active: legendStyle === 'table'}" @click="setLegendStyle('table')">{{ _("Tabelle") }}</button>
+                    <button :class="{active: legendStyle === 'off'}" @click="setLegendStyle('off')">{{ _("Aus") }}</button>
+                  </div>
+                </div>
+                <div class="menu-row" :class="{'is-disabled': legendStyle === 'off'}">
+                  <span class="menu-row-label">{{ _("Legendengröße") }}</span>
+                  <div class="seg">
+                    <button :class="{active: legendSizeShown === 'normal'}" @click="legendSize = 'normal'">{{ _("Normal") }}</button>
+                    <button :class="{active: legendSizeShown === 'small'}" @click="legendSize = 'small'">{{ _("Klein") }}</button>
                   </div>
                 </div>
               </div>
@@ -675,7 +683,7 @@
              keine sinnvollen Einträge (zwei eigenständige Jahresserien statt
              einer gedämpften Vergleichs-Nebenserie), deshalb zusätzlich
              ausgeblendet statt nur per hasData. -->
-        <div class="chart-legend" x-show="hasData && !yearsCompareActive && !multiYearActive && (legendStyle === 'chips' || !statsShown)">
+        <div class="chart-legend" x-show="hasData && legendStyle !== 'off' && !yearsCompareActive && !multiYearActive && (legendStyle === 'chips' || !statsShown)">
           <template x-for="stat in seriesStats" :key="stat.entityId">
             <button type="button" class="chart-legend-item" :class="{inactive: legendHiddenIds.includes(stat.entityId)}"
                     @click="toggleLegendItem(stat.entityId, stat.name)"
@@ -722,7 +730,7 @@
              macht (siehe yearsSeriesStats). .static: kein Serien-Umschalter
              in diesem ersten Schritt (siehe Kommentar bei yearsSeriesStats),
              deshalb ohne @click/toggleLegendItem(). -->
-        <div class="chart-legend" x-show="hasData && yearsCompareActive && (legendStyle === 'chips' || !chartStats)">
+        <div class="chart-legend" x-show="hasData && legendStyle !== 'off' && yearsCompareActive && (legendStyle === 'chips' || !chartStats)">
           <template x-for="stat in yearsSeriesStats" :key="stat.key">
             <span class="chart-legend-item static">
               <span class="dot" :style="{background: stat.color}"></span>
@@ -872,7 +880,7 @@
              Chips oder Tabelle (Legenden-Stil), ein Eintrag je Jahr plus Ø,
              nicht klickbar wie beim Soll-Balkenvergleich darüber. Darunter
              zusätzlich die Tabelle Jahr × Monat. -->
-        <div class="chart-legend" x-show="hasData && multiYearActive && (legendStyle === 'chips' || !chartStats)">
+        <div class="chart-legend" x-show="hasData && legendStyle !== 'off' && multiYearActive && (legendStyle === 'chips' || !chartStats)">
           <template x-for="stat in multiYearSeriesStats" :key="stat.key">
             <span class="chart-legend-item static">
               <span :class="stat.isAverage ? 'dash' : 'dot'" :style="stat.isAverage ? {borderColor: stat.color} : {background: stat.color}"></span>
@@ -1022,6 +1030,7 @@
     const CHART_STATS = {{ chart_stats | tojson }};
     const LEGEND_METRICS = {{ legend_metrics | tojson }};
     const LEGEND_STYLE = {{ legend_style | tojson }};
+    const LEGEND_SIZE = {{ legend_size | default('') | tojson }};
     const CHART_TYPE = {{ chart_type | tojson }};
     // "auto" = jede Serie behält ihre eigene entities.decimals-Einstellung,
     // sonst gilt dieser Wert einheitlich für ALLE Serien dieses Charts (siehe

@@ -154,6 +154,22 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
+      <div class="settings-compact-label">{{ _("Legendengröße") }} {{ hint_button(_('Legendengröße')) }}</div>
+      {% call hint_body('settings-compact-hint') %}{{ _("Standard für Charts ohne eigene Einstellung") }}{% endcall %}
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="legend-size-btn" onclick="toggleDDPicker('legend-size')">{% for k, l in legend_size_options %}{% if k == legend_size %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="legend_size" id="legend-size-input" value="{{ legend_size }}"
+             hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="legend-size-popover">
+        {% for key, label in legend_size_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('legend-size', '{{ key }}', '{{ label }}'); document.documentElement.dataset.legendSize = '{{ key }}';">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
       <div class="settings-compact-label">{{ _("Dashboard-Animation") }} {{ hint_button(_('Dashboard-Animation')) }}</div>
       {% call hint_body('settings-compact-hint') %}{{ _("Charts auf den Kacheln animiert aufbauen") }}{% endcall %}
     </div>

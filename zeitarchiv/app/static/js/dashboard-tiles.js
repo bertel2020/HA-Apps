@@ -261,6 +261,7 @@
     const legend = {items: legendItems, legendMetrics, showStats, style: legendStyle};
     legendCache.set(chartId, legend);
     const legendVisible = el.dataset.showLegend === 'true'
+      && legendStyle !== 'off'
       && parseInt(tileEl?.dataset.gridCols || '1', 10) >= 2
       && parseInt(tileEl?.dataset.gridRows || '1', 10) >= 2;
     renderLegend(el, legend, legendVisible);

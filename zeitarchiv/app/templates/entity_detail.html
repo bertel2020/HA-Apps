@@ -7,7 +7,7 @@
   {% from "_icons.html" import custom_name_icon %}
   
   {% set display_name = custom_name or friendly_name or entity_id %}
-  <div class="page" x-data="entityChart()">
+  <div class="page" x-data="entityChart()" :data-legend-size="legendSize || null">
     <div class="h1-row">
       <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon(_('App-eigener Anzeigename — HA: ') ~ (friendly_name or entity_id)) }}{% endif %}</h1>
       <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
@@ -195,8 +195,16 @@
             <div class="menu-row">
               <span class="menu-row-label">{{ _("Legenden-Stil") }}</span>
               <div class="seg">
-                <button :class="{active: legendStyle === 'chips'}" @click="legendStyle = 'chips'; saveChartOptions()">{{ _("Chips") }}</button>
-                <button :class="{active: legendStyle === 'table'}" @click="legendStyle = 'table'; saveChartOptions()">{{ _("Tabelle") }}</button>
+                <button :class="{active: legendStyle === 'chips'}" @click="setLegendStyle('chips')">{{ _("Chips") }}</button>
+                <button :class="{active: legendStyle === 'table'}" @click="setLegendStyle('table')">{{ _("Tabelle") }}</button>
+                <button :class="{active: legendStyle === 'off'}" @click="setLegendStyle('off')">{{ _("Aus") }}</button>
+              </div>
+            </div>
+            <div class="menu-row" :class="{'is-disabled': legendStyle === 'off'}">
+              <span class="menu-row-label">{{ _("Legendengröße") }}</span>
+              <div class="seg">
+                <button :class="{active: legendSizeShown === 'normal'}" @click="setLegendSize('normal')">{{ _("Normal") }}</button>
+                <button :class="{active: legendSizeShown === 'small'}" @click="setLegendSize('small')">{{ _("Klein") }}</button>
               </div>
             </div>
             <label class="menu-row">
@@ -292,14 +300,14 @@
                 <button :class="{active: averageStyle === 'rolling'}" @click="averageStyle = 'rolling'; render(); saveChartOptions()">{{ _("Gleitend") }}</button>
               </div>
             </div>
-            <label class="menu-row">
+            <label class="menu-row" :class="{'is-disabled': legendStyle === 'off'}">
               <span class="menu-row-label">{{ _("Statistik in Legende") }}</span>
               <span class="menu-toggle">
                 <input type="checkbox" :checked="chartStats" @change="chartStats = !chartStats; render(); saveChartOptions()">
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
-            <div class="menu-row legend-metrics-row" x-show="chartStats">
+            <div class="menu-row legend-metrics-row" :class="{'is-disabled': legendStyle === 'off'}" x-show="chartStats">
               <template x-for="metric in legendMetricOptions" :key="metric.value">
                 {# .filter-chip statt einer Kästchen-Liste: der app-weite Standard
                    für Chip-Mehrfachauswahl (siehe _energiedashboard_setup.html).
@@ -314,8 +322,16 @@
             <div class="menu-row" x-show="chartStats">
               <span class="menu-row-label">{{ _("Legenden-Stil") }}</span>
               <div class="seg">
-                <button :class="{active: legendStyle === 'chips'}" @click="legendStyle = 'chips'; saveChartOptions()">{{ _("Chips") }}</button>
-                <button :class="{active: legendStyle === 'table'}" @click="legendStyle = 'table'; saveChartOptions()">{{ _("Tabelle") }}</button>
+                <button :class="{active: legendStyle === 'chips'}" @click="setLegendStyle('chips')">{{ _("Chips") }}</button>
+                <button :class="{active: legendStyle === 'table'}" @click="setLegendStyle('table')">{{ _("Tabelle") }}</button>
+                <button :class="{active: legendStyle === 'off'}" @click="setLegendStyle('off')">{{ _("Aus") }}</button>
+              </div>
+            </div>
+            <div class="menu-row" :class="{'is-disabled': legendStyle === 'off'}" x-show="chartStats">
+              <span class="menu-row-label">{{ _("Legendengröße") }}</span>
+              <div class="seg">
+                <button :class="{active: legendSizeShown === 'normal'}" @click="setLegendSize('normal')">{{ _("Normal") }}</button>
+                <button :class="{active: legendSizeShown === 'small'}" @click="setLegendSize('small')">{{ _("Klein") }}</button>
               </div>
             </div>
             {% endif %}

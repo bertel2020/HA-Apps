@@ -397,6 +397,20 @@ function selectBrush() {
         averageStyle: CHART_OPTIONS.average_style,
         legendMetrics: [...CHART_OPTIONS.legend_metrics],
         legendStyle: CHART_OPTIONS.legend_style,
+        // '' = folgt der globalen Legendengröße (Einstellungen → Darstellung), sonst 'normal' | 'small'.
+        legendSize: CHART_OPTIONS.legend_size || '',
+        get legendSizeShown() { return this.legendSize || document.documentElement.dataset.legendSize || 'normal'; },
+        // 'off' blendet die Legende aus; Klick-Ausblendungen der Zustände gelten dann nicht mehr
+        // (die Heatmap behält ihren gewählten Zustand, der ist keine Ausblendung).
+        setLegendStyle(style) {
+          this.legendStyle = style;
+          if (style === 'off' && this.stateMode !== 'heatmap' && this.hiddenStates.length) {
+            this.hiddenStates = [];
+            this.render();
+          }
+          this.saveChartOptions();
+        },
+        setLegendSize(size) { this.legendSize = size; this.saveChartOptions(); },
         decimals: CHART_OPTIONS.decimals,
         compare: false,
         compareMode: 'previous',
@@ -534,6 +548,7 @@ function selectBrush() {
             area_fill: String(this.areaFill), average_style: this.averageStyle,
             chart_stats: String(this.chartStats), legend_metrics: this.legendMetrics.join(','),
             legend_style: this.legendStyle,
+            ...(this.legendSize ? {legend_size: this.legendSize} : {}),
           });
           // Heatmap: auch der gezeichnete Zustand geht mit (als Rohtext, siehe
           // saved_charts.heatmap_states), sonst finge der Editor wieder bei der
@@ -986,7 +1001,7 @@ function selectBrush() {
                 dynamic_y_axis: this.dynamicYAxis, chart_stats: this.chartStats,
                 show_marked: this.showMarked,
                 average_line: this.averageLine,
-                legend_metrics: this.legendMetrics, legend_style: this.legendStyle,
+                legend_metrics: this.legendMetrics, legend_style: this.legendStyle, legend_size: this.legendSize,
                 decimals: this.decimals, state_log: this.stateLog,
                 area_fill: this.areaFill, average_style: this.averageStyle,
               }),
@@ -1036,6 +1051,7 @@ function selectBrush() {
             this.areaFill !== CHART_DEFAULTS.area_fill ||
             this.averageStyle !== CHART_DEFAULTS.average_style ||
             this.legendStyle !== CHART_DEFAULTS.legend_style ||
+            this.legendSize !== (CHART_DEFAULTS.legend_size || '') ||
             this.decimals !== CHART_DEFAULTS.decimals ||
             this.stateLog !== (CHART_DEFAULTS.state_log !== false) ||
             JSON.stringify([...this.legendMetrics].sort()) !== JSON.stringify([...CHART_DEFAULTS.legend_metrics].sort())

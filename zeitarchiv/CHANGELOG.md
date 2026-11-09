@@ -55,6 +55,14 @@
     - Im Setup lässt sich die Karte abwählen
   - Die Karten stehen jetzt in der Reihenfolge des Wetterdashboards
 
+- **Charts**: Die Legende lässt sich ausschalten und in zwei Größen zeigen
+  - Legenden-Stil „Aus“ blendet die Legende ganz aus; „Statistik in Legende“
+    und die Größe sind dann ausgegraut
+  - Legendengröße „Normal“ oder „Klein“, je Chart, auch auf den
+    Dashboard-Kacheln
+  - Einstellungen, Darstellung: Die Legendengröße gilt als Standard für alle
+    Charts ohne eigene Einstellung
+
 ### Geändert
 
 - **Energiedashboard**: Aufbau wie im Wetterdashboard
@@ -128,6 +136,13 @@
       for consumption, grid import or a consumer such as the heat pump
     - The card can be switched off in the setup
   - The cards now follow the order of the weather dashboard
+
+- **Charts**: The legend can be switched off and shown in two sizes
+  - Legend style "Off" hides the legend completely; "Statistics in legend" and
+    the size are then greyed out
+  - Legend size "Normal" or "Small", per chart, also on the dashboard tiles
+  - Settings, Appearance: the legend size is the default for all charts
+    without their own setting
 
 #### Changed
 

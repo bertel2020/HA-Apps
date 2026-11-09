@@ -121,7 +121,7 @@
            data-show-legend="{{ 'true' if tile.show_legend else 'false' }}"
            data-chart-stats="{{ 'true' if tile.chart_stats else 'false' }}"
            data-legend-metrics='{{ tile.legend_metrics | tojson }}'
-           data-legend-style="{{ tile.legend_style }}"
+           data-legend-style="{{ tile.legend_style }}"{% if tile.legend_size %} data-legend-size="{{ tile.legend_size }}"{% endif %}
            data-chart-type="{{ tile.chart_type }}"
            data-donut-aggregation="{{ tile.donut_aggregation }}"
            data-show-values="{{ 'true' if tile.show_values else 'false' }}"

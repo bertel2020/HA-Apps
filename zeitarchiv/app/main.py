@@ -321,6 +321,12 @@ def _current_font_scale() -> str:
     return font_scale
 
 
+def _current_legend_size() -> str:
+    """Globale Legendengröße (Einstellungen → Darstellung): "normal" oder "small"."""
+    value = index.get_setting("legend_size", "normal")
+    return value if value in _GLOBAL_LEGEND_SIZES else "normal"
+
+
 def _font_scale_context(request: Request) -> dict:
     """Starlette context_processor: läuft für JEDE TemplateResponse automatisch
     mit, ohne dass jede einzelne Route den Skalierungsfaktor selbst in ihren
@@ -337,6 +343,7 @@ def _font_scale_context(request: Request) -> dict:
         dashboard_animation = "1"
     return {
         "font_scale_value": FONT_SCALE[font_scale],
+        "legend_size_global": _current_legend_size(),
         "page_layout": page_layout.current(index),
         "dashboard_row_height": DASHBOARD_ROW_HEIGHT[font_scale],
         "color_scheme": color_scheme,
@@ -1055,6 +1062,8 @@ def _settings_darstellung_context(saved: bool = False) -> dict:
         "font_scale": _current_font_scale(),
         "font_scale_options": list(FONT_SCALE_LABELS.items()),
         "font_scale_values": FONT_SCALE,
+        "legend_size": _current_legend_size(),
+        "legend_size_options": list(_LEGEND_SIZE_LABELS.items()),
         "color_scheme": color_scheme,
         "color_scheme_options": list(COLOR_SCHEME_LABELS.items()),
         "color_mode": color_mode,
@@ -1552,6 +1561,11 @@ async def settings_darstellung(request: Request) -> HTMLResponse:
             raise HTTPException(status_code=400, detail=tr("Ungültige Schriftgröße"))
         if font_scale is not None:
             index.set_setting("font_scale", str(font_scale))
+        legend_size = form.get("legend_size")
+        if legend_size is not None and legend_size not in _GLOBAL_LEGEND_SIZES:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Legendengröße"))
+        if legend_size is not None:
+            index.set_setting("legend_size", str(legend_size))
         if color_scheme is not None and color_scheme not in COLOR_SCHEME_LABELS:
             raise HTTPException(status_code=400, detail=tr("Ungültiges Farbschema"))
         if color_scheme is not None:
@@ -3272,6 +3286,7 @@ class _EntityChartOptionsBody(BaseModel):
     average_line: bool = False
     legend_metrics: list[str]
     legend_style: str
+    legend_size: str = ""
     decimals: str
     # Wechsel-Protokoll unter dem Zeitstrahl (nur Zustands-Entitäten).
     state_log: bool = True
@@ -3512,7 +3527,11 @@ _CHART_RANGE_OPTIONS = [
 ]
 _CHART_RESOLUTION_PRESETS = {"auto", "medium", "coarse", "full"}
 _CHART_LEGEND_METRICS = {"last", "min", "max", "average", "sum"}
-_CHART_LEGEND_STYLES = {"chips", "table"}
+# "off" blendet die Legende ganz aus (ROADMAP 1.52). Die Größe ist je Chart leer
+# (folgt der globalen Einstellung "Legendengröße") oder "normal"/"small".
+_CHART_LEGEND_STYLES = {"chips", "table", "off"}
+_CHART_LEGEND_SIZES = {"", "normal", "small"}
+_GLOBAL_LEGEND_SIZES = {"normal", "small"}
 # "Flach" (bisherige waagerechte Durchschnittslinie) oder "Gleitend" (neue
 # Trendlinie über Linien-Serien) — verschachtelt unter "Durchschnittslinie",
 # siehe chart_editor.js render()/movingAverage().
@@ -3551,6 +3570,7 @@ _ENTITY_CHART_OPTION_DEFAULTS = {
     "average_line": False,
     "legend_metrics": ["last", "min", "max", "average", "sum"],
     "legend_style": "chips",
+    "legend_size": "",
     "decimals": "auto",
     "area_fill": True,  # wie im Chart-Editor und auf Dashboard-Kacheln
     "average_style": "flat",
@@ -3560,7 +3580,8 @@ _ENTITY_CHART_OPTION_DEFAULTS = {
 }
 _ENTITY_CHART_DECIMALS = {"auto", "0", "1", "2", "3", "4"}
 _ON_OFF_LABELS = {"1": N_("An"), "0": N_("Aus")}
-_ENTITY_LEGEND_STYLE_LABELS = {"chips": N_("Chips"), "table": N_("Tabelle")}
+_ENTITY_LEGEND_STYLE_LABELS = {"chips": N_("Chips"), "table": N_("Tabelle"), "off": N_("Aus")}
+_LEGEND_SIZE_LABELS = {"normal": N_("Normal"), "small": N_("Klein")}
 _ENTITY_LEGEND_METRIC_LABELS = {"last": N_("Aktuell"), "min": N_("Min"), "max": N_("Max"), "average": N_("Durchschnitt"), "sum": N_("Summe")}
 
 
@@ -3571,6 +3592,8 @@ def _validate_entity_chart_options(data: dict) -> None:
         raise HTTPException(status_code=400, detail=tr("Ungültige Legenden-Kennzahl"))
     if "legend_style" in data and data["legend_style"] not in _CHART_LEGEND_STYLES:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Legenden-Stil"))
+    if "legend_size" in data and data["legend_size"] not in _CHART_LEGEND_SIZES:
+        raise HTTPException(status_code=400, detail=tr("Ungültige Legendengröße"))
     if "decimals" in data and data["decimals"] not in _ENTITY_CHART_DECIMALS:
         raise HTTPException(status_code=400, detail=tr("Ungültige Nachkommastellen"))
 
@@ -3670,6 +3693,8 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "chart_stats": chart["chart_stats"] if chart else prefill.get("chart_stats", True),
         "legend_metrics": chart["legend_metrics"] if chart else prefill.get("legend_metrics", ["sum"]),
         "legend_style": chart["legend_style"] if chart else prefill.get("legend_style", "chips"),
+        "legend_size": chart["legend_size"] if chart else prefill.get("legend_size", ""),
+        "legend_size_global": _current_legend_size(),
         "chart_type": effective_chart_type(chart, _aggregation_types()) if chart else prefill.get("chart_type", "auto"),
         "decimals": chart["decimals"] if chart else prefill.get("decimals", "auto"),
         "show_values": chart["show_values"] if chart else prefill.get("show_values", False),
@@ -3743,6 +3768,7 @@ class _SaveChartBody(BaseModel):
     chart_stats: bool = True
     legend_metrics: list[str] = ["sum"]
     legend_style: str = "chips"
+    legend_size: str = ""
     chart_type: str = "auto"
     decimals: str = "auto"
     show_values: bool = False
@@ -3789,6 +3815,8 @@ def charts_create(body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail=tr("Ungültige Legenden-Kennzahl"))
     if body.legend_style not in _CHART_LEGEND_STYLES:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Legenden-Stil"))
+    if body.legend_size not in _CHART_LEGEND_SIZES:
+        raise HTTPException(status_code=400, detail=tr("Ungültige Legendengröße"))
     if body.chart_type not in CHART_EDITOR_CHART_TYPES:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Diagrammtyp"))
     if body.decimals not in _ENTITY_CHART_DECIMALS:
@@ -3803,7 +3831,7 @@ def charts_create(body: _SaveChartBody) -> dict:
         entity_names, hidden_entity_ids=_hidden_for(body),
         resolution_preset=body.resolution_preset, dynamic_y_axis=body.dynamic_y_axis,
         chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
-        legend_style=body.legend_style, chart_type=body.chart_type,
+        legend_style=body.legend_style, legend_size=body.legend_size, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
         average_line=body.average_line, area_fill=body.area_fill, show_points=body.show_points,
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
@@ -3844,6 +3872,8 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         raise HTTPException(status_code=400, detail=tr("Ungültige Legenden-Kennzahl"))
     if body.legend_style not in _CHART_LEGEND_STYLES:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Legenden-Stil"))
+    if body.legend_size not in _CHART_LEGEND_SIZES:
+        raise HTTPException(status_code=400, detail=tr("Ungültige Legendengröße"))
     if body.chart_type not in CHART_EDITOR_CHART_TYPES:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Diagrammtyp"))
     if body.decimals not in _ENTITY_CHART_DECIMALS:
@@ -3858,7 +3888,7 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         body.continuous, entity_names, hidden_entity_ids=_hidden_for(body),
         resolution_preset=body.resolution_preset,
         dynamic_y_axis=body.dynamic_y_axis, chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
-        legend_style=body.legend_style, chart_type=body.chart_type,
+        legend_style=body.legend_style, legend_size=body.legend_size, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
         average_line=body.average_line, area_fill=body.area_fill, show_points=body.show_points,
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
@@ -3901,7 +3931,7 @@ def charts_duplicate(chart_id: int) -> dict:
         resolution_preset=chart["resolution_preset"],
         dynamic_y_axis=chart["dynamic_y_axis"],
         chart_stats=chart["chart_stats"], legend_metrics=chart["legend_metrics"],
-        legend_style=chart["legend_style"], chart_type=chart["chart_type"],
+        legend_style=chart["legend_style"], legend_size=chart["legend_size"], chart_type=chart["chart_type"],
         decimals=chart["decimals"], show_values=chart["show_values"],
         average_line=chart["average_line"], area_fill=chart["area_fill"], show_points=chart["show_points"],
         stacked=chart["stacked"], normalize=chart["normalize"], average_style=chart["average_style"],
