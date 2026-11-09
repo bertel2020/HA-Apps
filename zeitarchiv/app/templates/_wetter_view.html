@@ -301,8 +301,8 @@
         <h2 class="wt-h2">{{ _("Temperaturen im Vergleich") }} {{ hint_button(_("Temperaturen im Vergleich")) }}</h2>
         {% call hint_body() %}{{ _("Tagesmittel der Außentemperatur und der weiteren Sensoren. Tage mit zu wenigen Werten bleiben leer.") }}{% endcall %}
         <div class="wt-seg" role="group" aria-label="{{ _('Zeitraum') }}">
-          <template x-for="days in [7, 30, 90]" :key="days">
-            <button type="button" :aria-pressed="(tempDays === days).toString()" @click="setTempDays(days)" x-text="t('{n} Tage', {n: days})"></button>
+          <template x-for="opt in [{days: 7, label: t('7 Tage')}, {days: 30, label: t('30 Tage')}, {days: 365, label: t('12 Monate')}]" :key="opt.days">
+            <button type="button" :aria-pressed="(tempDays === opt.days).toString()" @click="setTempDays(opt.days)" x-text="opt.label"></button>
           </template>
         </div>
       </div>

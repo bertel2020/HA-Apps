@@ -265,8 +265,11 @@ def test_temperature_comparison_route_validates_the_period(client) -> None:
     index.set_setting(wetter_routes.SETTING_ENABLED, "1")
     wetter_routes._save_config(index, {**wetter_routes._empty_config(), "temperature": "sensor.wetter_test_temp9"})  # noqa: SLF001
     assert client.get("/wetterdashboard/temperaturen?days=5").status_code == 400
+    assert client.get("/wetterdashboard/temperaturen?days=90").status_code == 400
     result = client.get("/wetterdashboard/temperaturen?days=7")
     assert result.status_code == 200 and len(result.json()["dates"]) == 7
+    year = client.get("/wetterdashboard/temperaturen?days=365")
+    assert year.status_code == 200 and len(year.json()["dates"]) == 365
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
 
 

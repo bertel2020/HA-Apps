@@ -110,8 +110,9 @@ ROLE_LABELS = {key: label for key, label, _types in ROLES}
 MAX_EXTRA_TEMPERATURES = 20
 #: Blöcke der Vergleichstabelle, die sich in der Einrichtung ausblenden lassen (die Außentemperatur
 #: und Zusatzsensoren bleiben immer sichtbar).
-#: Zeiträume (Tage) des Temperaturvergleichs auf dem Reiter „Temperatur & Klima“.
-TEMPERATURE_DAYS = (7, 30, 90)
+#: Zeiträume (Tage) des Temperaturvergleichs auf dem Reiter „Temperatur & Klima“; 365 heißt in der Oberfläche „12 Monate“
+#: wie bei den Kacheln (rollierend, nach dem tatsächlichen Fenster benannt).
+TEMPERATURE_DAYS = (7, 30, 365)
 BLOCK_KEYS = ("kenntage", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation", "illuminance")
 #: Karten, die sich in der Einrichtung ein- und ausblenden lassen: (Schlüssel, Name, Rollen, von denen mindestens
 #: eine zugeordnet sein muss; „@extras“ und „@heating“ stehen für die Listen weiterer Sensoren und Heizzähler).
