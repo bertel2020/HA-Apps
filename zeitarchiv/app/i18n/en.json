@@ -3807,7 +3807,8 @@
     "Unbekannte Größe: {value}": "Unknown size: {value}",
     "Raum": "Room",
     "Sensoren desselben Raums stehen in der Tabelle „Zeiträume im Vergleich“ zusammen. Leer lassen übernimmt den Raum aus Home Assistant.": "Sensors of the same room are grouped in the “Periods compared” table. Leave empty to use the room from Home Assistant.",
-    "Nur Mittelwerte": "Averages only"
+    "Nur Mittelwerte": "Averages only",
+    "Räume im Diagramm": "Rooms in the chart"
   },
   "js": {
     "Ladestand": "State of charge",

@@ -83,6 +83,62 @@ def test_row_specs_carry_the_room_but_keep_keys_and_order(service) -> None:
     assert "room" not in next(s for s in specs if s["key"] == "temperature")
 
 
+def test_comparison_series_carry_room_and_floor_for_the_chart_selection(service) -> None:
+    from test_wetter import NOW, _add, _configure
+
+    for entity_id, unit in (("sensor.t", "°C"), ("sensor.bad_t", "°C"), ("sensor.bad_h", "%")):
+        _add(service, entity_id, "sensor", "measurement", unit, [(NOW.timestamp() - 3600, 20.0)])
+    (service.deps.data_dir / "selection_catalog.json").write_text(json.dumps({"entities": [
+        {"entity_id": "sensor.bad_t", "area": "Bad", "floor": "Obergeschoss"},
+        {"entity_id": "sensor.bad_h", "area": "Bad", "floor": "Obergeschoss"},
+    ]}), encoding="utf-8")
+    _configure(service, temperature="sensor.t", extra_temperatures=[
+        {"entity_id": "sensor.bad_t", "name": "Bad T"}, {"entity_id": "sensor.bad_h", "name": "Bad H"},
+    ])
+    data = service.compute_temperatures(3, NOW)
+    assert [(row["key"], row["room"], row["floor"]) for row in data["series"]] == [
+        ("temperature", "", ""), ("temperature:0", "Bad", "Obergeschoss")]
+    assert [(row["key"], row["room"]) for row in data["humidity"]] == [("temperature:1", "Bad")]
+
+
+def test_the_page_loads_the_room_helpers_before_the_dashboard_script() -> None:
+    html = (ADDON / "app" / "templates" / "wetterdashboard.html").read_text(encoding="utf-8")
+    assert html.index("wetter-rooms.js") < html.index("js/wetter.js")
+
+
+def _node(expression: str):
+    if shutil.which("node") is None:
+        pytest.skip("node fehlt")
+    script = f"const r = require({json.dumps(str(JS / 'wetter-rooms.js'))}); console.log(JSON.stringify({expression}));"
+    return json.loads(subprocess.run(["node", "-e", script], check=True, capture_output=True, text=True).stdout)
+
+
+CMP = (
+    '{series: [{key: "temperature", room: "", floor: ""}, {key: "temperature:0", room: "Bad", floor: "OG"},'
+    ' {key: "temperature:1", room: "", floor: ""}, {key: "temperature:2", room: "Keller", floor: "UG"}],'
+    ' humidity: [{key: "humidity"}, {key: "temperature:3", room: "Bad", floor: "OG"}, {key: "temperature:4", room: "Küche", floor: "EG"}]}'
+)
+
+
+def test_rooms_come_in_order_of_entries_with_unassigned_last() -> None:
+    assert _node(f"r.roomsOf({CMP})") == ["Bad", "Keller", "Küche", ""]
+    assert _node("r.roomsOf({series: [{key: 'temperature'}], humidity: []})") == []
+
+
+def test_floors_group_their_rooms_and_unassigned_come_last() -> None:
+    assert _node(f"r.floorsOf({CMP})") == [
+        {"floor": "OG", "rooms": ["Bad"]}, {"floor": "UG", "rooms": ["Keller"]},
+        {"floor": "EG", "rooms": ["Küche"]}, {"floor": "", "rooms": [""]},
+    ]
+
+
+def test_hidden_rooms_drop_their_lines_but_never_the_outdoor_line_and_colors_stay() -> None:
+    kept = _node(f'r.visible({CMP}.series, ["Bad", ""])')
+    assert [(row["key"], row["_i"]) for row in kept] == [("temperature", 0), ("temperature:2", 3)]
+    assert [row["key"] for row in _node(f"r.visible({CMP}.humidity, [\"Bad\"])")] == ["humidity", "temperature:4"]
+    assert len(_node(f"r.visible({CMP}.series, [])")) == 4
+
+
 SCRIPT = r"""
 const fs = require('fs');
 const D = process.argv[1];

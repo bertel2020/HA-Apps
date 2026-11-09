@@ -64,6 +64,15 @@
   </div>
 </div>
 {% endmacro %}
+{# Auswahl der Räume über den Vergleichsdiagrammen (nur bei mindestens zwei Räumen); die Außenwerte bleiben immer. #}
+{% macro room_chips() %}
+<div class="wt-rooms" role="group" aria-label="{{ _('Räume im Diagramm') }}" x-show="roomChips().length" x-cloak>
+  <template x-for="chip in roomChips()" :key="chip.name">
+    <button type="button" class="wt-room-chip" :aria-pressed="chip.on.toString()" @click="toggleRoom(chip.name)" x-text="chip.label"></button>
+  </template>
+  <button type="button" class="wt-room-all" x-show="roomsOff.length" x-cloak @click="showAllRooms()">{{ _("Alle") }}</button>
+</div>
+{% endmacro %}
 {% if not configured %}
 <div class="wt-title-row">
   <h1>{{ _("Wetterdashboard") }}</h1>
@@ -294,6 +303,7 @@
           </template>
         </div>
       </div>
+      {{ room_chips() }}
       <div class="wt-chart" x-ref="tempChart" x-show="!tempCmp || tempCmp.series.length"></div>
       <p class="hint hint-warn" x-show="tempError" x-text="tempError" x-cloak></p>
     </div>
@@ -302,6 +312,7 @@
         <h2 class="wt-h2">{{ _("Luftfeuchte im Vergleich") }} {{ hint_button(_("Luftfeuchte im Vergleich")) }}</h2>
         {% call hint_body() %}{{ _("Tagesmittel der Luftfeuchte außen und der weiteren Feuchtesensoren, im selben Zeitraum wie die Temperaturen.") }}{% endcall %}
       </div>
+      {{ room_chips() }}
       <div class="wt-chart" x-ref="humidChart"></div>
     </div>
   </section>

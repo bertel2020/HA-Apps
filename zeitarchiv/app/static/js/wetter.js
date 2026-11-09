@@ -193,6 +193,8 @@
       precip: null,
       precipError: '',
       tempCmp: null,
+      // Abgewählte Räume der Vergleichsdiagramme (Namen); neue Räume sind zunächst sichtbar.
+      roomsOff: [],
       tempDays: 30,
       tempError: '',
       monthly: null,
@@ -264,6 +266,7 @@
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
         if (typeof saved.avgOnly === 'boolean') this.avgOnly = saved.avgOnly;
+        if (Array.isArray(saved.roomsOff)) this.roomsOff = saved.roomsOff.filter((name) => typeof name === 'string');
         if (['5', '10', 'all'].includes(saved.kenntageRange)) this.kenntageRange = saved.kenntageRange;
         if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
         // Ausgeblendete Karten fehlen im Dokument: der erste vorhandene Reiter ist der Start, Diagramme ohne Karte laden nicht.
@@ -1492,8 +1495,27 @@
       drawTemps() {
         const data = this.tempCmp;
         if (!data) return;
-        if (data.series.length) this.drawComparison('temps', this.$refs.tempChart, data, data.series, '°C', 1);
-        if (data.humidity && data.humidity.length) this.drawComparison('humid', this.$refs.humidChart, data, data.humidity, '%', 0);
+        const off = this.roomsOff;
+        if (data.series.length) this.drawComparison('temps', this.$refs.tempChart, data, WetterRooms.visible(data.series, off), '°C', 1);
+        if (data.humidity && data.humidity.length) this.drawComparison('humid', this.$refs.humidChart, data, WetterRooms.visible(data.humidity, off), '%', 0);
+      },
+
+      // Räume der weiteren Sensoren für die Auswahl über den Diagrammen; ab zwei Räumen sichtbar.
+      roomChips() {
+        const rooms = this.tempCmp ? WetterRooms.roomsOf(this.tempCmp) : [];
+        return rooms.length > 1 ? rooms.map((name) => ({name, label: name || t('Ohne Raum'), on: !this.roomsOff.includes(name)})) : [];
+      },
+
+      toggleRoom(name) {
+        this.roomsOff = this.roomsOff.includes(name) ? this.roomsOff.filter((n) => n !== name) : [...this.roomsOff, name];
+        writeStore({roomsOff: this.roomsOff});
+        this.drawTemps();
+      },
+
+      showAllRooms() {
+        this.roomsOff = [];
+        writeStore({roomsOff: []});
+        this.drawTemps();
       },
 
       // Linien je Sensor über die letzten Tage; die Einheit steht an der Achse (Temperatur und Feuchte nie gemischt).
@@ -1502,6 +1524,8 @@
         const colors = palette();
         const labels = data.dates.map((iso) => utcDayMonth.format(new Date(`${iso}T00:00:00Z`)));
         const unit = (series[0] && series[0].unit) || fallbackUnit;
+        // Die Farbe richtet sich nach der Stelle in der ganzen Liste (_i), nicht nach der in der Auswahl.
+        const colorOf = (row, index) => this.heatColor(row._i != null ? row._i : index);
         const names = series.map((row) => row.label);
         const chart = chartFor(name, element);
         chart.setOption({
@@ -1519,8 +1543,8 @@
           series: series.map((row, index) => ({
             name: row.label, type: 'line', data: row.values, symbol: 'none', connectNulls: false,
             z: index === 0 ? 5 : 2,
-            lineStyle: {color: this.heatColor(index), width: index === 0 ? 3 : 2},
-            itemStyle: {color: this.heatColor(index)},
+            lineStyle: {color: colorOf(row, index), width: index === 0 ? 3 : 2},
+            itemStyle: {color: colorOf(row, index)},
           })),
         }, true);
         chart.resize();

@@ -928,6 +928,8 @@ class WetterService:
                     "key": spec["key"], "entity_id": spec["entity_id"],
                     "label": tr(TILE_LABELS[first_key]) if spec["key"] == first_key and first_key in TILE_LABELS else spec["label"],
                     "unit": spec["unit"],
+                    # Raum und Etage der weiteren Sensoren für die Auswahl im Diagramm (die Außenwerte haben keinen).
+                    "room": spec.get("room", ""), "floor": spec.get("floor", ""),
                     "values": [round(by_day[day], 1) if day in by_day else None for day in dates],
                 })
             return series
