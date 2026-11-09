@@ -710,6 +710,9 @@ sodass ohne Schalter nichts anders aussieht als vorher.
   `dashboard_detail.css` **und** `entities.css`; jede Änderung gehört in beide, Tests prüfen beide.
 - **Kachelraster der Übersicht und der Dashboard-Liste** (`.ov-tiles`, `.dash-grid`): ab 1500 px höchstens fünf Spalten
   (Mindestbreite `max(230px/240px, (100 % − 4 · 14px) / 5)`); darunter und ohne Schalter bleibt es beim `auto-fill`.
+- **Wetter-Kacheln:** `WetterLayout.tileColumns(count, width, maxColumns)` bekommt bei breiter Darstellung die Obergrenze 6
+  (`WIDE_TILE_MAX_COLUMNS` in `wetter.js`); die Regel „keine einzelne Kachel in der letzten Reihe“ gilt weiter, acht Kacheln
+  stehen also als 4+4, zwölf als 6+6.
 - **Neuzeichnen:** Chart-Kacheln hören mit einem `ResizeObserver` (eine Instanz je Seite,
   `dashboard-tiles.js`) statt nur auf `window.resize`. Wetter-, Langzeit- und die meisten Energie-Diagramme haben
   schon eigene Beobachter; nur das Sankey des Energiedashboards hängt am Fenster und rechnet seine Mindesthöhe

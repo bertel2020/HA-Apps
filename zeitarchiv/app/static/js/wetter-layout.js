@@ -4,10 +4,11 @@
   const MIN_TILE = 150;
   const GAP = 10;
 
-  // count: Anzahl Kacheln, width: verfügbare Breite in Pixeln. Gibt die Zahl der Spalten zurück.
-  function tileColumns(count, width) {
+  // count: Anzahl Kacheln, width: verfügbare Breite in Pixeln, maxColumns: Obergrenze (optional, breite Darstellung).
+  // Gibt die Zahl der Spalten zurück.
+  function tileColumns(count, width, maxColumns) {
     if (count <= 1) return 1;
-    const fit = Math.max(2, Math.floor((width + GAP) / (MIN_TILE + GAP)));
+    const fit = Math.min(maxColumns || Infinity, Math.max(2, Math.floor((width + GAP) / (MIN_TILE + GAP))));
     const most = Math.min(count, fit);
     let best = most;
     let bestFill = -1;

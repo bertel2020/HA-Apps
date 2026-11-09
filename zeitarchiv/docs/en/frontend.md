@@ -703,6 +703,9 @@ nothing looks different from before while the switch is off.
   `entities.css`; every change belongs in both, tests check both.
 - **Tile grids of the overview and the dashboard list** (`.ov-tiles`, `.dash-grid`): at most five columns from 1500 px
   (minimum width `max(230px/240px, (100% − 4 · 14px) / 5)`); below that and without the switch it stays `auto-fill`.
+- **Weather tiles:** `WetterLayout.tileColumns(count, width, maxColumns)` gets the cap 6 in the wide layout
+  (`WIDE_TILE_MAX_COLUMNS` in `wetter.js`); the rule "no single tile in the last row" still applies, so eight tiles
+  stand as 4+4, twelve as 6+6.
 - **Redraw:** chart tiles listen with a `ResizeObserver` (one per page, `dashboard-tiles.js`) instead of only
   `window.resize`. The weather, long-term and most energy charts already have their own observers; only the
   energy dashboard's Sankey hangs on the window and recomputes its minimum height (≈ width / 3, wide layout only)

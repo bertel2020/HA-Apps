@@ -32,6 +32,8 @@
   // alles andere steht in der Übersicht.
   // Tabellen und Kachelreihen je Gruppe: x-ref-Namen wie in _wetter_view.html (tiles<Gruppe>, table[Wrap]<Gruppe>, Übersicht ohne Gruppenname).
   const GROUPS = ['basis', 'wind', 'klima'];
+  // Breite Darstellung (experimentell): höchstens sechs Kacheln pro Zeile, sonst würden es bei 1440 px acht schmale.
+  const WIDE_TILE_MAX_COLUMNS = document.documentElement.dataset.pageLayout === 'wide' ? 6 : 0;
   const refName = (prefix, group) => prefix + (group === 'basis' && prefix !== 'tiles' ? '' : group.charAt(0).toUpperCase() + group.slice(1));
 
   // ---- Diagramme (Phase 2) ------------------------------------------------------------------
@@ -493,7 +495,7 @@
         for (const group of GROUPS) {
           const element = this.$refs[refName('tiles', group)];
           const count = this.tilesFor(group).length;
-          if (element && count && element.clientWidth) this.tileCols[group] = WetterLayout.tileColumns(count, element.clientWidth);
+          if (element && count && element.clientWidth) this.tileCols[group] = WetterLayout.tileColumns(count, element.clientWidth, WIDE_TILE_MAX_COLUMNS);
         }
       },
 

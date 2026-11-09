@@ -15,8 +15,9 @@ MODULE = APP / "static/js/wetter-layout.js"
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="node nicht installiert")
 
 
-def _columns(count: int, width: int) -> int:
-    script = f"const h = require({json.dumps(str(MODULE))}); console.log(h.tileColumns({count}, {width}));"
+def _columns(count: int, width: int, maximum: int | None = None) -> int:
+    extra = "" if maximum is None else f", {maximum}"
+    script = f"const h = require({json.dumps(str(MODULE))}); console.log(h.tileColumns({count}, {width}{extra}));"
     return int(subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True, timeout=30).stdout)
 
 
@@ -39,3 +40,38 @@ def _columns(count: int, width: int) -> int:
 )
 def test_no_tile_is_left_alone_in_the_last_row(count: int, width: int, expected: int) -> None:
     assert _columns(count, width) == expected
+
+
+@pytest.mark.parametrize(
+    ("count", "width", "expected"),
+    [
+        (8, 1400, 8),  # ohne Obergrenze eine Reihe aus acht (heute)
+        (6, 1400, 6),
+        (12, 1400, 6),  # 6+6
+        (5, 1400, 5),
+        (7, 1400, 7),
+    ],
+)
+def test_without_a_maximum_the_row_may_use_the_whole_width(count: int, width: int, expected: int) -> None:
+    assert _columns(count, width) == expected
+
+
+@pytest.mark.parametrize(
+    ("count", "width", "expected"),
+    [
+        (8, 1400, 4),  # nicht 8 in einer Reihe, nicht 6+2
+        (6, 1400, 6),
+        (12, 1400, 6),
+        (9, 1400, 5),
+        (4, 1400, 4),
+        (7, 1400, 4),  # 4+3
+    ],
+)
+def test_the_wide_layout_caps_the_row_at_six_tiles(count: int, width: int, expected: int) -> None:
+    assert _columns(count, width, 6) == expected
+
+
+def test_only_the_wide_layout_passes_the_cap() -> None:
+    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "document.documentElement.dataset.pageLayout === 'wide' ? 6 : 0" in script
+    assert "WetterLayout.tileColumns(count, element.clientWidth, WIDE_TILE_MAX_COLUMNS)" in script
