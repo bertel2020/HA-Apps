@@ -262,6 +262,12 @@
   // sich nicht mehr überlappen — etwas weniger als die 80px Label-Breite, weil
   // kaum ein Name die volle Breite ausnutzt.
   const SANKEY_NARROW_LABEL_PITCH = 68;
+  // Breite Darstellung (experimentell, Einstellungen → Darstellung): <html data-page-layout="wide">.
+  const isWideLayout = () => document.documentElement.dataset.pageLayout === 'wide';
+  // Mindesthöhe des Sankey bei breiter Darstellung: etwa ein Drittel der Breite, damit die Flüsse bei
+  // 1440 px nicht zu flachen Bändern werden. Ohne den Schalter 0, also die bisherige Höhe.
+  const sankeyWideMinHeight = (wrap) => (isWideLayout() && wrap ? wrap.clientWidth / 3 : 0);
+  let sankeyResizePending = false;
   let lastSankeyData = null;
   let lastSankeyIsNarrow = null;
   let currentRenderChart = null;
@@ -499,6 +505,13 @@
             const isNarrow = sankeyIsNarrow();
             if (lastSankeyData && isNarrow !== lastSankeyIsNarrow && currentRenderChart) {
               currentRenderChart(lastSankeyData);
+            } else if (lastSankeyData && currentRenderChart && isWideLayout() && !sankeyResizePending) {
+              // Breite Darstellung: die Mindesthöhe folgt der Breite (sankeyWideMinHeight), also bei Größenänderung neu rechnen.
+              sankeyResizePending = true;
+              requestAnimationFrame(() => {
+                sankeyResizePending = false;
+                if (lastSankeyData && currentRenderChart) currentRenderChart(lastSankeyData);
+              });
             }
           });
         }
@@ -1512,7 +1525,7 @@
         if (wrap && wrap.classList.contains('edash-sankey-wrap')) {
           const neueHoehe = isNarrow
             ? ''
-            : Math.round(Math.min(760, Math.max(420, dichtesteEbene * 52))) + 'px';
+            : Math.round(Math.min(760, Math.max(420, dichtesteEbene * 52, sankeyWideMinHeight(wrap)))) + 'px';
           if (wrap.style.height !== neueHoehe) {
             wrap.style.height = neueHoehe;
             // ECharts hat seine Größe beim init() gemerkt — ohne resize()

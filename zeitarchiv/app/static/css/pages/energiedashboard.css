@@ -1227,3 +1227,10 @@
 .el-wx-seg button{flex:1 1 0;min-width:0;white-space:normal;}
 .wt-sub{margin:10px 0 0;font-size:13px;font-weight:600;color:var(--ink-muted);}
 .el-spark{display:inline-block;vertical-align:middle;width:96px;height:30px;margin-right:8px;}
+
+/* Breite Darstellung (experimentell): die Seite wächst mit dem Rahmen (.page-wide), der Inhalt bleibt in allen Reitern
+   bei 1440px und steht mittig — wie das Dashboard-Raster. Breiter würden Sankey, Heatmap und Diagramme mit fester Höhe
+   zu flachen Streifen. Nur ab 1200px und nur mit Schalter, sonst bleibt alles wie bisher. */
+@media (min-width:1200px){
+  :root[data-page-layout="wide"] #energiedashboard-root{max-width:1440px;margin-inline:auto;}
+}

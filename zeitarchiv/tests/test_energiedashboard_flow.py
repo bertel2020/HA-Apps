@@ -874,7 +874,7 @@ def _js() -> str:
 
 def test_kartenhoehe_waechst_mit_der_dichtesten_ebene() -> None:
     js = _js()
-    assert "Math.min(760, Math.max(420, dichtesteEbene * 52))" in js
+    assert "Math.min(760, Math.max(420, dichtesteEbene * 52, sankeyWideMinHeight(wrap)))" in js
     # Untergrenze 420 = bisheriger Wert, damit kleine Anlagen unverändert bleiben.
     assert "wrap.classList.contains('edash-sankey-wrap')" in js
 

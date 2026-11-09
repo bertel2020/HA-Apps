@@ -101,7 +101,8 @@ def test_precise_mode_uses_four_columns_on_tablets() -> None:
     assert blocks[0] == blocks[1]
 
 
-WIDE_TEMPLATES = {"charts", "tables", "table_editor", "chart_editor", "entities_list", "dashboard_detail", "entities", "dashboards"}
+WIDE_TEMPLATES = {"charts", "tables", "table_editor", "chart_editor", "entities_list", "dashboard_detail", "entities", "dashboards",
+                  "energiedashboard", "wetterdashboard"}
 
 
 def test_only_the_planned_pages_opt_into_the_wide_frame() -> None:
@@ -111,7 +112,7 @@ def test_only_the_planned_pages_opt_into_the_wide_frame() -> None:
         if re.search(r'class="page page-wide"', path.read_text(encoding="utf-8"))
     }
     assert found == WIDE_TEMPLATES
-    for name in ("settings", "energiedashboard", "wetterdashboard"):
+    for name in ("settings",):
         assert "page-wide" not in (TEMPLATES / f"{name}.html").read_text(encoding="utf-8")
 
 
@@ -137,3 +138,13 @@ def test_dashboard_width_and_row_height_rules_live_in_the_switch_block() -> None
     # Außerhalb des Schalter-Blocks bleibt die Zeilenhöhe wie bisher an der Schriftgröße.
     assert "grid-auto-rows:var(--dashboard-row-height)" in css[:start]
     assert "max(var(--dashboard-row-height)" in block
+
+
+def test_energy_and_weather_pages_cap_their_content_at_1440px_inside_the_switch_block() -> None:
+    for name, root in (("energiedashboard", "#energiedashboard-root"), ("wetterdashboard", "#wetter-root")):
+        css = (PAGE_CSS / f"{name}.css").read_text(encoding="utf-8")
+        rule = f':root[data-page-layout="wide"] {root}{{max-width:1440px;margin-inline:auto;}}'
+        assert css.count(rule) == 1, name
+        assert css[: css.index(rule)].rstrip().endswith("@media (min-width:1200px){"), name
+    js = (STATIC / "js" / "energiedashboard.js").read_text(encoding="utf-8")
+    assert "sankeyWideMinHeight" in js and "isWideLayout() && wrap ? wrap.clientWidth / 3 : 0" in js
