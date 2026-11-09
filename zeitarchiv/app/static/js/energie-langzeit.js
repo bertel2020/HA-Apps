@@ -375,6 +375,8 @@
   }
 
   // Zeilen der Bilanz, die der Reiter „Langzeit“ als Monatswerte kennt: sie lassen sich in der Tabelle auswählen.
+  // Zeilen der Gruppe „Energie“ (energie_langzeit.SUMMARY_ROWS); alle anderen gehören zu „Anlage“.
+  const ENERGY_ROWS = ['erzeugung', 'einspeisung', 'netzbezug', 'verbrauch'];
   const MONTH_ROLE_ROWS = ['erzeugung', 'einspeisung', 'netzbezug', 'verbrauch'];
   const NA_YEAR = () => t('Für einzelne Jahre nicht berechnet');
 
@@ -389,13 +391,13 @@
   const naCell = (cls, tip, note = '') => `<td class="${cls} wt-na"${tip ? ` data-tooltip-fixed="${escapeHtml(tip)}"` : ''}>`
     + `<span class="wt-v">–</span>${note ? `<small>${escapeHtml(note)}</small>` : ''}</td>`;
 
-  // ctx: {table, cons, months, columns, vorjahr, diff, main ('pct'|'kwh'), filter ('all'|'bilanz'|'cons'), sort {col, dir}, selected}
+  // ctx: {table, cons, months, columns, vorjahr, diff, main ('pct'|'kwh'), filter ('all'|'energie'|'anlage'|'cons'), sort {col, dir}, selected}
   function compareTableHtml(ctx) {
     const {table, cons, months, vorjahr, diff, filter, sort, selected} = ctx;
     const cols = compareColumns(ctx);
     if (!cols.length) return `<tbody><tr><td>${escapeHtml(t('Keine Spalte ausgewählt.'))}</td></tr></tbody>`;
     const base = table || cons;
-    const sortable = !!cons && filter !== 'bilanz';
+    const sortable = !!cons && (filter === 'all' || filter === 'cons');
     const pct = ctx.main === 'pct';
     const label = (id) => (isPeriod(id) ? columnName(id) : String(id));
     const sorted = (id) => (sortable && id === sort.col ? ' wt-vt-sorted' : '');
@@ -413,7 +415,7 @@
     // Summen-Zeilen der Bilanz.
     if (table && filter !== 'cons') {
       let group = null;
-      for (const row of table.rows) {
+      for (const row of table.rows.filter((r) => filter === 'all' || (filter === 'energie') === ENERGY_ROWS.includes(r.key))) {
         if (row.group !== group) {
           group = row.group;
           html += `<tr class="wt-grp"><th colspan="${span}">${escapeHtml(group)}</th></tr>`;
@@ -448,7 +450,7 @@
     }
 
     // Gruppe „Verbraucher“: jede Spalte ist die Rangliste ihres Zeitraums (periodRank) oder Jahres (consumerRank).
-    if (cons && filter !== 'bilanz') {
+    if (cons && (filter === 'all' || filter === 'cons')) {
       const ranks = {};
       for (const col of cols) ranks[col.id] = isPeriod(col.id) ? periodRank(cons, col.id) : consumerRank(cons, col.id);
       const entryOf = (id, key) => ranks[id].entries.find((e) => e.item.key === key) || null;
@@ -600,7 +602,7 @@
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
         if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
         if (saved.tblMain === 'pct' || saved.tblMain === 'kwh') this.main = saved.tblMain;
-        if (['all', 'bilanz', 'cons'].includes(saved.cmpFilter)) this.filter = saved.cmpFilter;
+        if (['all', 'energie', 'anlage', 'cons'].includes(saved.cmpFilter)) this.filter = saved.cmpFilter;
         if (typeof saved.sel === 'string') this.sel = saved.sel;
         if (saved.shView === 'cols' || saved.shView === 'years') this.shView = saved.shView;
         if (saved.sharesMode === 'pct' || saved.sharesMode === 'kwh') this.sharesMode = saved.sharesMode;
@@ -792,6 +794,18 @@
         return MODE_HINT[this.mode]();
       },
 
+      // Zeilen der Tabelle: „Energie“ (Erzeugung bis Verbrauch), „Anlage“ (Quoten, Speicher, PV-Anlage), „Verbraucher“ oder alle.
+      // Was es nicht gibt (keine Verbraucher, keine Anlagen-Zeilen), fällt auf „Alle“ zurück.
+      hasAnlage() {
+        return !!this.table && this.table.rows.some((row) => !ENERGY_ROWS.includes(row.key));
+      },
+
+      shownFilter() {
+        if (this.filter === 'cons' && !this.hasCons) return 'all';
+        if (this.filter === 'anlage' && !this.hasAnlage()) return 'all';
+        return this.filter;
+      },
+
       setFilter(filter) {
         this.filter = filter;
         writeStore({cmpFilter: filter});
@@ -854,7 +868,7 @@
         table.style.setProperty('--n', cols.length * (this.vorjahr ? 2 : 1));
         table.innerHTML = compareTableHtml({
           table: this.table, cons: this.cons, months: this.months, columns: cols, vorjahr: this.vorjahr, diff: this.diff,
-          main: this.main, filter: this.hasCons ? this.filter : 'bilanz', sort: this.sortState(), selected: this.sel,
+          main: this.main, filter: this.shownFilter(), sort: this.sortState(), selected: this.sel,
         });
         // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
         if (wrap) requestAnimationFrame(() => wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1));
@@ -1520,7 +1534,10 @@
             metric: 'yield', unit: this.wx.unit, decimals: 2, years, current_year: current.year, current_month: current.month,
             ...monthSpan(years, current.year),
           };
-          chart.setOption(weatherMonthly(m, {colors, band: true, narrow: element.clientWidth < 520, font: scaledFont}), true);
+          const option = weatherMonthly(m, {colors, band: true, narrow: element.clientWidth < 520, font: scaledFont});
+          // Der Ertrag je Sonnenstunde schwankt wenig um einen Wert (hier 4,2 bis 5,2): Achse nicht bei 0 beginnen, sonst sind die Linien flach.
+          option.yAxis.scale = true;
+          chart.setOption(option, true);
         } else if (this.wxPart === 'temp' && this.temp && this.temp.enough) {
           const years = this.tempYears();
           const fit = linearFit(this.tempPoints());

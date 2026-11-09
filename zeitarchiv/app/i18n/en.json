@@ -2954,6 +2954,7 @@
     "Noch kein Katalog empfangen.": "No catalog received yet.",
     "Die Zeitarchiv-Integration schickt ihn automatisch, sobald sie verbunden ist (höchstens alle zehn Minuten). Ist die Integration älter, muss sie zuerst aktualisiert werden.": "The Zeitarchiv integration sends it automatically once it is connected (at most every ten minutes). If the integration is older, it has to be updated first.",
     "Energie": "Energy",
+    "Anlage": "System",
     "empfohlen": "recommended",
     "gefunden": "found",
     "Katalog von {received} · nur Metadaten, keine Messwerte": "Catalog from {received} · metadata only, no measured values",

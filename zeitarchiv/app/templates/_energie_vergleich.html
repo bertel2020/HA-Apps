@@ -24,13 +24,14 @@
       </div>
     </div>
     <div class="wt-controls">
-{% if cons_shown %}
       <div class="wt-seg" role="group" aria-label="{{ _('Zeilen') }}">
-        <button type="button" :aria-pressed="(filter === 'all').toString()" @click="setFilter('all')">{{ _("Alle") }}</button>
-        <button type="button" :aria-pressed="(filter === 'bilanz').toString()" @click="setFilter('bilanz')">{{ _("Bilanz") }}</button>
-        <button type="button" :aria-pressed="(filter === 'cons').toString()" @click="setFilter('cons')">{{ _("Verbraucher") }}</button>
-      </div>
+        <button type="button" :aria-pressed="(shownFilter() === 'all').toString()" @click="setFilter('all')">{{ _("Alle") }}</button>
+        <button type="button" :aria-pressed="(shownFilter() === 'energie').toString()" @click="setFilter('energie')">{{ _("Energie") }}</button>
+        <button type="button" x-show="hasAnlage()" x-cloak :aria-pressed="(shownFilter() === 'anlage').toString()" @click="setFilter('anlage')">{{ _("Anlage") }}</button>
+{% if cons_shown %}
+        <button type="button" :aria-pressed="(shownFilter() === 'cons').toString()" @click="setFilter('cons')">{{ _("Verbraucher") }}</button>
 {% endif %}
+      </div>
       <div class="dd-picker-wrap wt-controls-end">
         <button type="button" class="btn" onclick="toggleDDPicker('el-cols')">{{ _("Spalten ▾") }}</button>
         <div class="dd-picker-popover wt-vt-menu" id="el-cols-popover">
