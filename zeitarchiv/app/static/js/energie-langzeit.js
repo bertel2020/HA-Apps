@@ -1751,8 +1751,13 @@
         return record.date_end ? `${day(record.date)} – ${day(record.date_end)}` : day(record.date);
       },
 
+      // Ein Klick öffnet den Energiefluss der Übersicht an diesem Tag (Monatsrekord: an diesem Monat, Serie: am ersten Tag).
       recordLink(record) {
-        return `entities/${encodeURIComponent(record.entity_id)}?range=day&offset=${record.offset}`;
+        if (record.span !== 'month') return `energiedashboard?date=${record.date}`;
+        // Die Monatsansicht kennt nur einen Versatz in Monaten zu heute, kein Datum.
+        const now = window.ServerTime.parts(Date.now() / 1000);
+        const [year, month] = record.date.split('-').map(Number);
+        return `energiedashboard?range=month&offset=${(year - now.year) * 12 + (month - now.month)}`;
       },
 
       kenntageNote() {
