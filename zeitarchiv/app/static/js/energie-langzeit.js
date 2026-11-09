@@ -524,7 +524,7 @@
     return `${html}</tbody>`;
   }
 
-  // Jahre-Auswahl der Karten: „Letzte 5“, „Letzte 10“ oder „Alle“, nur ab mehr als fünf Jahren im Archiv; „Letzte 10“ erst ab mehr
+  // Jahre-Auswahl der Karten: „Letzte 5“, „Letzte 10“ oder „Alle“, sobald Jahre geladen sind; „Letzte 10“ erst ab mehr
   // als zehn (sonst wäre es dasselbe wie „Alle“).
   const YEAR_STEP = 5;
   const storedYearLimit = (value) => (value === YEAR_STEP || value === 10 ? value : 0);
@@ -998,7 +998,7 @@
         this.select(`c:${target.dataset.key}`);
       },
 
-      // Anzahl der Jahre im Archiv (0 = noch nicht geladen); die Jahre-Auswahl der Ansicht „Jahre“ erscheint ab mehr als fünf.
+      // Anzahl der Jahre im Archiv (0 = noch nicht geladen); die Jahre-Auswahl der Ansicht „Jahre“ erscheint, sobald Jahre geladen sind.
       yearCount() {
         return this.cons && this.cons.years ? this.cons.years.length : 0;
       },
@@ -1013,7 +1013,7 @@
       },
 
       showYearChoice() {
-        return this.shView === 'years' && this.yearCount() > YEAR_STEP;
+        return this.shView === 'years' && this.yearCount() > 0;
       },
 
       setYearLimit(value) {
@@ -1293,7 +1293,7 @@
         this.takeSelection();
       },
 
-      // Anzahl der Jahre im Archiv (0 = noch nicht geladen); die Jahre-Auswahl erscheint erst ab mehr als fünf.
+      // Anzahl der Jahre im Archiv (0 = noch nicht geladen); die Jahre-Auswahl erscheint, sobald Jahre geladen sind.
       yearCount() {
         const m = this.months ? this.months.years.length : 0;
         const c = this.cons && this.cons.years ? this.cons.years.length : 0;
@@ -1315,7 +1315,7 @@
       },
 
       showYearChoice() {
-        return this.yearCount() > YEAR_STEP;
+        return this.yearCount() > 0;
       },
 
       // Gilt für Jahresbilanz, Kenntage und die Monatswerte, damit alle dieselben Jahre und dieselbe Basis für Ø zeigen.
