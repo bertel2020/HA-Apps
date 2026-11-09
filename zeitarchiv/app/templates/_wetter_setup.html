@@ -25,7 +25,7 @@
 {% endmacro %}
 
 {% macro row_picker() %}
-<span class="dd-picker-wrap" x-data='entityPicker(listKind === "extra" ? optionsFor("extra") : preferUnits(counterOptions, "heating"), draft.entity_id, (id) => { draft.entity_id = id; }, null, null, false)' @click.outside="open = false">
+<span class="dd-picker-wrap" x-data='entityPicker(withoutTaken(listKind === "extra" ? optionsFor("extra") : preferUnits(counterOptions, "heating")), draft.entity_id, (id) => { draft.entity_id = id; }, null, null, false)' @click.outside="open = false">
   <span class="dd-picker-anchor">
     <button type="button" class="btn" :class="{'dd-picker-btn-clearable': entityId}"
             @click="toggleOpen($refs.search)"
@@ -201,6 +201,13 @@
         // Listen (weitere Sensoren, Heizzähler): Kachel je Eintrag, ein gemeinsamer Dialog bearbeitet eine Kopie (draft),
         // „Übernehmen“ schreibt sie zurück. Ein neuer Eintrag, der ohne Übernehmen geschlossen wird, verschwindet wieder.
         listKind: null, listIdx: -1, listNew: false, draft: {entity_id: "", name: "", room: ""},
+        // Schon eingetragene Sensoren (andere Zeilen derselben Liste, bei weiteren Sensoren auch die Rollen) fehlen in der
+        // Auswahl; der Sensor der gerade bearbeiteten Zeile bleibt.
+        withoutTaken(opts) {
+          const taken = new Set(this.listRows(this.listKind).filter((_, i) => i !== this.listIdx).map((row) => row.entity_id));
+          if (this.listKind === "extra") Object.values(this.roleVals).forEach((id) => { if (id) taken.add(id); });
+          return opts.filter((o) => !taken.has(o.entity_id) || o.entity_id === this.draft.entity_id);
+        },
         listRows(kind) { return kind === "extra" ? this.extras : this.heating; },
         openRow(kind, idx) {
           const row = this.listRows(kind)[idx];
