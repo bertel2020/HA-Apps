@@ -164,3 +164,12 @@ def test_restore_carries_the_column_count() -> None:
 def test_templates_mention_columns_only_through_the_context() -> None:
     assert (TEMPLATES / "_dashboard_tiles.html").read_text(encoding="utf-8").count("dashboard_grid_columns == 4") == 1
     assert re.search(r"dashboard_grid_columns", (APP / "dashboard_tiles.py").read_text(encoding="utf-8"))
+
+
+def test_precise_tablet_block_keeps_a_four_wide_tile_full_width() -> None:
+    """Regression: Die Regel für zwei Spalten (normal) machte aus einer 4er-Kachel im Präzisen Modus
+    auf dem Tablet eine halbe; dort hat das Raster vier Spalten und die Kachel soll die Zeile füllen."""
+    for name in ("dashboard_detail.css", "entities.css"):
+        css = (PAGE_CSS / name).read_text(encoding="utf-8")
+        start = css.index("@media (min-width:521px) and (max-width:820px){")
+        assert '.dashboard-grid.is-precise .dtile[data-grid-cols="4"]{grid-column:span 4;}' in css[start: css.index("\n  }", start)]

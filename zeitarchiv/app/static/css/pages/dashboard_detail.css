@@ -557,6 +557,7 @@
   @media (min-width:521px) and (max-width:820px){
     .dashboard-grid.is-precise{grid-template-columns:repeat(4,minmax(0,1fr));}
     .dashboard-grid.is-precise .dtile[data-grid-cols="3"]{grid-column:span 3;}
+    .dashboard-grid.is-precise .dtile[data-grid-cols="4"]{grid-column:span 4;}
     .dashboard-grid.is-precise .dtile[data-grid-cols="5"],.dashboard-grid.is-precise .dtile[data-grid-cols="6"],
     .dashboard-grid.is-precise .dtile[data-grid-cols="7"],.dashboard-grid.is-precise .dtile[data-grid-cols="8"]{grid-column:span 4;}
   }
