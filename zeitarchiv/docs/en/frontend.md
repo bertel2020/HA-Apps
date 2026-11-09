@@ -691,8 +691,8 @@ nothing looks different from before while the switch is off.
   or `1500px` (four columns). A source test (`tests/test_wide_layout.py`) fails if a rule sits outside.
 - **Tokens:** `--page-max` (1120 px; with the switch 1920 px from 1200 px) and `--page-narrow` (1120 px). Pages
   without opt-in (forms, settings, energy dashboard) and the backup bar (`.rw-bar-in`) stay at `--page-narrow`,
-  centered. Opt-in is the class `.page-wide` (exactly seven templates: charts, tables,
-  table editor, chart editor, entity list, dashboard, overview).
+  centered. Opt-in is the class `.page-wide` (exactly eight templates: charts, tables,
+  table editor, chart editor, entity list, dashboard, dashboard list, overview).
 - **Dashboard:** the grid is up to 1440 px wide (`--dash-max`) and centered; the row height grows with the
   window width (`max(--dashboard-row-height, column width × .58)`, computed from `vw`). `container-type` must
   **never** be set on `.dgroup` or `.dashboard-grid`: the `position:fixed` overlays of the tiles (menu,

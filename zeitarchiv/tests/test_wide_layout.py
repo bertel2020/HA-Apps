@@ -101,7 +101,7 @@ def test_precise_mode_uses_four_columns_on_tablets() -> None:
     assert blocks[0] == blocks[1]
 
 
-WIDE_TEMPLATES = {"charts", "tables", "table_editor", "chart_editor", "entities_list", "dashboard_detail", "entities"}
+WIDE_TEMPLATES = {"charts", "tables", "table_editor", "chart_editor", "entities_list", "dashboard_detail", "entities", "dashboards"}
 
 
 def test_only_the_planned_pages_opt_into_the_wide_frame() -> None:
