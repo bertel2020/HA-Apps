@@ -3565,6 +3565,7 @@
     "Für ein Jahres-Backup ein Jahr wählen, für eine Auswertung einen Monat. Mit einem zweiten Klick auf den letzten Monat oder das letzte Jahr wird daraus ein Zeitraum.": "For a yearly backup choose a year, for an analysis a month. A second click on the last month or year turns it into a period.",
     "Differenz anzeigen": "Show difference",
     "Kenntage je Jahr": "Characteristic days per year",
+    "gilt für alle Karten dieses Reiters": "applies to all cards on this tab",
     "Abweichung vom Mittel": "Deviation from mean",
     "Mitteltemperatur je Monat und Jahr": "Mean temperature per month and year",
     "kälter": "colder",

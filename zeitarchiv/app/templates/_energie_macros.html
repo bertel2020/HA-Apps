@@ -1,6 +1,6 @@
 {# Gemeinsame Bausteine der Energie-Reiter „Verbraucher“ und „Langzeit“. #}
 
-{# Jahre-Auswahl im Kopf einer Karte: „Letzte 5“, „Letzte 10“ (ab mehr als zehn Jahren) oder „Alle“, sobald Jahre geladen sind. Die Auswahl gilt für alle
+{# Jahre-Auswahl (Langzeit: in der haftenden Leiste über den Karten, Vergleich: im Kopf der Karte): „Letzte 5“, „Letzte 10“ (ab mehr als zehn Jahren) oder „Alle“, sobald Jahre geladen sind. Die Auswahl gilt für alle
    Karten des Reiters und wird im Browser gemerkt (yearOptions(), shownYearLimit(), setYearLimit() und showYearChoice() der Komponente). #}
 {% macro year_choice() %}
 <div class="wt-seg" role="group" aria-label="{{ _('Anzahl der Jahre') }}" x-show="showYearChoice()" x-cloak>

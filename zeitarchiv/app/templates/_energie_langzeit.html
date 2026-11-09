@@ -10,6 +10,11 @@
 {# Einfache Anführungszeichen, weil tojson doppelte liefert (sonst bricht das Attribut, sobald ein Bereich abgewählt ist). #}
 <div x-data='energieLangzeit({{ hidden | tojson }}, {{ (consumer_count > 0) | tojson }})'>
   <p class="hint hint-warn" x-show="monthsError" x-text="monthsError" x-cloak></p>
+  {# Jahre-Auswahl: gilt für alle Karten des Reiters, deshalb einmal hier und beim Scrollen unter der Kopfleiste haftend (Mockup A). #}
+  <div class="wt-scope" x-show="showYearChoice()" x-cloak>
+    <span class="wt-scope-lab"><b>{{ _("Jahre") }}</b> <span class="wt-scope-more">{{ _("gilt für alle Karten dieses Reiters") }}</span></span>
+    {{ year_choice() }}
+  </div>
 {% if 'rekorde' not in hidden %}
   {# Rekorde: höchste Tageswerte seit Archivbeginn, wie im Wetterdashboard die erste Karte des Langzeit-Reiters. #}
   <p class="hint hint-warn" x-show="recordsError" x-text="recordsError" x-cloak></p>
@@ -49,7 +54,6 @@
       <h2 class="wt-h2">{{ _("Jahresbilanz") }} {{ hint_button(_("Jahresbilanz")) }}</h2>
       {% call hint_body() %}<span x-text="yearsNote()"></span>{% endcall %}
       <div class="wt-controls-end">
-        {{ year_choice() }}
         <div class="wt-seg" role="group" aria-label="{{ _('Zählung') }}">
           <button type="button" :aria-pressed="(jbCount === 'ytd').toString()" @click="setJbCount('ytd')">{{ _("Bis jetzt") }}</button>
           <button type="button" :aria-pressed="(jbCount === 'full').toString()" @click="setJbCount('full')">{{ _("Komplett") }}</button>
@@ -89,7 +93,6 @@
         <button type="button" :aria-pressed="(ktMode === 'full').toString()" @click="setKtMode('full')">{{ _("Komplett") }}</button>
         <button type="button" :aria-pressed="(ktMode === 'ytd').toString()" @click="setKtMode('ytd')">{{ _("Bis jetzt") }}</button>
       </div>
-      {{ year_choice() }}
     </div>
     <p class="wt-stand" x-text="ktRange()"></p>
     <div class="wt-kt" x-ref="kenntage" @click="kenntageClick($event)"></div>
@@ -144,7 +147,6 @@
         </div>
 {% endif %}
         <label class="filter-chip" x-show="lzView === 'line'" x-cloak><input type="checkbox" x-model="band" @change="drawMonthly()"><span>{{ _("Spanne der Vorjahre") }}</span></label>
-        {{ year_choice() }}
       </div>
     </div>
 {% if 'matrix' not in hidden %}
@@ -170,7 +172,6 @@
       <h2 class="wt-h2">{{ _("Jahre im Vergleich, Tag für Tag") }} {{ hint_button(_("Jahre im Vergleich, Tag für Tag")) }}</h2>
       {% call hint_body() %}<span x-text="dayNote()"></span>{% endcall %}
       <div class="wt-controls-end">
-        {{ year_choice() }}
         <div class="wt-seg" role="group" aria-label="{{ _('Größe') }}">
           <template x-for="key in dayFields()" :key="key">
             <button type="button" :aria-pressed="(dayField === key).toString()" @click="setDayField(key)" x-text="dayFieldLabel(key)"></button>
@@ -208,7 +209,6 @@
           <button type="button" :aria-pressed="(wxPart === 'yield').toString()" @click="setWxPart('yield')">{{ _("Ertrag je Sonnenstunde") }}</button>
           <button type="button" :aria-pressed="(wxPart === 'temp').toString()" @click="setWxPart('temp')">{{ _("Verbrauch gegen Temperatur") }}</button>
         </div>
-        {{ year_choice() }}
       </div>
     </div>
     <p class="wt-stand" x-text="wxSub()"></p>
