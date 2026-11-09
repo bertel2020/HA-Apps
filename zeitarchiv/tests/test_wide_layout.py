@@ -168,3 +168,10 @@ def test_overview_tiles_and_dashboard_list_show_at_most_five_per_row_only_in_the
                 f'minmax(max({minimum}px, calc((100% - 4 * 14px) / 5)),1fr));}}')
         assert css.count(rule) == 1, name
         assert css[: css.index(rule)].rstrip().endswith("@media (min-width:1500px){"), name
+
+
+def test_consumer_share_card_stays_stacked_like_the_supply_card_in_the_switch_block() -> None:
+    css = (PAGE_CSS / "energiedashboard.css").read_text(encoding="utf-8")
+    rule = ':root[data-page-layout="wide"] .edash-verbraucher-card .edash-share-wrap{flex-direction:column;align-items:stretch;gap:14px;}'
+    assert css.count(rule) == 1
+    assert css[: css.index(rule)].count('#energiedashboard-root{max-width:1440px;margin-inline:auto;}') == 1

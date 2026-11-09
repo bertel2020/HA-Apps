@@ -1233,6 +1233,11 @@
    zu flachen Streifen. Nur ab 1200px und nur mit Schalter, sonst bleibt alles wie bisher. */
 @media (min-width:1200px){
   :root[data-page-layout="wide"] #energiedashboard-root{max-width:1440px;margin-inline:auto;}
+  /* Im breiteren Rahmen wäre die Karte Verbraucheranteile breit genug für Donut neben Tabelle, die Karte
+     Versorgungsanteile steht aber immer gestapelt: beide gleich (Donut oben, Tabelle darunter), wie ohne den Schalter. */
+  :root[data-page-layout="wide"] .edash-verbraucher-card .edash-share-wrap{flex-direction:column;align-items:stretch;gap:14px;}
+  :root[data-page-layout="wide"] .edash-verbraucher-card .edash-share-wrap .edash-share-donut{flex:0 0 auto;width:100%;max-width:220px;height:220px;margin:0 auto;}
+  :root[data-page-layout="wide"] .edash-verbraucher-card .edash-share-wrap .tbl-wrap{min-width:0;width:100%;}
   /* Tooltips am rechten Kartenrand (Speicherstand, die letzten zwei KPI-Kacheln) ragten bei 1440px-Rahmen über das
      Fenster und erzeugten waagrechten Überlauf: wie .notice-mute-btn rechtsbündig öffnen. */
   :root[data-page-layout="wide"] .edash-soc-now[data-tooltip]::after{left:auto;right:0;}
