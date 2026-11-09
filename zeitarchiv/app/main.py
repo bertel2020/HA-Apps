@@ -3648,7 +3648,8 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
     rows = index.list_entities()
     entity_options = [
         {
-            "entity_id": row["entity_id"], "label": row["friendly_name"] or row["entity_id"], "unit": row["unit"] or "",
+            "entity_id": row["entity_id"], "label": entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
+            "unit": row["unit"] or "",
             "aggregation_type": row["aggregation_type"], "is_favorite": bool(row["is_favorite"]),  # entityMultiPicker
         }
         for row in rows
