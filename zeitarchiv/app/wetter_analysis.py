@@ -182,7 +182,8 @@ def precipitation(
 def _precipitation_months(
     daily: dict[date, float], today: date, wet_threshold: float, complete: list[int], current_days: dict[date, float],
 ) -> list[dict]:
-    """Tabelle „Niederschlag je Monat“: laufendes Jahr, Vorjahr und Ø der kompletten Vorjahre samt Regentagen.
+    """Tabelle „Niederschlag je Monat“: laufendes Jahr, die Vorjahre (``past``, höchstens SHOWN_PAST_YEARS) und Ø der kompletten
+    Vorjahre samt Regentagen.
 
     Der laufende Monat zählt nur bis heute, und Vorjahr und Ø werden dann auf denselben Ausschnitt begrenzt
     (gleicher Zeitraum). Spätere Monate haben nur Vorjahr und Ø, jeweils der ganze Monat. Das Mittel braucht,
@@ -199,6 +200,11 @@ def _precipitation_months(
         last = today.day if running else 31
         wet = [value for day, value in current_days.items() if day.month == month]
         previous = month_sum(today.year - 1, month, last)
+        past = {
+            str(year): round(value, 3)
+            for year in range(today.year - 1, today.year - 1 - SHOWN_PAST_YEARS, -1)
+            if (value := month_sum(year, month, last)) is not None
+        }
         column = [month_sum(year, month, last) for year in complete]
         column = [value for value in column if value is not None]
         out.append({
@@ -206,6 +212,7 @@ def _precipitation_months(
             "running": running,
             "current": None if future or not wet else round(sum(wet), 3),
             "previous": None if previous is None else round(previous, 3),
+            "past": past,
             "avg": round(sum(column) / len(column), 3) if len(complete) >= 2 and column else None,
             "wet_days": None if future or not wet else sum(1 for value in wet if value >= wet_threshold),
         })

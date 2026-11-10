@@ -315,6 +315,7 @@
         const redrawTable = () => {
           this.heatWide = !this.heatWide;
           if (this.$root.isConnected && this.heat) { this.drawHeatTable(); this.drawHeatScatter(); }
+          if (this.$root.isConnected && this.precip) this.drawPrecipTable(palette());
         };
         WIDE_TABLE.addEventListener('change', redrawTable);
         WIDER_TABLE.addEventListener('change', redrawTable);
@@ -1886,7 +1887,8 @@
         this.drawPrecipTable(colors);
       },
 
-      // Tabelle „Niederschlag je Monat“: laufendes Jahr, Vorjahr, Ø und Abweichung, dazu die Regentage.
+      // Tabelle „Niederschlag je Monat“: laufendes Jahr und Vorjahre, Ø und Abweichung, dazu die Regentage.
+      // Jahresspalten wie beim Heizen: 4, mit breiter Darstellung ab 1440 px 5 (das laufende Jahr zählt mit).
       drawPrecipTable(colors) {
         const table = this.$refs.precipTable;
         const p = this.precip;
@@ -1896,8 +1898,11 @@
         const base = cssVar('--surface-alt');
         const first = p.avg_years.length >= 2 ? p.avg_years[0] : null;
         const last = p.avg_years[p.avg_years.length - 1];
+        // Vorjahre, die es gibt (neueste zuerst); eine leere Spalte zeigen wir nie.
+        const past = [...new Set(p.months.flatMap((row) => Object.keys(row.past || {})))]
+          .sort().reverse().slice(0, heatChartCount() - 1);
         const head = [
-          t('Monat'), String(p.year), String(p.previous_year),
+          t('Monat'), String(p.year), ...past,
           first == null ? t('Ø') : t('Ø {from}–{to}', {from: first, to: last}), t('Abweichung'), t('Regentage'),
         ];
         // Abweichung vom Ø in Prozent, gefärbt wie die Monatsmatrix (Niederschlag: nass blau, trocken ocker).
@@ -1912,26 +1917,33 @@
         };
         let html = `<thead><tr>${head.map((label, i) => `<th${i ? ' class="wt-pm-n"' : ''}>${escapeHtml(label)}</th>`).join('')}</tr></thead><tbody>`;
         let sumCur = 0;
-        let sumPrev = 0;
         let sumAvg = 0;
         let sumWet = 0;
         let sumComplete = true;
+        const sumPast = Object.fromEntries(past.map((year) => [year, 0]));
+        const pastComplete = Object.fromEntries(past.map((year) => [year, true]));
         for (const row of p.months) {
-          const past = row.current != null;
+          const known = row.current != null;
           const tag = row.running
             ? ` <span class="wt-pm-tag">${escapeHtml(t('läuft, bis {date}', {date: this.precipDateText()}))}</span>` : '';
-          html += `<tr class="${row.running ? 'wt-pm-run' : (past ? '' : 'wt-pm-off')}"><td>${escapeHtml(monthName(row.month, 'long'))}${tag}</td>`
-            + `<td class="wt-pm-n">${amount(row.current)}</td><td class="wt-pm-n">${amount(row.previous)}</td><td class="wt-pm-n">${amount(row.avg)}</td>`
+          html += `<tr class="${row.running ? 'wt-pm-run' : (known ? '' : 'wt-pm-off')}"><td>${escapeHtml(monthName(row.month, 'long'))}${tag}</td>`
+            + `<td class="wt-pm-n">${amount(row.current)}</td>`
+            + past.map((year) => `<td class="wt-pm-n">${amount((row.past || {})[year])}</td>`).join('')
+            + `<td class="wt-pm-n">${amount(row.avg)}</td>`
             + `${deviation(row.current, row.avg)}<td class="wt-pm-n">${row.wet_days == null ? '' : row.wet_days}</td></tr>`;
-          if (past) {
-            sumCur += row.current;
-            sumWet += row.wet_days;
-            if (row.previous == null || row.avg == null) sumComplete = false; else { sumPrev += row.previous; sumAvg += row.avg; }
+          if (!known) continue;
+          sumCur += row.current;
+          sumWet += row.wet_days;
+          if (row.avg == null) sumComplete = false; else sumAvg += row.avg;
+          for (const year of past) {
+            const value = (row.past || {})[year];
+            if (value == null) pastComplete[year] = false; else sumPast[year] += value;
           }
         }
-        // Summe bis heute; Vorjahr und Ø nur, wenn für jeden Monat davor ein Wert vorliegt (sonst wäre die Summe zu niedrig).
+        // Summe bis heute; ein Jahr oder der Ø nur, wenn für jeden Monat davor ein Wert vorliegt (sonst wäre die Summe zu niedrig).
         html += `<tr class="wt-pm-sum"><td>${escapeHtml(t('Summe bis {date}', {date: this.precipDateText()}))}</td>`
-          + `<td class="wt-pm-n">${amount(sumCur)}</td><td class="wt-pm-n">${amount(sumComplete ? sumPrev : p.previous_to_date)}</td>`
+          + `<td class="wt-pm-n">${amount(sumCur)}</td>`
+          + past.map((year) => `<td class="wt-pm-n">${pastComplete[year] ? amount(sumPast[year]) : '–'}</td>`).join('')
           + `<td class="wt-pm-n">${amount(sumComplete ? sumAvg : p.avg_to_date)}</td>${deviation(sumCur, sumComplete ? sumAvg : p.avg_to_date)}`
           + `<td class="wt-pm-n">${sumWet}</td></tr></tbody>`;
         table.innerHTML = html;

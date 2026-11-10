@@ -303,6 +303,8 @@ def test_precipitation_months_compare_the_running_month_over_the_same_period() -
     assert months[3]["previous"] == 2.0 and months[3]["avg"] == 2.0  # ganzer Monat
     assert months[4]["running"] and months[4]["current"] == 2.0
     assert months[4]["previous"] == 1.0 and months[4]["avg"] == 1.0  # nur bis zum 10.04. (ohne den 20.)
+    assert months[4]["past"] == {"2025": 1.0, "2024": 1.0, "2023": 1.0}  # jedes Vorjahr im selben Ausschnitt
+    assert months[3]["past"] == {"2025": 2.0, "2024": 2.0, "2023": 2.0} and "2022" not in months[3]["past"]
     assert months[5]["current"] is None and months[5]["wet_days"] is None
     assert months[5]["previous"] == 2.0 and months[5]["avg"] == 2.0  # spätere Monate: ganzer Monat
     assert months[1]["current"] is None  # im laufenden Jahr gibt es für den Januar keine Zeile

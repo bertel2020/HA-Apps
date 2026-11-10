@@ -41,9 +41,10 @@
   - „Nur Mittelwerte“ zeigt je Sensor eine Zeile
   - „Temperaturen im Vergleich“ und „Luftfeuchte im Vergleich“: Räume lassen
     sich ein- und ausblenden
-  - Reiter „Niederschlag“: neue Tabelle „Niederschlag je Monat“ (laufendes
-    Jahr, Vorjahr, Ø, Abweichung, Regentage); im Diagramm stehen Spanne und
-    Tageswerte in der Legende, die Tageswerte haben eine eigene Achse
+  - Reiter „Niederschlag“: neue Tabelle „Niederschlag je Monat“ (4 Jahre, mit
+    breiter Darstellung ab 1440 px 5; dazu Ø, Abweichung, Regentage); im
+    Diagramm stehen Spanne und Tageswerte in der Legende, die Tageswerte haben
+    eine eigene Achse
 
 - **Demo-Modus**: Die Demo bringt jetzt eine fertige Oberfläche mit und
   umfasst 5 Jahre Historie
@@ -124,9 +125,10 @@
   - "Averages only" shows one row per sensor
   - "Temperatures compared" and "Humidity compared": rooms can be shown and
     hidden
-  - "Precipitation" tab: new table "Precipitation per month" (current year, last
-    year, average, deviation, rain days); the chart lists the range and the
-    daily values in its legend, and the daily values have their own axis
+  - "Precipitation" tab: new table "Precipitation per month" (4 years, with the
+    wide layout 5 from 1440 px; plus average, deviation, rain days); the chart
+    lists the range and the daily values in its legend, and the daily values
+    have their own axis
 
 - **Demo mode**: The demo now comes with a ready-made interface and covers 5
   years of history
