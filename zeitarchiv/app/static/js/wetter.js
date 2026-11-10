@@ -27,7 +27,7 @@
 
   // Vergleichstabelle und Gruppen: element-table-render.js (dieselbe Datei zeichnet die Tabelle in der Lovelace-Karte).
   const {weatherComparison: renderTable, inGroup} = window.ElementTableRender;
-  const {weatherMonthly, weatherMatrix} = window.ElementChartRender;
+  const {weatherMonthly, weatherMatrix, pastOpacity, legendEntry} = window.ElementChartRender;
   // Gruppen: „wind“ = Reiter „Wind & Sonne“, „klima“ = Zusatzsensoren (Schlüssel „temperature:N“) auf „Temperatur & Klima“,
   // alles andere steht in der Übersicht.
   // Tabellen und Kachelreihen je Gruppe: x-ref-Namen wie in _wetter_view.html (tiles<Gruppe>, table[Wrap]<Gruppe>, Übersicht ohne Gruppenname).
@@ -1809,13 +1809,15 @@
             lineStyle: {color: colors.text, width: 2, type: 'dashed'}, itemStyle: {color: colors.text},
           });
         }
-        // Ältere Jahre als schwache Linien ohne Legendeneintrag (wie im Monatsvergleich).
-        for (const year of Object.keys(p.older || {}).sort()) {
+        // Ältere Jahre in immer blasseren Tönen, alle in der Legende (neueste zuerst: Vorjahr, dann ältere).
+        const olderYears = Object.keys(p.older || {}).sort().reverse();
+        olderYears.slice().reverse().forEach((year) => {
           series.push({
             name: year, type: 'line', data: nullable(p.older[year], scale), symbol: 'none', silent: true,
-            lineStyle: {color: colors.prev, width: 1.2, opacity: 0.45}, itemStyle: {color: colors.prev}, tooltip: {show: false},
+            lineStyle: {color: colors.prev, width: 1.2, opacity: pastOpacity(olderYears.indexOf(year) + 1)},
+            itemStyle: {color: colors.prev}, tooltip: {show: false},
           });
-        }
+        });
         if (previous) {
           series.push({
             name: String(p.previous_year), type: 'line', data: previous, symbol: 'none',
@@ -1823,7 +1825,8 @@
           });
           legend.push(String(p.previous_year));
         }
-        // Reihenfolge der Legende wie im Monatsvergleich: laufendes Jahr, Vorjahr, Ø.
+        olderYears.forEach((year, index) => legend.push(legendEntry(year, colors.prev, pastOpacity(index + 1))));
+        // Reihenfolge der Legende wie im Monatsvergleich: laufendes Jahr, Vorjahr, ältere Jahre, Ø.
         if (hasAvg) legend.push('Ø');
         series.push({
           name: String(p.year), type: 'line', data: cumulative, symbol: 'none', z: 5,

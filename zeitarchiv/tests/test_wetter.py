@@ -1433,9 +1433,9 @@ def test_year_charts_list_their_legend_in_the_same_order() -> None:
     source = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     block = source[source.index("const legend = [String(p.year)];"):]
     block = block[: block.index("const chart = chartFor('precip'")]
-    assert block.index("legend.push(String(p.previous_year))") < block.index("if (hasAvg) legend.push('Ø');")
+    assert block.index("legend.push(String(p.previous_year))") < block.index("olderYears.forEach") < block.index("if (hasAvg) legend.push('Ø');")
     render = (APP / "static/js/element-chart-render.js").read_text(encoding="utf-8")
-    assert render.index("legend.push(String(year))") < render.index("legend.push('Ø')") < render.index("legend.unshift(current)")
+    assert render.index("legendEntry(String(year)") < render.index("legend.push('Ø')") < render.index("legend.unshift(current)")
 
 
 def test_daylength_chart_lists_the_newest_year_first() -> None:
@@ -1445,3 +1445,15 @@ def test_daylength_chart_lists_the_newest_year_first() -> None:
     source = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "const years = [...byYear.keys()].sort().reverse();" in source
     assert "const latest = years[0];" in source
+
+
+def test_year_charts_put_every_shown_year_in_the_legend_with_its_own_tone() -> None:
+    """Monatsvergleich, Energie-Monatsvergleich und Niederschlag: alle gezeigten Jahre stehen in der Legende, und das Zeichen
+    hat den Ton der Linie (das Vorjahr voll, ältere blasser)."""
+    from _paths import APP
+
+    render = (APP / "static/js/element-chart-render.js").read_text(encoding="utf-8")
+    assert render.count("legendEntry(String(year), colors.prev, pastOpacity(index))") == 2
+    assert "return rank <= 0 ? 1 : Math.max(0.3, 0.7 - 0.1 * rank);" in render
+    wetter = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "olderYears.forEach((year, index) => legend.push(legendEntry(year, colors.prev, pastOpacity(index + 1))));" in wetter
