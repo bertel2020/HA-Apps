@@ -2472,7 +2472,8 @@
         (sunMode ? [] : periods).forEach((period, index) => {
           const color = this.heatColor(index);
           const name = WetterHeating.label(period);
-          legend.push(name);
+          // Das Legendenzeichen in voller Deckkraft: die Punkte älterer Perioden sind blass, ihre Farbe soll lesbar bleiben.
+          legend.push(legendEntry(name, color));
           const points = this.heat.days
             .filter((day) => WetterHeating.periodOf(day[0]) === period)
             .map((day) => [day[1], Math.round(WetterHeating.dayKwh(day, o.on) * 100) / 100, day[0]]);

@@ -1457,3 +1457,9 @@ def test_year_charts_put_every_shown_year_in_the_legend_with_its_own_tone() -> N
     assert "return rank <= 0 ? 1 : Math.max(0.3, 0.7 - 0.1 * rank);" in render
     wetter = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "olderYears.forEach((year, index) => legend.push(legendEntry(year, colors.prev, pastOpacity(index + 1))));" in wetter
+
+
+def test_heating_legend_marks_keep_full_colour() -> None:
+    from _paths import APP
+
+    assert "legend.push(legendEntry(name, color));" in (APP / "static/js/wetter.js").read_text(encoding="utf-8")
