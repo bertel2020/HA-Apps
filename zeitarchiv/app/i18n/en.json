@@ -4592,7 +4592,6 @@
     "Zu wenige Werte": "Too few values",
     "1.10.–{day}.{month}.": "1 Oct–{day}.{month}.",
     "Die Heizwerte konnten nicht geladen werden.": "The heating values could not be loaded.",
-    "Gerade nur über Tage unter der Heizgrenze": "Line only over days below the heating limit",
     "Gradtagzahl {tag} und Verbrauch je Monat": "Degree days {tag} and consumption per month",
     "Heizgrenze": "Heating limit",
     "Heizperiode": "Heating season",
@@ -4899,6 +4898,7 @@
     "Feuchte": "Humidity",
     "Ohne Raum": "No room",
     "Ohne Etage": "No floor",
-    "bisher": "so far"
+    "bisher": "so far",
+    "Ein Punkt je Tag (kWh pro Tag). Die Gerade gilt nur für Tage unter der Heizgrenze.": "One dot per day (kWh per day). The line only covers days below the heating limit."
   }
 }

@@ -2303,7 +2303,7 @@
       },
 
       heatReadout() {
-        return this.heatSlopes().length ? t('Gerade nur über Tage unter der Heizgrenze') : '';
+        return this.heatSlopes().length ? t('Ein Punkt je Tag (kWh pro Tag). Die Gerade gilt nur für Tage unter der Heizgrenze.') : '';
       },
 
       drawHeat() {
@@ -2455,7 +2455,9 @@
           animation: false, grid: gridFor(element, {right: 20, bottom: 24}), legend: legendBox(colors, legend),
           xAxis: {
             type: 'value', name: t('Tages-Ø Außentemperatur (°C)'), nameLocation: 'middle', nameGap: 26,
-            nameTextStyle: {color: colors.text}, ...axisStyle(colors), min: (value) => Math.floor(value.min / 5) * 5,
+            nameTextStyle: {color: colors.text}, ...axisStyle(colors),
+            // Auf die Daten zugeschnitten (in 2-°C-Schritten) statt fester Fünferschritte: sonst bleibt links und rechts viel leere Fläche.
+            min: (value) => Math.floor(value.min / 2) * 2, max: (value) => Math.ceil(value.max / 2) * 2,
           },
           // Einheit an den Teilstrichen statt als Achsenname: der Name landete in diesem Diagramm mitten in der Legende.
           yAxis: {
