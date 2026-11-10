@@ -1517,8 +1517,9 @@
           if (!byYear.has(year)) byYear.set(year, []);
           byYear.get(year).push([Date.UTC(2000, Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10))), hours, iso]);
         }
-        const years = [...byYear.keys()].sort();
-        const latest = years[years.length - 1];
+        // Neuestes Jahr zuerst, wie in den anderen Jahresdiagrammen: Legende und Farben (das neueste in der ersten Farbe).
+        const years = [...byYear.keys()].sort().reverse();
+        const latest = years[0];
         // Achse ab dem nächsten Vielfachen von 3 h unter der kürzesten Tageslänge: im Winter bei uns ab 6 h,
         // weiter im Norden bleibt Platz bis 0 h.
         const shortest = Math.min(...data.days.map((row) => row[1]));

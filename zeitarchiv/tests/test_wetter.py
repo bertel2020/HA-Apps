@@ -1436,3 +1436,12 @@ def test_year_charts_list_their_legend_in_the_same_order() -> None:
     assert block.index("legend.push(String(p.previous_year))") < block.index("if (hasAvg) legend.push('Ø');")
     render = (APP / "static/js/element-chart-render.js").read_text(encoding="utf-8")
     assert render.index("legend.push(String(year))") < render.index("legend.push('Ø')") < render.index("legend.unshift(current)")
+
+
+def test_daylength_chart_lists_the_newest_year_first() -> None:
+    """Der Jahresverlauf der Tageslänge führte die Jahre aufsteigend (und das älteste in der ersten Farbe)."""
+    from _paths import APP
+
+    source = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "const years = [...byYear.keys()].sort().reverse();" in source
+    assert "const latest = years[0];" in source
