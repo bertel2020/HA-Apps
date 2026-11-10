@@ -2433,8 +2433,9 @@
             .map((day) => [day[1], Math.round(WetterHeating.dayKwh(day, o.on) * 100) / 100, day[0]]);
           const line = WetterHeating.fit(this.heat.days, o, period);
           series.push({
-            name, type: 'scatter', data: points, symbolSize: index === 0 ? 7 : 5,
-            itemStyle: {color, opacity: index === 0 ? 0.9 : 0.5},
+            // Die aktuelle Heizperiode kräftig, ältere deutlich dezenter: sonst verschwindet sie im Brei der Vorjahre.
+            name, type: 'scatter', data: points, symbolSize: index === 0 ? 7 : 4,
+            itemStyle: {color, opacity: index === 0 ? 0.9 : 0.3},
             markLine: index === 0 ? {
               silent: true, symbol: 'none', lineStyle: {color: colors.faint, type: 'dashed'},
               label: {formatter: () => `${t('Heizgrenze')} ${num(o.limit, 0)} °C`, color: colors.text, fontSize: scaledFont(11)},
