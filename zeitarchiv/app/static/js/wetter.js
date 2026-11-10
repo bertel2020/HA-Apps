@@ -1807,7 +1807,6 @@
             name: 'Ø', type: 'line', data: avg, symbol: 'none',
             lineStyle: {color: colors.text, width: 2, type: 'dashed'}, itemStyle: {color: colors.text},
           });
-          legend.push('Ø');
         }
         // Ältere Jahre als schwache Linien ohne Legendeneintrag (wie im Monatsvergleich).
         for (const year of Object.keys(p.older || {}).sort()) {
@@ -1823,6 +1822,8 @@
           });
           legend.push(String(p.previous_year));
         }
+        // Reihenfolge der Legende wie im Monatsvergleich: laufendes Jahr, Vorjahr, Ø.
+        if (hasAvg) legend.push('Ø');
         series.push({
           name: String(p.year), type: 'line', data: cumulative, symbol: 'none', z: 5,
           lineStyle: {color: colors.cur, width: 3}, itemStyle: {color: colors.cur},

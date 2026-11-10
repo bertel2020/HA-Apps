@@ -1424,3 +1424,15 @@ def test_pv_unit_ignores_case_for_watt_and_kilowatt_but_not_for_milli_and_mega()
     scale = wetter_routes.pv_scale_kw
     assert [scale(u) for u in ("W", "w", "kW", "KW", " kw ", "MW")] == [0.001, 0.001, 1.0, 1.0, 1.0, 1000.0]
     assert [scale(u) for u in ("mW", "mw", "", None, "kWh")] == [None, None, None, None, None]
+
+
+def test_year_charts_list_their_legend_in_the_same_order() -> None:
+    """Monatsvergleich und Niederschlag: laufendes Jahr, Vorjahr, Ø (die Niederschlagslegende stand zuerst anders)."""
+    from _paths import APP
+
+    source = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    block = source[source.index("const legend = [String(p.year)];"):]
+    block = block[: block.index("const chart = chartFor('precip'")]
+    assert block.index("legend.push(String(p.previous_year))") < block.index("if (hasAvg) legend.push('Ø');")
+    render = (APP / "static/js/element-chart-render.js").read_text(encoding="utf-8")
+    assert render.index("legend.push(String(year))") < render.index("legend.push('Ø')") < render.index("legend.unshift(current)")
