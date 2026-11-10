@@ -179,8 +179,9 @@ def test_consumer_share_card_stays_stacked_like_the_supply_card_in_the_switch_bl
     assert css[: css.index(rule)].count('#energiedashboard-root{max-width:1440px;margin-inline:auto;}') == 1
 
 
-def test_heating_month_table_shows_a_fourth_season_only_in_the_wide_layout() -> None:
+def test_heating_month_table_shows_more_seasons_only_in_the_wide_layout() -> None:
     source = (APP / "static" / "js" / "wetter.js").read_text(encoding="utf-8")
-    assert "dataset.pageLayout === 'wide' && WIDE_TABLE.matches ? 4 : 3" in source
+    assert "dataset.pageLayout !== 'wide' || !WIDE_TABLE.matches) return 3;" in source
+    assert "return WIDER_TABLE.matches ? 5 : 4;" in source
     assert "info.periods.slice(0, heatSeasonCount())" in source
-    assert "(min-width:1200px)" in source
+    assert "(min-width:1200px)" in source and "(min-width:1440px)" in source

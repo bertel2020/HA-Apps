@@ -34,9 +34,14 @@
   const GROUPS = ['basis', 'wind', 'klima'];
   // Breite Darstellung (experimentell): höchstens sechs Kacheln pro Zeile, sonst würden es bei 1440 px acht schmale.
   const WIDE_TILE_MAX_COLUMNS = document.documentElement.dataset.pageLayout === 'wide' ? 6 : 0;
-  // Dieselbe Grenze wie die breite Darstellung im Stylesheet (ab 1200 px).
+  // Heizperioden in der Monatstabelle: 3; mit breiter Darstellung ab 1200 px 4, ab 1440 px 5 (ab 1200 px passen auch fünf
+  // ohne Scrollen, aber die Spalten würden eng).
   const WIDE_TABLE = window.matchMedia('(min-width:1200px)');
-  const heatSeasonCount = () => (document.documentElement.dataset.pageLayout === 'wide' && WIDE_TABLE.matches ? 4 : 3);
+  const WIDER_TABLE = window.matchMedia('(min-width:1440px)');
+  const heatSeasonCount = () => {
+    if (document.documentElement.dataset.pageLayout !== 'wide' || !WIDE_TABLE.matches) return 3;
+    return WIDER_TABLE.matches ? 5 : 4;
+  };
   const refName = (prefix, group) => prefix + (group === 'basis' && prefix !== 'tiles' ? '' : group.charAt(0).toUpperCase() + group.slice(1));
 
   // ---- Diagramme (Phase 2) ------------------------------------------------------------------
@@ -295,8 +300,10 @@
         this.hasDaylight = !!this.$root.querySelector('[x-ref="daylightChart"]');
         this.hasPv = !!this.$root.querySelector('[x-ref="pvChart"]');
         const observer = new ResizeObserver(() => { if (this.$root.isConnected) this.layoutTiles(); });
-        // Breite Darstellung: eine Heizperiode mehr in der Monatstabelle, sobald das Fenster breit genug ist.
-        WIDE_TABLE.addEventListener('change', () => { if (this.$root.isConnected && this.heat) this.drawHeatTable(); });
+        // Breite Darstellung: mehr Heizperioden in der Monatstabelle, sobald das Fenster breit genug ist.
+        const redrawTable = () => { if (this.$root.isConnected && this.heat) this.drawHeatTable(); };
+        WIDE_TABLE.addEventListener('change', redrawTable);
+        WIDER_TABLE.addEventListener('change', redrawTable);
         for (const group of GROUPS) {
           const ref = this.$refs[refName('tiles', group)];
           if (ref) observer.observe(ref);
