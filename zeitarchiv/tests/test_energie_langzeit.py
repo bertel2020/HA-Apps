@@ -508,7 +508,7 @@ def test_bereiche_des_reiters_werden_im_setup_gespeichert_und_nicht_gerendert(cl
     try:
         alles = client.post("/energiedashboard/setup", data={
             "netzbezug": "sensor.setup_netz",
-            "langzeit_zeigen": ["quoten", "speicher", "pv", "verbraucher", "jahresbilanz", "monatsvergleich", "matrix", "rekorde", "kenntage", "tagfuertag", "wetter"],
+            "langzeit_zeigen": ["quoten", "speicher", "pv", "verbraucher", "jahresbilanz", "aufteilung", "monatsvergleich", "matrix", "rekorde", "kenntage", "tagfuertag", "wetter"],
         })
         assert ed._load_config(index)["langzeit_ausblenden"] == []
         assert 'x-ref="monthlyChart"' in alles.text and 'x-ref="kenntage"' in alles.text and 'x-ref="jbBars"' in alles.text and 'x-ref="dayChart"' in alles.text
@@ -518,7 +518,7 @@ def test_bereiche_des_reiters_werden_im_setup_gespeichert_und_nicht_gerendert(cl
             "netzbezug": "sensor.setup_netz", "langzeit_zeigen": ["quoten", "rekorde"],
         })
         assert ed._load_config(index)["langzeit_ausblenden"] == [
-            "speicher", "pv", "jahresbilanz", "monatsvergleich", "matrix", "kenntage", "tagfuertag", "verbraucher", "wetter",
+            "speicher", "pv", "jahresbilanz", "aufteilung", "monatsvergleich", "matrix", "kenntage", "tagfuertag", "verbraucher", "wetter",
         ]
         for ref in ('x-ref="monthlyChart"', 'x-ref="matrixTable"', 'x-ref="kenntage"', 'x-ref="jbBars"', 'x-ref="dayChart"', 'x-ref="wxChart"'):
             assert ref not in wenig.text, ref
@@ -1312,3 +1312,17 @@ def test_langzeit_laedt_die_rekorde_mit_der_jahresauswahl_neu() -> None:
     assert "if (this.records) this.loadRecords();" in script[script.index("setYearLimit(value) {"):]
     page = (TEMPLATES / "_energie_langzeit.html").read_text(encoding="utf-8")
     assert 'x-text="recordsScope()"' in page and "mindestens ein Jahr" not in page
+
+
+def test_aufteilung_je_jahr_steht_im_reiter_langzeit_und_nicht_mehr_im_vergleich() -> None:
+    from _paths import APP, TEMPLATES
+
+    vergleich = (TEMPLATES / "_energie_vergleich.html").read_text(encoding="utf-8")
+    langzeit = (TEMPLATES / "_energie_langzeit.html").read_text(encoding="utf-8")
+    assert "setShView" not in vergleich and "year_choice" not in vergleich
+    assert 'x-ref="shares"' in vergleich and 'x-ref="shares"' in langzeit
+    assert "'aufteilung' not in hidden" in langzeit and 'x-ref="sharesLegend"' in langzeit
+    script = (APP / "static/js/energie-langzeit.js").read_text(encoding="utf-8")
+    assert "shView" not in script and "consYearLimit" not in script
+    assert "sharesYearsHtml(data, years, this.sharesMode, pick)" in script
+    assert "aufteilung" in (TEMPLATES / "_energiedashboard_setup.html").read_text(encoding="utf-8")

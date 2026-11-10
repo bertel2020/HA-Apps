@@ -54,10 +54,11 @@ COLUMN_WINDOWS = {
 #: kWh je kWp) und ob mehr davon günstig ("up"), ungünstig ("down") oder neutral (None) ist.
 #: Ausblendbare Bereiche (Setup, `langzeit_ausblenden`): Blöcke der Vergleichstabelle (Reiter „Vergleich“) und weitere Bereiche
 #: der Reiter „Vergleich“ und „Langzeit“. „verbraucher“ blendet die Gruppe „Verbraucher“ der Tabelle und „Aufteilung des
-#: Verbrauchs“ aus, „matrix“ und „monatsvergleich“ sind die beiden Darstellungen (Tabelle, Linien) der Karte mit den Monatswerten.
+#: Verbrauchs“ aus, „aufteilung“ ist die Karte „Aufteilung des Verbrauchs je Jahr“ im Reiter „Langzeit“, „matrix“ und „monatsvergleich“
+#: sind die beiden Darstellungen (Tabelle, Linien) der Karte mit den Monatswerten.
 #: Der Block „energie“ bleibt immer, sonst wäre die Tabelle leer.
 TABLE_BLOCKS = ("energie", "quoten", "speicher", "pv")
-CARD_BLOCKS = ("jahresbilanz", "monatsvergleich", "matrix", "rekorde", "kenntage", "tagfuertag", "verbraucher", "wetter")
+CARD_BLOCKS = ("jahresbilanz", "aufteilung", "monatsvergleich", "matrix", "rekorde", "kenntage", "tagfuertag", "verbraucher", "wetter")
 BLOCK_BY_GROUP = {"Energie": "energie", "Quoten": "quoten", "Speicher": "speicher", "PV-Anlage, wetterbereinigt": "pv"}
 
 

@@ -82,6 +82,23 @@
     <div class="wt-chart wt-chart-sm" x-ref="jbTrend"></div>
   </div>
 {% endif %}
+{% if 'aufteilung' not in hidden and 'verbraucher' not in hidden and consumer_count > 0 %}
+  {# Aufteilung des Verbrauchs je Jahr: ein gestapelter Balken je Jahr (die Zeiträume stehen im Reiter „Vergleich“); die Jahre-Auswahl oben gilt auch hier. #}
+  <div class="card wt-card" x-show="showShares()" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Aufteilung des Verbrauchs je Jahr") }} {{ hint_button(_("Aufteilung des Verbrauchs je Jahr")) }}</h2>
+      {% call hint_body() %}<span x-text="sharesNote()"></span>{% endcall %}
+      <div class="wt-controls-end">
+        <div class="wt-seg" role="group" aria-label="{{ _('Anteile oder kWh') }}">
+          <button type="button" :aria-pressed="(sharesMode === 'pct').toString()" @click="setSharesMode('pct')">{{ _("Anteile (%)") }}</button>
+          <button type="button" :aria-pressed="(sharesMode === 'kwh').toString()" @click="setSharesMode('kwh')">kWh</button>
+        </div>
+      </div>
+    </div>
+    <div class="wt-vs-rows wt-vs-cmp" x-ref="shares" @mouseover="sharesHover($event)" @mouseleave="sharesLeave()" @click="sharesClick($event)"></div>
+    <div class="wt-vs-leg" role="group" aria-label="{{ _('Verbraucher hervorheben') }}" x-ref="sharesLegend" @click="sharesClick($event)"></div>
+  </div>
+{% endif %}
 {% if 'kenntage' not in hidden %}
   {# Kenntage je Jahr: sechs Kenntage in drei Paaren, je Jahr ein Balken (Anteil an den ausgewerteten Tagen). Ein Klick auf
      eine Zeile öffnet den Jahreskalender. #}

@@ -1,6 +1,5 @@
 {% from "_hints.html" import hint_button, hint_body %}
 {% from "_dashboard_period_nav.html" import nav as period_nav with context %}
-{% from "_energie_macros.html" import year_choice %}
 {# Reiter „Vergleich“ des Energiedashboards (Roadmap 1.45/1.49/1.50), aufgebaut wie die Vergleichskarten des Wetterdashboards: eine Karte
    „Zeiträume im Vergleich“ mit Stichtag-Leiste (Alpine-Store dashStichtag, wie im Wetter), Spalten- und Vorjahr-Menü; darin die Bilanz
    (Energie, Quoten, Speicher, PV-Anlage) und die Verbraucher der obersten Ebene in einer Tabelle. Darunter „Aufteilung des Verbrauchs“.
@@ -72,21 +71,16 @@
   </div>
 
 {% if cons_shown %}
-  {# Aufteilung des Verbrauchs: ein gestapelter Balken je Spalte der Tabelle oder je Jahr, „Übrige“ schraffiert. #}
+  {# Aufteilung des Verbrauchs: ein gestapelter Balken je Spalte der Tabelle, „Übrige“ schraffiert. Je Jahr steht sie im Reiter „Langzeit“. #}
   <div class="card wt-card" x-show="cons" x-cloak>
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Aufteilung des Verbrauchs") }} {{ hint_button(_("Aufteilung des Verbrauchs")) }}</h2>
       {% call hint_body() %}<span x-text="sharesNote()"></span>{% endcall %}
       <div class="wt-controls-end">
-        <div class="wt-seg" role="group" aria-label="{{ _('Zeilen der Aufteilung') }}">
-          <button type="button" :aria-pressed="(shView === 'cols').toString()" @click="setShView('cols')">{{ _("Zeiträume") }}</button>
-          <button type="button" :aria-pressed="(shView === 'years').toString()" @click="setShView('years')">{{ _("Jahre") }}</button>
-        </div>
         <div class="wt-seg" role="group" aria-label="{{ _('Anteile oder kWh') }}">
           <button type="button" :aria-pressed="(sharesMode === 'pct').toString()" @click="setSharesMode('pct')">{{ _("Anteile (%)") }}</button>
           <button type="button" :aria-pressed="(sharesMode === 'kwh').toString()" @click="setSharesMode('kwh')">kWh</button>
         </div>
-        {{ year_choice() }}
       </div>
     </div>
     <div class="wt-vs-rows wt-vs-cmp" x-ref="shares" @mouseover="sharesHover($event)" @mouseleave="highlight(pickKey())" @click="sharesClick($event)"></div>

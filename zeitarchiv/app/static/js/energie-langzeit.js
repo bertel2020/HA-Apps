@@ -584,9 +584,7 @@
       sortDir: 'desc',
       // Ausgewählte Zeile: „r:<Rolle>“ (Bilanz) oder „c:<Verbraucher>“; gilt auch im Reiter „Langzeit“.
       sel: null,
-      shView: 'cols',
       sharesMode: 'pct',
-      yearLimit: 0,
       _seq: 0,
       _consSeq: 0,
 
@@ -605,9 +603,7 @@
         if (saved.tblMain === 'pct' || saved.tblMain === 'kwh') this.main = saved.tblMain;
         if (['all', 'energie', 'anlage', 'cons'].includes(saved.cmpFilter)) this.filter = saved.cmpFilter;
         if (typeof saved.sel === 'string') this.sel = saved.sel;
-        if (saved.shView === 'cols' || saved.shView === 'years') this.shView = saved.shView;
         if (saved.sharesMode === 'pct' || saved.sharesMode === 'kwh') this.sharesMode = saved.sharesMode;
-        this.yearLimit = storedYearLimit(saved.consYearLimit);
         const savedSortCol = saved.tblSort ? (saved.tblSort.col ?? saved.tblSort.year) : null;
         if (isColumn(savedSortCol) && ['asc', 'desc'].includes(saved.tblSort.dir)) {
           this.sortCol = savedSortCol;
@@ -942,12 +938,6 @@
 
       // ---- Aufteilung des Verbrauchs ----
 
-      setShView(view) {
-        this.shView = view;
-        writeStore({shView: view});
-        this.drawShares();
-      },
-
       setSharesMode(mode) {
         this.sharesMode = mode;
         writeStore({sharesMode: mode});
@@ -955,9 +945,7 @@
       },
 
       sharesNote() {
-        const base = this.shView === 'cols'
-          ? t('Anteil jedes Verbrauchers am Verbrauch laut Bilanz, je Spalte der Tabelle; dünn darunter das Vorjahr.')
-          : t('Anteil jedes Verbrauchers am Verbrauch des Jahres laut Bilanz, je Jahr im Archiv. Das laufende Jahr (*) und das erste Jahr des Archivs sind nicht vollständig.');
+        const base = t('Anteil jedes Verbrauchers am Verbrauch laut Bilanz, je Spalte der Tabelle; dünn darunter das Vorjahr.');
         return `${base} ${this.sharesMode === 'pct' ? t('Jeder Balken zeigt 100 %.') : t('Alle Balken im selben Maßstab in kWh.')} `
           + t('Rechts die Summe und wie viel davon eigene Zähler erfassen. Schraffiert: „Übrige (Grundlast)“, alles ohne eigenen Zähler. Ein Klick auf einen Verbraucher hebt ihn hervor und wählt ihn in der Tabelle aus.');
       },
@@ -967,13 +955,7 @@
         const host = this.$refs.shares;
         if (!data || !host) return;
         const pick = this.pickKey();
-        if (this.shView === 'years') {
-          if (!data.years) return;
-          const years = this.yearLimit ? data.years.slice(0, this.yearLimit) : data.years;
-          host.innerHTML = sharesYearsHtml(data, years, this.sharesMode, pick);
-        } else {
-          host.innerHTML = sharesColsHtml(data, compareColumns({table: this.table, cons: data, months: this.months, columns: this.cols()}), this.sharesMode, pick, this.vorjahr);
-        }
+        host.innerHTML = sharesColsHtml(data, compareColumns({table: this.table, cons: data, months: this.months, columns: this.cols()}), this.sharesMode, pick, this.vorjahr);
         host.classList.toggle('has-hl', !!pick);
         requestAnimationFrame(() => fitShareLabels(host));
         if (this.$refs.sharesLegend) this.$refs.sharesLegend.innerHTML = sharesLegendHtml(data, pick);
@@ -996,30 +978,6 @@
         const target = event.target.closest('[data-key]');
         if (!target) return;
         this.select(`c:${target.dataset.key}`);
-      },
-
-      // Anzahl der Jahre im Archiv (0 = noch nicht geladen); die Jahre-Auswahl der Ansicht „Jahre“ erscheint, sobald Jahre geladen sind.
-      yearCount() {
-        return this.cons && this.cons.years ? this.cons.years.length : 0;
-      },
-
-      yearOptions() {
-        return yearChoices(this.yearCount());
-      },
-
-      // Ein gemerkter Wert, der nichts mehr kürzt (zehn bei höchstens zehn Jahren), zeigt „Alle“.
-      shownYearLimit() {
-        return this.yearLimit && this.yearLimit < this.yearCount() ? this.yearLimit : 0;
-      },
-
-      showYearChoice() {
-        return this.shView === 'years' && this.yearCount() > 0;
-      },
-
-      setYearLimit(value) {
-        this.yearLimit = value;
-        writeStore({consYearLimit: value});
-        this.drawShares();
       },
     };
   };
@@ -1222,6 +1180,7 @@
     const shown = (key) => !hidden.includes(key);
     const withConsumers = hasConsumers && shown('verbraucher');
     const withMonths = shown('matrix') || shown('monatsvergleich');
+    const withShares = withConsumers && shown('aufteilung');
     return {
       opened: false,
       months: null,
@@ -1239,6 +1198,8 @@
       _daysSeq: 0,
       jbCount: 'ytd',
       jbMode: 'kwh',
+      // Aufteilung des Verbrauchs je Jahr: Anteile in Prozent oder kWh (dieselbe Wahl wie im Reiter „Vergleich“).
+      sharesMode: 'pct',
       // Gewählte Größe: „r:<Rolle>“ (Bilanz) oder „c:<Verbraucher>“; die Auswahl im Reiter „Vergleich“ gilt auch hier.
       sizeSel: 'r:erzeugung',
       // Darstellung der Monatswerte: 'tab' (Jahre × Monate) oder 'line' (eine Linie je Jahr).
@@ -1266,6 +1227,7 @@
         if (['erzeugung', 'verbrauch', 'netzbezug'].includes(saved.dayField)) this.dayField = saved.dayField;
         if ((saved.lzView === 'tab' && shown('matrix')) || (saved.lzView === 'line' && shown('monatsvergleich'))) this.lzView = saved.lzView;
         if (typeof saved.sizeSel === 'string') this.sizeSel = saved.sizeSel;
+        if (saved.sharesMode === 'pct' || saved.sharesMode === 'kwh') this.sharesMode = saved.sharesMode;
         if (saved.wxPart === 'yield' || saved.wxPart === 'temp') this.wxPart = saved.wxPart;
         if (typeof saved.tempSel === 'string') this.tempSel = saved.tempSel;
         // Geladen wird erst beim ersten Öffnen des Reiters: Die Übersicht ist die Startansicht.
@@ -1275,7 +1237,7 @@
           if (shown('jahresbilanz')) this.loadYears();
           if (shown('tagfuertag')) this.loadDays();
           if (withMonths) this.loadMonths();
-          if (withMonths && withConsumers) this.loadConsumers();
+          if ((withMonths || withShares) && withConsumers) this.loadConsumers();
           if (shown('rekorde') || shown('kenntage')) this.loadRecords();
         });
       },
@@ -1285,7 +1247,7 @@
         const fromTable = readStore().sel;
         if (typeof fromTable === 'string' && fromTable !== this.sizeSel) {
           this.sizeSel = fromTable;
-          this.$nextTick(() => this.drawSize());
+          this.$nextTick(() => { this.drawSize(); this.drawShares(); });
         }
       },
 
@@ -1325,9 +1287,62 @@
         this.drawYears();
         this.drawSize();
         this.drawKenntage();
+        this.drawShares();
         this.$nextTick(() => this.drawDays());
         this.$nextTick(() => this.drawWeather());
         if (this.records) this.loadRecords();  // die Rekorde zählen nur die gewählten Jahre: neu vom Server
+      },
+
+      // ---- Aufteilung des Verbrauchs je Jahr: ein gestapelter Balken je Jahr, wie die Zeiträume im Reiter „Vergleich“ ----
+
+      setSharesMode(mode) {
+        this.sharesMode = mode;
+        writeStore({sharesMode: mode});
+        this.drawShares();
+      },
+
+      sharesNote() {
+        return `${t('Anteil jedes Verbrauchers am Verbrauch des Jahres laut Bilanz, je Jahr im Archiv. Das laufende Jahr (*) und das erste Jahr des Archivs sind nicht vollständig.')} `
+          + `${this.sharesMode === 'pct' ? t('Jeder Balken zeigt 100 %.') : t('Alle Balken im selben Maßstab in kWh.')} `
+          + t('Rechts die Summe und wie viel davon eigene Zähler erfassen. Schraffiert: „Übrige (Grundlast)“, alles ohne eigenen Zähler. Ein Klick auf einen Verbraucher hebt ihn hervor und wählt ihn für die Monatswerte aus.');
+      },
+
+      showShares() {
+        return !!(this.cons && this.cons.years && this.cons.years.length);
+      },
+
+      drawShares() {
+        const data = this.cons;
+        const host = this.$refs.shares;
+        if (!data || !data.years || !host) return;
+        const pick = this.sizeSel && this.sizeSel.startsWith('c:') ? this.sizeSel.slice(2) : null;
+        const years = this.yearLimit ? data.years.slice(0, this.yearLimit) : data.years;
+        host.innerHTML = sharesYearsHtml(data, years, this.sharesMode, pick);
+        host.classList.toggle('has-hl', !!pick);
+        requestAnimationFrame(() => fitShareLabels(host));
+        if (this.$refs.sharesLegend) this.$refs.sharesLegend.innerHTML = sharesLegendHtml(data, pick);
+      },
+
+      // Hervorhebung eines Verbrauchers in allen Jahren (Zeiger darüber vorübergehend, Klick wählt aus).
+      highlight(key) {
+        const host = this.$refs.shares;
+        if (!host) return;
+        host.classList.toggle('has-hl', !!key);
+        host.querySelectorAll('.wt-vs-seg').forEach((seg) => seg.classList.toggle('is-hl', seg.dataset.key === key));
+      },
+
+      sharesHover(event) {
+        const seg = event.target.closest('.wt-vs-seg');
+        if (seg) this.highlight(seg.dataset.key);
+      },
+
+      sharesLeave() {
+        this.highlight(this.sizeSel && this.sizeSel.startsWith('c:') ? this.sizeSel.slice(2) : null);
+      },
+
+      sharesClick(event) {
+        const target = event.target.closest('[data-key]');
+        if (target) this.pickSize(`c:${target.dataset.key}`);
       },
 
       // ---- Jahre im Vergleich, Tag für Tag: Matrix Jahr × Kalendertag, gefärbt nach dem Tageswert ----
@@ -1668,6 +1683,7 @@
         this.sizeSel = key;
         writeStore({sizeSel: key});
         this.drawSize();
+        this.drawShares();
       },
 
       sizeTitle() {
@@ -1907,7 +1923,7 @@
           });
           if (!res.ok) throw new Error(String(res.status));
           this.cons = await res.json();
-          this.$nextTick(() => this.drawSize());
+          this.$nextTick(() => { this.drawSize(); this.drawShares(); });
         } catch (e) {
           this.monthsError = t('Die Verbraucher konnten nicht geladen werden.');
         }
