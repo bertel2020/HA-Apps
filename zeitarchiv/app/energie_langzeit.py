@@ -56,10 +56,13 @@ COLUMN_WINDOWS = {
 #: der Reiter „Vergleich“ und „Langzeit“. „verbraucher“ blendet die Gruppe „Verbraucher“ der Tabelle und „Aufteilung des
 #: Verbrauchs“ aus, „aufteilung“ ist die Karte „Aufteilung des Verbrauchs je Jahr“ im Reiter „Langzeit“, „matrix“ und „monatsvergleich“
 #: sind die beiden Darstellungen (Tabelle, Linien) der Karte mit den Monatswerten.
-#: Der Block „energie“ bleibt immer, sonst wäre die Tabelle leer.
-TABLE_BLOCKS = ("energie", "quoten", "speicher", "pv")
+#: „erzeuger“ ist die Gruppe mit den einzelnen Erzeugern (und deren spezifischem Ertrag in „pv“); sie erscheint nur bei zwei oder mehr
+#: Erzeugern. Der Block „energie“ bleibt immer, sonst wäre die Tabelle leer.
+TABLE_BLOCKS = ("energie", "quoten", "speicher", "pv", "erzeuger")
 CARD_BLOCKS = ("jahresbilanz", "aufteilung", "monatsvergleich", "matrix", "rekorde", "kenntage", "tagfuertag", "verbraucher", "wetter")
-BLOCK_BY_GROUP = {"Energie": "energie", "Quoten": "quoten", "Speicher": "speicher", "PV-Anlage, wetterbereinigt": "pv"}
+BLOCK_BY_GROUP = {
+    "Energie": "energie", "Erzeuger": "erzeuger", "Quoten": "quoten", "Speicher": "speicher", "PV-Anlage, wetterbereinigt": "pv",
+}
 
 
 def hidden_blocks(config: dict) -> set[str]:
@@ -188,6 +191,18 @@ def pv_entities(config: dict) -> list[tuple[str, float]]:
         for e in config.get("erzeuger") or []
         if e.get("entity_id") and e.get("kwp") and float(e["kwp"]) > 0
     ]
+
+
+def producers(config: dict) -> list[dict]:
+    """Die eingetragenen Erzeuger mit Entität (eine Entität nur einmal), in der Reihenfolge des Setups."""
+    seen: set[str] = set()
+    out = []
+    for erz in config.get("erzeuger") or []:
+        entity_id = erz.get("entity_id")
+        if entity_id and entity_id not in seen:
+            seen.add(entity_id)
+            out.append(erz)
+    return out
 
 
 def is_configured(config: dict) -> bool:
@@ -457,7 +472,25 @@ class EnergieLangzeitService:
                     irradiation = self.window_irradiation(radiation, start, end, now_local, read_cache)
                     if irradiation:
                         metrics["einstrahlung"] = round(yield_kwh / (kwp * irradiation) * 100, 1)
+        self._producer_metrics(config, metrics, froms, start, end, now_local, read_cache)
         return metrics, froms
+
+    def _producer_metrics(
+        self, config: dict, metrics: dict[str, float | None], froms: dict[str, float | None], start: datetime,
+        end: datetime, now_local: datetime, read_cache: query_mod.QueryReadCache,
+    ) -> None:
+        """Je Erzeuger die Energie (``erz:<Entität>``) und, mit Anlagenleistung, der spezifische Ertrag (``spez:<Entität>``); nur ab
+        zwei Erzeugern beziehungsweise zwei Anlagen mit Leistung, bei einem wäre es die Summe noch einmal."""
+        sources = producers(config)
+        if len(sources) >= 2:
+            for erz in sources:
+                entity_id = erz["entity_id"]
+                metrics[f"erz:{entity_id}"], froms[f"erz:{entity_id}"] = self.window_total([entity_id], start, end, now_local, read_cache)
+        plants = pv_entities(config)
+        if len(plants) >= 2:
+            for entity_id, power in plants:
+                yield_kwh, _first = self.window_total([entity_id], start, end, now_local, read_cache)
+                metrics[f"spez:{entity_id}"] = round(yield_kwh / power, 3) if yield_kwh is not None else None
 
     def visible_rows(self, config: dict, roles: dict[str, list[str]]) -> list[dict]:
         """Zeilen, für die die Einrichtung ausreicht; fehlende Rollen blenden ihre Zeilen aus."""
@@ -469,10 +502,31 @@ class EnergieLangzeitService:
             "spezifisch": pv, "einstrahlung": pv and radiation,
         }
         hidden = hidden_blocks(config)
-        return [
+        rows = [
             row for row in ROWS
             if shown.get(row["key"], bool(roles.get(row["key"]))) and BLOCK_BY_GROUP[row["group"]] not in hidden
         ]
+        sources = producers(config)
+        if len(sources) >= 2 and "erzeuger" not in hidden:
+            # Die einzelnen Erzeuger stehen hinter den Summen der Gruppe „Energie“, vor den Quoten.
+            extra = [
+                {"key": f"erz:{erz['entity_id']}", "group": N_("Erzeuger"), "label": self._consumer_name(erz),
+                 "better": "up", "kind": "energy"}
+                for erz in sources
+            ]
+            at = max((i for i, row in enumerate(rows) if row["group"] == "Energie"), default=-1) + 1
+            rows[at:at] = extra
+        plants = pv_entities(config)
+        if len(plants) >= 2 and "pv" not in hidden:
+            names = {erz["entity_id"]: self._consumer_name(erz) for erz in sources}
+            extra = [
+                {"key": f"spez:{entity_id}", "group": N_("PV-Anlage, wetterbereinigt"),
+                 "label": f"{tr(N_('Spezifischer Ertrag'))} · {names.get(entity_id, entity_id)}", "better": "up", "kind": "spec"}
+                for entity_id, _power in plants
+            ]
+            last = max((i for i, row in enumerate(rows) if row["group"] == "PV-Anlage, wetterbereinigt"), default=len(rows) - 1) + 1
+            rows[last:last] = extra
+        return rows
 
     def compute_table(self, config: dict, body: TableRequest, now_local: datetime | None = None) -> dict:
         now_local = now_local or datetime.now(self.tz)

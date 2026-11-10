@@ -378,6 +378,10 @@
   // Zeilen der Gruppe „Energie“ (energie_langzeit.SUMMARY_ROWS); alle anderen gehören zu „Anlage“.
   const ENERGY_ROWS = ['erzeugung', 'einspeisung', 'netzbezug', 'verbrauch'];
   const MONTH_ROLE_ROWS = ['erzeugung', 'einspeisung', 'netzbezug', 'verbrauch'];
+  // Welche Zeilen ein Filter zeigt: „Energie“ die Summen und die einzelnen Erzeuger (erz:…), „Anlage“ alles außer den Summen und die
+  // einzelnen Erzeuger ebenfalls, damit sie in keinem der beiden Filter fehlen.
+  const isProducerRow = (key) => key.startsWith('erz:');
+  const inFilter = (filter, key) => filter === 'all' || (filter === 'energie' ? ENERGY_ROWS.includes(key) || isProducerRow(key) : !ENERGY_ROWS.includes(key));
   const NA_YEAR = () => t('Für einzelne Jahre nicht berechnet');
 
   // Hauptwert und kleiner darunter der andere Wert; ohne Wert ein Strich.
@@ -415,7 +419,7 @@
     // Summen-Zeilen der Bilanz.
     if (table && filter !== 'cons') {
       let group = null;
-      for (const row of table.rows.filter((r) => filter === 'all' || (filter === 'energie') === ENERGY_ROWS.includes(r.key))) {
+      for (const row of table.rows.filter((r) => inFilter(filter, r.key))) {
         if (row.group !== group) {
           group = row.group;
           html += `<tr class="wt-grp"><th colspan="${span}">${escapeHtml(group)}</th></tr>`;

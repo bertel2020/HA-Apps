@@ -18,6 +18,8 @@
   - Neuer Reiter „Vergleich“ mit „Zeiträume im Vergleich“: Bilanz und
     Verbraucher in einer Tabelle, mit Stichtag, Vorjahr-Spalten, Filter und
     Sortierung; „Gemessen“ zeigt, wie viel eigene Zähler erfassen
+  - Bei mehreren Erzeugern stehen sie in der Tabelle einzeln, mit spezifischem
+    Ertrag je Anlage (abwählbar im Setup)
   - „Aufteilung des Verbrauchs“ als gestapelter Balken je Zeitraum (Reiter „Vergleich“) und je Jahr (Reiter „Langzeit“)
   - „Langzeit“ zeigt eine Größe über alle Jahre, Monat für Monat, als Tabelle
     oder Linien, und neu im Überblick
@@ -96,6 +98,8 @@
   - New "Comparison" tab with "Periods compared": balance and consumers in one
     table, with reference date, previous-year columns, filter and sorting;
     "Measured" shows how much your own meters record
+  - With several producers the table lists them individually, with the
+    specific yield per plant (can be switched off in the setup)
   - "Breakdown of consumption" as a stacked bar per period ("Comparison" tab) and per year ("Long term" tab)
   - "Long term" shows one quantity over all years, month by month, as a table
     or lines, and now also an overview

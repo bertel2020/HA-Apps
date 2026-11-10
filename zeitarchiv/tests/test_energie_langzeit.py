@@ -508,7 +508,7 @@ def test_bereiche_des_reiters_werden_im_setup_gespeichert_und_nicht_gerendert(cl
     try:
         alles = client.post("/energiedashboard/setup", data={
             "netzbezug": "sensor.setup_netz",
-            "langzeit_zeigen": ["quoten", "speicher", "pv", "verbraucher", "jahresbilanz", "aufteilung", "monatsvergleich", "matrix", "rekorde", "kenntage", "tagfuertag", "wetter"],
+            "langzeit_zeigen": ["quoten", "speicher", "pv", "erzeuger", "verbraucher", "jahresbilanz", "aufteilung", "monatsvergleich", "matrix", "rekorde", "kenntage", "tagfuertag", "wetter"],
         })
         assert ed._load_config(index)["langzeit_ausblenden"] == []
         assert 'x-ref="monthlyChart"' in alles.text and 'x-ref="kenntage"' in alles.text and 'x-ref="jbBars"' in alles.text and 'x-ref="dayChart"' in alles.text
@@ -518,7 +518,7 @@ def test_bereiche_des_reiters_werden_im_setup_gespeichert_und_nicht_gerendert(cl
             "netzbezug": "sensor.setup_netz", "langzeit_zeigen": ["quoten", "rekorde"],
         })
         assert ed._load_config(index)["langzeit_ausblenden"] == [
-            "speicher", "pv", "jahresbilanz", "aufteilung", "monatsvergleich", "matrix", "kenntage", "tagfuertag", "verbraucher", "wetter",
+            "speicher", "pv", "erzeuger", "jahresbilanz", "aufteilung", "monatsvergleich", "matrix", "kenntage", "tagfuertag", "verbraucher", "wetter",
         ]
         for ref in ('x-ref="monthlyChart"', 'x-ref="matrixTable"', 'x-ref="kenntage"', 'x-ref="jbBars"', 'x-ref="dayChart"', 'x-ref="wxChart"'):
             assert ref not in wenig.text, ref
@@ -1326,3 +1326,61 @@ def test_aufteilung_je_jahr_steht_im_reiter_langzeit_und_nicht_mehr_im_vergleich
     assert "shView" not in script and "consYearLimit" not in script
     assert "sharesYearsHtml(data, years, this.sharesMode, pick)" in script
     assert "aufteilung" in (TEMPLATES / "_energiedashboard_setup.html").read_text(encoding="utf-8")
+
+
+def _zwei_anlagen(service, kwp_a: float = 6.0, kwp_b: float = 4.0, name_b: str = "PV Ost") -> dict:
+    _zaehler(service, "sensor.pv_sued", (_ts(2), 500.0), (_ts(12), 560.0))          # 60 kWh
+    _zaehler(service, "sensor.pv_ost", (_ts(2), 100.0), (_ts(12), 120.0))           # 20 kWh
+    return _config(erzeuger=[
+        {"entity_id": "sensor.pv_sued", "name": "PV Süd", "kwp": kwp_a},
+        {"entity_id": "sensor.pv_ost", "name": name_b, "kwp": kwp_b},
+    ])
+
+
+def test_mehrere_erzeuger_stehen_einzeln_hinter_der_energie_und_ergeben_die_summe(service) -> None:
+    daten = service.compute_table(_zwei_anlagen(service), lz.TableRequest(columns=["monat"], vorjahr=False, at="2026-08-12"), NOW)
+    keys = [r["key"] for r in daten["rows"]]
+    assert keys.index("erz:sensor.pv_sued") == keys.index("verbrauch") + 1 and keys[keys.index("verbrauch") + 2] == "erz:sensor.pv_ost"
+    zeilen = {r["key"]: r for r in daten["rows"]}
+    assert zeilen["erz:sensor.pv_sued"]["label"] == "PV Süd" and zeilen["erz:sensor.pv_sued"]["group"] == "Erzeuger"
+    assert _zelle(daten, "erz:sensor.pv_sued", "monat")["cur"] == pytest.approx(60.0)
+    assert _zelle(daten, "erz:sensor.pv_ost", "monat")["cur"] == pytest.approx(20.0)
+    assert _zelle(daten, "erzeugung", "monat")["cur"] == pytest.approx(80.0)          # die Summe bleibt
+
+
+def test_ein_einziger_erzeuger_hat_keine_einzelzeile(service) -> None:
+    daten = service.compute_table(_pv_anlage(service), lz.TableRequest(columns=["monat"], vorjahr=False), NOW)
+    assert not [r["key"] for r in daten["rows"] if r["key"].startswith(("erz:", "spez:"))]
+
+
+def test_spezifischer_ertrag_je_anlage_steht_in_der_gruppe_der_wetterbereinigung(service) -> None:
+    daten = service.compute_table(_zwei_anlagen(service), lz.TableRequest(columns=["monat"], vorjahr=False, at="2026-08-12"), NOW)
+    keys = [r["key"] for r in daten["rows"]]
+    assert keys.index("spez:sensor.pv_sued") > keys.index("spezifisch")
+    zeile = next(r for r in daten["rows"] if r["key"] == "spez:sensor.pv_sued")
+    assert zeile["group"] == "PV-Anlage, wetterbereinigt" and zeile["kind"] == "spec" and zeile["label"].endswith("· PV Süd")
+    assert _zelle(daten, "spez:sensor.pv_sued", "monat")["cur"] == pytest.approx(10.0)    # 60 kWh / 6 kWp
+    assert _zelle(daten, "spez:sensor.pv_ost", "monat")["cur"] == pytest.approx(5.0)      # 20 kWh / 4 kWp
+    assert _zelle(daten, "spezifisch", "monat")["cur"] == pytest.approx(8.0)              # 80 kWh / 10 kWp
+
+
+def test_nur_anlagen_mit_leistung_bekommen_einen_spezifischen_ertrag(service) -> None:
+    daten = service.compute_table(_zwei_anlagen(service, kwp_b=0.0), lz.TableRequest(columns=["monat"], vorjahr=False), NOW)
+    keys = [r["key"] for r in daten["rows"]]
+    assert "erz:sensor.pv_ost" in keys and not [k for k in keys if k.startswith("spez:")]   # eine Anlage mit Leistung: nur die Summe
+
+
+def test_der_block_erzeuger_laesst_sich_im_setup_abwaehlen(service) -> None:
+    config = {**_zwei_anlagen(service), "langzeit_ausblenden": ["erzeuger"]}
+    daten = service.compute_table(config, lz.TableRequest(columns=["monat"], vorjahr=False), NOW)
+    assert not [r["key"] for r in daten["rows"] if r["key"].startswith("erz:")]
+    assert "spez:sensor.pv_sued" in [r["key"] for r in daten["rows"]]                 # die Wetterbereinigung bleibt
+
+
+def test_filter_energie_und_anlage_zeigen_die_einzelnen_erzeuger() -> None:
+    from _paths import APP
+
+    script = (APP / "static/js/energie-langzeit.js").read_text(encoding="utf-8")
+    assert "const isProducerRow = (key) => key.startsWith('erz:');" in script
+    assert "filter === 'energie' ? ENERGY_ROWS.includes(key) || isProducerRow(key) : !ENERGY_ROWS.includes(key)" in script
+    assert "for (const row of table.rows.filter((r) => inFilter(filter, r.key)))" in script

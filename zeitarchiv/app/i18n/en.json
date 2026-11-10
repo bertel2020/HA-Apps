@@ -3850,7 +3850,8 @@
     "Wohnzimmer Temperatur": "Living room temperature",
     "Wohnzimmer Feuchte": "Living room humidity",
     "Noch keine Rekorde: Es liegen noch keine abgeschlossenen Tage mit Werten vor.": "No records yet: there are no completed days with values yet.",
-    "Aufteilung des Verbrauchs je Jahr": "Breakdown of consumption per year"
+    "Aufteilung des Verbrauchs je Jahr": "Breakdown of consumption per year",
+    "Erzeuger einzeln": "Individual producers"
   },
   "js": {
     "Ladestand": "State of charge",
