@@ -22,7 +22,7 @@ from .storage.index import Index
 from .wetter_routes import is_wetter_configured, wetter_role_count
 
 #: Obergrenze der aktiven Kacheln: Es soll eine Auswahl bleiben, keine zweite Navigationsleiste.
-MAX_TILES = 8
+MAX_TILES = 10
 
 STATS_MODE_LABELS = {
     "alert": N_("Nur bei Auffälligkeit"),

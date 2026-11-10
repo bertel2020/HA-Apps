@@ -39,7 +39,8 @@ def test_default_selection_fills_up_with_own_dashboards_but_never_exceeds_the_li
         index.create_dashboard(f"Dash {number}")
     keys = _keys(index)
     assert len(keys) == overview_tiles.MAX_TILES
-    assert sum(1 for key in keys if key.startswith("dashboard:")) == 2
+    # Energie- und Wetterdashboard, die vier festen Seiten, der Rest sind eigene Dashboards.
+    assert sum(1 for key in keys if key.startswith("dashboard:")) == overview_tiles.MAX_TILES - 6
 
 
 def test_the_standard_dashboard_is_not_a_tile_target(index) -> None:
@@ -53,8 +54,11 @@ def test_toggle_adds_at_the_end_removes_and_respects_the_limit(index) -> None:
     overview_tiles.apply_form(index, {"overview_tile_toggle": "charts"})
     assert "charts" not in _keys(index)
 
-    for key in ("housekeeping", "import", "charts", "wetterdashboard"):
-        overview_tiles.apply_form(index, {"overview_tile_toggle": key})
+    # Neue eigene Dashboards erscheinen nach der ersten Änderung ausgeschaltet und füllen die Auswahl bis zum Limit auf.
+    own = [f"dashboard:{index.create_dashboard(f'Dash {number}')}" for number in range(overview_tiles.MAX_TILES)]
+    for key in ("housekeeping", "import", "charts", "wetterdashboard", *own):
+        if len(_keys(index)) < overview_tiles.MAX_TILES:
+            overview_tiles.apply_form(index, {"overview_tile_toggle": key})
     assert len(_keys(index)) == overview_tiles.MAX_TILES
     index.set_setting("energiedashboard_enabled", "1")
     with pytest.raises(ValueError):
