@@ -159,6 +159,7 @@ def test_chart_heights_grow_only_inside_the_1500px_switch_block() -> None:
         block = css[start: css.index("\n}", start)]
         assert block.count("height:") >= 3 and all(f"{root} " in line for line in block.splitlines()[1:])
     assert ':root[data-page-layout="wide"] #wetter-root .wt-table{min-width:100%;}' in (PAGE_CSS / "wetterdashboard.css").read_text(encoding="utf-8")
+    assert ':root[data-page-layout="wide"] #wetter-root .wt-days{grid-template-columns:repeat(7,minmax(0,1fr));}' in (PAGE_CSS / "wetterdashboard.css").read_text(encoding="utf-8")
 
 
 def test_overview_tiles_and_dashboard_list_show_at_most_five_per_row_only_in_the_switch_block() -> None:

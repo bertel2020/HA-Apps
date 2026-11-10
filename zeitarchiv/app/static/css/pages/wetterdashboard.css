@@ -477,6 +477,8 @@
   /* Tabellen in ihrer Inhaltsbreite (z. B. 987px) ließen im 1440px-Rahmen rechts eine leere Fläche: auf die Kartenbreite
      ziehen. min-width statt width, damit breitere Tabellen weiter im Wrapper scrollen. */
   :root[data-page-layout="wide"] #wetter-root .wt-table{min-width:100%;}
+  /* Tagesbild: 14 Tage als 7 + 7 statt 10 + 4 (auto-fill ließ im 1440px-Rahmen eine fast leere zweite Zeile). */
+  :root[data-page-layout="wide"] #wetter-root .wt-days{grid-template-columns:repeat(7,minmax(0,1fr));}
 }
 /* Ab 1500px etwas mehr Höhe, damit die Diagramme im breiteren Rahmen nicht zu flachen Streifen werden. */
 @media (min-width:1500px){
