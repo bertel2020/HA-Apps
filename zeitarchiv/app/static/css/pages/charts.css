@@ -142,3 +142,8 @@
   .card-menu-item-danger{color:var(--danger);}
   .card-menu-item-danger:hover{background:var(--danger-soft);}
   .card-menu-divider{height:1px;background:var(--border);margin:6px -2px;}
+
+/* Breite Darstellung (experimentell): höchstens 5 Karten pro Zeile (Mindestbreite nie unter einem Fünftel der Zeile). */
+@media (min-width:1500px){
+  :root[data-page-layout="wide"] .chart-grid{grid-template-columns:repeat(auto-fill,minmax(max(240px, calc((100% - 4 * 14px) / 5)),1fr));}
+}

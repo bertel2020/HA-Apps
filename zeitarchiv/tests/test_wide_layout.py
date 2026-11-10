@@ -163,7 +163,8 @@ def test_chart_heights_grow_only_inside_the_1500px_switch_block() -> None:
 
 
 def test_overview_tiles_and_dashboard_list_show_at_most_five_per_row_only_in_the_switch_block() -> None:
-    for name, sel, minimum in (("entities.css", ".ov-tiles", 230), ("dashboards.css", ".dash-grid", 240)):
+    for name, sel, minimum in (("entities.css", ".ov-tiles", 230), ("dashboards.css", ".dash-grid", 240),
+                              ("charts.css", ".chart-grid", 240), ("tables.css", ".chart-grid", 240)):
         css = (PAGE_CSS / name).read_text(encoding="utf-8")
         rule = (f':root[data-page-layout="wide"] {sel}{{grid-template-columns:repeat(auto-fill,'
                 f'minmax(max({minimum}px, calc((100% - 4 * 14px) / 5)),1fr));}}')
