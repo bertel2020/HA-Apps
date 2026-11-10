@@ -69,43 +69,6 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
-      <div class="settings-compact-label">{{ _("Statistik-Kacheln in der Übersicht") }} {{ hint_button(_('Statistik-Kacheln in der Übersicht')) }}</div>
-      {% call hint_body('settings-compact-hint') %}{{ _("„Nur bei Auffälligkeit“ zeigt einen schmalen Streifen, wenn in Housekeeping etwas offen ist. Die Zahlen stehen unter System → Statistik.") }}{% endcall %}
-    </div>
-    <span class="dd-picker-wrap">
-      <button type="button" class="btn btn-sm" id="overview-stats-btn" onclick="toggleDDPicker('overview-stats')">{% for k, l in overview_stats_options %}{% if k == overview_stats %}{{ l }}{% endif %}{% endfor %} ▾</button>
-      <input type="hidden" name="overview_stats" id="overview-stats-input" value="{{ overview_stats }}"
-             hx-post="settings/darstellung" hx-trigger="change" hx-target="#darstellung-form" hx-swap="innerHTML">
-      <div class="dd-picker-popover" id="overview-stats-popover">
-        {% for key, label in overview_stats_options %}
-        <div class="dd-picker-row" onclick="selectDDOption('overview-stats', '{{ key }}', '{{ label }}')">{{ label }}</div>
-        {% endfor %}
-      </div>
-    </span>
-  </div>
-  <div class="settings-compact-row ov-set-row">
-    <div class="settings-compact-row-text">
-      <div class="settings-compact-label">{{ _("Kacheln der Übersicht") }} <span class="ov-set-count">{{ _("{active} von höchstens {max} aktiv", active=overview_tile_count, max=overview_tile_max) }}</span> {{ hint_button(_('Kacheln der Übersicht')) }}</div>
-      {% call hint_body('settings-compact-hint') %}{{ _("Ziele, die oben auf der Übersicht als Kacheln stehen. Mit den Pfeilen sortieren. Nach der ersten Änderung erscheinen neue eigene Dashboards hier ausgeschaltet.") }}{% endcall %}
-    </div>
-    <ul class="ov-set-list" id="overview-tiles-list">
-      {% for r in overview_tile_rows %}
-      <li class="{{ '' if r.on else 'is-off' }}">
-        <span class="sw" style="background:{{ r.color }}"></span>
-        <span class="nm">{{ r.label }}{% if r.note and (not r.available or r.key.startswith('dashboard:')) %} <span class="tag">{{ r.note }}</span>{% endif %}</span>
-        <button type="button" class="ov-set-move" aria-label="{{ _('Nach oben') }}" {% if not r.can_up %}disabled{% endif %}
-                hx-post="settings/darstellung" hx-vals='{{ {"overview_tile_move": r.key ~ ":up"} | tojson }}' hx-target="#darstellung-form" hx-swap="innerHTML">↑</button>
-        <button type="button" class="ov-set-move" aria-label="{{ _('Nach unten') }}" {% if not r.can_down %}disabled{% endif %}
-                hx-post="settings/darstellung" hx-vals='{{ {"overview_tile_move": r.key ~ ":down"} | tojson }}' hx-target="#darstellung-form" hx-swap="innerHTML">↓</button>
-        <button type="button" class="ov-set-toggle{{ ' is-on' if r.on }}" role="switch" aria-checked="{{ 'true' if r.on else 'false' }}"
-                aria-label="{{ r.label }}" {% if not r.on and overview_tile_count >= overview_tile_max %}disabled{% endif %}
-                hx-post="settings/darstellung" hx-vals='{{ {"overview_tile_toggle": r.key} | tojson }}' hx-target="#darstellung-form" hx-swap="innerHTML"></button>
-      </li>
-      {% endfor %}
-    </ul>
-  </div>
-  <div class="settings-compact-row">
-    <div class="settings-compact-row-text">
       <div class="settings-compact-label">{{ _("Farbschema") }} {{ hint_button(_('Farbschema')) }}</div>
       {% call hint_body('settings-compact-hint') %}{{ _("Petrol/Kupfer, HA-Blau oder Cobalt/Teal") }}{% endcall %}
     </div>

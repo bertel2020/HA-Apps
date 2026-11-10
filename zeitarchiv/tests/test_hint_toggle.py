@@ -74,7 +74,7 @@ def test_the_pages_that_use_buttons_load_the_script() -> None:
         "wetterdashboard.html": ["_wetter_view.html", "_wetter_setup.html"],
         "data_quality.html": [],
         "table_editor.html": [],
-        "dashboard_editor.html": [],
+        "dashboard_editor.html": ["_dashboard_overview_options.html"],
     }
     quellen = _templates()
     for seite in seiten:

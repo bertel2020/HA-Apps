@@ -80,6 +80,10 @@
       </div>
       {% endif %}
 
+      {% if dashboard and dashboard.is_default %}
+      {% include "_dashboard_overview_options.html" %}
+      {% endif %}
+
       <div class="save-row">
         {% if dashboard and not dashboard.is_default %}
         <button type="button" class="btn btn-danger" @click="deleteDashboard()">{{ _("Löschen") }}</button>
@@ -94,6 +98,10 @@
   <script src="{{ asset('js/confirm-dialog.js') }}"></script>
   <script src="{{ asset('js/dynamic-back-link.js') }}"></script>
   <script src="{{ asset('js/hint-toggle.js') }}"></script>
+  {% if dashboard and dashboard.is_default %}
+  <script src="{{ asset('vendor/htmx.min.js') }}"></script>
+  <script src="{{ asset('js/dd-picker.js') }}"></script>
+  {% endif %}
   <script>
     const BASE = {{ app_root | tojson }};
     const DASHBOARD_ID = {{ dashboard.id | tojson if dashboard else 'null' }};

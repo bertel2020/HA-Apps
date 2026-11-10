@@ -157,24 +157,25 @@ def test_page_context_hides_the_alert_unless_the_mode_asks_for_it(index) -> None
     assert overview_tiles.page_context(index, TZ, "0", "0 B")["overview_alert"] is None
 
 
-def test_overview_and_settings_pages_render_the_tiles_and_the_switch(client) -> None:
+def test_overview_page_renders_the_tiles_and_the_switch(client) -> None:
     from app.main import index as app_index
 
     saved = {key: app_index.get_setting(key) for key in (overview_tiles.SETTING_STATS, overview_tiles.SETTING_TILES)}
     try:
-        assert client.post("/settings/darstellung", data={"overview_stats": "off"}).status_code == 200
+        assert client.post("/dashboards/overview-settings", data={"overview_stats": "off"}).status_code == 200
         page = client.get("/uebersicht").text
         assert 'class="ov-tiles"' in page and 'class="stat-row"' not in page and "ov-alert" not in page
         assert 'href="charts"' in page and 'href="statistik"' in page
 
-        assert client.post("/settings/darstellung", data={"overview_stats": "always"}).status_code == 200
+        assert client.post("/dashboards/overview-settings", data={"overview_stats": "always"}).status_code == 200
         assert 'class="stat-row"' in client.get("/uebersicht").text
 
-        form = client.post("/settings/darstellung", data={"overview_tile_toggle": "export"})
+        form = client.post("/dashboards/overview-settings", data={"overview_tile_toggle": "export"})
         assert form.status_code == 200 and 'id="overview-tiles-list"' in form.text
+        assert 'id="overview-options"' in form.text
         assert 'href="export"' in client.get("/uebersicht").text
-        assert client.post("/settings/darstellung", data={"overview_tile_toggle": "nope"}).status_code == 400
-        assert client.post("/settings/darstellung", data={"overview_stats": "nope"}).status_code == 400
+        assert client.post("/dashboards/overview-settings", data={"overview_tile_toggle": "nope"}).status_code == 400
+        assert client.post("/dashboards/overview-settings", data={"overview_stats": "nope"}).status_code == 400
     finally:
         for key, value in saved.items():
             if value is not None:
@@ -182,3 +183,16 @@ def test_overview_and_settings_pages_render_the_tiles_and_the_switch(client) -> 
             else:
                 app_index._conn.execute("DELETE FROM settings WHERE key = ?", (key,))
                 app_index._conn.commit()
+
+
+def test_overview_options_live_in_the_default_dashboard_editor_only(client) -> None:
+    from app.main import index as app_index
+
+    dashboards = app_index.list_dashboards()
+    default = next(d for d in dashboards if d["is_default"])
+    editor = client.get(f"/dashboards/{default['id']}/edit").text
+    assert 'id="overview-options"' in editor and 'id="overview-tiles-list"' in editor
+    for other in (d for d in dashboards if not d["is_default"]):
+        assert 'id="overview-options"' not in client.get(f"/dashboards/{other['id']}/edit").text
+    settings = client.get("/settings/darstellung").text if False else client.get("/settings").text
+    assert 'id="overview-tiles-list"' not in settings

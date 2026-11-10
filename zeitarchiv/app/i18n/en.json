@@ -1422,6 +1422,8 @@
     "{count} Rolle zugeordnet": "{count} role assigned",
     "{count} Rollen zugeordnet": "{count} roles assigned",
     "Dashboard bearbeiten": "Edit dashboard",
+    "Übersichtsseite": "Overview page",
+    "Diese Optionen gelten für die Startseite und werden sofort gespeichert. Sie stehen nur beim Standard-Dashboard.": "These options apply to the start page and are saved immediately. They only appear on the default dashboard.",
     "Präziser Modus": "Precise mode",
     "Lücken auffüllen": "Fill gaps",
     "Dashboard erstellen": "Create dashboard",

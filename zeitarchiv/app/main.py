@@ -1076,7 +1076,6 @@ def _settings_darstellung_context(saved: bool = False) -> dict:
         **page_refresh.settings_context(),
         "startseite": startseite,
         "startseite_options": list(STARTSEITE_LABELS.items()),
-        **overview_tiles.settings_context(index),
         # Globale Defaults für das Optionen-Menü der Entität-eigenen Chart-Seite
         # (entity_detail.html) — siehe _get_entity_chart_defaults()/
         # _resolve_entity_chart_options() weiter unten in dieser Datei. Bool-
@@ -1588,7 +1587,6 @@ async def settings_darstellung(request: Request) -> HTMLResponse:
         if startseite is not None:
             index.set_setting("startseite", str(startseite))
         try:
-            overview_tiles.apply_form(index, form)
             page_layout.apply_form(index, form)
             page_refresh.apply_form(index, form)
         except ValueError as exc:
@@ -4455,6 +4453,31 @@ def dashboards_new(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "dashboard_editor.html", {"dashboard": None})
 
 
+def _dashboard_editor_context(dashboard: dict) -> dict:
+    """Beim Standard-Dashboard kommen die Optionen der Übersichtsseite dazu (früher unter Einstellungen → Darstellung)."""
+    context = {"dashboard": dashboard}
+    if dashboard["is_default"]:
+        context.update(overview_tiles.settings_context(index))
+    return context
+
+
+@app.post("/dashboards/overview-settings", response_class=HTMLResponse)
+async def dashboards_overview_settings(request: Request) -> HTMLResponse:
+    """Speichert eine Änderung der Übersichtsseiten-Optionen und liefert den Block neu zurück."""
+    form = await request.form()
+
+    def apply():
+        try:
+            overview_tiles.apply_form(index, form)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return templates.TemplateResponse(
+            request, "_dashboard_overview_options.html", overview_tiles.settings_context(index)
+        )
+
+    return await run_in_threadpool(apply)
+
+
 @app.get("/dashboards/{dashboard_id}", response_class=HTMLResponse)
 def dashboard_detail(request: Request, dashboard_id: int) -> HTMLResponse:
     dashboard = _get_dashboard_or_404(dashboard_id)
@@ -4469,7 +4492,7 @@ def dashboard_detail(request: Request, dashboard_id: int) -> HTMLResponse:
 def dashboards_edit(request: Request, dashboard_id: int) -> HTMLResponse:
     dashboard = _get_dashboard_or_404(dashboard_id)
     return templates.TemplateResponse(
-        request, "dashboard_editor.html", {"dashboard": dashboard}
+        request, "dashboard_editor.html", _dashboard_editor_context(dashboard)
     )
 
 

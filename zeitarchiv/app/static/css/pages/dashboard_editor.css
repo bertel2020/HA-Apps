@@ -24,3 +24,6 @@
   @media (max-width:480px){
     .save-row{justify-content:flex-end;}
   }
+  /* Optionen der Übersichtsseite beim Standard-Dashboard: durch eine Linie von den Dashboard-Schaltern abgesetzt. */
+  .overview-options{margin-top:24px;padding-top:18px;border-top:1px solid var(--border);}
+  .overview-options-title{margin:0 0 4px;font-size:calc(17px * var(--font-scale, 1));}
