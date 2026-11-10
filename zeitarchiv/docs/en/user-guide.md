@@ -207,6 +207,16 @@ under **Dashboards**, just permanently assigned to the overview and not
 renamable or deletable. Like any other dashboard it can be populated with
 tiles, rearranged and locked (see below).
 
+Two things apply to the overview only and are in the editor of the default
+dashboard (**Dashboards → Edit**) under **Overview page**, no longer in the
+settings: the **overview tiles** are the shortcuts at the top of the page
+(energy and weather dashboard, own dashboards, charts, tables, entities,
+statistics, housekeeping, import, export). Up to 10 are active at the same time;
+the arrows change the order. **Statistics tiles on the overview** (Only when
+something needs attention, Always or Off) controls whether the key figures
+also appear as tiles or only a slim strip when something is open in
+Housekeeping. Both options save immediately, not only with "Save".
+
 What appears when opening Zeitarchiv via the HA sidebar (the overview, the
 energy dashboard or the weather dashboard) is determined by **Settings → Appearance → Start
 page**. The "Overview" entry in the header always leads to the overview
@@ -708,7 +718,7 @@ and feed-in, less grid import and consumption), red unfavorable.
   many years the monthly comparison, “Years × months” and key days show. The
   average and range are formed only from these years. Records always count since
   the archive began. The browser remembers the choice.
-- **Key days per year:** Six key days in three pairs, one bar per year with the
+- **Characteristic days per year:** Six key days in three pairs, one bar per year with the
   number of days and their share of the days evaluated: **Almost
   self-sufficient** (self-sufficiency of 90 % or more, i.e. grid import at most
   10 % of consumption with at least 0.5 kWh consumption) and **Surplus days**
@@ -787,13 +797,15 @@ matching type for each role and rejects wrong assignments.
 | Brightness (preferably the south sensor) | Measurement | Sunshine duration, sun hours, day class |
 | Brightness dawn | Measurement | Start and end of day, day length |
 | Wind direction, sun elevation | Measurement | only for the weather summary and daylight |
-| PV power (experimental) | Measurement (W, kW, MW) | Daily yield against expectation from brightness |
+| PV power | Measurement (W, kW, MW) | Daily yield against expectation from brightness |
 
 A rain sensor that only reports on and off is enough: the page then shows rain
 minutes and rain days instead of millimetres. If you have both, both rows are
 shown side by side. Many on/off sensors also report “rain” in fog, dew or when
 the sensor is wet; the drying time then counts too. You set when a day counts
 as a rain day in setup (default 1 mm or 10 min). In the **Display** section you can hide blocks of the comparison table (key days, precipitation, rain, humidity, pressure, wind, gust, radiation); the outdoor temperature and additional sensors are always shown, and the tiles at the top do not change. The period of a column is in the tooltip of its heading ("ⓘ"), not on a line of its own. For max and min, the day appears as a small line under the value in the month, previous month and year columns; the difference to the previous year can be switched on and off in the "Previous year" menu with "Show difference" (remembered by the browser).
+
+Under **Display → Cards** every block of the tabs can be hidden on its own, grouped by tab: Overview (Weather conditions, Periods compared, Day overview, Monthly comparison), Precipitation (Precipitation, Precipitation per month), Temperature & climate (Temperature & climate, Temperature comparison, Humidity comparison), Wind & sun (Wind & sun, Hours of sunshine, Daylight, The last days compared, Day length over the year, PV and brightness) and Long-term (Records, Key days per year, Monthly values per year, Years compared, day by day). Only blocks with an assigned role are offered. A tab is missing when all its blocks are hidden. Only the Heating tab stays separate in the "Experimental" block.
 
 The **Suggest** button in the readings section fills the roles that are still empty, based on device class, unit, names ("outdoor", "rain", "gust") and the weather integration; entities on the same device as the outdoor temperature are preferred. Roles that are already assigned stay unchanged, and nothing is saved until you press Save. Close calls are marked "check" and list further candidates. Wind direction, sun elevation (name with "sun height" or "elevation", not azimuth) and the PV power of the system (name with PV, unit W/kW, no forecast; a balcony system ranks lower) are suggested as well, as are heating counters (names with heating, heat pump, heating element …), and so are further temperature and humidity sensors (indoor rooms as well) for "More sensors" as long as none is set. Matching entities that are not archived yet are named; a link opens the selection assistant (topic Weather).
 
@@ -846,17 +858,13 @@ saturates at about 98,800 lx. The thresholds are in setup under **Sun and daylig
 - **Daylight** (Wind & sun): with the role **Brightness dawn** the curve shows night, twilight
   and day, plus start and end of day, day length and a comparison of the last days, and the
   **day length over the year** (one line per year, from hourly values with an interpolated
-  threshold crossing). Both parts are experimental. The times show what the
+  threshold crossing). The times show what the
   sensor sees, not the sun position. With the role **Sun elevation** (a sensor with the
   height of the sun in degrees, for example a template sensor from `sun.sun`) the table also
   shows the sun position at the start and end of day; a high value points to shading.
 - **Long-term**: monthly comparison, key days, yearly overview and records also know sun
   (sun hours, sunny and overcast days). A real comparison with the previous year is possible
   once the brightness has been archived for a year.
-
-**Experimental** (in setup in the "Experimental" block, calculation and presentation may
-still change):
-
 - **PV and brightness** (Wind & sun): with the roles **Brightness** and **PV power** the card
   compares the daily yield of the system with the expectation. The expectation is learned
   from the previous 28 days (median hourly power per brightness level). Deviations above

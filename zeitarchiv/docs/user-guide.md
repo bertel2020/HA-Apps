@@ -222,6 +222,17 @@ Kachel-Ansicht wie unter **Dashboards**, nur fest der Übersicht zugeordnet
 und nicht umbenennbar oder löschbar. Es lässt sich wie jedes andere
 Dashboard mit Kacheln bestücken, umsortieren und fixieren (siehe unten).
 
+Zwei Dinge gelten nur für die Übersicht und stehen im Editor des
+Standard-Dashboards (**Dashboards → Bearbeiten**) unter **Übersichtsseite**,
+nicht mehr in den Einstellungen: Die **Kacheln der Übersicht** sind die
+Sprungziele oben auf der Seite (Energie- und Wetterdashboard, eigene
+Dashboards, Charts, Tabellen, Entitäten, Statistik, Housekeeping, Import,
+Export). Bis zu 10 sind gleichzeitig aktiv; mit den Pfeilen lässt sich die
+Reihenfolge ändern. **Statistik-Kacheln in der Übersicht** (Nur bei
+Auffälligkeit, Immer oder Aus) steuert, ob die Kennzahlen zusätzlich als
+Kacheln erscheinen oder nur ein schmaler Streifen, wenn in Housekeeping etwas
+offen ist. Beide Optionen speichern sofort, nicht erst mit „Speichern“.
+
 Was beim Öffnen von Zeitarchiv über die HA-Sidebar erscheint (Übersicht,
 Energiedashboard oder Wetterdashboard), legt **Einstellungen → Darstellung →
 Startseite** fest. Der „Übersicht"-Eintrag in der Kopfzeile führt davon
@@ -842,7 +853,7 @@ Entitäten des passenden Typs und lehnt falsche Zuordnungen ab.
 | Helligkeit (am besten der Süd-Sensor) | Messwert | Sonnenscheindauer, Sonnenstunden, Tagesklasse |
 | Helligkeit Dämmerung | Messwert | Tagesbeginn und -ende, Tageslänge |
 | Windrichtung, Sonnenhöhe | Messwert | nur für Wetterlage bzw. Tageslicht |
-| PV-Leistung (experimentell) | Messwert (W, kW, MW) | Tagesertrag gegen Erwartung aus der Helligkeit |
+| PV-Leistung | Messwert (W, kW, MW) | Tagesertrag gegen Erwartung aus der Helligkeit |
 
 Ein Regensensor, der nur ein und aus meldet, reicht: Dann zeigt die Seite
 Regenminuten und Regentage statt Millimeter. Habt ihr beides, stehen beide
@@ -850,6 +861,8 @@ Zeilen nebeneinander. Viele Ein/Aus-Sensoren melden auch bei Nebel, Tau oder
 nassem Sensor „Regen“, die Trocknungszeit zählt dann mit. Ab wann ein Tag als
 Regentag zählt, stellt ihr in der Einrichtung ein (Standard 1 mm bzw. 10 min).
 Im Bereich **Anzeige** lassen sich Blöcke der Vergleichstabelle ausblenden (Kenntage, Niederschlag, Regen, Luftfeuchte, Luftdruck, Wind, Böe, Strahlung); die Außentemperatur und weitere Sensoren bleiben immer sichtbar, die Kacheln oben ändern sich nicht. Der Zeitraum einer Spalte steht im Tooltip der Überschrift („ⓘ“), nicht als eigene Zeile. Bei Max und Min steht in Monat, Vormonat und Jahr der Tag als kleine Zeile unter dem Wert; die Differenz zum Vorjahr lässt sich im Menü „Vorjahr“ mit „Differenz anzeigen“ aus- und einschalten (merkt sich der Browser).
+
+Unter **Anzeige → Karten** lässt sich jeder Block der Reiter einzeln ausblenden, nach Reitern gegliedert: Übersicht (Wetterlage, Zeiträume im Vergleich, Tagesbild, Monatsvergleich), Niederschlag (Niederschlag, Niederschlag je Monat), Temperatur & Klima (Temperatur & Klima, Temperaturen im Vergleich, Luftfeuchte im Vergleich), Wind & Sonne (Wind & Sonne, Sonnenstunden, Tageslicht, Die letzten Tage im Vergleich, Tageslänge im Jahresverlauf, PV und Helligkeit) und Langzeit (Rekorde, Kenntage je Jahr, Monatswerte je Jahr, Jahre im Vergleich, Tag für Tag). Zur Wahl stehen nur Blöcke, für die eine Rolle zugeordnet ist. Ein Reiter fehlt, wenn alle seine Blöcke ausgeblendet sind. Nur der Reiter Heizen steht getrennt im Block „Experimentell“.
 
 Der Knopf **Vorschlagen** im Bereich Messwerte füllt die noch leeren Rollen: aus Geräteklasse, Einheit, Namen („außen“, „Regen“, „Böe“) und der Wetter-Integration; gleiche Geräte wie die Außentemperatur werden bevorzugt. Bereits belegte Rollen bleiben unverändert, gespeichert wird erst mit „Speichern“. Bei knappen Entscheidungen steht „prüfen“ und es werden weitere Kandidaten genannt. Auch Windrichtung, Sonnenhöhe (Name mit „Sonnenhöhe“ oder „elevation“, nicht Azimut) und die PV-Leistung der Anlage (Name mit PV, Einheit W/kW, keine Prognose; ein Balkonkraftwerk erst danach) werden vorgeschlagen, ebenso Heizzähler (Name mit Heizung, Wärmepumpe, Heizstab …), ebenso weitere Temperatur- und Feuchtesensoren (auch Innenräume) für „Weitere Sensoren“, solange dort noch keiner steht. Passende Entitäten, die noch nicht archiviert sind, werden genannt; ein Link führt direkt in den Auswahl-Assistenten (Thema Wetter).
 
@@ -905,8 +918,7 @@ Einrichtung unter **Sonne und Tageslicht**.
 - **Tageslicht** (Wind & Sonne): Mit der Rolle **Helligkeit Dämmerung** zeigt die Kurve
   Nacht, Dämmerung und Tag, dazu Tagesbeginn und -ende, Tageslänge und einen Vergleich der
   letzten Tage (mit der Änderung der Tageslänge zum Vortag) sowie die **Tageslänge im
-  Jahresverlauf** (eine Linie je Jahr, aus Stundenwerten mit interpoliertem Übergang). Beide
-  Teile sind experimentell.
+  Jahresverlauf** (eine Linie je Jahr, aus Stundenwerten mit interpoliertem Übergang).
   Die Zeiten zeigen, was der Sensor sieht, nicht den Sonnenstand. Mit der Rolle
   **Sonnenhöhe** (ein Sensor mit der Höhe der Sonne in Grad, etwa ein Template-Sensor aus
   `sun.sun`) steht zusätzlich der Sonnenstand bei Tagesbeginn und -ende in der Tabelle; ein
@@ -914,10 +926,6 @@ Einrichtung unter **Sonne und Tageslicht**.
 - **Langzeit**: Monatsvergleich, Kenntage, Jahresübersicht und Rekorde kennen auch Sonne
   (Sonnenstunden, sonnige und trübe Tage). Ein echter Vorjahresvergleich ist möglich, sobald
   die Helligkeit ein Jahr archiviert ist.
-
-**Experimentell** (in der Einrichtung im Block „Experimentell“, Berechnung und Darstellung
-können sich noch ändern):
-
 - **PV und Helligkeit** (Wind & Sonne): Mit den Rollen **Helligkeit** und **PV-Leistung**
   vergleicht die Karte den Tagesertrag der Anlage mit der Erwartung. Die Erwartung wird aus
   den 28 Tagen davor gelernt (Median der Stundenleistung je Helligkeitsstufe). Abweichungen
