@@ -1384,3 +1384,31 @@ def test_filter_energie_und_anlage_zeigen_die_einzelnen_erzeuger() -> None:
     assert "const isProducerRow = (key) => key.startsWith('erz:');" in script
     assert "filter === 'energie' ? ENERGY_ROWS.includes(key) || isProducerRow(key) : !ENERGY_ROWS.includes(key)" in script
     assert "for (const row of table.rows.filter((r) => inFilter(filter, r.key)))" in script
+
+
+def test_jahresbilanz_liefert_bei_mehreren_erzeugern_die_summe_je_erzeuger(service, monkeypatch) -> None:
+    for entity_id in ("sensor.pv_a", "sensor.pv_b", "sensor.netz"):
+        _archiv(service, entity_id, datetime(2025, 1, 1, tzinfo=TZ).timestamp())
+    config = _config(netzbezug="sensor.netz", erzeuger=[{"entity_id": "sensor.pv_a", "name": "PV Süd"}, {"entity_id": "sensor.pv_b"}])
+    taeglich = {"sensor.pv_a": 7.0, "sensor.pv_b": 3.0, "sensor.netz": 4.0}
+
+    def fenster(entity_ids, start, end, now_local, read_cache):
+        tage = (end - start).total_seconds() / 86400
+        return round(sum(taeglich[e] for e in entity_ids) * tage, 3), None
+    monkeypatch.setattr(service, "window_total", fenster)
+    daten = service.compute_years(config, NOW)
+    assert [p["key"] for p in daten["producers"]] == ["sensor.pv_a", "sensor.pv_b"] and daten["producers"][0]["name"] == "PV Süd"
+    jahr = next(j for j in daten["years"] if j["year"] == 2025)
+    assert jahr["full"]["erzeuger"] == {"sensor.pv_a": pytest.approx(2555.0), "sensor.pv_b": pytest.approx(1095.0)}
+    assert sum(jahr["full"]["erzeuger"].values()) == pytest.approx(jahr["full"]["erzeugung"])   # der Stapel ergibt die Summe
+    einer = service.compute_years(_config(netzbezug="sensor.netz", erzeuger=[{"entity_id": "sensor.pv_a"}]), NOW)
+    assert einer["producers"] == [] and "erzeuger" not in einer["years"][0]["full"]            # ein Erzeuger: wie bisher
+
+
+def test_jahresbilanz_stapelt_die_erzeugung_bei_mehreren_erzeugern() -> None:
+    from _paths import APP
+
+    script = (APP / "static/js/energie-langzeit.js").read_text(encoding="utf-8")
+    assert "stack: 'erzeugung'" in script and "const MAX_STACKED_PRODUCERS = 4;" in script
+    assert "(data.producers || []).length >= 2" in script                  # ein Erzeuger: wie bisher
+    assert "name: t('Weitere')" in script and "producers: data.producers || []" in script

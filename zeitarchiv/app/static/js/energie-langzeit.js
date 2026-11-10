@@ -991,7 +991,7 @@
   function yearRows(data, count, limit) {
     const list = limit ? data.years.slice(0, limit) : data.years;
     return list.slice().reverse().map((entry) => ({
-      year: entry.year, partialFrom: entry.partial_from, m: entry[count],
+      year: entry.year, partialFrom: entry.partial_from, m: entry[count], producers: data.producers || [],
       // Das laufende Jahr ist nur in „Komplett“ unvollständig; „Bis jetzt“ zählt alle Jahre gleich weit.
       running: count === 'full' && entry.year === data.current,
     }));
@@ -1005,6 +1005,12 @@
     let html = `<b>${escapeHtml(yearLabel(row))}</b>`;
     for (const key of Object.keys(labels)) {
       if (row.m[key] != null) html += `<br>${escapeHtml(labels[key])}: ${escapeHtml(energy(row.m[key]))}`;
+      if (key === 'erzeugung' && row.m.erzeuger) {
+        for (const producer of row.producers) {
+          const value = row.m.erzeuger[producer.key];
+          if (value != null) html += `<br>&nbsp;&nbsp;· ${escapeHtml(producer.name)}: ${escapeHtml(energy(value))}`;
+        }
+      }
     }
     if (row.m.autarkie != null) html += `<br>${escapeHtml(t('Autarkie'))}: ${escapeHtml(percentText(row.m.autarkie))}`;
     if (row.m.eigenverbrauch != null) html += `<br>${escapeHtml(t('Eigenverbrauch'))}: ${escapeHtml(percentText(row.m.eigenverbrauch))}`;
@@ -1027,7 +1033,29 @@
     };
   }
 
-  // Vier Balken je Jahr; das laufende Jahr in „Komplett“ blass und gestrichelt.
+  // Abstufungen einer Farbe (#rrggbb) von voll bis hell, damit die Erzeuger sichtbar zur „Erzeugung“ gehören; andere Formate bleiben.
+  function lighten(color, share) {
+    const hex = /^#([0-9a-f]{6})$/i.exec(String(color).trim());
+    if (!hex) return color;
+    const n = parseInt(hex[1], 16);
+    const mix = (channel) => Math.round(channel + (255 - channel) * share);
+    return `rgb(${mix(n >> 16)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`;
+  }
+
+  // Die Erzeuger, die einzeln gestapelt werden: höchstens MAX_STACKED_PRODUCERS, die kleineren zusammen als „Weitere“.
+  const MAX_STACKED_PRODUCERS = 4;
+  function stackedProducers(data, rows) {
+    const list = (data.producers || []).map((producer) => ({
+      key: producer.key, name: producer.name,
+      total: rows.reduce((sum, row) => sum + ((row.m.erzeuger && row.m.erzeuger[producer.key]) || 0), 0),
+    }));
+    if (list.length <= MAX_STACKED_PRODUCERS) return {shown: list, rest: []};
+    const ranked = list.slice().sort((a, b) => b.total - a.total);
+    return {shown: ranked.slice(0, MAX_STACKED_PRODUCERS - 1), rest: ranked.slice(MAX_STACKED_PRODUCERS - 1)};
+  }
+
+  // Vier Balken je Jahr; das laufende Jahr in „Komplett“ blass und gestrichelt. Bei mehreren Erzeugern ist der Balken „Erzeugung“
+  // je Erzeuger gestapelt (Abstufungen der Farbe der Erzeugung), die Summe steht im Tooltip.
   function yearBars(data, rows, colors, narrow) {
     const defs = [
       ['erzeugung', t('Erzeugung'), cssVar('--energy-solar')], ['netzbezug', t('Netzbezug'), cssVar('--energy-grid')],
@@ -1044,13 +1072,35 @@
         axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => num(value, 0)},
       },
       tooltip: yearTooltip(rows, colors),
-      series: defs.map(([key, name, color]) => ({
-        name, type: 'bar', barMaxWidth: 18, itemStyle: {color, borderRadius: [2, 2, 0, 0]},
-        data: rows.map((row) => ({
-          value: row.m[key],
-          itemStyle: row.running ? {color, opacity: 0.55, borderColor: color, borderType: 'dashed', borderWidth: 1} : {color},
-        })),
-      })),
+      series: defs.flatMap(([key, name, color]) => {
+        const style = (row, tone) => (row.running ? {color: tone, opacity: 0.55, borderColor: tone, borderType: 'dashed', borderWidth: 1} : {color: tone});
+        const stacked = key === 'erzeugung' && (data.producers || []).length >= 2 && rows.some((row) => row.m.erzeuger);
+        if (!stacked) {
+          return [{
+            name, type: 'bar', barMaxWidth: 18, itemStyle: {color, borderRadius: [2, 2, 0, 0]},
+            data: rows.map((row) => ({value: row.m[key], itemStyle: style(row, color)})),
+          }];
+        }
+        const {shown, rest} = stackedProducers(data, rows);
+        const parts = shown.map((producer) => ({name: producer.name, value: (row) => (row.m.erzeuger || {})[producer.key]}));
+        if (rest.length) {
+          parts.push({
+            name: t('Weitere'),
+            value: (row) => {
+              const values = rest.map((producer) => (row.m.erzeuger || {})[producer.key]).filter((v) => v != null);
+              return values.length ? values.reduce((a, b) => a + b, 0) : null;
+            },
+          });
+        }
+        return parts.map((part, index) => {
+          const tone = lighten(color, parts.length > 1 ? index / parts.length * 0.6 : 0);
+          return {
+            name: `${name} · ${part.name}`, type: 'bar', stack: 'erzeugung', barMaxWidth: 18,
+            itemStyle: {color: tone, borderRadius: index === parts.length - 1 ? [2, 2, 0, 0] : 0},
+            data: rows.map((row) => ({value: part.value(row), itemStyle: style(row, tone)})),
+          };
+        });
+      }),
     };
   }
 

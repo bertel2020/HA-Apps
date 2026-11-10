@@ -4903,6 +4903,7 @@
     "seit {year}": "since {year}",
     "Höchste Tageswerte ab {date}, passend zur Jahresauswahl oben. Tage direkt nach einem fehlenden Tag zählen nicht mit, weil dort die Differenz mehrerer Tage steht und einen Schein-Rekord ergäbe. Bei Gleichstand gilt der frühere Tag.": "Highest daily values from {date}, matching the year selection above. Days directly after a missing day do not count, because they hold the difference of several days and would give a false record. In a tie the earlier day counts.",
     "Noch keine Rekorde: Es liegen noch keine Tageswerte vor.": "No records yet: there are no daily values yet.",
-    "Rechts die Summe und wie viel davon eigene Zähler erfassen. Schraffiert: „Übrige (Grundlast)“, alles ohne eigenen Zähler. Ein Klick auf einen Verbraucher hebt ihn hervor und wählt ihn für die Monatswerte aus.": "On the right the total and how much of it own meters record. Hatched: “Remaining (base load)”, everything without its own meter. Clicking a consumer highlights it and selects it for the monthly values."
+    "Rechts die Summe und wie viel davon eigene Zähler erfassen. Schraffiert: „Übrige (Grundlast)“, alles ohne eigenen Zähler. Ein Klick auf einen Verbraucher hebt ihn hervor und wählt ihn für die Monatswerte aus.": "On the right the total and how much of it own meters record. Hatched: “Remaining (base load)”, everything without its own meter. Clicking a consumer highlights it and selects it for the monthly values.",
+    "Weitere": "Others"
   }
 }

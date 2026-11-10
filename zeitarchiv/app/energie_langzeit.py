@@ -733,6 +733,7 @@ class EnergieLangzeitService:
         read_cache = query_mod.QueryReadCache()
         used = {role: ids for role, ids in roles.items() if ids}
         keep = ("erzeugung", "einspeisung", "netzbezug", "verbrauch", "autarkie", "eigenverbrauch")
+        sources = producers(config) if len(producers(config)) >= 2 else []
         out_years = []
         for year in years:
             start = datetime(year, 1, 1, tzinfo=self.tz)
@@ -744,6 +745,11 @@ class EnergieLangzeitService:
                 sums = {role: sums.get(role) for role in BALANCE_ROLES}
                 metrics = flow_metrics(sums)
                 entry[name] = {k: metrics[k] for k in keep}
+                if sources:
+                    # Je Erzeuger die Jahressumme, damit die Balken „Erzeugung“ gestapelt werden können; ohne Daten None.
+                    entry[name]["erzeuger"] = {
+                        erz["entity_id"]: self.window_total([erz["entity_id"]], start, end, now_local, read_cache)[0] for erz in sources
+                    }
             if first_day and first_day.year == year and (first_day.month, first_day.day) > (1, 1):
                 entry["partial_from"] = first_day.isoformat()
             out_years.append(entry)
@@ -753,6 +759,7 @@ class EnergieLangzeitService:
             "tz": str(self.tz), "now": now_local.timestamp(), "unit": "kWh",
             "today": now_local.date().isoformat(), "current": now_local.year,
             "roles": shown, "years": out_years,
+            "producers": [{"key": erz["entity_id"], "name": self._consumer_name(erz)} for erz in sources],
         }
         self._years_cache = (key, time.monotonic(), result)
         return result
