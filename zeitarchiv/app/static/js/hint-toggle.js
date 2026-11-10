@@ -56,9 +56,13 @@ const SCHMAL = window.matchMedia('(max-width:700px)');
    die Hinweise auf jeder Breite zu. Dort steht neben jedem Feld eine Kurzzeile, der
    lange Text ist nur noch Nachschlagewerk. */
 
+/* Breite Darstellung (experimentell): die Hinweise starten auf jeder Breite zugeklappt, damit die Seiten ruhig bleiben.
+   Ohne den Schalter bleibt es beim bisherigen Verhalten. */
+const BREIT = document.documentElement.dataset.pageLayout === 'wide';
+
 function standardZustand() {
   document.querySelectorAll(HINWEIS).forEach(function (ziel) {
-    ziel.hidden = SCHMAL.matches || !!ziel.closest('[data-hints="collapsed"]');
+    ziel.hidden = SCHMAL.matches || BREIT || !!ziel.closest('[data-hints="collapsed"]');
   });
   document.querySelectorAll('.hint-toggle').forEach(function (knopf) {
     const ziel = hinweisZu(knopf);
