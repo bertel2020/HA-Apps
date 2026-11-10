@@ -2290,7 +2290,7 @@
         const info = this.heatPeriodInfo();
         const rows = [];
         this.heatPeriods().slice(0, 4).forEach((period, index) => {
-          const line = WetterHeating.fit(this.heat.days, o, period);
+          const line = WetterHeating.fit(this.heat.days, o, period, this.heatFitFrom(o));
           if (!line) return;
           const running = info.running && period === info.current;
           rows.push({
@@ -2302,8 +2302,18 @@
         return rows;
       },
 
+      // Die Kennzahl kWh je Kelvin gilt nur im Bereich, in dem der Verbrauch ungefähr linear fällt (ab 0 °C bis zur
+      // Heizgrenze). Liegt die Heizgrenze selbst bei 5 °C oder darunter, bleibt es bei allen Tagen darunter.
+      heatFitFrom(o) {
+        return o.limit > 5 ? 0 : -Infinity;
+      },
+
       heatReadout() {
-        return this.heatSlopes().length ? t('Ein Punkt je Tag (kWh pro Tag). Die Gerade gilt nur für Tage unter der Heizgrenze.') : '';
+        if (!this.heatSlopes().length) return '';
+        const o = this.heatOpts();
+        return this.heatFitFrom(o) === 0
+          ? t('Ein Punkt je Tag (kWh pro Tag). Die Linien zeigen den geglätteten Verlauf; kWh je Kelvin gilt für 0 bis {limit} °C, darunter verläuft der Verbrauch oft flacher.', {limit: num(o.limit, 0)})
+          : t('Ein Punkt je Tag (kWh pro Tag). Die Linien zeigen den geglätteten Verlauf; kWh je Kelvin gilt für Tage unter der Heizgrenze.');
       },
 
       drawHeat() {
@@ -2431,7 +2441,6 @@
           const points = this.heat.days
             .filter((day) => WetterHeating.periodOf(day[0]) === period)
             .map((day) => [day[1], Math.round(WetterHeating.dayKwh(day, o.on) * 100) / 100, day[0]]);
-          const line = WetterHeating.fit(this.heat.days, o, period);
           series.push({
             // Die aktuelle Heizperiode kräftig, ältere deutlich dezenter: sonst verschwindet sie im Brei der Vorjahre.
             name, type: 'scatter', data: points, symbolSize: index === 0 ? 7 : 4,
@@ -2442,14 +2451,21 @@
               data: [{xAxis: o.limit}],
             } : undefined,
           });
-          if (line) {
-            // Nur über den Datenbereich, nicht bis zur Heizgrenze: sonst sieht die Gerade wie eine Aussage über Werte aus, die es nicht gibt.
-            const below = points.filter((p) => p[0] < o.limit).map((p) => p[0]);
-            const from = Math.min(...below);
-            const to = Math.max(...below);
+          // Geglättete Kurve; ohne genug Tage (laufende Periode, Frühherbst) die Ausgleichsgerade über den Datenbereich.
+          const curve = WetterHeating.smooth(this.heat.days, o, period);
+          let data = curve;
+          if (!data) {
+            const line = WetterHeating.fit(this.heat.days, o, period);
+            if (line) {
+              const below = points.filter((p) => p[0] < o.limit).map((p) => p[0]);
+              const from = Math.min(...below);
+              const to = Math.max(...below);
+              data = [[from, line.intercept + line.slope * from], [to, line.intercept + line.slope * to]];
+            }
+          }
+          if (data) {
             series.push({
-              name: `${name} `, type: 'line', symbol: 'none', silent: true, z: 4,
-              data: [[from, line.intercept + line.slope * from], [to, line.intercept + line.slope * to]],
+              name: `${name} `, type: 'line', symbol: 'none', silent: true, z: 4, data,
               lineStyle: {color, width: index === 0 ? 2.4 : 1.3, opacity: index === 0 ? 1 : 0.7}, tooltip: {show: false},
             });
           }

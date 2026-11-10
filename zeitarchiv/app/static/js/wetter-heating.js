@@ -111,11 +111,13 @@
 
   // Ausgleichsgerade (kleinste Quadrate) über die Tage unter der Heizgrenze einer Periode:
   // kWh je Tag gegen Tages-Ø. slope ist negativ; -slope sind kWh je Kelvin. Null ohne tragfähige Grundlage.
-  function fit(days, opts, period) {
+  // from (optional) schneidet die kalten Tage ab: unter etwa 0 °C flacht der Verbrauch ab, eine Gerade über alles
+  // zöge die Steigung dort herunter.
+  function fit(days, opts, period, from = -Infinity) {
     const xs = [];
     const ys = [];
     for (const day of days) {
-      if (periodOf(day[0]) !== period || day[1] >= opts.limit) continue;
+      if (periodOf(day[0]) !== period || day[1] >= opts.limit || day[1] < from) continue;
       xs.push(day[1]);
       ys.push(dayKwh(day, opts.on));
     }
@@ -134,6 +136,52 @@
     if (sxx === 0) return null;
     const slope = sxy / sxx;
     return {slope, intercept: my - slope * mx, n, r2: syy === 0 ? 1 : (sxy * sxy) / (sxx * syy)};
+  }
+
+  // Geglätteter Verlauf der Tageswerte einer Periode (lokale Gerade mit Dreiecksgewichten, „LOESS“): folgt dem Knick,
+  // wo der Verbrauch im Frost abflacht. Punkte von der kältesten bis zur wärmsten Tag unter der Heizgrenze, im Abstand
+  // von etwa 0,5 °C. Null bei zu wenigen Tagen.
+  const MIN_SMOOTH_DAYS = 20;
+
+  function smooth(days, opts, period) {
+    const pts = [];
+    for (const day of days) {
+      if (periodOf(day[0]) === period && day[1] < opts.limit) pts.push([day[1], dayKwh(day, opts.on)]);
+    }
+    const n = pts.length;
+    if (n < MIN_SMOOTH_DAYS) return null;
+    pts.sort((a, b) => a[0] - b[0]);
+    const k = Math.max(12, Math.ceil(n * 0.35));
+    const lo = pts[0][0];
+    const hi = pts[n - 1][0];
+    if (hi - lo < 1) return null;
+    const steps = Math.max(2, Math.round((hi - lo) / 0.5));
+    const out = [];
+    for (let i = 0; i <= steps; i++) {
+      const x = lo + (hi - lo) * i / steps;
+      const dist = pts.map((p) => Math.abs(p[0] - x)).sort((a, b) => a - b);
+      const h = Math.max(dist[Math.min(k, n) - 1], 1e-9);
+      let sw = 0;
+      let swx = 0;
+      let swy = 0;
+      let swxx = 0;
+      let swxy = 0;
+      for (const [px, py] of pts) {
+        const u = Math.abs(px - x) / h;
+        if (u >= 1) continue;
+        const w = (1 - u * u * u) ** 3;
+        sw += w;
+        swx += w * px;
+        swy += w * py;
+        swxx += w * px * px;
+        swxy += w * px * py;
+      }
+      if (sw === 0) continue;
+      const denom = sw * swxx - swx * swx;
+      const y = Math.abs(denom) < 1e-9 ? swy / sw : ((swxx * swy - swx * swxy) + (sw * swxy - swx * swy) * x) / denom;
+      out.push([Math.round(x * 100) / 100, Math.round(y * 100) / 100]);
+    }
+    return out.length >= 2 ? out : null;
   }
 
   // kWh je Monat und Zähler einer Heizperiode (Reihenfolge Oktober bis April).
@@ -208,7 +256,7 @@
     return {status: 'clear', percent};
   }
 
-  const api = {SUN_CLASSES, MIN_CLASS_DAYS, classStats, compare, MONTHS, periodOf, label, gradtage, dayKwh, stat, monthRange, periodRange, cutRange, currentPeriod, periods, fit, shares, summary};
+  const api = {SUN_CLASSES, MIN_CLASS_DAYS, classStats, compare, MONTHS, periodOf, label, gradtage, dayKwh, stat, monthRange, periodRange, cutRange, currentPeriod, periods, fit, smooth, MIN_SMOOTH_DAYS, shares, summary};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.WetterHeating = api;
 })(typeof window !== 'undefined' ? window : globalThis);

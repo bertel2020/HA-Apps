@@ -4899,6 +4899,7 @@
     "Ohne Raum": "No room",
     "Ohne Etage": "No floor",
     "bisher": "so far",
-    "Ein Punkt je Tag (kWh pro Tag). Die Gerade gilt nur für Tage unter der Heizgrenze.": "One dot per day (kWh per day). The line only covers days below the heating limit."
+    "Ein Punkt je Tag (kWh pro Tag). Die Linien zeigen den geglätteten Verlauf; kWh je Kelvin gilt für 0 bis {limit} °C, darunter verläuft der Verbrauch oft flacher.": "One dot per day (kWh per day). The lines show the smoothed trend; kWh per kelvin applies from 0 to {limit} °C, below that consumption often runs flatter.",
+    "Ein Punkt je Tag (kWh pro Tag). Die Linien zeigen den geglätteten Verlauf; kWh je Kelvin gilt für Tage unter der Heizgrenze.": "One dot per day (kWh per day). The lines show the smoothed trend; kWh per kelvin applies to days below the heating limit."
   }
 }

@@ -60,6 +60,29 @@ def test_fit_is_a_line_through_days_below_the_limit_only() -> None:
     assert _run(f'h.fit({json.dumps(rows)}, {{limit: 15}}, 2024)') is None
 
 
+def test_fit_can_skip_the_cold_days() -> None:
+    cold = [[f"2025-12-{d:02d}", float(t), [26.0]] for d, t in zip(range(1, 7), (-6, -5, -4, -3, -2, -1), strict=True)]  # flach im Frost
+    warm = [[f"2025-12-{d:02d}", float(t), [24 - 1.5 * t]] for d, t in zip(range(10, 20), range(0, 10), strict=True)]
+    rows = json.dumps(cold + warm)
+    assert _run(f"h.fit({rows}, {{limit: 15}}, 2025)")["slope"] > -1.5  # über alles: der flache Frost zieht die Steigung herunter
+    assert _run(f"h.fit({rows}, {{limit: 15}}, 2025, 0)")["slope"] == pytest.approx(-1.5)
+
+
+def test_smooth_follows_a_bend_and_needs_enough_days() -> None:
+    rows = []
+    for index in range(60):
+        temp = -6 + index * 0.25  # -6 bis 8,75 °C
+        kwh = 26.0 if temp < 0 else 26.0 - 1.4 * temp  # flach im Frost, dann fallend
+        rows.append([f"2025-12-{index % 28 + 1:02d}", temp, [kwh]])
+    rows = [[f"2025-{11 + index // 28 % 2:02d}-{index % 28 + 1:02d}", r[1], r[2]] for index, r in enumerate(rows)]
+    curve = _run(f'h.smooth({json.dumps(rows)}, {{limit: 15, on: [true]}}, 2025)')
+    assert curve[0][0] == pytest.approx(-6) and curve[-1][0] == pytest.approx(8.75)
+    value = {round(x): y for x, y in curve}
+    assert value[-5] == pytest.approx(26.0, abs=0.3)  # im Frost flach, keine Gerade darüber hinaus
+    assert value[6] == pytest.approx(26.0 - 1.4 * 6, abs=0.5)
+    assert _run(f'h.smooth({json.dumps(rows[:10])}, {{limit: 15, on: [true]}}, 2025)') is None  # zu wenige Tage
+
+
 def test_shares_group_by_month_and_counter() -> None:
     days = '[["2025-10-02", 5, [1, 2]], ["2025-10-03", 5, [3, 4]], ["2026-01-05", 0, [10, 0]], ["2026-07-01", 20, [9, 9]]]'
     totals = _run(f"h.shares({days}, [0, 1], 2025)")
