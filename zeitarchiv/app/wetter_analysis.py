@@ -28,8 +28,6 @@ COMPLETE_YEAR_MIN_DAYS = 350
 SHOWN_PAST_YEARS = 5
 #: Ein abgeschlossener Monat braucht für Mittelwerte mindestens so viel Abdeckung.
 MONTH_MIN_COVERAGE = 0.7
-#: Rekorde erst, wenn das Archiv mindestens so viele belegte Tage hat.
-RECORDS_MIN_DAYS = 365
 
 #: DWD-Kenntage: (Schlüssel, Grenzwert, Vergleichsfeld, Richtung)
 KENNTAGE = (
@@ -309,14 +307,14 @@ def count_kenntage(
 def records(points: list[DailyPoint], tz: ZoneInfo, today: date) -> dict | None:
     """Wärmster/kältester Tag, höchster/tiefster Wert aus einer Temperaturreihe.
 
-    Erst ab RECORDS_MIN_DAYS belegten Tagen, sonst wäre „seit Archivbeginn“ ein Wochenrekord.
-    Gezählt werden nur abgedeckte, abgeschlossene Tage."""
+    Gezählt werden nur abgedeckte, abgeschlossene Tage; ab dem ersten solchen Tag. Wie lange das Archiv reicht, nennt
+    ``since``; die Oberfläche schreibt es zu den Rekorden."""
     usable = [
         point for point in points
         if point.covered and point.value is not None and point.min_value is not None
         and point.max_value is not None and day_of(point, tz) < today
     ]
-    if len(usable) < RECORDS_MIN_DAYS:
+    if not usable:
         return None
 
     def entry(point: DailyPoint, value: float) -> dict:
@@ -395,9 +393,9 @@ def _longest_run(days: list[dict], kind: str) -> dict | None:
 
 def sun_records(days: list[dict], monthly_hours: dict, today: date) -> dict | None:
     """Rekorde der Sonne: sonnigster Tag, sonnigster Monat (nur abgeschlossene Monate aus ``monthly``) und die
-    längste Folge sonniger beziehungsweise trüber Tage. Erst ab RECORDS_MIN_DAYS Tagen mit Werten."""
+    längste Folge sonniger beziehungsweise trüber Tage, ab dem ersten Tag mit Werten."""
     with_hours = [entry for entry in days if entry["hours"] is not None]
-    if len(with_hours) < RECORDS_MIN_DAYS:
+    if not with_hours:
         return None
     top = max(with_hours, key=lambda entry: (entry["hours"], -entry["date"].toordinal()))
     out: dict = {

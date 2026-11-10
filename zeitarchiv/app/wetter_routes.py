@@ -951,7 +951,9 @@ class WetterService:
             "humidity": build(humidity_specs, "humidity") if humidity_specs else [],
         }
 
-    def compute_longterm(self, now_local: datetime | None = None) -> dict | None:
+    def compute_longterm(self, now_local: datetime | None = None, years: int = 0) -> dict | None:
+        """Kenntage und Rekorde der Langzeit-Seite. ``years`` > 0 beschränkt die Rekorde auf die neuesten so vielen Jahre
+        mit Daten (wie die Auswahl „Letzte 5“ der Seite); 0 heißt alle. Die Kenntage liefern immer alle Jahre."""
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
         if not config["temperature"] or self.deps.index.get_entity(config["temperature"]) is None:
@@ -959,7 +961,11 @@ class WetterService:
         today = now_local.date()
         points = self._daily(config["temperature"], now_local)
         temperature_unit = self.deps.index.get_entity(config["temperature"])["unit"]
-        found = analysis.records(points, self.deps.tz, today)
+        tz = self.deps.tz
+        with_data = sorted({analysis.day_of(point, tz).year for point in points})
+        first_year = with_data[-years] if 0 < years < len(with_data) else None  # None: alle Jahre
+        in_range = (lambda day: first_year is None or day.year >= first_year)  # noqa: E731
+        found = analysis.records([p for p in points if in_range(analysis.day_of(p, tz))], tz, today)
         entries: list[dict] = []
         if found:
             for key in ("warmest_day", "coldest_day", "highest", "lowest"):
@@ -969,6 +975,7 @@ class WetterService:
                 gusts = [
                     p for p in self._daily(gust_id, now_local)
                     if p.covered and p.max_value is not None and analysis.day_of(p, self.deps.tz) < today
+                    and in_range(analysis.day_of(p, self.deps.tz))
                 ]
                 if gusts:
                     top = max(gusts, key=lambda p: (p.max_value, -p.day_start))
@@ -979,7 +986,10 @@ class WetterService:
             precip = self._precip_role(config, "mm")
             if precip is not None:
                 factor = 1.0 / 60.0 if precip[1] == "dur" else 1.0
-                days = [p for p in self._daily(precip[0], now_local) if analysis.day_of(p, self.deps.tz) < today]
+                days = [
+                    p for p in self._daily(precip[0], now_local)
+                    if analysis.day_of(p, self.deps.tz) < today and in_range(analysis.day_of(p, self.deps.tz))
+                ]
                 if days:
                     top = max(days, key=lambda p: ((p.value or 0.0), -p.day_start))
                     entries.append({
@@ -996,7 +1006,8 @@ class WetterService:
         sun_days = self.sun_history(config, now_local)
         sun_kenntage = analysis.sun_kenntage(sun_days) if sun_days else None
         if sun_days:
-            found_sun = analysis.sun_records(sun_days, self._monthly_sun(config, now_local, sun_days) or {"years": {}}, today)
+            recent_sun = [entry for entry in sun_days if in_range(entry["date"])]
+            found_sun = analysis.sun_records(recent_sun, self._monthly_sun(config, now_local, recent_sun) or {"years": {}}, today)
             if found_sun:
                 for key in ("sunniest_day", "sunniest_month", "longest_sunny_streak", "longest_overcast_streak"):
                     if key in found_sun:
@@ -2011,9 +2022,9 @@ class WetterService:
             return result
 
         @router.get("/wetterdashboard/langzeit")
-        def wetterdashboard_longterm() -> dict:
+        def wetterdashboard_longterm(years: int = 0) -> dict:
             _require_configured()
-            result = self.compute_longterm()
+            result = self.compute_longterm(years=max(0, min(years, 100)))
             if result is None:
                 raise HTTPException(status_code=404, detail=tr("Noch nicht eingerichtet"))
             return result

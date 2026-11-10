@@ -389,7 +389,7 @@ def test_monthly_and_longterm_have_the_expected_shape(service) -> None:
     rain = service.compute_monthly("precip", "mm", NOW)
     assert rain["unit"] == "mm" and rain["years"]["2026"][7] == pytest.approx(3.5)
     longterm = service.compute_longterm(NOW)
-    assert longterm["records"] == [] and longterm["records_days"] == 0  # ein paar Tage sind kein Archiv
+    assert longterm["records"] == [] and longterm["records_days"] == 0  # ohne abgedeckte Tage keine Rekorde
     assert longterm["kenntage"] == {} and longterm["current_year"] == 2026  # ohne abgedeckte Tage keine Kenntage
 
 
@@ -1309,7 +1309,7 @@ def test_longterm_carries_the_sun_kenntage(service) -> None:
     data = service.compute_longterm(NOW)
     month = data["sun_kenntage"]["2026"]
     assert month["sunny"][7] == 1 and month["overcast"][7] == 1 and month["days"][7] == 3
-    assert not any(entry["key"].startswith(("sunniest", "longest")) for entry in data["records"])  # Archiv zu kurz
+    assert any(entry["key"] == "sunniest_day" for entry in data["records"])  # Rekorde gibt es ab dem ersten Tag mit Werten
 
 
 def _sun_days(classes: list[str | None], hours: float = 6.0) -> list[dict]:
@@ -1337,7 +1337,9 @@ def test_sun_records_find_the_longest_runs_and_the_sunniest_month() -> None:
     assert out["sunniest_month"] == {"value": 310.5, "date": "2025-02-01"}
     assert out["longest_sunny_streak"] == {"value": 5, "date": "2025-01-11", "end": "2025-01-15"}
     assert out["longest_overcast_streak"] == {"value": 3, "date": "2025-01-03", "end": "2025-01-05"}
-    assert analysis_mod.sun_records(days[:100], monthly, date(2026, 6, 1)) is None  # kein Jahr Werte
+    short = analysis_mod.sun_records(days[:100], monthly, date(2026, 6, 1))  # auch ein junges Archiv hat Rekorde
+    assert short["days"] == 99 and short["since"] == "2025-01-01"
+    assert analysis_mod.sun_records([], monthly, date(2026, 6, 1)) is None
 
 
 def test_sun_records_skip_the_running_month() -> None:
@@ -1463,3 +1465,39 @@ def test_heating_legend_marks_keep_full_colour() -> None:
     from _paths import APP
 
     assert "legend.push(legendEntry(name, color));" in (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+
+
+def test_records_cover_only_the_newest_years_when_asked(service) -> None:
+    """Die Auswahl „Letzte N“ der Langzeit-Seite gilt auch für die Rekorde: nur die neuesten N Jahre mit Daten zählen."""
+    from app.storage.query import DailyPoint
+
+    def day_point(day: date, value: float) -> DailyPoint:
+        stamp = datetime(day.year, day.month, day.day, tzinfo=TZ).timestamp()
+        return DailyPoint(day_start=stamp, value=value, min_value=value - 2, max_value=value + 2, covered=True)
+
+    points = [day_point(date(2022, 7, 1), 30.0), day_point(date(2024, 1, 5), -12.0), day_point(date(2025, 6, 6), 25.0)]
+    everything = analysis_mod.records(points, TZ, date(2026, 8, 20))
+    assert everything["warmest_day"]["date"] == "2022-07-01" and everything["coldest_day"]["date"] == "2024-01-05"
+    assert everything["since"] == "2022-07-01" and everything["days"] == 3
+    recent = analysis_mod.records([p for p in points if p.day_start >= datetime(2024, 1, 1, tzinfo=TZ).timestamp()], TZ, date(2026, 8, 20))
+    assert recent["warmest_day"]["date"] == "2025-06-06" and recent["since"] == "2024-01-05"
+
+
+def test_compute_longterm_passes_the_year_choice_to_the_records(service, monkeypatch) -> None:
+    from app.storage.query import DailyPoint
+
+    _rain_setup(service)
+    _configure(service, temperature="sensor.t")
+
+    def day_point(day: date, value: float) -> DailyPoint:
+        stamp = datetime(day.year, day.month, day.day, tzinfo=TZ).timestamp()
+        return DailyPoint(day_start=stamp, value=value, min_value=value - 2, max_value=value + 2, covered=True)
+
+    points = [day_point(date(2022, 7, 1), 30.0), day_point(date(2024, 1, 5), -12.0), day_point(date(2025, 6, 6), 25.0)]
+    monkeypatch.setattr(service, "_daily", lambda entity_id, now_local: points)
+    everything = {entry["key"]: entry for entry in service.compute_longterm(NOW)["records"]}
+    assert everything["warmest_day"]["date"] == "2022-07-01"
+    last_two = service.compute_longterm(NOW, years=2)  # neueste zwei Jahre mit Daten: 2025 und 2024
+    assert last_two["records_since"] == "2024-01-05" and last_two["records_days"] == 2
+    assert {entry["key"]: entry for entry in last_two["records"]}["warmest_day"]["date"] == "2025-06-06"
+    assert service.compute_longterm(NOW, years=10)["records_since"] == "2022-07-01"  # mehr als vorhanden: alle
