@@ -283,3 +283,11 @@ def test_daylight_compare_adds_the_sun_elevation_at_start_and_end(service) -> No
     assert data["compare"][1]["sun_from"] is None  # Tag ohne Werte: keine Höhe
     _configure(service, temperature="sensor.t", illuminance_dawn="sensor.daemm")
     assert service.compute_daylight("2026-08-19", NOW)["has_elevation"] is False
+
+
+def test_daylength_reaches_back_five_full_years_at_most() -> None:
+    from datetime import date
+
+    today = date(2026, 11, 10)
+    assert wetter_routes.daylength_start(date(2018, 3, 4), today) == date(2021, 1, 1)  # 2021 bis 2026: fünf frühere Jahre
+    assert wetter_routes.daylength_start(date(2025, 6, 1), today) == date(2025, 6, 1)  # ein jüngeres Archiv bleibt, wie es ist

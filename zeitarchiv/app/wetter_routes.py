@@ -151,6 +151,11 @@ TILE_LABELS = {
 PV_UNIT_KW = {"W": 0.001, "kW": 1.0, "MW": 1000.0}
 
 
+def daylength_start(archive_start: date, today: date) -> date:
+    """Erster Tag des Jahresverlaufs der Tageslänge: Archivbeginn, frühestens der 1. Januar vor DAYLENGTH_PAST_YEARS Jahren."""
+    return max(archive_start, date(today.year - DAYLENGTH_PAST_YEARS, 1, 1))
+
+
 def pv_scale_kw(unit: str | None) -> float | None:
     """Faktor nach kW. Die genaue Schreibweise gilt zuerst; „w“ und „kw“ in beliebiger Groß-/Kleinschreibung zählen auch.
     „mW“ (Milliwatt) und „MW“ (Megawatt) unterscheiden sich nur durch die Schreibweise, deshalb gilt nur das genaue „MW“."""
@@ -192,7 +197,7 @@ DAYLIGHT_NIGHT_RANGE_LX = (1.0, 200.0)
 DAYLIGHT_DAY_RANGE_LX = (50.0, 990.0)
 DAYLIGHT_COMPARE_DAYS = 14  # Tage in der Vergleichstabelle unter der Kurve (wie Tagesbild und PV)
 DAYLENGTH_MIN_HOURS = 12  # Stunden mit Werten, ab denen ein Tag für den Jahresverlauf zählt
-DAYLENGTH_MAX_DAYS = 800  # so weit reicht der Jahresverlauf höchstens zurück (laufendes Jahr, Vorjahr und etwas mehr)
+DAYLENGTH_PAST_YEARS = 5  # so viele frühere Jahre zeigt der Jahresverlauf höchstens (wie die anderen Jahresdiagramme)
 #: Süd-Helligkeit der Eltako-Station sättigt hier; darüber steht „ab“ statt eines Messwerts.
 SUN_SENSOR_SATURATION_LX = 98800
 SUN_MAX_GAP_HOURS = 6  # längste Lücke ohne Zeilen, die zwischen zwei sonnigen Stunden als sonnig gilt
@@ -1377,7 +1382,7 @@ class WetterService:
         tz = self.deps.tz
         now_local = now_local or datetime.now(tz)
         today = now_local.date()
-        first = max(datetime.fromtimestamp(entity["first_ts"], tz).date(), today - timedelta(days=DAYLENGTH_MAX_DAYS))
+        first = daylength_start(datetime.fromtimestamp(entity["first_ts"], tz).date(), today)
         start = datetime(first.year, first.month, first.day, tzinfo=tz)
         rows = self._rows(entity_id, "standard", start, now_local, now_local, query_mod.QueryReadCache())
         by_hour = {
