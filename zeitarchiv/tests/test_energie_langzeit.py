@@ -602,7 +602,7 @@ def test_tag_nach_einem_fehlenden_tag_zaehlt_nicht(service, monkeypatch) -> None
     assert tage[:4] == [1, 2, 3, 4] and 7 in tage
 
 
-def test_rekorde_erst_ab_einem_jahr_archiv_und_der_fruehere_tag_bei_gleichstand(service, monkeypatch) -> None:
+def test_rekorde_ab_dem_ersten_tag_und_der_fruehere_tag_bei_gleichstand(service, monkeypatch) -> None:
     config = _zwei_zaehler(service, _monat(2025, 7))
     tage = [_tag(i) for i in range(400)]                    # 1.7.2025 bis 4.8.2026
     pv = {tag: 5.0 for tag in tage}
@@ -620,7 +620,8 @@ def test_rekorde_erst_ab_einem_jahr_archiv_und_der_fruehere_tag_bei_gleichstand(
     assert rekorde["verbrauch"]["entity_id"] is None        # zusammengesetzt: kein Link
     assert rekorde["erzeugung"]["offset"] == (tage[100] - NOW.date()).days
     kurz = service.compute_records(config, datetime(2025, 12, 1, tzinfo=TZ))
-    assert kurz["enough"] is False and kurz["records"] == []   # unter einem Jahr gibt es keine Rekorde
+    assert kurz["enough"] is True and kurz["since"] == "2025-07-01"   # auch ein junges Archiv hat Rekorde
+    assert {r["key"] for r in kurz["records"]} >= {"erzeugung", "netzbezug"}
 
 
 def test_zusatzrekorde_bester_autarkiemonat_und_laengste_serie_fast_autarker_tage(service, monkeypatch) -> None:
@@ -1284,3 +1285,20 @@ def test_wetterdashboard_stellt_temperatur_und_sonnentage_nur_im_eingeschalteten
     assert wr.temperature_entity(index) == ""                                    # Wetterdashboard aus
     index.set_setting(wr.SETTING_ENABLED, "1")
     assert wr.temperature_entity(index) == "sensor.aussen"
+
+
+def test_rekorde_zaehlen_nur_die_neuesten_jahre_der_auswahl(service, monkeypatch) -> None:
+    """Die Auswahl „Letzte N“ der Langzeit-Seite gilt auch für die Rekorde; die Kenntage bleiben bei allen Jahren."""
+    config = _zwei_zaehler(service, _monat(2025, 7))
+    tage = [_tag(i) for i in range(400)]                    # 1.7.2025 bis 4.8.2026
+    pv = {tag: 5.0 for tag in tage}
+    pv[tage[10]] = 50.0                                     # 11.7.2025: im Vorjahr, nicht im laufenden Jahr
+    pv[tage[350]] = 30.0                                    # im Jahr 2026
+    _tagesreihen(monkeypatch, {"sensor.pv": pv, "sensor.netz": {tag: 3.0 for tag in tage}})
+    alle = service.compute_records(config, NOW)
+    neueste = service.compute_records(config, NOW, years=1)
+    assert {r["key"]: r for r in alle["records"]}["erzeugung"]["value"] == 50.0
+    jahr = {r["key"]: r for r in neueste["records"]}["erzeugung"]
+    assert jahr["value"] == 30.0 and neueste["since"] == "2026-01-01"
+    assert service.compute_records(config, NOW, years=5)["since"] == "2025-07-01"   # mehr als vorhanden: alle
+    assert neueste["kenntage"] == alle["kenntage"]

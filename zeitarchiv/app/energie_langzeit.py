@@ -97,8 +97,6 @@ BALANCE_ROLES = ("erzeugung", "netzbezug", "einspeisung", "entladung", "ladung")
 #: mindestens GAP_MIN und GAP_FACTOR mal der Median aller Monate. Zählerrückgänge werden immer markiert.
 GAP_FACTOR = 3
 GAP_MIN = 10
-#: Rekorde erscheinen erst, wenn das Archiv der Rollen mindestens so viele Tage umfasst.
-RECORD_MIN_DAYS = 365
 #: Verbrauch, ab dem ein Tag für „fast autark“ zählt (bei weniger ist der Anteil Zufall).
 CONSUMPTION_MIN = 0.5
 #: Schwellen der Kenntage (Setup des Energiedashboards, leer = Vorgabe): Autarkie ab … %, Sonnentage ab … kWh je kWp,
@@ -800,32 +798,37 @@ class EnergieLangzeitService:
             })
         return out
 
-    def compute_records(self, config: dict, now_local: datetime | None = None) -> dict:
-        """Rekordtage und Kenntage je Jahr aus den Tageswerten. Rekorde gibt es erst ab RECORD_MIN_DAYS Tagen Archiv."""
+    def compute_records(self, config: dict, now_local: datetime | None = None, years: int = 0) -> dict:
+        """Rekordtage und Kenntage je Jahr aus den Tageswerten. ``years`` > 0 beschränkt die Rekorde auf die neuesten so
+        vielen Jahre mit Daten (die Auswahl „Letzte 5“ der Seite), 0 heißt alle; die Kenntage liefern immer alle Jahre.
+        Rekorde gibt es ab dem ersten Tag mit Werten; ``since`` nennt den Beginn des gezählten Zeitraums."""
         now_local = now_local or datetime.now(self.tz)
         roles = role_entities(config)
-        days = self.usable_days(config, now_local)
+        all_days = self.usable_days(config, now_local)
         today = now_local.date()
+        with_data = sorted({d["date"].year for d in all_days})
+        first_year = with_data[-years] if 0 < years < len(with_data) else None  # None: alle Jahre
+        days = [d for d in all_days if first_year is None or d["date"].year >= first_year]
         span = (days[-1]["date"] - days[0]["date"]).days + 1 if days else 0
         records = []
-        if span >= RECORD_MIN_DAYS:
-            for key, role, label in RECORDS:
-                candidates = [d for d in days if d[key] is not None]
-                if not candidates:
-                    continue
-                # Gleichstand: der frühere Tag.
-                top = max(candidates, key=lambda d: (d[key], -d["date"].toordinal()))
-                single = roles[role][0] if role != "verbrauch" and len(roles.get(role, [])) == 1 else None
-                records.append({
-                    "key": key, "label": tr(label), "value": round(top[key], 3), "date": top["date"].isoformat(),
-                    "entity_id": single, "offset": (top["date"] - today).days,
-                })
+        for key, role, label in RECORDS:
+            candidates = [d for d in days if d[key] is not None]
+            if not candidates:
+                continue
+            # Gleichstand: der frühere Tag.
+            top = max(candidates, key=lambda d: (d[key], -d["date"].toordinal()))
+            single = roles[role][0] if role != "verbrauch" and len(roles.get(role, [])) == 1 else None
+            records.append({
+                "key": key, "label": tr(label), "value": round(top[key], 3), "date": top["date"].isoformat(),
+                "entity_id": single, "offset": (top["date"] - today).days,
+            })
+        if days:
             records.extend(self._streak_records(config, roles, days))
-        kenntage = self.compute_kenntage(config, days, today)
+        kenntage = self.compute_kenntage(config, all_days, today)
         return {
             "unit": "kWh",
             "since": days[0]["date"].isoformat() if days else None,
-            "days": len(days), "span": span, "enough": span >= RECORD_MIN_DAYS,
+            "days": len(days), "span": span, "enough": bool(days),
             "records": records,
             "kenntage": kenntage,
         }

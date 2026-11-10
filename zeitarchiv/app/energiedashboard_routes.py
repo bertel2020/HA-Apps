@@ -4000,12 +4000,13 @@ class EnergieDashboardService:
             return self.langzeit.compute_years(config)
 
         @router.get("/energiedashboard/langzeit/records")
-        def energiedashboard_langzeit_records() -> dict:
-            # Rekordtage und Kenntage je Jahr aus den Tageswerten aller Rollen (Reiter „Langzeit“).
+        def energiedashboard_langzeit_records(years: int = 0) -> dict:
+            # Rekordtage und Kenntage je Jahr aus den Tageswerten aller Rollen (Reiter „Langzeit“); years > 0: Rekorde nur
+            # über die neuesten so vielen Jahre mit Daten (Auswahl „Letzte N“ der Seite), 0 = alle.
             config = _load_config(deps.index)
             if not energie_langzeit.is_configured(config):
                 raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
-            return self.langzeit.compute_records(config)
+            return self.langzeit.compute_records(config, years=max(0, min(years, 100)))
 
         @router.get("/energiedashboard/langzeit/kenntage")
         def energiedashboard_langzeit_kenntage(field: str, year: int) -> dict:
