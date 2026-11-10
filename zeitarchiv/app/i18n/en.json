@@ -3850,7 +3850,8 @@
     "Keller Temperatur": "Basement temperature",
     "Keller Feuchte": "Basement humidity",
     "Wohnzimmer Temperatur": "Living room temperature",
-    "Wohnzimmer Feuchte": "Living room humidity"
+    "Wohnzimmer Feuchte": "Living room humidity",
+    "Noch keine Rekorde: Es liegen noch keine abgeschlossenen Tage mit Werten vor.": "No records yet: there are no completed days with values yet."
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4565,7 +4566,6 @@
     "Längste Trockenphase": "Longest dry spell",
     "Noch kein abgeschlossenes Vorjahr mit genug Werten für einen Durchschnitt.": "No completed previous year with enough values for an average yet.",
     "Noch keine Tage mit ausreichend Werten (mindestens 18 Stunden je Tag).": "No days with enough values yet (at least 18 hours per day).",
-    "Seit Archivbeginn ({date}, {days} Tage). Ein einzelner Messfehler kann einen Rekord setzen; über „Tag öffnen“ lässt sich der Tag prüfen.": "Since the archive began ({date}, {days} days). A single measurement error can set a record; use “Open day” to check the day.",
     "Seit Jahresbeginn liegen noch keine Werte vor.": "There are no values since the start of the year yet.",
     "Sommertage": "Summer days",
     "Stärkste Böe": "Strongest gust",
@@ -4900,6 +4900,8 @@
     "Ohne Etage": "No floor",
     "bisher": "so far",
     "Ein Punkt je Tag (kWh pro Tag). Die Linien zeigen den geglätteten Verlauf; kWh je Kelvin gilt für 0 bis {limit} °C, darunter verläuft der Verbrauch oft flacher.": "One dot per day (kWh per day). The lines show the smoothed trend; kWh per kelvin applies from 0 to {limit} °C, below that consumption often runs flatter.",
-    "Ein Punkt je Tag (kWh pro Tag). Die Linien zeigen den geglätteten Verlauf; kWh je Kelvin gilt für Tage unter der Heizgrenze.": "One dot per day (kWh per day). The lines show the smoothed trend; kWh per kelvin applies to days below the heating limit."
+    "Ein Punkt je Tag (kWh pro Tag). Die Linien zeigen den geglätteten Verlauf; kWh je Kelvin gilt für Tage unter der Heizgrenze.": "One dot per day (kWh per day). The lines show the smoothed trend; kWh per kelvin applies to days below the heating limit.",
+    "Gezählt ab {date} ({days} Tage), passend zur Jahresauswahl oben. Ein einzelner Messfehler kann einen Rekord setzen; über „Tag öffnen“ lässt sich der Tag prüfen.": "Counted from {date} ({days} days), matching the year selection above. A single measurement error can set a record; use “Open day” to check the day.",
+    "seit {year}": "since {year}"
   }
 }

@@ -438,9 +438,18 @@
 
   {% if show_long %}
   <section x-show="tab === 'long'" x-cloak role="tabpanel" id="wt-panel-long" aria-labelledby="wt-tab-long">
+    {# Jahre-Auswahl: gilt für alle Karten des Reiters (Rekorde, Kenntage, Jahres-Matrix), deshalb einmal hier und beim Scrollen haftend, wie im Energiedashboard. #}
+    <div class="wt-scope" x-show="showLongChoice()" x-cloak>
+      <span class="wt-scope-lab"><b>{{ _("Jahre") }}</b> <span class="wt-scope-more">{{ _("gilt für alle Karten dieses Reiters") }}</span></span>
+      <div class="wt-seg" role="group" aria-label="{{ _('Anzahl der Jahre') }}">
+        <template x-for="option in longOptions()" :key="option.value">
+          <button type="button" :aria-pressed="(longShownRange() === option.value).toString()" @click="setLongRange(option.value)" x-text="option.label"></button>
+        </template>
+      </div>
+    </div>
     <div class="card wt-card" x-show="longterm && longterm.records.length" x-cloak>
       <div class="wt-controls">
-        <h2 class="wt-h2">{{ _("Rekorde") }} {{ hint_button(_("Rekorde")) }}</h2>
+        <h2 class="wt-h2">{{ _("Rekorde") }} <span class="wt-rec-scope" x-text="recordsScope()"></span> {{ hint_button(_("Rekorde")) }}</h2>
         {% call hint_body() %}<span x-text="recordsNote()"></span>{% endcall %}
       </div>
       <div class="wt-rec-groups">
@@ -481,16 +490,11 @@
         </template>
       </div>
     </div>
-    <p class="hint hint-status" x-show="longterm && !longterm.records.length" x-cloak>{{ _("Rekorde erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte enthält.") }}</p>
+    <p class="hint hint-status" x-show="longterm && !longterm.records.length" x-cloak>{{ _("Noch keine Rekorde: Es liegen noch keine abgeschlossenen Tage mit Werten vor.") }}</p>
     <div class="card wt-card">
       <div class="wt-controls">
         <h2 class="wt-h2">{{ _("Kenntage je Jahr") }} {{ hint_button(_("Kenntage je Jahr")) }}</h2>
         {% call hint_body() %}<span x-text="kenntageNote()"></span>{% endcall %}
-        <div class="wt-seg" role="group" aria-label="{{ _('Anzahl der Jahre') }}" x-show="showKenntageChoice()" x-cloak>
-          <template x-for="option in kenntageOptions()" :key="option.value">
-            <button type="button" :aria-pressed="(kenntageShownRange() === option.value).toString()" @click="setKenntageRange(option.value)" x-text="option.label"></button>
-          </template>
-        </div>
       </div>
       <div class="wt-kk-grid">
         {% for key, label in (("frost", _("Frosttage")), ("eis", _("Eistage")), ("sommer", _("Sommertage")), ("heiss", _("Heiße Tage")), ("sunny", _("Sonnentage")), ("overcast", _("Trübe Tage"))) %}

@@ -1501,3 +1501,15 @@ def test_compute_longterm_passes_the_year_choice_to_the_records(service, monkeyp
     assert last_two["records_since"] == "2024-01-05" and last_two["records_days"] == 2
     assert {entry["key"]: entry for entry in last_two["records"]}["warmest_day"]["date"] == "2025-06-06"
     assert service.compute_longterm(NOW, years=10)["records_since"] == "2022-07-01"  # mehr als vorhanden: alle
+
+
+def test_longterm_page_has_one_year_choice_for_all_cards() -> None:
+    """Die Jahresauswahl steht einmal im Reiter Langzeit und gilt für Rekorde, Kenntage und die Jahres-Matrix."""
+    from _paths import APP, TEMPLATES
+
+    page = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+    assert page.count("setLongRange(option.value)") == 1 and "setKenntageRange" not in page
+    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "wetterdashboard/langzeit?years=${this.longYearsParam()}" in script
+    assert "this.loadLongterm();" in script[script.index("setLongRange(range) {"):script.index("limitedMatrix(m) {")]
+    assert "this.matrix ? this.limitedMatrix(this.matrix)" in script and "const m = this.matrix ? this.limitedMatrix(this.matrix) : null;" in script

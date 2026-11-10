@@ -173,11 +173,13 @@ def test_count_kenntage_over_a_window() -> None:
     assert wa.count_kenntage([], TZ, start, end, today) is None
 
 
-def test_records_need_a_year_of_data_and_name_the_days() -> None:
+def test_records_start_with_the_first_day_and_name_the_days() -> None:
     today = date(2026, 6, 1)
     days = list(_days(date(2025, 5, 1), date(2026, 5, 31)))
     points = [_point(day, value=10.0, low=2.0, high=18.0) for day in days]
-    assert wa.records(points[:100], TZ, today) is None
+    short = wa.records(points[:100], TZ, today)  # schon ein junges Archiv hat Rekorde
+    assert short["days"] == 100 and short["since"] == "2025-05-01"
+    assert wa.records([], TZ, today) is None
     hottest = _point(date(2025, 8, 3), value=27.5, low=19.0, high=38.2)
     coldest = _point(date(2026, 1, 20), value=-8.0, low=-14.0, high=-2.0)
     points[points.index(next(p for p in points if p.day_start == hottest.day_start))] = hottest

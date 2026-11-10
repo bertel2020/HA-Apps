@@ -219,7 +219,7 @@
       band: true,
       longterm: null,
       longError: '',
-      kenntageRange: 'all',
+      longRange: 'all',      // „Letzte 5 | Letzte 10 | Alle“ des Reiters Langzeit: gilt für Rekorde, Kenntage und die Jahres-Matrix
       hasConditions: false,
       conditions: null,
       _conditionsSeq: 0,
@@ -285,7 +285,7 @@
         if (Array.isArray(saved.roomsOff)) this.roomsOff = saved.roomsOff.filter((name) => typeof name === 'string');
         if (Array.isArray(saved.floorsClosed)) this.floorsClosed = saved.floorsClosed.filter((name) => typeof name === 'string');
         if (Array.isArray(saved.roomsClosed)) this.roomsClosed = saved.roomsClosed.filter((name) => typeof name === 'string');
-        if (['5', '10', 'all'].includes(saved.kenntageRange)) this.kenntageRange = saved.kenntageRange;
+        if (['5', '10', 'all'].includes(saved.kenntageRange)) this.longRange = saved.kenntageRange;  // alter Schlüssel: die Wahl bleibt erhalten
         if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
         // Ausgeblendete Karten fehlen im Dokument: der erste vorhandene Reiter ist der Start, Diagramme ohne Karte laden nicht.
         const firstTab = this.$root.querySelector('[role="tab"]');
@@ -1871,7 +1871,7 @@
       async loadLongterm() {
         this.longError = '';
         try {
-          this.longterm = await this.fetchJson('wetterdashboard/langzeit');
+          this.longterm = await this.fetchJson(`wetterdashboard/langzeit?years=${this.longYearsParam()}`);
           this.$nextTick(() => this.drawKenntage());
         } catch (e) {
           this.longError = t('Die Langzeitwerte konnten nicht geladen werden.');
@@ -1881,17 +1881,17 @@
       // Jahre der Karte „Kenntage je Jahr“: alle oder die letzten fünf bzw. zehn.
       kenntageYears() {
         const years = this.longterm ? Object.keys(this.longterm.kenntage).sort() : [];
-        return this.kenntageRange === 'all' ? years : years.slice(-Number(this.kenntageRange));
+        return this.longRange === 'all' ? years : years.slice(-Number(this.longRange));
       },
 
-      // Jahre-Auswahl wie im Energiedashboard (Reiter Langzeit): „Letzte 5“, „Letzte 10“, „Alle (n)“; immer, sobald Jahre geladen sind;
-      // „Letzte 10“ erst ab mehr als zehn. Ein gemerkter Wert, der nichts mehr kürzt, zeigt „Alle“.
-      kenntageCount() {
+      // Jahre-Auswahl des Reiters Langzeit wie im Energiedashboard: „Letzte 5“, „Letzte 10“, „Alle (n)“; immer, sobald Jahre geladen sind;
+      // „Letzte 10“ erst ab mehr als zehn. Ein gemerkter Wert, der nichts mehr kürzt, zeigt „Alle“. Sie gilt für die ganze Seite.
+      longCount() {
         return this.longterm ? Object.keys(this.longterm.kenntage).length : 0;
       },
 
-      kenntageOptions() {
-        const count = this.kenntageCount();
+      longOptions() {
+        const count = this.longCount();
         return [
           {value: '5', label: t('Letzte 5')},
           ...(count > 10 ? [{value: '10', label: t('Letzte 10')}] : []),
@@ -1899,18 +1899,32 @@
         ];
       },
 
-      showKenntageChoice() {
-        return this.kenntageCount() > 0;
+      showLongChoice() {
+        return this.longCount() > 0;
       },
 
-      kenntageShownRange() {
-        return this.kenntageRange !== 'all' && Number(this.kenntageRange) < this.kenntageCount() ? this.kenntageRange : 'all';
+      longShownRange() {
+        return this.longRange !== 'all' && Number(this.longRange) < this.longCount() ? this.longRange : 'all';
       },
 
-      setKenntageRange(range) {
-        this.kenntageRange = range;
+      // Anzahl der Jahre für den Server (Rekorde); 0 heißt alle.
+      longYearsParam() {
+        return this.longRange === 'all' ? 0 : Number(this.longRange);
+      },
+
+      setLongRange(range) {
+        this.longRange = range;
         writeStore({kenntageRange: range});
         this.drawKenntage();
+        this.drawMatrix();
+        this.loadLongterm();  // die Rekorde zählen nur die gewählten Jahre: neu vom Server
+      },
+
+      // Die Matrix nur mit den gewählten (neuesten) Jahren; die Zeilen stehen neuestes Jahr zuerst.
+      limitedMatrix(m) {
+        const rows = this.longRange === 'all' ? m.years.length : Number(this.longRange);
+        if (rows >= m.years.length) return m;
+        return {...m, years: m.years.slice(0, rows), cells: m.cells.filter((cell) => cell[1] < rows), missing: m.missing.filter((cell) => cell[1] < rows)};
       },
 
       kenntageNote() {
@@ -2171,7 +2185,7 @@
 
       // Eine Zeile je Jahr: 20 Pixel plus Platz für Achse und Farbskala.
       matrixHeight() {
-        const years = this.matrix ? this.matrix.years.length : 3;
+        const years = this.matrix ? this.limitedMatrix(this.matrix).years.length : 3;
         return `height: ${Math.max(160, years * 20 + 90)}px`;
       },
 
@@ -2184,7 +2198,7 @@
       },
 
       drawMatrix() {
-        const m = this.matrix;
+        const m = this.matrix ? this.limitedMatrix(this.matrix) : null;
         const element = this.$refs.matrixChart;
         if (!m || !element) return;
         if (!m.years.length || m.min == null) {
@@ -2706,12 +2720,19 @@
         return `entities/${encodeURIComponent(record.entity_id)}?range=day&offset=${record.offset_days}`;
       },
 
+      // Kurzer Zusatz zum Titel „Rekorde“: ab wann gezählt wird (hängt an der Jahresauswahl).
+      recordsScope() {
+        const l = this.longterm;
+        if (!l || !l.records_since) return '';
+        return t('seit {year}', {year: l.records_since.slice(0, 4)});
+      },
+
       recordsNote() {
         const l = this.longterm;
         if (!l || !l.records_since) return '';
         const since = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'})
           .format(new Date(l.records_since + 'T12:00:00Z'));
-        return t('Seit Archivbeginn ({date}, {days} Tage). Ein einzelner Messfehler kann einen Rekord setzen; über „Tag öffnen“ lässt sich der Tag prüfen.', {date: since, days: l.records_days});
+        return t('Gezählt ab {date} ({days} Tage), passend zur Jahresauswahl oben. Ein einzelner Messfehler kann einen Rekord setzen; über „Tag öffnen“ lässt sich der Tag prüfen.', {date: since, days: l.records_days});
       },
 
       async loadTiles() {
