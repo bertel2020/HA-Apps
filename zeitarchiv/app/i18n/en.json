@@ -4600,7 +4600,6 @@
     "Noch keine Heiztage.": "No heating days yet.",
     "Tages-Ø Außentemperatur (°C)": "Daily mean outdoor temperature (°C)",
     "kWh/Gt {a} gegenüber {b}": "kWh/DD {a} vs. {b}",
-    "{period}: {value} kWh je Kelvin ({n} Tage, R² {r2})": "{period}: {value} kWh per kelvin ({n} days, R² {r2})",
     "Entität öffnen": "Open entity",
     "{from}–{to} Uhr": "{from}–{to} h",
     "Vorjahr: Aus ▾": "Last year: off ▾",
@@ -4899,6 +4898,7 @@
     "Raum (optional)": "Room (optional)",
     "Feuchte": "Humidity",
     "Ohne Raum": "No room",
-    "Ohne Etage": "No floor"
+    "Ohne Etage": "No floor",
+    "bisher": "so far"
   }
 }

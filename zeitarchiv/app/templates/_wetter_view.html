@@ -584,7 +584,16 @@
         </template>
       </div>
       <div class="wt-chart wt-chart-tall" x-ref="heatChart"></div>
-      <p class="hint hint-status" x-text="heatReadout()"></p>
+      <div class="wt-slopes" x-show="heatSlopes().length" x-cloak>
+        <template x-for="row in heatSlopes()" :key="row.period">
+          <div class="wt-slope" :title="row.title">
+            <span class="wt-slope-name"><i class="wt-swatch" :style="'background:' + row.color"></i><span x-text="row.label"></span></span>
+            <span class="wt-slope-v" x-text="row.value"></span>
+            <span class="wt-slope-s" x-text="row.sub"></span>
+          </div>
+        </template>
+      </div>
+      <p class="hint hint-status" x-show="heatReadout()" x-text="heatReadout()"></p>
       <p class="hint hint-warn" x-show="heatError" x-text="heatError" x-cloak></p>
     </div>
     <div class="card wt-card" x-show="heat" x-cloak>

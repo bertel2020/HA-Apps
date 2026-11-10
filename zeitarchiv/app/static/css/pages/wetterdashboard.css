@@ -59,6 +59,12 @@
   .wt-day-dialog-label{margin:16px 0 6px;font-size:calc(12px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);}
   .wt-day-dialog .wt-day-bar{height:8px;}
   .wt-day-dialog .wt-chart{height:220px;}
+  /* Anstieg je Heizperiode unter dem Streudiagramm: eine kleine Kachel je Periode statt einer langen Zeile. */
+  .wt-slopes{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:12px 0 4px;}
+  .wt-slope{display:flex;flex-direction:column;gap:2px;min-width:0;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--surface-alt);}
+  .wt-slope-name{display:flex;align-items:center;gap:6px;font-size:calc(12px * var(--font-scale, 1));font-weight:600;color:var(--ink-muted);}
+  .wt-slope-v{font-size:calc(17px * var(--font-scale, 1));font-weight:600;font-variant-numeric:tabular-nums;}
+  .wt-slope-s{font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
   .wt-day-facts{display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:8px;}
   .wt-day-fact{display:flex;flex-direction:column;gap:2px;min-width:0;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:var(--surface-alt);}
   .wt-day-fact-label{font-size:calc(11.5px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-muted);}

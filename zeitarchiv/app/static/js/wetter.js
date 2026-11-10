@@ -2283,16 +2283,27 @@
         ];
       },
 
-      heatReadout() {
-        if (!this.heat) return '';
+      // Eine Zeile je Heizperiode unter dem Streudiagramm: Anstieg in kWh je Kelvin, Tage, R² im Tooltip.
+      heatSlopes() {
+        if (!this.heat) return [];
         const o = this.heatOpts();
-        const parts = [];
-        for (const period of this.heatPeriods().slice(0, 4)) {
+        const info = this.heatPeriodInfo();
+        const rows = [];
+        this.heatPeriods().slice(0, 4).forEach((period, index) => {
           const line = WetterHeating.fit(this.heat.days, o, period);
-          if (line) parts.push(t('{period}: {value} kWh je Kelvin ({n} Tage, R² {r2})', {period: WetterHeating.label(period), value: num(-line.slope, 2), n: line.n, r2: num(line.r2, 2)}));
-        }
-        parts.push(t('Gerade nur über Tage unter der Heizgrenze'));
-        return parts.join(' · ');
+          if (!line) return;
+          const running = info.running && period === info.current;
+          rows.push({
+            period, label: WetterHeating.label(period), color: this.heatColor(index), value: `${num(-line.slope, 2)} kWh/K`,
+            sub: running ? `${t('{n} Tage', {n: line.n})} · ${t('bisher')}` : t('{n} Tage', {n: line.n}),
+            title: `R² ${num(line.r2, 2)}`,
+          });
+        });
+        return rows;
+      },
+
+      heatReadout() {
+        return this.heatSlopes().length ? t('Gerade nur über Tage unter der Heizgrenze') : '';
       },
 
       drawHeat() {
