@@ -361,6 +361,13 @@
     <div class="field"><label for="wt-sky-sunny">{{ _("Sonnig ab") }}</label>
       <input type="text" id="wt-sky-sunny" class="wt-short" name="sky_sunny_lx" value="{{ config.sky_cuts_lx[2] | int if config.sky_cuts_lx else '' }}" placeholder="{{ (config.sun_threshold_lx * 2.8) | int }}" inputmode="numeric"> <span class="wt-unit">lx</span></div>
   </div>
+  <div class="wt-sub-feature">
+  <h3 class="wt-group-h">{{ _("PV und Helligkeit") }}</h3>
+  <p class="settings-section-description">{{ _("Vergleicht den Tagesertrag der PV-Anlage mit dem, was die Süd-Helligkeit erwarten lässt. Dazu die Rollen „Helligkeit“ und „PV-Leistung“ (unter „Weitere Messwerte“) zuordnen.") }}</p>
+  <div class="wt-chips">
+    <label class="filter-chip" x-show="cardAvailable('pvlight')"><input type="checkbox" name="show_card" value="pvlight" {% if 'pvlight' not in config.hidden_cards %}checked{% endif %}><span>{{ _("PV und Helligkeit") }}</span></label>
+  </div>
+  </div>
   </section>
 
   <section class="settings-section wt-section-neutral wt-section-anzeige">
@@ -437,13 +444,6 @@
       <input type="text" id="wt-heating-room" class="wt-short" name="heating_room" value="{{ config.heating_room | string | replace('.', ',') }}" inputmode="decimal"> <span class="wt-unit">°C</span></div>
     <div class="field"><label for="wt-heating-limit">{{ _("Heizgrenze") }}</label>
       <input type="text" id="wt-heating-limit" class="wt-short" name="heating_limit" value="{{ config.heating_limit | string | replace('.', ',') }}" inputmode="decimal"> <span class="wt-unit">°C</span></div>
-  </div>
-  </div>
-  <div class="wt-exp-feature">
-  <h3 class="wt-group-h">{{ _("PV und Helligkeit") }}</h3>
-  <p class="settings-section-description">{{ _("Vergleicht den Tagesertrag der PV-Anlage mit dem, was die Süd-Helligkeit erwarten lässt. Dazu die Rollen „Helligkeit“ und „PV-Leistung“ (unter „Weitere Messwerte“) zuordnen.") }}</p>
-  <div class="wt-chips">
-    <label class="filter-chip" x-show="cardAvailable('pvlight')"><input type="checkbox" name="show_card" value="pvlight" {% if 'pvlight' not in config.hidden_cards %}checked{% endif %}><span>{{ _("PV und Helligkeit") }}</span></label>
   </div>
   </div>
   </section>

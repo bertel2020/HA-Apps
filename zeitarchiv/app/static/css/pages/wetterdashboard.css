@@ -133,6 +133,7 @@
     background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--ink-faint) 22%, transparent), color-mix(in srgb, var(--ink-faint) 8%, transparent) 70%), var(--surface);}
   .wt-section-experimental{margin-top:32px;background:repeating-linear-gradient(135deg, var(--surface-alt) 0 12px, color-mix(in srgb, var(--surface-alt) 55%, var(--surface)) 12px 24px);border:1.5px dashed var(--ink-faint);}
   .wt-exp-feature{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px 6px;margin-top:12px;}
+  .wt-sub-feature{margin-top:18px;}
   .wt-group-h{margin:14px 0 8px;font-size:calc(11.5px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-muted);}
   .wt-group-h:first-of-type{margin-top:0;}
   .wt-section-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
