@@ -10,6 +10,10 @@
     mehr Breite (ab 1200 px bis 1920 px, darüber zentriert)
   - Energie- und Wetterdashboard nutzen bis 1440 px, mit etwas höheren
     Diagrammen
+  - Höchstens 5 Karten pro Zeile in Übersicht, Dashboard-Liste, Charts und
+    Tabellen, im Wetterdashboard höchstens 6 Kacheln; das Tagesbild teilt die
+    14 Tage als 7 + 7 auf
+  - Die Hinweise hinter dem (i) starten zugeklappt
   - Je Dashboard umschaltbar: 4 Kacheln pro Zeile (ab 1500 px); ein Hinweis
     schlägt es bei breitem Fenster vor und lässt sich wegklicken
 
@@ -171,6 +175,10 @@
     (from 1200 px up to 1920 px, centered beyond that)
   - Energy and weather dashboard use up to 1440 px, with slightly taller
     charts
+  - At most 5 cards per row in the overview, dashboard list, charts and
+    tables, and at most 6 tiles in the weather dashboard; the daily picture
+    splits its 14 days into 7 + 7
+  - The hints behind the (i) start collapsed
   - Per dashboard: 4 tiles per row (from 1500 px); a hint suggests it on a
     wide window and can be dismissed
 
