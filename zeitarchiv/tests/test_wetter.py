@@ -1248,6 +1248,8 @@ def test_hidden_cards_are_saved_only_for_available_cards_and_hide_cards_and_tabs
     assert wetter_routes._load_config(index)["hidden_cards"] == []
     html = client.get("/wetterdashboard").text
     assert 'id="wt-tab-wind"' in html and 'id="wt-tab-long"' in html and "data-wt-conditions" in html
+    # Langzeit steht wie im Energiedashboard als letzter Reiter, hinter den Themen
+    assert html.index('id="wt-tab-wind"') < html.index('id="wt-tab-long"')
     # Vergleichstabelle, Wind & Sonne, Langzeit abgewählt; Tageslicht (keine Rolle) und Heizen (kein Zähler) sind nicht wählbar
     assert client.post("/wetterdashboard/setup", data={**base, "show_card": ["basis", "monthly"]}).status_code == 200
     assert wetter_routes._load_config(index)["hidden_cards"] == ["compare", "wind", "longterm"]

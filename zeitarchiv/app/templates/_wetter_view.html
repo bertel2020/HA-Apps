@@ -177,11 +177,11 @@
     {% if show_windtab %}
     <button type="button" role="tab" id="wt-tab-wind" aria-controls="wt-panel-wind" class="entity-tab" :class="{'is-active': tab === 'wind'}" :aria-selected="(tab === 'wind').toString()" :tabindex="tab === 'wind' ? 0 : -1" @click="showTab('wind')" @keydown="tabKey($event)">{{ _("Wind &amp; Sonne") }}</button>
     {% endif %}
-    {% if show_long %}
-    <button type="button" role="tab" id="wt-tab-long" aria-controls="wt-panel-long" class="entity-tab" :class="{'is-active': tab === 'long'}" :aria-selected="(tab === 'long').toString()" :tabindex="tab === 'long' ? 0 : -1" @click="showTab('long')" @keydown="tabKey($event)">{{ _("Langzeit") }}</button>
-    {% endif %}
     {% if show_heat %}
     <button type="button" role="tab" id="wt-tab-heat" aria-controls="wt-panel-heat" class="entity-tab" :class="{'is-active': tab === 'heat'}" :aria-selected="(tab === 'heat').toString()" :tabindex="tab === 'heat' ? 0 : -1" @click="showTab('heat')" @keydown="tabKey($event)">{{ _("Heizen") }}</button>
+    {% endif %}
+    {% if show_long %}
+    <button type="button" role="tab" id="wt-tab-long" aria-controls="wt-panel-long" class="entity-tab" :class="{'is-active': tab === 'long'}" :aria-selected="(tab === 'long').toString()" :tabindex="tab === 'long' ? 0 : -1" @click="showTab('long')" @keydown="tabKey($event)">{{ _("Langzeit") }}</button>
     {% endif %}
   </nav>
 
