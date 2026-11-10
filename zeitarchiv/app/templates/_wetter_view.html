@@ -364,7 +364,7 @@
   {% if show_pv %}
   <div class="card wt-card" x-show="pv || pvError" x-cloak>
     <div class="wt-controls">
-      <h2 class="wt-h2">{{ _("PV und Helligkeit") }} <span class="wt-badge">{{ _("experimentell") }}</span> {{ hint_button(_("PV und Helligkeit")) }}</h2>
+      <h2 class="wt-h2">{{ _("PV und Helligkeit") }} {{ hint_button(_("PV und Helligkeit")) }}</h2>
       {% call hint_body() %}{{ _("Die Erwartung wird aus den letzten 28 Tagen gelernt: je Helligkeitsstufe der Median der Stundenleistung. Die Karte zeigt, ob der Tagesertrag dazu passt; sie ist eine Messung, keine Prognose. Eine Abweichung über 15 % wird markiert, aber nur an Tagen mit nennenswerter Erwartung. Temperatur, Abregelung und ein voller Akku senken die Leistung, ohne dass die Anlage schlechter wird. Der Süd-Sensor misst an einem Punkt, im Sommer sättigt er mittags (98.800 lx), dann sagt die Helligkeit über die Leistung nur noch wenig. Das Verhältnis nach Uhrzeit zeigt, ob die Anlage morgens oder abends systematisch abweicht (Ausrichtung der Module, Verschattung).") }}{% endcall %}
     </div>
     <div class="wt-pv-status" x-show="pv" x-cloak>
@@ -406,7 +406,7 @@
     <div class="wt-chart" x-show="daylight" x-ref="daylightChart"></div>
     <p class="hint hint-warn" x-show="daylightNote()" x-text="daylightNote()" x-cloak></p>
     <p class="hint hint-warn" x-show="daylightError" x-text="daylightError" x-cloak></p>
-    <h3 class="wt-h3 wt-dl-h" x-show="daylight">{{ _("Die letzten Tage im Vergleich") }} <span class="wt-badge">{{ _("experimentell") }}</span></h3>
+    <h3 class="wt-h3 wt-dl-h" x-show="daylight">{{ _("Die letzten Tage im Vergleich") }}</h3>
     <div class="tbl-wrap wt-table-wrap" x-show="daylight">
       <table class="wt-table wt-table-full wt-dl-table">
         <thead><tr>
@@ -428,7 +428,7 @@
       </table>
     </div>
     <p class="wt-hint" x-show="daylight && daylightHistoryNote()" x-text="daylightHistoryNote()" x-cloak></p>
-    <h3 class="wt-h3 wt-dl-h" x-show="daylength" x-cloak>{{ _("Tageslänge im Jahresverlauf") }} <span class="wt-badge">{{ _("experimentell") }}</span></h3>
+    <h3 class="wt-h3 wt-dl-h" x-show="daylength" x-cloak>{{ _("Tageslänge im Jahresverlauf") }}</h3>
     <div class="wt-chart wt-chart-short" x-show="daylength" x-cloak x-ref="daylengthChart"></div>
     <p class="hint hint-status" x-show="daylength" x-text="daylengthNote()" x-cloak></p>
   </div>
