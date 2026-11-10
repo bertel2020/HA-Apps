@@ -38,6 +38,8 @@
   // ohne Scrollen, aber die Spalten würden eng).
   const WIDE_TABLE = window.matchMedia('(min-width:1200px)');
   const WIDER_TABLE = window.matchMedia('(min-width:1440px)');
+  // Streudiagramm und Kacheln: 4 Perioden, mit breiter Darstellung ab 1440 px 5 (wie die Monatstabelle).
+  const heatChartCount = () => (document.documentElement.dataset.pageLayout === 'wide' && WIDER_TABLE.matches ? 5 : 4);
   const heatSeasonCount = () => {
     if (document.documentElement.dataset.pageLayout !== 'wide' || !WIDE_TABLE.matches) return 3;
     return WIDER_TABLE.matches ? 5 : 4;
@@ -233,6 +235,7 @@
       hasDayimage: false,
       dayimage: null,
       dayimageError: '',
+      heatWide: false,       // kippt an den Breitengrenzen der Heiz-Tabelle und löst das Neuzeichnen der Kacheln aus
       dayDlg: null,          // Dialog zu einer Tagesbild-Kachel: {cell, loading, error, data}
       hasDaylight: false,
       daylight: null,
@@ -301,7 +304,10 @@
         this.hasPv = !!this.$root.querySelector('[x-ref="pvChart"]');
         const observer = new ResizeObserver(() => { if (this.$root.isConnected) this.layoutTiles(); });
         // Breite Darstellung: mehr Heizperioden in der Monatstabelle, sobald das Fenster breit genug ist.
-        const redrawTable = () => { if (this.$root.isConnected && this.heat) this.drawHeatTable(); };
+        const redrawTable = () => {
+          this.heatWide = !this.heatWide;
+          if (this.$root.isConnected && this.heat) { this.drawHeatTable(); this.drawHeatScatter(); }
+        };
         WIDE_TABLE.addEventListener('change', redrawTable);
         WIDER_TABLE.addEventListener('change', redrawTable);
         for (const group of GROUPS) {
@@ -2296,12 +2302,17 @@
       },
 
       // Eine Zeile je Heizperiode unter dem Streudiagramm: Anstieg in kWh je Kelvin, Tage, R² im Tooltip.
+      // Liest heatWide, damit Alpine die Kacheln neu zeichnet, wenn das Fenster die 1440-px-Grenze überschreitet.
+      heatChartSeasons() {
+        return this.heatWide === undefined ? 4 : heatChartCount();
+      },
+
       heatSlopes() {
         if (!this.heat) return [];
         const o = this.heatOpts();
         const info = this.heatPeriodInfo();
         const rows = [];
-        this.heatPeriods().slice(0, 4).forEach((period, index) => {
+        this.heatPeriods().slice(0, this.heatChartSeasons()).forEach((period, index) => {
           const line = WetterHeating.fit(this.heat.days, o, period, this.heatFitFrom(o));
           if (!line) return;
           const running = info.running && period === info.current;
@@ -2432,7 +2443,7 @@
         if (!element) return;
         const o = this.heatOpts();
         const colors = palette();
-        const periods = this.heatPeriods().slice(0, 4);
+        const periods = this.heatPeriods().slice(0, this.heatChartSeasons());
         const sunMode = this.heatBySun && this.heatHasSun();
         const series = [];
         let legend = [];
