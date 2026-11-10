@@ -310,6 +310,9 @@
         </template>
       </div>
       <div class="wt-chart wt-chart-tall" x-ref="precipChart"></div>
+      <h3 class="wt-h3" x-show="precip && precip.months" x-cloak>{{ _("Niederschlag je Monat") }}</h3>
+      <div class="wt-table-wrap" x-show="precip && precip.months" x-cloak><table class="wt-table wt-table-full wt-precip-table" x-ref="precipTable"></table></div>
+      <p class="wt-foot" x-show="precip && precip.months" x-cloak x-text="precipTableNote()"></p>
       <p class="hint hint-warn" x-show="precipError" x-text="precipError" x-cloak></p>
     </div>
   </section>

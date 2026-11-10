@@ -330,6 +330,15 @@
     .wt-ts-warn{grid-column:1 / -1;}
   }
   .wt-table-wrap:has(> .wt-heat-table){overflow-x:auto;max-width:100%;}
+  .wt-table-wrap:has(> .wt-precip-table){overflow-x:auto;max-width:100%;}
+  .wt-precip-table{font-variant-numeric:tabular-nums;}
+  .wt-precip-table .wt-pm-n{text-align:right;}
+  .wt-precip-table .wt-pm-dev{text-align:right;}
+  .wt-precip-table .wt-pm-dev span{display:inline-block;min-width:4.2em;padding:1px 8px;border-radius:6px;}
+  .wt-precip-table tr.wt-pm-run td{background:var(--surface-alt);}
+  .wt-precip-table tr.wt-pm-off td{color:var(--ink-faint);}
+  .wt-precip-table tr.wt-pm-sum td{font-weight:600;border-top:2px solid var(--border-strong);}
+  .wt-pm-tag{display:inline-block;margin-left:6px;padding:0 7px;border-radius:99px;background:var(--bg-accent);color:var(--text-accent);font-size:calc(11px * var(--font-scale, 1));font-weight:600;white-space:nowrap;}
 
   /* Tageslicht: Vergleichstabelle der letzten Tage */
   .wt-dl-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:22px;}

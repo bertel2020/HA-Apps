@@ -283,3 +283,29 @@ def test_heating_days_cover_only_closed_heating_season_days_with_data() -> None:
 
 def test_heating_days_without_counters_are_empty() -> None:
     assert wa.heating_days([_point(date(2026, 1, 5))], [[]], [1.0], TZ, date(2026, 2, 1)) == []
+
+
+def test_precipitation_months_compare_the_running_month_over_the_same_period() -> None:
+    """Tabelle „Niederschlag je Monat“: Vorjahr und Ø begrenzen sich im laufenden Monat auf dessen bisherige Tage,
+    spätere Monate haben nur Vorjahr und Ø, und Regentage zählen erst ab der Schwelle."""
+    daily: dict[date, float] = {}
+    for year in (2023, 2024, 2025):  # drei komplette Jahre (Zeile an jedem Tag): 1 mm an jedem 1. und 20. eines Monats
+        for offset in range(365):
+            day = date(year, 1, 1) + timedelta(days=offset)
+            daily[day] = 1.0 if day.day in (1, 20) else 0.0
+    daily[date(2026, 3, 2)] = 4.0
+    daily[date(2026, 3, 3)] = 0.4
+    daily[date(2026, 4, 1)] = 2.0
+    result = wa.precipitation(daily, date(2026, 4, 10), 1.0)
+    months = {row["month"]: row for row in result["months"]}
+    assert len(months) == 12
+    assert months[3]["current"] == 4.4 and months[3]["wet_days"] == 1 and not months[3]["running"]
+    assert months[3]["previous"] == 2.0 and months[3]["avg"] == 2.0  # ganzer Monat
+    assert months[4]["running"] and months[4]["current"] == 2.0
+    assert months[4]["previous"] == 1.0 and months[4]["avg"] == 1.0  # nur bis zum 10.04. (ohne den 20.)
+    assert months[5]["current"] is None and months[5]["wet_days"] is None
+    assert months[5]["previous"] == 2.0 and months[5]["avg"] == 2.0  # spätere Monate: ganzer Monat
+    assert months[1]["current"] is None  # im laufenden Jahr gibt es für den Januar keine Zeile
+
+    only_one_year = {day: value for day, value in daily.items() if day.year in (2025, 2026)}
+    assert all(row["avg"] is None for row in wa.precipitation(only_one_year, date(2026, 4, 10), 1.0)["months"])

@@ -154,6 +154,14 @@
     };
   }
 
+  // Gerundete Schrittweite (1, 2, 5 mal Zehnerpotenz) für eine Achse; mindestens 0,1.
+  function niceStep(raw) {
+    if (!(raw > 0)) return 1;
+    const power = Math.pow(10, Math.floor(Math.log10(raw)));
+    const unit = raw / power;
+    return Math.max(0.1, (unit <= 1 ? 1 : unit <= 2 ? 2 : unit <= 5 ? 5 : 10) * power);
+  }
+
   function nullable(values, scale) {
     return values.map((value) => (value == null ? null : value * scale));
   }
@@ -1794,6 +1802,10 @@
         const high = nullable(p.high, scale);
         const hasAvg = p.avg_years.length >= 2;
         const dailyMax = Math.max(0, ...p.daily.filter((v) => v != null)) * scale;
+        // Rechte Achse für die Balken: nur das untere Drittel der Höhe, damit sie die Summenlinien nicht verdecken.
+        const dayStep = niceStep(dailyMax / 3);
+        const dayTop = Math.max(dayStep, Math.ceil(dailyMax / dayStep) * dayStep);
+        const bandName = t('Spanne {from}–{to}', {from: p.avg_years[0], to: p.avg_years[p.avg_years.length - 1]});
         const series = [];
         const legend = [String(p.year)];
         if (hasAvg) {
@@ -1801,7 +1813,8 @@
             name: 'low', type: 'line', stack: 'band', data: low, symbol: 'none', silent: true,
             lineStyle: {opacity: 0}, tooltip: {show: false},
           }, {
-            name: 'band', type: 'line', stack: 'band', symbol: 'none', silent: true, lineStyle: {opacity: 0},
+            name: bandName, type: 'line', stack: 'band', symbol: 'none', silent: true, lineStyle: {opacity: 0},
+            itemStyle: {color: colors.prev, opacity: 0.35},
             data: high.map((h, i) => (h == null || low[i] == null ? null : h - low[i])),
             areaStyle: {color: colors.prev, opacity: 0.16},
           }, {
@@ -1827,7 +1840,8 @@
         }
         olderYears.forEach((year, index) => legend.push(legendEntry(year, colors.prev, pastOpacity(index + 1))));
         // Reihenfolge der Legende wie im Monatsvergleich: laufendes Jahr, Vorjahr, ältere Jahre, Ø.
-        if (hasAvg) legend.push('Ø');
+        if (hasAvg) legend.push('Ø', {...legendEntry(bandName, colors.prev, 0.35), icon: 'rect'});
+        legend.push({...legendEntry(t('Tageswert'), colors.cur, 0.5), icon: 'rect'});
         series.push({
           name: String(p.year), type: 'line', data: cumulative, symbol: 'none', z: 5,
           lineStyle: {color: colors.cur, width: 3}, itemStyle: {color: colors.cur},
@@ -1837,7 +1851,7 @@
         });
         const chart = chartFor('precip', element);
         chart.setOption({
-          animation: false, grid: gridFor(element, {right: 8}), legend: legendBox(colors, legend),
+          animation: false, grid: gridFor(element, {right: 34, ...(element.clientWidth < 520 ? {top: 100} : {})}), legend: legendBox(colors, legend),
           xAxis: {
             type: 'category', data: labels, boundaryGap: false, ...axisStyle(colors),
             axisLabel: {
@@ -1849,7 +1863,11 @@
           },
           yAxis: [
             {type: 'value', min: 0, name: unit, nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
-            {type: 'value', min: 0, max: Math.max(dailyMax * 4, 1), show: false, splitLine: {show: false}},
+            {
+              type: 'value', min: 0, max: dayTop * 3, interval: dayStep, splitLine: {show: false},
+              axisLine: {show: false}, axisTick: {show: false},
+              axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => (value <= dayTop ? num(value, dayStep < 1 ? 1 : 0) : '')},
+            },
           ],
           tooltip: tooltipBox(colors, (params) => {
             const i = params[0].dataIndex;
@@ -1865,6 +1883,66 @@
         }, true);
         // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
         requestAnimationFrame(() => chart.resize());
+        this.drawPrecipTable(colors);
+      },
+
+      // Tabelle „Niederschlag je Monat“: laufendes Jahr, Vorjahr, Ø und Abweichung, dazu die Regentage.
+      drawPrecipTable(colors) {
+        const table = this.$refs.precipTable;
+        const p = this.precip;
+        if (!table || !p || !p.months) return;
+        const scale = this.precipScale();
+        const amount = (value) => (value == null ? '–' : escapeHtml(num(value * scale, 1)));
+        const base = cssVar('--surface-alt');
+        const first = p.avg_years.length >= 2 ? p.avg_years[0] : null;
+        const last = p.avg_years[p.avg_years.length - 1];
+        const head = [
+          t('Monat'), String(p.year), String(p.previous_year),
+          first == null ? t('Ø') : t('Ø {from}–{to}', {from: first, to: last}), t('Abweichung'), t('Regentage'),
+        ];
+        // Abweichung vom Ø in Prozent, gefärbt wie die Monatsmatrix (Niederschlag: nass blau, trocken ocker).
+        const deviation = (value, ref) => {
+          if (value == null || ref == null || ref === 0) return '<td></td>';
+          const diff = (value - ref) / ref;
+          const rounded = Math.round(Math.abs(diff) * 100);
+          const share = Math.round(Math.min(1, Math.abs(diff) / 0.6) * 80);
+          const sign = rounded === 0 ? '±' : (diff > 0 ? '+' : '−');
+          const style = ` style="background:color-mix(in srgb, ${diff < 0 ? colors.prev : colors.cold} ${share}%, ${base})"`;
+          return `<td class="wt-pm-dev"><span${style}>${sign}${rounded} %</span></td>`;
+        };
+        let html = `<thead><tr>${head.map((label, i) => `<th${i ? ' class="wt-pm-n"' : ''}>${escapeHtml(label)}</th>`).join('')}</tr></thead><tbody>`;
+        let sumCur = 0;
+        let sumPrev = 0;
+        let sumAvg = 0;
+        let sumWet = 0;
+        let sumComplete = true;
+        for (const row of p.months) {
+          const past = row.current != null;
+          const tag = row.running
+            ? ` <span class="wt-pm-tag">${escapeHtml(t('läuft, bis {date}', {date: this.precipDateText()}))}</span>` : '';
+          html += `<tr class="${row.running ? 'wt-pm-run' : (past ? '' : 'wt-pm-off')}"><td>${escapeHtml(monthName(row.month, 'long'))}${tag}</td>`
+            + `<td class="wt-pm-n">${amount(row.current)}</td><td class="wt-pm-n">${amount(row.previous)}</td><td class="wt-pm-n">${amount(row.avg)}</td>`
+            + `${deviation(row.current, row.avg)}<td class="wt-pm-n">${row.wet_days == null ? '' : row.wet_days}</td></tr>`;
+          if (past) {
+            sumCur += row.current;
+            sumWet += row.wet_days;
+            if (row.previous == null || row.avg == null) sumComplete = false; else { sumPrev += row.previous; sumAvg += row.avg; }
+          }
+        }
+        // Summe bis heute; Vorjahr und Ø nur, wenn für jeden Monat davor ein Wert vorliegt (sonst wäre die Summe zu niedrig).
+        html += `<tr class="wt-pm-sum"><td>${escapeHtml(t('Summe bis {date}', {date: this.precipDateText()}))}</td>`
+          + `<td class="wt-pm-n">${amount(sumCur)}</td><td class="wt-pm-n">${amount(sumComplete ? sumPrev : p.previous_to_date)}</td>`
+          + `<td class="wt-pm-n">${amount(sumComplete ? sumAvg : p.avg_to_date)}</td>${deviation(sumCur, sumComplete ? sumAvg : p.avg_to_date)}`
+          + `<td class="wt-pm-n">${sumWet}</td></tr></tbody>`;
+        table.innerHTML = html;
+      },
+
+      // Erläuterung unter der Tabelle: Vergleichszeitraum und Schwelle der Regentage.
+      precipTableNote() {
+        const p = this.precip;
+        if (!p) return '';
+        const threshold = p.mode === 'dur' ? `${num(p.threshold, 0)} min` : `${num(p.threshold, 1)} mm`;
+        return t('Farbe: Abweichung vom Ø. Stand {date}: Laufender Monat und Summe zählen bis dahin, Vorjahr und Ø gelten für denselben Zeitraum. Regentage: ab {threshold}.', {date: this.precipDateText(), threshold});
       },
 
       // Langzeit

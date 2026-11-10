@@ -155,6 +155,7 @@ def precipitation(
     return {
         "year": current_year,
         "today_slot": today_slot,
+        "months": _precipitation_months(daily, today, wet_threshold, complete, current_days),
         "daily": [round(current_values[slot], 3) if slot in current_values else None for slot in range(SLOTS)],
         "cumulative": cumulative.get(current_year, [None] * SLOTS),
         "previous": previous if previous and any(v is not None for v in previous) else None,
@@ -176,6 +177,39 @@ def precipitation(
         "longest_dry_end": longest_end.isoformat() if longest_end else None,
         "current_dry_days": current_run,
     }
+
+
+def _precipitation_months(
+    daily: dict[date, float], today: date, wet_threshold: float, complete: list[int], current_days: dict[date, float],
+) -> list[dict]:
+    """Tabelle „Niederschlag je Monat“: laufendes Jahr, Vorjahr und Ø der kompletten Vorjahre samt Regentagen.
+
+    Der laufende Monat zählt nur bis heute, und Vorjahr und Ø werden dann auf denselben Ausschnitt begrenzt
+    (gleicher Zeitraum). Spätere Monate haben nur Vorjahr und Ø, jeweils der ganze Monat. Das Mittel braucht,
+    wie die Linie im Diagramm, mindestens zwei komplette Jahre."""
+    def month_sum(year: int, month: int, last_day: int) -> float | None:
+        last_day = min(last_day, calendar.monthrange(year, month)[1])
+        values = [daily[day] for d in range(1, last_day + 1) if (day := date(year, month, d)) in daily]
+        return sum(values) if values else None
+
+    out = []
+    for month in range(1, 13):
+        running = month == today.month
+        future = month > today.month
+        last = today.day if running else 31
+        wet = [value for day, value in current_days.items() if day.month == month]
+        previous = month_sum(today.year - 1, month, last)
+        column = [month_sum(year, month, last) for year in complete]
+        column = [value for value in column if value is not None]
+        out.append({
+            "month": month,
+            "running": running,
+            "current": None if future or not wet else round(sum(wet), 3),
+            "previous": None if previous is None else round(previous, 3),
+            "avg": round(sum(column) / len(column), 3) if len(complete) >= 2 and column else None,
+            "wet_days": None if future or not wet else sum(1 for value in wet if value >= wet_threshold),
+        })
+    return out
 
 
 def _mean(values: list[float]) -> float | None:

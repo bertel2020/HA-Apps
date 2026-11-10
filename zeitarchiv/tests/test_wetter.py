@@ -1437,7 +1437,10 @@ def test_year_charts_list_their_legend_in_the_same_order() -> None:
     source = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     block = source[source.index("const legend = [String(p.year)];"):]
     block = block[: block.index("const chart = chartFor('precip'")]
-    assert block.index("legend.push(String(p.previous_year))") < block.index("olderYears.forEach") < block.index("if (hasAvg) legend.push('Ø');")
+    assert block.index("legend.push(String(p.previous_year))") < block.index("olderYears.forEach") < block.index("if (hasAvg) legend.push('Ø'")
+    # Spanne der Vorjahre und Tageswert (Balken) stehen hinter Ø in der Legende, die Balken haben eine eigene, sichtbare Achse.
+    assert block.index("legend.push('Ø'") < block.index("legendEntry(t('Tageswert')")
+    assert "interval: dayStep" in source and "max: Math.max(dailyMax * 4, 1), show: false" not in source
     render = (APP / "static/js/element-chart-render.js").read_text(encoding="utf-8")
     assert render.index("legendEntry(String(year)") < render.index("legend.push('Ø')") < render.index("legend.unshift(current)")
 
