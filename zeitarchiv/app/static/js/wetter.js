@@ -2443,11 +2443,14 @@
             } : undefined,
           });
           if (line) {
-            const from = Math.min(...points.filter((p) => p[0] < o.limit).map((p) => p[0]));
+            // Nur über den Datenbereich, nicht bis zur Heizgrenze: sonst sieht die Gerade wie eine Aussage über Werte aus, die es nicht gibt.
+            const below = points.filter((p) => p[0] < o.limit).map((p) => p[0]);
+            const from = Math.min(...below);
+            const to = Math.max(...below);
             series.push({
               name: `${name} `, type: 'line', symbol: 'none', silent: true, z: 4,
-              data: [[from, line.intercept + line.slope * from], [o.limit, line.intercept + line.slope * o.limit]],
-              lineStyle: {color, width: 2.2}, tooltip: {show: false},
+              data: [[from, line.intercept + line.slope * from], [to, line.intercept + line.slope * to]],
+              lineStyle: {color, width: index === 0 ? 2.4 : 1.3, opacity: index === 0 ? 1 : 0.7}, tooltip: {show: false},
             });
           }
         });
