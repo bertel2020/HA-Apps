@@ -149,6 +149,10 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     # (_entity_facts_category/_extra, _with_unit, _value_range_text) und die Routen value-range und facts
     # sind eine geschlossene Einheit für ein eigenes entity_facts_routes.py nach dem Muster der übrigen
     # *_routes.py; wer diese Schwelle als Nächstes reißt, schneidet dort.
+    # Am 10. November 2026 genommen: Die Optionen der Übersichtsseite im Bearbeiten-Formular hatten main.py
+    # auf 5.873 gebracht. _entity_facts() samt Verwandten und die Routen value-range und facts stehen jetzt in
+    # entity_facts_routes.py (main.py: 5.775). Die Schwelle blieb unangetastet; der nächste benannte Kandidat
+    # sind die Kontext-Bauer der Dashboards (siehe oben).
     assert len(main.splitlines()) < 5_860
 
 

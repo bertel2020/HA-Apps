@@ -155,6 +155,7 @@ from .backup_external_routes import BackupExternalDependencies, create_backup_ex
 from .restore_routes import RestoreDependencies, create_restore_router
 from .export_routes import ExportDependencies, create_export_router
 from .entity_delete_routes import EntityDeleteDependencies, create_entity_delete_router
+from .entity_facts_routes import EntityFacts, EntityFactsDependencies, create_entity_facts_router, visible_row_count as _visible_row_count
 from .marked_values_routes import MarkedValuesDependencies, create_marked_values_router
 from .report_routes import ReportDependencies, ReportService
 from .energiedashboard_routes import (
@@ -166,7 +167,7 @@ from .energiedashboard_routes import (
     is_energiedashboard_configured,
 )
 from .wetter_routes import WetterDependencies, WetterService, is_wetter_configured, wetter_role_count
-from . import cleanup_stats, counter_bulk, data_quality, entity_usage, value_range
+from . import cleanup_stats, counter_bulk, data_quality, entity_usage
 from . import card_elements, dashboard_tiles, overview_tiles, page_layout, page_refresh
 from .dashboard_tiles import tile_metric_context as _tile_metric_context
 from .route_support import (
@@ -2616,90 +2617,6 @@ def statistik_index_optimize(request: Request) -> HTMLResponse:
     )
 
 
-def _entity_facts(entity) -> dict:
-    """Kennzahlen im Kopf der drei Entitätsseiten (Verlauf, Werte bearbeiten,
-    Konfiguration) — dieselben Felder wie die Spalten der Entitätenliste, damit
-    man sie nicht erst dort nachschlagen muss. Ein gemeinsamer Aufbau, weil der
-    Kopf auf allen drei Seiten gleich ist (_entity_facts.html) und die Werte
-    sonst dreimal leicht verschieden zusammengesetzt würden."""
-    last_ts = entity["last_ts"]
-    return {
-        "type_label": format_type(entity["aggregation_type"]),
-        "state_class": entity["state_class"] or "",
-        "unit": entity["unit"] or "",
-        "row_count": format_int(_visible_row_count(entity)),
-        "size": format_size(entity["size_bytes"]),
-        "first_ts": format_timestamp(entity["first_ts"], TZ),
-        "first_ts_time": format_time(entity["first_ts"], TZ),
-        "last_ts": format_timestamp(last_ts, TZ),
-        "last_ts_time": format_time(last_ts, TZ),
-        # Nur die größte Einheit („vor 1 Std.“, nicht „vor 1 Std. 16 Min.“): so passt
-        # sie hinter die Uhrzeit in dieselbe Zeile, ohne dass die Zelle höher wird
-        # oder mitten im Satz umbricht. Jede Einheit besteht aus Zahl und Wort.
-        "last_ago": tr("vor {dauer}", dauer=" ".join(format_uptime(max(0.0, time.time() - last_ts)).split()[:2])) if last_ts else "",
-        "extra": _entity_facts_extra(entity),
-        "category": _entity_facts_category(entity["entity_id"]),
-    }
-
-
-def _entity_facts_category(entity_id: str) -> dict | None:
-    """Die Kategorie der Entität für den Chip unter dem Typ, oder None ohne."""
-    category_id = index.get_entity_category_id(entity_id)
-    if category_id is None:
-        return None
-    return next((c for c in index.list_entity_categories() if c["id"] == category_id), None)
-
-
-def _entity_facts_extra(entity) -> dict | None:
-    """Die typabhängige letzte Zelle der Kennzahlen-Leiste, oder None, wo es
-    keinen sinnvollen Wert gibt (Schalter).
-
-    Standard: Minimum/Maximum über den gesamten Zeitraum. Der Index kennt sie
-    nicht, ein Vollscan gehört nicht in den Seitenaufbau — liegt kein gültiger
-    Zwischenspeicher vor, bleibt `text` leer und der Browser holt sie über
-    /entities/{id}/value-range nach (static/js/entity-facts.js).
-    Zähler: der aktuelle Zählerstand (Min/Max wären hier nur Anfangs- und
-    Endstand). Zustand: Zahl der bekannten Zustände."""
-    kind = entity["aggregation_type"]
-    decimals = decimals_to_int(entity["decimals"])
-    if kind == "standard":
-        entry = value_range.cached(index, entity)
-        return {
-            "label": tr("Min / Max"), "note": tr("gesamter Zeitraum"), "pending": entry is None,
-            "text": _value_range_text(entry, decimals, entity) if entry else "",
-        }
-    if kind == "counter":
-        # last_value fehlt nach Import/Restore/Abgleich — dann aus den Daten lesen,
-        # statt die Zelle je nach Herkunft der Entität verschwinden zu lassen.
-        last = entity["last_value"]
-        if last is None:
-            last = value_range.last_raw_value(DATA_DIR, index, TZ, entity, datetime.now(TZ))
-        return {"label": tr("Zählerstand"), "note": "", "pending": False,
-                "text": _with_unit(format_value(last, decimals), entity) if last is not None else "—"}
-    if kind == "state":
-        return {"label": tr("Zustände"), "note": tr("verschieden"), "pending": False,
-                "text": format_int(len(index.get_state_map(entity["entity_id"])))}
-    return None
-
-
-def _with_unit(text: str, entity) -> str:
-    """Wert mit Einheit, damit die Zelle für sich lesbar ist (die Einheit steht
-    zusätzlich in der Typ-Zelle, dort aber weit weg vom Wert)."""
-    return f"{text} {entity['unit']}" if entity["unit"] else text
-
-
-def _value_range_text(entry: dict, decimals: int | None, entity) -> str:
-    if entry["min"] is None or entry["max"] is None:
-        return "—"
-    return _with_unit(f"{format_value(entry['min'], decimals)} / {format_value(entry['max'], decimals)}", entity)
-
-
-def _visible_row_count(entity) -> int:
-    """Logische Rohwerte: physischer Indexzähler abzüglich Soft-Deletes."""
-    deleted_count = int(entity["deleted_count"] or 0)
-    return max(0, int(entity["row_count"] or 0) - deleted_count)
-
-
 # Spalten der Entitäten-Tabelle jenseits von Favorit-Stern und Entität
 # (Name+ID) — beide sind Kernfunktion (Favorisieren, Navigation) und deshalb
 # nicht abwählbar. Die Tabelle ist mit allen Spalten strukturell breiter als
@@ -3090,27 +3007,6 @@ def entity_outlier_rate(request: Request, entity_id: str) -> HTMLResponse:
     )
 
 
-@app.get("/entities/{entity_id}/value-range")
-@_storage_locked(lambda args: args["entity_id"])
-def entity_value_range(entity_id: str) -> dict:
-    """Minimum/Maximum der Entität über den gesamten Zeitraum, als Text für die
-    Kennzahlen-Leiste. Rechnet bei Bedarf einen Vollscan (siehe value_range.py)
-    — deshalb ein eigener Aufruf, den die Seite erst nach dem Laden stellt."""
-    entity = _require_entity(entity_id)
-    entry = value_range.cached(index, entity) or value_range.compute(
-        DATA_DIR, index, TZ, entity, datetime.now(TZ)
-    )
-    return {"text": _value_range_text(entry, decimals_to_int(entity["decimals"]), entity)}
-
-
-@app.get("/entities/{entity_id}/facts")
-@_storage_locked(lambda args: args["entity_id"])
-def entity_facts_values(entity_id: str) -> dict:
-    """Bewegliche Felder der Kennzahlen-Leiste für das Nachladen des Verlaufs (entity_detail.js, refreshFacts()); Min/Max nur aus dem Zwischenspeicher."""
-    facts = _entity_facts(_require_entity(entity_id))
-    return {key: facts[key] for key in ("last_ts", "last_ts_time", "last_ago", "row_count", "size", "extra")}
-
-
 @app.get("/entities/{entity_id}/config", response_class=HTMLResponse)
 @_storage_locked(lambda args: args["entity_id"])
 def entity_config_page(request: Request, entity_id: str) -> HTMLResponse:
@@ -3350,6 +3246,12 @@ def entity_delete(entity_id: str) -> dict:
 app.include_router(create_entity_delete_router(EntityDeleteDependencies(
     index=index, data_dir=DATA_DIR, tz=TZ, coordinator=storage_coordinator, background=_background,
 )))
+_entity_facts_service = EntityFacts(EntityFactsDependencies(
+    index=index, data_dir=DATA_DIR, tz=TZ, coordinator=storage_coordinator,
+    require_entity=lambda entity_id: _require_entity(entity_id),
+))
+_entity_facts = _entity_facts_service.facts
+app.include_router(create_entity_facts_router(_entity_facts_service))
 
 
 @app.get("/entities/{entity_id}/migrate", response_class=HTMLResponse)
