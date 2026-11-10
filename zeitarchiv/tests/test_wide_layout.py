@@ -191,3 +191,11 @@ def test_heating_chart_and_tiles_show_a_fifth_season_only_in_the_wide_layout() -
     source = (APP / "static" / "js" / "wetter.js").read_text(encoding="utf-8")
     assert "dataset.pageLayout === 'wide' && WIDER_TABLE.matches ? 5 : 4" in source
     assert source.count("this.heatPeriods().slice(0, this.heatChartSeasons())") == 2
+
+
+def test_heating_month_table_gets_even_columns_only_in_the_switch_block() -> None:
+    css = (PAGE_CSS / "wetterdashboard.css").read_text(encoding="utf-8")
+    rule = ':root[data-page-layout="wide"] #wetter-root .wt-heat-table{table-layout:fixed;width:100%;}'
+    assert css.count(rule) == 1
+    assert css[: css.index(rule)].rfind("@media (min-width:1200px){") > css[: css.index(rule)].rfind("@media (min-width:1500px){")
+    assert ".wt-heat-table thead th.wt-dh{width:150px;}" in css

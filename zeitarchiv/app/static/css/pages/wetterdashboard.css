@@ -485,6 +485,11 @@
   :root[data-page-layout="wide"] #wetter-root .wt-table{min-width:100%;}
   /* Tagesbild: 14 Tage als 7 + 7 statt 10 + 4 (auto-fill ließ im 1440px-Rahmen eine fast leere zweite Zeile). */
   :root[data-page-layout="wide"] #wetter-root .wt-days{grid-template-columns:repeat(7,minmax(0,1fr));}
+  /* Heiz-Monatstabelle: Monatsnamen und Δ bekommen feste, schmale Spalten, die Heizperioden teilen den Rest gleich auf.
+     Mit automatischer Breite wurde die Δ-Spalte fast doppelt so breit wie eine Periode und die laufende zu schmal. */
+  :root[data-page-layout="wide"] #wetter-root .wt-heat-table{table-layout:fixed;width:100%;}
+  :root[data-page-layout="wide"] #wetter-root .wt-heat-table thead th:first-child{width:150px;}
+  :root[data-page-layout="wide"] #wetter-root .wt-heat-table thead th.wt-dh{width:150px;}
 }
 /* Ab 1500px etwas mehr Höhe, damit die Diagramme im breiteren Rahmen nicht zu flachen Streifen werden. */
 @media (min-width:1500px){
