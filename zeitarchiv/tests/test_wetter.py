@@ -1230,7 +1230,11 @@ def test_card_availability_follows_the_assigned_roles() -> None:
     assert not any(wetter_routes.card_available(key, config) for key in wetter_routes.CARD_KEYS)
     config.update(temperature="sensor.t", illuminance_dawn="sensor.d", heating=[{"entity_id": "sensor.h", "name": ""}])
     available = {key for key in wetter_routes.CARD_KEYS if wetter_routes.card_available(key, config)}
-    assert available == {"basis", "compare", "monthly", "longterm", "daylight", "heating"}  # ohne Helligkeit kein Tagesbild
+    # ohne Helligkeit kein Tagesbild
+    assert available == {
+        "basis", "compare", "monthly", "records", "kenntage", "monthyears", "yearmatrix",
+        "daylight", "daylight_days", "daylength", "heating",
+    }
 
 
 def test_hidden_cards_are_saved_only_for_available_cards_and_hide_cards_and_tabs(client) -> None:
@@ -1243,7 +1247,8 @@ def test_hidden_cards_are_saved_only_for_available_cards_and_hide_cards_and_tabs
     page = client.get("/wetterdashboard/setup").text
     assert 'name="show_card"' in page and "cardAvailable(" in page
     # alles angehakt: nichts ausgeblendet
-    shown = ["basis", "compare", "monthly", "wind", "longterm", "daylight", "heating"]
+    long_cards = ["records", "kenntage", "monthyears", "yearmatrix"]
+    shown = ["basis", "compare", "monthly", "wind", *long_cards, "daylight", "daylight_days", "daylength", "heating"]
     assert client.post("/wetterdashboard/setup", data={**base, "show_card": shown}).status_code == 200
     assert wetter_routes._load_config(index)["hidden_cards"] == []
     html = client.get("/wetterdashboard").text
@@ -1252,13 +1257,27 @@ def test_hidden_cards_are_saved_only_for_available_cards_and_hide_cards_and_tabs
     assert html.index('id="wt-tab-wind"') < html.index('id="wt-tab-long"')
     # Vergleichstabelle, Wind & Sonne, Langzeit abgewählt; Tageslicht (keine Rolle) und Heizen (kein Zähler) sind nicht wählbar
     assert client.post("/wetterdashboard/setup", data={**base, "show_card": ["basis", "monthly"]}).status_code == 200
-    assert wetter_routes._load_config(index)["hidden_cards"] == ["compare", "wind", "longterm"]
+    assert wetter_routes._load_config(index)["hidden_cards"] == ["compare", "wind", *long_cards]
     html = client.get("/wetterdashboard").text
     assert 'id="wt-tab-wind"' not in html and 'id="wt-tab-long"' not in html and "data-wt-conditions" in html and 'x-ref="table"' not in html
     assert 'id="wt-tab-overview"' in html
     # alles abgewählt: auch die Übersicht fehlt
     assert client.post("/wetterdashboard/setup", data={**base, "show_card": []}).status_code == 200
     assert 'id="wt-tab-overview"' not in client.get("/wetterdashboard").text
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
+def test_cards_hidden_before_the_blocks_were_split_keep_all_their_blocks_hidden(client) -> None:
+    from app.main import index
+
+    config = {"temperature": "sensor.karten_t", "hidden_cards": ["longterm", "klima", "precip"]}
+    index.set_setting(wetter_routes.SETTING_CONFIG, json.dumps(config))
+    hidden = wetter_routes._load_config(index)["hidden_cards"]
+    assert {"records", "kenntage", "monthyears", "yearmatrix", "klima", "tempcmp", "humidcmp", "precip", "precip_months"} <= set(hidden)
+    # Nach dem Speichern der neuen Einrichtung gilt jede Wahl für sich.
+    config["cards_detail"] = True
+    index.set_setting(wetter_routes.SETTING_CONFIG, json.dumps(config))
+    assert wetter_routes._load_config(index)["hidden_cards"] == ["precip", "klima"]
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
 
 

@@ -145,14 +145,26 @@
 {% set show_monthly = 'monthly' not in hc %}
 {% set show_dayimage = has_dayimage and 'dayimage' not in hc %}
 {% set show_overview = show_basis or show_compare or show_dayimage or show_monthly %}
-{% set show_precip = precip_modes and 'precip' not in hc %}
-{% set show_klima = has_klima and 'klima' not in hc %}
+{% set show_precip_main = precip_modes and 'precip' not in hc %}
+{% set show_precip_months = precip_modes and 'precip_months' not in hc %}
+{% set show_precip = show_precip_main or show_precip_months %}
+{% set show_klima_tiles = has_klima and 'klima' not in hc %}
+{% set show_tempcmp = has_klima and 'tempcmp' not in hc %}
+{% set show_humidcmp = has_klima and 'humidcmp' not in hc %}
+{% set show_klima = show_klima_tiles or show_tempcmp or show_humidcmp %}
 {% set show_windtiles = has_windtiles and 'wind' not in hc %}
 {% set show_sunhours = has_dayimage and 'sunhours' not in hc %}
-{% set show_daylight = has_daylight and 'daylight' not in hc %}
+{% set show_daylight_main = has_daylight and 'daylight' not in hc %}
+{% set show_dl_days = has_daylight and 'daylight_days' not in hc %}
+{% set show_dl_length = has_daylight and 'daylength' not in hc %}
+{% set show_daylight = show_daylight_main or show_dl_days or show_dl_length %}
 {% set show_pv = has_pv and 'pvlight' not in hc %}
 {% set show_windtab = show_windtiles or show_sunhours or show_daylight or show_pv %}
-{% set show_long = 'longterm' not in hc %}
+{% set show_records = 'records' not in hc %}
+{% set show_kenntage = 'kenntage' not in hc %}
+{% set show_monthyears = 'monthyears' not in hc %}
+{% set show_yearmatrix = 'yearmatrix' not in hc %}
+{% set show_long = show_records or show_kenntage or show_monthyears or show_yearmatrix %}
 {% set show_heat = has_heating and 'heating' not in hc %}
 <div x-data='wetterDashboard({{ precip_modes | tojson }})' data-hints="collapsed" data-tile-style="{{ config.tile_style }}">
   <div class="wt-title-row">
@@ -290,7 +302,7 @@
   <section x-show="tab === 'precip'" x-cloak role="tabpanel" id="wt-panel-precip" aria-labelledby="wt-tab-precip">
     <div class="card wt-card">
       <div class="wt-controls">
-        <h2 class="wt-h2">{{ _("Niederschlag seit Jahresbeginn") }}</h2>
+        {% if show_precip_main %}<h2 class="wt-h2">{{ _("Niederschlag seit Jahresbeginn") }}</h2>{% endif %}
         {% if precip_modes | length > 1 %}
         <div class="wt-seg" role="group" aria-label="{{ _('Art des Niederschlags') }}">
           <button type="button" :aria-pressed="(precipMode === 'mm').toString()" @click="setPrecipMode('mm')">{{ _("Menge") }}</button>
@@ -298,6 +310,7 @@
         </div>
         {% endif %}
       </div>
+      {% if show_precip_main %}
       <p class="wt-headline" x-show="precip" x-text="precipHeadline()"></p>
       <div class="wt-kpis" x-show="precip" :style="'--wt-cols:' + kpiCols(precipKpis().length)">
         <template x-for="kpi in precipKpis()" :key="kpi.label">
@@ -310,9 +323,12 @@
         </template>
       </div>
       <div class="wt-chart wt-chart-tall" x-ref="precipChart"></div>
+      {% endif %}
+      {% if show_precip_months %}
       <h3 class="wt-h3" x-show="precip && precip.months" x-cloak>{{ _("Niederschlag je Monat") }}</h3>
       <div class="wt-table-wrap" x-show="precip && precip.months" x-cloak><table class="wt-table wt-table-full wt-precip-table" x-ref="precipTable"></table></div>
       <p class="wt-foot" x-show="precip && precip.months" x-cloak x-text="precipTableNote()"></p>
+      {% endif %}
       <p class="hint hint-warn" x-show="precipError" x-text="precipError" x-cloak></p>
     </div>
   </section>
@@ -320,7 +336,8 @@
 
   {% if show_klima %}
   <section x-show="tab === 'klima'" x-cloak role="tabpanel" id="wt-panel-klima" aria-labelledby="wt-tab-klima">
-    {{ weather_card("klima", 3) }}
+    {% if show_klima_tiles %}{{ weather_card("klima", 3) }}{% endif %}
+    {% if show_tempcmp %}
     <div class="card wt-card">
       <div class="wt-controls">
         <h2 class="wt-h2">{{ _("Temperaturen im Vergleich") }} {{ hint_button(_("Temperaturen im Vergleich")) }}</h2>
@@ -335,6 +352,8 @@
       <div class="wt-chart" x-ref="tempChart" x-show="!tempCmp || tempCmp.series.length"></div>
       <p class="hint hint-warn" x-show="tempError" x-text="tempError" x-cloak></p>
     </div>
+    {% endif %}
+    {% if show_humidcmp %}
     <div class="card wt-card" x-show="tempCmp && tempCmp.humidity && tempCmp.humidity.length" x-cloak>
       <div class="wt-controls">
         <h2 class="wt-h2">{{ _("Luftfeuchte im Vergleich") }} {{ hint_button(_("Luftfeuchte im Vergleich")) }}</h2>
@@ -343,6 +362,7 @@
       {{ room_chips() }}
       <div class="wt-chart" x-ref="humidChart"></div>
     </div>
+    {% endif %}
   </section>
   {% endif %}
 
@@ -391,6 +411,7 @@
 
   {% if show_daylight %}
   <div class="card wt-card" x-show="daylight || daylightError" x-cloak>
+    {% if show_daylight_main %}
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Tageslicht") }} {{ hint_button(_("Tageslicht")) }}</h2>
       {% call hint_body() %}{{ _("Der Dämmerungssensor misst von 0 bis 1.000 lx. Die Kurve zeigt, wann es für den Sensor hell wird und wann nicht mehr, nicht den Sonnenstand: Dichte Wolken verschieben den Tagesbeginn nach hinten, Ausrichtung und Verschattung wirken ebenfalls. Die Schwellen für Nacht und Tag stehen in der Einrichtung.") }}{% endcall %}
@@ -409,6 +430,8 @@
     <div class="wt-chart" x-show="daylight" x-ref="daylightChart"></div>
     <p class="hint hint-warn" x-show="daylightNote()" x-text="daylightNote()" x-cloak></p>
     <p class="hint hint-warn" x-show="daylightError" x-text="daylightError" x-cloak></p>
+    {% endif %}
+    {% if show_dl_days %}
     <h3 class="wt-h3 wt-dl-h" x-show="daylight">{{ _("Die letzten Tage im Vergleich") }}</h3>
     <div class="tbl-wrap wt-table-wrap" x-show="daylight">
       <table class="wt-table wt-table-full wt-dl-table">
@@ -431,9 +454,12 @@
       </table>
     </div>
     <p class="wt-hint" x-show="daylight && daylightHistoryNote()" x-text="daylightHistoryNote()" x-cloak></p>
+    {% endif %}
+    {% if show_dl_length %}
     <h3 class="wt-h3 wt-dl-h" x-show="daylength" x-cloak>{{ _("Tageslänge im Jahresverlauf") }}</h3>
     <div class="wt-chart wt-chart-short" x-show="daylength" x-cloak x-ref="daylengthChart"></div>
     <p class="hint hint-status" x-show="daylength" x-text="daylengthNote()" x-cloak></p>
+    {% endif %}
   </div>
   {% endif %}
   </section>
@@ -450,6 +476,7 @@
         </template>
       </div>
     </div>
+    {% if show_records %}
     <div class="card wt-card" x-show="longterm && longterm.records.length" x-cloak>
       <div class="wt-controls">
         <h2 class="wt-h2">{{ _("Rekorde") }} <span class="wt-rec-scope" x-text="recordsScope()"></span> {{ hint_button(_("Rekorde")) }}</h2>
@@ -494,6 +521,8 @@
       </div>
     </div>
     <p class="hint hint-status" x-show="longterm && !longterm.records.length" x-cloak>{{ _("Noch keine Rekorde: Es liegen noch keine abgeschlossenen Tage mit Werten vor.") }}</p>
+    {% endif %}
+    {% if show_kenntage %}
     <div class="card wt-card">
       <div class="wt-controls">
         <h2 class="wt-h2">{{ _("Kenntage je Jahr") }} {{ hint_button(_("Kenntage je Jahr")) }}</h2>
@@ -509,6 +538,8 @@
       </div>
       <p class="wt-foot" x-show="kenntageFoot()" x-text="kenntageFoot()" x-cloak></p>
     </div>
+    {% endif %}
+    {% if show_monthyears %}
     <div class="card wt-card" x-show="tempYears" x-cloak>
       <div class="wt-controls">
         <h2 class="wt-h2">
@@ -531,6 +562,8 @@
         <span x-text="tempYearsLegend().low"></span><span class="wt-tm-scale" x-ref="tempYearsScale"></span><span x-text="tempYearsLegend().high"></span>
       </div>
     </div>
+    {% endif %}
+    {% if show_yearmatrix %}
     <div class="card wt-card">
       <div class="wt-controls">
         <h2 class="wt-h2">{{ _("Jahre im Vergleich, Tag für Tag") }} {{ hint_button(_("Jahre im Vergleich, Tag für Tag")) }}</h2>
@@ -550,6 +583,7 @@
       <div class="wt-chart wt-matrix" x-ref="matrixChart" :style="matrixHeight()"></div>
       <p class="hint hint-warn" x-show="matrixError" x-text="matrixError" x-cloak></p>
     </div>
+    {% endif %}
     <p class="hint hint-warn" x-show="longError" x-text="longError" x-cloak></p>
   </section>
   {% endif %}

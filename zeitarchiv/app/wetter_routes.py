@@ -121,24 +121,40 @@ CARD_OPTIONS = (
     ("compare", N_("Zeiträume im Vergleich"), ("temperature", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation", "illuminance")),
     ("monthly", N_("Monatsvergleich"), ("temperature", "precip_mm", "precip_dur")),
     ("precip", N_("Niederschlag"), ("precip_mm", "precip_dur")),
+    ("precip_months", N_("Niederschlag je Monat"), ("precip_mm", "precip_dur")),
     ("klima", N_("Temperatur & Klima"), ("@extras",)),
+    ("tempcmp", N_("Temperaturen im Vergleich"), ("@extras",)),
+    ("humidcmp", N_("Luftfeuchte im Vergleich"), ("@extras",)),
     ("wind", N_("Wind & Sonne"), ("wind", "gust", "radiation", "illuminance")),
     ("sunhours", N_("Sonnenstunden"), ("illuminance",)),
     ("daylight", N_("Tageslicht"), ("illuminance_dawn",)),
+    ("daylight_days", N_("Die letzten Tage im Vergleich"), ("illuminance_dawn",)),
+    ("daylength", N_("Tageslänge im Jahresverlauf"), ("illuminance_dawn",)),
     ("dayimage", N_("Tagesbild"), ("illuminance",)),
     ("pvlight", N_("PV und Helligkeit"), ("@pv",)),
-    ("longterm", N_("Langzeit"), ("temperature", "precip_mm", "precip_dur")),
+    ("records", N_("Rekorde"), ("temperature", "precip_mm", "precip_dur")),
+    ("kenntage", N_("Kenntage je Jahr"), ("temperature", "precip_mm", "precip_dur")),
+    ("monthyears", N_("Monatswerte je Jahr"), ("temperature", "precip_mm", "precip_dur")),
+    ("yearmatrix", N_("Jahre im Vergleich, Tag für Tag"), ("temperature", "precip_mm", "precip_dur")),
     ("heating", N_("Heizen"), ("@heating",)),
 )
 CARD_KEYS = tuple(key for key, _label, _needs in CARD_OPTIONS)
+#: Karten, die früher mehrere Blöcke zugleich ein- und ausgeblendet haben. Wer die Karte ausgeblendet hatte,
+#: behält alle ihre Blöcke ausgeblendet, bis er sie einzeln einschaltet (siehe „cards_detail“ in _load_config).
+CARD_SPLIT_CHILDREN = {
+    "precip": ("precip_months",),
+    "klima": ("tempcmp", "humidcmp"),
+    "daylight": ("daylight_days", "daylength"),
+    "longterm": ("records", "kenntage", "monthyears", "yearmatrix"),
+}
 #: Gliederung der Kartenauswahl nach Reiter des Dashboards (Reitername, Karten). „heating“ fehlt hier
 #: absichtlich: Der Reiter „Heizen“ ist experimentell und steht in der Einrichtung in einem eigenen Block.
 CARD_GROUPS = (
     (N_("Übersicht"), ("basis", "compare", "dayimage", "monthly")),
-    (N_("Niederschlag"), ("precip",)),
-    (N_("Temperatur & Klima"), ("klima",)),
-    (N_("Wind & Sonne"), ("wind", "sunhours", "daylight", "pvlight")),
-    (N_("Langzeit"), ("longterm",)),
+    (N_("Niederschlag"), ("precip", "precip_months")),
+    (N_("Temperatur & Klima"), ("klima", "tempcmp", "humidcmp")),
+    (N_("Wind & Sonne"), ("wind", "sunhours", "daylight", "daylight_days", "daylength", "pvlight")),
+    (N_("Langzeit"), ("records", "kenntage", "monthyears", "yearmatrix")),
 )
 #: Nachkommastellen, wenn die Entität „automatisch“ eingestellt ist: Strahlung in ganzen W/m².
 ROLE_DEFAULT_DECIMALS = {"radiation": 0}
@@ -228,6 +244,7 @@ def _empty_config() -> dict:
         "hidden_blocks": [],
         "hidden_cards": [],
         "cards_split": False,
+        "cards_detail": False,
         "lage_layout": DEFAULT_LAGE_LAYOUT,
         "tile_style": DEFAULT_TILE_STYLE,
     }
@@ -288,8 +305,15 @@ def _load_config(index: Index) -> dict:
         # Die Wetterlage (conditions) ist seither Teil der Karte „Wetterlage“ (basis).
         if "basis" in hidden_cards and "compare" not in hidden_cards and not data.get("cards_split"):
             hidden_cards = [*hidden_cards, "compare"]
+        # Bis 1.4x schaltete eine Karte mehrere Blöcke zugleich (z. B. „Langzeit“): Die Teile erben ihre Wahl.
+        if not data.get("cards_detail"):
+            hidden_cards = [
+                *hidden_cards,
+                *(child for parent, children in CARD_SPLIT_CHILDREN.items() if parent in hidden_cards for child in children),
+            ]
         config["hidden_cards"] = [key for key in CARD_KEYS if key in hidden_cards]
         config["cards_split"] = True
+        config["cards_detail"] = True
     if data.get("lage_layout") in LAGE_LAYOUTS:
         config["lage_layout"] = data["lage_layout"]
     if data.get("tile_style") in TILE_STYLES:
@@ -1883,6 +1907,7 @@ class WetterService:
                 ]
             else:
                 config["hidden_cards"] = previous_cards
+            config["cards_detail"] = True  # die Blöcke der Reiter sind einzeln wählbar (siehe CARD_SPLIT_CHILDREN)
             config["cards_split"] = True  # die Karten „Wetterlage“ und „Zeiträume im Vergleich“ sind getrennt (siehe _load_config)
             # Ohne Angabe (ältere Aufrufer) bleibt die bisherige Darstellung.
             layout = lage_layout.strip()
