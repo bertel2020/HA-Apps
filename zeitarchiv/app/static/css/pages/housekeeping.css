@@ -83,6 +83,9 @@
      (margin-bottom:8px), damit hier zuverlässig margin:0 gewinnt, unabhängig
      von der Reihenfolge im Stylesheet. */
   .hk-section-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+  /* Datenqualität: Der Knopf „Übersicht öffnen“ ist höher als die Überschrift und saß mit Baseline-Ausrichtung zu tief,
+     direkt auf den Kennzahlen. Mittig ausrichten und Abstand nach unten; der Hinweis darunter hat ihn früher geliefert. */
+  #datenqualitaet .hk-section-head{align-items:center;margin-bottom:14px;}
   /* Der aufgeklappte Abschnitts-Hinweis steht im Kopf (hint-toggle.js sucht ihn
      direkt hinter der Überschrift, siehe _hints.html), soll dort aber keine
      Spalte belegen: mit voller Breite und order:1 rutscht er unter die Zeile,
