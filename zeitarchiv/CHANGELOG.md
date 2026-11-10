@@ -17,25 +17,6 @@
   - Je Dashboard umschaltbar: 4 Kacheln pro Zeile (ab 1500 px); ein Hinweis
     schlägt es bei breitem Fenster vor und lässt sich wegklicken
 
-- **Wetterdashboard**: Weitere Sensoren nach Raum und Etage
-  - Bis zu 20 weitere Sensoren (vorher 5); der Dialog bietet nur Temperatur-
-    und Feuchtesensoren an und blendet schon eingetragene aus
-  - „Zeiträume im Vergleich“ (Reiter „Temperatur & Klima“): ein Block je Raum
-    mit Temperatur und Feuchte
-    - Der Raum kommt aus der Area in Home Assistant; im Dialog des Sensors
-      lässt er sich von Hand setzen, Sensoren ohne Raum stehen unter „Ohne
-      Raum“
-    - Jeder Raum lässt sich einklappen
-    - „Nur Mittelwerte“ im Menü der Tabelle zeigt je Sensor eine Zeile statt
-      Max, Min und Ø
-    - Mit Etagen in Home Assistant stehen die Räume unter ihrer Etage, die
-      sich ebenfalls einklappen lässt (braucht die neue Version der
-      Integration)
-    - Die Lovelace-Karte zeigt die Räume und Etagen ebenfalls, ohne
-      Einklappen
-  - „Temperaturen im Vergleich“ und „Luftfeuchte im Vergleich“: die Räume
-    lassen sich ein- und ausblenden
-
 - **Energiedashboard**
   - Neuer Reiter „Vergleich“, aufgebaut wie im
     Wetterdashboard
@@ -95,6 +76,25 @@
   - Der Reiter „Langzeit“ funktionierte nicht mehr, sobald
     im Setup ein Bereich abgewählt war
 
+- **Wetterdashboard**: Weitere Sensoren nach Raum und Etage
+  - Bis zu 20 weitere Sensoren (vorher 5); der Dialog bietet nur Temperatur-
+    und Feuchtesensoren an und blendet schon eingetragene aus
+  - „Zeiträume im Vergleich“ (Reiter „Temperatur & Klima“): ein Block je Raum
+    mit Temperatur und Feuchte
+    - Der Raum kommt aus der Area in Home Assistant; im Dialog des Sensors
+      lässt er sich von Hand setzen, Sensoren ohne Raum stehen unter „Ohne
+      Raum“
+    - Jeder Raum lässt sich einklappen
+    - „Nur Mittelwerte“ im Menü der Tabelle zeigt je Sensor eine Zeile statt
+      Max, Min und Ø
+    - Mit Etagen in Home Assistant stehen die Räume unter ihrer Etage, die
+      sich ebenfalls einklappen lässt (braucht die neue Version der
+      Integration)
+    - Die Lovelace-Karte zeigt die Räume und Etagen ebenfalls, ohne
+      Einklappen
+  - „Temperaturen im Vergleich“ und „Luftfeuchte im Vergleich“: die Räume
+    lassen sich ein- und ausblenden
+
 - **Demo-Modus**: Die Demo bringt jetzt eine fertige Oberfläche mit und
   umfasst 5 Jahre Historie
   - Energie- und Wetterdashboard sind eingerichtet
@@ -133,8 +133,6 @@
 
 ### Geändert
 
-- **Wetterdashboard**: „Temperaturen im Vergleich“ zeigt 7 Tage, 30 Tage oder
-  12 Monate (vorher 7, 30 oder 90 Tage)
 - **Energiedashboard**: Aufbau wie im Wetterdashboard
   - „Zeiträume im Vergleich“ steht jetzt im Reiter „Vergleich“; die Übersicht
     verweist mit einem Link darauf
@@ -149,6 +147,8 @@
     „Vergleich“ zeigt die Änderung je Verbraucher
   - Setup: Neuer Haken für die Verbraucher und die Aufteilung; die
     Monatswerte lassen sich als Tabelle und als Linien einzeln abwählen
+- **Wetterdashboard**: „Temperaturen im Vergleich“ zeigt 7 Tage, 30 Tage oder
+  12 Monate (vorher 7, 30 oder 90 Tage)
 
 ### Behoben
 
@@ -181,22 +181,6 @@
   - The hints behind the (i) start collapsed
   - Per dashboard: 4 tiles per row (from 1500 px); a hint suggests it on a
     wide window and can be dismissed
-
-- **Weather dashboard**: More sensors by room and floor
-  - Up to 20 additional sensors (was 5); the dialog offers only temperature
-    and humidity sensors and hides ones that are already entered
-  - "Periods compared" (tab "Temperature & climate"): one block per room with
-    temperature and humidity
-    - The room comes from the area in Home Assistant; it can be set by hand in
-      the sensor's dialog, sensors without a room are listed under "No room"
-    - Every room can be collapsed
-    - "Averages only" in the table menu shows one row per sensor instead of
-      max, min and average
-    - With floors in Home Assistant the rooms sit under their floor, which can
-      be collapsed too (needs the new version of the integration)
-    - The Lovelace card shows the rooms and floors as well, without collapsing
-  - "Temperatures compared" and "Humidity compared": rooms can be shown and
-    hidden
 
 - **Energy dashboard**
   - New "Comparison" tab, laid out like the weather
@@ -258,6 +242,22 @@
   - The "Long term" tab stopped working as soon as an
     area was switched off in the setup
 
+- **Weather dashboard**: More sensors by room and floor
+  - Up to 20 additional sensors (was 5); the dialog offers only temperature
+    and humidity sensors and hides ones that are already entered
+  - "Periods compared" (tab "Temperature & climate"): one block per room with
+    temperature and humidity
+    - The room comes from the area in Home Assistant; it can be set by hand in
+      the sensor's dialog, sensors without a room are listed under "No room"
+    - Every room can be collapsed
+    - "Averages only" in the table menu shows one row per sensor instead of
+      max, min and average
+    - With floors in Home Assistant the rooms sit under their floor, which can
+      be collapsed too (needs the new version of the integration)
+    - The Lovelace card shows the rooms and floors as well, without collapsing
+  - "Temperatures compared" and "Humidity compared": rooms can be shown and
+    hidden
+
 - **Demo mode**: The demo now comes with a ready-made interface and covers 5
   years of history
   - Energy and weather dashboards are set up
@@ -292,8 +292,6 @@
 
 #### Changed
 
-- **Weather dashboard**: "Temperatures compared" shows 7 days, 30 days or 12
-  months (was 7, 30 or 90 days)
 - **Energy dashboard**: Layout like the weather dashboard
   - "Periods compared" now sits in the "Comparison" tab; the overview links
     to it
@@ -308,6 +306,8 @@
     shows the change per consumer
   - Setup: New checkbox for the consumers and the breakdown; the monthly
     values can be switched off separately as table and as lines
+- **Weather dashboard**: "Temperatures compared" shows 7 days, 30 days or 12
+  months (was 7, 30 or 90 days)
 
 #### Fixed
 
