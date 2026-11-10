@@ -190,7 +190,7 @@ DEFAULT_DAYLIGHT_NIGHT_LX = 5.0
 DEFAULT_DAYLIGHT_DAY_LX = 400.0
 DAYLIGHT_NIGHT_RANGE_LX = (1.0, 200.0)
 DAYLIGHT_DAY_RANGE_LX = (50.0, 990.0)
-DAYLIGHT_COMPARE_DAYS = 7  # Tage in der Vergleichstabelle unter der Kurve
+DAYLIGHT_COMPARE_DAYS = 14  # Tage in der Vergleichstabelle unter der Kurve (wie Tagesbild und PV)
 DAYLENGTH_MIN_HOURS = 12  # Stunden mit Werten, ab denen ein Tag für den Jahresverlauf zählt
 DAYLENGTH_MAX_DAYS = 800  # so weit reicht der Jahresverlauf höchstens zurück (laufendes Jahr, Vorjahr und etwas mehr)
 #: Süd-Helligkeit der Eltako-Station sättigt hier; darüber steht „ab“ statt eines Messwerts.

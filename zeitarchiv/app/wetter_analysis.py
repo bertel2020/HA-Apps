@@ -24,6 +24,8 @@ from .storage.query import DailyPoint
 SLOTS = 365  # Kalendertage eines Nicht-Schaltjahres
 #: Ein Jahr gilt als vollständig, wenn so viele Tage Werte haben (Archiv muss dort schon laufen).
 COMPLETE_YEAR_MIN_DAYS = 350
+#: Frühere Jahre, die ein Jahresdiagramm als eigene Linie zeigt (Ø und Band gelten für alle vollständigen Jahre).
+SHOWN_PAST_YEARS = 5
 #: Ein abgeschlossener Monat braucht für Mittelwerte mindestens so viel Abdeckung.
 MONTH_MIN_COVERAGE = 0.7
 #: Rekorde erst, wenn das Archiv mindestens so viele belegte Tage hat.
@@ -159,6 +161,11 @@ def precipitation(
         "cumulative": cumulative.get(current_year, [None] * SLOTS),
         "previous": previous if previous and any(v is not None for v in previous) else None,
         "previous_year": current_year - 1,
+        # Die älteren Jahre davor als schwache Linien: insgesamt SHOWN_PAST_YEARS frühere Jahre, das Vorjahr eingerechnet.
+        "older": {
+            str(year): cumulative[year]
+            for year in sorted((y for y in complete if y < current_year - 1), reverse=True)[: SHOWN_PAST_YEARS - 1]
+        },
         "avg": avg, "low": low, "high": high,
         "avg_years": complete,
         # Stand bis heute: der letzte echte Wert, auch wenn heute noch keine Zeile da ist.

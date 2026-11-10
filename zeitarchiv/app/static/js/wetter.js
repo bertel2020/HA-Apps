@@ -1809,6 +1809,13 @@
           });
           legend.push('Ø');
         }
+        // Ältere Jahre als schwache Linien ohne Legendeneintrag (wie im Monatsvergleich).
+        for (const year of Object.keys(p.older || {}).sort()) {
+          series.push({
+            name: year, type: 'line', data: nullable(p.older[year], scale), symbol: 'none', silent: true,
+            lineStyle: {color: colors.prev, width: 1.2, opacity: 0.45}, itemStyle: {color: colors.prev}, tooltip: {show: false},
+          });
+        }
         if (previous) {
           series.push({
             name: String(p.previous_year), type: 'line', data: previous, symbol: 'none',

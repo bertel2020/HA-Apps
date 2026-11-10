@@ -72,6 +72,17 @@ def test_average_and_band_use_only_complete_previous_years() -> None:
     assert result["total"] == pytest.approx(0.5 * (slot + 1))
 
 
+def test_older_years_are_capped_but_average_and_band_use_all_complete_years() -> None:
+    daily = _years({year: float(year - 2018) for year in range(2019, 2026)})  # 2019 bis 2025, sieben Jahre
+    daily[date(2026, 1, 1)] = 1.0
+    result = wa.precipitation(daily, date(2026, 1, 2), 1.0)
+    assert result["avg_years"] == list(range(2019, 2026))  # alle sieben im Mittel
+    # Gezeigt: das Vorjahr (eigene Linie) plus vier ältere = fünf frühere Jahre.
+    assert result["previous_year"] == 2025
+    assert sorted(result["older"]) == ["2021", "2022", "2023", "2024"]
+    assert result["older"]["2024"][0] == pytest.approx(6.0)
+
+
 def test_average_needs_two_years_for_the_comparison() -> None:
     result = wa.precipitation(_years({2025: 2.0}) | {date(2026, 1, 1): 1.0}, date(2026, 1, 2), 1.0)
     assert result["avg_to_date"] is None and result["avg_years"] == [2025]
