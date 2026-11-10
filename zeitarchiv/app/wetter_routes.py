@@ -137,7 +137,7 @@ CARD_GROUPS = (
     (N_("Übersicht"), ("basis", "compare", "dayimage", "monthly")),
     (N_("Niederschlag"), ("precip",)),
     (N_("Temperatur & Klima"), ("klima",)),
-    (N_("Wind & Sonne"), ("wind", "sunhours", "daylight")),
+    (N_("Wind & Sonne"), ("wind", "sunhours", "daylight", "pvlight")),
     (N_("Langzeit"), ("longterm",)),
 )
 #: Nachkommastellen, wenn die Entität „automatisch“ eingestellt ist: Strahlung in ganzen W/m².
