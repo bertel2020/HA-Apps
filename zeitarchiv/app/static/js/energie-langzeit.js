@@ -1327,6 +1327,7 @@
         this.drawKenntage();
         this.$nextTick(() => this.drawDays());
         this.$nextTick(() => this.drawWeather());
+        if (this.records) this.loadRecords();  // die Rekorde zählen nur die gewählten Jahre: neu vom Server
       },
 
       // ---- Jahre im Vergleich, Tag für Tag: Matrix Jahr × Kalendertag, gefärbt nach dem Tageswert ----
@@ -1754,7 +1755,8 @@
       async loadRecords() {
         this.recordsError = '';
         try {
-          const res = await fetch('energiedashboard/langzeit/records');
+          // Die Rekorde zählen nur die gewählten Jahre (0 = alle); die Kenntage liefert der Server immer vollständig.
+          const res = await fetch(`energiedashboard/langzeit/records?years=${this.yearLimit || 0}`);
           if (!res.ok) throw new Error(String(res.status));
           this.records = await res.json();
           this.$nextTick(() => this.drawKenntage());
@@ -1763,8 +1765,16 @@
         }
       },
 
+      // Kurzer Zusatz zum Titel „Rekorde“: ab wann gezählt wird (hängt an der Jahresauswahl).
+      recordsScope() {
+        return this.records && this.records.since ? t('seit {year}', {year: this.records.since.slice(0, 4)}) : '';
+      },
+
       recordsNote() {
-        return t('Höchste Tageswerte seit Beginn des Archivs. Tage direkt nach einem fehlenden Tag zählen nicht mit, weil dort die Differenz mehrerer Tage steht und einen Schein-Rekord ergäbe. Bei Gleichstand gilt der frühere Tag.');
+        const since = this.records && this.records.since
+          ? new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'}).format(new Date(this.records.since + 'T12:00:00Z'))
+          : '';
+        return t('Höchste Tageswerte ab {date}, passend zur Jahresauswahl oben. Tage direkt nach einem fehlenden Tag zählen nicht mit, weil dort die Differenz mehrerer Tage steht und einen Schein-Rekord ergäbe. Bei Gleichstand gilt der frühere Tag.', {date: since});
       },
 
       recordAccent(key) {

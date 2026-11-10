@@ -1302,3 +1302,13 @@ def test_rekorde_zaehlen_nur_die_neuesten_jahre_der_auswahl(service, monkeypatch
     assert jahr["value"] == 30.0 and neueste["since"] == "2026-01-01"
     assert service.compute_records(config, NOW, years=5)["since"] == "2025-07-01"   # mehr als vorhanden: alle
     assert neueste["kenntage"] == alle["kenntage"]
+
+
+def test_langzeit_laedt_die_rekorde_mit_der_jahresauswahl_neu() -> None:
+    from _paths import APP, TEMPLATES
+
+    script = (APP / "static/js/energie-langzeit.js").read_text(encoding="utf-8")
+    assert "energiedashboard/langzeit/records?years=${this.yearLimit || 0}" in script
+    assert "if (this.records) this.loadRecords();" in script[script.index("setYearLimit(value) {"):]
+    page = (TEMPLATES / "_energie_langzeit.html").read_text(encoding="utf-8")
+    assert 'x-text="recordsScope()"' in page and "mindestens ein Jahr" not in page

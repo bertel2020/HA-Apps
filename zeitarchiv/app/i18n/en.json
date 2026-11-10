@@ -3422,7 +3422,6 @@
     "Monatsvergleich": "Monthly comparison",
     "Niederschlag seit Jahresbeginn": "Precipitation since the start of the year",
     "Rekorde": "Records",
-    "Rekorde erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte enthält.": "Records appear once the archive holds at least a year of daily values.",
     "Spanne der Vorjahre": "Range of previous years",
     "Tag öffnen": "Open day",
     "Temperatur": "Temperature",
@@ -4655,7 +4654,6 @@
     "Kacheln und Tabelle zeigen die Zeiträume zum {date}.": "Tiles and table show the periods as of {date}.",
     "Die Monatswerte konnten nicht geladen werden.": "The monthly values could not be loaded.",
     "Rekorde und Kenntage konnten nicht geladen werden.": "Records and key days could not be loaded.",
-    "Höchste Tageswerte seit Beginn des Archivs. Tage direkt nach einem fehlenden Tag zählen nicht mit, weil dort die Differenz mehrerer Tage steht und einen Schein-Rekord ergäbe. Bei Gleichstand gilt der frühere Tag.": "Highest daily values since the start of the archive. Days directly after a missing day do not count, because they hold the difference of several days and would give a false record. In a tie the earlier day counts.",
     "Ausgewertete Tage": "Days evaluated",
     "gegen": "against",
     "kWh/kWp": "kWh/kWp",
@@ -4805,7 +4803,6 @@
     "Ersten Tag öffnen": "Open first day",
     "{from} bis heute": "{from} to today",
     "{from} bis {to}": "{from} to {to}",
-    "Rekorde erscheinen, sobald ein Jahr Daten vorliegt.": "Records appear once a year of data is available.",
     "Keine Veränderungen zum Vorjahr gefunden.": "No changes compared with the previous year found.",
     "Der Tag konnte nicht geladen werden.": "The day could not be loaded.",
     "Als Stichtag setzen": "Set as reference day",
@@ -4902,6 +4899,8 @@
     "Ein Punkt je Tag (kWh pro Tag). Die Linien zeigen den geglätteten Verlauf; kWh je Kelvin gilt für 0 bis {limit} °C, darunter verläuft der Verbrauch oft flacher.": "One dot per day (kWh per day). The lines show the smoothed trend; kWh per kelvin applies from 0 to {limit} °C, below that consumption often runs flatter.",
     "Ein Punkt je Tag (kWh pro Tag). Die Linien zeigen den geglätteten Verlauf; kWh je Kelvin gilt für Tage unter der Heizgrenze.": "One dot per day (kWh per day). The lines show the smoothed trend; kWh per kelvin applies to days below the heating limit.",
     "Gezählt ab {date} ({days} Tage), passend zur Jahresauswahl oben. Ein einzelner Messfehler kann einen Rekord setzen; über „Tag öffnen“ lässt sich der Tag prüfen.": "Counted from {date} ({days} days), matching the year selection above. A single measurement error can set a record; use “Open day” to check the day.",
-    "seit {year}": "since {year}"
+    "seit {year}": "since {year}",
+    "Höchste Tageswerte ab {date}, passend zur Jahresauswahl oben. Tage direkt nach einem fehlenden Tag zählen nicht mit, weil dort die Differenz mehrerer Tage steht und einen Schein-Rekord ergäbe. Bei Gleichstand gilt der frühere Tag.": "Highest daily values from {date}, matching the year selection above. Days directly after a missing day do not count, because they hold the difference of several days and would give a false record. In a tie the earlier day counts.",
+    "Noch keine Rekorde: Es liegen noch keine Tageswerte vor.": "No records yet: there are no daily values yet."
   }
 }

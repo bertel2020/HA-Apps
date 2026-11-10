@@ -16,11 +16,11 @@
     {{ year_choice() }}
   </div>
 {% if 'rekorde' not in hidden %}
-  {# Rekorde: höchste Tageswerte seit Archivbeginn, wie im Wetterdashboard die erste Karte des Langzeit-Reiters. #}
+  {# Rekorde: höchste Tageswerte der gewählten Jahre (Jahre-Auswahl oben), wie im Wetterdashboard die erste Karte des Langzeit-Reiters. #}
   <p class="hint hint-warn" x-show="recordsError" x-text="recordsError" x-cloak></p>
   <div class="card wt-card" x-show="records && records.enough && records.records.length" x-cloak>
     <div class="wt-controls">
-      <h2 class="wt-h2">{{ _("Rekorde") }} {{ hint_button(_("Rekorde")) }}</h2>
+      <h2 class="wt-h2">{{ _("Rekorde") }} <span class="wt-rec-scope" x-text="recordsScope()"></span> {{ hint_button(_("Rekorde")) }}</h2>
       {% call hint_body() %}<span x-text="recordsNote()"></span>{% endcall %}
     </div>
     <div class="el-rec" :style="'--el-rec-cols:' + (records && records.records.length > 4 ? 3 : Math.max(1, records ? records.records.length : 1))">
@@ -43,7 +43,7 @@
       </template>
     </div>
   </div>
-  <p class="hint hint-status" x-show="records && !records.enough" x-cloak>{{ _("Rekorde erscheinen, sobald das Archiv mindestens ein Jahr Tageswerte enthält.") }}</p>
+  <p class="hint hint-status" x-show="records && !records.enough" x-cloak>{{ _("Noch keine Rekorde: Es liegen noch keine abgeschlossenen Tage mit Werten vor.") }}</p>
 {% endif %}
 {% if 'jahresbilanz' not in hidden %}
   {# Jahresbilanz: Summen je Kalenderjahr (Erzeugung, Netzbezug, Einspeisung, Verbrauch), darunter Autarkie und Eigenverbrauch.
