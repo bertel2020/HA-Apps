@@ -993,6 +993,7 @@
               isState: s.aggregation_type === 'state',
               stateRows: s.aggregation_type === 'state' ? this.stateRowsFor(s) : [],
               color: this.colorFor(s.entity_id),
+              stack: this.stackLabelFor(s.entity_id),
               ...this.seriesStatsFor(s, s.points, this.windowEnd),
               // Min/Max/Ø über Zustandsindizes sind keine Aussage.
               ...(s.aggregation_type === 'state' ? {last: '—', min: '—', max: '—', average: '—', sum: null} : {}),
@@ -1595,6 +1596,24 @@
           this.stackGroups = {groups, members};
           this.render();
         },
+        // Stapelname für die Legende, nur bei wirksamen Stapeln (gleiche Regel wie ChartTileRender.stackLabels).
+        stackLabelFor(id) {
+          const members = (this.stackGroups && this.stackGroups.members) || {};
+          const gid = members[id];
+          if (!gid || !this.stacked || !this.canStack || !this.isBarId(id)) return '';
+          const unitOf = s => (s.aggregation_type === 'switch' && s.display_mode === 'time') ? ' duration' : s.unit;
+          const mine = this.series.find(s => s.entity_id === id);
+          const same = this.series.filter(s => s.chart_type === 'bar' && members[s.entity_id] === gid && unitOf(s) === unitOf(mine));
+          if (same.length < 2) return '';
+          return (this.stackGroupList().find(g => g.id === gid) || {}).name || t('Stapel');
+        },
+        // Anteile (%) wirken nur, wenn jeder Balken einer Achse in einem Stapel liegt (siehe barOnlyAxis in render()).
+        get stackPercentBlocked() {
+          if (!this.stacked || !this.canStack || !this.normalize) return false;
+          const members = (this.stackGroups && this.stackGroups.members) || {};
+          if (!Object.keys(members).length) return false;
+          return this.series.some(s => s.chart_type === 'bar' && !this.stackLabelFor(s.entity_id));
+        },
         stackMembersOf(gid) {
           const members = (this.stackGroups && this.stackGroups.members) || {};
           return this.orderableEntityIds.filter(id => members[id] === gid && this.isBarId(id));
@@ -2052,6 +2071,12 @@
             stackKeys.forEach(k => { if (k) keyCounts.set(k, (keyCounts.get(k) || 0) + 1); });
             stackKeys.forEach((k, i) => { if (k && keyCounts.get(k) < 2) stackKeys[i] = null; });
           }
+          const stackNameByKey = new Map();
+          chartSeries.forEach((s, i) => {
+            if (stackKeys[i] && hasStackGroups) {
+              stackNameByKey.set(stackKeys[i], (this.stackGroupList().find(g => g.id === stackMembers[s.entity_id]) || {}).name || t('Stapel'));
+            }
+          });
           const normalizeActive = stackedActive && this.normalize;
           // Nur Achsen, auf denen AUSSCHLIESSLICH Balken-Serien liegen, dürfen
           // auf Prozent umgestellt werden — eine mitgezeichnete Linien-Serie
@@ -2571,14 +2596,32 @@
                        + `<span style="margin-left:8px;text-align:right;"><strong>${escapeHtml(formatPointValue(p.data))}${extra}</strong>`
                        + `${TooltipHold.note(p, faint, withStamp ? ms => fmtTooltipTimestamp(ms, tooltipBucketSeconds) : null)}</span></div>`;
                 };
+                // Summe je Stapel (nur mit eigenen Stapeln): bei Anteilen (%) die Summe der Absolutwerte.
+                const sums = new Map();
+                if (hasStackGroups) {
+                  params.forEach(p => {
+                    const key = stackKeys[p.seriesIndex];
+                    if (!key) return;
+                    const abs = p.data[6];
+                    const entry = sums.get(key) || {n: 0, sum: 0, unit: abs != null ? p.data[7] : p.data[3], decimals: abs != null ? p.data[8] : p.data[4], duration: !!p.data[5]};
+                    entry.n += 1;
+                    entry.sum += abs != null ? abs : p.data[1];
+                    sums.set(key, entry);
+                  });
+                }
+                const sumRows = [...sums.entries()].filter(([, e]) => e.n >= 2).map(([key, e]) => {
+                  const value = e.duration ? NumberFormat.fmtDuration(e.sum) : `${fmtNum(e.sum, e.decimals)}${e.unit ? ' ' + e.unit : ''}`;
+                  return `<div style="display:flex;justify-content:space-between;gap:18px;margin-top:4px;padding-top:4px;border-top:1px solid var(--border);">`
+                       + `<span>Σ ${escapeHtml(stackNameByKey.get(key) || '')}</span><span style="margin-left:8px;text-align:right;"><strong>${escapeHtml(value)}</strong></span></div>`;
+                }).join('');
                 if (sameTime) {
                   const header = freshIndexes.length ? times[freshIndexes[0]] : times[0];
                   return `<div style="font-size:calc(11px * var(--font-scale, 1));color:${faint};margin-bottom:4px;">${header}</div>`
-                       + params.map(p => row(p, true)).join('');
+                       + params.map(p => row(p, true)).join('') + sumRows;
                 }
                 return params.map((p, i) =>
                   `<div style="font-size:calc(11px * var(--font-scale, 1));color:${faint};margin-bottom:2px;">${times[i]}</div>${row(p, false)}`
-                ).join('');
+                ).join('') + sumRows;
               },
               appendToBody: true,
             },

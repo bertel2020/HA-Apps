@@ -86,3 +86,23 @@ def test_empty_stacks_do_not_unstack_the_chart() -> None:
     # Ein frisch angelegter, leerer Stapel darf die Balken nicht plötzlich einzeln zeichnen.
     for source in (EDITOR_JS, TILE_JS):
         assert "const hasStackGroups = Object.keys(stackMembers).length > 0;" in source
+
+
+def test_tooltips_sum_each_stack_in_both_renderers() -> None:
+    for source in (EDITOR_JS, TILE_JS):
+        assert "stackNameByKey" in source
+        assert "const sumRows = " in source
+        assert "e.n >= 2" in source
+
+
+def test_legend_names_the_stack_in_editor_tile_and_card() -> None:
+    legend = (APP / "static/js/legend-render.js").read_text(encoding="utf-8")
+    assert "stackLabels" in TILE_JS and "stackLabels(series, spec)" in legend
+    assert "stackTag(item)" in legend
+    assert 'x-text="stat.stack"' in EDITOR_TEMPLATE
+    assert "stackLabelFor(id)" in EDITOR_JS
+
+
+def test_editor_explains_why_percent_does_not_apply() -> None:
+    assert "x-show=\"stackPercentBlocked\"" in EDITOR_TEMPLATE
+    assert "get stackPercentBlocked()" in EDITOR_JS

@@ -1,5 +1,6 @@
 {
   "app": {
+    "Anteile (%) wirken erst, wenn alle Balken in einem Stapel liegen. Solange Balken ohne Stapel dabei sind, bleiben die Werte absolut.": "Shares (%) only apply once every bar is in a stack. While bars without a stack are present, the values stay absolute.",
     "+ Stapel hinzufügen": "+ Add stack",
     "auflösen": "dissolve",
     "Entitäten hierher ziehen": "Drag entities here",

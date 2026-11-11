@@ -18,6 +18,8 @@
     zuordnen; Balken ohne Stapel stehen einzeln daneben
   - Stapel lassen sich anlegen, benennen und auflösen; Einträge werden per
     Ziehen oder über das Feld „Stapel“ zugeordnet
+  - Der Tooltip zeigt die Summe je Stapel, die Legende nennt den Stapel;
+    „Anteile (%)“ rechnet je Stapel
   - Gilt auch auf Dashboards und in der Karte; ohne Auswahl bleibt alles wie
     bisher in einem Stapel
 
@@ -74,6 +76,8 @@
     stack; bars without a stack stand next to the others
   - Stacks can be added, named and dissolved; entries are assigned by
     dragging or with the “Stack” field
+  - The tooltip shows the sum per stack, the legend names the stack; “Shares
+    (%)” is calculated per stack
   - Also applies on dashboards and in the card; without a choice everything
     stays in one stack as before
 

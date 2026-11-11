@@ -470,6 +470,7 @@
                     <button :class="{active: normalize}" @click="normalize = true; render()">{{ _("Anteile (%)") }}</button>
                   </div>
                 </div>
+                <p class="color-hint menu-row-hint" x-show="stackPercentBlocked" x-cloak>{{ _("Anteile (%) wirken erst, wenn alle Balken in einem Stapel liegen. Solange Balken ohne Stapel dabei sind, bleiben die Werte absolut.") }}</p>
                 <!-- "Horizontal" ergibt nur im Ranking-Vergleich Sinn (Auflösung
                      "Voll" — jede Entität bekommt dort ihre eigene Kategorie,
                      siehe render()/singleBucket, erst dann können lange
@@ -743,6 +744,7 @@
                     @mouseenter="highlightDonutSlice(stat.name)" @mouseleave="unhighlightDonutSlice(stat.name)">
               <span class="dot" :style="{background: stat.color}" x-show="!stat.isState"></span>
               <span class="name" x-text="stat.name"></span>
+              <span class="legend-stack" x-show="stat.stack" x-text="stat.stack"></span>
               {# Zustände: die Legende steht pro Zeile — Farbe, Name, Dauer
                  und Anteil je Zustand statt Min/Max über Indizes. #}
               <span class="values state-legend-values" x-show="stat.isState">
@@ -856,6 +858,7 @@
                     <span class="legend-name-cell">
                       <span class="dot" :style="{background: stat.color}" x-show="!stat.isState"></span>
                       <span x-text="stat.name"></span>
+                      <span class="legend-stack" x-show="stat.stack" x-text="stat.stack"></span>
                     </span>
                     <span class="legend-compare-label state-legend-values" x-show="stat.isState">
                       <template x-for="row in stat.stateRows" :key="row.idx">
