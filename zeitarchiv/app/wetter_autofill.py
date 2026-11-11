@@ -14,6 +14,7 @@ Vorsprung gilt als „ok“, ein knapper als „prüfen“.
 from __future__ import annotations
 
 import re
+from collections.abc import Collection
 from typing import Any
 
 from .i18n import tr
@@ -239,6 +240,48 @@ def _extras(rows: list[dict[str, Any]], taken: set[str]) -> list[dict[str, str]]
     return [row for _o, _e, row in found][:MAX_EXTRAS]
 
 
+def _catalog_row(row: dict[str, Any]) -> dict[str, Any]:
+    """Zeile des Integrationskatalogs in der Form, die `_score` erwartet (Entität nicht archiviert)."""
+    return {
+        "entity_id": row["entity_id"], "domain": row["entity_id"].split(".", 1)[0],
+        "aggregation_type": "switch" if row["entity_id"].startswith("binary_sensor.") else (
+            "counter" if row.get("state_class") == "total_increasing" else "standard"),
+        "unit": row.get("unit"), "state_class": row.get("state_class"), "name": row.get("name"),
+        "device_class": row.get("device_class"), "platform": row.get("platform"),
+        "device": row.get("device"), "area": row.get("area"),
+    }
+
+
+def suggest_for_entities(
+    entity_ids: Collection[str], catalog: list[dict[str, Any]], filled: Collection[str] = (),
+    anchor_id: str | None = None,
+) -> dict[str, dict[str, Any]]:
+    """Rollenvorschläge nur für die übergebenen Entitäten (z. B. die gerade im Assistenten übernommenen).
+
+    Grundlage sind allein die Metadaten des Katalogs, die Entitäten müssen nicht archiviert sein.
+    ``filled``: Rollen, die schon belegt sind; sie bekommen nie einen Vorschlag. ``anchor_id``: die
+    belegte Außentemperatur, damit „dasselbe Gerät wie die Außentemperatur“ auch dann zählt, wenn sie
+    selbst nicht zur Auswahl gehört. Rückgabe: ``{rolle: Vorschlag}``; ``confidence`` ist „ok“ nur bei
+    klarem Vorsprung vor den anderen Kandidaten der Auswahl, sonst „check“ (dann nichts vorbelegen).
+    """
+    wanted = set(entity_ids)
+    by_id = {row["entity_id"]: row for row in catalog}
+    rows = [_catalog_row(by_id[entity_id]) for entity_id in sorted(wanted) if entity_id in by_id]
+    labels = {row["entity_id"]: row["name"] or row["entity_id"] for row in rows}
+    anchor = _catalog_row(by_id[anchor_id]) if anchor_id in by_id else None
+    result: dict[str, dict[str, Any]] = {}
+    for role in ROLE_KEYS:
+        if role in filled:
+            continue
+        ranked = _rank(role, rows, anchor)
+        if not ranked:
+            continue
+        result[role] = _entry(ranked, labels)
+        if role == "temperature" and anchor is None:
+            anchor = ranked[0][1]
+    return result
+
+
 def suggest(
     archived: list[dict[str, Any]], labels: dict[str, str], catalog: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
@@ -286,17 +329,7 @@ def suggest(
     ][:6]
     missing = []
     if catalog:
-        outside = [
-            {
-                "entity_id": row["entity_id"], "domain": row["entity_id"].split(".", 1)[0],
-                "aggregation_type": "switch" if row["entity_id"].startswith("binary_sensor.") else (
-                    "counter" if row.get("state_class") == "total_increasing" else "standard"),
-                "unit": row.get("unit"), "state_class": row.get("state_class"), "name": row.get("name"),
-                "device_class": row.get("device_class"), "platform": row.get("platform"),
-                "device": row.get("device"), "area": row.get("area"),
-            }
-            for row in catalog if row["entity_id"] not in known
-        ]
+        outside = [_catalog_row(row) for row in catalog if row["entity_id"] not in known]
         for role in ROLE_KEYS:
             if role in roles:
                 continue

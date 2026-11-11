@@ -164,3 +164,56 @@ def test_direction_elevation_and_pv_power_are_suggested_by_name_and_unit() -> No
     assert roles["sun_elevation"]["entity_id"] == "sensor.sun_solar_elevation"  # Azimut ist keine Höhe
     assert roles["pv_power"]["entity_id"] == "sensor.dach_pv_leistung"  # Dachanlage vor Balkonkraftwerk, keine Prognose
     assert roles["pv_power"]["confidence"] == "ok"
+
+
+# ---- suggest_for_entities: nur für eine Auswahl, ohne Archiv ---------------------------------
+
+def _full_catalog():
+    return [
+        _catalog("sensor.sun_solar_elevation", name="Sun Solare Elevation", unit="°", platform="sun"),
+        _catalog("sensor.ecowitt_druck_relativ", name="Druck relativ", device_class="atmospheric_pressure",
+                 unit="hPa", platform="ecowitt", device=STATION),
+        _catalog("sensor.ecowitt_temp_aussen", name="Außentemperatur", device_class="temperature",
+                 unit="°C", platform="ecowitt", device=STATION),
+        _catalog("sensor.helligkeit_sued", name="Helligkeit Süd", device_class="illuminance", unit="lx",
+                 platform="ecowitt", device=STATION),
+        _catalog("sensor.helligkeit_ost", name="Helligkeit Ost", device_class="illuminance", unit="lx",
+                 platform="ecowitt", device=STATION),
+        _catalog("sensor.keller_temperatur", name="Keller", device_class="temperature", unit="°C",
+                 platform="zha", device="Keller"),
+    ]
+
+
+def test_suggest_for_entities_uses_only_the_given_entities_and_needs_no_archive() -> None:
+    result = wetter_autofill.suggest_for_entities(
+        ["sensor.sun_solar_elevation", "sensor.ecowitt_druck_relativ"], _full_catalog(),
+    )
+    assert set(result) == {"sun_elevation", "pressure"}
+    assert result["sun_elevation"]["entity_id"] == "sensor.sun_solar_elevation"
+    assert result["pressure"]["entity_id"] == "sensor.ecowitt_druck_relativ"
+
+
+def test_suggest_for_entities_ignores_everything_outside_the_selection() -> None:
+    result = wetter_autofill.suggest_for_entities(["sensor.ecowitt_druck_relativ"], _full_catalog())
+    assert set(result) == {"pressure"}
+
+
+def test_suggest_for_entities_never_proposes_roles_that_are_already_filled() -> None:
+    result = wetter_autofill.suggest_for_entities(
+        ["sensor.sun_solar_elevation", "sensor.ecowitt_druck_relativ"], _full_catalog(), filled={"pressure"},
+    )
+    assert set(result) == {"sun_elevation"}
+
+
+def test_suggest_for_entities_marks_several_close_candidates_as_check() -> None:
+    result = wetter_autofill.suggest_for_entities(
+        ["sensor.helligkeit_sued", "sensor.helligkeit_ost"], _full_catalog(), anchor_id="sensor.ecowitt_temp_aussen",
+    )
+    pick = result["illuminance"]
+    assert pick["entity_id"] == "sensor.helligkeit_sued"  # „Süd“ gilt für die Sonnenscheindauer
+    assert {c["entity_id"] for c in pick["candidates"]} == {"sensor.helligkeit_ost"}
+
+
+def test_suggest_for_entities_with_unknown_entities_returns_nothing() -> None:
+    assert wetter_autofill.suggest_for_entities(["sensor.gibt_es_nicht"], _full_catalog()) == {}
+    assert wetter_autofill.suggest_for_entities([], _full_catalog()) == {}
