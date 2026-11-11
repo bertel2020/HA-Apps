@@ -127,3 +127,9 @@ def test_assigning_an_entry_to_a_stack_switches_stacking_on() -> None:
 def test_adding_a_stack_switches_stacking_on_and_dissolving_the_last_one_off() -> None:
     assert "if (!this.stacked && this.canStack && !this.compare) this.stacked = true;" in EDITOR_JS
     assert "if (!groups.length) this.stacked = false;" in EDITOR_JS
+
+
+def test_dropping_on_a_stack_keeps_the_order_of_the_list() -> None:
+    # Der Weg zu einem Stapel führt über andere Zeilen; deren Umsortieren beim Ziehen wird beim Ablegen zurückgenommen.
+    assert "component.dragOrderSnapshot = [...component.selectedEntityIds];" in EDITOR_JS
+    assert "this.selectedEntityIds = [...this.dragOrderSnapshot];" in EDITOR_JS

@@ -519,6 +519,8 @@
         draggedEl = row;
         draggedId = row.dataset.entityId;
         component.draggingEntityId = draggedId;
+        // Reihenfolge vor dem Ziehen: der Weg zu einem Stapel führt über andere Zeilen und würde sie sonst umsortieren.
+        component.dragOrderSnapshot = [...component.selectedEntityIds];
         row.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', draggedId || '');
@@ -543,6 +545,7 @@
         if (draggedEl) draggedEl.classList.remove('dragging');
         if (draggedId) component.load();
         component.draggingEntityId = null;
+        component.dragOrderSnapshot = null;
         component.stackOver = null;
         draggedEl = null;
         draggedId = null;
@@ -580,6 +583,7 @@
         // Mehrere Stapel: {groups: [{id, name}], members: {entity_id: id}}, {} = ein Stapel je Achse.
         stackGroups: JSON.parse(JSON.stringify(STACK_GROUPS || {})),
         draggingEntityId: null,
+        dragOrderSnapshot: null,
         stackOver: null,
         colorPickerFor: null,
         name: CHART_NAME,
@@ -1658,6 +1662,8 @@
           event.preventDefault();
           const id = this.draggingEntityId;
           this.stackOver = null;
+          // Das Ablegen auf einen Stapel ordnet nur zu: die Reihenfolge (und damit die Farben) bleibt wie vor dem Ziehen.
+          if (this.dragOrderSnapshot) this.selectedEntityIds = [...this.dragOrderSnapshot];
           if (id && this.isBarId(id)) this.setStack(id, gid);
         },
         toggleStacked() {
