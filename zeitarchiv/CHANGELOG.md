@@ -18,8 +18,9 @@
     zuordnen; Balken ohne Stapel stehen einzeln daneben
   - Stapel lassen sich anlegen, benennen und auflösen; Einträge werden per
     Ziehen oder über das Feld „Stapel“ zugeordnet
-  - Der Tooltip zeigt die Summe je Stapel, die Legende nennt den Stapel;
-    „Anteile (%)“ rechnet je Stapel
+  - Der Tooltip zeigt die Summe je Stapel; „Anteile (%)“ rechnet je Stapel
+  - Die Legende fasst die Einträge eines Stapels zusammen: als Kopfzeile in der
+    Tabelle, als gemeinsame Kapsel bei den Chips, jeweils mit der Summe
   - Auch bei Auflösung „Voll“ und horizontal: jeder Stapel steht in einer
     eigenen Kategorie, die übrigen Einträge einzeln daneben
   - Die Reihenfolge im Stapel lässt sich im Stapel-Block ändern, die Farben
@@ -90,8 +91,9 @@
     stack; bars without a stack stand next to the others
   - Stacks can be added, named and dissolved; entries are assigned by
     dragging or with the “Stack” field
-  - The tooltip shows the sum per stack, the legend names the stack; “Shares
-    (%)” is calculated per stack
+  - The tooltip shows the sum per stack; “Shares (%)” is calculated per stack
+  - The legend groups the entries of a stack: as a header row in the table, as
+    a shared capsule with chips, each with the sum
   - Also at resolution “Full” and horizontal: every stack sits in its own
     category, the other entries stand next to it
   - The order within a stack can be changed in the stack block, the colors

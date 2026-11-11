@@ -98,8 +98,8 @@ def test_tooltips_sum_each_stack_in_both_renderers() -> None:
 def test_legend_names_the_stack_in_editor_tile_and_card() -> None:
     legend = (APP / "static/js/legend-render.js").read_text(encoding="utf-8")
     assert "stackLabels" in TILE_JS and "stackLabels(series, spec)" in legend
-    assert "stackTag(item)" in legend
-    assert 'x-text="stat.stack"' in EDITOR_TEMPLATE
+    assert "groupByStack(items)" in legend
+    assert 'x-text="entry.name"' in EDITOR_TEMPLATE
     assert "stackLabelFor(id)" in EDITOR_JS
 
 
@@ -149,3 +149,19 @@ def test_stacked_compare_uses_its_own_stack_in_both_renderers() -> None:
         assert "compareTotals" in source
         # Tooltip-Summen lesen den Stapel der gezeichneten Serie, nicht den Index der Hauptserien.
         assert "(echartsSeries[p.seriesIndex] || {}).stack" in source
+
+
+LEGEND_JS = (APP / "static/js/legend-render.js").read_text(encoding="utf-8")
+
+
+def test_legend_groups_stack_members_in_all_three_places() -> None:
+    # Editor und Kachel/Karte ziehen die Mitglieder eines Stapels zusammen; Aktuell und Σ sind die Summen der Mitglieder.
+    assert "function groupByStack(items)" in LEGEND_JS
+    assert "get legendEntries()" in EDITOR_JS
+    for source in (LEGEND_JS, EDITOR_JS):
+        assert "fmtSum: isSwitch ? NumberFormat.fmtDuration : formatted" in source
+    assert "chart-legend-group-sum" in LEGEND_JS and "chart-legend-group-sum" in EDITOR_TEMPLATE
+    assert "chart-legend-group-row" in LEGEND_JS and "chart-legend-group-row" in EDITOR_TEMPLATE
+    # Das Tag hinter dem Namen entfällt, der Stapel steht als Kopfzeile bzw. Kapsel.
+    assert "stackTag" not in LEGEND_JS
+    assert 'x-text="stat.stack"' not in EDITOR_TEMPLATE

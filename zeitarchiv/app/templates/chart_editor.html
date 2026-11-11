@@ -743,13 +743,15 @@
              einer gedämpften Vergleichs-Nebenserie), deshalb zusätzlich
              ausgeblendet statt nur per hasData. -->
         <div class="chart-legend" x-show="hasData && legendStyle !== 'off' && !yearsCompareActive && !multiYearActive && (legendStyle === 'chips' || !statsShown)">
-          <template x-for="stat in seriesStats" :key="stat.entityId">
+          <template x-for="entry in legendEntries" :key="entry.key">
+           <span :class="entry.group ? 'chart-legend-group' : 'chart-legend-plain'">
+            <span class="chart-legend-group-name" x-show="entry.group" x-text="entry.name"></span>
+            <template x-for="stat in entry.members" :key="stat.entityId">
             <button type="button" class="chart-legend-item" :class="{inactive: legendHiddenIds.includes(stat.entityId)}"
                     @click="toggleLegendItem(stat.entityId, stat.name)"
                     @mouseenter="highlightDonutSlice(stat.name)" @mouseleave="unhighlightDonutSlice(stat.name)">
               <span class="dot" :style="{background: stat.color}" x-show="!stat.isState"></span>
               <span class="name" x-text="stat.name"></span>
-              <span class="legend-stack" x-show="stat.stack" x-text="stat.stack"></span>
               {# Zustände: die Legende steht pro Zeile — Farbe, Name, Dauer
                  und Anteil je Zustand statt Min/Max über Indizes. #}
               <span class="values state-legend-values" x-show="stat.isState">
@@ -782,6 +784,9 @@
                 </span>
               </div>
             </button>
+            </template>
+            <span class="chart-legend-group-sum" x-show="entry.group && chartStats && legendMetrics.includes('sum') && entry.sum !== null">Σ <strong x-text="entry.sum"></strong></span>
+           </span>
           </template>
         </div>
         <!-- Eigene Legende für den Soll-Balkenvergleich (yearsCompareActive)
@@ -854,16 +859,24 @@
                 <th x-show="legendMetrics.includes('sum')">Σ</th>
               </tr>
             </thead>
+            <template x-for="entry in legendEntries" :key="entry.key">
             <tbody>
-              <template x-for="stat in seriesStats" :key="stat.entityId">
-                <tr class="chart-legend-table-row" :class="{inactive: legendHiddenIds.includes(stat.entityId)}"
+              <tr class="chart-legend-group-row" x-show="entry.group">
+                <td class="legend-name-col"><span class="legend-name-cell"><span x-text="entry.name"></span> <span class="legend-stack">{{ _("Stapel") }}</span></span></td>
+                <td x-show="legendMetrics.includes('last')" :class="{'chart-legend-group-dash': entry.last === null}" x-text="entry.last ?? '–'"></td>
+                <td x-show="legendMetrics.includes('min')" class="chart-legend-group-dash">–</td>
+                <td x-show="legendMetrics.includes('max')" class="chart-legend-group-dash">–</td>
+                <td x-show="legendMetrics.includes('average')" class="chart-legend-group-dash">–</td>
+                <td x-show="legendMetrics.includes('sum')" :class="{'chart-legend-group-dash': entry.sum === null}" x-text="entry.sum ?? '–'"></td>
+              </tr>
+              <template x-for="stat in entry.members" :key="stat.entityId">
+                <tr class="chart-legend-table-row" :class="{inactive: legendHiddenIds.includes(stat.entityId), 'chart-legend-group-member': entry.group}"
                     @click="toggleLegendItem(stat.entityId, stat.name)"
                     @mouseenter="highlightDonutSlice(stat.name)" @mouseleave="unhighlightDonutSlice(stat.name)">
                   <td class="legend-name-col">
                     <span class="legend-name-cell">
                       <span class="dot" :style="{background: stat.color}" x-show="!stat.isState"></span>
                       <span x-text="stat.name"></span>
-                      <span class="legend-stack" x-show="stat.stack" x-text="stat.stack"></span>
                     </span>
                     <span class="legend-compare-label state-legend-values" x-show="stat.isState">
                       <template x-for="row in stat.stateRows" :key="row.idx">
@@ -902,6 +915,7 @@
                 </tr>
               </template>
             </tbody>
+            </template>
           </table>
         </div>
 

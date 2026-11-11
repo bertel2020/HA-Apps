@@ -930,12 +930,39 @@
           // größeren Sekundenwerten sichtbar ungenau wird.
           const sumFormatted = isSwitch ? NumberFormat.fmtDuration(sumValue) : formatted(sumValue);
           return {
+            // Rohwerte und Formatierer für die Summe über einen Stapel (legendEntries).
+            lastRaw: values.length ? values[values.length - 1] : null,
+            sumRaw: hasSum && values.length ? sumValue : null,
+            fmtValue: formatted,
+            fmtSum: isSwitch ? NumberFormat.fmtDuration : formatted,
             last: values.length ? formatted(values[values.length - 1]) : '—',
             min: minima.length ? formatted(Math.min(...minima)) : '—',
             max: maxima.length ? formatted(Math.max(...maxima)) : '—',
             average: values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—',
             sum: hasSum ? (values.length ? sumFormatted : '—') : null,
           };
+        },
+        // Legende nach Stapeln gruppiert (Parität zu groupByStack() in legend-render.js): die Mitglieder eines
+        // Stapels stehen an der Stelle des ersten beisammen, Aktuell und Σ des Stapels sind die Summen der Mitglieder.
+        get legendEntries() {
+          const entries = [];
+          const byKey = new Map();
+          this.seriesStats.forEach(stat => {
+            if (!stat.stack || !stat.stackKey || stat.isState) { entries.push({group: false, key: stat.entityId, members: [stat]}); return; }
+            let entry = byKey.get(stat.stackKey);
+            if (!entry) { entry = {group: true, key: 'stack:' + stat.stackKey, name: stat.stack, members: []}; byKey.set(stat.stackKey, entry); entries.push(entry); }
+            entry.members.push(stat);
+          });
+          entries.forEach(entry => {
+            if (!entry.group) return;
+            const first = entry.members[0];
+            const total = key => (entry.members.every(m => Number.isFinite(m[key])) ? entry.members.reduce((sum, m) => sum + m[key], 0) : null);
+            const last = total('lastRaw');
+            const sum = total('sumRaw');
+            entry.last = last === null ? null : first.fmtValue(last);
+            entry.sum = sum === null ? null : first.fmtSum(sum);
+          });
+          return entries;
         },
         // Tabellen-Legende bei Zuständen: eine Zeile je Entität und Zustand.
         get stateTableRows() {
@@ -1001,6 +1028,7 @@
               stateRows: s.aggregation_type === 'state' ? this.stateRowsFor(s) : [],
               color: this.colorFor(s.entity_id),
               stack: this.stackLabelFor(s.entity_id),
+              stackKey: this.stackLabelFor(s.entity_id) ? `${this.stackGroups.members[s.entity_id]}|${(s.aggregation_type === 'switch' && s.display_mode === 'time') ? ' duration' : s.unit}` : '',
               ...this.seriesStatsFor(s, s.points, this.windowEnd),
               // Min/Max/Ø über Zustandsindizes sind keine Aussage.
               ...(s.aggregation_type === 'state' ? {last: '—', min: '—', max: '—', average: '—', sum: null} : {}),
