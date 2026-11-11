@@ -90,6 +90,9 @@
   // Ein Diagramm folgt der Breite seines Kastens auch ohne Fenster-Ereignis (Reiter eben erst sichtbar, Scrollleiste erscheint,
   // Karte ändert ihre Breite): sonst blieb es bei der Breite des Zeichnens stehen und ließ rechts Leerraum.
   const observers = {};
+  // Abgewählte Legendeneinträge, je Diagramm; werden wie die übrigen Einstellungen im Browser gemerkt.
+  const legendState = {...(readStore().legends || {})};
+  const restoreLegend = (key, chart) => { if (legendState[key]) chart.setOption({legend: {selected: legendState[key]}}); };
 
   function chartFor(key, element) {
     if (charts[key] && charts[key].getDom() !== element) {
@@ -99,6 +102,8 @@
     }
     if (!charts[key]) {
       charts[key] = echarts.init(element);
+      // Die Legendenauswahl überlebt das Neuzeichnen (z. B. nach geänderter Heizgrenze), sonst springt sie auf den Urzustand.
+      charts[key].on('legendselectchanged', (event) => { legendState[key] = {...event.selected}; writeStore({legends: legendState}); });
       if (typeof ResizeObserver === 'function') {
         observers[key] = new ResizeObserver(() => { if (charts[key] && element.clientWidth) charts[key].resize(); });
         observers[key].observe(element);
@@ -709,6 +714,7 @@
         const colors = palette();
         const chart = chartFor('monthly', element);
         chart.setOption(weatherMonthly(m, {colors, band: this.band, narrow: element.clientWidth < 520, font: scaledFont}), true);
+        restoreLegend('monthly', chart);
         // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
         requestAnimationFrame(() => chart.resize());
       },
@@ -1254,7 +1260,7 @@
         const data = this.dayimage;
         if (!data) return [];
         const picked = this.stichtag();
-        return data.days.map((day) => {
+        return data.days.slice().reverse().map((day) => {
           const label = utcDayMonth.format(new Date(`${day.date}T12:00:00Z`));
           const has = !!day.class;
           const sub = has
@@ -2634,6 +2640,7 @@
           },
           series,
         }, true);
+        restoreLegend('heat', chart);
         requestAnimationFrame(() => chart.resize());
       },
 
