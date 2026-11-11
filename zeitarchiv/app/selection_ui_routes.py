@@ -253,8 +253,11 @@ def make_ui_router(get_index: Callable[[], Index], templates: Jinja2Templates, d
         role_offer = (
             selection_roles.wetter_offer(get_index(), catalog["entities"], timeline, archived()) if catalog else []
         )
+        energy_offer = (
+            selection_roles.energie_offer(get_index(), catalog["entities"], timeline, archived()) if catalog else []
+        )
         return templates.TemplateResponse(request, "selection_overview.html", {
-            "role_offer": role_offer,
+            "role_offer": role_offer, "energy_offer": energy_offer,
             "catalog": catalog, "table": data, "timeline": timeline, "filters": selection_overview.FILTERS,
             "job": current, "job_status_text": tr(str(selection_overview.STATUS_TEXT.get(current["status"], "")))
             if current else "", "can_apply": bool(catalog and catalog.get("phase1")),

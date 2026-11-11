@@ -373,6 +373,7 @@
     <h1>{{ _("Energiedashboard") }}</h1>
   </div>
   <p class="sub">{{ _("Wie euer Strom fließt — von der Erzeugung bis zum Verbraucher.") }}</p>
+  {% if prefill_count %}<p class="hint hint-status">{{ _("{count} Zuordnungen aus dem Auswahl-Assistenten vorbelegt. Es wurde nichts gespeichert: prüfen und dann speichern.", count=prefill_count) }}</p>{% endif %}
   <form hx-post="energiedashboard/setup" hx-target="#energiedashboard-root" hx-swap="innerHTML">
 
     <section class="settings-section edash-section-allgemein">

@@ -56,6 +56,26 @@
       </form>
     </section>
     {% endif %}
+    {% if energy_offer %}
+    <section class="ov-roles" aria-labelledby="ov-energy-h">
+      <h2 id="ov-energy-h">{{ _("Passt in das Energiedashboard") }}</h2>
+      <p class="sub">{{ _("Diese kürzlich übernommenen Entitäten sind in Home Assistant als Quelle oder Verbraucher eingetragen und passen ins Energiedashboard. Zugeordnet wird erst, wenn du dort speicherst.") }}</p>
+      <form method="get" action="{{ app_root }}/energiedashboard">
+        <ul class="ov-roles-list">
+          {% for row in energy_offer %}
+          <li>
+            <label>
+              <input type="checkbox" name="assign" value="{{ row.assign }}" {% if row.confidence == "ok" %}checked{% endif %}>
+              <span class="ov-roles-name"><b>{{ row.name }}</b><code>{{ row.entity_id }}</code></span>
+              <span class="ov-roles-role">{{ row.label }}{% if row.confidence != "ok" %} <em>({{ _("prüfen") }})</em>{% endif %}</span>
+            </label>
+          </li>
+          {% endfor %}
+        </ul>
+        <button type="submit" class="btn primary">{{ _("Zuordnen und Dashboard öffnen") }}</button>
+      </form>
+    </section>
+    {% endif %}
 
     {% if catalog is none %}
     <div class="settings-panel ov-empty">

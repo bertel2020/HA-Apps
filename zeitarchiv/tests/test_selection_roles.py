@@ -162,3 +162,174 @@ def test_prefill_never_overwrites_a_filled_role(client) -> None:
     finally:
         index.set_setting(wetter_routes.SETTING_CONFIG, "")
         index.set_setting(wetter_routes.SETTING_ENABLED, "0")
+
+
+# ---- Energiedashboard (Schritt 4) -------------------------------------------------------------
+
+def _energy_row(entity_id, role, device=None, name=None):
+    return {"entity_id": entity_id, "domain": "sensor", "name": name or entity_id, "energy_role": role,
+            "device": device, "device_class": "energy", "state_class": "total_increasing", "unit": "kWh"}
+
+
+ENERGY = [
+    _energy_row("sensor.netz_bezug", "grid_import", name="Netzbezug"),
+    _energy_row("sensor.netz_einsp", "grid_export", name="Netz Einspeisung"),
+    _energy_row("sensor.pv_dach", "solar", name="PV Dach"),
+    _energy_row("sensor.wp", "consumer", name="Wärmepumpe"),
+    _energy_row("sensor.akku_laden", "battery_in", device="Akku", name="Akku Laden"),
+    _energy_row("sensor.akku_entladen", "battery_out", device="Akku", name="Akku Entladen"),
+]
+ENERGY_IDS = [row["entity_id"] for row in ENERGY]
+
+
+def _config(**fields):
+    from app import energiedashboard_routes as edr
+
+    return {**edr._empty_config(), **fields}  # noqa: SLF001
+
+
+def test_energy_proposals_follow_the_home_assistant_energy_roles() -> None:
+    proposals = selection_roles.energie_proposals(_config(), ENERGY, ENERGY_IDS)
+    assert [(p["target"], p["assign"], p["confidence"]) for p in proposals] == [
+        ("netzbezug", "netzbezug:sensor.netz_bezug", "ok"),
+        ("einspeisung", "einspeisung:sensor.netz_einsp", "ok"),
+        ("erzeuger", "erzeuger:sensor.pv_dach", "ok"),
+        ("speicher", "speicher:sensor.akku_entladen,sensor.akku_laden", "ok"),
+        ("verbraucher", "verbraucher:sensor.wp", "ok"),
+    ]
+    assert proposals[3]["name"] == "Akku Entladen + Akku Laden"
+
+
+def test_energy_proposals_skip_filled_fields_and_entities_that_already_have_a_role() -> None:
+    config = _config(netzbezug="sensor.anderer_zaehler", erzeuger=[{"entity_id": "sensor.pv_dach", "name": "PV"}])
+    targets = [p["target"] for p in selection_roles.energie_proposals(config, ENERGY, ENERGY_IDS)]
+    assert "netzbezug" not in targets and "erzeuger" not in targets and "einspeisung" in targets
+
+
+def test_energy_proposals_only_use_the_given_entities() -> None:
+    assert [p["target"] for p in selection_roles.energie_proposals(_config(), ENERGY, ["sensor.wp"])] == ["verbraucher"]
+
+
+def test_energy_proposals_mark_ambiguous_cases_as_check() -> None:
+    rows = [
+        _energy_row("sensor.bezug_a", "grid_import"), _energy_row("sensor.bezug_b", "grid_import"),
+        _energy_row("sensor.laden_nur", "battery_in", device="Solo"),
+        _energy_row("sensor.akku1_aus", "battery_out", device="Zwei"), _energy_row("sensor.akku1_ein", "battery_in", device="Zwei"),
+        _energy_row("sensor.akku2_aus", "battery_out", device="Zwei"),
+        _energy_row("sensor.ohne_geraet_aus", "battery_out"),
+    ]
+    got = {p["assign"]: p["confidence"] for p in selection_roles.energie_proposals(_config(), rows, [r["entity_id"] for r in rows])}
+    assert got["netzbezug:sensor.bezug_a"] == got["netzbezug:sensor.bezug_b"] == "check"
+    assert got["speicher:,sensor.laden_nur"] == "check"
+    assert got["speicher:sensor.ohne_geraet_aus,"] == "check"
+    assert got["speicher:sensor.akku1_aus,"] == "check" and got["speicher:sensor.akku2_aus,"] == "check"
+
+
+def test_energy_offer_needs_the_dashboard_switched_on(index) -> None:
+    timeline = [_entry(["sensor.wp"])]
+    assert selection_roles.energie_offer(index, ENERGY, timeline, {"sensor.wp"}, now=1_000_100.0) == []
+    index.set_setting("energiedashboard_enabled", "1")
+    offer = selection_roles.energie_offer(index, ENERGY, timeline, {"sensor.wp"}, now=1_000_100.0)
+    assert [row["assign"] for row in offer] == ["verbraucher:sensor.wp"]
+    assert selection_roles.energie_offer(index, ENERGY, timeline, set(), now=1_000_100.0) == []  # noch nicht archiviert
+
+
+def _options(*ids, kind="counter"):
+    return {eid: {"entity_id": eid, "label": f"Name {eid}", "aggregation_type": kind} for eid in ids}
+
+
+def test_apply_assignments_fills_fields_and_appends_rows_without_touching_the_input() -> None:
+    from app import energiedashboard_routes as edr
+
+    config = _config(verbraucher=[{"entity_id": "sensor.alt", "name": "Alt", "gruppe": "", "parent": ""}])
+    options = _options("sensor.b", "sensor.e", "sensor.p", "sensor.v", "sensor.out", "sensor.in")
+    merged, applied = edr.apply_assignments(config, [
+        "netzbezug:sensor.b", "einspeisung:sensor.e", "erzeuger:sensor.p", "verbraucher:sensor.v",
+        "speicher:sensor.out,sensor.in",
+    ], options)
+    assert applied == 5
+    assert merged["netzbezug"] == "sensor.b" and merged["einspeisung"] == "sensor.e"
+    assert merged["erzeuger"][0]["entity_id"] == "sensor.p" and merged["erzeuger"][0]["name"] == "Name sensor.p"
+    assert [r["entity_id"] for r in merged["verbraucher"]] == ["sensor.alt", "sensor.v"]
+    assert merged["speicher"][0]["entladen_entity_id"] == "sensor.out" and merged["speicher"][0]["laden_entity_id"] == "sensor.in"
+    assert config["netzbezug"] is None and len(config["verbraucher"]) == 1 and config["erzeuger"] == []
+
+
+def test_apply_assignments_drops_everything_invalid() -> None:
+    from app import energiedashboard_routes as edr
+
+    config = _config(netzbezug="sensor.schon_da", erzeuger=[{"entity_id": "sensor.belegt", "name": "x"}])
+    options = {**_options("sensor.neu", "sensor.belegt", "sensor.schon_da"), **_options("sensor.gauge", kind="standard"),
+               "sensor.gauge": {"entity_id": "sensor.gauge", "label": "G", "aggregation_type": "standard"}}
+    merged, applied = edr.apply_assignments(config, [
+        "netzbezug:sensor.neu",            # Feld schon belegt
+        "erzeuger:sensor.belegt",          # Entität hat schon eine Rolle
+        "verbraucher:sensor.gauge",        # kein Zähler
+        "verbraucher:sensor.nicht_da",     # nicht archiviert
+        "unbekannt:sensor.neu", "kaputt",  # unbekanntes Ziel, kein Doppelpunkt
+        "speicher:,", "speicher:sensor.gauge,sensor.gauge",
+    ], options)
+    assert applied == 0 and merged["netzbezug"] == "sensor.schon_da"
+    assert len(merged["erzeuger"]) == 1 and merged["verbraucher"] == [] and merged["speicher"] == []
+
+
+def test_apply_assignments_uses_an_entity_only_once() -> None:
+    from app import energiedashboard_routes as edr
+
+    merged, applied = edr.apply_assignments(
+        _config(), ["verbraucher:sensor.v", "erzeuger:sensor.v"], _options("sensor.v"),
+    )
+    assert applied == 1 and len(merged["verbraucher"]) == 1 and merged["erzeuger"] == []
+
+
+def test_energy_dashboard_opens_the_setup_with_the_assignments_prefilled(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.assign_netz_kwh", "sensor", "total_increasing", "kWh")
+    index.set_setting("energiedashboard_enabled", "1")
+    index.set_setting("energiedashboard_config", "")
+    try:
+        page = client.get("/energiedashboard?assign=netzbezug:sensor.assign_netz_kwh&assign=netzbezug:sensor.gibt_es_nicht").text
+        assert 'hx-get="energiedashboard/setup?assign=netzbezug%3Asensor.assign_netz_kwh"' in page
+        assert "gibt_es_nicht" not in page
+        setup = client.get("/energiedashboard/setup?assign=netzbezug:sensor.assign_netz_kwh").text
+        assert 'netzbezug: "sensor.assign_netz_kwh"' in setup
+        assert "1 Zuordnungen aus dem Auswahl-Assistenten vorbelegt" in setup
+        assert "Zuordnungen aus dem Auswahl-Assistenten vorbelegt" not in client.get("/energiedashboard/setup").text
+        assert index.get_setting("energiedashboard_config", "") == ""  # nichts gespeichert
+    finally:
+        index.set_setting("energiedashboard_config", "")
+        index.set_setting("energiedashboard_enabled", "0")
+
+
+def test_overview_page_shows_both_offers_for_recently_added_entities(client) -> None:
+    import os
+    import time
+    from pathlib import Path
+
+    from app import selection_catalog
+    from app.main import index
+
+    data_dir = Path(os.environ["ZEITARCHIV_DATA_DIR"])
+    target = data_dir / selection_catalog.FILENAME
+    index.get_or_create_entity("sensor.offer_sonne", "sensor", "measurement", "°")
+    index.get_or_create_entity("sensor.offer_wp_kwh", "sensor", "total_increasing", "kWh")
+    selection_catalog.save(data_dir, [
+        {"entity_id": "sensor.offer_sonne", "name": "Sonnenstand", "unit": "°", "platform": "sun"},
+        {"entity_id": "sensor.offer_wp_kwh", "name": "Wärmepumpe Offer", "energy_role": "consumer",
+         "device_class": "energy", "state_class": "total_increasing", "unit": "kWh"},
+    ], log=[{
+        "id": "offer1", "ts": time.time(), "source": "assistant", "action": "add", "status": "applied",
+        "entity_ids": ["sensor.offer_sonne", "sensor.offer_wp_kwh"], "count": 2,
+    }], phase1=True)
+    index.set_setting("wetterdashboard_enabled", "1")
+    index.set_setting("energiedashboard_enabled", "1")
+    try:
+        page = client.get("/selection/overview").text
+        assert "Passt in das Wetterdashboard" in page and 'value="sun_elevation:sensor.offer_sonne"' in page
+        assert "Passt in das Energiedashboard" in page and 'value="verbraucher:sensor.offer_wp_kwh"' in page
+        assert 'action="/energiedashboard"' in page or "/energiedashboard\"" in page
+    finally:
+        index.set_setting("wetterdashboard_enabled", "0")
+        index.set_setting("energiedashboard_enabled", "0")
+        target.unlink(missing_ok=True)

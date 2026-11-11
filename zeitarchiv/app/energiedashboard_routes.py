@@ -30,7 +30,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from urllib.parse import urlencode
+
+from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -419,6 +421,71 @@ def refresh_heatmap_weekday_cache_if_stale(service: "EnergieDashboardService") -
             continue
         grid = service.compute_heatmap_weekday(config, range_key, 0)
         index.set_heatmap_weekday_snapshot(range_key, grid)
+
+
+def configured_entity_ids(config: dict) -> set[str]:
+    """Alle Entitäten, die schon eine Rolle im Energiedashboard haben (Netz, Erzeuger, Speicher, Verbraucher)."""
+    used = {config.get("netzbezug"), config.get("einspeisung")}
+    used |= {row.get("entity_id") for row in (config.get("erzeuger") or []) + (config.get("verbraucher") or [])}
+    for storage in config.get("speicher") or []:
+        used |= {storage.get(key) for key in ("laden_entity_id", "entladen_entity_id", "soc_entity_id", "capacity_entity_id")}
+    return {entity_id for entity_id in used if entity_id}
+
+
+def active_role_config(index: Index) -> dict | None:
+    """Rollenbelegung oder ``None``, wenn das Energiedashboard ausgeschaltet ist (der Auswahl-Assistent bietet dann
+    keine Rollen an)."""
+    return _load_config(index) if _is_enabled(index) else None
+
+
+#: Ziele der Zuordnung aus dem Auswahl-Assistenten (ROADMAP 1.54): Felder mit einer Entität, Listen mit neuen Zeilen.
+ASSIGN_FIELDS = ("netzbezug", "einspeisung")
+ASSIGN_LISTS = ("erzeuger", "speicher", "verbraucher")
+MAX_ASSIGN = 40
+
+
+def apply_assignments(config: dict, values: list[str], options: dict[str, dict]) -> tuple[dict, int]:
+    """Kopie der Konfiguration mit den Zuordnungen „Ziel:Entität“ aus dem Auswahl-Assistenten.
+
+    Es wird nichts gespeichert: die Einrichtung zeigt das Ergebnis zum Prüfen, gespeichert wird dort. Felder werden nur
+    gesetzt, wenn sie leer sind, Listen nur angehängt; eine Entität, die schon eine Rolle hat, wird übersprungen.
+    Zählerrollen verlangen einen archivierten Zähler (``aggregation_type`` „counter“), ein Speicher (``ziel:entladen,laden``)
+    mindestens eine Seite. Ungültiges fällt still weg. Rückgabe: Konfiguration und Zahl der angewendeten Zuordnungen."""
+    merged = {**config, "erzeuger": [dict(r) for r in config.get("erzeuger") or []],
+              "speicher": [dict(r) for r in config.get("speicher") or []],
+              "verbraucher": [dict(r) for r in config.get("verbraucher") or []]}
+    used = configured_entity_ids(merged)
+
+    def usable(entity_id: str) -> bool:
+        option = options.get(entity_id)
+        return bool(entity_id) and option is not None and option["aggregation_type"] == "counter" and entity_id not in used
+
+    applied = 0
+    for value in values[:MAX_ASSIGN]:
+        target, _sep, rest = value.partition(":")
+        if target in ASSIGN_FIELDS:
+            if not merged.get(target) and usable(rest):
+                merged[target] = rest
+                used.add(rest)
+                applied += 1
+        elif target in ("erzeuger", "verbraucher"):
+            if usable(rest):
+                row = {"entity_id": rest, "name": options[rest]["label"]}
+                merged[target].append({**row, "kwp": None} if target == "erzeuger" else {**row, "gruppe": "", "parent": ""})
+                used.add(rest)
+                applied += 1
+        elif target == "speicher":
+            out_id, _comma, in_id = rest.partition(",")
+            ids = [eid for eid in (out_id, in_id) if usable(eid)]
+            if ids and (out_id != in_id):
+                merged["speicher"].append({
+                    "name": options[ids[0]]["label"], "entladen_entity_id": out_id if out_id in ids else "",
+                    "laden_entity_id": in_id if in_id in ids else "", "soc_entity_id": "", "capacity_kwh": None,
+                    "capacity_entity_id": "",
+                })
+                used.update(ids)
+                applied += 1
+    return merged, applied
 
 
 def _is_enabled(index: Index) -> bool:
@@ -3513,9 +3580,12 @@ class EnergieDashboardService:
                 result.append({"month": tr(_MONTH_NAMES_DE[month - 1]), **anomaly})
         return result
 
-    def _page_context(self, request: Request) -> dict:
+    def _page_context(self, request: Request, assign: list[str] | None = None) -> dict:
         config = _load_config(self.deps.index)
+        options = {option["entity_id"]: option for option in self._entity_options()}
+        valid = [value for value in (assign or [])[:MAX_ASSIGN] if apply_assignments(config, [value], options)[1]]
         return {
+            "assign_query": urlencode([("assign", value) for value in valid]),
             "configured": _is_configured(config),
             "enabled": _is_enabled(self.deps.index),
             "config": config,
@@ -3529,9 +3599,9 @@ class EnergieDashboardService:
         deps = self.deps
 
         @router.get("/energiedashboard", response_class=HTMLResponse)
-        def energiedashboard_page(request: Request) -> HTMLResponse:
+        def energiedashboard_page(request: Request, assign: list[str] = Query(default=[])) -> HTMLResponse:
             return deps.templates.TemplateResponse(
-                request, "energiedashboard.html", self._page_context(request)
+                request, "energiedashboard.html", self._page_context(request, assign)
             )
 
         @router.post("/energiedashboard/enable")
@@ -3547,8 +3617,10 @@ class EnergieDashboardService:
             return {"enabled": False}
 
         @router.get("/energiedashboard/setup", response_class=HTMLResponse)
-        def energiedashboard_setup_form(request: Request) -> HTMLResponse:
+        def energiedashboard_setup_form(request: Request, assign: list[str] = Query(default=[])) -> HTMLResponse:
             config = _load_config(deps.index)
+            options = {option["entity_id"]: option for option in self._entity_options()}
+            config, prefill_count = apply_assignments(config, assign, options)
             # Aufgelöste Kapazität je bereits konfiguriertem Speicher (nur für
             # dessen capacity_entity_id, nicht für jede Entität in
             # entity_options — dieselbe Berechnung wie im Datenendpunkt,
@@ -3569,7 +3641,7 @@ class EnergieDashboardService:
             return deps.templates.TemplateResponse(
                 request, "_energiedashboard_setup.html",
                 {
-                    "config": config, "entity_options": self._entity_options(),
+                    "config": config, "entity_options": self._entity_options(), "prefill_count": prefill_count,
                     "resolved_capacities": resolved_capacities,
                     "anomalie_schwelle_options": list(ANOMALIE_SCHWELLE_LABELS.items()),
                     **deps.app_root_context(request),
