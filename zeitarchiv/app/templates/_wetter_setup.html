@@ -350,12 +350,12 @@
   <div class="wt-chips">
     <label class="filter-chip"><input type="checkbox" name="sun_relative" value="1" {% if config.sun_relative %}checked{% endif %}><span>{{ _("Nach Sonnenstand (Anteil am klaren Himmel)") }}</span></label>
   </div>
-  {% call hint_body() %}{{ _("Mit der Rolle „Sonnenhöhe“ wird die Helligkeit auf die Helligkeit eines klaren Himmels bei der jeweiligen Sonnenhöhe bezogen. Dann gelten dieselben Prozentwerte das ganze Jahr: Ein klarer Novembermittag zählt als sonnig, ein dünn bewölkter Junimittag nicht. Sonnenschein zählt ab dem eingestellten Anteil und einer Sonnenhöhe über 3 Grad. Die Himmelsklassen folgen festen Anteilen: bewölkt ab 30 %, heiter ab 50 %, sonnig ab 75 %. Die Felder darunter in lx gelten dann nur, wenn die Rolle fehlt oder der Schalter aus ist. Die Klarhimmel-Kurve ist eine Näherung; weicht dein Sensor ab, gleicht der Abgleich sie an (Anhalt: die höchsten Werte klarer Tage sollten etwa 100 % erreichen).") }}{% endcall %}
+  {% call hint_body() %}{{ _("Mit der Rolle „Sonnenhöhe“ wird die Helligkeit auf die Helligkeit eines klaren Himmels bei der jeweiligen Sonnenhöhe bezogen. Dann gelten dieselben Prozentwerte das ganze Jahr: Ein klarer Novembermittag zählt als sonnig, ein dünn bewölkter Junimittag nicht. Sonnenschein zählt ab dem eingestellten Anteil und einer Sonnenhöhe über 3 Grad. Die Himmelsklassen folgen festen Anteilen: bewölkt ab 30 %, heiter ab 50 %, sonnig ab 75 %. Die Felder darunter in lx gelten dann nur, wenn die Rolle fehlt oder der Schalter aus ist. Die Klarhimmel-Kurve ist eine Näherung; erreicht dein Sensor bei klarem Himmel weniger oder mehr, trage es im dritten Feld ein (Anhalt: die höchsten Werte klarer Tage im Verlauf sollten etwa 100 % erreichen).") }}{% endcall %}
   <div class="wt-thresholds">
-    <div class="field"><label for="wt-sun-share">{{ _("Sonne ab einem Anteil von") }}</label>
-      <input type="text" id="wt-sun-share" class="wt-short" name="sun_share_pct" value="{{ config.sun_share_pct | int }}" inputmode="numeric"> <span class="wt-unit">%</span></div>
-    <div class="field"><label for="wt-sun-scale">{{ _("Abgleich der Klarhimmel-Kurve") }}</label>
-      <input type="text" id="wt-sun-scale" class="wt-short" name="sun_scale_pct" value="{{ config.sun_scale_pct | int }}" inputmode="numeric"> <span class="wt-unit">%</span></div>
+    <div class="field"><label for="wt-sun-share">{{ _("Sonne ab") }}</label>
+      <input type="text" id="wt-sun-share" class="wt-short" name="sun_share_pct" value="{{ config.sun_share_pct | int }}" inputmode="numeric"> <span class="wt-unit">{{ _("% des klaren Himmels") }}</span></div>
+    <div class="field"><label for="wt-sun-scale">{{ _("Mein Sensor erreicht bei klarem Himmel") }}</label>
+      <input type="text" id="wt-sun-scale" class="wt-short" name="sun_scale_pct" value="{{ config.sun_scale_pct | int }}" inputmode="numeric"> <span class="wt-unit">{{ _("% der Idealkurve") }}</span></div>
   </div>
   <div class="wt-thresholds">
     <div class="field"><label for="wt-sun-lx">{{ _("Sonne ab einer Helligkeit von") }}</label>

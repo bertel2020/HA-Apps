@@ -242,7 +242,7 @@ def _empty_config() -> dict:
         "rain_day_mm": DEFAULT_RAIN_DAY_MM,
         "rain_day_minutes": DEFAULT_RAIN_DAY_MINUTES,
         "sun_threshold_lx": DEFAULT_SUN_THRESHOLD_LX,
-        "sun_relative": False,
+        "sun_relative": True,  # wirkt nur mit belegter Rolle „Sonnenhöhe“ (siehe _sun_relative)
         "sun_share_pct": conditions.DEFAULT_SUN_SHARE_PCT,
         "sun_scale_pct": 100.0,
         "daylight_night_lx": DEFAULT_DAYLIGHT_NIGHT_LX,
@@ -336,7 +336,7 @@ def _load_config(index: Index) -> dict:
     value = data.get("sun_threshold_lx")
     if isinstance(value, (int, float)) and not isinstance(value, bool) and SUN_THRESHOLD_RANGE_LX[0] <= value <= SUN_THRESHOLD_RANGE_LX[1]:
         config["sun_threshold_lx"] = float(value)
-    config["sun_relative"] = data.get("sun_relative") is True
+    config["sun_relative"] = data.get("sun_relative") is not False  # fehlt der Schlüssel (ältere Speicherung): an
     for key, bounds in (("sun_share_pct", SUN_SHARE_RANGE_PCT), ("sun_scale_pct", SUN_SCALE_RANGE_PCT)):
         value = data.get(key)
         if isinstance(value, (int, float)) and not isinstance(value, bool) and bounds[0] <= value <= bounds[1]:

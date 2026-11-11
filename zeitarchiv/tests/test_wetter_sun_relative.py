@@ -145,4 +145,6 @@ def test_config_roundtrip_and_bounds(service) -> None:
     assert config["sun_relative"] is True and config["sun_share_pct"] == 55.0 and config["sun_scale_pct"] == 80.0
     wetter_routes._save_config(index, {**wetter_routes._empty_config(), "sun_share_pct": 5.0, "sun_scale_pct": 900.0})
     config = wetter_routes._load_config(index)
-    assert config["sun_relative"] is False and config["sun_share_pct"] == 60.0 and config["sun_scale_pct"] == 100.0
+    assert config["sun_relative"] is True and config["sun_share_pct"] == 60.0 and config["sun_scale_pct"] == 100.0  # Standard: an
+    wetter_routes._save_config(index, {**wetter_routes._empty_config(), "sun_relative": False})
+    assert wetter_routes._load_config(index)["sun_relative"] is False
