@@ -208,6 +208,48 @@
   // als entityOptions[].last_value (dort günstiger, aber für viele
   // Kapazitäts-Sensoren leer) und deshalb in capacityLabel() zuerst geprüft.
   resolvedCapacities: {{ resolved_capacities | tojson }},
+  // „Aus Home Assistant übernehmen“: holt die Zuordnungen aus den Rollen des Energie-Dashboards von Home Assistant und
+  // trägt sie in den noch ungespeicherten Stand ein (Felder nur, wenn leer; Listen werden angehängt; Entitäten mit
+  // vorhandener Rolle bleiben außen). Nur sichere Vorschläge; nichts wird gespeichert.
+  haBusy: false, haNote: "",
+  async takeFromHa() {
+    this.haBusy = true; this.haNote = "";
+    try {
+      const res = await fetch("energiedashboard/setup/vorschlaege");
+      if (!res.ok) throw new Error(String(res.status));
+      const data = await res.json();
+      if (!data.has_catalog) { this.haNote = t("Noch kein Katalog der Integration empfangen. Ohne ihn kennt Zeitarchiv die Rollen aus Home Assistant nicht."); this.haBusy = false; return; }
+      const used = new Set([this.netzbezug, this.einspeisung, ...this.erzeuger.map(r => r.entity_id), ...this.verbraucher.map(r => r.entity_id),
+        ...this.speicher.flatMap(sp => [sp.laden_entity_id, sp.entladen_entity_id, sp.soc_entity_id, sp.capacity_entity_id])].filter(Boolean));
+      let done = 0, check = 0;
+      for (const p of data.proposals) {
+        if (p.confidence !== "ok") { check += 1; continue; }
+        const [target, rest] = p.assign.split(":");
+        const ids = rest.split(",");
+        if (ids.some(id => id && used.has(id))) continue;
+        const key = target + Date.now() + Math.random();
+        if (target === "netzbezug" || target === "einspeisung") {
+          if (this[target]) continue;
+          this[target] = ids[0];
+        } else if (target === "erzeuger") {
+          this.erzeuger.push({entity_id: ids[0], name: this.nameFor(ids[0]), kwp: "", _key: key});
+        } else if (target === "verbraucher") {
+          this.verbraucher.push({entity_id: ids[0], name: this.nameFor(ids[0]), gruppe: "", parent: "", _key: key});
+        } else if (target === "speicher") {
+          this.speicher.push({name: this.nameFor(ids[0] || ids[1]), entladen_entity_id: ids[0] || "", laden_entity_id: ids[1] || "",
+            soc_entity_id: "", capacity_kwh: "", capacity_entity_id: "", _key: key});
+        } else continue;
+        ids.filter(Boolean).forEach(id => used.add(id));
+        done += 1;
+      }
+      this.haNote = done
+        ? t("{done} Zuordnungen übernommen, {check} unsichere ausgelassen. Es wurde nichts gespeichert: prüfen, ändern und dann speichern.", {done, check})
+        : t("Nichts zu ergänzen: alle Rollen aus Home Assistant sind schon zugeordnet oder es gibt keine passenden archivierten Zähler.");
+    } catch (e) {
+      this.haNote = t("Vorschläge konnten nicht geladen werden.");
+    }
+    this.haBusy = false;
+  },
   nameFor(id) {
     const o = this.entityOptions.find(o => o.entity_id === id);
     return o ? o.label : id;
@@ -373,6 +415,10 @@
     <h1>{{ _("Energiedashboard") }}</h1>
   </div>
   <p class="sub">{{ _("Wie euer Strom fließt — von der Erzeugung bis zum Verbraucher.") }}</p>
+  <div class="edash-ha-import">
+    <button type="button" class="btn" @click="takeFromHa()" :disabled="haBusy">{{ _("Aus Home Assistant übernehmen") }}</button>
+    <p class="hint hint-status" x-show="haNote" x-text="haNote" x-cloak></p>
+  </div>
   {% if prefill_count %}<p class="hint hint-status">{{ _("{count} Zuordnungen aus dem Auswahl-Assistenten vorbelegt. Es wurde nichts gespeichert: prüfen und dann speichern.", count=prefill_count) }}</p>{% endif %}
   <form hx-post="energiedashboard/setup" hx-target="#energiedashboard-root" hx-swap="innerHTML">
 

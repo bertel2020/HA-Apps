@@ -3069,6 +3069,7 @@
     "Erzeuger (neue Zeile)": "Producer (new row)",
     "Speicher (neue Zeile)": "Storage (new row)",
     "Verbraucher (neue Zeile)": "Consumer (new row)",
+    "Aus Home Assistant übernehmen": "Take from Home Assistant",
     "Helligkeit draußen": "Outdoor brightness",
     "Herkunft": "Origin",
     "Hier betrifft das {count}.": "Here this affects {count}.",
@@ -4938,6 +4939,9 @@
     "bei Schwelle {n} % des klaren Himmels": "at a threshold of {n} % of clear sky",
     "Spitze um {time} Uhr: {value} %": "peak at {time}: {value} %",
     "Schwelle {n} %": "Threshold {n} %",
-    "Sonnenstunden (ab {n} % des klaren Himmels)": "Sunshine hours (from {n} % of clear sky)"
+    "Sonnenstunden (ab {n} % des klaren Himmels)": "Sunshine hours (from {n} % of clear sky)",
+    "Noch kein Katalog der Integration empfangen. Ohne ihn kennt Zeitarchiv die Rollen aus Home Assistant nicht.": "No catalog received from the integration yet. Without it Zeitarchiv does not know the roles from Home Assistant.",
+    "{done} Zuordnungen übernommen, {check} unsichere ausgelassen. Es wurde nichts gespeichert: prüfen, ändern und dann speichern.": "{done} assignments taken over, {check} uncertain ones skipped. Nothing has been saved: check, adjust, then save.",
+    "Nichts zu ergänzen: alle Rollen aus Home Assistant sind schon zugeordnet oder es gibt keine passenden archivierten Zähler.": "Nothing to add: all roles from Home Assistant are already assigned or there are no matching archived counters."
   }
 }

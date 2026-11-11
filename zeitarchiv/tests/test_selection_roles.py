@@ -333,3 +333,42 @@ def test_overview_page_shows_both_offers_for_recently_added_entities(client) -> 
         index.set_setting("wetterdashboard_enabled", "0")
         index.set_setting("energiedashboard_enabled", "0")
         target.unlink(missing_ok=True)
+
+
+def test_energy_setup_suggestions_cover_all_archived_entities_with_a_home_assistant_role(client) -> None:
+    import os
+    from pathlib import Path
+
+    from app import selection_catalog
+    from app.main import index
+
+    data_dir = Path(os.environ["ZEITARCHIV_DATA_DIR"])
+    target = data_dir / selection_catalog.FILENAME
+    target.unlink(missing_ok=True)
+    index.set_setting("energiedashboard_config", "")
+    try:
+        assert client.get("/energiedashboard/setup/vorschlaege").json() == {"has_catalog": False, "proposals": []}
+        for entity_id in ("sensor.vs_bezug", "sensor.vs_pv", "sensor.vs_nicht_archiviert_aber_rolle"):
+            if entity_id != "sensor.vs_nicht_archiviert_aber_rolle":
+                index.get_or_create_entity(entity_id, "sensor", "total_increasing", "kWh")
+        selection_catalog.save(data_dir, [
+            {"entity_id": "sensor.vs_bezug", "name": "Bezug", "energy_role": "grid_import", "unit": "kWh"},
+            {"entity_id": "sensor.vs_pv", "name": "PV", "energy_role": "solar", "unit": "kWh"},
+            {"entity_id": "sensor.vs_nicht_archiviert_aber_rolle", "name": "Fehlt", "energy_role": "consumer", "unit": "kWh"},
+        ])
+        data = client.get("/energiedashboard/setup/vorschlaege").json()
+        assert data["has_catalog"] is True
+        assert [(p["assign"], p["confidence"]) for p in data["proposals"]] == [
+            ("netzbezug:sensor.vs_bezug", "ok"), ("erzeuger:sensor.vs_pv", "ok"),
+        ]
+        index.set_setting("energiedashboard_config", '{"netzbezug": "sensor.vs_bezug"}')
+        again = client.get("/energiedashboard/setup/vorschlaege").json()
+        assert [p["assign"] for p in again["proposals"]] == ["erzeuger:sensor.vs_pv"]
+    finally:
+        index.set_setting("energiedashboard_config", "")
+        target.unlink(missing_ok=True)
+
+
+def test_energy_setup_form_has_the_take_from_home_assistant_button(client) -> None:
+    html = client.get("/energiedashboard/setup").text
+    assert "takeFromHa()" in html and "Aus Home Assistant übernehmen" in html

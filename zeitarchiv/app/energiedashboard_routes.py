@@ -3616,6 +3616,26 @@ class EnergieDashboardService:
             deps.index.set_setting(SETTING_ENABLED, "0")
             return {"enabled": False}
 
+        @router.get("/energiedashboard/setup/vorschlaege")
+        def energiedashboard_setup_suggestions() -> dict:
+            """Zuordnungen aus den Rollen des Energie-Dashboards von Home Assistant für „Aus Home Assistant übernehmen“
+            (nichts wird gespeichert). Alle archivierten Entitäten mit einer Rolle zählen, nicht nur kürzlich übernommene."""
+            # Erst hier importiert: selection_roles importiert dieses Modul.
+            from . import selection_catalog, selection_roles
+
+            catalog = selection_catalog.load(deps.data_dir)
+            if catalog is None:
+                return {"has_catalog": False, "proposals": []}
+            config = _load_config(deps.index)
+            options = {option["entity_id"]: option for option in self._entity_options()}
+            ids = [row["entity_id"] for row in catalog["entities"] if row.get("energy_role") and row["entity_id"] in options]
+            proposals = [
+                {"target": item["target"], "assign": item["assign"], "confidence": item["confidence"]}
+                for item in selection_roles.energie_proposals(config, catalog["entities"], ids)
+                if apply_assignments(config, [item["assign"]], options)[1]
+            ]
+            return {"has_catalog": True, "proposals": proposals}
+
         @router.get("/energiedashboard/setup", response_class=HTMLResponse)
         def energiedashboard_setup_form(request: Request, assign: list[str] = Query(default=[])) -> HTMLResponse:
             config = _load_config(deps.index)
