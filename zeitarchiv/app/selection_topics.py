@@ -75,6 +75,18 @@ _SYSTEM_NAME = re.compile(
     r"(cpu|prozessor|processor|arbeitsspeicher|memory|\bram\b|swap|festplatte|disk|speicherplatz|auslastung|load\b|uptime|laufzeit)",
     re.IGNORECASE,
 )
+#: Soll-, Grenz- und Abgleichwerte: keine Messwerte, auch wenn sie als Temperatur oder Feuchte geführt werden.
+_SETPOINT = re.compile(
+    r"(zielwert|soll(wert|temp)|setpoint|target|\bmin(imum)?\b|\bmax(imum)?\b|offset|kalibrier|calibrat|schwelle|threshold)",
+    re.IGNORECASE,
+)
+#: Einzelwerte von VMs, Containern, Platten und Speichern: nur der Host selbst zählt als Hauptwert.
+_GUEST = re.compile(r"^(lxc|qemu|storage|disk|vm|ct)_|_(drive|volume|datavol)", re.IGNORECASE)
+_CORE_NAME = re.compile(
+    r"(cpu|prozessor|processor|arbeitsspeicher|memory|speicherauslastung|\bram\b|swap|auslagerung|speicherplatz|festplatte|disk)",
+    re.IGNORECASE,
+)
+_FREE_NAME = re.compile(r"(frei|free|available)", re.IGNORECASE)
 _BATTERY_NAME = re.compile(r"(batterie|battery|akku\b)", re.IGNORECASE)
 _SPEED_PLATFORMS = frozenset({"speedtestdotnet", "fastdotcom"})
 _NETWORK_NAME = re.compile(r"(wlan|wifi|wi-fi|lan\b|router|internet|dsl|download|upload|ping|latenz|latency)", re.IGNORECASE)
@@ -148,8 +160,16 @@ def rule_klima(row: dict[str, Any]) -> tuple[str, str] | str | None:
             return None  # gehört zum Thema „System & Server“
         if _DEVICE_TEMP.search(_hint_text(row)):
             return tr("Gerätetemperatur, kaum für das Raumklima"), MORE
+        if _SETPOINT.search(_hint_text(row)):
+            return tr("Zielwert, Grenzwert oder Abgleich, kein Messwert"), MORE
+        if not row.get("area"):
+            return tr("Raumtemperatur, aber keinem Bereich zugeordnet"), MORE
         return tr("Raumtemperatur"), RECOMMENDED
     if dc == "humidity":
+        if _SETPOINT.search(_hint_text(row)):
+            return tr("Zielwert, Grenzwert oder Abgleich, kein Messwert"), MORE
+        if not row.get("area"):
+            return tr("Luftfeuchtigkeit, aber keinem Bereich zugeordnet"), MORE
         return tr("Luftfeuchtigkeit"), RECOMMENDED
     return None
 
@@ -184,6 +204,21 @@ def rule_batterien(row: dict[str, Any]) -> tuple[str, str] | str | None:
     return None
 
 
+def _system_main_value(row: dict[str, Any]) -> bool:
+    """Hauptwert des Hosts: Auslastung in % oder Temperatur, nicht je VM, Container, Platte oder App."""
+    object_id = row["entity_id"].split(".", 1)[1]
+    if _GUEST.search(object_id):
+        return False
+    if row.get("platform") == "hassio" and not object_id.startswith("home_assistant"):
+        return False  # Apps des Supervisors
+    if _FREE_NAME.search(_hint_text(row)) and row.get("unit") == "%":
+        return False  # „frei“ ist nur die Umkehrung von „belegt“
+    dc = row.get("device_class")
+    if dc == "temperature":
+        return True
+    return row.get("unit") == "%" and bool(_CORE_NAME.search(_hint_text(row)))
+
+
 def rule_system(row: dict[str, Any]) -> tuple[str, str] | str | None:
     if row["domain"] != "sensor":
         return None
@@ -194,10 +229,12 @@ def rule_system(row: dict[str, Any]) -> tuple[str, str] | str | None:
             return tr("Zeitpunkt des Starts oder Neustarts"), MORE
         if dc in {"date", "enum"}:
             return None
-        if dc == "temperature":
-            return tr("Prozessor- oder Gerätetemperatur"), RECOMMENDED
-        if row.get("unit") == "%" or named:
+        if _system_main_value(row):
+            if dc == "temperature":
+                return tr("Prozessor- oder Gerätetemperatur"), RECOMMENDED
             return tr("Auslastung oder Belegung"), RECOMMENDED
+        if row.get("unit") == "%" or named or dc == "temperature":
+            return tr("Einzelwert einer VM, eines Containers, einer Platte oder App ({platform})", platform=platform), MORE
         return tr("Weiterer Wert der Systemüberwachung ({platform})", platform=platform), MORE
     if named and row.get("unit") == "%":
         return tr("Name deutet auf Systemauslastung"), MORE
@@ -212,6 +249,8 @@ _OPENING_REASONS = {
 
 def rule_tueren_fenster(row: dict[str, Any]) -> tuple[str, str] | str | None:
     domain, dc = row["domain"], row.get("device_class")
+    if domain == "binary_sensor" and dc == "opening":
+        return tr(_OPENING_REASONS[dc]), MORE  # zu unscharf: Tür, Fenster, Schublade oder Klappe
     if domain == "binary_sensor" and dc in _OPENING_REASONS:
         return tr(_OPENING_REASONS[dc]), RECOMMENDED
     if domain == "lock":
@@ -298,6 +337,12 @@ _HIGH_RATE = {"wind_speed", "irradiance", "volume_flow_rate", "data_rate", "illu
 def suggest_topic(topic: str, entities: Iterable[dict[str, Any]], archived: Collection[str] = ()) -> dict[str, Any]:
     """Wendet die Regel eines Themas auf den Katalog an (Form wie ``suggest_energy``)."""
     rule = RULES[topic]
+    entities = list(entities)
+    # Pro Gerät ein Eintrag: hat es einen Batteriestand in %, wird „Batterie schwach“ nur ein weiterer Treffer.
+    percent_devices = {
+        row["device"] for row in entities
+        if topic == "batterien" and row.get("device") and row["domain"] == "sensor" and row.get("device_class") == "battery"
+    }
     recommended: list[dict[str, Any]] = []
     more: list[dict[str, Any]] = []
     derived = 0
@@ -311,6 +356,8 @@ def suggest_topic(topic: str, entities: Iterable[dict[str, Any]], archived: Coll
             derived += 1
             continue
         reason, bucket = verdict
+        if bucket == RECOMMENDED and row["domain"] == "binary_sensor" and row.get("device") in percent_devices:
+            reason, bucket = tr("Batterie schwach (ja/nein), der Stand steht schon als Prozentwert da"), MORE
         if bucket == RECOMMENDED and row.get("entity_category") == "diagnostic" and topic not in _DIAGNOSTIC_OK:
             bucket = MORE
         high_rate = row.get("device_class") in _HIGH_RATE or (row["domain"] == "binary_sensor" and row.get("device_class") == "motion")
