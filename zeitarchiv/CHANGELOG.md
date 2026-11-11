@@ -50,7 +50,8 @@
   - Gilt für Dashboards mit Zeitraum-Navigation und die Übersicht; im
     Wetter- und Energiedashboard bleibt die Reiterzeile mit der Zeitraum-Steuerung stehen
   - Im Wetter- und Energiedashboard sitzt die Zeitraum-Steuerung in der
-    Reiterzeile, die beim Scrollen stehen bleibt
+    Reiterzeile, die beim Scrollen stehen bleibt; im Reiter „Langzeit“ steht
+    dort die Jahre-Auswahl
   - Auf dem Smartphone scrollt die Leiste mit
 
 ### Geändert
@@ -125,7 +126,8 @@
   - Applies to dashboards with period navigation and the overview; in the
     weather and energy dashboards the tab row with the period controls stays in place
   - In the weather and energy dashboards the period controls sit in the tab row,
-    which stays in place while scrolling
+    which stays in place while scrolling; on the “Long term” tab it holds the
+    year selection
   - On smartphones the bar scrolls with the page
 
 #### Changed

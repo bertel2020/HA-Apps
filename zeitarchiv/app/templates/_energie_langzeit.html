@@ -10,11 +10,14 @@
 {# Einfache Anführungszeichen, weil tojson doppelte liefert (sonst bricht das Attribut, sobald ein Bereich abgewählt ist). #}
 <div x-data='energieLangzeit({{ hidden | tojson }}, {{ (consumer_count > 0) | tojson }})'>
   <p class="hint hint-warn" x-show="monthsError" x-text="monthsError" x-cloak></p>
-  {# Jahre-Auswahl: gilt für alle Karten des Reiters, deshalb einmal hier und beim Scrollen unter der Kopfleiste haftend (Mockup A). #}
-  <div class="wt-scope" x-show="showYearChoice()" x-cloak>
-    <span class="wt-scope-lab"><b>{{ _("Jahre") }}</b> <span class="wt-scope-more">{{ _("gilt für alle Karten dieses Reiters") }}</span></span>
-    {{ year_choice() }}
-  </div>
+  {# Jahre-Auswahl: gilt für alle Karten des Reiters, deshalb wie der Zeitraum in der Reiterzeile des Energiedashboards (#ed-years-slot,
+     _energiedashboard_view.html). x-teleport setzt den Block dorthin, lässt ihn aber in diesem Alpine-Bereich (energieLangzeit). #}
+  <template x-teleport="#ed-years-slot">
+    <div class="wt-scope-years" x-show="showYearChoice()" x-cloak>
+      <span class="wt-scope-lab"><b>{{ _("Jahre") }}</b></span>
+      {{ year_choice() }}
+    </div>
+  </template>
 {% if 'rekorde' not in hidden %}
   {# Rekorde: höchste Tageswerte der gewählten Jahre (Jahre-Auswahl oben), wie im Wetterdashboard die erste Karte des Langzeit-Reiters. #}
   <p class="hint hint-warn" x-show="recordsError" x-text="recordsError" x-cloak></p>

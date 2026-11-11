@@ -198,6 +198,15 @@
     {% endif %}
   </nav>
   <div class="dash-tabs-bar-end" x-show="['overview', 'klima', 'wind'].includes(tab)" x-cloak>{{ period_nav(true, true) }}</div>
+  {# Jahre-Auswahl des Reiters Langzeit: gilt für alle Karten des Reiters (Rekorde, Kenntage, Jahres-Matrix), deshalb wie der Zeitraum in der Reiterzeile. #}
+  <div class="dash-tabs-bar-end wt-scope-years" x-show="tab === 'long' && showLongChoice()" x-cloak title="{{ _('gilt für alle Karten dieses Reiters') }}">
+    <span class="wt-scope-lab"><b>{{ _("Jahre") }}</b></span>
+    <div class="wt-seg" role="group" aria-label="{{ _('Anzahl der Jahre') }}">
+      <template x-for="option in longOptions()" :key="option.value">
+        <button type="button" :aria-pressed="(longShownRange() === option.value).toString()" @click="setLongRange(option.value)" x-text="option.label"></button>
+      </template>
+    </div>
+  </div>
   </div>
 
   {% if show_overview %}
@@ -470,15 +479,6 @@
 
   {% if show_long %}
   <section x-show="tab === 'long'" x-cloak role="tabpanel" id="wt-panel-long" aria-labelledby="wt-tab-long">
-    {# Jahre-Auswahl: gilt für alle Karten des Reiters (Rekorde, Kenntage, Jahres-Matrix), deshalb einmal hier und beim Scrollen haftend, wie im Energiedashboard. #}
-    <div class="wt-scope" x-show="showLongChoice()" x-cloak>
-      <span class="wt-scope-lab"><b>{{ _("Jahre") }}</b> <span class="wt-scope-more">{{ _("gilt für alle Karten dieses Reiters") }}</span></span>
-      <div class="wt-seg" role="group" aria-label="{{ _('Anzahl der Jahre') }}">
-        <template x-for="option in longOptions()" :key="option.value">
-          <button type="button" :aria-pressed="(longShownRange() === option.value).toString()" @click="setLongRange(option.value)" x-text="option.label"></button>
-        </template>
-      </div>
-    </div>
     {% if show_records %}
     <div class="card wt-card" x-show="longterm && longterm.records.length" x-cloak>
       <div class="wt-controls">

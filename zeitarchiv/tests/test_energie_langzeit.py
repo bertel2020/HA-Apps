@@ -545,7 +545,9 @@ def test_reiter_uebersicht_vergleich_langzeit_und_wohin_die_karten_gehoeren(clie
         übersicht = ohne[ohne.index('id="ed-panel-over"'):ohne.index('id="ed-panel-cmp"')]
         assert 'x-ref="table"' not in übersicht and "edash-cmp-link" in übersicht        # nur der Link auf den Reiter
         vergleich = ohne[ohne.index('id="ed-panel-cmp"'):ohne.index('id="ed-panel-long"')]
-        assert 'x-ref="table"' in vergleich and "dashStichtag" in vergleich              # Tabelle mit Stichtag-Leiste
+        assert 'x-ref="table"' in vergleich                                              # die Tabelle selbst
+        leiste = ohne[ohne.index('class="dash-tabs-bar"'):ohne.index('id="ed-panel-over"')]
+        assert "dashStichtag" in leiste.split('x-show="tab === \'cmp\'"')[1]                         # Stichtag-Leiste in der Reiterzeile
         langzeit = ohne[ohne.index('id="ed-panel-long"'):]
         assert 'x-ref="table"' not in langzeit
         for karte in ('x-ref="kenntage"', 'x-ref="matrixTable"', 'x-ref="monthlyChart"', 'x-ref="sizeSpark"'):
