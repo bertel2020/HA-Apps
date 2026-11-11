@@ -436,7 +436,7 @@
                    table-layout:auto bleibt eine <colgroup> ohne Wirkung,
                    kann also immer gerendert werden. -->
               <colgroup>
-                <col :style="style.label_col_width ? `width:${style.label_col_width}px` : ''">
+                <col :style="effectiveLabelWidth() ? `width:${effectiveLabelWidth()}px` : ''">
                 <col x-show="style.show_row_sum && style.row_sum_position === 'left'">
                 <template x-for="col in columns.filter(c => !c.hidden)" :key="col.uid"><col></template>
                 <col x-show="style.show_row_sum && style.row_sum_position === 'right'">

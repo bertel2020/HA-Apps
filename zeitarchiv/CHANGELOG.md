@@ -54,6 +54,10 @@
     bleiben erhalten, auch nach einer Änderung von Raumtemperatur oder
     Heizgrenze und nach dem Neuladen
 
+- **Tabellen**: „Spalten gleichmäßig“ kürzt die Beschriftungsspalte nicht mehr
+  - Die Breite richtet sich nach dem längsten Beschriftungstext statt nach der
+    Breite beim Einschalten; per Ziehgriff gesetzte Breiten gelten weiter
+
 - **Auswahl-Assistent**: Empfiehlt weniger
   - Temperatur & Klima: nur Sensoren mit Bereich; Zielwerte und Abgleiche
     stehen unter „Weitere Treffer“
@@ -115,6 +119,10 @@
   - Entries switched off in the legend of the heating chart and the monthly
     comparison are kept, also after changing room temperature or heating limit
     and after reloading
+
+- **Tables**: “Equal columns” no longer truncates the label column
+  - The width follows the longest label instead of the width at the time the
+    option was switched on; widths set with the drag handle still apply
 
 - **Selection assistant**: Recommends less
   - Temperature & climate: only sensors with an area; targets and offsets are

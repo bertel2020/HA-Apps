@@ -360,8 +360,22 @@
           if (!col.width) return '';
           return `width:${col.width}px;max-width:${col.width}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;`;
         },
-        labelColStyle() {
+        // Effektive Breite der Beschriftungsspalte: eine per Ziehgriff gesetzte
+        // Breite gilt wörtlich. Ohne sie wird sie nur bei "Spalten
+        // gleichmäßig" (table-layout:fixed, braucht eine Breite) aus dem
+        // längsten Label berechnet — dieselbe Formel wie auf der Kachel
+        // (autoLabelWidth in table-tile-render.js). Ohne die Option bleibt das
+        // automatische Tabellenlayout.
+        effectiveLabelWidth() {
           const w = this.style.label_col_width;
+          if (w) return w;
+          if (!this.style.equal_value_cols) return null;
+          const longest = this.rows.reduce((n, r) => (r.row_type === 'separator' || !this.rowVisible(r))
+            ? n : Math.max(n, String(this.resolvedRowLabel(r) || '').length), 0);
+          return Math.max(120, Math.min(320, longest * 8 + 24));
+        },
+        labelColStyle() {
+          const w = this.effectiveLabelWidth();
           if (!w) return '';
           return `width:${w}px;max-width:${w}px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;`;
         },
@@ -396,23 +410,9 @@
           document.addEventListener('mousemove', onMove);
           document.addEventListener('mouseup', onUp);
         },
-        // "Spalten gleichmäßig" (style.equal_value_cols) braucht table-
-        // layout:fixed, das sich an den Zellbreiten der ersten Zeile
-        // orientiert — ohne eigene label_col_width würde die
-        // Beschriftungsspalte dann fälschlich MIT gleichmäßig aufgeteilt
-        // statt ihre bisherige (automatische) Breite zu behalten. Deshalb
-        // beim Einschalten einmalig die AKTUELLE, gerenderte Breite als
-        // label_col_width einfrieren — Doppelklick auf den Ziehgriff setzt
-        // sie bei Bedarf wieder auf automatisch zurück.
+        // Die Beschriftungsbreite wird nicht mehr beim Einschalten eingefroren
+        // (zu schmal, sobald die Labels länger werden) — siehe effectiveLabelWidth().
         toggleEqualValueCols() {
-          if (!this.style.equal_value_cols && !this.style.label_col_width) {
-            // NICHT einfach "th.tbl-label-col" (erste Treffer wäre bei
-            // fehlenden Spaltengruppen die UNSICHTBARE Gruppen-Kopfzeile,
-            // x-show="hasColumnGroups()" lässt ihre Zelle mit Breite 0 im DOM
-            // stehen) — explizit die sichtbare Zeitraum-Kopfzeile.
-            const labelTh = this.$refs.previewTable?.querySelector('tr.tbl-header-row:not(.tbl-group-header-row) th.tbl-label-col');
-            if (labelTh) this.style.label_col_width = Math.round(labelTh.getBoundingClientRect().width);
-          }
           this.style.equal_value_cols = !this.style.equal_value_cols;
         },
 
