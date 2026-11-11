@@ -67,14 +67,16 @@
    („Temperatur“, „Regen“ groß, dann Helligkeit, Wind und der Rest) kommen aus displayTiles(); eine eigene Wetterlage-Karte gibt es dann nicht. #}
 {% macro weather_card(group, placeholders, lage=false, hero=false) %}
 {% set sfx = group %}
+{# Stichtag-Leiste des App-Standards (wie bei den Dashboards: ‹ Datum ›, Kalender, „Heute“; ohne Schrittweiten-Knöpfe). Der Alpine-Store
+   dashStichtag hält den Tag und stellt ihn als ?date=… in die Adresse; wetter.js lädt Kacheln und Tabelle bei „dashboard-stichtag“ neu.
+   Eigene Leiste vor der Karte statt im Kartenkopf: die Karte ist kurz, und sticky endet mit dem Elternelement — so bleibt die Leiste
+   im ganzen Reiter stehen. #}
+<div class="dash-sticky-bar is-sticky wt-stichtag-bar">{{ period_nav(true, true) }}</div>
 <div class="card wt-card wt-tilecard">
   <div class="wt-controls wt-card-head">
     {# Der Titel nennt den Tag („Heute“, „Gestern“, sonst „Rückblick“); in der Vergangenheit springt ein Klick auf heute. #}
     <h2 class="wt-h2" :class="{'wt-h2-jump': stichtag()}" x-text="{{ 'conditionsTitle()' if lage else 'cardTitle()' }}" @click="if (stichtag()) $store.dashStichtag.set(null)" :title="stichtag() ? t('Zurück zu heute') : ''"></h2>
     {% if hero %}{{ lage_knopf() }}{% endif %}
-    {# Stichtag-Leiste des App-Standards (wie bei den Dashboards: ‹ Datum ›, Kalender, „Heute“; ohne Schrittweiten-Knöpfe). Der Alpine-Store
-       dashStichtag hält den Tag und stellt ihn als ?date=… in die Adresse; wetter.js lädt Kacheln und Tabelle bei „dashboard-stichtag“ neu. #}
-    {{ period_nav(true, true) }}
     {% if hero %}{{ lage_hint() }}{% endif %}
   </div>
   <p class="wt-stand" x-show="tilesStand" x-cloak x-text="standText()"></p>

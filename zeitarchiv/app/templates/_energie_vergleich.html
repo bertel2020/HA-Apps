@@ -13,14 +13,14 @@
 <div x-data='energieVergleich({{ {"consumers": consumer_count > 0, "hidden": hidden} | tojson }})' data-hints="collapsed">
   <p class="hint hint-warn" x-show="consumersError" x-text="consumersError" x-cloak></p>
 
+  {# Stichtag-Leiste des App-Standards, wie im Wetterdashboard (‹ Datum ›, Kalender, „Heute“; ohne Schrittweiten-Knöpfe), als eigene
+     klebende Leiste vor der Karte. #}
+  <div class="dash-sticky-bar is-sticky wt-stichtag-bar">{{ period_nav(true, true) }}</div>
+
   <div class="card wt-card">
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Zeiträume im Vergleich") }} {{ hint_button(_("Zeiträume im Vergleich")) }}</h2>
       {% call hint_body() %}<span x-text="note()"></span>{% endcall %}
-      <div class="wt-controls-end">
-        {# Stichtag-Leiste des App-Standards, wie im Wetterdashboard (‹ Datum ›, Kalender, „Heute“; ohne Schrittweiten-Knöpfe). #}
-        {{ period_nav(true, true) }}
-      </div>
     </div>
     <div class="wt-controls">
       <div class="wt-seg" role="group" aria-label="{{ _('Zeilen') }}">

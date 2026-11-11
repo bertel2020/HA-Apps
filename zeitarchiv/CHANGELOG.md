@@ -46,8 +46,9 @@
     füllen könnten
 
 - **Dashboards**: Titel und Zeitraum-Leiste bleiben beim Scrollen oben stehen
-  - Gilt für Dashboards mit Zeitraum-Navigation und die Übersicht
-  - Auf dem Smartphone scrollt die Leiste weiterhin mit
+  - Gilt für Dashboards mit Zeitraum-Navigation und die Übersicht; im
+    Wetterdashboard und im Energie-Vergleich bleibt die Datums-Leiste stehen
+  - Auf dem Smartphone scrollt die Leiste bei Dashboards und Übersicht mit
 
 ### Geändert
 
@@ -117,8 +118,9 @@
     fill
 
 - **Dashboards**: Title and period bar stay at the top while scrolling
-  - Applies to dashboards with period navigation and the overview
-  - On smartphones the bar still scrolls with the page
+  - Applies to dashboards with period navigation and the overview; in the
+    weather dashboard and the energy comparison the date bar stays in place
+  - On smartphones the bar scrolls with the page on dashboards and the overview
 
 #### Changed
 
