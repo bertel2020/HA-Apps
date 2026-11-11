@@ -518,6 +518,7 @@
         if (!handleGrabbed) { e.preventDefault(); return; }
         draggedEl = row;
         draggedId = row.dataset.entityId;
+        component.draggingEntityId = draggedId;
         row.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', draggedId || '');
@@ -541,6 +542,8 @@
       container.addEventListener('dragend', () => {
         if (draggedEl) draggedEl.classList.remove('dragging');
         if (draggedId) component.load();
+        component.draggingEntityId = null;
+        component.stackOver = null;
         draggedEl = null;
         draggedId = null;
       });
@@ -576,6 +579,8 @@
         seriesColors: {...SERIES_COLORS},
         // Mehrere Stapel: {groups: [{id, name}], members: {entity_id: id}}, {} = ein Stapel je Achse.
         stackGroups: JSON.parse(JSON.stringify(STACK_GROUPS || {})),
+        draggingEntityId: null,
+        stackOver: null,
         colorPickerFor: null,
         name: CHART_NAME,
         entityNames: {...ENTITY_NAMES},
@@ -1586,10 +1591,49 @@
           } else {
             members[id] = value;
           }
-          const used = new Set(Object.values(members));
-          const kept = groups.filter(g => used.has(g.id));
-          this.stackGroups = kept.length ? {groups: kept, members} : {};
+          // Leere Stapel bleiben stehen (frisch angelegt, wartet auf Einträge); der Server räumt sie beim Speichern auf.
+          this.stackGroups = {groups, members};
           this.render();
+        },
+        stackMembersOf(gid) {
+          const members = (this.stackGroups && this.stackGroups.members) || {};
+          return this.orderableEntityIds.filter(id => members[id] === gid && this.isBarId(id));
+        },
+        addStack() {
+          const groups = this.stackGroupList().map(g => ({...g}));
+          const members = {...((this.stackGroups && this.stackGroups.members) || {})};
+          const nextId = () => 'g' + (groups.reduce((m, g) => Math.max(m, +g.id.slice(1)), 0) + 1);
+          if (!groups.length) {
+            // Der erste Stapel nimmt alle Balken mit (Ansicht bleibt gleich), dazu ein leerer zum Befüllen.
+            const first = {id: nextId(), name: t('Stapel {n}', {n: 1})};
+            groups.push(first);
+            this.series.filter(s => s.chart_type === 'bar').forEach(s => { members[s.entity_id] = first.id; });
+          }
+          groups.push({id: nextId(), name: t('Stapel {n}', {n: groups.length + 1})});
+          this.stackGroups = {groups, members};
+          this.render();
+        },
+        renameStack(gid, name) {
+          const groups = this.stackGroupList().map(g => (g.id === gid ? {...g, name} : g));
+          this.stackGroups = {groups, members: {...(this.stackGroups.members || {})}};
+        },
+        dissolveStack(gid) {
+          const groups = this.stackGroupList().filter(g => g.id !== gid);
+          const members = {};
+          Object.entries((this.stackGroups && this.stackGroups.members) || {}).forEach(([id, g]) => { if (g !== gid) members[id] = g; });
+          this.stackGroups = groups.length && Object.keys(members).length ? {groups, members} : {};
+          this.render();
+        },
+        stackDragOver(event, gid) {
+          if (!this.draggingEntityId || !this.isBarId(this.draggingEntityId)) return;
+          event.preventDefault();
+          this.stackOver = gid;
+        },
+        stackDrop(event, gid) {
+          event.preventDefault();
+          const id = this.draggingEntityId;
+          this.stackOver = null;
+          if (id && this.isBarId(id)) this.setStack(id, gid);
         },
         toggleStacked() {
           this.stacked = !this.stacked;
@@ -1996,7 +2040,7 @@
           // ein Stapel je Achse, mit Stapeln nur die zugeordneten Balken je Stapel; ein Stapel
           // mit nur einer Balken-Serie wirkt wie ein Einzelbalken.
           const stackMembers = (this.stackGroups && this.stackGroups.members) || {};
-          const hasStackGroups = !!(this.stackGroups && (this.stackGroups.groups || []).length);
+          const hasStackGroups = Object.keys(stackMembers).length > 0;
           const stackKeys = chartSeries.map(s => {
             if (!stackedActive || s.chart_type !== 'bar') return null;
             if (!hasStackGroups) return 'bar-' + axisKey(s);

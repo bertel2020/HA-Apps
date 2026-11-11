@@ -71,3 +71,18 @@ def test_editor_offers_the_stack_select_and_saves_it() -> None:
 def test_tile_dataset_carries_the_groups() -> None:
     assert "ds.stackGroups" in TILE_JS
     assert "data-stack-groups" in template_text("_dashboard_tiles.html")
+
+
+def test_editor_has_stack_containers_with_drop_and_dissolve() -> None:
+    for call in ("addStack()", "dissolveStack(g.id)", "stackDrop($event, g.id)", "renameStack(g.id, $event.target.value)"):
+        assert call in EDITOR_TEMPLATE
+    for fn in ("addStack()", "dissolveStack(gid)", "stackDrop(event, gid)", "stackMembersOf(gid)"):
+        assert fn in EDITOR_JS
+    # Die Reihenfolge der Liste bleibt die einzige Farbreihenfolge: Ziehen auf einen Stapel gibt die Zeile frei.
+    assert "component.draggingEntityId = draggedId;" in EDITOR_JS
+
+
+def test_empty_stacks_do_not_unstack_the_chart() -> None:
+    # Ein frisch angelegter, leerer Stapel darf die Balken nicht plötzlich einzeln zeichnen.
+    for source in (EDITOR_JS, TILE_JS):
+        assert "const hasStackGroups = Object.keys(stackMembers).length > 0;" in source

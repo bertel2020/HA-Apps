@@ -16,6 +16,8 @@
 - **Charts**: Mehrere Stapel in einem Chart
   - Bei „Gestapelt“ lässt sich jeder Balken-Serie in „Ausgewählt“ ein Stapel
     zuordnen; Balken ohne Stapel stehen einzeln daneben
+  - Stapel lassen sich anlegen, benennen und auflösen; Einträge werden per
+    Ziehen oder über das Feld „Stapel“ zugeordnet
   - Gilt auch auf Dashboards und in der Karte; ohne Auswahl bleibt alles wie
     bisher in einem Stapel
 
@@ -70,6 +72,8 @@
 - **Charts**: Several stacks in one chart
   - With “Stacked” on, every bar series in “Selected” can be assigned to a
     stack; bars without a stack stand next to the others
+  - Stacks can be added, named and dissolved; entries are assigned by
+    dragging or with the “Stack” field
   - Also applies on dashboards and in the card; without a choice everything
     stays in one stack as before
 

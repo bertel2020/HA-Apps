@@ -197,6 +197,34 @@
               </div>
             </template>
           </div>
+          <!-- Stapel: Container zu den Balken. Die Liste oben bleibt die einzige Reihenfolge
+               (und damit Farbreihenfolge); hier wird nur zugeordnet. Zuordnen geht per Ziehen
+               des Griffs auf einen Stapel oder über das Feld „Stapel“ in der Zeile (Touch). -->
+          <div class="stack-block" :class="{inactive: !stacked}" x-show="canStack" x-cloak>
+            <p class="sub" style="margin:0 0 8px;" x-text="stacked ? t('Balken im selben Stapel liegen aufeinander, die übrigen stehen einzeln daneben. Zum Zuordnen den Griff einer Zeile auf einen Stapel ziehen oder das Feld „Stapel“ nutzen.') : t('Stapel sind inaktiv, solange „Gestapelt“ aus ist. Sie bleiben gespeichert.')"></p>
+            <template x-for="g in stackGroupList()" :key="g.id">
+              <div class="stack-card" :class="{over: stackOver === g.id}"
+                   @dragover="stackDragOver($event, g.id)" @dragleave="stackOver === g.id && (stackOver = null)" @drop="stackDrop($event, g.id)">
+                <div class="stack-card-head">
+                  <input type="text" :value="g.name" :placeholder="t('Stapel')" maxlength="60" aria-label="{{ _('Name des Stapels') }}"
+                         @input="renameStack(g.id, $event.target.value)">
+                  <span class="stack-count" x-text="stackMembersOf(g.id).length"></span>
+                  <button type="button" class="stack-dissolve" @click="dissolveStack(g.id)">{{ _("auflösen") }}</button>
+                </div>
+                <div class="stack-members">
+                  <template x-for="mid in stackMembersOf(g.id)" :key="mid">
+                    <span class="stack-chip">
+                      <span class="stack-chip-dot" :style="'--dot:' + colorFor(mid)"></span>
+                      <span x-text="labelFor(mid)"></span>
+                      <button type="button" title="{{ _('Aus dem Stapel nehmen') }}" aria-label="{{ _('Aus dem Stapel nehmen') }}" @click="setStack(mid, 'none')">✕</button>
+                    </span>
+                  </template>
+                  <span class="stack-empty" x-show="!stackMembersOf(g.id).length">{{ _("Entitäten hierher ziehen") }}</span>
+                </div>
+              </div>
+            </template>
+            <button type="button" class="btn btn-sm" @click="addStack()">{{ _("+ Stapel hinzufügen") }}</button>
+          </div>
         </div>
 
         <!-- Zeitraum & Daten: welcher Ausschnitt und wie er geholt wird
