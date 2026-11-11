@@ -201,6 +201,7 @@
                (und damit Farbreihenfolge); hier wird nur zugeordnet. Zuordnen geht per Ziehen
                des Griffs auf einen Stapel oder über das Feld „Stapel“ in der Zeile (Touch). -->
           <div class="stack-block" :class="{inactive: !stacked}" x-show="canStack" x-cloak>
+            <p class="sub" style="margin:0 0 8px;" x-show="stacked && singleBucket && !hasStackMembers" x-text="t('In der Auflösung „Voll“ bekommt jeder Stapel eine eigene Kategorie. Lege dazu Stapel an.')"></p>
             <p class="sub" style="margin:0 0 8px;" x-text="stacked ? t('Balken im selben Stapel liegen aufeinander, die übrigen stehen einzeln daneben. Zum Zuordnen den Griff einer Zeile auf einen Stapel ziehen oder das Feld „Stapel“ nutzen.') : t('Stapel sind inaktiv, solange „Gestapelt“ aus ist. Sie bleiben gespeichert.')"></p>
             <template x-for="g in stackGroupList()" :key="g.id">
               <div class="stack-card" :class="{over: stackOver === g.id}"
@@ -264,7 +265,7 @@
                Entitäts-Chart (.toolbar-right in app.css). -->
           <div class="toolbar-right">
             <div class="menu-wrap" @click.outside="compareMenuOpen = false">
-              <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw || resolutionPreset === 'full' || (stacked && canStack) || donut" @click="compareMenuOpen = !compareMenuOpen">
+              <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw || resolutionPreset === 'full' || stackActive || donut" @click="compareMenuOpen = !compareMenuOpen">
                 <span x-text="compareButtonLabel"></span> <span class="chevron">▾</span>
               </button>
               <div class="menu-popover menu-popover-narrow" x-show="compareMenuOpen" x-cloak
@@ -499,7 +500,7 @@
                      Bedingung bliebe "Ausrichtung" dann fälschlich
                      ausgeblendet, obwohl der Chart längst im Ranking-
                      Vergleich steht, für den sie gedacht ist. -->
-                <div class="menu-row menu-row-stack" x-show="!donut && !timeline && !(stacked && canStack)">
+                <div class="menu-row menu-row-stack" x-show="!donut && !timeline && (!stackActive || singleBucket || hasStackMembers)">
                   <span class="menu-row-label">{{ _("Ausrichtung") }}
                     <span class="menu-note" x-show="compare">{{ _("Horizontal nicht bei aktivem Vergleich") }}</span>
                   </span>
@@ -554,10 +555,10 @@
                      bei Auflösung "Tag" weiter oben. -->
                 <label class="menu-row" x-show="!donut && !timeline">
                   <span class="menu-row-label">{{ _("Durchschnittslinie") }}
-                    <span class="menu-note" x-show="stacked && canStack">{{ _("nicht im gestapelten Modus") }}</span>
+                    <span class="menu-note" x-show="stackActive">{{ _("nicht im gestapelten Modus") }}</span>
                   </span>
                   <span class="menu-toggle">
-                    <input type="checkbox" :checked="averageLine" :disabled="stacked && canStack" @change="averageLine = !averageLine; render()">
+                    <input type="checkbox" :checked="averageLine" :disabled="stackActive" @change="averageLine = !averageLine; render()">
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
@@ -571,7 +572,7 @@
                      "Fläche" oben). Bei gemischten Linien-/Balken-Charts
                      bleibt die Zeile sichtbar und wirkt weiterhin nur auf die
                      Linien-Serien. -->
-                <div class="menu-row menu-row-stack" x-show="averageLine && !(stacked && canStack) && hasLineSeries && !donut">
+                <div class="menu-row menu-row-stack" x-show="averageLine && !stackActive && hasLineSeries && !donut">
                   <span class="menu-row-label">{{ _("Linienstil") }}</span>
                   <div class="seg">
                     <button :class="{active: averageStyle === 'flat'}" @click="averageStyle = 'flat'; render()">{{ _("Flach") }}</button>

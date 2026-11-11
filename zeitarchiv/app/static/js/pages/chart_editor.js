@@ -831,7 +831,10 @@
         // Kategorie stapeln" UND "jede Entität ihre eigene Kategorie" wäre
         // ein Widerspruch, deshalb schließen sich beide aus — dieselbe
         // Konvention wie "Gestapelt" + "Vergleichen".
-        get canStack() { return !this.singleBucket && this.series.filter(s => s.chart_type === 'bar').length >= 2; },
+        get canStack() { return this.series.filter(s => s.chart_type === 'bar').length >= 2; },
+        get hasStackMembers() { return Object.keys((this.stackGroups && this.stackGroups.members) || {}).length > 0; },
+        // Stapeln wirkt tatsächlich: bei Auflösung „Voll“ nur mit eigenen Stapeln (jeder Stapel eine Kategorie).
+        get stackActive() { return this.stacked && this.canStack && (!this.singleBucket || this.hasStackMembers); },
         // "Ausrichtung" (Vertikal/Horizontal, Optionen-Menü) — setHorizontal()
         // weiter unten, statt eines eigenen canGoHorizontal-Getters: die Zeile
         // ist jetzt immer sichtbar, "Horizontal" schaltet den dafür nötigen
@@ -1600,7 +1603,7 @@
         stackLabelFor(id) {
           const members = (this.stackGroups && this.stackGroups.members) || {};
           const gid = members[id];
-          if (!gid || !this.stacked || !this.canStack || !this.isBarId(id)) return '';
+          if (!gid || !this.stackActive || !this.isBarId(id)) return '';
           const unitOf = s => (s.aggregation_type === 'switch' && s.display_mode === 'time') ? ' duration' : s.unit;
           const mine = this.series.find(s => s.entity_id === id);
           const same = this.series.filter(s => s.chart_type === 'bar' && members[s.entity_id] === gid && unitOf(s) === unitOf(mine));
@@ -1609,7 +1612,7 @@
         },
         // Anteile (%) wirken nur, wenn jeder Balken einer Achse in einem Stapel liegt (siehe barOnlyAxis in render()).
         get stackPercentBlocked() {
-          if (!this.stacked || !this.canStack || !this.normalize) return false;
+          if (!this.stackActive || !this.normalize) return false;
           const members = (this.stackGroups && this.stackGroups.members) || {};
           if (!Object.keys(members).length) return false;
           return this.series.some(s => s.chart_type === 'bar' && !this.stackLabelFor(s.entity_id));
@@ -2023,10 +2026,9 @@
           // je Entität liest sich außerdem als Ranking natürlicher als
           // mehrere in eine Kategorie gruppierte Balken.
           //
-          // "Gestapelt" schließt diese Auflösung aus (canStack-Getter) —
-          // sonst gäbe es zwei widersprüchliche Antworten auf "wie viele
-          // Kategorien": eine gestapelte Kombination will ALLE Entitäten in
-          // EINER Kategorie, der Ranking-Vergleich hier will das Gegenteil.
+          // "Gestapelt" wirkt hier nur mit eigenen Stapeln: jeder Stapel bekommt eine
+          // eigene Kategorie, übrige Entitäten bleiben je eine (Ranking-Vergleich). Ohne
+          // Stapel gäbe es zwei widersprüchliche Antworten auf "wie viele Kategorien".
           const singleBucket = this.singleBucket;
           const horizontalActive = singleBucket && this.horizontal;
           // Anzeigename je Entität, in Auswahlreihenfolge — dieselbe Quelle
@@ -2035,7 +2037,6 @@
           // Wh- und kWh-Serien teilen sich eine Achse (Kopien in der größten
           // Einheit); die Kennzahlen-Tabelle liest weiter this.series.
           const chartSeries = NumberFormat.harmonizeUnits(this.series);
-          const entityCategories = chartSeries.map(s => this.entityNames[s.entity_id] || s.friendly_name);
 
           // Eine Y-Achse je unterschiedlicher Einheit (wie die Wachstums-Chart auf
           // der Statistik-Seite mit zwei Achsen, hier verallgemeinert auf N) —
@@ -2054,7 +2055,7 @@
           // kombiniert (siehe yAxis unten, eine Achse je axisKey).
           // stackedActive/normalizeActive gelten deshalb nicht global,
           // sondern je Achse.
-          const stackedActive = this.stacked && this.canStack;
+          const stackedActive = this.stackActive;
           // Stapelschlüssel je Serie (Parität zu chart-tile-render.js): ohne Stapel-Einstellung
           // ein Stapel je Achse, mit Stapeln nur die zugeordneten Balken je Stapel; ein Stapel
           // mit nur einer Balken-Serie wirkt wie ein Einzelbalken.
@@ -2075,6 +2076,21 @@
           chartSeries.forEach((s, i) => {
             if (stackKeys[i] && hasStackGroups) {
               stackNameByKey.set(stackKeys[i], (this.stackGroupList().find(g => g.id === stackMembers[s.entity_id]) || {}).name || t('Stapel'));
+            }
+          });
+          // Kategorie je Serie bei „Voll“: Mitglieder eines Stapels teilen sich eine Kategorie (Name
+          // des Stapels), jede übrige Serie hat ihre eigene (Anzeigename wie in der Legende).
+          const slotOf = [];
+          const slotLabels = [];
+          const slotForKey = new Map();
+          chartSeries.forEach((s, i) => {
+            const key = stackKeys[i];
+            if (singleBucket && key) {
+              if (!slotForKey.has(key)) { slotForKey.set(key, slotLabels.length); slotLabels.push(stackNameByKey.get(key) || ''); }
+              slotOf[i] = slotForKey.get(key);
+            } else {
+              slotOf[i] = slotLabels.length;
+              slotLabels.push(this.entityNames[s.entity_id] || s.friendly_name);
             }
           });
           const normalizeActive = stackedActive && this.normalize;
@@ -2182,7 +2198,7 @@
           // sondern derselbe Ausdruck wie für die x-Achsen-Rolle.
           const categoryAxisObj = singleBucket ? {
             type: 'category',
-            data: entityCategories,
+            data: slotLabels,
             axisTick: {show: false},
             // Ohne dies versucht ECharts (Default: onZero:true), die Achsen-
             // Linie an der Y-Position von y=0 auszurichten — bei aktiver
@@ -2244,19 +2260,19 @@
             const axisNormalized = normalizeActive && !!stackKeys[i] && barOnlyAxis.has(axisKey(s));
             // Bei singleBucket (Kategorie-Achse, s. o.) ist die X-Position die
             // EIGENE Kategorie dieser Entität (ihre Position in chartSeries,
-            // s. entityCategories) statt eines Zeitstempels — der Halte-Punkt
+            // s. slotOf) statt eines Zeitstempels — der Halte-Punkt
             // bis windowEnd (nächster Block) ergibt bei einer einzelnen
             // Kategorie je Entität ohnehin keinen Sinn und entfällt deshalb
             // hier.
             const mainData = mainPoints.map(p => {
-              if (!axisNormalized) return [singleBucket ? i : p.ts * 1000, p.value, p.ts * 1000, s.unit, seriesDecimals, isDurationSeries(s)];
+              if (!axisNormalized) return [singleBucket ? slotOf[i] : p.ts * 1000, p.value, p.ts * 1000, s.unit, seriesDecimals, isDurationSeries(s)];
               // Felder 7–9: Originalwert/-einheit/-Nachkommastellen, nur für
               // den Tooltip (formatPointValue() liest sie nicht, siehe dort)
               // — sonst verliert der Tooltip genau die Zahl, die die
               // Normierung aus dem Balken selbst entfernt.
               const total = axisTotals.get(stackKeys[i]).get(p.ts) || 0;
               const pct = total ? (p.value / total) * 100 : 0;
-              return [singleBucket ? i : p.ts * 1000, pct, p.ts * 1000, '%', 0, false, p.value, s.unit, seriesDecimals];
+              return [singleBucket ? slotOf[i] : p.ts * 1000, pct, p.ts * 1000, '%', 0, false, p.value, s.unit, seriesDecimals];
             });
             if (!singleBucket && chartType === 'line' && mainData.length && this.windowEnd != null
                 && mainData[mainData.length - 1][0] < this.windowEnd * 1000) {

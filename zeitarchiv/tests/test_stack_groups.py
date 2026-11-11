@@ -106,3 +106,15 @@ def test_legend_names_the_stack_in_editor_tile_and_card() -> None:
 def test_editor_explains_why_percent_does_not_apply() -> None:
     assert "x-show=\"stackPercentBlocked\"" in EDITOR_TEMPLATE
     assert "get stackPercentBlocked()" in EDITOR_JS
+
+
+def test_full_resolution_gives_every_stack_its_own_category() -> None:
+    # Bei „Voll“ teilen sich Mitglieder eines Stapels eine Kategorie (Stapelname), übrige Serien haben je eine.
+    for source in (EDITOR_JS, TILE_JS):
+        assert "const slotOf = [];" in source
+        assert "data: slotLabels," in source
+    assert "[slotOf[i], aggregate," in TILE_JS
+    assert "singleBucket ? slotOf[i] : p.ts * 1000" in EDITOR_JS
+    # Stapeln gilt bei „Voll“ nur mit eigenen Stapeln, sonst bleibt es der Ranking-Vergleich.
+    assert "(!singleBucket || hasStackGroups)" in TILE_JS
+    assert "(!this.singleBucket || this.hasStackMembers)" in EDITOR_JS
