@@ -2090,7 +2090,7 @@
           // ein Stapel je Achse, mit Stapeln nur die zugeordneten Balken je Stapel; ein Stapel
           // mit nur einer Balken-Serie wirkt wie ein Einzelbalken.
           const stackMembers = (this.stackGroups && this.stackGroups.members) || {};
-          const hasStackGroups = Object.keys(stackMembers).length > 0;
+          const hasStackGroups = Object.keys(stackMembers).length > 0 || (((this.stackGroups && this.stackGroups.groups) || []).length > 0);
           const stackKeys = chartSeries.map(s => {
             if (!stackedActive || s.chart_type !== 'bar') return null;
             if (!hasStackGroups) return 'bar-' + axisKey(s);

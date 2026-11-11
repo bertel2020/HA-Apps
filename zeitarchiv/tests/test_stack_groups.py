@@ -82,10 +82,10 @@ def test_editor_has_stack_containers_with_drop_and_dissolve() -> None:
     assert "component.draggingEntityId = draggedId;" in EDITOR_JS
 
 
-def test_empty_stacks_do_not_unstack_the_chart() -> None:
-    # Ein frisch angelegter, leerer Stapel darf die Balken nicht plötzlich einzeln zeichnen.
+def test_empty_stack_means_no_bar_is_stacked() -> None:
+    # Sobald ein Stapel existiert (auch leer), gilt nur noch die Zuordnung: nicht zugeordnete Balken stehen einzeln.
     for source in (EDITOR_JS, TILE_JS):
-        assert "const hasStackGroups = Object.keys(stackMembers).length > 0;" in source
+        assert "Object.keys(stackMembers).length > 0 || (((" in source
 
 
 def test_tooltips_sum_each_stack_in_both_renderers() -> None:
