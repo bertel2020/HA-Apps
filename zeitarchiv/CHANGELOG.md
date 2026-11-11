@@ -1,5 +1,43 @@
 # Changelog
 
+## Unreleased
+
+### Neu
+
+- **Wetterdashboard**: Sonnenschein und Himmelszustand nach Sonnenstand
+  (optional, Einstellungen → Sonne und Tageslicht)
+  - Die Helligkeit wird auf einen klaren Himmel bei der aktuellen Sonnenhöhe
+    bezogen, dieselben Prozentwerte gelten damit das ganze Jahr
+  - Braucht die Rolle „Sonnenhöhe“; ohne sie oder bei ausgeschaltetem Schalter
+    bleibt es bei den festen lx-Werten
+  - Einstellbar: Anteil für Sonnenschein (Standard 60 %) und ein Abgleich der
+    Klarhimmel-Kurve an den eigenen Sensor
+
+### Geändert
+
+- **Wetterdashboard**: Hinweistext zur Rolle „Sonnenhöhe“ nennt den Sensor
+  „Solare Elevation“ der Integration Sun
+
+---
+
+### English
+
+#### New
+
+- **Weather dashboard**: Sunshine and sky condition by sun position (optional,
+  Settings → Sun and daylight)
+  - Brightness is related to a clear sky at the current sun elevation, so the
+    same percentages apply all year
+  - Needs the “Sun elevation” role; without it, or with the switch off, the
+    fixed lx values stay in use
+  - Adjustable: the share for sunshine (default 60 %) and a calibration of the
+    clear-sky curve to your own sensor
+
+#### Changed
+
+- **Weather dashboard**: The hint for the “Sun elevation” role now mentions
+  the “Solar elevation” sensor of the Sun integration
+
 ## 1.40.0 - 2026-11-10
 
 ### Neu

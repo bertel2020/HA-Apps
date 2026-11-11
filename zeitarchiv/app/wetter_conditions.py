@@ -6,6 +6,8 @@ reicht sie hierher. Die Klassen sind Faustwerte aus den Daten einer Eltako-Stati
 
 from __future__ import annotations
 
+import math
+
 NIGHT = "night"
 DUSK = "dusk"
 DAY = "day"  # nur der Dämmerungssensor, ohne Helligkeit für eine Himmelsklasse
@@ -17,6 +19,16 @@ SUNNY = "sunny"  # sonnig
 #: Untergrenzen von bewölkt, heiter, sonnig als Vielfaches der Sonnen-Schwelle (Standard 25.000 lx): 15.000, 25.000
 #: und 70.000 lx. „Heiter“ beginnt genau dort, wo die Sonnenscheindauer zu zählen anfängt.
 CLASS_FACTORS_LX = (0.6, 1.0, 2.8)
+#: Sonnenschein und Himmelsklassen nach Sonnenstand (Issue 11): Die Helligkeit wird auf die Klarhimmel-Helligkeit
+#: bei der jeweiligen Sonnenhöhe bezogen, in Prozent. Dieselben Schwellen gelten dann das ganze Jahr.
+DEFAULT_SUN_SHARE_PCT = 60.0
+#: Untergrenzen von bewölkt, heiter, sonnig in Prozent der Klarhimmel-Helligkeit.
+CLASS_CUTS_PCT = (30.0, 50.0, 75.0)
+#: Unter dieser Sonnenhöhe (Grad) gibt es keinen Sonnenschein und keine Himmelsklasse nach Anteil.
+MIN_ELEVATION_DEG = 3.0
+#: Umrechnung W/m² in lx für die Klarhimmel-Strahlung (Ecowitt und ähnliche Stationen; Sensoren streuen, siehe Skalierung).
+LX_PER_WM2 = 127.0
+
 #: Dieselben Klassen für eine Strahlung in W/m². Aus lx umgerechnet (etwa 110 lx je W/m²), **nicht an Messungen
 #: geprüft**: Der Nutzer, an dessen Daten die lx-Grenzen entstanden, hat keinen Strahlungssensor.
 CLASS_CUTS_WM2 = (150.0, 250.0, 650.0)
@@ -43,6 +55,23 @@ def sky_class(value: float, cuts: tuple[float, float, float]) -> str:
 
 def lx_cuts(sun_threshold_lx: float) -> tuple[float, float, float]:
     return tuple(sun_threshold_lx * factor for factor in CLASS_FACTORS_LX)  # type: ignore[return-value]
+
+
+def clear_sky_lx(elevation_deg: float, scale: float = 1.0) -> float | None:
+    """Klarhimmel-Helligkeit in lx bei der Sonnenhöhe ``elevation_deg`` (Haurwitz: 1098 · sin h · exp(−0,057 / sin h) W/m²).
+
+    ``scale`` gleicht einen Sensor an, der von der Idealkurve abweicht (1,0 = unverändert). None bei einer Sonnenhöhe
+    unter ``MIN_ELEVATION_DEG``: Dort sagt der Anteil nichts."""
+    if elevation_deg < MIN_ELEVATION_DEG:
+        return None
+    sine = math.sin(math.radians(elevation_deg))
+    return 1098.0 * sine * math.exp(-0.057 / sine) * LX_PER_WM2 * scale
+
+
+def share_of_clear_pct(value_lx: float, elevation_deg: float, scale: float = 1.0) -> float | None:
+    """Helligkeit als Prozent der Klarhimmel-Helligkeit; None ohne verwertbare Sonnenhöhe."""
+    clear = clear_sky_lx(elevation_deg, scale)
+    return None if clear is None or clear <= 0 else value_lx / clear * 100.0
 
 
 def to_kmh(value: float, unit: str | None) -> float | None:

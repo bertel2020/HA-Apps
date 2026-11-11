@@ -3663,7 +3663,7 @@
     "Die Himmelsklassen der Wetterlage (trüb, bewölkt, heiter, sonnig) folgen der Sonnen-Schwelle: bewölkt ab 60 %, heiter ab 100 % und sonnig ab 280 % davon. Wer eigene Grenzen eintragen will, füllt die drei letzten Felder; leer bedeutet automatisch. Die Grenzen müssen von unten nach oben ansteigen.": "The sky classes of the weather summary (overcast, cloudy, fair, sunny) follow the sun threshold: cloudy from 60 %, fair from 100 % and sunny from 280 % of it. To enter your own limits, fill the last three fields; empty means automatic. The limits must rise from bottom to top.",
     "Die Grenzen der Himmelsklassen müssen von unten nach oben ansteigen.": "The limits of the sky classes must rise from bottom to top.",
     "Sonnenhöhe": "Sun elevation",
-    "Die Rolle „Sonnenhöhe“ ist ein Sensor mit der Höhe der Sonne in Grad, zum Beispiel ein Template-Sensor aus dem Attribut „elevation“ von sun.sun. Der Reiter Wind & Sonne zeigt damit, bei welchem Sonnenstand der Dämmerungssensor Tag meldet: Ein hoher Wert am Morgen oder Abend deutet auf Verschattung hin.": "The role “Sun elevation” is a sensor with the height of the sun in degrees, for example a template sensor from the “elevation” attribute of sun.sun. The Wind & Sun tab then shows at which sun position the dawn sensor reports day: a high value in the morning or evening points to shading.",
+    "Die Rolle „Sonnenhöhe“ ist ein Sensor mit der Höhe der Sonne in Grad, zum Beispiel der Sensor „Solare Elevation“ der Integration Sun (sensor.sun_solar_elevation, in den Entitäten der Integration zu aktivieren) oder ein Template-Sensor aus dem Attribut „elevation“ von sun.sun. Der Reiter Wind & Sonne zeigt damit, bei welchem Sonnenstand der Dämmerungssensor Tag meldet: Ein hoher Wert am Morgen oder Abend deutet auf Verschattung hin.": "The role “Sun elevation” is a sensor with the height of the sun in degrees, for example the “Solar elevation” sensor of the Sun integration (sensor.sun_solar_elevation, to be enabled in the integration’s entities) or a template sensor from the “elevation” attribute of sun.sun. The Wind & Sun tab then shows at which sun position the dawn sensor reports day: a high value in the morning or evening points to shading.",
     "Tageslänge im Jahresverlauf": "Day length over the year",
     "Noch keine Tageslänge aus dem Dämmerungssensor vorhanden.": "No day length from the dawn sensor yet.",
     "„Windrichtung“ im Namen": "“Wind direction” in the name",
@@ -3738,7 +3738,7 @@
     "Helligkeit in lx, am besten vom Süd-Sensor, zum Beispiel „Helligkeit Süd“.": "Brightness in lx, ideally from the south-facing sensor, for example “Brightness south”.",
     "Ein Helligkeitssensor für Tag und Nacht in lx, zum Beispiel ein Dämmerungs- oder Lichtsensor.": "A brightness sensor for day and night in lx, for example a twilight or light sensor.",
     "Windrichtung in Grad, zum Beispiel „Windrichtung“.": "Wind direction in degrees, for example “Wind direction”.",
-    "Höhe der Sonne in Grad, zum Beispiel ein Template-Sensor aus dem Attribut „elevation“ von sun.sun.": "Elevation of the sun in degrees, for example a template sensor from the “elevation” attribute of sun.sun.",
+    "Höhe der Sonne in Grad, zum Beispiel der Sensor „Solare Elevation“ der Integration Sun (sensor.sun_solar_elevation, in den Entitäten der Integration zu aktivieren) oder ein Template-Sensor aus dem Attribut „elevation“ von sun.sun.": "Elevation of the sun in degrees, for example the “Solar elevation” sensor of the Sun integration (sensor.sun_solar_elevation, to be enabled in the integration’s entities) or a template sensor from the “elevation” attribute of sun.sun.",
     "Aktuelle Leistung der PV-Anlage in W oder kW, zum Beispiel „Solarleistung“.": "Current output of the PV system in W or kW, for example “Solar power”.",
     "Nicht wählbar": "Not selectable",
     "Messwert, kein Zähler": "Measurement, not a counter",
@@ -3858,7 +3858,11 @@
     "Wohnzimmer Feuchte": "Living room humidity",
     "Noch keine Rekorde: Es liegen noch keine abgeschlossenen Tage mit Werten vor.": "No records yet: there are no completed days with values yet.",
     "Aufteilung des Verbrauchs je Jahr": "Breakdown of consumption per year",
-    "Erzeuger einzeln": "Individual producers"
+    "Erzeuger einzeln": "Individual producers",
+    "Nach Sonnenstand (Anteil am klaren Himmel)": "By sun position (share of clear sky)",
+    "Sonne ab einem Anteil von": "Sun from a share of",
+    "Abgleich der Klarhimmel-Kurve": "Clear-sky curve calibration",
+    "Mit der Rolle „Sonnenhöhe“ wird die Helligkeit auf die Helligkeit eines klaren Himmels bei der jeweiligen Sonnenhöhe bezogen. Dann gelten dieselben Prozentwerte das ganze Jahr: Ein klarer Novembermittag zählt als sonnig, ein dünn bewölkter Junimittag nicht. Sonnenschein zählt ab dem eingestellten Anteil und einer Sonnenhöhe über 3 Grad. Die Himmelsklassen folgen festen Anteilen: bewölkt ab 30 %, heiter ab 50 %, sonnig ab 75 %. Die Felder darunter in lx gelten dann nur, wenn die Rolle fehlt oder der Schalter aus ist. Die Klarhimmel-Kurve ist eine Näherung; weicht dein Sensor ab, gleicht der Abgleich sie an (Anhalt: die höchsten Werte klarer Tage sollten etwa 100 % erreichen).": "With the role “Sun elevation”, the brightness is related to the brightness of a clear sky at the current sun elevation. The same percentages then apply all year: a clear November noon counts as sunny, a thinly clouded June noon does not. Sunshine counts from the set share and a sun elevation above 3 degrees. The sky classes use fixed shares: cloudy from 30 %, fair from 50 %, sunny from 75 %. The fields below in lx then apply only if the role is missing or the switch is off. The clear-sky curve is an approximation; if your sensor deviates, the calibration adjusts it (rule of thumb: the highest values of clear days should reach about 100 %)."
   },
   "js": {
     "Ladestand": "State of charge",
@@ -4917,6 +4921,10 @@
     "Spanne {from}–{to}": "Range {from}–{to}",
     "läuft, bis {date}": "running, to {date}",
     "Summe bis {date}": "Total to {date}",
-    "Farbe: Abweichung vom Ø. Stand {date}: Laufender Monat und Summe zählen bis dahin, Vorjahr und Ø gelten für denselben Zeitraum. Regentage: ab {threshold}.": "Colour: deviation from the average. As of {date}: the current month and the total count up to then, last year and the average cover the same period. Rain days: from {threshold}."
+    "Farbe: Abweichung vom Ø. Stand {date}: Laufender Monat und Summe zählen bis dahin, Vorjahr und Ø gelten für denselben Zeitraum. Regentage: ab {threshold}.": "Colour: deviation from the average. As of {date}: the current month and the total count up to then, last year and the average cover the same period. Rain days: from {threshold}.",
+    "bei Schwelle {n} % des klaren Himmels": "at a threshold of {n} % of clear sky",
+    "Spitze um {time} Uhr: {value} %": "peak at {time}: {value} %",
+    "Schwelle {n} %": "Threshold {n} %",
+    "Sonnenstunden (ab {n} % des klaren Himmels)": "Sunshine hours (from {n} % of clear sky)"
   }
 }

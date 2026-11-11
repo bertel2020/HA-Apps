@@ -100,7 +100,7 @@ ROLE_HELP = {
     "illuminance": N_("Helligkeit in lx, am besten vom Süd-Sensor, zum Beispiel „Helligkeit Süd“."),
     "illuminance_dawn": N_("Ein Helligkeitssensor für Tag und Nacht in lx, zum Beispiel ein Dämmerungs- oder Lichtsensor."),
     "wind_direction": N_("Windrichtung in Grad, zum Beispiel „Windrichtung“."),
-    "sun_elevation": N_("Höhe der Sonne in Grad, zum Beispiel ein Template-Sensor aus dem Attribut „elevation“ von sun.sun."),
+    "sun_elevation": N_("Höhe der Sonne in Grad, zum Beispiel der Sensor „Solare Elevation“ der Integration Sun (sensor.sun_solar_elevation, in den Entitäten der Integration zu aktivieren) oder ein Template-Sensor aus dem Attribut „elevation“ von sun.sun."),
     "pv_power": N_("Aktuelle Leistung der PV-Anlage in W oder kW, zum Beispiel „Solarleistung“."),
 }
 ROLE_KEYS = tuple(key for key, _label, _types in ROLES)
@@ -205,6 +205,8 @@ YEAR_COLUMN = re.compile(r"^j(\d{4})$")
 #: Licht nicht. Startwert aus den Oktoberdaten des Nutzers: trübe Tage mittags bis etwa 15.000 lx, klare ab 50.000 lx.
 DEFAULT_SUN_THRESHOLD_LX = 25000.0
 SUN_THRESHOLD_RANGE_LX = (1000.0, 100000.0)
+SUN_SHARE_RANGE_PCT = (10.0, 100.0)
+SUN_SCALE_RANGE_PCT = (20.0, 200.0)  # Abgleich der Klarhimmel-Kurve an den Sensor
 #: Tageslichtkurve: Der Dämmerungssensor der Eltako-Station misst 0 bis 1.000 lx. „Nacht“ liegt unter der unteren
 #: Schwelle (ungefähr das Ende der bürgerlichen Dämmerung), „Tag“ ab der oberen (ungefähr Sonnenauf- und -untergang).
 DEFAULT_DAYLIGHT_NIGHT_LX = 5.0
@@ -238,6 +240,9 @@ def _empty_config() -> dict:
         "rain_day_mm": DEFAULT_RAIN_DAY_MM,
         "rain_day_minutes": DEFAULT_RAIN_DAY_MINUTES,
         "sun_threshold_lx": DEFAULT_SUN_THRESHOLD_LX,
+        "sun_relative": False,
+        "sun_share_pct": conditions.DEFAULT_SUN_SHARE_PCT,
+        "sun_scale_pct": 100.0,
         "daylight_night_lx": DEFAULT_DAYLIGHT_NIGHT_LX,
         "daylight_day_lx": DEFAULT_DAYLIGHT_DAY_LX,
         "sky_cuts_lx": [],
@@ -329,6 +334,11 @@ def _load_config(index: Index) -> dict:
     value = data.get("sun_threshold_lx")
     if isinstance(value, (int, float)) and not isinstance(value, bool) and SUN_THRESHOLD_RANGE_LX[0] <= value <= SUN_THRESHOLD_RANGE_LX[1]:
         config["sun_threshold_lx"] = float(value)
+    config["sun_relative"] = data.get("sun_relative") is True
+    for key, bounds in (("sun_share_pct", SUN_SHARE_RANGE_PCT), ("sun_scale_pct", SUN_SCALE_RANGE_PCT)):
+        value = data.get(key)
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and bounds[0] <= value <= bounds[1]:
+            config[key] = float(value)
     cuts = data.get("sky_cuts_lx")
     if (
         isinstance(cuts, list) and len(cuts) == 3
@@ -569,6 +579,63 @@ class WetterService:
             "top_ts": first_ts[top_day] if per_day[top_day] > 0 else None,
         }
 
+    def _sun_relative(self, config: dict) -> bool:
+        """Sonnenschein und Himmelsklasse nach Sonnenstand: Schalter an und die Rolle „Sonnenhöhe“ belegt und bekannt."""
+        entity_id = config.get("sun_elevation")
+        return bool(config.get("sun_relative") and entity_id and self.deps.index.get_entity(entity_id) is not None)
+
+    def _sun_threshold(self, config: dict) -> float:
+        """Schwelle für Sonnenschein: Prozent der Klarhimmel-Helligkeit (Modus nach Sonnenstand) oder lx."""
+        if self._sun_relative(config):
+            return float(config["sun_share_pct"])
+        return float(config["sun_threshold_lx"])
+
+    def _to_relative(
+        self, rows: list[rollup_mod.FineRow], config: dict, now_local: datetime, read_cache: query_mod.QueryReadCache | None = None,
+    ) -> list[rollup_mod.FineRow]:
+        """Stundenzeilen der Helligkeit als Prozent der Klarhimmel-Helligkeit zur Sonnenhöhe der Stunde.
+
+        Stunden ohne bekannte Sonnenhöhe entfallen (nichts raten, die Lückenregel der Sonnenstunden greift wie bei fehlenden
+        Zeilen); steht die Sonne unter ``MIN_ELEVATION_DEG``, zählt die Stunde mit 0 %."""
+        if not rows:
+            return []
+        read_cache = read_cache or query_mod.QueryReadCache()
+        tz = self.deps.tz
+        first = datetime.fromtimestamp(min(row.bucket_start for row in rows), tz) - timedelta(hours=3)
+        last = datetime.fromtimestamp(max(row.bucket_start for row in rows), tz) + timedelta(hours=4)
+        elevations = sorted(
+            (row.bucket_start + 1800.0, row.value)
+            for row in self._rows(config["sun_elevation"], "standard", first, min(last, now_local), now_local, read_cache)
+            if row.value is not None
+        )
+        stamps = [stamp for stamp, _value in elevations]
+        scale = float(config["sun_scale_pct"]) / 100.0
+
+        def elevation_at(moment: float) -> float | None:
+            after = bisect.bisect_left(stamps, moment)
+            if after < len(stamps) and stamps[after] == moment:
+                return elevations[after][1]
+            if after == 0 or after >= len(stamps) or stamps[after] - stamps[after - 1] > 3 * 3600:
+                return None
+            (t0, v0), (t1, v1) = elevations[after - 1], elevations[after]
+            return v0 + (v1 - v0) * (moment - t0) / (t1 - t0)
+
+        def pct(value: float | None, elevation: float) -> float | None:
+            if value is None:
+                return None
+            share = conditions.share_of_clear_pct(value, elevation, scale)
+            return 0.0 if share is None else share
+
+        out = []
+        for row in rows:
+            elevation = elevation_at(row.bucket_start + 1800.0)
+            if elevation is None:
+                continue
+            out.append(replace(
+                row, value=pct(row.value, elevation), min_value=pct(row.min_value, elevation), max_value=pct(row.max_value, elevation),
+            ))
+        return out
+
     def _sunshine_per_day(
         self, values: list[rollup_mod.FineRow], threshold: float, until: float | None,
         held: list[tuple[float, float]] | None = None,
@@ -613,7 +680,11 @@ class WetterService:
         if not values:
             return None
         tz = self.deps.tz
-        per_day = self._sunshine_per_day(values, float(config["sun_threshold_lx"]), until)
+        if self._sun_relative(config):
+            values = self._to_relative(values, config, datetime.now(tz))
+            if not values:
+                return None
+        per_day = self._sunshine_per_day(values, self._sun_threshold(config), until)
         hours = {day: seconds / 3600.0 for day, seconds in per_day.items()}
         top_day = max(hours, key=lambda day: (hours[day], -day.toordinal()))
         top_start = min(row.bucket_start for row in values if datetime.fromtimestamp(row.bucket_start, tz).date() == top_day)
@@ -693,6 +764,8 @@ class WetterService:
             "rain_day_mm": config["rain_day_mm"],
             "rain_day_minutes": config["rain_day_minutes"],
             "sun_threshold_lx": config["sun_threshold_lx"],
+            "sun_relative": self._sun_relative(config),
+            "sun_share_pct": config["sun_share_pct"],
             "columns": [
                 {
                     "key": win["key"], "range": win["range"], "partial": win["partial"],
@@ -1112,11 +1185,13 @@ class WetterService:
         following = day + timedelta(days=1)
         end = datetime(following.year, following.month, following.day, tzinfo=tz)
         until = min(end, now_local)
-        threshold = float(config["sun_threshold_lx"])
+        relative = self._sun_relative(config)
+        threshold = self._sun_threshold(config)
         base = {
             "tz": str(tz), "date": day.isoformat(), "start": start.timestamp(), "end": end.timestamp(),
-            "live": start <= now_local < end, "threshold": threshold,
-            "unit": (self.deps.index.get_entity(entity_id)["unit"] or "lx"), "saturation": SUN_SENSOR_SATURATION_LX,
+            "live": start <= now_local < end, "threshold": threshold, "relative": relative,
+            "unit": "%" if relative else (self.deps.index.get_entity(entity_id)["unit"] or "lx"),
+            "saturation": None if relative else SUN_SENSOR_SATURATION_LX,
         }
         if until <= start:
             return {**base, "hours": [], "sun_hours": None, "peak": None}
@@ -1124,6 +1199,8 @@ class WetterService:
             (row for row in self._rows(entity_id, "standard", start, until, now_local, query_mod.QueryReadCache()) if row.value is not None),
             key=lambda row: row.bucket_start,
         )
+        if relative:
+            rows = self._to_relative(rows, config, now_local)
         if not rows:
             return {**base, "hours": [], "sun_hours": None, "peak": None}
         held: list[tuple[float, float]] = []
@@ -1158,7 +1235,8 @@ class WetterService:
             (row for row in self._rows(entity_id, "standard", start, now_local, now_local, read_cache) if row.value is not None),
             key=lambda row: row.bucket_start,
         )
-        sun_seconds = self._sunshine_per_day(main_rows, float(config["sun_threshold_lx"]), now_local.timestamp())
+        sun_rows = self._to_relative(main_rows, config, now_local, read_cache) if self._sun_relative(config) else main_rows
+        sun_seconds = self._sunshine_per_day(sun_rows, self._sun_threshold(config), now_local.timestamp())
         night_lx, day_lx = config["daylight_night_lx"], config["daylight_day_lx"]
         light_rows = main_rows
         dawn_id = config["illuminance_dawn"]
@@ -1506,8 +1584,16 @@ class WetterService:
             main_role, main = "radiation", self._recent(config["radiation"], now_local, read_cache)
         dawn = self._recent(config["illuminance_dawn"], now_local, read_cache)
         if main is not None or dawn is not None:
+            sky_value = main["mean"] if main is not None else None
             if main_role == "illuminance" and main is not None:
                 cuts, unit = sky_cuts(config), "lx"
+                if self._sun_relative(config):
+                    elevation = self._recent(config["sun_elevation"], now_local, read_cache)
+                    share = conditions.share_of_clear_pct(main["mean"], elevation["mean"], config["sun_scale_pct"] / 100.0) if elevation else None
+                    if share is not None:
+                        cuts, unit, sky_value = conditions.CLASS_CUTS_PCT, "%", share
+                    elif elevation is not None:
+                        cuts, unit, sky_value = conditions.CLASS_CUTS_PCT, "%", 0.0  # Sonne zu tief: kein Anteil, also trüb
             else:
                 cuts, unit = conditions.CLASS_CUTS_WM2, unit_of(config["radiation"]) or "W/m²"
             if dawn is not None:
@@ -1517,9 +1603,9 @@ class WetterService:
             else:
                 kind = conditions.NIGHT if main is not None and main["mean"] < conditions.NIGHT_WM2 else None
             if kind is None:
-                kind = conditions.sky_class(main["mean"], cuts) if main is not None else conditions.DAY
+                kind = conditions.sky_class(sky_value, cuts) if main is not None else conditions.DAY
             sky = {
-                "class": kind, "value": main["mean"] if main else None, "unit": unit,
+                "class": kind, "value": sky_value, "unit": unit,
                 "source": main_role if main else None, "dawn": dawn["mean"] if dawn else None,
             }
 
@@ -1623,6 +1709,10 @@ class WetterService:
         if main_rows:
             lux = main_role == "illuminance"
             cuts = sky_cuts(config) if lux else conditions.CLASS_CUTS_WM2
+            shares = None
+            if lux and self._sun_relative(config):
+                cuts = conditions.CLASS_CUTS_PCT
+                shares = {row.bucket_start: row.value for row in self._to_relative(main_rows, config, now_local, read_cache)}
             dawn = {row.bucket_start: row.value for row in rows_of(config["illuminance_dawn"]) if row.value is not None}
             counts: dict[str, int] = {}
             for row in main_rows:
@@ -1631,7 +1721,10 @@ class WetterService:
                 else:
                     bright = row.value >= (night_lx if lux else conditions.NIGHT_WM2)
                 if bright:
-                    kind = conditions.sky_class(row.value, cuts)
+                    value = row.value if shares is None else shares.get(row.bucket_start)
+                    if value is None:
+                        continue  # Sonnenhöhe dieser Stunde unbekannt: keine Klasse raten
+                    kind = conditions.sky_class(value, cuts)
                     counts[kind] = counts.get(kind, 0) + 1
             order = (conditions.OVERCAST, conditions.CLOUDY, conditions.FAIR, conditions.SUNNY)
             dominant = max(counts, key=lambda kind: (counts[kind], order.index(kind))) if counts else None
@@ -1851,6 +1944,9 @@ class WetterService:
             rain_day_mm: str = Form(""),
             rain_day_minutes: str = Form(""),
             sun_threshold_lx: str = Form(""),
+            sun_relative: str = Form(""),
+            sun_share_pct: str = Form(""),
+            sun_scale_pct: str = Form(""),
             daylight_night_lx: str = Form(""),
             daylight_day_lx: str = Form(""),
             sky_cloudy_lx: str = Form(""),
@@ -1966,6 +2062,9 @@ class WetterService:
                     detail=tr("Wert außerhalb von {low} bis {high}: {value}", low=f"{low:g}", high=f"{high:g}", value=sun_threshold_lx),
                 )
             config["sun_threshold_lx"] = threshold
+            config["sun_relative"] = bool(sun_relative.strip())
+            config["sun_share_pct"] = _parse_bounded(sun_share_pct, conditions.DEFAULT_SUN_SHARE_PCT, SUN_SHARE_RANGE_PCT)
+            config["sun_scale_pct"] = _parse_bounded(sun_scale_pct, 100.0, SUN_SCALE_RANGE_PCT)
             night = _parse_bounded(daylight_night_lx, DEFAULT_DAYLIGHT_NIGHT_LX, DAYLIGHT_NIGHT_RANGE_LX)
             day = _parse_bounded(daylight_day_lx, DEFAULT_DAYLIGHT_DAY_LX, DAYLIGHT_DAY_RANGE_LX)
             if night >= day:

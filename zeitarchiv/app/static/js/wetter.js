@@ -998,11 +998,11 @@
         const data = this.sunhours;
         if (!data) return '';
         if (!data.hours.length) return escapeHtml(t('Für diesen Tag liegen keine Werte vor.'));
-        let text = `<b>${escapeHtml(t('{h} Sonnenstunden', {h: num(data.sun_hours || 0, 1)}))}</b> ${escapeHtml(t('bei Schwelle {n} lx', {n: num(data.threshold, 0)}))}`;
+        let text = `<b>${escapeHtml(t('{h} Sonnenstunden', {h: num(data.sun_hours || 0, 1)}))}</b> ${escapeHtml(data.relative ? t('bei Schwelle {n} % des klaren Himmels', {n: num(data.threshold, 0)}) : t('bei Schwelle {n} lx', {n: num(data.threshold, 0)}))}`;
         const peak = data.peak;
         if (peak && peak.value > 0) {
-          text += ` · ${escapeHtml(t('Spitze um {time} Uhr: {value} lx', {time: fmtDate(formats.hm, peak.start), value: num(peak.value, 0)}))}`;
-          if (peak.value >= data.saturation * 0.995) text += ` · ${escapeHtml(t('Süd mittags „ab {n} lx“ (Sensor sättigt)', {n: num(data.saturation, 0)}))}`;
+          text += ` · ${escapeHtml(data.relative ? t('Spitze um {time} Uhr: {value} %', {time: fmtDate(formats.hm, peak.start), value: num(peak.value, 0)}) : t('Spitze um {time} Uhr: {value} lx', {time: fmtDate(formats.hm, peak.start), value: num(peak.value, 0)}))}`;
+          if (data.saturation && peak.value >= data.saturation * 0.995) text += ` · ${escapeHtml(t('Süd mittags „ab {n} lx“ (Sensor sättigt)', {n: num(data.saturation, 0)}))}`;
         }
         return text;
       },
@@ -1026,8 +1026,8 @@
             splitLine: {show: false}, axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (ms) => fmtDate(formats.hm, ms / 1000)},
           },
           yAxis: {
-            type: 'value', min: 0, max: peak, name: 'klx', nameTextStyle: {color: colors.text}, ...axisStyle(colors),
-            axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => num(value / 1000, 0)},
+            type: 'value', min: 0, max: peak, name: data.relative ? '%' : 'klx', nameTextStyle: {color: colors.text}, ...axisStyle(colors),
+            axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => num(data.relative ? value : value / 1000, 0)},
           },
           tooltip: {
             trigger: 'axis', confine: true, backgroundColor: colors.surface, borderColor: colors.grid,
@@ -1037,7 +1037,7 @@
               if (point[1] == null) return '';
               const stamp = point[0] / 1000 - 1800;
               const sunny = point[1] >= data.threshold;
-              return `<b>${escapeHtml(fmtDate(formats.hm, stamp))}–${escapeHtml(fmtDate(formats.hm, stamp + 3600))}</b><br>${escapeHtml(num(point[1], 0))} lx · ${escapeHtml(sunny ? t('Sonne') : t('keine Sonne'))}`;
+              return `<b>${escapeHtml(fmtDate(formats.hm, stamp))}–${escapeHtml(fmtDate(formats.hm, stamp + 3600))}</b><br>${escapeHtml(num(point[1], 0))} ${data.relative ? '%' : 'lx'} · ${escapeHtml(sunny ? t('Sonne') : t('keine Sonne'))}`;
             },
           },
           series: [{
@@ -1052,7 +1052,7 @@
             markLine: {
               silent: true, symbol: 'none',
               lineStyle: {color: colors.faint, type: 'dashed', width: 1},
-              label: {color: colors.text, fontSize: scaledFont(11), position: 'insideEndTop', formatter: t('Schwelle {n} lx', {n: num(data.threshold, 0)})},
+              label: {color: colors.text, fontSize: scaledFont(11), position: 'insideEndTop', formatter: data.relative ? t('Schwelle {n} %', {n: num(data.threshold, 0)}) : t('Schwelle {n} lx', {n: num(data.threshold, 0)})},
               data: [{yAxis: data.threshold}],
             },
           }],
