@@ -1621,17 +1621,12 @@
           const members = (this.stackGroups && this.stackGroups.members) || {};
           return this.orderableEntityIds.filter(id => members[id] === gid && this.isBarId(id));
         },
+        // Ein neuer, leerer Stapel; es wird nichts verschoben (ein leerer Stapel ändert die Ansicht nicht).
         addStack() {
           const groups = this.stackGroupList().map(g => ({...g}));
           const members = {...((this.stackGroups && this.stackGroups.members) || {})};
-          const nextId = () => 'g' + (groups.reduce((m, g) => Math.max(m, +g.id.slice(1)), 0) + 1);
-          if (!groups.length) {
-            // Der erste Stapel nimmt alle Balken mit (Ansicht bleibt gleich), dazu ein leerer zum Befüllen.
-            const first = {id: nextId(), name: t('Stapel {n}', {n: 1})};
-            groups.push(first);
-            this.series.filter(s => s.chart_type === 'bar').forEach(s => { members[s.entity_id] = first.id; });
-          }
-          groups.push({id: nextId(), name: t('Stapel {n}', {n: groups.length + 1})});
+          const id = 'g' + (groups.reduce((m, g) => Math.max(m, +g.id.slice(1)), 0) + 1);
+          groups.push({id, name: t('Stapel {n}', {n: groups.length + 1})});
           this.stackGroups = {groups, members};
           this.render();
         },
