@@ -270,7 +270,7 @@
                Entitäts-Chart (.toolbar-right in app.css). -->
           <div class="toolbar-right">
             <div class="menu-wrap" @click.outside="compareMenuOpen = false">
-              <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw || resolutionPreset === 'full' || stackActive || donut" @click="compareMenuOpen = !compareMenuOpen">
+              <button type="button" class="chip menu-btn" :class="{active: compare}" :disabled="raw || resolutionPreset === 'full' || donut" @click="compareMenuOpen = !compareMenuOpen">
                 <span x-text="compareButtonLabel"></span> <span class="chevron">▾</span>
               </button>
               <div class="menu-popover menu-popover-narrow" x-show="compareMenuOpen" x-cloak
@@ -451,10 +451,9 @@
                      deaktivierter Schalter noch anzeigen müsste. -->
                 <label class="menu-row" x-show="canStack && !donut">
                   <span class="menu-row-label">{{ _("Gestapelt") }}
-                    <span class="menu-note" x-show="compare">{{ _("nicht bei aktivem Vergleich") }}</span>
                   </span>
                   <span class="menu-toggle">
-                    <input type="checkbox" :checked="stacked" :disabled="compare" @change="toggleStacked()">
+                    <input type="checkbox" :checked="stacked" @change="toggleStacked()">
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>

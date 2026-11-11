@@ -145,10 +145,7 @@ def tile_compare(chart: dict, chart_type: str, entity_ids: list[str]) -> dict | 
     """Welcher Vergleich für dieses Chart gilt, oder None: dieselbe Regel wie ``tileCompare()`` in
     chart-tile-render.js (ein Test hält beide gleich). ``entity_ids`` sind die sichtbaren Entitäten."""
     settings = chart["compare_settings"] or {}
-    if (
-        not settings.get("compare") or chart_type in NO_COMPARE_TYPES or chart["resolution_preset"] == "full"
-        or (chart["stacked"] and len(entity_ids) >= 2)
-    ):
+    if not settings.get("compare") or chart_type in NO_COMPARE_TYPES or chart["resolution_preset"] == "full":
         return None
     mode = settings.get("mode") or "previous"
     range_key, continuous = chart["range_key"], chart["continuous"]

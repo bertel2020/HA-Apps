@@ -121,11 +121,11 @@ def test_full_resolution_gives_every_stack_its_own_category() -> None:
 
 
 def test_assigning_an_entry_to_a_stack_switches_stacking_on() -> None:
-    assert "if (value !== 'none' && !this.stacked && this.canStack && !this.compare) this.stacked = true;" in EDITOR_JS
+    assert "if (value !== 'none' && !this.stacked && this.canStack) this.stacked = true;" in EDITOR_JS
 
 
 def test_adding_a_stack_switches_stacking_on_and_dissolving_the_last_one_off() -> None:
-    assert "if (!this.stacked && this.canStack && !this.compare) this.stacked = true;" in EDITOR_JS
+    assert "if (!this.stacked && this.canStack) this.stacked = true;" in EDITOR_JS
     assert "if (!groups.length) this.stacked = false;" in EDITOR_JS
 
 
@@ -140,3 +140,12 @@ def test_chips_move_inside_a_stack_and_keep_their_colors() -> None:
     assert "moveInStack(entityId, delta)" in EDITOR_JS
     # Die bisherige Palettenfarbe wird festgeschrieben, damit sich beim Tauschen keine Farbe ändert.
     assert "pinned[id] = 'palette:' + (this.colorIndexFor(id) % PALETTE.length);" in EDITOR_JS
+
+
+def test_stacked_compare_uses_its_own_stack_in_both_renderers() -> None:
+    for source in (EDITOR_JS, TILE_JS):
+        assert "stackKeys[i] + '-cmp'" in source
+        assert "cmp.stack = cmpStackKey;" in source
+        assert "compareTotals" in source
+        # Tooltip-Summen lesen den Stapel der gezeichneten Serie, nicht den Index der Hauptserien.
+        assert "(echartsSeries[p.seriesIndex] || {}).stack" in source

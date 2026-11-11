@@ -24,6 +24,8 @@
     eigenen Kategorie, die übrigen Einträge einzeln daneben
   - Die Reihenfolge im Stapel lässt sich im Stapel-Block ändern, die Farben
     bleiben dabei gleich
+  - Auch zusammen mit dem Vorjahres-/Vorperiodenvergleich: jeder Stapel
+    bekommt einen blasseren Vergleichsstapel daneben
   - Gilt auch auf Dashboards und in der Karte; ohne Auswahl bleibt alles wie
     bisher in einem Stapel
 
@@ -86,6 +88,8 @@
     category, the other entries stand next to it
   - The order within a stack can be changed in the stack block, the colors
     stay the same
+  - Also together with the previous-year/previous-period comparison: every
+    stack gets a paler comparison stack next to it
   - Also applies on dashboards and in the card; without a choice everything
     stays in one stack as before
 

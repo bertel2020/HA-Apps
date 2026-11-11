@@ -1497,7 +1497,6 @@
           // sichtbar statt an ein offengehaltenes Menü gebunden.
           this.compareMenuOpen = false;
           this.raw = false;
-          this.stacked = false;
           this.timeline = false;
           this.donut = false;
           // Ein Vergleich (Vorjahr, Langzeit, …) bezieht sich immer auf die
@@ -1603,7 +1602,7 @@
           this.stackGroups = {groups, members};
           // Wer einen Eintrag einem Stapel zuordnet, will ihn gestapelt sehen: „Gestapelt“ schaltet sich ein
           // (nicht bei Vergleich, der Vorrang hat und Stapeln ausschließt).
-          if (value !== 'none' && !this.stacked && this.canStack && !this.compare) this.stacked = true;
+          if (value !== 'none' && !this.stacked && this.canStack) this.stacked = true;
           this.render();
         },
         // Stapelname für die Legende, nur bei wirksamen Stapeln (gleiche Regel wie ChartTileRender.stackLabels).
@@ -1657,7 +1656,7 @@
           groups.push({id, name: t('Stapel {n}', {n: groups.length + 1})});
           this.stackGroups = {groups, members};
           // Wer einen Stapel anlegt, will stapeln: „Gestapelt“ schaltet sich ein (nicht bei Vergleich, der Vorrang hat).
-          if (!this.stacked && this.canStack && !this.compare) this.stacked = true;
+          if (!this.stacked && this.canStack) this.stacked = true;
           this.render();
         },
         renameStack(gid, name) {
@@ -2266,6 +2265,28 @@
             (legendCompanions[owner] ||= []).push(name);
             legendSelected[name] = legendSelected[owner];
           };
+          // Vorperiode/Vorjahr gestapelter Balken: je Stapel ein eigener, blasser Stapel daneben
+          // ('<Stapelschlüssel>-cmp') mit denselben Segmenten und derselben Reihenfolge. Bei
+          // Anteilen (%) wird der Vergleichsstapel auf seine eigene Summe normiert.
+          const compareShiftMs = s => ((s.compare_window_start != null && this.windowStart != null)
+            ? (this.windowStart - s.compare_window_start) * 1000 : 0);
+          const compareResampled = s => resamplePoints(
+            s.compare_points, this.range, this.resolutionPreset, s.aggregation_type, s.compare_window_start
+          );
+          const compareStackKey = (s, i) => (this.compare && stackKeys[i] && s.chart_type === 'bar' && s.compare_points && s.compare_points.length)
+            ? stackKeys[i] + '-cmp' : null;
+          const compareTotals = new Map();
+          const lastCompareIndex = new Map();
+          chartSeries.forEach((s, i) => {
+            const key = compareStackKey(s, i);
+            if (!key) return;
+            lastCompareIndex.set(key, i);
+            if (!normalizeActive || !barOnlyAxis.has(axisKey(s))) return;
+            if (!compareTotals.has(key)) compareTotals.set(key, new Map());
+            const totals = compareTotals.get(key);
+            const shift = compareShiftMs(s);
+            compareResampled(s).forEach(p => { const x = p.ts * 1000 + shift; totals.set(x, (totals.get(x) || 0) + p.value); });
+          });
           chartSeries.forEach((s, i) => {
             const color = this.colorFor(s.entity_id);
             // chart_type kommt vom Server (query.py: "bar" für Zähler/Schalter,
@@ -2465,29 +2486,26 @@
                 z: 3,
               });
             }
-            // stackedActive schließt Vergleich schon am Knopf aus
-            // (toggleStacked()/:disabled in chart_editor.html) — hier
-            // zusätzlich robust dagegen, falls compare aus einem älteren
-            // Zustand (z. B. prefill) noch true wäre: eine Vorperiode-
-            // Nebenserie ließe sich in einem gestapelten Balken nicht sinnvoll
-            // einordnen (mitstapeln würde acht statt vier Segmente ergeben).
-            if (this.compare && !stackedActive && s.compare_points && s.compare_points.length) {
+            // Gestapelte Balken: die Vorperiode bekommt einen eigenen Stapel (cmpStackKey, s. o.).
+            if (this.compare && s.compare_points && s.compare_points.length) {
               // Vorperiode um die exakte Fensterdifferenz verschieben, nicht per
               // Array-Index mappen — siehe derselbe Kommentar/Grund in
               // entity_detail.html (unterschiedlich lange Punktreihen).
-              const shiftMs = (s.compare_window_start != null && this.windowStart != null)
-                ? (this.windowStart - s.compare_window_start) * 1000
-                : 0;
+              const shiftMs = compareShiftMs(s);
+              const cmpStackKey = compareStackKey(s, i);
               const compareOffset = this.compareMode === 'year' ? 0 : -1;
               const compareLabel = formatPeriodLabel(
                 this.range, this.continuous, s.compare_window_start, s.compare_window_end, false
               );
               const seriesLabel = this.compareMode === 'year' ? t('Vorjahr') : t('Vorperiode');
-              const comparePoints = resamplePoints(
-                s.compare_points, this.range, this.resolutionPreset,
-                s.aggregation_type, s.compare_window_start
-              );
-              const compareData = comparePoints.map(p => [p.ts * 1000 + shiftMs, p.value, p.ts * 1000, s.unit, seriesDecimals, isDurationSeries(s)]);
+              const comparePoints = compareResampled(s);
+              const cmpNormalized = !!cmpStackKey && normalizeActive && barOnlyAxis.has(axisKey(s));
+              const compareData = comparePoints.map(p => {
+                const x = p.ts * 1000 + shiftMs;
+                if (!cmpNormalized) return [x, p.value, p.ts * 1000, s.unit, seriesDecimals, isDurationSeries(s)];
+                const total = compareTotals.get(cmpStackKey).get(x) || 0;
+                return [x, total ? (p.value / total) * 100 : 0, p.ts * 1000, '%', 0, false, p.value, s.unit, seriesDecimals];
+              });
               if (chartType === 'line' && compareData.length && this.windowEnd != null
                   && compareData[compareData.length - 1][0] < this.windowEnd * 1000) {
                 const last = compareData[compareData.length - 1];
@@ -2505,6 +2523,11 @@
                 barMaxWidth: 48,
                 clip: chartType !== 'bar',
               };
+              if (cmpStackKey) {
+                cmp.stack = cmpStackKey;
+                stackNameByKey.set(cmpStackKey, `${stackNameByKey.get(stackKeys[i]) || ''}${hasStackGroups ? ' ' : ''}(${seriesLabel})`.trim());
+                if (lastCompareIndex.get(cmpStackKey) === i) cmp.itemStyle.borderRadius = [3, 3, 0, 0];
+              }
               if (chartType === 'line') {
                 cmp.smooth = true;
                 if (!this.showPoints) cmp.symbol = 'none';
@@ -2646,7 +2669,7 @@
                 const sums = new Map();
                 if (hasStackGroups) {
                   params.forEach(p => {
-                    const key = stackKeys[p.seriesIndex];
+                    const key = (echartsSeries[p.seriesIndex] || {}).stack;
                     if (!key) return;
                     const abs = p.data[6];
                     const entry = sums.get(key) || {n: 0, sum: 0, unit: abs != null ? p.data[7] : p.data[3], decimals: abs != null ? p.data[8] : p.data[4], duration: !!p.data[5]};

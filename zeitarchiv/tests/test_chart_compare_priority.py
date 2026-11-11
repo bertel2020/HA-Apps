@@ -1,6 +1,7 @@
 """Vergleich (Vormonat/Vorjahresmonat) hat auf der Charts-Seite Vorrang vor
-Optionen, mit denen er sich ausschließt (Rohwerte, Zeitstrahl, Gestapelt,
-Donut, Auflösung "Voll"/Ausrichtung "Horizontal") — Nutzerwunsch.
+Optionen, mit denen er sich ausschließt (Rohwerte, Zeitstrahl, Donut,
+Auflösung "Voll"/Ausrichtung "Horizontal") — Nutzerwunsch. Gestapelt gehört
+nicht mehr dazu: gestapelte Balken bekommen einen eigenen Vergleichsstapel.
 
 Vorher lief das umgekehrt: AKTIVIEREN einer dieser Optionen schaltete einen
 bereits aktiven Vergleich stillschweigend ab (z. B. `if (this.raw) this.compare
@@ -29,4 +30,10 @@ def test_activating_one_of_them_no_longer_silently_turns_compare_off() -> None:
 
 
 def test_enabling_compare_resets_the_conflicting_options_instead() -> None:
-    assert "this.raw = false;\n          this.stacked = false;\n          this.timeline = false;\n          this.donut = false;" in CHART_EDITOR_JS
+    assert "this.raw = false;\n          this.timeline = false;\n          this.donut = false;" in CHART_EDITOR_JS
+
+
+def test_stacked_and_compare_can_be_combined() -> None:
+    assert ':disabled="compare" @change="toggleStacked()"' not in EDITOR
+    assert "stackActive || donut" not in EDITOR
+    assert "stackKeys[i] + '-cmp'" in CHART_EDITOR_JS
