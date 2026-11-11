@@ -36,6 +36,27 @@
     </div>
     {% endif %}
 
+    {% if role_offer %}
+    <section class="ov-roles" aria-labelledby="ov-roles-h">
+      <h2 id="ov-roles-h">{{ _("Passt in das Wetterdashboard") }}</h2>
+      <p class="sub">{{ _("Diese kürzlich übernommenen Entitäten passen in leere Rollen des Wetterdashboards. Zugeordnet wird erst, wenn du dort speicherst.") }}</p>
+      <form method="get" action="{{ app_root }}/wetterdashboard">
+        <ul class="ov-roles-list">
+          {% for row in role_offer %}
+          <li>
+            <label>
+              <input type="checkbox" name="assign" value="{{ row.role }}:{{ row.entity_id }}" {% if row.confidence == "ok" %}checked{% endif %}>
+              <span class="ov-roles-name"><b>{{ row.name }}</b><code>{{ row.entity_id }}</code></span>
+              <span class="ov-roles-role">{{ row.label }}{% if row.confidence != "ok" %} <em>({{ _("prüfen") }})</em>{% endif %}</span>
+            </label>
+          </li>
+          {% endfor %}
+        </ul>
+        <button type="submit" class="btn primary">{{ _("Zuordnen und Dashboard öffnen") }}</button>
+      </form>
+    </section>
+    {% endif %}
+
     {% if catalog is none %}
     <div class="settings-panel ov-empty">
       <p><b>{{ _("Noch kein Katalog empfangen.") }}</b></p>

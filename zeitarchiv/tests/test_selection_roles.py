@@ -86,3 +86,79 @@ def test_selection_page_shows_the_role_hint_for_a_search_hit(client) -> None:
     finally:
         client.post("/wetterdashboard/disable", follow_redirects=False)
         target.unlink(missing_ok=True)
+
+
+# ---- Block „Passt in das Wetterdashboard“ und Vorbelegung (Schritt 3) -------------------------
+
+def _entry(ids, *, ts=1_000_000.0, action="add", source="assistant", status="applied", undone_by=None):
+    return {"id": "e1", "ts": ts, "action": action, "source": source, "status": status, "entity_ids": ids,
+            "results": {}, "undone_by": undone_by}
+
+
+def test_offer_lists_recently_added_archived_entities_that_fit_an_empty_role(index) -> None:
+    _enable(index)
+    offer = selection_roles.wetter_offer(
+        index, CATALOG, [_entry(["sensor.sun_solar_elevation", "sensor.druck"])],
+        {"sensor.sun_solar_elevation", "sensor.druck"}, now=1_000_100.0,
+    )
+    assert [(row["entity_id"], row["role"]) for row in offer] == [
+        ("sensor.druck", "pressure"), ("sensor.sun_solar_elevation", "sun_elevation"),
+    ]
+    assert offer[0]["name"] == "Druck relativ"
+
+
+@pytest.mark.parametrize("entry", [
+    _entry(["sensor.druck"], action="remove"),
+    _entry(["sensor.druck"], source="integration"),
+    _entry(["sensor.druck"], status="pending"),
+    _entry(["sensor.druck"], undone_by="x"),
+    _entry(["sensor.druck"], ts=1.0),  # zu alt
+])
+def test_offer_ignores_other_history_entries(index, entry) -> None:
+    _enable(index)
+    assert selection_roles.wetter_offer(index, CATALOG, [entry], {"sensor.druck"}, now=1_000_100.0) == []
+
+
+def test_offer_waits_until_the_entity_is_archived(index) -> None:
+    _enable(index)
+    assert selection_roles.wetter_offer(index, CATALOG, [_entry(["sensor.druck"])], set(), now=1_000_100.0) == []
+
+
+def test_offer_disappears_once_the_role_is_filled(index) -> None:
+    _enable(index, pressure="sensor.druck")
+    assert selection_roles.wetter_offer(index, CATALOG, [_entry(["sensor.druck"])], {"sensor.druck"}, now=1_000_100.0) == []
+
+
+def test_weather_dashboard_opens_the_setup_with_valid_assignments_prefilled(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.assign_sonne", "sensor", "measurement", "°")
+    index.set_setting(wetter_routes.SETTING_ENABLED, "1")
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    try:
+        page = client.get("/wetterdashboard?assign=sun_elevation:sensor.assign_sonne&assign=pressure:sensor.nicht_archiviert").text
+        assert 'hx-get="wetterdashboard/setup?assign=sun_elevation%3Asensor.assign_sonne"' in page
+        assert "nicht_archiviert" not in page
+        setup = client.get("/wetterdashboard/setup?assign=sun_elevation:sensor.assign_sonne&assign=pressure:sensor.nicht_archiviert").text
+        assert '"sun_elevation": "sensor.assign_sonne"' in setup and '"pressure": ""' in setup
+        assert "1 Rollen aus dem Auswahl-Assistenten vorbelegt" in setup
+        assert "Rollen aus dem Auswahl-Assistenten vorbelegt" not in client.get("/wetterdashboard/setup").text
+    finally:
+        index.set_setting(wetter_routes.SETTING_CONFIG, "")
+        index.set_setting(wetter_routes.SETTING_ENABLED, "0")
+
+
+def test_prefill_never_overwrites_a_filled_role(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.assign_alt", "sensor", "measurement", "hPa")
+    index.get_or_create_entity("sensor.assign_neu", "sensor", "measurement", "hPa")
+    index.set_setting(wetter_routes.SETTING_ENABLED, "1")
+    wetter_routes._save_config(index, {**wetter_routes._empty_config(), "pressure": "sensor.assign_alt"})  # noqa: SLF001
+    try:
+        setup = client.get("/wetterdashboard/setup?assign=pressure:sensor.assign_neu").text
+        assert '"pressure": "sensor.assign_alt"' in setup and '"pressure": "sensor.assign_neu"' not in setup
+        assert "Rollen aus dem Auswahl-Assistenten vorbelegt" not in setup
+    finally:
+        index.set_setting(wetter_routes.SETTING_CONFIG, "")
+        index.set_setting(wetter_routes.SETTING_ENABLED, "0")

@@ -80,7 +80,7 @@
         roleTypes: {{ role_types | tojson }},
         roleUnits: {{ role_units | tojson }},
         roleHelp: {{ role_help | tojson }},
-        roleVals: { {% for key, label, types in roles %}{{ key | tojson }}: {{ (config[key] or '') | tojson }}{{ ',' if not loop.last }}{% endfor %} },
+        roleVals: { {% for key, label, types in roles %}{{ key | tojson }}: {{ (config[key] or prefill.get(key) or '') | tojson }}{{ ',' if not loop.last }}{% endfor %} },
         roleLabels: { {% for key, label, types in roles %}{{ key | tojson }}: {{ _(label) | tojson }}{{ ',' if not loop.last }}{% endfor %} },
         activeRole: null, draftRole: "",
         extras: {{ config.extra_temperatures | tojson }},
@@ -93,7 +93,7 @@
             : token === "@heating" ? this.heating.length > 0
             : token === "@pv" ? !!(this.roleVals.pv_power && this.roleVals.illuminance) : !!this.roleVals[token]);
         },
-        hints: {}, note: "", missingNote: "", suggesting: false,
+        hints: {}, note: {{ (_("{count} Rollen aus dem Auswahl-Assistenten vorbelegt. Es wurde nichts gespeichert: prüfen und dann speichern.", count=prefill | length) if prefill else "") | tojson }}, missingNote: "", suggesting: false,
         async suggest() {
           this.suggesting = true; this.note = ""; this.missingNote = "";
           try {

@@ -24,7 +24,10 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from . import selection_catalog, selection_category, selection_jobs, selection_overview, selection_search, selection_suggest
+from . import (
+    selection_catalog, selection_category, selection_jobs, selection_overview, selection_roles, selection_search,
+    selection_suggest,
+)
 from .formatting import format_time, format_timestamp
 from .i18n import tr
 from .selection_topics import TOPIC_INFO, rule_anwesenheit, topic_label
@@ -247,7 +250,11 @@ def make_ui_router(get_index: Callable[[], Index], templates: Jinja2Templates, d
         for item in timeline:
             item["when"] = when(item.get("ts"))
         current = next((item for item in jobs if item["id"] == job), None) if job else None
+        role_offer = (
+            selection_roles.wetter_offer(get_index(), catalog["entities"], timeline, archived()) if catalog else []
+        )
         return templates.TemplateResponse(request, "selection_overview.html", {
+            "role_offer": role_offer,
             "catalog": catalog, "table": data, "timeline": timeline, "filters": selection_overview.FILTERS,
             "job": current, "job_status_text": tr(str(selection_overview.STATUS_TEXT.get(current["status"], "")))
             if current else "", "can_apply": bool(catalog and catalog.get("phase1")),

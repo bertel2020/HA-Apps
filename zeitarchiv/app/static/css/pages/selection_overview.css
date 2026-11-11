@@ -24,6 +24,18 @@
   .ov-job-failed{border-color:var(--danger);background:var(--danger-soft);}
   .ov-job a{color:var(--accent-line);}
 
+  .ov-roles{margin:0 0 18px;padding:14px 18px;border:1px solid var(--border-strong);border-radius:12px;background:var(--surface);}
+  .ov-roles h2{margin:0 0 2px;font-size:calc(15px * var(--font-scale, 1));}
+  .ov-roles .sub{margin:0 0 10px;}
+  .ov-roles-list{list-style:none;margin:0 0 12px;padding:0;}
+  .ov-roles-list li{border-top:1px solid var(--border);}
+  .ov-roles-list label{display:flex;align-items:center;gap:12px;padding:8px 0;cursor:pointer;}
+  .ov-roles-list input{flex:0 0 auto;width:18px;height:18px;accent-color:var(--accent-line);}
+  .ov-roles-name{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
+  .ov-roles-name code{font-size:calc(11px * var(--font-scale, 1));color:var(--ink-muted);overflow-wrap:anywhere;}
+  .ov-roles-role{flex:0 0 auto;font-size:calc(13px * var(--font-scale, 1));color:var(--accent-line);}
+  .ov-roles-role em{color:var(--warning);font-style:normal;}
+
   .ov-search{display:flex;gap:8px;margin:0 0 10px;}
   .ov-search input[type=search]{flex:1 1 auto;min-width:0;}
   .ov-search .btn{min-height:36px;}

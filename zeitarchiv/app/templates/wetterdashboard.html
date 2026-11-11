@@ -7,7 +7,7 @@
 {% block content %}
 
   <div class="page page-wide">
-    <div id="wetter-root">
+    <div id="wetter-root"{% if assign_query %} hx-get="wetterdashboard/setup?{{ assign_query }}" hx-trigger="load" hx-swap="innerHTML"{% endif %}>
       {% include "_wetter_view.html" %}
     </div>
   </div>

@@ -27,7 +27,9 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from urllib.parse import urlencode
+
+from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -1820,9 +1822,23 @@ class WetterService:
 
     # -- Seite -------------------------------------------------------------------------
 
-    def _page_context(self, request: Request) -> dict:
+    def _assignments(self, config: dict, values: list[str]) -> dict[str, str]:
+        """Zuordnungen „Rolle:Entität“ aus dem Auswahl-Assistenten (ROADMAP 1.54): nur bekannte Rollen, die noch
+        leer sind, mit einer archivierten Entität, jede Entität höchstens einmal. Alles andere fällt still weg."""
+        known = {option["entity_id"] for option in self._entity_options()}
+        picked: dict[str, str] = {}
+        for value in values[:len(ROLE_KEYS)]:
+            role, _sep, entity_id = value.partition(":")
+            if role in ROLE_KEYS and not config.get(role) and role not in picked \
+                    and entity_id in known and entity_id not in picked.values():
+                picked[role] = entity_id
+        return picked
+
+    def _page_context(self, request: Request, assign: list[str] | None = None) -> dict:
         config = _load_config(self.deps.index)
+        assignments = self._assignments(config, assign or [])
         return {
+            "assign_query": urlencode([("assign", f"{role}:{entity_id}") for role, entity_id in assignments.items()]),
             "configured": _is_configured(config),
             "precip_modes": self.available_precip(),
             "has_heating": bool(self.heating_counters(config)),
@@ -1865,8 +1881,8 @@ class WetterService:
         deps = self.deps
 
         @router.get("/wetterdashboard", response_class=HTMLResponse)
-        def wetterdashboard_page(request: Request) -> HTMLResponse:
-            return deps.templates.TemplateResponse(request, "wetterdashboard.html", self._page_context(request))
+        def wetterdashboard_page(request: Request, assign: list[str] = Query(default=[])) -> HTMLResponse:
+            return deps.templates.TemplateResponse(request, "wetterdashboard.html", self._page_context(request, assign))
 
         @router.post("/wetterdashboard/enable")
         def wetterdashboard_enable() -> dict:
@@ -1880,13 +1896,14 @@ class WetterService:
             return {"enabled": False}
 
         @router.get("/wetterdashboard/setup", response_class=HTMLResponse)
-        def wetterdashboard_setup_form(request: Request) -> HTMLResponse:
+        def wetterdashboard_setup_form(request: Request, assign: list[str] = Query(default=[])) -> HTMLResponse:
             config = _load_config(deps.index)
+            prefill = self._assignments(config, assign)
             warnings = {key: _role_warning(deps.index, key, config[key]) for key in ROLE_KEYS}
             return deps.templates.TemplateResponse(
                 request, "_wetter_setup.html",
                 {
-                    "config": config, "entity_options": self._entity_options(),
+                    "config": config, "entity_options": self._entity_options(), "prefill": prefill,
                     "roles": [(key, label, types) for key, label, types in ROLES],
                     "role_types": {key: list(types) for key, _label, types in ROLES},
                     "role_units": ROLE_UNITS,

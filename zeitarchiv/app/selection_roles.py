@@ -7,10 +7,12 @@ belegte Rollen und ein ausgeschaltetes Dashboard bleiben ohne Hinweis. Es wird n
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from . import wetter_autofill, wetter_routes
 from .i18n import tr
+from .selection_overview import undo_ids
 from .storage.index import Index
 
 
@@ -42,3 +44,34 @@ def attach(result: dict[str, Any], hints: dict[str, dict[str, str]]) -> None:
                 hint = hints.get(row["entity_id"])
                 if hint:
                     row["role_hint"] = hint
+
+
+#: So lange nach dem Übernehmen bietet „Auswahl & Verlauf“ die Zuordnung an. Der Block verschwindet früher von selbst,
+#: sobald die Rolle belegt ist.
+OFFER_WINDOW = 2 * 24 * 3600
+MAX_OFFER = 12
+
+
+def wetter_offer(
+    index: Index, entities: list[dict[str, Any]], timeline: list[dict[str, Any]], archived: set[str],
+    now: float | None = None,
+) -> list[dict[str, str]]:
+    """Zeilen für „Passt in das Wetterdashboard“: kürzlich im Assistenten übernommene Entitäten, die schon archiviert
+    sind (vorher zeigte die Rolle ins Leere) und in eine leere Rolle passen. ``[]``, wenn nichts zu tun ist."""
+    cutoff = (now if now is not None else time.time()) - OFFER_WINDOW
+    ids: list[str] = []
+    for entry in timeline:
+        if entry.get("action") != "add" or entry.get("source") != "assistant" or entry.get("undone_by"):
+            continue
+        if entry.get("status") not in {"applied", "partial"} or float(entry.get("ts") or 0) < cutoff:
+            continue
+        ids.extend(eid for eid in undo_ids(entry) if eid in archived and eid not in ids)
+    hints = wetter_hints(index, entities, ids)
+    names = {row["entity_id"]: row.get("name") or row["entity_id"] for row in entities}
+    order = list(wetter_routes.ROLE_KEYS)
+    rows = [
+        {"entity_id": eid, "name": names.get(eid, eid), **hint}
+        for eid, hint in hints.items()
+    ]
+    rows.sort(key=lambda row: order.index(row["role"]))
+    return rows[:MAX_OFFER]
