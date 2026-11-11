@@ -133,3 +133,10 @@ def test_dropping_on_a_stack_keeps_the_order_of_the_list() -> None:
     # Der Weg zu einem Stapel führt über andere Zeilen; deren Umsortieren beim Ziehen wird beim Ablegen zurückgenommen.
     assert "component.dragOrderSnapshot = [...component.selectedEntityIds];" in EDITOR_JS
     assert "this.selectedEntityIds = [...this.dragOrderSnapshot];" in EDITOR_JS
+
+
+def test_chips_move_inside_a_stack_and_keep_their_colors() -> None:
+    assert "moveInStack(mid, -1)" in EDITOR_TEMPLATE and "moveInStack(mid, 1)" in EDITOR_TEMPLATE
+    assert "moveInStack(entityId, delta)" in EDITOR_JS
+    # Die bisherige Palettenfarbe wird festgeschrieben, damit sich beim Tauschen keine Farbe ändert.
+    assert "pinned[id] = 'palette:' + (this.colorIndexFor(id) % PALETTE.length);" in EDITOR_JS

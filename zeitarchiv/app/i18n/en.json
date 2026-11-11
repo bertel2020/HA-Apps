@@ -1,5 +1,8 @@
 {
   "app": {
+    "Im Stapel nach unten": "Down in the stack",
+    "Im Stapel nach oben": "Up in the stack",
+    "Die Reihenfolge im Stapel ist die der Liste, von links (unten) nach rechts (oben).": "The order in the stack is that of the list, from left (bottom) to right (top).",
     "Anteile (%) wirken erst, wenn alle Balken in einem Stapel liegen. Solange Balken ohne Stapel dabei sind, bleiben die Werte absolut.": "Shares (%) only apply once every bar is in a stack. While bars without a stack are present, the values stay absolute.",
     "+ Stapel hinzufügen": "+ Add stack",
     "auflösen": "dissolve",

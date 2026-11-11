@@ -22,6 +22,8 @@
     „Anteile (%)“ rechnet je Stapel
   - Auch bei Auflösung „Voll“ und horizontal: jeder Stapel steht in einer
     eigenen Kategorie, die übrigen Einträge einzeln daneben
+  - Die Reihenfolge im Stapel lässt sich im Stapel-Block ändern, die Farben
+    bleiben dabei gleich
   - Gilt auch auf Dashboards und in der Karte; ohne Auswahl bleibt alles wie
     bisher in einem Stapel
 
@@ -82,6 +84,8 @@
     (%)” is calculated per stack
   - Also at resolution “Full” and horizontal: every stack sits in its own
     category, the other entries stand next to it
+  - The order within a stack can be changed in the stack block, the colors
+    stay the same
   - Also applies on dashboards and in the card; without a choice everything
     stays in one stack as before
 

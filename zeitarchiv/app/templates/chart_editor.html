@@ -203,6 +203,7 @@
           <div class="stack-block" :class="{inactive: !stacked}" x-show="canStack" x-cloak>
             <p class="sub" style="margin:0 0 8px;" x-show="stacked && singleBucket && !hasStackMembers" x-text="t('In der Auflösung „Voll“ bekommt jeder Stapel eine eigene Kategorie. Lege dazu Stapel an.')"></p>
             <p class="sub" style="margin:0 0 8px;" x-text="stacked ? t('Balken im selben Stapel liegen aufeinander, die übrigen stehen einzeln daneben. Zum Zuordnen den Griff einer Zeile auf einen Stapel ziehen oder das Feld „Stapel“ nutzen.') : t('Stapel sind inaktiv, solange „Gestapelt“ aus ist. Sie bleiben gespeichert.')"></p>
+            <p class="color-hint" style="margin:0;" x-show="stackGroupList().length">{{ _("Die Reihenfolge im Stapel ist die der Liste, von links (unten) nach rechts (oben).") }}</p>
             <template x-for="g in stackGroupList()" :key="g.id">
               <div class="stack-card" :class="{over: stackOver === g.id}"
                    @dragover="stackDragOver($event, g.id)" @dragleave="stackOver === g.id && (stackOver = null)" @drop="stackDrop($event, g.id)">
@@ -217,6 +218,10 @@
                     <span class="stack-chip">
                       <span class="stack-chip-dot" :style="'--dot:' + colorFor(mid)"></span>
                       <span x-text="labelFor(mid)"></span>
+                      <button type="button" class="stack-chip-move" title="{{ _('Im Stapel nach unten') }}" aria-label="{{ _('Im Stapel nach unten') }}"
+                              :disabled="stackMembersOf(g.id).indexOf(mid) === 0" @click="moveInStack(mid, -1)">←</button>
+                      <button type="button" class="stack-chip-move" title="{{ _('Im Stapel nach oben') }}" aria-label="{{ _('Im Stapel nach oben') }}"
+                              :disabled="stackMembersOf(g.id).indexOf(mid) === stackMembersOf(g.id).length - 1" @click="moveInStack(mid, 1)">→</button>
                       <button type="button" title="{{ _('Aus dem Stapel nehmen') }}" aria-label="{{ _('Aus dem Stapel nehmen') }}" @click="setStack(mid, 'none')">✕</button>
                     </span>
                   </template>

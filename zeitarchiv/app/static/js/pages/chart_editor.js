@@ -1629,6 +1629,27 @@
           return this.orderableEntityIds.filter(id => members[id] === gid && this.isBarId(id));
         },
         // Ein neuer, leerer Stapel; es wird nichts verschoben (ein leerer Stapel ändert die Ansicht nicht).
+        // Reihenfolge im Stapel (links = unten, rechts = oben). Es gibt nur eine Reihenfolge für Legende,
+        // Statistik und Stapel: die beiden Serien tauschen in der Liste „Ausgewählt“ ihren Platz. Ihre bisherige
+        // Palettenfarbe wird dabei als eigene Farbe festgeschrieben, damit sich beim Umsortieren keine Farbe ändert.
+        moveInStack(entityId, delta) {
+          const gid = ((this.stackGroups && this.stackGroups.members) || {})[entityId];
+          if (!gid) return;
+          const members = this.stackMembersOf(gid);
+          const at = members.indexOf(entityId);
+          const to = at + delta;
+          if (at === -1 || to < 0 || to >= members.length) return;
+          const neighbor = members[to];
+          const pinned = {...this.seriesColors};
+          [entityId, neighbor].forEach(id => {
+            if (!pinned[id]) pinned[id] = 'palette:' + (this.colorIndexFor(id) % PALETTE.length);
+          });
+          this.seriesColors = pinned;
+          const idxA = this.selectedEntityIds.indexOf(entityId);
+          const idxB = this.selectedEntityIds.indexOf(neighbor);
+          [this.selectedEntityIds[idxA], this.selectedEntityIds[idxB]] = [this.selectedEntityIds[idxB], this.selectedEntityIds[idxA]];
+          this.load();
+        },
         addStack() {
           const groups = this.stackGroupList().map(g => ({...g}));
           const members = {...((this.stackGroups && this.stackGroups.members) || {})};
