@@ -3056,6 +3056,8 @@
     "Luftfeuchtigkeit, aber keinem Bereich zugeordnet": "Humidity, but not assigned to an area",
     "Einzelwert einer VM, eines Containers, einer Platte oder App ({platform})": "Single value of a VM, container, disk or app ({platform})",
     "Batterie schwach (ja/nein), der Stand steht schon als Prozentwert da": "Battery low (yes/no), the level is already listed as a percentage",
+    "Rolle im Wetterdashboard: {role}": "Role in the weather dashboard: {role}",
+    "Rolle im Wetterdashboard: {role} (prüfen)": "Role in the weather dashboard: {role} (check)",
     "Helligkeit draußen": "Outdoor brightness",
     "Herkunft": "Origin",
     "Hier betrifft das {count}.": "Here this affects {count}.",

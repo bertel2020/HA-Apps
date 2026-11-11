@@ -9,6 +9,7 @@
     <span class="sel-name">{{ row.name }}</span>
     <span class="sel-id">{{ row.entity_id }}</span>
     <span class="sel-reason">{{ row.reason }}{% if row.high_rate %} · {{ _("hohe Änderungsrate") }}{% endif %}</span>
+    {% if row.role_hint %}<span class="sel-role{{ ' is-check' if row.role_hint.confidence == 'check' }}">{% if row.role_hint.confidence == 'check' %}{{ _("Rolle im Wetterdashboard: {role} (prüfen)", role=row.role_hint.label) }}{% else %}{{ _("Rolle im Wetterdashboard: {role}", role=row.role_hint.label) }}{% endif %}</span>{% endif %}
   </span>
   <span class="sel-kind">{{ row.kind }}{% if row.unit %} · {{ row.unit }}{% endif %}</span>
   {% if row.text %}<span class="sel-badge sel-badge-muted" title="{{ _('Der Zustand ist Text; solche Entitäten gehen nur als Einzel-ID, nicht über das Label.') }}">{{ _("nur als Einzel-ID") }}</span>{% endif %}

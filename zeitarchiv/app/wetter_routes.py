@@ -396,6 +396,12 @@ def temperature_entity(index: Index) -> str:
     return (_load_config(index).get("temperature") or "") if _is_enabled(index) else ""
 
 
+def active_role_config(index: Index) -> dict | None:
+    """Rollenbelegung des Wetterdashboards oder ``None``, wenn es ausgeschaltet ist (der Auswahl-Assistent bietet
+    dann keine Rollen an)."""
+    return _load_config(index) if _is_enabled(index) else None
+
+
 def radiation_entity(index: Index) -> str:
     """Entität der Strahlung (W/m²) oder leer; das Energiedashboard braucht sie für den Ertrag je Einstrahlung."""
     return _load_config(index).get("radiation") or ""

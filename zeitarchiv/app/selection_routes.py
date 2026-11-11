@@ -26,7 +26,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
-from . import selection_catalog, selection_jobs, selection_patterns, selection_search, selection_suggest
+from . import selection_catalog, selection_jobs, selection_patterns, selection_roles, selection_search, selection_suggest
 from .formatting import format_time, format_timestamp
 from .i18n import N_
 from .selection_change_routes import make_change_router
@@ -183,6 +183,8 @@ def make_router(get_index: Callable[[], Index], templates: Jinja2Templates, data
         if catalog is not None:
             archived = {entity["entity_id"] for entity in get_index().list_entities()}
             result = view_result(topic, query, catalog["entities"], archived)
+            shown = [row["entity_id"] for part in ("recommended", "more") for group in result[part] for row in group["rows"]]
+            selection_roles.attach(result, selection_roles.wetter_hints(get_index(), catalog["entities"], shown))
             tiles = topic_tiles(catalog["entities"], archived)
             received = f"{format_timestamp(catalog['received_ts'], tz)} {format_time(catalog['received_ts'], tz)}"
             for row in selection_patterns.view_rows(result):
