@@ -58,3 +58,24 @@ def test_separator_label_is_editable_saved_and_rendered() -> None:
 def test_formula_unit_field_matches_aggregation_picker_width() -> None:
     assert ".tbl-row-top .tbl-agg-picker{flex:none;width:76px;}" in EDITOR
     assert "input.tbl-formula-unit-inline{flex:none;width:76px;" in EDITOR
+
+
+def test_blank_row_is_a_separator_with_hidden_line() -> None:
+    # Leerzeile = Trennlinie mit hide_line: behält die Abschnittsgrenze für Summen und Anteile.
+    assert "addRow('separator', {hide_line: true})" in EDITOR
+    assert 'x-model="row.hide_line"' in EDITOR
+    assert "row.hide_line ? ' is-blank'" in DASHBOARD
+    assert "hide_line: bool = False" in MAIN
+
+
+def test_blank_row_survives_a_save_and_load_round_trip(tmp_path) -> None:
+    from app.storage.index import Index  # noqa: PLC0415
+
+    index = Index(tmp_path / "index.db")
+    rows = [
+        {"label": "", "row_type": "separator", "entity_ids": [], "formula": "", "bold": False, "hide_line": True},
+        {"label": "", "row_type": "separator", "entity_ids": [], "formula": "", "bold": False},
+    ]
+    index._write_table_rows(1, rows)
+    loaded = [dict(r) for r in index._conn.execute("SELECT hide_line FROM table_rows ORDER BY position")]
+    assert [r["hide_line"] for r in loaded] == [1, 0]

@@ -991,6 +991,8 @@
     "Summe/Durchschnitt aller Entität-/Gruppen-Zeilen seit der letzten Trennlinie — aktualisiert sich automatisch, wenn darüber Zeilen hinzukommen oder wegfallen": "Sum/average of all entity/group rows since the last separator — updates automatically when rows above are added or removed",
     "+ Summenzeile": "+ Sum row",
     "+ Trennlinie": "+ Separator",
+    "+ Leerzeile": "+ Blank row",
+    "Linie ausblenden": "Hide line",
     "Rein optisch — ändert nie die Werte, nur wie die Tabelle aussieht (hier und auf der Dashboard-Kachel, falls angeheftet).": "Purely visual — never changes the values, only how the table looks (here and on the dashboard tile, if pinned).",
     "Hervorhebung": "Highlighting",
     "Abwechselnder Zeilenhintergrund, erleichtert das zeilenweise Lesen": "Alternating row background, makes reading row by row easier",

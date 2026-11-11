@@ -13,10 +13,38 @@
   - Einstellbar: Anteil für Sonnenschein (Standard 60 %) und ein Abgleich der
     Klarhimmel-Kurve an den eigenen Sensor
 
+- **Tabellen**: Neu „+ Leerzeile“ fügt eine leere Zeile zwischen Abschnitten
+  ein; sie ist eine Trennlinie mit ausgeblendeter Linie (Option „Linie
+  ausblenden“)
+
+- **Entitäten**: Der Auswahl-Assistent bietet passende Rollen der Dashboards an
+  - Unter „Auswahl & Verlauf“ steht für kürzlich übernommene Entitäten, welche
+    leere Rolle im Wetter- oder Energiedashboard sie füllen könnten; „Zuordnen
+    und Dashboard öffnen“ öffnet die Einrichtung vorbelegt, gespeichert wird
+    erst dort
+  - Im Energiedashboard dient die Energie-Konfiguration von Home Assistant als
+    Grundlage (Netz, Erzeuger, Speicher, Verbraucher); die Einrichtung hat
+    dafür den Knopf „Aus Home Assistant übernehmen“
+  - Treffer in der Liste zeigen, welche leere Rolle des Wetterdashboards sie
+    füllen könnten
+
 ### Geändert
 
-- **Wetterdashboard**: Hinweistext zur Rolle „Sonnenhöhe“ nennt den Sensor
-  „Solare Elevation“ der Integration Sun
+- **Wetterdashboard**
+  - Hinweistext zur Rolle „Sonnenhöhe“ nennt den Sensor „Solare Elevation“ der
+    Integration Sun
+  - Tagesbild beginnt mit dem aktuellen Tag und blickt nach rechts zurück
+  - Abgewählte Einträge in der Legende von Heizdiagramm und Monatsvergleich
+    bleiben erhalten, auch nach einer Änderung von Raumtemperatur oder
+    Heizgrenze und nach dem Neuladen
+
+- **Auswahl-Assistent**: Empfiehlt weniger
+  - Temperatur & Klima: nur Sensoren mit Bereich; Zielwerte und Abgleiche
+    stehen unter „Weitere Treffer“
+  - System & Server: nur die Hauptwerte des Hosts, keine Einzelwerte je VM,
+    Container, Platte oder App
+  - Batterien: „Batterie schwach“ nur, wenn das Gerät keinen Prozentwert hat
+  - Türen & Fenster: Öffnungsmelder unter „Weitere Treffer“
 
 ---
 
@@ -33,10 +61,36 @@
   - Adjustable: the share for sunshine (default 60 %) and a calibration of the
     clear-sky curve to your own sensor
 
+- **Tables**: New “+ Blank row” adds an empty row between sections; it is a
+  separator with the line hidden (option “Hide line”)
+
+- **Entities**: The selection assistant offers matching dashboard roles
+  - Under “Selection & history”, recently added entities show which empty role
+    in the weather or energy dashboard they could fill; “Assign and open the
+    dashboard” opens the setup prefilled, saving happens there
+  - For the energy dashboard, the energy configuration of Home Assistant is the
+    basis (grid, producers, storage, consumers); the setup has a button “Take
+    from Home Assistant” for it
+  - Hits in the list show which empty role of the weather dashboard they could
+    fill
+
 #### Changed
 
-- **Weather dashboard**: The hint for the “Sun elevation” role now mentions
-  the “Solar elevation” sensor of the Sun integration
+- **Weather dashboard**
+  - The hint for the “Sun elevation” role now mentions the “Solar elevation”
+    sensor of the Sun integration
+  - The daily picture starts with the current day and looks back to the right
+  - Entries switched off in the legend of the heating chart and the monthly
+    comparison are kept, also after changing room temperature or heating limit
+    and after reloading
+
+- **Selection assistant**: Recommends less
+  - Temperature & climate: only sensors with an area; targets and offsets are
+    listed under “More matches”
+  - System & server: only the main values of the host, no single values per VM,
+    container, disk or app
+  - Batteries: “Battery low” only if the device has no percentage value
+  - Doors & windows: opening sensors are listed under “More matches”
 
 ## 1.40.0 - 2026-11-10
 

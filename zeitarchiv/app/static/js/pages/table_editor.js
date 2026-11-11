@@ -288,7 +288,7 @@
         columns: INITIAL_COLUMNS.map(c => ({decimals: 'auto', year_over_year: false, hidden: false, group_label: '', heatmap: false, width: null, in_sum: true, ...c, uid: uid(), offset: Math.min(c.offset || 0, 0)})),
         rows: INITIAL_ROWS.map(r => ({
           formula_unit: '', aggregation: 'auto', hidden: false, show_label: false, accent: false,
-          percent_of_total: false, hide_if_empty: false,
+          percent_of_total: false, hide_if_empty: false, hide_line: false,
           ...r, uid: uid(), pickerOpen: false, typePickerOpen: false, aggPickerOpen: false, optsPickerOpen: false, search: '',
         })),
         style: {...DEFAULT_STYLE, ...INITIAL_STYLE},
@@ -347,7 +347,7 @@
         // Der Menü-Button selbst wird aktiv, sobald irgendeine enthaltene
         // Option an ist — sonst müsste man das Menü öffnen, um das zu sehen.
         rowOptionsActive(row) {
-          return !!(row.bold || row.show_label || row.accent || row.percent_of_total || row.hide_if_empty);
+          return !!(row.bold || row.show_label || row.accent || row.percent_of_total || row.hide_if_empty || row.hide_line);
         },
 
         // Manuelle Spaltenbreite (col.width/style.label_col_width, per
@@ -532,11 +532,12 @@
           this.columns = this.columns.filter(c => c.uid !== colUid);
           this.load();
         },
-        addRow(type) {
+        // Leerzeile: eine Trennlinie mit ausgeblendeter Linie (extra = {hide_line: true}).
+        addRow(type, extra) {
           this.rows.push({
             uid: uid(), label: '', row_type: type, entity_ids: [], formula: '', formula_unit: '',
             aggregation: type === 'summary' ? 'sum' : 'auto', bold: false, hidden: false, show_label: false,
-            accent: false, percent_of_total: false, hide_if_empty: false,
+            accent: false, percent_of_total: false, hide_if_empty: false, hide_line: false, ...(extra || {}),
             pickerOpen: false, typePickerOpen: false, aggPickerOpen: false, optsPickerOpen: false, search: '',
           });
           this.load();
@@ -987,6 +988,7 @@
               bold: !!r.bold,
               hidden: !!r.hidden,
               show_label: r.row_type === 'separator' ? !!r.show_label : false,
+              hide_line: r.row_type === 'separator' ? !!r.hide_line : false,
               accent: r.row_type === 'formula' ? !!r.accent : false,
               percent_of_total: (r.row_type === 'entity' || r.row_type === 'group') ? !!r.percent_of_total : false,
               hide_if_empty: (r.row_type === 'entity' || r.row_type === 'group') ? !!r.hide_if_empty : false,

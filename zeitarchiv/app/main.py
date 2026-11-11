@@ -4584,6 +4584,10 @@ class _TableRowBody(BaseModel):
     # (z. B. ein stillgelegtes Gerät), ohne dass man sie manuell über
     # "hidden" ein-/ausschalten muss.
     hide_if_empty: bool = False
+    # Nur für row_type "separator" relevant — blendet die Linie aus: die
+    # Trennlinie wird zur Leerzeile, hat aber weiter ihre Abschnittsgrenze
+    # für Summenzeilen und Anteile.
+    hide_line: bool = False
 
 
 class _TableStyleBody(BaseModel):

@@ -264,6 +264,7 @@
                           <div class="dd-picker-popover dd-picker-popover-alpine tbl-row-opts-popover" x-show="row.optsPickerOpen" x-cloak>
                             <label class="dd-picker-row"><input type="checkbox" x-model="row.bold"><span>{{ _("Fett") }}</span></label>
                             <label class="dd-picker-row" x-show="row.row_type === 'separator'"><input type="checkbox" x-model="row.show_label"><span>{{ _("Als Überschrift zeigen") }}</span></label>
+                            <label class="dd-picker-row" x-show="row.row_type === 'separator'"><input type="checkbox" x-model="row.hide_line"><span>{{ _("Linie ausblenden") }}</span></label>
                             <label class="dd-picker-row" x-show="row.row_type === 'formula'"><input type="checkbox" x-model="row.accent"><span>{{ _("Hervorheben") }}</span></label>
                             <label class="dd-picker-row" x-show="row.row_type === 'entity' || row.row_type === 'group'"><input type="checkbox" x-model="row.percent_of_total"><span>{{ _("% Anteil") }}</span></label>
                             <label class="dd-picker-row" x-show="row.row_type === 'entity' || row.row_type === 'group'"><input type="checkbox" x-model="row.hide_if_empty"><span>{{ _("Bei 0 ausblenden") }}</span></label>
@@ -292,6 +293,7 @@
               <button type="button" class="btn" @click="addRow('formula')">{{ _("+ Formel") }}</button>
               <button type="button" class="btn" data-tooltip="{{ _('Summe/Durchschnitt aller Entität-/Gruppen-Zeilen seit der letzten Trennlinie — aktualisiert sich automatisch, wenn darüber Zeilen hinzukommen oder wegfallen') }}" @click="addRow('summary')">{{ _("+ Summenzeile") }}</button>
               <button type="button" class="btn" @click="addRow('separator')">{{ _("+ Trennlinie") }}</button>
+              <button type="button" class="btn" @click="addRow('separator', {hide_line: true})">{{ _("+ Leerzeile") }}</button>
             </div>
 
             <h3 class="tbl-h">{{ _("Darstellung") }} {{ hint_button(_('Darstellung')) }}</h3>
@@ -488,7 +490,7 @@
                     <span class="tbl-cell"><span class="tbl-cell-number"><span class="tbl-number-whole" x-text="sumNumberParts(row).whole"></span><span class="tbl-number-separator" x-text="sumNumberParts(row).separator"></span><span class="tbl-number-fraction" x-text="sumNumberParts(row).fraction"></span></span><span class="tbl-cell-unit" x-show="style.show_units && sumUnit(row)" x-text="sumUnit(row)"></span></span>
                   </td>
 <td x-show="row.row_type === 'separator'" :colspan="tableColspan">
-                    <span class="tbl-separator-content"><span class="tbl-separator-line" aria-hidden="true"></span><span class="tbl-separator-label" x-show="row.show_label && row.label.trim()" x-text="row.label.trim()"></span><span class="tbl-separator-line" x-show="row.show_label && row.label.trim()" aria-hidden="true"></span></span>
+                    <span class="tbl-separator-content" :class="{'is-blank': row.hide_line}"><span class="tbl-separator-line" aria-hidden="true"></span><span class="tbl-separator-label" x-show="row.show_label && row.label.trim()" x-text="row.label.trim()"></span><span class="tbl-separator-line" x-show="row.show_label && row.label.trim()" aria-hidden="true"></span></span>
                   </td>
                 </tr>
               </template>

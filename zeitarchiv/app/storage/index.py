@@ -809,7 +809,8 @@ CREATE TABLE IF NOT EXISTS table_rows (
     show_label INTEGER NOT NULL DEFAULT 0,
     accent INTEGER NOT NULL DEFAULT 0,
     percent_of_total INTEGER NOT NULL DEFAULT 0,
-    hide_if_empty INTEGER NOT NULL DEFAULT 0
+    hide_if_empty INTEGER NOT NULL DEFAULT 0,
+    hide_line INTEGER NOT NULL DEFAULT 0
 );
 """
 
@@ -1390,6 +1391,9 @@ class Index:
             self._conn.execute("ALTER TABLE table_rows ADD COLUMN percent_of_total INTEGER NOT NULL DEFAULT 0")
         if "hide_if_empty" not in table_row_columns:
             self._conn.execute("ALTER TABLE table_rows ADD COLUMN hide_if_empty INTEGER NOT NULL DEFAULT 0")
+        if "hide_line" not in table_row_columns:
+            # Leerzeile: eine Trennlinie ohne sichtbare Linie (main.py _TableRowBody.hide_line).
+            self._conn.execute("ALTER TABLE table_rows ADD COLUMN hide_line INTEGER NOT NULL DEFAULT 0")
 
         table_column_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(table_columns)")}
         if "decimals" not in table_column_columns:
@@ -3644,15 +3648,15 @@ class Index:
         self._conn.executemany(
             "INSERT INTO table_rows "
             "(table_id, position, label, row_type, entity_ids, formula, formula_unit, bold, aggregation, hidden, "
-            "show_label, accent, percent_of_total, hide_if_empty) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "show_label, accent, percent_of_total, hide_if_empty, hide_line) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     table_id, i, r["label"], r["row_type"], json.dumps(r["entity_ids"]),
                     r["formula"], r.get("formula_unit", ""), int(r["bold"]), r.get("aggregation", "auto"),
                     int(r.get("hidden", False)), int(r.get("show_label", False)), int(r.get("accent", False)),
                     int(r.get("percent_of_total", False)),
-                    int(r.get("hide_if_empty", False)),
+                    int(r.get("hide_if_empty", False)), int(r.get("hide_line", False)),
                 )
                 for i, r in enumerate(rows)
             ],
@@ -3754,7 +3758,7 @@ class Index:
                     "aggregation": r["aggregation"], "hidden": bool(r["hidden"]),
                     "show_label": bool(r["show_label"]), "accent": bool(r["accent"]),
                     "percent_of_total": bool(r["percent_of_total"]),
-                    "hide_if_empty": bool(r["hide_if_empty"]),
+                    "hide_if_empty": bool(r["hide_if_empty"]), "hide_line": bool(r["hide_line"]),
                 }
                 for r in row_rows
             ]

@@ -1309,6 +1309,9 @@ td.mono{font-family:var(--font-mono);}
    als "fett" markierte Trennzeile war von der normalen nicht zu unterscheiden. */
 .tbl-separator-content{display:flex;align-items:center;gap:8px;width:100%;}
 .tbl-separator-line{display:block;flex:1;height:1px;background:var(--border);}
+/* Leerzeile: Trennlinie ohne sichtbare Linie, behält ihre Höhe. */
+.tbl-separator-content.is-blank{min-height:1.2em;}
+.tbl-separator-content.is-blank .tbl-separator-line{background:transparent;}
 .tbl-separator-label{
   color:var(--ink-muted);font-size:calc(11px * var(--font-scale, 1));font-weight:600;
   letter-spacing:.035em;text-transform:uppercase;white-space:nowrap;
