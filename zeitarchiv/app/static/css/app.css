@@ -1626,7 +1626,7 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
 /* Wetter- und Energiedashboard: die Reiterzeile trägt rechts die Zeitraum-Steuerung (ein Streifen statt Reiterzeile plus eigener Leiste)
    und bleibt beim Scrollen unter der Kopfleiste stehen. Die Linie unter den Reitern kommt vom Rahmen des Streifens; Smartphone:
    die Steuerung bricht in eine zweite Zeile, deshalb dort kein Kleben. */
-.dash-tabs-bar{position:sticky;top:57px;z-index:10;display:flex;align-items:center;gap:4px 16px;margin:14px 0;padding:0 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);}
+.dash-tabs-bar{position:sticky;top:57px;z-index:10;min-height:calc(48px * var(--font-scale, 1));display:flex;align-items:center;gap:4px 16px;margin:14px 0;padding:0 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);}
 .dash-tabs-bar .entity-tabs{flex:1 1 auto;min-width:0;margin:0 !important;border-bottom:0;}
 .dash-tabs-bar-end{margin-left:auto;flex:none;padding:6px 0;}
 @media (max-width:640px){
@@ -2464,14 +2464,16 @@ button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
 .wt-card-sep{border-top:1px solid var(--border);margin:18px 0 12px;}
 .wt-h3{margin:0;font-size:calc(14px * var(--font-scale, 1));font-weight:600;}
 .wt-controls-end{margin-left:auto;}
-/* Jahre-Auswahl des Reiters Langzeit (Energie): eine Leiste über den Karten, die unter der Kopfleiste (.topnav, 57px) haftet. */
-.wt-scope{position:sticky;top:57px;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:8px 14px;flex-wrap:wrap;padding:8px 12px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);}
+/* Jahre-Auswahl des Reiters Langzeit (Energie, Wetter): eine Leiste über den Karten, die unter der Kopfleiste (.topnav, 57px) und der ebenfalls klebenden
+   Reiterzeile (.dash-tabs-bar, Mindesthöhe 48px) haftet; mobil klebt die Reiterzeile nicht, dort gilt wieder 57px. */
+.wt-scope{position:sticky;top:calc(57px + 48px * var(--font-scale, 1) + 8px);z-index:10;display:flex;align-items:center;justify-content:space-between;gap:8px 14px;flex-wrap:wrap;padding:8px 12px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);}
 .wt-scope-lab{font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
 .wt-scope-lab b{color:var(--ink);font-weight:600;font-size:calc(14px * var(--font-scale, 1));}
 /* Zusatz hinter dem Titel „Rekorde“ der Langzeit-Reiter: ab wann gezählt wird. */
 .wt-rec-scope{margin-left:6px;font-size:calc(13px * var(--font-scale, 1));font-weight:400;color:var(--ink-muted);}
 @media (max-width:640px){
   .wt-scope{flex-wrap:nowrap;}
+  .wt-scope{top:57px;}
   .wt-scope-more{display:none;}
 }
 .wt-stand{margin:0 0 10px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
