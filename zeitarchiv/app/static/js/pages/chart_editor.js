@@ -1631,6 +1631,8 @@
           const id = 'g' + (groups.reduce((m, g) => Math.max(m, +g.id.slice(1)), 0) + 1);
           groups.push({id, name: t('Stapel {n}', {n: groups.length + 1})});
           this.stackGroups = {groups, members};
+          // Wer einen Stapel anlegt, will stapeln: „Gestapelt“ schaltet sich ein (nicht bei Vergleich, der Vorrang hat).
+          if (!this.stacked && this.canStack && !this.compare) this.stacked = true;
           this.render();
         },
         renameStack(gid, name) {
@@ -1641,7 +1643,10 @@
           const groups = this.stackGroupList().filter(g => g.id !== gid);
           const members = {};
           Object.entries((this.stackGroups && this.stackGroups.members) || {}).forEach(([id, g]) => { if (g !== gid) members[id] = g; });
-          this.stackGroups = groups.length && Object.keys(members).length ? {groups, members} : {};
+          this.stackGroups = groups.length ? {groups, members} : {};
+          // Der letzte aufgelöste Stapel schaltet „Gestapelt“ wieder aus (so wie das Anlegen es einschaltet);
+          // bleiben andere Stapel stehen, bleiben sie gestapelt.
+          if (!groups.length) this.stacked = false;
           this.render();
         },
         stackDragOver(event, gid) {

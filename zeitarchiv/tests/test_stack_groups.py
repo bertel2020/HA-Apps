@@ -122,3 +122,8 @@ def test_full_resolution_gives_every_stack_its_own_category() -> None:
 
 def test_assigning_an_entry_to_a_stack_switches_stacking_on() -> None:
     assert "if (value !== 'none' && !this.stacked && this.canStack && !this.compare) this.stacked = true;" in EDITOR_JS
+
+
+def test_adding_a_stack_switches_stacking_on_and_dissolving_the_last_one_off() -> None:
+    assert "if (!this.stacked && this.canStack && !this.compare) this.stacked = true;" in EDITOR_JS
+    assert "if (!groups.length) this.stacked = false;" in EDITOR_JS
