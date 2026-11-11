@@ -141,7 +141,10 @@ def test_boundary_value_skips_row_groups_entirely_after_cutoff(monkeypatch, tmp_
     assert read_calls == 1
 
 
-def test_rollup_read_pushes_time_window_into_parquet(monkeypatch, tmp_path: Path) -> None:
+def test_rollup_read_returns_exactly_the_time_window(tmp_path: Path) -> None:
+    """Früher schob _read_rollup_rows das Zeitfenster als Filter in den Parquet-Read (Row-Group-Pushdown). Seit dem
+    prozessweiten Tabellen-Cache (_fine_table_cached) wird die Datei einmal ganz gelesen und je Fenster im Speicher
+    gefiltert; die Halboffenheit [start, end) muss dabei exakt bleiben."""
     entity_id = "sensor.temp"
     path = rollup.rollup_path(tmp_path, entity_id, "stunde")
     path.parent.mkdir(parents=True)
@@ -149,18 +152,10 @@ def test_rollup_read_pushes_time_window_into_parquet(monkeypatch, tmp_path: Path
         pa.table({"bucket_start": [100.0, 200.0, 300.0], "value": [1.0, 2.0, 3.0]}),
         path,
     )
-    original = query.pq.read_table
-    seen: dict = {}
 
-    def recording_read(*args, **kwargs):
-        seen["filters"] = kwargs.get("filters")
-        return original(*args, **kwargs)
-
-    monkeypatch.setattr(query.pq, "read_table", recording_read)
-    rows = query._read_rollup_rows(tmp_path, entity_id, "stunde", 150.0, 250.0)
-
-    assert [row.bucket_start for row in rows] == [200.0]
-    assert seen["filters"] == [("bucket_start", ">=", 150.0), ("bucket_start", "<", 250.0)]
+    assert [row.bucket_start for row in query._read_rollup_rows(tmp_path, entity_id, "stunde", 150.0, 250.0)] == [200.0]
+    assert [row.bucket_start for row in query._read_rollup_rows(tmp_path, entity_id, "stunde", 100.0, 300.0)] == [100.0, 200.0]
+    assert query._read_rollup_rows(tmp_path, entity_id, "stunde", 301.0, 400.0) == []
 
 
 def test_week_range_merges_completed_rollup_with_live_current_month() -> None:

@@ -321,8 +321,24 @@ def test_the_fine_rollup_levels_stay_out_of_the_cache(monkeypatch, tmp_path: Pat
 
     cache = query.QueryReadCache()
     zuerst = query._read_rollup_rows(tmp_path, entity_id, "stunde", start, start + 200 * 3600, cache)
+    index.close()
     assert zuerst
+    # Der Request-Cache hält die feine Stufe nicht vollständig als Python-Zeilen. Der prozessweite, nach Bytes
+    # begrenzte Tabellen-Cache (_fine_table_cached) ist davon getrennt und unten getestet.
+    assert (entity_id, "stunde") not in cache._rollup_rows
 
+
+def _stunde_datei(tmp_path: Path, entity_id: str, start: float, werte: list[float]) -> Path:
+    ziel = rollup.rollup_dir(tmp_path, entity_id)
+    ziel.mkdir(parents=True, exist_ok=True)
+    pfad = ziel / "stunde.parquet"
+    pq.write_table(
+        pa.table({"bucket_start": [start + i * 3600 for i in range(len(werte))], "value": werte}), pfad,
+    )
+    return pfad
+
+
+def _lesezaehler(monkeypatch) -> list[str]:
     gelesen: list[str] = []
     original = pq.read_table
 
@@ -331,9 +347,45 @@ def test_the_fine_rollup_levels_stay_out_of_the_cache(monkeypatch, tmp_path: Pat
         return original(path, *args, **kwargs)
 
     monkeypatch.setattr(query.pq, "read_table", aufzeichnend)
-    query._read_rollup_rows(tmp_path, entity_id, "stunde", start, start + 200 * 3600, cache)
-    index.close()
-    assert gelesen == ["stunde.parquet"], "feine Stufe darf nicht aus dem Cache kommen"
+    return gelesen
+
+
+def test_fine_rollup_table_is_read_once_across_requests_and_windows(monkeypatch, tmp_path: Path) -> None:
+    """Zwei Requests und überlappende Fenster lesen die Datei nur einmal; der Ausschnitt ist trotzdem exakt."""
+    entity_id = "sensor.cache_treffer"
+    start = datetime(2026, 7, 1, tzinfo=TZ).timestamp()
+    _stunde_datei(tmp_path, entity_id, start, [float(i) for i in range(200)])
+    gelesen = _lesezaehler(monkeypatch)
+
+    voll = query._read_rollup_rows(tmp_path, entity_id, "stunde", start, start + 200 * 3600, query.QueryReadCache())
+    teil = query._read_rollup_rows(tmp_path, entity_id, "stunde", start + 10 * 3600, start + 20 * 3600, query.QueryReadCache())
+
+    assert gelesen == ["stunde.parquet"]
+    assert [row.value for row in voll] == [float(i) for i in range(200)]
+    assert [row.value for row in teil] == [float(i) for i in range(10, 20)]
+
+
+def test_fine_rollup_cache_follows_a_rewritten_file(tmp_path: Path) -> None:
+    """Import, Restore und Monatsabschluss schreiben die Datei neu: Der Cache darf keine alten Werte liefern."""
+    entity_id = "sensor.cache_neu"
+    start = datetime(2026, 7, 1, tzinfo=TZ).timestamp()
+    _stunde_datei(tmp_path, entity_id, start, [1.0, 2.0, 3.0])
+    assert [r.value for r in query._read_rollup_rows(tmp_path, entity_id, "stunde", start, start + 10 * 3600)] == [1.0, 2.0, 3.0]
+
+    _stunde_datei(tmp_path, entity_id, start, [9.0, 8.0, 7.0, 6.0])
+    assert [r.value for r in query._read_rollup_rows(tmp_path, entity_id, "stunde", start, start + 10 * 3600)] == [9.0, 8.0, 7.0, 6.0]
+
+
+def test_fine_rollup_cache_is_bounded_and_missing_files_are_empty(monkeypatch, tmp_path: Path) -> None:
+    start = datetime(2026, 7, 1, tzinfo=TZ).timestamp()
+    assert query._read_rollup_rows(tmp_path, "sensor.gibt_es_nicht", "stunde", start, start + 3600) == []
+
+    monkeypatch.setattr(query, "_FINE_TABLE_CACHE_MAX_BYTES", 40_000)
+    for nummer in range(8):
+        entity_id = f"sensor.grenze_{nummer}"
+        _stunde_datei(tmp_path, entity_id, start, [float(i) for i in range(500)])
+        assert len(query._read_rollup_rows(tmp_path, entity_id, "stunde", start, start + 500 * 3600)) == 500
+    assert query._fine_table_cache_bytes <= 40_000
 
 
 def test_rollup_rows_cannot_be_mutated_at_all(tmp_path: Path) -> None:

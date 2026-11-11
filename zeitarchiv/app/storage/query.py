@@ -24,6 +24,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 from . import cleanup, rollup
@@ -491,6 +492,50 @@ def _state_rows_from_table(table) -> list[rollup.FineRow]:
     ]
 
 
+# Prozessweiter Cache für die Tabellen feiner Rollup-Stufen (tag/stunde). Die Vergleichstabellen von Energie- und
+# Wetterdashboard lesen bei jedem Aufruf dieselben, sich überlappenden Zeiträume (Monat, Vormonat, Jahr, Vorjahr) je Entität
+# neu aus der Parquet-Datei; gemessen gingen etwa drei Viertel der Wetter-Tabelle (2,5 s) in diese Lesungen. Ein Cache über
+# fertige Ausschnitte (FineRow-Listen) hat nicht getragen: Die Ausschnitte überlappen, belegten zusammen ein Vielfaches der
+# Datei und verdrängten sich gegenseitig. Deshalb liegt die Tabelle einer Datei als Arrow-Tabelle im Speicher (spaltenweise,
+# gemessen 61 MB für alle 115 stunde-Dateien der Testdaten gegenüber 2,2 Mio. Python-Objekten) und der Ausschnitt wird daraus
+# gefiltert. Gültigkeit: Änderungszeit und Größe der Datei. Rollup, Import, Restore und Löschen schreiben die Datei neu, ein
+# Fingerabdruck erspart jede Invalidierung an den Schreibstellen. Begrenzt nach Bytes, die ältesten fliegen zuerst.
+_FINE_TABLE_CACHE: "OrderedDict[str, tuple[tuple, object]]" = OrderedDict()
+_FINE_TABLE_CACHE_LOCK = threading.Lock()
+_FINE_TABLE_CACHE_MAX_BYTES = 80 * 1024 * 1024
+_fine_table_cache_bytes = 0
+
+
+def _fine_table_cached(path: Path):
+    """Gesamte Tabelle einer feinen Rollup-Datei (aus dem Cache, sonst gelesen); None, wenn es die Datei nicht gibt."""
+    global _fine_table_cache_bytes
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    fingerprint = (stat.st_mtime_ns, stat.st_size)
+    key = str(path)
+    with _FINE_TABLE_CACHE_LOCK:
+        cached = _FINE_TABLE_CACHE.get(key)
+        if cached is not None and cached[0] == fingerprint:
+            _FINE_TABLE_CACHE.move_to_end(key)
+            return cached[1]
+    table = pq.read_table(path)
+    size = table.nbytes
+    if size > _FINE_TABLE_CACHE_MAX_BYTES // 4:
+        return table  # eine einzelne Datei soll den Cache nicht allein füllen
+    with _FINE_TABLE_CACHE_LOCK:
+        old = _FINE_TABLE_CACHE.pop(key, None)
+        if old is not None:
+            _fine_table_cache_bytes -= old[1].nbytes
+        _FINE_TABLE_CACHE[key] = (fingerprint, table)
+        _fine_table_cache_bytes += size
+        while _fine_table_cache_bytes > _FINE_TABLE_CACHE_MAX_BYTES and _FINE_TABLE_CACHE:
+            _key, (_fp, dropped) = _FINE_TABLE_CACHE.popitem(last=False)
+            _fine_table_cache_bytes -= dropped.nbytes
+    return table
+
+
 def _read_rollup_rows(
     data_dir: Path, entity_id: str, level: str, start_ts: float, end_ts: float,
     read_cache: QueryReadCache | None = None,
@@ -508,12 +553,11 @@ def _read_rollup_rows(
             if start_ts <= row.bucket_start < end_ts
         ]
     path = rollup.rollup_path(data_dir, entity_id, level)
-    if not path.exists():
+    table = _fine_table_cached(path)
+    if table is None:
         return []
-    table = pq.read_table(
-        path,
-        filters=[("bucket_start", ">=", start_ts), ("bucket_start", "<", end_ts)],
-    )
+    bucket = table.column("bucket_start")
+    table = table.filter(pc.and_(pc.greater_equal(bucket, start_ts), pc.less(bucket, end_ts)))
     return _rollup_rows_from_table(table)
 
 
