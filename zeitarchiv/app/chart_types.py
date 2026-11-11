@@ -162,6 +162,37 @@ _PALETTE_SIZE = 8
 _HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
+def stack_groups_clean(value: dict | None, entity_ids: list[str]) -> dict:
+    """Stapel eines Charts (saved_charts.stack_groups).
+
+    Form: ``{"groups": [{"id": "g1", "name": "Geräte"}], "members": {entity_id: "g1"}}``.
+    Mitglieder fremder Entitäten, unbekannte Stapel, doppelte Namen-IDs und leere Stapel
+    fallen still weg. Stapel mit nur einem Mitglied bleiben stehen (sie wirken wie ein
+    Einzelbalken, der Nutzer kann ihnen weitere Einträge zuordnen). Ohne gültigen
+    Stapel kommt ``{}`` zurück: dann gilt wie bisher ein einziger Stapel je Achse."""
+    allowed = set(entity_ids)
+    raw = value if isinstance(value, dict) else {}
+    groups: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for group in raw.get("groups") or []:
+        if not isinstance(group, dict):
+            continue
+        gid = group.get("id")
+        if not isinstance(gid, str) or not re.fullmatch(r"g[0-9]{1,3}", gid) or gid in seen:
+            continue
+        name = group.get("name")
+        name = name.strip()[:60] if isinstance(name, str) else ""
+        seen.add(gid)
+        groups.append({"id": gid, "name": name})
+    members = {
+        entity_id: gid for entity_id, gid in (raw.get("members") or {}).items()
+        if entity_id in allowed and isinstance(gid, str) and gid in seen
+    }
+    used = set(members.values())
+    groups = [g for g in groups if g["id"] in used]
+    return {"groups": groups, "members": members} if groups else {}
+
+
 def series_colors_clean(value: dict | None, entity_ids: list[str]) -> dict[str, str]:
     """Eigene Serienfarbe je Entität (saved_charts.series_colors).
 

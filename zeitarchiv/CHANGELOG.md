@@ -13,6 +13,12 @@
   - Einstellbar: Anteil für Sonnenschein (Standard 60 %) und ein Abgleich der
     Klarhimmel-Kurve an den eigenen Sensor
 
+- **Charts**: Mehrere Stapel in einem Chart
+  - Bei „Gestapelt“ lässt sich jeder Balken-Serie in „Ausgewählt“ ein Stapel
+    zuordnen; Balken ohne Stapel stehen einzeln daneben
+  - Gilt auch auf Dashboards und in der Karte; ohne Auswahl bleibt alles wie
+    bisher in einem Stapel
+
 - **Tabellen**: Neu „+ Leerzeile“ fügt eine leere Zeile zwischen Abschnitten
   ein; sie ist eine Trennlinie mit ausgeblendeter Linie (Option „Linie
   ausblenden“)
@@ -60,6 +66,12 @@
     fixed lx values stay in use
   - Adjustable: the share for sunshine (default 60 %) and a calibration of the
     clear-sky curve to your own sensor
+
+- **Charts**: Several stacks in one chart
+  - With “Stacked” on, every bar series in “Selected” can be assigned to a
+    stack; bars without a stack stand next to the others
+  - Also applies on dashboards and in the card; without a choice everything
+    stays in one stack as before
 
 - **Tables**: New “+ Blank row” adds an empty row between sections; it is a
   separator with the line hidden (option “Hide line”)

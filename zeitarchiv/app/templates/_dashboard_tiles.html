@@ -112,6 +112,7 @@
            data-compare-settings='{{ tile.compare_settings | default({}) | tojson }}'
            data-heatmap-states='{{ tile.heatmap_states | default({}) | tojson }}'
            data-series-colors='{{ tile.series_colors | default({}) | tojson }}'
+           data-stack-groups='{{ tile.stack_groups | default({}) | tojson }}'
            data-entity-ids='{{ tile.entity_ids | tojson }}'
            data-entity-names='{{ tile.entity_names | tojson }}'
           data-hidden-entity-ids='{{ tile.hidden_entity_ids | default([]) | tojson }}'

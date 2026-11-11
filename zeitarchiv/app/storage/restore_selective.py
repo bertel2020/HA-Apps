@@ -160,6 +160,7 @@ _CHART_FIELD_LABELS = {
     "chart_type": N_("Typ"),
     "heatmap_states": N_("Typ"),
     "series_colors": N_("Farben"),
+    "stack_groups": N_("Stapel"),
     "resolution_preset": N_("Auflösung"),
 }
 

@@ -574,6 +574,8 @@
         // im Tabellen-Editor.
         hiddenEntityIds: [...HIDDEN_ENTITY_IDS],
         seriesColors: {...SERIES_COLORS},
+        // Mehrere Stapel: {groups: [{id, name}], members: {entity_id: id}}, {} = ein Stapel je Achse.
+        stackGroups: JSON.parse(JSON.stringify(STACK_GROUPS || {})),
         colorPickerFor: null,
         name: CHART_NAME,
         entityNames: {...ENTITY_NAMES},
@@ -1552,6 +1554,43 @@
         // ist disabled, solange compare true ist. Reines render() statt
         // load(): Stapelung ändert nur, WIE die bereits geladenen Daten
         // gezeichnet werden, keinen Server-Query-Parameter.
+        // ---- Stapel (Auswahlfeld je Zeile in „Ausgewählt“) ----------------------
+        isBarId(id) {
+          const s = this.series.find(x => x.entity_id === id);
+          return !!s && s.chart_type === 'bar';
+        },
+        // 'implicit' = noch keine Stapel angelegt, alle Balken einer Achse stehen in einem Stapel.
+        stackValue(id) {
+          const groups = (this.stackGroups && this.stackGroups.groups) || [];
+          if (!groups.length) return 'implicit';
+          return (this.stackGroups.members || {})[id] || 'none';
+        },
+        stackGroupList() { return (this.stackGroups && this.stackGroups.groups) || []; },
+        setStack(id, value) {
+          const groups = this.stackGroupList().map(g => ({...g}));
+          const members = {...((this.stackGroups && this.stackGroups.members) || {})};
+          const barIds = this.series.filter(s => s.chart_type === 'bar').map(s => s.entity_id);
+          const nextId = () => 'g' + (groups.reduce((m, g) => Math.max(m, +g.id.slice(1)), 0) + 1);
+          if (!groups.length) {
+            // Der erste Stapel nimmt alle anderen Balken mit, damit sich die Ansicht nicht verändert.
+            const first = {id: nextId(), name: t('Stapel {n}', {n: 1})};
+            groups.push(first);
+            barIds.forEach(b => { if (b !== id) members[b] = first.id; });
+          }
+          if (value === 'new') {
+            const g = {id: nextId(), name: t('Stapel {n}', {n: groups.length + 1})};
+            groups.push(g);
+            members[id] = g.id;
+          } else if (value === 'none') {
+            delete members[id];
+          } else {
+            members[id] = value;
+          }
+          const used = new Set(Object.values(members));
+          const kept = groups.filter(g => used.has(g.id));
+          this.stackGroups = kept.length ? {groups: kept, members} : {};
+          this.render();
+        },
         toggleStacked() {
           this.stacked = !this.stacked;
           this.render();
@@ -1953,6 +1992,22 @@
           // stackedActive/normalizeActive gelten deshalb nicht global,
           // sondern je Achse.
           const stackedActive = this.stacked && this.canStack;
+          // Stapelschlüssel je Serie (Parität zu chart-tile-render.js): ohne Stapel-Einstellung
+          // ein Stapel je Achse, mit Stapeln nur die zugeordneten Balken je Stapel; ein Stapel
+          // mit nur einer Balken-Serie wirkt wie ein Einzelbalken.
+          const stackMembers = (this.stackGroups && this.stackGroups.members) || {};
+          const hasStackGroups = !!(this.stackGroups && (this.stackGroups.groups || []).length);
+          const stackKeys = chartSeries.map(s => {
+            if (!stackedActive || s.chart_type !== 'bar') return null;
+            if (!hasStackGroups) return 'bar-' + axisKey(s);
+            const gid = stackMembers[s.entity_id];
+            return gid ? 'bar-' + axisKey(s) + '-' + gid : null;
+          });
+          if (hasStackGroups) {
+            const keyCounts = new Map();
+            stackKeys.forEach(k => { if (k) keyCounts.set(k, (keyCounts.get(k) || 0) + 1); });
+            stackKeys.forEach((k, i) => { if (k && keyCounts.get(k) < 2) stackKeys[i] = null; });
+          }
           const normalizeActive = stackedActive && this.normalize;
           // Nur Achsen, auf denen AUSSCHLIESSLICH Balken-Serien liegen, dürfen
           // auf Prozent umgestellt werden — eine mitgezeichnete Linien-Serie
@@ -1960,7 +2015,7 @@
           // die gestapelten Balken gemeint ist, und zeigte ihre eigenen (nicht
           // normierten) Werte dadurch verzerrt.
           const barOnlyAxis = new Set(
-            units.filter(u => chartSeries.every(s => axisKey(s) !== u || s.chart_type === 'bar'))
+            units.filter(u => chartSeries.every((s, i) => axisKey(s) !== u || (s.chart_type === 'bar' && stackKeys[i])))
           );
           // Achsen mit MINDESTENS einer Balken-Serie (nicht nur reine
           // Balken-Achsen wie barOnlyAxis oben) dürfen "Dynamische Y-Achse"
@@ -1988,8 +2043,8 @@
             chartSeries.forEach((s, i) => {
               const u = axisKey(s);
               if (!barOnlyAxis.has(u)) return;
-              if (!axisTotals.has(u)) axisTotals.set(u, new Map());
-              const totals = axisTotals.get(u);
+              if (!axisTotals.has(stackKeys[i])) axisTotals.set(stackKeys[i], new Map());
+              const totals = axisTotals.get(stackKeys[i]);
               preparedPoints[i].forEach(p => totals.set(p.ts, (totals.get(p.ts) || 0) + p.value));
             });
           }
@@ -2117,7 +2172,7 @@
             // eine überlagerte Linie derselben Einheit bliebe unverändert in
             // Absolutwerten (axisNormalized bleibt dann false für sie, weil
             // ihre Achse nicht in barOnlyAxis steht).
-            const axisNormalized = normalizeActive && chartType === 'bar' && barOnlyAxis.has(axisKey(s));
+            const axisNormalized = normalizeActive && !!stackKeys[i] && barOnlyAxis.has(axisKey(s));
             // Bei singleBucket (Kategorie-Achse, s. o.) ist die X-Position die
             // EIGENE Kategorie dieser Entität (ihre Position in chartSeries,
             // s. entityCategories) statt eines Zeitstempels — der Halte-Punkt
@@ -2130,7 +2185,7 @@
               // den Tooltip (formatPointValue() liest sie nicht, siehe dort)
               // — sonst verliert der Tooltip genau die Zahl, die die
               // Normierung aus dem Balken selbst entfernt.
-              const total = axisTotals.get(axisKey(s)).get(p.ts) || 0;
+              const total = axisTotals.get(stackKeys[i]).get(p.ts) || 0;
               const pct = total ? (p.value / total) * 100 : 0;
               return [singleBucket ? i : p.ts * 1000, pct, p.ts * 1000, '%', 0, false, p.value, s.unit, seriesDecimals];
             });
@@ -2144,7 +2199,7 @@
             // unterschiedlicher Einheit (z. B. kWh und Dauer) fälschlich in
             // denselben Balken aufsummiert, sobald ein Chart mehrere Achsen
             // kombiniert.
-            const isStackedBar = chartType === 'bar' && stackedActive;
+            const isStackedBar = !!stackKeys[i];
             const unitIndex = units.indexOf(axisKey(s));
             // Gleitender Durchschnitt (Optionen-Menü, "Durchschnittslinie" →
             // "Gleitend") nur für Linien-Serien — bei einer Balken-Serie
@@ -2175,7 +2230,7 @@
               // Tooltip/Label-Formatter lesen ohnehin per festem Index
               // (data[1]=Wert), bleiben also unverändert korrekt.
               encode: horizontalActive ? {x: 1, y: 0} : undefined,
-              stack: isStackedBar ? 'bar-' + axisKey(s) : undefined,
+              stack: stackKeys[i] || undefined,
               // Bei aktiver Trendlinie tritt die rohe (verrauschte) Kurve
               // zurück, bleibt aber sichtbar — die Trendlinie ist die
               // Ergänzung, nicht der Ersatz.
@@ -3205,6 +3260,7 @@
             chart_type: this.donut ? 'donut' : (this.timeline ? (this.hasState ? (this.heatmapWanted ? 'heatmap' : (this.stateChosen ? this.stateMode : 'auto')) : 'timeline') : (this.allSwitch ? 'bar' : 'auto')),
             heatmap_states: this.heatmapStates,
             series_colors: this.seriesColors,
+            stack_groups: this.stackGroups,
             decimals: this.decimals,
             show_values: this.showValues,
             average_line: this.averageLine,
