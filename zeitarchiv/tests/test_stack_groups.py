@@ -91,8 +91,10 @@ def test_empty_stack_means_no_bar_is_stacked() -> None:
 def test_tooltips_sum_each_stack_in_both_renderers() -> None:
     for source in (EDITOR_JS, TILE_JS):
         assert "stackNameByKey" in source
-        assert "const sumRows = " in source
-        assert "e.n >= 2" in source
+        assert "const stackedRows = renderRow => {" in source
+        assert "const sumRowFor = " in source
+        assert "padding-left:10px;border-left:2px solid" in source
+        assert "e.n < 2" in source
 
 
 def test_legend_names_the_stack_in_editor_tile_and_card() -> None:

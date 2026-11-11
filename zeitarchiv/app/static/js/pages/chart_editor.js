@@ -2706,15 +2706,33 @@
                     sums.set(key, entry);
                   });
                 }
-                const sumRows = [...sums.entries()].filter(([, e]) => e.n >= 2).map(([key, e]) => {
+                const sumRowFor = (key, e, last) => {
                   const value = e.duration ? NumberFormat.fmtDuration(e.sum) : `${fmtNum(e.sum, e.decimals)}${e.unit ? ' ' + e.unit : ''}`;
-                  return `<div style="display:flex;justify-content:space-between;gap:18px;margin-top:4px;padding-top:4px;border-top:1px solid var(--border);">`
+                  return `<div style="display:flex;justify-content:space-between;gap:18px;margin-top:4px;padding-top:4px;border-top:1px solid var(--border);${last ? '' : 'margin-bottom:6px;'}">`
                        + `<span>Σ ${escapeHtml(stackNameByKey.get(key) || '')}</span><span style="margin-left:8px;text-align:right;"><strong>${escapeHtml(value)}</strong></span></div>`;
-                }).join('');
+                };
+                const sumRows = [...sums.entries()].filter(([, e]) => e.n >= 2).map(([key, e]) => sumRowFor(key, e, true)).join('');
+                // Mitglieder eines Stapels stehen eingerückt beisammen (an der Stelle des ersten) mit der Summe darunter,
+                // übrige Zeilen in Reihenfolge (Parität zu stackedRows in chart-tile-render.js).
+                const stackOfParam = p => (echartsSeries[p.seriesIndex] || {}).stack;
+                const stackedRows = renderRow => {
+                  const out = [];
+                  const done = new Set();
+                  params.forEach(p => {
+                    const key = stackOfParam(p);
+                    const e = key && sums.get(key);
+                    if (!e || e.n < 2) { out.push(renderRow(p)); return; }
+                    if (done.has(key)) return;
+                    done.add(key);
+                    params.filter(q => stackOfParam(q) === key).forEach(q => out.push(`<div style="padding-left:10px;border-left:2px solid var(--border);">${renderRow(q)}</div>`));
+                    out.push(sumRowFor(key, e, false));
+                  });
+                  return out.join('');
+                };
                 if (sameTime) {
                   const header = freshIndexes.length ? times[freshIndexes[0]] : times[0];
                   return `<div style="font-size:calc(11px * var(--font-scale, 1));color:${faint};margin-bottom:4px;">${header}</div>`
-                       + params.map(p => row(p, true)).join('') + sumRows;
+                       + stackedRows(p => row(p, true));
                 }
                 return params.map((p, i) =>
                   `<div style="font-size:calc(11px * var(--font-scale, 1));color:${faint};margin-bottom:2px;">${times[i]}</div>${row(p, false)}`
