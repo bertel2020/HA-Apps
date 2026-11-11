@@ -67,11 +67,6 @@
    („Temperatur“, „Regen“ groß, dann Helligkeit, Wind und der Rest) kommen aus displayTiles(); eine eigene Wetterlage-Karte gibt es dann nicht. #}
 {% macro weather_card(group, placeholders, lage=false, hero=false) %}
 {% set sfx = group %}
-{# Stichtag-Leiste des App-Standards (wie bei den Dashboards: ‹ Datum ›, Kalender, „Heute“; ohne Schrittweiten-Knöpfe). Der Alpine-Store
-   dashStichtag hält den Tag und stellt ihn als ?date=… in die Adresse; wetter.js lädt Kacheln und Tabelle bei „dashboard-stichtag“ neu.
-   Eigene Leiste vor der Karte statt im Kartenkopf: die Karte ist kurz, und sticky endet mit dem Elternelement — so bleibt die Leiste
-   im ganzen Reiter stehen. #}
-<div class="dash-sticky-bar is-sticky wt-stichtag-bar">{{ period_nav(true, true) }}</div>
 <div class="card wt-card wt-tilecard">
   <div class="wt-controls wt-card-head">
     {# Der Titel nennt den Tag („Heute“, „Gestern“, sonst „Rückblick“); in der Vergangenheit springt ein Klick auf heute. #}
@@ -178,6 +173,10 @@
 
   {# Reiterzeile des App-Standards (.entity-tabs in app.css, wie bei Entitäten und Entitätsseiten); hier
      Schaltflächen statt Links, weil die Reiter nur umschalten und die Seite nicht wechseln. #}
+  {# Stichtag-Leiste des App-Standards (wie bei den Dashboards: ‹ Datum ›, Kalender, „Heute“; ohne Schrittweiten-Knöpfe) in der Reiterzeile,
+     die beim Scrollen unter der Kopfleiste stehen bleibt. Der Alpine-Store dashStichtag hält den Tag und stellt ihn als ?date=… in die
+     Adresse; wetter.js lädt Kacheln und Tabelle bei „dashboard-stichtag“ neu. Nur in den Reitern mit Kachelkarte. #}
+  <div class="dash-tabs-bar">
   <nav class="entity-tabs wt-tabs" role="tablist" aria-label="{{ _('Ansichten des Wetterdashboards') }}">
     {% if show_overview %}
     <button type="button" role="tab" id="wt-tab-overview" aria-controls="wt-panel-overview" class="entity-tab" :class="{'is-active': tab === 'overview'}" :aria-selected="(tab === 'overview').toString()" :tabindex="tab === 'overview' ? 0 : -1" @click="showTab('overview')" @keydown="tabKey($event)">{{ _("Übersicht") }}</button>
@@ -198,6 +197,8 @@
     <button type="button" role="tab" id="wt-tab-long" aria-controls="wt-panel-long" class="entity-tab" :class="{'is-active': tab === 'long'}" :aria-selected="(tab === 'long').toString()" :tabindex="tab === 'long' ? 0 : -1" @click="showTab('long')" @keydown="tabKey($event)">{{ _("Langzeit") }}</button>
     {% endif %}
   </nav>
+  <div class="dash-tabs-bar-end" x-show="['overview', 'klima', 'wind'].includes(tab)" x-cloak>{{ period_nav(true, true) }}</div>
+  </div>
 
   {% if show_overview %}
   <section x-show="tab === 'overview'" role="tabpanel" id="wt-panel-overview" aria-labelledby="wt-tab-overview">

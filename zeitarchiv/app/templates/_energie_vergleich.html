@@ -1,5 +1,4 @@
 {% from "_hints.html" import hint_button, hint_body %}
-{% from "_dashboard_period_nav.html" import nav as period_nav with context %}
 {# Reiter „Vergleich“ des Energiedashboards (Roadmap 1.45/1.49/1.50), aufgebaut wie die Vergleichskarten des Wetterdashboards: eine Karte
    „Zeiträume im Vergleich“ mit Stichtag-Leiste (Alpine-Store dashStichtag, wie im Wetter), Spalten- und Vorjahr-Menü; darin die Bilanz
    (Energie, Quoten, Speicher, PV-Anlage) und die Verbraucher der obersten Ebene in einer Tabelle. Darunter „Aufteilung des Verbrauchs“.
@@ -12,10 +11,6 @@
 {# Einfache Anführungszeichen, weil tojson doppelte liefert. #}
 <div x-data='energieVergleich({{ {"consumers": consumer_count > 0, "hidden": hidden} | tojson }})' data-hints="collapsed">
   <p class="hint hint-warn" x-show="consumersError" x-text="consumersError" x-cloak></p>
-
-  {# Stichtag-Leiste des App-Standards, wie im Wetterdashboard (‹ Datum ›, Kalender, „Heute“; ohne Schrittweiten-Knöpfe), als eigene
-     klebende Leiste vor der Karte. #}
-  <div class="dash-sticky-bar is-sticky wt-stichtag-bar">{{ period_nav(true, true) }}</div>
 
   <div class="card wt-card">
     <div class="wt-controls">

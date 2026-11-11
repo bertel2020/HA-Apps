@@ -1,3 +1,4 @@
+{% from "_dashboard_period_nav.html" import nav as period_nav with context %}
 {% if not configured %}
 <div class="edash-title-row">
   <h1>{{ _("Energiedashboard") }}</h1>
@@ -379,16 +380,16 @@
      Reiter nur umschalten und die Seite nicht wechseln. „Übersicht“ ist der bisherige Energiefluss, unverändert. #}
   {# Der Name des Reiters „Vergleich“ steht nur hier (und im Link der Übersicht); der Schlüssel des Reiters bleibt „cmp“. #}
   {% set compare_tab = _("Vergleich") %}
+  {# Zeitraum-Steuerung in der Reiterzeile, die beim Scrollen unter der Kopfleiste stehen bleibt: im Reiter „Übersicht“ Pills, ‹ Datum › und
+     Bericht-Knopf, im Reiter „Vergleich“ nur ‹ Datum ›. Dort sind sie über alle Karten des Reiters gültig; im Kopf einer Karte würde
+     sticky mit der Karte enden. #}
+  <div class="dash-tabs-bar">
   <nav class="entity-tabs wt-tabs" role="tablist" aria-label="{{ _('Ansichten des Energiedashboards') }}" style="margin-top:14px;" @keydown="tabKey($event)">
     <button type="button" role="tab" id="ed-tab-over" aria-controls="ed-panel-over" class="entity-tab" :class="{'is-active': tab === 'over'}" :aria-selected="(tab === 'over').toString()" :tabindex="tab === 'over' ? 0 : -1" @click="showTab('over')">{{ _("Übersicht") }}</button>
     <button type="button" role="tab" id="ed-tab-cmp" aria-controls="ed-panel-cmp" class="entity-tab" :class="{'is-active': tab === 'cmp'}" :aria-selected="(tab === 'cmp').toString()" :tabindex="tab === 'cmp' ? 0 : -1" @click="showTab('cmp')">{{ compare_tab }}</button>
     <button type="button" role="tab" id="ed-tab-long" aria-controls="ed-panel-long" class="entity-tab" :class="{'is-active': tab === 'long'}" :aria-selected="(tab === 'long').toString()" :tabindex="tab === 'long' ? 0 : -1" @click="showTab('long')">{{ _("Langzeit") }}</button>
   </nav>
-
-  <section x-show="tab === 'over'" role="tabpanel" id="ed-panel-over" aria-labelledby="ed-tab-over">
-  {# Zeitraum-Steuerung (Pills, ‹ Datum ›, Bericht) als klebende Leiste vor den Karten statt im Kopf der Energiefluss-Karte: dieser Kopf
-     ist nur eine Karte hoch, sticky endet mit dem Elternelement. So bleibt die Leiste im ganzen Reiter stehen. #}
-  <div class="dash-sticky-bar is-sticky edash-stichtag-bar">
+  <div class="dash-tabs-bar-end" x-show="tab === 'over'" x-cloak>
   <div class="edash-period-controls">
     <div class="edash-period-pills">
       <template x-for="r in ranges" :key="r.key">
@@ -415,6 +416,10 @@
     </a>
   </div>
   </div>
+  <div class="dash-tabs-bar-end" x-show="tab === 'cmp'" x-cloak>{{ period_nav(true, true) }}</div>
+  </div>
+
+  <section x-show="tab === 'over'" role="tabpanel" id="ed-panel-over" aria-labelledby="ed-tab-over">
   <div class="edash-card edash-span3 edash-flow-card">
     <div class="edash-card-head">
       <div class="edash-card-title">{{ _("Energiefluss") }}</div>

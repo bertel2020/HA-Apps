@@ -1623,10 +1623,17 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
 .dash-sticky-bar.is-sticky .dash-period-banner{margin:8px 0 0;}
 /* Auf dem Smartphone bricht die Leiste auf drei Zeilen (etwa 160px von 800): dort scrollt sie mit, wie bisher. */
 @media (max-width:640px){.dash-sticky-bar.is-sticky{position:static;}}
-/* Wetter- und Energie-Vergleich: nur die kompakte Leiste (‹ Datum › + „Heute“), rechts schwebend; sie ist auch mobil einzeilig und klebt dort. */
-.dash-sticky-bar.wt-stichtag-bar,.dash-sticky-bar.edash-stichtag-bar{width:fit-content;margin-left:auto;}
-@media (max-width:640px){.dash-sticky-bar.is-sticky.edash-stichtag-bar{width:auto;}}
-@media (max-width:640px){.dash-sticky-bar.is-sticky.wt-stichtag-bar{position:sticky;width:auto;}}
+/* Wetter- und Energiedashboard: die Reiterzeile trägt rechts die Zeitraum-Steuerung (ein Streifen statt Reiterzeile plus eigener Leiste)
+   und bleibt beim Scrollen unter der Kopfleiste stehen. Die Linie unter den Reitern kommt vom Rahmen des Streifens; Smartphone:
+   die Steuerung bricht in eine zweite Zeile, deshalb dort kein Kleben. */
+.dash-tabs-bar{position:sticky;top:57px;z-index:10;display:flex;align-items:center;gap:4px 16px;margin:14px 0;padding:0 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);}
+.dash-tabs-bar .entity-tabs{flex:1 1 auto;min-width:0;margin:0 !important;border-bottom:0;}
+.dash-tabs-bar-end{margin-left:auto;flex:none;padding:6px 0;}
+@media (max-width:640px){
+  .dash-tabs-bar{position:static;flex-wrap:wrap;}
+  .dash-tabs-bar .entity-tabs{flex:1 1 100%;}
+  .dash-tabs-bar-end{margin-left:0;width:100%;}
+}
 
 /* Kalender-Widget dafür, identisch zu den Kopien in chart_editor.css,
    entity_detail.css, cleanup.css und table_editor.css (siehe
