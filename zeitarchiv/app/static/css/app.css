@@ -1323,7 +1323,7 @@ td.mono{font-family:var(--font-mono);}
    fiel 650 auf 700 hoch und 800 mangels fetterem Schnitt auf 700 zurück — die
    als "fett" markierte Trennzeile war von der normalen nicht zu unterscheiden. */
 .tbl-separator-content{display:flex;align-items:center;gap:8px;width:100%;}
-.tbl-separator-line{display:block;flex:1;height:1px;background:var(--border);}
+.tbl-separator-line{display:block;flex:1;height:2px;background:var(--border-strong);}
 /* Leerzeile: Trennlinie ohne sichtbare Linie, behält ihre Höhe. */
 .tbl-separator-content.is-blank{min-height:1.2em;}
 .tbl-separator-content.is-blank .tbl-separator-line{background:transparent;}
