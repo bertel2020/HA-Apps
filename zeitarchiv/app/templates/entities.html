@@ -47,11 +47,13 @@
     {% include "_overview_tiles.html" %}
 
     <div class="dashboard-section">
+      <div class="dash-sticky-bar{% if dashboard_period_nav %} is-sticky{% endif %}">
       <div class="dashboard-head">
         <h2>{{ dashboard_name }}</h2>
         {% if dashboard_period_nav %}{{ period_nav() }}{% endif %}
       </div>
       {% if dashboard_period_nav %}{{ period_banner() }}{% endif %}
+      </div>
       {% include "_four_columns_hint.html" %}
       {% include "_dashboard_tiles.html" %}
     </div>

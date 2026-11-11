@@ -44,6 +44,10 @@
   - Treffer in der Liste zeigen, welche leere Rolle des Wetterdashboards sie
     füllen könnten
 
+- **Dashboards**: Titel und Zeitraum-Leiste bleiben beim Scrollen oben stehen
+  - Gilt für Dashboards mit Zeitraum-Navigation und die Übersicht
+  - Auf dem Smartphone scrollt die Leiste weiterhin mit
+
 ### Geändert
 
 - **Wetterdashboard**
@@ -109,6 +113,10 @@
     from Home Assistant” for it
   - Hits in the list show which empty role of the weather dashboard they could
     fill
+
+- **Dashboards**: Title and period bar stay at the top while scrolling
+  - Applies to dashboards with period navigation and the overview
+  - On smartphones the bar still scrolls with the page
 
 #### Changed
 

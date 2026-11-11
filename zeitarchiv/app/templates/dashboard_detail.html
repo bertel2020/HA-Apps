@@ -8,6 +8,7 @@
 {% block content %}
   
   <div class="page page-wide"{% if dashboard_grid_columns == 4 %} data-columns="4"{% endif %}>
+    <div class="dash-sticky-bar{% if dashboard_period_nav %} is-sticky{% endif %}">
     <div class="dash-title-row">
       <h1>{{ (dashboard.name | retranslate) if dashboard.is_default else dashboard.name }}</h1>
       {% if dashboard.locked %}
@@ -18,6 +19,7 @@
       {% if dashboard_period_nav %}{{ period_nav() }}{% endif %}
     </div>
     {% if dashboard_period_nav %}{{ period_banner() }}{% endif %}
+    </div>
     {% include "_four_columns_hint.html" %}
 
     <div class="dashboard-section">
