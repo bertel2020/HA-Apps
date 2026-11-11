@@ -1624,7 +1624,8 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
 /* Auf dem Smartphone bricht die Leiste auf drei Zeilen (etwa 160px von 800): dort scrollt sie mit, wie bisher. */
 @media (max-width:640px){.dash-sticky-bar.is-sticky{position:static;}}
 /* Wetter- und Energie-Vergleich: nur die kompakte Leiste (‹ Datum › + „Heute“), rechts schwebend; sie ist auch mobil einzeilig und klebt dort. */
-.dash-sticky-bar.wt-stichtag-bar{width:fit-content;margin-left:auto;}
+.dash-sticky-bar.wt-stichtag-bar,.dash-sticky-bar.edash-stichtag-bar{width:fit-content;margin-left:auto;}
+@media (max-width:640px){.dash-sticky-bar.is-sticky.edash-stichtag-bar{width:auto;}}
 @media (max-width:640px){.dash-sticky-bar.is-sticky.wt-stichtag-bar{position:sticky;width:auto;}}
 
 /* Kalender-Widget dafür, identisch zu den Kopien in chart_editor.css,

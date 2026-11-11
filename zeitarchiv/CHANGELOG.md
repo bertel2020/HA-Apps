@@ -48,8 +48,9 @@
 
 - **Dashboards**: Titel und Zeitraum-Leiste bleiben beim Scrollen oben stehen
   - Gilt für Dashboards mit Zeitraum-Navigation und die Übersicht; im
-    Wetterdashboard und im Energie-Vergleich bleibt die Datums-Leiste stehen
-  - Auf dem Smartphone scrollt die Leiste bei Dashboards und Übersicht mit
+    Wetter- und Energiedashboard bleibt die Zeitraum-Leiste stehen
+  - Auf dem Smartphone scrollt die Leiste mit; nur die kurze Datums-Leiste im
+    Wetterdashboard und im Energie-Vergleich bleibt stehen
 
 ### Geändert
 
@@ -121,8 +122,9 @@
 
 - **Dashboards**: Title and period bar stay at the top while scrolling
   - Applies to dashboards with period navigation and the overview; in the
-    weather dashboard and the energy comparison the date bar stays in place
-  - On smartphones the bar scrolls with the page on dashboards and the overview
+    weather and energy dashboards the period bar stays in place
+  - On smartphones the bar scrolls with the page; only the short date bar in
+    the weather dashboard and the energy comparison stays in place
 
 #### Changed
 
