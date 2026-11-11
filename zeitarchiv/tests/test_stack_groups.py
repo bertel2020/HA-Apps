@@ -118,3 +118,7 @@ def test_full_resolution_gives_every_stack_its_own_category() -> None:
     # Stapeln gilt bei „Voll“ nur mit eigenen Stapeln, sonst bleibt es der Ranking-Vergleich.
     assert "(!singleBucket || hasStackGroups)" in TILE_JS
     assert "(!this.singleBucket || this.hasStackMembers)" in EDITOR_JS
+
+
+def test_assigning_an_entry_to_a_stack_switches_stacking_on() -> None:
+    assert "if (value !== 'none' && !this.stacked && this.canStack && !this.compare) this.stacked = true;" in EDITOR_JS

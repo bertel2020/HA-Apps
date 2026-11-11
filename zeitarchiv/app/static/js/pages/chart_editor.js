@@ -1597,6 +1597,9 @@
           }
           // Leere Stapel bleiben stehen (frisch angelegt, wartet auf Einträge); der Server räumt sie beim Speichern auf.
           this.stackGroups = {groups, members};
+          // Wer einen Eintrag einem Stapel zuordnet, will ihn gestapelt sehen: „Gestapelt“ schaltet sich ein
+          // (nicht bei Vergleich, der Vorrang hat und Stapeln ausschließt).
+          if (value !== 'none' && !this.stacked && this.canStack && !this.compare) this.stacked = true;
           this.render();
         },
         // Stapelname für die Legende, nur bei wirksamen Stapeln (gleiche Regel wie ChartTileRender.stackLabels).
