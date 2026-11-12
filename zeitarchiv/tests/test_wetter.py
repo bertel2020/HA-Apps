@@ -614,7 +614,7 @@ def test_cards_match_the_energy_dashboard_card_metrics() -> None:
     css = (APP / "static/css/app.css").read_text(encoding="utf-8")
     energy = (APP / "static/css/pages/energiedashboard.css").read_text(encoding="utf-8")
     assert ".edash-card{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:16px 18px" in energy
-    assert ".wt-card{padding:16px 18px;border-radius:12px;box-shadow:var(--shadow);}" in css
+    assert ".wt-card{padding:16px 18px;border-radius:12px;box-shadow:var(--shadow),var(--tile-lift);}" in css
 
 
 def test_setup_form_uses_app_fields_and_info_buttons(client) -> None:
