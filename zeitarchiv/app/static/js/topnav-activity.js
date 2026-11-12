@@ -95,6 +95,13 @@
   async function hole() {
     const ziel = document.getElementById('notice-activity');
     if (!ziel) return;
+    /* Ein versteckter Tab zeigt die Glocke niemandem: nichts abfragen, nur den Takt weiterlaufen lassen. Beim Zurückkehren
+       holt der visibilitychange-Handler unten sofort nach; hat sich in der Zwischenzeit etwas geändert, blinkt die Glocke
+       dann wie sonst (siehe oben: Das Blinken entsteht in jedem Tab für sich). */
+    if (document.visibilityState === 'hidden') {
+      plane(TAKT_RUHE_MS);
+      return;
+    }
     let aktiv = bekannteVorgaenge ? bekannteVorgaenge.length > 0 : false;
     try {
       const res = await fetch((ziel.dataset.appRoot || '') + '/notices/activity');
@@ -129,5 +136,8 @@
     if (!ziel) return;
     bekannteVorgaenge = kennungen(ziel);
     plane(bekannteVorgaenge.length > 0 ? TAKT_AKTIV_MS : TAKT_RUHE_MS);
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') plane(0);
+    });
   })();
 })();
