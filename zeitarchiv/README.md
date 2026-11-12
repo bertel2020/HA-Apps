@@ -634,7 +634,7 @@ Die verwendeten Drittanbieter-Komponenten und deren Lizenzen sind in
 <p align="center">
   <a href="https://github.com/bertel2020/HA-Zeitarchiv">Integration einrichten</a>
   ·
-  <a href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md">Changelog</a>
+  <a href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md">Changelog</a>
   ·
   <a href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/DOCS.md">App-Store-Dokumentation</a>
 </p>

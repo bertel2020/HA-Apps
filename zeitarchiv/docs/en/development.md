@@ -50,7 +50,7 @@ python3 scripts/sync_versions.py --check
 ## Release
 
 1. Raise `addon/VERSION`, run `python3 scripts/sync_versions.py`, add to
-   `CHANGELOG.md`.
+   `CHANGELOG.md` (English) and `CHANGELOG.de.md` (German).
 2. Synchronize to `HA-Apps/zeitarchiv/` — copy changed files, tests via
    `python3 scripts/sync_tests.py` (check run: `--check`). The version table in
    `HA-Apps/README.md` also names the app version and is not touched by any
