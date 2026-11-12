@@ -1,3 +1,36 @@
+// Dashboard-Kacheln (_dashboard_tiles.html): Die Entitätsliste steht einmal als JSON im Fragment
+// (#dashboard-entity-pin-options) statt in jeder Werte-Kachel und in der Hinzufügen-Liste neu. Vorher wuchs das HTML
+// mit Entitäten × Kacheln (7 Kacheln × 168 Entitäten: 7 × 30 KB), und Alpine wertete jeden Ausdruck einzeln aus.
+// Geparst wird einmal je Fragment; nach einem htmx-Tausch ist es ein neues Element und wird neu gelesen.
+function dashboardEntityPinOptions() {
+  const cache = dashboardEntityPinOptions.cache || (dashboardEntityPinOptions.cache = {el: null, data: []});
+  const el = document.getElementById('dashboard-entity-pin-options');
+  if (!el) return [];
+  if (cache.el !== el) {
+    try { cache.data = JSON.parse(el.textContent); } catch (e) { cache.data = []; }
+    cache.el = el;
+  }
+  return cache.data;
+}
+
+// Zustand des "Kachel hinzufügen"-Popups für den Reiter "Werte": Die Zeilen entstehen erst beim Öffnen des Reiters
+// (x-if in _dashboard_tiles.html) aus derselben Liste, statt als je ein fertig gerenderter Button pro Entität.
+// htmx.ajax() ersetzt hx-post, weil htmx von Alpine erzeugte Knoten nicht von selbst verarbeitet.
+function dashboardAddTile(pinBase, dashboardId) {
+  return {
+    entityMatches() {
+      const q = (this.search || '').toLowerCase();
+      return dashboardEntityPinOptions().filter((e) => !q || (e.label + ' ' + e.entity_id).toLowerCase().includes(q));
+    },
+    pinEntity(entityId, el) {
+      this.open = false;
+      htmx.ajax('POST', pinBase + encodeURIComponent(entityId) + '?dashboard_id=' + encodeURIComponent(dashboardId), {
+        source: el, target: '#dashboard-grid', swap: 'outerHTML',
+      });
+    },
+  };
+}
+
 // Wiederverwendbare Alpine-Komponente für ein durchsuchbares
 // Einzel-Entität-Dropdown mit Leeren-Button (Feld-innenliegendes "✕") und
 // verzögertem Tooltip (Entity-ID). Gemeinsame Basis für Einstellungen →

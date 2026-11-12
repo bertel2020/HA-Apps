@@ -32,7 +32,7 @@
           <div class="dtile-title-field">
             <span class="menu-row-label">{{ _("Entität") }}</span>
             <form class="dd-picker-wrap dtile-entity-picker"
-                  x-data='entityPicker({{ entity_pin_options | tojson }}, {{ tile.entity_id | tojson }})'
+                  x-data='entityPicker(dashboardEntityPinOptions(), {{ tile.entity_id | tojson }})'
                   x-ref="entityForm" @click.outside="open = false"
                   hx-post="{{ href_base }}dashboard/entity/{{ tile.pin_id }}?dashboard_id={{ dashboard_id }}"
                   hx-target="#dashboard-grid" hx-swap="outerHTML">
