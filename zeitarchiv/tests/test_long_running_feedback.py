@@ -512,6 +512,24 @@ def test_the_activity_endpoint_does_not_build_the_notice_list(client, monkeypatc
     assert client.get("/notices/activity").status_code == 200
 
 
+def test_the_panel_endpoint_builds_the_notice_list_only_once(client, monkeypatch) -> None:
+    """Der Kontextprozessor liefert die Hinweisliste bereits für jede TemplateResponse; ein zusätzlicher Aufruf in der
+    Route verdoppelte die Arbeit."""
+    from app import main
+
+    aufrufe = []
+    original = main._collect_all_notices
+
+    def zaehlen() -> list:
+        aufrufe.append(1)
+        return original()
+
+    monkeypatch.setattr(main, "_collect_all_notices", zaehlen)
+    antwort = client.get("/notices/panel")
+    assert antwort.status_code == 200
+    assert len(aufrufe) == 1
+
+
 def test_the_activity_endpoint_lists_the_running_job(client, laufender_vorgang) -> None:
     html = client.get("/notices/activity").text
     assert 'data-job-id="pytest-job"' in html

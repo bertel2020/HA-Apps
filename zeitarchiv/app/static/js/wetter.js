@@ -555,7 +555,7 @@
         if (temp) {
           const adjective = live && c.temp && c.temp.unit === '°C' ? this.tempAdjective(c.temp.value).toLowerCase() : '';
           out.push({
-            key: 'temperature', role: 'temperature', icon: 'temp', label: temp.label, big: false, href: link(temp), title: this.tileTitle(temp),
+            key: 'temperature', role: 'temperature', icon: 'temp', label: temp.label, big: false, href: link(temp), title: '',
             value: this.tileValue(temp), sub: [adjective, this.tileSub(temp)].filter(Boolean).join('\n'),
           });
         }
@@ -574,7 +574,7 @@
           const before = [mm, dur].map((tile) => (tile ? this.tileSub(tile) : '')).filter(Boolean);
           if (before.length) lines.push(before.join(' · '));
           out.push({
-            key: 'rain', role: 'precip_mm', icon: 'drop', label: t('Regen'), big: false, href: link(first), title: first ? this.tileTitle(first) : '',
+            key: 'rain', role: 'precip_mm', icon: 'drop', label: t('Regen'), big: false, href: link(first), title: '',
             value: rain ? escapeHtml(rain.text) : this.tileValue(first), sub: lines.join('\n'),
           });
         }
@@ -600,10 +600,10 @@
           ...rest.filter((tile) => !lead.includes(tile.key))].forEach((tile) => {
           out.push({
             key: tile.key, role: tile.key, icon: this.tileIcon(tile), label: tile.label, big: false, href: 'entities/' + encodeURIComponent(tile.entity_id),
-            title: this.tileTitle(tile), value: this.tileValue(tile), sub: this.tileSub(tile),
+            title: '', value: this.tileValue(tile), sub: this.tileSub(tile),
           });
         });
-        // Kurzfassung für die Leiste: nur die erste Zeile; die ganze Angabe steht im Tooltip.
+        // Kurzfassung für die Leiste: nur die erste Zeile; die ganze Angabe steht im Tooltip (setzt title für alle Kacheln neu).
         out.forEach((tile) => {
           const lines = String(tile.sub || '').split('\n').filter(Boolean);
           tile.k = lines[0] || '';

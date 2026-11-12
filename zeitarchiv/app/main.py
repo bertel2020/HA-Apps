@@ -1417,10 +1417,11 @@ def notices_panel(request: Request) -> HTMLResponse:
     refreshNoticePanel() nach dem Zurückholen einer stummgeschalteten Meldung
     auf der Einstellungen-Seite abgerufen (_topnav.html), damit das Panel
     nicht bis zum nächsten vollständigen Seitenaufruf veraltet bleibt.
-    _notices_context läuft zwar als globaler context_processor mit, aber nur
-    für ganze TemplateResponses — hier explizit erneut aufgerufen, weil diese
-    Route ganz bewusst nur das kleine Partial zurückgibt."""
-    return templates.TemplateResponse(request, "_notice_panel_body.html", _notices_context(request))
+    Der Kontext kommt allein aus dem globalen context_processor
+    ``_notices_context``: Jede TemplateResponse ruft ihn auf, auch die für ein
+    Partial. Ihn hier zusätzlich selbst aufzurufen baute die Hinweisliste
+    (Einstellungsabfragen, Auswertung aller Entitäten) zweimal je Aufruf."""
+    return templates.TemplateResponse(request, "_notice_panel_body.html", {})
 
 
 @app.get("/notices/activity", response_class=HTMLResponse)
