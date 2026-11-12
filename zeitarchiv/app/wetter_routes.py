@@ -1537,7 +1537,13 @@ class WetterService:
         Segmente stehen womöglich noch im Hot Buffer) sowie jeder Monat mit geändertem Fingerabdruck. Ein Ausschnitt wird
         mit einem Tag Vorlauf gerechnet und der Vorlauf verworfen, damit Lückenregel und Sonnenhöhe am Rand gleich bleiben."""
         stats = self._sun_segment_stats(config)
-        config_key = (str(self.deps.data_dir), str(self.deps.tz), *(config.get(name) for name in SUN_CACHE_CONFIG_KEYS))
+        # Der tatsächliche Modus gehört in den Schlüssel, nicht nur der Schalter: Ob relativ gerechnet wird, hängt auch davon ab,
+        # ob die Sonnenhöhen-Entität im Index steht. Für Monate ohne Segment der Sonnenhöhe ist der Fingerabdruck gleich,
+        # egal ob sie dort steht; wird sie gelöscht oder später angelegt, käme sonst das Ergebnis des anderen Modus.
+        config_key = (
+            str(self.deps.data_dir), str(self.deps.tz), *(config.get(name) for name in SUN_CACHE_CONFIG_KEYS),
+            self._sun_relative(config),
+        )
         current = (now_local.year, now_local.month)
         months: list[tuple[int, int]] = []
         year, month = first.year, first.month
