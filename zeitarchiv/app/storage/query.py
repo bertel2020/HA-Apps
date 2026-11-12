@@ -95,9 +95,12 @@ class QueryReadCache:
         # keine.
         self.memo: dict = {}
 
+    # Beide Sichten (mit und ohne Min/Max) kommen aus EINEM Parse der Datei: iter_records() liest ohnehin jede Zeile
+    # vollständig, read_rows() wirft Min/Max danach nur weg. Zwei getrennte Caches parsten dieselbe Monats-CSV je Request
+    # zweimal (einmal für die Reihe, einmal für den Randwert), und eine kaputte Zeile wurde zweimal gemeldet.
     def read_hot_rows(self, path: Path) -> list[tuple[float, float]]:
         if path not in self._hot_rows:
-            self._hot_rows[path] = read_rows(path)
+            self._hot_rows[path] = [(row[0], row[1]) for row in self.read_hot_rows_with_extremes(path)]
         return self._hot_rows[path]
 
     def read_hot_rows_with_extremes(self, path: Path) -> list[tuple[float, float, float | None, float | None]]:
@@ -385,9 +388,10 @@ def _boundary_value(
     """Letzter Rohwert vor ``before_ts`` aus Hot Buffer oder Monatsarchiv."""
     before_local = datetime.fromtimestamp(before_ts, tz)
     rows = _hot_rows(hot_path(data_dir, entity_id, before_ts, tz), read_cache)
-    prior = sorted((ts, value) for ts, value in rows if ts < before_ts)
-    if prior:
-        return prior[-1][1]
+    # Der letzte Wert vor dem Fenster: das größte (ts, value)-Paar, ohne die ganze Datei dafür zu sortieren.
+    prior = max(((ts, value) for ts, value in rows if ts < before_ts), default=None)
+    if prior is not None:
+        return prior[1]
 
     # Bei historischen Fenstern liegt auch der aktuelle Fenstermonat bereits
     # im Archiv. Rueckwaerts suchen, damit der letzte bekannte Wert selbst bei

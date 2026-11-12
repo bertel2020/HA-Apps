@@ -45,13 +45,13 @@ def test_query_read_cache_parses_current_hot_file_once(monkeypatch, tmp_path: Pa
     index.record_write(entity_id, ts)
 
     paths: list[Path] = []
-    original = query.read_rows
+    original = query._read_rows_with_extremes  # der gemeinsame Parser des QueryReadCache
 
     def recording_read_rows(path: Path):
         paths.append(path)
         return original(path)
 
-    monkeypatch.setattr(query, "read_rows", recording_read_rows)
+    monkeypatch.setattr(query, "_read_rows_with_extremes", recording_read_rows)
     cache = query.QueryReadCache()
     query.query_series(tmp_path, index, entity_id, "day", TZ, now, read_cache=cache)
     query.query_series(tmp_path, index, entity_id, "month", TZ, now, read_cache=cache)

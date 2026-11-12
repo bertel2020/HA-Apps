@@ -316,7 +316,9 @@ def test_iter_raw_rows_shares_hot_read_cache_across_streaming_passes() -> None:
 
         read_cache = query.QueryReadCache()
         calls: list[Path] = []
-        original_read_rows = query.read_rows
+        # Der Cache parst eine Hot-Datei einmal (mit Min/Max) und leitet die Paar-Sicht daraus ab; gezählt wird deshalb
+        # am gemeinsamen Parser statt an read_rows().
+        original_read_rows = query._read_rows_with_extremes
 
         def counting_read_rows(path):
             calls.append(path)
@@ -328,13 +330,13 @@ def test_iter_raw_rows_shares_hot_read_cache_across_streaming_passes() -> None:
                 hot_rows_loader=read_cache.read_hot_rows,
             )
 
-        query.read_rows = counting_read_rows
+        query._read_rows_with_extremes = counting_read_rows
         try:
             # Simuliert die zwei Durchläufe von analyze_raw_rows_page().
             first_pass = list(rows_factory())
             second_pass = list(rows_factory())
         finally:
-            query.read_rows = original_read_rows
+            query._read_rows_with_extremes = original_read_rows
 
         assert first_pass == second_pass == [(ts, 1.0)]
         assert len(calls) == 1

@@ -793,6 +793,10 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         is_current = True
         for entity_id in ids:
             entity = deps.index.get_entity(entity_id)
+            # Hauptabfrage, Vergleichsreihe und „Summe bis zum gleichen Tag“ lesen dieselbe Monats-CSV und dieselben
+            # Rollup-Stufen. Der Cache gilt je Entität und nicht je Anfrage: Bei vielen Entitäten läge sonst jede
+            # Hot-Datei bis zum Ende der Anfrage im Speicher (auf kleinen Geräten Hunderte MB bei großen Dateien).
+            entity_cache = read_cache if read_cache is not None else query_mod.QueryReadCache()
             # Heatmap: nur die Zellen der Zustands-Entitäten; alles andere
             # kommt unverändert, die Oberfläche wirft es für die Heatmap ohnehin
             # heraus (Zustände stehen nie neben anderen Serien).
@@ -816,6 +820,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 result = query_mod.query_series(
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                     offset=offset, continuous=continuous, year_over_year=year_over_year,
+                    read_cache=entity_cache,
                 )
             entry = {
                 "entity_id": entity_id,
@@ -845,7 +850,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                     offset=offset if compare_mode == "year" else offset - 1,
                     continuous=continuous,
-                    year_over_year=compare_mode == "year", full_period=True,
+                    year_over_year=compare_mode == "year", full_period=True, read_cache=entity_cache,
                 )
                 entry.update(
                     compare_points=compare_result["points"],
@@ -858,6 +863,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     cut = query_mod.query_compare_cut(
                         deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                         offset=offset, continuous=continuous, year_over_year=compare_mode == "year",
+                        read_cache=entity_cache,
                     )
                     if cut:
                         entry.update(compare_cut_points=cut["points"], compare_cut_end=cut["window_end"])
