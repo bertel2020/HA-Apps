@@ -3,7 +3,7 @@
 *[Deutsche Version](../README.md)*
 
 For a short overview (installation, feature list) see the
-[app README](../../README.en.md).
+[app README](../../README.md).
 
 > **Language note:** All documents listed here are available in English in
 > `docs/en/`; the German originals live one level up.

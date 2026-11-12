@@ -1,10 +1,9 @@
 # Home Assistant Apps by bertel2020
 
-*[English version](README.en.md)*
+*[Deutsche Version](README.de.md)*
 
-Dieses Repository stellt verschiedene Apps für Home Assistant bereit. Jede App
-liegt in einem eigenen Ordner und kann unabhängig installiert und aktualisiert
-werden.
+This repository provides various apps for Home Assistant. Each app lives in
+its own folder and can be installed and updated independently.
 
 <p align="center">
   <a href="https://buymeacoffee.com/bertel2020"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?logo=buy-me-a-coffee&logoColor=black" alt="Buy Me a Coffee"></a>
@@ -12,37 +11,37 @@ werden.
   <a href="https://paypal.me/RobertoMartins"><img src="https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white" alt="PayPal"></a>
 </p>
 
-## Verfügbare Apps
+## Available apps
 
-| App | Version | Beschreibung | Dokumentation |
+| App | Version | Description | Documentation |
 | --- | --- | --- | --- |
-| Zeitarchiv | [1.40.0](zeitarchiv/CHANGELOG.de.md)<br><sub>10.11.2026</sub> | Kompaktes Zeitreihen-Archiv mit Parquet, Ingress, Energie- und Wetterdashboard, Charts, Importen sowie sicherer Logging- und Ingest-Diagnose. | [Anleitung](zeitarchiv/README.md) · [Dokumentation](zeitarchiv/docs/README.md) |
+| Zeitarchiv | [1.40.0](zeitarchiv/CHANGELOG.md)<br><sub>2026-11-10</sub> | Compact time series archive with Parquet, Ingress, energy and weather dashboards, charts, imports, and safe logging and ingest diagnostics. | [Guide](zeitarchiv/README.en.md) · [User guide](zeitarchiv/docs/en/user-guide.md) |
 
-Weitere Apps können später als zusätzlicher Ordner im Repository-Stamm ergänzt
-und in dieser Tabelle eingetragen werden.
+Further apps can later be added as an additional folder in the repository root
+and entered in this table.
 
-## Repository in Home Assistant hinzufügen
+## Add the repository to Home Assistant
 
-[![Add-on-Repository zu My Home Assistant hinzufügen](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fbertel2020%2FHA-Apps)
+[![Add add-on repository to My Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fbertel2020%2FHA-Apps)
 
-Alternativ von Hand:
+Or manually:
 
-1. In Home Assistant **Einstellungen → Apps → App-Store** öffnen.
-2. Rechts oben das Menü öffnen und **Repositories** auswählen.
-3. Folgende Adresse hinzufügen:
+1. In Home Assistant, open **Settings → Apps → App store**.
+2. Open the menu at the top right and select **Repositories**.
+3. Add the following address:
 
    ```text
    https://github.com/bertel2020/HA-Apps
    ```
 
-4. Den App-Store neu laden.
-5. Die gewünschte App auswählen und installieren.
+4. Reload the app store.
+5. Select the desired app and install it.
 
-Die Apps werden als vorgebaute Images für `amd64` und `aarch64` auf
-`ghcr.io/bertel2020` veröffentlicht; der Home-Assistant-Host muss beim
-Installieren oder Aktualisieren nichts selbst bauen.
+The apps are published as prebuilt images for `amd64` and `aarch64` on
+`ghcr.io/bertel2020`; the Home Assistant host does not have to build anything
+itself when installing or updating.
 
-## Repository-Struktur
+## Repository structure
 
 ```text
 HA-Apps/
@@ -54,17 +53,17 @@ HA-Apps/
 │   ├── README.md
 │   ├── docs/
 │   └── ...
-└── weitere-app/
+└── another-app/
     ├── config.yaml
     ├── Dockerfile
     └── ...
 ```
 
-## Fehler melden
+## Report issues
 
-Fehler und Verbesserungsvorschläge bitte über die
-[GitHub Issues](https://github.com/bertel2020/HA-Apps/issues) melden.
+Please report bugs and suggestions via
+[GitHub Issues](https://github.com/bertel2020/HA-Apps/issues).
 
-## Lizenz
+## License
 
 [MIT](LICENSE)

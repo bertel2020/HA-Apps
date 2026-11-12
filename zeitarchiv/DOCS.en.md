@@ -69,4 +69,4 @@ Reports**. There, results can be filtered, inspected in detail and downloaded
 as JSON. Import previews do not create a report.
 
 Detailed notes on features and limits are in the bundled
-[README.md](README.en.md).
+[README.md](README.md).

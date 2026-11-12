@@ -5,7 +5,7 @@
 Dieses Dokument ist die ausführliche Anleitung für Nutzer der App — Schritt
 für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 Überblick (was die App ist, Kernfunktionen auf einen Blick) siehe die
-[App-README](../README.md); technische Interna für Entwickler stehen in den
+[App-README](../README.de.md); technische Interna für Entwickler stehen in den
 übrigen Dokumenten dieses Ordners (siehe [README.md](README.md)).
 
 ## Inhalt
@@ -113,7 +113,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
 
 1. **App installieren** — über den Add-on-Store (Repository
    `https://github.com/bertel2020/HA-Apps` hinzufügen) oder manuell. Details:
-   [App-README → Installation](../README.md#installation).
+   [App-README → Installation](../README.de.md#installation).
 2. **API-Token kopieren** — Zeitarchiv über die Home-Assistant-Seitenleiste
    öffnen, **Einstellungen → Verbindung**, Token kopieren. Der Token wird
    beim ersten Start automatisch erzeugt und ist nur für diese Zeitarchiv-

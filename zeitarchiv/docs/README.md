@@ -3,7 +3,7 @@
 *[English version](en/README.md)*
 
 Für einen kurzen Überblick (Installation, Funktionsliste) siehe die
-[App-README](../README.md).
+[App-README](../README.de.md).
 
 **Zwei getrennte Produkte, ein Datenfluss.** Diese Dokumente beschreiben
 ausschließlich die **App** (`addon/`, hier im Repo als `app/`). Den

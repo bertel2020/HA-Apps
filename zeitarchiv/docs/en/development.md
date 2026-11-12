@@ -53,7 +53,7 @@ python3 scripts/sync_versions.py --check
    `CHANGELOG.md` (English) and `CHANGELOG.de.md` (German).
 2. Synchronize to `HA-Apps/zeitarchiv/` — copy changed files, tests via
    `python3 scripts/sync_tests.py` (check run: `--check`). The version table in
-   `HA-Apps/README.md` also names the app version and is not touched by any
+   `HA-Apps/README.md` and `README.de.md` also names the app version and is not touched by any
    script. Then commit and push.
 3. The "Zeitarchiv Image" workflow (`.github/workflows/zeitarchiv-image.yml` in
    the HA-Apps repo) then builds the images for `amd64` and `aarch64` via

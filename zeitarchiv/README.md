@@ -5,8 +5,8 @@
 <h1 align="center">Zeitarchiv App</h1>
 
 <p align="center">
-  Langfristige, kompakte Zeitreihen für Home Assistant.<br>
-  <sub>PARQUET + ZSTD · INGRESS · ENERGIEDASHBOARD · CHARTS · TABELLEN · IMPORT · BACKUP · DEMO-MODUS</sub>
+  Long-term, compact time series for Home Assistant.<br>
+  <sub>PARQUET + ZSTD · INGRESS · ENERGY DASHBOARD · CHARTS · TABLES · IMPORT · BACKUP · DEMO MODE</sub>
 </p>
 
 <p align="center">
@@ -24,617 +24,576 @@
   <a href="https://paypal.me/RobertoMartins"><img src="https://img.shields.io/badge/PayPal-donate-00457C?logo=paypal&logoColor=white" alt="PayPal"></a>
 </p>
 
-<p align="center"><em><a href="README.en.md">English version</a></em></p>
+<p align="center"><em><a href="README.de.md">Deutsche Version</a></em></p>
 
-Zeitarchiv bewahrt ausgewählte Zustandsänderungen unabhängig von der
-Aufbewahrungsdauer des Home-Assistant-Recorders auf. Die
-[Zeitarchiv-Integration](https://github.com/bertel2020/HA-Zeitarchiv) sammelt
-die gewünschten Werte; diese App speichert, verdichtet, durchsucht und
-visualisiert sie.
+Zeitarchiv preserves selected state changes independently of the retention
+period of the Home Assistant recorder. The
+[Zeitarchiv integration](https://github.com/bertel2020/HA-Zeitarchiv) collects
+the desired values; this app stores, compacts, searches and visualizes them.
 
-Ausführliches, aufgabenorientiertes Benutzerhandbuch:
-[docs/user-guide.md](docs/user-guide.md).
+A detailed, task-oriented user guide:
+[docs/en/user-guide.md](docs/en/user-guide.md).
 
-## Was Zeitarchiv ist
+## What Zeitarchiv is
 
-Der Home-Assistant-Recorder ist auf kurze Aufbewahrung und den laufenden
-Betrieb ausgelegt — für Auswertungen über Monate oder Jahre reicht das nicht.
-Zeitarchiv schließt diese Lücke: Es übernimmt ausgewählte Zustandsänderungen
-von Home Assistant, verdichtet abgeschlossene Monate spaltenorientiert und
-verlustfrei, und stellt daraus schnelle Langzeitauswertungen bereit — als
-eigene, in die Home-Assistant-Oberfläche eingebettete Anwendung, nicht als
-weitere Lovelace-Karte.
+The Home Assistant recorder is designed for short retention and day-to-day
+operation — which is not enough for analyses spanning months or years.
+Zeitarchiv closes this gap: it takes selected state changes from Home
+Assistant, compacts completed months in a columnar, lossless format, and uses
+them to provide fast long-term analyses — as a dedicated application embedded
+in the Home Assistant interface, not as yet another Lovelace card.
 
-Zeitarchiv besteht aus zwei getrennten, unabhängig versionierten Teilen:
+Zeitarchiv consists of two separate, independently versioned parts:
 
-- Die **[Zeitarchiv-Integration](https://github.com/bertel2020/HA-Zeitarchiv)**
-  läuft in Home Assistant selbst und entscheidet, welche Entitäten
-  archiviert werden.
-- Diese **App** läuft als eigenständiges Add-on, empfängt die Werte über
-  eine token-gesicherte API, speichert sie dauerhaft und stellt Archiv,
-  Auswertung und Datenpflege über den Ingress bereit.
+- The **[Zeitarchiv integration](https://github.com/bertel2020/HA-Zeitarchiv)**
+  runs inside Home Assistant itself and decides which entities are archived.
+- This **app** runs as a standalone add-on, receives the values via a
+  token-secured API, stores them permanently, and provides archive, analysis
+  and data maintenance through Ingress.
 
-## Auf einen Blick
+## At a glance
 
 | | |
 | --- | --- |
-| **Speichert dauerhaft** | Verlaufsdaten bleiben erhalten, unabhängig davon, wie lange Home Assistants eigene Aufbewahrung läuft |
-| **Bleibt schnell** | Charts über Wochen, Monate oder Jahre laden zügig, auch bei sehr langer Historie |
-| **Eigene Dashboards** | Frei kombinierbare Charts (Linie, Balken, Zeitstrahl) und Vergleichstabellen auf beliebig vielen eigenen Dashboards |
-| **Energiedashboard** | Eigene Sankey-Ansicht des Energieflusses mit Autarkie-, Kosten- und CO₂-Auswertung — auf Wunsch mit einem Klick aktiviert; der Reiter Langzeit vergleicht Zeiträume über die Jahre |
-| **Wetterdashboard** | Eigene Wetterseite mit Wetterlage, aktuellen Werten, Vorjahresvergleich, Niederschlag, Kenntagen, Sonnenscheindauer, Tageslicht und Heizgradtagen — ebenfalls mit einem Klick aktiviert |
-| **Datenpflege** | Ausreißer, Lücken, Duplikate und Zählerrückgänge erkennen, korrigieren oder bereinigen — mit einer Datenqualität-Übersicht über alle Entitäten |
-| **Datenübernahme** | Bestehende Historie aus Symcon, CSV-Dateien oder direkt aus Home Assistant importieren |
-| **Sicherung** | Prüfbare, portable ZIP-Backups mit Zeitplan; die Wiederherstellung kann alles, einzelne Entitäten oder nur die Einstellungen zurückholen |
-| **Demo-Modus** | Eigene Instanz mit synthetischen Vorführdaten, komplett getrennt von den echten Daten — per Add-on-Option umschaltbar |
-| **Abgesichert** | Läuft hinter Home Assistants eigenem Login, Schreibzugriff strikt vom Rest der Oberfläche getrennt |
+| **Stores permanently** | Historical data is retained regardless of how long Home Assistant's own retention runs |
+| **Stays fast** | Charts over weeks, months or years load quickly, even with a very long history |
+| **Your own dashboards** | Freely combinable charts (line, bar, timeline) and comparison tables on any number of your own dashboards |
+| **Energy dashboard** | Dedicated Sankey view of the energy flow with self-sufficiency, cost and CO₂ analysis — enabled with one click if desired; the Long-term tab compares periods across the years |
+| **Weather dashboard** | Dedicated weather page with weather summary, current values, comparison with last year, precipitation, characteristic days, sunshine duration, daylight and heating degree days — also enabled with one click |
+| **Data maintenance** | Detect, correct or clean up outliers, gaps, duplicates and counter decreases — with a data quality overview across all entities |
+| **Data import** | Import existing history from Symcon, CSV files or directly from Home Assistant |
+| **Backup** | Verifiable, portable ZIP backups with schedule; a restore can bring back everything, single entities or just the settings |
+| **Demo mode** | Separate instance with synthetic showcase data, completely isolated from the real data — switchable via add-on option |
+| **Secured** | Runs behind Home Assistant's own login, write access strictly separated from the rest of the interface |
 
-## Zusammenspiel
+## How the pieces fit together
 
 ```text
-Home-Assistant-Entitäten
+Home Assistant entities
           │ state_changed
           ▼
-Zeitarchiv-Integration
+Zeitarchiv integration
   Filter · Queue · Batch · Retry
-          │ POST /api/write + Bearer-Token
+          │ POST /api/write + bearer token
           ▼
-Zeitarchiv App
-  Hot Buffer ──► Monatsarchiv ──► Rollups
+Zeitarchiv app
+  Hot buffer ──► Monthly archive ──► Rollups
           │
-          └────► Ingress-Oberfläche
-                 Charts · Tabellen · Pflege · Export
+          └────► Ingress interface
+                 Charts · Tables · Maintenance · Export
 ```
 
-Die Verantwortlichkeiten bleiben bewusst getrennt:
+Responsibilities are deliberately kept separate:
 
-- Die **Integration** entscheidet, welche Home-Assistant-Entitäten gesendet
-  werden, und hält Übertragungsfehler von Home Assistant fern.
-- Die **App** entscheidet über Auflösung, Aufbewahrung, Speicherung,
-  Aggregation und Darstellung. Die Entitäts-Auflösung dient der Darstellung;
-  eingehende Werte werden nicht mehr über einen zeitlichen Mindestabstand
-  verworfen.
+- The **integration** decides which Home Assistant entities are sent and keeps
+  transmission errors away from Home Assistant.
+- The **app** decides on resolution, retention, storage, aggregation and
+  presentation. Entity resolution serves presentation; incoming values are no
+  longer discarded based on a minimum time interval.
 
 ## Installation
 
-### 1. App installieren
+### 1. Install the app
 
-[![Add-on-Repository zu My Home Assistant hinzufügen](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fbertel2020%2FHA-Apps)
-[![Zeitarchiv in My Home Assistant öffnen](https://my.home-assistant.io/badges/supervisor_addon.svg)](https://my.home-assistant.io/redirect/supervisor_addon/?addon=c1c17729_zeitarchiv&repository_url=https%3A%2F%2Fgithub.com%2Fbertel2020%2FHA-Apps)
+[![Add add-on repository to My Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fbertel2020%2FHA-Apps)
+[![Open Zeitarchiv in My Home Assistant](https://my.home-assistant.io/badges/supervisor_addon.svg)](https://my.home-assistant.io/redirect/supervisor_addon/?addon=c1c17729_zeitarchiv&repository_url=https%3A%2F%2Fgithub.com%2Fbertel2020%2FHA-Apps)
 
-Der erste Button trägt das Repository im Add-on-Store ein, der zweite öffnet
-direkt die Installationsseite von Zeitarchiv. Alternativ von Hand:
+The first button adds the repository to the add-on store, the second opens
+the Zeitarchiv installation page directly. Alternatively, manually:
 
-**Über den Add-on-Store:** In Home Assistant **Einstellungen → Add-ons →
-Add-on-Store → ⋮ → Repositories** öffnen, `https://github.com/bertel2020/HA-Apps`
-eintragen und hinzufügen. **Zeitarchiv** erscheint danach im Store; installieren
-und starten.
+**Via the add-on store:** In Home Assistant, open **Settings → Add-ons →
+Add-on store → ⋮ → Repositories**, enter `https://github.com/bertel2020/HA-Apps`
+and add it. **Zeitarchiv** then appears in the store; install and start it.
 
-Installation und Updates laufen über vorgebaute Images für `amd64` und
-`aarch64` (`ghcr.io/bertel2020/zeitarchiv-{arch}`), die ein GitHub-Workflow
-bei jedem Release erzeugt. Der Home-Assistant-Host baut also nichts lokal;
-Updates sind entsprechend schnell und der Supervisor zeigt den Fortschritt an.
+Installation and updates use prebuilt images for `amd64` and `aarch64`
+(`ghcr.io/bertel2020/zeitarchiv-{arch}`) that a GitHub workflow builds with
+every release. The Home Assistant host therefore builds nothing locally;
+updates are correspondingly fast and the Supervisor shows the progress.
 
-**Manuell:** Alternativ den Inhalt dieses Verzeichnisses als
-`/addons/zeitarchiv` auf den Home-Assistant-Host kopieren und den Store neu
-laden. Auch dann zieht der Supervisor das vorgebaute Image; wer das
-Dockerfile wirklich lokal bauen will, entfernt dafür die Zeile `image:` aus
-der `config.yaml`.
+**Manual:** Alternatively, copy the contents of this directory to the Home
+Assistant host as `/addons/zeitarchiv` and reload the store. Even then the
+Supervisor pulls the prebuilt image; if you really want to build the
+Dockerfile locally, remove the `image:` line from `config.yaml`.
 
-Nach dem Start erscheint Zeitarchiv in der Home-Assistant-Seitenleiste. Die
-vollständige Oberfläche läuft über den authentifizierten Supervisor-Ingress;
-ein separates Benutzerkonto ist nicht erforderlich.
+After starting, Zeitarchiv appears in the Home Assistant sidebar. The full
+interface runs through the authenticated Supervisor Ingress; a separate user
+account is not required.
 
-### Aktualisieren
+### Updating
 
-Zeitarchiv lässt sich ohne Datenverlust aktualisieren — die archivierten Daten
-liegen im Datenordner der App und bleiben bei einem Update erhalten:
+Zeitarchiv can be updated without losing data — the archived data lives in the
+app's data folder and is kept across updates:
 
-1. Optional vorab ein Backup unter **System → Backup / Restore** erstellen.
-2. In Home Assistant unter **Einstellungen → Add-ons → Zeitarchiv** auf
-   **Aktualisieren** klicken (erscheint, sobald eine neue Version verfügbar ist).
-3. Die [Integration](https://github.com/bertel2020/HA-Zeitarchiv) in HACS
-   ebenfalls aktualisieren und Home Assistant neu starten.
+1. Optionally create a backup under **System → Backup / Restore** first.
+2. In Home Assistant, go to **Settings → Add-ons → Zeitarchiv** and click
+   **Update** (shown as soon as a new version is available).
+3. Also update the [integration](https://github.com/bertel2020/HA-Zeitarchiv)
+   in HACS and restart Home Assistant.
 
-**Das Add-on nicht deinstallieren und neu installieren: Beim Deinstallieren
-löscht Home Assistant den Datenordner der App.**
+**Do not uninstall and reinstall the add-on: uninstalling makes Home
+Assistant delete the app's data folder.**
 
-### 2. API-Token kopieren
+### 2. Copy the API token
 
-Zeitarchiv öffnen und unter **Einstellungen → Verbindung** den automatisch
-erzeugten API-Token kopieren. Der Token kann dort später neu generiert werden.
+Open Zeitarchiv and copy the automatically generated API token under
+**Settings → Connection**. The token can be regenerated there later.
 
-### 3. Integration verbinden
+### 3. Connect the integration
 
-Die [Zeitarchiv-Integration](https://github.com/bertel2020/HA-Zeitarchiv)
-installieren (über HACS oder manuell, siehe deren README) und in Home
-Assistant über **Einstellungen → Geräte & Dienste → Integration hinzufügen →
-Zeitarchiv** einrichten. Benötigt werden Host, Port `8127` und der API-Token.
+Install the [Zeitarchiv integration](https://github.com/bertel2020/HA-Zeitarchiv)
+(via HACS or manually, see its README) and set it up in Home Assistant via
+**Settings → Devices & services → Add integration → Zeitarchiv**. You need the
+host, port `8127` and the API token.
 
-### 4. Archivfilter festlegen
+### 4. Define archive filters
 
-Auf der Integrationskachel **Konfigurieren → Archivfilter bearbeiten** öffnen
-und Domains, Entitäten, Bereiche oder Geräte auswählen. Ohne passende Filter
-wartet die App auf Daten, archiviert aber nichts.
+On the integration tile, open **Configure → Edit archive filters** and select
+domains, entities, areas or devices. Without matching filters the app waits
+for data but archives nothing.
 
-## Kernfunktionen
+## Core features
 
-Details zur Bedienung jeder Seite stehen im
-[Benutzerhandbuch](docs/user-guide.md); hier nur ein funktionaler Überblick.
+Details on using each page are in the
+[user guide](docs/en/user-guide.md); this is only a functional overview.
 
-**Dashboards.** Charts und Vergleichstabellen lassen sich als Kacheln auf
-beliebig vielen, frei benannten Dashboards anordnen — nicht nur auf einer
-einzigen Startseite. Die Übersichten von Dashboards, Charts und Tabellen
-bieten Suche, wählbare Sortierung und einen davon unabhängigen Schalter
-„Favoriten zuerst“.
+**Dashboards.** Charts and comparison tables can be arranged as tiles on any
+number of freely named dashboards — not just on a single start page. The
+overviews of dashboards, charts and tables offer search, selectable sorting
+and an independent "favorites first" switch.
 
-**Energiedashboard.** Eigenständige, per Kachel auf der Dashboard-Übersicht
-aktivierbare Ansicht des gesamten Energieflusses als Sankey-Diagramm —
-Netzbezug, beliebig viele Erzeuger, beliebig viele Speicher und Verbraucher
-(optional zu frei benannten Gruppen zusammengefasst), jeweils mit
-Stunde-/Tag-/Monat-/Jahr-Navigation:
+**Energy dashboard.** A standalone view of the entire energy flow as a Sankey
+diagram, activatable via a tile on the dashboard overview — grid import, any
+number of generators, any number of storage units and consumers (optionally
+grouped into freely named groups), each with hour/day/month/year navigation:
 
-- **Kennzahlen und Ringe:** Erzeugung, Verbrauch, Netzbezug, Speicher und
-  Einspeisung als KPI-Kacheln (bei mehreren Speichern/Erzeugern als Summe mit
-  Aufschlüsselung im Tooltip) — ein Klick führt zum Chart der jeweiligen
-  Entität mit dem gerade gewählten Zeitraum, bei mehreren möglichen
-  Entitäten über ein kurzes Auswahlfenster; Autarkie-, Eigenverbrauchs-,
-  Speicher-SOC- und Wirkungsgrad-Ringe (bei mehreren Speichern
-  kapazitätsgewichtet zusammengefasst) mit anklickbarem Monatstrend über die
-  letzten drei Jahre.
-- **Kosten und CO₂:** Bilanz aus Strompreis- bzw. CO₂-Entität oder einem
-  eigenen Festpreis, falls keine passende Entität vorhanden ist — steht die
-  Bilanz im Plus (mehr erlöst/vermieden als bezahlt/verursacht), wird das
-  eigens hervorgehoben statt nur als Zahl gezeigt.
-- **PV-Ertragsprognose** und ein **Tageslastprofil** (stündlicher Verbrauch
-  der letzten 7 Tage; bei Monat/Jahr stattdessen nach Wochentag gemittelt).
-- **Status-Check:** prüft die Energiebilanz auf Plausibilität, meldet
-  veraltete Sensorwerte statt sie unbemerkt zu glätten, und markiert
-  Verbraucher/Gruppen, die deutlich über ihrem üblichen Schnitt liegen
-  (Schwelle einstellbar, auch abschaltbar).
+- **Key figures and rings:** Generation, consumption, grid import, storage and
+  feed-in as KPI tiles (with several storage units/generators as a sum with a
+  breakdown in the tooltip) — a click leads to the chart of the respective
+  entity with the currently selected period, or via a short selection dialog
+  when several entities are possible; rings for self-sufficiency, self-
+  consumption, storage SOC and efficiency (combined capacity-weighted with
+  several storage units) with a clickable monthly trend over the last three
+  years.
+- **Costs and CO₂:** Balance from an electricity price or CO₂ entity, or from
+  a custom fixed price if no suitable entity exists — if the balance is in the
+  plus (more earned/avoided than paid/caused), this is highlighted
+  specifically rather than just shown as a number.
+- **PV yield forecast** and a **daily load profile** (hourly consumption of
+  the last 7 days; for month/year, averaged by weekday instead).
+- **Status check:** checks the energy balance for plausibility, reports
+  stale sensor values instead of silently smoothing them over, and flags
+  consumers/groups that are well above their usual average (threshold
+  adjustable, can also be switched off).
 
-**Entitäten und Verläufe.** Jede archivierte Entität besitzt eine eigene
-Verlaufsansicht mit Zeitraum-Navigation von Stunde bis Dekade, Vergleich mit
-Vorperiode oder Vorjahr sowie individuell einstellbarer Auflösung,
-Aufbewahrung und Rundung. Ein optionaler, rein app-interner Anzeigename
-überschreibt bei Bedarf Home Assistants eigenen Namen nur in der
-Darstellung.
+**Entities and histories.** Every archived entity has its own history view
+with period navigation from hour to decade, comparison with the previous
+period or previous year, and individually configurable resolution, retention
+and rounding. An optional, purely app-internal display name overrides Home
+Assistant's own name in the presentation only, if needed.
 
-**Housekeeping.** Eigener Bereich für Dinge, die sonst leicht übersehen
-werden: erkannte Duplikate, inaktive Entitäten (bewusst stillgelegte lassen sich als „Historisch“ ausnehmen), widersprüchliche
-Konfigurationskombinationen (z. B. eine Lücken-Erkennung, die durch
-Auflösung oder Wertänderungsfilter nie zutreffen kann), ungenutzte
-Charts/Tabellen, freier Speicherplatz auf dem Host-Dateisystem, sowie
-Speicherplatz-, Aufbewahrungs- und Rotations-Verwaltung an einer Stelle.
+**Housekeeping.** A dedicated area for things that are otherwise easy to
+overlook: detected duplicates, inactive entities (deliberately retired ones can be excluded as “Historic”), contradictory configuration
+combinations (e.g. a gap detection that can never trigger because of the
+resolution or a value-change filter), unused charts/tables, free space on the
+host file system, as well as storage, retention and rotation management in one
+place.
 
-**Meldungen.** Die Glocke in der Kopfzeile bündelt Systemhinweise —
-empfohlene Wartung, fehlgeschlagene Backup-/Aufbewahrungs-/Importläufe,
-verfügbare App- und Integrations-Updates, sowie mehrere
-Housekeeping-Prüfungen. Einzelne Meldungen lassen sich befristet oder
-dauerhaft stummschalten; echte Fehler nie. Ein rotierender Praxis-Tipp
-ergänzt die Meldungen, lässt sich einzeln ausblenden oder komplett
-abschalten. Dieselben Meldungen stehen der Home-Assistant-Integration über
-`GET /api/notices` zur Verfügung — Grundlage für Home-Assistant-Repairs und
-automatisierbare `binary_sensor`-Entities am Zeitarchiv-Gerät. Derselbe
-Endpunkt meldet auch das letzte erfolgreiche Backup; die Integration macht
-daraus eine eigene Sensor-Entity als Automations-Trigger für ein
-Offsite-Ziel (siehe unten).
+**Notices.** The bell in the header bundles system notices — recommended
+maintenance, failed backup/retention/import runs, available app and
+integration updates, and several housekeeping checks. Individual notices can
+be muted temporarily or permanently; real errors never. A rotating practical
+tip complements the notices and can be hidden individually or switched off
+entirely. The same notices are available to the Home Assistant integration via
+`GET /api/notices` — the basis for Home Assistant Repairs and automatable
+`binary_sensor` entities on the Zeitarchiv device. The same endpoint also
+reports the last successful backup; the integration turns this into a
+dedicated sensor entity as an automation trigger for an offsite target (see
+below).
 
-**Laufende Vorgänge.** Aktionen, die spürbar dauern — Importe, Bereinigung,
-Backup, Aufbewahrung, Rotation, Index-Optimierung —, zeigen ihren Stand am
-Knopf, wo zählbar zusätzlich als Fortschrittsbalken, und übergreifend an der
-Glocke: Sie laufen im Hintergrund weiter, auch wenn die Seite gewechselt
-wird. Dort stehen auch die Vorgänge, die von selbst anlaufen (Speicherindex-
-Prüfung nach dem Start, nachträglicher Aufbau von Auswertungsstufen). Da
-mehrere davon für ihre Dauer alle Schreibzugriffe pausieren, ist die Glocke
-die Antwort auf die Frage, warum die App gerade wartet.
+**Running operations.** Actions that take noticeable time — imports, cleanup,
+backup, retention, rotation, index optimization — show their status on the
+button, additionally as a progress bar where countable, and globally at the
+bell: they keep running in the background even when you switch pages. This is
+also where operations that start on their own are listed (storage index check
+after startup, subsequent build-up of analysis levels). Since several of them
+pause all write access for their duration, the bell answers the question of
+why the app is waiting right now.
 
-**Charts und Tabellen.** Eigene Charts können mehrere Entitäten mit
-unterschiedlichen Einheiten überlagern. Vergleichstabellen kombinieren
-einzelne Entitäten, Summengruppen und Formeln über frei gewählte
-Zeitspalten (z. B. Monat für Monat über mehrere Jahre).
+**Charts and tables.** Custom charts can overlay several entities with
+different units. Comparison tables combine individual entities, sum groups and
+formulas across freely chosen time columns (e.g. month by month over several
+years).
 
-**Datenpflege.** Ausreißer, Lücken, doppelte Zeitstempel und gerundet
-gleiche Wiederholungen werden erkannt und lassen sich einzeln korrigieren
-oder als zunächst rückgängig machbare Soft-Delete-Markierung entfernen.
-Physisch entfernt werden markierte Werte erst durch einen separaten,
-endgültigen Schritt.
+**Data maintenance.** Outliers, gaps, duplicate timestamps and repeats that
+are equal after rounding are detected and can be corrected individually or
+removed via an initially reversible soft-delete mark. Marked values are only
+physically removed by a separate, final step.
 
-**Statistik.** Zeigt Bestand, Speicherbedarf, Zuwachs und Wachstum über die
-Zeit; der SQLite-Index kann bei Bedarf kontrolliert optimiert werden.
+**Statistics.** Shows inventory, storage requirements, growth and growth over
+time; the SQLite index can be optimized in a controlled way when needed.
 
-**Demo-Modus.** Eine Add-on-Option lässt die App komplett getrennt von den
-echten Daten mit synthetischen Vorführ-/Testdaten laufen — ein simulierter
-Haushalt mit PV-Anlage, Wallbox, Balkonkraftwerk und Heimspeicher. Erzeugt
-sich beim ersten Start automatisch, lässt sich per Zeitplan aktuell halten
-oder jederzeit manuell ergänzen bzw. neu erzeugen, und rückstandslos wieder
-entfernen — praktisch für einen ersten Eindruck oder eine dauerhafte
-Schaufenster-Instanz. Details: [Benutzerhandbuch →
-Demo-Modus](docs/user-guide.md#demo-modus).
+**Demo mode.** An add-on option lets the app run completely separated from
+the real data with synthetic showcase/test data — a simulated household with
+PV system, wallbox, balcony power plant and home battery. It generates itself
+on first start, can be kept current on a schedule or supplemented or
+regenerated manually at any time, and removed without a trace — handy for a
+first impression or a permanent shop-window instance. Details: [User guide →
+Demo mode](docs/en/user-guide.md#demo-mode).
 
-**Import und Export.** Bestehende Historie lässt sich aus Symcon-Exporten,
-frei zuordenbaren CSV-Dateien oder direkt aus der laufenden
-Home-Assistant-Instanz übernehmen. Der empfohlene Vollimport verbindet ältere
-Stundenstatistik automatisch und ohne zeitliche Überschneidung mit der jüngeren
-Rohhistorie; beide Quellen bleiben auch einzeln importierbar.
-Jeder Import bleibt als Report nachvollziehbar; bereits vorhandene
-Zeitstempel werden dabei nie dupliziert. Der laufende Monat wird automatisch
-im Hot Buffer ergänzt; historische Lücken in abgeschlossenen Archiven lassen
-sich optional schließen. Der Dry Run stellt zusätzlich eine ausführliche
-Debug-Datei zur Diagnose bereit. Unter System → Export führt ein
-Assistent zur CSV-Datei (mehrere Entitäten als ZIP): mit Zeitraum und wahlweise
-gröberer Auflösung (Minute, Stunde, Tag) statt der kompletten Rohwerte.
+**Import and export.** Existing history can be taken over from Symcon exports,
+freely mappable CSV files, or directly from the running Home Assistant
+instance. The recommended full import automatically joins older hourly
+statistics with the more recent raw history without temporal overlap; both
+sources can also still be imported individually. Every import remains
+traceable as a report; timestamps that already exist are never duplicated. The
+current month is automatically supplemented in the hot buffer; historical gaps
+in completed archives can optionally be closed. The dry run additionally
+provides a detailed debug file for diagnosis. Under System → Export, a wizard
+leads to the CSV file (several entities as a ZIP): with a period and optionally
+a coarser resolution (minute, hour, day) instead of the complete raw values.
 
 ## Screenshots
 
 <p align="center">
-  <a href="docs/img/startseite-light.png"><picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/img/startseite-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="docs/img/startseite-light.png">
-    <img src="docs/img/startseite-light.png" alt="Startseite mit Kennzahlen und Standard-Dashboard" width="270">
+  <a href="docs/img/en/overview.png"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/en/overview-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/img/en/overview.png">
+    <img src="docs/img/en/overview.png" alt="Home page with key figures and default dashboard" width="270">
   </picture></a>
-  <a href="docs/img/energiedashboard-light.png"><picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/img/energiedashboard-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="docs/img/energiedashboard-light.png">
-    <img src="docs/img/energiedashboard-light.png" alt="Energiedashboard: Sankey-Energiefluss über einen Monat" width="270">
+  <a href="docs/img/en/energy-dashboard.png"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/en/energy-dashboard-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/img/en/energy-dashboard.png">
+    <img src="docs/img/en/energy-dashboard.png" alt="Energy dashboard: Sankey energy flow over one day" width="270">
   </picture></a>
-  <a href="docs/img/entitaeten.png"><img src="docs/img/entitaeten.png" alt="Entitätenübersicht mit Suche und Filtern" width="270"></a>
-  <br><sub>Startseite &nbsp;·&nbsp; Energiedashboard &nbsp;·&nbsp; Entitätenübersicht</sub>
+  <a href="docs/img/en/entities.png"><img src="docs/img/en/entities.png" alt="Entity overview with search and filters" width="270"></a>
+  <br><sub>Home page &nbsp;·&nbsp; Energy dashboard &nbsp;·&nbsp; Entity overview</sub>
 </p>
 
 <p align="center">
-  <a href="docs/img/tabelle.png"><img src="docs/img/tabelle.png" alt="Vergleichstabelle über mehrere Zeiträume" width="270"></a>
-  <a href="docs/img/meldungen.png"><img src="docs/img/meldungen.png" alt="Meldungs-Center in der Kopfzeile" width="270"></a>
-  <a href="docs/img/energiedashboard-scheme-ha.png"><img src="docs/img/energiedashboard-scheme-ha.png" alt="Farbschema Home Assistant" width="270"></a>
-  <br><sub>Vergleichstabelle &nbsp;·&nbsp; Meldungs-Center &nbsp;·&nbsp; Farbschema „Home Assistant"</sub>
+  <a href="docs/img/en/table-2.png"><img src="docs/img/en/table-2.png" alt="Comparison table across several periods" width="270"></a>
+  <a href="docs/img/en/notices.png"><img src="docs/img/en/notices.png" alt="Notice center in the header" width="270"></a>
+  <a href="docs/img/en/energy-dashboard-scheme-ha.png"><img src="docs/img/en/energy-dashboard-scheme-ha.png" alt="Home Assistant color scheme" width="270"></a>
+  <br><sub>Comparison table &nbsp;·&nbsp; Notice center &nbsp;·&nbsp; "Home Assistant" color scheme</sub>
 </p>
 
 <p align="center">
-  <a href="docs/img/datenqualitaet-light.png"><picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/img/datenqualitaet-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="docs/img/datenqualitaet-light.png">
-    <img src="docs/img/datenqualitaet-light.png" alt="Datenqualität: Ausreißer, Lücken, Duplikate und Zählerrückgänge je Entität" width="270">
-  </picture></a>
-  <a href="docs/img/wiederherstellen-assistent-light.png"><img src="docs/img/wiederherstellen-assistent-light.png" alt="Wiederherstellen mit Auswahl: alles, einzelne Entitäten oder nur Einstellungen" width="270"></a>
-  <a href="docs/img/langzeit-vergleich-dark.png"><img src="docs/img/langzeit-vergleich-dark.png" alt="Langzeit-Vergleich: ein Jahr je Linie mit Ø-Linie und Tabelle Jahr × Monat" width="270"></a>
-  <br><sub>Datenqualität &nbsp;·&nbsp; Wiederherstellen mit Auswahl &nbsp;·&nbsp; Langzeit-Vergleich</sub>
+  <a href="docs/img/en/long-term-comparison-dark.png"><img src="docs/img/en/long-term-comparison-dark.png" alt="Long-term comparison: one line per year with average line and year × month table" width="270"></a>
+  <br><sub>Long-term comparison</sub>
 </p>
 
 <p align="center">
-  <a href="docs/img/wetterdashboard-light.png"><picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/img/wetterdashboard-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="docs/img/wetterdashboard-light.png">
-    <img src="docs/img/wetterdashboard-light.png" alt="Wetterdashboard: aktuelle Werte und Zeiträume im Vergleich zum Vorjahr" width="270">
+  <a href="docs/img/en/weather-dashboard.png"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/en/weather-dashboard-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/img/en/weather-dashboard.png">
+    <img src="docs/img/en/weather-dashboard.png" alt="Weather dashboard: current values and periods compared with last year" width="270">
   </picture></a>
-  <a href="docs/img/wetter-langzeit-light.png"><img src="docs/img/wetter-langzeit-light.png" alt="Wetterdashboard, Reiter Langzeit: Kenntage je Jahr" width="270"></a>
-  <a href="docs/img/energie-langzeit-light.png"><picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/img/energie-langzeit-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="docs/img/energie-langzeit-light.png">
-    <img src="docs/img/energie-langzeit-light.png" alt="Energiedashboard, Reiter Langzeit: Zeiträume im Vergleich zum Vorjahr" width="270">
+  <a href="docs/img/en/weather-long-term.png"><img src="docs/img/en/weather-long-term.png" alt="Weather dashboard, Long-term tab: characteristic days per year" width="270"></a>
+  <a href="docs/img/en/energy-long-term.png"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/en/energy-long-term-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="docs/img/en/energy-long-term.png">
+    <img src="docs/img/en/energy-long-term.png" alt="Energy dashboard, Long-term tab: periods compared with last year" width="270">
   </picture></a>
-  <br><sub>Wetterdashboard &nbsp;·&nbsp; Wetter: Kenntage &nbsp;·&nbsp; Energie: Langzeit</sub>
+  <br><sub>Weather dashboard &nbsp;·&nbsp; Weather: characteristic days &nbsp;·&nbsp; Energy: long-term</sub>
 </p>
 
-<p align="center"><sub>Passt sich automatisch Hell/Dunkel an (siehe Startseite/Energiedashboard oben); neben „Zeitarchiv" (Standard) und „Home Assistant" auch als „Modern" wählbar. Weitere Ansichten: <a href="docs/img">docs/img</a>.</sub></p>
+<p align="center"><sub>Adapts automatically to light/dark (see home page/energy dashboard above); besides "Zeitarchiv" (default) and "Home Assistant" also selectable as "Modern". More views: <a href="docs/img/en">docs/img/en</a>.</sub></p>
 
-## Speicherung und Aufbewahrung
+## Storage and retention
 
 ```text
-laufender Monat      abgeschlossene Monate        Langzeitabfragen
-Hot Buffer (CSV)  ─► Parquet + zstd            ─► vorberechnete Rollups
+current month         completed months             long-term queries
+Hot buffer (CSV)  ─►  Parquet + zstd           ─►  precomputed rollups
 ```
 
-Der laufende Monat liegt als anhängbare CSV-Datei vor. Abgeschlossene Monate
-werden spaltenorientiert und verlustfrei komprimiert; daraus vorberechnete
-Rollups (Stunde bis Jahr) machen Langzeitauswertungen schnell, ohne bei jeder
-Abfrage über Rohdaten aggregieren zu müssen. Die automatische, standardmäßig
-deaktivierte Aufbewahrungs-Durchsetzung entfernt Werte jenseits der je
-Entität konfigurierten Frist; als **Unbegrenzt** markierte Entitäten bleiben
-unangetastet.
+The current month is kept as an appendable CSV file. Completed months are
+compressed in a columnar, lossless format; precomputed rollups (hour to year)
+derived from them make long-term analyses fast without having to aggregate
+raw data on every query. The automatic retention enforcement, disabled by
+default, removes values beyond the period configured per entity; entities
+marked **Unlimited** are left untouched.
 
-## Backup und Wiederherstellung
+## Backup and restore
 
-Vollständige, portable ZIP-Backups (Index, Hot Buffer, Monatsarchive,
-Rollups) lassen sich erstellen, planen, prüfen und wiederherstellen —
-zusätzlich zu, nicht statt der automatischen Home-Assistant-Snapshots. Ein
-Backup von anderswo (z. B. einer anderen Installation oder vor einem
-Geräteumzug extern aufbewahrt) lässt sich per Ziehen &amp; Ablegen
-importieren. Eine Wiederherstellung wird vor der Anwendung geprüft
-(Prüfsummen, ZIP-Struktur, Index-Integrität) und ist rollback-fähig: Der
-bisherige Datenbestand wird vor dem Überschreiben verschoben, nicht
-gelöscht.
+Complete, portable ZIP backups (index, hot buffer, monthly archives, rollups)
+can be created, scheduled, verified and restored — in addition to, not instead
+of, the automatic Home Assistant snapshots. A backup from elsewhere (e.g.
+another installation or one stored externally before a device move) can be
+imported via drag &amp; drop. A restore is verified before being applied
+(checksums, ZIP structure, index integrity) and is rollback-capable: the
+existing data is moved aside before being overwritten, not deleted.
 
-Als **externes Ziel** kopiert die App jedes erfolgreiche Backup zusätzlich auf
-einen Netzwerkspeicher (NFS oder SMB/CIFS), den Home Assistant unter
-*Einstellungen → System → Speicher → Netzwerkspeicher* mit der Verwendung
-„Medien“ oder „Share“ einbindet. Zeitarchiv bindet nichts selbst ein, die
-Zugangsdaten bleiben bei Home Assistant. Alternativ lädt die App Backups per
-**WebDAV** hoch (z. B. Nextcloud oder ein NAS); das Passwort steht dafür nur in
-den Add-on-Optionen. Für andere Ziele (S3, Cloud) meldet die App das letzte erfolgreiche Backup an die Home-Assistant-Integration,
-die daraus eine Sensor-Entity und ein Automations-Blueprint macht (siehe
-Integrations-README); die Übertragung übernimmt dann eine eigene Automation,
-z. B. mit `rclone`.
+As an **external target** the app additionally copies every successful backup
+to a network storage (NFS or SMB/CIFS) that Home Assistant mounts under
+*Settings → System → Storage → Network storage* with the usage “Media” or
+“Share”. Zeitarchiv mounts nothing itself, and the credentials stay with Home
+Assistant. Alternatively the app uploads backups via **WebDAV** (e.g. Nextcloud
+or a NAS); the password is stored only in the add-on options. For other targets
+(S3, cloud) the app reports the last
+successful backup to the Home Assistant integration, which turns it into a
+sensor entity and an automation blueprint (see the integration README); the
+transfer is then handled by an automation of your own, e.g. using `rclone`.
 
-## Sicherheit und Netzwerk
+## Security and network
 
-| Zugang | Erreichbarer Umfang |
+| Access | Reachable scope |
 | --- | --- |
-| Supervisor-Ingress, intern Port `8099` | Vollständige Oberfläche und Verwaltung |
-| Veröffentlichter Port `8127` | Nur `GET /api/health`, `POST /api/write` und `GET /api/notices` |
+| Supervisor Ingress, internal port `8099` | Full interface and administration |
+| Published port `8127` | Only `GET /api/health`, `POST /api/write` and `GET /api/notices` |
 
-Alle drei API-Endpunkte auf Port `8127` benötigen einen Bearer-Token. Oberfläche,
-Abfragen, Exporte, Backups, Importe und Verwaltungsrouten antworten dort mit
-HTTP 404. Importpfade werden normalisiert, Archive auf Zip-Bomb-Muster geprüft
-und dynamische Inhalte mit restriktiven Sicherheitsheadern ausgeliefert.
+All three API endpoints on port `8127` require a bearer token. The interface,
+queries, exports, backups, imports and administration routes respond with
+HTTP 404 there. Import paths are normalized, archives are checked for zip-bomb
+patterns, and dynamic content is served with restrictive security headers.
 
-## Einstellungen und Konfiguration
+## Settings and configuration
 
-Darstellung, Archivierungs-Standards, Verbindung, Diagnose und mehr werden
-vollständig in der App verwaltet und im Zeitarchiv-Index gespeichert — siehe
-[Benutzerhandbuch → Einstellungen im
-Detail](docs/user-guide.md#einstellungen-im-detail). Speicherplatz,
-Aufbewahrung und Rotation liegen im eigenen [Housekeeping-Bereich](docs/user-guide.md#housekeeping).
-Die Supervisor-Optionen sind `timezone` (IANA-Zeitzone, Standard
-`Europe/Berlin`) und `demo_mode` (schaltet die App auf eine synthetische
-Vorführ-/Testinstanz um, siehe [Benutzerhandbuch →
-Demo-Modus](docs/user-guide.md#demo-modus)) — beide brauchen nach einer
-Änderung einen Add-on-Neustart.
+Appearance, archiving defaults, connection, diagnostics and more are managed
+entirely in the app and stored in the Zeitarchiv index — see [User guide →
+Settings in detail](docs/en/user-guide.md#settings-in-detail). Storage,
+retention and rotation live in the dedicated [Housekeeping area](docs/en/user-guide.md#housekeeping).
+The Supervisor options are `timezone` (IANA time zone, default
+`Europe/Berlin`) and `demo_mode` (switches the app to a synthetic
+showcase/test instance, see [User guide →
+Demo mode](docs/en/user-guide.md#demo-mode)) — both need an add-on restart after
+a change.
 
-Beim Start sowie nach Datenimporten gleicht Zeitarchiv die abgeleiteten
-Indexkennzahlen automatisch mit Parquet-Archiv und Hot Buffer ab, um
-Inkonsistenzen früh sichtbar zu machen.
+At startup and after data imports, Zeitarchiv automatically reconciles the
+derived index metrics with the Parquet archive and hot buffer to make
+inconsistencies visible early.
 
-Für die Diagnose stehen ein begrenzter lokaler Live-Logpuffer und die
-Supervisor-Historie zur Verfügung. Secrets werden vor der Ausgabe maskiert;
-Request-IDs, stabile Ereigniscodes und zusammengefasste Ingest-Kennzahlen
-erleichtern die Fehlersuche ohne ein dauerhaftes Log pro Messwert. Details:
-[Logging-Betrieb](docs/logging.md).
+For diagnostics, a bounded local live log buffer and the Supervisor history
+are available. Secrets are masked before output; request IDs, stable event
+codes and aggregated ingest metrics make troubleshooting easier without a
+permanent log entry per measurement. Details:
+[Logging operations](docs/logging.md).
 
-## Bekannte Grenzen
+## Known limitations
 
-- Die App ist für ein einzelnes lokales Home-Assistant-System und einen
-  gemeinsamen API-Token ausgelegt; Mehrbenutzer- oder Mandantentrennung gibt
-  es derzeit nicht.
-- Die Ingress-Seiten sind nicht als eigenständige Lovelace-Karten oder
-  öffentliche Chart-URLs gedacht.
-- Manuelle Lösch- und Retention-Aktionen können endgültig sein. Vor größeren
-  Eingriffen sollte ein geprüftes Backup erstellt werden.
+- The app is designed for a single local Home Assistant system and one shared
+  API token; there is currently no multi-user or multi-tenant separation.
+- The Ingress pages are not intended as standalone Lovelace cards or public
+  chart URLs.
+- Manual delete and retention actions can be permanent. Before larger
+  interventions, a verified backup should be created.
 
-## Warum Zeitarchiv?
+## Why Zeitarchiv?
 
 <details>
-<summary>Warum gibt es Zeitarchiv – trotz Home-Assistant-Langzeitstatistik, Energiedashboard und InfluxDB/Grafana?</summary>
+<summary>Why does Zeitarchiv exist – despite Home Assistant long-term statistics, the energy dashboard and InfluxDB/Grafana?</summary>
 
-Zeitarchiv ist nicht entstanden, weil ich die vorhandenen Lösungen nicht
-kannte. Im Gegenteil: Ich habe mich lange und intensiv mit InfluxDB,
-VictoriaMetrics und Grafana beschäftigt und verschiedene Ansätze
-ausprobiert. Diese Systeme sind sehr leistungsfähig, waren für meinen
-Anwendungsfall aber zu aufwendig und führten trotz des erheblichen
-Einrichtungsaufwands nicht zu dem Bedienkomfort, den ich gesucht habe.
+Zeitarchiv did not come about because I was unaware of the existing
+solutions. Quite the opposite: I spent a long and intensive time with
+InfluxDB, VictoriaMetrics and Grafana and tried various approaches. These
+systems are very powerful, but were too complex for my use case and, despite
+considerable setup effort, did not deliver the ease of use I was looking for.
 
-### Home-Assistant-Recorder und Langzeitstatistik
+### Home Assistant recorder and long-term statistics
 
-Der Recorder von Home Assistant ist in erster Linie die Betriebsdatenbank
-des Systems. Er versorgt unter anderem die Verlaufsansicht, das Logbuch,
-Dashboard-Karten und die Langzeitstatistik.
+The Home Assistant recorder is first and foremost the system's operational
+database. Among other things, it feeds the history view, the logbook,
+dashboard cards and the long-term statistics.
 
-Die vollständige Zustandshistorie wird standardmäßig nur für einen
-begrenzten Zeitraum aufbewahrt. Dieser Zeitraum kann verlängert werden,
-dadurch wächst jedoch auch die operative Datenbank.
+By default, the full state history is only kept for a limited period. This
+period can be extended, but the operational database then grows as well.
 
-Für geeignete numerische Sensoren bietet Home Assistant zusätzlich eine
-Langzeitstatistik. Diese ist für viele Anwendungen vollkommen ausreichend,
-speichert langfristig aber statistische Verdichtungen beziehungsweise
-Summen und nicht zwingend sämtliche ursprünglichen Zustandsänderungen in
-ihrer ursprünglichen zeitlichen Auflösung. Außerdem müssen Entitäten
-bestimmte Voraussetzungen erfüllen, beispielsweise eine passende
-`state_class`. Andere Sensoren und nicht numerische Zustände können nicht
-in gleicher Weise langfristig ausgewertet werden.
+For suitable numeric sensors, Home Assistant additionally offers long-term
+statistics. These are entirely sufficient for many applications, but in the
+long run store statistical aggregations or sums rather than necessarily every
+original state change at its original temporal resolution. In addition,
+entities must meet certain requirements, for example a suitable
+`state_class`. Other sensors and non-numeric states cannot be analyzed
+long-term in the same way.
 
-Zeitarchiv verfolgt deshalb einen anderen Ansatz:
+Zeitarchiv therefore takes a different approach:
 
-- Es werden nur ausdrücklich ausgewählte Entitäten archiviert.
-- Die übertragenen Zustandsänderungen bleiben zunächst vollständig
-  erhalten.
-- Auflösung, Rundung und Aufbewahrung lassen sich pro Entität
-  konfigurieren.
-- Entitäten können bei Bedarf unbegrenzt aufbewahrt werden.
-- Das Archiv ist unabhängig von der Aufbewahrungsdauer des
-  Home-Assistant-Recorders.
+- Only explicitly selected entities are archived.
+- The transmitted state changes are initially retained in full.
+- Resolution, rounding and retention can be configured per entity.
+- Entities can be retained indefinitely if needed.
+- The archive is independent of the retention period of the Home Assistant
+  recorder.
 
-Ein wichtiger Schwerpunkt ist dabei die kompakte Speicherung großer
-Datenmengen. Abgeschlossene Monate werden spaltenorientiert mit Parquet
-und Zstandard komprimiert. Zusätzlich sorgen vorberechnete Rollups dafür,
-dass Auswertungen über Monate oder Jahre nicht jedes Mal sämtliche
-Rohdaten verarbeiten müssen. Dadurch ist Zeitarchiv auf Archive über viele
-Jahre und Datenbestände mit vielen Millionen bis hin zu mehreren hundert
-Millionen Messwerten ausgelegt.
+An important focus here is the compact storage of large amounts of data.
+Completed months are compressed in a columnar format with Parquet and
+Zstandard. In addition, precomputed rollups ensure that analyses over months
+or years do not have to process all raw data every time. Zeitarchiv is
+therefore designed for archives spanning many years and datasets with many
+millions up to several hundred million measurements.
 
-Zeitarchiv soll also keine zweite vollständige Home-Assistant-Datenbank
-sein, sondern ein bewusst ausgewähltes und langfristig nutzbares
-Messwertarchiv.
+Zeitarchiv is thus not meant to be a second complete Home Assistant database,
+but a deliberately selected, long-term usable measurement archive.
 
-### Visualisierung und langfristige Vergleiche
+### Visualization and long-term comparisons
 
-Home Assistant bietet gute Standarddarstellungen für den aktuellen und
-kurzfristigen Verlauf. Auch die Langzeitstatistik kann für viele Sensoren
-sinnvoll visualisiert werden.
+Home Assistant offers good standard views for the current and short-term
+history. The long-term statistics can also be visualized meaningfully for many
+sensors.
 
-Sobald ich jedoch komplexere und regelmäßig wiederkehrende Vergleiche
-erstellen wollte, wurde die Umsetzung deutlich aufwendiger. Dazu gehören
-beispielsweise:
+As soon as I wanted to create more complex and regularly recurring
+comparisons, however, implementation became considerably more laborious. These
+include, for example:
 
-- aktueller Zeitraum im Vergleich zum Vorjahr
-- mehrere Jahre nebeneinander
-- Monatsvergleiche über unterschiedliche Jahre
-- mehrere Entitäten mit verschiedenen Einheiten in einem Chart
-- Tabellen mit frei wählbaren Zeitspalten
-- Summen aus mehreren Entitäten
-- berechnete Werte und eigene Formeln
-- dauerhaft gespeicherte, thematisch getrennte Auswertungen
+- current period compared to the previous year
+- several years side by side
+- month comparisons across different years
+- several entities with different units in one chart
+- tables with freely selectable time columns
+- sums of several entities
+- calculated values and custom formulas
+- permanently saved, thematically separated analyses
 
-Genau an diesem Punkt hat mich auch Grafana nicht vollständig überzeugt.
-Grafana kann grundsätzlich Zeitverschiebungen und Vergleiche abbilden. Ein
-komfortabler Vorjahresvergleich ist jedoch kein allgemeines eingebautes
-Feature, das sich für beliebige Datenreihen einfach einschalten lässt. Je
-nach Datenquelle und gewünschter Darstellung benötigt man dafür angepasste
-Abfragen, Zeitverschiebungen, Transformationen oder mehrfach konfigurierte
-Datenreihen und Panels.
+It is exactly at this point that Grafana did not fully convince me either.
+Grafana can in principle represent time shifts and comparisons. A convenient
+year-over-year comparison, however, is not a general built-in feature that can
+simply be switched on for arbitrary data series. Depending on the data source
+and the desired presentation, you need customized queries, time shifts,
+transformations or multiply configured data series and panels.
 
-Bei einfachen Abfragen ist das machbar. Sobald mehrere Entitäten,
-unterschiedliche Zeiträume, Summen oder wechselnde Auswertungen beteiligt
-sind, entsteht jedoch schnell erheblicher Konfigurations- und
-Pflegeaufwand.
+For simple queries this is feasible. As soon as several entities, different
+periods, sums or changing analyses are involved, however, configuration and
+maintenance effort quickly becomes considerable.
 
-Mein Ziel war eine Bedienung, bei der ich einen Zeitraum auswähle und
-anschließend einfach „Vorjahr vergleichen" aktiviere. Die dafür benötigten
-Abfragen und Zeitverschiebungen soll die Anwendung selbst erzeugen.
+My goal was an operation where I select a period and then simply activate
+"compare previous year". The queries and time shifts required for that should
+be generated by the application itself.
 
-Zeitarchiv bietet deshalb:
+Zeitarchiv therefore offers:
 
-- Vergleich mit Vorperiode oder Vorjahr direkt in der Verlaufsansicht
-- Navigation von einer Stunde bis zu einer Dekade
-- Charts mit mehreren Entitäten und unterschiedlichen Einheiten
-- frei konfigurierbare Vergleichstabellen
-- Summengruppen und eigene Formeln
-- frei benennbare Dashboards
-- wiederverwendbare Charts und Tabellen
-- direkten Wechsel zwischen Kennzahl und Entitätsverlauf
+- comparison with the previous period or previous year directly in the history
+  view
+- navigation from one hour up to a decade
+- charts with several entities and different units
+- freely configurable comparison tables
+- sum groups and custom formulas
+- freely nameable dashboards
+- reusable charts and tables
+- direct switching between a key figure and the entity history
 
-### Bereinigung und Pflege historischer Daten
+### Cleaning up and maintaining historical data
 
-Ein weiterer wichtiger Punkt ist die Datenqualität. Sensoren liefern
-gelegentlich falsche Werte, springen kurzzeitig auf null oder erzeugen
-unplausible Zählerstände. Auch Duplikate, Datenlücken und dauerhaft
-wiederholte Werte kommen vor.
+Another important point is data quality. Sensors occasionally deliver wrong
+values, briefly jump to zero or produce implausible meter readings.
+Duplicates, data gaps and permanently repeated values also occur.
 
-Home Assistant besitzt Werkzeuge zur Prüfung und Korrektur bestimmter
-Statistikwerte. Es gibt jedoch keinen durchgängigen Arbeitsbereich, in dem
-sich die ursprüngliche Historie ausgewählter Entitäten systematisch
-untersuchen, korrigieren und bereinigen lässt.
+Home Assistant has tools for checking and correcting certain statistics
+values. There is, however, no end-to-end workspace in which the original
+history of selected entities can be systematically examined, corrected and
+cleaned up.
 
-Auch InfluxDB oder VictoriaMetrics speichern Zeitreihen sehr effizient.
-Das gezielte Auffinden und komfortable Korrigieren einzelner
-Home-Assistant-Messwerte ist jedoch nicht ihr primärer Anwendungsfall.
-Dafür benötigt man Abfragen, Datenbankwerkzeuge oder eigene
-Wartungsprozesse. Grafana visualisiert die Daten, ist aber keine
-Oberfläche zur eigentlichen Datenpflege.
+InfluxDB or VictoriaMetrics also store time series very efficiently. Finding
+and conveniently correcting individual Home Assistant measurements, however,
+is not their primary use case. For that you need queries, database tools or
+your own maintenance processes. Grafana visualizes the data, but is not an
+interface for the actual data maintenance.
 
-Zeitarchiv stellt diese Aufgaben deshalb direkt in der Oberfläche bereit:
+Zeitarchiv therefore provides these tasks directly in the interface:
 
-- Ausreißer, Lücken und Duplikate erkennen
-- einzelne Messwerte nachträglich korrigieren
-- verdächtige Werte zunächst per Soft Delete ausblenden
-- Änderungen prüfen, bevor Daten endgültig entfernt werden
-- inaktive Entitäten erkennen (stillgelegte als „Historisch“ ausnehmen)
-- historische Lücken durch Importe schließen
-- vorhandene Zeitstempel beim Import nicht erneut anlegen
-- widersprüchliche Einstellungen und ungenutzte Auswertungen anzeigen
-- Import-, Backup- und Wartungsvorgänge nachvollziehbar dokumentieren
+- detect outliers, gaps and duplicates
+- correct individual measurements after the fact
+- hide suspicious values via soft delete first
+- review changes before data is permanently removed
+- detect inactive entities (exclude retired ones as “Historic”)
+- close historical gaps through imports
+- not re-create existing timestamps on import
+- show contradictory settings and unused analyses
+- document import, backup and maintenance operations traceably
 
-Ein einzelner defekter Sensorwert soll nicht noch Jahre später Summen,
-Diagramme oder Vergleiche verfälschen.
+A single faulty sensor value should not distort sums, charts or comparisons
+years later.
 
-### Energiedashboard
+### Energy dashboard
 
-Das Energiedashboard von Home Assistant ist eine gute Standardlösung und
-für die meisten Installationen der richtige Ausgangspunkt. Zeitarchiv
-soll es nicht ersetzen.
+The Home Assistant energy dashboard is a good standard solution and the right
+starting point for most installations. Zeitarchiv is not meant to replace it.
 
-Das Zeitarchiv-Energiedashboard legt den Schwerpunkt stärker auf
-langfristige Vergleiche und zusätzliche Auswertungen:
+The Zeitarchiv energy dashboard puts more emphasis on long-term comparisons
+and additional analyses:
 
-- Sankey-Darstellung mit mehreren Erzeugern und Speichern
-- frei benennbare Verbrauchergruppen
-- Autarkie und Eigenverbrauch
-- Speicherfüllstand und Wirkungsgrad
-- Kosten- und CO₂-Bilanz
-- PV-Ertragsprognose
-- Tageslastprofil
-- Navigation von der Stunde bis zum Jahr
-- Monatstrends über mehrere Jahre
-- direkter Wechsel von einer Kennzahl zum langfristigen Entitätsverlauf
-- Plausibilitätsprüfung der Energiebilanz
-- Hinweise auf veraltete Sensorwerte
-- Erkennung ungewöhnlich hoher Verbraucher
+- Sankey view with several generators and storage units
+- freely nameable consumer groups
+- self-sufficiency and self-consumption
+- storage level and efficiency
+- cost and CO₂ balance
+- PV yield forecast
+- daily load profile
+- navigation from hour to year
+- monthly trends over several years
+- direct switch from a key figure to the long-term entity history
+- plausibility check of the energy balance
+- notices about stale sensor values
+- detection of unusually high consumers
 
-Beide Energiedashboards können problemlos parallel verwendet werden.
+Both energy dashboards can be used side by side without any problem.
 
-### Warum nicht InfluxDB, VictoriaMetrics und Grafana?
+### Why not InfluxDB, VictoriaMetrics and Grafana?
 
-InfluxDB, VictoriaMetrics und Grafana sind mächtige und bewährte Systeme.
-Wer sie bereits eingerichtet hat, die Abfragesprachen beherrscht und
-seine gewünschten Auswertungen damit komfortabel abbilden kann, benötigt
-Zeitarchiv möglicherweise nicht.
+InfluxDB, VictoriaMetrics and Grafana are powerful, proven systems. Anyone who
+has already set them up, masters the query languages and can comfortably
+build their desired analyses with them may not need Zeitarchiv.
 
-Für meine Anforderungen bedeuteten diese Lösungen jedoch:
+For my requirements, however, these solutions meant:
 
-- mehrere eigenständige Komponenten installieren und betreiben
-- Datenübertragung und Filter konfigurieren
-- Abfragen in InfluxQL, Flux, SQL, MetricsQL oder PromQL erstellen
-- Zeitverschiebungen und Vorjahresvergleiche selbst konstruieren
-- Panels und Dashboards einzeln konfigurieren und pflegen
-- Aufbewahrungsregeln festlegen
-- Datenbank, Benutzer und Zugriffsrechte verwalten
-- eigene Sicherungs- und Wiederherstellungsprozesse einrichten
-- für Datenkorrekturen zusätzliche Werkzeuge oder Abfragen verwenden
+- installing and operating several standalone components
+- configuring data transfer and filters
+- writing queries in InfluxQL, Flux, SQL, MetricsQL or PromQL
+- constructing time shifts and year-over-year comparisons yourself
+- configuring and maintaining panels and dashboards individually
+- defining retention rules
+- managing database, users and access rights
+- setting up your own backup and restore processes
+- using additional tools or queries for data corrections
 
-Trotz langer Beschäftigung mit diesen Systemen erreichte ich damit nicht
-die Kombination aus einfacher Bedienung, langfristigen Vergleichen,
-Datenpflege und Home-Assistant-Integration, die ich mir vorgestellt hatte.
+Despite a long time spent with these systems, I did not reach with them the
+combination of simple operation, long-term comparisons, data maintenance and
+Home Assistant integration that I had in mind.
 
-Zeitarchiv ist bewusst weniger universell. Dafür sind Archivierung,
-Visualisierung, Vorjahresvergleich, Datenpflege, Import, Export, Backup
-und Wiederherstellung in einer auf Home Assistant zugeschnittenen
-Oberfläche zusammengefasst.
+Zeitarchiv is deliberately less universal. In return, archiving,
+visualization, year-over-year comparison, data maintenance, import, export,
+backup and restore are combined in an interface tailored to Home Assistant.
 
-### Mein persönlicher Hintergrund
+### My personal background
 
-Ich nutze seit etwa 13 Jahren Symcon und habe dort inzwischen mehr als 130
-Millionen Messwerte aus den Bereichen Energie, Temperatur, Wetter und
-Betrieb gespeichert.
+I have been using Symcon for about 13 years and have by now stored more than
+130 million measurements there from the areas of energy, temperature, weather
+and operations.
 
-Home Assistant verwende ich hauptsächlich für Steuerung, Automatisierungen
-und die Integration unterschiedlichster Systeme. Bei Symcon schätze ich
-dagegen die unkomplizierte Langzeitspeicherung, schnelle Vergleiche und
-die Möglichkeit, fehlerhafte historische Werte nachträglich zu
-korrigieren.
+I use Home Assistant mainly for control, automations and integrating the most
+diverse systems. What I value about Symcon, on the other hand, is the
+uncomplicated long-term storage, quick comparisons and the ability to correct
+faulty historical values after the fact.
 
-Zeitarchiv ist aus dem Wunsch entstanden, diese Arbeitsweise direkt in
-Home Assistant zu ermöglichen – mit deutlich weniger Einrichtungs- und
-Pflegeaufwand als bei einer selbst zusammengestellten Lösung aus
-externer Zeitreihendatenbank und Grafana.
+Zeitarchiv arose from the wish to make this way of working possible directly
+in Home Assistant — with significantly less setup and maintenance effort than
+a self-assembled solution of an external time series database and Grafana.
 
-Kurz gesagt: Zeitarchiv richtet sich an Anwender, die ausgewählte Daten
-nicht nur langfristig und platzsparend aufbewahren, sondern sie auch
-komfortabel vergleichen, visualisieren, kontrollieren, sichern und bei
-Bedarf korrigieren möchten.
+In short: Zeitarchiv is aimed at users who not only want to keep selected data
+long-term and space-efficiently, but also want to conveniently compare,
+visualize, check, back up and, when necessary, correct it.
 
 </details>
 
-## Haftungsausschluss
+## Disclaimer
 
-Zeitarchiv ist ein privat entwickeltes, kostenloses Open-Source-Projekt und
-wird ohne Gewährleistung oder Garantie bereitgestellt. Die Nutzung erfolgt
-auf eigene Verantwortung; insbesondere kann keine Garantie für einen
-fehlerfreien Betrieb sowie für die Richtigkeit, Vollständigkeit,
-Verfügbarkeit oder den dauerhaften Erhalt gespeicherter Daten übernommen
-werden. Erstelle daher regelmäßig unabhängige Backups deiner Daten.
+Zeitarchiv is a privately developed, free open-source project and is provided
+without warranty or guarantee. Use is at your own risk; in particular, no
+guarantee can be given for error-free operation or for the correctness,
+completeness, availability or lasting preservation of stored data. Therefore,
+make independent backups of your data regularly.
 
-## Lizenz
+## License
 
-Dieses Projekt steht unter der [MIT-Lizenz](LICENSE).
+This project is licensed under the [MIT License](LICENSE).
 Copyright 2026 bertel2020.
 
-Die verwendeten Drittanbieter-Komponenten und deren Lizenzen sind in
-[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) aufgeführt.
+The third-party components used and their licenses are listed in
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
 ---
 
 <p align="center">
-  <a href="https://github.com/bertel2020/HA-Zeitarchiv">Integration einrichten</a>
+  <a href="https://github.com/bertel2020/HA-Zeitarchiv">Set up the integration</a>
   ·
-  <a href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md">Changelog</a>
+  <a href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md">Changelog</a>
   ·
-  <a href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/DOCS.md">App-Store-Dokumentation</a>
+  <a href="https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/DOCS.md">App store documentation</a>
 </p>
