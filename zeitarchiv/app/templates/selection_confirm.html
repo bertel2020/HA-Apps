@@ -68,7 +68,7 @@
 
     {% elif kind == "remove" %}
     <h1>{{ _("Aus der Auswahl entfernen?") }}</h1>
-    <p class="sub">{{ _("{count} Entitäten werden nicht mehr archiviert. Bereits archivierte Daten bleiben erhalten.", count=ids|length) }}</p>
+    <p class="sub">{% if ids|length == 1 %}{{ _("1 Entität wird nicht mehr archiviert. Bereits archivierte Daten bleiben erhalten.") }}{% else %}{{ _("{count} Entitäten werden nicht mehr archiviert. Bereits archivierte Daten bleiben erhalten.", count=ids|length) }}{% endif %}</p>
     <form method="post" action="{{ app_root }}/selection/remove" class="settings-panel">
       <input type="hidden" name="confirmed" value="1">
       {% if one %}<input type="hidden" name="one" value="{{ one }}">{% else %}{% for entity_id in ids %}<input type="hidden" name="ids" value="{{ entity_id }}">{% endfor %}{% endif %}
@@ -80,8 +80,8 @@
       <p><b>{{ _("Von Hand gewählt: {count}", count=manual_count) }}</b></p>
       <ul>{% for name in manual_names %}<li>{{ name }}</li>{% endfor %}</ul>
       <p class="hint hint-warn">{{ _("Diese Einzel-IDs wurden von Hand in den Optionen der Integration eingetragen. Entfernen nimmt sie dort heraus.") }}</p>
-      {% if manual_missing %}<p class="hint hint-warn" role="alert">{{ _("Bitte bestätige, dass auch die von Hand gewählten Entitäten entfernt werden sollen.") }}</p>{% endif %}
-      <label class="filter-chip"><input type="checkbox" name="confirm_manual" value="1"><span>{{ _("Ja, auch die von Hand gewählten entfernen") }}</span></label>
+      <p class="hint hint-warn" role="alert" data-manual-missing{% if not manual_missing %} hidden{% endif %}>{{ _("Bitte bestätige, dass auch die von Hand gewählten Entitäten entfernt werden sollen.") }}</p>
+      <label class="confirm-check"><input type="checkbox" name="confirm_manual" value="1"><span>{{ _("Ja, auch die von Hand gewählten entfernen") }}</span></label>
       {% endif %}
       {% if still_count %}<p class="hint hint-warn">{{ _("{count} davon bleiben trotzdem ausgewählt, weil ein Muster, Bereich, Gerät oder Label sie erfasst. Das lässt sich nur in Home Assistant ändern.", count=still_count) }}</p>{% endif %}
       {% if skipped %}<p class="hint">{{ _("{count} markierte Zeilen passen nicht zu dieser Aktion und bleiben unverändert.", count=skipped) }}</p>{% endif %}
@@ -107,7 +107,7 @@
     </form>
     {% elif kind == "exclude" %}
     <h1>{{ _("Ausschließen?") }}</h1>
-    <p class="sub">{{ _("{count} Entitäten kommen in die Ausschlüsse der Integration und werden nicht mehr archiviert, egal auf welchem Weg sie ausgewählt sind. Bereits archivierte Daten bleiben erhalten.", count=ids|length) }}</p>
+    <p class="sub">{% if ids|length == 1 %}{{ _("1 Entität kommt in die Ausschlüsse der Integration und wird nicht mehr archiviert, egal auf welchem Weg sie ausgewählt ist. Bereits archivierte Daten bleiben erhalten.") }}{% else %}{{ _("{count} Entitäten kommen in die Ausschlüsse der Integration und werden nicht mehr archiviert, egal auf welchem Weg sie ausgewählt sind. Bereits archivierte Daten bleiben erhalten.", count=ids|length) }}{% endif %}</p>
     <form method="post" action="{{ app_root }}/selection/exclude" class="settings-panel">
       <input type="hidden" name="confirmed" value="1">
       {% if one %}<input type="hidden" name="one" value="{{ one }}">{% else %}{% for entity_id in ids %}<input type="hidden" name="ids" value="{{ entity_id }}">{% endfor %}{% endif %}
@@ -116,8 +116,8 @@
       {% if held_count %}<p class="hint">{{ _("{count} davon sind über ein Muster, einen Bereich, ein Gerät oder ein Label ausgewählt. Der Ausschluss gilt trotzdem; die Auswahl in Home Assistant bleibt sonst, wie sie ist.", count=held_count) }}</p>{% endif %}
       {% if manual_count %}
       <p class="hint hint-warn">{{ _("Von Hand in Home Assistant gewählt: {count}. Der Ausschluss setzt sich über diese Wahl hinweg.", count=manual_count) }}</p>
-      {% if manual_missing %}<p class="hint hint-warn" role="alert">{{ _("Bitte bestätige, dass auch die von Hand gewählten Entitäten ausgeschlossen werden sollen.") }}</p>{% endif %}
-      <label class="filter-chip"><input type="checkbox" name="confirm_manual" value="1"><span>{{ _("Ja, auch die von Hand gewählten ausschließen") }}</span></label>
+      <p class="hint hint-warn" role="alert" data-manual-missing{% if not manual_missing %} hidden{% endif %}>{{ _("Bitte bestätige, dass auch die von Hand gewählten Entitäten ausgeschlossen werden sollen.") }}</p>
+      <label class="confirm-check"><input type="checkbox" name="confirm_manual" value="1"><span>{{ _("Ja, auch die von Hand gewählten ausschließen") }}</span></label>
       {% endif %}
       {% if skipped %}<p class="hint">{{ _("{count} markierte Zeilen passen nicht zu dieser Aktion und bleiben unverändert.", count=skipped) }}</p>{% endif %}
       <p>
@@ -128,7 +128,7 @@
 
     {% elif kind == "include" %}
     <h1>{{ _("Wieder aufnehmen?") }}</h1>
-    <p class="sub">{{ _("Für {count} Entitäten wird der Ausschluss aufgehoben. Archiviert werden sie danach, wenn sie auf einem Weg ausgewählt sind.", count=ids|length) }}</p>
+    <p class="sub">{% if ids|length == 1 %}{{ _("Für 1 Entität wird der Ausschluss aufgehoben. Archiviert wird sie danach, wenn sie auf einem Weg ausgewählt ist.") }}{% else %}{{ _("Für {count} Entitäten wird der Ausschluss aufgehoben. Archiviert werden sie danach, wenn sie auf einem Weg ausgewählt sind.", count=ids|length) }}{% endif %}</p>
     <form method="post" action="{{ app_root }}/selection/include" class="settings-panel">
       <input type="hidden" name="confirmed" value="1">
       {% if one %}<input type="hidden" name="one" value="{{ one }}">{% else %}{% for entity_id in ids %}<input type="hidden" name="ids" value="{{ entity_id }}">{% endfor %}{% endif %}

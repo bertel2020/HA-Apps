@@ -229,3 +229,34 @@ def test_pages_render_in_english(client, catalog, german_again) -> None:
     assert "Changed in HA" in overview and "Zeitarchiv · Energy" in overview
     confirm = client.post("/selection/remove", data={"one": "sensor.ui_hand"}).text
     assert "Remove from the selection?" in confirm and "Chosen by hand: 1" in confirm
+
+
+# ---- Bestätigung als Popup (selection_overview.js) -----------------------------------------
+
+def test_confirmation_says_one_entity_in_the_singular(client, catalog) -> None:
+    text = client.post("/selection/remove", data={"one": "sensor.ui_wp"}).text
+    assert "1 Entität wird nicht mehr archiviert" in text and "1 Entitäten" not in text
+    both = client.post("/selection/remove", data={"ids": ["sensor.ui_hand", "sensor.ui_wp"]}).text
+    assert "2 Entitäten werden nicht mehr archiviert" in both
+
+
+def test_manual_confirmation_is_a_real_checkbox_with_a_hidden_warning(client, catalog) -> None:
+    text = client.post("/selection/remove", data={"ids": ["sensor.ui_hand", "sensor.ui_wp"]}).text
+    assert 'class="confirm-check"' in text and "filter-chip" not in text.split("Von Hand gewählt")[1]
+    assert "data-manual-missing hidden" in text  # das Popup zeigt den Hinweis ohne Neuladen
+    missing = client.post("/selection/remove", data={"ids": ["sensor.ui_hand", "sensor.ui_wp"], "confirmed": "1"})
+    assert missing.status_code == 400 and "data-manual-missing>" in missing.text.replace(" hidden", "")
+
+
+def test_popup_response_has_no_topnav_but_the_confirmation_page(client, catalog) -> None:
+    html = client.post("/selection/remove?popup=1", data={"one": "sensor.ui_wp"}).text
+    assert "page-sticky-header" not in html and "Aus der Auswahl entfernen?" in html and 'class="page' in html
+
+
+def test_overview_has_the_confirm_dialog_and_the_script_handles_the_three_actions() -> None:
+    from _paths import APP, template_text
+
+    html = template_text("selection_overview.html")
+    assert 'id="sel-confirm"' in html and "page-sel" in html and "page-head-wide" not in html
+    js = (APP / "static" / "js" / "pages" / "selection_overview.js").read_text()
+    assert "remove|exclude|include" in js and "getAttribute('formaction')" in js and "popup" in js

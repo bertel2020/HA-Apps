@@ -1,5 +1,8 @@
 {
   "app": {
+    "1 Entität wird nicht mehr archiviert. Bereits archivierte Daten bleiben erhalten.": "1 entity will no longer be archived. Data already archived is kept.",
+    "1 Entität kommt in die Ausschlüsse der Integration und wird nicht mehr archiviert, egal auf welchem Weg sie ausgewählt ist. Bereits archivierte Daten bleiben erhalten.": "1 entity goes into the integration's exclusions and will no longer be archived, no matter how it was selected. Data already archived is kept.",
+    "Für 1 Entität wird der Ausschluss aufgehoben. Archiviert wird sie danach, wenn sie auf einem Weg ausgewählt ist.": "The exclusion is lifted for 1 entity. It is archived afterwards if it is selected in some way.",
     "Zeitraum nur für dieses Popup, das Dashboard bleibt unverändert.": "Period applies to this popup only, the dashboard stays unchanged.",
     "Als Seite öffnen": "Open as page",
     "Im Stapel nach unten": "Down in the stack",

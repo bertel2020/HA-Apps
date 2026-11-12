@@ -5,7 +5,7 @@
 <link rel="stylesheet" href="{{ asset('css/pages/selection_overview.css') }}">
 {% endblock %}
 {% block content %}
-  <div class="page page-wide page-head-wide">
+  <div class="page page-wide page-sel">
     <h1>{{ _("Entitäten") }}</h1>
     <p class="sub">{{ _("Was die Zeitarchiv-Integration archiviert, auf welchem Weg es in die Auswahl kam und was sich daran geändert hat.") }}</p>
     {% with active = 'auswahl' %}{% include "_entities_tabs.html" %}{% endwith %}
@@ -285,5 +285,10 @@
     </div>
     {% endif %}
   </div>
+  {# Bestätigung von Entfernen / Ausschließen / Wieder aufnehmen als Popup (selection_overview.js). Der Inhalt ist die Bestätigungsseite
+     der Route (selection_confirm.html, ?popup=1); ohne Skript gehen die Knöpfe wie bisher auf diese Seite. #}
+  <dialog class="detail-dialog sel-confirm-dialog" id="sel-confirm" aria-labelledby="sel-confirm-title">
+    <div class="sel-confirm-body" id="sel-confirm-body"></div>
+  </dialog>
   <script src="{{ asset('js/pages/selection_overview.js') }}"></script>
 {% endblock %}

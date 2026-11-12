@@ -194,3 +194,29 @@
     .ov-pattern-card{padding:12px 14px;}
     .ov-pattern-action,.ov-pattern-action .btn{width:100%;}
   }
+
+  /* Bestätigung als Popup (selection_overview.js): die Bestätigungsseite der Route in einem Dialog,
+     ohne eigenen Rahmen der Seite. */
+  .sel-confirm-dialog{width:min(560px,calc(100vw - 32px));padding:20px 22px;}
+  .sel-confirm-body h1{margin:0 0 6px;font-size:calc(18px * var(--font-scale, 1));}
+  .sel-confirm-body .sub{margin:0 0 12px;}
+  .sel-confirm-body .settings-panel{margin:0;padding:0;border:0;box-shadow:none;background:none;}
+  .sel-confirm-body ul{margin:6px 0 10px;padding-left:20px;max-height:220px;overflow:auto;}
+  .sel-confirm-body p{margin:0 0 10px;}
+  .sel-confirm-body form > p:last-child{display:flex;justify-content:flex-end;gap:8px;margin:14px 0 0;}
+  .sel-confirm-body .hint{margin:0 0 10px;}
+  /* Echtes Kontrollkästchen statt des Filter-Chips. */
+  .confirm-check{display:flex;align-items:flex-start;gap:10px;margin:4px 0 10px;cursor:pointer;font-size:calc(14px * var(--font-scale, 1));line-height:1.4;}
+  .confirm-check input{flex:none;width:18px;height:18px;margin:1px 0 0;accent-color:var(--accent-line);cursor:pointer;}
+  @media(max-width:560px){
+    .sel-confirm-dialog{padding:16px;}
+  }
+
+  /* Breite Darstellung: die Seite nutzt die volle Breite. Tabelle links, rechts die Verlaufsspalte (bleibt beim
+     Scrollen stehen); die Hinweise darüber enden an der Tabellenspalte statt über die ganze Seite zu laufen. */
+  @media(min-width:1200px){
+    :root[data-page-layout="wide"] .page-sel{--ov-side:clamp(340px,24vw,480px);--ov-gap:28px;}
+    :root[data-page-layout="wide"] .page-sel .ov-layout{grid-template-columns:minmax(0,1fr) var(--ov-side);gap:var(--ov-gap);}
+    :root[data-page-layout="wide"] .page-sel :is(.ov-assist,.ov-job,.ov-roles,.ov-note,.ov-meta){max-width:calc(100% - var(--ov-side) - var(--ov-gap));}
+    :root[data-page-layout="wide"] .page-sel .ov-side{position:sticky;top:72px;max-height:calc(100vh - 88px);overflow:auto;}
+  }
