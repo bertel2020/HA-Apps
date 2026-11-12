@@ -1617,6 +1617,8 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
 /* Titel + Zeitraum-Leiste (+ Rückblick-Hinweis) bleiben beim Scrollen unter der Kopfleiste (.topnav, 57px) stehen,
    in der Optik der Jahre-Leiste (.wt-scope). Nur mit eingeschalteter Zeitraum-Navigation (is-sticky). */
 .dash-sticky-bar.is-sticky{position:sticky;top:57px;z-index:10;padding:8px 12px;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);}
+/* Weniger Abstand zur Topnav (deren 28 px Unterrand gilt für alle Seiten, hier nur die Titelleiste der Dashboards). */
+.dash-sticky-bar.is-sticky{margin-top:-12px;}
 .dash-sticky-bar.is-sticky h1,.dash-sticky-bar.is-sticky h2{margin:0;}
 .dash-sticky-bar.is-sticky h1{font-size:calc(20px * var(--font-scale, 1));}
 .dash-sticky-bar.is-sticky .dashboard-head{margin-bottom:0;}
