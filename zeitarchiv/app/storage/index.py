@@ -8,7 +8,6 @@ Tabelle (state_class → Standard/Zähler, Domain → Schalter).
 from __future__ import annotations
 
 from ..i18n import N_, tr
-from ..table_letters import assign_row_letters
 
 import json
 import math
@@ -811,8 +810,7 @@ CREATE TABLE IF NOT EXISTS table_rows (
     accent INTEGER NOT NULL DEFAULT 0,
     percent_of_total INTEGER NOT NULL DEFAULT 0,
     hide_if_empty INTEGER NOT NULL DEFAULT 0,
-    hide_line INTEGER NOT NULL DEFAULT 0,
-    letter TEXT NOT NULL DEFAULT ''
+    hide_line INTEGER NOT NULL DEFAULT 0
 );
 """
 
@@ -1400,19 +1398,6 @@ class Index:
         if "hide_line" not in table_row_columns:
             # Leerzeile: eine Trennlinie ohne sichtbare Linie (main.py _TableRowBody.hide_line).
             self._conn.execute("ALTER TABLE table_rows ADD COLUMN hide_line INTEGER NOT NULL DEFAULT 0")
-        if "letter" not in table_row_columns:
-            # Fester Zeilen-Buchstabe (table_letters.py): bestehende Tabellen behalten ihre bisherigen
-            # Buchstaben, die bis hierher aus der Position folgten, damit keine Formel ihren Bezug ändert.
-            self._conn.execute("ALTER TABLE table_rows ADD COLUMN letter TEXT NOT NULL DEFAULT ''")
-            rows_by_table: dict[int, list[sqlite3.Row]] = {}
-            for row in self._conn.execute("SELECT id, table_id, row_type FROM table_rows ORDER BY table_id, position"):
-                rows_by_table.setdefault(row["table_id"], []).append(row)
-            for table_rows in rows_by_table.values():
-                letters = assign_row_letters([{"row_type": r["row_type"]} for r in table_rows])
-                self._conn.executemany(
-                    "UPDATE table_rows SET letter = ? WHERE id = ?",
-                    [(letter, r["id"]) for letter, r in zip(letters, table_rows, strict=True)],
-                )
 
         table_column_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(table_columns)")}
         if "decimals" not in table_column_columns:
@@ -3667,19 +3652,18 @@ class Index:
         )
 
     def _write_table_rows(self, table_id: int, rows: list[dict]) -> None:
-        letters = assign_row_letters(rows)
         self._conn.executemany(
             "INSERT INTO table_rows "
             "(table_id, position, label, row_type, entity_ids, formula, formula_unit, bold, aggregation, hidden, "
-            "show_label, accent, percent_of_total, hide_if_empty, hide_line, letter) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "show_label, accent, percent_of_total, hide_if_empty, hide_line) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     table_id, i, r["label"], r["row_type"], json.dumps(r["entity_ids"]),
                     r["formula"], r.get("formula_unit", ""), int(r["bold"]), r.get("aggregation", "auto"),
                     int(r.get("hidden", False)), int(r.get("show_label", False)), int(r.get("accent", False)),
                     int(r.get("percent_of_total", False)),
-                    int(r.get("hide_if_empty", False)), int(r.get("hide_line", False)), letters[i],
+                    int(r.get("hide_if_empty", False)), int(r.get("hide_line", False)),
                 )
                 for i, r in enumerate(rows)
             ],
@@ -3782,7 +3766,6 @@ class Index:
                     "show_label": bool(r["show_label"]), "accent": bool(r["accent"]),
                     "percent_of_total": bool(r["percent_of_total"]),
                     "hide_if_empty": bool(r["hide_if_empty"]), "hide_line": bool(r["hide_line"]),
-                    "letter": r["letter"],
                 }
                 for r in row_rows
             ]
