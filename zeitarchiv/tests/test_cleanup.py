@@ -166,6 +166,29 @@ def test_daily_counts_are_stored_with_the_alltime_stats() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_alltime_stats_listing_can_leave_out_the_daily_counts() -> None:
+    """Die Meldung und die Quote brauchen ``counts`` und die Schwellen, nicht die Tageszähler (über 99 % der Bytes).
+    Ohne ``daily`` entfällt deren Parsen; ein defekter Eintrag darf auch dort nicht die ganze Liste kippen."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        index.set_cleanup_alltime_stats("sensor.a", {"all": 5}, outlier_threshold="50", daily={"2024-07-01": {"gaps": 1}})
+        index.set_cleanup_alltime_stats("sensor.b", {"all": 7})
+        voll = index.list_cleanup_alltime_stats()
+        schlank = index.list_cleanup_alltime_stats(with_daily=False)
+        assert voll["sensor.a"]["daily"] == {"2024-07-01": {"gaps": 1}}
+        assert "daily" not in schlank["sensor.a"]
+        assert schlank["sensor.a"]["counts"] == {"all": 5} and schlank["sensor.a"]["outlier_threshold"] == "50"
+        assert schlank["sensor.b"] == voll["sensor.b"]
+        # Ein defekter Wert: json_remove wirft für die ganze Abfrage, der Rückfall überspringt nur diesen Eintrag.
+        index.set_setting(Index._CLEANUP_ALLTIME_STATS_PREFIX + "sensor.kaputt", "{kein json")
+        assert set(index.list_cleanup_alltime_stats(with_daily=False)) == {"sensor.a", "sensor.b"}
+        assert set(index.list_cleanup_alltime_stats()) == {"sensor.a", "sensor.b"}
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_soft_delete_excludes_row_and_undo_restores_it() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
     try:

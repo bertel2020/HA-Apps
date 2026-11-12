@@ -229,8 +229,11 @@ def outlier_rates_measured(index: Index) -> tuple[list[dict], int]:
     der Entitäten, die noch keine belastbare Messung haben — ohne den
     Auffälligkeits-Filter von outlier_rate_overview(). Gemeinsame Quelle für
     Housekeeping → Ausreißer und die Datenqualitäts-Übersicht, damit beide
-    exakt dieselbe Messung zeigen."""
-    eintraege = index.list_cleanup_alltime_stats()
+    exakt dieselbe Messung zeigen.
+
+    Die Quote braucht nur ``counts``, Schwelle und Regel, nicht die Tageszähler (``daily``): Ohne sie ist das Laden
+    viermal schneller, und die Meldung läuft bei jedem Seitenaufruf."""
+    eintraege = index.list_cleanup_alltime_stats(with_daily=False)
     gemessen: list[dict] = []
     offen = 0
     for entity in index.list_entities():

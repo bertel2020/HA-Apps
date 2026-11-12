@@ -4222,19 +4222,37 @@ class Index:
             entry["daily"] = daily
         self.set_setting(self._CLEANUP_ALLTIME_STATS_PREFIX + entity_id, json.dumps(entry))
 
-    def list_cleanup_alltime_stats(self) -> dict[str, dict]:
+    def list_cleanup_alltime_stats(self, with_daily: bool = True) -> dict[str, dict]:
         """Alle gecachten Gesamt-Zählungen auf einmal, {entity_id: Eintrag}.
 
         Für Housekeeping → Ausreißer und die zugehörige Meldung: beide brauchen
         den Stand ALLER Entitäten. Einzeln nachgeschlagen wären das je Aufruf
         so viele SELECTs wie Entitäten; hier ist es eines. Defekte Einträge
         werden übersprungen statt zu werfen — ein kaputter JSON-Wert darf die
-        Housekeeping-Seite nicht unbenutzbar machen."""
+        Housekeeping-Seite nicht unbenutzbar machen.
+
+        ``with_daily=False`` lässt das Feld ``daily`` weg: Es sind die Tageszähler seit Beginn der Messung und damit
+        über 99 % der Bytes (gemessen 4,5 MB bei 171 Einträgen, bis 85 KB je Entität). Wer nur ``counts`` und die
+        Schwellen braucht (die Quote, die Meldung), spart das Parsen: etwa 10 statt 37 ms. Die Einträge enthalten dann
+        den Schlüssel ``daily`` nicht, auch wenn er gespeichert ist; wer ihn oder sein Fehlen auswertet, ruft ohne
+        den Schalter auf."""
         vorsatz = self._CLEANUP_ALLTIME_STATS_PREFIX
+        rows = None
         with self._lock, self._conn:
-            rows = self._conn.execute(
-                "SELECT key, value FROM settings WHERE key LIKE ? || '%'", (vorsatz,)
-            ).fetchall()
+            if not with_daily:
+                try:
+                    rows = self._conn.execute(
+                        "SELECT key, json_remove(value, '$.daily') AS value FROM settings WHERE key LIKE ? || '%'",
+                        (vorsatz,),
+                    ).fetchall()
+                except sqlite3.OperationalError:
+                    # SQLite ohne JSON-Funktionen, oder ein Wert ist kein gültiges JSON (json_remove wirft dann für die
+                    # ganze Abfrage): zurück auf den Weg unten, der defekte Einträge einzeln überspringt.
+                    rows = None
+            if rows is None:
+                rows = self._conn.execute(
+                    "SELECT key, value FROM settings WHERE key LIKE ? || '%'", (vorsatz,)
+                ).fetchall()
         eintraege: dict[str, dict] = {}
         for row in rows:
             try:
