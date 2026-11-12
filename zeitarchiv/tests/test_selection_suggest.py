@@ -119,3 +119,19 @@ def test_catalog_is_replaced_atomically_and_unreadable_files_give_none(tmp_path)
     assert [row["entity_id"] for row in selection_catalog.load(tmp_path)["entities"]] == ["sensor.b", "sensor.c"]
     (tmp_path / selection_catalog.FILENAME).write_text("{kaputt", encoding="utf-8")
     assert selection_catalog.load(tmp_path) is None
+
+
+def test_device_branch_needs_a_source_device_with_exactly_one_power_value() -> None:
+    rows = [
+        _energy("sensor.inv_energie", "Wechselrichter Energie", device="Wechselrichter", energy_role="solar"),
+        _row("sensor.inv_p1", "WR String 1", device="Wechselrichter", device_class="power", unit="W", state_class="measurement"),
+        _row("sensor.inv_p2", "WR String 2", device="Wechselrichter", device_class="power", unit="W", state_class="measurement"),
+        _energy("sensor.zaehler_energie", "Zähler Energie", device="Zähler", energy_role="grid_import"),
+        _row("sensor.zaehler_p", "Zähler Leistung", device="Zähler", device_class="power", unit="W", state_class="measurement"),
+        _energy("sensor.wp_energie", "WP Energie", device="WP", energy_role="consumer"),
+        _row("sensor.wp_p", "WP Leistung", device="WP", device_class="power", unit="W", state_class="measurement"),
+    ]
+    result = selection_suggest.suggest("energie", rows, set())
+    rec = {r["entity_id"] for g in result["recommended"] for r in g["rows"]}
+    assert "sensor.zaehler_p" in rec  # Quelle mit genau einem Leistungswert
+    assert not rec & {"sensor.inv_p1", "sensor.inv_p2", "sensor.wp_p"}  # Teilwerte und Verbraucher nur weitere Treffer

@@ -58,7 +58,7 @@ WEATHER_PLATFORMS = frozenset({
     "met", "openweathermap", "dwd_weather", "dwd_weather_warnings", "pirateweather", "accuweather",
     "weatherflow", "weatherflow_cloud", "ecowitt", "meteo_france", "meteoalarm", "buienradar", "smhi",
     "tomorrowio", "open_meteo", "brightsky", "aemet", "ipma", "nws", "environment_canada", "metoffice",
-    "netatmo", "weatherkit", "knmi", "bom", "zamg", "awattar_weather",
+    "netatmo", "weatherkit", "knmi", "bom", "zamg", "awattar_weather", "google_weather",
 })
 #: Integrationen für Router, Netzwerk und Internetanschluss.
 NETWORK_PLATFORMS = frozenset({
@@ -92,9 +92,33 @@ _SPEED_PLATFORMS = frozenset({"speedtestdotnet", "fastdotcom"})
 _NETWORK_NAME = re.compile(r"(wlan|wifi|wi-fi|lan\b|router|internet|dsl|download|upload|ping|latenz|latency)", re.IGNORECASE)
 
 
+#: „indoor_outdoor_meter“ (SwitchBot u. a.) ist ein Modellname, kein Hinweis auf draußen.
+_INDOOR_OUTDOOR = re.compile(r"indoor[\s_/-]*outdoor", re.IGNORECASE)
+#: Abgeleitete Wetterwerte: keine Messung der Station, das Wetterdashboard braucht sie nicht.
+_WEATHER_DERIVED = re.compile(
+    r"(gef[üu]hlt|feels|apparent|taupunkt|dew.?point|heat.?index|hitzeindex|wind.?chill|schnee|snow|k[üu]rzlich|recent)",
+    re.IGNORECASE,
+)
+#: Fahrzeug-Integrationen: Türen, Fenster und Hauben eines Autos gehören nicht zum Haus.
+VEHICLE_PLATFORMS = frozenset({
+    "audiconnect", "cupra", "myskoda", "skodaconnect", "volkswagen_we_connect_id", "weconnect", "seatconnect",
+    "bmw_connected_drive", "mercedesme", "tesla_custom", "teslemetry", "tesla_fleet", "tessie", "hyundai_kia_connect",
+    "kia_uvo", "renault", "volvooncall", "volvo", "toyota", "polestar", "ford", "fordpass", "nissan_leaf", "mini_connected",
+    "cupra_eu_data_act", "vag_connect", "carconnectivity", "audi_connect",
+})
+#: Hausgeräte: „Tür“ meint die Gerätetür (Waschmaschine, Backofen), nicht die Haustür.
+APPLIANCE_PLATFORMS = frozenset({
+    "home_connect", "homeconnect", "homeconnect_ws", "home_connect_alt", "miele", "bsh", "smartthings_appliance", "lg_thinq",
+})
+#: Integrationen, deren Melder keine Anwesenheit von Personen anzeigen (Kameraerkennung, 3D-Drucker).
+NOT_PRESENCE_PLATFORMS = frozenset({"frigate", "moonraker", "octoprint", "bambu_lab", "prusalink"})
+_EMA_NAME = re.compile(r"(\bema\b|exponential)", re.IGNORECASE)
+
+
 def _hint_text(row: dict[str, Any]) -> str:
     object_id = row["entity_id"].split(".", 1)[1].replace("_", " ")
-    return " ".join(str(part) for part in (row.get("name"), object_id, row.get("area"), row.get("device")) if part)
+    text = " ".join(str(part) for part in (row.get("name"), object_id, row.get("area"), row.get("device")) if part)
+    return _INDOOR_OUTDOOR.sub(" ", text)
 
 
 def is_outdoor(row: dict[str, Any]) -> bool:
@@ -122,6 +146,8 @@ def rule_wetter(row: dict[str, Any]) -> tuple[str, str] | str | None:
     if domain != "sensor":
         return None
     weather_source = platform in WEATHER_PLATFORMS
+    if _WEATHER_DERIVED.search(_hint_text(row)) and dc in {"temperature", "humidity", "precipitation", "precipitation_intensity"}:
+        return tr("Abgeleiteter Wert (gefühlt, Taupunkt, Schnee …), keine Messung"), MORE
     if dc in {"precipitation", "precipitation_intensity"}:
         if _counter(row) and is_derived_counter(row):
             return DERIVED
@@ -160,6 +186,8 @@ def rule_klima(row: dict[str, Any]) -> tuple[str, str] | str | None:
             return None  # gehört zum Thema „System & Server“
         if _DEVICE_TEMP.search(_hint_text(row)):
             return tr("Gerätetemperatur, kaum für das Raumklima"), MORE
+        if _EMA_NAME.search(_hint_text(row)):
+            return tr("Geglätteter Wert eines Thermostats, kein Messwert"), MORE
         if _SETPOINT.search(_hint_text(row)):
             return tr("Zielwert, Grenzwert oder Abgleich, kein Messwert"), MORE
         if not row.get("area"):
@@ -196,6 +224,8 @@ def rule_luftqualitaet(row: dict[str, Any]) -> tuple[str, str] | str | None:
 def rule_batterien(row: dict[str, Any]) -> tuple[str, str] | str | None:
     domain, dc = row["domain"], row.get("device_class")
     if dc == "battery" and domain == "sensor":
+        if (row.get("unit") or "").lower() in {"v", "mv"}:
+            return tr("Batteriespannung in Volt, kein Ladestand"), MORE
         return tr("Batteriestand eines Geräts"), RECOMMENDED
     if dc == "battery" and domain == "binary_sensor":
         return tr("Batterie schwach (ja/nein)"), RECOMMENDED
@@ -252,6 +282,10 @@ def rule_tueren_fenster(row: dict[str, Any]) -> tuple[str, str] | str | None:
     if domain == "binary_sensor" and dc == "opening":
         return tr(_OPENING_REASONS[dc]), MORE  # zu unscharf: Tür, Fenster, Schublade oder Klappe
     if domain == "binary_sensor" and dc in _OPENING_REASONS:
+        if row.get("platform") in VEHICLE_PLATFORMS:
+            return tr("Tür oder Fenster eines Fahrzeugs"), MORE
+        if row.get("platform") in APPLIANCE_PLATFORMS:
+            return tr("Tür eines Hausgeräts"), MORE
         return tr(_OPENING_REASONS[dc]), RECOMMENDED
     if domain == "lock":
         return tr("Türschloss"), MORE
@@ -313,6 +347,8 @@ def rule_anwesenheit(row: dict[str, Any]) -> tuple[str, str] | str | None:
     if domain == "device_tracker":
         return tr("Geräte-Tracker (Handy, Router)"), MORE
     if domain == "binary_sensor" and dc in {"occupancy", "presence"}:
+        if row.get("platform") in NOT_PRESENCE_PLATFORMS:
+            return tr("Erkennung einer Kamera oder eines Geräts, keine Person im Haus"), MORE
         return tr("Präsenzmelder"), RECOMMENDED
     if domain == "binary_sensor" and dc == "motion":
         return tr("Bewegungsmelder, schaltet oft"), MORE

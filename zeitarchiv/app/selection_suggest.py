@@ -82,9 +82,16 @@ def suggest_energy(entities: Iterable[dict[str, Any]], archived: Collection[str]
         row for row in entities
         if row.get("domain") == "sensor" and not row.get("hidden") and row.get("entity_category") != "config"
     ]
+    # Der Gerätezweig gilt nur für Quellen (Netz, Solar, Batterie), nicht für Verbraucher, und nur, wenn das Gerät genau
+    # einen Leistungswert hat: bei Wechselrichtern mit Strings und Phasen wären sonst alle Teilwerte „empfohlen“.
+    source_roles = set(_ENERGY_ROLES) - {"consumer"}
     dashboard_devices = {
-        _group_key(row) for row in rows if row.get("energy_role") in _ENERGY_ROLES and row.get("device")
+        _group_key(row) for row in rows if row.get("energy_role") in source_roles and row.get("device")
     }
+    power_count: dict[str, int] = {}
+    for row in rows:
+        if row.get("device_class") == "power" and row.get("device"):
+            power_count[_group_key(row)] = power_count.get(_group_key(row), 0) + 1
     recommended: list[dict[str, Any]] = []
     more: list[dict[str, Any]] = []
     derived = 0
@@ -98,7 +105,7 @@ def suggest_energy(entities: Iterable[dict[str, Any]], archived: Collection[str]
         elif counter and is_derived_counter(row):
             derived += 1
             continue
-        elif power and row.get("device") and _group_key(row) in dashboard_devices:
+        elif power and row.get("device") and _group_key(row) in dashboard_devices and power_count.get(_group_key(row)) == 1:
             reason, bucket = tr("Leistung am selben Gerät wie eine Quelle aus dem Energie-Dashboard"), recommended
         elif counter:
             reason, bucket = tr("Zählerstand in kWh ({state_class})", state_class=row["state_class"]), more

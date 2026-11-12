@@ -3913,7 +3913,13 @@
     "Kein Dashboard ist eingeschaltet. Das Wetter- und das Energiedashboard lassen sich in ihren Einstellungen einschalten.": "No dashboard is switched on. The weather and energy dashboards can be switched on in their settings.",
     "Für die offenen Rollen gibt es keine Vorschläge aus dem Katalog.": "There are no suggestions in the catalog for the open roles.",
     "Rolle: {role}": "Role: {role}",
-    "Begründung": "Reason"
+    "Begründung": "Reason",
+    "Abgeleiteter Wert (gefühlt, Taupunkt, Schnee …), keine Messung": "Derived value (feels-like, dew point, snow …), not a measurement",
+    "Geglätteter Wert eines Thermostats, kein Messwert": "Smoothed thermostat value, not a measurement",
+    "Batteriespannung in Volt, kein Ladestand": "Battery voltage in volts, not a charge level",
+    "Tür oder Fenster eines Fahrzeugs": "Door or window of a vehicle",
+    "Tür eines Hausgeräts": "Door of an appliance",
+    "Erkennung einer Kamera oder eines Geräts, keine Person im Haus": "Detection by a camera or device, not a person at home"
   },
   "js": {
     "Fixierung aufheben und das Dashboard bearbeiten?": "Unlock this dashboard and edit it?",

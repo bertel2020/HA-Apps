@@ -298,3 +298,57 @@ def test_wetter_recommends_a_rain_switch_but_not_a_leak_sensor() -> None:
     rec, more, _result = _rows("wetter", catalog)
     assert {"binary_sensor.regensensor", "binary_sensor.rain"} <= set(rec)
     assert "binary_sensor.waschkeller_wasser" not in rec and "binary_sensor.waschkeller_wasser" not in more
+
+
+# ---- Weniger Rauschen (Maßnahme 1) ------------------------------------------------------------
+
+def test_indoor_outdoor_meter_is_not_an_outdoor_sensor() -> None:
+    meter = _row("sensor.bad_indoor_outdoor_meter_temperatur", "Bad Indoor/Outdoor Meter Temperatur",
+                 device_class="temperature", area="Bad", platform="switchbot")
+    garden = _row("sensor.garten_temperatur", "Garten Temperatur", device_class="temperature", area="Garten")
+    wetter_rec, _more, _ = _rows("wetter", [meter, garden])
+    assert "sensor.garten_temperatur" in wetter_rec and "sensor.bad_indoor_outdoor_meter_temperatur" not in wetter_rec
+    klima_rec, _more, _ = _rows("klima", [meter])
+    assert "sensor.bad_indoor_outdoor_meter_temperatur" in klima_rec  # gehört jetzt zum Raumklima
+
+
+def test_derived_weather_values_are_only_more_hits() -> None:
+    rows = [
+        _row("sensor.station_temperatur", "Station Außentemperatur", device_class="temperature", platform="ecowitt"),
+        _row("sensor.station_gefuehlt", "Station gefühlte Temperatur", device_class="temperature", platform="ecowitt"),
+        _row("sensor.station_taupunkt", "Station Taupunkt", device_class="temperature", platform="ecowitt"),
+    ]
+    rec, more, _ = _rows("wetter", rows)
+    assert set(rec) == {"sensor.station_temperatur"} and set(more) == {"sensor.station_gefuehlt", "sensor.station_taupunkt"}
+
+
+def test_vehicle_and_appliance_doors_are_only_more_hits() -> None:
+    rows = [
+        _row("binary_sensor.haustuer", "Haustür", device_class="door"),
+        _row("binary_sensor.auto_tuer", "Auto Tür", device_class="door", platform="audiconnect"),
+        _row("binary_sensor.waschmaschine_tuer", "Waschmaschine Tür", device_class="door", platform="home_connect"),
+    ]
+    rec, more, _ = _rows("tueren_fenster", rows)
+    assert set(rec) == {"binary_sensor.haustuer"}
+    assert set(more) == {"binary_sensor.auto_tuer", "binary_sensor.waschmaschine_tuer"}
+
+
+def test_camera_detections_and_printers_are_not_presence() -> None:
+    rows = [
+        _row("binary_sensor.wohnzimmer_praesenz", "Wohnzimmer Präsenz", device_class="occupancy"),
+        _row("binary_sensor.hof_katze", "Hof Katze", device_class="occupancy", platform="frigate"),
+        _row("binary_sensor.drucker_filament", "Drucker Filament", device_class="occupancy", platform="moonraker"),
+    ]
+    rec, more, _ = _rows("anwesenheit", rows)
+    assert set(rec) == {"binary_sensor.wohnzimmer_praesenz"} and len(more) == 2
+
+
+def test_smoothed_thermostat_values_and_battery_voltage_are_only_more_hits() -> None:
+    ema = _row("sensor.thermo_temperatur_ema", "Thermostat Temperatur EMA", device_class="temperature", area="Bad")
+    room = _row("sensor.bad_temperatur", "Bad Temperatur", device_class="temperature", area="Bad")
+    rec, more, _ = _rows("klima", [ema, room])
+    assert set(rec) == {"sensor.bad_temperatur"} and "sensor.thermo_temperatur_ema" in more
+    volt = _row("sensor.batt_v", "Sensor Batterie", device_class="battery", unit="V")
+    percent = _row("sensor.batt_p", "Sensor Batterie Stand", device_class="battery", unit="%")
+    rec, more, _ = _rows("batterien", [volt, percent])
+    assert set(rec) == {"sensor.batt_p"} and set(more) == {"sensor.batt_v"}
