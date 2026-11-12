@@ -16,7 +16,7 @@
   .cat-swatch.is-current{box-shadow:0 0 0 2px var(--ink);}
   .cat-palette{display:none;grid-template-columns:repeat(4,24px);gap:10px;padding:12px;min-width:0;}
   .cat-palette.open{display:grid;}
-  .cat-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
+  .cat-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:calc(14px * var(--font-scale, 1));font-weight:500;}
   .cat-name input{width:100%;max-width:280px;}
   .cat-count{flex:none;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;}
   .cat-actions{flex:none;display:flex;gap:6px;}
