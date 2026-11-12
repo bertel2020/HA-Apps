@@ -1,7 +1,7 @@
   /* Dashboard-Kacheln: drei Spalten als feste Desktop-Grundeinheit. Jede
      Kachel kann davon 1–3 Spalten und 1–3 Zeilen belegen. */
   [x-cloak]{display:none!important;}
-  .dashboard-section{margin-top:40px;}
+  .dashboard-section{margin-top:24px;}
   .dashboard-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px;}
   .dashboard-head h2{margin:0;font-size:calc(17px * var(--font-scale, 1));}
   .dashboard-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:var(--dashboard-row-height);gap:14px;align-items:stretch;}
