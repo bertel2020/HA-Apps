@@ -9,8 +9,10 @@
   const title = dialog.querySelector('.tile-popup-title');
   const editLink = dialog.querySelector('.tile-popup-edit');
   const pageLink = dialog.querySelector('.tile-popup-page');
-  const chip = dialog.querySelector('.tile-popup-refresh');
+  const chipWrap = dialog.querySelector('.tile-popup-refresh-wrap');
+  const chip = chipWrap.querySelector('.tile-popup-refresh');
   const chipText = chip.querySelector('.tile-popup-refresh-text');
+  const menu = chipWrap.querySelector('.tile-popup-refresh-menu');
   let pushed = false;
 
   // Alpine-Daten der Seite im iframe (gleiche Herkunft): dort steckt der Zustand des Chips „Aktuell“.
@@ -25,15 +27,43 @@
     } catch (e) { /* Seite lädt noch */ }
     return null;
   }
+  function closeMenu() {
+    menu.hidden = true;
+    chip.setAttribute('aria-expanded', 'false');
+    const data = pageData();
+    if (data) data.refreshMenuOpen = false;
+  }
   function syncChip() {
     const data = dialog.open ? pageData() : null;
-    chip.hidden = !data;
-    if (!data) return;
+    chipWrap.hidden = !data;
+    if (!data) { closeMenu(); return; }
     chipText.textContent = data.refreshChipText();
     chip.classList.toggle('paused', !!data.refreshPause());
     chip.title = data.refreshChipTitle ? data.refreshChipTitle() : '';
+    if (!menu.hidden) {
+      menu.querySelector('.refresh-info').textContent = data.refreshInfo();
+      menu.querySelector('.refresh-state').textContent = data.refreshOn ? window.t('An') : window.t('Aus');
+    }
   }
-  chip.addEventListener('click', () => { const data = pageData(); if (data && data.refreshNow) data.refreshNow(); });
+  // Dasselbe Menü wie auf der Seite selbst: Info, jetzt aktualisieren, automatisch an/aus.
+  chip.addEventListener('click', () => {
+    const data = pageData();
+    if (!data) return;
+    const open = menu.hidden;
+    menu.hidden = !open;
+    chip.setAttribute('aria-expanded', String(open));
+    // Die Seite zählt das Alter nur bei offenem Menü hoch (refreshTick).
+    data.refreshMenuOpen = open;
+    if (open) data.refreshAge = Math.round((Date.now() - data._lastRefresh) / 1000);
+    syncChip();
+  });
+  menu.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-refresh]');
+    const data = pageData();
+    if (!row || !data) return;
+    if (row.dataset.refresh === 'now') { data.refreshNow(); closeMenu(); } else { data.refreshOn = !data.refreshOn; syncChip(); }
+  });
+  document.addEventListener('click', (e) => { if (!menu.hidden && !chipWrap.contains(e.target)) closeMenu(); });
   setInterval(syncChip, 1000);
 
   function withParams(href, params) {
@@ -60,7 +90,8 @@
 
   function closed() {
     frame.src = 'about:blank';
-    chip.hidden = true;
+    chipWrap.hidden = true;
+    menu.hidden = true;
     if (pushed) { pushed = false; if (history.state && history.state.zaTilePopup) history.back(); }
   }
 

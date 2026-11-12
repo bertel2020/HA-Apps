@@ -2748,5 +2748,6 @@ html[data-popup] .entity-purge-banner .pending-dot{margin-top:5px;}
 html[data-popup] .entity-purge-banner a,html[data-popup] .entity-purge-banner .purge-auto-note{display:none;}
 /* Titelzeile der Seite im Popup (Name, Aktuell-Chip, CSV, Anpassen) entfällt: Name und Chip stehen im Kopf des Popups. */
 html[data-popup] .chart-title-row:not(.chart-title-row-end),html[data-popup] .refresh-wrap{display:none !important;}
-.tile-popup-refresh[hidden]{display:none;}
+.tile-popup-refresh-wrap[hidden],.tile-popup-refresh-menu[hidden]{display:none;}
+.tile-popup-refresh-menu{z-index:5;}
 html[data-popup] .settings-panel > .toolbar{margin-top:0;}
