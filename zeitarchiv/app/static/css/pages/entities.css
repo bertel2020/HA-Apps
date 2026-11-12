@@ -511,7 +511,7 @@
 /* Auswahl-Kacheln der Übersicht (overview_tiles.py). Fläche, Schatten und Hover wie die Dashboard-
    Kacheln (dashboards.css): Farbverlauf-Kante oben, Symbol im getönten Quadrat, Titel, eine Infozeile.
    Das Raster bricht von selbst um (auto-fill), bei größerer Schrift also schon früher zweireihig. */
-.ov-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:22px;}
+.ov-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:-12px;margin-bottom:22px;}
 .ov-tile{--tc:var(--chart-1);--tc2:var(--chart-2);display:flex;flex-direction:column;padding:0;overflow:hidden;position:relative;
   text-decoration:none;color:inherit;background:var(--tile-wash), var(--surface);box-shadow:var(--shadow);
   transition:background .16s ease,border-color .16s ease;}
