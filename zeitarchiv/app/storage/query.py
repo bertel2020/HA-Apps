@@ -470,6 +470,19 @@ def _rollup_rows_from_table(table) -> list[rollup.FineRow]:
     present = [col for col in ("value", "min_value", "max_value", "on_seconds") if col in columns]
     bucket_starts = table.column("bucket_start").to_pylist()
     values_by_col = {col: table.column(col).to_pylist() for col in present}
+    # Die beiden Formen, die es in Wirklichkeit gibt (Messwert mit Min/Max, Zähler), ohne je Zeile ein Wörterbuch für
+    # FineRow(**kwargs) zu bauen: In der Vergleichstabelle sind das hunderttausende Zeilen je Aufruf.
+    if present == ["value", "min_value", "max_value"]:
+        fine_row = rollup.FineRow
+        return [
+            fine_row(bucket_start, value, low, high)
+            for bucket_start, value, low, high in zip(
+                bucket_starts, values_by_col["value"], values_by_col["min_value"], values_by_col["max_value"], strict=True,
+            )
+        ]
+    if present == ["value"]:
+        fine_row = rollup.FineRow
+        return [fine_row(bucket_start, value) for bucket_start, value in zip(bucket_starts, values_by_col["value"], strict=True)]
     rows = []
     for i, bucket_start in enumerate(bucket_starts):
         kwargs = {"bucket_start": bucket_start}

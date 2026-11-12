@@ -551,20 +551,20 @@ class WetterService:
             values = [row.value for row in rows if row.value is not None]
             if not values:
                 return None
-            highs = [
-                (row.max_value if row.max_value is not None else row.value, row.bucket_start)
+            # Gleichstand: erstes Auftreten, also die frühere Zeit. Höchstwert über (Wert, −Zeit): der größte Wert, bei
+            # Gleichstand die kleinste Zeit; Tiefstwert über (Wert, Zeit). Ohne Zwischenlisten und Schlüsselfunktion: bei
+            # einem Jahr Stundenzeilen je Zelle sind das sonst hunderttausende Aufrufe.
+            high = max(
+                (row.max_value if row.max_value is not None else row.value, -row.bucket_start)
                 for row in rows if row.value is not None
-            ]
-            lows = [
+            )
+            low = min(
                 (row.min_value if row.min_value is not None else row.value, row.bucket_start)
                 for row in rows if row.value is not None
-            ]
-            # Gleichstand: erstes Auftreten (min/max über (Wert, Zeit) nimmt die frühere Zeit).
-            high = max(highs, key=lambda pair: (pair[0], -pair[1]))
-            low = min(lows, key=lambda pair: (pair[0], pair[1]))
+            )
             return {
                 "avg": sum(values) / len(values),
-                "max": high[0], "max_ts": high[1],
+                "max": high[0], "max_ts": -high[1],
                 "min": low[0], "min_ts": low[1],
             }
         if kind == "sunshine":
@@ -654,8 +654,11 @@ class WetterService:
             elevation = elevation_at(row.bucket_start + 1800.0)
             if elevation is None:
                 continue
-            out.append(replace(
-                row, value=pct(row.value, elevation), min_value=pct(row.min_value, elevation), max_value=pct(row.max_value, elevation),
+            # Wie dataclasses.replace(row, value=…, min_value=…, max_value=…), nur ohne dessen Umweg über die Felderliste:
+            # bei Jahren von Stundenzeilen sind das zehntausende Aufrufe je Tabellenzelle.
+            out.append(rollup_mod.FineRow(
+                row.bucket_start, pct(row.value, elevation), pct(row.min_value, elevation), pct(row.max_value, elevation),
+                row.on_seconds, row.states,
             ))
         return out
 
@@ -737,6 +740,70 @@ class WetterService:
         first = datetime.fromtimestamp(entity["first_ts"], self.deps.tz).year
         return list(range((anchor or now_local).year - 1, first - 1, -1))
 
+    def _rows_for_windows(
+        self, entity_id: str, aggregation_type: str, spans: list[tuple[datetime, datetime]], now_local: datetime,
+        read_cache: query_mod.QueryReadCache,
+    ) -> list[list[rollup_mod.FineRow]]:
+        """Die Zeilen mehrerer Fenster derselben Entität, je Fenster wie ``_rows(start, end)``.
+
+        Die Spalten der Tabelle überlappen sich: Heute, Gestern und Monat liegen im Jahr, beim Vorjahr gilt dasselbe.
+        Statt jedes Fenster einzeln zu lesen, zu verdichten und aus Parquet in Python-Zeilen zu wandeln, wird je Gruppe
+        überlappender Fenster einmal das Gesamtfenster gelesen und daraus je Fenster der Ausschnitt nach Bucket-Beginn
+        geschnitten.
+
+        Das ist bei Messwerten und Zählern genau dasselbe wie die Einzelabfrage, wenn zwei Bedingungen gelten (und nur
+        dann wird gruppiert): Ein Bucket hängt nur von den Zeilen in ihm ab (Messwert) bzw. vom Wert davor (Zähler, im
+        Gesamtfenster derselbe wie der Randwert des Ausschnitts), also muss jedes Fenster auf einer Bucket-Grenze beginnen.
+        Und endet ein Fenster MITTEN in einem Bucket (jetzt, bzw. dasselbe Datum im Vorjahr), wird dieser letzte Bucket
+        aus Rohdaten bis zum Ende neu berechnet (siehe ``_fine_rows_until``); dann darf es nur mit Fenstern gruppiert
+        werden, die am selben Zeitpunkt enden, sonst käme der ganze Bucket aus dem Rollup. Bei Schaltern gilt das alles
+        nicht: Eine Einschaltdauer reicht über den Fensteranfang hinweg (der Zustand von davor zählt im Gesamtfenster mit,
+        im Ausschnitt nicht); sie werden weiter je Fenster gelesen."""
+        out: list[list[rollup_mod.FineRow]] = [[] for _ in spans]
+        if aggregation_type == "switch":
+            return [self._rows(entity_id, aggregation_type, start, end, now_local, read_cache) for start, end in spans]
+        key_fn = rollup_mod.named_bucket_key(self.deps.tz, rollup_mod.FINE_LEVEL[aggregation_type])
+
+        def aligned(moment: datetime) -> bool:
+            return key_fn(moment.timestamp()) >= moment
+
+        singles: list[int] = []
+        whole_end: list[int] = []  # Ende auf einer Bucket-Grenze: untereinander gruppierbar
+        by_cut: dict[float, list[int]] = {}  # Ende mitten im Bucket: nur Fenster mit demselben Ende
+        for i, (start, end) in enumerate(spans):
+            if not start < end or not aligned(start):
+                singles.append(i)
+            elif aligned(end):
+                whole_end.append(i)
+            else:
+                by_cut.setdefault(end.timestamp(), []).append(i)
+
+        merged: list[list[int]] = []  # überlappende Fenster mit Ende auf einer Bucket-Grenze
+        merged_end = None
+        for i in sorted(whole_end, key=lambda i: spans[i][0]):
+            if merged and merged_end is not None and spans[i][0] < merged_end:
+                merged[-1].append(i)
+                merged_end = max(merged_end, spans[i][1])
+            else:
+                merged.append([i])
+                merged_end = spans[i][1]
+        groups = [[i] for i in singles] + merged + list(by_cut.values())
+
+        for group in groups:
+            if len(group) == 1:
+                start, end = spans[group[0]]
+                out[group[0]] = self._rows(entity_id, aggregation_type, start, end, now_local, read_cache)
+                continue
+            total = self._rows(
+                entity_id, aggregation_type, min(spans[i][0] for i in group), max(spans[i][1] for i in group),
+                now_local, read_cache,
+            )
+            stamps = [row.bucket_start for row in total]
+            for i in group:
+                start, end = spans[i]
+                out[i] = total[bisect.bisect_left(stamps, start.timestamp()):bisect.bisect_left(stamps, end.timestamp())]
+        return out
+
     def compute_table(self, body: TableRequest, now_local: datetime | None = None) -> dict:
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
@@ -756,23 +823,32 @@ class WetterService:
             entity = self.deps.index.get_entity(spec["entity_id"])
             first_ts = entity["first_ts"] if entity else None
             cells: dict[str, dict] = {}
-            for win in windows:
-                cell: dict = {}
+            # Die Sonnenscheindauer liest die Stundenmittel eines Messwerts (kind „sunshine“ ist nur die Anzeigeart).
+            aggregation = "standard" if spec["kind"] == "sunshine" else spec["kind"]
+            jobs = [
+                (win, side, start, end)
+                for win in windows
                 for side, start, end in (
                     ("cur", win["start"], win["end"]),
                     *((("vj", win["vj_start"], win["vj_end"]),) if body.vorjahr else ()),
-                ):
-                    # Die Sonnenscheindauer liest die Stundenmittel eines Messwerts (kind „sunshine“ ist nur die Anzeigeart).
-                    aggregation = "standard" if spec["kind"] == "sunshine" else spec["kind"]
-                    rows = self._rows(spec["entity_id"], aggregation, start, end, now_local, read_cache)
-                    cell[side] = self.summarize(
-                        spec["kind"], rows, config, held_off=bool(first_ts and first_ts < start.timestamp()),
-                        unit=spec["unit"], until=min(end.timestamp(), now_local.timestamp()),
-                    )
-                    # Fehlende Daten sind kein 0: Beginn des Archivs mitgeben, wenn er im Fenster liegt.
-                    if cell[side] is None and first_ts and first_ts > start.timestamp():
-                        cell[f"{side}_from"] = first_ts
-                cells[win["key"]] = cell
+                )
+            ]
+            # Heute, gestern, Monat und Jahr überlappen sich (ebenso die Vorjahrespartner): ein Lesen je Gruppe statt je Zelle.
+            window_rows = self._rows_for_windows(
+                spec["entity_id"], aggregation, [(start, end) for _win, _side, start, end in jobs], now_local, read_cache,
+            )
+            cell_of: dict[str, dict] = {}
+            for (win, side, start, end), rows in zip(jobs, window_rows, strict=True):
+                cell = cell_of.setdefault(win["key"], {})
+                cell[side] = self.summarize(
+                    spec["kind"], rows, config, held_off=bool(first_ts and first_ts < start.timestamp()),
+                    unit=spec["unit"], until=min(end.timestamp(), now_local.timestamp()),
+                )
+                # Fehlende Daten sind kein 0: Beginn des Archivs mitgeben, wenn er im Fenster liegt.
+                if cell[side] is None and first_ts and first_ts > start.timestamp():
+                    cell[f"{side}_from"] = first_ts
+            for win in windows:
+                cells[win["key"]] = cell_of.get(win["key"], {})
             rows_out.append({**spec, "cells": cells})
             if spec["key"] == "temperature" and "kenntage" not in hidden:
                 rows_out.append(self._kenntage_row(spec, windows, body.vorjahr, now_local, read_cache))
