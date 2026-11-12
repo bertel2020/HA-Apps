@@ -2458,7 +2458,7 @@ footer{margin-top:20px;font-family:var(--font-mono);font-size:calc(11px * var(--
 /* Die Reiterzeile selbst kommt aus app.css (.entity-tabs); hier nur, was eine Schaltfläche statt eines Links braucht. */
 button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
 /* Karten wie im Energiedashboard (.edash-card): 12 px Rundung, 16×18 Innenabstand, leichter Schatten, Titel 14 px. */
-.wt-card{padding:16px 18px;border-radius:12px;box-shadow:var(--shadow);}
+.wt-card{padding:16px 18px;border-radius:12px;box-shadow:var(--shadow),var(--tile-lift);}
 .wt-card ~ .wt-card{margin-top:16px;}
 .wt-h2{font-size:calc(14px * var(--font-scale, 1));font-weight:600;margin:0;flex:1 1 220px;}
 .wt-card-head{justify-content:space-between;}

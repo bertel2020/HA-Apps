@@ -109,7 +109,7 @@
      Ruhezustand flach und heben sich erst beim Überfahren
      (transform + box-shadow, siehe .edash-kpi:hover) — ein Ruheschatten nähme
      genau dieser Reaktion ihre Wirkung. */
-  .edash-card{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:16px 18px;min-width:0;box-shadow:var(--shadow);}
+  .edash-card{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:16px 18px;min-width:0;box-shadow:var(--shadow),var(--tile-lift);}
   .edash-card.edash-span3{grid-column:span 3;}
   .edash-card.edash-span2{grid-column:span 2;}
   /* Autarkie & Speicher stand früher zusammen mit Verbraucheranteile in
