@@ -172,7 +172,9 @@ def test_recommended_new_rows_are_prechecked_locked_ones_and_more_are_not(topic)
     result = selection_suggest.suggest(topic, catalog, archived={"weather.b"})
     for group in result["recommended"]:
         for row in group["rows"]:
-            assert row["checked"] is (row["status"] == "new")
+            # Ohne Vorauswahl bleiben die sensiblen Themen und Batterien; Energie hakt nur Rollen aus dem Energie-Dashboard.
+            wanted = row["status"] == "new" and topic not in selection_suggest.NO_PRECHECK
+            assert row["checked"] is (wanted and (topic != "energie" or row["reason"].startswith("Im Energie-Dashboard")))
     for group in result["more"]:
         assert all(row["checked"] is False for row in group["rows"])
 
@@ -386,3 +388,24 @@ def test_rows_without_a_device_are_never_collapsed() -> None:
     rows = [_row("binary_sensor.x", "X", device_class="door", platform="a"), _row("binary_sensor.y", "Y", device_class="door", platform="b")]
     rec, _more, _ = _rows("tueren_fenster", rows)
     assert len(rec) == 2
+
+
+# ---- Vorauswahl (Maßnahme 3) -----------------------------------------------------------------
+
+@pytest.mark.parametrize("topic", ["tueren_fenster", "anwesenheit", "batterien"])
+def test_sensitive_and_battery_topics_preselect_nothing(topic) -> None:
+    rows = {
+        "tueren_fenster": [_row("binary_sensor.haustuer", "Haustür", device_class="door")],
+        "anwesenheit": [_row("person.anna", "Anna")],
+        "batterien": [_row("sensor.batt", "Batt", device_class="battery", unit="%")],
+    }[topic]
+    result = selection_suggest.suggest(topic, rows, set())
+    row = result["recommended"][0]["rows"][0]
+    assert row["status"] == "new" and row["checked"] is False
+    assert result["precheck"] is False and result["counts"]["checked"] == 0 and result["counts"]["recommended_new"] == 1
+
+
+def test_other_topics_still_preselect_new_recommended_rows() -> None:
+    rows = [_row("sensor.bad_temperatur", "Bad Temperatur", device_class="temperature", area="Bad")]
+    result = selection_suggest.suggest("klima", rows, set())
+    assert result["recommended"][0]["rows"][0]["checked"] is True and result["counts"]["checked"] == 1

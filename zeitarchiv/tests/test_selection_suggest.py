@@ -135,3 +135,14 @@ def test_device_branch_needs_a_source_device_with_exactly_one_power_value() -> N
     rec = {r["entity_id"] for g in result["recommended"] for r in g["rows"]}
     assert "sensor.zaehler_p" in rec  # Quelle mit genau einem Leistungswert
     assert not rec & {"sensor.inv_p1", "sensor.inv_p2", "sensor.wp_p"}  # Teilwerte und Verbraucher nur weitere Treffer
+
+
+def test_energy_preselects_only_the_roles_from_the_energy_dashboard() -> None:
+    rows = [
+        _energy("sensor.netz_bezug", "Netzbezug", device="Zähler", energy_role="grid_import"),
+        _row("sensor.zaehler_p", "Zähler Leistung", device="Zähler", device_class="power", unit="W", state_class="measurement"),
+    ]
+    result = selection_suggest.suggest("energie", rows, set())
+    checked = {r["entity_id"]: r["checked"] for g in result["recommended"] for r in g["rows"]}
+    assert checked == {"sensor.netz_bezug": True, "sensor.zaehler_p": False}
+    assert result["counts"]["recommended_new"] == 2 and result["counts"]["checked"] == 1

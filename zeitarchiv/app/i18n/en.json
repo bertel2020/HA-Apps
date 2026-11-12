@@ -3920,7 +3920,8 @@
     "Tür oder Fenster eines Fahrzeugs": "Door or window of a vehicle",
     "Tür eines Hausgeräts": "Door of an appliance",
     "Erkennung einer Kamera oder eines Geräts, keine Person im Haus": "Detection by a camera or device, not a person at home",
-    "Doppelt: dieselbe Entität kommt auch über {platform}": "Duplicate: the same entity also comes via {platform}"
+    "Doppelt: dieselbe Entität kommt auch über {platform}": "Duplicate: the same entity also comes via {platform}",
+    "Hier ist nichts vorausgewählt. Markiere, was archiviert werden soll.": "Nothing is preselected here. Mark what should be archived."
   },
   "js": {
     "Fixierung aufheben und das Dashboard bearbeiten?": "Unlock this dashboard and edit it?",

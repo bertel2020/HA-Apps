@@ -115,7 +115,9 @@ def suggest_energy(entities: Iterable[dict[str, Any]], archived: Collection[str]
             continue
         if row.get("entity_category") == "diagnostic" and bucket is recommended and role not in _ENERGY_ROLES:
             bucket = more
-        bucket.append(suggestion(row, reason, archived, high_rate=power or role == "grid_power"))
+        sug = suggestion(row, reason, archived, high_rate=power or role == "grid_power")
+        sug["core"] = role in _ENERGY_ROLES  # nur die Rollen aus dem Energie-Dashboard sind vorangehakt
+        bucket.append(sug)
     collapse_duplicates(recommended, more)
     return result("energie", recommended, more, derived)
 
@@ -146,6 +148,11 @@ def suggestion(row: dict[str, Any], reason: str, archived: Collection[str], *, h
     }
 
 
+#: Themen ohne Vorauswahl: sensible Themen (Türen, Anwesenheit) und Batterien (viele Geräte, selten alle gewollt).
+#: Die Zeilen stehen trotzdem unter „Empfohlen“, markiert wird bewusst selbst.
+NO_PRECHECK = frozenset({"batterien", "tueren_fenster", "anwesenheit"})
+
+
 def collapse_duplicates(recommended: list[dict[str, Any]], more: list[dict[str, Any]]) -> None:
     """Dasselbe Gerät über zwei Integrationen (z. B. ``eltako`` und ``enocean_eltako``): nur eine Zeile bleibt empfohlen.
 
@@ -171,17 +178,20 @@ def collapse_duplicates(recommended: list[dict[str, Any]], more: list[dict[str, 
 
 
 def result(topic: str, recommended: list[dict], more: list[dict], derived: int) -> dict[str, Any]:
+    precheck = topic not in NO_PRECHECK
     for row in recommended:
-        row["checked"] = row["status"] == "new"
+        row["checked"] = precheck and row["status"] == "new" and row.get("core", True)
     for row in more:
         row["checked"] = False
     return {
         "topic": topic,
+        "precheck": precheck,
         "recommended": _grouped(recommended),
         "more": _grouped(more),
         "counts": {
             "recommended": len(recommended),
             "recommended_new": sum(1 for r in recommended if r["status"] == "new"),
+            "checked": sum(1 for r in recommended if r["checked"]),
             "more": len(more),
             "derived": derived,
             "found": len(recommended) + len(more) + derived,

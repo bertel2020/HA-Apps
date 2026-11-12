@@ -110,6 +110,7 @@
       {% else %}
       <h2>{{ _("Vorschläge für deine Dashboards") if is_dashboards else _("Empfohlen") }} <span class="sel-n">{{ result.recommended|map(attribute='rows')|map('length')|sum }}</span></h2>
       {% if result.recommended %}
+      {% if not result.precheck and can_apply %}<p class="sel-meta">{{ _("Hier ist nichts vorausgewählt. Markiere, was archiviert werden soll.") }}</p>{% endif %}
       {% set sel_groups = result.recommended %}
       {% include "_selection_table.html" %}
       {% elif is_dashboards %}
@@ -144,7 +145,7 @@
       <div class="sel-footer">
         <div class="sel-footer-info">
           <p class="sel-footer-counts">
-            <span class="sel-footer-marked"><b id="sel-checked">{{ result.counts.recommended_new if can_apply else 0 }}</b> {{ _("markiert") }}</span>
+            <span class="sel-footer-marked"><b id="sel-checked">{{ result.counts.checked if can_apply else 0 }}</b> {{ _("markiert") }}</span>
             <span class="sel-footer-stats">
               <span><b>{{ counts.new }}</b> {{ _("neu") }}</span>
               <span><b>{{ counts.archived + counts.selected }}</b> {{ _("schon archiviert oder ausgewählt") }}</span>

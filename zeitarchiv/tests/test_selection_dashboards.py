@@ -113,3 +113,20 @@ def test_selection_template_renders_the_table_with_group_boxes() -> None:
     script = (root / "static" / "js" / "pages" / "selection.js").read_text(encoding="utf-8")
     assert 'class="sel-group-all"' in table and "<thead>" in table
     assert "sel-group-all" in script
+
+
+def test_topic_without_preselection_says_so_and_starts_with_zero_marked(client) -> None:
+    import os
+
+    from app import selection_catalog
+
+    data_dir = Path(os.environ["ZEITARCHIV_DATA_DIR"])
+    door = {"entity_id": "binary_sensor.haustuer", "domain": "binary_sensor", "name": "Haustür", "device_class": "door"}
+    selection_catalog.save(data_dir, [door], phase1=True)
+    try:
+        page = client.get("/selection?topic=tueren_fenster").text
+        assert "Hier ist nichts vorausgewählt" in page
+        assert '<b id="sel-checked">0</b>' in page and 'value="binary_sensor.haustuer"' in page
+        assert " checked" not in page.split('value="binary_sensor.haustuer"')[1].split(">")[0]
+    finally:
+        (data_dir / selection_catalog.FILENAME).unlink(missing_ok=True)
