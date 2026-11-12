@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="{{ asset('css/pages/entity_categories.css') }}">
 {% endblock %}
 {% block content %}
-  <div class="page">
+  <div class="page page-wide page-head-wide">
     <h1>{{ _("Entitäten") }}</h1>
     <p class="sub">{{ _("Kategorien ordnen die Entitäten nach Thema, zum Beispiel Wärmepumpe oder Solar. Die Reihenfolge hier ist die Sortierung in der Liste.") }}</p>
     {% with active = 'kategorien' %}{% include "_entities_tabs.html" %}{% endwith %}
