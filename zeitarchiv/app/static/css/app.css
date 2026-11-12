@@ -2755,3 +2755,5 @@ html[data-popup] .chart-title-row:not(.chart-title-row-end),html[data-popup] .re
 .tile-popup-refresh-wrap[hidden],.tile-popup-refresh-menu[hidden]{display:none;}
 .tile-popup-refresh-menu{z-index:5;}
 html[data-popup] .settings-panel > .toolbar{margin-top:0;}
+/* Energie- und Wetterdashboard: derselbe Abstand unter der Topnav wie die Titelleiste der Dashboards (16 statt 28 px). */
+#energiedashboard-root,#wetter-root{margin-top:-12px;}
