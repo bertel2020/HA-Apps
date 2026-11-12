@@ -2741,3 +2741,8 @@ html[data-popup] .chart-title-row-end > .period-label{display:none !important;}
   .tile-popup-edit{order:3;flex:1 1 100%;text-align:center;}
   .tile-popup-foot span{display:none;}
 }
+/* Im Kachel-Popup nur die Kernaussage, einzeilig: ohne die Links (sie führen aus der Ansicht heraus)
+   und ohne den Hinweis zur automatischen Bereinigung. */
+html[data-popup] .entity-purge-banner{padding:6px 10px;gap:8px;font-size:calc(13px * var(--font-scale, 1));}
+html[data-popup] .entity-purge-banner .pending-dot{margin-top:5px;}
+html[data-popup] .entity-purge-banner a,html[data-popup] .entity-purge-banner .purge-auto-note{display:none;}

@@ -59,3 +59,8 @@ def test_only_value_chart_and_table_tiles_open_the_popup() -> None:
     assert "a.dtile-body[href]" in js
     assert ".dtile-entity" in js and 'data-item-type="chart"' in js and 'data-item-type="table"' in js
     assert "cleanup" not in js
+
+
+def test_popup_shortens_the_purge_banner_and_drops_its_links() -> None:
+    css = (APP / "static" / "css" / "app.css").read_text()
+    assert "html[data-popup] .entity-purge-banner a,html[data-popup] .entity-purge-banner .purge-auto-note{display:none;}" in css
