@@ -290,7 +290,7 @@
      dass Zeilen darunter ohne Scrollen sichtbar bleiben. */
   .edash-tile-dialog{width:min(640px,calc(100vw - 32px));padding:16px;}
   .edash-tile-dialog .detail-dialog-header{align-items:flex-start;margin-bottom:8px;}
-  .edash-tile-dialog .detail-dialog-header .btn{padding:0;width:26px;height:26px;border-radius:50%;line-height:1;flex:none;}
+  .edash-tile-dialog .detail-dialog-header .btn{padding:0;width:30px;height:30px;border-radius:50%;line-height:1;flex:none;}
   .edash-tile-sub{margin:2px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
   .edash-tile-chart{height:270px;width:100%;}
   .edash-tile-modes{display:flex;width:fit-content;margin-left:auto;gap:4px;background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;padding:3px;margin-bottom:8px;}

@@ -350,7 +350,7 @@
         <h2 id="tile-dialog-title" x-text="tile.title"></h2>
         <p class="edash-tile-sub" x-text="periodText"></p>
       </div>
-      <form method="dialog"><button class="btn" aria-label="{{ _('Dialog schließen') }}">×</button></form>
+      <form method="dialog"><button class="btn" aria-label="{{ _('Dialog schließen') }}">✕</button></form>
     </div>
     <div class="edash-tile-modes" x-show="tileHasModes()" role="group" aria-label="{{ _('Ansicht') }}">
       <button type="button" :class="{'is-active': tile.mode === 'bar'}" :aria-pressed="tile.mode === 'bar'" @click="setTileMode('bar')">{{ _("Balken") }}</button>
