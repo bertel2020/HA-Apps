@@ -196,7 +196,10 @@
                       <div class="tbl-group-wrap tbl-value-picker" x-show="row.row_type === 'group'" @click.outside="row.pickerOpen = false">
                         <button type="button" class="tbl-group-btn" @click="row.pickerOpen = !row.pickerOpen"
                                 x-text="row.entity_ids.length ? (row.entity_ids.length === 1 ? t('1 Entität ausgewählt') : t('{count} Entitäten ausgewählt', {count: row.entity_ids.length})) : t('Entitäten wählen …')"></button>
-                        <div class="tbl-group-popover" x-show="row.pickerOpen" x-cloak>
+                        {# x-if statt x-show: die Liste aller Entitäten wird nur für das gerade geöffnete Popover gebaut,
+                           nicht für jede Gruppenzeile ständig mit (Öffnen des Editors, siehe CHANGELOG_INTERNAL). #}
+                        <template x-if="row.pickerOpen">
+                        <div class="tbl-group-popover">
                           <input type="search" placeholder="{{ _('Suchen …') }}" x-model="row.search">
                           {% for opt in entity_options %}
                           <label class="tbl-group-row" x-show='!row.search || {{ (opt.label ~ " " ~ opt.entity_id) | lower | tojson }}.includes(row.search.toLowerCase())'>
@@ -207,6 +210,7 @@
                           </label>
                           {% endfor %}
                         </div>
+                        </template>
                       </div>
 
                       <!-- Platzhalter, damit das Beschriftungsfeld in JEDER Zeile an
