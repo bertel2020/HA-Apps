@@ -31,6 +31,7 @@ def test_popup_mode_drops_topnav_and_marks_the_page(client) -> None:
     assert " data-popup" in popup.split("<body", 1)[0]
     assert "page-sticky-header" not in popup
     assert "zaPopupClose" in popup
+    assert "vendor/alpine.min.js" in popup  # sonst kommt Alpine nur über die fehlende Topnav
 
 
 def test_chart_page_shows_period_bar_when_embedded_and_hides_the_edit_button() -> None:
@@ -44,11 +45,13 @@ def test_entity_page_hides_header_facts_and_tabs_in_popup() -> None:
     assert html.count("popup-hide") >= 3
 
 
-def test_dashboard_has_the_dialog_and_loads_the_script() -> None:
-    html = template_text("dashboard_detail.html")
-    assert '<dialog id="tile-popup"' in html
-    assert "js/tile-popup.js" in html
-    assert "tile-popup-edit" in html
+def test_both_dashboard_pages_include_the_dialog_and_load_the_script() -> None:
+    dialog = template_text("_tile_popup.html")
+    assert '<dialog id="tile-popup"' in dialog and "tile-popup-edit" in dialog
+    for name in ("dashboard_detail.html", "entities.html"):  # Übersicht und eigene Dashboards
+        html = template_text(name)
+        assert '{% include "_tile_popup.html" %}' in html, name
+        assert "js/tile-popup.js" in html, name
 
 
 def test_only_value_chart_and_table_tiles_open_the_popup() -> None:

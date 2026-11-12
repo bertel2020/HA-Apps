@@ -27,16 +27,7 @@
     </div>
   </div>
 
-  {# Verlaufs-Popup der Kacheln (tile-popup.js): nur lesend, „Bearbeiten“ führt auf die bisherige Seite. #}
-  <dialog id="tile-popup" class="tile-popup" aria-labelledby="tile-popup-title">
-    <div class="tile-popup-head">
-      <h2 class="tile-popup-title" id="tile-popup-title"></h2>
-      <a class="btn btn-primary tile-popup-edit" href="#">{{ _("Bearbeiten") }}</a>
-      <button type="button" class="btn tile-popup-close" aria-label="{{ _('Schließen') }}">✕</button>
-    </div>
-    <iframe class="tile-popup-frame" title="{{ _('Verlauf') }}" src="about:blank"></iframe>
-    <div class="tile-popup-foot"><span>{{ _("Zeitraum nur für dieses Popup, das Dashboard bleibt unverändert.") }}</span><a class="tile-popup-page" href="#">{{ _("Als Seite öffnen") }} ↗</a></div>
-  </dialog>
+  {% include "_tile_popup.html" %}
 
   <script src="{{ asset('vendor/htmx.min.js') }}"></script>
   <script src="{{ asset('vendor/echarts.min.js') }}"></script>

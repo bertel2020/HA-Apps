@@ -59,6 +59,8 @@
     </div>
   </div>
 
+  {% include "_tile_popup.html" %}
+
   <script src="{{ asset('vendor/htmx.min.js') }}"></script>
   <script src="{{ asset('vendor/echarts.min.js') }}"></script>
   <script src="{{ asset('js/confirm-dialog.js') }}"></script>
@@ -75,4 +77,5 @@
   <script src="{{ asset('js/chart-tile-render.js') }}"></script>
   <script src="{{ asset('js/legend-render.js') }}"></script>
   <script src="{{ asset('js/dashboard-tiles.js') }}"></script>
+  <script src="{{ asset('js/tile-popup.js') }}"></script>
 {% endblock %}
