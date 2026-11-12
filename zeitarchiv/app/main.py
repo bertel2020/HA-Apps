@@ -4582,6 +4582,9 @@ MAX_TABLE_ROW_LABEL_LENGTH = 30
 class _TableRowBody(BaseModel):
     label: str
     row_type: str
+    # Fester Zeilen-Buchstabe, auf den Formeln verweisen (table_letters.py). Leer: der Server vergibt
+    # den kleinsten freien — so bleiben ältere Aufrufer ohne das Feld gültig.
+    letter: str = Field("", pattern=r"^[A-Z]?$")
     entity_ids: list[EntityId] = []
     formula: str = ""
     formula_unit: str = ""

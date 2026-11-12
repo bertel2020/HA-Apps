@@ -64,6 +64,13 @@
   - „Verwendet in“ öffnet das Standard-Dashboard jetzt als Übersicht, wie die
     Navigation
 
+- **Tabellen**: Zeilen behalten ihren Buchstaben
+  - Beim Verschieben oder Löschen ändern sich die Buchstaben der anderen Zeilen
+    nicht mehr, Formeln wie „A / B“ bleiben unverändert gültig
+  - Eine neue Zeile bekommt den kleinsten freien Buchstaben; Buchstaben, auf
+    die noch eine Formel zeigt, werden nicht neu vergeben
+  - Bestehende Tabellen behalten ihre bisherigen Buchstaben
+
 ### Geändert
 
 - **Wetterdashboard**
@@ -149,6 +156,13 @@
     top, even if the browser does not report the originating page
   - “Used in” now opens the default dashboard as the overview, like the
     navigation
+
+- **Tables**: Rows keep their letter
+  - Moving or deleting rows no longer changes the letters of the other rows,
+    formulas such as “A / B” stay valid
+  - A new row gets the smallest free letter; letters a formula still points to
+    are not reused
+  - Existing tables keep their current letters
 
 #### Changed
 

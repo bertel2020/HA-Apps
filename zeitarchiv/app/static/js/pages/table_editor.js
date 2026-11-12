@@ -181,17 +181,14 @@
     // kein manuelles insertBefore), nur vertikal (Zeilen untereinander statt
     // Karten nebeneinander): Reihenfolge-Vergleich per rect.top/height-
     // Mittelpunkt statt rect.left/width. Anders als bei Spalten wird beim
-    // Loslassen zusätzlich correctFormulaLetters() aufgerufen — sie
-    // korrigiert die Buchstaben-Referenzen in Formel-Zeilen anhand der beim
-    // Start des Ziehens gemerkten alten Zuordnung, genau wie moveRow() per
-    // Pfeil-Buttons — und danach neu geladen.
+    // Loslassen neu geladen. Die Buchstaben bleiben an ihren Zeilen
+    // (row.letter), die Formeln müssen beim Umsortieren nicht angefasst werden.
     function setupRowDrag() {
       const container = document.getElementById('tbl-rows');
       if (!container || container.dataset.dragBound) return;
       container.dataset.dragBound = '1';
       let draggedUid = null;
       let draggedEl = null;
-      let oldLetterToUid = null;
       // Siehe Kommentar zu handleGrabbed in setupColumnDrag() oben —
       // event.target ist bei dragstart selbst nicht der angeklickte
       // Kindknoten, deshalb per mousedown vormerken.
@@ -210,8 +207,6 @@
         card.classList.add('dragging');
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', draggedUid || '');
-        const pageData = Alpine.$data(document.querySelector('.page'));
-        oldLetterToUid = pageData.snapshotRowLetters();
       });
       container.addEventListener('dragover', e => {
         if (!draggedUid) return;
@@ -232,14 +227,9 @@
       });
       container.addEventListener('dragend', () => {
         if (draggedEl) draggedEl.classList.remove('dragging');
-        if (draggedUid && oldLetterToUid) {
-          const pageData = Alpine.$data(document.querySelector('.page'));
-          pageData.correctFormulaLetters(oldLetterToUid);
-          pageData.load();
-        }
+        if (draggedUid) Alpine.$data(document.querySelector('.page')).load();
         draggedEl = null;
         draggedUid = null;
-        oldLetterToUid = null;
       });
     }
 
@@ -322,16 +312,23 @@
         colNumberPositions: {},  // col.uid -> {left, width} in px, aus der echten Tabelle gemessen
         numbersTrackWidth: 0,  // Gesamtbreite der Tabelle — Breite von .tbl-numbers-track
 
-        // Buchstaben-Zuordnung bewusst über ALLE Zeilen (auch ausgeblendete)
-        // — sonst würde eine Formel, die auf eine versteckte Hilfszeile
-        // verweist, bei jedem Ausblenden ihre Referenz verlieren.
+        // Fester Buchstabe je Zeile (row.letter), auch bei ausgeblendeten Zeilen — sonst würde eine Formel, die auf
+        // eine versteckte Hilfszeile verweist, bei jedem Ausblenden ihre Referenz verlieren. Der Buchstabe bleibt
+        // beim Verschieben; Trennlinien haben keinen.
         get rowLetters() {
           const m = {};
-          let dataIndex = 0;
-          this.rows.forEach(r => {
-            m[r.uid] = r.row_type === 'separator' ? null : String.fromCharCode(65 + ((dataIndex++) % 26));
-          });
+          this.rows.forEach(r => { m[r.uid] = (r.row_type === 'separator' || !r.letter) ? null : r.letter; });
           return m;
+        },
+        // Kleinster freier Buchstabe für eine neue Zeile. Auch Buchstaben, auf die noch eine Formel verweist (z. B.
+        // nach dem Löschen der Zeile), werden nicht neu vergeben — sonst zeigte die Formel still auf die neue Zeile.
+        nextFreeLetter() {
+          const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+          const used = new Set(this.rows.map(r => r.letter).filter(Boolean));
+          const referenced = new Set();
+          this.rows.forEach(r => { if (r.row_type === 'formula') (r.formula || '').toUpperCase().replace(/[A-Z]/g, ch => referenced.add(ch)); });
+          const free = letters.split('').filter(ch => !used.has(ch));
+          return free.find(ch => !referenced.has(ch)) || free[0] || '';
         },
 
         get visibleColumnCount() {
@@ -513,7 +510,8 @@
         duplicateRow(rowUid) {
           const index = this.rows.findIndex(r => r.uid === rowUid);
           if (index < 0) return;
-          this.rows.splice(index + 1, 0, {...this.rows[index], uid: uid()});
+          const source = this.rows[index];
+          this.rows.splice(index + 1, 0, {...source, uid: uid(), letter: source.row_type === 'separator' ? '' : this.nextFreeLetter()});
           this.load();
         },
         // Verschiebt eine Spalte um eine Position nach links (-1) oder rechts
@@ -538,12 +536,16 @@
             uid: uid(), label: '', row_type: type, entity_ids: [], formula: '', formula_unit: '',
             aggregation: type === 'summary' ? 'sum' : 'auto', bold: false, hidden: false, show_label: false,
             accent: false, percent_of_total: false, hide_if_empty: false, hide_line: false, ...(extra || {}),
+            letter: type === 'separator' ? '' : this.nextFreeLetter(),
             pickerOpen: false, typePickerOpen: false, aggPickerOpen: false, optsPickerOpen: false, search: '',
           });
           this.load();
         },
         setRowType(row, type) {
           row.row_type = type;
+          // Trennlinien haben keinen Buchstaben; wird eine daraus zur Datenzeile, bekommt sie einen neuen.
+          if (type === 'separator') row.letter = '';
+          else if (!row.letter) row.letter = this.nextFreeLetter();
           if (type === 'entity') row.entity_ids = row.entity_ids.slice(0, 1);
           if (type === 'separator') {
             row.label = '';
@@ -564,41 +566,9 @@
           const index = this.rows.findIndex(r => r.uid === rowUid);
           const target = index + direction;
           if (index < 0 || target < 0 || target >= this.rows.length) return;
-          const oldLetterToUid = this.snapshotRowLetters();
           const [row] = this.rows.splice(index, 1);
           this.rows.splice(target, 0, row);
-          this.correctFormulaLetters(oldLetterToUid);
           this.load();
-        },
-        // Buchstabe→UID-Momentaufnahme der aktuellen Reihenfolge, vor einer
-        // Umsortierung zu ziehen (von moveRow() per Pfeil-Button UND von
-        // setupRowDrag() bei dragstart genutzt) — Grundlage für
-        // correctFormulaLetters() danach.
-        snapshotRowLetters() {
-          const letterToUid = {};
-          Object.entries(this.rowLetters).forEach(([rowUid, letter]) => {
-            if (letter) letterToUid[letter] = rowUid;
-          });
-          return letterToUid;
-        },
-        // Korrigiert die Buchstaben-Referenzen (A/B/C …) in Formel-Zeilen
-        // nach einer Umsortierung von this.rows: die Buchstaben sind rein
-        // positionsabhängig (rowLetters-Getter), eine Formel wie "A/B"
-        // speichert aber nur den Buchstaben, nicht die referenzierte Zeile
-        // selbst — ohne diese Korrektur würde eine Formel nach dem
-        // Umsortieren stillschweigend eine ANDERE Zeile referenzieren als
-        // vorher gemeint. oldLetterToUid ist die vor der Umsortierung per
-        // snapshotRowLetters() gezogene Momentaufnahme.
-        correctFormulaLetters(oldLetterToUid) {
-          const newLetterOfUid = this.rowLetters;
-          this.rows.forEach(r => {
-            if (r.row_type !== 'formula' || !r.formula) return;
-            r.formula = r.formula.replace(/[A-Za-z]/g, ch => {
-              const referencedUid = oldLetterToUid[ch.toUpperCase()];
-              if (!referencedUid) return ch;
-              return newLetterOfUid[referencedUid] || ch;
-            });
-          });
         },
         removeRow(rowUid) {
           this.rows = this.rows.filter(r => r.uid !== rowUid);
@@ -811,7 +781,7 @@
             hidden: !!c.hidden, in_sum: c.in_sum !== false,
           }));
           const plainRows = this.rows.map(r => ({
-            row_type: r.row_type, entity_ids: r.entity_ids, formula: r.formula,
+            letter: r.letter || '', row_type: r.row_type, entity_ids: r.entity_ids, formula: r.formula,
             formula_unit: r.formula_unit || '', aggregation: r.aggregation || 'auto',
             percent_of_total: !!r.percent_of_total,
           }));
@@ -918,7 +888,7 @@
           if (!this._computedValues) { this.rowSums = {}; this.sumOverlapping = false; return; }
           const cols = this.columns.map(c => ({hidden: !!c.hidden, in_sum: c.in_sum !== false}));
           const rows = this.rows.map(r => ({
-            row_type: r.row_type, formula: r.formula, formula_unit: r.formula_unit || '',
+            letter: r.letter || '', row_type: r.row_type, formula: r.formula, formula_unit: r.formula_unit || '',
             aggregation: r.aggregation || 'auto', percent_of_total: !!r.percent_of_total,
           }));
           const sums = TableCompute.computeRowSums(cols, rows, this._computedValues, this._summable);
@@ -978,7 +948,7 @@
               width: c.width || null, in_sum: c.in_sum !== false,
             })),
             rows: this.rows.map(r => ({
-              label: this.resolvedRowLabel(r), row_type: r.row_type,
+              label: this.resolvedRowLabel(r), row_type: r.row_type, letter: r.row_type === 'separator' ? '' : (r.letter || ''),
               entity_ids: (r.row_type === 'separator' || r.row_type === 'summary') ? [] : r.entity_ids,
               formula: (r.row_type === 'separator' || r.row_type === 'summary') ? '' : r.formula,
               formula_unit: r.row_type === 'formula' ? (r.formula_unit || '').trim() : '',
@@ -1139,6 +1109,11 @@
         },
 
         init() {
+          // Zeilen ohne Buchstaben (Vorbelegung ohne Buchstaben, mehr als 26 Datenzeilen) bekommen der Reihe nach den
+          // kleinsten freien — dieselbe Regel wie assign_row_letters() im Server, ergibt also A, B, C … wie bisher.
+          const taken = new Set(this.rows.map(r => r.letter).filter(Boolean));
+          const free = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').filter(ch => !taken.has(ch));
+          this.rows.forEach(r => { if (r.row_type !== 'separator' && !r.letter) r.letter = free.shift() || ''; });
           this.load();
           if (TABLE_ID) {
             this._refreshTimer = setInterval(() => this.refreshTick(), 1000);
