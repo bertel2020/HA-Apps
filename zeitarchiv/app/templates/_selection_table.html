@@ -1,0 +1,22 @@
+{# Vorschlagstabelle des Auswahl-Assistenten. Erwartet `sel_groups`: Liste aus
+   {name, rows}; `name` leer = keine Zwischenüberschrift. #}
+<div class="tbl-wrap sel-table-wrap">
+<table class="dt sel-table" data-cards="off">
+  <thead><tr>
+    <th class="sel-col-check"></th>
+    <th class="sel-col-entity">{{ _("Entität") }}</th>
+    <th class="sel-col-kind">{{ _("Art") }}</th>
+    <th class="sel-col-state">{{ _("Status") }}</th>
+  </tr></thead>
+  <tbody>
+  {% for group in sel_groups %}
+  {% if group.name %}
+  <tr class="sel-group-row"><th scope="colgroup" colspan="4"><span class="sel-group-name">{{ group.name }}</span> <span class="sel-n">{{ group.rows|length }}</span></th></tr>
+  {% endif %}
+  {% for row in group.rows %}
+  {% include "_selection_row.html" %}
+  {% endfor %}
+  {% endfor %}
+  </tbody>
+</table>
+</div>

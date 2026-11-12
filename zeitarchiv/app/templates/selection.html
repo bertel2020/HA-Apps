@@ -63,28 +63,16 @@
 
       {% if is_search %}
       {% if result.more %}
-      <div class="settings-panel sel-list">
-        {% for group in result.more %}
-        <div class="sel-group">{{ group.name }}</div>
-        {% for row in group.rows %}
-        {% include "_selection_row.html" %}
-        {% endfor %}
-        {% endfor %}
-      </div>
+      {% set sel_groups = result.more %}
+      {% include "_selection_table.html" %}
       {% elif not unexclude %}
       <p class="sel-none">{{ _("Nichts gefunden. Alle Begriffe müssen in Name, ID, Gerät, Bereich oder Plattform vorkommen.") }}</p>
       {% endif %}
       {% else %}
       <h2>{{ _("Empfohlen") }} <span class="sel-n">{{ result.recommended|map(attribute='rows')|map('length')|sum }}</span></h2>
       {% if result.recommended %}
-      <div class="settings-panel sel-list">
-        {% for group in result.recommended %}
-        <div class="sel-group">{{ group.name }}</div>
-        {% for row in group.rows %}
-        {% include "_selection_row.html" %}
-        {% endfor %}
-        {% endfor %}
-      </div>
+      {% set sel_groups = result.recommended %}
+      {% include "_selection_table.html" %}
       {% elif topic == "energie" %}
       <p class="sel-none">{{ _("Keine Quellen aus dem Energie-Dashboard gefunden. Ist es in Home Assistant eingerichtet?") }}</p>
       {% else %}
@@ -93,14 +81,8 @@
 
       {% if result.more %}
       <h2>{{ _("Weitere Treffer") }} <span class="sel-n">{{ result.more|map(attribute='rows')|map('length')|sum }}</span></h2>
-      <div class="settings-panel sel-list">
-        {% for group in result.more %}
-        <div class="sel-group">{{ group.name }}</div>
-        {% for row in group.rows %}
-        {% include "_selection_row.html" %}
-        {% endfor %}
-        {% endfor %}
-      </div>
+      {% set sel_groups = result.more %}
+      {% include "_selection_table.html" %}
       {% endif %}
 
       {% endif %}
@@ -108,11 +90,8 @@
       {% if unexclude %}
       <h2>{{ _("Ausschluss aufheben und übernehmen") }} <span class="sel-n">{{ unexclude|length }}</span></h2>
       <p class="sel-meta">{{ _("Diese Treffer stehen als Einzel-ID in den Ausschlüssen der Integration. Markieren hebt den Ausschluss beim Übernehmen auf; die Bestätigung nennt sie noch einmal.") }}</p>
-      <div class="settings-panel sel-list">
-        {% for row in unexclude %}
-        {% include "_selection_row.html" %}
-        {% endfor %}
-      </div>
+            {% set sel_groups = [{"name": "", "rows": unexclude}] %}
+      {% include "_selection_table.html" %}
       {% endif %}
 
       {% if result.counts.derived %}
