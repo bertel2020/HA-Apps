@@ -91,6 +91,8 @@
     without flicker
   - The tile menu no longer repeats the entity list per tile
   - The bell in the top bar does not poll while the tab is hidden
+  - Comparison tables of the weather and energy dashboards and the temperature
+    chart of the weather dashboard load faster
 
 - **Weather dashboard**
   - The hint for the “Sun elevation” role now mentions the “Solar elevation”
@@ -123,6 +125,18 @@
     container, disk or app
   - Batteries: “Battery low” only if the device has no percentage value
   - Doors & windows: opening sensors are listed under “More matches”
+  - Duplicates: the same device from two integrations is listed once; the
+    other one appears under “More matches”
+  - Pre-selection: only the key points are ticked; some topics start without
+    ticks
+  - The tile shows “recommended” and how many of them are “new”
+  - Suggestions as a standard table, plus a new view “Dashboards” with the
+    roles still empty per dashboard
+
+### Fixed
+
+- **Weather dashboard**: The rain tile no longer breaks the page when there is
+  no sensor tile for it
 
 ## 1.40.0 - 2026-11-10
 

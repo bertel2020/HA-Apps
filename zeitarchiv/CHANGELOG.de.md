@@ -93,6 +93,8 @@
     seltener und ohne Flackern
   - Das Kachel-Menü wiederholt die Entitätenliste nicht mehr je Kachel
   - Die Glocke in der Topnav fragt im versteckten Tab nichts mehr ab
+  - Vergleichstabellen von Wetter- und Energiedashboard sowie der
+    Temperaturverlauf des Wetterdashboards laden schneller
 
 - **Wetterdashboard**
   - Hinweistext zur Rolle „Sonnenhöhe“ nennt den Sensor „Solare Elevation“ der
@@ -125,6 +127,17 @@
     Container, Platte oder App
   - Batterien: „Batterie schwach“ nur, wenn das Gerät keinen Prozentwert hat
   - Türen & Fenster: Öffnungsmelder unter „Weitere Treffer“
+  - Doppelte: dasselbe Gerät aus zwei Integrationen steht einmal in der Liste,
+    das andere unter „Weitere Treffer“
+  - Vorauswahl: nur Kernpunkte sind angehakt, einige Themen starten ohne Haken
+  - Die Kachel zeigt „empfohlen“ und wie viele davon „neu“ sind
+  - Vorschläge als Standardtabelle, dazu eine neue Ansicht „Dashboards“ mit den
+    noch leeren Rollen je Dashboard
+
+### Behoben
+
+- **Wetterdashboard**: Die Regen-Kachel bricht die Seite nicht mehr ab, wenn es
+  keine Sensor-Kachel dafür gibt
 
 ## 1.40.0 - 2026-11-10
 
