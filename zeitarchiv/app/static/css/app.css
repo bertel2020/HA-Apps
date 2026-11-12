@@ -2715,8 +2715,8 @@ a.el-rec-big[href]:focus-visible{outline:2px solid var(--c);outline-offset:-2px;
    lesend, ohne Seitenkopf, Rücklinks und Reiter — Titel und „Bearbeiten“ stehen im
    Rahmen des Popups (tile-popup.js). */
 html[data-popup] .popup-hide,html[data-popup] [data-dynamic-back]{display:none !important;}
-html[data-popup] body{background:var(--surface);}
-html[data-popup] .page{margin-top:0;padding-top:12px;}
+html[data-popup] body{background:var(--surface);padding-top:0;}
+html[data-popup] .page{margin-top:0;padding-top:10px;}
 html[data-popup] .chart-title-row-end > .period-label{display:none !important;}
 
 /* Verlaufs-Popup einer Kachel (tile-popup.js, Roadmap 1.55): Dialog mit der
@@ -2749,3 +2749,4 @@ html[data-popup] .entity-purge-banner a,html[data-popup] .entity-purge-banner .p
 /* Titelzeile der Seite im Popup (Name, Aktuell-Chip, CSV, Anpassen) entfällt: Name und Chip stehen im Kopf des Popups. */
 html[data-popup] .chart-title-row:not(.chart-title-row-end),html[data-popup] .refresh-wrap{display:none !important;}
 .tile-popup-refresh[hidden]{display:none;}
+html[data-popup] .settings-panel > .toolbar{margin-top:0;}
