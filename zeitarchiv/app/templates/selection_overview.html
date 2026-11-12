@@ -163,33 +163,32 @@
               </td>
               <td class="ov-col-actions">
                 {# Zeilenmenü im Standardaufbau der App: runder ⋮-Knopf (wie das Kachelmenü), Popover mit .menu-row-Zeilen.
-                   Die Aktionen sind Submit-Knöpfe des Sammel-Formulars (name="one"), die Erklärung klappt unter ihnen auf. #}
+                   Die Aktionen sind Submit-Knöpfe des Sammel-Formulars (name="one"). Ohne Aktion und ohne Verlauf gibt es kein Menü;
+                   die Herkunft steht in der Spalte „Herkunft“, nicht noch einmal hier. #}
+                {% set can_remove = row.removable and can_apply %}
+                {% set can_exclude = can_change and row.excludable %}
+                {% set can_include = can_change and row.includable %}
+                {% if can_remove or can_exclude or can_include or row.excluded_patterns or row.status == "archived" %}
                 <details class="ov-menu">
                   <summary class="ov-menu-btn" aria-label="{{ _('Aktionen für {name}', name=row.name) }}" title="{{ _('Aktionen') }}">⋮</summary>
                   <div class="menu-popover ov-menu-pop" role="menu">
-                    {% if row.removable and can_apply %}
+                    {% if can_remove %}
                     <button type="submit" class="menu-row menu-row-danger" role="menuitem" name="one" value="{{ row.entity_id }}">{% if row.manual %}{{ _("Aus Auswahl entfernen …") }}{% else %}{{ _("Entfernen …") }}{% endif %}</button>
                     {% endif %}
-                    {% if can_change and row.excludable %}
+                    {% if can_exclude %}
                     <button type="submit" class="menu-row" role="menuitem" name="one" value="{{ row.entity_id }}" formaction="{{ app_root }}/selection/exclude">{{ _("Ausschließen …") }}</button>
-                    {% if row.held_by_ha %}<p class="ov-menu-note">{{ _("Ausgewählt über Muster, Bereich, Gerät oder Label in Home Assistant. Ausschließen wirkt trotzdem, dort bleibt alles, wie es ist.") }}</p>{% endif %}
                     {% endif %}
-                    {% if can_change and row.includable %}
+                    {% if can_include %}
                     <button type="submit" class="menu-row" role="menuitem" name="one" value="{{ row.entity_id }}" formaction="{{ app_root }}/selection/include">{{ _("Wieder aufnehmen …") }}</button>
                     {% endif %}
+                    {# Ohne diesen Hinweis wäre unklar, warum ein ausgeschlossener Eintrag sich hier nicht wieder aufnehmen lässt. #}
                     {% for pattern in row.excluded_patterns %}
                     <p class="ov-menu-note">{{ _("Der Ausschluss kommt von diesem Muster, ändern lässt er sich nur in Home Assistant:") }} <code class="ov-pattern">{{ pattern }}</code></p>
                     {% endfor %}
-                    {% if row.only_in_ha and not can_change %}
-                    <p class="ov-menu-note">{{ _("Muster, Bereich, Gerät und Label ändert man in Home Assistant (Zeitarchiv-Integration, Optionen). Ausschließen von hier aus kommt später.") }}</p>
-                    {% endif %}
                     {% if row.status == "archived" %}<a class="menu-row" role="menuitem" href="{{ app_root }}/entities/{{ row.entity_id }}">{{ _("Verlauf der Entität →") }}</a>{% endif %}
-                    <details class="ov-why">
-                      <summary class="menu-row">{{ _("Warum ist das drin?") }} <span class="chevron" aria-hidden="true">▾</span></summary>
-                      <ul class="ov-explain">{% for line in row.explain %}<li>{{ line }}</li>{% endfor %}</ul>
-                    </details>
                   </div>
                 </details>
+                {% endif %}
               </td>
             </tr>
             {% endfor %}

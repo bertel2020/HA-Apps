@@ -2759,5 +2759,5 @@ html[data-popup] .settings-panel > .toolbar{margin-top:0;}
 #energiedashboard-root,#wetter-root{margin-top:-12px;}
 /* Reiter „Entitäten“ (Liste, Auswahl & Verlauf, Kategorien): Titel, Beschreibung und Reiterzeile beginnen auf allen drei
    Seiten am selben linken Rand (page-wide), damit sie beim Wechseln nicht springen. Der Inhalt von „Auswahl & Verlauf“
-   und „Kategorien“ behält seine Breite (--page-narrow), linksbündig; die Liste ist eine Tabelle und nutzt die ganze Breite. */
-.page-head-wide > :not(h1):not(.sub):not(.entity-tabs){max-width:var(--page-narrow);}
+   und „Kategorien“ behält seine Breite (--page-narrow) und steht mittig; die Liste ist eine Tabelle und nutzt die ganze Breite. */
+.page-head-wide > :not(h1):not(.sub):not(.entity-tabs){max-width:var(--page-narrow);margin-left:auto;margin-right:auto;}
