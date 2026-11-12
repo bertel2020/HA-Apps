@@ -288,7 +288,7 @@
   button.edash-kpi:disabled:hover{transform:none;box-shadow:none;border-color:var(--border);}
   /* Diagramm-Popup der Kacheln (Verbrauch, Speicher). Breite wie die übrigen Detail-Dialoge, Diagramm flach genug,
      dass Zeilen darunter ohne Scrollen sichtbar bleiben. */
-  .edash-tile-dialog{width:min(680px,calc(100vw - 32px));padding:0;overflow:hidden;}
+  .edash-tile-dialog{width:min(780px,calc(100vw - 32px));padding:0;overflow:hidden;}
   .edash-tile-dialog[open]{display:flex;flex-direction:column;max-height:calc(100vh - 48px);}
   /* Kopf und Inhalt wie beim Kachel-Popup der Dashboards: Kopfzeile mit Trennlinie, darunter der Inhalt auf der Seitenfläche. */
   .edash-tile-head{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);flex:none;}
@@ -299,7 +299,7 @@
   .edash-tile-body{padding:14px 16px 16px;overflow:auto;background:var(--bg);}
   .edash-tile-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:10px 8px 4px;}
   .edash-tile-sub{margin:1px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);}
-  .edash-tile-chart{height:270px;width:100%;}
+  .edash-tile-chart{height:330px;width:100%;}
   .edash-tile-modes{display:flex;width:fit-content;margin-left:auto;gap:4px;background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;padding:3px;margin-bottom:8px;}
   .edash-tile-modes button{font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));padding:5px 10px;border-radius:6px;border:0;background:transparent;color:var(--ink-faint);cursor:pointer;}
   .edash-tile-modes button.is-active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:600;}
