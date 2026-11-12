@@ -16,7 +16,7 @@
   .sel-none{color:var(--ink-muted);font-size:calc(14px * var(--font-scale, 1));}
   .sel-empty p{margin:0 0 8px;}
   .sel-list{padding:0;overflow:hidden;margin-bottom:22px;}
-  .sel-group{padding:9px 16px;background:var(--surface-alt);border-bottom:1px solid var(--border);font-size:calc(13px * var(--font-scale, 1));font-weight:600;color:var(--accent-line);}
+  .sel-group{padding:10px 16px;background:var(--accent-line-soft);border-bottom:1px solid var(--border-strong);font-size:calc(13.5px * var(--font-scale, 1));font-weight:600;color:var(--accent-line);}
   .sel-row{display:flex;align-items:flex-start;gap:14px;padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;}
   .sel-row.is-locked{cursor:default;}
   .sel-row.is-locked .sel-main{opacity:.75;}
@@ -29,7 +29,7 @@
   .sel-role{align-self:flex-start;margin-top:3px;border-radius:999px;padding:1px 10px;font-size:calc(12px * var(--font-scale, 1));background:var(--accent-line-soft);color:var(--accent-line);}
   .sel-role.is-check{background:var(--warning-soft);color:var(--warning);}
   .sel-kind{flex:0 0 auto;margin-top:3px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);white-space:nowrap;}
-  .sel-badge{flex:0 0 auto;margin-top:1px;min-width:88px;text-align:center;padding:3px 8px;border-radius:5px;font-size:calc(12px * var(--font-scale, 1));font-weight:500;}
+  .sel-badge{flex:0 0 auto;margin-top:1px;min-width:64px;text-align:center;padding:3px 8px;border-radius:5px;font-size:calc(12px * var(--font-scale, 1));font-weight:500;}
   .sel-badge-new{background:var(--accent-line-soft);color:var(--accent-line);}
   .sel-badge-muted{background:var(--surface-alt);color:var(--ink-muted);}
   .sel-badge-warn{background:var(--warning-soft);color:var(--warning);}
@@ -109,6 +109,19 @@
   .sel-pattern-examples li{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;min-width:0;}
   .sel-pattern-examples .sel-name{font-size:calc(13px * var(--font-scale, 1));}
   .sel-pattern-examples .sel-badge{min-width:0;padding:1px 6px;font-size:calc(11px * var(--font-scale, 1));}
+  /* Breit: Name/ID links, Begründung in eigener Spalte, Art und Badge rechts
+     in fester Breite, damit die Zeile nicht über die ganze Fläche
+     auseinanderfällt. */
+  @media (min-width:821px){
+    .sel-main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);column-gap:24px;row-gap:2px;align-items:start;}
+    .sel-main .sel-name,.sel-main .sel-id{grid-column:1;}
+    .sel-main .sel-reason{grid-column:2;grid-row:1 / span 2;align-self:center;}
+    .sel-main .sel-role{grid-column:2;}
+    .sel-kind{min-width:96px;text-align:right;margin-top:2px;}
+    .sel-badge{margin-top:0;}
+    .sel-row{align-items:center;}
+    .sel-check{margin:0;}
+  }
   @media (max-width:640px){
     .sel-search-row{flex-wrap:wrap;}
     /* Telefon: Info oben, darunter das Segment über die ganze Breite (zwei
