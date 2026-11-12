@@ -3900,7 +3900,20 @@
     "Sonne ab": "Sun from",
     "% des klaren Himmels": "% of clear sky",
     "Mein Sensor erreicht bei klarem Himmel": "My sensor reaches on a clear sky",
-    "% der Idealkurve": "% of the ideal curve"
+    "% der Idealkurve": "% of the ideal curve",
+    "{set} von {total} belegt": "{set} of {total} assigned",
+    "Öffnen →": "Open →",
+    "{count} belegt": "{count} assigned",
+    "Vorschlag": "Suggestion",
+    "noch nicht archiviert": "not archived yet",
+    "offen, nichts Passendes gefunden": "open, nothing suitable found",
+    "Alle in {group} markieren": "Mark all in {group}",
+    "Rollen deiner Dashboards": "Roles of your dashboards",
+    "Vorschläge für deine Dashboards": "Suggestions for your dashboards",
+    "Kein Dashboard ist eingeschaltet. Das Wetter- und das Energiedashboard lassen sich in ihren Einstellungen einschalten.": "No dashboard is switched on. The weather and energy dashboards can be switched on in their settings.",
+    "Für die offenen Rollen gibt es keine Vorschläge aus dem Katalog.": "There are no suggestions in the catalog for the open roles.",
+    "Rolle: {role}": "Role: {role}",
+    "Begründung": "Reason"
   },
   "js": {
     "Fixierung aufheben und das Dashboard bearbeiten?": "Unlock this dashboard and edit it?",

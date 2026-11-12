@@ -26,7 +26,10 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
-from . import selection_catalog, selection_jobs, selection_patterns, selection_roles, selection_search, selection_suggest
+from . import (
+    selection_catalog, selection_dashboards, selection_jobs, selection_patterns, selection_roles, selection_search,
+    selection_suggest,
+)
 from .formatting import format_time, format_timestamp
 from .i18n import N_
 from .selection_change_routes import make_change_router
@@ -129,13 +132,19 @@ def create_catalog_router(
     return router
 
 
-def topic_tiles(entities: list[dict[str, Any]], archived: set[str]) -> list[dict[str, Any]]:
-    """Kacheln mit Trefferzahlen je Thema."""
+def topic_tiles(
+    entities: list[dict[str, Any]], archived: set[str], index: Index | None = None,
+) -> list[dict[str, Any]]:
+    """Kacheln mit Trefferzahlen je Thema; mit eingeschaltetem Dashboard zusätzlich „Dashboards“."""
     tiles = []
     for topic in selection_suggest.TOPICS:
         counts = selection_suggest.suggest(topic, entities, archived)["counts"]
         tiles.append({"topic": topic, "label": TOPIC_INFO[topic]["label"], "counts": counts,
                       "sensitive": TOPIC_INFO[topic]["sensitive"]})
+    if index is not None and selection_dashboards.cards(index, entities, archived):
+        counts = selection_dashboards.result(index, entities, archived)["counts"]
+        tiles.append({"topic": selection_dashboards.TOPIC, "label": selection_dashboards.INFO["label"], "counts": counts,
+                      "sensitive": False})
     return tiles
 
 
@@ -171,21 +180,25 @@ def make_router(get_index: Callable[[], Index], templates: Jinja2Templates, data
             topic = understood
         elif query:
             topic = selection_search.SEARCH_TOPIC
-        elif topic not in selection_suggest.TOPICS:
+        elif topic not in selection_suggest.TOPICS and topic != selection_dashboards.TOPIC:
             topic = selection_suggest.TOPICS[0]
+        is_dashboards = topic == selection_dashboards.TOPIC
         is_search = topic == selection_search.SEARCH_TOPIC
         catalog = selection_catalog.load(data_dir)
         result = tiles = received = None
         patterns: list[dict[str, Any]] = []
+        dashboards: list[dict[str, Any]] = []
         unexclude: list[dict[str, Any]] = []
         counts = {"new": 0, "archived": 0, "selected": 0, "excluded": 0, "text": 0}
         can_change = bool(catalog and catalog.get("phase1") and catalog.get("phase2"))
         if catalog is not None:
             archived = {entity["entity_id"] for entity in get_index().list_entities()}
-            result = view_result(topic, query, catalog["entities"], archived)
+            result = view_result(topic, query, catalog["entities"], archived, get_index())
             shown = [row["entity_id"] for part in ("recommended", "more") for group in result[part] for row in group["rows"]]
             selection_roles.attach(result, selection_roles.wetter_hints(get_index(), catalog["entities"], shown))
-            tiles = topic_tiles(catalog["entities"], archived)
+            tiles = topic_tiles(catalog["entities"], archived, get_index())
+            if is_dashboards:
+                dashboards = selection_dashboards.cards(get_index(), catalog["entities"], archived)
             received = f"{format_timestamp(catalog['received_ts'], tz)} {format_time(catalog['received_ts'], tz)}"
             for row in selection_patterns.view_rows(result):
                 counts[row["status"]] += 1
@@ -197,10 +210,11 @@ def make_router(get_index: Callable[[], Index], templates: Jinja2Templates, data
             if can_change:
                 unexclude = take_unexcludable(result)
         return templates.TemplateResponse(request, "selection.html", {
-            "topic": topic, "topic_info": SEARCH_INFO if is_search else TOPIC_INFO[topic], "result": result,
+            "topic": topic, "topic_info": SEARCH_INFO if is_search else selection_dashboards.INFO if is_dashboards else TOPIC_INFO[topic],
+            "is_dashboards": is_dashboards, "result": result,
             "received": received, "tiles": tiles, "counts": counts, "can_apply": bool(catalog and catalog.get("phase1")),
             "can_change": can_change, "max_ids": selection_jobs.MAX_IDS, "query": query, "is_search": is_search,
-            "understood": understood, "patterns": patterns, "unexclude": unexclude,
+            "understood": understood, "patterns": patterns, "unexclude": unexclude, "dashboards": dashboards,
         })
 
     router.include_router(make_ui_router(get_index, templates, data_dir, tz))

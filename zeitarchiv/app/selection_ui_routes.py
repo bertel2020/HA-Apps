@@ -25,7 +25,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.templating import Jinja2Templates
 
 from . import (
-    selection_catalog, selection_category, selection_jobs, selection_overview, selection_roles, selection_search,
+    selection_catalog, selection_category, selection_dashboards, selection_jobs, selection_overview, selection_roles, selection_search,
     selection_suggest,
 )
 from .formatting import format_time, format_timestamp
@@ -53,15 +53,33 @@ def _app_root(request: Request) -> str:
     return str(request.scope.get("root_path", "")).rstrip("/")
 
 
+def is_free_view(topic: str) -> bool:
+    """Ansichten ohne eigenes Thema: die Suche und die Dashboard-Vorschläge (Zeilen aus mehreren Themen)."""
+    return topic in (selection_search.SEARCH_TOPIC, selection_dashboards.TOPIC)
+
+
+def topic_text(topic: str) -> str:
+    """Name der Ansicht in Bestätigungen: Suche, Dashboards oder das Thema."""
+    if topic == selection_dashboards.TOPIC:
+        return tr(selection_dashboards.INFO["label"])
+    return tr("Suche") if topic == selection_search.SEARCH_TOPIC else topic_label(topic)
+
+
 def view_url(request: Request, topic: str, query: str = "") -> str:
     """Zurück zur Vorschlagsseite: zur Suche (``q``) oder zum Thema."""
+    if topic == selection_dashboards.TOPIC:
+        return f"{_app_root(request)}/selection?topic={topic}"
     if topic == selection_search.SEARCH_TOPIC:
         return f"{_app_root(request)}/selection?{urlencode({'q': query})}"
     return f"{_app_root(request)}/selection?topic={topic if topic in selection_suggest.TOPICS else 'energie'}"
 
 
-def view_result(topic: str, query: str, entities: list[dict[str, Any]], archived: set[str]) -> dict[str, Any]:
-    """Ergebnis einer Ansicht: Suche oder Thema (gleiche Form)."""
+def view_result(
+    topic: str, query: str, entities: list[dict[str, Any]], archived: set[str], index: Index | None = None,
+) -> dict[str, Any]:
+    """Ergebnis einer Ansicht: Suche, Dashboard-Vorschläge oder Thema (gleiche Form)."""
+    if topic == selection_dashboards.TOPIC and index is not None:
+        return selection_dashboards.result(index, entities, archived)
     if topic == selection_search.SEARCH_TOPIC:
         return selection_search.search(query, entities, archived)
     return selection_suggest.suggest(topic, entities, archived)
@@ -149,7 +167,7 @@ def make_ui_router(get_index: Callable[[], Index], templates: Jinja2Templates, d
         category: str = Form(""),
         recategorize: str = Form(""),
     ) -> Response:
-        is_search = topic == selection_search.SEARCH_TOPIC
+        is_search = is_free_view(topic)
         query = selection_search.clean_query(q)
         back = view_url(request, topic, query)
         if not is_search and topic not in selection_suggest.TOPICS:
@@ -169,7 +187,7 @@ def make_ui_router(get_index: Callable[[], Index], templates: Jinja2Templates, d
         unknown = [eid for eid in (*requested, *requested_unexclude) if eid not in rows]
         if unknown:
             return error(request, tr("Nicht im Katalog: {entity_id}", entity_id=unknown[0][:80]), back)
-        suggested = view_result(topic, query, catalog["entities"], archived())
+        suggested = view_result(topic, query, catalog["entities"], archived(), get_index())
         candidates = {
             row["entity_id"]: row for section in ("recommended", "more")
             for group in suggested[section] for row in group["rows"]
@@ -196,8 +214,8 @@ def make_ui_router(get_index: Callable[[], Index], templates: Jinja2Templates, d
                 else TOPIC_INFO[topic]["sensitive"]
             )
             return confirm(request, {
-                "kind": "apply", "topic": topic, "q": query, "is_search": is_search,
-                "topic_text": tr("Suche") if is_search else topic_label(topic), "mode": mode,
+                "kind": "apply", "topic": topic, "q": query, "is_search": topic == selection_search.SEARCH_TOPIC,
+                "topic_text": topic_text(topic), "mode": mode,
                 "ids": new_ids, "unexclude": requested_unexclude, "count": len(ids),
                 "names": [candidates[eid]["name"] for eid in new_ids[:CONFIRM_LIST]],
                 "more": max(0, len(new_ids) - CONFIRM_LIST),

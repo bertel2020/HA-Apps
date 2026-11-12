@@ -14,11 +14,37 @@
   function update() {
     const checked = form.querySelectorAll('input.sel-check:checked').length;
     counter.textContent = String(checked);
+    syncGroups();
     if (allowed) submit.disabled = checked === 0 || checked > max;
   }
 
+  // Sammelkästchen einer Gruppe: setzt alle wählbaren Zeilen bis zur nächsten Gruppenzeile.
+  function groupBoxes(head) {
+    const boxes = [];
+    for (let row = head.nextElementSibling; row && !row.classList.contains('sel-group-row'); row = row.nextElementSibling) {
+      const box = row.querySelector('input.sel-check');
+      if (box && !box.disabled) boxes.push(box);
+    }
+    return boxes;
+  }
+  function syncGroups() {
+    form.querySelectorAll('tr.sel-group-row').forEach((head) => {
+      const all = head.querySelector('input.sel-group-all');
+      const boxes = groupBoxes(head);
+      if (!all) return;
+      all.disabled = boxes.length === 0;
+      all.checked = boxes.length > 0 && boxes.every((box) => box.checked);
+      all.indeterminate = !all.checked && boxes.some((box) => box.checked);
+    });
+  }
+
   form.addEventListener('change', (event) => {
-    if (event.target.classList && event.target.classList.contains('sel-check')) update();
+    const target = event.target;
+    if (!target.classList) return;
+    if (target.classList.contains('sel-group-all')) {
+      groupBoxes(target.closest('tr')).forEach((box) => { box.checked = target.checked; });
+      update();
+    } else if (target.classList.contains('sel-check')) update();
   });
   update();
 })();

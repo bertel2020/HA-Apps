@@ -27,8 +27,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import selection_overview, selection_patterns, selection_search, selection_suggest
 from .i18n import tr
-from .selection_topics import topic_label
-from .selection_ui_routes import CONFIRM_LIST, Pages, _app_root, pick_rows, view_result, view_url
+from .selection_ui_routes import CONFIRM_LIST, Pages, _app_root, is_free_view, pick_rows, topic_text, view_result, view_url
 from .storage.index import Index
 
 
@@ -121,7 +120,7 @@ def make_change_router(get_index: Callable[[], Index], templates: Jinja2Template
         q: str = Form(""),
         confirmed: str = Form(""),
     ) -> Response:
-        is_search = topic == selection_search.SEARCH_TOPIC
+        is_search = is_free_view(topic)
         query = selection_search.clean_query(q)
         back = view_url(request, topic, query)
         if not is_search and topic not in selection_suggest.TOPICS:
@@ -130,7 +129,7 @@ def make_change_router(get_index: Callable[[], Index], templates: Jinja2Template
         if catalog is None:
             return error(request, problem or "", back)
         archived = pages.archived()
-        result = view_result(topic, query, catalog["entities"], archived)
+        result = view_result(topic, query, catalog["entities"], archived, get_index())
         active = {item["pattern"] for item in catalog.get("patterns") or ()}
         candidate = next((
             item for item in selection_patterns.candidates(
@@ -144,7 +143,7 @@ def make_change_router(get_index: Callable[[], Index], templates: Jinja2Template
         if confirmed != "1":
             return confirm(request, {
                 "kind": "pattern_add", "pattern": pattern, "preview": candidate, "topic": topic, "q": query,
-                "topic_text": tr("Suche") if is_search else topic_label(topic), "back": back,
+                "topic_text": topic_text(topic), "back": back,
             })
         return pages.create(
             request, back, source="assistant", action="add_patterns", patterns=[pattern],

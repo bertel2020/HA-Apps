@@ -45,6 +45,45 @@
 
     <p class="sel-meta">{{ _("Katalog von {received} · nur Metadaten, keine Messwerte", received=received) }}</p>
 
+    {% if is_dashboards %}
+    <section class="sel-dash" aria-labelledby="sel-dash-h">
+      <h2 id="sel-dash-h">{{ _("Rollen deiner Dashboards") }}</h2>
+      {% if dashboards %}
+      <div class="sel-dash-grid">
+        {% for card in dashboards %}
+        <div class="sel-dash-card">
+          <div class="sel-dash-head">
+            <b>{{ card.title }}</b>
+            <span class="sel-n">{{ _("{set} von {total} belegt", set=card.set, total=card.total) }}</span>
+            <a href="{{ app_root }}/{{ 'wetterdashboard' if card.key == 'wetter' else 'energiedashboard' }}">{{ _("Öffnen →") }}</a>
+          </div>
+          <ul class="sel-dash-list">
+            {% for item in card["items"] %}
+            <li class="is-{{ item.state }}">
+              <span class="sel-dash-role">{{ item.label }}</span>
+              <span class="sel-dash-val">
+              {% if item.state == "set" %}
+                <span class="sel-dash-dot" aria-hidden="true"></span>{% if item.name %}{{ item.name }}{% else %}{{ _("{count} belegt", count=item.count) }}{% endif %}
+                {% if item.name and item.count and item.count > 1 %}<span class="sel-dash-more">+{{ item.count - 1 }}</span>{% endif %}
+              {% elif item.state == "suggest" %}
+                <span class="sel-dash-tag">{{ _("Vorschlag") }}</span>{{ item.name }}
+                <span class="sel-dash-more">{{ _("archiviert") if item.archived else _("noch nicht archiviert") }}{% if item.confidence == "check" %} · {{ _("prüfen") }}{% endif %}</span>
+              {% else %}
+                <span class="sel-dash-none">{{ _("offen, nichts Passendes gefunden") }}</span>
+              {% endif %}
+              </span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="sel-none">{{ _("Kein Dashboard ist eingeschaltet. Das Wetter- und das Energiedashboard lassen sich in ihren Einstellungen einschalten.") }}</p>
+      {% endif %}
+    </section>
+    {% endif %}
+
     {% if is_search %}
     <h2 class="sel-search-h">{{ _("Suche: „{query}“", query=query) }} <span class="sel-n">{{ result.counts.found }}</span></h2>
     {% if result.truncated %}<p class="sel-meta">{{ _("Es gibt {count} weitere Treffer. Bitte die Suche genauer fassen.", count=result.truncated) }}</p>{% endif %}
@@ -69,10 +108,12 @@
       <p class="sel-none">{{ _("Nichts gefunden. Alle Begriffe müssen in Name, ID, Gerät, Bereich oder Plattform vorkommen.") }}</p>
       {% endif %}
       {% else %}
-      <h2>{{ _("Empfohlen") }} <span class="sel-n">{{ result.recommended|map(attribute='rows')|map('length')|sum }}</span></h2>
+      <h2>{{ _("Vorschläge für deine Dashboards") if is_dashboards else _("Empfohlen") }} <span class="sel-n">{{ result.recommended|map(attribute='rows')|map('length')|sum }}</span></h2>
       {% if result.recommended %}
       {% set sel_groups = result.recommended %}
       {% include "_selection_table.html" %}
+      {% elif is_dashboards %}
+      <p class="sel-none">{{ _("Für die offenen Rollen gibt es keine Vorschläge aus dem Katalog.") }}</p>
       {% elif topic == "energie" %}
       <p class="sel-none">{{ _("Keine Quellen aus dem Energie-Dashboard gefunden. Ist es in Home Assistant eingerichtet?") }}</p>
       {% else %}
