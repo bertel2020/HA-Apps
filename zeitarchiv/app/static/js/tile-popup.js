@@ -9,7 +9,32 @@
   const title = dialog.querySelector('.tile-popup-title');
   const editLink = dialog.querySelector('.tile-popup-edit');
   const pageLink = dialog.querySelector('.tile-popup-page');
+  const chip = dialog.querySelector('.tile-popup-refresh');
+  const chipText = chip.querySelector('.tile-popup-refresh-text');
   let pushed = false;
+
+  // Alpine-Daten der Seite im iframe (gleiche Herkunft): dort steckt der Zustand des Chips „Aktuell“.
+  function pageData() {
+    try {
+      const w = frame.contentWindow;
+      if (!w || !w.Alpine) return null;
+      for (const el of w.document.querySelectorAll('[x-data]')) {
+        const data = w.Alpine.$data(el);
+        if (data && typeof data.refreshChipText === 'function') return data;
+      }
+    } catch (e) { /* Seite lädt noch */ }
+    return null;
+  }
+  function syncChip() {
+    const data = dialog.open ? pageData() : null;
+    chip.hidden = !data;
+    if (!data) return;
+    chipText.textContent = data.refreshChipText();
+    chip.classList.toggle('paused', !!data.refreshPause());
+    chip.title = data.refreshChipTitle ? data.refreshChipTitle() : '';
+  }
+  chip.addEventListener('click', () => { const data = pageData(); if (data && data.refreshNow) data.refreshNow(); });
+  setInterval(syncChip, 1000);
 
   function withParams(href, params) {
     const url = new URL(href, location.href);
@@ -35,6 +60,7 @@
 
   function closed() {
     frame.src = 'about:blank';
+    chip.hidden = true;
     if (pushed) { pushed = false; if (history.state && history.state.zaTilePopup) history.back(); }
   }
 

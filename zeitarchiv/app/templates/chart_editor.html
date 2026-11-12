@@ -28,7 +28,7 @@
               </div>
             </span>
             {% endif %}
-            <button type="button" class="btn" x-show="hasData" data-tooltip="{{ _('Aktuell angezeigte Chart-Daten als CSV herunterladen') }}" @click="exportCsv()">{{ _("CSV") }}</button>
+            <button type="button" class="btn popup-hide" x-show="hasData" data-tooltip="{{ _('Aktuell angezeigte Chart-Daten als CSV herunterladen') }}" @click="exportCsv()">{{ _("CSV") }}</button>
             {% if chart_id %}
             <button type="button" class="btn popup-hide" x-show="!editing" @click="editing = true">{{ _("Anpassen") }}</button>
             {% endif %}

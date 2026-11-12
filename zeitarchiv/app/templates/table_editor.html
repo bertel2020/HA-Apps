@@ -30,7 +30,7 @@
               </div>
             </span>
             {% endif %}
-            <button type="button" class="btn" x-show="rows.length && columns.length" data-tooltip="{{ _('Aktuell berechnete Tabelle als CSV herunterladen') }}" @click="exportCsv()">{{ _("CSV") }}</button>
+            <button type="button" class="btn popup-hide" x-show="rows.length && columns.length" data-tooltip="{{ _('Aktuell berechnete Tabelle als CSV herunterladen') }}" @click="exportCsv()">{{ _("CSV") }}</button>
             {% if table_id %}
             <button type="button" class="btn popup-hide" x-show="!editing" @click="editing = true">{{ _("Anpassen") }}</button>
             {% endif %}

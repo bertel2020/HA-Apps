@@ -3,6 +3,10 @@
   <div class="tile-popup-head">
     <h2 class="tile-popup-title" id="tile-popup-title"></h2>
     <a class="btn btn-primary tile-popup-edit" href="#">{{ _("Bearbeiten") }}</a>
+    {# Chip „Aktuell“ der Seite im iframe, hier im Kopf statt in einer eigenen Zeile (tile-popup.js). #}
+    <button type="button" class="refresh-chip tile-popup-refresh" hidden>
+      <span class="refresh-dot"></span><span class="tile-popup-refresh-text"></span>
+    </button>
     <button type="button" class="btn tile-popup-close" aria-label="{{ _('Schließen') }}">✕</button>
   </div>
   <iframe class="tile-popup-frame" title="{{ _('Verlauf') }}" src="about:blank"></iframe>
