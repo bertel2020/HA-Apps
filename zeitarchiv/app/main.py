@@ -1424,11 +1424,17 @@ def notices_panel(request: Request) -> HTMLResponse:
 
 
 @app.get("/notices/activity", response_class=HTMLResponse)
-def notices_activity(request: Request) -> HTMLResponse:
+def notices_activity() -> HTMLResponse:
     """Frischer Inhalt für #notice-activity (Glocken-Menü), Gegenstück zu
     notices_panel() — warum nur die LAUFENDEN Vorgänge und nichts über
-    fertige, steht bei activity_snapshot() in progress.py."""
-    return templates.TemplateResponse(request, "_activity_block.html", _notices_context(request))
+    fertige, steht bei activity_snapshot() in progress.py.
+
+    Das Fragment braucht nur ``activity``. Es wird deshalb ohne TemplateResponse gerendert: Die würde alle
+    Kontextprozessoren durchlaufen (Hinweisliste samt Einstellungsabfragen, Navigation, Sprachkatalog) und diese Arbeit
+    bei jedem Takt des Browsers (alle 8 s je offenem Tab) für eine Antwort von meist einem Byte erledigen. Sprache und
+    Zahlenformat stehen schon in den ContextVars der App-Abhängigkeit (i18n.dependencies), ``_`` und ``format_int``
+    sind Umgebungs-Globals bzw. -Filter."""
+    return HTMLResponse(templates.get_template("_activity_block.html").render(activity=activity_snapshot()))
 
 
 @app.get("/settings/muted-notices", response_class=HTMLResponse)

@@ -500,6 +500,18 @@ def test_the_activity_endpoint_is_empty_while_nothing_runs(client) -> None:
     assert antwort.text.strip() == ""
 
 
+def test_the_activity_endpoint_does_not_build_the_notice_list(client, monkeypatch) -> None:
+    """Der Browser fragt alle 8 s je offenem Tab nach. Das Fragment braucht nur die laufenden Vorgänge; die Hinweisliste
+    (Einstellungsabfragen, Auswertung aller Entitäten) gehört nicht in diesen Takt."""
+    from app import main
+
+    def verboten() -> list:
+        raise AssertionError("die Hinweisliste darf für /notices/activity nicht aufgebaut werden")
+
+    monkeypatch.setattr(main, "_collect_all_notices", verboten)
+    assert client.get("/notices/activity").status_code == 200
+
+
 def test_the_activity_endpoint_lists_the_running_job(client, laufender_vorgang) -> None:
     html = client.get("/notices/activity").text
     assert 'data-job-id="pytest-job"' in html
