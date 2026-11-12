@@ -3919,7 +3919,8 @@
     "Batteriespannung in Volt, kein Ladestand": "Battery voltage in volts, not a charge level",
     "Tür oder Fenster eines Fahrzeugs": "Door or window of a vehicle",
     "Tür eines Hausgeräts": "Door of an appliance",
-    "Erkennung einer Kamera oder eines Geräts, keine Person im Haus": "Detection by a camera or device, not a person at home"
+    "Erkennung einer Kamera oder eines Geräts, keine Person im Haus": "Detection by a camera or device, not a person at home",
+    "Doppelt: dieselbe Entität kommt auch über {platform}": "Duplicate: the same entity also comes via {platform}"
   },
   "js": {
     "Fixierung aufheben und das Dashboard bearbeiten?": "Unlock this dashboard and edit it?",

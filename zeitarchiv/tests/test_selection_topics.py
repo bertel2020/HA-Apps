@@ -352,3 +352,37 @@ def test_smoothed_thermostat_values_and_battery_voltage_are_only_more_hits() -> 
     percent = _row("sensor.batt_p", "Sensor Batterie Stand", device_class="battery", unit="%")
     rec, more, _ = _rows("batterien", [volt, percent])
     assert set(rec) == {"sensor.batt_p"} and set(more) == {"sensor.batt_v"}
+
+
+# ---- Doppelte (Maßnahme 2) -------------------------------------------------------------------
+
+def _door(entity_id, platform, device="Kontakt Haustür", **fields):
+    return _row(entity_id, device, device_class="door", platform=platform, device=device, **fields)
+
+
+def test_same_device_from_two_integrations_keeps_one_recommended_and_marks_the_other() -> None:
+    rows = [_door("binary_sensor.a_haustuer", "eltako"), _door("binary_sensor.b_haustuer", "enocean_eltako")]
+    rec, more, _ = _rows("tueren_fenster", rows)
+    assert set(rec) == {"binary_sensor.a_haustuer"}  # alphabetisch erste Integration
+    assert more["binary_sensor.b_haustuer"]["reason"] == "Doppelt: dieselbe Entität kommt auch über eltako"
+
+
+def test_the_already_archived_duplicate_is_the_one_that_stays() -> None:
+    rows = [_door("binary_sensor.a_haustuer", "eltako"), _door("binary_sensor.b_haustuer", "enocean_eltako")]
+    rec, more, _ = _rows("tueren_fenster", rows, archived={"binary_sensor.b_haustuer"})
+    assert set(rec) == {"binary_sensor.b_haustuer"} and set(more) == {"binary_sensor.a_haustuer"}
+
+
+def test_several_rows_per_integration_are_not_a_duplicate_pair() -> None:
+    rows = [
+        _door("binary_sensor.a1", "eltako"), _door("binary_sensor.a2", "eltako"),
+        _door("binary_sensor.b1", "enocean_eltako"),
+    ]
+    rec, _more, _ = _rows("tueren_fenster", rows)
+    assert set(rec) == {"binary_sensor.a1", "binary_sensor.a2", "binary_sensor.b1"}
+
+
+def test_rows_without_a_device_are_never_collapsed() -> None:
+    rows = [_row("binary_sensor.x", "X", device_class="door", platform="a"), _row("binary_sensor.y", "Y", device_class="door", platform="b")]
+    rec, _more, _ = _rows("tueren_fenster", rows)
+    assert len(rec) == 2

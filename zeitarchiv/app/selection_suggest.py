@@ -116,6 +116,7 @@ def suggest_energy(entities: Iterable[dict[str, Any]], archived: Collection[str]
         if row.get("entity_category") == "diagnostic" and bucket is recommended and role not in _ENERGY_ROLES:
             bucket = more
         bucket.append(suggestion(row, reason, archived, high_rate=power or role == "grid_power"))
+    collapse_duplicates(recommended, more)
     return result("energie", recommended, more, derived)
 
 
@@ -133,12 +134,40 @@ def suggestion(row: dict[str, Any], reason: str, archived: Collection[str], *, h
         "kind": _kind(row),
         "reason": reason,
         "group": _group_key(row),
+        "platform": row.get("platform"),
+        "device": row.get("device"),
+        "domain": row.get("domain"),
+        "device_class": row.get("device_class"),
         "status": status,
         "high_rate": high_rate,
         "text": bool(row.get("text")),
         "unexcludable": status == "excluded" and bool(excluded_by)
         and all(way.get("type") == "entity" for way in excluded_by),
     }
+
+
+def collapse_duplicates(recommended: list[dict[str, Any]], more: list[dict[str, Any]]) -> None:
+    """Dasselbe Gerät über zwei Integrationen (z. B. ``eltako`` und ``enocean_eltako``): nur eine Zeile bleibt empfohlen.
+
+    Als Doppelte gelten empfohlene Zeilen mit gleichem Gerät, gleicher Domain und gleicher Geräteklasse aus mindestens
+    zwei Integrationen, wenn jede Integration genau eine solche Zeile liefert (sonst ist es kein Paar, sondern eine echte
+    Mehrzahl). Es bleibt die schon archivierte oder ausgewählte Zeile, sonst die der alphabetisch ersten Integration; die
+    übrigen wandern mit dem Hinweis „Doppelt“ zu den weiteren Treffern. Nichts geht verloren, nur die Vorauswahl entfällt."""
+    groups: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
+    for row in recommended:
+        if row.get("device") and row.get("platform"):
+            groups.setdefault((row["device"], row.get("domain"), row.get("device_class")), []).append(row)
+    for rows in groups.values():
+        platforms = [row["platform"] for row in rows]
+        if len(set(platforms)) < 2 or len(set(platforms)) != len(platforms):
+            continue
+        keep = min(rows, key=lambda row: (row["status"] not in ("archived", "selected"), row["platform"]))
+        for row in rows:
+            if row is keep:
+                continue
+            recommended.remove(row)
+            row["reason"] = tr("Doppelt: dieselbe Entität kommt auch über {platform}", platform=keep["platform"])
+            more.append(row)
 
 
 def result(topic: str, recommended: list[dict], more: list[dict], derived: int) -> dict[str, Any]:

@@ -19,7 +19,7 @@ from collections.abc import Callable, Collection, Iterable
 from typing import Any
 
 from .i18n import N_, tr
-from .selection_suggest import _TOTAL_CLASSES, is_derived_counter, result, suggestion
+from .selection_suggest import _TOTAL_CLASSES, collapse_duplicates, is_derived_counter, result, suggestion
 
 #: Anzeigename und Kurzbeschreibung je Thema; ``sensitive`` zeigt einen Hinweis.
 TOPIC_INFO: dict[str, dict[str, Any]] = {
@@ -398,6 +398,7 @@ def suggest_topic(topic: str, entities: Iterable[dict[str, Any]], archived: Coll
             bucket = MORE
         high_rate = row.get("device_class") in _HIGH_RATE or (row["domain"] == "binary_sensor" and row.get("device_class") == "motion")
         (recommended if bucket == RECOMMENDED else more).append(suggestion(row, reason, archived, high_rate=high_rate))
+    collapse_duplicates(recommended, more)
     return result(topic, recommended, more, derived)
 
 
