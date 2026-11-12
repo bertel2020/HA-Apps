@@ -574,7 +574,7 @@
           const before = [mm, dur].map((tile) => (tile ? this.tileSub(tile) : '')).filter(Boolean);
           if (before.length) lines.push(before.join(' · '));
           out.push({
-            key: 'rain', role: 'precip_mm', icon: 'drop', label: t('Regen'), big: false, href: link(first), title: this.tileTitle(first),
+            key: 'rain', role: 'precip_mm', icon: 'drop', label: t('Regen'), big: false, href: link(first), title: first ? this.tileTitle(first) : '',
             value: rain ? escapeHtml(rain.text) : this.tileValue(first), sub: lines.join('\n'),
           });
         }
