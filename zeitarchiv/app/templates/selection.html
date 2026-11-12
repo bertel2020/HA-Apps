@@ -37,7 +37,7 @@
         <span class="sel-tile-text">
           <span class="sel-tile-name">{{ tile.label }}{% if tile.sensitive %} <span class="sel-badge sel-badge-warn">{{ _("sensibel") }}</span>{% endif %}</span>
           <span class="sel-tile-count"><b>{{ tile.counts.found }}</b> {{ _("gefunden") }}</span>
-          <span class="sel-tile-count"><b>{{ tile.counts.recommended }}</b> {{ _("empfohlen") }}</span>
+          <span class="sel-tile-count"><b>{{ tile.counts.recommended }}</b> {{ _("empfohlen") }} · <b>{{ tile.counts.recommended_new }}</b> {{ _("neu") }}</span>
         </span>
       </a>
       {% endfor %}

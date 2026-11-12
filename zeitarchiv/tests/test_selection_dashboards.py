@@ -130,3 +130,19 @@ def test_topic_without_preselection_says_so_and_starts_with_zero_marked(client) 
         assert " checked" not in page.split('value="binary_sensor.haustuer"')[1].split(">")[0]
     finally:
         (data_dir / selection_catalog.FILENAME).unlink(missing_ok=True)
+
+
+def test_tile_shows_recommended_and_new_counts(client) -> None:
+    import os
+
+    from app import selection_catalog
+
+    data_dir = Path(os.environ["ZEITARCHIV_DATA_DIR"])
+    door = {"entity_id": "binary_sensor.haustuer", "domain": "binary_sensor", "name": "Haustür", "device_class": "door"}
+    selection_catalog.save(data_dir, [door], phase1=True)
+    try:
+        page = client.get("/selection").text
+        assert "empfohlen</span>" not in page  # Zahl und Wort stehen in einer Zeile
+        assert " neu</span>" in page
+    finally:
+        (data_dir / selection_catalog.FILENAME).unlink(missing_ok=True)
