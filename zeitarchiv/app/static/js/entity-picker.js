@@ -83,10 +83,13 @@ function entityPicker(options, initialEntityId, onSelectFn, allowUnits, denyUnit
       // zum Feld zu gehören. block:'nearest' scrollt nur, wenn nötig — auf
       // normal großen Seiten (wo das Popover ohnehin passt) ändert sich
       // nichts.
+      // searchInputEl darf eine Funktion sein: steckt das Popover hinter x-if (Tabellen-Editor), gibt es das
+      // Suchfeld erst nach dem Aufklappen, $refs wäre beim Klick noch leer.
       if (this.open) this.$nextTick(() => {
-        if (!searchInputEl) return;
-        searchInputEl.focus();
-        const popover = searchInputEl.closest('.dd-picker-popover');
+        const input = typeof searchInputEl === 'function' ? searchInputEl() : searchInputEl;
+        if (!input) return;
+        input.focus();
+        const popover = input.closest('.dd-picker-popover');
         if (popover) popover.scrollIntoView({block: 'nearest'});
       });
     },
