@@ -54,6 +54,10 @@
     dort die Jahre-Auswahl
   - Auf dem Smartphone scrollt die Leiste mit
 
+- **Dashboards**: Fixierung per Klick auf das Schloss aufheben
+  - Das Schloss neben dem Titel fragt nach und schaltet das Bearbeiten wieder
+    ein, der Umweg über Dashboards → Bearbeiten entfällt
+
 ### Geändert
 
 - **Wetterdashboard**
@@ -129,6 +133,10 @@
     which stays in place while scrolling; on the “Long term” tab it holds the
     year selection
   - On smartphones the bar scrolls with the page
+
+- **Dashboards**: Unlock by clicking the lock
+  - The lock next to the title asks for confirmation and switches editing back
+    on, no detour via Dashboards → Edit needed
 
 #### Changed
 

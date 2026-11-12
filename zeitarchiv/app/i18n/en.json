@@ -220,6 +220,7 @@
     "Neuer Chart": "New chart",
     "Zeitarchiv — {name}": "Zeitarchiv — {name}",
     "Fixiert": "Locked",
+    "Klicken zum Bearbeiten": "Click to edit",
     "Eigene, frei benennbare Dashboards zusätzlich zur Übersichtsseite. &middot;": "Custom, freely named dashboards in addition to the overview page. &middot;",
     "&larr; zurück zu Dashboards": "&larr; back to dashboards",
     "Name und Fixierung dieses Dashboards.": "Name and lock setting of this dashboard.",
@@ -3897,6 +3898,8 @@
     "% der Idealkurve": "% of the ideal curve"
   },
   "js": {
+    "Fixierung aufheben und das Dashboard bearbeiten?": "Unlock this dashboard and edit it?",
+    "Aufheben der Fixierung fehlgeschlagen.": "Unlocking failed.",
     "In der Auflösung „Voll“ bekommt jeder Stapel eine eigene Kategorie. Lege dazu Stapel an.": "At resolution “Full” every stack gets its own category. Add stacks for this.",
     "Balken im selben Stapel liegen aufeinander, die übrigen stehen einzeln daneben. Zum Zuordnen den Griff einer Zeile auf einen Stapel ziehen oder das Feld „Stapel“ nutzen.": "Bars in the same stack lie on top of each other, the others stand next to them. To assign, drag a row's handle onto a stack or use the “Stack” field.",
     "Stapel sind inaktiv, solange „Gestapelt“ aus ist. Sie bleiben gespeichert.": "Stacks are inactive while “Stacked” is off. They stay saved.",
