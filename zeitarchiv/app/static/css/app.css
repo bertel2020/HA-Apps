@@ -2710,3 +2710,11 @@ a.el-rec-big[href]:focus-visible{outline:2px solid var(--c);outline-offset:-2px;
 .refresh-info{padding:6px 10px 8px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);font-variant-numeric:tabular-nums;}
 .refresh-state{color:var(--ink-muted);font-size:calc(12px * var(--font-scale, 1));}
 .chart-legend-plain{display:contents;}
+
+/* Seite im Kachel-Popup des Dashboards (iframe, ?popup=1, Roadmap 1.55): nur
+   lesend, ohne Seitenkopf, Rücklinks und Reiter — Titel und „Bearbeiten“ stehen im
+   Rahmen des Popups (tile-popup.js). */
+html[data-popup] .popup-hide,html[data-popup] [data-dynamic-back]{display:none !important;}
+html[data-popup] body{background:var(--surface);}
+html[data-popup] .page{margin-top:0;padding-top:12px;}
+html[data-popup] .chart-title-row-end > .period-label{display:none !important;}

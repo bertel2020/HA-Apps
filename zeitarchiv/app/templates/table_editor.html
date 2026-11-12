@@ -8,12 +8,12 @@
   {% from "_icons.html" import custom_name_icon %}
   
   <div class="page page-wide" x-data="tableEditor()">
-    <h1>{{ _("Tabellen") }}</h1>
+    <h1 class="popup-hide">{{ _("Tabellen") }}</h1>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">{{ _("Mehrere Größen über mehrere Zeiträume nebeneinander vergleichen. &middot;") }} <a href="{{ app_root }}/tables">{{ _("&larr; zurück zu Tabellen") }}</a>{% if back_dashboard %} &middot; <a href="{{ app_root }}{{ back_dashboard.path }}" data-back-dashboard>{{ back_dashboard.label }}</a>{% endif %}</p>
 
     <div class="settings-panel">
         <div class="chart-title-row">
-          <h2 x-text="editing ? (tableId ? t('Tabelle bearbeiten') : t('Neue Tabelle')) : (name || t('Neue Tabelle'))"></h2>
+          <h2 class="popup-hide" x-text="editing ? (tableId ? t('Tabelle bearbeiten') : t('Neue Tabelle')) : (name || t('Neue Tabelle'))"></h2>
           <div style="display:flex;gap:8px;align-items:center;">
             {% if table_id %}
             <span class="refresh-wrap" x-show="rows.length && columns.length" x-cloak @click.outside="refreshMenuOpen = false">
@@ -32,11 +32,11 @@
             {% endif %}
             <button type="button" class="btn" x-show="rows.length && columns.length" data-tooltip="{{ _('Aktuell berechnete Tabelle als CSV herunterladen') }}" @click="exportCsv()">{{ _("CSV") }}</button>
             {% if table_id %}
-            <button type="button" class="btn" x-show="!editing" @click="editing = true">{{ _("Anpassen") }}</button>
+            <button type="button" class="btn popup-hide" x-show="!editing" @click="editing = true">{{ _("Anpassen") }}</button>
             {% endif %}
           </div>
         </div>
-        {% if table_id %}{% include "_dashboard_usage.html" %}{% endif %}
+        {% if table_id %}<div class="popup-hide">{% include "_dashboard_usage.html" %}</div>{% endif %}
         <p class="sub" x-show="editing">{{ _("Zeilen (Entität/Gruppe/Formel/Trennlinie) × Spalten (Zeitraum) — dieselbe Perioden-Logik wie bei Charts, nur tabellarisch statt grafisch. Zeigt beim Ansehen immer aktuelle Werte, kein eingefrorener Schnappschuss.") }}</p>
 
         <template x-if="editing">

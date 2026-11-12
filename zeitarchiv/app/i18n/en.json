@@ -1,5 +1,7 @@
 {
   "app": {
+    "Zeitraum nur für dieses Popup, das Dashboard bleibt unverändert.": "Period applies to this popup only, the dashboard stays unchanged.",
+    "Als Seite öffnen": "Open as page",
     "Im Stapel nach unten": "Down in the stack",
     "Im Stapel nach oben": "Up in the stack",
     "Die Reihenfolge im Stapel ist die der Liste, von links (unten) nach rechts (oben).": "The order in the stack is that of the list, from left (bottom) to right (top).",

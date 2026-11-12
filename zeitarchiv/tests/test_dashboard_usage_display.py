@@ -26,8 +26,8 @@ def test_usage_partial_follows_app_chip_and_popover_patterns() -> None:
 
 
 def test_saved_chart_and_table_views_include_usage_partial() -> None:
-    assert '{% if chart_id %}{% include "_dashboard_usage.html" %}{% endif %}' in CHART_EDITOR
-    assert '{% if table_id %}{% include "_dashboard_usage.html" %}{% endif %}' in TABLE_EDITOR
+    assert '{% if chart_id %}<div class="popup-hide">{% include "_dashboard_usage.html" %}</div>{% endif %}' in CHART_EDITOR
+    assert '{% if table_id %}<div class="popup-hide">{% include "_dashboard_usage.html" %}</div>{% endif %}' in TABLE_EDITOR
 
 
 def test_item_dashboard_usage_is_default_first_then_alphabetical(tmp_path: Path) -> None:

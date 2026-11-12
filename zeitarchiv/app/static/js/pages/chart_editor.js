@@ -751,6 +751,8 @@
         // Bearbeiten-Modus zu starten statt erst über "Anpassen" umschalten
         // zu müssen.
         editing: !CHART_ID || new URLSearchParams(location.search).has('edit'),
+        // Eingebettet im Kachel-Popup des Dashboards: nur ansehen, aber mit Zeitraum/Vergleichen.
+        popup: new URLSearchParams(location.search).get('popup') === '1',
         // Zustands-Entitäten, die wegen gemischter Zahlen-Entitäten nicht
         // gezeichnet werden (siehe load()).
         droppedStateIds: [],

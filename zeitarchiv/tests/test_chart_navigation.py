@@ -18,7 +18,7 @@ def test_navigation_only_while_customizing_and_plain_label_when_viewing() -> Non
     row = EDITOR_TEMPLATE.split('<div class="chart-title-row chart-title-row-end">', 1)[1].split("<template x-if", 1)[0]
     assert '<span class="period-label" x-show="!editing" x-text="periodLabel"></span>' in row
     assert "chart-nav" not in row
-    toolbar = EDITOR_TEMPLATE.split('<div class="toolbar" x-show="editing">', 1)[1].split('<div class="toolbar-right">', 1)[0]
+    toolbar = EDITOR_TEMPLATE.split('<div class="toolbar" x-show="editing || popup">', 1)[1].split('<div class="toolbar-right">', 1)[0]
     assert toolbar.index('<div class="seg">') < toolbar.index('<span class="nav chart-nav">')
     assert '@click="goBack()"' in toolbar
     assert ':disabled="!canGoForward" @click="goForward()"' in toolbar

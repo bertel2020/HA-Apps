@@ -8,7 +8,7 @@
   
   {% set display_name = custom_name or friendly_name or entity_id %}
   <div class="page" x-data="entityChart()" :data-legend-size="legendSize || null">
-    <div class="h1-row">
+    <div class="h1-row popup-hide">
       <h1{% if not friendly_name and not custom_name %} class="raw"{% endif %}>{{ display_name }}{% if custom_name %}{{ custom_name_icon(_('App-eigener Anzeigename — HA: ') ~ (friendly_name or entity_id)) }}{% endif %}</h1>
       <button type="button" class="fav-star {{ 'active' if is_favorite else '' }}" aria-pressed="{{ 'true' if is_favorite else 'false' }}"
               title="{{ _('Favorit') }}" onclick="toggleFavorite('{{ app_root }}/entities/{{ entity_id }}/favorite', this)">★</button>
@@ -45,8 +45,8 @@
       {% endif %}
     </p>
 
-    {% include "_entity_facts.html" %}
-    {% with active = 'verlauf' %}{% include "_entity_tabs.html" %}{% endwith %}
+    <div class="popup-hide">{% include "_entity_facts.html" %}</div>
+    <div class="popup-hide">{% with active = 'verlauf' %}{% include "_entity_tabs.html" %}{% endwith %}</div>
 
     {% include "_pending_purge_banner.html" %}
 

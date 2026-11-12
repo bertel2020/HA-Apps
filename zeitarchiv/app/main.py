@@ -357,6 +357,9 @@ def _font_scale_context(request: Request) -> dict:
         # den zwei Stellen (Housekeeping, Einstellungen), die DEMO_MODE bisher
         # schon einzeln in ihren Kontext aufnahmen.
         "demo_mode_active": DEMO_MODE,
+        # Seite steckt im Kachel-Popup des Dashboards (iframe, ?popup=1): ohne Topnav
+        # und Rücklinks, nur lesend (siehe tile-popup.js, Roadmap 1.55).
+        "popup_mode": request.query_params.get("popup") == "1",
     }
 
 
