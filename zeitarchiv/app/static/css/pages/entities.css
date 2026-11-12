@@ -138,8 +138,9 @@
   .dtile-entity-body .dtile-title{
     flex:none;text-align:left;margin-bottom:0;padding-top:4px;
   }
+  /* Kein min-height:0 — Begründung bei .dtile-entity-value in dashboard_detail.css. */
   .dtile-entity-value{
-    flex:1;min-height:0;display:flex;align-content:center;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:5px;
+    flex:1;display:flex;align-content:center;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:5px;
   }
   .dtile-entity-main{display:flex;align-items:baseline;gap:5px;}
   .dtile-entity-number{font-family:var(--font-display);font-size:calc(28px * var(--font-scale, 1));font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
@@ -196,7 +197,7 @@
   }
   .dtile-entity[data-grid-rows="1"] .dtile-entity-stats .dtile-entity-period{display:none;}
   .dtile-entity[data-grid-rows="1"] .dtile-entity-metric{font-size:calc(13px * var(--font-scale, 1));}
-  .dtile-entity-sparkline{flex:none;width:100%;margin-top:6px;}
+  .dtile-entity-sparkline{flex:0 1 auto;min-height:0;overflow:hidden;width:100%;margin-top:6px;}
   /* siehe identische Regel/Begründung in dashboard_detail.html — nur an
      data-grid-rows geknüpft, nicht zusätzlich an data-grid-cols. */
   .dtile-entity[data-grid-rows="1"] .dtile-body{padding:10px 10px 8px;}

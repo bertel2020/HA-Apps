@@ -167,8 +167,11 @@
   .dtile-entity-body .dtile-title{
     flex:none;text-align:left;margin-bottom:0;padding-top:4px;
   }
+  /* Kein min-height:0: In einer niedrigen Kachel (Präziser Modus, Smartphone, große Schrift) schrumpfte die Box
+     unter die Zeilenhöhe der Zahl, die Zahl ragte heraus und der Strich der Kennzahlen-Zeile lief durch sie.
+     Jetzt behält der Wert seine Höhe, und die Sparkline gibt nach (.dtile-entity-sparkline unten). */
   .dtile-entity-value{
-    flex:1;min-height:0;display:flex;align-content:center;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:5px;
+    flex:1;display:flex;align-content:center;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:5px;
   }
   .dtile-entity-main{display:flex;align-items:baseline;gap:5px;}
   .dtile-entity-number{font-family:var(--font-display);font-size:calc(28px * var(--font-scale, 1));font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
@@ -247,7 +250,7 @@
   }
   .dtile-entity[data-grid-rows="1"] .dtile-entity-stats .dtile-entity-period{display:none;}
   .dtile-entity[data-grid-rows="1"] .dtile-entity-metric{font-size:calc(13px * var(--font-scale, 1));}
-  .dtile-entity-sparkline{flex:none;width:100%;margin-top:6px;}
+  .dtile-entity-sparkline{flex:0 1 auto;min-height:0;overflow:hidden;width:100%;margin-top:6px;}
   /* Einzeilige Kachel (unabhängig von der Spaltenzahl — 1x1 UND z. B. 2x1
      haben dieselbe begrenzte Höhe): weniger Abstand statt Inhalte
      auszublenden, damit Titel + Wert + (falls aktiv) Sparkline trotzdem

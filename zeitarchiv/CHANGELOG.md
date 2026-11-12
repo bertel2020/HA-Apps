@@ -85,6 +85,11 @@
   - Die Breite richtet sich nach dem längsten Beschriftungstext statt nach der
     Breite beim Einschalten; per Ziehgriff gesetzte Breiten gelten weiter
 
+- **Dashboards**: Wertekacheln in niedrigen Kacheln ohne Strich durch die Zahl
+  - Bei geringer Kachelhöhe (Präziser Modus, Smartphone, große Schrift) läuft die
+    Linie über den Min/Max-Werten nicht mehr durch den Hauptwert; die Sparkline
+    wird dann gekürzt
+
 - **Auswahl-Assistent**: Empfiehlt weniger
   - Temperatur & Klima: nur Sensoren mit Bereich; Zielwerte und Abgleiche
     stehen unter „Weitere Treffer“
@@ -177,6 +182,11 @@
 - **Tables**: “Equal columns” no longer truncates the label column
   - The width follows the longest label instead of the width at the time the
     option was switched on; widths set with the drag handle still apply
+
+- **Dashboards**: Value tiles without a line through the number when low
+  - On low tiles (precise mode, smartphone, large text) the line above the
+    min/max values no longer runs through the main value; the sparkline is
+    shortened instead
 
 - **Selection assistant**: Recommends less
   - Temperature & climate: only sensors with an area; targets and offsets are
