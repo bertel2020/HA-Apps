@@ -954,10 +954,10 @@
           xAxis: {type: 'category', data: data.labels, axisLabel: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)}, axisLine: {lineStyle: {color: gridLine}}},
           yAxis: [{
             type: 'value', name: unit.trim(), nameTextStyle: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)}, max: isShare ? 100 : undefined,
-            axisLabel: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)}, splitLine: {lineStyle: {color: gridLine}},
+            axisLabel: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11), formatter: (value) => this.fmt(value)}, splitLine: {lineStyle: {color: gridLine}},
           }].concat(hasSoc ? [{
             type: 'value', name: '%', min: 0, max: 100, nameTextStyle: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)},
-            axisLabel: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11)}, splitLine: {show: false},
+            axisLabel: {color: ink, fontFamily: fontMono(), fontSize: scaledFont(11), formatter: (value) => this.fmt(value)}, splitLine: {show: false},
           }] : []),
           series: data.series.map((row, i) => ({
             name: row.name,

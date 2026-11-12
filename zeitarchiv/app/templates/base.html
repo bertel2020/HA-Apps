@@ -49,9 +49,9 @@
 </head>
 <body>
 {% if popup_mode %}
-{# Alpine und der Knopf-Zeitgeber kommen sonst über die Topnav (_topnav.html), die hier fehlt. #}
+{# Alpine kommt sonst über die Topnav (_topnav.html), die hier fehlt. Der Knopf-Zeitgeber (btn-elapsed.js) nicht:
+   im nur lesenden Popup startet kein langer Vorgang. #}
 <script src="{{ asset('vendor/alpine.min.js') }}" defer></script>
-<script src="{{ asset('js/btn-elapsed.js') }}" defer></script>
 <script>
 // Im Kachel-Popup (iframe) erreicht Esc das Elternfenster nicht von selbst.
 document.addEventListener('keydown', function (e) { if (e.key === 'Escape') parent.postMessage({zaPopupClose: true}, location.origin); });
