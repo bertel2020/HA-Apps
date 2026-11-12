@@ -827,12 +827,18 @@ class WetterService:
                 return entity_id, kind
         return None
 
-    def _daily(self, entity_id: str, now_local: datetime) -> list:
+    def _daily(self, entity_id: str, now_local: datetime, since: date | None = None) -> list:
+        """Tagesreihe ab dem 1. Januar des ersten Archivjahres; mit ``since`` erst ab Mitternacht dieses Tages.
+
+        Ein Aufrufer, der nur die letzten Tage braucht, soll nicht die ganze Historie lesen: Das laufende Jahr
+        wird nie zwischengespeichert, die Kosten wuchsen also mit jedem Tag seit dem 1. Januar und mit jedem Sensor."""
         entity = self.deps.index.get_entity(entity_id)
         first = entity["first_ts"] if entity else None
         if first is None:
             return []
         start = datetime.fromtimestamp(first, self.deps.tz).replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        if since is not None:
+            start = max(start, datetime(since.year, since.month, since.day, tzinfo=self.deps.tz))
         return query_mod.query_daily_series(
             self.deps.data_dir, self.deps.index, entity_id, start, now_local, self.deps.tz, now_local,
             query_mod.QueryReadCache(),
@@ -1039,7 +1045,8 @@ class WetterService:
             for spec in chosen:
                 by_day = {
                     analysis.day_of(point, self.deps.tz): point.value
-                    for point in self._daily(spec["entity_id"], now_local) if point.covered and point.value is not None
+                    for point in self._daily(spec["entity_id"], now_local, since=dates[0])
+                    if point.covered and point.value is not None
                 }
                 series.append({
                     "key": spec["key"], "entity_id": spec["entity_id"],
