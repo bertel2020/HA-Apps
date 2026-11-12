@@ -72,7 +72,25 @@
     - “Used in” now opens the default dashboard as the overview, like the
       navigation
 
+  - History popup instead of a page change
+    - Clicking a chart, table or value tile opens its history as a popup over
+      the dashboard; the dashboard stays where it was
+    - Period, navigation, comparisons and options work as on the page itself;
+      “Edit” and “Open as page” lead to the full page
+    - On smartphones the popup slides up from the bottom
+  - Energy dashboard popup: same frame and close button as the tile popup,
+    larger, axes in the app format
+  - Cards with a soft shadow in the weather and energy dashboards, same
+    spacing below the top bar everywhere
+
 ### Changed
+
+- **Dashboards**: Load faster, especially with many entities and on slow
+  systems
+  - Tiles, weather and energy dashboards refresh long periods less often and
+    without flicker
+  - The tile menu no longer repeats the entity list per tile
+  - The bell in the top bar does not poll while the tab is hidden
 
 - **Weather dashboard**
   - The hint for the “Sun elevation” role now mentions the “Solar elevation”

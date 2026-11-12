@@ -74,7 +74,25 @@
     - „Verwendet in“ öffnet das Standard-Dashboard jetzt als Übersicht, wie die
       Navigation
 
+  - Verlaufs-Popup statt Seitenwechsel
+    - Ein Klick auf eine Chart-, Tabellen- oder Wertekachel öffnet den Verlauf
+      als Popup über dem Dashboard; das Dashboard bleibt, wo es war
+    - Zeitraum, Navigation, Vergleiche und Optionen funktionieren wie auf der
+      Seite selbst; „Bearbeiten“ und „Als Seite öffnen“ führen zur ganzen Seite
+    - Auf dem Smartphone fährt das Popup von unten ein
+  - Energiedashboard-Popup: gleicher Rahmen und Schließen-Knopf wie beim
+    Kachel-Popup, größer, Achsen im App-Format
+  - Karten im Wetter- und Energiedashboard mit weichem Schatten, überall
+    gleicher Abstand unter der Topnav
+
 ### Geändert
+
+- **Dashboards**: Laden schneller, besonders mit vielen Entitäten und auf
+  langsamen Systemen
+  - Kacheln, Wetter- und Energiedashboard aktualisieren lange Zeiträume
+    seltener und ohne Flackern
+  - Das Kachel-Menü wiederholt die Entitätenliste nicht mehr je Kachel
+  - Die Glocke in der Topnav fragt im versteckten Tab nichts mehr ab
 
 - **Wetterdashboard**
   - Hinweistext zur Rolle „Sonnenhöhe“ nennt den Sensor „Solare Elevation“ der
