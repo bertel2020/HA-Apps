@@ -110,6 +110,17 @@
   // ließe "manuell aktualisieren" wirken, obwohl es das gar nicht mehr
   // bräuchte. Nur während der Tab sichtbar ist (siehe setupAutoRefresh).
   const DASHBOARD_REFRESH_INTERVAL_MS = 60000;
+  // Der Takt oben bleibt; eine Kachel wird aber nur neu geladen, wenn seit ihrer letzten Zeichnung das Intervall ihres
+  // Zeitraums verstrichen ist. Eine Minute ändert eine Wochen-, Monats- oder Jahressumme kaum, die Abfrage kostet den
+  // Server (auf einem Pi oder bei vielen Kacheln) aber jedes Mal die volle Zeit. Kacheln ohne Zeitraum (Tabellen)
+  // bleiben beim Takt von einer Minute.
+  const DASHBOARD_REFRESH_BY_RANGE_MS = {hour: 60000, day: 60000, week: 300000, month: 600000, year: 900000};
+  // Der Takt läuft nie auf die Millisekunde genau; ohne Spielraum griffe ein 10-min-Intervall erst beim Takt danach.
+  const REFRESH_SLACK_MS = 5000;
+  // Zeitpunkt der letzten Zeichnung je Kachel (gesetzt in nextRenderSeq(), das jeder Zeichenpfad aufruft).
+  const lastRenderAt = new WeakMap();
+  // true, solange renderTile() für ein stilles Nachladen zeichnet (siehe dort); liest der setOption-Wrapper unten.
+  let quietDraw = false;
 
 
   // el = die .dtile-body (Chart-Kachel-Link), legend = {items, legendMetrics,
@@ -208,11 +219,15 @@
   }
 
   function nextRenderSeq(el) {
+    lastRenderAt.set(el, Date.now());
     el.dataset.renderSeq = String((Number(el.dataset.renderSeq) || 0) + 1);
     return el.dataset.renderSeq;
   }
 
-  async function renderTile(el) {
+  // quiet: stilles Nachladen (Auto-Refresh) ohne Einblend-Animation. setOption(…, true) ersetzt die Serien, und
+  // ECharts ließe die Kachel sonst jede Minute neu einwachsen (Wandtablet: Flackern und Renderlast). Dasselbe tut die
+  // Chart-Seite beim stillen Nachladen (entity_detail.js, quietRender).
+  async function renderTile(el, {quiet = false} = {}) {
     // item-id sitzt auf der äußeren .dtile (auch Drag&Drop-Handle, siehe
     // setupDragAndDrop), die restlichen Daten auf dem inneren Link selbst.
     const chartId = el.closest('.dtile').dataset.itemId;
@@ -296,6 +311,8 @@
     if (!chart) {
       chartEl.innerHTML = '';
       chart = echarts.init(chartEl);
+      const rawSetOption = chart.setOption.bind(chart);
+      chart.setOption = (option, ...rest) => rawSetOption(quietDraw ? {...option, animation: false} : option, ...rest);
       instances.set(chartId, chart);
       observeChart(chart, chartEl);
     }
@@ -305,7 +322,13 @@
     // "var(--x)" gar nicht erst. Bewusst aus dem CSS gelesen statt fest
     // verdrahtet, damit die Kachel im Dark Mode mitzieht wie der Rest der App.
     const style = getComputedStyle(document.body);
-    draw(chart, {spec, data, series, viewType, multiYear, hiddenSet: legendHidden.get(chartId), style});
+    // draw() ist synchron: Das Flag gilt nur für diesen einen Aufruf.
+    quietDraw = quiet;
+    try {
+      draw(chart, {spec, data, series, viewType, multiYear, hiddenSet: legendHidden.get(chartId), style});
+    } finally {
+      quietDraw = false;
+    }
   }
 
 
@@ -772,12 +795,19 @@
   // Läuft auch im Hintergrund weiter (der Browser drosselt Intervalle
   // inaktiver Tabs ohnehin selbst), die visibilityState-Prüfung im Tick
   // spart zusätzlich die Server-Anfragen selbst, nicht nur deren Timing.
-  function rerenderTiles() {
+  // auto: Nachladen durch den Takt. Dann werden nur Kacheln gezeichnet, deren Intervall verstrichen ist (siehe
+  // DASHBOARD_REFRESH_BY_RANGE_MS), und Charts ohne Animation. Ohne auto (neuer Stichtag) zeichnet alles sofort.
+  function rerenderTiles({auto = false} = {}) {
+    const now = Date.now();
     renderedTiles.forEach(el => {
       if (!el.isConnected) { renderedTiles.delete(el); return; }
+      if (auto) {
+        const interval = DASHBOARD_REFRESH_BY_RANGE_MS[el.dataset.range] || DASHBOARD_REFRESH_INTERVAL_MS;
+        if (now - (lastRenderAt.get(el) || 0) < interval - REFRESH_SLACK_MS) return;
+      }
       if (el.classList.contains('dtile-entity-body')) renderEntityTile(el);
       else if (el.dataset.columns != null) renderTableTile(el);
-      else renderTile(el);
+      else renderTile(el, {quiet: auto});
     });
   }
 
@@ -787,13 +817,13 @@
     if (refreshTimer) clearInterval(refreshTimer);
     refreshTimer = setInterval(() => {
       if (document.visibilityState !== 'visible' || stichtag()) return;
-      rerenderTiles();
+      rerenderTiles({auto: true});
     }, DASHBOARD_REFRESH_INTERVAL_MS);
   }
 
   // Neuer Stichtag: sichtbare Kacheln sofort neu laden. Noch nie gezeichnete
   // lesen ihn, sobald sie in den Sichtbereich kommen.
-  window.addEventListener('dashboard-stichtag', rerenderTiles);
+  window.addEventListener('dashboard-stichtag', () => rerenderTiles());
 
   function setupSizePickers() {
     const grid = document.getElementById('dashboard-grid');
