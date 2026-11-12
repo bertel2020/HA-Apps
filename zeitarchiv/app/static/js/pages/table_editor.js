@@ -513,7 +513,9 @@
         duplicateRow(rowUid) {
           const index = this.rows.findIndex(r => r.uid === rowUid);
           if (index < 0) return;
+          const oldLetterToUid = this.snapshotRowLetters();
           this.rows.splice(index + 1, 0, {...this.rows[index], uid: uid()});
+          this.correctFormulaLetters(oldLetterToUid);
           this.load();
         },
         // Verschiebt eine Spalte um eine Position nach links (-1) oder rechts
@@ -543,6 +545,8 @@
           this.load();
         },
         setRowType(row, type) {
+          // Trennlinien haben keinen Buchstaben: Wechsel von/zu „Trennlinie“ verschiebt die Buchstaben der Zeilen darunter.
+          const oldLetterToUid = this.snapshotRowLetters();
           row.row_type = type;
           if (type === 'entity') row.entity_ids = row.entity_ids.slice(0, 1);
           if (type === 'separator') {
@@ -558,6 +562,7 @@
             row.formula_unit = '';
             if (row.aggregation !== 'sum' && row.aggregation !== 'avg') row.aggregation = 'sum';
           }
+          this.correctFormulaLetters(oldLetterToUid);
           this.load();
         },
         moveRow(rowUid, direction) {
@@ -596,12 +601,16 @@
             r.formula = r.formula.replace(/[A-Za-z]/g, ch => {
               const referencedUid = oldLetterToUid[ch.toUpperCase()];
               if (!referencedUid) return ch;
-              return newLetterOfUid[referencedUid] || ch;
+              // Die referenzierte Zeile gibt es nicht mehr (gelöscht, zur Trennlinie gemacht): „?“ statt des alten
+              // Buchstabens, der jetzt eine andere Zeile meinte — die Formel zeigt dann einen Fehler statt eines falschen Werts.
+              return newLetterOfUid[referencedUid] || '?';
             });
           });
         },
         removeRow(rowUid) {
+          const oldLetterToUid = this.snapshotRowLetters();
           this.rows = this.rows.filter(r => r.uid !== rowUid);
+          this.correctFormulaLetters(oldLetterToUid);
           this.load();
         },
         toggleGroupEntity(row, entityId) {

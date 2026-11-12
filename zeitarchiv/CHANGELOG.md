@@ -83,6 +83,13 @@
     Linie über den Min/Max-Werten nicht mehr durch den Hauptwert; die Sparkline
     wird dann gekürzt
 
+- **Tabellen**: Formeln folgen ihren Zeilen auch beim Löschen und Duplizieren
+  - Zeilen-Buchstaben bleiben von oben nach unten alphabetisch; Formeln wie
+    „A / B“ werden beim Löschen, Duplizieren und beim Wechsel von oder zu
+    „Trennlinie“ mitgezogen, nicht mehr nur beim Verschieben
+  - Zeigt eine Formel auf eine gelöschte Zeile, steht dort „?“ und die Zelle
+    zeigt einen Fehler statt eines falschen Werts
+
 - **Auswahl-Assistent**: Empfiehlt weniger
   - Temperatur & Klima: nur Sensoren mit Bereich; Zielwerte und Abgleiche
     stehen unter „Weitere Treffer“
@@ -173,6 +180,13 @@
   - On low tiles (precise mode, smartphone, large text) the line above the
     min/max values no longer runs through the main value; the sparkline is
     shortened instead
+
+- **Tables**: Formulas follow their rows when deleting and duplicating too
+  - Row letters stay alphabetical from top to bottom; formulas such as “A / B”
+    are updated when deleting, duplicating and when switching to or from
+    “Separator”, not only when moving
+  - If a formula points at a deleted row it shows “?” and the cell shows an
+    error instead of a wrong value
 
 - **Selection assistant**: Recommends less
   - Temperature & climate: only sensors with an area; targets and offsets are
