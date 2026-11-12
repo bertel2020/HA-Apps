@@ -259,7 +259,7 @@
                       <template x-if="row.row_type === 'formula'">
                       <input type="text" class="tbl-formula-input tbl-formula-input-inline"
                              placeholder="z. B. A / B * 100" x-model="row.formula" @change="load()"
-                             :data-tooltip="t('Formel — verfügbar: {rows}', {rows: (rows.slice(0, idx).map(r => rowLetters[r.uid]).filter(Boolean).join(', ') || t('– (keine Zeile oberhalb)'))})">
+                             :data-tooltip="t('Formel — verfügbar: {rows}', {rows: (((L) => rows.slice(0, idx).map(r => L[r.uid]).filter(Boolean).join(', '))(rowLetters) || t('– (keine Zeile oberhalb)'))})">
                       </template>
                       <template x-if="row.row_type === 'formula'">
                       <input type="text" class="tbl-formula-input tbl-formula-unit-inline"
