@@ -21,6 +21,8 @@ from .i18n import N_, tr
 import bisect
 import json
 import re
+import threading
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
@@ -221,6 +223,19 @@ DAYLENGTH_PAST_YEARS = 5  # so viele frühere Jahre zeigt der Jahresverlauf höc
 #: Süd-Helligkeit der Eltako-Station sättigt hier; darüber steht „ab“ statt eines Messwerts.
 SUN_SENSOR_SATURATION_LX = 98800
 SUN_MAX_GAP_HOURS = 6  # längste Lücke ohne Zeilen, die zwischen zwei sonnigen Stunden als sonnig gilt
+
+#: Abgeschlossene Monate der Sonnentage (sun_history) je (Datenverzeichnis, Einstellungen, Monat, Archivbeginn) ->
+#: (Fingerabdruck der Rollup-Segmente, Tageseinträge). Nur im Speicher: nach einem Neustart zahlt der erste Aufruf einmal.
+#: Gleiches Prinzip wie _DAILY_YEAR_CACHE in storage/query.py: Jede Änderung an den Daten schreibt ein Segment neu und
+#: ändert damit den Fingerabdruck, der Cache braucht keine Haken in den Schreibpfaden.
+_SUN_MONTH_CACHE: "OrderedDict[tuple, tuple[tuple, list[dict]]]" = OrderedDict()
+_SUN_MONTH_CACHE_LOCK = threading.Lock()
+_SUN_MONTH_CACHE_MAX = 512  # je Eintrag etwa 30 kleine Tageseinträge; auch 40 Jahre Archiv bleiben weit unter 20 MB
+#: Einstellungen, die das Ergebnis der Sonnentage bestimmen (Schlüssel des Monats-Caches).
+SUN_CACHE_CONFIG_KEYS = (
+    "illuminance", "illuminance_dawn", "sun_elevation", "sun_relative", "sun_share_pct", "sun_scale_pct",
+    "sun_threshold_lx", "daylight_night_lx", "daylight_day_lx",
+)
 #: Darstellung der Karte Wetterlage: ``large`` (zentrierter Kopf, vier Kacheln), ``compact`` (Kopf in einer Zeile,
 #: niedrigere Kacheln), ``strip`` (Kopf in einer Zeile, Kacheln als eine Leiste). Dieselben Angaben, nur anders gesetzt.
 LAGE_LAYOUTS = ("large", "compact", "strip")
@@ -1235,19 +1250,25 @@ class WetterService:
 
     # -- Tagesbild -----------------------------------------------------------------------
 
-    def _sun_days(self, first: date, last: date, config: dict, now_local: datetime) -> list[dict]:
+    def _sun_days(
+        self, first: date, last: date, config: dict, now_local: datetime, read_until: datetime | None = None,
+    ) -> list[dict]:
         """Sonnentage ``first`` bis ``last`` (einschließlich): je Tag ``class`` (sunny, mixed, overcast oder None),
         ``share`` (Sonnenanteil), ``hours`` (Sonnenstunden, auch ohne Klasse; None ohne Werte) und ``bright``
         (helle Stunden). Der Sonnenanteil ist Sonnenstunden geteilt durch die hellen Stunden; hell ist eine Stunde laut
         Dämmerungssensor (sonst nach der Helligkeit selbst) ab der Tag-Schwelle. Ein Tag mit weniger als
         ``DAYIMAGE_MIN_BRIGHT_HOURS`` hellen Stunden (oder ohne Werte) bekommt keine Klasse. Gemeinsame Grundlage von
-        Tagesbild, Langzeit-Kenntagen, Monatsvergleich, Jahresmatrix und Rekorden."""
+        Tagesbild, Langzeit-Kenntagen, Monatsvergleich, Jahresmatrix und Rekorden.
+
+        ``read_until``: Die Stundenzeilen werden nur bis dahin gelesen (sonst bis jetzt). Wer nur einen Ausschnitt
+        braucht (der Monats-Cache der Sonnentage), liest so nicht die ganze Zeit bis heute mit."""
         entity_id = config["illuminance"]
         tz = self.deps.tz
         read_cache = query_mod.QueryReadCache()
         start = datetime(first.year, first.month, first.day, tzinfo=tz)
+        read_end = now_local if read_until is None else min(read_until, now_local)
         main_rows = sorted(
-            (row for row in self._rows(entity_id, "standard", start, now_local, now_local, read_cache) if row.value is not None),
+            (row for row in self._rows(entity_id, "standard", start, read_end, now_local, read_cache) if row.value is not None),
             key=lambda row: row.bucket_start,
         )
         sun_rows = self._to_relative(main_rows, config, now_local, read_cache) if self._sun_relative(config) else main_rows
@@ -1257,7 +1278,7 @@ class WetterService:
         dawn_id = config["illuminance_dawn"]
         if dawn_id and self.deps.index.get_entity(dawn_id) is not None:
             light_rows = [
-                row for row in self._rows(dawn_id, "standard", start, now_local, now_local, read_cache) if row.value is not None
+                row for row in self._rows(dawn_id, "standard", start, read_end, now_local, read_cache) if row.value is not None
             ]
 
         def stats_of(rows: list) -> dict[float, tuple[float, float]]:
@@ -1389,7 +1410,107 @@ class WetterService:
             return []
         first = datetime.fromtimestamp(entity["first_ts"], self.deps.tz).date()
         yesterday = now_local.date() - timedelta(days=1)
-        return self._sun_days(first, yesterday, config, now_local) if first <= yesterday else []
+        return self._sun_days_cached(first, yesterday, config, now_local) if first <= yesterday else []
+
+    def _sun_segment_stats(self, config: dict) -> dict[str, dict[str, tuple[int, int]]]:
+        """Name, Änderungszeit und Größe aller Stundensegmente der Entitäten, die in die Sonnentage eingehen."""
+        ids = [config["illuminance"]]
+        dawn_id = config["illuminance_dawn"]
+        if dawn_id and self.deps.index.get_entity(dawn_id) is not None:
+            ids.append(dawn_id)
+        if self._sun_relative(config):
+            ids.append(config["sun_elevation"])
+        stats: dict[str, dict[str, tuple[int, int]]] = {}
+        for entity_id in ids:
+            directory = rollup_mod.rollup_path(self.deps.data_dir, entity_id, rollup_mod.FINE_LEVEL["standard"])
+            found: dict[str, tuple[int, int]] = {}
+            if directory.is_dir():
+                for path in directory.glob("*.parquet"):
+                    try:
+                        info = path.stat()
+                    except FileNotFoundError:
+                        continue
+                    found[path.name] = (info.st_mtime_ns, info.st_size)
+            stats[entity_id] = found
+        return stats
+
+    @staticmethod
+    def _sun_month_fingerprint(
+        stats: dict[str, dict[str, tuple[int, int]]], config: dict, year: int, month: int,
+    ) -> tuple | None:
+        """Fingerabdruck der Segmente, aus denen die Sonnentage eines Monats entstehen; None = nicht zwischenspeichern.
+
+        Eingang sind der Monat und seine beiden Nachbarn: Eine Lücke bis ``SUN_MAX_GAP_HOURS`` und die Interpolation der
+        Sonnenhöhe reichen über den Monatswechsel. Der Folgemonat muss als Segment vorliegen (sonst steht er womöglich
+        noch im Hot Buffer und ändert sich laufend), ebenso der Monat selbst."""
+        before = (year - 1, 12) if month == 1 else (year, month - 1)
+        after = (year + 1, 1) if month == 12 else (year, month + 1)
+        names = [rollup_mod.segment_name(*before), rollup_mod.segment_name(year, month), rollup_mod.segment_name(*after), "legacy.parquet"]
+        main = stats[config["illuminance"]]
+        if names[1] not in main or names[2] not in main:
+            return None
+        return tuple((entity_id, name, *found[name]) for entity_id, found in stats.items() for name in names if name in found)
+
+    def _sun_days_cached(self, first: date, last: date, config: dict, now_local: datetime) -> list[dict]:
+        """Wie ``_sun_days(first, last)``, aber abgeschlossene Monate kommen aus dem Speicher, solange die Segmente
+        unverändert sind.
+
+        Vorher las und rechnete jeder Aufruf die ganze Historie neu (alle Stundenzeilen seit Archivbeginn, davon die Hälfte
+        der Zeit in der Umrechnung auf Prozent der Klarhimmel-Helligkeit), obwohl sich abgeschlossene Tage nicht mehr
+        ändern. Gerechnet wird nur, was nicht im Cache liegt: das zuletzt abgeschlossene und das laufende Monat (ihre
+        Segmente stehen womöglich noch im Hot Buffer) sowie jeder Monat mit geändertem Fingerabdruck. Ein Ausschnitt wird
+        mit einem Tag Vorlauf gerechnet und der Vorlauf verworfen, damit Lückenregel und Sonnenhöhe am Rand gleich bleiben."""
+        stats = self._sun_segment_stats(config)
+        config_key = (str(self.deps.data_dir), str(self.deps.tz), *(config.get(name) for name in SUN_CACHE_CONFIG_KEYS))
+        current = (now_local.year, now_local.month)
+        months: list[tuple[int, int]] = []
+        year, month = first.year, first.month
+        while (year, month) <= (last.year, last.month):
+            months.append((year, month))
+            year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+
+        by_day: dict[date, dict] = {}
+        pending: list[tuple[tuple[int, int], tuple | None, tuple]] = []  # (Monat, Fingerabdruck, Cache-Schlüssel)
+        for ym in months:
+            nxt = (ym[0] + 1, 1) if ym[1] == 12 else (ym[0], ym[1] + 1)
+            fingerprint = self._sun_month_fingerprint(stats, config, *ym) if nxt < current else None
+            key = (config_key, ym, first if (first.year, first.month) == ym else None)
+            if fingerprint is not None:
+                with _SUN_MONTH_CACHE_LOCK:
+                    cached = _SUN_MONTH_CACHE.get(key)
+                    if cached is not None and cached[0] == fingerprint:
+                        _SUN_MONTH_CACHE.move_to_end(key)
+                        by_day.update((entry["date"], entry) for entry in cached[1])
+                        continue
+            pending.append((ym, fingerprint, key))
+
+        # Lückenlose Folgen fehlender Monate in einem Durchgang rechnen.
+        runs: list[list[tuple[tuple[int, int], tuple | None, tuple]]] = []
+        for item in pending:
+            ym = item[0]
+            if runs and ((runs[-1][-1][0][0] * 12 + runs[-1][-1][0][1]) + 1) == ym[0] * 12 + ym[1]:
+                runs[-1].append(item)
+            else:
+                runs.append([item])
+        for run in runs:
+            (y0, m0), (y1, m1) = run[0][0], run[-1][0]
+            run_first = max(first, date(y0, m0, 1))
+            run_last = min(last, (date(y1 + 1, 1, 1) if m1 == 12 else date(y1, m1 + 1, 1)) - timedelta(days=1))
+            read_until = datetime.combine(run_last + timedelta(days=2), datetime.min.time(), tzinfo=self.deps.tz)
+            entries = self._sun_days(run_first - timedelta(days=1), run_last, config, now_local, read_until)[1:]
+            computed = {entry["date"]: entry for entry in entries}
+            by_day.update(computed)
+            for ym, fingerprint, key in run:
+                if fingerprint is None:
+                    continue
+                month_entries = [entry for entry in entries if (entry["date"].year, entry["date"].month) == ym]
+                with _SUN_MONTH_CACHE_LOCK:
+                    _SUN_MONTH_CACHE[key] = (fingerprint, month_entries)
+                    _SUN_MONTH_CACHE.move_to_end(key)
+                    while len(_SUN_MONTH_CACHE) > _SUN_MONTH_CACHE_MAX:
+                        _SUN_MONTH_CACHE.popitem(last=False)
+        # Kopien: Aufrufer dürfen die Einträge verändern, ohne den Cache mitzuändern.
+        return [dict(by_day[first + timedelta(days=offset)]) for offset in range((last - first).days + 1)]
 
     # -- Tageslicht ----------------------------------------------------------------------
 
