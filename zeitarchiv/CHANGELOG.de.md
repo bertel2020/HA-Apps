@@ -55,6 +55,8 @@
     dafür den Knopf „Aus Home Assistant übernehmen“
   - Treffer in der Liste zeigen, welche leere Rolle des Wetterdashboards sie
     füllen könnten
+  - Eine neue Ansicht „Dashboards“ listet die noch leeren Rollen je Dashboard,
+    die Vorschläge stehen als Standardtabelle
 
 - **Dashboards**
   - Titel und Zeitraum-Leiste bleiben beim Scrollen oben stehen
@@ -87,14 +89,18 @@
 
 ### Geändert
 
-- **Dashboards**: Laden schneller, besonders mit vielen Entitäten und auf
-  langsamen Systemen
-  - Kacheln, Wetter- und Energiedashboard aktualisieren lange Zeiträume
-    seltener und ohne Flackern
-  - Das Kachel-Menü wiederholt die Entitätenliste nicht mehr je Kachel
-  - Die Glocke in der Topnav fragt im versteckten Tab nichts mehr ab
-  - Vergleichstabellen von Wetter- und Energiedashboard sowie der
-    Temperaturverlauf des Wetterdashboards laden schneller
+- **Dashboards**
+  - Laden schneller, besonders mit vielen Entitäten und auf langsamen Systemen
+    - Kacheln, Wetter- und Energiedashboard aktualisieren lange Zeiträume
+      seltener und ohne Flackern
+    - Das Kachel-Menü wiederholt die Entitätenliste nicht mehr je Kachel
+    - Die Glocke in der Topnav fragt im versteckten Tab nichts mehr ab
+    - Vergleichstabellen von Wetter- und Energiedashboard sowie der
+      Temperaturverlauf des Wetterdashboards laden schneller
+  - Wertekacheln in niedrigen Kacheln ohne Strich durch die Zahl
+    - Bei geringer Kachelhöhe (Präziser Modus, Smartphone, große Schrift) läuft die
+      Linie über den Min/Max-Werten nicht mehr durch den Hauptwert; die Sparkline
+      wird dann gekürzt
 
 - **Wetterdashboard**
   - Hinweistext zur Rolle „Sonnenhöhe“ nennt den Sensor „Solare Elevation“ der
@@ -115,11 +121,6 @@
     - Zeigt eine Formel auf eine gelöschte Zeile, steht dort „?“ und die Zelle
       zeigt einen Fehler statt eines falschen Werts
 
-- **Dashboards**: Wertekacheln in niedrigen Kacheln ohne Strich durch die Zahl
-  - Bei geringer Kachelhöhe (Präziser Modus, Smartphone, große Schrift) läuft die
-    Linie über den Min/Max-Werten nicht mehr durch den Hauptwert; die Sparkline
-    wird dann gekürzt
-
 - **Auswahl-Assistent**: Empfiehlt weniger
   - Temperatur & Klima: nur Sensoren mit Bereich; Zielwerte und Abgleiche
     stehen unter „Weitere Treffer“
@@ -131,8 +132,6 @@
     das andere unter „Weitere Treffer“
   - Vorauswahl: nur Kernpunkte sind angehakt, einige Themen starten ohne Haken
   - Die Kachel zeigt „empfohlen“ und wie viele davon „neu“ sind
-  - Vorschläge als Standardtabelle, dazu eine neue Ansicht „Dashboards“ mit den
-    noch leeren Rollen je Dashboard
 
 ### Behoben
 

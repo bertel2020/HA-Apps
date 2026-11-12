@@ -53,6 +53,8 @@
     from Home Assistant” for it
   - Hits in the list show which empty role of the weather dashboard they could
     fill
+  - A new view “Dashboards” lists the roles still empty per dashboard, with
+    suggestions as a standard table
 
 - **Dashboards**
   - Title and period bar stay at the top while scrolling
@@ -85,14 +87,18 @@
 
 ### Changed
 
-- **Dashboards**: Load faster, especially with many entities and on slow
-  systems
-  - Tiles, weather and energy dashboards refresh long periods less often and
-    without flicker
-  - The tile menu no longer repeats the entity list per tile
-  - The bell in the top bar does not poll while the tab is hidden
-  - Comparison tables of the weather and energy dashboards and the temperature
-    chart of the weather dashboard load faster
+- **Dashboards**
+  - Load faster, especially with many entities and on slow systems
+    - Tiles, weather and energy dashboards refresh long periods less often and
+      without flicker
+    - The tile menu no longer repeats the entity list per tile
+    - The bell in the top bar does not poll while the tab is hidden
+    - Comparison tables of the weather and energy dashboards and the temperature
+      chart of the weather dashboard load faster
+  - Value tiles without a line through the number when low
+    - On low tiles (precise mode, smartphone, large text) the line above the
+      min/max values no longer runs through the main value; the sparkline is
+      shortened instead
 
 - **Weather dashboard**
   - The hint for the “Sun elevation” role now mentions the “Solar elevation”
@@ -113,11 +119,6 @@
     - If a formula points at a deleted row it shows “?” and the cell shows an
       error instead of a wrong value
 
-- **Dashboards**: Value tiles without a line through the number when low
-  - On low tiles (precise mode, smartphone, large text) the line above the
-    min/max values no longer runs through the main value; the sparkline is
-    shortened instead
-
 - **Selection assistant**: Recommends less
   - Temperature & climate: only sensors with an area; targets and offsets are
     listed under “More matches”
@@ -130,8 +131,6 @@
   - Pre-selection: only the key points are ticked; some topics start without
     ticks
   - The tile shows “recommended” and how many of them are “new”
-  - Suggestions as a standard table, plus a new view “Dashboards” with the
-    roles still empty per dashboard
 
 ### Fixed
 
