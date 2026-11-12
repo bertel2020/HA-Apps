@@ -220,6 +220,8 @@
     "Neuer Chart": "New chart",
     "Zeitarchiv — {name}": "Zeitarchiv — {name}",
     "Fixiert": "Locked",
+    "← zurück zur Übersicht": "← back to the overview",
+    "← zurück zum Dashboard „{name}“": "← back to dashboard “{name}”",
     "Klicken zum Bearbeiten": "Click to edit",
     "Eigene, frei benennbare Dashboards zusätzlich zur Übersichtsseite. &middot;": "Custom, freely named dashboards in addition to the overview page. &middot;",
     "&larr; zurück zu Dashboards": "&larr; back to dashboards",

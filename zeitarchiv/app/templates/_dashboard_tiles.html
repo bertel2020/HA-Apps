@@ -107,7 +107,7 @@
            style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}"
            {% if not dashboard_locked %}title="{{ _('Zum Umsortieren ziehen') }}"{% endif %}>
         {% if not dashboard_locked %}{% include "_dashboard_tile_menu.html" %}{% endif %}
-        <a class="dtile-body" href="{{ href_base }}charts/{{ tile.id }}" draggable="false"
+        <a class="dtile-body" href="{{ href_base }}charts/{{ tile.id }}?from_dashboard={{ dashboard_id }}" draggable="false"
            data-period-anchor="{{ tile.period_anchor or '' }}"
            data-compare-settings='{{ tile.compare_settings | default({}) | tojson }}'
            data-heatmap-states='{{ tile.heatmap_states | default({}) | tojson }}'
@@ -146,7 +146,7 @@
            style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}"
            {% if not dashboard_locked %}title="{{ _('Zum Umsortieren ziehen') }}"{% endif %}>
         {% if not dashboard_locked %}{% include "_dashboard_tile_menu.html" %}{% endif %}
-        <a class="dtile-body" href="{{ href_base }}tables/{{ tile.id }}" draggable="false"
+        <a class="dtile-body" href="{{ href_base }}tables/{{ tile.id }}?from_dashboard={{ dashboard_id }}" draggable="false"
            data-columns='{{ tile.columns | tojson }}' data-rows='{{ tile.rows | tojson }}' data-style='{{ tile.style | tojson }}'>
           <div class="dtile-title">{{ tile.name }}{{ missing_badge(tile.missing_ids, tile=true) }}</div>
           <div class="dtile-table-preview"><div class="dtile-loading">&hellip;</div></div>
@@ -207,7 +207,7 @@
            style="--tile-cols:{{ tile.grid_cols }};--tile-rows:{{ tile.grid_rows }}"
            {% if not dashboard_locked %}title="{{ _('Zum Umsortieren ziehen') }}"{% endif %}>
         {% if not dashboard_locked %}{% include "_dashboard_tile_menu.html" %}{% endif %}
-        <a class="dtile-body dtile-entity-body" href="{{ href_base }}entities/{{ tile.entity_id }}" draggable="false"
+        <a class="dtile-body dtile-entity-body" href="{{ href_base }}entities/{{ tile.entity_id }}?from_dashboard={{ dashboard_id }}" draggable="false"
            data-entity-id="{{ tile.entity_id }}" data-is-switch="{{ 'true' if tile.is_switch else 'false' }}"
            data-is-state="{{ 'true' if tile.is_state else 'false' }}" data-state-view="{{ tile.state_view }}"
            data-decimals="{{ tile.decimals }}" data-show-sparkline="{{ 'true' if tile.show_sparkline else 'false' }}"

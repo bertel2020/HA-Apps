@@ -3759,11 +3759,14 @@ def charts_create(body: _SaveChartBody) -> dict:
 
 
 @app.get("/charts/{chart_id}", response_class=HTMLResponse)
-def charts_view(request: Request, chart_id: int) -> HTMLResponse:
+def charts_view(request: Request, chart_id: int, from_dashboard: str | None = None) -> HTMLResponse:
     chart = index.get_saved_chart(chart_id)
     if chart is None:
         raise HTTPException(status_code=404, detail=tr("Chart nicht gefunden"))
-    return templates.TemplateResponse(request, "chart_editor.html", _chart_editor_context(chart))
+    return templates.TemplateResponse(
+        request, "chart_editor.html",
+        {**_chart_editor_context(chart), "back_dashboard": _back_dashboard(from_dashboard)},
+    )
 
 
 @app.post("/charts/{chart_id}")
@@ -3874,6 +3877,26 @@ def _require_dashboard_unlocked(dashboard_id: int) -> None:
     dashboard = index.get_dashboard(dashboard_id)
     if dashboard is not None and dashboard["locked"]:
         raise HTTPException(status_code=423, detail=tr("Dashboard ist fixiert — Layout-Änderungen sind gesperrt"))
+
+
+def _back_dashboard(from_dashboard: str | None) -> dict | None:
+    """Rücklink zum Dashboard, von dem aus eine Kachel geöffnet wurde (?from_dashboard=…).
+
+    Serverseitig statt über document.referrer (dynamic-back-link.js): unter HA-Ingress fehlt der
+    Referrer oft, dann fehlte der Rückweg zum Dashboard ganz. Gültig ist nur eine vorhandene
+    Dashboard-ID; alles andere (fremde Werte, gelöschtes Dashboard) ergibt keinen Link, nie einen Fehler.
+    Das Standard-Dashboard führt zur Übersichtsseite, die es als Startseite zeigt."""
+    if not from_dashboard or not from_dashboard.isdigit():
+        return None
+    dashboard = index.get_dashboard(int(from_dashboard))
+    if dashboard is None:
+        return None
+    if dashboard["is_default"]:
+        return {"path": "/uebersicht", "label": tr("← zurück zur Übersicht")}
+    return {
+        "path": f"/dashboards/{dashboard['id']}",
+        "label": tr("← zurück zum Dashboard „{name}“", name=dashboard["name"]),
+    }
 
 
 def _get_dashboard_or_404(dashboard_id: int) -> dict:
@@ -4772,11 +4795,14 @@ def tables_create(body: _SaveTableBody) -> dict:
 
 
 @app.get("/tables/{table_id}", response_class=HTMLResponse)
-def tables_view(request: Request, table_id: int) -> HTMLResponse:
+def tables_view(request: Request, table_id: int, from_dashboard: str | None = None) -> HTMLResponse:
     table = index.get_saved_table(table_id)
     if table is None:
         raise HTTPException(status_code=404, detail=tr("Tabelle nicht gefunden"))
-    return templates.TemplateResponse(request, "table_editor.html", _table_editor_context(table))
+    return templates.TemplateResponse(
+        request, "table_editor.html",
+        {**_table_editor_context(table), "back_dashboard": _back_dashboard(from_dashboard)},
+    )
 
 
 @app.post("/tables/{table_id}")
@@ -4850,6 +4876,7 @@ def entity_detail(
     range_key: str | None = Query(None, alias="range"),
     offset: int = 0,
     marked: bool = False,
+    from_dashboard: str | None = None,
 ) -> HTMLResponse:
     # URLs dieser Seite laufen über app_root: unter Ingress hat sie einen
     # dynamischen Pfad-Präfix, ein fest absoluter Pfad ("/api/query") würde
@@ -4878,6 +4905,7 @@ def entity_detail(
         "entity_detail.html",
         {
             "entity_id": entity_id,
+            "back_dashboard": _back_dashboard(from_dashboard),
             "friendly_name": entity["friendly_name"],
             "custom_name": entity["custom_name"] or "",
             "aggregation_type": entity["aggregation_type"],

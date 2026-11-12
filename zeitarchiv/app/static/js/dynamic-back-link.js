@@ -84,6 +84,11 @@
     });
     if (alreadyLinked) return;
 
+    // Der Server hat den Weg zurück zum Dashboard schon fest eingetragen (?from_dashboard=…, siehe
+    // _back_dashboard in main.py): ein zweiter, referrer-basierter Link zu einem Dashboard bzw. zur
+    // Übersicht wäre dasselbe noch einmal (Standard-Dashboard: /uebersicht vs. /dashboards/1).
+    if (container.querySelector('[data-back-dashboard]') && /^\/(uebersicht|dashboards\/\d+)(\/|$)/.test(refRel)) return;
+
     const match = ROUTES.find((r) => r.re.test(refRel));
     if (!match) { forget(); return; }
 

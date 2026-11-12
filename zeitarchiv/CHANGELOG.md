@@ -58,6 +58,12 @@
   - Das Schloss neben dem Titel fragt nach und schaltet das Bearbeiten wieder
     ein, der Umweg über Dashboards → Bearbeiten entfällt
 
+- **Dashboards**: Rücklink zum Dashboard auf Chart-, Tabellen- und Entitätsseite
+  - Wer eine Kachel öffnet, sieht oben „← zurück zum Dashboard“ (bzw. „zur
+    Übersicht“), auch wenn der Browser die Herkunftsseite nicht meldet
+  - „Verwendet in“ öffnet das Standard-Dashboard jetzt als Übersicht, wie die
+    Navigation
+
 ### Geändert
 
 - **Wetterdashboard**
@@ -137,6 +143,12 @@
 - **Dashboards**: Unlock by clicking the lock
   - The lock next to the title asks for confirmation and switches editing back
     on, no detour via Dashboards → Edit needed
+
+- **Dashboards**: Link back to the dashboard on chart, table and entity pages
+  - Opening a tile shows “← back to dashboard” (or “to the overview”) at the
+    top, even if the browser does not report the originating page
+  - “Used in” now opens the default dashboard as the overview, like the
+    navigation
 
 #### Changed
 
