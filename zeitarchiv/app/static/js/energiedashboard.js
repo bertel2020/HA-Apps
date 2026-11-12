@@ -231,6 +231,14 @@
   // ebenfalls 60s) — ohne das blieb ein offen gelassenes Energiedashboard
   // beliebig lange auf dem Stand des letzten manuellen Reloads stehen.
   const ENERGIEDASHBOARD_REFRESH_INTERVAL_MS = 60000;
+  // Der Takt oben bleibt, geladen wird aber nur, wenn seit dem letzten Laden mindestens so lange vergangen ist.
+  // Eine Minute Verbrauch ändert eine Monats- oder Jahressumme kaum, kostet den Server aber das Mehrfache einer
+  // Tagesansicht (Monat/Jahr: mehrere Hundert ms auf einem schnellen Rechner, auf einem Pi und bei offenem Tab auf
+  // einem Wandtablet dauerhaft Last). Stunde und Tag ändern sich spürbar und bleiben bei einer Minute.
+  const ENERGIEDASHBOARD_REFRESH_BY_RANGE_MS = {hour: 60000, day: 60000, week: 300000, month: 600000, year: 900000};
+  // Der Takt läuft nie auf die Millisekunde genau; ohne diesen Spielraum würde ein Intervall von 10 min erst beim
+  // nächsten Takt (11 min) greifen.
+  const REFRESH_SLACK_MS = 5000;
   const {energyHeatmap, energyShares} = window.ElementChartRender;
   const SHARE_COLORS = ['--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5', '--chart-6', '--chart-7', '--chart-8'];
   // Dieselbe Breakpoint-Zahl wie die übrigen @media(max-width:560px)-Regeln
@@ -330,6 +338,7 @@
       // this.offset, und der nächste Pfeil sprang unerwartet.
       _loadSeq: 0,
       _heatmapSeq: 0,
+      _lastLoadAt: 0,  // Zeitpunkt des letzten load()-Starts, für das gestaffelte Auto-Refresh
       kpi: {},
       kpiCompare: {},
       compareLabel: '',
@@ -532,6 +541,9 @@
           // abgeschlossene Vorperiode (offset != 0) bleibt für immer gleich,
           // ein erneutes Laden wäre reine Verschwendung.
           if (this.offset !== 0) return;
+          // Je länger der Zeitraum, desto seltener (siehe ENERGIEDASHBOARD_REFRESH_BY_RANGE_MS).
+          const interval = ENERGIEDASHBOARD_REFRESH_BY_RANGE_MS[this.range] || ENERGIEDASHBOARD_REFRESH_INTERVAL_MS;
+          if (Date.now() - this._lastLoadAt < interval - REFRESH_SLACK_MS) return;
           // Offene Dialoge (Trend-Popups, Mehrfach-Entitäten-Auswahl) nicht
           // unter der Hand neu rendern, während der Nutzer sie gerade liest.
           if (document.querySelector('dialog[open]')) return;
@@ -1114,8 +1126,12 @@
 
       async load() {
         const seq = ++this._loadSeq;
+        this._lastLoadAt = Date.now();
         this.loading = true;
         this.loadError = false;
+        // Die Heatmap ist ein eigener, unabhängiger Abruf (eigener Fehlerpfad, eigene Laufnummer): Sie startet
+        // gleichzeitig mit den Hauptdaten statt erst danach. Vorher kamen beide nacheinander (zweimal ca. 110 ms).
+        this.loadHeatmap();
         try {
           const params = new URLSearchParams({range: this.range, offset: String(this.offset)});
           const res = await fetch(`energiedashboard/data?${params}`);
@@ -1147,11 +1163,6 @@
         } finally {
           if (seq === this._loadSeq) this.loading = false;
         }
-        if (seq !== this._loadSeq) return;
-        // Eigener, unabhängiger Fetch (eigenes try/catch unten) — ein
-        // Fehlschlag hier soll die restliche Seite nicht als loadError
-        // markieren, die Karte blendet sich per x-show einfach aus.
-        this.loadHeatmap();
       },
 
       // Popup öffnen und die Trend-Daten dafür (einmalig) nachladen. Das
