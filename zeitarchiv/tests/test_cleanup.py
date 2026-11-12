@@ -189,6 +189,46 @@ def test_alltime_stats_listing_can_leave_out_the_daily_counts() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_boundary_value_skips_rows_marked_as_deleted_in_hot_buffer_and_archive() -> None:
+    """Der Randwert vor einem Fenster (Start eines Zählerfensters, Zustand davor) ist der letzte Rohwert. Ein als
+    gelöscht markierter Wert gehört nicht dazu, sonst verfälscht ein markierter Ausreißer die ganze Auswertung des
+    Fensters (jede andere Abfrage der Rohwerte lässt markierte Zeilen weg)."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.zaehler"
+        index.get_or_create_entity(entity_id, "sensor", "total_increasing", "kWh")
+        # Hot Buffer des laufenden Monats: ein normaler Wert, danach ein Ausreißer (Zählerrückgang auf 0).
+        hotbuffer.append(tmp, entity_id, _ts(2026, 11, 11, 20), 5.0, TZ)
+        hotbuffer.append(tmp, entity_id, _ts(2026, 11, 11, 23, 50), 0.0, TZ)
+        before = _ts(2026, 11, 12, 0)
+        assert query._boundary_value(tmp, entity_id, before, TZ) == 0.0  # noqa: SLF001 — ohne Index ungefiltert wie bisher
+        assert query._boundary_value(tmp, entity_id, before, TZ, index=index) == 0.0  # noqa: SLF001
+        cleanup.soft_delete(index, entity_id, [_ts(2026, 11, 11, 23, 50)])
+        assert query._boundary_value(tmp, entity_id, before, TZ, index=index) == 5.0  # noqa: SLF001
+        # Mit gesetzter Markierung für alle Zeilen davor: kein Randwert aus dem Hot Buffer.
+        cleanup.soft_delete(index, entity_id, [_ts(2026, 11, 11, 20)])
+        assert query._boundary_value(tmp, entity_id, before, TZ, index=index) is None  # noqa: SLF001
+
+        # Archiv: Oktober mit einem normalen Wert und einem Ausreißer als letztem Wert; im Hot Buffer nichts vor dem Fenster.
+        archive_dir = tmp / "archive" / entity_id
+        archive_dir.mkdir(parents=True)
+        pq.write_table(
+            pa.table({"ts": [_ts(2026, 10, 30, 12), _ts(2026, 10, 31, 23, 59)], "value": [7.0, 0.0]}),
+            archive_dir / "2026-10.parquet",
+        )
+        window = _ts(2026, 11, 1, 0)
+        index2 = Index(tmp / "index2.sqlite")
+        index2.get_or_create_entity(entity_id, "sensor", "total_increasing", "kWh")
+        assert query._boundary_value(tmp, entity_id, window, TZ, index=index2) == 0.0  # noqa: SLF001
+        cleanup.soft_delete(index2, entity_id, [_ts(2026, 10, 31, 23, 59)])
+        assert query._boundary_value(tmp, entity_id, window, TZ, index=index2) == 7.0  # noqa: SLF001
+        index.close()
+        index2.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_soft_delete_excludes_row_and_undo_restores_it() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
     try:

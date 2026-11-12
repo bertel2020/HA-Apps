@@ -344,7 +344,7 @@ def marked_ranges_in_window(
     return bloecke, gesamt
 
 
-def _last_value_before(path: Path, before_ts: float) -> float | None:
+def _last_value_before(path: Path, before_ts: float, deleted: dict[float, int] | None = None) -> float | None:
     """Letzter Wert einer einzelnen Archiv-Monatsdatei mit ``ts < before_ts``.
 
     Liest pro Row-Group zuerst nur die Parquet-Statistik (min/max von ``ts``,
@@ -354,7 +354,13 @@ def _last_value_before(path: Path, before_ts: float) -> float | None:
     verwertbare Statistik (z. B. sehr alte/fremde Parquet-Dateien) werden wie
     bisher vollständig gelesen. Anders als zuvor wird nicht mehr die
     komplette Tabelle sortiert, bevor gefiltert wird — nur die tatsächlich
-    infrage kommenden Kandidaten."""
+    infrage kommenden Kandidaten.
+
+    ``deleted``: als gelöscht markierte Vorkommen je Zeitstempel (``Index.get_deleted_counts``) dieses Monats; sie
+    zählen nicht als letzter Wert, wie in jeder anderen Abfrage der Rohwerte (``cleanup.iter_raw_rows``). Gibt es
+    in einer Row-Group nach dem Filtern keinen Kandidaten mehr, gilt die davor. Dasselbe Zeitstempel-Vorkommen über
+    zwei Row-Groups hinweg (ein Duplikat an der Grenze) würde die Zählung in jeder Gruppe anwenden; dieser Fall ist
+    im Archiv nicht vorgesehen (Zeilen sind nach Zeit geschrieben)."""
     parquet_file = pq.ParquetFile(path)
     metadata = parquet_file.metadata
     ts_index = parquet_file.schema_arrow.get_field_index("ts")
@@ -371,6 +377,8 @@ def _last_value_before(path: Path, before_ts: float) -> float | None:
             )
             if ts < before_ts
         ]
+        if deleted and candidates:
+            candidates = filter_deleted_occurrences(candidates, deleted)
         if candidates:
             # Stabil nur nach ts sortieren (wie zuvor table.sort_by("ts")) —
             # bei doppelten Zeitstempeln bleibt so dieselbe Reihenfolge wie
@@ -383,13 +391,27 @@ def _last_value_before(path: Path, before_ts: float) -> float | None:
 
 def _boundary_value(
     data_dir: Path, entity_id: str, before_ts: float, tz: ZoneInfo,
-    read_cache: QueryReadCache | None = None,
+    read_cache: QueryReadCache | None = None, index: Index | None = None,
 ) -> float | None:
-    """Letzter Rohwert vor ``before_ts`` aus Hot Buffer oder Monatsarchiv."""
+    """Letzter Rohwert vor ``before_ts`` aus Hot Buffer oder Monatsarchiv.
+
+    Mit ``index`` zählen als gelöscht markierte Vorkommen nicht: Jede andere Abfrage der Rohwerte lässt sie weg
+    (``_read_hot_rows_filtered``, ``cleanup.iter_raw_rows``), und als Randwert (Start eines Zählerfensters, Zustand
+    vor dem Fenster) würde ein markierter Ausreißer sonst das ganze Fenster verfälschen: ein Zählerrückgang auf 0, den
+    man gerade markiert hat, ließe die nächste Differenz als Tagesverbrauch erscheinen. Ohne ``index`` bleibt es beim
+    ungefilterten Lesen (Aufrufer ohne Zugriff auf den Index)."""
     before_local = datetime.fromtimestamp(before_ts, tz)
+    month_start = before_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     rows = _hot_rows(hot_path(data_dir, entity_id, before_ts, tz), read_cache)
-    # Der letzte Wert vor dem Fenster: das größte (ts, value)-Paar, ohne die ganze Datei dafür zu sortieren.
-    prior = max(((ts, value) for ts, value in rows if ts < before_ts), default=None)
+    deleted = index.get_deleted_counts(entity_id, month_start.timestamp(), before_ts) if index is not None else {}
+    candidates = ((ts, value) for ts, value in rows if ts < before_ts)
+    if deleted:
+        # Wie _read_hot_rows_filtered: nach (ts, value) sortiert, dann die ersten markierten Vorkommen je Zeitstempel weg.
+        kept = filter_deleted_occurrences(sorted(candidates), deleted)
+        prior = kept[-1] if kept else None
+    else:
+        # Der letzte Wert vor dem Fenster: das größte (ts, value)-Paar, ohne die ganze Datei dafür zu sortieren.
+        prior = max(candidates, default=None)
     if prior is not None:
         return prior[1]
 
@@ -403,7 +425,15 @@ def _boundary_value(
     for path in sorted(archive_dir.glob("????-??.parquet"), reverse=True):
         if path.stem > current_month:
             continue
-        value = _last_value_before(path, before_ts)
+        deleted_in_month: dict[float, int] = {}
+        if index is not None:
+            year, month = int(path.stem[:4]), int(path.stem[5:7])
+            following = (year + 1, 1) if month == 12 else (year, month + 1)
+            deleted_in_month = index.get_deleted_counts(
+                entity_id, datetime(year, month, 1, tzinfo=tz).timestamp(),
+                min(before_ts, datetime(*following, 1, tzinfo=tz).timestamp()),
+            )
+        value = _last_value_before(path, before_ts, deleted_in_month)
         if value is not None:
             return value
     return None
@@ -444,7 +474,7 @@ def _query_live_fine(
         )
     )
     boundary = (
-        _boundary_value(data_dir, entity_id, window_start.timestamp(), tz, read_cache)
+        _boundary_value(data_dir, entity_id, window_start.timestamp(), tz, read_cache, index=index)
         if aggregation_type == "counter"
         else None
     )
@@ -666,7 +696,7 @@ def _fine_rows_until(
         )
     )
     boundary = (
-        _boundary_value(data_dir, entity_id, raw_start.timestamp(), tz, read_cache)
+        _boundary_value(data_dir, entity_id, raw_start.timestamp(), tz, read_cache, index=index)
         if aggregation_type == "counter"
         else None
     )
@@ -752,7 +782,7 @@ def _query_completed_plus_live_fine(
             read_cache, extremes=aggregation_type == "standard",
         )
         boundary = (
-            _boundary_value(data_dir, entity_id, live_start.timestamp(), tz, read_cache)
+            _boundary_value(data_dir, entity_id, live_start.timestamp(), tz, read_cache, index=index)
             if aggregation_type == "counter"
             else None
         )
@@ -807,7 +837,7 @@ def query_hourly_counter_series(
             read_cache,
         )
         boundary = (
-            _boundary_value(data_dir, entity_id, live_start.timestamp(), tz, read_cache)
+            _boundary_value(data_dir, entity_id, live_start.timestamp(), tz, read_cache, index=index)
             if aggregation_type == "counter"
             else None
         )
@@ -1053,7 +1083,7 @@ def _month_live_row(
     if not rows:
         return None
     boundary = (
-        _boundary_value(data_dir, entity_id, month_start.timestamp(), tz, read_cache)
+        _boundary_value(data_dir, entity_id, month_start.timestamp(), tz, read_cache, index=index)
         if aggregation_type == "counter"
         else None
     )
@@ -1319,7 +1349,7 @@ def query_series(
     # daher eine kuenstliche Luecke bis zum ersten Wert innerhalb des Fensters.
     if resolved_chart_type == "line" and aggregation_type == "standard":
         boundary_value = _boundary_value(
-            data_dir, entity_id, window_start.timestamp(), tz, read_cache
+            data_dir, entity_id, window_start.timestamp(), tz, read_cache, index=index
         )
         if boundary_value is not None and (
             not points or points[0]["ts"] > window_start.timestamp()
@@ -1535,7 +1565,7 @@ def query_state_shares(
             data_dir, entity_id, index, now_local.timestamp(), live_start.timestamp(), window_end.timestamp(), tz,
             read_cache,
         )
-        boundary = _boundary_value(data_dir, entity_id, live_start.timestamp(), tz, read_cache)
+        boundary = _boundary_value(data_dir, entity_id, live_start.timestamp(), tz, read_cache, index=index)
         live, _ = rollup.compute_fine_rollup_with_key(
             hot, STATE_TYPE, key_fn, boundary, window_end.timestamp(),
             bucket_next_fn=next_fn, window_start_ts=live_start.timestamp(),
@@ -1562,7 +1592,7 @@ def query_state_shares(
                 carried = None
             else:
                 if carried is None:
-                    carried = _boundary_value(data_dir, entity_id, max(start_ts, first_ts), tz, read_cache)
+                    carried = _boundary_value(data_dir, entity_id, max(start_ts, first_ts), tz, read_cache, index=index)
                 if carried is not None:
                     span_start = max(start_ts, window_start.timestamp(), first_ts)
                     span_end = min(bucket_end.timestamp(), limit.timestamp())
@@ -1638,7 +1668,7 @@ def _state_hour_rows(
             data_dir, entity_id, index, now_local.timestamp(), live_start.timestamp(), window_end.timestamp(), tz,
             read_cache,
         )
-        boundary = _boundary_value(data_dir, entity_id, live_start.timestamp(), tz, read_cache)
+        boundary = _boundary_value(data_dir, entity_id, live_start.timestamp(), tz, read_cache, index=index)
         live, _ = rollup.compute_fine_rollup_with_key(
             hot, STATE_TYPE, key_fn, boundary, window_end.timestamp(),
             bucket_next_fn=next_fn, window_start_ts=live_start.timestamp(),
@@ -1658,7 +1688,7 @@ def _state_hour_rows(
             span_start = max(cursor.timestamp(), window_start.timestamp(), first_ts)
             span_end = min(month_end.timestamp(), completed_end.timestamp())
             if carried is None:
-                carried = _boundary_value(data_dir, entity_id, span_start, tz, read_cache)
+                carried = _boundary_value(data_dir, entity_id, span_start, tz, read_cache, index=index)
             if carried is not None and span_end > span_start:
                 idx = int(round(carried))
                 hour = key_fn(span_start)
@@ -1933,7 +1963,7 @@ def query_raw_series(
         )
     ]
 
-    boundary_value = _boundary_value(data_dir, entity_id, window_start.timestamp(), tz)
+    boundary_value = _boundary_value(data_dir, entity_id, window_start.timestamp(), tz, None, index)
     if boundary_value is not None and (
         not points or points[0]["ts"] > window_start.timestamp()
     ):

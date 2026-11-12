@@ -753,7 +753,7 @@ class EnergieDashboardService:
         entity_id = sp.get("capacity_entity_id")
         if entity_id:
             raw_value = query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
-                self.deps.data_dir, entity_id, now.timestamp() + 1, self.deps.tz, read_cache,
+                self.deps.data_dir, entity_id, now.timestamp() + 1, self.deps.tz, read_cache, index=self.deps.index,
             )
             if raw_value is not None:
                 entity = self.deps.index.get_entity(entity_id)
@@ -1353,7 +1353,7 @@ class EnergieDashboardService:
         start_ts = window_start.timestamp()
         zustand: dict[float, float] = {}
         vorher = query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
-            self.deps.data_dir, entity_id, start_ts, tz, read_cache
+            self.deps.data_dir, entity_id, start_ts, tz, read_cache, index=self.deps.index
         )
         if vorher is not None:
             zustand[start_ts] = vorher
@@ -1481,7 +1481,7 @@ class EnergieDashboardService:
                     # fehlt. Ersetzt sie die Bucket-Reihe (die diesen Randpunkt hat), gälten alle Stunden vor der
                     # ersten Änderung als "ohne Preis" und die Kosten wären entsprechend zu niedrig.
                     vorher = query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
-                        self.deps.data_dir, price_entity_id, start_ts, self.deps.tz, read_cache
+                        self.deps.data_dir, price_entity_id, start_ts, self.deps.tz, read_cache, index=self.deps.index
                     )
                     if vorher is not None:
                         series[start_ts] = vorher * scale
@@ -1699,7 +1699,7 @@ class EnergieDashboardService:
                 # vorhandener Daten None. _boundary_value() liest stattdessen
                 # den tatsächlich letzten Rohwert aus Hot-Buffer/Archiv.
                 raw_value = query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
-                    self.deps.data_dir, sp["soc_entity_id"], now.timestamp() + 1, self.deps.tz, read_cache,
+                    self.deps.data_dir, sp["soc_entity_id"], now.timestamp() + 1, self.deps.tz, read_cache, index=self.deps.index,
                 )
                 if raw_value is not None:
                     soc_now_pairs.append((raw_value, weight))
@@ -1753,13 +1753,13 @@ class EnergieDashboardService:
         prognose_morgen = None
         if prognose.get("rest_heute_entity_id"):
             raw_value = query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
-                self.deps.data_dir, prognose["rest_heute_entity_id"], now.timestamp() + 1, self.deps.tz, read_cache,
+                self.deps.data_dir, prognose["rest_heute_entity_id"], now.timestamp() + 1, self.deps.tz, read_cache, index=self.deps.index,
             )
             if raw_value is not None:
                 prognose_rest_heute = round(raw_value, 1)
         if prognose.get("morgen_entity_id"):
             raw_value = query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
-                self.deps.data_dir, prognose["morgen_entity_id"], now.timestamp() + 1, self.deps.tz, read_cache,
+                self.deps.data_dir, prognose["morgen_entity_id"], now.timestamp() + 1, self.deps.tz, read_cache, index=self.deps.index,
             )
             if raw_value is not None:
                 prognose_morgen = round(raw_value, 1)

@@ -1268,7 +1268,7 @@ class WetterService:
                 "unit": spec["unit"], "decimals": spec["decimals"],
                 # Nicht entities.last_value: das ist bei vielen Sensoren leer (siehe Energiedashboard).
                 "last": query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
-                    self.deps.data_dir, spec["entity_id"], today["end"].timestamp(), self.deps.tz, read_cache
+                    self.deps.data_dir, spec["entity_id"], today["end"].timestamp(), self.deps.tz, read_cache, index=self.deps.index
                 ),
                 "last_ts": entity["last_ts"] if entity else None,
                 "today": now_summary, "yesterday": yesterday_summary,
@@ -1758,7 +1758,7 @@ class WetterService:
         rows = [row for row in rows if row.value is not None]
         if not rows:
             held = query_mod._boundary_value(  # noqa: SLF001
-                self.deps.data_dir, entity_id, now_local.timestamp(), self.deps.tz, read_cache,
+                self.deps.data_dir, entity_id, now_local.timestamp(), self.deps.tz, read_cache, index=self.deps.index,
             )
             return None if held is None else {"mean": held, "max": held, "last": held}
         highs = [row.max_value if row.max_value is not None else row.value for row in rows]
@@ -1774,7 +1774,7 @@ class WetterService:
             hot_rows_loader=read_cache.read_hot_rows,
         ))
         timeline = [(ts, value >= 0.5) for ts, value in rows]
-        initial = query_mod._boundary_value(self.deps.data_dir, entity_id, start, self.deps.tz, read_cache)  # noqa: SLF001
+        initial = query_mod._boundary_value(self.deps.data_dir, entity_id, start, self.deps.tz, read_cache, index=self.deps.index)  # noqa: SLF001
         if initial is not None:
             timeline.insert(0, (start, initial >= 0.5))
         elif timeline:
