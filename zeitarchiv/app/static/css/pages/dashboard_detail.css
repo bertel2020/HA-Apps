@@ -98,7 +98,7 @@
   .dtile{
     position:relative;min-width:0;grid-column:span var(--tile-cols,1);grid-row:span var(--tile-rows,1);
     border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:visible;cursor:grab;
-    box-shadow:var(--shadow);
+    box-shadow:var(--shadow),var(--tile-lift);
   }
   .dtile[data-grid-cols="2"]{grid-column:span 2;}
   .dtile[data-grid-cols="3"]{grid-column:span 3;}
