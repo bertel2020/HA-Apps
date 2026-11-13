@@ -4690,6 +4690,17 @@ class Index:
             ).fetchall()
             return {row["deleted_at"]: row["n"] for row in rows}
 
+    def last_deleted_batch_size(self, entity_id: str) -> int:
+        """Größe der zuletzt gelöschten Charge — für den Knopf „Letzte Löschung rückgängig (N Werte)“. Zählt in SQL
+        statt alle Zeitstempel der Charge zu laden (eine Sammelaktion markiert Zehntausende)."""
+        with self._lock, self._conn:
+            row = self._conn.execute(
+                "SELECT COUNT(*) AS n FROM deleted_points WHERE entity_id = ? AND deleted_at = "
+                "(SELECT MAX(deleted_at) FROM deleted_points WHERE entity_id = ?)",
+                (entity_id, entity_id),
+            ).fetchone()
+        return int(row["n"]) if row else 0
+
     def last_deleted_at(self, entity_id: str) -> float | None:
         """deleted_at der jüngsten Charge (None, wenn nichts markiert ist) — die
         Kennung, die die "Rückgängig"-Vorschau dem Bestätigen mitgibt, damit

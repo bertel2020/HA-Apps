@@ -39,7 +39,7 @@
   </table>
 </div>
 {% else %}
-<div class="empty">{{ _("Alle Entitäten haben in den letzten {stale_entities_days} Tagen neue Werte geliefert.", stale_entities_days=stale_entities_days) }}</div>
+<div class="empty">{% if stale_entities_days == 1 %}{{ _("Alle Entitäten haben in den letzten 24 Stunden neue Werte geliefert.") }}{% else %}{{ _("Alle Entitäten haben in den letzten {stale_entities_days} Tagen neue Werte geliefert.", stale_entities_days=stale_entities_days) }}{% endif %}</div>
 {% endif %}
 
 {# Alle als „historisch“ markierten Entitäten, unabhängig vom Schwellwert. Im

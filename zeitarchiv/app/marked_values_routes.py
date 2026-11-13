@@ -331,7 +331,9 @@ def create_marked_values_router(deps: MarkedValuesDependencies) -> APIRouter:
         danach die Liste mit dem Ergebnis darüber (ohne hx-trigger — das beendet das
         Polling von selbst)."""
         stand = purge_progress.snapshot()
-        if not stand["started"]:
+        # Der Fortschritt gehört dem globalen Lauf oder einer anderen Entität: deren Ergebnis oder Fehler
+        # ist nicht das dieser Entität. Während er läuft, zeigt die Seite ihn (ein zweiter Lauf startet nicht).
+        if not stand["started"] or (not stand["running"] and stand.get("kind") != entity_id):
             return await run_in_threadpool(panel, request, entity_id, 1, DEFAULT_PAGE_SIZE)
         if stand["running"]:
             return await run_in_threadpool(progress_response, request, entity_id)

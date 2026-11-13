@@ -36,6 +36,12 @@
       document.addEventListener('DOMContentLoaded', () => setTab(directTab));
     }
 
+    // Meldung des Servers, wenn sie ein Text ist. Bei einer Validierungsfehler-Antwort (422) ist "detail"
+    // eine Liste von Objekten und würde als "[object Object]" erscheinen.
+    function serverMessage(err, fallback) {
+      return err && typeof err.detail === 'string' && err.detail ? err.detail : fallback;
+    }
+
     async function submitAddValue() {
       const statusEl = document.getElementById('add-value-status');
       const dtStr = document.getElementById('add-datetime').value;
@@ -63,7 +69,7 @@
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           statusEl.className = 'add-value-status err';
-          statusEl.textContent = err.detail || t('Hinzufügen fehlgeschlagen.');
+          statusEl.textContent = serverMessage(err, t('Hinzufügen fehlgeschlagen.'));
           return;
         }
         statusEl.className = 'add-value-status ok';
@@ -118,7 +124,7 @@
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           statusEl.className = 'add-value-status err';
-          statusEl.textContent = err.detail || t('Vorschau fehlgeschlagen.');
+          statusEl.textContent = serverMessage(err, t('Vorschau fehlgeschlagen.'));
           return;
         }
         const data = await res.json();
@@ -165,7 +171,7 @@
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           statusEl.className = 'add-value-status err';
-          statusEl.textContent = err.detail || t('Verdichten fehlgeschlagen.');
+          statusEl.textContent = serverMessage(err, t('Verdichten fehlgeschlagen.'));
           return;
         }
         const data = await res.json();
@@ -305,8 +311,13 @@
           method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({ts: parseFloat(cell.dataset.ts), old_value: parseFloat(cell.dataset.oldValue), new_value: newValue}),
         });
-        if (!res.ok) return false;
+        if (!res.ok) {
+          // Die Meldung des Servers (z. B. "Kein passender Rohwert gefunden") nicht verwerfen.
+          postCorrect.message = serverMessage(await res.json().catch(() => ({})), '');
+          return false;
+        }
       } catch (e) {
+        postCorrect.message = '';
         return false;
       }
       finishCorrectCell(cell, newValue);
@@ -320,7 +331,7 @@
         if (!(await postCorrect(cell))) failed++;
       }
       btn.disabled = false;
-      if (failed) { appAlert(t('Korrigieren fehlgeschlagen.')); return; }
+      if (failed) { appAlert(postCorrect.message || t('Korrigieren fehlgeschlagen.')); return; }
       htmx.trigger('#controls', 'change');
     }
 
@@ -328,7 +339,7 @@
       const cell = btn.closest('.correct-value-cell');
       btn.disabled = true;
       if (!(await postCorrect(cell))) {
-        if (cell.dataset.editing === 'true') appAlert(t('Korrigieren fehlgeschlagen.'));
+        if (cell.dataset.editing === 'true') appAlert(postCorrect.message || t('Korrigieren fehlgeschlagen.'));
         btn.disabled = false;
         return;
       }

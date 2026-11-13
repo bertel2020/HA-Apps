@@ -80,8 +80,8 @@ def mark_returning(
     marked: dict[str, int] = {}
     for row in (before or {}).get("rows", []):
         entity = index.get_entity(row["entity_id"])
-        if not row.get("returning") or (entity is not None and entity["counter_auto_mark"]):
-            continue  # Zähler mit eingeschalteter Regel markiert der stündliche Lauf selbst
+        if entity is None or not row.get("returning") or entity["counter_auto_mark"]:
+            continue  # Zähler mit eingeschalteter Regel markiert der stündliche Lauf selbst; gelöschte Entität: nichts zu tun
         with entity_lock(row["entity_id"]) if entity_lock else nullcontext():
             timestamps = returning_timestamps(data_dir, index, tz, row["entity_id"], now)
             if timestamps:
@@ -114,6 +114,8 @@ def undo_batch(
     restored = 0
     touched: set[str] = set()
     for entity_id in entity_ids:
+        if index.get_entity(entity_id) is None:
+            continue  # unbekannte Kennung aus dem Formular
         started_at = time.time()
         with entity_lock(entity_id) if entity_lock else nullcontext():
             count = index.undo_deleted_batch(entity_id, batch_at)

@@ -70,12 +70,13 @@ from .formatting import (
     format_retention,
     format_size,
     format_time,
+    format_day_month_timestamp,
     format_timestamp,
     format_uptime,
     format_value,
 )
 from .progress import JobBusy, JobProgress
-from .route_support import MAX_FORM_FIELDS, STORAGE_LOCKED_TIMEOUT_SECONDS
+from .route_support import MAX_FORM_FIELDS, STORAGE_LOCKED_TIMEOUT_SECONDS, UI_EXCLUSIVE_TIMEOUT_SECONDS
 from .storage import cleanup, rotate
 from .storage import reset as reset_storage
 from .storage.coordinator import StorageCoordinator
@@ -301,7 +302,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "count": row["count"],
                 "count_label": format_int(row["count"]),
                 "last_ts": last["ts"],
-                "last_label": f"{format_timestamp(last['ts'], deps.tz)[:6]} {format_time(last['ts'], deps.tz)[:5]}",
+                "last_label": f"{format_day_month_timestamp(last['ts'], deps.tz)} {format_time(last['ts'], deps.tz)[:5]}",
                 "change": tr(
                     "{previous} → {value}",
                     previous=_keep_together(notices_mod.counter_value_label(last["previous"], row)),
@@ -311,7 +312,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "note": note,
                 "returning_detail": [
                     {
-                        "when": f"{format_timestamp(item['ts'], deps.tz)[:6]} {format_time(item['ts'], deps.tz)[:5]}",
+                        "when": f"{format_day_month_timestamp(item['ts'], deps.tz)} {format_time(item['ts'], deps.tz)[:5]}",
                         "value": _keep_together(notices_mod.counter_value_label(item["value"], row)),
                         "previous": _keep_together(notices_mod.counter_value_label(item["previous"], row)),
                     }
@@ -829,7 +830,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "display_name": entity_display_name(entity["entity_id"], entity["friendly_name"], entity["custom_name"]),
                 "has_name": bool(entity["custom_name"] or entity["friendly_name"]),
                 "last_value_label": (
-                    formats.format_datetime(datetime.fromtimestamp(last_ts, deps.tz), seconds=False, comma=True) if last_ts is not None else "Nie empfangen"
+                    formats.format_datetime(datetime.fromtimestamp(last_ts, deps.tz), seconds=False, comma=True) if last_ts is not None else tr("Nie empfangen")
                 ),
                 # 10**6 Tage statt float('inf') — sortiert serverseitig genauso
                 # zuverlässig an die Spitze, ist aber über data-sort auch für
@@ -1007,7 +1008,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         if rotated == 0:
             result = tr("Nichts zu tun — alle Entitäten sind bereits aktuell rotiert.")
         else:
-            result = f"{rotated} Monatsdatei{'en' if rotated != 1 else ''} archiviert."
+            result = tr("1 Monatsdatei archiviert.") if rotated == 1 else tr("{count} Monatsdateien archiviert.", count=rotated)
         logger.info(
             "Manuelle Rotation abgeschlossen · event=manual_rotation_completed files=%d",
             rotated,
@@ -1064,7 +1065,8 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     @router.post("/settings/storage-index/check", response_class=HTMLResponse)
     def settings_storage_index_check(request: Request) -> HTMLResponse:
         """Erstellt eine rein lesende Vorschau möglicher Indexabweichungen."""
-        with deps.coordinator.exclusive():
+        # Mit Zeitbudget (503 statt Stau): ein wartendes exclusive() hält neue Entitätsoperationen an, auch die Aufnahme aus HA.
+        with deps.coordinator.exclusive(timeout=UI_EXCLUSIVE_TIMEOUT_SECONDS):
             report = deps.run_storage_reconciliation(repair=False)
         return deps.templates.TemplateResponse(
             request, "_settings_storage_index_form.html", _settings_storage_index_context(report)
@@ -1074,7 +1076,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     @router.post("/settings/storage-index/repair", response_class=HTMLResponse)
     def settings_storage_index_repair(request: Request) -> HTMLResponse:
         """Prüft erneut und ersetzt nur abgeleitete Metadaten atomar."""
-        with deps.coordinator.exclusive():
+        with deps.coordinator.exclusive(timeout=UI_EXCLUSIVE_TIMEOUT_SECONDS):
             report = deps.run_storage_reconciliation(repair=True)
             # Dasselbe Objekt, das die Glocke liest (storage_reconcile_last): nach der manuellen Reparatur kein Hinweis mehr.
             report["acknowledged"] = True
@@ -1353,6 +1355,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         matrix = data_quality.build_matrix(
             deps.index, period=period, today=datetime.now(deps.tz).date(), tz=deps.tz
         )
+        all_rows = matrix["rows"]  # vor Filter und Seiten: Grundlage des „gesehen“-Stands
         # Die Heatmap-Ansicht (data_quality.build_heatmap, _data_quality_heatmap.html) ist vorerst
         # aus der Oberfläche genommen, siehe ROADMAP.md; Dienst und Vorlage bleiben bestehen.
         if sort not in data_quality.SORT_KEYS:
@@ -1382,7 +1385,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
 
         # Besuch merken, bevor die Seite (samt Meldungen) gerendert wird: der Hinweis "neue Befunde
         # seit dem letzten Besuch" soll auf dieser Seite selbst nicht mehr erscheinen.
-        data_quality.mark_seen(deps.index)
+        data_quality.mark_seen(deps.index, all_rows if matrix['period'] == 'all' else None)
         return deps.templates.TemplateResponse(
             request, "data_quality.html",
             {

@@ -279,3 +279,25 @@ def test_hinzufuegen_und_korrigieren_lehnen_nan_und_unendlich_ab(client) -> None
         assert client.post(f"/entities/{entity_id}/rows/add", content=body, headers=kopf).status_code == 400
     korrektur = '{"ts": 1700000000, "old_value": 1, "new_value": Infinity}'
     assert client.post(f"/entities/{entity_id}/rows/correct", content=korrektur, headers=kopf).status_code == 400
+
+
+def test_ungueltige_eingaben_geben_400_statt_500(client) -> None:
+    from app.main import index
+
+    entity_id = "sensor.pytest_dq_eingabe"
+    _entity(index, entity_id)
+    form = {"filter": "all", "range": "day", "offset": "0", "page_size": "20"}
+    for schlecht in ("abc", "nan", "inf"):
+        assert client.post(f"/entities/{entity_id}/rows/delete", data={**form, "ts": schlecht}).status_code == 400
+    assert client.get(f"/entities/{entity_id}/data-days?year=0&month=5").status_code == 400
+    assert client.get(f"/entities/{entity_id}/data-days?year=10000&month=5").status_code == 400
+    assert client.get(f"/entities/{entity_id}/data-days?year=2026&month=5").status_code == 200
+
+
+def test_rueckgaengig_mit_unbekannter_entitaet_legt_nichts_an(client) -> None:
+    antwort = client.post(
+        "/housekeeping/datenqualitaet/duplicates/undo",
+        data={"entity_id": ["sensor.pytest_gibt_es_nicht"], "batch_at": ["1.0"]},
+    )
+    assert antwort.status_code == 200
+    assert "0</strong> Zeile(n) wiederhergestellt" in antwort.text

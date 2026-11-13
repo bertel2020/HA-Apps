@@ -220,7 +220,7 @@
     </tr>
     {% for row in rows %}
     {# Zeilenhintergrund nur, wenn sich etwas aufräumen lässt (Ausreißer, Duplikat, Wiederholung, Fehlwert); Lücke, „Noch offen“ und „Vermutlich Reset“ färben die Zeile nicht. #}
-    {% set act_labels = [_("Ausreißer"), "Duplikat", "Wiederholung"] %}
+    {% set act_labels = [_("Ausreißer"), _("Duplikat"), _("Wiederholung")] %}
     {% set zeile = namespace(act=false) %}
     {% for flag in row.flags %}{% set v = counter_verdicts_map.get(row.ts) if flag.label == _("Zählerrückgang") and counter_verdicts_map else none %}{% if flag.label in act_labels or (v and v.returns) %}{% set zeile.act = true %}{% endif %}{% endfor %}
     <tr class="{{ 'flag-act' if zeile.act else '' }}">

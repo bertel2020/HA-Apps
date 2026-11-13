@@ -32,6 +32,14 @@ def format_size(size_bytes: int) -> str:
     return f"{_localize_number_text(f'{value:.1f}')} TB"  # unreachable, beruhigt nur Type-Checker
 
 
+def format_day_month_timestamp(ts: float | None, tz: ZoneInfo) -> str:
+    """Tag und Monat im Format der Oberfläche (``07.10.`` / ``07/10`` / ``10/07``). Statt
+    ``format_timestamp(...)[:6]``: das schnitt im englischen Format den Schrägstrich ab (``07/10/``)."""
+    if ts is None:
+        return "—"
+    return formats.format_day_month(datetime.fromtimestamp(ts, tz))
+
+
 def format_timestamp(ts: float | None, tz: ZoneInfo) -> str:
     """tz explizit statt UTC (time.gmtime) — sonst kann das angezeigte Datum bei
     Zeitstempeln nahe Mitternacht vom tatsächlichen lokalen Kalendertag abweichen

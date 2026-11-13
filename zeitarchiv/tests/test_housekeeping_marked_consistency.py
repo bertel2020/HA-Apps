@@ -447,3 +447,60 @@ def test_bulk_preview_names_removed_and_affected_rows(env) -> None:
     row = preview["rows"][0]
     assert row["count"] == 3  # würden entfernt
     assert row["affected"] == 6  # so viele Zeilen zählt die Matrix
+
+
+def test_day_month_label_follows_the_format_without_a_trailing_slash() -> None:
+    from app import formats
+    from app.formatting import format_day_month_timestamp
+
+    ts = datetime(2026, 10, 7, 12, tzinfo=TZ).timestamp()
+    for name, expected in (("de-DE", "07.10."), ("en-GB", "07/10"), ("en-US", "10/07")):
+        token = formats.current_format.set(name)
+        try:
+            assert format_day_month_timestamp(ts, TZ) == expected
+        finally:
+            formats.current_format.reset(token)
+    assert format_day_month_timestamp(None, TZ) == "—"
+
+
+def test_outlier_factor_and_durations_follow_the_format() -> None:
+    from app import formats
+
+    token = formats.current_format.set("en-GB")
+    try:
+        assert cleanup._format_factor(2.5) == "2.5×"
+        assert cleanup._format_factor(56941875.0) == "56,941,875×"
+    finally:
+        formats.current_format.reset(token)
+    assert cleanup._format_factor(2.5) == "2,5×"
+    assert cleanup._format_factor(56941875.0) == "56.941.875×"
+    assert cleanup._format_duration(95) == "1 Min."
+
+
+def test_last_batch_size_counts_only_the_newest_batch(env) -> None:
+    _tmp, index = env
+    index.get_or_create_entity("sensor.a", "sensor", "measurement", "W")
+    assert index.last_deleted_batch_size("sensor.a") == 0
+    cleanup.soft_delete(index, "sensor.a", [1.0, 2.0, 3.0], deleted_at=1000.0)
+    cleanup.soft_delete(index, "sensor.a", [4.0, 5.0], deleted_at=2000.0)
+    assert index.last_deleted_batch_size("sensor.a") == 2
+    assert index.last_deleted_batch_size("sensor.unbekannt") == 0
+
+
+def test_mark_seen_from_a_built_matrix_does_not_rebuild_it(env, monkeypatch) -> None:
+    from app import data_quality
+
+    _tmp, index = env
+    index.get_or_create_entity("sensor.a", "sensor", "measurement", "W")
+    index.get_or_create_entity("sensor.b", "sensor", "measurement", "W")
+    index.set_cleanup_alltime_stats("sensor.a", {"all": 10, "duplicates": 2}, "off", cleanup.OUTLIER_RULE_VERSION)
+    index.set_cleanup_alltime_stats("sensor.gelöscht", {"all": 10, "duplicates": 5}, "off", cleanup.OUTLIER_RULE_VERSION)
+
+    def must_not_run(*_a, **_k):
+        raise AssertionError("Matrix wurde ein zweites Mal gebaut")
+
+    monkeypatch.setattr(data_quality, "build_matrix", must_not_run)
+    data_quality.mark_seen(index, [{"entity_id": "sensor.a", "total": 2}])
+    import json as _json
+
+    assert _json.loads(index.get_setting(data_quality.SEEN_SETTING)) == {"sensor.a": 2}  # ohne die gelöschte Entität

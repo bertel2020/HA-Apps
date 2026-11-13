@@ -15,7 +15,7 @@ from .formatting import (
     DEFAULT_PURGE_AUTO_ENABLED,
     DEFAULT_PURGE_MIN_AGE_DAYS,
     PURGE_MIN_AGE_DAYS_LABELS,
-    format_timestamp,
+    format_day_month_timestamp,
 )
 from .i18n import tr
 
@@ -45,7 +45,7 @@ def batch_due(deleted_at: float, min_age_days: int, tz: ZoneInfo, now: float | N
     if due_ts <= now:
         return {"label": tr("wird beim nächsten Lauf entfernt"), "soon": True}
     days_left = (datetime.fromtimestamp(due_ts, tz).date() - datetime.fromtimestamp(now, tz).date()).days
-    date = format_timestamp(due_ts, tz)[:6]
+    date = format_day_month_timestamp(due_ts, tz)
     if days_left <= SOON_DAYS:
         suffix = tr("in 1 Tag") if days_left <= 1 else tr("in {count} Tagen", count=days_left)
         return {"label": tr("wird ab {date} entfernt, {in_days}", date=date, in_days=suffix), "soon": True}
@@ -64,7 +64,7 @@ def note_for_entity(index, entity_id: str, tz: ZoneInfo, now: float | None = Non
     now = time.time() if now is None else now
     due_ts = oldest + state["min_age_days"] * 86400
     note["overdue"] = due_ts <= now
-    note["due"] = format_timestamp(due_ts, tz)[:6]
+    note["due"] = format_day_month_timestamp(due_ts, tz)
     return note
 
 

@@ -111,9 +111,10 @@ def _format_factor(factor: float) -> str:
     """Vielfaches für den Markierungsgrund. Unter 10 mit einer Nachkommastelle,
     darüber gerundet mit Tausenderpunkten — ein Ziffernfehler ergibt schnell
     siebenstellige Vielfache, und "56941875,0×" liest niemand."""
+    separators = formats.number_separators()
     if factor < 10:
-        return f"{factor:.1f}".replace(".", ",") + "×"
-    return f"{factor:,.0f}".replace(",", ".") + "×"
+        return f"{factor:.1f}".replace(".", separators["decimal"]) + "×"
+    return f"{factor:,.0f}".replace(",", separators["thousands"]) + "×"
 
 
 class OutlierDetector:
@@ -200,9 +201,9 @@ class OutlierDetector:
         und Wiederholungen ("… Vorwert X um TT.MM.JJJJ hh:mm:ss")."""
         if self._previous is None or self._previous_ts is None:
             return ""
-        return (
-            f" — Vorwert {_format_val(self._previous, self.decimals)} "
-            f"um {_format_ts(self._previous_ts, self.tz)}"
+        return tr(
+            " — Vorwert {value} um {when}",
+            value=_format_val(self._previous, self.decimals), when=_format_ts(self._previous_ts, self.tz),
         )
 
     def _check_counter(self, ts: float, value: float) -> str | None:
@@ -408,8 +409,8 @@ def analyze_raw_rows_page(
                     for label, reason in (
                         (tr("Ausreißer"), group_outlier),
                         (tr("Lücke"), group_gap),
-                        ("Duplikat", duplicate_reason),
-                        ("Wiederholung", repetition_reason),
+                        (tr("Duplikat"), duplicate_reason),
+                        (tr("Wiederholung"), repetition_reason),
                         (tr("Zählerrückgang"), counter_decrease_reason),
                     )
                     if reason is not None
@@ -604,13 +605,13 @@ def get_raw_values_for_timestamps(
 def _format_duration(seconds: float) -> str:
     seconds = int(seconds)
     if seconds < 60:
-        return f"{seconds} Sek."
+        return tr("{seconds} Sek.", seconds=seconds)
     minutes = seconds // 60
     if minutes < 60:
-        return f"{minutes} Min."
+        return tr("{minutes} Min.", minutes=minutes)
     hours, minutes = divmod(minutes, 60)
     if hours < 24:
-        return f"{hours} Std. {minutes} Min." if minutes else f"{hours} Std."
+        return tr("{hours} Std. {minutes} Min.", hours=hours, minutes=minutes) if minutes else tr("{hours} Std.", hours=hours)
     days, hours = divmod(hours, 24)
     return tr("{days} Tage {hours} Std.", days=days, hours=hours) if hours else tr("{days} Tage", days=days)
 
@@ -638,7 +639,7 @@ def detect_duplicates(
 def _repetition_reason(
     decimals: str, last_kept_ts: float, last_kept_value: float, tz: ZoneInfo
 ) -> str:
-    precision = "3 (Automatisch)" if decimals == "auto" else decimals
+    precision = tr("3 (Automatisch)") if decimals == "auto" else decimals
     return (
         tr("Gleicher gerundeter Folgewert bei {precision} Nachkommastellen — wie Vorwert {_format_val} um {_format_ts}", precision=precision, _format_val=_format_val(last_kept_value, decimals), _format_ts=_format_ts(last_kept_ts, tz))
     )

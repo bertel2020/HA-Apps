@@ -173,6 +173,7 @@ from . import card_elements, dashboard_tiles, overview_tiles, page_layout, page_
 from .dashboard_tiles import tile_metric_context as _tile_metric_context
 from .route_support import (
     MAX_FORM_FIELDS,
+    STORAGE_LOCKED_TIMEOUT_SECONDS,
     UI_EXCLUSIVE_TIMEOUT_SECONDS,
     UploadLimitExceeded,
     UploadSizeLimitMiddleware,
@@ -5014,8 +5015,8 @@ def entity_data_days(entity_id: str, year: int, month: int) -> dict:
     Entität-Zeitraums ausgrauen kann, statt nur den Gesamtzeitraum
     einzugrenzen."""
     _require_entity(entity_id)
-    if not (1 <= month <= 12):
-        raise HTTPException(status_code=400, detail=tr("Ungültiger Monat"))
+    if not (1 <= month <= 12 and 1970 <= year <= 2100):
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Monat oder ungültiges Jahr"))
     days_in_month = calendar.monthrange(year, month)[1]
     month_start = datetime(year, month, 1, tzinfo=TZ)
     month_end = datetime(year, month, days_in_month, 23, 59, 59, tzinfo=TZ)
@@ -5217,8 +5218,8 @@ def _rows_fragment(
                     for label, reasons in (
                         (tr("Ausreißer"), outliers),
                         (tr("Lücke"), gaps),
-                        ("Duplikat", duplicates),
-                        ("Wiederholung", repetitions),
+                        (tr("Duplikat"), duplicates),
+                        (tr("Wiederholung"), repetitions),
                         (tr("Zählerrückgang"), counter_decreases),
                     )
                     if ts in reasons
@@ -5299,7 +5300,7 @@ def _rows_fragment(
             "gap_detection_enabled": gap_threshold != "off",
             "outlier_detection_enabled": outlier_threshold != "off",
             "counter_decrease_enabled": cleanup_stats.counter_decreases_flagged(entity),
-            "last_batch_count": len(index.get_last_deleted_batch(entity_id)),
+            "last_batch_count": index.last_deleted_batch_size(entity_id),
             "marked_count": int(entity["deleted_count"] or 0),
             "first_date": first_date,
             "last_date": last_date,
@@ -5346,7 +5347,11 @@ async def delete_rows(request: Request, entity_id: str) -> HTMLResponse:
     # Zeile ist ein Feld ("ts"), bei 1000 Zeilen pro Seite plus range/filter/...
     # also zu viel: der Request scheiterte mit 400, ohne dass etwas gelöscht wurde.
     form = await request.form(max_fields=MAX_FORM_FIELDS)
-    timestamps = [float(value) for key, value in form.multi_items() if key == "ts"]
+    try:
+        timestamps = [float(value) for key, value in form.multi_items() if key == "ts"]
+    except ValueError:
+        timestamps = [math.nan]
+    _require_finite(*timestamps)
     filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
     source = str(form.get("source", "manual"))
     entity = _require_entity(entity_id)
@@ -5354,7 +5359,7 @@ async def delete_rows(request: Request, entity_id: str) -> HTMLResponse:
 
     def delete_locked() -> HTMLResponse:
         nonlocal deleted_total
-        with storage_coordinator.entity(entity_id):
+        with storage_coordinator.entity(entity_id, timeout=STORAGE_LOCKED_TIMEOUT_SECONDS):
             to_mark = timestamps
             if source == "duplicates":
                 # Die Vorschau kann veraltet sein (Duplikate inzwischen anderswo
@@ -5548,7 +5553,7 @@ async def undo_rows(request: Request, entity_id: str) -> HTMLResponse:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Zahlenwert in der Anfrage.")) from None
 
     def undo_locked() -> HTMLResponse:
-        with storage_coordinator.entity(entity_id):
+        with storage_coordinator.entity(entity_id, timeout=STORAGE_LOCKED_TIMEOUT_SECONDS):
             if batch_at is None:
                 cleanup.undo_last_delete(index, entity_id)
             else:
@@ -5574,10 +5579,11 @@ async def undo_preview(request: Request, entity_id: str) -> HTMLResponse:
     filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
 
     def load_preview() -> tuple[float | None, list[float], list[tuple[float, float]]]:
-        with storage_coordinator.entity(entity_id):
+        with storage_coordinator.entity(entity_id, timeout=STORAGE_LOCKED_TIMEOUT_SECONDS):
             batch_at = index.last_deleted_at(entity_id)
             batch = index.get_last_deleted_batch(entity_id)
-            return batch_at, batch, cleanup.get_raw_values_for_timestamps(DATA_DIR, entity_id, batch, TZ)
+            # Die Vorschau zeigt nur die neuesten Zeilen: nicht jeden Monat der ganzen Charge lesen.
+            return batch_at, batch, cleanup.get_raw_values_for_timestamps(DATA_DIR, entity_id, sorted(batch)[-_UNDO_PREVIEW_LIMIT:], TZ)
 
     batch_at, batch_timestamps, values = await run_in_threadpool(load_preview)
     preview_rows = [
@@ -5627,7 +5633,7 @@ async def duplicates_preview(request: Request, entity_id: str) -> HTMLResponse:
     window_start, window_end = cleanup_stats.rows_window(range_key, offset, now, entity["first_ts"], TZ)
 
     def load_to_delete() -> list[tuple[float, float]]:
-        with storage_coordinator.entity(entity_id):
+        with storage_coordinator.entity(entity_id, timeout=STORAGE_LOCKED_TIMEOUT_SECONDS):
             return cleanup.duplicate_rows_in_window(DATA_DIR, index, entity_id, window_start.timestamp(), window_end.timestamp(), TZ, now)
 
     # duplicate_rows_to_delete() braucht rows weiterhin aufsteigend nach
@@ -5676,7 +5682,7 @@ async def repetitions_preview(request: Request, entity_id: str) -> HTMLResponse:
     window_start, window_end = cleanup_stats.rows_window(range_key, offset, now, entity["first_ts"], TZ)
 
     def load_preview() -> tuple[int, list[tuple[float, float]]]:
-        with storage_coordinator.entity(entity_id):
+        with storage_coordinator.entity(entity_id, timeout=STORAGE_LOCKED_TIMEOUT_SECONDS):
             rows = cleanup.iter_raw_rows(
                 DATA_DIR, index, entity_id,
                 window_start.timestamp(), window_end.timestamp(), TZ, now=now
@@ -5728,7 +5734,7 @@ async def repetitions_delete(request: Request, entity_id: str) -> HTMLResponse:
 
     def delete_locked() -> HTMLResponse:
         nonlocal deleted_total
-        with storage_coordinator.entity(entity_id):
+        with storage_coordinator.entity(entity_id, timeout=STORAGE_LOCKED_TIMEOUT_SECONDS):
             rows = cleanup.iter_raw_rows(
                 DATA_DIR, index, entity_id,
                 window_start.timestamp(), window_end.timestamp(), TZ, now=now
@@ -5763,7 +5769,7 @@ async def counter_returning_delete(request: Request, entity_id: str) -> HTMLResp
     offset = 0 if range_key == "all" else min(offset, 0)
     window_start, window_end = cleanup_stats.rows_window(range_key, offset, datetime.now(TZ), entity["first_ts"], TZ)
     def run() -> HTMLResponse:
-        with storage_coordinator.entity(entity_id):
+        with storage_coordinator.entity(entity_id, timeout=STORAGE_LOCKED_TIMEOUT_SECONDS):
             n = counter_bulk.mark_entity_returning(
                 DATA_DIR, index, TZ, entity_id, (window_start.timestamp(), window_end.timestamp())
             )

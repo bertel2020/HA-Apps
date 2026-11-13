@@ -370,7 +370,7 @@ def build_matrix(
     computed: dict[str, float | None] = {}
     for entity in index.list_entities():
         entity_id = entity["entity_id"]
-        names[entity_id] = entity["custom_name"] or entity["custom_name"] or entity["friendly_name"] or entity_id
+        names[entity_id] = entity["custom_name"] or entity["friendly_name"] or entity_id
         if not entity["first_ts"]:
             continue  # keine Daten, nichts zu messen
         if entity["state_class"] == "total_increasing" and entity["counter_decreases"] == "allow":
@@ -480,7 +480,7 @@ def build_matrix(
 
 # Beschriftung der Markierung je Spalte, wie sie cleanup.analyze_raw_rows_page vergibt.
 def _flag_labels() -> dict[str, str]:
-    return {"duplicates": "Duplikat", "counter_decreases": tr("Zählerrückgang"), "outliers": tr("Ausreißer"), "gaps": tr("Lücke")}
+    return {"duplicates": tr("Duplikat"), "counter_decreases": tr("Zählerrückgang"), "outliers": tr("Ausreißer"), "gaps": tr("Lücke")}
 
 
 def _reasons_for(key: str, flags: list[dict]) -> list[str]:
@@ -737,6 +737,8 @@ def undo_duplicate_removal(index: Index, batches: list[tuple[str, float]], entit
     weiter zurück."""
     restored = 0
     for entity_id, batch_at in dict.fromkeys(batches):
+        if index.get_entity(entity_id) is None:
+            continue  # unbekannte Kennung aus dem Formular: keine Sperre und kein Eintrag dafür anlegen
         with entity_lock(entity_id):
             count = cleanup.undo_delete_batch(index, entity_id, batch_at)
         if count:
@@ -752,6 +754,16 @@ _TOTALS_MAX_AGE = 120.0
 _totals_cache: dict = {"at": 0.0, "key": None, "data": {}}
 
 
+def _totals_from(index: Index, rows: list[dict]) -> dict[str, int]:
+    """Befunde je gemessener Entität aus den Zeilen einer Gesamt-Matrix (build_matrix mit Zeitraum „Gesamt“).
+    Nur Entitäten, die es noch gibt: Zählungen gelöschter Entitäten blieben sonst für immer im „gesehen“-Stand."""
+    known = {entity["entity_id"] for entity in index.list_entities()}
+    totals = {entity_id: 0 for entity_id in index.list_cleanup_alltime_stats(with_daily=False) if entity_id in known}
+    for row in rows:
+        totals[row["entity_id"]] = row["total"]
+    return totals
+
+
 def current_totals(index: Index, *, max_age: float = _TOTALS_MAX_AGE) -> dict[str, int]:
     """Mitzählende Befunde (gesamte Historie) je gemessener Entität, für den Vergleich mit dem
     Stand des letzten Besuchs. Entitäten ohne Befund stehen mit 0 darin, damit "gemessen, nichts
@@ -761,16 +773,22 @@ def current_totals(index: Index, *, max_age: float = _TOTALS_MAX_AGE) -> dict[st
     key = id(index)
     if _totals_cache["key"] == key and now - _totals_cache["at"] < max_age:
         return _totals_cache["data"]
-    totals = {entity_id: 0 for entity_id in index.list_cleanup_alltime_stats()}
-    for row in build_matrix(index)["rows"]:
-        totals[row["entity_id"]] = row["total"]
+    totals = _totals_from(index, build_matrix(index)["rows"])
     _totals_cache.update(at=now, key=key, data=totals)
     return totals
 
 
-def mark_seen(index: Index) -> None:
-    """Merkt sich den aktuellen Stand als "gesehen" (beim Öffnen der Datenqualität-Seite)."""
-    index.set_setting(SEEN_SETTING, json.dumps(current_totals(index, max_age=0)))
+def mark_seen(index: Index, all_rows: list[dict] | None = None) -> None:
+    """Merkt sich den aktuellen Stand als "gesehen" (beim Öffnen der Datenqualität-Seite).
+
+    ``all_rows`` sind die Zeilen einer bereits gebauten Matrix im Zeitraum „Gesamt“ (vor Filter und Seitenaufteilung):
+    spart den zweiten Aufbau der ganzen Matrix, den die Seite sonst nur für diese Zahlen machte."""
+    if all_rows is None:
+        totals = current_totals(index, max_age=0)
+    else:
+        totals = _totals_from(index, all_rows)
+        _totals_cache.update(at=time.monotonic(), key=id(index), data=totals)
+    index.set_setting(SEEN_SETTING, json.dumps(totals))
 
 
 def new_findings(index: Index) -> dict | None:

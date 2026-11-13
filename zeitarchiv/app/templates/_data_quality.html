@@ -69,7 +69,7 @@
 <form id="dq-bulk-form" hx-post="{{ app_root }}/housekeeping/datenqualitaet/duplicates/preview"
       hx-target="#dq-bulk-panel" hx-swap="innerHTML"></form>
 <div class="dq-bulkbar" x-show="selected.length" x-cloak>
-  <span class="dq-bulkbar-count" x-text="selected.length + ' {{ _('gewählt') }}'"></span>
+  <span class="dq-bulkbar-count" x-text='selected.length + " " + {{ _("gewählt") | tojson }}'></span>
   <button type="submit" form="dq-bulk-form" class="btn btn-sm">{{ _("Duplikate entfernen …") }}</button>
   <button type="button" class="btn btn-sm" @click="selected = []">{{ _("Auswahl aufheben") }}</button>
 </div>
