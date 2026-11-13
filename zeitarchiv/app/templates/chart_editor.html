@@ -176,7 +176,7 @@
                   <option value="bar" :selected="kindValue(id) === 'bar'">{{ _("Balken") }}</option>
                   <option value="line" :selected="kindValue(id) === 'line'">{{ _("Linie") }}</option>
                 </select>
-                <label class="entity-name-axis" x-show="canChooseKind(id) && isLineId(id)" x-cloak
+                <label class="entity-name-axis" x-show="canOwnAxis(id)" x-cloak
                        title="{{ _('Die Linie bekommt eine eigene Achse, ihre Skala richtet sich nur nach ihr') }}">
                   <input type="checkbox" :checked="ownAxisOn(id)" @change="setSeriesAxis(id, $event.target.checked)">
                   <span>{{ _("Eigene Achse") }}</span>

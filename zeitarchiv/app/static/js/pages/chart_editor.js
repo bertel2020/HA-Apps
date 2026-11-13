@@ -1626,6 +1626,14 @@
           const s = this.series.find(x => x.entity_id === id);
           return !!s && s.chart_type === 'line';
         },
+        // „Eigene Achse“ hat nur Sinn, wo die Linie sich sonst eine Achse teilen würde: mit einer anderen Serie
+        // gleicher Einheit. Eine Linie mit eigener Einheit (W neben kWh) hat ihre Achse ohnehin für sich.
+        canOwnAxis(id) {
+          if (!this.canChooseKind(id) || !this.isLineId(id)) return false;
+          if (this.ownAxisOn(id)) return true;
+          const mine = this.series.find(x => x.entity_id === id);
+          return this.series.some(o => o.entity_id !== id && o.unit === mine.unit && o.aggregation_type !== 'state');
+        },
         ownAxisOn(id) { return !!(this.seriesStyle[id] && this.seriesStyle[id].axis === 'own'); },
         setSeriesKind(id, value) {
           const style = {...(this.seriesStyle[id] || {})};
@@ -2270,7 +2278,11 @@
             return Math.max(55, Math.round(text.length * 7.5 + 22));
           });
           const axisOffset = i => { let sum = 0; for (let j = i - 2; j >= 0; j -= 2) sum += axisWidths[j]; return sum; };
-          const sideMargin = side => units.reduce((m, _u, i) => ((i % 2 === 0) === (side === 'left') ? Math.max(m, axisOffset(i)) : m), 0);
+          const sideAxes = side => units.map((_u, i) => i).filter(i => (i % 2 === 0) === (side === 'left'));
+          const sideWidth = side => sideAxes(side).reduce((sum, i) => sum + axisWidths[i], 0);
+          // Mehrere Achsen auf einer Seite: AxisFit misst nur eine je Seite, containLabel schneidet die äußere ab;
+          // dann gilt der geschätzte Platz aller Achsen der Seite als Rand.
+          const multiAxisSide = sideAxes('left').length > 1 || sideAxes('right').length > 1;
           const yAxis = units.map((u, i) => {
             const decimals = unitDecimals.get(u);
             const isDuration = u === ' duration';
@@ -2656,9 +2668,7 @@
             // left 24 statt 10: containLabel misst die breiteste Beschriftung etwas zu knapp, bei langen
             // Werten (z. B. „25,000 ct/kWh“) fehlte links eine Ziffer. AxisFit (axis-fit.js) setzt den Rand
             // nach dem Zeichnen aus der gemessenen Breite; 24 ist der Wert fürs erste Bild.
-            // Versetzte Achsen (mehrere Einheiten oder „Eigene Achse“) liegen außerhalb des gemessenen Rands: ihr
-            // Abstand kommt je Seite dazu, sonst wird die äußere Beschriftung abgeschnitten.
-            grid: {left: 24 + sideMargin('left'), right: 10 + sideMargin('right'), top: 28, bottom: 40, containLabel: true},
+            grid: {left: multiAxisSide ? Math.max(24, sideWidth('left')) : 24, right: multiAxisSide ? Math.max(10, sideWidth('right')) : 10, top: 28, bottom: 40, containLabel: !multiAxisSide},
             // min/max explizit auf das Abfragefenster fixiert, statt ECharts
             // per Default auf den tatsächlichen Datenbereich auto-fitten zu
             // lassen — sonst hört die Achse (und damit sichtbar der Chart) beim

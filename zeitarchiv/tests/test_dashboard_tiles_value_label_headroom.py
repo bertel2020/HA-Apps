@@ -16,7 +16,7 @@ SOURCE = tile_js()
 
 
 def _main_grid() -> str:
-    match = re.search(r"grid: \{\s*(?://[^\n]*\s*)*left: 6 \+ yAxisSideMargin\('left'\),.*?containLabel: true,\s*\}", SOURCE, re.S)
+    match = re.search(r"grid: \{\s*(?://[^\n]*\s*)*left: multiAxisSide \? .*?containLabel: [^,]+,\s*\}", SOURCE, re.S)
     assert match
     return match.group(0)
 
@@ -27,4 +27,4 @@ def test_grid_reserves_room_above_bars_only_when_values_are_shown() -> None:
 
 
 def test_grid_reserves_room_right_of_horizontal_bars_when_values_are_shown() -> None:
-    assert "right: (showValues && horizontalActive ? 36 : 6) + yAxisSideMargin('right')" in _main_grid()
+    assert "(showValues && horizontalActive ? 36 : 6)" in _main_grid()
