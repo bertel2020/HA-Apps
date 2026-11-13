@@ -22,6 +22,7 @@ from ..i18n import tr
 
 import calendar
 import os
+from contextlib import contextmanager
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -705,6 +706,69 @@ def remove_month(
     _remove_rows_for_month(rollup_path(data_dir, entity_id, "monat"), tz, year, month)
     if aggregation_type == "counter":
         _remove_row_for_year(rollup_path(data_dir, entity_id, "jahr"), tz, year)
+
+
+# Marker neben einer Archivdatei, solange deren Rollup-Zeilen noch nicht zu ihr passen. Jede Änderung an einem
+# Archivmonat besteht aus zwei Dateioperationen (Archiv schreiben, Rollup neu berechnen), die sich nicht atomar
+# zusammenfassen lassen: ein Absturz dazwischen ließ den Monat ohne oder mit veralteten Rollup-Zeilen zurück, die
+# Zahlen in Charts und Statistik wichen dann von den Rohdaten ab, ohne dass etwas darauf hinwies. Gilt für die
+# Rotation (neuer Monat), das Neuschreiben (Hinzufügen, Korrigieren, Verdichten) und den Archiv-Purge.
+PENDING_SUFFIX = ".rollup-pending"
+
+
+@contextmanager
+def pending(archive_path: Path):
+    """Legt den Marker an, bevor das Archiv angefasst wird, und entfernt ihn erst, wenn auch das Rollup neu
+    berechnet ist. Bei einem Fehler bleibt er stehen; repair_pending() holt das beim nächsten Start nach.
+
+    Liefert den Marker: scheitert das atomare Schreiben der Archivdatei selbst, ist die Datei unverändert und es gibt
+    nichts nachzuziehen, dann darf der Aufrufer ihn entfernen (siehe write_archive_pending)."""
+    marker = archive_path.with_suffix(PENDING_SUFFIX)
+    archive_path.parent.mkdir(parents=True, exist_ok=True)
+    marker.touch()
+    yield marker
+    marker.unlink(missing_ok=True)
+
+
+def write_archive_pending(marker: Path, write) -> None:
+    """Führt das atomare Schreiben der Archivdatei aus. Wirft es, bleibt die Datei, wie sie war
+    (write_file_atomically); der Marker wird dann entfernt, weil das Rollup noch zu ihr passt."""
+    try:
+        write()
+    except BaseException:
+        marker.unlink(missing_ok=True)
+        raise
+
+
+def repair_pending(data_dir: Path, index, tz: ZoneInfo) -> int:
+    """Rechnet die Rollup-Zeilen jedes Monats neu, dessen Marker noch liegt (Absturz oder Fehler zwischen
+    Archiv und Rollup, siehe pending), aus der Archivdatei, wie sie jetzt ist; fehlt die Datei (der Monat wurde
+    ganz entfernt, oder die Rotation brach vor dem Schreiben ab), werden seine Rollup-Zeilen entfernt. Bricht die
+    Rotation vor dem Löschen der Hot-Datei ab, rotiert die nächste Rotation den Monat ganz normal weiter.
+    Idempotent. Gibt die Zahl der Monate zurück."""
+    repaired = 0
+    for marker in sorted((data_dir / "archive").glob(f"*/*{PENDING_SUFFIX}")):
+        entity = index.get_entity(marker.parent.name)
+        try:
+            year, month = int(marker.stem[:4]), int(marker.stem[5:7])
+        except ValueError:
+            marker.unlink(missing_ok=True)
+            continue
+        if entity is not None:
+            archive_path = marker.with_suffix(".parquet")
+            hourly = bool(entity["hourly_rollup"])
+            if archive_path.exists():
+                replace_month(
+                    data_dir, entity["entity_id"], entity["aggregation_type"], pq.read_table(archive_path),
+                    year, month, tz, hourly_rollup=hourly,
+                )
+            else:
+                remove_month(
+                    data_dir, entity["entity_id"], entity["aggregation_type"], year, month, tz, hourly_rollup=hourly,
+                )
+        marker.unlink(missing_ok=True)
+        repaired += 1
+    return repaired
 
 
 def replace_month(

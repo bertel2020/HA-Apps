@@ -18,7 +18,6 @@ import json
 import statistics
 import time
 from collections import deque
-from contextlib import contextmanager
 from collections.abc import Callable, Collection, Iterable, Iterator
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -1398,7 +1397,7 @@ def purge_archived_months(
                 continue
 
             old_size = path.stat().st_size
-            with _rollup_pending(path):
+            with rollup.pending(path) as marker:
                 if kept:
                     kept_table = pa.table({
                         "ts": [r[0] for r in kept],
@@ -1406,9 +1405,9 @@ def purge_archived_months(
                         "min_value": [r[2] for r in kept],
                         "max_value": [r[3] for r in kept],
                     })
-                    write_file_atomically(
-                        path, lambda tmp, table=kept_table: pq.write_table(table, tmp, compression="zstd")
-                    )
+                    rollup.write_archive_pending(marker, lambda path=path, table=kept_table: write_file_atomically(
+                        path, lambda tmp: pq.write_table(table, tmp, compression="zstd")
+                    ))
                     rollup.replace_month(
                         data_dir, entity_id, aggregation_type, kept_table, year, month, tz,
                         hourly_rollup=hourly_rollup,
@@ -1493,54 +1492,6 @@ def read_values_for_timestamps(
 # (derselbe Ablauf wie purge_archived_months() oben).
 
 
-# Marker neben einer Archivdatei, solange deren Rollup-Zeilen noch nicht zu ihr passen. Das Neuschreiben eines
-# Archivmonats besteht aus zwei Dateioperationen (Archiv ersetzen, Rollup neu berechnen), die sich nicht atomar
-# zusammenfassen lassen: ein Absturz dazwischen ließ den Monat ohne oder mit veralteten Rollup-Zeilen zurück,
-# die Zahlen in Charts und Statistik wichen dann von den Rohdaten ab, ohne dass etwas darauf hinwies.
-PENDING_ROLLUP_SUFFIX = ".rollup-pending"
-
-
-@contextmanager
-def _rollup_pending(archive_path: Path):
-    """Legt den Marker an, bevor das Archiv angefasst wird, und entfernt ihn erst, wenn auch das Rollup neu
-    berechnet ist. Bei einem Fehler bleibt er stehen; repair_pending_rollups() holt das beim nächsten Start nach."""
-    marker = archive_path.with_suffix(PENDING_ROLLUP_SUFFIX)
-    archive_path.parent.mkdir(parents=True, exist_ok=True)
-    marker.touch()
-    yield
-    marker.unlink(missing_ok=True)
-
-
-def repair_pending_rollups(data_dir: Path, index: Index, tz: ZoneInfo) -> int:
-    """Rechnet die Rollup-Zeilen jedes Monats neu, dessen Marker noch liegt (Absturz oder Fehler zwischen
-    Archiv und Rollup, siehe _rollup_pending), aus der Archivdatei, wie sie jetzt ist; fehlt die Datei (der
-    Monat wurde ganz entfernt), werden seine Rollup-Zeilen entfernt. Idempotent. Gibt die Zahl der Monate zurück."""
-    repaired = 0
-    archive_root = data_dir / "archive"
-    for marker in sorted(archive_root.glob(f"*/*{PENDING_ROLLUP_SUFFIX}")):
-        entity = index.get_entity(marker.parent.name)
-        try:
-            year, month = int(marker.stem[:4]), int(marker.stem[5:7])
-        except ValueError:
-            marker.unlink(missing_ok=True)
-            continue
-        if entity is not None:
-            archive_path = marker.with_suffix(".parquet")
-            hourly = bool(entity["hourly_rollup"])
-            if archive_path.exists():
-                rollup.replace_month(
-                    data_dir, entity["entity_id"], entity["aggregation_type"], pq.read_table(archive_path),
-                    year, month, tz, hourly_rollup=hourly,
-                )
-            else:
-                rollup.remove_month(
-                    data_dir, entity["entity_id"], entity["aggregation_type"], year, month, tz, hourly_rollup=hourly,
-                )
-        marker.unlink(missing_ok=True)
-        repaired += 1
-    return repaired
-
-
 def _rewrite_archive_month(
     data_dir: Path, index: Index, entity_id: str, aggregation_type: str,
     rows: list[tuple[float, float, float | None, float | None]],
@@ -1565,10 +1516,12 @@ def _rewrite_archive_month(
         "min_value": [r[2] for r in rows],
         "max_value": [r[3] for r in rows],
     })
-    with _rollup_pending(archive_path):
+    with rollup.pending(archive_path) as marker:
         # Wie die Rotation: eindeutiger Temp-Name, fsync vor dem Umbenennen, Aufräumen bei Fehler
         # (z. B. Platte voll) — ein fester „.tmp“-Name blieb bei einem Abbruch als Rest liegen.
-        write_file_atomically(archive_path, lambda tmp: pq.write_table(table, tmp, compression="zstd"))
+        rollup.write_archive_pending(
+            marker, lambda: write_file_atomically(archive_path, lambda tmp: pq.write_table(table, tmp, compression="zstd"))
+        )
         rollup.replace_month(
             data_dir, entity_id, aggregation_type, table, year, month, tz, hourly_rollup=hourly_rollup
         )

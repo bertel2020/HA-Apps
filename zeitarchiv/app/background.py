@@ -65,7 +65,7 @@ from .energiedashboard_routes import (
 )
 from .progress import JobBusy, JobProgress
 from .route_support import dir_size
-from .storage import backup, backup_external, cleanup, hotbuffer, reconcile
+from .storage import backup, backup_external, cleanup, hotbuffer, reconcile, rollup
 from .storage import resolution as resolution_mod
 from .storage import rotate as rotate_mod
 from .storage import retention as retention_mod
@@ -1263,10 +1263,10 @@ class BackgroundService:
         # des Setup-Formulars, damit der rückwirkende Backfill überhaupt anläuft.
         sync_hourly_rollup_flags_for_current_config(self.energiedashboard_service)
         # Einmalig beim Start: Archivmonate, bei denen das Neuschreiben zwischen Archivdatei und Rollup
-        # unterbrochen wurde (Marker neben der Archivdatei, siehe cleanup._rollup_pending), bekommen ihre
+        # unterbrochen wurde (Marker neben der Archivdatei, siehe rollup.pending), bekommen ihre
         # Rollup-Zeilen aus der Archivdatei neu berechnet. Ohne Marker kostet der Lauf ein Verzeichnis-Listing.
         try:
-            repaired = cleanup.repair_pending_rollups(self.data_dir, self.index, self.tz)
+            repaired = rollup.repair_pending(self.data_dir, self.index, self.tz)
             if repaired:
                 logger.warning(
                     "Rollups unterbrochener Archiv-Änderungen neu berechnet · "

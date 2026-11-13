@@ -154,19 +154,24 @@ def rotate_month_file(
             table = table.replace_schema_metadata(
                 {STATE_MAP_METADATA_KEY: json.dumps(mapping, ensure_ascii=False)}
             )
-    # Temp-Datei + fsync + Umbenennen, erst danach die Hot-CSV löschen: Bei einem Absturz
-    # steht entweder noch der alte Archivstand (und die CSV) oder der vollständige neue da.
-    write_file_atomically(archive_path, lambda tmp: pq.write_table(table, tmp, compression="zstd"))
-    index.add_size_bytes(entity_id, archive_path.stat().st_size - previous_size)
-    hot_csv_path.unlink()
-
     hourly_rollup = bool(entity_row["hourly_rollup"]) if entity_row else False
     # Die Rollup-Zeilen dieses Monats gibt es bei einem ergänzten Archiv schon (aus den früher archivierten Zeilen):
     # ersetzen statt anhängen, sonst stünden sie doppelt darin.
     write_rollup = rollup.replace_month if merged_into_existing else rollup.append_completed_month
-    write_rollup(
-        data_dir, entity_id, aggregation_type, table, year, month, tz, hourly_rollup=hourly_rollup
-    )
+    # Marker bis das Rollup steht: ein Absturz nach dem Löschen der Hot-CSV, aber vor den Rollup-Zeilen, ließ den
+    # Monat sonst für immer ohne sie zurück (die CSV, aus der man neu rotieren könnte, gibt es dann nicht mehr).
+    # Beim nächsten Start rechnet rollup.repair_pending() sie aus dem Archiv nach.
+    with rollup.pending(archive_path) as marker:
+        # Temp-Datei + fsync + Umbenennen, erst danach die Hot-CSV löschen: Bei einem Absturz
+        # steht entweder noch der alte Archivstand (und die CSV) oder der vollständige neue da.
+        rollup.write_archive_pending(
+            marker, lambda: write_file_atomically(archive_path, lambda tmp: pq.write_table(table, tmp, compression="zstd"))
+        )
+        index.add_size_bytes(entity_id, archive_path.stat().st_size - previous_size)
+        hot_csv_path.unlink()
+        write_rollup(
+            data_dir, entity_id, aggregation_type, table, year, month, tz, hourly_rollup=hourly_rollup
+        )
 
 
 def rotate_if_needed(data_dir: Path, entity_id: str, current_ts: float, index: Index, tz: ZoneInfo) -> None:

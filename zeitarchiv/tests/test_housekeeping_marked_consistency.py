@@ -258,8 +258,8 @@ def test_archive_rewrite_is_atomic_and_leaves_no_residue_on_failure(env, monkeyp
         cleanup.add_raw_value(tmp, index, entity_id, ts + 60, 2.0, TZ, now=datetime(2024, 8, 15, tzinfo=TZ))
 
     assert path.read_bytes() == original  # Archivmonat unverändert
-    # kein Temp-Rest; der Marker bleibt bewusst, der Start rechnet das Rollup des Monats dann neu (siehe unten)
-    assert sorted(p.name for p in archive_dir.iterdir()) == ["2024-07.parquet", "2024-07.rollup-pending"]
+    # kein Temp-Rest und kein Marker: die Archivdatei ist unverändert, das Rollup passt noch zu ihr
+    assert sorted(p.name for p in archive_dir.iterdir()) == ["2024-07.parquet"]
 
 
 def _entity_with_duplicates(tmp, index, entity_id: str) -> None:
@@ -580,9 +580,9 @@ def test_interrupted_archive_rewrite_gets_its_rollup_back_at_startup(env, monkey
     assert pq.read_table(path).num_rows == 3
     assert (archive_dir / "2024-07.rollup-pending").exists()
 
-    assert cleanup.repair_pending_rollups(tmp, index, TZ) == 1
+    assert rollup.repair_pending(tmp, index, TZ) == 1
     assert not (archive_dir / "2024-07.rollup-pending").exists()
-    assert cleanup.repair_pending_rollups(tmp, index, TZ) == 0  # idempotent
+    assert rollup.repair_pending(tmp, index, TZ) == 0  # idempotent
     assert pq.read_table(path).num_rows == 3  # das Archiv selbst bleibt unberührt
 
 
@@ -610,3 +610,59 @@ def test_collect_gathers_several_filters_in_one_pass() -> None:
     )
     assert [row["ts"] for row in result["collected"]["outliers"]["rows"]] == [row["ts"] for row in single["rows"]]
     assert result["rows"] == []  # filter_="none" behält nichts für die Seite
+
+
+def _rollup_files(data_dir: Path, entity_id: str) -> dict[str, int]:
+    """{relativer Pfad: Zeilenzahl} aller Rollup-Dateien einer Entität, zum Vergleichen zweier Wege."""
+    root = data_dir / "rollup" / entity_id
+    return {
+        str(path.relative_to(root)): pq.read_table(path).num_rows
+        for path in sorted(root.rglob("*.parquet")) if root.exists()
+    }
+
+
+def test_interrupted_rotation_gets_its_rollup_back_at_startup(env, monkeypatch) -> None:
+    from app.storage import rollup, rotate
+
+    tmp, index = env
+    tz = ZoneInfo("UTC")
+    ents = ("sensor.normal", "sensor.abgestuerzt")
+    for entity_id in ents:
+        index.get_or_create_entity(entity_id, "sensor", "total_increasing", "kWh")
+        for i, ts in enumerate((1719878400.0, 1719964800.0, 1720051200.0)):  # Juli 2024
+            hotbuffer.append(tmp, entity_id, ts, 100.0 + i, tz)
+            index.record_write(entity_id, ts)
+    august = 1722470400.0
+
+    rotate.rotate_if_needed(tmp, "sensor.normal", august, index, tz)  # Vergleichsweg ohne Absturz
+
+    def crash(*_args, **_kwargs):
+        raise OSError("Absturz nach dem Löschen der Hot-Datei")
+
+    monkeypatch.setattr(rollup, "append_completed_month", crash)
+    with pytest.raises(OSError):
+        rotate.rotate_if_needed(tmp, "sensor.abgestuerzt", august, index, tz)
+    monkeypatch.undo()
+
+    archive_dir = tmp / "archive" / "sensor.abgestuerzt"
+    assert (archive_dir / "2024-07.parquet").exists()  # Archiv steht
+    assert not (tmp / "hot" / "sensor.abgestuerzt-2024-07.csv").exists()  # die CSV ist weg, neu rotieren geht nicht
+    assert (archive_dir / "2024-07.rollup-pending").exists()
+    assert _rollup_files(tmp, "sensor.abgestuerzt") == {}  # Rollup fehlt
+
+    assert rollup.repair_pending(tmp, index, tz) == 1
+    assert not (archive_dir / "2024-07.rollup-pending").exists()
+    assert _rollup_files(tmp, "sensor.abgestuerzt") == _rollup_files(tmp, "sensor.normal")
+    assert _rollup_files(tmp, "sensor.normal")  # und der Vergleichsweg hat überhaupt Zeilen
+
+
+def test_a_normal_rotation_leaves_no_marker(env) -> None:
+    from app.storage import rotate
+
+    tmp, index = env
+    tz = ZoneInfo("UTC")
+    index.get_or_create_entity("sensor.a", "sensor", "measurement", "W")
+    hotbuffer.append(tmp, "sensor.a", 1719878400.0, 1.0, tz)
+    index.record_write("sensor.a", 1719878400.0)
+    rotate.rotate_if_needed(tmp, "sensor.a", 1722470400.0, index, tz)
+    assert list((tmp / "archive" / "sensor.a").glob("*.rollup-pending")) == []
