@@ -74,6 +74,41 @@ def test_same_anchor_survives_a_coarse_current_period_and_maps_back_to_its_day()
     assert offsets == [-2, 0, -2]
 
 
+def _run_server_zone(browser_tz: str, expression: str):
+    """Wie _run_js, aber mit ServerTime (Serverzone Berlin) und einer abweichenden Browserzone."""
+    server_time = APP_JS / "server-time.js"
+    code = (
+        "global.window = global; global.document = {documentElement: {dataset: {tz: 'Europe/Berlin'}}};"
+        f"{server_time.read_text()}\n"
+        f"const p=require({json.dumps(str(SCRIPT))}); console.log(JSON.stringify({expression}));"
+    )
+    result = subprocess.run(
+        ["node", "-e", code], check=True, capture_output=True, text=True,
+        env={**os.environ, "TZ": browser_tz},
+    )
+    return json.loads(result.stdout)
+
+
+def test_the_offset_is_counted_in_the_server_zone_whatever_the_browser_zone() -> None:
+    """Der Server steht schon im Oktober (00:30 Uhr Berlin), der Browser in Lissabon/Honolulu noch im September:
+    "heute" und das gewählte Datum gelten in der Serverzone, sonst läge der Versatz um eine Periode daneben."""
+    now = _ms(2026, 10, 1, 0, 30)
+    for browser_tz in ("Europe/Berlin", "Europe/Lisbon", "Pacific/Honolulu", "Asia/Tokyo"):
+        today = _run_server_zone(browser_tz, f"p.offsetForRange('day', p.dayAnchor(2026, 10, 1), {now})")
+        yesterday = _run_server_zone(browser_tz, f"p.offsetForRange('day', p.dayAnchor(2026, 9, 30), {now})")
+        month = _run_server_zone(browser_tz, f"p.offsetForRange('month', p.dayAnchor(2026, 9, 30), {now})")
+        assert (today, yesterday, month) == (0, -1, -1), browser_tz
+        week = _run_server_zone(browser_tz, f"p.offsetForRange('week', p.dayAnchor(2026, 9, 28), {now})")
+        assert week == 0, browser_tz  # Montag 28.09. liegt in derselben Woche wie der 01.10.
+
+
+def test_the_anchor_date_for_an_address_is_the_server_day() -> None:
+    midnight_berlin = _ms(2026, 10, 1, 0, 10)
+    for browser_tz in ("Europe/Lisbon", "Pacific/Honolulu"):
+        assert _run_server_zone(browser_tz, f"p.anchorDate({midnight_berlin})") == "2026-10-01", browser_tz
+        assert _run_server_zone(browser_tz, "p.anchorDate(p.dayAnchor(2026, 1, 15))") == "2026-01-15", browser_tz
+
+
 def _run_all() -> None:
     tests = [obj for name, obj in globals().items() if name.startswith("test_")]
     for test in tests:

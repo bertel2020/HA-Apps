@@ -13,8 +13,7 @@
     function jumpToDate(dateStr) {
       const root = Alpine.$data(document.querySelector('.page'));
       const [y, m, d] = dateStr.split('-').map(Number);
-      const picked = new Date(y, m - 1, d, 12);
-      root._rangeAnchorMs = picked.getTime();
+      root._rangeAnchorMs = PeriodNavigation.dayAnchor(y, m, d);
       root.offset = PeriodNavigation.offsetForRange(root.range, root._rangeAnchorMs);
       root.load();
     }
@@ -579,9 +578,7 @@ function selectBrush() {
           // saved_charts.period_anchor. Die laufende Periode bleibt "immer
           // aktuell". Diese Seite selbst merkt sich die Periode nicht.
           if (this.offset !== 0 && this.windowStart != null && this.windowEnd != null) {
-            const d = new Date(PeriodNavigation.anchorForWindow(this.windowStart, this.windowEnd, false));
-            const pad = n => String(n).padStart(2, '0');
-            params.set('anchor', `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+            params.set('anchor', PeriodNavigation.anchorDate(PeriodNavigation.anchorForWindow(this.windowStart, this.windowEnd, false)));
           }
           return `${BASE}/charts/new?${params}`;
         },

@@ -3,31 +3,58 @@
 // Zoom-Anker; für die laufende Periode bleibt "jetzt" der Anker. Das Ergebnis
 // ist wieder derselbe relative Perioden-Offset, den /api/query erwartet.
 (function (root, factory) {
-  const api = factory();
+  const api = factory(root);
   if (typeof module === 'object' && module.exports) module.exports = api;
   root.PeriodNavigation = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (root) {
   const HOUR_MS = 60 * 60 * 1000;
   const DAY_MS = 24 * HOUR_MS;
 
-  // Date.UTC wird hier absichtlich nur mit den LOKALEN Kalenderbestandteilen
-  // gefüttert. Dadurch ist die Differenz "ein Kalendertag" auch über eine
-  // Sommer-/Winterzeit-Umstellung exakt 1 statt 23 bzw. 25 Stunden.
-  function localHourIndex(date) {
-    return Math.floor(Date.UTC(
-      date.getFullYear(), date.getMonth(), date.getDate(), date.getHours()
-    ) / HOUR_MS);
+  // Kalenderbestandteile in der Zeitzone des SERVERS (ServerTime, static/js/server-time.js): Der Server rechnet
+  // jeden Zeitraum in seiner Zone, "heute" und das gewählte Datum müssen deshalb dort bestimmt werden. Mit der
+  // Browserzone verschöbe sich bei abweichender Zone der Versatz um eine Periode (Browser noch beim Vortag). Ohne
+  // ServerTime (Tests, Karte) gilt wie früher die Browserzone.
+  function serverTime() {
+    const st = root && root.ServerTime;
+    return st && st.zone ? st : null;
   }
 
-  function localDayIndex(date) {
-    return Math.floor(Date.UTC(
-      date.getFullYear(), date.getMonth(), date.getDate()
-    ) / DAY_MS);
+  function calendar(ms) {
+    const st = serverTime();
+    if (st) {
+      const p = st.parts(ms / 1000);
+      return {year: p.year, month: p.month - 1, day: p.day, hour: p.hour, weekday: p.weekday};
+    }
+    const d = new Date(ms);
+    return {year: d.getFullYear(), month: d.getMonth(), day: d.getDate(), hour: d.getHours(), weekday: d.getDay()};
   }
 
-  function monday(date) {
-    const weekday = (date.getDay() + 6) % 7; // Montag = 0
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate() - weekday);
+  // Date.UTC wird hier absichtlich nur mit den KALENDERbestandteilen gefüttert. Dadurch ist die Differenz "ein
+  // Kalendertag" auch über eine Sommer-/Winterzeit-Umstellung exakt 1 statt 23 bzw. 25 Stunden.
+  function hourIndex(c) {
+    return Math.floor(Date.UTC(c.year, c.month, c.day, c.hour) / HOUR_MS);
+  }
+
+  function dayIndex(c) {
+    return Math.floor(Date.UTC(c.year, c.month, c.day) / DAY_MS);
+  }
+
+  function mondayIndex(c) {
+    return dayIndex(c) - (c.weekday + 6) % 7; // Montag = 0
+  }
+
+  // 12 Uhr des Kalendertags y-m-d (m = 1–12) in der Serverzone als Anker in ms: Mittags, damit eine Zeitumstellung
+  // den Tag nicht verschiebt.
+  function dayAnchor(y, m, d) {
+    const st = serverTime();
+    return st ? st.toEpoch(y, m, d, 12) * 1000 : new Date(y, m - 1, d, 12).getTime();
+  }
+
+  // Umkehrung für die Adresse eines festen Zeitraums: das Datum JJJJ-MM-TT von ms in der Serverzone.
+  function anchorDate(ms) {
+    const c = calendar(ms);
+    const pad = n => String(n).padStart(2, '0');
+    return `${c.year}-${pad(c.month + 1)}-${pad(c.day)}`;
   }
 
   function anchorForWindow(windowStart, windowEnd, isCurrent, nowMs = Date.now()) {
@@ -38,28 +65,27 @@
   }
 
   function offsetForRange(range, anchorMs, nowMs = Date.now()) {
-    const anchor = new Date(anchorMs);
-    const now = new Date(nowMs);
+    const anchor = calendar(anchorMs);
+    const now = calendar(nowMs);
     let offset = 0;
     switch (range) {
       case 'hour':
-        offset = localHourIndex(anchor) - localHourIndex(now);
+        offset = hourIndex(anchor) - hourIndex(now);
         break;
       case 'day':
-        offset = localDayIndex(anchor) - localDayIndex(now);
+        offset = dayIndex(anchor) - dayIndex(now);
         break;
       case 'week':
-        offset = Math.round((localDayIndex(monday(anchor)) - localDayIndex(monday(now))) / 7);
+        offset = Math.round((mondayIndex(anchor) - mondayIndex(now)) / 7);
         break;
       case 'month':
-        offset = (anchor.getFullYear() - now.getFullYear()) * 12
-          + anchor.getMonth() - now.getMonth();
+        offset = (anchor.year - now.year) * 12 + anchor.month - now.month;
         break;
       case 'year':
-        offset = anchor.getFullYear() - now.getFullYear();
+        offset = anchor.year - now.year;
         break;
       case 'decade':
-        offset = Math.floor(anchor.getFullYear() / 10) - Math.floor(now.getFullYear() / 10);
+        offset = Math.floor(anchor.year / 10) - Math.floor(now.year / 10);
         break;
       default:
         throw new Error(t('Unbekannter Zeitraum: {range}',{range}));
@@ -68,5 +94,5 @@
     return Math.min(offset, 0);
   }
 
-  return {anchorForWindow, offsetForRange};
+  return {anchorForWindow, offsetForRange, dayAnchor, anchorDate};
 });

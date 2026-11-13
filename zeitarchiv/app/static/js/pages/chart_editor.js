@@ -57,7 +57,7 @@
     function jumpToDate(dateStr) {
       const root = Alpine.$data(document.querySelector('.page'));
       const [y, m, d] = dateStr.split('-').map(Number);
-      root._rangeAnchorMs = new Date(y, m - 1, d, 12).getTime();
+      root._rangeAnchorMs = PeriodNavigation.dayAnchor(y, m, d);
       root.offset = PeriodNavigation.offsetForRange(root.range, root._rangeAnchorMs);
       root.load();
     }
@@ -68,12 +68,10 @@
     // Tag nicht verschiebt — dieselbe Wahl wie jumpToDate().
     function anchorDateToMs(dateStr) {
       const [y, m, d] = dateStr.split('-').map(Number);
-      return new Date(y, m - 1, d, 12).getTime();
+      return PeriodNavigation.dayAnchor(y, m, d);
     }
     function msToAnchorDate(ms) {
-      const d = new Date(ms);
-      const pad = n => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      return PeriodNavigation.anchorDate(ms);
     }
 
     // Auf Modulebene statt lokal in formatPeriodLabel() (wie bis hierhin) —

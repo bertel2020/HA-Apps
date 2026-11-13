@@ -42,7 +42,7 @@ def test_cleanup_reuses_chart_period_anchor_and_shows_hour_date() -> None:
     assert "js/period-navigation.js" in cleanup
     assert "PeriodNavigation.anchorForWindow" in cleanup
     assert "PeriodNavigation.offsetForRange" in cleanup
-    assert "pageData.rangeAnchorMs = picked.getTime()" in cleanup
+    assert "pageData.rangeAnchorMs = PeriodNavigation.dayAnchor(y, m, d)" in cleanup
     assert "pageData.windowEnd = {{ window_end_ts }}" in rows
     assert "pageData.isCurrent = {{ is_current | tojson }}" in rows
     assert "t('{range} Uhr',{range: `${fmtDay(start)} · ${fmtTime(start)}–${fmtTime(end)}`})" in chart_editor

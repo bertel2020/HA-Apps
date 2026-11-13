@@ -441,9 +441,8 @@
       if (!dateStr) return;
       const rangeKey = document.getElementById('range-field').value;
       const [y, m, d] = dateStr.split('-').map(Number);
-      const picked = new Date(y, m - 1, d, 12);
       const pageData = Alpine.$data(document.querySelector('.page'));
-      pageData.rangeAnchorMs = picked.getTime();
+      pageData.rangeAnchorMs = PeriodNavigation.dayAnchor(y, m, d);
       const offset = rangeKey === 'all' ? 0 : PeriodNavigation.offsetForRange(rangeKey, pageData.rangeAnchorMs);
       setOffset(offset, true);
     }
