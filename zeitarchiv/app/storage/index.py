@@ -4067,7 +4067,7 @@ class Index:
     _COUNTER_DECREASE_SNAPSHOT_KEY = "counter_decrease_snapshot_cache"
     # Hochzählen, sobald sich die Regeln der Erkennung ändern: ein Schnappschuss nach
     # alten Regeln gilt dann sofort als veraltet statt bis zu einer Stunde weiterzuwirken.
-    _COUNTER_DECREASE_RULES = 3
+    _COUNTER_DECREASE_RULES = 4
 
     def is_counter_decrease_snapshot_stale(self, min_interval_seconds: float = 3600) -> bool:
         """Wie is_duplicate_snapshot_stale(): die Zählung braucht den Storage-Layer und bleibt

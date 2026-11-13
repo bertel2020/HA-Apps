@@ -37,14 +37,32 @@ def test_the_assessment_stays_open_while_the_data_is_too_short_to_decide() -> No
     assert [item["returns"] for item in found] == [None]
 
 
-def test_either_limit_is_enough_to_count_as_returning() -> None:
-    # Dichter Takt (30 s): die Rückkehr kommt nach 9 Werten, also nach 4,5 Minuten.
+def test_return_window_is_time_based_and_the_first_follow_up_always_counts() -> None:
+    # Dichter Takt (30 s): die Rückkehr kommt nach 9 Werten, also nach 4,5 Minuten — innerhalb von 30 Minuten.
     dense = _rows(100, 101, 0, *[0.1] * 8, 101.2, step=30.0)
     assert cleanup.classify_counter_decreases(dense)[0]["returns"] is True
-    # Dünner Takt (1 h): schon der 2. Folgewert liegt über 30 Minuten, aber unter 10 Werten.
-    sparse = _rows(100, 101, 0, 0.1, 101.2, step=3600.0)
+    # Dünner Takt (1 h): der erste Folgewert darf auch nach einer Stunde entscheiden …
+    sparse = _rows(100, 101, 0, 101.2, step=3600.0)
     assert cleanup.classify_counter_decreases(sparse)[0]["returns"] is True
+    # … ein späterer nicht mehr: dass der Stand erst nach Stunden wieder über den Vorwert steigt, ist ein
+    # Reset (früher zählten dafür 10 Werte, bei diesem Takt zehn Stunden).
+    reset = _rows(100, 101, 0, 0.1, 101.2, step=3600.0)
+    assert cleanup.classify_counter_decreases(reset)[0]["returns"] is False
 
+
+def test_a_run_of_low_values_belongs_to_one_missing_value() -> None:
+    item = cleanup.classify_counter_decreases(_rows(100, 101, 0, 0, 0, 101.5, step=60.0))[0]
+    assert item["returns"] is True
+    assert cleanup.marked_timestamps([item]) == [item["marks"][0], item["marks"][0] + 60, item["marks"][0] + 120]
+    # Kehrt der Stand nicht zurück, wird nichts markiert.
+    reset = cleanup.classify_counter_decreases(_rows(100, 101, 0, 0.1, 0.2, step=3600.0))
+    assert cleanup.marked_timestamps(reset) == []
+
+
+def test_float_noise_is_not_a_decrease() -> None:
+    assert cleanup.classify_counter_decreases(_rows(123.45000000001, 123.45)) == []
+    assert cleanup.detect_counter_decreases(_rows(123.45000000001, 123.45)) == {}
+    assert cleanup.detect_counter_decreases(_rows(123.45, 123.40)) != {}
 
 def test_rising_values_are_never_flagged_and_the_low_value_becomes_the_new_baseline() -> None:
     assert cleanup.classify_counter_decreases(_rows(1, 2, 3, 4)) == []
@@ -148,6 +166,21 @@ def test_a_daily_reset_to_zero_is_not_a_decrease_but_a_glitch_at_midnight_with_a
     # Dasselbe Verhalten mitten am Tag: auch ein Rückgang auf 0 zählt.
     midday = [(day + 40000, 12.5), (day + 40300, 0.0)]
     assert len(cleanup.classify_counter_decreases(midday, TZ)) == 1
+
+
+def test_a_midnight_drop_that_comes_straight_back_is_a_glitch_not_a_reset() -> None:
+    midnight = datetime(2026, 10, 6, 0, 0, tzinfo=TZ).timestamp()
+    # Lebenszeitzähler: 1000 → 0 → 1000 über den Tageswechsel. Der erste Folgewert erreicht den Vorwert wieder.
+    glitch = [(midnight - 300, 1000.0), (midnight + 60, 0.0), (midnight + 360, 1000.5)]
+    found = cleanup.classify_counter_decreases(glitch, TZ)
+    assert [item["returns"] for item in found] == [True]
+    assert list(cleanup.detect_counter_decreases(glitch, TZ)) == [midnight + 60]
+    # Ein echter Tageszähler steigt danach langsam: weiterhin kein Rückgang.
+    daily = [(midnight - 300, 12.5), (midnight + 60, 0.0), (midnight + 360, 0.05)]
+    assert cleanup.classify_counter_decreases(daily, TZ) == []
+    assert cleanup.detect_counter_decreases(daily, TZ) == {}
+    # Der Rückgang am Ende der Daten (noch kein Folgewert) bleibt ein Reset.
+    assert cleanup.classify_counter_decreases(daily[:2], TZ) == []
 
 
 def test_a_snapshot_computed_under_older_rules_is_stale_and_not_shown(tmp_path) -> None:

@@ -232,7 +232,7 @@ def test_the_stored_rule_version_matches_the_detector() -> None:
     den Fehler oben zurück — deshalb steht die Zahl an einer Stelle."""
     from app.storage import cleanup as cleanup_mod
 
-    assert cleanup_mod.OUTLIER_RULE_VERSION == 2
+    assert cleanup_mod.OUTLIER_RULE_VERSION == 3
 
 
 # --- Woher die Zahlen kommen -------------------------------------------------

@@ -89,7 +89,7 @@ def list_raw_rows(
 # aktuelle Quote — gemessen: 2.406 von 52.194 markierten Werten an einer
 # Entität, an der die neue Regel 0 findet. Die Schwelle allein kann eine
 # Zählung also nicht ausweisen; erst Schwelle UND Regel zusammen tun das.
-OUTLIER_RULE_VERSION = 2
+OUTLIER_RULE_VERSION = 3
 
 # Ausreißer-Erkennung: Fenstergrößen der beiden Regeln (Begründung und
 # Messwerte siehe OutlierDetector).
@@ -97,6 +97,14 @@ OUTLIER_WINDOW = 15
 OUTLIER_MIN_VALUES = 5
 COUNTER_OUTLIER_WINDOW = 50
 COUNTER_OUTLIER_MIN_STEPS = 5
+# Nach einem Rückgang bleibt der Stand davor so lange die Bezugsgröße für den nächsten Zuwachs
+# (ein Fehlwert 10123 → 0 → 10124 ist kein Zuwachs von 10124). Bleibt der Zähler länger niedrig,
+# war es ein Reset und der niedrige Wert wird zur neuen Bezugsgröße.
+COUNTER_OUTLIER_HOLD_VALUES = 10
+# Ein Abstand zum Vorwert, der mehr als das Doppelte des üblichen beträgt, zählt als Lücke: der Zuwachs
+# darf dann entsprechend größer sein (Pause von Home Assistant, Sender offline), sonst wäre jeder korrekte
+# Wert nach einer Pause ein „Ausreißer“. Ein Ziffernfehler liegt um Größenordnungen darüber und fällt weiter auf.
+COUNTER_OUTLIER_GAP_SCALE_FROM = 2.0
 
 
 def _format_factor(factor: float) -> str:
@@ -135,6 +143,11 @@ class OutlierDetector:
 
         Negative Zuwächse gehen weder in den Bezug ein noch werden sie
         markiert — dafür gibt es die eigene Markierung "Zählerrückgang".
+        Nach einem Rückgang bleibt der Stand davor die Bezugsgröße (bis zu
+        COUNTER_OUTLIER_HOLD_VALUES Werte lang): bei 10123 → 0 → 10124 ist
+        der letzte Wert kein Zuwachs von 10124. Nach einer Pause (Abstand über
+        dem Doppelten des üblichen) darf der Zuwachs im selben Verhältnis
+        größer sein; solche Zuwächse gehen nicht in den Bezug ein.
 
     ``"standard"`` — alle übrigen Sensoren
         Werte sind hier additiv und dürfen negativ sein, ein Vielfaches des
@@ -161,17 +174,19 @@ class OutlierDetector:
         self.tz = tz
         self._values: deque[float] = deque(maxlen=OUTLIER_WINDOW)
         self._steps: deque[float] = deque(maxlen=COUNTER_OUTLIER_WINDOW)
+        self._step_seconds: deque[float] = deque(maxlen=COUNTER_OUTLIER_WINDOW)
         self._previous: float | None = None
         self._previous_ts: float | None = None
+        self._low_seen = 0
 
     def check(self, ts: float, value: float) -> str | None:
         """Begründung, wenn `value` ein Ausreißer ist — sonst None. Muss für
         JEDEN Wert in zeitlicher Reihenfolge aufgerufen werden, auch wenn die
         Erkennung aus ist: die Aufrufe bilden den Bezug."""
         if self.mode == "counter":
-            grund = self._check_counter(value)
-        else:
-            grund = self._check_standard(value)
+            # Der Zähler führt seine Bezugsgröße selbst (siehe _check_counter).
+            return self._check_counter(ts, value)
+        grund = self._check_standard(value)
         self._previous = value
         self._previous_ts = ts
         return grund
@@ -190,20 +205,42 @@ class OutlierDetector:
             f"um {_format_ts(self._previous_ts, self.tz)}"
         )
 
-    def _check_counter(self, value: float) -> str | None:
+    def _check_counter(self, ts: float, value: float) -> str | None:
         if self._previous is None:
+            self._previous, self._previous_ts = value, ts
             return None
+        if _dropped(self._previous, value):
+            # Rückgang (eigene Markierung „Zählerrückgang“): kein Zuwachs, und der Stand davor bleibt Bezug,
+            # damit der Wert nach einem Fehlwert nicht als riesiger Zuwachs gilt. Erst ein länger
+            # anhaltender niedriger Stand (Reset, Zählerwechsel) wird zur neuen Bezugsgröße.
+            self._low_seen += 1
+            if self._low_seen > COUNTER_OUTLIER_HOLD_VALUES:
+                self._previous, self._previous_ts, self._low_seen = value, ts, 0
+            return None
+        self._low_seen = 0
         zuwachs = value - self._previous
-        if zuwachs <= 0:
-            return None
+        dauer = ts - self._previous_ts if self._previous_ts is not None else 0.0
         grund = None
-        if self.factor is not None and len(self._steps) >= COUNTER_OUTLIER_MIN_STEPS:
-            ueblich = statistics.median(self._steps)
-            if ueblich > 0 and zuwachs > self.factor * ueblich:
-                grund = (
-                    tr("Zuwachs {_format_val} ist das {_format_factor} des üblichen Zuwachses ({_format_val2}, Median der letzten {len}){_vorwert}", _format_val=_format_val(zuwachs, self.decimals), _format_factor=_format_factor(zuwachs / ueblich), _format_val2=_format_val(ueblich, self.decimals), len=len(self._steps), _vorwert=self._vorwert())
-                )
-        self._steps.append(zuwachs)
+        # Pause: der Abstand ist deutlich größer als üblich, der Zuwachs darf es auch sein.
+        spreizung = 1.0
+        if len(self._step_seconds) >= COUNTER_OUTLIER_MIN_STEPS:
+            ueblich_dauer = statistics.median(self._step_seconds)
+            if ueblich_dauer > 0 and dauer / ueblich_dauer > COUNTER_OUTLIER_GAP_SCALE_FROM:
+                spreizung = dauer / ueblich_dauer
+        if zuwachs > 0:
+            if self.factor is not None and len(self._steps) >= COUNTER_OUTLIER_MIN_STEPS:
+                ueblich = statistics.median(self._steps)
+                if ueblich > 0 and zuwachs > self.factor * ueblich * spreizung:
+                    grund = (
+                        tr("Zuwachs {_format_val} ist das {_format_factor} des üblichen Zuwachses ({_format_val2}, Median der letzten {len}){_vorwert}", _format_val=_format_val(zuwachs, self.decimals), _format_factor=_format_factor(zuwachs / ueblich), _format_val2=_format_val(ueblich, self.decimals), len=len(self._steps), _vorwert=self._vorwert())
+                    )
+            # Zuwächse über eine Pause gehen nicht in den Bezug ein: sie wären größer als üblich und
+            # zögen den Median hoch.
+            if spreizung == 1.0:
+                self._steps.append(zuwachs)
+                self._step_seconds.append(dauer)
+        # Erst nach der Prüfung weiterziehen: _vorwert() nennt in der Begründung den Vorwert.
+        self._previous, self._previous_ts = value, ts
         return grund
 
     def _check_standard(self, value: float) -> str | None:
@@ -354,7 +391,7 @@ def analyze_raw_rows_page(
                 total_matches += 1
         group_rows = []
 
-    for ts, value in rows_factory():
+    for ts, value, following in _with_following(rows_factory()):
         if group_ts is None or ts != group_ts:
             flush_group()
             group_ts = ts
@@ -388,8 +425,8 @@ def analyze_raw_rows_page(
                 counter_previous_ts is not None
                 and counter_previous_value is not None
                 and ts > counter_previous_ts
-                and value < counter_previous_value
-                and not _is_periodic_reset(counter_previous_ts, ts, counter_previous_value, value, tz)
+                and _dropped(counter_previous_value, value)
+                and not _is_planned_reset(counter_previous_ts, ts, counter_previous_value, value, following, tz)
             ):
                 counter_decrease_reason = _counter_decrease_reason(
                     counter_previous_value, value
@@ -635,6 +672,39 @@ def _counter_decrease_reason(previous_value: float, value: float) -> str:
     )
 
 
+def _dropped(previous: float, value: float) -> bool:
+    """``value`` liegt unter ``previous`` — mit einer Toleranz für Gleitkommarauschen (123,45000000001 → 123,45)."""
+    return value < previous - abs(previous) * COUNTER_DROP_TOLERANCE
+
+
+def _with_following(
+    rows: Iterable[tuple[float, float]],
+) -> Iterator[tuple[float, float, tuple[float, float] | None]]:
+    """(Zeitstempel, Wert, nächste Zeile oder None) je Zeile, im Streaming mit konstantem Speicher. Der
+    Rückgang um Mitternacht braucht den Folgewert, um Reset und Fehlwert zu unterscheiden."""
+    iterator = iter(rows)
+    try:
+        current = next(iterator)
+    except StopIteration:
+        return
+    for following in iterator:
+        yield current[0], current[1], following
+        current = following
+    yield current[0], current[1], None
+
+
+def _is_planned_reset(
+    previous_ts: float, ts: float, previous: float, value: float,
+    following: tuple[float, float] | None, tz: ZoneInfo,
+) -> bool:
+    """Planmäßiger Rücksetzer um Mitternacht (siehe _is_periodic_reset) — es sei denn, der nächste Wert
+    erreicht den Vorwert sofort wieder: dann war es ein Fehlwert (Lebenszeitzähler 1000 → 0 → 1000), kein
+    Reset. Ein echter Tageszähler steigt nach dem Reset langsam, sein erster Folgewert liegt weit darunter."""
+    if not _is_periodic_reset(previous_ts, ts, previous, value, tz):
+        return False
+    return not (following is not None and following[0] > ts and not _dropped(previous, following[1]))
+
+
 def detect_counter_decreases(
     rows: Iterable[tuple[float, float]], tz: ZoneInfo | None = None
 ) -> dict[float, str]:
@@ -652,10 +722,10 @@ def detect_counter_decreases(
     decreases: dict[float, str] = {}
     previous_ts: float | None = None
     previous_value: float | None = None
-    for ts, value in rows:
+    for ts, value, following in _with_following(rows):
         if previous_ts is not None and ts > previous_ts:
-            if previous_value is not None and value < previous_value and not (
-                tz is not None and _is_periodic_reset(previous_ts, ts, previous_value, value, tz)
+            if previous_value is not None and _dropped(previous_value, value) and not (
+                tz is not None and _is_planned_reset(previous_ts, ts, previous_value, value, following, tz)
             ):
                 decreases[ts] = _counter_decrease_reason(previous_value, value)
             previous_ts, previous_value = ts, value
@@ -757,8 +827,13 @@ COUNTER_WINDOW_DAYS = 30
 # Fehlwert-Häufung (Meldung): an so vielen verschiedenen Tagen der letzten 14 Tage kehrte ein Rückgang zurück.
 COUNTER_PATTERN_DAYS = 14
 COUNTER_PATTERN_MIN_DAYS = 3
+#: Ein Rückgang „kehrt zurück“ (Fehlwert), wenn der Vorwert innerhalb dieser Zeit wieder erreicht wird. Der erste
+#: Folgewert darf immer entscheiden, auch bei Sendern, die seltener als alle 30 Minuten melden. Früher galt
+#: zusätzlich „oder 10 Werte“ (das jeweils längere Fenster): bei einem 30-Minuten-Takt waren das gut fünf Stunden,
+#: in denen ein echter Reset (Stand steigt wieder über den Vorwert) als Fehlwert durchging.
 COUNTER_RETURN_SECONDS = 1800
-COUNTER_RETURN_VALUES = 10
+#: Rückgänge um weniger als dieses Verhältnis zum Vorwert sind Rauschen der Gleitkommadarstellung, kein Rückgang.
+COUNTER_DROP_TOLERANCE = 1e-9
 
 
 # Zähler mit planmäßigem Rücksetzen (Tages-, Monatsertrag: „… heute“) fallen jede Nacht auf
@@ -781,36 +856,44 @@ def classify_counter_decreases(
 
     Ein Rückgang ist wie in detect_counter_decreases() die erste niedrigere Zeile nach einem
     höheren Stand; danach gilt der niedrige Wert als neue Bezugsgröße. ``returns`` ist
-    True, wenn ein Folgewert den Vorwert wieder erreicht (Fehlwert), False, wenn das
-    in beiden Grenzen (Zeit UND Anzahl) ausbleibt (Zählerwechsel oder Rücksetzer), und
-    None, solange die Daten enden, bevor sich das entscheiden lässt.
+    True, wenn ein Folgewert den Vorwert wieder erreicht (Fehlwert): entweder der erste Folgewert
+    oder ein späterer innerhalb von COUNTER_RETURN_SECONDS. False, wenn das ausbleibt (Zählerwechsel
+    oder Rücksetzer), und None, solange die Daten enden, bevor sich das entscheiden lässt.
 
-    Mit ``tz`` werden planmäßige Rücksetzer um Mitternacht (siehe _is_periodic_reset) nicht
+    ``marks`` sind die Zeitstempel, die zu diesem Fehlwert gehören: der Rückgang selbst und alle
+    weiteren Zeilen unter dem Vorwert bis zur Rückkehr (100, 0, 0, 0, 100 ergibt drei). Nur bei
+    ``returns`` True aussagekräftig, siehe marked_timestamps().
+
+    Mit ``tz`` werden planmäßige Rücksetzer um Mitternacht (siehe _is_planned_reset) nicht
     mitgezählt; ohne bleibt es bei jedem Rückgang."""
     found: list[dict] = []
     pending: list[dict] = []
     previous_ts: float | None = None
     previous_value: float | None = None
-    for ts, value in rows:
+    for ts, value, following in _with_following(rows):
         for item in list(pending):
             item["seen"] += 1
-            if value >= item["previous"]:
+            late = ts - item["ts"] > COUNTER_RETURN_SECONDS
+            if not _dropped(item["previous"], value) and (item["seen"] == 1 or not late):
                 item.update(returns=True, recovered_value=value, recovered_after=ts - item["ts"])
                 pending.remove(item)
-            elif ts - item["ts"] > COUNTER_RETURN_SECONDS and item["seen"] > COUNTER_RETURN_VALUES:
+            elif late:
                 item["returns"] = False
                 pending.remove(item)
+            elif ts > item["marks"][-1]:
+                item["marks"].append(ts)
         if previous_ts is None:
             previous_ts, previous_value = ts, value
             continue
         if ts <= previous_ts:
             continue
-        if previous_value is not None and value < previous_value and not (
-            tz is not None and _is_periodic_reset(previous_ts, ts, previous_value, value, tz)
+        if previous_value is not None and _dropped(previous_value, value) and not (
+            tz is not None and _is_planned_reset(previous_ts, ts, previous_value, value, following, tz)
         ):
             item = {
                 "ts": ts, "previous": previous_value, "value": value,
                 "returns": None, "recovered_value": None, "recovered_after": None, "seen": 0,
+                "marks": [ts],
             }
             found.append(item)
             pending.append(item)
@@ -818,6 +901,12 @@ def classify_counter_decreases(
     for item in found:
         item.pop("seen", None)
     return found
+
+
+def marked_timestamps(decreases: Iterable[dict]) -> list[float]:
+    """Alle Zeitstempel, die zu den zurückkehrenden Rückgängen gehören (Rückgang plus weitere niedrige Werte bis
+    zur Rückkehr), aufsteigend und ohne Doppelte. Einzige Quelle für Sammelmarkierung, Regel und Zählung."""
+    return sorted({ts for item in decreases if item["returns"] for ts in item["marks"]})
 
 
 def scan_counter_decreases(
@@ -854,7 +943,7 @@ def scan_counter_decreases(
             "unit": entity["unit"],
             "decimals": entity["decimals"],
             "count": len(decreases),
-            "returning": sum(1 for item in decreases if item["returns"]),
+            "returning": len(marked_timestamps(decreases)),
             "returning_days": sorted({
                 datetime.fromtimestamp(item["ts"], tz).date().isoformat()
                 for item in decreases

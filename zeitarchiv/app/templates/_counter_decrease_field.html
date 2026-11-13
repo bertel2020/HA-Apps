@@ -33,7 +33,7 @@
             hx-target="#counter-decrease-field" hx-swap="outerHTML"
             hx-confirm="{{ _('Fehlwerte ab jetzt automatisch markieren? Rückgänge, die sofort zurückkehren, werden künftig vom stündlichen Lauf zur Löschung markiert. Vorhandene Rückgänge bleiben unberührt, und nichts wird endgültig entfernt: die Werte stehen im Reiter „Markiert“ und lassen sich zurücknehmen.') }}">{{ _("Einschalten …") }}</button>
     {% endif %}
-    <p class="hint">{{ _("Ein Rückgang, der sofort zurückkehrt (der Stand erreicht den Vorwert innerhalb von 30 Minuten oder 10 Werten wieder), wird vom stündlichen Lauf zur Löschung markiert. Zurückgenommene Werte werden nicht erneut markiert.") }}</p>
+    <p class="hint">{{ _("Ein Rückgang, der sofort zurückkehrt (der Stand erreicht den Vorwert innerhalb von 30 Minuten wieder, bei selteneren Werten schon mit dem nächsten Wert), wird vom stündlichen Lauf zur Löschung markiert, samt aller niedrigen Werte dazwischen. Zurückgenommene Werte werden nicht erneut markiert.") }}</p>
     {% if counter_auto_halted %}<p class="hint hint-status">{{ _("Angehalten: in einem Lauf gab es mehr als {limit} zurückkehrende Rückgänge. Die Regel markiert nichts mehr, bis sie neu eingeschaltet wird.", limit=counter_auto_limit) }}</p>{% endif %}
   </div>
   {% endif %}

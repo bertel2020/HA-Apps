@@ -2,7 +2,8 @@
 zurückkehren (Einordnung „kehrt zurück“, wahrscheinlich Fehlwerte), in einem Schritt zur
 Löschung markieren — und diese Sammelmarkierung wieder zurücknehmen.
 
-Markiert wird nur der Fehlwert selbst, nie der Wert davor oder danach, und nichts wird
+Markiert wird der Fehlwert selbst samt der weiteren niedrigen Werte bis zur Rückkehr
+(100, 0, 0, 0, 100: die drei Nullen), nie der Wert davor oder danach, und nichts wird
 endgültig entfernt: die Werte landen im Reiter „Markiert“ der jeweiligen Entität. Alle
 Entitäten einer Sammelmarkierung teilen sich EINEN ``deleted_at``-Wert; darüber findet das
 Zurücknehmen genau diese Chargen und keine, die später dazukamen."""
@@ -42,7 +43,7 @@ def returning_timestamps(
         ),
         tz,
     )
-    return [item["ts"] for item in decreases if item["returns"] and window_start <= item["ts"] < window_end]
+    return [ts for ts in cleanup.marked_timestamps(decreases) if window_start <= ts < window_end]
 
 
 def refresh_snapshot(

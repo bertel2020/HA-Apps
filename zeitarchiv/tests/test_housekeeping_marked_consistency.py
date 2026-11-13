@@ -355,3 +355,48 @@ def test_marking_a_non_counter_leaves_the_counter_snapshot_alone(env) -> None:
     assert index.get_counter_decrease_snapshot()["checked_at"] != 0
     cleanup.soft_delete(index, "sensor.zaehler", [1.0])
     assert index.get_counter_decrease_snapshot()["checked_at"] == 0
+
+
+def _counter_rows(values, start=1_700_000_000.0, step=60.0):
+    return [(start + i * step, v) for i, v in enumerate(values)]
+
+
+def test_counter_outlier_does_not_flag_the_good_value_after_a_bad_one() -> None:
+    steady = [10000.0 + i for i in range(10)]
+    rows = _counter_rows(steady + [0.0, 10010.0, 10011.0])
+    flagged = cleanup.detect_outliers(rows, 10, decimals="auto", tz=TZ, mode="counter")
+    assert flagged == {}  # 10010 ist ein Zuwachs von 1 zum Stand vor dem Fehlwert, kein Zuwachs von 10010
+
+
+def test_counter_outlier_still_catches_a_digit_error() -> None:
+    steady = [10000.0 + i for i in range(10)]
+    rows = _counter_rows(steady + [101230.0])
+    assert list(cleanup.detect_outliers(rows, 10, decimals="auto", tz=TZ, mode="counter")) == [rows[-1][0]]
+
+
+def test_counter_outlier_accepts_a_proportional_step_after_a_pause() -> None:
+    # Minütlich +1; dann 6 Stunden Pause (360 Minuten) und +360: derselbe Verbrauch, kein Ausreißer.
+    rows = _counter_rows([float(i) for i in range(10)])
+    last_ts, last_value = rows[-1]
+    rows.append((last_ts + 360 * 60, last_value + 360))
+    assert cleanup.detect_outliers(rows, 10, decimals="auto", tz=TZ, mode="counter") == {}
+    # Dasselbe Zeitloch mit einem Zuwachs, der um Größenordnungen darüber liegt, fällt weiter auf.
+    rows[-1] = (last_ts + 360 * 60, last_value + 360_000)
+    assert list(cleanup.detect_outliers(rows, 10, decimals="auto", tz=TZ, mode="counter")) == [rows[-1][0]]
+
+
+def test_counter_outlier_rebases_after_a_lasting_reset() -> None:
+    # Reset auf niedrigen Stand, der bleibt: nach einiger Zeit ist er die neue Bezugsgröße, kein Dauer-Ausreißer.
+    rows = _counter_rows([10000.0 + i for i in range(10)] + [float(i) for i in range(40)])
+    assert cleanup.detect_outliers(rows, 10, decimals="auto", tz=TZ, mode="counter") == {}
+
+
+def test_streaming_analysis_agrees_with_detect_for_a_midnight_glitch() -> None:
+    midnight = datetime(2026, 10, 6, 0, 0, tzinfo=TZ).timestamp()
+    rows = [(midnight - 300, 1000.0), (midnight + 60, 0.0), (midnight + 360, 1000.5)]
+    result = cleanup.analyze_raw_rows_page(
+        lambda: iter(rows), filter_="counter_decreases", page=1, page_size=50,
+        gap_threshold_minutes=None, outlier_factor=None, tz=TZ, counter_decrease_enabled=True,
+    )
+    assert result["counts"]["counter_decreases"] == 1
+    assert list(cleanup.detect_counter_decreases(rows, TZ)) == [midnight + 60]

@@ -1,8 +1,8 @@
 """Regel „Fehlwerte automatisch markieren“ (je Zähler, Konfiguration → Zählerrückgänge, nur bei „Melden“).
 
 Der stündliche Lauf markiert bei Zählern mit eingeschalteter Regel die Rückgänge, die sofort wieder
-zurückkehren (Einordnung „kehrt zurück“, siehe cleanup.classify_counter_decreases) — nur den Fehlwert
-selbst, nie Vor- oder Folgewert, und nichts endgültig: die Werte landen als eigene Charge im Reiter
+zurückkehren (Einordnung „kehrt zurück“, siehe cleanup.classify_counter_decreases) — den Fehlwert
+samt der weiteren niedrigen Werte bis zur Rückkehr, nie Vor- oder Folgewert, und nichts endgültig: die Werte landen als eigene Charge im Reiter
 „Markiert“ und lassen sich zurücknehmen. Eine zurückgenommene Charge wird nicht erneut markiert
 (Tabelle counter_mark_ignored), sonst käme derselbe Wert beim nächsten Lauf sofort wieder.
 
@@ -59,13 +59,16 @@ def process_entity(
         tz,
     )
     ignored = index.list_counter_mark_ignored(entity["entity_id"])
-    todo = [
-        item["ts"] for item in decreases
+    episodes = [
+        item for item in decreases
         if item["returns"] is True and item["ts"] >= since and item["ts"] not in ignored
     ]
-    if len(todo) > MAX_PER_RUN:
+    # Die Sicherung zählt Fehlwerte, nicht Zeilen: ein langer Aussetzer (viele niedrige Werte hintereinander)
+    # ist EIN Fehlwert und soll die Regel nicht anhalten.
+    if len(episodes) > MAX_PER_RUN:
         index.set_counter_auto_halted(entity["entity_id"], now.timestamp())
         return 0
+    todo = [ts for ts in cleanup.marked_timestamps(episodes) if ts not in ignored]
     if todo:
         cleanup.soft_delete(index, entity["entity_id"], todo, source="counter_rule", trigger="automatic")
     return len(todo)
