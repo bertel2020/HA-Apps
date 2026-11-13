@@ -257,6 +257,11 @@ class OutlierDetector:
         return grund
 
 
+# So viele Treffer hält analyze_raw_rows_page höchstens gleichzeitig als Zeilen im Speicher, bevor es für
+# tiefe Seiten auf zwei Durchläufe mit Fenster umschaltet (5.000 Wörterbücher sind rund 2 MB).
+MAX_RETAINED_MATCHES = 5000
+
+
 class ResultLimitExceeded(ValueError):
     """Eine Abfrage würde mehr Zeilen als erlaubt materialisieren."""
 
@@ -273,6 +278,7 @@ def analyze_raw_rows_page(
     decimals: str = "auto",
     counter_decrease_enabled: bool = False,
     outlier_mode: str = "standard",
+    match_window: tuple[int, int] | None = None,
 ) -> dict:
     """Analysiert beliebig viele sortierte Rohwerte mit begrenztem Speicher.
 
@@ -280,6 +286,12 @@ def analyze_raw_rows_page(
     und behält nur so viele der neuesten Treffer, wie für die angeforderte
     Seite nötig sind. Damit funktioniert insbesondere der Zeitraum "Gesamt"
     auch oberhalb des UI-Materialisierungslimits.
+
+    Liegt die angeforderte Seite so tief, dass "die neuesten Seite × Seitengröße
+    Treffer" nicht mehr klein wäre (die letzte Seite von Millionen Treffern hielte
+    sonst alle als Wörterbücher im Speicher), rechnet die Funktion zweimal: erst
+    nur zum Zählen, dann mit ``match_window`` — den chronologischen Indizes
+    [von, bis) der Treffer, die die Seite zeigt. Behalten wird dann nur dieses Fenster.
 
     ``outlier_factor`` ist ein VIELFACHES des für diese Entität Üblichen (nicht
     mehr ein Prozentsatz), ``outlier_mode`` wählt die Bezugsgröße dafür —
@@ -292,6 +304,21 @@ def analyze_raw_rows_page(
     page_size = max(1, min(int(page_size), 1000))
     upper_page = max(1, -(-total_rows // page_size))
     requested_page = max(1, min(int(page), upper_page))
+    if match_window is None and requested_page * page_size > MAX_RETAINED_MATCHES:
+        options = dict(
+            filter_=filter_, gap_threshold_minutes=gap_threshold_minutes, outlier_factor=outlier_factor,
+            tz=tz, decimals=decimals, counter_decrease_enabled=counter_decrease_enabled,
+            outlier_mode=outlier_mode,
+        )
+        probe = analyze_raw_rows_page(rows_factory, page=1, page_size=1, **options)
+        matches = probe["pagination"]["total"]
+        actual = max(1, min(requested_page, -(-matches // page_size)))
+        # Seiten zeigen neueste zuerst: Seite n ist das Fenster n Seiten vor dem Ende.
+        upper = matches - (actual - 1) * page_size
+        return analyze_raw_rows_page(
+            rows_factory, page=actual, page_size=page_size,
+            match_window=(max(0, upper - page_size), upper), **options,
+        )
     retained: deque[dict] = deque(maxlen=requested_page * page_size)
     gap_seconds = (
         gap_threshold_minutes * 60 if gap_threshold_minutes is not None else None
@@ -387,7 +414,8 @@ def analyze_raw_rows_page(
                     )
                     if reason is not None
                 ]
-                retained.append(row)
+                if match_window is None or match_window[0] <= total_matches < match_window[1]:
+                    retained.append(row)
                 total_matches += 1
         group_rows = []
 
@@ -450,7 +478,8 @@ def analyze_raw_rows_page(
     actual_page = max(1, min(requested_page, total_pages))
     newest_first = list(reversed(retained))
     start_index = (actual_page - 1) * page_size
-    page_rows = newest_first[start_index : start_index + page_size]
+    # Mit match_window besteht ``retained`` schon aus genau dieser Seite.
+    page_rows = newest_first if match_window is not None else newest_first[start_index : start_index + page_size]
     return {
         "rows": page_rows,
         "counts": counts,

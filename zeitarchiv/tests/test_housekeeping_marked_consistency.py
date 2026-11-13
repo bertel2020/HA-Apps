@@ -400,3 +400,30 @@ def test_streaming_analysis_agrees_with_detect_for_a_midnight_glitch() -> None:
     )
     assert result["counts"]["counter_decreases"] == 1
     assert list(cleanup.detect_counter_decreases(rows, TZ)) == [midnight + 60]
+
+
+@pytest.mark.parametrize("filter_", ["all", "outliers", "duplicates"])
+def test_deep_pages_use_a_match_window_and_show_the_same_rows(filter_, monkeypatch) -> None:
+    start = 1_700_000_000.0
+    rows = []
+    for i in range(237):
+        value = 20.0 + (i % 5) * 0.1
+        if i % 17 == 0:
+            value = 500.0  # Ausreißer
+        rows.append((start + i * 60.0, value))
+    rows.insert(40, rows[40])  # ein Duplikat (gleicher Zeitstempel)
+    rows.insert(120, rows[120])
+
+    def analyze(page):
+        return cleanup.analyze_raw_rows_page(
+            lambda: iter(rows), filter_=filter_, page=page, page_size=10,
+            gap_threshold_minutes=None, outlier_factor=10.0, tz=TZ,
+        )
+
+    reference = {page: analyze(page) for page in (1, 2, 5, 12, 99)}  # 99 wird auf die letzte Seite geklemmt
+    monkeypatch.setattr(cleanup, "MAX_RETAINED_MATCHES", 15)
+    for page, expected in reference.items():
+        deep = analyze(page)
+        assert [row["ts"] for row in deep["rows"]] == [row["ts"] for row in expected["rows"]]
+        assert deep["pagination"] == expected["pagination"]
+        assert deep["counts"] == expected["counts"]
