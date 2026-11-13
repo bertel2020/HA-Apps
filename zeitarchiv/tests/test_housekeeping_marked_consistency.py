@@ -167,3 +167,73 @@ def test_undo_duplicate_removal_uses_batch_of_the_bulk_run(env) -> None:
     restored = data_quality.undo_duplicate_removal(index, [(entity_id, 1000.0), (entity_id, 1000.0)], lock)
     assert restored == 1
     assert index.get_deleted_counts_for_entity(entity_id) == {20.0: 1}
+
+
+def test_refresh_snapshot_leaves_an_invalidated_snapshot_alone(env) -> None:
+    from app import counter_bulk
+
+    tmp, index = env
+    index.set_counter_decrease_snapshot([{"entity_id": "sensor.x", "last": {"ts": 1.0}}])
+    index.invalidate_counter_decrease_snapshot()
+    before = index.get_counter_decrease_snapshot()
+    assert before["checked_at"] == 0
+    counter_bulk.refresh_snapshot(tmp, index, TZ, before, {"sensor.x"})
+    assert index.get_counter_decrease_snapshot()["checked_at"] == 0  # nicht als frisch gestempelt
+
+
+def test_alltime_counts_discards_result_when_marked_during_scan(env, monkeypatch) -> None:
+    from app import cleanup_stats
+
+    tmp, index = env
+    entity_id = "sensor.a"
+    index.get_or_create_entity(entity_id, "sensor", "measurement", "W")
+    ts = _ts(2024, 8, 10, 8)
+    hotbuffer.append(tmp, entity_id, ts, 1.0, TZ)
+    index.record_write(entity_id, ts)
+    entity = index.get_entity(entity_id)
+    now = datetime(2024, 8, 15, 12, tzinfo=TZ)
+
+    real = cleanup.analyze_raw_rows_page
+
+    def marks_during_scan(*args, **kwargs):
+        result = real(*args, **kwargs)
+        cleanup.soft_delete(index, entity_id, [ts])  # Nutzer markiert, während der Scan läuft
+        return result
+
+    monkeypatch.setattr(cleanup, "analyze_raw_rows_page", marks_during_scan)
+    cleanup_stats.alltime_counts(tmp, index, TZ, entity, now, force=True)
+    assert index.get_cleanup_alltime_stats(entity_id) is None  # veraltetes Ergebnis nicht gespeichert
+
+
+def test_mark_unknown_makes_matrix_entry_pending_in_total_period(env) -> None:
+    from app import data_quality
+
+    _tmp, index = env
+    entity_id = "sensor.a"
+    index.get_or_create_entity(entity_id, "sensor", "measurement", "W")
+    index.set_first_ts_and_add_rows(entity_id, 1_700_000_000.0, 0)
+    index.set_cleanup_alltime_stats(entity_id, {"all": 10, "duplicates": 0}, "off", cleanup.OUTLIER_RULE_VERSION, daily={}, gap_threshold="off")
+    data_quality.mark_stats_unknown(index, entity_id)
+    entry = index.get_cleanup_alltime_stats(entity_id)
+    assert "counts" not in entry and "daily" not in entry and entry["computed_at"] == 0
+    assert data_quality.build_matrix(index, period="all")["pending"] >= 1
+
+
+def test_add_and_correct_invalidate_caches_and_last_value(env) -> None:
+    tmp, index = env
+    entity_id = "sensor.a"
+    index.get_or_create_entity(entity_id, "sensor", "measurement", "W")
+    now = datetime(2024, 8, 15, 12, tzinfo=TZ)
+    ts = _ts(2024, 8, 10, 8)
+    hotbuffer.append(tmp, entity_id, ts, 999.0, TZ)
+    index.record_write(entity_id, ts)
+    index.set_setting(index.VALUE_RANGE_KEY_PREFIX + entity_id, '{"computed_at": 4102444800, "deleted_count": 0}')
+    index.set_cleanup_alltime_stats(entity_id, {"all": 1}, "off", cleanup.OUTLIER_RULE_VERSION)
+    generation = index.finding_generation(entity_id)
+
+    assert cleanup.correct_raw_value(tmp, index, entity_id, ts, 999.0, 5.0, TZ, now=now)
+
+    assert index.get_entity(entity_id)["last_value"] == 5.0
+    assert index.finding_generation(entity_id) == generation + 1
+    assert index.get_cleanup_alltime_stats(entity_id)["computed_at"] == 0
+    assert '"computed_at": 0' in index.get_setting(index.VALUE_RANGE_KEY_PREFIX + entity_id)

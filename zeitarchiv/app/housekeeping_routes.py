@@ -361,14 +361,20 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         """Kontext von _counter_decreases.html: die Tabelle samt Sammelaktion „Fehlwerte markieren“
         und, nach einer Aktion, dem Ergebnishinweis mit „Rückgängig“."""
         rows = _counter_decreases_for_display()
-        returning = sum(row["returning"] for row in rows)
+
+        def _rule_on(entity_id: str) -> bool:
+            entity = deps.index.get_entity(entity_id)
+            return entity is not None and bool(entity["counter_auto_mark"])
+
+        # Zähler mit eingeschalteter Regel markiert der stündliche Lauf selbst; mark_returning überspringt
+        # sie. Gehörten ihre Fehlwerte zur Summe, kündigte der Dialog mehr an, als der Klick markiert.
+        bulk_rows = [row for row in rows if row["returning"] and not _rule_on(row["entity_id"])]
+        returning = sum(row["returning"] for row in bulk_rows)
         bulk = None
         if returning:
             total = sum(row["count"] for row in rows)
             entries = []
-            for row in rows:
-                if not row["returning"]:
-                    continue
+            for row in bulk_rows:
                 shown = row["returning_detail"][:3]
                 name = row["friendly_name"] or row["entity_id"]
                 entries.append({
@@ -1498,7 +1504,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         """Markiert alle zurückkehrenden Zählerrückgänge zur Löschung (counter_bulk.py)."""
 
         def run() -> dict:
-            outcome = counter_bulk.mark_returning(deps.data_dir, deps.index, deps.tz)
+            outcome = counter_bulk.mark_returning(deps.data_dir, deps.index, deps.tz, entity_lock=deps.coordinator.entity)
             entity_ids = list(outcome["entities"])
             if not entity_ids:
                 return {"message": tr("Nichts zu markieren: es kehrt kein Rückgang mehr zurück.")}
@@ -1536,7 +1542,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             raise HTTPException(status_code=400, detail=tr("Ungültige Eingabe")) from None
         entity_ids = [e for e in str(form.get("entity_ids", "")).split(",") if e]
         restored = await run_in_threadpool(
-            counter_bulk.undo_batch, deps.data_dir, deps.index, deps.tz, batch_at, entity_ids
+            counter_bulk.undo_batch, deps.data_dir, deps.index, deps.tz, batch_at, entity_ids, deps.coordinator.entity
         )
         deps.invalidate_purge_preview()
         result = {"message": tr("{values} wieder aktiv.", values=_values_label(restored))}

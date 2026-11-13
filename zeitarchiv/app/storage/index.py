@@ -920,6 +920,8 @@ class Index:
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self._db_path = db_path
         self._lock = _TimeoutLock()
+        # Zähler je Entität, der bei jeder Markierung/Rücknahme steigt (siehe finding_generation()).
+        self._finding_generations: dict[str, int] = {}
         self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._read_local = threading.local()
@@ -4098,6 +4100,24 @@ class Index:
         # Nach anderen Regeln berechnet: lieber keine Zahlen als falsche, bis der nächste Lauf neu rechnet.
         return snapshot if snapshot.get("rules") == self._COUNTER_DECREASE_RULES else None
 
+    VALUE_RANGE_KEY_PREFIX = "value_range:"
+
+    def invalidate_value_range(self, entity_id: str) -> None:
+        """Verwirft das zwischengespeicherte Minimum/Maximum (value_range.py), wenn ein Rohwert
+        hinzugefügt oder korrigiert wurde: anders als beim Markieren ändert sich dabei nicht
+        deleted_count, das Alter allein ließe den alten Wert bis zu eine Stunde stehen."""
+        key = self.VALUE_RANGE_KEY_PREFIX + entity_id
+        if self.get_setting(key) is not None:
+            self.set_setting(key, json.dumps({"computed_at": 0}))
+
+    def finding_generation(self, entity_id: str) -> int:
+        """Wie oft Werte dieser Entität seit dem Start markiert oder zurückgeholt wurden. Eine Messung
+        der Gesamt-Zählung, die ohne Entitätssperre läuft, merkt sich den Stand vorher und verwirft
+        ihr Ergebnis, wenn er sich bis zum Schreiben geändert hat — sonst überschriebe sie die
+        Invalidierung mit Zahlen von vor dem Markieren."""
+        with self._lock:
+            return self._finding_generations.get(entity_id, 0)
+
     def invalidate_finding_caches(self, entity_id: str) -> None:
         """Nach dem Markieren oder Zurückholen von Werten: die zwischengespeicherten Befunde
         (globale Duplikat-Zählung, Gesamt-Zählung dieser Entität) gelten nicht mehr. Ohne das
@@ -4105,6 +4125,8 @@ class Index:
         viel“ bis zu eine Stunde weiter da, obwohl die Ursache behoben ist. Der nächste
         Wartungstakt rechnet neu; die alten Zahlen bleiben bis dahin stehen (Ausreißer) bzw. die
         Duplikat-Liste ist leer (wie beim Zählerrückgang-Schnappschuss)."""
+        with self._lock:
+            self._finding_generations[entity_id] = self._finding_generations.get(entity_id, 0) + 1
         if self.get_setting(self._DUPLICATE_SNAPSHOT_KEY) is not None:
             self.set_setting(self._DUPLICATE_SNAPSHOT_KEY, json.dumps({"checked_at": 0, "rows": []}))
         key = self._CLEANUP_ALLTIME_STATS_PREFIX + entity_id

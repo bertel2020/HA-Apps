@@ -115,6 +115,7 @@ def alltime_counts(
         if cached is not None:
             return cached["counts"]
 
+    generation = index.finding_generation(entity_id)
     window_start, window_end = rows_window("all", 0, now, entity["first_ts"], tz)
     gap_threshold = entity["gap_threshold"]
     outlier_threshold = effective_outlier_threshold(
@@ -145,6 +146,11 @@ def alltime_counts(
         outlier_mode=outlier_mode(entity),
     )
     counts = analysis["counts"]
+    if index.finding_generation(entity_id) != generation:
+        # Während des Scans wurde markiert oder zurückgeholt (der Hintergrundlauf hält keine
+        # Entitätssperre): die Zahlen stammen von vor der Änderung. Nicht speichern, damit die
+        # Invalidierung (computed_at 0) stehen bleibt und beim nächsten Takt neu gemessen wird.
+        return counts
     index.set_cleanup_alltime_stats(
         entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION,
         daily=analysis["daily"], gap_threshold=gap_threshold,

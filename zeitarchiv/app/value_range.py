@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 from .storage import cleanup
 from .storage.index import Index
 
-_KEY_PREFIX = "value_range:"
+_KEY_PREFIX = Index.VALUE_RANGE_KEY_PREFIX
 # Ein Minimum/Maximum altert langsam; eine Stunde ist für „gesamter Zeitraum“
 # ehrlich genug. Wer Werte löscht, sieht die Änderung trotzdem sofort — siehe
 # deleted_count in cached().

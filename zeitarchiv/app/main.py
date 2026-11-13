@@ -15,6 +15,7 @@ import calendar
 import hashlib
 import json
 import logging
+import math
 import os
 import platform
 import secrets
@@ -5393,6 +5394,13 @@ def _state_options(entity_id: str) -> list[dict]:
     return options
 
 
+def _require_finite(*numbers: float) -> None:
+    """NaN/Infinity ließen sich nicht mehr korrigieren (NaN == NaN ist nie wahr) und stünden in
+    Rollups und Statistik; die Aufnahme prüft das ebenfalls (isfinite)."""
+    if not all(math.isfinite(number) for number in numbers):
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Zahlenwert in der Anfrage."))
+
+
 class _AddValueBody(BaseModel):
     ts: float
     value: float
@@ -5409,6 +5417,7 @@ def add_row(entity_id: str, body: _AddValueBody) -> dict:
     entity = _require_entity(entity_id)
     if entity["aggregation_type"] == "state":
         raise HTTPException(status_code=400, detail=tr("Hinzufügen ist für Zustände nicht verfügbar"))
+    _require_finite(body.ts, body.value)
     now = datetime.now(TZ)
     if body.ts <= 0 or body.ts > now.timestamp() + 3600:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitstempel"))
@@ -5437,6 +5446,7 @@ def correct_row(entity_id: str, body: _CorrectValueBody) -> dict:
     der Aufrufer (cleanup.html) triggert nach Erfolg selbst ein Neuladen von
     #controls, damit die Tabelle den neuen Wert zeigt."""
     entity = _require_entity(entity_id)
+    _require_finite(body.ts, body.old_value, body.new_value)
     if entity["aggregation_type"] == "state" and body.new_value not in {
         float(option["idx"]) for option in _state_options(entity_id)
     }:

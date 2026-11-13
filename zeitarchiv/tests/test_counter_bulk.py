@@ -191,3 +191,39 @@ def test_the_entity_marking_covers_the_chosen_range_not_only_the_last_30_days(tm
     assert counter_bulk.mark_entity_returning(tmp_path, index, TZ, "sensor.alt", window) == 1
     assert index.get_deleted_counts("sensor.alt", base, base + 3600) == {base + 2 * 300: 1}
     index.close()
+
+
+def test_window_marking_sees_context_outside_the_window(tmp_path) -> None:
+    """Der Rückgang am Fensteranfang braucht seinen Vorwert, der am Fensterende seine Folgewerte —
+    beide liegen außerhalb des Fensters, markiert wird aber nur darin."""
+    index, now, base = _seed(tmp_path)
+    fehlwert = base + 2 * 300
+    # Fenster beginnt genau am Fehlwert und endet kurz danach: Vorwert (base + 300) und Folgewert
+    # (base + 900) liegen außerhalb.
+    assert counter_bulk.returning_timestamps(
+        tmp_path, index, TZ, "sensor.z1", now=now, window=(fehlwert, fehlwert + 60)
+    ) == [fehlwert]
+    # Ein Fenster, das den Fehlwert nicht enthält, markiert ihn nicht, auch wenn er im Lesebereich liegt.
+    assert counter_bulk.returning_timestamps(
+        tmp_path, index, TZ, "sensor.z1", now=now, window=(fehlwert + 1, fehlwert + 600)
+    ) == []
+    index.close()
+
+
+def test_mark_returning_twice_marks_each_value_only_once(tmp_path) -> None:
+    from contextlib import contextmanager
+
+    index, now, base = _seed(tmp_path)
+    index.set_counter_decrease_snapshot(cleanup.scan_counter_decreases(tmp_path, index, TZ, now=now))
+
+    @contextmanager
+    def lock(_entity_id):
+        yield
+
+    counter_bulk.mark_returning(tmp_path, index, TZ, now=now, entity_lock=lock)
+    # zweiter Klick auf denselben (veralteten) Dialog
+    index.set_counter_decrease_snapshot(cleanup.scan_counter_decreases(tmp_path, index, TZ, now=now))
+    second = counter_bulk.mark_returning(tmp_path, index, TZ, now=now, entity_lock=lock)
+    assert second["entities"] == {}
+    assert index.get_deleted_counts("sensor.z1", base, base + 3600) == {base + 2 * 300: 1}
+    index.close()

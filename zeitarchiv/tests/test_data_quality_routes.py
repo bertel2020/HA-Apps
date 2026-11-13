@@ -267,3 +267,15 @@ def test_duplikat_bestaetigung_doppelt_abgeschickt_markiert_nur_einmal(client) -
         data={"filter": "all", "range": "month", "offset": "0", "batch_at": batch_at},
     )
     assert index.get_deleted_counts_for_entity(entity_id) == {1.0: 1}
+
+
+def test_hinzufuegen_und_korrigieren_lehnen_nan_und_unendlich_ab(client) -> None:
+    from app.main import index
+
+    entity_id = "sensor.pytest_dq_nan"
+    _entity(index, entity_id)
+    kopf = {"Content-Type": "application/json"}
+    for body in ('{"ts": 1700000000, "value": NaN}', '{"ts": NaN, "value": 1}', '{"ts": 1700000000, "value": 1e400}'):
+        assert client.post(f"/entities/{entity_id}/rows/add", content=body, headers=kopf).status_code == 400
+    korrektur = '{"ts": 1700000000, "old_value": 1, "new_value": Infinity}'
+    assert client.post(f"/entities/{entity_id}/rows/correct", content=korrektur, headers=kopf).status_code == 400

@@ -1422,6 +1422,7 @@ def add_raw_value(
 
     index.add_row_count(entity_id, 1)
     index.bump_ts_bounds(entity_id, ts, value)
+    _invalidate_after_edit(index, entity_id)
 
 
 def correct_raw_value(
@@ -1488,7 +1489,21 @@ def correct_raw_value(
             hourly_rollup=bool(entity["hourly_rollup"]),
         )
 
+    # Die jüngste Zeile korrigiert: last_value im Index nachziehen (bump_ts_bounds überschreibt es
+    # nur, wenn ts nicht vor last_ts liegt, verschiebt also keine Grenzen).
+    index.bump_ts_bounds(entity_id, ts, new_value)
+    _invalidate_after_edit(index, entity_id)
     return True
+
+
+def _invalidate_after_edit(index: Index, entity_id: str) -> None:
+    """Nach dem Hinzufügen/Korrigieren eines Rohwerts gelten die zwischengespeicherten Befunde
+    (Gesamt-Zählung, Duplikat-Liste), der Zählerrückgang-Schnappschuss und das Minimum/Maximum
+    nicht mehr. Ein Ausreißer, den man korrigiert statt gelöscht hat, stünde sonst noch bis zu
+    eine Stunde in Zählung und Kennzahlen."""
+    index.invalidate_finding_caches(entity_id)
+    index.invalidate_counter_decrease_snapshot()
+    index.invalidate_value_range(entity_id)
 
 
 # -- Verdichten: rückwirkende Reduktion bereits archivierter Monate --

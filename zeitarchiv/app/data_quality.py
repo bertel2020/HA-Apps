@@ -384,6 +384,7 @@ def build_matrix(
         if (
             entry is None or (outliers_on and entity_id not in measured_outliers) or not gaps_ok
             or (window_start and "daily" not in entry)
+            or "counts" not in entry
         ):
             pending += 1
         elif entry.get("computed_at") and (entity["last_ts"] or 0) > entry["computed_at"]:
@@ -403,7 +404,7 @@ def build_matrix(
                 if entity_id in measured_outliers:
                     counts["outliers"][entity_id] = window["outliers"]
         else:
-            if entry is not None:
+            if entry is not None and "counts" in entry:
                 entry_counts = entry.get("counts") or {}
                 counts["duplicates"][entity_id] = entry_counts.get("duplicates") or 0
                 counts["counter_decreases"][entity_id] = entry_counts.get("counter_decreases") or 0
@@ -626,12 +627,15 @@ def mark_duplicates_removed(index: Index, entity_id: str) -> None:
 
 
 def mark_stats_unknown(index: Index, entity_id: str) -> None:
-    """Nach "Rückgängig": die alten Zahlen stimmen nicht mehr. Ohne Tageszahlen gilt der Eintrag in der
-    Matrix als nicht gemessen und wird im Hintergrund neu gerechnet."""
+    """Nach "Rückgängig": die alten Zahlen stimmen nicht mehr. Ohne Tageszahlen und Gesamtzahlen gilt
+    der Eintrag in der Matrix als nicht gemessen und wird im Hintergrund neu gerechnet."""
     entry = _stats_entry(index, entity_id)
     if not entry:
         return
     entry.pop("daily", None)
+    # Auch die Gesamtzahlen verwerfen: blieben sie stehen, zeigte die Matrix im Zeitraum „Gesamt“ die
+    # alten (nach dem Entfernen auf 0 gesetzten) Duplikate weiter als gemessen an.
+    entry.pop("counts", None)
     entry["computed_at"] = 0
     _write_stats_entry(index, entity_id, entry)
 

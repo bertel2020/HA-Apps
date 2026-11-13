@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import time
+from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -31,10 +32,17 @@ def returning_timestamps(
     window_start, window_end = window or (
         now.timestamp() - cleanup.COUNTER_WINDOW_DAYS * 86400, now.timestamp()
     )
+    # Wie die Anzeige (verdict_details_for_rows) mit Vorlauf und Nachlauf lesen: ohne den Vorwert fehlt
+    # der erste Rückgang des Fensters, ohne Folgewerte bleibt der letzte „offen“ — die Anzeige nannte
+    # ihn dann „kehrt zurück“, markiert wurde er nicht. Markiert wird trotzdem nur im Fenster.
     decreases = cleanup.classify_counter_decreases(
-        cleanup.iter_raw_rows(data_dir, index, entity_id, window_start, window_end, tz, now=now), tz
+        cleanup.iter_raw_rows(
+            data_dir, index, entity_id, window_start - _LOOKBACK_SECONDS,
+            min(window_end + _LOOKAHEAD_SECONDS, now.timestamp()), tz, now=now,
+        ),
+        tz,
     )
-    return [item["ts"] for item in decreases if item["returns"]]
+    return [item["ts"] for item in decreases if item["returns"] and window_start <= item["ts"] < window_end]
 
 
 def refresh_snapshot(
@@ -44,7 +52,11 @@ def refresh_snapshot(
     die betroffenen Entitäten neu her, statt alle Zähler neu zu scannen (das macht der
     stündliche Wartungstakt). ``before`` ist der Stand VOR der Änderung: das Markieren
     entwertet den Schnappschuss, danach wäre er leer."""
-    if before is None:
+    if before is None or not before.get("checked_at"):
+        # Ein entwerteter Schnappschuss (checked_at 0, z. B. nach einem manuellen Markieren) hat keine
+        # Zeilen; aus ihm nur die eine Entität zurückzuschreiben und ihn dabei als frisch zu stempeln
+        # ließe die Rückgänge aller anderen Zähler bis zum nächsten stündlichen Lauf verschwinden.
+        # Er bleibt entwertet, der Wartungstakt rechnet ihn ohnehin neu.
         return
     kept = [row for row in before.get("rows", []) if row["entity_id"] not in entity_ids]
     fresh = cleanup.scan_counter_decreases(data_dir, index, tz, entity_ids=entity_ids)
@@ -52,9 +64,16 @@ def refresh_snapshot(
     index.set_counter_decrease_snapshot(rows)
 
 
-def mark_returning(data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None) -> dict:
+def mark_returning(
+    data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None, entity_lock=None
+) -> dict:
     """Markiert bei allen Zählern die zurückkehrenden Rückgänge. Liefert die Chargenzeit und
-    je Entität die Anzahl; ohne Treffer bleibt ``entities`` leer."""
+    je Entität die Anzahl; ohne Treffer bleibt ``entities`` leer.
+
+    ``entity_lock(entity_id)`` ist der Kontextmanager des Speicher-Koordinators: Lesen der Rohwerte
+    und Markieren laufen je Entität unter der Sperre wie beim stündlichen Lauf. Ein zweiter Klick
+    oder ein zweiter Tab findet die Werte dann bereits markiert (iter_raw_rows blendet sie aus)
+    und markiert sie nicht ein weiteres Mal."""
     before = index.get_counter_decrease_snapshot()
     batch_at = time.time()
     marked: dict[str, int] = {}
@@ -62,10 +81,11 @@ def mark_returning(data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | N
         entity = index.get_entity(row["entity_id"])
         if not row.get("returning") or (entity is not None and entity["counter_auto_mark"]):
             continue  # Zähler mit eingeschalteter Regel markiert der stündliche Lauf selbst
-        timestamps = returning_timestamps(data_dir, index, tz, row["entity_id"], now)
-        if timestamps:
-            cleanup.soft_delete(index, row["entity_id"], timestamps, deleted_at=batch_at, source="counter_bulk")
-            marked[row["entity_id"]] = len(timestamps)
+        with entity_lock(row["entity_id"]) if entity_lock else nullcontext():
+            timestamps = returning_timestamps(data_dir, index, tz, row["entity_id"], now)
+            if timestamps:
+                cleanup.soft_delete(index, row["entity_id"], timestamps, deleted_at=batch_at, source="counter_bulk")
+                marked[row["entity_id"]] = len(timestamps)
     refresh_snapshot(data_dir, index, tz, before, set(marked))
     return {"batch_at": batch_at, "entities": marked, "values": sum(marked.values())}
 
@@ -86,7 +106,7 @@ def mark_entity_returning(
 
 
 def undo_batch(
-    data_dir: Path, index: Index, tz: ZoneInfo, batch_at: float, entity_ids: list[str]
+    data_dir: Path, index: Index, tz: ZoneInfo, batch_at: float, entity_ids: list[str], entity_lock=None
 ) -> int:
     """Nimmt die Sammelmarkierung ``batch_at`` bei den genannten Entitäten zurück."""
     before = index.get_counter_decrease_snapshot()
@@ -94,7 +114,8 @@ def undo_batch(
     touched: set[str] = set()
     for entity_id in entity_ids:
         started_at = time.time()
-        count = index.undo_deleted_batch(entity_id, batch_at)
+        with entity_lock(entity_id) if entity_lock else nullcontext():
+            count = index.undo_deleted_batch(entity_id, batch_at)
         if count:
             restored += count
             touched.add(entity_id)
