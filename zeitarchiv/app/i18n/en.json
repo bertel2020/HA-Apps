@@ -1089,6 +1089,7 @@
     "Duplikate entfernen …": "Remove duplicates …",
     "Es gab nichts zu entfernen.": "There was nothing to remove.",
     "In der Matrix": "In the matrix",
+    "„Gesamter Zeitraum“ zeigt noch den Stand vor der Änderung und wird gerade neu gezählt.": "“Entire period” still shows the state before the change and is being recounted.",
     " — Vorwert {value} um {when}": " — previous value {value} at {when}",
     "{seconds} Sek.": "{seconds} sec.",
     "{minutes} Min.": "{minutes} min.",

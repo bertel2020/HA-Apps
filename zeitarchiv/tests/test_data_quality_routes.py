@@ -301,3 +301,26 @@ def test_rueckgaengig_mit_unbekannter_entitaet_legt_nichts_an(client) -> None:
     )
     assert antwort.status_code == 200
     assert "0</strong> Zeile(n) wiederhergestellt" in antwort.text
+
+
+def test_nach_dem_loeschen_zeigt_die_ansicht_alte_gesamtzahlen_ohne_neu_zu_zaehlen(client, monkeypatch) -> None:
+    """Löschen/Rückgängig entwerten die Gesamt-Zählung; die Antwort wartet nicht auf die Neuzählung (7–22 s an großen
+    Entitäten), sondern zeigt den alten Stand mit Hinweis. Der Wartungstakt zählt neu."""
+    from app import cleanup_stats
+    from app.main import index
+
+    entity_id = "sensor.pytest_dq_stale"
+    _mit_duplikaten(index, entity_id)
+    form = {"filter": "all", "range": "month", "offset": "0", "page_size": "20"}
+    erste = client.get(f"/entities/{entity_id}/rows", params={"filter": "all", "range": "month", "offset": 0}).text
+    assert "wird gerade neu gezählt" not in erste
+    assert index.get_cleanup_alltime_stats(entity_id)["computed_at"] > 0
+
+    def darf_nicht_laufen(*_args, **_kwargs):
+        raise AssertionError("Gesamt-Zählung lief synchron in der Antwort")
+
+    monkeypatch.setattr(cleanup_stats, "alltime_counts", darf_nicht_laufen)
+    html = client.post(f"/entities/{entity_id}/rows/delete", data={**form, "source": "duplicates"}).text
+    assert "wird gerade neu gezählt" in html
+    assert 'hx-trigger="load delay:30s"' in html
+    assert index.get_cleanup_alltime_stats(entity_id)["computed_at"] == 0  # der Wartungstakt misst als Nächstes

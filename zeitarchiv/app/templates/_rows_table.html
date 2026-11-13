@@ -81,6 +81,15 @@
         </tr>
       </tbody>
     </table>
+    {% if alltime_stale %}
+    {# Nach Löschen/Rückgängig: die Zeile „Gesamter Zeitraum“ zeigt noch den alten Stand, der Wartungstakt zählt neu.
+       Die Ansicht lädt sich selbst nach, bis die neuen Zahlen da sind. #}
+    <p class="hint" role="status"
+       hx-get="{{ app_root }}/entities/{{ entity_id }}/rows" hx-trigger="load delay:30s"
+       hx-include="#controls, [name=page_size]" hx-target="#rows-table" hx-swap="innerHTML">
+      {{ _("„Gesamter Zeitraum“ zeigt noch den Stand vor der Änderung und wird gerade neu gezählt.") }}
+    </p>
+    {% endif %}
   </div>
 </div>
 

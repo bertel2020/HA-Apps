@@ -5273,13 +5273,13 @@ def _rows_fragment(
         # Zeitraum-Kachel — ein zweiter Vollscan wäre hier reine Verschwendung,
         # der Cache bleibt aber trotzdem aufgefrischt (nächster Aufruf mit
         # engerem Zeitraum-Chip muss dann nicht sofort neu scannen).
-        alltime_counts = counts
+        alltime_counts, alltime_stale = counts, False
         index.set_cleanup_alltime_stats(
             entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION,
             daily=daily_counts, gap_threshold=gap_threshold,
         )
     else:
-        alltime_counts = cleanup_stats.alltime_counts(DATA_DIR, index, TZ, entity, now)
+        alltime_counts, alltime_stale = cleanup_stats.alltime_counts_or_invalidated(DATA_DIR, index, TZ, entity, now)
 
     return templates.TemplateResponse(
         request,
@@ -5299,6 +5299,7 @@ def _rows_fragment(
             "is_current": offset == 0,
             "counts": counts,
             "alltime_counts": alltime_counts,
+            "alltime_stale": alltime_stale,
             "range_row_count_label": format_int(counts['all']),
             "total_row_count_label": format_int(_visible_row_count(entity)),
             "pagination": pagination,

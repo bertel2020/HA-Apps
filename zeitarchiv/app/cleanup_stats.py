@@ -95,6 +95,23 @@ def rows_window(
 _CLEANUP_ALLTIME_STATS_MAX_AGE_SECONDS = 15 * 60
 
 
+def alltime_counts_or_invalidated(
+    data_dir: Path, index: Index, tz: ZoneInfo, entity, now: datetime
+) -> tuple[dict, bool]:
+    """(Zahlen, veraltet) für die Zeile „Gesamter Zeitraum“ der Bereinigungsansicht.
+
+    Markieren und Zurücknehmen entwerten den Eintrag (computed_at 0, siehe Index.invalidate_finding_caches).
+    Die Zählung kostet dann eine volle Analyse der Historie (gemessen 7–22 s an Entitäten mit 1,5–3,9 Mio.
+    Zeilen) und lief bisher synchron in der Antwort auf „Löschen“/„Rückgängig“, unter der Entitätssperre. Jetzt
+    zeigt die Ansicht die alten Zahlen mit dem Hinweis, dass neu gezählt wird; der Wartungstakt misst die
+    entwertete Entität als erste (due_entities_for_outlier_rate). Alles andere (kein Eintrag, nur abgelaufenes
+    Alter) rechnet wie bisher sofort."""
+    cached = index.get_cleanup_alltime_stats(entity["entity_id"])
+    if cached is not None and cached.get("counts") is not None and not cached.get("computed_at"):
+        return cached["counts"], True
+    return alltime_counts(data_dir, index, tz, entity, now), False
+
+
 def alltime_counts(
     data_dir: Path, index: Index, tz: ZoneInfo, entity, now: datetime, *, force: bool = False
 ) -> dict:
