@@ -20,7 +20,10 @@ Detail, Einstellungen-Referenz, typische Aufgaben.
 ## Einrichtung
 
 1. App installieren und starten.
-2. Zeitarchiv über die Home-Assistant-Seitenleiste öffnen.
+2. Zeitarchiv über die Home-Assistant-Seitenleiste öffnen. Fehlt der Eintrag,
+   unter **Einstellungen → Apps → Zeitarchiv** prüfen, dass die App gestartet
+   ist, und **In der Seitenleiste anzeigen** aktivieren; alternativ dort
+   **Oberfläche öffnen** klicken.
 3. Unter **Einstellungen → Verbindung** den beim ersten Start automatisch
    erzeugten API-Token kopieren.
 4. Die Zeitarchiv-Integration installieren (über HACS oder manuell von

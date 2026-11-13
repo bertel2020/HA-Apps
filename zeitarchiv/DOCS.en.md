@@ -20,7 +20,9 @@ settings reference, typical tasks.
 ## Setup
 
 1. Install and start the app.
-2. Open Zeitarchiv from the Home Assistant sidebar.
+2. Open Zeitarchiv from the Home Assistant sidebar. If the entry is missing,
+   check under **Settings → Apps → Zeitarchiv** that the app is started and
+   enable **Show in sidebar**; alternatively click **Open Web UI** there.
 3. Under **Settings → Connection**, copy the API token that was generated
    automatically on first start.
 4. Install the Zeitarchiv integration (via HACS or manually from
