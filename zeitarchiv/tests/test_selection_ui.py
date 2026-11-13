@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -235,7 +236,8 @@ def test_pages_render_in_english(client, catalog, german_again) -> None:
 
 def test_confirmation_says_one_entity_in_the_singular(client, catalog) -> None:
     text = client.post("/selection/remove", data={"one": "sensor.ui_wp"}).text
-    assert "1 Entität wird nicht mehr archiviert" in text and "1 Entitäten" not in text
+    # Als eigenständige Zahl prüfen: „151 Entitäten“ in einer Meldung der Kopfleiste enthält „1 Entitäten“ als Teilstück.
+    assert "1 Entität wird nicht mehr archiviert" in text and not re.search(r"(?<!\d)1 Entitäten", text)
     both = client.post("/selection/remove", data={"ids": ["sensor.ui_hand", "sensor.ui_wp"]}).text
     assert "2 Entitäten werden nicht mehr archiviert" in both
 
