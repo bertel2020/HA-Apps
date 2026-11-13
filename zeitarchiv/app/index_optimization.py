@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .error_text import user_message
 from .i18n import N_, tr
 
 import logging
@@ -117,7 +118,7 @@ def optimize_index(index, index_path: Path, storage_coordinator) -> dict:
         )
         return {
             "success": False,
-            "message": tr("Optimierung fehlgeschlagen: {exc}", exc=exc),
+            "message": tr("Optimierung fehlgeschlagen: {exc}", exc=user_message(exc)),
         }
 
 

@@ -44,6 +44,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from .error_text import user_message
 from .i18n import N_, tr
 from . import cleanup_stats, counter_auto
 from . import demo_mode
@@ -373,7 +374,7 @@ class BackgroundService:
                 job_id,
             )
             finished_at = time.time()
-            error = str(exc)[:2000] or exc.__class__.__name__
+            error = user_message(exc)
             self.index.update_retention_job(
                 job_id,
                 status="failed",
@@ -739,7 +740,7 @@ class BackgroundService:
                     job_id,
                 )
                 finished_at = time.time()
-                error = str(exc)[:2000] or exc.__class__.__name__
+                error = user_message(exc)
                 self.index.update_backup_job(
                     job_id,
                     status="failed",
@@ -819,7 +820,7 @@ class BackgroundService:
             )
             self.index.update_backup_job(
                 job_id, external_status=backup_external.STATUS_FAILED,
-                external_finished_at=time.time(), external_error=str(exc)[:2000],
+                external_finished_at=time.time(), external_error=user_message(exc),
             )
             return False
         logger.info(

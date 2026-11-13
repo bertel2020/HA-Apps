@@ -26,6 +26,7 @@ app.css), nicht den Zustand.
 
 from __future__ import annotations
 
+from .error_text import user_message
 from .i18n import tr
 
 import threading
@@ -283,7 +284,7 @@ class JobProgress:
             if logger is not None:
                 logger.exception("%s fehlgeschlagen · event=job_failed job=%s", self.name, self.name)
             with self.lock:
-                self.error = str(fehler)[:2000] or fehler.__class__.__name__
+                self.error = user_message(fehler)
         else:
             with self.lock:
                 self.result = ergebnis
@@ -335,7 +336,7 @@ class JobProgress:
             # einer, der sauber durchgelaufen ist.
             if eigene_belegung:
                 with self.lock:
-                    self.error = str(fehler)[:2000] or fehler.__class__.__name__
+                    self.error = user_message(fehler)
             raise
         finally:
             if eigene_belegung:
