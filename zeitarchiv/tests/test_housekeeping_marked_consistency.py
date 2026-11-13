@@ -666,3 +666,37 @@ def test_a_normal_rotation_leaves_no_marker(env) -> None:
     index.record_write("sensor.a", 1719878400.0)
     rotate.rotate_if_needed(tmp, "sensor.a", 1722470400.0, index, tz)
     assert list((tmp / "archive" / "sensor.a").glob("*.rollup-pending")) == []
+
+
+def test_an_interrupted_rollup_rebuild_is_redone_at_startup(env, monkeypatch) -> None:
+    from app.storage import rollup, rotate
+
+    tmp, index = env
+    tz = ZoneInfo("UTC")
+    index.get_or_create_entity("sensor.r", "sensor", "total_increasing", "kWh")
+    for i, ts in enumerate((1719878400.0, 1719964800.0, 1720051200.0)):
+        hotbuffer.append(tmp, "sensor.r", ts, 100.0 + i, tz)
+        index.record_write("sensor.r", ts)
+    rotate.rotate_if_needed(tmp, "sensor.r", 1722470400.0, index, tz)
+    expected = _rollup_files(tmp, "sensor.r")
+    assert expected
+    archive_dir = tmp / "archive" / "sensor.r"
+
+    rollup.rebuild_entity_rollups(tmp, "sensor.r", "counter", tz)
+    assert not (archive_dir / rollup.REBUILD_MARKER).exists()  # normaler Neuaufbau hinterlässt nichts
+
+    def crash(*_args, **_kwargs):
+        raise OSError("Absturz im Neuaufbau")
+
+    monkeypatch.setattr(rollup, "append_completed_month", crash)
+    with pytest.raises(OSError):
+        rollup.rebuild_entity_rollups(tmp, "sensor.r", "counter", tz)
+    monkeypatch.undo()
+    assert (archive_dir / rollup.REBUILD_MARKER).exists()
+
+    # Ein Archiv wird verändert, bevor der Neuaufbau läuft: der Marker steht schon davor.
+    import shutil
+    shutil.rmtree(tmp / "rollup" / "sensor.r")
+    assert rollup.repair_pending(tmp, index, tz) == 1
+    assert not (archive_dir / rollup.REBUILD_MARKER).exists()
+    assert _rollup_files(tmp, "sensor.r") == expected

@@ -988,6 +988,8 @@ def import_rows(
         if written_first_ts is None or smallest < written_first_ts:
             written_first_ts = smallest
 
+    if to_import or to_update:
+        rollup.mark_rebuild_pending(data_dir, entity_id)
     for year, month, label, month_rows in to_import:
         month_rows.sort()
         unique_rows = _unique_by_timestamp(month_rows)
@@ -1076,6 +1078,8 @@ def import_rows(
         # verändern. Deshalb alle Rollups der Entität atomar aus den nun
         # vollständigen Roharchiven neu aufbauen, nicht nur den einen Monat.
         rollup.rebuild_entity_rollups(data_dir, entity_id, aggregation_type, tz, hourly_rollup=hourly_rollup)
+    else:
+        rollup.clear_rebuild_pending(data_dir, entity_id)  # die Rollups wurden Monat für Monat fortgeschrieben
 
     if written_count:
         _backfill_index_stats(index, entity_id, written_first_ts, written_count)

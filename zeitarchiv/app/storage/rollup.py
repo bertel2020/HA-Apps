@@ -714,6 +714,9 @@ def remove_month(
 # Zahlen in Charts und Statistik wichen dann von den Rohdaten ab, ohne dass etwas darauf hinwies. Gilt für die
 # Rotation (neuer Monat), das Neuschreiben (Hinzufügen, Korrigieren, Verdichten) und den Archiv-Purge.
 PENDING_SUFFIX = ".rollup-pending"
+#: Marker je Entität: Die Rollups sind nicht mehr verlässlich (ein Archiv wurde verändert oder ein Neuaufbau
+#: läuft) und müssen komplett neu gebaut werden. Liegt im Archivordner der Entität, ohne Endung .parquet.
+REBUILD_MARKER = ".rebuild-pending"
 
 
 @contextmanager
@@ -738,6 +741,18 @@ def write_archive_pending(marker: Path, write) -> None:
     except BaseException:
         marker.unlink(missing_ok=True)
         raise
+
+
+def mark_rebuild_pending(data_dir: Path, entity_id: str) -> None:
+    """Legt den Neuaufbau-Marker an, bevor ein Archiv der Entität verändert wird. rebuild_entity_rollups() entfernt
+    ihn nach dem Umschalten; bricht der Vorgang vorher ab, baut repair_pending() beim Start neu auf."""
+    folder = entity_dir(data_dir, "archive", entity_id)
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / REBUILD_MARKER).touch()
+
+
+def clear_rebuild_pending(data_dir: Path, entity_id: str) -> None:
+    (entity_dir(data_dir, "archive", entity_id) / REBUILD_MARKER).unlink(missing_ok=True)
 
 
 def repair_pending(data_dir: Path, index, tz: ZoneInfo) -> int:
@@ -768,6 +783,18 @@ def repair_pending(data_dir: Path, index, tz: ZoneInfo) -> int:
                 )
         marker.unlink(missing_ok=True)
         repaired += 1
+    for marker in sorted((data_dir / "archive").glob(f"*/{REBUILD_MARKER}")):
+        entity = index.get_entity(marker.parent.name)
+        if entity is not None:
+            rebuild_entity_rollups(
+                data_dir, entity["entity_id"], entity["aggregation_type"], tz,
+                hourly_rollup=bool(entity["hourly_rollup"]),
+            )
+        marker.unlink(missing_ok=True)
+        repaired += 1
+    # Reste abgebrochener Neuaufbauten (Staging-Ordner); beim Start läuft kein Neuaufbau.
+    for leftover in data_dir.glob(".*-type-rebuild-*"):
+        shutil.rmtree(leftover, ignore_errors=True)
     return repaired
 
 
@@ -810,6 +837,7 @@ def rebuild_entity_rollups(
     """
     archive_dir = entity_dir(data_dir, "archive", entity_id)
     (data_dir / "rollup").mkdir(parents=True, exist_ok=True)
+    mark_rebuild_pending(data_dir, entity_id)
     staging_root = Path(
         tempfile.mkdtemp(prefix=f".{entity_id}-type-rebuild-", dir=data_dir)
     )
@@ -854,6 +882,7 @@ def rebuild_entity_rollups(
         try:
             replacement_dir.replace(target_dir)
             switched = True
+            clear_rebuild_pending(data_dir, entity_id)
         except Exception:
             if previous_dir.exists() and not target_dir.exists():
                 previous_dir.replace(target_dir)

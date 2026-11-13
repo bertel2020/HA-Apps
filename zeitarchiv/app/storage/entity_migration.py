@@ -285,6 +285,7 @@ def _overwrite_existing_values(
                     for field in table.schema
                 }
                 new_table = pa.table(new_columns, schema=table.schema)
+                rollup.mark_rebuild_pending(data_dir, target_entity_id)
                 temporary = archive_path.with_name(f".{archive_path.name}.migrating")
                 try:
                     pq.write_table(new_table, temporary, compression="zstd")
