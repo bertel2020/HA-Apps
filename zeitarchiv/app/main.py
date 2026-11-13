@@ -175,6 +175,7 @@ from .route_support import (
     MAX_FORM_FIELDS,
     STORAGE_LOCKED_TIMEOUT_SECONDS,
     UI_EXCLUSIVE_TIMEOUT_SECONDS,
+    CrossSiteGuardMiddleware,
     UploadLimitExceeded,
     UploadSizeLimitMiddleware,
     copy_upload_limited,
@@ -551,12 +552,9 @@ class _CachedStaticFiles(StaticFiles):
 # Zuerst eingehängt, damit sie innen sitzt: Die Anfrage-Protokollierung sieht dann auch die abgewiesenen Uploads.
 app.add_middleware(
     UploadSizeLimitMiddleware,
-    limits={
-        "/import/upload": MAX_ZIP_UPLOAD_BYTES,
-        "/import/settings-upload": MAX_SETTINGS_UPLOAD_BYTES,
-        "/import/csv/upload": MAX_CSV_UPLOAD_BYTES,
-    },
+    limits={"/import/upload": MAX_ZIP_UPLOAD_BYTES, "/import/settings-upload": MAX_SETTINGS_UPLOAD_BYTES, "/import/csv/upload": MAX_CSV_UPLOAD_BYTES},
 )
+app.add_middleware(CrossSiteGuardMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=500)  # bislang kein Content-Encoding irgendwo

@@ -2264,6 +2264,7 @@
     "Bei {anzahl} Entität markiert die eingestellte Schwelle mehr als {marke} % aller Werte": "For {anzahl} entity the configured threshold marks more than {marke} % of all values",
     "Bei {anzahl} Entitäten markiert die eingestellte Schwelle mehr als {marke} % aller Werte": "For {anzahl} entities the configured threshold marks more than {marke} % of all values",
     "Upload ist größer als {format_upload_limit}": "Upload is larger than {format_upload_limit}",
+    "Anfrage von einer fremden Website abgewiesen.": "Request from another website rejected.",
     "Gleicher gerundeter Folgewert bei {precision} Nachkommastellen — wie Vorwert {_format_val} um {_format_ts}": "Same rounded consecutive value at {precision} decimal places — like the previous value {_format_val} at {_format_ts}",
     "Vorwert {previous_value:.12g} → {value:.12g}; Rückgang um {difference:.12g}": "Previous value {previous_value:.12g} → {value:.12g}; decrease by {difference:.12g}",
     "{days} Tage {hours} Std.": "{days} days {hours} hrs.",

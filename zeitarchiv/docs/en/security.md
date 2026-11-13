@@ -135,7 +135,9 @@ answers meant for a language model. Safeguards:
   Zeitarchiv).
 - **No rate limiting** on `/api/write` beyond the batch size limit — trusts the
   integration as the only realistic client behind the token.
-- **No CSRF protection** on the Ingress forms — Ingress sessions are
-  same-origin and run inside the already authenticated Home Assistant session;
-  a classic CSRF scenario (a foreign origin sends a form) presupposes a valid
-  Ingress session of its own, which the attacker does not have.
+- **CSRF only via `Sec-Fetch-Site`.** There is no per-form token. Instead the app
+  rejects every state-changing request (POST, PUT, PATCH, DELETE) that the browser marks
+  as `cross-site` and that carries no `Authorization` header (403, log line
+  `event=cross_site_blocked`). The UI runs in Ingress under the same origin as Home
+  Assistant (`same-origin`). Without the header (older browsers, scripts) nothing is
+  checked; there it remains the Ingress session and the unguessable Ingress path.

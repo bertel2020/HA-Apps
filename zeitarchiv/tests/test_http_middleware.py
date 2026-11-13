@@ -54,3 +54,20 @@ def test_request_id_header_matches_access_log_line(client, caplog) -> None:
         if "event=http_request" in record.getMessage() and f"request_id={request_id}" in record.getMessage()
     ]
     assert matching, f"Kein Access-Log-Eintrag mit request_id={request_id} gefunden"
+
+
+def test_a_cross_site_post_is_rejected_before_any_route_runs(client) -> None:
+    for method in ("post", "put", "patch", "delete"):
+        resp = getattr(client, method)("/housekeeping/anything", headers={"Sec-Fetch-Site": "cross-site"})
+        assert resp.status_code == 403, method
+        assert "Content-Security-Policy" in resp.headers  # die Antwort läuft durch die übrigen Middlewares
+
+
+def test_same_origin_without_header_and_token_requests_are_not_blocked(client) -> None:
+    for headers in ({"Sec-Fetch-Site": "same-origin"}, {"Sec-Fetch-Site": "same-site"}, {"Sec-Fetch-Site": "none"}, {}):
+        assert client.post("/housekeeping/anything", headers=headers).status_code != 403, headers
+    # Mit Token (Integration, Skripte) wird nicht geprüft; die Auth der API entscheidet selbst.
+    token = {"Authorization": "Bearer falsch", "Sec-Fetch-Site": "cross-site"}
+    assert client.post("/api/write", headers=token, content=b"{}").status_code == 401
+    # Lesende Anfragen von einer fremden Seite bleiben erlaubt (sie ändern nichts).
+    assert client.get("/", headers={"Sec-Fetch-Site": "cross-site"}).status_code == 200

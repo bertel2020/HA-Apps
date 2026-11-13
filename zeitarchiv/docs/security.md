@@ -143,8 +143,10 @@ in Antworten für ein Sprachmodell gehen. Schutzmaßnahmen:
 - **Kein Rate-Limiting** auf `/api/write` über die Batch-Größengrenze hinaus
   — vertraut der Integration als einzigem realistischen Client hinter dem
   Token.
-- **Kein CSRF-Schutz** auf den Ingress-Formularen — Ingress-Sessions sind
-  same-origin und laufen innerhalb der bereits authentifizierten
-  Home-Assistant-Session; ein klassisches CSRF-Szenario (fremde Origin sendet
-  Formular) setzt eine eigene, gültige Ingress-Session voraus, die der
-  Angreifer nicht hat.
+- **CSRF nur über `Sec-Fetch-Site`.** Ein Token pro Formular gibt es nicht. Stattdessen
+  weist die App jede verändernde Anfrage (POST, PUT, PATCH, DELETE) ab, die der Browser
+  als `cross-site` kennzeichnet und die keinen `Authorization`-Header trägt (403,
+  Protokollzeile `event=cross_site_blocked`). Die Oberfläche läuft im Ingress unter
+  demselben Ursprung wie Home Assistant (`same-origin`). Ohne den Header (ältere
+  Browser, Skripte) wird nicht geprüft; dort bleibt es bei der Ingress-Sitzung und dem
+  nicht erratbaren Ingress-Pfad.

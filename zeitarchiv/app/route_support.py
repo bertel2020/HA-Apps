@@ -6,6 +6,7 @@ from .i18n import tr
 
 import functools
 import inspect
+import logging
 import stat
 from collections.abc import Callable, Iterable
 from pathlib import Path
@@ -71,6 +72,36 @@ class UploadSizeLimitMiddleware:
                     )
                     await response(scope, receive, send)
                     return
+        await self.app(scope, receive, send)
+
+
+class CrossSiteGuardMiddleware:
+    """Weist eine verändernde Browser-Anfrage von einer fremden Website ab (CSRF, Defense in Depth).
+
+    Aktuelle Browser nennen die Herkunft jeder Anfrage in ``Sec-Fetch-Site`` und lassen sie Seiten nicht fälschen. Die
+    Oberfläche läuft im Ingress unter demselben Ursprung wie Home Assistant (``same-origin``); ``cross-site`` kommt nur
+    von einer fremden Seite, die das Formular im Namen des angemeldeten Nutzers abschickt. Ohne den Header (ältere
+    Browser, Skripte, die Integration) und mit Token (``Authorization``) wird nicht geprüft. Reines ASGI wie die
+    übrigen Middlewares."""
+
+    UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] == "http" and scope["method"] in self.UNSAFE_METHODS:
+            headers = dict(scope["headers"])
+            if headers.get(b"sec-fetch-site") == b"cross-site" and b"authorization" not in headers:
+                logging.getLogger(__name__).warning(
+                    "Anfrage von einer fremden Website abgewiesen · event=cross_site_blocked method=%s path=%s",
+                    scope["method"], scope["path"],
+                )
+                response = JSONResponse(
+                    {"detail": tr("Anfrage von einer fremden Website abgewiesen.")}, status_code=403
+                )
+                await response(scope, receive, send)
+                return
         await self.app(scope, receive, send)
 
 
