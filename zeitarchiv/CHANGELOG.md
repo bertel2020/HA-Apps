@@ -14,14 +14,14 @@
 
 ### New
 
-- **Weather dashboard**: Sunshine and sky condition by sun position (Settings →
-  Sun and daylight)
-  - Brightness is related to a clear sky at the current sun elevation, so the
-    same percentages apply all year
-  - Applies automatically once the “Sun elevation” role is set; without it,
-    or with the switch off, the fixed lx values stay in use
-  - Adjustable: the share for sunshine (default 60 %) and a calibration of the
-    clear-sky curve to your own sensor
+- **Dashboards**: History popup instead of a page change
+  - Clicking a chart, table or value tile opens its history as a popup over
+    the dashboard; the dashboard stays where it was
+  - Period, navigation, comparisons and options work as on the page itself;
+    “Edit” and “Open as page” lead to the full page
+  - On smartphones the popup slides up from the bottom
+  - Energy dashboard popup: same frame and close button as the tile popup,
+    larger, axes in the app format
 
 - **Charts**: Several stacks in one chart
   - With “Stacked” on, every bar series in “Selected” can be assigned to a
@@ -40,6 +40,15 @@
     stack gets a paler comparison stack next to it
   - Also applies on dashboards and in the card; without a choice everything
     stays in one stack as before
+
+- **Weather dashboard**: Sunshine and sky condition by sun position (Settings →
+  Sun and daylight)
+  - Brightness is related to a clear sky at the current sun elevation, so the
+    same percentages apply all year
+  - Applies automatically once the “Sun elevation” role is set; without it,
+    or with the switch off, the fixed lx values stay in use
+  - Adjustable: the share for sunshine (default 60 %) and a calibration of the
+    clear-sky curve to your own sensor
 
 - **Tables**: New “+ Blank row” adds an empty row between sections; it is a
   separator with the line hidden (option “Hide line”)
@@ -74,14 +83,6 @@
     - “Used in” now opens the default dashboard as the overview, like the
       navigation
 
-  - History popup instead of a page change
-    - Clicking a chart, table or value tile opens its history as a popup over
-      the dashboard; the dashboard stays where it was
-    - Period, navigation, comparisons and options work as on the page itself;
-      “Edit” and “Open as page” lead to the full page
-    - On smartphones the popup slides up from the bottom
-  - Energy dashboard popup: same frame and close button as the tile popup,
-    larger, axes in the app format
   - Cards with a soft shadow in the weather and energy dashboards, same
     spacing below the top bar everywhere
 

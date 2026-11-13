@@ -14,14 +14,14 @@
 
 ### Neu
 
-- **Wetterdashboard**: Sonnenschein und Himmelszustand nach Sonnenstand
-  (Einstellungen → Sonne und Tageslicht)
-  - Die Helligkeit wird auf einen klaren Himmel bei der aktuellen Sonnenhöhe
-    bezogen, dieselben Prozentwerte gelten damit das ganze Jahr
-  - Gilt automatisch, sobald die Rolle „Sonnenhöhe“ belegt ist; ohne sie oder
-    bei ausgeschaltetem Schalter bleibt es bei den festen lx-Werten
-  - Einstellbar: Anteil für Sonnenschein (Standard 60 %) und ein Abgleich der
-    Klarhimmel-Kurve an den eigenen Sensor
+- **Dashboards**: Verlaufs-Popup statt Seitenwechsel
+  - Ein Klick auf eine Chart-, Tabellen- oder Wertekachel öffnet den Verlauf
+    als Popup über dem Dashboard; das Dashboard bleibt, wo es war
+  - Zeitraum, Navigation, Vergleiche und Optionen funktionieren wie auf der
+    Seite selbst; „Bearbeiten“ und „Als Seite öffnen“ führen zur ganzen Seite
+  - Auf dem Smartphone fährt das Popup von unten ein
+  - Energiedashboard-Popup: gleicher Rahmen und Schließen-Knopf wie beim
+    Kachel-Popup, größer, Achsen im App-Format
 
 - **Charts**: Mehrere Stapel in einem Chart
   - Bei „Gestapelt“ lässt sich jeder Balken-Serie in „Ausgewählt“ ein Stapel
@@ -40,6 +40,15 @@
     bekommt einen blasseren Vergleichsstapel daneben
   - Gilt auch auf Dashboards und in der Karte; ohne Auswahl bleibt alles wie
     bisher in einem Stapel
+
+- **Wetterdashboard**: Sonnenschein und Himmelszustand nach Sonnenstand
+  (Einstellungen → Sonne und Tageslicht)
+  - Die Helligkeit wird auf einen klaren Himmel bei der aktuellen Sonnenhöhe
+    bezogen, dieselben Prozentwerte gelten damit das ganze Jahr
+  - Gilt automatisch, sobald die Rolle „Sonnenhöhe“ belegt ist; ohne sie oder
+    bei ausgeschaltetem Schalter bleibt es bei den festen lx-Werten
+  - Einstellbar: Anteil für Sonnenschein (Standard 60 %) und ein Abgleich der
+    Klarhimmel-Kurve an den eigenen Sensor
 
 - **Tabellen**: Neu „+ Leerzeile“ fügt eine leere Zeile zwischen Abschnitten
   ein; sie ist eine Trennlinie mit ausgeblendeter Linie (Option „Linie
@@ -76,14 +85,6 @@
     - „Verwendet in“ öffnet das Standard-Dashboard jetzt als Übersicht, wie die
       Navigation
 
-  - Verlaufs-Popup statt Seitenwechsel
-    - Ein Klick auf eine Chart-, Tabellen- oder Wertekachel öffnet den Verlauf
-      als Popup über dem Dashboard; das Dashboard bleibt, wo es war
-    - Zeitraum, Navigation, Vergleiche und Optionen funktionieren wie auf der
-      Seite selbst; „Bearbeiten“ und „Als Seite öffnen“ führen zur ganzen Seite
-    - Auf dem Smartphone fährt das Popup von unten ein
-  - Energiedashboard-Popup: gleicher Rahmen und Schließen-Knopf wie beim
-    Kachel-Popup, größer, Achsen im App-Format
   - Karten im Wetter- und Energiedashboard mit weichem Schatten, überall
     gleicher Abstand unter der Topnav
 
