@@ -12,9 +12,9 @@
   <p class="dq-bulk-text">{{ _('<strong>{total}</strong> Zeile(n) in {entities} Entität(en) würden entfernt. Je mehrfach vorkommendem Zeitstempel bleibt ein Datensatz erhalten, alle weiteren werden gelöscht. Das lässt sich direkt danach rückgängig machen.', total=bulk.total_label, entities=bulk.rows | length) }}</p>
   <div class="tbl-wrap dq-bulk-list">
     <table class="dt compact">
-      <tr><th>{{ _("Entität") }}</th><th class="dq-num">{{ _("Zeilen") }}</th></tr>
+      <tr><th>{{ _("Entität") }}</th><th class="dq-num">{{ _("Zeilen") }}</th><th class="dq-num" title="{{ _('So viele Zeilen zählt die Matrix: alle Zeilen der doppelten Zeitstempel. Entfernt wird je Zeitstempel eine weniger.') }}">{{ _("In der Matrix") }}</th></tr>
       {% for row in bulk.rows %}
-      <tr><td>{{ row.friendly_name }}</td><td class="dq-num">{{ row.count }}</td></tr>
+      <tr><td>{{ row.friendly_name }}</td><td class="dq-num">{{ row.count }}</td><td class="dq-num">{{ row.affected }}</td></tr>
       {% endfor %}
     </table>
   </div>

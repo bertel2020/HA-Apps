@@ -427,3 +427,23 @@ def test_deep_pages_use_a_match_window_and_show_the_same_rows(filter_, monkeypat
         assert [row["ts"] for row in deep["rows"]] == [row["ts"] for row in expected["rows"]]
         assert deep["pagination"] == expected["pagination"]
         assert deep["counts"] == expected["counts"]
+
+
+def test_bulk_preview_names_removed_and_affected_rows(env) -> None:
+    from contextlib import nullcontext
+
+    from app import data_quality
+
+    tmp, index = env
+    entity_id = "sensor.dup"
+    index.get_or_create_entity(entity_id, "sensor", "measurement", "W")
+    base = datetime.now(TZ).replace(day=1, hour=0, minute=1, second=0, microsecond=0).timestamp()
+    for ts in (base, base + 60, base + 120):  # drei Zeitstempel, jeweils doppelt
+        for _ in range(2):
+            hotbuffer.append(tmp, entity_id, ts, 5.0, TZ)
+            index.record_write(entity_id, ts)
+
+    preview = data_quality.preview_duplicate_removal(tmp, index, TZ, [entity_id], lambda _e: nullcontext())
+    row = preview["rows"][0]
+    assert row["count"] == 3  # würden entfernt
+    assert row["affected"] == 6  # so viele Zeilen zählt die Matrix

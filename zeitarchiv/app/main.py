@@ -5649,6 +5649,7 @@ async def duplicates_preview(request: Request, entity_id: str) -> HTMLResponse:
         {
             "entity_id": entity_id,
             "total_to_delete": len(to_delete),
+            "affected": len(to_delete) + len({ts for ts, _ in to_delete}),
             "preview_rows": preview_rows,
             "truncated": max(0, len(to_delete) - _DUPLICATES_PREVIEW_LIMIT),
             "filter": filter_,

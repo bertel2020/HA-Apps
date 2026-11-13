@@ -674,17 +674,20 @@ def preview_duplicate_removal(
             continue
         try:
             with entity_lock(entity_id):
-                count = len(duplicate_timestamps(data_dir, index, tz, entity_id, entity, now))
+                timestamps = duplicate_timestamps(data_dir, index, tz, entity_id, entity, now)
         except Exception:
             logger.exception("Duplikat-Vorschau fehlgeschlagen · event=duplicates_preview_failed entity_id=%s", entity_id)
             failed.append(_entity_label(entity, entity_id))
             continue
-        if count:
-            rows.append({"entity_id": entity_id, "friendly_name": _entity_label(entity, entity_id), "count": count})
-    return {
-        "rows": rows, "failed": failed,
-        "total": sum(r["count"] for r in rows), "total_label": format_int(sum(r["count"] for r in rows)),
-    }
+        if timestamps:
+            # Die Matrix zählt ALLE Zeilen der doppelten Zeitstempel, entfernt wird je Zeitstempel eine weniger:
+            # beide Zahlen nebeneinander, damit „6“ in der Matrix und „3“ hier kein Widerspruch sind.
+            rows.append({
+                "entity_id": entity_id, "friendly_name": _entity_label(entity, entity_id), "count": len(timestamps),
+                "affected": len(timestamps) + len(set(timestamps)),
+            })
+    total = sum(r["count"] for r in rows)
+    return {"rows": rows, "failed": failed, "total": total, "total_label": format_int(total)}
 
 
 def remove_duplicates(
