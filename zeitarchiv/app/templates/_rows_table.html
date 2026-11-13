@@ -236,7 +236,7 @@
       {% if mode == 'correct' %}
       <td><button type="button" class="correct-edit-btn" title="{{ _('Wert korrigieren') }}" onclick="startCorrect(this)">✎</button></td>
       {% else %}
-      <td><input type="checkbox" name="ts" value="{{ row.ts }}"></td>
+      <td><input type="checkbox" name="ts" value="{{ row.ts }}:{{ row.value }}"></td>
       {% endif %}
       <td>{{ row.formatted_ts }}</td>
       {% if mode == 'correct' %}

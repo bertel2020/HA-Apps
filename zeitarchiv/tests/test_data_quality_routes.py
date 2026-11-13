@@ -289,6 +289,8 @@ def test_ungueltige_eingaben_geben_400_statt_500(client) -> None:
     form = {"filter": "all", "range": "day", "offset": "0", "page_size": "20"}
     for schlecht in ("abc", "nan", "inf"):
         assert client.post(f"/entities/{entity_id}/rows/delete", data={**form, "ts": schlecht}).status_code == 400
+    for schlecht in ("1700000000:abc", "1700000000:nan", "abc:1"):
+        assert client.post(f"/entities/{entity_id}/rows/delete", data={**form, "ts": schlecht}).status_code == 400
     assert client.get(f"/entities/{entity_id}/data-days?year=0&month=5").status_code == 400
     assert client.get(f"/entities/{entity_id}/data-days?year=10000&month=5").status_code == 400
     assert client.get(f"/entities/{entity_id}/data-days?year=2026&month=5").status_code == 200
@@ -324,3 +326,15 @@ def test_nach_dem_loeschen_zeigt_die_ansicht_alte_gesamtzahlen_ohne_neu_zu_zaehl
     assert "wird gerade neu gezählt" in html
     assert 'hx-trigger="load delay:30s"' in html
     assert index.get_cleanup_alltime_stats(entity_id)["computed_at"] == 0  # der Wartungstakt misst als Nächstes
+
+
+def test_a_ticked_row_marks_exactly_its_own_value_among_equal_timestamps(client) -> None:
+    from app.main import index
+
+    entity_id = "sensor.pytest_dq_wertzeile"
+    _entity(index, entity_id)
+    form = {"filter": "all", "range": "day", "offset": "0", "page_size": "20"}
+    assert client.post(f"/entities/{entity_id}/rows/delete", data={**form, "ts": "1700000000.0:7.5"}).status_code == 200
+    assert index.get_deleted_counts_for_entity(entity_id).values_by_ts == {1700000000.0: [7.5]}
+    client.post(f"/entities/{entity_id}/rows/delete", data={**form, "ts": "1700000100.0"})  # älteres Formular
+    assert index.get_deleted_counts_for_entity(entity_id)[1700000100.0] == 1

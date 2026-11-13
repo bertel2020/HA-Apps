@@ -5353,11 +5353,14 @@ async def delete_rows(request: Request, entity_id: str) -> HTMLResponse:
     # Zeile ist ein Feld ("ts"), bei 1000 Zeilen pro Seite plus range/filter/...
     # also zu viel: der Request scheiterte mit 400, ohne dass etwas gelöscht wurde.
     form = await request.form(max_fields=MAX_FORM_FIELDS)
+    # Jede Zeile trägt "Zeitstempel:Wert" (ältere Formulare nur den Zeitstempel): der Wert benennt bei mehreren Zeilen
+    # mit demselben Zeitstempel die gemeinte.
     try:
-        timestamps = [float(value) for key, value in form.multi_items() if key == "ts"]
+        pairs = [str(raw).partition(":") for key, raw in form.multi_items() if key == "ts"]
+        timestamps, row_values = [float(p[0]) for p in pairs], [float(p[2]) if p[2] else None for p in pairs]
     except ValueError:
-        timestamps = [math.nan]
-    _require_finite(*timestamps)
+        timestamps, row_values = [math.nan], [None]
+    _require_finite(*timestamps, *(v for v in row_values if v is not None))
     filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
     source = str(form.get("source", "manual"))
     entity = _require_entity(entity_id)
@@ -5367,6 +5370,7 @@ async def delete_rows(request: Request, entity_id: str) -> HTMLResponse:
         nonlocal deleted_total
         with storage_coordinator.entity(entity_id, timeout=STORAGE_LOCKED_TIMEOUT_SECONDS):
             to_mark = timestamps
+            marked_values = row_values
             if source == "duplicates":
                 # Die Vorschau kann veraltet sein (Duplikate inzwischen anderswo
                 # entfernt, Bestätigung doppelt abgeschickt): ein Zeitstempel würde
@@ -5380,7 +5384,8 @@ async def delete_rows(request: Request, entity_id: str) -> HTMLResponse:
                     range_key, effective_offset, now, entity["first_ts"], TZ
                 )
                 to_mark = [ts for ts, _value in cleanup.duplicate_rows_in_window(DATA_DIR, index, entity_id, window_start.timestamp(), window_end.timestamp(), TZ, now)]
-            cleanup.soft_delete(index, entity_id, to_mark, source=source)
+                marked_values = [None] * len(to_mark)
+            cleanup.soft_delete(index, entity_id, to_mark, source=source, values=marked_values)
             deleted_total = len(to_mark)
             return _rows_fragment(
                 request, entity_id, filter_, range_key, offset, page, page_size, mode,

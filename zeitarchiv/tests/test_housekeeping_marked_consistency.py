@@ -761,3 +761,53 @@ def test_a_purge_whose_file_was_not_replaced_keeps_the_marks(env) -> None:
     }}))
     assert cleanup.finish_interrupted_purges(tmp, index, tz) == 0  # Datei hat noch 2 Zeilen
     assert index.get_deleted_counts_for_entity("sensor.q")
+
+
+def test_a_mark_with_a_value_hits_exactly_that_row_among_equal_timestamps(env) -> None:
+    from app.storage.index import DeletedCounts, filter_deleted_occurrences, marked_positions
+
+    rows = [(10.0, 1.0), (10.0, 2.0), (10.0, 3.0), (20.0, 5.0)]
+    only_ts = DeletedCounts({10.0: 1})
+    assert filter_deleted_occurrences(rows, only_ts) == [(10.0, 2.0), (10.0, 3.0), (20.0, 5.0)]  # wie bisher: die erste
+    marked = DeletedCounts({10.0: 1}, {10.0: [3.0]})
+    assert filter_deleted_occurrences(rows, marked) == [(10.0, 1.0), (10.0, 2.0), (20.0, 5.0)]
+    # Zwei Markierungen: eine kennt ihren Wert, die andere nicht — die ohne Wert nimmt die erste verbliebene.
+    mixed = DeletedCounts({10.0: 2}, {10.0: [2.0]})
+    assert filter_deleted_occurrences(rows, mixed) == [(10.0, 3.0), (20.0, 5.0)]
+    # Hat sich die Zeile inzwischen geändert, zählt die Markierung wie eine ohne Wert (nichts bleibt sichtbar unmarkiert).
+    stale = DeletedCounts({10.0: 1}, {10.0: [9.0]})
+    assert filter_deleted_occurrences(rows, stale) == [(10.0, 2.0), (10.0, 3.0), (20.0, 5.0)]
+    assert marked_positions([1.0, 2.0], 5, []) == {0, 1}
+
+
+def test_marking_by_value_survives_every_read_and_purge_path(env) -> None:
+    from app.storage import rotate
+
+    tmp, index = env
+    tz = ZoneInfo("UTC")
+    index.get_or_create_entity("sensor.d", "sensor", "measurement", "W")
+    ts = 1719878400.0  # Juli 2024
+    for value in (1.0, 2.0, 3.0):
+        hotbuffer.append(tmp, "sensor.d", ts, value, tz)
+    index.record_write("sensor.d", ts)
+    rotate.rotate_if_needed(tmp, "sensor.d", 1722470400.0, index, tz)  # Archiv
+
+    cleanup.soft_delete(index, "sensor.d", [ts], values=[3.0])
+    shown = list(cleanup.iter_raw_rows(tmp, index, "sensor.d", ts - 1, ts + 1, tz, now=datetime(2024, 9, 1, tzinfo=tz)))
+    assert shown == [(ts, 1.0), (ts, 2.0)]
+
+    cleanup.purge_archived_months(tmp, index, tz)
+    archive = tmp / "archive" / "sensor.d" / "2024-07.parquet"
+    assert sorted(pq.read_table(archive).column("value").to_pylist()) == [1.0, 2.0]
+    assert index.get_deleted_counts_for_entity("sensor.d") == {}
+
+
+def test_the_database_keeps_old_marks_without_a_value(env) -> None:
+    tmp, index = env
+    index.get_or_create_entity("sensor.o", "sensor", "measurement", "W")
+    index.mark_deleted("sensor.o", [5.0])  # wie bisher, ohne Wert
+    index.mark_deleted("sensor.o", [5.0, 6.0], values=[2.5, None])
+    counts = index.get_deleted_counts("sensor.o", 0.0, 100.0)
+    assert dict(counts) == {5.0: 2, 6.0: 1}
+    assert counts.values_by_ts == {5.0: [2.5]}
+    assert index.get_deleted_counts_for_entity("sensor.o").values_by_ts == {5.0: [2.5]}

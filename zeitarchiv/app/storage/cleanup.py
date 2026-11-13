@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from ..i18n import tr
 
+import itertools
 import json
 import uuid
 import statistics
@@ -34,7 +35,10 @@ from . import resolution as resolution_mod
 from .hotbuffer import append as hot_append
 from .hotbuffer import hot_path, month_key, read_rows
 from .atomic import write_file_atomically
-from .index import Index, filter_deleted_occurrences, resolution_seconds, should_accept_value
+from .index import (
+    DeletedCounts, Index, deleted_values_of, filter_deleted_occurrences, marked_positions, resolution_seconds,
+    should_accept_value,
+)
 from .paths import entity_dir
 
 
@@ -600,20 +604,25 @@ def iter_raw_rows(
                 )
                 for row in zip(batch.column("ts").to_pylist(), batch.column("value").to_pylist())
             )]
-        remaining_deleted = dict(deleted)
+        marked_values = deleted_values_of(deleted)
         for batch in batches:
-            for ts, value in batch:
-                if not (start_ts <= ts < end_ts):
-                    continue
-                if remaining_deleted.get(ts, 0) > 0:
-                    remaining_deleted[ts] -= 1
-                    continue
-                emitted += 1
-                if max_rows is not None and emitted > max_rows:
-                    raise ResultLimitExceeded(
-                        tr("Ergebnis überschreitet {max_rows} Rohwerte", max_rows=max_rows)
-                    )
-                yield ts, value
+            # Die Zeilen eines Zeitstempels liegen hintereinander (nach (ts, Wert) sortiert); welche davon markiert
+            # ist, entscheidet marked_positions() für die ganze Gruppe.
+            for ts, group in itertools.groupby((row for row in batch if start_ts <= row[0] < end_ts), key=lambda row: row[0]):
+                group_rows = list(group)
+                marked = (
+                    marked_positions([value for _ts, value in group_rows], deleted[ts], marked_values.get(ts, []))
+                    if deleted.get(ts, 0) > 0 else set()
+                )
+                for position, (_ts, value) in enumerate(group_rows):
+                    if position in marked:
+                        continue
+                    emitted += 1
+                    if max_rows is not None and emitted > max_rows:
+                        raise ResultLimitExceeded(
+                            tr("Ergebnis überschreitet {max_rows} Rohwerte", max_rows=max_rows)
+                        )
+                    yield ts, value
 
 
 def get_raw_values_for_timestamps(
@@ -1097,11 +1106,14 @@ MARK_SOURCES = ("manual", "duplicates", "repetitions", "counter_bulk", "counter_
 
 def soft_delete(
     index: Index, entity_id: str, timestamps: list[float], deleted_at: float | None = None,
-    source: str = "manual", trigger: str = "manual",
+    source: str = "manual", trigger: str = "manual", values: list[float | None] | None = None,
 ) -> None:
+    """``values`` (parallel zu timestamps): die Werte der markierten Zeilen, wo bekannt. Nur sie unterscheiden bei
+    mehreren Zeilen mit demselben Zeitstempel, welche gemeint ist; ohne Wert trifft es die erste in der Reihenfolge
+    (Zeitstempel, Wert)."""
     started_at = time.time()
     deleted_at = started_at if deleted_at is None else deleted_at
-    index.mark_deleted(entity_id, timestamps, deleted_at=deleted_at)
+    index.mark_deleted(entity_id, timestamps, deleted_at=deleted_at, values=values)
     if timestamps:
         index.invalidate_counter_decrease_snapshot_for(entity_id)
         index.log_entity_action(
@@ -1140,7 +1152,7 @@ def undo_delete_batch(index: Index, entity_id: str, deleted_at: float) -> int:
     return count
 
 
-def _group_by_month(ts_counts: dict[float, int], tz: ZoneInfo) -> dict[str, dict[float, int]]:
+def _group_by_month(ts_counts: dict[float, int], tz: ZoneInfo) -> dict[str, DeletedCounts]:
     """Gruppiert EINMAL nach Kalendermonat (dieselbe "YYYY-MM"-Zuordnung wie
     hotbuffer.month_key()/die Archiv-Dateinamen "YYYY-MM.parquet") — Grundlage
     für einen O(1)-Nachschlag je Archiv-Monat (path.stem direkt als Schlüssel)
@@ -1149,9 +1161,13 @@ def _group_by_month(ts_counts: dict[float, int], tz: ZoneInfo) -> dict[str, dict
     Löschungen UND vielen Archiv-Monaten (z. B. 620.000 Zeilen × 151 Monate)
     summierte sich das bisher zu zig Millionen Vergleichen und machte allein
     die (rein lesende!) Einstellungen-Vorschau mehrere Sekunden langsam."""
-    by_month: dict[str, dict[float, int]] = {}
+    by_month: dict[str, DeletedCounts] = {}
+    marked_values = deleted_values_of(ts_counts)
     for ts, count in ts_counts.items():
-        by_month.setdefault(month_key(ts, tz), {})[ts] = count
+        month = by_month.setdefault(month_key(ts, tz), DeletedCounts())
+        month[ts] = count
+        if ts in marked_values:
+            month.values_by_ts[ts] = marked_values[ts]
     return by_month
 
 
@@ -1278,7 +1294,7 @@ def purge_hot_buffer(
     for entity in _entities_in_scope(index, entity_ids):
         entity_id = entity["entity_id"]
         deleted = index.get_deleted_counts_for_entity(entity_id, older_than=older_than)
-        relevant = {ts: count for ts, count in deleted.items() if ts >= current_month_start}
+        relevant = deleted.subset(lambda ts: ts >= current_month_start)
         if not relevant:
             continue
         path = hot_path(data_dir, entity_id, now.timestamp(), tz)
@@ -1294,10 +1310,13 @@ def purge_hot_buffer(
                 positions.setdefault(record[0], []).append(position)
         drop: set[int] = set()
         removed_timestamps: list[float] = []
+        marked_values = deleted_values_of(relevant)
         for ts, found in positions.items():
             found.sort(key=lambda position: records[position][1])
-            for position in found[:relevant[ts]]:
-                drop.add(position)
+            for index_in_found in sorted(marked_positions(
+                [records[position][1] for position in found], relevant[ts], marked_values.get(ts, [])
+            )):
+                drop.add(found[index_in_found])
                 removed_timestamps.append(ts)
         kept_records: list[hotbuffer.HotRecord] = [
             record for position, record in enumerate(records) if position not in drop

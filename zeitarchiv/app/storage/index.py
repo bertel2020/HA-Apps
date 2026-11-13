@@ -444,7 +444,8 @@ CREATE TABLE IF NOT EXISTS deleted_points (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     entity_id TEXT NOT NULL,
     ts REAL NOT NULL,
-    deleted_at REAL NOT NULL
+    deleted_at REAL NOT NULL,
+    value REAL
 );
 CREATE INDEX IF NOT EXISTS idx_deleted_points_entity_ts
     ON deleted_points(entity_id, ts);
@@ -815,6 +816,48 @@ CREATE TABLE IF NOT EXISTS table_rows (
 """
 
 
+class DeletedCounts(dict):
+    """Zeitstempel → Anzahl der als gelöscht markierten Vorkommen (wie bisher ein dict[float, int]) und dazu
+    ``values_by_ts``: Zeitstempel → Werte jener Markierungen, die den Wert der markierten Zeile kennen (in der
+    Reihenfolge des Markierens). Beides zusammen sagt filter_deleted_occurrences(), WELCHE Zeile bei mehreren mit
+    demselben Zeitstempel gemeint ist; ohne Werte gilt die Reihenfolge (Zeitstempel, Wert)."""
+
+    def __init__(self, counts=(), values_by_ts: dict[float, list[float]] | None = None):
+        super().__init__(counts)
+        self.values_by_ts: dict[float, list[float]] = dict(values_by_ts or {})
+
+    def subset(self, keep) -> "DeletedCounts":
+        """Nur die Zeitstempel, für die keep(ts) gilt (z. B. ein Monat), samt ihrer Werte."""
+        return DeletedCounts(
+            ((ts, count) for ts, count in self.items() if keep(ts)),
+            {ts: values for ts, values in self.values_by_ts.items() if keep(ts)},
+        )
+
+
+def deleted_values_of(deleted: dict) -> dict[float, list[float]]:
+    return getattr(deleted, "values_by_ts", None) or {}
+
+
+def marked_positions(values: list[float], count: int, marked_values: list[float]) -> set[int]:
+    """Welche Zeilen eines Zeitstempels markiert sind. ``values``: die Werte seiner Zeilen in der Anzeigereihenfolge,
+    ``count``: wie viele Vorkommen markiert sind, ``marked_values``: Werte der Markierungen, die ihre Zeile kennen.
+    Zuerst fällt je bekanntem Wert die erste Zeile mit genau diesem Wert weg (hat sie sich inzwischen geändert, zählt
+    die Markierung wie eine ohne Wert), danach vom Rest die ersten Zeilen, bis ``count`` erreicht ist."""
+    picked: set[int] = set()
+    for wanted in marked_values:
+        if len(picked) >= count:
+            break
+        for position, value in enumerate(values):
+            if position not in picked and value == wanted:
+                picked.add(position)
+                break
+    for position in range(len(values)):
+        if len(picked) >= count:
+            break
+        picked.add(position)
+    return picked
+
+
 def filter_deleted_occurrences(rows: list[tuple], deleted_counts: dict[float, int]) -> list[tuple]:
     """Entfernt aus rows genau so viele Vorkommen je Zeitstempel wie in
     deleted_counts hinterlegt — NICHT pauschal alle Zeilen mit diesem
@@ -824,10 +867,26 @@ def filter_deleted_occurrences(rows: list[tuple], deleted_counts: dict[float, in
     genutzt, damit Bereinigungs-Tabelle und Chart-Anzeige nach dem Löschen
     einer einzelnen Duplikat-Zeile konsistent bleiben.
 
-    Tupel-Form-neutral (liest nur row[0] als Zeitstempel, gibt die Zeile
+    Trägt deleted_counts Werte (DeletedCounts.values_by_ts), fällt je Markierung die Zeile mit diesem Wert weg,
+    siehe marked_positions(); sonst die ersten n Vorkommen in der Reihenfolge von rows.
+
+    Tupel-Form-neutral (liest nur row[0] als Zeitstempel und row[1] als Wert, gibt die Zeile
     unverändert zurück) — cleanup.py reicht beim Archiv-Purge auch
     (ts, value, min_value, max_value)-Zeilen durch, query.py weiterhin
     (ts, value)."""
+    marked_values = deleted_values_of(deleted_counts)
+    if marked_values:
+        by_ts: dict[float, list[int]] = {}
+        for position, row in enumerate(rows):
+            if row[0] in deleted_counts:
+                by_ts.setdefault(row[0], []).append(position)
+        drop: set[int] = set()
+        for ts, positions in by_ts.items():
+            picked = marked_positions(
+                [rows[position][1] for position in positions], deleted_counts[ts], marked_values.get(ts, [])
+            )
+            drop.update(positions[i] for i in picked)
+        return [row for position, row in enumerate(rows) if position not in drop]
     remaining = dict(deleted_counts)
     kept: list[tuple] = []
     for row in rows:
@@ -1115,6 +1174,11 @@ class Index:
                 "SELECT entity_id, ts, deleted_at FROM deleted_points_old"
             )
             self._conn.execute("DROP TABLE deleted_points_old")
+            dp_columns = {"id", "entity_id", "ts", "deleted_at"}
+        if "value" not in dp_columns:
+            # Der Wert der markierten Zeile (nur wenn beim Markieren bekannt): bei einem Zeitstempel mit mehreren
+            # Zeilen trifft die Markierung genau diese statt „die erste“. Ältere Markierungen bleiben NULL.
+            self._conn.execute("ALTER TABLE deleted_points ADD COLUMN value REAL")
 
         # Beim Neuaufbau der alten deleted_points-Tabelle werden deren Indizes
         # zusammen mit der umbenannten Alttabelle entfernt. Deshalb hier nach
@@ -4589,18 +4653,24 @@ class Index:
             )
 
     def mark_deleted(
-        self, entity_id: str, timestamps: list[float], *, deleted_at: float | None = None
+        self, entity_id: str, timestamps: list[float], *, deleted_at: float | None = None,
+        values: list[float | None] | None = None,
     ) -> None:
         """Markiert jedes Vorkommen in timestamps einzeln als gelöscht — kommt ein
         Zeitstempel darin mehrfach vor (z. B. weil zwei Duplikat-Zeilen mit
         demselben Zeitstempel einzeln ausgewählt wurden), wird entsprechend
         mehrfach vermerkt. get_deleted_counts() liest das als Anzahl zurück, statt
-        pauschal "dieser Zeitstempel ist komplett gelöscht" zu markieren."""
+        pauschal "dieser Zeitstempel ist komplett gelöscht" zu markieren.
+
+        ``values`` (parallel zu timestamps, einzelne Einträge None): der Wert der markierten Zeile. Er entscheidet bei
+        mehreren Zeilen mit demselben Zeitstempel, welche gemeint ist (siehe filter_deleted_occurrences)."""
         now = time.time() if deleted_at is None else deleted_at
+        if values is None:
+            values = [None] * len(timestamps)
         with self._lock, self._conn:
             self._conn.executemany(
-                "INSERT INTO deleted_points (entity_id, ts, deleted_at) VALUES (?, ?, ?)",
-                [(entity_id, ts, now) for ts in timestamps],
+                "INSERT INTO deleted_points (entity_id, ts, deleted_at, value) VALUES (?, ?, ?, ?)",
+                [(entity_id, ts, now, value) for ts, value in zip(timestamps, values, strict=True)],
             )
             self._conn.execute(
                 "UPDATE entities SET deleted_count = deleted_count + ? WHERE entity_id = ?",
@@ -4738,7 +4808,7 @@ class Index:
             ).fetchall()
             return [r["ts"] for r in rows]
 
-    def get_deleted_counts(self, entity_id: str, start_ts: float, end_ts: float) -> dict[float, int]:
+    def get_deleted_counts(self, entity_id: str, start_ts: float, end_ts: float) -> DeletedCounts:
         """Wie viele Vorkommen je Zeitstempel als gelöscht markiert sind — bei
         einem normalen (nicht doppelten) Zeitstempel ist das 0 oder 1, bei einem
         Duplikat kann es 1 sein (nur eines der beiden Vorkommen gelöscht) oder 2
@@ -4746,10 +4816,25 @@ class Index:
         Zeilen wie markiert auszufiltern, nicht automatisch alle."""
         with self._lock, self._conn:
             rows = self._conn.execute(
-                "SELECT ts, COUNT(*) AS n FROM deleted_points WHERE entity_id = ? AND ts >= ? AND ts < ? GROUP BY ts",
+                "SELECT ts, COUNT(*) AS n, COUNT(value) AS known FROM deleted_points "
+                "WHERE entity_id = ? AND ts >= ? AND ts < ? GROUP BY ts",
                 (entity_id, start_ts, end_ts),
             ).fetchall()
-            return {row["ts"]: row["n"] for row in rows}
+            values = self._values_of_marks(rows, "AND ts >= ? AND ts < ?", (entity_id, start_ts, end_ts))
+            return DeletedCounts(((row["ts"], row["n"]) for row in rows), values)
+
+    def _values_of_marks(self, grouped, extra_where: str, params: tuple) -> dict[float, list[float]]:
+        """Werte der Markierungen, die ihn kennen — nur gelesen, wenn es überhaupt welche gibt (der Regelfall
+        sind Markierungen ohne Wert, dann bleibt es bei der einen Abfrage)."""
+        if not any(row["known"] for row in grouped):
+            return {}
+        result: dict[float, list[float]] = {}
+        for row in self._conn.execute(
+            f"SELECT ts, value FROM deleted_points WHERE entity_id = ? {extra_where} AND value IS NOT NULL ORDER BY id",
+            params,
+        ):
+            result.setdefault(row["ts"], []).append(row["value"])
+        return result
 
     def get_deleted_points_count(self) -> int:
         """Gesamtzahl weich gelöschter Vorkommen über alle Entitäten — für die
@@ -4827,7 +4912,7 @@ class Index:
             },
         }
 
-    def get_deleted_counts_for_entity(self, entity_id: str, older_than: float | None = None) -> dict[float, int]:
+    def get_deleted_counts_for_entity(self, entity_id: str, older_than: float | None = None) -> DeletedCounts:
         """Wie get_deleted_counts(), aber ohne Zeitfenster — für den Purge, der
         alle gelöschten Vorkommen einer Entität sehen muss, nicht nur die in
         einem bestimmten Anzeige-Zeitraum.
@@ -4840,15 +4925,19 @@ class Index:
         with self._lock, self._conn:
             if older_than is None:
                 rows = self._conn.execute(
-                    "SELECT ts, COUNT(*) AS n FROM deleted_points WHERE entity_id = ? GROUP BY ts",
+                    "SELECT ts, COUNT(*) AS n, COUNT(value) AS known FROM deleted_points WHERE entity_id = ? "
+                    "GROUP BY ts",
                     (entity_id,),
                 ).fetchall()
+                values = self._values_of_marks(rows, "", (entity_id,))
             else:
                 rows = self._conn.execute(
-                    "SELECT ts, COUNT(*) AS n FROM deleted_points WHERE entity_id = ? AND deleted_at <= ? GROUP BY ts",
+                    "SELECT ts, COUNT(*) AS n, COUNT(value) AS known FROM deleted_points "
+                    "WHERE entity_id = ? AND deleted_at <= ? GROUP BY ts",
                     (entity_id, older_than),
                 ).fetchall()
-            return {row["ts"]: row["n"] for row in rows}
+                values = self._values_of_marks(rows, "AND deleted_at <= ?", (entity_id, older_than))
+            return DeletedCounts(((row["ts"], row["n"]) for row in rows), values)
 
     def remove_deleted_points(
         self, entity_id: str, timestamps: list[float], *, older_than: float | None = None
