@@ -100,6 +100,15 @@ All messages are `info`, so they are visible only at application level `info` or
 Usage counters (per day, 90 days) and the last 50 changes are also kept in the index
 settings and appear under Settings → AI access → Usage.
 
+## Rejected requests
+
+| Event | When |
+| --- | --- |
+| `cross_site_blocked` | state-changing request (POST, PUT, PATCH, DELETE) with `Sec-Fetch-Site: cross-site` and no `Authorization` header rejected with `403` (`method`, `path`); at most once per five minutes, otherwise with `unterdrueckte_wiederholungen`. See [security.md](security.md) |
+
+If the message appears although you saved in the UI yourself, the browser or a proxy on the way
+reports the request as coming from another website; check the proxy and Ingress settings.
+
 ## Redaction and diagnostic tools
 
 Before any output, bearer tokens and typical secrets (`token`, `api_token`,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .i18n import tr
+from .logging_setup import log_rate_limited
 
 import functools
 import inspect
@@ -93,7 +94,8 @@ class CrossSiteGuardMiddleware:
         if scope["type"] == "http" and scope["method"] in self.UNSAFE_METHODS:
             headers = dict(scope["headers"])
             if headers.get(b"sec-fetch-site") == b"cross-site" and b"authorization" not in headers:
-                logging.getLogger(__name__).warning(
+                log_rate_limited(
+                    logging.getLogger(__name__), logging.WARNING, "cross_site_blocked",
                     "Anfrage von einer fremden Website abgewiesen · event=cross_site_blocked method=%s path=%s",
                     scope["method"], scope["path"],
                 )

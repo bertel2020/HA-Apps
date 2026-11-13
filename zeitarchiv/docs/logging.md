@@ -101,6 +101,16 @@ Alle Meldungen sind `info`, also nur bei Anwendungslevel `info` oder `debug` sic
 Nutzungszähler (je Tag, 90 Tage) und die letzten 50 Änderungen liegen zusätzlich in den
 Einstellungen des Index und erscheinen unter Einstellungen → KI-Zugriff → Nutzung.
 
+## Abgewiesene Anfragen
+
+| Event | Wann |
+| --- | --- |
+| `cross_site_blocked` | verändernde Anfrage (POST, PUT, PATCH, DELETE) mit `Sec-Fetch-Site: cross-site` ohne `Authorization`-Header mit `403` abgewiesen (`method`, `path`); höchstens einmal in fünf Minuten, sonst mit `unterdrueckte_wiederholungen`. Siehe [security.md](security.md) |
+
+Erscheint die Meldung, obwohl man selbst in der Oberfläche gespeichert hat, meldet der Browser
+oder ein Proxy auf dem Weg die Anfrage als fremde Website; dann bitte die Einstellungen von
+Proxy und Ingress prüfen.
+
 ## Redaction und Diagnosewerkzeuge
 
 Vor jeder Ausgabe werden Bearer-Token und typische Secrets (`token`,
