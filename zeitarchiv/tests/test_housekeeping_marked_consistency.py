@@ -504,3 +504,17 @@ def test_mark_seen_from_a_built_matrix_does_not_rebuild_it(env, monkeypatch) -> 
     import json as _json
 
     assert _json.loads(index.get_setting(data_quality.SEEN_SETTING)) == {"sensor.a": 2}  # ohne die gelöschte Entität
+
+
+def test_matrix_loads_daily_counts_only_for_a_time_window(env, monkeypatch) -> None:
+    from app import data_quality
+
+    _tmp, index = env
+    seen = []
+    real = index.list_cleanup_alltime_stats
+    monkeypatch.setattr(index, "list_cleanup_alltime_stats", lambda with_daily=True: seen.append(with_daily) or real(with_daily=with_daily))
+    data_quality.build_matrix(index, period="all")
+    after_all = len(seen)
+    data_quality.build_matrix(index, period="7d")
+    # Der erste Aufruf jeder Matrix lädt die Einträge; die Quoten-Auswertung danach braucht nie Tageszähler.
+    assert seen[0] is False and seen[after_all] is True

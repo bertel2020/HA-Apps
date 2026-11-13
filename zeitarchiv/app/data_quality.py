@@ -348,7 +348,8 @@ def build_matrix(
     window_start = (
         ((today or date.today()) - timedelta(days=window_days - 1)).isoformat() if window_days else None
     )
-    entries = index.list_cleanup_alltime_stats()
+    # Die Tageszähler sind über 99 % der Bytes eines Eintrags und werden nur für ein Zeitfenster gebraucht.
+    entries = index.list_cleanup_alltime_stats(with_daily=window_start is not None)
     rates, _ = cleanup_stats.outlier_rates_measured(index)
     measured_outliers = {r["entity_id"]: r["marked"] for r in rates}
 

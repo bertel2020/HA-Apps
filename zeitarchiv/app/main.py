@@ -1020,7 +1020,8 @@ def _count_stale_entities() -> int:
     hot_dir je Entität durchsuchen (siehe Kommentar dort)."""
     now_ts = datetime.now(TZ).timestamp()
     entity_ids = [entity["entity_id"] for entity in index.list_entities()]
-    with storage_coordinator.entities(entity_ids):
+    # Nur dieses Verzeichnis-Listing braucht die Sperren (nicht die ganze Seite, die es aufruft); mit Zeitbudget (503 statt Stau).
+    with storage_coordinator.entities(entity_ids, timeout=STORAGE_LOCKED_TIMEOUT_SECONDS):
         return len(hotbuffer.find_entities_with_stale_hot_files(DATA_DIR, set(entity_ids), now_ts, TZ))
 
 

@@ -249,6 +249,22 @@ def demo_data_context(index: Index, base_dir: Path, demo_mode_active: bool) -> d
     return context
 
 
+def _form_in_threadpool(handler):
+    """Macht aus ``handler(request, form)`` einen async-Handler, der das Formular liest und die übrige Arbeit im
+    Threadpool erledigt. Die Einstellungs-Routen schreiben in den SQLite-Index; im Ereignisloop würde ein
+    belegter Index (bis INDEX_LOCK_TIMEOUT_SECONDS) alle anderen Anfragen mit anhalten.
+
+    Bewusst ohne functools.wraps: FastAPI folgt ``__wrapped__`` und läse ``form`` als Abfrageparameter."""
+
+    async def route(request: Request) -> HTMLResponse:
+        form = await request.form()
+        return await run_in_threadpool(handler, request, form)
+
+    route.__name__ = handler.__name__
+    route.__doc__ = handler.__doc__
+    return route
+
+
 def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     router = APIRouter()
 
@@ -890,7 +906,6 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
 
 
     @router.get("/housekeeping", response_class=HTMLResponse)
-    @deps.storage_locked(lambda _args: [row["entity_id"] for row in deps.index.list_entities()])
     def housekeeping_view(request: Request) -> HTMLResponse:
         """Sammelt Dinge, die niemandem auffallen, solange man nicht gezielt danach
         sucht: ungenutzte Charts/Tabellen (kein Dashboard-Pin), Entitäten mit
@@ -946,14 +961,14 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         )
 
     @router.post("/settings/archivierung", response_class=HTMLResponse)
-    async def settings_archivierung(request: Request) -> HTMLResponse:
+    @_form_in_threadpool
+    def settings_archivierung(request: Request, form) -> HTMLResponse:
         """Speichert die globalen Standardwerte für neu erkannte Entitäten
         (Einstellungen-Bereich, Konzept Abschnitt 03) — wirkt nur auf Entitäten,
         die AB JETZT zum ersten Mal einen Wert senden; bereits archivierte
         Entitäten behalten ihre individuelle Einstellung aus der jeweiligen
         Konfigurationsseite unverändert (Index.get_or_create_entity() greift nur
         beim Neuanlegen auf diese Standardwerte zu)."""
-        form = await request.form()
         fields = {
             "default_resolution": (form.get("default_resolution"), RESOLUTION_LABELS, tr("Ungültige Auflösung")),
             "default_retention": (form.get("default_retention"), RETENTION_LABELS, tr("Ungültige Aufbewahrung")),
@@ -1019,12 +1034,12 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
 
 
     @router.post("/settings/compact", response_class=HTMLResponse)
-    async def settings_compact(request: Request) -> HTMLResponse:
+    @_form_in_threadpool
+    def settings_compact(request: Request, form) -> HTMLResponse:
         """Speichert die globalen Verdichten-Einstellungen (Schalter +
         Mindestalter) — die eigentliche Verdichtung läuft anschließend im
         Wartungsplaner (background.py), nicht hier. Standardmäßig aus (siehe
         DEFAULT_COMPACT_AUTO_ENABLED)."""
-        form = await request.form()
         auto_enabled = form.get("compact_auto_enabled")
         min_age_months = form.get("compact_min_age_months")
         if auto_enabled is not None and auto_enabled not in COMPACT_AUTO_LABELS:
@@ -1041,12 +1056,12 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
 
 
     @router.post("/settings/purge-auto", response_class=HTMLResponse)
-    async def settings_purge_auto(request: Request) -> HTMLResponse:
+    @_form_in_threadpool
+    def settings_purge_auto(request: Request, form) -> HTMLResponse:
         """Speichert die globalen Einstellungen der automatischen Bereinigung
         (Schalter + Mindestalter der Löschmarkierung) — der eigentliche Purge
         läuft anschließend im Wartungsplaner (background.py), nicht hier.
         Standardmäßig aus (siehe DEFAULT_PURGE_AUTO_ENABLED)."""
-        form = await request.form()
         auto_enabled = form.get("purge_auto_enabled")
         min_age_days = form.get("purge_min_age_days")
         if auto_enabled is not None and auto_enabled not in PURGE_AUTO_LABELS:
@@ -1271,13 +1286,13 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
 
 
     @router.post("/settings/retention-enforcement", response_class=HTMLResponse)
-    async def settings_retention_enforcement_toggle(request: Request) -> HTMLResponse:
+    @_form_in_threadpool
+    def settings_retention_enforcement_toggle(request: Request, form) -> HTMLResponse:
         """Schaltet die automatische, tägliche Anwendung der Aufbewahrungsfrist
         an/aus (Konzept "Offene Punkte": Aufbewahrung wurde bisher nur
         gespeichert, nie angewendet) — bewusst standardmäßig aus, weil das anders
         als der Purge im Bereinigungs-Werkzeug ganze, nie zuvor markierte
         Zeiträume endgültig löscht."""
-        form = await request.form()
         schedule = form.get("retention_enforcement")
         schedule_time = str(form.get("retention_enforcement_time", deps.retention_default_time))
         weekday_raw = str(form.get("retention_enforcement_weekday", deps.retention_default_weekday))
