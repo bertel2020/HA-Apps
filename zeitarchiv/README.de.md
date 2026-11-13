@@ -141,7 +141,10 @@ löscht Home Assistant den Datenordner der App.**
 
 ### 2. API-Token kopieren
 
-Zeitarchiv öffnen und unter **Einstellungen → Verbindung** den automatisch
+Zeitarchiv öffnen (Seitenleiste oder **Einstellungen → Apps → Zeitarchiv →
+Oberfläche öffnen**; die App muss gestartet sein, und **In der Seitenleiste
+anzeigen** muss aktiv sein, damit der Eintrag erscheint) und unter
+**Einstellungen → Verbindung** den automatisch
 erzeugten API-Token kopieren. Der Token kann dort später neu generiert werden.
 
 ### 3. Integration verbinden

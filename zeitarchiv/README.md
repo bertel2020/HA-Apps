@@ -135,7 +135,9 @@ Assistant delete the app's data folder.**
 
 ### 2. Copy the API token
 
-Open Zeitarchiv and copy the automatically generated API token under
+Open Zeitarchiv (sidebar, or **Settings → Apps → Zeitarchiv → Open Web UI**;
+the app must be started, and **Show in sidebar** must be enabled for the entry
+to appear) and copy the automatically generated API token under
 **Settings → Connection**. The token can be regenerated there later.
 
 ### 3. Connect the integration
