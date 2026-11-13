@@ -10,7 +10,7 @@
 >
 > 🇬🇧 [English version](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md)
 
-## Unreleased
+## 1.50.0 - 2026-11-13
 
 ### Neu
 
@@ -145,10 +145,45 @@
   - Vorauswahl: nur Kernpunkte sind angehakt, einige Themen starten ohne Haken
   - Die Kachel zeigt „empfohlen“ und wie viele davon „neu“ sind
 
+- **Housekeeping**
+  - Ausreißer: Ein dauerhafter Niveauwechsel wird nur noch einmal markiert, nicht mehr bis zu achtmal
+    - Nach dem Update messen die Hintergrundläufe die Ausreißer-Quoten neu; bis dahin stehen sie als „nicht
+      gemessen“ da, bei Leistungssensoren sinken sie voraussichtlich deutlich
+  - Zählerrückgänge: Einordnung als Fehlwert genauer
+    - Ein Rückgang gilt als Fehlwert, wenn der Stand innerhalb von 30 Minuten wieder den Vorwert erreicht (der erste
+      Folgewert zählt immer); bisher galt das längere von 30 Minuten oder 10 Werten, bei langsamen Sendern stundenlang
+    - Ein Rückgang über Mitternacht, der sofort zurückkehrt, ist ein Fehlwert und kein Tagesreset
+    - Eine Folge niedriger Werte zählt als ein Fehlwert und wird ganz markiert
+    - Zähler-Ausreißer: Nach einem Rückgang gilt der Stand davor weiter als Bezug, der gute Wert danach wird nicht mehr
+      als Zuwachs markiert; nach einer Pause wird die Schwelle mit dem Abstand angepasst
+  - Die Zeile „Gesamter Zeitraum“ zeigt nach Löschen und Rückgängig zunächst die alten Zahlen und zählt im Hintergrund
+    neu, mit Hinweis unter der Tabelle; der Klick wartet nicht mehr bis zu 20 Sekunden
+  - Die Duplikat-Zahlen von Matrix und Entfernen werden nebeneinander erklärt
+  - Abgesichert nach einem Absturz: Rollups, die bei Rotation, Entfernen markierter Werte, Import oder Neuaufbau
+    unterbrochen wurden, werden beim Start nachgezogen
+  - Formulare der Oberfläche lassen sich nicht mehr von fremden Websites abschicken
+  - Fehlermeldungen von Aufträgen zeigen keine Serverpfade mehr, nur Ursache und Dateiname
+
 ### Behoben
 
 - **Wetterdashboard**: Die Regen-Kachel bricht die Seite nicht mehr ab, wenn es
   keine Sensor-Kachel dafür gibt
+
+- **Housekeeping**
+  - Verdichten: Als gelöscht markierte Fehlwerte flossen in Mittelwerte und Letztwerte ein und ließen sich nicht mehr
+    zurückholen; sie fallen jetzt weg wie beim Entfernen
+  - „Rückgängig“ nimmt genau die gezeigte Löschung zurück; ein zweites Absenden findet nichts mehr
+  - Duplikate: Beim Entfernen bleibt der höchste Wert, und wer ein Duplikat einzeln ankreuzt, markiert genau diese Zeile
+  - Rohwert hinzufügen: „21.5“ wurde als 215 gespeichert; die Eingabe wird streng gelesen, die Meldung nennt den
+    gespeicherten Wert
+  - Werte hinzufügen und korrigieren aktualisiert Hinweise, Zählerrückgänge, Min/Max und letzten Wert sofort; NaN und
+    Unendlich werden abgelehnt
+  - Fehlwerte-Regel: Ein Fehler bei einem Zähler hält die übrigen nicht mehr auf
+  - Die Bereinigungsansicht zeigt einen Hinweis, wenn eine Aktion scheitert; die letzte Seite großer Zeiträume belegt
+    nicht mehr den gesamten Arbeitsspeicher
+  - Zeitraum-Sprung: Läuft der Browser in einer anderen Zeitzone als das Add-on, landete ein Sprung zum heutigen
+    Datum rund um Mitternacht eine Periode daneben
+  - Englische Oberfläche: Markierungsgründe und Datumsangaben der Bereinigung waren teils deutsch
 
 ## 1.40.0 - 2026-11-10
 

@@ -10,7 +10,7 @@
 >
 > 🇩🇪 [Änderungen auf Deutsch](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md)
 
-## Unreleased
+## 1.50.0 - 2026-11-13
 
 ### New
 
@@ -144,10 +144,43 @@
     ticks
   - The tile shows “recommended” and how many of them are “new”
 
+- **Housekeeping**
+  - Outliers: A lasting level change is marked only once, no longer up to eight times
+    - After the update the background runs re-measure the outlier rates; until then they show as “not measured”, for
+      power sensors they are expected to drop noticeably
+  - Counter decreases: more accurate classification as a bad value
+    - A decrease counts as a bad value if the reading reaches the previous value again within 30 minutes (the first
+      following value always counts); before, the longer of 30 minutes or 10 values applied, for slow senders hours
+    - A decrease across midnight that returns straight away is a bad value, not a daily reset
+    - A run of low values counts as one bad value and is marked as a whole
+    - Counter outliers: after a decrease the reading before it stays the reference, the good value after it is no
+      longer marked as an increase; after a pause the threshold is scaled with the gap
+  - The “Entire period” row shows the old numbers first after deleting and undoing and recounts in the background,
+    with a note under the table; the click no longer waits up to 20 seconds
+  - The duplicate numbers of the matrix and of removal are explained side by side
+  - Safer after a crash: rollups interrupted during rotation, removal of marked values, import or rebuild are
+    caught up at startup
+  - The forms of the interface can no longer be submitted from foreign websites
+  - Error messages of jobs no longer show server paths, only the cause and the file name
+
 ### Fixed
 
 - **Weather dashboard**: The rain tile no longer breaks the page when there is
   no sensor tile for it
+
+- **Housekeeping**
+  - Compact: Values marked as deleted flowed into averages and last values and could not be brought back; they are
+    now dropped as with removal
+  - “Undo” reverts exactly the deletion shown; a second submit finds nothing
+  - Duplicates: removal keeps the highest value, and ticking a single duplicate marks exactly that row
+  - Add raw value: “21.5” was stored as 215; the input is read strictly, the message names the stored value
+  - Adding and correcting values updates hints, counter decreases, min/max and the last value at once; NaN and
+    infinity are rejected
+  - Bad-value rule: an error with one counter no longer holds up the others
+  - The cleanup view shows a note when an action fails; the last page of long periods no longer uses all the memory
+  - Period jump: with the browser in a different time zone than the add-on, a jump to today’s date around midnight
+    landed one period off
+  - English interface: marking reasons and dates in cleanup were partly German
 
 ## 1.40.0 - 2026-11-10
 
