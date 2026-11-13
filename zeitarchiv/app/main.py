@@ -5347,17 +5347,36 @@ async def delete_rows(request: Request, entity_id: str) -> HTMLResponse:
     form = await request.form(max_fields=MAX_FORM_FIELDS)
     timestamps = [float(value) for key, value in form.multi_items() if key == "ts"]
     filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
+    source = str(form.get("source", "manual"))
+    entity = _require_entity(entity_id)
+    deleted_total = 0
 
     def delete_locked() -> HTMLResponse:
+        nonlocal deleted_total
         with storage_coordinator.entity(entity_id):
-            cleanup.soft_delete(index, entity_id, timestamps, source=str(form.get("source", "manual")))
+            to_mark = timestamps
+            if source == "duplicates":
+                # Die Vorschau kann veraltet sein (Duplikate inzwischen anderswo
+                # entfernt, Bestätigung doppelt abgeschickt): ein Zeitstempel würde
+                # dann ein zweites Mal markiert und blendete auch das letzte
+                # verbliebene Vorkommen aus. Deshalb unter der Sperre neu bestimmen,
+                # wie es auch die Sammelaktion tut; die Zeitstempel aus dem Formular
+                # zählen hier nicht.
+                now = datetime.now(TZ)
+                effective_offset = 0 if range_key == "all" else min(offset, 0)
+                window_start, window_end = cleanup_stats.rows_window(
+                    range_key, effective_offset, now, entity["first_ts"], TZ
+                )
+                to_mark = [ts for ts, _value in cleanup.duplicate_rows_in_window(DATA_DIR, index, entity_id, window_start.timestamp(), window_end.timestamp(), TZ, now)]
+            cleanup.soft_delete(index, entity_id, to_mark, source=source)
+            deleted_total = len(to_mark)
             return _rows_fragment(
                 request, entity_id, filter_, range_key, offset, page, page_size, mode,
-                deleted_count=len(timestamps) or None,
+                deleted_count=len(to_mark) or None,
             )
 
     result = await run_in_threadpool(delete_locked)
-    if timestamps:
+    if deleted_total:
         _background.invalidate_purge_preview()
     return result
 
@@ -5509,10 +5528,21 @@ async def undo_rows(request: Request, entity_id: str) -> HTMLResponse:
     _require_entity(entity_id)
     form = await request.form()
     filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
+    # Die Vorschau gibt die Kennung der Charge mit, die sie gezeigt hat: genau
+    # die wird zurückgenommen, auch wenn inzwischen eine neuere entstanden ist
+    # (Zählerregel, zweiter Tab). Ohne Kennung (älteres Formular) gilt die jüngste.
+    batch_at_raw = form.get("batch_at")
+    try:
+        batch_at = float(batch_at_raw) if batch_at_raw not in (None, "") else None
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail=tr("Ungültiger Zahlenwert in der Anfrage.")) from None
 
     def undo_locked() -> HTMLResponse:
         with storage_coordinator.entity(entity_id):
-            cleanup.undo_last_delete(index, entity_id)
+            if batch_at is None:
+                cleanup.undo_last_delete(index, entity_id)
+            else:
+                cleanup.undo_delete_batch(index, entity_id, batch_at)
             return _rows_fragment(request, entity_id, filter_, range_key, offset, page, page_size, mode)
 
     return await run_in_threadpool(undo_locked)
@@ -5533,12 +5563,13 @@ async def undo_preview(request: Request, entity_id: str) -> HTMLResponse:
     form = await request.form()
     filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
 
-    def load_preview() -> tuple[list[float], list[tuple[float, float]]]:
+    def load_preview() -> tuple[float | None, list[float], list[tuple[float, float]]]:
         with storage_coordinator.entity(entity_id):
+            batch_at = index.last_deleted_at(entity_id)
             batch = index.get_last_deleted_batch(entity_id)
-            return batch, cleanup.get_raw_values_for_timestamps(DATA_DIR, entity_id, batch, TZ)
+            return batch_at, batch, cleanup.get_raw_values_for_timestamps(DATA_DIR, entity_id, batch, TZ)
 
-    batch_timestamps, values = await run_in_threadpool(load_preview)
+    batch_at, batch_timestamps, values = await run_in_threadpool(load_preview)
     preview_rows = [
         {
             "formatted_value": format_value(value, decimals_int),
@@ -5553,6 +5584,7 @@ async def undo_preview(request: Request, entity_id: str) -> HTMLResponse:
         {
             "entity_id": entity_id,
             "total_to_restore": len(batch_timestamps),
+            "batch_at": batch_at,
             "preview_rows": preview_rows,
             "truncated": max(0, len(batch_timestamps) - _UNDO_PREVIEW_LIMIT),
             "filter": filter_,
@@ -5586,23 +5618,11 @@ async def duplicates_preview(request: Request, entity_id: str) -> HTMLResponse:
 
     def load_to_delete() -> list[tuple[float, float]]:
         with storage_coordinator.entity(entity_id):
-            # iter_raw_rows() statt list_raw_rows(max_rows=...): Duplikate müssen
-            # über den ganzen gewählten Zeitraum gesucht werden, auch wenn der weit
-            # über MAX_UI_ANALYSIS_ROWS liegt (z. B. "Gesamt" bei Millionen Rohwerten)
-            # — das Cap gilt nur für Pfade, die wirklich alle Zeilen materialisieren
-            # müssten. Hier hält iter_duplicate_rows_to_delete() den Speicherbedarf
-            # konstant, da Duplikate dank Sortierung immer direkt aufeinanderfolgen.
-            rows = cleanup.iter_raw_rows(
-                DATA_DIR, index, entity_id, window_start.timestamp(), window_end.timestamp(), TZ,
-                now=now
-            )
-            return cleanup.duplicate_rows_to_delete(rows)
+            return cleanup.duplicate_rows_in_window(DATA_DIR, index, entity_id, window_start.timestamp(), window_end.timestamp(), TZ, now)
 
-    # duplicate_rows_to_delete() braucht rows weiterhin chronologisch aufsteigend,
-    # um korrekt das JEWEILS ÄLTESTE Vorkommen je Zeitstempel zu behalten — erst
-    # für die Anzeige unten drehen wir auf neueste-zuerst um (Konzept: Listen mit
-    # Werten generell neueste oben), all_timestamps bleibt davon unberührt (die
-    # Reihenfolge der versteckten Formularfelder ist für den Löschvorgang egal).
+    # duplicate_rows_to_delete() braucht rows weiterhin aufsteigend nach
+    # (Zeitstempel, Wert) — erst für die Anzeige unten drehen wir auf
+    # neueste-zuerst um (Konzept: Listen mit Werten generell neueste oben).
     to_delete = await run_in_threadpool(load_to_delete)
     preview_rows = [
         {
@@ -5621,7 +5641,6 @@ async def duplicates_preview(request: Request, entity_id: str) -> HTMLResponse:
             "total_to_delete": len(to_delete),
             "preview_rows": preview_rows,
             "truncated": max(0, len(to_delete) - _DUPLICATES_PREVIEW_LIMIT),
-            "all_timestamps": [ts for ts, _ in to_delete],
             "filter": filter_,
             "range": range_key,
             "offset": offset,

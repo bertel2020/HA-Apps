@@ -4659,6 +4659,17 @@ class Index:
             ).fetchall()
             return {row["deleted_at"]: row["n"] for row in rows}
 
+    def last_deleted_at(self, entity_id: str) -> float | None:
+        """deleted_at der jüngsten Charge (None, wenn nichts markiert ist) — die
+        Kennung, die die "Rückgängig"-Vorschau dem Bestätigen mitgibt, damit
+        genau diese Charge zurückgenommen wird."""
+        with self._lock, self._conn:
+            row = self._conn.execute(
+                "SELECT MAX(deleted_at) AS latest FROM deleted_points WHERE entity_id = ?",
+                (entity_id,),
+            ).fetchone()
+        return row["latest"] if row else None
+
     def get_last_deleted_batch(self, entity_id: str) -> list[float]:
         """Zeitstempel der zuletzt gelöschten Charge (gleicher deleted_at-Wert),
         OHNE etwas zu ändern — für die "Rückgängig"-Vorschau (zeigt, was der

@@ -1434,11 +1434,17 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
     @router.post("/housekeeping/datenqualitaet/duplicates/undo", response_class=HTMLResponse)
     async def data_quality_duplicates_undo(request: Request) -> HTMLResponse:
         """Nimmt den Sammellauf von eben wieder zurück (je Entität die zuletzt gelöschte Charge)."""
-        entity_ids = [
-            str(v) for k, v in (await request.form(max_fields=MAX_FORM_FIELDS)).multi_items() if k == "entity_id"
-        ]
+        form = await request.form(max_fields=MAX_FORM_FIELDS)
+        entity_ids = [str(v) for k, v in form.multi_items() if k == "entity_id"]
+        try:
+            batch_ats = [float(v) for k, v in form.multi_items() if k == "batch_at"]
+        except ValueError:
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Zahlenwert in der Anfrage.")) from None
+        if len(batch_ats) != len(entity_ids):
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Zahlenwert in der Anfrage."))
         restored = await run_in_threadpool(
-            data_quality.undo_duplicate_removal, deps.index, entity_ids, deps.coordinator.entity
+            data_quality.undo_duplicate_removal, deps.index, list(zip(entity_ids, batch_ats)),
+            deps.coordinator.entity,
         )
         if restored:
             deps.invalidate_purge_preview()

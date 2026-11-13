@@ -669,26 +669,32 @@ def remove_duplicates(
         if entity is None:
             continue
         deleted = 0
+        deleted_at = time.time()
         with entity_lock(entity_id):
             timestamps = duplicate_timestamps(data_dir, index, tz, entity_id, entity, now)
-            deleted_at = time.time()
             for start in range(0, len(timestamps), BULK_BATCH):
                 batch = timestamps[start:start + BULK_BATCH]
                 cleanup.soft_delete(index, entity_id, batch, deleted_at=deleted_at, source="duplicates")
                 deleted += len(batch)
         if deleted:
             mark_duplicates_removed(index, entity_id)
-            rows.append({"entity_id": entity_id, "friendly_name": entity["custom_name"] or entity["friendly_name"] or entity_id, "count": deleted})
+            rows.append({
+                "entity_id": entity_id, "friendly_name": entity["custom_name"] or entity["friendly_name"] or entity_id,
+                "count": deleted, "batch_at": deleted_at,
+            })
     total = sum(r["count"] for r in rows)
     return {"rows": rows, "total": total, "total_label": format_int(total)}
 
 
-def undo_duplicate_removal(index: Index, entity_ids: list[str], entity_lock) -> int:
-    """Macht je Entität die zuletzt gelöschte Charge rückgängig, also den Lauf von eben."""
+def undo_duplicate_removal(index: Index, batches: list[tuple[str, float]], entity_lock) -> int:
+    """Nimmt je Entität genau die Charge zurück, die der Sammellauf geschrieben hat
+    (`batches`: Paare aus Entität und deleted_at). Eine zwischenzeitlich
+    entstandene andere Charge bleibt unberührt, ein zweiter Aufruf nimmt nichts
+    weiter zurück."""
     restored = 0
-    for entity_id in dict.fromkeys(entity_ids):
+    for entity_id, batch_at in dict.fromkeys(batches):
         with entity_lock(entity_id):
-            count = cleanup.undo_last_delete(index, entity_id)
+            count = cleanup.undo_delete_batch(index, entity_id, batch_at)
         if count:
             mark_stats_unknown(index, entity_id)
         restored += count

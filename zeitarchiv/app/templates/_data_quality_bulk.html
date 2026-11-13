@@ -32,7 +32,7 @@
   {% if bulk.rows %}
   <p class="dq-bulk-text">{{ _('<strong>{total}</strong> Zeile(n) in {entities} Entität(en) entfernt. Die Zahlen oben aktualisieren sich beim nächsten Laden der Seite.', total=bulk.total_label, entities=bulk.rows | length) }}</p>
   <form id="dq-bulk-confirm">
-    {% for row in bulk.rows %}<input type="hidden" name="entity_id" value="{{ row.entity_id }}">{% endfor %}
+    {% for row in bulk.rows %}<input type="hidden" name="entity_id" value="{{ row.entity_id }}"><input type="hidden" name="batch_at" value="{{ row.batch_at }}">{% endfor %}
   </form>
   <div class="actionbar">
     <button type="button" class="btn" hx-post="{{ bulk_url }}/undo" hx-include="#dq-bulk-confirm"

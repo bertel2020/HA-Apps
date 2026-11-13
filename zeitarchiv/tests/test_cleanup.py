@@ -36,15 +36,16 @@ def test_detect_duplicates() -> None:
     assert "2×" in duplicates[_ts(2024, 7, 1, 8)]
 
 
-def test_duplicate_rows_to_delete_keeps_first_occurrence_per_timestamp() -> None:
+def test_duplicate_rows_to_delete_keeps_last_occurrence_per_timestamp() -> None:
     dup_ts = _ts(2024, 7, 1, 8)
     rows = [
         (dup_ts, 21.0), (dup_ts, 21.5), (dup_ts, 21.9),  # dreifaches Duplikat
         (_ts(2024, 7, 1, 9), 22.0),  # kein Duplikat
     ]
     to_delete = cleanup.duplicate_rows_to_delete(rows)
-    # das erste Vorkommen (21.0) bleibt erhalten, die beiden weiteren werden vorgeschlagen.
-    assert to_delete == [(dup_ts, 21.5), (dup_ts, 21.9)]
+    # Nach dem Markieren blendet filter_deleted_occurrences() die ERSTEN n Vorkommen
+    # aus; die Vorschau nennt deshalb genau die — das letzte (21.9) bleibt.
+    assert to_delete == [(dup_ts, 21.0), (dup_ts, 21.5)]
 
 
 def test_detect_gaps_flags_row_after_gap_exceeding_configured_threshold() -> None:

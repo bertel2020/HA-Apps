@@ -1,5 +1,6 @@
 <div style="border-top:1px solid var(--border);padding-top:16px;">
   <input type="hidden" name="page_size" value="{{ page_size }}">
+  {% if batch_at is not none %}<input type="hidden" name="batch_at" value="{{ batch_at }}">{% endif %}
   <h3 class="eyebrow">{{ _("Rückgängig &mdash; Bestätigung") }}</h3>
 
   {% if total_to_restore %}
@@ -21,7 +22,7 @@
   <div class="actionbar" style="margin-top:14px;">
     <button class="btn primary"
             hx-post="{{ app_root }}/entities/{{ entity_id }}/rows/undo"
-            hx-include="#controls, [name=page_size]" hx-target="#rows-table" hx-swap="innerHTML">
+            hx-include="#controls, [name=page_size], [name=batch_at]" hx-target="#rows-table" hx-swap="innerHTML">
       {{ _("Ja, {total_to_restore} Zeile(n) wiederherstellen", total_to_restore=total_to_restore) }}
     </button>
     <button class="btn"

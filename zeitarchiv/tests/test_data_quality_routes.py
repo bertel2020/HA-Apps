@@ -143,7 +143,17 @@ def test_sammelaktion_vorschau_loeschen_und_rueckgaengig(client) -> None:
     nochmal = client.post("/housekeeping/datenqualitaet/duplicates/preview", data=daten).text
     assert "keine Duplikate" in nochmal
 
-    zurueck = client.post("/housekeeping/datenqualitaet/duplicates/undo", data=daten).text
+    # Die Charge des Laufs steckt als Kennung im Formular des Rückgängig-Knopfs.
+    import re
+
+    batch_at = re.search(r'name="batch_at" value="([^"]+)"', geloescht).group(1)
+    fremd = {"entity_id": ["sensor.pytest_dq_bulk"], "batch_at": ["1.0"]}
+    assert "0</strong> Zeile(n) wiederhergestellt" in client.post(
+        "/housekeeping/datenqualitaet/duplicates/undo", data=fremd).text
+    zurueck = client.post(
+        "/housekeeping/datenqualitaet/duplicates/undo",
+        data={"entity_id": ["sensor.pytest_dq_bulk"], "batch_at": [batch_at]},
+    ).text
     assert "wiederhergestellt" in zurueck
     assert "Bestätigung" in client.post("/housekeeping/datenqualitaet/duplicates/preview", data=daten).text
 
@@ -229,3 +239,31 @@ def test_seite_zeigt_gesamtstatus_und_stand_je_zeile(client) -> None:
     assert "sort=measured&amp;dir=asc" in html
     antwort = client.get("/housekeeping/datenqualitaet?sort=measured&dir=asc")
     assert antwort.status_code == 200
+
+
+def test_duplikat_bestaetigung_doppelt_abgeschickt_markiert_nur_einmal(client) -> None:
+    """Die Bestätigung bestimmt die Duplikate unter der Sperre neu: ein zweites
+    Absenden (oder eine veraltete Vorschau) markiert nichts mehr, sonst würde auch das
+    letzte verbliebene Vorkommen ausgeblendet. Rückgängig nimmt genau die Charge zurück,
+    die die Vorschau zeigte, auch wenn danach eine andere entstand."""
+    from app.main import index
+
+    entity_id = "sensor.pytest_dq_doppelt"
+    _mit_duplikaten(index, entity_id)  # dreimal derselbe Zeitstempel
+    form = {"source": "duplicates", "filter": "all", "range": "month", "offset": "0", "page_size": "20"}
+
+    client.post(f"/entities/{entity_id}/rows/delete", data=form)
+    assert sum(index.get_deleted_counts_for_entity(entity_id).values()) == 2
+    client.post(f"/entities/{entity_id}/rows/delete", data=form)  # zweites Absenden
+    assert sum(index.get_deleted_counts_for_entity(entity_id).values()) == 2
+
+    vorschau = client.post(
+        f"/entities/{entity_id}/rows/undo-preview", data={"filter": "all", "range": "month", "offset": "0"}
+    ).text
+    batch_at = re.search(r'name="batch_at" value="([^"]+)"', vorschau).group(1)
+    index.mark_deleted(entity_id, [1.0], deleted_at=float(batch_at) + 100)  # neuere, fremde Charge
+    client.post(
+        f"/entities/{entity_id}/rows/undo",
+        data={"filter": "all", "range": "month", "offset": "0", "batch_at": batch_at},
+    )
+    assert index.get_deleted_counts_for_entity(entity_id) == {1.0: 1}

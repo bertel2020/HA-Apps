@@ -428,6 +428,24 @@ def analyze_raw_rows_page(
     }
 
 
+def _sorted_within_timestamp(rows: Iterable[tuple[float, float]]) -> Iterator[tuple[float, float]]:
+    """Gibt rows (nach Zeitstempel aufsteigend) unverändert zurück, sortiert aber
+    die Vorkommen DESSELBEN Zeitstempels nach Wert. Streaming: gehalten wird
+    immer nur die Gruppe eines Zeitstempels. Ergibt dieselbe Reihenfolge wie
+    sorted(rows) auf (ts, value)-Tupeln — die gemeinsame Reihenfolge, nach der
+    jeder Lese- und Purge-Pfad die ersten n Vorkommen eines Zeitstempels als
+    gelöscht behandelt (siehe filter_deleted_occurrences())."""
+    group_ts: float | None = None
+    group: list[tuple[float, float]] = []
+    for row in rows:
+        if row[0] != group_ts:
+            yield from sorted(group)
+            group = []
+            group_ts = row[0]
+        group.append(row)
+    yield from sorted(group)
+
+
 def iter_raw_rows(
     data_dir: Path,
     index: Index,
@@ -458,12 +476,17 @@ def iter_raw_rows(
             archive_path = entity_dir(data_dir, "archive", entity_id) / f"{month_key}.parquet"
             if not archive_path.exists():
                 continue
-            batches = (
-                zip(batch.column("ts").to_pylist(), batch.column("value").to_pylist())
+            # Innerhalb eines Zeitstempels nach Wert sortieren (wie der Hot Buffer
+            # oben und wie filter_deleted_occurrences() es voraussetzt), sonst
+            # blendet die Dateireihenfolge ein anderes Duplikat aus als alle
+            # anderen Lesepfade.
+            batches = [_sorted_within_timestamp(
+                row
                 for batch in pq.ParquetFile(archive_path).iter_batches(
                     batch_size=8192, columns=["ts", "value"]
                 )
-            )
+                for row in zip(batch.column("ts").to_pylist(), batch.column("value").to_pylist())
+            )]
         remaining_deleted = dict(deleted)
         for batch in batches:
             for ts, value in batch:
@@ -644,26 +667,45 @@ def iter_duplicate_rows_to_delete(
     rows: Iterable[tuple[float, float]],
 ) -> Iterator[tuple[float, float]]:
     """Streaming-Variante von duplicate_rows_to_delete() mit konstantem statt mit
-    der Zeilenzahl wachsendem Speicherbedarf: da rows nach Zeitstempel sortiert
-    sind (list_raw_rows/iter_raw_rows), liegen alle Vorkommen desselben
-    Zeitstempels direkt hintereinander — ein Vergleich mit nur dem Vorwert
-    genügt, statt sich alle bisher gesehenen Zeitstempel in einem Set zu merken."""
-    previous_ts: float | None = None
-    for ts, value in rows:
-        if ts == previous_ts:
-            yield ts, value
-        else:
-            previous_ts = ts
+    der Zeilenzahl wachsendem Speicherbedarf: da rows nach (Zeitstempel, Wert)
+    sortiert sind (iter_raw_rows), liegen alle Vorkommen desselben Zeitstempels
+    direkt hintereinander — gehalten wird nur das jeweils letzte Vorkommen."""
+    pending: tuple[float, float] | None = None
+    for row in rows:
+        if pending is not None and row[0] == pending[0]:
+            yield pending
+        pending = row
 
 
 def duplicate_rows_to_delete(rows: Iterable[tuple[float, float]]) -> list[tuple[float, float]]:
     """Für "Duplikate automatisch entfernen" (Konzept Abschnitt 04): bei jedem
-    mehrfach vorkommenden Zeitstempel bleibt genau EIN Vorkommen erhalten (das
-    zeitlich erste in rows), alle weiteren werden zum Löschen vorgeschlagen.
-    rows muss dieselbe stabile Reihenfolge haben wie beim tatsächlichen Löschen
-    (list_raw_rows liefert bereits sortiert), sonst könnte hier ein anderes
-    Vorkommen ausgewählt werden als später tatsächlich entfernt wird."""
+    mehrfach vorkommenden Zeitstempel bleibt genau EIN Vorkommen erhalten — das
+    LETZTE in der Reihenfolge (Zeitstempel, Wert), also der größte Wert —,
+    alle davor werden zum Löschen vorgeschlagen.
+
+    Das ist genau die Zeile, die nach dem Markieren tatsächlich verschwindet:
+    gespeichert wird nur der Zeitstempel samt Anzahl, und
+    filter_deleted_occurrences() blendet in derselben Reihenfolge die ersten n
+    Vorkommen aus. Vorschau und Wirkung stimmen damit überein. rows muss nach
+    (Zeitstempel, Wert) sortiert sein (iter_raw_rows liefert das)."""
     return list(iter_duplicate_rows_to_delete(rows))
+
+
+def duplicate_rows_in_window(
+    data_dir: Path, index: Index, entity_id: str, start_ts: float, end_ts: float, tz: ZoneInfo,
+    now: datetime | None = None,
+) -> list[tuple[float, float]]:
+    """Die Zeilen, die "Duplikate entfernen" im Zeitraum markieren würde. Aufrufer
+    hält den Entitäts-Lock. Gemeinsam von der Vorschau und vom Löschen genutzt:
+    gelöscht wird, was jetzt gefunden wird, nicht was die Vorschau zeigte.
+
+    iter_raw_rows() statt list_raw_rows(max_rows=...): Duplikate müssen über den
+    ganzen gewählten Zeitraum gesucht werden, auch wenn der weit über
+    MAX_UI_ANALYSIS_ROWS liegt (z. B. "Gesamt" bei Millionen Rohwerten) — das Cap
+    gilt nur für Pfade, die wirklich alle Zeilen materialisieren müssten. Hier hält
+    iter_duplicate_rows_to_delete() den Speicherbedarf konstant, da Duplikate dank
+    Sortierung immer direkt aufeinanderfolgen."""
+    return duplicate_rows_to_delete(iter_raw_rows(data_dir, index, entity_id, start_ts, end_ts, tz, now=now))
 
 
 def count_duplicate_rows_by_entity(
@@ -917,6 +959,22 @@ def undo_last_delete(index: Index, entity_id: str) -> int:
     return count
 
 
+def undo_delete_batch(index: Index, entity_id: str, deleted_at: float) -> int:
+    """Macht GENAU die Charge mit diesem deleted_at rückgängig, nicht die jüngste.
+    Zwischen "Löschen" und "Rückgängig" kann eine andere Charge entstanden sein
+    (Zählerregel im Hintergrund, zweiter Tab); undo_last_delete() würde dann
+    deren Markierungen zurücknehmen. Wiederholtes Absenden ist harmlos: die
+    Charge ist beim zweiten Mal weg, es wird nichts weiter zurückgenommen."""
+    started_at = time.time()
+    count = index.undo_deleted_batch(entity_id, deleted_at)
+    if count:
+        index.log_entity_action(
+            entity_id, "undo", "manual", started_at, time.time(), "success",
+            rows_affected=count, detail=json.dumps({"mode": "batch", "batch": deleted_at}),
+        )
+    return count
+
+
 def _group_by_month(ts_counts: dict[float, int], tz: ZoneInfo) -> dict[str, dict[float, int]]:
     """Gruppiert EINMAL nach Kalendermonat (dieselbe "YYYY-MM"-Zuordnung wie
     hotbuffer.month_key()/die Archiv-Dateinamen "YYYY-MM.parquet") — Grundlage
@@ -1062,16 +1120,23 @@ def purge_hot_buffer(
         records = hotbuffer.read_full_rows(path)
         if not records:
             continue
-        remaining = dict(relevant)
-        kept_records: list[hotbuffer.HotRecord] = []
+        # Je Zeitstempel fallen die ersten n Vorkommen in der Reihenfolge
+        # (Zeitstempel, Wert) weg — dieselbe wie in der Anzeige. Die Dateireihenfolge
+        # würde bei Duplikaten mit verschiedenen Werten die andere Zeile treffen.
+        positions: dict[float, list[int]] = {}
+        for position, record in enumerate(records):
+            if record[0] in relevant:
+                positions.setdefault(record[0], []).append(position)
+        drop: set[int] = set()
         removed_timestamps: list[float] = []
-        for record in records:
-            ts = record[0]
-            if remaining.get(ts, 0) > 0:
-                remaining[ts] -= 1
+        for ts, found in positions.items():
+            found.sort(key=lambda position: records[position][1])
+            for position in found[:relevant[ts]]:
+                drop.add(position)
                 removed_timestamps.append(ts)
-            else:
-                kept_records.append(record)
+        kept_records: list[hotbuffer.HotRecord] = [
+            record for position, record in enumerate(records) if position not in drop
+        ]
         if not removed_timestamps:
             continue
         hotbuffer.write_records(path, kept_records)
@@ -1531,6 +1596,27 @@ def _validate_compaction_target(entity: dict, target_resolution: str) -> int:
     return interval
 
 
+def _month_rows_without_marked(
+    index: Index, entity_id: str, archive_path: Path, year: int, month: int, tz: ZoneInfo
+) -> tuple[list[tuple[float, float, float | None, float | None]], int]:
+    """Ein Archivmonat für das Verdichten: sortiert nach (ts, value) und OHNE die
+    weich gelöschten Vorkommen. Ohne diesen Filter flössen markierte Fehlwerte/
+    Ausreißer in die Mittelwerte bzw. als letzter Wert in die Zähler-Buckets ein,
+    und remove_deleted_points_for_month() räumte danach die Markierungen ab —
+    der Wert wäre dauerhaft wieder aktiv und ließe sich nicht mehr zurückholen.
+    Wie bei purge_archived_months() fallen die markierten Zeilen damit physisch
+    weg; ihre Markierungen räumt der Aufrufer anschließend ab."""
+    rows = sorted(_read_archive_month_full(archive_path), key=lambda r: (r[0], r[1]))
+    month_start = datetime(year, month, 1, tzinfo=tz).timestamp()
+    next_year, next_month = (year + 1, 1) if month == 12 else (year, month + 1)
+    month_end = datetime(next_year, next_month, 1, tzinfo=tz).timestamp()
+    deleted = index.get_deleted_counts(entity_id, month_start, month_end)
+    if not deleted:
+        return rows, 0
+    kept = filter_deleted_occurrences(rows, deleted)
+    return kept, len(rows) - len(kept)
+
+
 def preview_compact_raw_values(
     data_dir: Path, index: Index, entity_id: str, start_ts: float, end_ts: float, target_resolution: str,
     tz: ZoneInfo, now: datetime | None = None,
@@ -1553,11 +1639,11 @@ def preview_compact_raw_values(
         index, entity_id, aggregation_type, target_resolution, interval, archive_dir,
         start_ts, end_ts, current_month_start, tz,
     )
-    for _year, _month, archive_path in months:
-        rows = sorted(_read_archive_month_full(archive_path), key=lambda r: (r[0], r[1]))
+    for year, month, archive_path in months:
+        rows, filtered_out = _month_rows_without_marked(index, entity_id, archive_path, year, month, tz)
         if not rows:
             continue
-        rows_before += len(rows)
+        rows_before += len(rows) + filtered_out
         rows_after += len(_compacted_rows_for_month(rows, aggregation_type, interval))
     return {"rows_before": rows_before, "rows_after": rows_after, "months": len(months)}
 
@@ -1674,6 +1760,10 @@ def compact_raw_values(
     Locking ist Sache des Aufrufers (main.py, wie bei correct_raw_value()/
     add_raw_value()/purge_*): diese Funktion nimmt selbst keine Sperre.
 
+    Weich gelöschte Zeilen werden dabei NICHT mitverdichtet, sondern fallen
+    physisch weg (wie beim Purge) — sonst wäre ein markierter Fehlwert nach dem
+    Verdichten wieder aktiv, ohne dass sich das zurückholen ließe.
+
     Räumt außerdem deleted_points-Markierungen im verdichteten Monat auf
     (siehe remove_deleted_points_for_month()) — deren ursprüngliche
     Rohzeitstempel existieren danach nicht mehr, sie blieben sonst dauerhaft
@@ -1699,17 +1789,17 @@ def compact_raw_values(
         start_ts, end_ts, current_month_start, tz,
     )
     for year, month, archive_path in months:
-        rows = sorted(_read_archive_month_full(archive_path), key=lambda r: (r[0], r[1]))
+        rows, filtered_out = _month_rows_without_marked(index, entity_id, archive_path, year, month, tz)
         if not rows:
             continue
         new_rows = _compacted_rows_for_month(rows, aggregation_type, interval)
-        rows_before += len(rows)
+        rows_before += len(rows) + filtered_out
         rows_after += len(new_rows)
         _rewrite_archive_month(
             data_dir, index, entity_id, aggregation_type, new_rows, year, month, tz,
             hourly_rollup=hourly_rollup,
         )
-        index.add_row_count(entity_id, len(new_rows) - len(rows))
+        index.add_row_count(entity_id, len(new_rows) - len(rows) - filtered_out)
         index.set_compacted_month(entity_id, year, month, target_resolution, now.timestamp())
         months_compacted.append(f"{year:04d}-{month:02d}")
         stale_markers_removed += remove_deleted_points_for_month(index, entity_id, year, month, tz)

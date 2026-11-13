@@ -472,8 +472,9 @@ def test_sammel_loeschen_ueberspringt_entitaeten_ohne_duplikate(daten):
 def test_sammel_rueckgaengig_stellt_wieder_her_und_verwirft_die_zahlen(daten):
     tmp, idx = daten
     _mit_duplikaten(tmp, idx, "sensor.a", 2)
-    data_quality.remove_duplicates(tmp, idx, _TZ, ["sensor.a"], _lock, now=_JETZT)
-    assert data_quality.undo_duplicate_removal(idx, ["sensor.a"], _lock) == 2
+    lauf = data_quality.remove_duplicates(tmp, idx, _TZ, ["sensor.a"], _lock, now=_JETZT)
+    batch_at = lauf["rows"][0]["batch_at"]
+    assert data_quality.undo_duplicate_removal(idx, [("sensor.a", batch_at)], _lock) == 2
     assert len(data_quality.duplicate_timestamps(tmp, idx, _TZ, "sensor.a", idx.get_entity("sensor.a"), _JETZT)) == 2
     eintrag = idx.get_cleanup_alltime_stats("sensor.a")
     assert "daily" not in eintrag
