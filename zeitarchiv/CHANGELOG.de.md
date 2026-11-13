@@ -107,6 +107,7 @@
   - Hinweistext zur Rolle „Sonnenhöhe“ nennt den Sensor „Solare Elevation“ der
     Integration Sun
   - Tagesbild beginnt mit dem aktuellen Tag und blickt nach rechts zurück
+  - Die Wind-Kachel der Übersicht zeigt wieder Tief- und Höchstwert von heute
   - Abgewählte Einträge in der Legende von Heizdiagramm und Monatsvergleich
     bleiben erhalten, auch nach einer Änderung von Raumtemperatur oder
     Heizgrenze und nach dem Neuladen

@@ -583,9 +583,12 @@
         const fromLage = {};
         if (c) {
           this.conditionsTiles().filter((tile) => tile.kind === 'sky' || tile.kind === 'wind').forEach((tile) => {
+            // Der Wind der Wetterlage ersetzt die Wertekachel; deren Tief/Hoch von heute (▼ ▲) bleibt als letzte Zeile erhalten.
+            const windTile = tile.kind === 'wind' ? this.tiles.find((x) => x.key === 'wind') : null;
+            const span = windTile ? this.tileSub(windTile) : '';
             fromLage[tile.kind] = {
               key: tile.kind, role: tile.kind === 'sky' ? 'illuminance' : 'wind', icon: tile.icon, label: tile.label, big: false, href: '',
-              title: '', value: escapeHtml(tile.value), sub: [tile.sub, tile.sub2].filter(Boolean).join('\n'),
+              title: '', value: escapeHtml(tile.value), sub: [tile.sub, tile.sub2, span].filter(Boolean).join('\n'),
             };
           });
         }

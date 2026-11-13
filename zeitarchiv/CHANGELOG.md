@@ -105,6 +105,7 @@
   - The hint for the “Sun elevation” role now mentions the “Solar elevation”
     sensor of the Sun integration
   - The daily picture starts with the current day and looks back to the right
+  - The wind tile of the overview shows today’s low and high again
   - Entries switched off in the legend of the heating chart and the monthly
     comparison are kept, also after changing room temperature or heating limit
     and after reloading
