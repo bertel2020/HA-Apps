@@ -700,3 +700,64 @@ def test_an_interrupted_rollup_rebuild_is_redone_at_startup(env, monkeypatch) ->
     assert rollup.repair_pending(tmp, index, tz) == 1
     assert not (archive_dir / rollup.REBUILD_MARKER).exists()
     assert _rollup_files(tmp, "sensor.r") == expected
+
+
+def test_a_purge_interrupted_after_the_file_swap_is_completed_at_startup(env, monkeypatch) -> None:
+    from app.storage import rollup, rotate
+
+    tmp, index = env
+    tz = ZoneInfo("UTC")
+    index.get_or_create_entity("sensor.p", "sensor", "total_increasing", "kWh")
+    stamps = (1719878400.0, 1719964800.0, 1720051200.0)  # Juli 2024
+    for i, ts in enumerate(stamps):
+        hotbuffer.append(tmp, "sensor.p", ts, 100.0 + i, tz)
+        index.record_write("sensor.p", ts)
+    rotate.rotate_if_needed(tmp, "sensor.p", 1722470400.0, index, tz)
+    index.mark_deleted("sensor.p", [stamps[1]])
+    rows_before = index.get_entity("sensor.p")["row_count"]
+    archive = tmp / "archive" / "sensor.p" / "2024-07.parquet"
+
+    def crash(*_args, **_kwargs):
+        raise OSError("Absturz nach dem Ersetzen der Datei")
+
+    monkeypatch.setattr(Index, "apply_archive_purge", crash)
+    with pytest.raises(OSError):
+        cleanup.purge_archived_months(tmp, index, tz)
+    monkeypatch.undo()
+
+    assert pq.ParquetFile(archive).metadata.num_rows == 2  # Datei ist ersetzt
+    assert index.get_deleted_counts_for_entity("sensor.p")  # Markierung steht noch
+    assert index.get_entity("sensor.p")["row_count"] == rows_before
+
+    assert cleanup.finish_interrupted_purges(tmp, index, tz) == 1
+    assert index.get_deleted_counts_for_entity("sensor.p") == {}
+    assert index.get_entity("sensor.p")["row_count"] == rows_before - 1
+    assert index.get_entity("sensor.p")["size_bytes"] == archive.stat().st_size
+
+    # Zweiter Lauf (Absturz nach dem Nachziehen): nichts wird doppelt verbucht.
+    assert cleanup.finish_interrupted_purges(tmp, index, tz) == 0
+    assert index.get_entity("sensor.p")["row_count"] == rows_before - 1
+    assert rollup.repair_pending(tmp, index, tz) == 1
+    assert not archive.with_suffix(".rollup-pending").exists()
+
+
+def test_a_purge_whose_file_was_not_replaced_keeps_the_marks(env) -> None:
+    from app.storage import rotate
+
+    tmp, index = env
+    tz = ZoneInfo("UTC")
+    index.get_or_create_entity("sensor.q", "sensor", "total_increasing", "kWh")
+    stamps = (1719878400.0, 1719964800.0)
+    for i, ts in enumerate(stamps):
+        hotbuffer.append(tmp, "sensor.q", ts, 100.0 + i, tz)
+        index.record_write("sensor.q", ts)
+    rotate.rotate_if_needed(tmp, "sensor.q", 1722470400.0, index, tz)
+    index.mark_deleted("sensor.q", [stamps[0]])
+    archive = tmp / "archive" / "sensor.q" / "2024-07.parquet"
+    import json
+    archive.with_suffix(".rollup-pending").write_text(json.dumps({"purge": {
+        "entity_id": "sensor.q", "old_rows": 2, "removed": 1, "old_size": 1, "timestamps": [stamps[0]],
+        "older_than": None, "token": "t",
+    }}))
+    assert cleanup.finish_interrupted_purges(tmp, index, tz) == 0  # Datei hat noch 2 Zeilen
+    assert index.get_deleted_counts_for_entity("sensor.q")

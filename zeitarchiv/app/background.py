@@ -1266,6 +1266,7 @@ class BackgroundService:
         # unterbrochen wurde (Marker neben der Archivdatei, siehe rollup.pending), bekommen ihre
         # Rollup-Zeilen aus der Archivdatei neu berechnet. Ohne Marker kostet der Lauf ein Verzeichnis-Listing.
         try:
+            cleanup.finish_interrupted_purges(self.data_dir, self.index, self.tz)
             repaired = rollup.repair_pending(self.data_dir, self.index, self.tz)
             if repaired:
                 logger.warning(

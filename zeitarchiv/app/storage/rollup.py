@@ -23,6 +23,7 @@ from ..i18n import tr
 import calendar
 import os
 from contextlib import contextmanager
+import json
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -720,15 +721,21 @@ REBUILD_MARKER = ".rebuild-pending"
 
 
 @contextmanager
-def pending(archive_path: Path):
+def pending(archive_path: Path, payload: dict | None = None):
     """Legt den Marker an, bevor das Archiv angefasst wird, und entfernt ihn erst, wenn auch das Rollup neu
     berechnet ist. Bei einem Fehler bleibt er stehen; repair_pending() holt das beim nächsten Start nach.
 
     Liefert den Marker: scheitert das atomare Schreiben der Archivdatei selbst, ist die Datei unverändert und es gibt
-    nichts nachzuziehen, dann darf der Aufrufer ihn entfernen (siehe write_archive_pending)."""
+    nichts nachzuziehen, dann darf der Aufrufer ihn entfernen (siehe write_archive_pending).
+
+    ``payload`` (JSON) hält fest, was der Aufrufer nach dem Ersetzen der Datei noch nachziehen muss; der Archiv-Purge
+    legt hier ab, welche Markierungen er entfernen will (cleanup.finish_interrupted_purges)."""
     marker = archive_path.with_suffix(PENDING_SUFFIX)
     archive_path.parent.mkdir(parents=True, exist_ok=True)
-    marker.touch()
+    if payload is None:
+        marker.touch()
+    else:
+        marker.write_text(json.dumps(payload), encoding="utf-8")
     yield marker
     marker.unlink(missing_ok=True)
 

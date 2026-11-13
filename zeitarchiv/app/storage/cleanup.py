@@ -15,6 +15,7 @@ from __future__ import annotations
 from ..i18n import tr
 
 import json
+import uuid
 import statistics
 import time
 from collections import deque
@@ -1397,7 +1398,17 @@ def purge_archived_months(
                 continue
 
             old_size = path.stat().st_size
-            with rollup.pending(path) as marker:
+            removed_timestamps = [ts for ts, count in relevant.items() for _ in range(count)]
+            # Der Marker hält fest, was nach dem Ersetzen der Datei noch zu tun ist (Zähler, Größe, Markierungen):
+            # Stürzt der Vorgang dazwischen ab, holt finish_interrupted_purges das beim Start nach.
+            token = uuid.uuid4().hex
+            purge_note = {
+                "purge": {
+                    "entity_id": entity_id, "old_rows": len(rows), "removed": removed, "old_size": old_size,
+                    "timestamps": removed_timestamps, "older_than": older_than, "token": token,
+                }
+            }
+            with rollup.pending(path, purge_note) as marker:
                 if kept:
                     kept_table = pa.table({
                         "ts": [r[0] for r in kept],
@@ -1423,11 +1434,12 @@ def purge_archived_months(
                     )
                     new_size = 0
                     entity_had_emptied_month = True
-
-            index.add_row_count(entity_id, -removed)
-            index.add_size_bytes(entity_id, new_size - old_size)
-            removed_timestamps = [ts for ts, count in relevant.items() for _ in range(count)]
-            index.remove_deleted_points(entity_id, removed_timestamps, older_than=older_than)
+                # Noch unter dem Marker: erst danach gilt der Purge als vollständig (eine Transaktion, siehe
+                # Index.apply_archive_purge).
+                index.apply_archive_purge(
+                    entity_id, removed, new_size - old_size, removed_timestamps, older_than, token
+                )
+            index.forget_archive_purge(token)
 
             rows_purged += removed
             months_purged += 1
@@ -1438,6 +1450,43 @@ def purge_archived_months(
             _update_first_ts_after_archive_purge(data_dir, index, entity_id, tz, now)
 
     return {"rows_purged": rows_purged, "months_purged": months_purged}
+
+
+def finish_interrupted_purges(data_dir: Path, index: Index, tz: ZoneInfo, now: datetime | None = None) -> int:
+    """Zieht beim Start nach, was ein abgestürzter Archiv-Purge nicht mehr verbucht hat: Stand der Archivdatei prüfen
+    (Zeilenzahl; fehlt die Datei, war der Monat ganz geleert). Ist sie ersetzt, werden Zeilenzahl, Größe und
+    Markierungen nachgezogen (einmalig, über das Token); ist sie unverändert, bleiben die Markierungen stehen und der
+    nächste Purge entfernt die Zeilen. Der Marker bleibt liegen, rollup.repair_pending() rechnet danach das Rollup.
+    Gibt die Zahl nachgezogener Monate zurück."""
+    now = now or datetime.now(tz)
+    finished = 0
+    for marker in sorted((data_dir / "archive").glob(f"*/*{rollup.PENDING_SUFFIX}")):
+        try:
+            note = json.loads(marker.read_text(encoding="utf-8")).get("purge")
+        except (OSError, ValueError, AttributeError):
+            continue
+        if not note:
+            continue
+        archive_path = marker.with_suffix(".parquet")
+        entity_id = note["entity_id"]
+        if index.get_entity(entity_id) is None:
+            continue
+        if archive_path.exists():
+            if pq.ParquetFile(archive_path).metadata.num_rows != note["old_rows"] - note["removed"]:
+                continue  # Datei wurde nicht ersetzt
+            new_size = archive_path.stat().st_size
+        else:
+            new_size = 0
+        if index.apply_archive_purge(
+            entity_id, note["removed"], new_size - note["old_size"], note["timestamps"], note["older_than"],
+            note["token"],
+        ):
+            finished += 1
+        if new_size == 0:
+            _update_first_ts_after_archive_purge(data_dir, index, entity_id, tz, now)
+        index.forget_archive_purge(note["token"])
+        marker.write_text("", encoding="utf-8")  # nichts mehr nachzuziehen; das Rollup folgt in repair_pending
+    return finished
 
 
 def read_values_for_timestamps(

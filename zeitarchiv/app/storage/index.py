@@ -4865,27 +4865,56 @@ class Index:
         unterschiedlich alt markiert), bleiben die jüngeren bis zum nächsten
         Lauf unangetastet, statt dass eine willkürliche von ihnen mitgeht."""
         with self._lock, self._conn:
-            removed = 0
-            for ts in timestamps:
-                if older_than is None:
-                    row = self._conn.execute(
-                        "SELECT id FROM deleted_points WHERE entity_id = ? AND ts = ? LIMIT 1",
-                        (entity_id, ts),
-                    ).fetchone()
-                else:
-                    row = self._conn.execute(
-                        "SELECT id FROM deleted_points WHERE entity_id = ? AND ts = ? AND deleted_at <= ? "
-                        "ORDER BY deleted_at ASC LIMIT 1",
-                        (entity_id, ts, older_than),
-                    ).fetchone()
-                if row:
-                    self._conn.execute("DELETE FROM deleted_points WHERE id = ?", (row["id"],))
-                    removed += 1
-            if removed:
-                self._conn.execute(
-                    "UPDATE entities SET deleted_count = deleted_count - ? WHERE entity_id = ?",
-                    (removed, entity_id),
-                )
+            self._remove_deleted_points_in_transaction(entity_id, timestamps, older_than)
+
+    def _remove_deleted_points_in_transaction(
+        self, entity_id: str, timestamps: list[float], older_than: float | None
+    ) -> None:
+        removed = 0
+        for ts in timestamps:
+            if older_than is None:
+                row = self._conn.execute(
+                    "SELECT id FROM deleted_points WHERE entity_id = ? AND ts = ? LIMIT 1",
+                    (entity_id, ts),
+                ).fetchone()
+            else:
+                row = self._conn.execute(
+                    "SELECT id FROM deleted_points WHERE entity_id = ? AND ts = ? AND deleted_at <= ? "
+                    "ORDER BY deleted_at ASC LIMIT 1",
+                    (entity_id, ts, older_than),
+                ).fetchone()
+            if row:
+                self._conn.execute("DELETE FROM deleted_points WHERE id = ?", (row["id"],))
+                removed += 1
+        if removed:
+            self._conn.execute(
+                "UPDATE entities SET deleted_count = deleted_count - ? WHERE entity_id = ?",
+                (removed, entity_id),
+            )
+
+    def apply_archive_purge(
+        self, entity_id: str, rows_removed: int, size_delta: int, timestamps: list[float],
+        older_than: float | None, token: str,
+    ) -> bool:
+        """Zieht nach dem Ersetzen einer Archivdatei Zeilenzahl, Größe und Markierungen in EINER Transaktion nach
+        und hält ``token`` fest. Gibt False zurück, wenn dieser Purge schon verbucht ist (Wiederholung nach einem
+        Absturz, siehe cleanup.finish_interrupted_purges)."""
+        key = f"archive_purge_applied:{token}"
+        with self._lock, self._conn:
+            if self._conn.execute("SELECT 1 FROM settings WHERE key = ?", (key,)).fetchone():
+                return False
+            self._conn.execute(
+                "UPDATE entities SET row_count = row_count + ?, size_bytes = size_bytes + ?, updated_at = ? "
+                "WHERE entity_id = ?",
+                (-rows_removed, size_delta, time.time(), entity_id),
+            )
+            self._remove_deleted_points_in_transaction(entity_id, timestamps, older_than)
+            self._conn.execute("INSERT INTO settings (key, value) VALUES (?, '1')", (key,))
+        return True
+
+    def forget_archive_purge(self, token: str) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("DELETE FROM settings WHERE key = ?", (f"archive_purge_applied:{token}",))
 
     def get_compacted_month(self, entity_id: str, year: int, month: int) -> sqlite3.Row | None:
         """Marker eines bereits verdichteten Monats, oder None. Grundlage für
