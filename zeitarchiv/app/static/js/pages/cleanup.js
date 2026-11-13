@@ -50,7 +50,7 @@
       // Die Uhrzeit des Feldes gilt in der Zeitzone des Servers, nicht des Browsers.
       const [, y, mo, d, h, mi, sec] = dtStr.match(/^(\d+)-(\d+)-(\d+)T(\d+):(\d+)(?::(\d+))?/).map(Number);
       const ts = ServerTime.toEpoch(y, mo, d, h, mi, sec || 0);
-      const value = NumberFormat.parse(valueStr);
+      const value = NumberFormat.parseStrict(valueStr);
       if (Number.isNaN(value)) {
         statusEl.className = 'add-value-status err';
         statusEl.textContent = t('Ungültiger Wert.');
@@ -67,7 +67,8 @@
           return;
         }
         statusEl.className = 'add-value-status ok';
-        statusEl.textContent = t('✓ Wert hinzugefügt.');
+        // Der gespeicherte Wert im Format der Oberfläche: wer "1.234" schrieb und 1,234 meinte, sieht es sofort.
+        statusEl.textContent = t('✓ Wert hinzugefügt: {value}', {value: value.toLocaleString(NumberFormat.LOCALE, {maximumFractionDigits: 10})});
         document.getElementById('add-value').value = '';
       } catch (e) {
         statusEl.className = 'add-value-status err';

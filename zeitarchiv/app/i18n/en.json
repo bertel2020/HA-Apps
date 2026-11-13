@@ -3972,7 +3972,7 @@
     "Hinzufügen fehlgeschlagen.": "Adding failed.",
     "Der Speicher ist gerade belegt (Sicherung oder Import). Bitte gleich noch einmal versuchen.": "Storage is busy right now (backup or import). Please try again in a moment.",
     "Die Aktion ist fehlgeschlagen. Bitte die Seite neu laden und den Stand prüfen.": "The action failed. Please reload the page and check the current state.",
-    "✓ Wert hinzugefügt.": "✓ Value added.",
+    "✓ Wert hinzugefügt: {value}": "✓ Value added: {value}",
     "Bitte Zeitraum angeben.": "Please specify a period.",
     "\"Bis\" muss nach \"Von\" liegen.": "“To” must be after “From”.",
     "Verdichten — nicht umkehrbar": "Compact — cannot be undone",
