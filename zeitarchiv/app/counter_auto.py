@@ -12,6 +12,7 @@ Zähler an und meldet das, statt einen kaputten Datenstrom Stunde für Stunde we
 
 from __future__ import annotations
 
+import logging
 import time
 from datetime import datetime
 from pathlib import Path
@@ -21,9 +22,17 @@ from .i18n import tr
 from .storage import cleanup
 from .storage.index import Index
 
+logger = logging.getLogger(__name__)
+
 MAX_PER_RUN = 50
 RUN_INTERVAL_SECONDS = 3600
 _LAST_RUN_KEY = "counter_auto_mark_last_run"
+#: Zeitpunkt des letzten Laufs, bei dem ALLE Zähler fehlerfrei durchliefen: ab hier muss nur noch gelesen
+#: werden. Getrennt vom Takt-Schlüssel oben, der vor dem Lauf gesetzt wird.
+_LAST_OK_KEY = "counter_auto_mark_last_ok"
+#: Rückspiel vor dem letzten fehlerfreien Lauf: dessen jüngste Rückgänge hatten noch keine Folgewerte
+#: („offen“) und werden jetzt erst eingeordnet (cleanup.classify_counter_decreases schaut bis 6 h voraus).
+_REPLAY_SECONDS = 86400
 #: Wie weit vor ``since`` gelesen wird, damit der Vorwert des ersten Rückgangs bekannt ist.
 _LOOKBACK_SECONDS = 3 * 86400
 #: Meldung „Fehlwerte automatisch markiert“: an so vielen Tagen der letzten 14 wurde markiert.
@@ -31,15 +40,21 @@ INFO_MIN_DAYS = 3
 INFO_WINDOW_DAYS = 14
 
 
-def process_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now: datetime) -> int:
+def process_entity(
+    data_dir: Path, index: Index, tz: ZoneInfo, entity, now: datetime, last_ok: float | None = None
+) -> int:
     """Markiert die zurückkehrenden Rückgänge eines Zählers; Anzahl markierter Werte (0 bei
-    angehaltener Regel oder wenn die Sicherung ausgelöst hat)."""
+    angehaltener Regel oder wenn die Sicherung ausgelöst hat).
+
+    ``last_ok`` ist der letzte fehlerfreie Lauf: gelesen wird erst ab dort (mit Rückspiel und dem Vorlauf
+    für den Vorwert) statt jedes Mal ab dem Einschalten. Ohne ihn gilt das ganze Fenster seit ``since``."""
     if entity["counter_auto_halted_at"] is not None or entity["counter_auto_since"] is None:
         return 0
     since = entity["counter_auto_since"]
+    read_from = since if last_ok is None else max(since, last_ok - _REPLAY_SECONDS)
     decreases = cleanup.classify_counter_decreases(
         cleanup.iter_raw_rows(
-            data_dir, index, entity["entity_id"], since - _LOOKBACK_SECONDS, now.timestamp(), tz, now=now
+            data_dir, index, entity["entity_id"], read_from - _LOOKBACK_SECONDS, now.timestamp(), tz, now=now
         ),
         tz,
     )
@@ -64,9 +79,20 @@ def run_if_due(data_dir: Path, index: Index, tz: ZoneInfo, entity_lock, now: dat
     if last is not None and now.timestamp() - float(last) < RUN_INTERVAL_SECONDS:
         return False
     index.set_setting(_LAST_RUN_KEY, str(now.timestamp()))
+    last_ok = index.get_setting(_LAST_OK_KEY)
+    last_ok = float(last_ok) if last_ok is not None else None
+    failed = False
     for entity in index.list_counter_auto_entities():
-        with entity_lock(entity["entity_id"]):
-            process_entity(data_dir, index, tz, entity, now)
+        # Ein Fehler bei einem Zähler (defekte Datei, Sperre) darf die übrigen nicht blockieren: die
+        # Reihenfolge ist stabil, derselbe Zähler stünde sonst jede Stunde wieder vorn.
+        try:
+            with entity_lock(entity["entity_id"]):
+                process_entity(data_dir, index, tz, entity, now, last_ok)
+        except Exception:
+            failed = True
+            logger.exception("Fehlwerte-Regel fehlgeschlagen · event=counter_auto_failed entity_id=%s", entity["entity_id"])
+    if not failed:
+        index.set_setting(_LAST_OK_KEY, str(now.timestamp()))
     return True
 
 

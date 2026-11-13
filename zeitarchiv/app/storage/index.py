@@ -4146,6 +4146,15 @@ class Index:
         if self.get_setting(self._COUNTER_DECREASE_SNAPSHOT_KEY) is not None:
             self.set_setting(self._COUNTER_DECREASE_SNAPSHOT_KEY, json.dumps({"checked_at": 0, "rules": self._COUNTER_DECREASE_RULES, "rows": []}))
 
+    def invalidate_counter_decrease_snapshot_for(self, entity_id: str) -> None:
+        """Wie invalidate_counter_decrease_snapshot(), aber nur, wenn die Entität überhaupt im
+        Schnappschuss vorkommen kann (state_class total_increasing). Das Markieren eines
+        Temperatur-Ausreißers ließ sonst den nächsten Wartungstakt alle Zähler über 30 Tage
+        neu scannen, obwohl sich an keinem Zählerrückgang etwas geändert hat."""
+        entity = self.get_entity(entity_id)
+        if entity is not None and entity["state_class"] == "total_increasing":
+            self.invalidate_counter_decrease_snapshot()
+
     _HEATMAP_WEEKDAY_CACHE_KEY = "energiedashboard_heatmap_weekday_cache"
 
     def is_heatmap_weekday_stale(self, range_key: str, min_interval_seconds: float = 86400) -> bool:

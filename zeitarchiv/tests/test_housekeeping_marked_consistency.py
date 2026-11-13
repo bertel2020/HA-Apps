@@ -237,3 +237,121 @@ def test_add_and_correct_invalidate_caches_and_last_value(env) -> None:
     assert index.finding_generation(entity_id) == generation + 1
     assert index.get_cleanup_alltime_stats(entity_id)["computed_at"] == 0
     assert '"computed_at": 0' in index.get_setting(index.VALUE_RANGE_KEY_PREFIX + entity_id)
+
+
+def test_archive_rewrite_is_atomic_and_leaves_no_residue_on_failure(env, monkeypatch) -> None:
+    tmp, index = env
+    entity_id = "sensor.a"
+    index.get_or_create_entity(entity_id, "sensor", "measurement", "W")
+    ts = _ts(2024, 7, 5, 8)
+    archive_dir = tmp / "archive" / entity_id
+    archive_dir.mkdir(parents=True)
+    path = archive_dir / "2024-07.parquet"
+    pq.write_table(pa.table({"ts": [ts], "value": [1.0]}), path)
+    original = path.read_bytes()
+
+    def failing_write(*_args, **_kwargs):
+        raise OSError("Platte voll")
+
+    monkeypatch.setattr(cleanup.pq, "write_table", failing_write)
+    with pytest.raises(OSError):
+        cleanup.add_raw_value(tmp, index, entity_id, ts + 60, 2.0, TZ, now=datetime(2024, 8, 15, tzinfo=TZ))
+
+    assert path.read_bytes() == original  # Archivmonat unverändert
+    assert [p.name for p in archive_dir.iterdir()] == ["2024-07.parquet"]  # kein Temp-Rest
+
+
+def _entity_with_duplicates(tmp, index, entity_id: str) -> None:
+    index.get_or_create_entity(entity_id, "sensor", "measurement", "W")
+    ts = datetime.now(TZ).replace(day=1, hour=0, minute=1, second=0, microsecond=0).timestamp()
+    for _ in range(2):
+        hotbuffer.append(tmp, entity_id, ts, 5.0, TZ)
+        index.record_write(entity_id, ts)
+
+
+def test_bulk_duplicate_removal_survives_a_failing_entity(env) -> None:
+    from contextlib import contextmanager
+
+    from app import data_quality
+
+    tmp, index = env
+    _entity_with_duplicates(tmp, index, "sensor.kaputt")
+    _entity_with_duplicates(tmp, index, "sensor.gut")
+
+    @contextmanager
+    def lock(entity_id):
+        if entity_id == "sensor.kaputt":
+            raise TimeoutError("Speicher gesperrt")
+        yield
+
+    preview = data_quality.preview_duplicate_removal(tmp, index, TZ, ["sensor.kaputt", "sensor.gut"], lock)
+    assert [r["entity_id"] for r in preview["rows"]] == ["sensor.gut"]
+    assert preview["failed"] == ["sensor.kaputt"]
+
+    done = data_quality.remove_duplicates(tmp, index, TZ, ["sensor.kaputt", "sensor.gut"], lock)
+    assert [r["entity_id"] for r in done["rows"]] == ["sensor.gut"]  # mit Kennung für „Rückgängig“
+    assert done["rows"][0]["batch_at"]
+    assert done["failed"] == ["sensor.kaputt"]
+    assert done["total"] == 1
+
+
+def test_counter_rule_continues_after_a_failing_entity_and_reads_only_new_data(env, monkeypatch) -> None:
+    from contextlib import nullcontext
+
+    from app import counter_auto
+
+    tmp, index = env
+    now = datetime(2024, 8, 15, 12, tzinfo=TZ)
+    for entity_id in ("sensor.z1", "sensor.z2"):
+        index.get_or_create_entity(entity_id, "sensor", "total_increasing", "kWh")
+    seen = []
+
+    def fake_process(data_dir, idx, tz, entity, current, last_ok=None):
+        seen.append((entity["entity_id"], last_ok))
+        if entity["entity_id"] == "sensor.z1":
+            raise RuntimeError("defekte Datei")
+        return 0
+
+    monkeypatch.setattr(counter_auto, "process_entity", fake_process)
+    monkeypatch.setattr(index, "list_counter_auto_entities", lambda: [{"entity_id": "sensor.z1"}, {"entity_id": "sensor.z2"}])
+
+    assert counter_auto.run_if_due(tmp, index, TZ, lambda _e: nullcontext(), now=now) is True
+    assert [e for e, _ in seen] == ["sensor.z1", "sensor.z2"]  # der zweite läuft trotz Fehler beim ersten
+    assert index.get_setting(counter_auto._LAST_OK_KEY) is None  # nicht fehlerfrei: nächster Lauf liest weiter alles
+
+    monkeypatch.setattr(counter_auto, "process_entity", lambda *args, **kwargs: 0)
+    later = datetime(2024, 8, 15, 14, tzinfo=TZ)
+    assert counter_auto.run_if_due(tmp, index, TZ, lambda _e: nullcontext(), now=later) is True
+    assert index.get_setting(counter_auto._LAST_OK_KEY) == str(later.timestamp())
+
+
+def test_counter_rule_reads_from_last_ok_not_from_since(env, monkeypatch) -> None:
+    from app import counter_auto
+
+    tmp, index = env
+    now = datetime(2024, 8, 15, 12, tzinfo=TZ)
+    since = (now.timestamp() - 200 * 86400)
+    entity = {"entity_id": "sensor.z1", "counter_auto_halted_at": None, "counter_auto_since": since}
+    starts = []
+
+    def fake_rows(_data_dir, _index, _entity_id, start, end, _tz, now=None, **_kw):
+        starts.append(start)
+        return iter(())
+
+    monkeypatch.setattr(cleanup, "iter_raw_rows", fake_rows)
+    monkeypatch.setattr(index, "list_counter_mark_ignored", lambda _e: set())
+    counter_auto.process_entity(tmp, index, TZ, entity, now)
+    counter_auto.process_entity(tmp, index, TZ, entity, now, last_ok=now.timestamp() - 3600)
+    assert starts[0] == since - counter_auto._LOOKBACK_SECONDS
+    assert starts[1] == now.timestamp() - 3600 - counter_auto._REPLAY_SECONDS - counter_auto._LOOKBACK_SECONDS
+
+
+def test_marking_a_non_counter_leaves_the_counter_snapshot_alone(env) -> None:
+    _tmp, index = env
+    index.get_or_create_entity("sensor.temp", "sensor", "measurement", "°C")
+    index.get_or_create_entity("sensor.zaehler", "sensor", "total_increasing", "kWh")
+    index.set_counter_decrease_snapshot([])
+    cleanup.soft_delete(index, "sensor.temp", [1.0])
+    assert index.get_counter_decrease_snapshot()["checked_at"] != 0
+    cleanup.soft_delete(index, "sensor.zaehler", [1.0])
+    assert index.get_counter_decrease_snapshot()["checked_at"] == 0

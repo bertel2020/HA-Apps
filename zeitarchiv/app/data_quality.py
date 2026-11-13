@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 import json
+import logging
 import math
 from pathlib import Path
 import time
@@ -29,7 +30,10 @@ from . import cleanup_stats, formats
 from .i18n import tr
 from .formatting import decimals_to_int, format_int, format_uptime, format_value
 from .storage import cleanup
+from .storage.query import QueryReadCache
 from .storage.index import Index, effective_outlier_threshold
+
+logger = logging.getLogger(__name__)
 
 # "severity" ist die Farbe der Zahl und folgt wie in Werte bearbeiten der Frage "lässt sich etwas
 # tun?": warn (gelb) = aufräumen möglich, mute (grau) = nur Information (Lücken). Rot bleibt Fehlern
@@ -510,6 +514,8 @@ def findings_for_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now:
     cached = (entry or {}).get("counts") or {}
     start = datetime.fromtimestamp(entity["first_ts"], tz) if entity["first_ts"] else now
     groups = []
+    # Jede Kategorie liest die Historie zweimal (Zählen, Sammeln); den laufenden Monat nur einmal einlesen.
+    read_cache = QueryReadCache()
     for column in COLUMNS:
         key = column["key"]
         if key == "counter_decreases" and not counter_enabled:
@@ -519,13 +525,20 @@ def findings_for_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now:
         if key == "gaps" and gap_threshold == "off":
             continue
         # Der Cache gilt für die Kategorie nur, wenn er mit der aktuellen Schwelle gezählt ist.
-        cache_valid = cleanup_stats.gaps_measured(entity, entry) if key == "gaps" else True
+        if key == "gaps":
+            cache_valid = cleanup_stats.gaps_measured(entity, entry)
+        elif key == "outliers":
+            # Eine 0 aus einer anderen Schwelle oder Regel sagt nichts über die jetzige.
+            cache_valid = cleanup_stats.outlier_rate(index, entity) is not None
+        else:
+            cache_valid = True
         if cached and cache_valid and not cached.get(column["filter"]):
             continue
 
         def rows_factory():
             return cleanup.iter_raw_rows(
-                data_dir, index, entity_id, start.timestamp(), now.timestamp(), tz, now=now
+                data_dir, index, entity_id, start.timestamp(), now.timestamp(), tz, now=now,
+                hot_rows_loader=read_cache.read_hot_rows,
             )
 
         analysis = cleanup.analyze_raw_rows_page(
@@ -640,23 +653,38 @@ def mark_stats_unknown(index: Index, entity_id: str) -> None:
     _write_stats_entry(index, entity_id, entry)
 
 
+def _entity_label(entity, entity_id: str) -> str:
+    return entity["custom_name"] or entity["friendly_name"] or entity_id
+
+
 def preview_duplicate_removal(
     data_dir: Path, index: Index, tz: ZoneInfo, entity_ids: list[str],
     entity_lock, now: datetime | None = None,
 ) -> dict:
     """Je gewählter Entität die Zahl der Zeilen, die entfernt würden. Entitäten ohne Duplikate fallen
-    heraus. `entity_lock(entity_id)` ist der Kontextmanager des StorageCoordinator."""
+    heraus. `entity_lock(entity_id)` ist der Kontextmanager des StorageCoordinator. Eine Entität, die
+    sich nicht lesen lässt (defekte Datei, Sperre nicht rechtzeitig erhalten), steht in `failed`,
+    statt die ganze Vorschau zu kippen."""
     now = now or datetime.now(tz)
     rows = []
+    failed = []
     for entity_id in dict.fromkeys(entity_ids):
         entity = index.get_entity(entity_id)
         if entity is None:
             continue
-        with entity_lock(entity_id):
-            count = len(duplicate_timestamps(data_dir, index, tz, entity_id, entity, now))
+        try:
+            with entity_lock(entity_id):
+                count = len(duplicate_timestamps(data_dir, index, tz, entity_id, entity, now))
+        except Exception:
+            logger.exception("Duplikat-Vorschau fehlgeschlagen · event=duplicates_preview_failed entity_id=%s", entity_id)
+            failed.append(_entity_label(entity, entity_id))
+            continue
         if count:
-            rows.append({"entity_id": entity_id, "friendly_name": entity["custom_name"] or entity["friendly_name"] or entity_id, "count": count})
-    return {"rows": rows, "total": sum(r["count"] for r in rows), "total_label": format_int(sum(r["count"] for r in rows))}
+            rows.append({"entity_id": entity_id, "friendly_name": _entity_label(entity, entity_id), "count": count})
+    return {
+        "rows": rows, "failed": failed,
+        "total": sum(r["count"] for r in rows), "total_label": format_int(sum(r["count"] for r in rows)),
+    }
 
 
 def remove_duplicates(
@@ -668,26 +696,35 @@ def remove_duplicates(
     Vorschau zeigte."""
     now = now or datetime.now(tz)
     rows = []
+    failed = []
     for entity_id in dict.fromkeys(entity_ids):
         entity = index.get_entity(entity_id)
         if entity is None:
             continue
         deleted = 0
         deleted_at = time.time()
-        with entity_lock(entity_id):
-            timestamps = duplicate_timestamps(data_dir, index, tz, entity_id, entity, now)
-            for start in range(0, len(timestamps), BULK_BATCH):
-                batch = timestamps[start:start + BULK_BATCH]
-                cleanup.soft_delete(index, entity_id, batch, deleted_at=deleted_at, source="duplicates")
-                deleted += len(batch)
+        try:
+            with entity_lock(entity_id):
+                timestamps = duplicate_timestamps(data_dir, index, tz, entity_id, entity, now)
+                for start in range(0, len(timestamps), BULK_BATCH):
+                    batch = timestamps[start:start + BULK_BATCH]
+                    cleanup.soft_delete(index, entity_id, batch, deleted_at=deleted_at, source="duplicates")
+                    deleted += len(batch)
+        except Exception:
+            # Eine Entität darf den Lauf nicht abbrechen: sonst wären die davor markierten ohne
+            # Ergebnisanzeige und damit ohne „Rückgängig“ geblieben.
+            logger.exception("Duplikate entfernen fehlgeschlagen · event=duplicates_remove_failed entity_id=%s", entity_id)
+            failed.append(_entity_label(entity, entity_id))
         if deleted:
+            # Auch bei einem Fehler in einem späteren Stapel: was schon markiert ist, muss rückgängig
+            # zu machen sein.
             mark_duplicates_removed(index, entity_id)
             rows.append({
-                "entity_id": entity_id, "friendly_name": entity["custom_name"] or entity["friendly_name"] or entity_id,
+                "entity_id": entity_id, "friendly_name": _entity_label(entity, entity_id),
                 "count": deleted, "batch_at": deleted_at,
             })
     total = sum(r["count"] for r in rows)
-    return {"rows": rows, "total": total, "total_label": format_int(total)}
+    return {"rows": rows, "failed": failed, "total": total, "total_label": format_int(total)}
 
 
 def undo_duplicate_removal(index: Index, batches: list[tuple[str, float]], entity_lock) -> int:

@@ -32,6 +32,7 @@ from . import hotbuffer, rollup
 from . import resolution as resolution_mod
 from .hotbuffer import append as hot_append
 from .hotbuffer import hot_path, month_key, read_rows
+from .atomic import write_file_atomically
 from .index import Index, filter_deleted_occurrences, resolution_seconds, should_accept_value
 from .paths import entity_dir
 
@@ -938,7 +939,7 @@ def soft_delete(
     deleted_at = started_at if deleted_at is None else deleted_at
     index.mark_deleted(entity_id, timestamps, deleted_at=deleted_at)
     if timestamps:
-        index.invalidate_counter_decrease_snapshot()
+        index.invalidate_counter_decrease_snapshot_for(entity_id)
         index.log_entity_action(
             entity_id, "mark", trigger, started_at, time.time(), "success",
             rows_affected=len(timestamps),
@@ -1240,9 +1241,9 @@ def purge_archived_months(
                     "min_value": [r[2] for r in kept],
                     "max_value": [r[3] for r in kept],
                 })
-                tmp_path = path.with_suffix(".tmp")
-                pq.write_table(kept_table, tmp_path, compression="zstd")
-                tmp_path.replace(path)
+                write_file_atomically(
+                    path, lambda tmp, table=kept_table: pq.write_table(table, tmp, compression="zstd")
+                )
                 rollup.replace_month(
                     data_dir, entity_id, aggregation_type, kept_table, year, month, tz,
                     hourly_rollup=hourly_rollup,
@@ -1351,9 +1352,9 @@ def _rewrite_archive_month(
         "min_value": [r[2] for r in rows],
         "max_value": [r[3] for r in rows],
     })
-    tmp_path = archive_path.with_suffix(".tmp")
-    pq.write_table(table, tmp_path, compression="zstd")
-    tmp_path.replace(archive_path)
+    # Wie die Rotation: eindeutiger Temp-Name, fsync vor dem Umbenennen, Aufräumen bei Fehler
+    # (z. B. Platte voll) — ein fester „.tmp“-Name blieb bei einem Abbruch als Rest liegen.
+    write_file_atomically(archive_path, lambda tmp: pq.write_table(table, tmp, compression="zstd"))
     rollup.replace_month(
         data_dir, entity_id, aggregation_type, table, year, month, tz, hourly_rollup=hourly_rollup
     )
@@ -1502,7 +1503,7 @@ def _invalidate_after_edit(index: Index, entity_id: str) -> None:
     nicht mehr. Ein Ausreißer, den man korrigiert statt gelöscht hat, stünde sonst noch bis zu
     eine Stunde in Zählung und Kennzahlen."""
     index.invalidate_finding_caches(entity_id)
-    index.invalidate_counter_decrease_snapshot()
+    index.invalidate_counter_decrease_snapshot_for(entity_id)
     index.invalidate_value_range(entity_id)
 
 

@@ -75,7 +75,7 @@ from .formatting import (
     format_value,
 )
 from .progress import JobBusy, JobProgress
-from .route_support import MAX_FORM_FIELDS
+from .route_support import MAX_FORM_FIELDS, STORAGE_LOCKED_TIMEOUT_SECONDS
 from .storage import cleanup, rotate
 from .storage import reset as reset_storage
 from .storage.coordinator import StorageCoordinator
@@ -1406,6 +1406,12 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             {"groups": data_quality.findings_for_entity(deps.data_dir, deps.index, deps.tz, entity)},
         )
 
+    def _bounded_entity_lock(entity_id: str):
+        """Entitätssperre mit Zeitbudget für die Sammelaktionen der Datenqualität: während eines Backups
+        oder Imports hinge der Request sonst unbegrenzt; die Entität landet stattdessen unter „nicht
+        verarbeitet“ und die übrigen laufen weiter."""
+        return deps.coordinator.entity(entity_id, timeout=STORAGE_LOCKED_TIMEOUT_SECONDS)
+
     @router.post("/housekeeping/datenqualitaet/duplicates/preview", response_class=HTMLResponse)
     async def data_quality_duplicates_preview(request: Request) -> HTMLResponse:
         """Sammelaktion der Datenqualität, Schritt 1: zeigt je gewählter Entität, wie viele Duplikate
@@ -1415,7 +1421,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         ]
         preview = await run_in_threadpool(
             data_quality.preview_duplicate_removal, deps.data_dir, deps.index, deps.tz, entity_ids,
-            deps.coordinator.entity,
+            _bounded_entity_lock,
         )
         return deps.templates.TemplateResponse(
             request, "_data_quality_bulk.html", {"step": "preview", "bulk": preview}
@@ -1429,7 +1435,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         ]
         done = await run_in_threadpool(
             data_quality.remove_duplicates, deps.data_dir, deps.index, deps.tz, entity_ids,
-            deps.coordinator.entity,
+            _bounded_entity_lock,
         )
         if done["total"]:
             deps.invalidate_purge_preview()
@@ -1450,7 +1456,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             raise HTTPException(status_code=400, detail=tr("Ungültiger Zahlenwert in der Anfrage."))
         restored = await run_in_threadpool(
             data_quality.undo_duplicate_removal, deps.index, list(zip(entity_ids, batch_ats)),
-            deps.coordinator.entity,
+            _bounded_entity_lock,
         )
         if restored:
             deps.invalidate_purge_preview()

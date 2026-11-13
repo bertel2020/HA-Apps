@@ -457,6 +457,31 @@
     document.body.addEventListener('change', e => { if (e.target.name === 'ts') updateSelectedCount(); });
     document.body.addEventListener('htmx:afterSwap', updateSelectedCount);
 
+    // Scheitert eine Aktion, die in die Zeilentabelle schreibt (400 bei zu vielen Feldern, 503 bei
+    // gesperrtem Speicher, 404, Verbindungsabbruch), tauscht htmx nichts aus: der Klick blieb ohne
+    // Rückmeldung. Der Hinweis steht über der Tabelle und verschwindet beim nächsten erfolgreichen Laden.
+    function showRowsError(event) {
+      const target = event.detail && event.detail.target;
+      if (!target || target.id !== 'rows-table') return;
+      let box = document.getElementById('rows-error');
+      if (!box) {
+        box = document.createElement('p');
+        box.id = 'rows-error';
+        box.className = 'add-value-status err';
+        box.setAttribute('role', 'alert');
+        target.parentNode.insertBefore(box, target);
+      }
+      const status = event.detail.xhr && event.detail.xhr.status;
+      box.textContent = status === 503
+        ? t('Der Speicher ist gerade belegt (Sicherung oder Import). Bitte gleich noch einmal versuchen.')
+        : t('Die Aktion ist fehlgeschlagen. Bitte die Seite neu laden und den Stand prüfen.');
+    }
+    ['htmx:responseError', 'htmx:sendError', 'htmx:timeout'].forEach(name => document.body.addEventListener(name, showRowsError));
+    document.body.addEventListener('htmx:afterSwap', event => {
+      const box = document.getElementById('rows-error');
+      if (box && event.target && event.target.id === 'rows-table') box.remove();
+    });
+
     // Die Kennzahl-Spalten (je Kennzahl, NICHT das Tag-Feld — das hat eine
     // feste CSS-Breite, siehe .entity-stats-tag) sollen zwischen "Gesamter
     // Zeitraum" und der ausgewählten Periode exakt fluchten, obwohl beide

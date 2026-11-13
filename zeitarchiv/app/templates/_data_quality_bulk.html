@@ -3,6 +3,9 @@
    gelöscht wird erst nach der Bestätigung, und neu berechnet, nicht aus der Vorschau übernommen. #}
 {% set bulk_url = app_root ~ '/housekeeping/datenqualitaet/duplicates' %}
 <div class="dq-bulk-box">
+  {% if bulk.get('failed') %}
+  <p class="dq-bulk-text">{{ _('Nicht verarbeitet (Fehler oder Speicher gerade gesperrt): {names}. Details im Protokoll.', names=bulk.failed | join(", ")) }}</p>
+  {% endif %}
   {% if step == 'preview' %}
   {% if bulk.rows %}
   <h3 class="eyebrow">{{ _("Duplikate entfernen &mdash; Bestätigung") }}</h3>

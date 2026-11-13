@@ -33,6 +33,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
+from .atomic import write_file_atomically
 from .index import STATE_TYPE
 from .paths import entity_dir
 
@@ -650,7 +651,7 @@ def drop_rows_in_spans(path: Path, dataset_dir: Path | None, spans: list[tuple[f
         if dataset_dir is not None and not any(dataset_dir.iterdir()):
             dataset_dir.rmdir()
         return
-    pq.write_table(table.filter(keep), path, compression="zstd")
+    write_file_atomically(path, lambda tmp: pq.write_table(table.filter(keep), tmp, compression="zstd"))
 
 
 def _remove_rows_for_month(path: Path, tz: ZoneInfo, year: int, month: int) -> None:
