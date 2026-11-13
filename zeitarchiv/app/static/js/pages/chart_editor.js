@@ -2258,6 +2258,19 @@
           // vorliegen (siehe onResolutionChange()/Optionen-Menü, die das nur
           // clientseitig ab jetzt verhindern).
           const dynamicYAxis = this.dynamicYAxis && !singleBucket;
+          // Abstand der Achsen nach der Breite ihrer Beschriftung (Zahl samt Einheit, am größten Wert der Achse
+          // geschätzt): Eine feste Schrittweite ließ Achsen mit „2,756 kWh“ unter die der Nachbarachse laufen.
+          const axisMaxAbs = new Map();
+          chartSeries.forEach((s, i) => {
+            const peak = Math.max(0, ...preparedPoints[i].map(p => Math.abs(p.value)).filter(Number.isFinite));
+            axisMaxAbs.set(axisKey(s), Math.max(axisMaxAbs.get(axisKey(s)) || 0, peak));
+          });
+          const axisWidths = units.map(u => {
+            const text = u === ' duration' ? '00:00:00' : (normalizeActive && barOnlyAxis.has(u) ? '100 %' : `${fmtNum(axisMaxAbs.get(u) || 0, unitDecimals.get(u))} ${axisUnitText(u)}`);
+            return Math.max(55, Math.round(text.length * 7.5 + 22));
+          });
+          const axisOffset = i => { let sum = 0; for (let j = i - 2; j >= 0; j -= 2) sum += axisWidths[j]; return sum; };
+          const sideMargin = side => units.reduce((m, _u, i) => ((i % 2 === 0) === (side === 'left') ? Math.max(m, axisOffset(i)) : m), 0);
           const yAxis = units.map((u, i) => {
             const decimals = unitDecimals.get(u);
             const isDuration = u === ' duration';
@@ -2277,7 +2290,7 @@
               nameTextStyle: axisInk ? {color: axisInk} : undefined,
               nameLocation: 'end',
               position: i % 2 === 0 ? 'left' : 'right',
-              offset: Math.floor(i / 2) * 55,
+              offset: axisOffset(i),
               min: isPercentAxis ? 0 : (axisDynamic ? undefined : value => Math.min(0, value.min)),
               max: isPercentAxis ? 100 : (axisDynamic ? undefined : value => Math.max(0, value.max)),
               // ECharts erzwingt bei einer value-Achse standardmäßig (scale:
@@ -2643,7 +2656,9 @@
             // left 24 statt 10: containLabel misst die breiteste Beschriftung etwas zu knapp, bei langen
             // Werten (z. B. „25,000 ct/kWh“) fehlte links eine Ziffer. AxisFit (axis-fit.js) setzt den Rand
             // nach dem Zeichnen aus der gemessenen Breite; 24 ist der Wert fürs erste Bild.
-            grid: {left: 24, right: 10, top: 28, bottom: 40, containLabel: true},
+            // Versetzte Achsen (mehrere Einheiten oder „Eigene Achse“) liegen außerhalb des gemessenen Rands: ihr
+            // Abstand kommt je Seite dazu, sonst wird die äußere Beschriftung abgeschnitten.
+            grid: {left: 24 + sideMargin('left'), right: 10 + sideMargin('right'), top: 28, bottom: 40, containLabel: true},
             // min/max explizit auf das Abfragefenster fixiert, statt ECharts
             // per Default auf den tatsächlichen Datenbereich auto-fitten zu
             // lassen — sonst hört die Achse (und damit sichtbar der Chart) beim

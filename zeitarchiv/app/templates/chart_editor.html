@@ -169,7 +169,7 @@
                   <span class="id" x-text="id"></span>
                 </span>
                 <input type="text" :placeholder="labelFor(id)" x-model="entityNames[id]" @input="render()">
-                <select class="entity-name-stack" x-show="canChooseKind(id)" x-cloak
+                <select class="entity-name-stack entity-name-kind" x-show="canChooseKind(id)" x-cloak
                         :value="kindValue(id)" @change="setSeriesKind(id, $event.target.value)"
                         title="{{ _('Darstellung') }}" aria-label="{{ _('Darstellung') }}">
                   <option value="auto" :selected="kindValue(id) === 'auto'" x-text="t('Auto') + ' (' + (autoKindFor(id) === 'bar' ? t('Balken') : t('Linie')) + ')'"></option>
