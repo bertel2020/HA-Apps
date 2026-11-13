@@ -18,6 +18,7 @@ import json
 import statistics
 import time
 from collections import deque
+from contextlib import contextmanager
 from collections.abc import Callable, Collection, Iterable, Iterator
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -305,6 +306,7 @@ def analyze_raw_rows_page(
     counter_decrease_enabled: bool = False,
     outlier_mode: str = "standard",
     match_window: tuple[int, int] | None = None,
+    collect: dict[str, int] | None = None,
 ) -> dict:
     """Analysiert beliebig viele sortierte Rohwerte mit begrenztem Speicher.
 
@@ -318,6 +320,11 @@ def analyze_raw_rows_page(
     sonst alle als Wörterbücher im Speicher), rechnet die Funktion zweimal: erst
     nur zum Zählen, dann mit ``match_window`` — den chronologischen Indizes
     [von, bis) der Treffer, die die Seite zeigt. Behalten wird dann nur dieses Fenster.
+
+    ``collect`` ({Filter: Höchstzahl}) sammelt in DEMSELBEN Durchlauf für mehrere Filter zugleich die jeweils
+    neuesten Treffer (Ergebnis unter ``"collected"``: {Filter: {"rows": neueste zuerst, "total": Treffer}}). Die
+    aufgeklappte Zeile der Datenqualität brauchte dafür je Kategorie einen eigenen Durchlauf, gemessen 18–80 s
+    an Entitäten mit 1,5–3,9 Mio. Zeilen. Mit ``filter_="none"`` wird daneben nichts für die Seite behalten.
 
     ``outlier_factor`` ist ein VIELFACHES des für diese Entität Üblichen (nicht
     mehr ein Prozentsatz), ``outlier_mode`` wählt die Bezugsgröße dafür —
@@ -346,6 +353,8 @@ def analyze_raw_rows_page(
             match_window=(max(0, upper - page_size), upper), **options,
         )
     retained: deque[dict] = deque(maxlen=requested_page * page_size)
+    collected = {name: deque(maxlen=limit) for name, limit in (collect or {}).items()}
+    collected_totals = dict.fromkeys(collected, 0)
     gap_seconds = (
         gap_threshold_minutes * 60 if gap_threshold_minutes is not None else None
     )
@@ -385,7 +394,7 @@ def analyze_raw_rows_page(
     )
 
     selected_filter = filter_ if filter_ in {
-        "all", "outliers", "gaps", "duplicates", "repetitions", "counter_decreases"
+        "all", "outliers", "gaps", "duplicates", "repetitions", "counter_decreases", "none"
     } else "all"
 
     def flush_group() -> None:
@@ -408,6 +417,16 @@ def analyze_raw_rows_page(
             counts["duplicates"] += len(group_rows)
             count_day(group_ts, "duplicates", len(group_rows))
 
+        def hits(name: str, repetition_reason: str | None, counter_decrease_reason: str | None) -> bool:
+            return (
+                name == "all"
+                or (name == "outliers" and group_outlier is not None)
+                or (name == "gaps" and group_gap is not None)
+                or (name == "duplicates" and duplicate_reason is not None)
+                or (name == "repetitions" and repetition_reason is not None)
+                or (name == "counter_decreases" and counter_decrease_reason is not None)
+            )
+
         for row in group_rows:
             repetition_reason = row.pop("repetition_reason")
             counter_decrease_reason = row.pop("counter_decrease_reason")
@@ -417,18 +436,9 @@ def analyze_raw_rows_page(
             if counter_decrease_reason is not None:
                 counts["counter_decreases"] += 1
                 count_day(group_ts, "counter_decreases")
-            row_matches = (
-                selected_filter == "all"
-                or (selected_filter == "outliers" and group_outlier is not None)
-                or (selected_filter == "gaps" and group_gap is not None)
-                or (selected_filter == "duplicates" and duplicate_reason is not None)
-                or (selected_filter == "repetitions" and repetition_reason is not None)
-                or (
-                    selected_filter == "counter_decreases"
-                    and counter_decrease_reason is not None
-                )
-            )
-            if row_matches:
+            row_matches = hits(selected_filter, repetition_reason, counter_decrease_reason)
+            wanted = [name for name in collected if hits(name, repetition_reason, counter_decrease_reason)]
+            if row_matches or wanted:
                 row["flags"] = [
                     {"label": label, "reason": reason}
                     for label, reason in (
@@ -440,6 +450,10 @@ def analyze_raw_rows_page(
                     )
                     if reason is not None
                 ]
+                for name in wanted:
+                    collected_totals[name] += 1
+                    collected[name].append(row)
+            if row_matches:
                 if match_window is None or match_window[0] <= total_matches < match_window[1]:
                     retained.append(row)
                 total_matches += 1
@@ -506,7 +520,13 @@ def analyze_raw_rows_page(
     start_index = (actual_page - 1) * page_size
     # Mit match_window besteht ``retained`` schon aus genau dieser Seite.
     page_rows = newest_first if match_window is not None else newest_first[start_index : start_index + page_size]
+    extra = {
+        "collected": {
+            name: {"rows": list(reversed(found)), "total": collected_totals[name]} for name, found in collected.items()
+        }
+    } if collect else {}
     return {
+        **extra,
         "rows": page_rows,
         "counts": counts,
         "daily": daily,
@@ -1378,31 +1398,32 @@ def purge_archived_months(
                 continue
 
             old_size = path.stat().st_size
-            if kept:
-                kept_table = pa.table({
-                    "ts": [r[0] for r in kept],
-                    "value": [r[1] for r in kept],
-                    "min_value": [r[2] for r in kept],
-                    "max_value": [r[3] for r in kept],
-                })
-                write_file_atomically(
-                    path, lambda tmp, table=kept_table: pq.write_table(table, tmp, compression="zstd")
-                )
-                rollup.replace_month(
-                    data_dir, entity_id, aggregation_type, kept_table, year, month, tz,
-                    hourly_rollup=hourly_rollup,
-                )
-                new_size = path.stat().st_size
-            else:
-                # Jeder Rohwert dieses Monats war weich gelöscht — Archivdatei
-                # und zugehörige Rollup-Zeilen komplett entfernen statt eine
-                # leere Parquet-Datei/eine Monats-Zeile ohne Grundlage zu behalten.
-                path.unlink()
-                rollup.remove_month(
-                    data_dir, entity_id, aggregation_type, year, month, tz, hourly_rollup=hourly_rollup
-                )
-                new_size = 0
-                entity_had_emptied_month = True
+            with _rollup_pending(path):
+                if kept:
+                    kept_table = pa.table({
+                        "ts": [r[0] for r in kept],
+                        "value": [r[1] for r in kept],
+                        "min_value": [r[2] for r in kept],
+                        "max_value": [r[3] for r in kept],
+                    })
+                    write_file_atomically(
+                        path, lambda tmp, table=kept_table: pq.write_table(table, tmp, compression="zstd")
+                    )
+                    rollup.replace_month(
+                        data_dir, entity_id, aggregation_type, kept_table, year, month, tz,
+                        hourly_rollup=hourly_rollup,
+                    )
+                    new_size = path.stat().st_size
+                else:
+                    # Jeder Rohwert dieses Monats war weich gelöscht — Archivdatei
+                    # und zugehörige Rollup-Zeilen komplett entfernen statt eine
+                    # leere Parquet-Datei/eine Monats-Zeile ohne Grundlage zu behalten.
+                    path.unlink()
+                    rollup.remove_month(
+                        data_dir, entity_id, aggregation_type, year, month, tz, hourly_rollup=hourly_rollup
+                    )
+                    new_size = 0
+                    entity_had_emptied_month = True
 
             index.add_row_count(entity_id, -removed)
             index.add_size_bytes(entity_id, new_size - old_size)
@@ -1472,6 +1493,54 @@ def read_values_for_timestamps(
 # (derselbe Ablauf wie purge_archived_months() oben).
 
 
+# Marker neben einer Archivdatei, solange deren Rollup-Zeilen noch nicht zu ihr passen. Das Neuschreiben eines
+# Archivmonats besteht aus zwei Dateioperationen (Archiv ersetzen, Rollup neu berechnen), die sich nicht atomar
+# zusammenfassen lassen: ein Absturz dazwischen ließ den Monat ohne oder mit veralteten Rollup-Zeilen zurück,
+# die Zahlen in Charts und Statistik wichen dann von den Rohdaten ab, ohne dass etwas darauf hinwies.
+PENDING_ROLLUP_SUFFIX = ".rollup-pending"
+
+
+@contextmanager
+def _rollup_pending(archive_path: Path):
+    """Legt den Marker an, bevor das Archiv angefasst wird, und entfernt ihn erst, wenn auch das Rollup neu
+    berechnet ist. Bei einem Fehler bleibt er stehen; repair_pending_rollups() holt das beim nächsten Start nach."""
+    marker = archive_path.with_suffix(PENDING_ROLLUP_SUFFIX)
+    archive_path.parent.mkdir(parents=True, exist_ok=True)
+    marker.touch()
+    yield
+    marker.unlink(missing_ok=True)
+
+
+def repair_pending_rollups(data_dir: Path, index: Index, tz: ZoneInfo) -> int:
+    """Rechnet die Rollup-Zeilen jedes Monats neu, dessen Marker noch liegt (Absturz oder Fehler zwischen
+    Archiv und Rollup, siehe _rollup_pending), aus der Archivdatei, wie sie jetzt ist; fehlt die Datei (der
+    Monat wurde ganz entfernt), werden seine Rollup-Zeilen entfernt. Idempotent. Gibt die Zahl der Monate zurück."""
+    repaired = 0
+    archive_root = data_dir / "archive"
+    for marker in sorted(archive_root.glob(f"*/*{PENDING_ROLLUP_SUFFIX}")):
+        entity = index.get_entity(marker.parent.name)
+        try:
+            year, month = int(marker.stem[:4]), int(marker.stem[5:7])
+        except ValueError:
+            marker.unlink(missing_ok=True)
+            continue
+        if entity is not None:
+            archive_path = marker.with_suffix(".parquet")
+            hourly = bool(entity["hourly_rollup"])
+            if archive_path.exists():
+                rollup.replace_month(
+                    data_dir, entity["entity_id"], entity["aggregation_type"], pq.read_table(archive_path),
+                    year, month, tz, hourly_rollup=hourly,
+                )
+            else:
+                rollup.remove_month(
+                    data_dir, entity["entity_id"], entity["aggregation_type"], year, month, tz, hourly_rollup=hourly,
+                )
+        marker.unlink(missing_ok=True)
+        repaired += 1
+    return repaired
+
+
 def _rewrite_archive_month(
     data_dir: Path, index: Index, entity_id: str, aggregation_type: str,
     rows: list[tuple[float, float, float | None, float | None]],
@@ -1496,12 +1565,13 @@ def _rewrite_archive_month(
         "min_value": [r[2] for r in rows],
         "max_value": [r[3] for r in rows],
     })
-    # Wie die Rotation: eindeutiger Temp-Name, fsync vor dem Umbenennen, Aufräumen bei Fehler
-    # (z. B. Platte voll) — ein fester „.tmp“-Name blieb bei einem Abbruch als Rest liegen.
-    write_file_atomically(archive_path, lambda tmp: pq.write_table(table, tmp, compression="zstd"))
-    rollup.replace_month(
-        data_dir, entity_id, aggregation_type, table, year, month, tz, hourly_rollup=hourly_rollup
-    )
+    with _rollup_pending(archive_path):
+        # Wie die Rotation: eindeutiger Temp-Name, fsync vor dem Umbenennen, Aufräumen bei Fehler
+        # (z. B. Platte voll) — ein fester „.tmp“-Name blieb bei einem Abbruch als Rest liegen.
+        write_file_atomically(archive_path, lambda tmp: pq.write_table(table, tmp, compression="zstd"))
+        rollup.replace_month(
+            data_dir, entity_id, aggregation_type, table, year, month, tz, hourly_rollup=hourly_rollup
+        )
     new_size = archive_path.stat().st_size
     index.add_size_bytes(entity_id, new_size - old_size)
 

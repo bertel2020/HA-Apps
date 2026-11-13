@@ -258,7 +258,8 @@ def test_archive_rewrite_is_atomic_and_leaves_no_residue_on_failure(env, monkeyp
         cleanup.add_raw_value(tmp, index, entity_id, ts + 60, 2.0, TZ, now=datetime(2024, 8, 15, tzinfo=TZ))
 
     assert path.read_bytes() == original  # Archivmonat unverändert
-    assert [p.name for p in archive_dir.iterdir()] == ["2024-07.parquet"]  # kein Temp-Rest
+    # kein Temp-Rest; der Marker bleibt bewusst, der Start rechnet das Rollup des Monats dann neu (siehe unten)
+    assert sorted(p.name for p in archive_dir.iterdir()) == ["2024-07.parquet", "2024-07.rollup-pending"]
 
 
 def _entity_with_duplicates(tmp, index, entity_id: str) -> None:
@@ -550,3 +551,62 @@ def test_both_outlier_paths_agree_on_a_level_change() -> None:
         gap_threshold_minutes=None, outlier_factor=20.0, tz=TZ,
     )
     assert {row["ts"] for row in streamed["rows"]} == listed
+
+
+def test_interrupted_archive_rewrite_gets_its_rollup_back_at_startup(env, monkeypatch) -> None:
+    from app.storage import rollup
+
+    tmp, index = env
+    entity_id = "sensor.a"
+    index.get_or_create_entity(entity_id, "sensor", "measurement", "W")
+    base = _ts(2024, 7, 5, 8)
+    archive_dir = tmp / "archive" / entity_id
+    archive_dir.mkdir(parents=True)
+    path = archive_dir / "2024-07.parquet"
+    pq.write_table(pa.table({"ts": [base, base + 60], "value": [1.0, 3.0]}), path)
+    now = datetime(2024, 8, 15, tzinfo=TZ)
+
+    real_replace = rollup.replace_month
+
+    def crash(*_args, **_kwargs):
+        raise OSError("Absturz zwischen Archiv und Rollup")
+
+    monkeypatch.setattr(rollup, "replace_month", crash)
+    with pytest.raises(OSError):
+        cleanup.add_raw_value(tmp, index, entity_id, base + 120, 5.0, TZ, now=now)
+    monkeypatch.setattr(rollup, "replace_month", real_replace)
+
+    # Das Archiv hat den neuen Wert schon, das Rollup nicht; der Marker zeigt das an.
+    assert pq.read_table(path).num_rows == 3
+    assert (archive_dir / "2024-07.rollup-pending").exists()
+
+    assert cleanup.repair_pending_rollups(tmp, index, TZ) == 1
+    assert not (archive_dir / "2024-07.rollup-pending").exists()
+    assert cleanup.repair_pending_rollups(tmp, index, TZ) == 0  # idempotent
+    assert pq.read_table(path).num_rows == 3  # das Archiv selbst bleibt unberührt
+
+
+def test_collect_gathers_several_filters_in_one_pass() -> None:
+    start = 1_700_000_000.0
+    rows = [(start + i * 60.0, 20.0 + (i % 5) * 0.1) for i in range(60)]
+    rows[30] = (rows[30][0], 500.0)  # Ausreißer
+    rows.insert(10, rows[10])  # Duplikat
+    calls = []
+
+    def factory():
+        calls.append(1)
+        return iter(rows)
+
+    result = cleanup.analyze_raw_rows_page(
+        factory, filter_="none", page=1, page_size=1, gap_threshold_minutes=None,
+        outlier_factor=20.0, tz=TZ, collect={"outliers": 5, "duplicates": 1000},
+    )
+    assert len(calls) == 2  # Zählen und Analysieren, unabhängig von der Zahl der Kategorien
+    assert result["collected"]["outliers"]["total"] >= 1
+    assert result["collected"]["duplicates"]["total"] == 2
+    single = cleanup.analyze_raw_rows_page(
+        lambda: iter(rows), filter_="outliers", page=1, page_size=5, gap_threshold_minutes=None,
+        outlier_factor=20.0, tz=TZ,
+    )
+    assert [row["ts"] for row in result["collected"]["outliers"]["rows"]] == [row["ts"] for row in single["rows"]]
+    assert result["rows"] == []  # filter_="none" behält nichts für die Seite

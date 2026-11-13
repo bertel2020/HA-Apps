@@ -514,9 +514,11 @@ def findings_for_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now:
     entry = index.get_cleanup_alltime_stats(entity_id)
     cached = (entry or {}).get("counts") or {}
     start = datetime.fromtimestamp(entity["first_ts"], tz) if entity["first_ts"] else now
-    groups = []
-    # Jede Kategorie liest die Historie zweimal (Zählen, Sammeln); den laufenden Monat nur einmal einlesen.
+    # Der laufende Monat wird über alle Kategorien nur einmal eingelesen.
     read_cache = QueryReadCache()
+    # Welche Kategorien überhaupt gesucht werden müssen: die ausgeschalteten und die, die der Cache schon mit 0
+    # kennt, nicht.
+    wanted: list[dict] = []
     for column in COLUMNS:
         key = column["key"]
         if key == "counter_decreases" and not counter_enabled:
@@ -535,31 +537,41 @@ def findings_for_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now:
             cache_valid = True
         if cached and cache_valid and not cached.get(column["filter"]):
             continue
+        wanted.append(column)
+    if not wanted:
+        return []
 
-        def rows_factory():
-            return cleanup.iter_raw_rows(
-                data_dir, index, entity_id, start.timestamp(), now.timestamp(), tz, now=now,
-                hot_rows_loader=read_cache.read_hot_rows,
-            )
-
-        analysis = cleanup.analyze_raw_rows_page(
-            rows_factory,
-            filter_=column["filter"],
-            page=1,
-            # Duplikate: ein Zeitstempel belegt mindestens zwei Zeilen, deshalb mehr
-            # holen und unten je Zeitstempel zu einem Eintrag zusammenfassen.
-            page_size=1000 if key == "duplicates" else DETAIL_LIMIT,
-            gap_threshold_minutes=None if gap_threshold == "off" else float(gap_threshold),
-            outlier_factor=None if outlier_threshold == "off" else float(outlier_threshold),
-            tz=tz,
-            decimals=decimals,
-            counter_decrease_enabled=counter_enabled,
-            outlier_mode=cleanup_stats.outlier_mode(entity),
+    def rows_factory():
+        return cleanup.iter_raw_rows(
+            data_dir, index, entity_id, start.timestamp(), now.timestamp(), tz, now=now,
+            hot_rows_loader=read_cache.read_hot_rows,
         )
-        total = analysis["pagination"]["total"]
+
+    # EIN Durchlauf für alle gesuchten Kategorien (analyze_raw_rows_page, ``collect``). Je Kategorie ein eigener
+    # Durchlauf brauchte an großen Entitäten 18–80 Sekunden, bei Klick auf die Zeile.
+    analysis = cleanup.analyze_raw_rows_page(
+        rows_factory,
+        filter_="none",
+        page=1,
+        page_size=1,
+        gap_threshold_minutes=None if gap_threshold == "off" else float(gap_threshold),
+        outlier_factor=None if outlier_threshold == "off" else float(outlier_threshold),
+        tz=tz,
+        decimals=decimals,
+        counter_decrease_enabled=counter_enabled,
+        outlier_mode=cleanup_stats.outlier_mode(entity),
+        # Duplikate: ein Zeitstempel belegt mindestens zwei Zeilen, deshalb mehr holen und unten je
+        # Zeitstempel zu einem Eintrag zusammenfassen.
+        collect={column["filter"]: 1000 if column["key"] == "duplicates" else DETAIL_LIMIT for column in wanted},
+    )
+    groups = []
+    for column in wanted:
+        key = column["key"]
+        result = analysis["collected"][column["filter"]]
+        total = result["total"]
         if not total:
             continue
-        found = analysis["rows"]
+        found = result["rows"]
         if key == "duplicates":
             # Jedes Paar kommt als zwei Zeilen mit gleichem Zeitstempel (und gleicher
             # Begründung "2× derselbe Zeitstempel"); eine genügt. Gezählt bleiben
@@ -614,7 +626,7 @@ def duplicate_timestamps(
     data_dir: Path, index: Index, tz: ZoneInfo, entity_id: str, entity, now: datetime | None = None
 ) -> list[float]:
     """Zeitstempel, die "Duplikate entfernen" in dieser Entität löschen würde (je Zeitstempel bleibt
-    das älteste Vorkommen). Aufrufer hält den Entitäts-Lock."""
+    das letzte Vorkommen, also der größte Wert). Aufrufer hält den Entitäts-Lock."""
     now = now or datetime.now(tz)
     return [ts for ts, _value in cleanup.duplicate_rows_to_delete(_alltime_rows(data_dir, index, tz, entity_id, entity, now))]
 

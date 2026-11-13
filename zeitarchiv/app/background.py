@@ -1262,6 +1262,21 @@ class BackgroundService:
         # bräuchte jede bestehende Installation ein manuelles erneutes Speichern
         # des Setup-Formulars, damit der rückwirkende Backfill überhaupt anläuft.
         sync_hourly_rollup_flags_for_current_config(self.energiedashboard_service)
+        # Einmalig beim Start: Archivmonate, bei denen das Neuschreiben zwischen Archivdatei und Rollup
+        # unterbrochen wurde (Marker neben der Archivdatei, siehe cleanup._rollup_pending), bekommen ihre
+        # Rollup-Zeilen aus der Archivdatei neu berechnet. Ohne Marker kostet der Lauf ein Verzeichnis-Listing.
+        try:
+            repaired = cleanup.repair_pending_rollups(self.data_dir, self.index, self.tz)
+            if repaired:
+                logger.warning(
+                    "Rollups unterbrochener Archiv-Änderungen neu berechnet · "
+                    "event=pending_rollups_repaired months=%d", repaired,
+                )
+        except Exception:
+            logger.exception(
+                "Rollups unterbrochener Archiv-Änderungen konnten nicht neu berechnet werden · "
+                "event=pending_rollups_repair_failed"
+            )
         # Einmalig beim Start: compact_raw_values() räumte deleted_points bisher
         # nicht auf (Fund vom 18.09.2026) — für jeden VOR diesem Fix bereits
         # verdichteten Monat holt das die seither verwaisten Markierungen nach.
