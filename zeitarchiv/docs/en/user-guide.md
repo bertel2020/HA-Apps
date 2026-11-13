@@ -1924,6 +1924,11 @@ Fifteen values as the window means: a slowly drifting signal does **not**
 stand out, because the reference moves along. Only what breaks out of its
 immediate neighborhood stands out.
 
+A **lasting level change** (a cloud over the system, an appliance switching on)
+counts as **one** jump: the first value is marked, the following ones on the new
+level are not, as long as they stay close to it. Only a value in the usual range
+ends the jump.
+
 **Why a multiple and not a percentage?** Because a percentage means different
 things on two sensors of the same kind. 5 % is a full 0.6 on a freshly
 connected counter (reading 12) and a full 60,000 on an old one (reading

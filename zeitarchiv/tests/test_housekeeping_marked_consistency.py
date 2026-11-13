@@ -518,3 +518,35 @@ def test_matrix_loads_daily_counts_only_for_a_time_window(env, monkeypatch) -> N
     data_quality.build_matrix(index, period="7d")
     # Der erste Aufruf jeder Matrix lädt die Einträge; die Quoten-Auswertung danach braucht nie Tageszähler.
     assert seen[0] is False and seen[after_all] is True
+
+
+def _noisy(count, base=20.0):
+    return [base + (i % 5) * 0.1 for i in range(count)]
+
+
+def test_a_lasting_level_change_is_marked_once() -> None:
+    values = _noisy(20) + [100.0 + (i % 3) * 0.1 for i in range(12)] + _noisy(12, 100.0)
+    rows = _counter_rows(values)
+    flagged = cleanup.detect_outliers(rows, 20, decimals="auto", tz=TZ)
+    # Der Sprung auf 100 wird markiert, seine Fortsetzung nicht (früher etwa die Hälfte des Fensters, 7–8 Werte).
+    assert list(flagged) == [rows[20][0]]
+
+
+def test_a_single_spike_and_a_second_level_change_are_still_marked() -> None:
+    values = _noisy(20) + [500.0] + _noisy(20) + [900.0] * 3 + [20.0] * 4
+    rows = _counter_rows(values)
+    flagged = cleanup.detect_outliers(rows, 20, decimals="auto", tz=TZ)
+    assert rows[20][0] in flagged  # die Spitze
+    assert rows[41][0] in flagged  # der neue Sprung nach Rückkehr ins Übliche zählt wieder
+    assert rows[42][0] not in flagged and rows[43][0] not in flagged  # seine Fortsetzung nicht
+
+
+def test_both_outlier_paths_agree_on_a_level_change() -> None:
+    values = _noisy(20) + [100.0 + (i % 3) * 0.1 for i in range(12)]
+    rows = _counter_rows(values)
+    listed = set(cleanup.detect_outliers(rows, 20, decimals="auto", tz=TZ))
+    streamed = cleanup.analyze_raw_rows_page(
+        lambda: iter(rows), filter_="outliers", page=1, page_size=100,
+        gap_threshold_minutes=None, outlier_factor=20.0, tz=TZ,
+    )
+    assert {row["ts"] for row in streamed["rows"]} == listed

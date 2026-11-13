@@ -89,7 +89,7 @@ def list_raw_rows(
 # aktuelle Quote — gemessen: 2.406 von 52.194 markierten Werten an einer
 # Entität, an der die neue Regel 0 findet. Die Schwelle allein kann eine
 # Zählung also nicht ausweisen; erst Schwelle UND Regel zusammen tun das.
-OUTLIER_RULE_VERSION = 3
+OUTLIER_RULE_VERSION = 4
 
 # Ausreißer-Erkennung: Fenstergrößen der beiden Regeln (Begründung und
 # Messwerte siehe OutlierDetector).
@@ -156,14 +156,25 @@ class OutlierDetector:
         |Wert − Median| > Faktor × MAD (Median der absoluten Abweichungen)
         über die letzten ``OUTLIER_WINDOW`` Werte.
 
+        Ein Niveauwechsel zählt einmal: Werte, die nahe am zuletzt markierten
+        Wert liegen, setzen denselben Sprung nur fort und werden nicht erneut
+        markiert, bis ein Wert wieder im üblichen Bereich liegt.
+
         Das ist skalen- UND nullpunktunabhängig: dieselbe Kurve in °C, in
         Kelvin und um null herum ergibt exakt dieselben Markierungen — was
         die Prozentfassung nicht konnte (ein Sprung 20 → 60 sind in °C 200 %,
         in Kelvin 13,6 %).
 
-    Was die Regel NICHT kann: ist der MAD null (15 identische Werte in Folge),
-    gibt es kein "üblich", an dem sich ein Vielfaches messen ließe — dann wird
-    übersprungen statt geraten. Dasselbe gilt für einen stillstehenden Zähler.
+    Was die Regel NICHT kann: ist der MAD null, gibt es kein "üblich", an dem
+    sich ein Vielfaches messen ließe — dann wird übersprungen statt geraten.
+    Das ist schon der Fall, wenn mehr als die Hälfte der letzten 15 Werte
+    identisch ist (nicht erst bei 15 identischen), bei groben Sensoren also
+    öfter, als man erwartet (gemessen an echten Daten: Windgeschwindigkeit
+    57 %, Außentemperatur im Winter 23 %, Leistungssensoren praktisch nie).
+    Eine Untergrenze für die Streuung (Auflösung oder kleinster Wertsprung)
+    änderte an diesen Daten keine einzige Markierung, siehe
+    CHANGELOG_INTERNAL.md; deshalb gibt es sie nicht. Dasselbe gilt für einen
+    stillstehenden Zähler.
     """
 
     def __init__(
@@ -179,6 +190,9 @@ class OutlierDetector:
         self._previous: float | None = None
         self._previous_ts: float | None = None
         self._low_seen = 0
+        # Letzter Wert, der weit vom Üblichen lag (Regel „standard“): Folgewerte auf demselben neuen Niveau
+        # sind keine weiteren Ausreißer, siehe _check_standard().
+        self._last_far: float | None = None
 
     def check(self, ts: float, value: float) -> str | None:
         """Begründung, wenn `value` ein Ausreißer ist — sonst None. Muss für
@@ -250,7 +264,18 @@ class OutlierDetector:
             mitte = statistics.median(self._values)
             streuung = statistics.median([abs(v - mitte) for v in self._values])
             abstand = abs(value - mitte)
-            if streuung > 0 and abstand > self.factor * streuung:
+            weit = streuung > 0 and abstand > self.factor * streuung
+            # Ein dauerhafter Niveauwechsel (Wolke über der Anlage, ein Gerät schaltet) ist EIN Sprung: der
+            # markierte Wert geht ins Fenster, der Median zieht erst nach etwa der Hälfte der Werte nach, und
+            # jeder Folgewert auf dem neuen Niveau wäre wieder „weit“ vom alten Median. Liegt er nahe am
+            # zuletzt weit entfernten Wert, ist das die Fortsetzung desselben Sprungs und keine neue Markierung.
+            # Gemessen an echten Leistungssensoren lagen 70–80 % der Markierungen in solchen Läufen.
+            fortsetzung = (
+                weit and self._last_far is not None
+                and abs(value - self._last_far) <= self.factor * streuung
+            )
+            self._last_far = value if weit else None
+            if weit and not fortsetzung:
                 grund = (
                     tr("{_format_val} liegt {_format_factor} weiter vom Median der letzten {len} Werte ({_format_val2}) entfernt als üblich (±{_format_val3}){_vorwert}", _format_val=_format_val(value, self.decimals), _format_factor=_format_factor(abstand / streuung), len=len(self._values), _format_val2=_format_val(mitte, self.decimals), _format_val3=_format_val(streuung, self.decimals), _vorwert=self._vorwert())
                 )

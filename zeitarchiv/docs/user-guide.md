@@ -2078,6 +2078,11 @@ Fünfzehn Werte als Fenster bedeutet: ein langsam driftendes Signal fällt
 **nicht** auf, weil der Bezug mitwandert. Auffällig ist nur, wer aus seiner
 unmittelbaren Nachbarschaft ausbricht.
 
+Ein **dauerhafter Niveauwechsel** (eine Wolke über der Anlage, ein Gerät schaltet
+ein) zählt als **ein** Sprung: der erste Wert wird markiert, die folgenden auf dem
+neuen Niveau nicht, solange sie nahe an ihm liegen. Erst ein Wert im üblichen
+Bereich beendet den Sprung.
+
 **Warum ein Vielfaches und kein Prozentsatz?** Weil ein Prozentsatz auf zwei
 Sensoren derselben Art Verschiedenes bedeutet. 5 % sind bei einem frisch
 angeschlossenen Zähler (Stand 12) ganze 0,6 und bei einem alten (Stand
