@@ -21,7 +21,7 @@ def test_the_tile_groups_duration_series_onto_their_own_axis() -> None:
     display_mode=time bekommen einen synthetischen Achsen-Schlüssel statt
     ihrer echten (meist leeren) unit."""
     assert "isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time'" in TILES_JS
-    assert "axisKey = s => isDurationSeries(s) ? ' duration' : s.unit" in TILES_JS
+    assert "axisKey = s => isDurationSeries(s) ? ' duration' : (ownAxis(s)" in TILES_JS
     assert "units.indexOf(axisKey(s))" in TILES_JS
 
 

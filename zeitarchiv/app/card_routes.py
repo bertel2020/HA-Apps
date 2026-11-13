@@ -110,6 +110,7 @@ def chart_spec(chart: dict, chart_type: str) -> dict[str, str]:
         "hiddenEntityIds": json.dumps(chart["hidden_entity_ids"]),
         "seriesColors": json.dumps(chart["series_colors"]),
         "stackGroups": json.dumps(chart.get("stack_groups") or {}),
+        "seriesStyle": json.dumps(chart.get("series_style") or {}),
         "heatmapStates": json.dumps(chart["heatmap_states"]),
         "compareSettings": json.dumps(chart["compare_settings"]) if chart["compare_settings"] else "",
         "periodAnchor": chart["period_anchor"] or "",
@@ -186,7 +187,7 @@ def ad_hoc_chart(entity_ids: list[str], period: str, style: str) -> dict:
     range_key, continuous = PERIODS[period]
     return {
         "id": None, "name": None, "entity_ids": entity_ids, "entity_names": {}, "hidden_entity_ids": [],
-        "series_colors": {}, "stack_groups": {}, "heatmap_states": {}, "compare_settings": {}, "period_anchor": None,
+        "series_colors": {}, "stack_groups": {}, "series_style": {}, "heatmap_states": {}, "compare_settings": {}, "period_anchor": None,
         "range_key": range_key, "continuous": continuous, "resolution_preset": "auto", "dynamic_y_axis": True,
         "chart_type": "auto", "donut_aggregation": "sum", "show_values": False, "decimals": "auto",
         "average_line": False, "average_style": "flat", "area_fill": True, "show_points": False,
@@ -269,6 +270,10 @@ def create_card_router(
         base = {
             "entity_ids": ",".join(visible), "range": range_key, "offset": offset, "continuous": chart["continuous"],
             "year_over_year": False, "at": at,
+            "kinds": ",".join(
+                f"{entity_id}:{style['kind']}" for entity_id, style in (chart.get("series_style") or {}).items()
+                if entity_id in visible and style.get("kind")
+            ),
         }
         plain = {"compare": False, "compare_mode": "previous", "raw": False, "previous_years": 1}
         timeline = chart_type == "timeline"

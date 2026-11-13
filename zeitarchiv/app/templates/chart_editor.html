@@ -169,6 +169,18 @@
                   <span class="id" x-text="id"></span>
                 </span>
                 <input type="text" :placeholder="labelFor(id)" x-model="entityNames[id]" @input="render()">
+                <select class="entity-name-stack" x-show="canChooseKind(id)" x-cloak
+                        :value="kindValue(id)" @change="setSeriesKind(id, $event.target.value)"
+                        title="{{ _('Darstellung') }}" aria-label="{{ _('Darstellung') }}">
+                  <option value="auto" :selected="kindValue(id) === 'auto'" x-text="t('Auto') + ' (' + (autoKindFor(id) === 'bar' ? t('Balken') : t('Linie')) + ')'"></option>
+                  <option value="bar" :selected="kindValue(id) === 'bar'">{{ _("Balken") }}</option>
+                  <option value="line" :selected="kindValue(id) === 'line'">{{ _("Linie") }}</option>
+                </select>
+                <label class="entity-name-axis" x-show="canChooseKind(id) && isLineId(id)" x-cloak
+                       title="{{ _('Die Linie bekommt eine eigene Achse, ihre Skala richtet sich nur nach ihr') }}">
+                  <input type="checkbox" :checked="ownAxisOn(id)" @change="setSeriesAxis(id, $event.target.checked)">
+                  <span>{{ _("Eigene Achse") }}</span>
+                </label>
                 <select class="entity-name-stack" x-show="stacked && canStack && isBarId(id)" x-cloak
                         :value="stackValue(id)" @change="setStack(id, $event.target.value)"
                         title="{{ _('Stapel') }}" aria-label="{{ _('Stapel') }}">
@@ -1101,6 +1113,7 @@
     const SERIES_COLORS = {{ series_colors | default({}) | tojson }};
     // Mehrere Stapel {groups: [{id, name}], members: {entity_id: id}}.
     const STACK_GROUPS = {{ stack_groups | default({}) | tojson }};
+    const SERIES_STYLE = {{ series_style | default({}) | tojson }};
     const ENTITY_OPTIONS = {{ entity_options | tojson }};
     const RESOLUTION_PRESET = {{ resolution_preset | tojson }};
     const DYNAMIC_Y_AXIS = {{ dynamic_y_axis | tojson }};

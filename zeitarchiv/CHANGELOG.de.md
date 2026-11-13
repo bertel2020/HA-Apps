@@ -41,6 +41,16 @@
   - Gilt auch auf Dashboards und in der Karte; ohne Auswahl bleibt alles wie
     bisher in einem Stapel
 
+- **Charts**: Linie oder Balken je Serie
+  - In „Ausgewählt“ hat jede Zeile eines Zählers oder Messwerts ein Feld „Darstellung“: Auto, Balken oder Linie;
+    „Auto“ bleibt wie bisher (Zähler Balken, Messwert Linie)
+  - So lässt sich etwa ein Gesamtverbrauch als Balken neben gestapelten Einzelbalken legen oder ein Tageswert als
+    Linie über Balken
+  - Bei einer Linie gibt es zusätzlich „Eigene Achse“: Kleine Werte neben großen bleiben ablesbar, die Achse trägt
+    die Farbe der Linie
+  - Linien nehmen an Stapeln und an „Anteile (%)“ nicht teil
+  - Gilt auch auf Dashboards, im Popup und in der Karte
+
 - **Wetterdashboard**: Sonnenschein und Himmelszustand nach Sonnenstand
   (Einstellungen → Sonne und Tageslicht)
   - Die Helligkeit wird auf einen klaren Himmel bei der aktuellen Sonnenhöhe

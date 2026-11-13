@@ -185,7 +185,7 @@ from . import notices as notices_mod
 from . import version_check
 from .notices import collect_notices
 from .chart_period import calendar_bounds, compare_settings_or_400, period_anchor_or_400
-from .chart_types import CHART_EDITOR_CHART_TYPES, ENTITY_CHART_TYPES, chart_type_label, chart_type_key, editor_display_prefill, effective_chart_type, heatmap_states_clean, series_colors_clean, stack_groups_clean
+from .chart_types import CHART_EDITOR_CHART_TYPES, ENTITY_CHART_TYPES, chart_type_label, chart_type_key, editor_display_prefill, effective_chart_type, heatmap_states_clean, series_colors_clean, series_style_clean, stack_groups_clean
 from .progress import activity_snapshot, register_source
 
 logger = logging.getLogger(__name__)
@@ -3645,6 +3645,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "heatmap_states": chart["heatmap_states"] if chart else prefill.get("heatmap_states", {}),
         "series_colors": chart["series_colors"] if chart else {},
         "stack_groups": chart["stack_groups"] if chart else {},
+        "series_style": chart["series_style"] if chart else {},
     }
 
 
@@ -3711,6 +3712,7 @@ class _SaveChartBody(BaseModel):
     heatmap_states: dict[str, str] = {}  # gezeichneter Zustand je Entität der Heatmap
     series_colors: dict[str, str] = {}  # eigene Serienfarbe, siehe series_colors_clean()
     stack_groups: dict = {}  # Stapel und Zuordnung, siehe stack_groups_clean()
+    series_style: dict = {}  # Darstellung je Serie, siehe series_style_clean()
 
 
 def _hidden_for(body: _SaveChartBody) -> list[str]:
@@ -3767,6 +3769,7 @@ def charts_create(body: _SaveChartBody) -> dict:
         heatmap_states=heatmap_states_clean(body.heatmap_states, body.entity_ids),
         series_colors=series_colors_clean(body.series_colors, body.entity_ids),
         stack_groups=stack_groups_clean(body.stack_groups, body.entity_ids),
+        series_style=series_style_clean(body.series_style, body.entity_ids, _aggregation_types()),
     )
     return {"id": chart_id}
 
@@ -3828,6 +3831,7 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         heatmap_states=heatmap_states_clean(body.heatmap_states, body.entity_ids),
         series_colors=series_colors_clean(body.series_colors, body.entity_ids),
         stack_groups=stack_groups_clean(body.stack_groups, body.entity_ids),
+        series_style=series_style_clean(body.series_style, body.entity_ids, _aggregation_types()),
     )
     return {"id": chart_id}
 
@@ -3870,7 +3874,7 @@ def charts_duplicate(chart_id: int) -> dict:
         horizontal=chart["horizontal"], donut_aggregation=chart["donut_aggregation"],
         period_anchor=chart["period_anchor"], compare_settings=chart["compare_settings"],
         heatmap_states=chart["heatmap_states"], series_colors=chart["series_colors"],
-        stack_groups=chart["stack_groups"],
+        stack_groups=chart["stack_groups"], series_style=chart["series_style"],
     )
     return {"id": new_id}
 

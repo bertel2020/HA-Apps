@@ -41,6 +41,16 @@
   - Also applies on dashboards and in the card; without a choice everything
     stays in one stack as before
 
+- **Charts**: Line or bar per series
+  - In “Selected”, every row of a counter or measurement has an “Appearance” field: Auto, Bar or Line; “Auto”
+    stays as before (counters as bars, measurements as lines)
+  - This allows, for example, a total consumption as a bar next to stacked single bars, or a daily value as a line
+    over bars
+  - A line also has “Own axis”: small values next to large ones stay readable, and the axis takes the color of
+    the line
+  - Lines do not take part in stacks and in “Shares (%)”
+  - Also applies on dashboards, in the popup and in the card
+
 - **Weather dashboard**: Sunshine and sky condition by sun position (Settings →
   Sun and daylight)
   - Brightness is related to a clear sky at the current sun elevation, so the

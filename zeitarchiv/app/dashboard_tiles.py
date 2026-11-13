@@ -212,6 +212,7 @@ def tiles_context(
                 "heatmap_states": c["heatmap_states"],  # gezeichneter Zustand je Entität der Heatmap
                 "series_colors": c["series_colors"],  # eigene Serienfarbe wie auf der Chart-Seite
                 "stack_groups": c["stack_groups"],  # Stapel wie auf der Chart-Seite
+                "series_style": c["series_style"],  # Linie/Balken und Achse je Serie wie auf der Chart-Seite
             })
             groups[-1]["tiles"].append(tiles[-1])
         elif p["item_type"] == "table":

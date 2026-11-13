@@ -134,7 +134,7 @@ def test_a_supported_chart_runs_the_same_query_as_the_tile() -> None:
     assert calls == [{
         "entity_ids": "sensor.a,sensor.b", "range": "month", "offset": 0, "continuous": True,
         "year_over_year": False, "compare": True, "compare_mode": "previous", "raw": False,
-        "previous_years": 1, "at": "2026-10-01", "heatmap": False, "columns": False, "px": 0,
+        "previous_years": 1, "at": "2026-10-01", "heatmap": False, "columns": False, "px": 0, "kinds": "",
     }]
 
 

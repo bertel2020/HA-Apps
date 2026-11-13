@@ -3937,7 +3937,10 @@
     "Tür eines Hausgeräts": "Door of an appliance",
     "Erkennung einer Kamera oder eines Geräts, keine Person im Haus": "Detection by a camera or device, not a person at home",
     "Doppelt: dieselbe Entität kommt auch über {platform}": "Duplicate: the same entity also comes via {platform}",
-    "Hier ist nichts vorausgewählt. Markiere, was archiviert werden soll.": "Nothing is preselected here. Mark what should be archived."
+    "Hier ist nichts vorausgewählt. Markiere, was archiviert werden soll.": "Nothing is preselected here. Mark what should be archived.",
+    "Eigene Achse": "Own axis",
+    "Die Linie bekommt eine eigene Achse, ihre Skala richtet sich nur nach ihr": "The line gets its own axis; its scale follows only that line",
+    "Ungültige Darstellung je Serie": "Invalid appearance per series"
   },
   "js": {
     "Fixierung aufheben und das Dashboard bearbeiten?": "Unlock this dashboard and edit it?",
@@ -5012,6 +5015,8 @@
     "Sonnenstunden (ab {n} % des klaren Himmels)": "Sunshine hours (from {n} % of clear sky)",
     "Noch kein Katalog der Integration empfangen. Ohne ihn kennt Zeitarchiv die Rollen aus Home Assistant nicht.": "No catalog received from the integration yet. Without it Zeitarchiv does not know the roles from Home Assistant.",
     "{done} Zuordnungen übernommen, {check} unsichere ausgelassen. Es wurde nichts gespeichert: prüfen, ändern und dann speichern.": "{done} assignments taken over, {check} uncertain ones skipped. Nothing has been saved: check, adjust, then save.",
-    "Nichts zu ergänzen: alle Rollen aus Home Assistant sind schon zugeordnet oder es gibt keine passenden archivierten Zähler.": "Nothing to add: all roles from Home Assistant are already assigned or there are no matching archived counters."
+    "Nichts zu ergänzen: alle Rollen aus Home Assistant sind schon zugeordnet oder es gibt keine passenden archivierten Zähler.": "Nothing to add: all roles from Home Assistant are already assigned or there are no matching archived counters.",
+    "Balken": "Bar",
+    "Linie": "Line"
   }
 }

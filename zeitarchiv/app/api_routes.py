@@ -23,6 +23,7 @@ from .ai_routes import AiDependencies, create_ai_router
 from .card_routes import create_card_router
 from .selection_routes import create_catalog_router
 from .chart_period import stichtag_or_400, stichtag_window
+from .chart_types import SERIES_STYLE_KINDS, SERIES_STYLE_TYPES
 from .formatting import decimals_to_int, entity_display_name
 from .limits import (
     MAX_EVENT_TEXT_LENGTH,
@@ -438,6 +439,22 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         if integration_version:
             ha_integration.record_seen(deps.index, integration_version)
 
+    def parse_series_kinds_or_400(raw: str) -> dict[str, str]:
+        out: dict[str, str] = {}
+        for item in raw.split(","):
+            if not item.strip():
+                continue
+            entity_id, _sep, kind = item.strip().rpartition(":")
+            if not entity_id or kind not in SERIES_STYLE_KINDS:
+                raise HTTPException(status_code=400, detail=tr("Ungültige Darstellung je Serie"))
+            _validate_entity_id_or_400(entity_id)
+            out[entity_id] = kind
+        return out
+
+    def series_kind(entity, kind: str | None) -> str | None:
+        """Linie oder Balken für eine Serie: nur Zähler und Messwerte lassen es zu, sonst gilt die Entitätsart."""
+        return kind if entity is not None and entity["aggregation_type"] in SERIES_STYLE_TYPES else None
+
     def limited_multi_entity_ids(args: dict) -> list[str]:
         ids = [item.strip() for item in args["entity_ids"].split(",") if item.strip()]
         if len(ids) > MAX_MULTI_QUERY_ENTITIES:
@@ -759,7 +776,9 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         heatmap: bool = False,
         columns: bool = False,
         px: int = 0,
+        kinds: str = "",
     ) -> dict:
+        # kinds: Darstellung je Serie („entity_id:bar,entity_id:line“); ohne Eintrag gilt die Entitätsart.
         # at: Stichtag der Zeitraum-Navigation eines Dashboards — verschiebt
         # Bezugszeitpunkt bzw. Versatz, alles Weitere (Vergleich, Langzeit)
         # rechnet unverändert relativ dazu.
@@ -768,6 +787,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
         ids = limited_multi_entity_ids({"entity_ids": entity_ids})
         for entity_id in ids:
             _validate_entity_id_or_400(entity_id)
+        kind_of = parse_series_kinds_or_400(kinds)
         if heatmap and range not in query_mod.STATE_HEATMAP_RANGES:
             raise HTTPException(status_code=400, detail=tr("Die Heatmap gibt es erst ab dem Zeitraum Monat"))
         if columns and range not in query_mod.STATE_COLUMNS_RANGES:
@@ -820,7 +840,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 result = query_mod.query_series(
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                     offset=offset, continuous=continuous, year_over_year=year_over_year,
-                    read_cache=entity_cache,
+                    chart_type=series_kind(entity, kind_of.get(entity_id)), read_cache=entity_cache,
                 )
             entry = {
                 "entity_id": entity_id,
@@ -850,7 +870,8 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                     offset=offset if compare_mode == "year" else offset - 1,
                     continuous=continuous,
-                    year_over_year=compare_mode == "year", full_period=True, read_cache=entity_cache,
+                    year_over_year=compare_mode == "year", full_period=True,
+                    chart_type=series_kind(entity, kind_of.get(entity_id)), read_cache=entity_cache,
                 )
                 entry.update(
                     compare_points=compare_result["points"],

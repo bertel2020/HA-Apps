@@ -582,6 +582,8 @@
         seriesColors: {...SERIES_COLORS},
         // Mehrere Stapel: {groups: [{id, name}], members: {entity_id: id}}, {} = ein Stapel je Achse.
         stackGroups: JSON.parse(JSON.stringify(STACK_GROUPS || {})),
+        // Darstellung je Serie: {entity_id: {kind: 'bar'|'line', axis: 'own'}}; ohne Eintrag gilt die Entitätsart.
+        seriesStyle: JSON.parse(JSON.stringify(SERIES_STYLE || {})),
         draggingEntityId: null,
         dragOrderSnapshot: null,
         stackOver: null,
@@ -1608,6 +1610,46 @@
           return (this.stackGroups.members || {})[id] || 'none';
         },
         stackGroupList() { return (this.stackGroups && this.stackGroups.groups) || []; },
+        // ---- Darstellung je Serie (Felder „Darstellung“ und „Eigene Achse“ in „Ausgewählt“) ----------
+        // Nur Zähler und Messwerte lassen die Wahl; Schalter bleiben Balken, Zustände haben ihren Zeitstrahl.
+        canChooseKind(id) {
+          const s = this.series.find(x => x.entity_id === id);
+          return !!s && !this.donut && !this.timeline && ['counter', 'standard'].includes(s.aggregation_type);
+        },
+        // Was „Auto“ aus der Serie macht: Zähler Balken, Messwert Linie.
+        autoKindFor(id) {
+          const s = this.series.find(x => x.entity_id === id);
+          return s && s.aggregation_type === 'counter' ? 'bar' : 'line';
+        },
+        kindValue(id) { return (this.seriesStyle[id] && this.seriesStyle[id].kind) || 'auto'; },
+        isLineId(id) {
+          const s = this.series.find(x => x.entity_id === id);
+          return !!s && s.chart_type === 'line';
+        },
+        ownAxisOn(id) { return !!(this.seriesStyle[id] && this.seriesStyle[id].axis === 'own'); },
+        setSeriesKind(id, value) {
+          const style = {...(this.seriesStyle[id] || {})};
+          if (value === 'bar' || value === 'line') style.kind = value; else delete style.kind;
+          this.writeSeriesStyle(id, style);
+          // Die Server-Abfrage liefert je Serie Zeitabschnittswerte (Balken) oder Punkte (Linie): neu laden.
+          this.load({silent: true});
+        },
+        setSeriesAxis(id, own) {
+          const style = {...(this.seriesStyle[id] || {})};
+          if (own) style.axis = 'own'; else delete style.axis;
+          this.writeSeriesStyle(id, style);
+          this.render();
+        },
+        writeSeriesStyle(id, style) {
+          const next = {...this.seriesStyle};
+          if (Object.keys(style).length) next[id] = style; else delete next[id];
+          this.seriesStyle = next;
+        },
+        // Für die Abfrage: nur ausdrückliche Wahlen („entity:bar,entity:line“).
+        kindsParam(ids) {
+          return ids.filter(id => this.seriesStyle[id] && this.seriesStyle[id].kind)
+            .map(id => `${id}:${this.seriesStyle[id].kind}`).join(',');
+        },
         setStack(id, value) {
           const groups = this.stackGroupList().map(g => ({...g}));
           const members = {...((this.stackGroups && this.stackGroups.members) || {})};
@@ -1839,6 +1881,8 @@
             compare: String(this.compare), compare_mode: this.compareMode,
             raw: String(this.raw),
           });
+          const kinds = this.kindsParam(this.visibleEntityIds);
+          if (kinds) params.set('kinds', kinds);
           if (this.multiYearRequested) params.set('previous_years', String(this.compareYears));
           // Heatmap: zusätzlich die Zellen (Wochentag x Stunde); Legende und
           // Kennzahlen kommen weiter aus den Anteilen derselben Abfrage.
@@ -2106,7 +2150,11 @@
           // eine Achse mit unitlosen Standard-Entitäten teilen und in Rohsekunden
           // statt als Dauer beschriftet.
           const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
-          const axisKey = s => isDurationSeries(s) ? ' duration' : s.unit;
+          // Linie mit „Eigene Achse“: Schlüssel mit Entität hinter einem Trennzeichen, die Achse zeigt davon
+          // nur die Einheit (Parität mit chart-tile-render.js).
+          const ownAxis = s => s.chart_type === 'line' && this.ownAxisOn(s.entity_id);
+          const axisKey = s => isDurationSeries(s) ? ' duration' : (ownAxis(s) ? `${s.unit}\u0001${s.entity_id}` : s.unit);
+          const axisUnitText = u => String(u == null ? '' : u).split('\u0001')[0];
           const units = [...new Set(chartSeries.map(axisKey))];
           // Balken-Serien stapeln je Einheit statt in einem globalen "total"-
           // Topf — sonst würden z. B. kWh- und Dauer-Serien auf derselben
@@ -2219,9 +2267,14 @@
             // würde die Prozentwerte selbst verzerrt darstellen.
             const isPercentAxis = normalizeActive && barOnlyAxis.has(u);
             const axisDynamic = dynamicYAxis && !axisHasBar.has(u);
+            const unitText = axisUnitText(u);
+            // Eigene Achse einer Linie: Beschriftung in der Serienfarbe.
+            const ownSeries = chartSeries.find(s => ownAxis(s) && axisKey(s) === u);
+            const axisInk = ownSeries ? this.colorFor(ownSeries.entity_id) : undefined;
             return {
               type: 'value',
-              name: isPercentAxis ? t('Anteil') : (isDuration ? t('Dauer') : (u || undefined)),
+              name: isPercentAxis ? t('Anteil') : (isDuration ? t('Dauer') : (unitText || undefined)),
+              nameTextStyle: axisInk ? {color: axisInk} : undefined,
               nameLocation: 'end',
               position: i % 2 === 0 ? 'left' : 'right',
               offset: Math.floor(i / 2) * 55,
@@ -2232,7 +2285,7 @@
               // undefined sind — ohne scale:true hätte "Dynamische Y-Achse"
               // also keine sichtbare Wirkung gegenüber der festen Variante.
               scale: isPercentAxis ? false : axisDynamic,
-              axisLabel: {formatter: v => isPercentAxis ? `${fmtNum(v, 0)} %` : (isDuration ? NumberFormat.fmtDuration(v) : (u ? `${fmtNum(v, decimals)} ${u}` : fmtNum(v, decimals)))},
+              axisLabel: {color: axisInk, formatter: v => isPercentAxis ? `${fmtNum(v, 0)} %` : (isDuration ? NumberFormat.fmtDuration(v) : (unitText ? `${fmtNum(v, decimals)} ${unitText}` : fmtNum(v, decimals)))},
               // Gitterlinien nur von der ersten Achse und gestrichelt in Rahmenfarbe wie in der Dashboard-
               // Kachel: ECharts' Standard zeichnet je Achse eine durchgezogene helle Linie, bei zwei Achsen
               // (andere Teilung) lag ein zweites Gitter darüber und die Skala war nicht mehr ablesbar.
@@ -3465,6 +3518,7 @@
             heatmap_states: this.heatmapStates,
             series_colors: this.seriesColors,
             stack_groups: this.stackGroups,
+            series_style: this.seriesStyle,
             decimals: this.decimals,
             show_values: this.showValues,
             average_line: this.averageLine,
