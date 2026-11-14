@@ -229,3 +229,20 @@ def test_a_redirect_is_not_followed_and_never_carries_the_credentials_along() ->
         for server in (target, redirector):
             server.shutdown()
             server.server_close()
+
+
+def test_check_connection_counts_series_of_the_integration(monkeypatch) -> None:
+    seen = _fake_open(monkeypatch, lambda path, params: json.dumps(
+        {"status": "success", "data": ["go_goroutines", "sensor.a_value", "sensor.b_value"]}
+    ).encode())
+    assert vm_import.check_connection("http://vm:8428") == 2
+    assert seen[0].full_url == "http://vm:8428/api/v1/label/__name__/values"
+
+
+def test_check_connection_fails_without_series_or_with_garbage(monkeypatch) -> None:
+    _fake_open(monkeypatch, lambda path, params: json.dumps({"status": "success", "data": ["up"]}).encode())
+    with pytest.raises(vm_import.VmApiError, match="_value"):
+        vm_import.check_connection("http://vm:8428")
+    _fake_open(monkeypatch, lambda path, params: b"<html>")
+    with pytest.raises(vm_import.VmApiError, match="gültige Antwort"):
+        vm_import.check_connection("http://vm:8428")

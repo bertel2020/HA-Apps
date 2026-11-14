@@ -204,6 +204,48 @@ def _explain(message: str) -> str:
     return tr("InfluxDB meldet: {message}", message=message[:200])
 
 
+def check_connection(
+    base_url: str | None,
+    database: str,
+    auth: tuple[str, str] | None,
+    verify_tls: bool = True,
+) -> tuple[str, list[str]]:
+    """Verbindungstest ohne Import. Liefert (Version, Domains mit Daten); die
+    Version ist leer, wenn der Server sie nicht verrät (z. B. hinter einem
+    Proxy). ``/ping`` braucht keine Anmeldung, die eigentliche Abfrage prüft
+    dann Zugangsdaten und Datenbank. Eine InfluxDB 2.x meldet sich schon im
+    Ping mit ``v2…`` und wird hier abgewiesen, statt später mit einem
+    unverständlichen Fehler zu scheitern. Ein Treffer-loser Tag ``domain``
+    heißt: die Datenbank existiert, stammt aber nicht von der HA-Integration."""
+    version = ""
+    ping = urllib.request.Request(
+        normalize_base_url(base_url) + "/ping", headers={"User-Agent": "Zeitarchiv/InfluxImport"}
+    )
+    try:
+        with _opener(verify_tls).open(ping, timeout=REQUEST_TIMEOUT) as response:
+            version = (response.headers.get("X-Influxdb-Version") or "").strip()
+    except urllib.error.HTTPError:
+        pass  # Ping verlangt Anmeldung oder fehlt hinter einem Proxy: Version bleibt leer
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise InfluxApiError(
+            tr("InfluxDB nicht erreichbar: {v}", v=exc.reason if isinstance(exc, urllib.error.URLError) else exc)
+        ) from exc
+    if version.lstrip("vV").startswith(("2", "3")):
+        raise InfluxApiError(tr("InfluxDB {version} erkannt: Unterstützt wird nur InfluxDB 1.x", version=version))
+    request = _request(base_url or DEFAULT_BASE_URL, database, 'SHOW TAG VALUES WITH KEY = "domain"', auth)
+    domains: set[str] = set()
+    for result in _results(_open_lines(request, verify_tls)):
+        for series in result.get("series") or []:
+            for row in series.get("values") or []:
+                if isinstance(row, list) and len(row) > 1 and isinstance(row[1], str):
+                    domains.add(row[1])
+    if not domains:
+        raise InfluxApiError(
+            tr("Datenbank erreichbar, enthält aber keine Daten der Home-Assistant-Integration (Tag „domain“ fehlt)")
+        )
+    return version, sorted(domains)
+
+
 def _clean_value(value: object) -> float | None:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         return None

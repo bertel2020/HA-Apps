@@ -339,3 +339,82 @@ def test_a_redirect_is_not_followed_and_never_carries_the_credentials_along() ->
         for server in (target, redirector):
             server.shutdown()
             server.server_close()
+
+
+# ------------------------------------------------------------ Verbindungstest
+
+
+class _PingOpener:
+    """Ersetzt ``influxdb_import._opener``: ``/ping`` antwortet mit der Version
+    (oder einem Fehler); die eigentliche Abfrage läuft über ``_open_lines``."""
+
+    def __init__(self, version: str = "1.8.10", error: Exception | None = None) -> None:
+        self.version, self.error, self.requests = version, error, []
+
+    def open(self, request, timeout=None):  # noqa: A003
+        self.requests.append(request)
+        if self.error:
+            raise self.error
+        outer = self
+
+        class _Response:
+            headers = {"X-Influxdb-Version": outer.version} if outer.version else {}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        return _Response()
+
+
+def _domains(*names: str) -> bytes:
+    return _reply(_values("W", [["domain", n] for n in names], columns=("key", "value")))
+
+
+def test_check_connection_reports_version_and_domains(monkeypatch) -> None:
+    ping = _PingOpener("1.8.10")
+    monkeypatch.setattr(influxdb_import, "_opener", lambda verify_tls: ping)
+    seen = _fake(monkeypatch, lambda params: _domains("switch", "sensor"))
+    version, domains = influxdb_import.check_connection("http://influx:8086", "ha", ("u", "pw"))
+    assert (version, domains) == ("1.8.10", ["sensor", "switch"])
+    assert ping.requests[0].full_url == "http://influx:8086/ping"
+    assert params_of(seen[0])["db"] == ["ha"] and "domain" in params_of(seen[0])["q"][0]
+    # Zugangsdaten nur im Header der Abfrage, nie in einer URL
+    assert "pw" not in seen[0].full_url and seen[0].get_header("Authorization")
+
+
+def test_check_connection_tolerates_a_missing_version(monkeypatch) -> None:
+    error = urllib.error.HTTPError("http://x/ping", 404, "nf", {}, io.BytesIO(b""))
+    monkeypatch.setattr(influxdb_import, "_opener", lambda verify_tls: _PingOpener(error=error))
+    _fake(monkeypatch, lambda params: _domains("sensor"))
+    assert influxdb_import.check_connection("http://influx:8086", "ha", None) == ("", ["sensor"])
+
+
+def test_check_connection_rejects_influxdb_2(monkeypatch) -> None:
+    monkeypatch.setattr(influxdb_import, "_opener", lambda verify_tls: _PingOpener("v2.7.1"))
+    seen = _fake(monkeypatch, lambda params: _domains("sensor"))
+    with pytest.raises(influxdb_import.InfluxApiError, match="1.x"):
+        influxdb_import.check_connection("http://influx:8086", "ha", None)
+    assert not seen  # keine Abfrage mehr nach dem erkannten 2.x
+
+
+def test_check_connection_unreachable_and_empty_database(monkeypatch) -> None:
+    monkeypatch.setattr(
+        influxdb_import, "_opener", lambda verify_tls: _PingOpener(error=urllib.error.URLError("refused"))
+    )
+    with pytest.raises(influxdb_import.InfluxApiError, match="nicht erreichbar"):
+        influxdb_import.check_connection("http://influx:8086", "ha", None)
+
+    monkeypatch.setattr(influxdb_import, "_opener", lambda verify_tls: _PingOpener())
+    _fake(monkeypatch, lambda params: json.dumps({"results": [{"statement_id": 0}]}).encode())
+    with pytest.raises(influxdb_import.InfluxApiError, match="domain"):
+        influxdb_import.check_connection("http://influx:8086", "ha", None)
+
+
+def test_check_connection_passes_wrong_database_and_credentials_on(monkeypatch) -> None:
+    monkeypatch.setattr(influxdb_import, "_opener", lambda verify_tls: _PingOpener())
+    _fake(monkeypatch, lambda params: json.dumps({"error": "database not found: \"nope\""}).encode())
+    with pytest.raises(influxdb_import.InfluxApiError, match="Datenbank"):
+        influxdb_import.check_connection("http://influx:8086", "nope", None)

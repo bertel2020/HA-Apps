@@ -282,6 +282,28 @@ class InfluxImportService:
     def register(self, router: APIRouter) -> None:
         deps = self.deps
 
+        @router.post("/import/influxdb/connection", response_class=HTMLResponse)
+        async def import_influxdb_connection(request: Request) -> HTMLResponse:
+            """Verbindungstest: Adresse, Zugangsdaten und Datenbank, ohne etwas
+            zu lesen oder zu schreiben. Liefert nur die Ergebniszeile, die
+            Sektion wird nicht neu gezeichnet (Markierungen und Passwort bleiben)."""
+            config = self._config(await request.form())
+            try:
+                version, domains = await run_in_threadpool(
+                    influxdb_import.check_connection, config.base_url, config.database, config.auth, config.verify_tls
+                )
+            except influxdb_import.InfluxApiError as exc:
+                logger.warning("InfluxDB-Verbindungstest fehlgeschlagen · %s", exc)
+                context = {"ok": False, "message": str(exc)}
+            else:
+                parts = [tr("Verbindung hergestellt")]
+                if version:
+                    parts.append(tr("InfluxDB {version}", version=version))
+                parts.append(tr("Datenbank „{database}“ enthält Daten aus {count} Domains", database=config.database, count=len(domains)))
+                logger.info("InfluxDB-Verbindungstest erfolgreich · Version=%s · Domains=%d", version or "?", len(domains))
+                context = {"ok": True, "message": " · ".join(parts)}
+            return deps.templates.TemplateResponse(request, "_connection_check_result.html", context)
+
         @router.post("/import/influxdb/availability", response_class=HTMLResponse)
         async def import_influxdb_availability(request: Request) -> HTMLResponse:
             """Verfügbarkeits-Vorschau der markierten Entitäten — expliziter

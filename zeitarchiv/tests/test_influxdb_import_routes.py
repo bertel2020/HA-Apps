@@ -230,3 +230,49 @@ def test_progress_endpoint_is_silent_before_any_run(service) -> None:
     endpoint = _endpoint(service, "/import/influxdb/progress", "GET")
     response = endpoint(_request("/import/influxdb/progress", [], method="GET"))
     assert response.body == b""
+
+
+# ------------------------------------------------------------ Verbindungstest
+
+
+def test_connection_check_shows_version_database_and_never_the_password(service, monkeypatch) -> None:
+    calls = []
+
+    def fake(base_url, database, auth, verify_tls=True):
+        calls.append((base_url, database, auth, verify_tls))
+        return "1.8.10", ["sensor", "switch"]
+
+    monkeypatch.setattr(influxdb_import, "check_connection", fake)
+    endpoint = _endpoint(service, "/import/influxdb/connection", "POST")
+    template, context = asyncio.run(endpoint(_request("/import/influxdb/connection", FORM)))
+    assert template == "_connection_check_result.html" and context["ok"] is True
+    assert "1.8.10" in context["message"] and "ha" in context["message"] and "2" in context["message"]
+    assert "geheim" not in json.dumps(context)
+    assert calls == [("http://influx:8086", "ha", ("roberto", "geheim"), True)]
+
+
+def test_connection_check_reports_the_error_text(service, monkeypatch) -> None:
+    def fail(*args, **kwargs):
+        raise influxdb_import.InfluxApiError("Die Datenbank wurde nicht gefunden")
+
+    monkeypatch.setattr(influxdb_import, "check_connection", fail)
+    endpoint = _endpoint(service, "/import/influxdb/connection", "POST")
+    template, context = asyncio.run(endpoint(_request("/import/influxdb/connection", FORM)))
+    assert context == {"ok": False, "message": "Die Datenbank wurde nicht gefunden"}
+
+
+def test_vm_connection_check_uses_the_form_address(service, monkeypatch) -> None:
+    from app.storage import vm_import
+
+    seen = []
+    monkeypatch.setattr(vm_import, "check_connection", lambda base_url: seen.append(base_url) or 7)
+    endpoint = _endpoint(service, "/import/vm/connection", "POST")
+    template, context = asyncio.run(endpoint(_request("/import/vm/connection", [("base_url", "http://vm:8428")])))
+    assert seen == ["http://vm:8428"] and context["ok"] is True and "7" in context["message"]
+
+    def fail(base_url):
+        raise vm_import.VmApiError("VictoriaMetrics nicht erreichbar: refused")
+
+    monkeypatch.setattr(vm_import, "check_connection", fail)
+    template, context = asyncio.run(endpoint(_request("/import/vm/connection", [])))
+    assert context["ok"] is False and "nicht erreichbar" in context["message"]

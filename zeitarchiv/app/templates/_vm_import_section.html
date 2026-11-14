@@ -14,6 +14,13 @@
       <label class="ha-import-field" style="width:100%;max-width:480px;">
         <input type="text" name="base_url" id="vm-base-url" class="map-input" value="{{ vm_base_url }}" placeholder="{{ vm_default_base_url }}" autocomplete="off" spellcheck="false" title="{{ _('Adresse der VictoriaMetrics-API, z. B. http://1bd4a9fb-victoria-metrics:8428') }}" onchange="onVmConfigChanged()">
       </label>
+      <div class="ha-conn-row">
+        <button type="button" class="btn" id="vm-connection-btn" title="{{ _('Prüft Adresse ohne etwas zu importieren') }}" hx-post="import/vm/connection" hx-include="#vm-form" hx-target="#vm-connection-result" hx-swap="innerHTML" hx-disabled-elt="this" hx-indicator="#vm-connection-wait">
+          {{ _("Verbindung prüfen") }}
+        </button>
+        <span id="vm-connection-wait" class="ha-conn-slot"><span class="htmx-indicator">{{ _("Prüfung läuft …") }}</span></span>
+        <span id="vm-connection-result"></span>
+      </div>
     </div>
 
     <div class="ha-full-controls">

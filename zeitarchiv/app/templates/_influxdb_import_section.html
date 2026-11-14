@@ -42,6 +42,13 @@
           <span class="ha-archive-help-popover" role="tooltip">{{ _("Gilt nur für https-Adressen. Bei einem selbstsignierten Zertifikat die Prüfung abschalten; die Verbindung bleibt verschlüsselt, der Server wird aber nicht mehr auf Echtheit geprüft.") }}</span>
         </span>
       </span>
+      <div class="ha-conn-row">
+        <button type="button" class="btn" id="influx-connection-btn" title="{{ _('Prüft Adresse, Zugangsdaten und Datenbank ohne etwas zu importieren') }}" hx-post="import/influxdb/connection" hx-include="#influx-form" hx-target="#influx-connection-result" hx-swap="innerHTML" hx-disabled-elt="this" hx-indicator="#influx-connection-wait">
+          {{ _("Verbindung prüfen") }}
+        </button>
+        <span id="influx-connection-wait" class="ha-conn-slot"><span class="htmx-indicator">{{ _("Prüfung läuft …") }}</span></span>
+        <span id="influx-connection-result"></span>
+      </div>
     </div>
 
     <div class="ha-full-controls">

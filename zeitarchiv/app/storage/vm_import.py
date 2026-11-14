@@ -122,6 +122,26 @@ def _open(request: urllib.request.Request) -> bytes:
         ) from exc
 
 
+def check_connection(base_url: str | None = None, auth: tuple[str, str] | None = None) -> int:
+    """Verbindungstest ohne Import: Adresse erreichbar und es gibt Messreihen
+    der Home-Assistant-Integration (Endung ``_value``). Liefert deren Anzahl,
+    ein leerer Bestand ist ein Fehler — dann stimmt meist die Adresse nicht."""
+    body = _open(_request(base_url or DEFAULT_BASE_URL, "/api/v1/label/__name__/values", None, auth))
+    try:
+        payload = json.loads(body)
+    except ValueError as exc:
+        raise VmApiError(tr("VictoriaMetrics lieferte keine gültige Antwort")) from exc
+    names = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(names, list):
+        raise VmApiError(tr("VictoriaMetrics lieferte keine gültige Antwort"))
+    count = sum(1 for name in names if isinstance(name, str) and name.endswith(VALUE_SUFFIX))
+    if not count:
+        raise VmApiError(
+            tr("Erreichbar, aber ohne Messreihen der Home-Assistant-Integration (Endung „{suffix}“)", suffix=VALUE_SUFFIX)
+        )
+    return count
+
+
 def _selector_name(entity_id: str) -> str:
     return entity_id + VALUE_SUFFIX
 

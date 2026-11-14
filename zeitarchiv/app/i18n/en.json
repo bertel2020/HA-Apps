@@ -3974,7 +3974,17 @@
     "Ungültige Darstellung je Serie": "Invalid appearance per series",
     "Zuerst Entitäten in der Tabelle markieren": "Mark entities in the table first",
     "InfluxDB (experimentell)": "InfluxDB (experimental)",
-    "Dieser Import ist neu und noch nicht an großen echten Datenbeständen erprobt. Zunächst nur wenige Entitäten übernehmen und das Ergebnis prüfen.": "This import is new and has not yet been tried on large real data sets. Import only a few entities first and check the result."
+    "Dieser Import ist neu und noch nicht an großen echten Datenbeständen erprobt. Zunächst nur wenige Entitäten übernehmen und das Ergebnis prüfen.": "This import is new and has not yet been tried on large real data sets. Import only a few entities first and check the result.",
+    "Verbindung prüfen": "Check connection",
+    "Prüft Adresse ohne etwas zu importieren": "Checks the address without importing anything",
+    "Prüft Adresse, Zugangsdaten und Datenbank ohne etwas zu importieren": "Checks address, credentials and database without importing anything",
+    "Erreichbar, aber ohne Messreihen der Home-Assistant-Integration (Endung „{suffix}“)": "Reachable, but without any series from the Home Assistant integration (suffix “{suffix}”)",
+    "InfluxDB {version} erkannt: Unterstützt wird nur InfluxDB 1.x": "InfluxDB {version} detected: only InfluxDB 1.x is supported",
+    "Datenbank erreichbar, enthält aber keine Daten der Home-Assistant-Integration (Tag „domain“ fehlt)": "Database reachable, but it holds no data from the Home Assistant integration (tag “domain” is missing)",
+    "Verbindung hergestellt": "Connection established",
+    "InfluxDB {version}": "InfluxDB {version}",
+    "Datenbank „{database}“ enthält Daten aus {count} Domains": "Database “{database}” holds data from {count} domains",
+    "Verbindung hergestellt · {count} Messreihen der Home-Assistant-Integration gefunden": "Connection established · {count} series from the Home Assistant integration found"
   },
   "js": {
     "Fixierung aufheben und das Dashboard bearbeiten?": "Unlock this dashboard and edit it?",

@@ -3322,6 +3322,25 @@ class ImportService:
                 request, "_ha_import_result.html", ergebnis
             )
 
+        @router.post("/import/vm/connection", response_class=HTMLResponse)
+        async def import_vm_connection(request: Request) -> HTMLResponse:
+            """Verbindungstest ohne Import. Liefert nur die Ergebniszeile, die
+            Sektion wird nicht neu gezeichnet (Markierungen bleiben)."""
+            form = await request.form()
+            base_url = str(form.get("base_url") or "").strip() or vm_import.DEFAULT_BASE_URL
+            try:
+                count = await run_in_threadpool(vm_import.check_connection, base_url)
+            except vm_import.VmApiError as exc:
+                logger.warning("VictoriaMetrics-Verbindungstest fehlgeschlagen · %s", exc)
+                context = {"ok": False, "message": str(exc)}
+            else:
+                logger.info("VictoriaMetrics-Verbindungstest erfolgreich · Messreihen=%d", count)
+                context = {
+                    "ok": True,
+                    "message": tr("Verbindung hergestellt · {count} Messreihen der Home-Assistant-Integration gefunden", count=count),
+                }
+            return self.deps.templates.TemplateResponse(request, "_connection_check_result.html", context)
+
         @router.post("/import/vm/availability", response_class=HTMLResponse)
         async def import_vm_availability(request: Request) -> HTMLResponse:
             """Verfügbarkeits-Vorschau der markierten Entitäten — expliziter
