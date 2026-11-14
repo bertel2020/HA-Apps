@@ -46,7 +46,7 @@ from zoneinfo import ZoneInfo
 
 from .error_text import user_message
 from .i18n import N_, tr
-from . import cleanup_stats, counter_auto
+from . import cleanup_stats, counter_auto, duplicates_auto
 from . import demo_mode
 from . import ha_integration
 from . import notices as notices_mod
@@ -65,7 +65,7 @@ from .energiedashboard_routes import (
     sync_hourly_rollup_flags_for_current_config,
 )
 from .progress import JobBusy, JobProgress
-from .route_support import dir_size
+from .route_support import STORAGE_LOCKED_TIMEOUT_SECONDS, dir_size
 from .storage import backup, backup_external, cleanup, hotbuffer, reconcile, rollup
 from .storage import resolution as resolution_mod
 from .storage import rotate as rotate_mod
@@ -960,8 +960,21 @@ class BackgroundService:
             self.data_dir, self.index, self.tz
         )
         self.index.set_duplicate_snapshot(
-            [{"entity_id": r["entity_id"], "friendly_name": r["friendly_name"], "count": r["count"]} for r in rows]
+            [
+                {"entity_id": r["entity_id"], "friendly_name": r["friendly_name"], "count": r["count"], "identical": r["identical"]}
+                for r in rows
+            ]
         )
+
+    def _run_duplicates_auto_if_due(self) -> None:
+        """Stündlicher Lauf von „Duplikate automatisch entfernen“ (Housekeeping → Duplikate, standardmäßig aus).
+        Die Entitätssperre hat ein Zeitbudget: belegte Entitäten (Backup, Import) kommen im nächsten Lauf dran."""
+        ran = duplicates_auto.run_if_due(
+            self.data_dir, self.index, self.tz,
+            lambda entity_id: self.coordinator.entity(entity_id, timeout=STORAGE_LOCKED_TIMEOUT_SECONDS),
+        )
+        if ran:
+            self.invalidate_purge_preview()  # neue Markierungen: Speicherplatz-Zahlen neu rechnen
 
     def _refresh_counter_decrease_snapshot_if_stale(self) -> None:
         """Zählerrückgänge der letzten 30 Tage für die Meldung und Housekeeping →
@@ -1211,6 +1224,8 @@ class BackgroundService:
                     self.refresh_purge_preview_if_stale()
                 with self._maintenance_step("duplicate_snapshot"):
                     self._refresh_duplicate_snapshot_if_stale()
+                with self._maintenance_step("duplicates_auto"):
+                    self._run_duplicates_auto_if_due()
                 with self._maintenance_step("counter_decrease_snapshot"):
                     self._refresh_counter_decrease_snapshot_if_stale()
                 with self._maintenance_step("counter_auto_mark"):

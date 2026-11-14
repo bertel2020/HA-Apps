@@ -310,6 +310,8 @@
   <p class="hint hint-status">{{ _("state_class total: Rückgänge sind bei diesem Zähler normal und werden nicht geprüft, weil der Stand laut Home Assistant sinken darf. Nur bei total_increasing gibt es Markierung und Meldung.") }}</p>
 </div>
 {% endif %}
+{% set dup_field = duplicates_auto_field(entity_id) if duplicates_auto_field is defined else none %}
+{% if dup_field %}{% set dup_state = dup_field.dup_state %}{% include "_duplicates_auto_field.html" %}{% endif %}
 </section>
 {% if gap_threshold_auto_adjusted %}
 <script>

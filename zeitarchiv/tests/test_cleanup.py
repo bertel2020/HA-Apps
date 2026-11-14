@@ -1011,7 +1011,7 @@ def test_count_duplicate_rows_by_entity_only_lists_affected_entities_within_wind
 
         results = cleanup.count_duplicate_rows_by_entity(tmp, index, TZ, window_days=30, now=now)
 
-        assert results == [{"entity_id": dup_id, "friendly_name": "Dup", "count": 2}]
+        assert results == [{"entity_id": dup_id, "friendly_name": "Dup", "count": 2, "identical": 2}]
 
         index.close()
     finally:
@@ -1456,7 +1456,7 @@ def test_count_duplicate_rows_by_entity_counts_dense_entities_without_a_row_limi
 
         results = cleanup.count_duplicate_rows_by_entity(tmp, index, TZ, window_days=30, now=now)
 
-        assert results == [{"entity_id": entity_id, "friendly_name": "Dicht", "count": 10}]
+        assert results == [{"entity_id": entity_id, "friendly_name": "Dicht", "count": 10, "identical": 10}]
         index.close()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

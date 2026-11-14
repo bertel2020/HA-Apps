@@ -204,6 +204,12 @@ DEFAULT_COMPACT_MIN_AGE_MONTHS = "3"
 # der Verdichten-Automatik oben.
 PURGE_AUTO_LABELS = {"off": N_("Aus"), "on": "An"}
 DEFAULT_PURGE_AUTO_ENABLED = "off"
+# Housekeeping → Duplikate: Schalter „Duplikate automatisch entfernen“ (duplicates_auto.py), standardmäßig AUS.
+# "identical" entfernt nur Zeilen mit gleichem Zeitstempel UND gleichem Wert, "all" lässt je Zeitstempel den
+# größten Wert stehen (wie der Knopf auf der Bereinigungsseite).
+DEFAULT_DUPLICATES_AUTO_ENABLED = "off"
+DUPLICATES_AUTO_MODES = {"identical": N_("Nur bei gleichem Wert"), "all": N_("Auch bei abweichenden Werten")}
+DEFAULT_DUPLICATES_AUTO_MODE = "identical"
 # Wie lange eine Löschmarkierung (deleted_points.deleted_at) unangetastet
 # bleibt, bevor die Automatik sie physisch entfernt — in Tagen statt Monaten
 # wie beim Verdichten-Pendant, weil "Rückgängig" (undo_last_deleted_batch())

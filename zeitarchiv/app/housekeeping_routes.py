@@ -34,14 +34,14 @@ from pathlib import Path
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from . import formats
 from . import cleanup_stats
-from . import cleanup_tile, counter_auto, counter_bulk, data_quality
+from . import cleanup_tile, counter_auto, counter_bulk, data_quality, duplicates_auto
 from . import demo_mode
 from . import notices as notices_mod
 from .backup_scheduler import parse_schedule_time
@@ -55,6 +55,7 @@ from .formatting import (
     DEFAULT_COMPACT_AUTO_ENABLED,
     DEFAULT_COMPACT_MIN_AGE_MONTHS,
     DEFAULT_PURGE_AUTO_ENABLED,
+    DUPLICATES_AUTO_MODES,
     DEFAULT_PURGE_MIN_AGE_DAYS,
     DEMO_APPEND_INTERVAL_LABELS,
     GAP_THRESHOLD_LABELS,
@@ -275,15 +276,24 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         eigene Funktion statt Inline-Code in housekeeping_view(), damit die
         Aufbereitung unabhängig von der Route testbar/lesbar bleibt."""
         duplicate_rows = (deps.index.get_duplicate_snapshot() or {}).get("rows", [])
-        duplicates_by_entity = [
-            {
+        auto_state = duplicates_auto.settings(deps.index)
+        duplicates_by_entity = []
+        for row in duplicate_rows:
+            entity = deps.index.get_entity(row["entity_id"])
+            status, mode = duplicates_auto.entity_status(entity, auto_state["mode"]) if entity is not None else ("on", auto_state["mode"])
+            identical = row.get("identical")
+            duplicates_by_entity.append({
                 "entity_id": row["entity_id"],
                 "friendly_name": row["friendly_name"],
                 "count": format_int(row['count']),
                 "count_raw": row["count"],
-            }
-            for row in duplicate_rows
-        ]
+                # Spalte „davon gleicher Wert“ (Automatik aus) bzw. Automatik-Status je Entität (an)
+                "identical_raw": identical if identical is not None else -1,
+                "identical_label": format_int(identical) if identical is not None else "—",
+                "status": status,
+                "differs": row["count"] - identical if status == "on" and mode == "identical" and identical is not None else 0,
+                "found_label": format_int(row["count"]),
+            })
         duplicates_total = format_int(sum(row['count'] for row in duplicate_rows))
         return duplicate_rows, duplicates_by_entity, duplicates_total
 
@@ -477,6 +487,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         "add": N_("Hinzufügen"), "correct": N_("Korrektur"), "purge": N_("Bereinigen"),
         "mark": N_("Markieren"), "undo": N_("Rückgängig"),
         "compact": N_("Verdichten"), "retention": N_("Aufbewahrung"),
+        "duplicates_auto_run": N_("Duplikate automatisch entfernen"),
     }
     _ACTIVITY_STATUS_LABELS = {
         "success": N_("Erfolgreich"), "failed": N_("Fehlgeschlagen"), "interrupted": N_("Abgebrochen"),
@@ -905,6 +916,174 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         return deps.templates.TemplateResponse(request, "_stale_entities_body.html", _stale_entities_context(days))
 
 
+    def _duplicates_auto_view(state: dict) -> dict:
+        """Anzeigewerte der Automatik für _duplicates_auto.html (Schalter, Modus, Takt, Läufe der letzten 7 Tage)."""
+        def when(ts: float) -> str:
+            return f"{format_timestamp(ts, deps.tz)} {format_time(ts, deps.tz)[:5]}"
+
+        runs = []
+        for run in duplicates_auto.runs(deps.index):
+            runs.append({
+                "when": when(run["created_at"]), "total": run["total"], "first": run["first"], "manual": run["manual"],
+                "undone": run["undone"], "run_at_raw": repr(run["run_at"]),
+                "summary": (
+                    tr("{values} Werte bei {entities}", values=format_int(run["total"]), entities=duplicates_auto.entities_label(len(run["entities"])))
+                    if run["total"] else tr("nichts markiert")
+                ),
+                "entities": [
+                    {"entity_id": e["entity_id"], "name": e["name"], "count_label": format_int(e["count"]), "left": e["left"]}
+                    for e in run["entities"]
+                ],
+                "halted_names": [_entity_label(deps.index, entity_id) for entity_id in run["halted"]],
+            })
+        return {
+            "enabled": state["enabled"], "mode": state["mode"],
+            "mode_label": tr(DUPLICATES_AUTO_MODES[state["mode"]]),
+            "since_label": format_timestamp(state["since"], deps.tz) if state["since"] else "—",
+            "last_label": format_time(state["last_run"], deps.tz)[:5] if state["last_run"] else "—",
+            "next_label": (
+                tr("gegen {time}", time=format_time(state["last_run"] + duplicates_auto.RUN_INTERVAL_SECONDS, deps.tz)[:5])
+                if state["last_run"] else tr("beim nächsten Takt")
+            ),
+            "runs": runs,
+        }
+
+    def _entity_label(index: Index, entity_id: str) -> str:
+        entity = index.get_entity(entity_id)
+        return (entity["custom_name"] or entity["friendly_name"] or entity_id) if entity is not None else entity_id
+
+    def _duplicates_context(result: dict | None = None, dialog: dict | None = None, rows: tuple | None = None) -> dict:
+        """Kontext von _duplicates_auto.html (Abschnitt „Duplikate“): Tabelle, Schalter, Läufe; ``dialog`` öffnet die
+        Bestätigung zum Einschalten bzw. Ändern des Modus."""
+        state = duplicates_auto.settings(deps.index)
+        _, duplicates_by_entity, duplicates_total = rows or _duplicate_rows_for_display()
+        return {
+            "duplicates_by_entity": duplicates_by_entity, "duplicates_total": duplicates_total,
+            "dup_auto": _duplicates_auto_view(state), "dup_auto_limit": duplicates_auto.MAX_PER_ENTITY,
+            "dup_result": result, "dup_dialog": dialog,
+        }
+
+    def _duplicates_dialog(mode: str, change: bool) -> dict:
+        texts = {
+            "identical": tr("Zwei identische Zeilen zur selben Zeit: eine bleibt. Dabei geht nichts verloren."),
+            "all": tr("Je Zeitstempel bleibt der größte Wert. Passt zu Zählern, bei Messwerten ist das eine Annahme."),
+        }
+        return {
+            "mode": mode, "change": change,
+            "modes": [(value, tr(label), texts[value]) for value, label in DUPLICATES_AUTO_MODES.items()],
+            "preview": duplicates_auto.preview(deps.index, mode),
+        }
+
+    def _duplicates_response(request: Request, result: dict | None = None, dialog: dict | None = None) -> HTMLResponse:
+        return deps.templates.TemplateResponse(request, "_duplicates_auto.html", _duplicates_context(result, dialog))
+
+    def _form_mode(form) -> str:
+        mode = str(form.get("mode", ""))
+        if mode not in DUPLICATES_AUTO_MODES:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Eingabe"))
+        return mode
+
+    @router.get("/housekeeping/duplicates/auto", response_class=HTMLResponse)
+    def duplicates_auto_view(request: Request) -> HTMLResponse:
+        """Abschnitt „Duplikate“ ohne Dialog (z. B. nach „Abbrechen“)."""
+        return _duplicates_response(request)
+
+    @router.post("/housekeeping/duplicates/auto/preview", response_class=HTMLResponse)
+    def duplicates_auto_preview(request: Request, mode: str = Form(""), change: str = Form("")) -> HTMLResponse:
+        """Schalter „Automatisch entfernen“ (aus → an) oder „Modus ändern“: zeigt die Bestätigung samt Vorschau,
+        schreibt aber nichts. Gewechselter Modus lädt die Vorschau neu."""
+        if mode not in DUPLICATES_AUTO_MODES:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Eingabe"))
+        return _duplicates_response(request, dialog=_duplicates_dialog(mode, bool(change)))
+
+    @router.post("/housekeeping/duplicates/auto/enable", response_class=HTMLResponse)
+    def duplicates_auto_enable(request: Request, mode: str = Form("")) -> HTMLResponse:
+        if mode not in DUPLICATES_AUTO_MODES:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Eingabe"))
+        duplicates_auto.enable(deps.index, mode, time.time())
+        return _duplicates_response(request, {
+            "message": tr("Automatik eingeschaltet."),
+            "note": tr("Der erste Lauf kommt beim nächsten Wartungstakt (innerhalb weniger Minuten). Jeder Lauf erscheint hier und als Meldung."),
+        })
+
+    @router.post("/housekeeping/duplicates/auto/mode", response_class=HTMLResponse)
+    def duplicates_auto_mode(request: Request, mode: str = Form("")) -> HTMLResponse:
+        if mode not in DUPLICATES_AUTO_MODES:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Eingabe"))
+        duplicates_auto.set_mode(deps.index, mode)
+        return _duplicates_response(request, {"message": tr("Modus geändert."), "note": tr("Er gilt ab dem nächsten Lauf.")})
+
+    @router.post("/housekeeping/duplicates/auto/disable", response_class=HTMLResponse)
+    def duplicates_auto_disable(request: Request) -> HTMLResponse:
+        duplicates_auto.disable(deps.index)
+        return _duplicates_response(request, {
+            "message": tr("Automatik ausgeschaltet."),
+            "note": tr("Bereits markierte Werte bleiben markiert und lassen sich weiter zurücknehmen."),
+        })
+
+    @router.post("/housekeeping/duplicates/auto/undo", response_class=HTMLResponse)
+    async def duplicates_auto_undo(request: Request) -> HTMLResponse:
+        """Nimmt einen Lauf (oder nur eine Entität daraus) zurück."""
+        form = await request.form()
+        try:
+            run_at = float(form.get("run_at", ""))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=tr("Ungültige Eingabe")) from None
+        entity_id = str(form.get("entity_id", "")) or None
+        restored = await run_in_threadpool(duplicates_auto.undo_run, deps.index, run_at, _bounded_entity_lock, entity_id)
+        if restored:
+            deps.invalidate_purge_preview()
+        return _duplicates_response(request, {
+            "message": tr("{values} Werte wiederhergestellt.", values=format_int(restored)),
+            "note": tr("Diese Zeitstempel werden nicht erneut automatisch entfernt."),
+        })
+
+    @router.post("/housekeeping/duplicates/auto/resume", response_class=HTMLResponse)
+    async def duplicates_auto_resume(request: Request) -> HTMLResponse:
+        """„Fortsetzen“ bei einer angehaltenen Entität: räumt sie jetzt ohne Sicherung auf."""
+        form = await request.form()
+        entity_id = str(form.get("entity_id", ""))
+        if deps.index.get_entity(entity_id) is None:
+            raise HTTPException(status_code=404, detail=tr("Entität nicht gefunden"))
+        marked = await run_in_threadpool(
+            duplicates_auto.resume_entity, deps.data_dir, deps.index, deps.tz, entity_id, _bounded_entity_lock
+        )
+        if marked:
+            deps.invalidate_purge_preview()
+        return _duplicates_response(request, {
+            "message": tr("{values} Werte markiert.", values=format_int(marked)) if marked else tr("Nichts zu markieren."),
+            "note": tr("Die Automatik läuft für diese Entität wieder mit."),
+        })
+
+    def _duplicates_auto_field_context(entity_id: str) -> dict:
+        entity = deps.index.get_entity(entity_id)
+        return {
+            "entity_id": entity_id,
+            "dup_state": entity_status_for_field(entity),
+        }
+
+    def entity_status_for_field(entity) -> dict:
+        state = duplicates_auto.settings(deps.index)
+        status, _ = duplicates_auto.entity_status(entity, state["mode"])
+        return {"status": status, "global_on": state["enabled"], "exempt": entity["duplicates_auto"] == "off"}
+
+    @router.post("/entities/{entity_id}/duplicates-auto", response_class=HTMLResponse)
+    def entity_duplicates_auto(request: Request, entity_id: str, mode: str = Form(""), from_: str = Form("", alias="from")) -> HTMLResponse:
+        """Ausnahme „Duplikate nie automatisch entfernen“ je Entität (``off``) oder zurück zur globalen Einstellung
+        (``inherit``). Kommt von der Konfiguration (liefert nur das Feld) oder aus Housekeeping (liefert den Abschnitt)."""
+        if mode not in ("inherit", "off"):
+            raise HTTPException(status_code=400, detail=tr("Ungültige Eingabe"))
+        if deps.index.get_entity(entity_id) is None:
+            raise HTTPException(status_code=404, detail=tr("Entität nicht gefunden"))
+        deps.index.set_duplicates_auto(entity_id, mode)
+        if from_ == "housekeeping":
+            return _duplicates_response(request)
+        return deps.templates.TemplateResponse(request, "_duplicates_auto_field.html", _duplicates_auto_field_context(entity_id))
+
+    deps.templates.env.globals["duplicates_auto_field"] = lambda entity_id: (
+        _duplicates_auto_field_context(entity_id) if deps.index.get_entity(entity_id) is not None else None
+    )
+
     @router.get("/housekeeping", response_class=HTMLResponse)
     def housekeeping_view(request: Request) -> HTMLResponse:
         """Sammelt Dinge, die niemandem auffallen, solange man nicht gezielt danach
@@ -930,7 +1109,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             {"id": t["id"], "name": t["name"], "row_count": t["row_count"], "column_count": t["column_count"]}
             for t in deps.index.list_unused_saved_tables()
         ]
-        _, duplicates_by_entity, duplicates_total = _duplicate_rows_for_display()
+        duplicates_auto.mark_seen(deps.index)  # die Glocken-Meldung über automatische Läufe gilt mit dem Besuch als gesehen
         return deps.templates.TemplateResponse(
             request,
             "housekeeping.html",
@@ -939,8 +1118,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "unused_tables": unused_tables,
                 "chart_count": deps.index.count_saved_charts(),
                 "table_count": deps.index.count_saved_tables(),
-                "duplicates_by_entity": duplicates_by_entity,
-                "duplicates_total": duplicates_total,
+                **_duplicates_context(rows=_duplicate_rows_for_display()),
                 **_counter_decreases_context(),
                 "data_quality": data_quality.build_matrix(deps.index),
                 "gap_threshold_conflicts": notices_mod.gap_threshold_conflicts(deps.index),

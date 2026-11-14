@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import cleanup_stats, counter_auto, data_quality
+from . import cleanup_stats, counter_auto, data_quality, duplicates_auto
 from . import purge_auto
 from . import ha_integration
 from . import tips as tips_mod
@@ -843,6 +843,21 @@ def build_notices(
     # Housekeeping-Tabelle treibt (siehe main.py _refresh_duplicate_snapshot_if_stale) —
     # nur ein zusätzlicher, günstiger Blick auf denselben Cache.
     duplicate_rows = (index.get_duplicate_snapshot() or {}).get("rows", [])
+    auto_state = duplicates_auto.settings(index)
+    if auto_state["enabled"]:
+        # Mit eingeschalteter Automatik zählt die Meldung nur, was sie nicht erledigt: Ausnahmen, Zustands-
+        # Entitäten, angehaltene Entitäten und abweichende Werte im Modus „nur bei gleichem Wert“.
+        open_rows = []
+        for row in duplicate_rows:
+            entity = index.get_entity(row["entity_id"])
+            if entity is None:
+                continue
+            status, mode = duplicates_auto.entity_status(entity, auto_state["mode"])
+            identical = row.get("identical")
+            left = row["count"] if status != "on" else (row["count"] - identical if mode == "identical" and identical is not None else 0)
+            if left > 0:
+                open_rows.append({**row, "count": left})
+        duplicate_rows = open_rows
     if duplicate_rows:
         duplicate_total = sum(row["count"] for row in duplicate_rows)
         notices.append({
@@ -851,10 +866,12 @@ def build_notices(
             "title": tr("Duplikate gefunden"),
             "detail": (
                 tr("{format_int} doppelte Zeitstempel über {entities} in den letzten 30 Tagen.", format_int=format_int(duplicate_total), entities=(tr("{count} Entität", count=len(duplicate_rows)) if len(duplicate_rows) == 1 else tr("{count} Entitäten", count=len(duplicate_rows))))
+                + (" " + tr("Die Automatik erledigt davon nichts: Ausnahmen, Zustands-Entitäten, angehaltene Entitäten und abweichende Werte bleiben stehen.") if auto_state["enabled"] else "")
             ),
             "meta": tr("Duplikate"),
             "link": "/housekeeping#duplikate",
         })
+    notices.extend(duplicates_auto.notices(index, tz))
 
     counter_rows = (index.get_counter_decrease_snapshot() or {}).get("rows", [])
     pattern_rows = [row for row in counter_rows if len(row.get("returning_days", [])) >= cleanup.COUNTER_PATTERN_MIN_DAYS]

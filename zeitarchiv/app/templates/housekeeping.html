@@ -73,40 +73,8 @@
       </section>
 
       <section id="duplikate" class="settings-section">
-        <h2 class="settings-section-title">{{ _("Duplikate") }} {{ hint_button(_('Duplikate')) }}</h2>
-        {% call hint_body('settings-section-description') %}{{ _("Archivweit erkannte doppelte Zeitstempel, letzte 30 Tage.") }}{% endcall %}
-        <div class="tbl-wrap">
-          {% if duplicates_by_entity %}
-          <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
-            <colgroup>
-              <col class="stats-col-entity"><col class="stats-col-value">
-            </colgroup>
-            <thead><tr><th>{{ _("Entität") }}</th><th>{{ _("Duplikate") }}</th></tr></thead>
-            <tbody>
-            {% for row in duplicates_by_entity %}
-            <tr>
-              <td class="entity" data-sort="{{ row.friendly_name or row.entity_id }}">
-                <a href="entities/{{ row.entity_id }}/cleanup?filter=duplicates&amp;range=all" class="entity-tooltip-host">
-                  {% if row.friendly_name %}
-                  <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
-                  {% else %}
-                  <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
-                  {% endif %}
-                  <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name or _('Kein Friendly Name') }}</strong><code>{{ row.entity_id }}</code></span>
-                </a>
-              </td>
-              <td data-sort="{{ row.count_raw }}">{{ row.count }}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-          </table>
-          {% else %}
-          <div class="empty">{{ _("Keine Duplikate in den letzten 30 Tagen gefunden.") }}</div>
-          {% endif %}
-        </div>
-        {% if duplicates_by_entity %}
-        <p class="hint hint-status" style="margin-top:14px;">{{ _("{duplicates_total} doppelte Zeitstempel in den letzten 30 Tagen &mdash; die Bereinigungs-Seite entfernt sie über „Duplikate automatisch entfernen“.", duplicates_total=duplicates_total) }}</p>
-        {% endif %}
+        {# Schalter „Automatisch entfernen“, Tabelle und Läufe: duplicates_auto.py, ein Partial, das die Aktionen austauschen #}
+        <div id="duplicates-body">{% include "_duplicates_auto.html" %}</div>
       </section>
 
       <section id="zaehlerrueckgaenge" class="settings-section">

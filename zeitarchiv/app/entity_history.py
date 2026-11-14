@@ -56,6 +56,7 @@ SOURCE_LABELS = {
     "repetitions": N_("Wiederholungen"),
     "counter_bulk": N_("Zählerrückgänge · Sammelaktion"),
     "counter_rule": N_("Zählerrückgänge · Regel"),
+    "duplicates_auto": N_("Duplikate · Automatik"),
 }
 
 

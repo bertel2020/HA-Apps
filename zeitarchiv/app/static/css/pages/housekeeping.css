@@ -287,3 +287,40 @@
   .cbc-row{flex-direction:column;}
   .cbc-values{text-align:left;}
 }
+
+/* „Duplikate automatisch entfernen“ (_duplicates_auto.html): Schalter in der Kopfzeile des Abschnitts, Bestätigung
+   mit Vorschau, Statuszeile, Läufe der letzten 7 Tage. Nur Variablen, keine eigenen Farben. */
+.dup-auto-switch{display:inline-flex;align-items:center;gap:10px;margin-left:auto;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);cursor:pointer;}
+.dup-auto-switch .dup-auto-mode{color:var(--ink-muted);font-size:calc(12px * var(--font-scale, 1));}
+.dup-auto-switch strong{font-weight:600;}
+.dup-auto-dialog{margin:12px 0;padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);display:grid;gap:8px;max-width:640px;}
+.dup-auto-dialog-title{margin:0;font-size:calc(15px * var(--font-scale, 1));}
+.dup-auto-option{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;cursor:pointer;}
+.dup-auto-option.is-selected{border-color:var(--accent-line);background:var(--accent-line-soft);}
+.dup-auto-option input{margin-top:3px;}
+.dup-auto-option .hint{display:block;margin:2px 0 0;}
+.dup-auto-preview{padding:10px 12px;border-radius:10px;background:var(--surface-alt);font-size:calc(13px * var(--font-scale, 1));}
+.dup-auto-preview p{margin:0 0 6px;}
+.dup-auto-preview ul{margin:0 0 6px;padding-left:18px;}
+.dup-auto-dialog-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;}
+.dup-auto-status{margin:10px 0;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;}
+.dup-auto-cell{white-space:nowrap;font-size:calc(12.5px * var(--font-scale, 1));}
+.dup-auto-on{color:var(--accent-line);}
+.dup-auto-exempt,.dup-auto-state{color:var(--ink-muted);}
+.dup-auto-halted{color:var(--warning);}
+.dup-auto-action{text-align:right;white-space:nowrap;}
+.dup-auto-runs{margin-top:18px;}
+.dup-auto-runs h3{margin:0 0 8px;font-size:calc(14px * var(--font-scale, 1));font-weight:600;}
+.dup-auto-run{border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:8px;}
+.dup-auto-run summary{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:8px 12px;cursor:pointer;list-style:none;}
+.dup-auto-run summary::-webkit-details-marker{display:none;}
+.dup-auto-run-when{font-weight:600;font-size:calc(13px * var(--font-scale, 1));}
+.dup-auto-run-sum{flex:1;min-width:140px;color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));}
+.dup-auto-undone{color:var(--ink-faint);font-size:calc(12px * var(--font-scale, 1));}
+.dup-auto-run .dt{margin:0;border-top:1px solid var(--border);}
+.dup-auto-run .dt .name{display:block;font-weight:600;font-size:calc(13px * var(--font-scale, 1));}
+.dup-auto-run .dt .id{display:block;font-family:var(--font-mono);font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);}
+@media (max-width:640px){
+  .dup-auto-switch{margin-left:0;flex-basis:100%;justify-content:space-between;}
+  .dup-auto-cell{white-space:normal;}
+}

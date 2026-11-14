@@ -11,7 +11,7 @@ import re
 import time
 from zoneinfo import ZoneInfo
 
-from . import purge_auto
+from . import duplicates_auto, purge_auto
 from .formatting import format_int, format_timestamp
 from .i18n import tr
 
@@ -41,7 +41,8 @@ def items(index, tz: ZoneInfo) -> list[dict]:
         },
         {
             "label": tr("Doppelte Zeitstempel"), "count": duplicates, "warn": bool(duplicates),
-            "sub": tr("letzte 30 Tage") if duplicates else "", "link": "housekeeping#duplikate",
+            "sub": (tr("letzte 30 Tage · automatisch") if duplicates_auto.settings(index)["enabled"] else tr("letzte 30 Tage")) if duplicates else "",
+            "link": "housekeeping#duplikate",
         },
         {
             "label": tr("Markierte Werte"), "count": marked, "warn": False,

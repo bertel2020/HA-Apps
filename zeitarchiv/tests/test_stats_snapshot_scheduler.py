@@ -202,6 +202,10 @@ WARTUNGSPLANER_ZEILEN: dict[str, str | None] = {
     # kein zusätzlicher globaler Zustand, der eine eigene Diagnose-Zeile
     # rechtfertigen würde.
     "_run_automatic_purge_if_due": None,
+    # Standardmäßig aus (Housekeeping → Duplikate). Letzter Lauf und nächster Takt stehen im Abschnitt selbst, jeder
+    # Lauf mit Fund in der Läufe-Liste, in der Glocke und in Housekeeping → Aktivität — kein eigener globaler
+    # Zustand für eine Diagnose-Zeile, dasselbe Argument wie bei _run_automatic_purge_if_due.
+    "_run_duplicates_auto_if_due": None,
 }
 
 #: Läuft NICHT im 30-Sekunden-Takt, sondern einmalig beim Start in einem

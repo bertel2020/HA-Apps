@@ -14,6 +14,14 @@
 
 ### New
 
+- **Housekeeping**: Remove duplicates automatically on request
+  - New "Remove automatically" switch in the Duplicates section, off by default
+  - The hourly run marks duplicate timestamps of the last 30 days, either only
+    with the same value or keeping the largest value
+  - Every run appears as a notice and can be undone as a whole or per entity
+  - Single entities can be excluded; if too many new duplicates show up, the
+    automation pauses for that entity
+
 - **Import**: InfluxDB as another import tab (experimental)
   - One-off import of the history from an InfluxDB 1.x that the Home Assistant
     `influxdb` integration has written to

@@ -1,0 +1,166 @@
+{# Inhalt von <div id="duplicates-body"> in housekeeping.html (Abschnitt „Duplikate“): Kopfzeile mit dem Schalter
+   „Automatisch entfernen“ (duplicates_auto.py), Tabelle, Läufe der letzten 7 Tage. Jede Aktion der Automatik
+   (Einschalten, Modus, Ausnahme, Rückgängig) tauscht dieses Partial per hx-target="#duplicates-body" aus. #}
+{% from "_hints.html" import hint_button, hint_body %}
+{% set auto = dup_auto %}
+{% set auto_url = app_root ~ '/housekeeping/duplicates/auto' %}
+{% if dup_result %}
+<div class="counter-result" role="status">
+  <div class="counter-result-main"><strong>{{ dup_result.message }}</strong>{% if dup_result.note %}<p class="counter-result-note">{{ dup_result.note }}</p>{% endif %}</div>
+  <div class="counter-result-actions"><button type="button" class="btn btn-sm" onclick="this.closest('.counter-result').remove()">{{ _("OK") }}</button></div>
+</div>
+{% endif %}
+<div class="hk-section-head">
+  <h2 class="settings-section-title">{{ _("Duplikate") }} {{ hint_button(_('Duplikate')) }}</h2>
+  {% call hint_body('settings-section-description') %}{{ _("Archivweit erkannte doppelte Zeitstempel, letzte 30 Tage. Mit „Automatisch entfernen“ markiert der stündliche Lauf sie selbst zur Löschung. Nichts wird endgültig entfernt: die Werte stehen im Reiter „Markiert“ der Entität, jeder Lauf lässt sich hier zurücknehmen.") }}{% endcall %}
+  <label class="dup-auto-switch">
+    <span class="dup-auto-mode">{% if auto.enabled %}{{ auto.mode_label }}{% else %}{{ _("Aus") }}{% endif %}</span>
+    <span class="menu-toggle">
+      <input type="checkbox" role="switch" {% if auto.enabled %}checked hx-post="{{ auto_url }}/disable"{% else %}hx-post="{{ auto_url }}/preview"{% endif %}
+             hx-trigger="change" hx-target="#duplicates-body" hx-swap="innerHTML" hx-vals='{"mode": "{{ auto.mode }}"}' aria-label="{{ _('Duplikate automatisch entfernen') }}">
+      <span class="track"><span class="thumb"></span></span>
+    </span>
+    <strong>{{ _("Automatisch entfernen") }}</strong>
+  </label>
+</div>
+
+{% if dup_dialog %}
+{# Einschalten (und Modus ändern): Bestätigung mit Vorschau. Die Zahlen kommen aus dem stündlichen Schnappschuss. #}
+<form class="dup-auto-dialog" hx-post="{{ auto_url }}/{{ 'mode' if dup_dialog.change else 'enable' }}" hx-target="#duplicates-body" hx-swap="innerHTML">
+  <p class="dup-auto-dialog-title"><strong>{{ _("Modus ändern") if dup_dialog.change else _("Duplikate automatisch entfernen?") }}</strong></p>
+  <p class="hint hint-status">{{ _("Der stündliche Lauf markiert doppelte Zeitstempel der letzten 30 Tage zur Löschung. Nichts wird endgültig entfernt: die Werte stehen im Reiter „Markiert“ und lassen sich zurücknehmen.") }}</p>
+  {% for value, label, text in dup_dialog.modes %}
+  <label class="dup-auto-option{{ ' is-selected' if value == dup_dialog.mode else '' }}">
+    <input type="radio" name="mode" value="{{ value }}" {{ 'checked' if value == dup_dialog.mode else '' }}
+           hx-post="{{ auto_url }}/preview" hx-trigger="change" hx-target="#duplicates-body" hx-swap="innerHTML" hx-include="closest form"
+           {% if dup_dialog.change %}hx-vals='{"change": "1"}'{% endif %}>
+    <span><strong>{{ label }}{% if value == 'identical' %} {{ _("(empfohlen)") }}{% endif %}</strong><span class="hint">{{ text }}</span></span>
+  </label>
+  {% endfor %}
+  {% if not dup_dialog.change %}
+  <div class="dup-auto-preview">
+    {% if dup_dialog.preview.rows %}
+    <p><strong>{{ _("Beim ersten Lauf würden {total} Duplikate bei {entities} entfernt:", total=dup_dialog.preview.total_label, entities=dup_dialog.preview.entities_label) }}</strong></p>
+    <ul>
+      {% for row in dup_dialog.preview.rows %}
+      <li><strong>{{ row.name }}</strong> · {{ row.count }}{% if row.left %} <span class="hint">{{ _("({count} mit abweichendem Wert bleiben)", count=row.left) }}</span>{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p><strong>{{ _("Im Moment gibt es nichts aufzuräumen.") }}</strong> {{ _("Die Automatik räumt auf, was künftig dazukommt.") }}</p>
+    {% endif %}
+    {% if dup_dialog.preview.skipped %}
+    <p class="hint">{{ _("Nicht automatisch:") }} {% for item in dup_dialog.preview.skipped %}<strong>{{ item.name }}</strong> ({{ item.reason }}){{ ", " if not loop.last }}{% endfor %}</p>
+    {% endif %}
+  </div>
+  <p class="hint">{{ _("Danach räumt jeder Lauf nur auf, was neu dazukommt. Findet ein Lauf bei einer Entität mehr als {limit} Duplikate, hält die Automatik für sie an und meldet das: dann stimmt meist etwas an der Quelle nicht.", limit=dup_auto_limit) }}</p>
+  {% endif %}
+  <div class="dup-auto-dialog-actions">
+    <button type="button" class="btn btn-sm" hx-get="{{ auto_url }}" hx-target="#duplicates-body" hx-swap="innerHTML">{{ _("Abbrechen") }}</button>
+    <button type="submit" class="btn btn-sm primary">{{ _("Speichern") if dup_dialog.change else _("Einschalten") }}</button>
+  </div>
+</form>
+{% elif auto.enabled %}
+<p class="dup-auto-status">
+  {{ _("Automatik: {mode} · seit {since} · letzter Lauf {last}, nächster {next}.", mode=auto.mode_label, since=auto.since_label, last=auto.last_label, next=auto.next_label) }}
+  <button type="button" class="btn btn-sm" hx-post="{{ auto_url }}/preview" hx-vals='{"change": "1", "mode": "{{ auto.mode }}"}' hx-target="#duplicates-body" hx-swap="innerHTML">{{ _("Modus ändern") }}</button>
+</p>
+{% endif %}
+
+<div class="tbl-wrap">
+  {% if duplicates_by_entity %}
+  <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
+    <colgroup>
+      <col class="stats-col-entity"><col class="stats-col-value">{% if auto.enabled %}<col class="stats-col-value"><col>{% else %}<col class="stats-col-value">{% endif %}
+    </colgroup>
+    <thead><tr>
+      <th>{{ _("Entität") }}</th><th>{{ _("Duplikate") }}</th>
+      {% if auto.enabled %}<th>{{ _("Automatik") }}</th><th></th>{% else %}<th>{{ _("davon gleicher Wert") }}</th>{% endif %}
+    </tr></thead>
+    <tbody>
+    {% for row in duplicates_by_entity %}
+    <tr>
+      <td class="entity" data-sort="{{ row.friendly_name or row.entity_id }}">
+        <a href="entities/{{ row.entity_id }}/cleanup?filter=duplicates&amp;range=all" class="entity-tooltip-host">
+          {% if row.friendly_name %}
+          <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
+          {% else %}
+          <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
+          {% endif %}
+          <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name or _('Kein Friendly Name') }}</strong><code>{{ row.entity_id }}</code></span>
+        </a>
+      </td>
+      <td data-sort="{{ row.count_raw }}">{{ row.count }}</td>
+      {% if auto.enabled %}
+      <td class="dup-auto-cell dup-auto-{{ row.status }}" data-sort="{{ row.status }}">
+        {% if row.status == 'on' %}<span>● {{ _("an") }}</span>{% if row.differs %} <span class="hint">{{ _("({count} abweichend, bleiben)", count=row.differs) }}</span>{% endif %}
+        {% elif row.status == 'exempt' %}<span>○ {{ _("Ausnahme") }}</span>
+        {% elif row.status == 'state' %}<span>– {{ _("Zustand, nur von Hand") }}</span>
+        {% else %}<span>▲ {{ _("angehalten ({count} in einem Lauf)", count=row.found_label) }}</span>{% endif %}
+      </td>
+      <td class="dup-auto-action">
+        {% if row.status == 'on' %}
+        <button type="button" class="btn btn-sm" hx-post="{{ app_root }}/entities/{{ row.entity_id }}/duplicates-auto" hx-vals='{"mode": "off", "from": "housekeeping"}' hx-target="#duplicates-body" hx-swap="innerHTML">{{ _("Ausnehmen") }}</button>
+        {% elif row.status == 'exempt' %}
+        <button type="button" class="btn btn-sm" hx-post="{{ app_root }}/entities/{{ row.entity_id }}/duplicates-auto" hx-vals='{"mode": "inherit", "from": "housekeeping"}' hx-target="#duplicates-body" hx-swap="innerHTML">{{ _("Wieder einbeziehen") }}</button>
+        {% elif row.status == 'halted' %}
+        <button type="button" class="btn btn-sm" hx-post="{{ auto_url }}/resume" hx-vals='{"entity_id": "{{ row.entity_id }}"}' hx-target="#duplicates-body" hx-swap="innerHTML"
+                hx-confirm="{{ _('Die Duplikate dieser Entität jetzt zur Löschung markieren und die Automatik fortsetzen? Nichts wird endgültig entfernt, die Werte lassen sich zurücknehmen.') }}">{{ _("Fortsetzen …") }}</button>
+        {% endif %}
+      </td>
+      {% else %}
+      <td data-sort="{{ row.identical_raw }}">{{ row.identical_label }}</td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">{{ _("Keine Duplikate in den letzten 30 Tagen gefunden.") }}</div>
+  {% endif %}
+</div>
+{% if duplicates_by_entity %}
+<p class="hint hint-status" style="margin-top:14px;">
+  {% if auto.enabled %}{{ _("{duplicates_total} doppelte Zeitstempel in den letzten 30 Tagen. Was die Automatik nicht erledigt, bleibt hier stehen und lässt sich auf der Bereinigungs-Seite über „Duplikate automatisch entfernen“ entfernen.", duplicates_total=duplicates_total) }}
+  {% else %}{{ _("{duplicates_total} doppelte Zeitstempel in den letzten 30 Tagen &mdash; die Bereinigungs-Seite entfernt sie über „Duplikate automatisch entfernen“.", duplicates_total=duplicates_total) }}{% endif %}
+</p>
+{% endif %}
+
+{% if auto.runs %}
+<div class="dup-auto-runs">
+  <h3>{{ _("Letzte automatische Läufe") }}</h3>
+  {% for run in auto.runs %}
+  <details class="dup-auto-run"{% if loop.first %} open{% endif %}>
+    <summary>
+      <span class="dup-auto-run-when">{{ run.when }}{% if run.first %} · {{ _("erster Lauf") }}{% endif %}{% if run.manual %} · {{ _("von Hand fortgesetzt") }}{% endif %}</span>
+      <span class="dup-auto-run-sum">{{ run.summary }}</span>
+      {% if run.undone %}<span class="dup-auto-undone">{{ _("zurückgenommen") }}</span>
+      {% elif run.total %}
+      <button type="button" class="btn btn-sm" hx-post="{{ auto_url }}/undo" hx-vals='{"run_at": "{{ run.run_at_raw }}"}' hx-target="#duplicates-body" hx-swap="innerHTML"
+              hx-confirm="{{ _('Diesen Lauf zurücknehmen? Die Werte sind danach wieder aktiv und werden nicht erneut automatisch entfernt.') }}"
+              onclick="event.stopPropagation()">{{ _("Lauf rückgängig") }}</button>
+      {% endif %}
+    </summary>
+    <table class="dt">
+      <tbody>
+      {% for item in run.entities %}
+      <tr>
+        <td><span class="name">{{ item.name }}</span><span class="id">{{ item.entity_id }}</span></td>
+        <td>{{ item.count_label }}</td>
+        <td class="dup-auto-action">
+          {% if item.left %}
+          <button type="button" class="btn btn-sm" hx-post="{{ auto_url }}/undo" hx-vals='{"run_at": "{{ run.run_at_raw }}", "entity_id": "{{ item.entity_id }}"}' hx-target="#duplicates-body" hx-swap="innerHTML">{{ _("Rückgängig") }}</button>
+          {% else %}<span class="dup-auto-undone">{{ _("zurückgenommen") }}</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      {% for name in run.halted_names %}
+      <tr><td colspan="3"><span class="hint">▲ {{ _("{name} angehalten: zu viele Duplikate in einem Lauf", name=name) }}</span></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% endfor %}
+  <p class="hint">{{ _("Zurücknehmen geht, bis die automatische Bereinigung markierte Werte endgültig entfernt. Läufe ohne Fund erscheinen nicht.") }}</p>
+</div>
+{% endif %}

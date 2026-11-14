@@ -1,0 +1,24 @@
+{% from "_hints.html" import hint_button, hint_body %}
+{# Konfiguration → „Duplikate automatisch entfernen“ (duplicates_auto.py): Ausnahme je Entität. Wird von
+   entity_config_form eingebunden und von POST /entities/{id}/duplicates-auto (housekeeping_routes.py) allein neu gerendert. #}
+<div class="field cfg-row" id="duplicates-auto-field">
+  <label>{{ _("Duplikate automatisch entfernen") }} {{ hint_button(_('Duplikate automatisch entfernen')) }}</label>
+  <p class="cfg-short">{{ _("Ausnahme von der globalen Einstellung in Housekeeping") }}</p>
+  {% if dup_state.status == 'state' %}
+  <p class="hint hint-status">{{ _("Zustands-Entitäten entfernt die Automatik nie von selbst; Duplikate lassen sich nur von Hand auf der Bereinigungs-Seite entfernen.") }}</p>
+  {% else %}
+  <div class="dup-auto-box">
+    <strong>{{ _("Ausnahme: nie automatisch") if dup_state.exempt else _("Wie global") }}</strong>
+    <span class="counter-auto-state">{{ _("Ein") if dup_state.global_on and not dup_state.exempt else _("Aus") }}</span>
+    {% if dup_state.exempt %}
+    <button type="button" class="btn btn-sm" hx-post="{{ app_root }}/entities/{{ entity_id }}/duplicates-auto" hx-vals='{"mode": "inherit"}'
+            hx-target="#duplicates-auto-field" hx-swap="outerHTML">{{ _("Wieder einbeziehen") }}</button>
+    {% else %}
+    <button type="button" class="btn btn-sm" hx-post="{{ app_root }}/entities/{{ entity_id }}/duplicates-auto" hx-vals='{"mode": "off"}'
+            hx-target="#duplicates-auto-field" hx-swap="outerHTML">{{ _("Ausnehmen") }}</button>
+    {% endif %}
+    {% if dup_state.status == 'halted' %}<p class="hint hint-status">{{ _("Angehalten: in einem Lauf gab es zu viele Duplikate. Fortsetzen geht in Housekeeping unter Duplikate.") }}</p>{% endif %}
+  </div>
+  {% endif %}
+  {% call hint_body() %}{{ _("Ist in Housekeeping „Duplikate automatisch entfernen“ eingeschaltet, räumt der stündliche Lauf auch diese Entität auf. Mit „Ausnehmen“ bleibt sie davon ausgenommen; die Duplikate lassen sich weiter von Hand entfernen.") }}{% endcall %}
+</div>

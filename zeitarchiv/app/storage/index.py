@@ -409,6 +409,8 @@ CREATE TABLE IF NOT EXISTS entities (
     counter_auto_mark INTEGER NOT NULL DEFAULT 0,
     counter_auto_since REAL,
     counter_auto_halted_at REAL,
+    duplicates_auto TEXT NOT NULL DEFAULT 'inherit',
+    duplicates_auto_halted_at REAL,
     unit TEXT,
     state_class TEXT,
     friendly_name TEXT,
@@ -436,6 +438,13 @@ CREATE TABLE IF NOT EXISTS entities (
 -- Zeitstempel, die bei einem Zähler mit Regel „Fehlwerte automatisch markieren“ zurückgenommen wurden:
 -- sie gelten als bewusst behalten und werden von der Regel nicht erneut markiert (counter_auto.py).
 CREATE TABLE IF NOT EXISTS counter_mark_ignored (
+    entity_id TEXT NOT NULL,
+    ts REAL NOT NULL,
+    PRIMARY KEY (entity_id, ts)
+);
+-- Dasselbe für „Duplikate automatisch entfernen“ (duplicates_auto.py): zurückgenommene Zeitstempel
+-- bleiben stehen, der stündliche Lauf nimmt sie nicht erneut mit.
+CREATE TABLE IF NOT EXISTS duplicate_auto_ignored (
     entity_id TEXT NOT NULL,
     ts REAL NOT NULL,
     PRIMARY KEY (entity_id, ts)
@@ -1086,6 +1095,9 @@ class Index:
             ("counter_auto_mark", "INTEGER NOT NULL DEFAULT 0"),
             ("counter_auto_since", "REAL"),
             ("counter_auto_halted_at", "REAL"),
+            # „inherit“ = folgt dem globalen Schalter, „off“ = Ausnahme (duplicates_auto.py)
+            ("duplicates_auto", "TEXT NOT NULL DEFAULT 'inherit'"),
+            ("duplicates_auto_halted_at", "REAL"),
         ):
             if column not in columns:
                 self._conn.execute(f"ALTER TABLE entities ADD COLUMN {column} {ddl}")
@@ -2648,6 +2660,19 @@ class Index:
                 "SELECT * FROM entity_actions ORDER BY created_at DESC, id DESC LIMIT ?",
                 (safe_limit,),
             ).fetchall()
+
+    def list_entity_actions_by_action(self, action: str, *, since_ts: float | None = None, limit: int = 200) -> list[sqlite3.Row]:
+        """Protokolleinträge EINER Aktionsart über alle Entitäten, neueste zuerst (z. B. die Läufe von
+        „Duplikate automatisch entfernen“, die keiner einzelnen Entität gehören)."""
+        sql = "SELECT * FROM entity_actions WHERE action = ?"
+        params: list = [action]
+        if since_ts is not None:
+            sql += " AND created_at >= ?"
+            params.append(since_ts)
+        sql += " ORDER BY created_at DESC, id DESC LIMIT ?"
+        params.append(max(1, min(int(limit), 500)))
+        with self._lock, self._conn:
+            return self._conn.execute(sql, params).fetchall()
 
     def list_entity_actions_for_entity(
         self,
@@ -4535,6 +4560,39 @@ class Index:
             "AND state_class = 'total_increasing'"
         ).fetchall()
 
+    def set_duplicates_auto(self, entity_id: str, mode: str) -> None:
+        """"inherit" (folgt dem globalen Schalter) oder "off" (Ausnahme). Eine Rückkehr zu "inherit" hebt
+        auch ein „angehalten“ auf."""
+        if mode not in ("inherit", "off"):
+            raise ValueError(mode)
+        with self._lock, self._conn:
+            self._conn.execute(
+                "UPDATE entities SET duplicates_auto = ?, duplicates_auto_halted_at = NULL WHERE entity_id = ?",
+                (mode, entity_id),
+            )
+
+    def set_duplicates_auto_halted(self, entity_id: str, now: float | None) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("UPDATE entities SET duplicates_auto_halted_at = ? WHERE entity_id = ?", (now, entity_id))
+
+    def list_duplicates_auto_halted(self) -> list[sqlite3.Row]:
+        return self._read_conn().execute(
+            "SELECT * FROM entities WHERE duplicates_auto_halted_at IS NOT NULL"
+        ).fetchall()
+
+    def remember_duplicate_auto_ignored(self, entity_id: str, deleted_at: float) -> None:
+        """Die Zeitstempel einer Charge als „bewusst behalten“ vermerken (vor dem Zurücknehmen eines Automatik-Laufs)."""
+        with self._lock, self._conn:
+            self._conn.execute(
+                "INSERT OR IGNORE INTO duplicate_auto_ignored (entity_id, ts) "
+                "SELECT entity_id, ts FROM deleted_points WHERE entity_id = ? AND deleted_at = ?",
+                (entity_id, deleted_at),
+            )
+
+    def list_duplicate_auto_ignored(self, entity_id: str) -> set[float]:
+        rows = self._read_conn().execute("SELECT ts FROM duplicate_auto_ignored WHERE entity_id = ?", (entity_id,)).fetchall()
+        return {row["ts"] for row in rows}
+
     def list_counter_mark_ignored(self, entity_id: str) -> set[float]:
         rows = self._read_conn().execute("SELECT ts FROM counter_mark_ignored WHERE entity_id = ?", (entity_id,)).fetchall()
         return {row["ts"] for row in rows}
@@ -4548,6 +4606,15 @@ class Index:
             "AND EXISTS (SELECT 1 FROM entities WHERE entity_id = ? AND counter_auto_mark = 1)",
             (entity_id, *params, entity_id),
         )
+        # Dasselbe für „Duplikate automatisch entfernen“: wer eine Markierung zurücknimmt, will den Wert
+        # behalten, solange der Schalter an ist (sonst käme er beim nächsten Lauf sofort wieder).
+        enabled = self._conn.execute("SELECT value FROM settings WHERE key = 'duplicates_auto_enabled'").fetchone()
+        if enabled is not None and enabled["value"] == "on":
+            self._conn.execute(
+                "INSERT OR IGNORE INTO duplicate_auto_ignored (entity_id, ts) "
+                f"SELECT entity_id, ts FROM deleted_points WHERE entity_id = ? AND {where}",
+                (entity_id, *params),
+            )
 
     def list_counter_decreases_allowed(self) -> list[sqlite3.Row]:
         return self._read_conn().execute(
@@ -4578,7 +4645,7 @@ class Index:
         Konfiguration, Dashboards und Einstellungen bleiben."""
         with self._lock, self._conn:
             for table in (
-                "deleted_points", "ingested_events", "counter_mark_ignored",
+                "deleted_points", "ingested_events", "counter_mark_ignored", "duplicate_auto_ignored",
                 "compacted_months", "stats_snapshots",
             ):
                 self._conn.execute(f"DELETE FROM {table}")  # noqa: S608 — feste Namen
@@ -4586,7 +4653,7 @@ class Index:
                 """UPDATE entities
                    SET first_ts = NULL, last_ts = NULL, last_value = NULL, row_count = 0,
                        deleted_count = 0, size_bytes = 0, counter_auto_since = NULL,
-                       counter_auto_halted_at = NULL, updated_at = ?""",
+                       counter_auto_halted_at = NULL, duplicates_auto_halted_at = NULL, updated_at = ?""",
                 (time.time(),),
             )
 
@@ -4632,6 +4699,7 @@ class Index:
             self._conn.execute(
                 "DELETE FROM deleted_points WHERE entity_id = ?", (entity_id,)
             )
+            self._conn.execute("DELETE FROM duplicate_auto_ignored WHERE entity_id = ?", (entity_id,))
             self._conn.execute(
                 "DELETE FROM ingested_events WHERE entity_id = ?", (entity_id,)
             )

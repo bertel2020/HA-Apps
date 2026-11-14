@@ -832,6 +832,30 @@ def iter_duplicate_rows_to_delete(
         pending = row
 
 
+def iter_identical_duplicate_rows(rows: Iterable[tuple[float, float]]) -> Iterator[tuple[float, float]]:
+    """Zeilen, die eine vorangehende Zeile mit GENAU demselben Zeitstempel und Wert wiederholen (für die
+    Automatik im Modus „Nur bei gleichem Wert“). rows ist nach (Zeitstempel, Wert) sortiert, gleiche Zeilen
+    liegen also direkt hintereinander; eine bleibt je Gruppe erhalten, beim Löschen geht keine Information verloren."""
+    previous: tuple[float, float] | None = None
+    for row in rows:
+        if previous is not None and row[0] == previous[0] and row[1] == previous[1]:
+            yield row
+        previous = row
+
+
+def count_duplicates(rows: Iterable[tuple[float, float]]) -> tuple[int, int]:
+    """(alle überzähligen Zeilen je Zeitstempel, davon wertgleiche) in EINEM Durchlauf, ohne die Zeilen zu halten."""
+    total = identical = 0
+    previous: tuple[float, float] | None = None
+    for row in rows:
+        if previous is not None and row[0] == previous[0]:
+            total += 1
+            if row[1] == previous[1]:
+                identical += 1
+        previous = row
+    return total, identical
+
+
 def duplicate_rows_to_delete(rows: Iterable[tuple[float, float]]) -> list[tuple[float, float]]:
     """Für "Duplikate automatisch entfernen" (Konzept Abschnitt 04): bei jedem
     mehrfach vorkommenden Zeitstempel bleibt genau EIN Vorkommen erhalten — das
@@ -894,12 +918,14 @@ def count_duplicate_rows_by_entity(
     for entity in index.list_entities():
         entity_id = entity["entity_id"]
         rows = iter_raw_rows(data_dir, index, entity_id, window_start, window_end, tz, now=now)
-        count = sum(1 for _ in iter_duplicate_rows_to_delete(rows))
+        count, identical = count_duplicates(rows)
         if count:
             results.append({
                 "entity_id": entity_id,
                 "friendly_name": entity["custom_name"] or entity["friendly_name"],
                 "count": count,
+                # davon wertgleich: das erledigt die Automatik im Standardmodus (duplicates_auto.py)
+                "identical": identical,
             })
     results.sort(key=lambda r: r["count"], reverse=True)
     return results
@@ -1101,7 +1127,7 @@ def detect_outliers(
 
 
 #: Herkunft einer Markierung (Reiter „Markiert“, „Verlauf“): was die Chargen auslöste.
-MARK_SOURCES = ("manual", "duplicates", "repetitions", "counter_bulk", "counter_rule")
+MARK_SOURCES = ("manual", "duplicates", "repetitions", "counter_bulk", "counter_rule", "duplicates_auto")
 
 
 def soft_delete(

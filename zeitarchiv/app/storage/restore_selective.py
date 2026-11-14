@@ -63,7 +63,7 @@ _HOT_NAME_RE = r"^{id}-\d{{4}}-\d{{2}}\.csv$"
 ENTITY_GROUPS: dict[str, tuple[str, ...]] = {
     "name": ("custom_name",),
     "ret": ("retention", "resolution", "compact_target", "hourly_rollup"),
-    "filter": ("value_filter", "ignore_values_enabled", "ignore_values", "gap_threshold", "outlier_threshold"),
+    "filter": ("value_filter", "ignore_values_enabled", "ignore_values", "gap_threshold", "outlier_threshold", "duplicates_auto"),
     "counter": ("counter_decreases", "counter_auto_mark"),
     "disp": ("decimals", "display_mode", "chart_options", "is_favorite"),
     # Keine Spalte von entities, sondern die Zuordnung in entity_category (Name
@@ -90,6 +90,7 @@ _COLUMN_LABELS = {
     "ignore_values": N_("Zu ignorierende Werte"),
     "gap_threshold": N_("Lückengrenze"),
     "outlier_threshold": N_("Ausreißergrenze"),
+    "duplicates_auto": N_("Duplikate automatisch entfernen"),
     "counter_decreases": N_("Zählerrückgänge"),
     "counter_auto_mark": N_("Automatisch markieren"),
     "decimals": N_("Nachkommastellen"),
@@ -134,6 +135,8 @@ GENERAL_SETTINGS: list[tuple[str, str]] = [
     ("purge_min_age_days", N_("Bereinigen ab Alter (Tage)")),
     ("compact_auto_enabled", N_("Automatisch verdichten")),
     ("compact_min_age_months", N_("Verdichten ab Alter (Monate)")),
+    ("duplicates_auto_enabled", N_("Duplikate automatisch entfernen")),
+    ("duplicates_auto_mode", N_("Duplikate automatisch entfernen: Modus")),
 ]
 _ENERGIE_KEYS = ("energiedashboard_enabled", "energiedashboard_config")
 _WETTER_KEYS = ("wetterdashboard_enabled", "wetterdashboard_config")
@@ -346,6 +349,8 @@ def _prettify(column: str, value: object) -> str:
     }.get(column)
     if labels is not None and str(value) in labels:
         return tr(labels[str(value)])
+    if column == "duplicates_auto":
+        return tr("Ausnahme") if str(value) == "off" else tr("Wie global")
     if column in ("hourly_rollup", "ignore_values_enabled", "counter_auto_mark", "is_favorite"):
         return tr("Ja") if int(value) else tr("Nein")
     if column == "chart_options":

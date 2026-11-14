@@ -14,6 +14,14 @@
 
 ### Neu
 
+- **Housekeeping**: Duplikate auf Wunsch automatisch entfernen
+  - Neuer Schalter „Automatisch entfernen“ im Abschnitt Duplikate, standardmäßig aus
+  - Der stündliche Lauf markiert doppelte Zeitstempel der letzten 30 Tage,
+    wahlweise nur bei gleichem Wert oder mit „größter Wert bleibt“
+  - Jeder Lauf erscheint als Meldung und lässt sich ganz oder je Entität zurücknehmen
+  - Einzelne Entitäten lassen sich ausnehmen; bei zu vielen neuen Duplikaten hält
+    die Automatik für die Entität an
+
 - **Import**: InfluxDB als weiterer Importreiter (experimentell)
   - Einmaliger Import der Historie aus einer InfluxDB 1.x, in die die
     Home-Assistant-Integration `influxdb` geschrieben hat

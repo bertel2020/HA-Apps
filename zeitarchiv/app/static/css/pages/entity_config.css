@@ -35,7 +35,7 @@
   .badge.adjusted{margin-left:8px;vertical-align:1px;color:var(--warning);border-color:var(--warning);background:var(--warning-soft);cursor:pointer;}
   .badge.adjusted:hover,.badge.adjusted:focus-visible{background:var(--warning);color:var(--surface);outline:none;}
   .badge.fixed{margin-left:6px;color:var(--ink-faint);}
-  .cfg-row .counter-auto{margin-top:10px;}
+  .cfg-row .counter-auto,.cfg-row .dup-auto-box{margin-top:10px;}
   .preview{margin-top:10px;padding-top:14px;}
   .entity-data-management{margin-top:28px;padding-top:22px;border-top:1px solid var(--border);}
   .entity-data-management > .hint{margin:0 0 14px;}
@@ -72,12 +72,12 @@
   }
 
 /* Regel „Fehlwerte automatisch markieren“ unter dem Feld „Zählerrückgänge“ (_counter_decrease_field.html). */
-.counter-auto{
+.counter-auto,.dup-auto-box{
   margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface-alt);
   display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;max-width:560px;
 }
-.counter-auto .counter-auto-state{
+.counter-auto .counter-auto-state,.dup-auto-box .counter-auto-state{
   padding:0 8px;border-radius:10px;font-weight:600;font-size:calc(12px * var(--font-scale, 1));
   background:var(--surface);color:var(--ink-muted);
 }
-.counter-auto .hint{flex-basis:100%;margin:0;}
+.counter-auto .hint,.dup-auto-box .hint{flex-basis:100%;margin:0;}
