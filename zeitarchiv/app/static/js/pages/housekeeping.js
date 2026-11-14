@@ -41,3 +41,24 @@
       }
     }).catch(() => { btn.disabled = false; appAlert(t('Löschen fehlgeschlagen.')); });
   }
+
+// Duplikate-Automatik: Einschalt-/Moduswahl als modales Popup. Das Partial (_duplicates_auto.html) tauscht
+// #duplicates-body per htmx; das <dialog> darin wird nach jedem Tausch geöffnet. Schließen ohne Entscheidung
+// (Escape, Klick daneben) lädt den Abschnitt neu, damit Schalter und Zustand wieder zum Server passen.
+(function () {
+  function openDupAutoModal() {
+    const dlg = document.querySelector('dialog[data-dup-auto-modal]');
+    if (!dlg || dlg.open) return;
+    dlg.showModal();
+    dlg.addEventListener('close', () => {
+      if (!dlg.isConnected) return;
+      const cancel = dlg.querySelector('[data-dup-auto-cancel]');
+      if (cancel) cancel.click();
+    }, {once: true});
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+    const first = dlg.querySelector('input[type=radio]:checked, [data-dup-auto-cancel]');
+    if (first) first.focus();
+  }
+  document.addEventListener('htmx:afterSettle', openDupAutoModal);
+  document.addEventListener('DOMContentLoaded', openDupAutoModal);
+})();

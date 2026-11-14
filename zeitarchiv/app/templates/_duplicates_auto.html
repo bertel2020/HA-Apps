@@ -25,8 +25,9 @@
 
 {% if dup_dialog %}
 {# Einschalten (und Modus ändern): Bestätigung mit Vorschau. Die Zahlen kommen aus dem stündlichen Schnappschuss. #}
+<dialog class="detail-dialog dup-auto-modal" data-dup-auto-modal aria-labelledby="dup-auto-modal-title">
 <form class="dup-auto-dialog" hx-post="{{ auto_url }}/{{ 'mode' if dup_dialog.change else 'enable' }}" hx-target="#duplicates-body" hx-swap="innerHTML">
-  <p class="dup-auto-dialog-title"><strong>{{ _("Modus ändern") if dup_dialog.change else _("Duplikate automatisch entfernen?") }}</strong></p>
+  <h3 class="dup-auto-dialog-title" id="dup-auto-modal-title">{{ _("Modus ändern") if dup_dialog.change else _("Duplikate automatisch entfernen?") }}</h3>
   <p class="hint hint-status">{{ _("Der stündliche Lauf markiert doppelte Zeitstempel der letzten 30 Tage zur Löschung. Nichts wird endgültig entfernt: die Werte stehen im Reiter „Markiert“ und lassen sich zurücknehmen.") }}</p>
   {% for value, label, text in dup_dialog.modes %}
   <label class="dup-auto-option{{ ' is-selected' if value == dup_dialog.mode else '' }}">
@@ -55,10 +56,11 @@
   <p class="hint">{{ _("Danach räumt jeder Lauf nur auf, was neu dazukommt. Findet ein Lauf bei einer Entität mehr als {limit} Duplikate, hält die Automatik für sie an und meldet das: dann stimmt meist etwas an der Quelle nicht.", limit=dup_auto_limit) }}</p>
   {% endif %}
   <div class="dup-auto-dialog-actions">
-    <button type="button" class="btn btn-sm" hx-get="{{ auto_url }}" hx-target="#duplicates-body" hx-swap="innerHTML">{{ _("Abbrechen") }}</button>
+    <button type="button" class="btn btn-sm" data-dup-auto-cancel hx-get="{{ auto_url }}" hx-target="#duplicates-body" hx-swap="innerHTML">{{ _("Abbrechen") }}</button>
     <button type="submit" class="btn btn-sm primary">{{ _("Speichern") if dup_dialog.change else _("Einschalten") }}</button>
   </div>
 </form>
+</dialog>
 {% elif auto.enabled %}
 <p class="dup-auto-status">
   <span>{{ _("{mode} · seit {since} · letzter Lauf {last} · nächster {next}", mode=auto.mode_label, since=auto.since_label, last=auto.last_label, next=auto.next_label) }}</span>

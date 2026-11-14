@@ -292,8 +292,9 @@
    mit Vorschau, Statuszeile, Läufe der letzten 7 Tage. Nur Variablen, keine eigenen Farben. */
 .dup-auto-switch{display:inline-flex;align-items:center;gap:10px;margin-left:auto;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);cursor:pointer;}
 .dup-auto-switch strong{font-weight:600;}
-.dup-auto-dialog{margin:12px 0;padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);display:grid;gap:8px;max-width:640px;}
-.dup-auto-dialog-title{margin:0;font-size:calc(15px * var(--font-scale, 1));}
+.dup-auto-modal{width:min(560px,calc(100vw - 32px));}
+.dup-auto-dialog{display:grid;gap:10px;margin:0;}
+.dup-auto-dialog-title{margin:0;font-size:calc(16px * var(--font-scale, 1));font-weight:600;}
 .dup-auto-option{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;cursor:pointer;}
 .dup-auto-option.is-selected{border-color:var(--accent-line);background:var(--accent-line-soft);}
 .dup-auto-option input{margin-top:3px;}
