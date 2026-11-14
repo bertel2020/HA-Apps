@@ -2115,10 +2115,17 @@ class WetterService:
                 {
                     "config": config, "entity_options": self._entity_options(), "prefill": prefill,
                     "light_defaults": {
-                        "wt-sun-share": int(conditions.DEFAULT_SUN_SHARE_PCT), "wt-sun-scale": 100,
-                        "wt-sun-lx": int(DEFAULT_SUN_THRESHOLD_LX), "wt-night-lx": int(DEFAULT_DAYLIGHT_NIGHT_LX),
-                        "wt-day-lx": int(DEFAULT_DAYLIGHT_DAY_LX),
-                        "wt-sky-cloudy": "", "wt-sky-fair": "", "wt-sky-sunny": "",
+                        "values": {
+                            "wt-sun-share": int(conditions.DEFAULT_SUN_SHARE_PCT), "wt-sun-scale": 100,
+                            "wt-sun-lx": int(DEFAULT_SUN_THRESHOLD_LX), "wt-night-lx": int(DEFAULT_DAYLIGHT_NIGHT_LX),
+                            "wt-day-lx": int(DEFAULT_DAYLIGHT_DAY_LX),
+                            "wt-sky-cloudy": "", "wt-sky-fair": "", "wt-sky-sunny": "",
+                        },
+                        # Grau hinterlegte Vorschläge der Himmelsklassen: folgen der Sonnen-Schwelle, hier der Standard.
+                        "placeholders": dict(zip(
+                            ("wt-sky-cloudy", "wt-sky-fair", "wt-sky-sunny"),
+                            (int(cut) for cut in conditions.lx_cuts(DEFAULT_SUN_THRESHOLD_LX)),
+                        )),
                     },
                     "roles": [(key, label, types) for key, label, types in ROLES],
                     "role_types": {key: list(types) for key, _label, types in ROLES},

@@ -373,7 +373,7 @@
   </div>
   <div class="wt-thresholds-reset">
     <button type="button" class="btn" data-defaults="{{ light_defaults | tojson | forceescape }}"
-            @click="const d = JSON.parse($el.dataset.defaults); for (const id in d) { const f = document.getElementById(id); if (f) f.value = d[id]; } const r = $el.closest('section').querySelector('input[name=sun_relative]'); if (r) r.checked = true;">{{ _("Standardwerte wiederherstellen") }}</button>
+            @click="const d = JSON.parse($el.dataset.defaults); for (const id in d.values) { const f = document.getElementById(id); if (f) f.value = d.values[id]; } for (const id in d.placeholders) { const f = document.getElementById(id); if (f) f.placeholder = d.placeholders[id]; } const r = $el.closest('section').querySelector('input[name=sun_relative]'); if (r) r.checked = true;">{{ _("Standardwerte wiederherstellen") }}</button>
     <span class="wt-unit">{{ _("Trägt die Standardwerte ein; gespeichert wird erst mit „Speichern“.") }}</span>
   </div>
   <div class="wt-sub-feature">
