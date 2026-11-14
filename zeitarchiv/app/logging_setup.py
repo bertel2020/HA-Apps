@@ -52,7 +52,7 @@ _LOG_AREA_LOGGERS = {
     ),
     "import_export": (
         "import_routes", "export_routes", "storage.ha_import", "storage.ha_statistics",
-        "storage.vm_import", "storage.zip_guard",
+        "storage.vm_import", "storage.influxdb_import", "storage.zip_guard",
     ),
     "data": ("entity_delete_routes", "marked_values_routes"),
     "http": ("http", "access"),

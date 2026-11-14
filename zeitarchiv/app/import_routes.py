@@ -53,6 +53,7 @@ from .limits import (
     MAX_SETTINGS_UPLOAD_BYTES,
     MAX_ZIP_UPLOAD_BYTES,
 )
+from .influxdb_import_routes import InfluxImportService
 from .progress import JobBusy, JobProgress, register_source
 from .route_support import UI_EXCLUSIVE_TIMEOUT_SECONDS, UploadLimitExceeded, copy_upload_limited, dir_size
 from .storage import csv_import, ha_import, ha_statistics, hotbuffer, import_reports, symcon_import, vm_import
@@ -260,6 +261,7 @@ class ImportService:
         # Periodenwahl, die mehrere gleichzeitig gültige Stände bräuchte.
         self._vm_availability_lock = threading.Lock()
         self._vm_availability: dict | None = None
+        self._influx = InfluxImportService(self)
 
 
     @staticmethod
@@ -2143,7 +2145,7 @@ class ImportService:
             die Seite zeigt bis dahin dieselbe Fortschrittsanzeige wie nach einem
             Upload — synchron würde das bei einem großen Export die Seite für die
             volle Scan-Dauer blockieren."""
-            active_tab = tab if tab in {"symcon", "csv", "ha", "vm", "reports"} else "symcon"
+            active_tab = tab if tab in {"symcon", "csv", "ha", "vm", "influxdb", "reports"} else "symcon"
             common_context = {
                 "active_import_tab": active_tab,
                 **self.deps.reports_context(source, status, search, date_from, date_to, sort, dir, page, page_size),
@@ -2152,6 +2154,7 @@ class ImportService:
                 # keine HA-API-Anfrage nötig (siehe _ha_import_context()).
                 **self._ha_import_context(),
                 **self._vm_import_context(),
+                **self._influx.context(),
             }
             source_exists = self.deps.symcon_import_dir.exists() and any(self.deps.symcon_import_dir.iterdir())
             if source_exists:
@@ -3581,5 +3584,6 @@ class ImportService:
                 ergebnis["errors"] = [*ergebnis.get("errors", []), f"Abgebrochen: {stand['error']}"]
             return self.deps.templates.TemplateResponse(request, "_vm_import_result.html", ergebnis)
 
+        self._influx.register(router)
 
         return router

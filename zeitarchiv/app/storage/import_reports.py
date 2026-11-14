@@ -12,7 +12,7 @@ from pathlib import Path
 FORMAT = "zeitarchiv-import-report"
 FORMAT_VERSION = 2
 # Dieselben Quellen wie in create(): fehlte eine, wurde ihr Report angelegt, aber nie gelistet, geöffnet oder gelöscht.
-_SOURCE_TYPES = ("symcon", "csv", "ha", "vm")
+_SOURCE_TYPES = ("symcon", "csv", "ha", "vm", "influxdb")
 _REPORT_ID_RE = re.compile(r"^\d{8}T\d{6}Z-(?:" + "|".join(_SOURCE_TYPES) + r")-[0-9a-f]{12}$")
 
 

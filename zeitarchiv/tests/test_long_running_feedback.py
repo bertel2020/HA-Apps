@@ -620,6 +620,7 @@ ERWARTETE_QUELLEN = {
     "csv-import": "CSV-Import",
     "ha-import": "Home-Assistant-Import",
     "vm-import": "VictoriaMetrics-Import",
+    "influxdb-import": "InfluxDB-Import",
     # --- ab hier die fünf ohne Auslöser ---
     "storage-reconcile": "Speicherabgleich",
     "rotation": "Rotation",

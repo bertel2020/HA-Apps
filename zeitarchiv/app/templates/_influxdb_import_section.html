@@ -1,0 +1,277 @@
+<div id="influx-section">
+{% if influx_availability_error %}
+<div class="callout" style="border-left-color:var(--danger);">
+  {{ _("Verfügbarkeit konnte nicht geprüft werden: {ha_availability_error}", ha_availability_error=influx_availability_error) }}
+</div>
+{% endif %}
+{% if not influx_entities %}
+<div class="empty">{{ _("Noch keine Entität in Zeitarchiv bekannt — die HA-Integration muss mindestens einen Live-Wert übertragen haben, bevor ein Import für diese Entität möglich ist.") }}</div>
+{% else %}
+<form id="influx-form" method="post" action="import/influxdb/dry-run">
+  <div class="ha-import-config">
+    <div class="ha-import-config-block">
+      <span class="ha-import-config-label">{{ _("InfluxDB-Adresse") }}</span>
+      <label class="ha-import-field" style="width:100%;max-width:480px;">
+        <input type="text" name="base_url" id="influx-base-url" class="map-input" value="{{ influx_base_url }}" placeholder="{{ influx_default_base_url }}" autocomplete="off" spellcheck="false" title="{{ _('Adresse der InfluxDB-API, z. B. http://a0d7b954-influxdb:8086') }}" onchange="onInfluxConfigChanged()">
+      </label>
+      <label class="ha-import-field" style="width:100%;max-width:480px;">
+        <span>{{ _("Datenbank") }}</span>
+        <input type="text" name="database" id="influx-database" class="map-input" value="{{ influx_database }}" placeholder="{{ influx_default_database }}" autocomplete="off" spellcheck="false" title="{{ _('Name der InfluxDB-Datenbank, in die die Home-Assistant-Integration schreibt') }}" onchange="onInfluxConfigChanged()">
+      </label>
+    </div>
+
+    <div class="ha-import-config-block">
+      <span class="ha-import-config-label">{{ _("Zugangsdaten (optional)") }}</span>
+      <span class="ha-archive-option-row">
+        <label class="ha-import-field">
+          <span>{{ _("Benutzer") }}</span>
+          <input type="text" name="username" id="influx-username" class="map-input" value="{{ influx_username }}" autocomplete="off" spellcheck="false" onchange="onInfluxConfigChanged()">
+        </label>
+        <label class="ha-import-field">
+          <span>{{ _("Passwort") }}</span>
+          <input type="password" name="password" id="influx-password" class="map-input" value="" autocomplete="off" title="{{ _('Wird nicht gespeichert und nur für die Dauer der Abfrage bzw. des Imports im Speicher gehalten.') }}" oninput="rememberInfluxPassword(this.value)">
+        </label>
+      </span>
+      <span class="ha-archive-option-row">
+        <label class="ha-archive-option">
+          <input type="checkbox" name="verify_tls" {% if influx_verify_tls %}checked{% endif %}>
+          <span>{{ _("Zertifikat prüfen") }}</span>
+        </label>
+        <span class="ha-archive-help" tabindex="0" role="button" aria-label="{{ _('Information zu Zertifikat prüfen') }}">
+          <span aria-hidden="true">i</span>
+          <span class="ha-archive-help-popover" role="tooltip">{{ _("Gilt nur für https-Adressen. Bei einem selbstsignierten Zertifikat die Prüfung abschalten; die Verbindung bleibt verschlüsselt, der Server wird aber nicht mehr auf Echtheit geprüft.") }}</span>
+        </span>
+      </span>
+    </div>
+
+    <div class="ha-full-controls">
+      <label class="ha-import-field">
+        <span>{{ _("Zeitraum") }}</span>
+        <select name="range_preset" id="influx-range-select" class="ha-import-select" title="{{ _('Zeitraum') }}" onchange="onInfluxRangeChange(this.value)">
+          {% for value, label in influx_range_options %}
+          <option value="{{ value }}" {% if value == influx_range_preset %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <span id="influx-custom-range-fields" class="ha-custom-range" style="{{ 'display:flex;' if influx_range_preset == 'custom' else 'display:none;' }}">
+        <label class="ha-import-field" for="influx-date-from"><span>{{ _("Von") }}</span><input type="date" id="influx-date-from" name="date_from" value="{{ influx_date_from }}" onchange="onInfluxConfigChanged()"></label>
+        <label class="ha-import-field" for="influx-date-to"><span>{{ _("Bis") }}</span><input type="date" id="influx-date-to" name="date_to" value="{{ influx_date_to }}" onchange="onInfluxConfigChanged()"></label>
+      </span>
+    </div>
+
+    <div class="ha-import-config-block">
+      <span class="ha-import-config-label">{{ _("Importoptionen") }}</span>
+      <span class="ha-archive-option-row">
+        <label class="ha-archive-option">
+          <input type="checkbox" name="include_existing_months" {% if influx_include_existing_months %}checked{% endif %}>
+          <span>{{ _("Archivlücken füllen") }}</span>
+        </label>
+        <span class="ha-archive-help" tabindex="0" role="button" aria-label="{{ _('Information zu Archivlücken füllen') }}">
+          <span aria-hidden="true">i</span>
+          <span class="ha-archive-help-popover" role="tooltip">{{ _("Füllt in abgeschlossenen Monatsarchiven ausschließlich fehlende Zeitstempel. Vorhandene Werte bleiben unverändert. Betroffene Monatsarchive und Rollups werden anschließend neu aufgebaut. Für den laufenden Monat ist die Option nicht nötig.") }}</span>
+        </span>
+      </span>
+    </div>
+
+    <div class="ha-import-check-row">
+      <button type="button" class="btn" id="influx-availability-btn" title="{{ _('Prüft nur die markierten Entitäten') }}" hx-post="import/influxdb/availability" hx-include="#influx-form" hx-target="#influx-section" hx-swap="outerHTML" hx-disabled-elt="this" hx-indicator="#influx-availability-status">
+        {{ _("Verfügbarkeit prüfen") }}
+      </button>
+      <span class="ha-checked-at {{ 'is-error' if influx_availability_error else ('is-checked' if influx_availability_checked_at_label else 'is-idle') }}" id="influx-availability-status" data-changed="{{ _('Einstellung geändert · neu prüfen') }}">
+        <span class="ha-status-idle">{% if influx_availability_checked_at_label %}{{ _("Geprüft: {ha_availability_checked_at_label}", ha_availability_checked_at_label=influx_availability_checked_at_label) }}{% else %}{{ _("Noch nicht geprüft") }}{% endif %}{% if influx_availability_stale %} · <span class="ha-stale-badge" title="{{ _('Vor mehr als 15 Minuten geprüft — der tatsächliche Stand in InfluxDB kann sich seither geändert haben.') }}">{{ _("⏳ Nicht mehr taufrisch") }}</span>{% endif %}</span>
+        <span class="htmx-indicator">{{ _("Prüfung läuft …") }}</span>
+      </span>
+    </div>
+  </div>
+
+  <div class="toolbar import-filter-toolbar" style="flex-wrap:wrap;overflow:visible;">
+    <input type="search" class="search" id="influx-entity-search" placeholder="{{ _('Entität suchen …') }}" oninput="onInfluxSearch(this.value)">
+    <span class="count-chip" id="influx-marked-count" data-template="{{ _('{n} markiert') }}">{{ _("{n} markiert", n=0) }}</span>
+    <div class="toolbar-right">
+      <button type="button" class="btn" hx-post="import/influxdb/dry-run" hx-include="#influx-form" hx-target="#influx-import-output" hx-swap="innerHTML"
+              hx-disabled-elt="this">{{ _("Vorschau (Dry Run)") }}</button>
+      <button type="button" class="btn primary" hx-post="import/influxdb/start" hx-include="#influx-form" hx-target="#influx-import-output" hx-swap="innerHTML"
+              hx-disabled-elt="this">{{ _("Import starten") }}</button>
+    </div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table id="influx-import-table" class="dt symcon-import-table ha-import-table">
+      <colgroup>
+        <col class="symcon-col-check">
+        <col class="ha-col-entity">
+        <col class="ha-col-type"><col class="ha-col-unit"><col class="ha-col-available">
+      </colgroup>
+      <tr>
+        <th><input type="checkbox" onchange="toggleAllInfluxRows(this)" title="{{ _('Alle auf dieser Seite markieren') }}"></th>
+        <th>{{ _("Entität") }}</th>
+        <th>{{ _("Typ") }}</th>
+        <th>{{ _("Einheit") }}</th>
+        <th>{{ _("Verfügbar") }}</th>
+      </tr>
+      {% for entity in influx_entities %}
+      <tr data-entity-id="{{ entity.entity_id }}"
+          class="{{ 'marked' if entity.entity_id in influx_selected_ids }}"
+          data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id) | lower }}">
+        <td>
+          <input type="checkbox" class="influx-mark-checkbox" name="entity_ids" value="{{ entity.entity_id }}" onchange="onInfluxMarkChange(this)" {% if entity.entity_id in influx_selected_ids %}checked{% endif %}>
+        </td>
+        <td>
+          <a href="entities/{{ entity.entity_id }}" class="ha-entity-cell entity-tooltip-host">
+            <span class="ent-name" style="font-weight:600;">{{ entity.friendly_name or entity.entity_id }}</span>
+            <span class="ent-id mono" style="color:var(--ink-faint);font-size:calc(11px * var(--font-scale, 1));">{{ entity.entity_id }}</span>
+            <span class="entity-tooltip ha-entity-tooltip" role="tooltip">
+              <strong>{{ entity.friendly_name or entity.entity_id }}</strong>
+              <code>{{ entity.entity_id }}</code>
+            </span>
+          </a>
+        </td>
+        <td><span class="badge {{ entity.aggregation_type }}">{{ entity.type_label }}</span></td>
+        <td>{{ entity.unit or "—" }}</td>
+        <td class="mono" style="font-size:calc(12px * var(--font-scale, 1));">
+          {% if entity.available_range %}
+          <div>{{ entity.available_range }}</div>
+          <div class="ha-available-count">{{ entity.available_count }}</div>
+          {% elif entity.has_data is none %}
+          <span class="ha-art-badge unknown" title="{{ _('Zeitraum wählen und &bdquo;Verfügbarkeit prüfen&ldquo; klicken') }}">–</span>
+          {% else %}
+          <span class="ha-art-badge no-data">{{ entity.available_label }}</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+
+  <div class="pager" style="justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span class="pager-range" id="influx-pager-range" data-template="{{ _('{from}–{to} von {total}') }}"></span>
+      <button type="button" class="btn navbtn" id="influx-pager-prev" onclick="stepInfluxPage(-1)">‹</button>
+      <span class="pager-page" id="influx-pager-page" data-template="{{ _('Seite {page} / {pages}') }}"></span>
+      <button type="button" class="btn navbtn" id="influx-pager-next" onclick="stepInfluxPage(1)">›</button>
+    </div>
+    <select id="influx-page-size" onchange="setInfluxPageSize(this.value)" title="{{ _('Zeilen pro Seite') }}">
+      <option value="20" selected>{{ _("20 / Seite") }}</option>
+      <option value="50">{{ _("50 / Seite") }}</option>
+      <option value="100">{{ _("100 / Seite") }}</option>
+      <option value="500">{{ _("500 / Seite") }}</option>
+    </select>
+  </div>
+
+  <div id="influx-import-output" hx-get="import/influxdb/progress" hx-trigger="load" hx-swap="innerHTML"></div>
+</form>
+{% endif %}
+</div>
+<script>
+  (function () {
+    // Client-seitige Suche/Paginierung wie in _ha_import_section.html: alle
+    // Zeilen samt Checkbox-Zustand bleiben im Formular, nur die Sichtbarkeit
+    // ändert sich — sonst gingen markierte Entitäten auf ausgeblendeten
+    // "Seiten" beim Absenden verloren.
+    let influxPageSize = 20;
+    let influxPage = 1;
+    let influxSearch = '';
+
+    function fill(template, values) {
+      return template.replace(/\{(\w+)\}/g, (_, key) => values[key]);
+    }
+    function onInfluxSearch(value) {
+      influxSearch = value.trim().toLowerCase();
+      influxPage = 1;
+      applyInfluxPaging();
+    }
+    function refreshInfluxMarkedCount() {
+      const count = document.querySelectorAll('.influx-mark-checkbox:checked').length;
+      const chip = document.getElementById('influx-marked-count');
+      if (chip) { chip.classList.toggle('active', count > 0); chip.textContent = fill(chip.dataset.template, { n: count }); }
+      const availabilityButton = document.getElementById('influx-availability-btn');
+      if (availabilityButton) availabilityButton.disabled = count === 0;
+    }
+    function onInfluxMarkChange(checkbox) {
+      checkbox.closest('tr').classList.toggle('marked', checkbox.checked);
+      refreshInfluxMarkedCount();
+      applyInfluxPaging();  // Markieren ändert die Zeilenreihenfolge (markierte zuerst)
+    }
+    function toggleAllInfluxRows(headerCheckbox) {
+      document.querySelectorAll('#influx-import-table tr[data-entity-id]').forEach((row) => {
+        if (row.style.display === 'none') return;
+        const cb = row.querySelector('.influx-mark-checkbox');
+        if (!cb) return;
+        cb.checked = headerCheckbox.checked;
+        row.classList.toggle('marked', headerCheckbox.checked);
+      });
+      refreshInfluxMarkedCount();
+      applyInfluxPaging();
+    }
+    function onInfluxRangeChange(value) {
+      const field = document.getElementById('influx-custom-range-fields');
+      if (field) field.style.display = value === 'custom' ? 'flex' : 'none';
+      onInfluxConfigChanged();
+    }
+    function onInfluxConfigChanged() {
+      // Adresse oder Zeitraum geändert: die angezeigte Verfügbarkeit gehört zur
+      // alten Einstellung (serverseitig am Schlüssel erkannt) — hier nur der
+      // Hinweis, dass neu geprüft werden muss.
+      const status = document.getElementById('influx-availability-status');
+      const idle = document.querySelector('#influx-availability-status .ha-status-idle');
+      if (status) { status.classList.remove('is-checked', 'is-error'); status.classList.add('is-idle'); }
+      if (idle) idle.textContent = status.dataset.changed;
+    }
+    function applyInfluxPaging() {
+      const table = document.getElementById('influx-import-table');
+      if (!table) return;
+      const rows = Array.from(table.querySelectorAll('tr[data-entity-id]'));
+      // Markierte Zeilen immer zuerst; Array.prototype.sort ist stabil, die
+      // Reihenfolge innerhalb der Gruppen bleibt also erhalten.
+      rows.sort((a, b) => (b.classList.contains('marked') ? 1 : 0) - (a.classList.contains('marked') ? 1 : 0));
+      rows.forEach((row) => table.appendChild(row));
+      const isFilteredOut = (row) => influxSearch && !(row.dataset.search || '').includes(influxSearch);
+      rows.filter(isFilteredOut).forEach((row) => { row.style.display = 'none'; });
+      const visible = rows.filter((row) => !isFilteredOut(row));
+      const total = visible.length;
+      const totalPages = Math.max(1, Math.ceil(total / influxPageSize));
+      influxPage = Math.max(1, Math.min(influxPage, totalPages));
+      const start = (influxPage - 1) * influxPageSize;
+      const end = Math.min(start + influxPageSize, total);
+      visible.forEach((row, i) => { row.style.display = (i >= start && i < end) ? '' : 'none'; });
+      const range = document.getElementById('influx-pager-range');
+      if (range) range.textContent = fill(range.dataset.template, { from: total ? start + 1 : 0, to: total ? end : 0, total });
+      const pageLabel = document.getElementById('influx-pager-page');
+      if (pageLabel) pageLabel.textContent = fill(pageLabel.dataset.template, { page: influxPage, pages: totalPages });
+      const prevBtn = document.getElementById('influx-pager-prev');
+      if (prevBtn) prevBtn.disabled = influxPage <= 1;
+      const nextBtn = document.getElementById('influx-pager-next');
+      if (nextBtn) nextBtn.disabled = influxPage >= totalPages;
+    }
+    function setInfluxPageSize(value) {
+      const parsed = parseInt(value, 10);
+      influxPageSize = Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 1000) : 20;
+      influxPage = 1;
+      applyInfluxPaging();
+    }
+    function stepInfluxPage(delta) {
+      influxPage += delta;
+      applyInfluxPaging();
+    }
+
+    // Die Sektion wird nach "Verfügbarkeit prüfen" neu gezeichnet; das Passwort
+    // wird nie zurückgeschrieben (nicht im HTML, nicht auf dem Server), deshalb
+    // hält es hier nur diese Seite im Speicher, bis sie neu geladen wird.
+    function rememberInfluxPassword(value) {
+      window.__influxPassword = value;
+    }
+    const passwordField = document.getElementById('influx-password');
+    if (passwordField && window.__influxPassword) passwordField.value = window.__influxPassword;
+
+    window.rememberInfluxPassword = rememberInfluxPassword;
+    window.onInfluxSearch = onInfluxSearch;
+    window.onInfluxMarkChange = onInfluxMarkChange;
+    window.toggleAllInfluxRows = toggleAllInfluxRows;
+    window.onInfluxRangeChange = onInfluxRangeChange;
+    window.onInfluxConfigChanged = onInfluxConfigChanged;
+    window.setInfluxPageSize = setInfluxPageSize;
+    window.stepInfluxPage = stepInfluxPage;
+    refreshInfluxMarkedCount();
+    applyInfluxPaging();
+  })();
+</script>

@@ -13,11 +13,13 @@
       document.getElementById('tab-csv').style.display = name === 'csv' ? '' : 'none';
       document.getElementById('tab-ha').style.display = name === 'ha' ? '' : 'none';
       document.getElementById('tab-vm').style.display = name === 'vm' ? '' : 'none';
+      document.getElementById('tab-influxdb').style.display = name === 'influxdb' ? '' : 'none';
       document.getElementById('tab-reports').style.display = name === 'reports' ? '' : 'none';
       document.getElementById('tab-btn-symcon').classList.toggle('active', name === 'symcon');
       document.getElementById('tab-btn-csv').classList.toggle('active', name === 'csv');
       document.getElementById('tab-btn-ha').classList.toggle('active', name === 'ha');
       document.getElementById('tab-btn-vm').classList.toggle('active', name === 'vm');
+      document.getElementById('tab-btn-influxdb').classList.toggle('active', name === 'influxdb');
       document.getElementById('tab-btn-reports').classList.toggle('active', name === 'reports');
       if (name === 'symcon') url.searchParams.delete('tab');
       else url.searchParams.set('tab', name);

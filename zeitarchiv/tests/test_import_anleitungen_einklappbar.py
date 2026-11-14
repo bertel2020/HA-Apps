@@ -17,8 +17,8 @@ from _paths import APP, template_text
 
 def test_all_how_to_blocks_are_marked_collapsible() -> None:
     quelle = template_text("import.html")
-    assert quelle.count('<div class="callout" data-collapsible>') == 4
-    assert quelle.count('<strong class="callout-title">') == 4
+    assert quelle.count('<div class="callout" data-collapsible>') == 5
+    assert quelle.count('<strong class="callout-title">') == 5
     # Der Hinweis auf die fehlende settings.json ist KEINE Anleitung, sondern
     # eine Meldung zum aktuellen Zustand — er bleibt immer sichtbar.
     assert 'id="settings-hint"' in quelle
