@@ -10,6 +10,20 @@
 >
 > 🇬🇧 [English version](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md)
 
+## Unreleased
+
+### Neu
+
+- **Import**: InfluxDB als weiterer Importreiter
+  - Einmaliger Import der Historie aus einer InfluxDB 1.x, in die die
+    Home-Assistant-Integration `influxdb` geschrieben hat
+  - Adresse, Datenbank und optional Benutzer und Passwort; die
+    Zertifikatsprüfung lässt sich bei selbstsigniertem https abschalten
+  - Umbenannte Entitäten und Einheitenwechsel werden zu einer Zeitreihe
+    zusammengeführt
+  - Auch sehr große Historien lassen sich übernehmen: Die Entitäten werden
+    nacheinander geholt und geschrieben, mit Fortschritt je Entität
+
 ## 1.50.0 - 2026-11-13
 
 ### Neu

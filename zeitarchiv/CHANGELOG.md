@@ -10,6 +10,19 @@
 >
 > 🇩🇪 [Änderungen auf Deutsch](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md)
 
+## Unreleased
+
+### New
+
+- **Import**: InfluxDB as another import tab
+  - One-off import of the history from an InfluxDB 1.x that the Home Assistant
+    `influxdb` integration has written to
+  - Address, database and optionally user and password; certificate checking
+    can be turned off for self-signed https
+  - Renamed entities and unit changes are merged into one time series
+  - Very large histories can be imported too: entities are fetched and written
+    one after another, with progress per entity
+
 ## 1.50.0 - 2026-11-13
 
 ### New

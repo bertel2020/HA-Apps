@@ -2738,6 +2738,37 @@ Dieser Import benötigt die Add-on-Berechtigung `homeassistant_api` sowie
 eine Home-Assistant-Installation mit Supervisor (steht bei Home Assistant
 Container nicht zur Verfügung).
 
+### InfluxDB
+
+Einmaliger Import der Historie aus einer eigenständigen **InfluxDB 1.x**, in
+die die Home-Assistant-Integration `influxdb` geschrieben hat (InfluxDB 2.x
+und 3.x werden nicht unterstützt).
+
+Ablauf: Adresse und Datenbank prüfen, bei Bedarf Benutzer und Passwort
+eintragen, Zeitraum wählen, Entitäten markieren, optional „Verfügbarkeit
+prüfen“, Vorschau (Dry Run), Import starten.
+
+- **Adresse:** Als Vorgabe steht der interne Add-on-Hostname. Er enthält einen
+  installationsabhängigen Teil und lässt sich anpassen. Bei einer https-Adresse
+  mit selbstsigniertem Zertifikat die Option „Zertifikat prüfen“ abschalten.
+- **Zugangsdaten:** Benutzer und Passwort sind optional. Das Passwort wird
+  nicht gespeichert, steht in keinem Importbericht und wird nur für die Dauer
+  der Abfrage im Speicher gehalten. Nach dem Neuladen der Seite muss es neu
+  eingegeben werden.
+- **Zuordnung:** Zur Auswahl stehen Entitäten, die bereits mindestens einen
+  Live-Wert an Zeitarchiv übertragen haben. Gesucht wird über Domain und
+  Entitäts-ID, nicht über den Anzeigenamen. Eine umbenannte Entität oder eine
+  mit gewechselter Einheit liegt in InfluxDB in mehreren Messreihen; sie
+  werden zu einer Zeitreihe zusammengeführt.
+- **Werte:** Gelesen werden die gespeicherten Rohwerte, keine verdichteten
+  Werte. Zustands-Entitäten werden über ihren Text abgebildet.
+- **Große Mengen:** Die Entitäten werden nacheinander abgerufen und
+  geschrieben. Der Import läuft im Hintergrund mit Fortschritt je Entität und
+  darf die Seite verlassen. Bricht er ab, bleiben die bis dahin geschriebenen
+  Entitäten erhalten; ein erneuter Import ergänzt nur Fehlendes.
+- **Einmalig:** Es wird nicht fortlaufend synchronisiert. Vorhandene
+  Zeitstempel und Werte werden nie ersetzt.
+
 ### Reports
 
 Jeder tatsächlich ausgeführte Import (Symcon, CSV oder Home Assistant)
