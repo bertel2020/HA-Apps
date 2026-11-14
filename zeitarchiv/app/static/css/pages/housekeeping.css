@@ -290,6 +290,7 @@
 
 /* „Duplikate automatisch entfernen“ (_duplicates_auto.html): Schalter in der Kopfzeile des Abschnitts, Bestätigung
    mit Vorschau, Statuszeile, Läufe der letzten 7 Tage. Nur Variablen, keine eigenen Farben. */
+#duplicates-body .hk-section-head{margin-bottom:8px;}
 .dup-auto-switch{display:inline-flex;align-items:center;gap:10px;margin-left:auto;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);cursor:pointer;}
 .dup-auto-switch strong{font-weight:600;}
 .dup-auto-modal{width:min(560px,calc(100vw - 32px));}
