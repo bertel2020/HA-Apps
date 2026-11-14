@@ -371,6 +371,11 @@
     <div class="field"><label for="wt-sky-sunny">{{ _("Sonnig ab") }}</label>
       <input type="text" id="wt-sky-sunny" class="wt-short" name="sky_sunny_lx" value="{{ config.sky_cuts_lx[2] | int if config.sky_cuts_lx else '' }}" placeholder="{{ (config.sun_threshold_lx * 2.8) | int }}" inputmode="numeric"> <span class="wt-unit">lx</span></div>
   </div>
+  <div class="wt-thresholds-reset">
+    <button type="button" class="btn" data-defaults="{{ light_defaults | tojson | forceescape }}"
+            @click="const d = JSON.parse($el.dataset.defaults); for (const id in d) { const f = document.getElementById(id); if (f) f.value = d[id]; } const r = $el.closest('section').querySelector('input[name=sun_relative]'); if (r) r.checked = true;">{{ _("Standardwerte wiederherstellen") }}</button>
+    <span class="wt-unit">{{ _("Trägt die Standardwerte ein; gespeichert wird erst mit „Speichern“.") }}</span>
+  </div>
   <div class="wt-sub-feature">
   <h3 class="wt-group-h">{{ _("PV und Helligkeit") }}</h3>
   <p class="settings-section-description">{{ _("Vergleicht den Tagesertrag der PV-Anlage mit dem, was die Süd-Helligkeit erwarten lässt. Dazu die Rollen „Helligkeit“ und „PV-Leistung“ (unter „Weitere Messwerte“) zuordnen. Die Karte lässt sich unter „Anzeige“ ausblenden.") }}</p>

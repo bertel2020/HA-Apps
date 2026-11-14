@@ -2713,6 +2713,8 @@
     "Demo Werkstatt Licht Energie": "Demo Workshop Lighting Energy",
     "Demo Werkstatt Ladestation Energie": "Demo Workshop Charging Station Energy",
     "Zurücksetzen": "Reset",
+    "Standardwerte wiederherstellen": "Restore default values",
+    "Trägt die Standardwerte ein; gespeichert wird erst mit „Speichern“.": "Fills in the default values; nothing is saved until you click “Save”.",
     "LÖSCHEN": "DELETE",
     "Im Demo-Modus nicht verfügbar.": "Not available in demo mode.",
     "Löscht Daten endgültig und lässt sich nicht rückgängig machen. Vorhandene Backups bleiben erhalten.": "Deletes data permanently and cannot be undone. Existing backups are kept.",
