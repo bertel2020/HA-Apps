@@ -2738,7 +2738,7 @@ Dieser Import benötigt die Add-on-Berechtigung `homeassistant_api` sowie
 eine Home-Assistant-Installation mit Supervisor (steht bei Home Assistant
 Container nicht zur Verfügung).
 
-### InfluxDB
+### InfluxDB (experimentell)
 
 Einmaliger Import der Historie aus einer eigenständigen **InfluxDB 1.x**, in
 die die Home-Assistant-Integration `influxdb` geschrieben hat (InfluxDB 2.x

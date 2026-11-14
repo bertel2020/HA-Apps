@@ -14,7 +14,7 @@
 
 ### Neu
 
-- **Import**: InfluxDB als weiterer Importreiter
+- **Import**: InfluxDB als weiterer Importreiter (experimentell)
   - Einmaliger Import der Historie aus einer InfluxDB 1.x, in die die
     Home-Assistant-Integration `influxdb` geschrieben hat
   - Adresse, Datenbank und optional Benutzer und Passwort; die

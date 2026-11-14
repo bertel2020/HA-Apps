@@ -14,7 +14,7 @@
 
 ### New
 
-- **Import**: InfluxDB as another import tab
+- **Import**: InfluxDB as another import tab (experimental)
   - One-off import of the history from an InfluxDB 1.x that the Home Assistant
     `influxdb` integration has written to
   - Address, database and optionally user and password; certificate checking
