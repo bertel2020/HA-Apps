@@ -444,13 +444,13 @@ def analyze_raw_rows_page(
             wanted = [name for name in collected if hits(name, repetition_reason, counter_decrease_reason)]
             if row_matches or wanted:
                 row["flags"] = [
-                    {"label": label, "reason": reason}
+                    {"label": tr(label), "reason": reason}
                     for label, reason in (
-                        (tr("Ausreißer"), group_outlier),
-                        (tr("Lücke"), group_gap),
-                        (tr("Duplikat"), duplicate_reason),
-                        (tr("Wiederholung"), repetition_reason),
-                        (tr("Zählerrückgang"), counter_decrease_reason),
+                        ("Ausreißer", group_outlier),
+                        ("Lücke", group_gap),
+                        ("Duplikat", duplicate_reason),
+                        ("Wiederholung", repetition_reason),
+                        ("Zählerrückgang", counter_decrease_reason),
                     )
                     if reason is not None
                 ]

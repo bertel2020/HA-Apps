@@ -18,6 +18,7 @@ Sprachwahl: Einstellung ``language`` (``auto``/``de``/``en``, Standard ``auto``)
 from __future__ import annotations
 
 import contextvars
+import time
 import json
 import re
 from collections.abc import Callable
@@ -50,6 +51,10 @@ current_language: contextvars.ContextVar[str | None] = contextvars.ContextVar("z
 LAST_SEEN_KEY = "language_last_seen"
 _background_provider: Callable[[], str] | None = None
 _last_seen: str | None = None
+# Hintergrundläufe rufen tr() zeilenweise auf; der Sprach-Lookup (SQLite unter dem Index-Lock)
+# wird deshalb kurz zwischengespeichert statt pro Text neu gelesen.
+_BACKGROUND_TTL = 5.0
+_background_cache: tuple[float, str] | None = None
 
 
 def active_language() -> str:
@@ -58,11 +63,21 @@ def active_language() -> str:
     if language:
         return language
     if _background_provider is not None:
+        now = time.monotonic()
+        if _background_cache is not None and now - _background_cache[0] < _BACKGROUND_TTL:
+            return _background_cache[1]
         try:
-            return _background_provider()
+            value = _background_provider()
         except Exception:  # eine Anzeigesprache darf nie einen Hintergrundlauf abbrechen
-            pass
+            return SOURCE_LANGUAGE
+        _set_background_cache((now, value))
+        return value
     return SOURCE_LANGUAGE
+
+
+def _set_background_cache(entry: tuple[float, str] | None) -> None:
+    global _background_cache
+    _background_cache = entry
 
 
 def set_background_language(get_index: Callable[[], Any]) -> None:
@@ -81,6 +96,7 @@ def set_background_language(get_index: Callable[[], Any]) -> None:
 
     global _background_provider
     _background_provider = provider
+    _set_background_cache(None)
 
 
 def _remember_language(index, setting: str, accept_language: str) -> None:
@@ -94,6 +110,7 @@ def _remember_language(index, setting: str, accept_language: str) -> None:
     language = matched_language(accept_language)
     if language and language != _last_seen:
         _last_seen = language
+        _set_background_cache(None)
         if index.get_setting(LAST_SEEN_KEY, "") != language:
             index.set_setting(LAST_SEEN_KEY, language)
 
