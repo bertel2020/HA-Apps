@@ -10,7 +10,7 @@
 >
 > 🇬🇧 [English version](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md)
 
-## Unreleased
+## 1.51.0 - 2026-11-14
 
 ### Neu
 
@@ -36,6 +36,10 @@
   - Testet Adresse, Zugangsdaten und Datenbank, bevor etwas markiert wird
   - Meldet, ob die Daten der Home-Assistant-Integration gefunden wurden, und
     weist eine nicht unterstützte InfluxDB-Version ab
+
+- **Wetterdashboard**: „Standardwerte wiederherstellen“ bei Sonne und Tageslicht
+  - Setzt die Helligkeits-Felder auf die Standardwerte zurück
+  - Gespeichert wird erst mit „Speichern“, der Schritt lässt sich also noch verwerfen
 
 ### Geändert
 

@@ -10,7 +10,7 @@
 >
 > 🇩🇪 [Änderungen auf Deutsch](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md)
 
-## Unreleased
+## 1.51.0 - 2026-11-14
 
 ### New
 
@@ -35,6 +35,10 @@
   - Tests address, credentials and database before anything is marked
   - Says whether the data of the Home Assistant integration was found and
     rejects an unsupported InfluxDB version
+
+- **Weather dashboard**: “Restore defaults” for sun and daylight
+  - Resets the brightness fields to their default values
+  - Nothing is saved until you press “Save”, so the step can still be discarded
 
 ### Changed
 
