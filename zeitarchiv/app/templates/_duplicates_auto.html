@@ -4,12 +4,6 @@
 {% from "_hints.html" import hint_button, hint_body %}
 {% set auto = dup_auto %}
 {% set auto_url = app_root ~ '/housekeeping/duplicates/auto' %}
-{% if dup_result %}
-<div class="dup-auto-flash" role="status">
-  <span class="dup-auto-flash-text"><strong>{{ dup_result.message }}</strong>{% if dup_result.note %} <span class="dup-auto-flash-note">{{ dup_result.note }}</span>{% endif %}</span>
-  <button type="button" class="dup-auto-flash-x" aria-label="{{ _('OK') }}" onclick="this.closest('.dup-auto-flash').remove()">×</button>
-</div>
-{% endif %}
 <div class="hk-section-head">
   <h2 class="settings-section-title">{{ _("Duplikate") }} {{ hint_button(_('Duplikate')) }}</h2>
   {% call hint_body('settings-section-description') %}{{ _("Archivweit erkannte doppelte Zeitstempel, letzte 30 Tage. Mit „Automatisch entfernen“ markiert der stündliche Lauf sie selbst zur Löschung. Nichts wird endgültig entfernt: die Werte stehen im Reiter „Markiert“ der Entität, jeder Lauf lässt sich hier zurücknehmen.") }}{% endcall %}
@@ -68,6 +62,12 @@
 </p>
 {% endif %}
 
+{% if dup_result %}
+<div class="dup-auto-flash" role="status">
+  <span class="dup-auto-flash-text"><strong>{{ dup_result.message }}</strong>{% if dup_result.note %} <span class="dup-auto-flash-note">{{ dup_result.note }}</span>{% endif %}</span>
+  <button type="button" class="dup-auto-flash-x" aria-label="{{ _('OK') }}" onclick="this.closest('.dup-auto-flash').remove()">×</button>
+</div>
+{% endif %}
 <div class="tbl-wrap">
   {% if duplicates_by_entity %}
   <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
