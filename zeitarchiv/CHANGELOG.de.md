@@ -24,6 +24,25 @@
   - Auch sehr große Historien lassen sich übernehmen: Die Entitäten werden
     nacheinander geholt und geschrieben, mit Fortschritt je Entität
 
+- **Import**: „Verbindung prüfen“ bei VictoriaMetrics und InfluxDB
+  - Testet Adresse, Zugangsdaten und Datenbank, bevor etwas markiert wird
+  - Meldet, ob die Daten der Home-Assistant-Integration gefunden wurden, und
+    weist eine nicht unterstützte InfluxDB-Version ab
+
+### Geändert
+
+- **Import**: Neben „Verfügbarkeit prüfen“ weist ein Hinweis darauf hin, dass
+  zuerst Entitäten markiert werden müssen
+
+### Behoben
+
+- **Performance**: Dauerhaft hohe CPU-Last behoben
+  - Die Ausreißer-Messung schlägt die Sprache nicht mehr für jede Zeile
+    nach, der Server bleibt zwischen den Schreibvorgängen im Leerlauf
+
+- **Import**: Ein Klick auf das Adressfeld des VictoriaMetrics-Imports oder
+  das Datumsmuster-Feld des CSV-Imports öffnet keine Entitätenliste mehr
+
 ## 1.50.0 - 2026-11-13
 
 ### Neu

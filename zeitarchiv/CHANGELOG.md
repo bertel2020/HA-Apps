@@ -23,6 +23,25 @@
   - Very large histories can be imported too: entities are fetched and written
     one after another, with progress per entity
 
+- **Import**: “Check connection” for VictoriaMetrics and InfluxDB
+  - Tests address, credentials and database before anything is marked
+  - Says whether the data of the Home Assistant integration was found and
+    rejects an unsupported InfluxDB version
+
+### Changed
+
+- **Import**: A hint next to “Check availability” says that entities have to
+  be marked first
+
+### Fixed
+
+- **Performance**: Permanently high CPU load fixed
+  - The outlier measurement no longer looks up the language for every row, so
+    the server stays idle between writes
+
+- **Import**: Clicking the address field of the VictoriaMetrics import or the
+  date pattern field of the CSV import no longer opens an entity list
+
 ## 1.50.0 - 2026-11-13
 
 ### New
