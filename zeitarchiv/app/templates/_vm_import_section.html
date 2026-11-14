@@ -53,6 +53,7 @@
         <span class="ha-status-idle">{% if vm_availability_checked_at_label %}{{ _("Geprüft: {ha_availability_checked_at_label}", ha_availability_checked_at_label=vm_availability_checked_at_label) }}{% else %}{{ _("Noch nicht geprüft") }}{% endif %}{% if vm_availability_stale %} · <span class="ha-stale-badge" title="{{ _('Vor mehr als 15 Minuten geprüft — der tatsächliche Stand in VictoriaMetrics kann sich seither geändert haben.') }}">{{ _("⏳ Nicht mehr taufrisch") }}</span>{% endif %}</span>
         <span class="htmx-indicator">{{ _("Prüfung läuft …") }}</span>
       </span>
+      <span class="ha-check-hint" id="vm-availability-hint">{{ _("Zuerst Entitäten in der Tabelle markieren") }}</span>
     </div>
   </div>
 
@@ -158,6 +159,8 @@
       if (chip) { chip.classList.toggle('active', count > 0); chip.textContent = fill(chip.dataset.template, { n: count }); }
       const availabilityButton = document.getElementById('vm-availability-btn');
       if (availabilityButton) availabilityButton.disabled = count === 0;
+      const availabilityHint = document.getElementById('vm-availability-hint');
+      if (availabilityHint) availabilityHint.style.display = count === 0 ? '' : 'none';
     }
     function onVmMarkChange(checkbox) {
       checkbox.closest('tr').classList.toggle('marked', checkbox.checked);

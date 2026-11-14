@@ -132,7 +132,7 @@
   }
 
   document.addEventListener('focusin', (e) => {
-    if (e.target.matches && e.target.matches('.map-input')) open(e.target);
+    if (e.target.matches && e.target.matches('.map-picker .map-input')) open(e.target);
   });
   document.addEventListener('input', (e) => {
     if (activeInput && e.target === activeInput) render(e.target.value);

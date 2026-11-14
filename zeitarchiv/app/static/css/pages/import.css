@@ -119,6 +119,7 @@
   /* Status und Zeitpunkt der HA-Verfügbarkeitsprüfung. hx-indicator setzt
      während der Anfrage .htmx-request direkt auf diesen Chip. */
   .ha-checked-at{display:inline-flex;align-items:center;width:auto;max-width:100%;min-height:32px;box-sizing:border-box;font-weight:600;font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));line-height:1.4;border:1px solid var(--border);border-radius:999px;padding:5px 11px;white-space:nowrap;vertical-align:middle;}
+  .ha-check-hint{color:var(--ink-muted);font-size:calc(12px * var(--font-scale, 1));vertical-align:middle;}
   .ha-checked-at.is-idle{color:var(--ink-muted);background:var(--surface-alt);}
   .ha-checked-at.is-checked{color:var(--accent-line);background:var(--accent-line-soft);border-color:var(--accent-line);}
   .ha-checked-at.is-error{color:var(--danger);background:var(--danger-soft);border-color:var(--danger);}

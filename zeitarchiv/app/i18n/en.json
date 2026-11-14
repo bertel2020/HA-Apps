@@ -3971,7 +3971,8 @@
     "Hier ist nichts vorausgewählt. Markiere, was archiviert werden soll.": "Nothing is preselected here. Mark what should be archived.",
     "Eigene Achse": "Own axis",
     "Die Linie bekommt eine eigene Achse, ihre Skala richtet sich nur nach ihr": "The line gets its own axis; its scale follows only that line",
-    "Ungültige Darstellung je Serie": "Invalid appearance per series"
+    "Ungültige Darstellung je Serie": "Invalid appearance per series",
+    "Zuerst Entitäten in der Tabelle markieren": "Mark entities in the table first"
   },
   "js": {
     "Fixierung aufheben und das Dashboard bearbeiten?": "Unlock this dashboard and edit it?",
