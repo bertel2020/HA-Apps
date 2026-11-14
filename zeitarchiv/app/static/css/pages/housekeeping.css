@@ -291,7 +291,6 @@
 /* „Duplikate automatisch entfernen“ (_duplicates_auto.html): Schalter in der Kopfzeile des Abschnitts, Bestätigung
    mit Vorschau, Statuszeile, Läufe der letzten 7 Tage. Nur Variablen, keine eigenen Farben. */
 .dup-auto-switch{display:inline-flex;align-items:center;gap:10px;margin-left:auto;font-size:calc(13px * var(--font-scale, 1));color:var(--ink);cursor:pointer;}
-.dup-auto-switch .dup-auto-mode{color:var(--ink-muted);font-size:calc(12px * var(--font-scale, 1));}
 .dup-auto-switch strong{font-weight:600;}
 .dup-auto-dialog{margin:12px 0;padding:14px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);display:grid;gap:8px;max-width:640px;}
 .dup-auto-dialog-title{margin:0;font-size:calc(15px * var(--font-scale, 1));}
@@ -303,7 +302,15 @@
 .dup-auto-preview p{margin:0 0 6px;}
 .dup-auto-preview ul{margin:0 0 6px;padding-left:18px;}
 .dup-auto-dialog-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;}
-.dup-auto-status{margin:10px 0;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;}
+.dup-auto-status{margin:6px 0 14px;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 12px;}
+.dup-auto-link{background:none;border:0;padding:0;font:inherit;color:var(--accent-line);cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
+.dup-auto-link:hover{text-decoration-thickness:2px;}
+.dup-auto-flash{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:7px 8px 7px 12px;border-radius:8px;border-left:3px solid var(--positive);background:var(--surface-alt);font-size:calc(12.5px * var(--font-scale, 1));max-height:120px;animation:dup-auto-flash-out .4s ease 9s forwards;}
+.dup-auto-flash-text{flex:1;min-width:0;}
+.dup-auto-flash-note{color:var(--ink-muted);}
+.dup-auto-flash-x{flex:none;background:none;border:0;color:var(--ink-muted);font-size:18px;line-height:1;padding:0 6px;cursor:pointer;}
+@keyframes dup-auto-flash-out{to{opacity:0;max-height:0;margin:0;padding-top:0;padding-bottom:0;visibility:hidden;}}
+@media (prefers-reduced-motion:reduce){.dup-auto-flash{animation:none;}}
 .dup-auto-cell{white-space:nowrap;font-size:calc(12.5px * var(--font-scale, 1));}
 .dup-auto-on{color:var(--accent-line);}
 .dup-auto-exempt,.dup-auto-state{color:var(--ink-muted);}

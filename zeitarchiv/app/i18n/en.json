@@ -4000,7 +4000,7 @@
     "Automatik": "Automation",
     "Automatik ausgeschaltet.": "Automation turned off.",
     "Automatik eingeschaltet.": "Automation turned on.",
-    "Automatik: {mode} · seit {since} · letzter Lauf {last}, nächster {next}.": "Automation: {mode} · since {since} · last run {last}, next {next}.",
+    "{mode} · seit {since} · letzter Lauf {last} · nächster {next}": "{mode} · since {since} · last run {last} · next {next}",
     "Automatisch entfernen": "Remove automatically",
     "Bei „{name}“ gab es in einem Lauf mehr als {limit} Duplikate. Die Automatik fasst sie nicht mehr an, bis du sie in Housekeeping unter Duplikate fortsetzt: so viele neue Duplikate deuten meist auf ein Problem an der Quelle.": "For “{name}” a single run found more than {limit} duplicates. The automation leaves it alone until you resume it in Housekeeping under Duplicates: that many new duplicates usually point to a problem at the source.",
     "Bereits markierte Werte bleiben markiert und lassen sich weiter zurücknehmen.": "Values that are already marked stay marked and can still be undone.",

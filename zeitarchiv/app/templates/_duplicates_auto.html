@@ -5,16 +5,15 @@
 {% set auto = dup_auto %}
 {% set auto_url = app_root ~ '/housekeeping/duplicates/auto' %}
 {% if dup_result %}
-<div class="counter-result" role="status">
-  <div class="counter-result-main"><strong>{{ dup_result.message }}</strong>{% if dup_result.note %}<p class="counter-result-note">{{ dup_result.note }}</p>{% endif %}</div>
-  <div class="counter-result-actions"><button type="button" class="btn btn-sm" onclick="this.closest('.counter-result').remove()">{{ _("OK") }}</button></div>
+<div class="dup-auto-flash" role="status">
+  <span class="dup-auto-flash-text"><strong>{{ dup_result.message }}</strong>{% if dup_result.note %} <span class="dup-auto-flash-note">{{ dup_result.note }}</span>{% endif %}</span>
+  <button type="button" class="dup-auto-flash-x" aria-label="{{ _('OK') }}" onclick="this.closest('.dup-auto-flash').remove()">×</button>
 </div>
 {% endif %}
 <div class="hk-section-head">
   <h2 class="settings-section-title">{{ _("Duplikate") }} {{ hint_button(_('Duplikate')) }}</h2>
   {% call hint_body('settings-section-description') %}{{ _("Archivweit erkannte doppelte Zeitstempel, letzte 30 Tage. Mit „Automatisch entfernen“ markiert der stündliche Lauf sie selbst zur Löschung. Nichts wird endgültig entfernt: die Werte stehen im Reiter „Markiert“ der Entität, jeder Lauf lässt sich hier zurücknehmen.") }}{% endcall %}
   <label class="dup-auto-switch">
-    <span class="dup-auto-mode">{% if auto.enabled %}{{ auto.mode_label }}{% else %}{{ _("Aus") }}{% endif %}</span>
     <span class="menu-toggle">
       <input type="checkbox" role="switch" {% if auto.enabled %}checked hx-post="{{ auto_url }}/disable"{% else %}hx-post="{{ auto_url }}/preview"{% endif %}
              hx-trigger="change" hx-target="#duplicates-body" hx-swap="innerHTML" hx-vals='{"mode": "{{ auto.mode }}"}' aria-label="{{ _('Duplikate automatisch entfernen') }}">
@@ -62,8 +61,8 @@
 </form>
 {% elif auto.enabled %}
 <p class="dup-auto-status">
-  {{ _("Automatik: {mode} · seit {since} · letzter Lauf {last}, nächster {next}.", mode=auto.mode_label, since=auto.since_label, last=auto.last_label, next=auto.next_label) }}
-  <button type="button" class="btn btn-sm" hx-post="{{ auto_url }}/preview" hx-vals='{"change": "1", "mode": "{{ auto.mode }}"}' hx-target="#duplicates-body" hx-swap="innerHTML">{{ _("Modus ändern") }}</button>
+  <span>{{ _("{mode} · seit {since} · letzter Lauf {last} · nächster {next}", mode=auto.mode_label, since=auto.since_label, last=auto.last_label, next=auto.next_label) }}</span>
+  <button type="button" class="dup-auto-link" hx-post="{{ auto_url }}/preview" hx-vals='{"change": "1", "mode": "{{ auto.mode }}"}' hx-target="#duplicates-body" hx-swap="innerHTML">{{ _("Modus ändern") }}</button>
 </p>
 {% endif %}
 
