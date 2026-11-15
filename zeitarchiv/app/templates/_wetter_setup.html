@@ -440,6 +440,15 @@
     <label class="filter-chip"><input type="radio" name="tile_style" value="{{ key }}" {% if config.tile_style == key %}checked{% endif %}><span>{{ label }}</span></label>
     {% endfor %}
   </div>
+  <div x-show="extras.length">
+  <h3 class="wt-group-h">{{ _("Weitere Sensoren in der Übersicht") }}</h3>
+  <div class="wt-chips" role="radiogroup" aria-label="{{ _('Weitere Sensoren in der Übersicht') }}">
+    {% for key, label in (("single", _("Einzeln")), ("room", _("Nach Raum"))) %}
+    <label class="filter-chip"><input type="radio" name="klima_tiles" value="{{ key }}" {% if config.klima_tiles == key %}checked{% endif %}><span>{{ label }}</span></label>
+    {% endfor %}
+  </div>
+  <p class="wt-why">{{ _("Nach Raum zeigt je Raum eine Kachel mit Temperatur und Luftfeuchte. Sensoren ohne Raum bleiben einzeln. Gilt für die Kacheln auf dem Reiter „Temperatur &amp; Klima“.") }}</p>
+  </div>
   <h3 class="wt-group-h">{{ _("Blöcke der Vergleichstabelle") }}</h3>
   <input type="hidden" name="blocks_submitted" value="1">
   <div class="wt-chips">

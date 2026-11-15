@@ -243,6 +243,9 @@ DEFAULT_LAGE_LAYOUT = "strip"
 #: Stil der Kacheln auf den Wetterseiten: ``plate`` (Icon in getönter Plakette) oder ``tint`` (Fläche in der Rollenfarbe).
 TILE_STYLES = ("plate", "tint")
 DEFAULT_TILE_STYLE = "plate"
+#: Kacheln der weiteren Sensoren auf dem Reiter „Temperatur & Klima“: „single“ je Sensor, „room“ je Raum.
+KLIMA_TILES = ("single", "room")
+DEFAULT_KLIMA_TILES = "single"
 DEFAULT_RAIN_DAY_MM = 1.0  # DWD: Niederschlagstag ab 1 mm
 DEFAULT_RAIN_DAY_MINUTES = 10
 
@@ -269,6 +272,7 @@ def _empty_config() -> dict:
         "cards_detail": False,
         "lage_layout": DEFAULT_LAGE_LAYOUT,
         "tile_style": DEFAULT_TILE_STYLE,
+        "klima_tiles": DEFAULT_KLIMA_TILES,
     }
 
 
@@ -342,6 +346,8 @@ def _load_config(index: Index) -> dict:
         config["lage_layout"] = data["lage_layout"]
     if data.get("tile_style") in TILE_STYLES:
         config["tile_style"] = data["tile_style"]
+    if data.get("klima_tiles") in KLIMA_TILES:
+        config["klima_tiles"] = data["klima_tiles"]
     for key in ("heating_room", "heating_limit"):
         value = data.get(key)
         if isinstance(value, (int, float)) and not isinstance(value, bool) and 0 < value < 40:
@@ -1274,6 +1280,8 @@ class WetterService:
                 "key": spec["key"], "entity_id": spec["entity_id"], "kind": spec["kind"],
                 "label": tr(TILE_LABELS[spec["key"]]) if spec["key"] in TILE_LABELS else spec["label"],
                 "unit": spec["unit"], "decimals": spec["decimals"],
+                # Raum und Etage der weiteren Sensoren für die Kachel je Raum (Außenwerte und Rollen haben keinen).
+                "room": spec.get("room", ""), "floor": spec.get("floor", ""),
                 # Nicht entities.last_value: das ist bei vielen Sensoren leer (siehe Energiedashboard).
                 "last": query_mod._boundary_value(  # noqa: SLF001 — siehe Modul-Docstring
                     self.deps.data_dir, spec["entity_id"], today["end"].timestamp(), self.deps.tz, read_cache, index=self.deps.index
@@ -2209,6 +2217,7 @@ class WetterService:
             sky_sunny_lx: str = Form(""),
             lage_layout: str = Form(""),
             tile_style: str = Form(""),
+            klima_tiles: str = Form(""),
         ) -> HTMLResponse:
             submitted = {
                 "temperature": temperature, "precip_mm": precip_mm, "precip_dur": precip_dur,
@@ -2270,6 +2279,10 @@ class WetterService:
             if style and style not in TILE_STYLES:
                 raise HTTPException(status_code=400, detail=tr("Ungültiger Kachelstil: {value}", value=style))
             config["tile_style"] = style or _load_config(deps.index)["tile_style"]
+            klima = klima_tiles.strip()
+            if klima and klima not in KLIMA_TILES:
+                raise HTTPException(status_code=400, detail=tr("Ungültige Darstellung: {value}", value=klima))
+            config["klima_tiles"] = klima or _load_config(deps.index)["klima_tiles"]
             heating = []
             for position, entity_id in enumerate(heating_entity_id):
                 entity_id = entity_id.strip()

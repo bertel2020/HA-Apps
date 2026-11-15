@@ -96,7 +96,26 @@
     </template>
   </div>
   {% else %}
-  <div class="wt-tiles" x-ref="tiles{{ group | capitalize }}" :style="'--wt-cols:' + tileCols.{{ group }}" x-show="tilesFor('{{ group }}').length" x-cloak>
+  {% if group == 'klima' %}
+  {# Optional (Einrichtung → Kachelstil): eine Kachel je Raum mit Temperatur und Feuchte; Sensoren ohne Raum bleiben einzeln. #}
+  <div class="wt-tiles wt-roomtiles" x-ref="tilesRoomKlima" x-show="klimaRooms && roomTiles().length" x-cloak>
+    <template x-for="room in roomTiles()" :key="room.key">
+      <div class="wt-roomtile" :class="{'is-loose': room.loose}">
+        <span class="wt-roomtile-head"><span class="wt-roomtile-name" x-text="room.name"></span><span class="wt-roomtile-floor" x-text="room.floor"></span></span>
+        <span class="wt-roomtile-parts">
+          <template x-for="part in room.parts" :key="part.key">
+            <a class="wt-roomtile-part" :data-kind="part.kind" :href="part.href" :title="part.title">
+              <span class="wt-roomtile-label"><span class="wt-tile-icon" x-html="iconSvg(part.icon)"></span><span x-text="part.label"></span></span>
+              <span class="wt-tile-value" x-html="part.value"></span>
+              <span class="wt-tile-sub" x-text="part.sub"></span>
+            </a>
+          </template>
+        </span>
+      </div>
+    </template>
+  </div>
+  {% endif %}
+  <div class="wt-tiles" x-ref="tiles{{ group | capitalize }}" :style="'--wt-cols:' + tileCols.{{ group }}" x-show="tilesFor('{{ group }}').length{% if group == 'klima' %} && !klimaRooms{% endif %}" x-cloak>
     <template x-for="(tile, i) in tilesFor('{{ group }}')" :key="tile.key">
       <a class="wt-tile" :class="{'wt-tile-wide': tileCols.{{ group }} > 1 && i === tilesFor('{{ group }}').length - 1 && tilesFor('{{ group }}').length % tileCols.{{ group }} === 1}" :data-role="tile.key" :href="'entities/' + encodeURIComponent(tile.entity_id)" :title="tileTitle(tile)">
         <span class="wt-tile-icon" x-html="iconSvg(tileIcon(tile))"></span>
@@ -163,7 +182,7 @@
 {% set show_yearmatrix = 'yearmatrix' not in hc %}
 {% set show_long = show_records or show_kenntage or show_monthyears or show_yearmatrix %}
 {% set show_heat = has_heating and 'heating' not in hc %}
-<div x-data='wetterDashboard({{ precip_modes | tojson }})' data-hints="collapsed" data-tile-style="{{ config.tile_style }}">
+<div x-data='wetterDashboard({{ precip_modes | tojson }})' data-hints="collapsed" data-tile-style="{{ config.tile_style }}" data-klima-tiles="{{ config.klima_tiles }}">
   <div class="wt-title-row">
     <h1>{{ _("Wetterdashboard") }}</h1>
     <button type="button" class="wt-title-edit" title="{{ _('Rollen bearbeiten') }}"

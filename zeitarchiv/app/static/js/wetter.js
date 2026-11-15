@@ -279,6 +279,8 @@
       tiles: [],
       tilesLoaded: false,
       tileCols: {basis: 4, wind: 3, klima: 3},
+      // Einstellung „Weitere Sensoren“ (Kachelstil): eine Kachel je Raum statt je Sensor.
+      klimaRooms: (document.querySelector('[data-klima-tiles]') || {dataset: {}}).dataset.klimaTiles === 'room',
       tilesStand: '',
       tilesAt: null,
       error: '',
@@ -537,6 +539,35 @@
       // (sechs Rekorde: 3+3). Schmale Bildschirme übernimmt das Stylesheet.
       kpiCols(count) {
         return WetterLayout.tileColumns(count, 640);
+      },
+
+      // Kacheln der weiteren Sensoren je Raum: Temperatur vor Feuchte, Räume in der Reihenfolge ihres ersten Sensors,
+      // Sensoren ohne Raum einzeln am Ende. Gibt es mehrere Sensoren derselben Art im Raum, tragen sie ihren Namen.
+      roomTiles() {
+        const kindOf = (tile) => (tile.unit === '%' ? 'humid' : 'temp');
+        const rooms = new Map();
+        const loose = [];
+        this.tilesFor('klima').forEach((tile) => {
+          if (!tile.room) { loose.push(tile); return; }
+          if (!rooms.has(tile.room)) rooms.set(tile.room, []);
+          rooms.get(tile.room).push(tile);
+        });
+        const part = (tile, label) => ({
+          key: tile.key, kind: kindOf(tile), icon: kindOf(tile) === 'humid' ? 'humid' : 'temp', label,
+          value: this.tileValue(tile), sub: this.tileSub(tile),
+          href: 'entities/' + encodeURIComponent(tile.entity_id), title: this.tileTitle(tile),
+        });
+        const out = [];
+        rooms.forEach((list, name) => {
+          const count = {temp: list.filter((tile) => kindOf(tile) === 'temp').length, humid: list.filter((tile) => kindOf(tile) === 'humid').length};
+          const ordered = [...list.filter((tile) => kindOf(tile) === 'temp'), ...list.filter((tile) => kindOf(tile) === 'humid')];
+          out.push({
+            key: 'room:' + name, name, floor: list[0].floor || '', loose: false,
+            parts: ordered.map((tile) => part(tile, count[kindOf(tile)] > 1 ? tile.label : (kindOf(tile) === 'humid' ? t('Luftfeuchte') : t('Temperatur')))),
+          });
+        });
+        loose.forEach((tile) => out.push({key: tile.key, name: t('Ohne Raum'), floor: '', loose: true, parts: [part(tile, tile.label)]}));
+        return out;
       },
 
       tilesFor(group) {

@@ -278,3 +278,23 @@ def test_extra_sensor_without_tile_only_loses_its_tile(service) -> None:
     assert [row["key"] for row in service.compute_temperatures(3, NOW)["series"]] == ["temperature", "temperature:0", "temperature:1"]
     assert wetter_rooms.entry("sensor.x", "X") == {"entity_id": "sensor.x", "name": "X"}
     assert wetter_rooms.entry("sensor.x", "X", tile=False)["tile"] is False
+
+
+def test_tiles_carry_room_and_floor_and_the_room_setting_defaults_to_single(service) -> None:
+    """Die Kachel je Raum gruppiert im Browser; dafür tragen die Kacheln Raum und Etage. Standard bleibt „je Sensor“."""
+    from app import wetter_routes
+    from test_wetter import NOW, _add, _configure
+
+    for entity_id in ("sensor.t", "sensor.bad_t"):
+        _add(service, entity_id, "sensor", "measurement", "°C", [(NOW.timestamp() - 3600, 20.0)])
+    (service.deps.data_dir / "selection_catalog.json").write_text(json.dumps({"entities": [
+        {"entity_id": "sensor.bad_t", "area": "Bad", "floor": "Obergeschoss"},
+    ]}), encoding="utf-8")
+    _configure(service, temperature="sensor.t", extra_temperatures=[{"entity_id": "sensor.bad_t", "name": "Bad T"}])
+    tiles = {tile["key"]: (tile["room"], tile["floor"]) for tile in service.compute_tiles(NOW)}
+    assert tiles == {"temperature": ("", ""), "temperature:0": ("Bad", "Obergeschoss")}
+    assert wetter_routes._load_config(service.deps.index)["klima_tiles"] == "single"
+    _configure(service, klima_tiles="room")
+    assert wetter_routes._load_config(service.deps.index)["klima_tiles"] == "room"
+    _configure(service, klima_tiles="unsinn")
+    assert wetter_routes._load_config(service.deps.index)["klima_tiles"] == "single"
