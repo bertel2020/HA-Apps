@@ -154,6 +154,10 @@
   .wt-sub-feature{margin-top:18px;}
   .wt-group-h{margin:14px 0 8px;font-size:calc(11.5px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-muted);}
   .wt-group-h:first-of-type{margin-top:0;}
+  /* Tiefe der Einrichtung: die Abschnittskarten schweben wie die Karten der Dashboards (--tile-lift), die Kacheln darin
+     heben sich leicht von ihnen ab. Gilt gleich für die Energie-Einrichtung (siehe dort). */
+  .wt-setup .settings-section{box-shadow:var(--shadow), var(--tile-lift);}
+  .wt-setup .wt-item-tile{box-shadow:var(--shadow), 0 3px 8px -4px rgba(19,28,23,.2);}
   .wt-section-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
   .wt-section-head .settings-section-title{margin:0 0 8px;}
   .wt-section-head-center{align-items:center;}

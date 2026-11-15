@@ -876,6 +876,9 @@
     box-shadow:var(--shadow);transition:border-color .12s;
   }
   .edash-item-tile:hover{border-color:var(--border-strong);}
+  /* Tiefe der Einrichtung wie im Wetterdashboard: Abschnittskarten schweben (--tile-lift), Kacheln heben sich leicht ab. */
+  #energiedashboard-root .settings-section{box-shadow:var(--shadow), var(--tile-lift);}
+  .edash-item-tile{box-shadow:var(--shadow), 0 3px 8px -4px rgba(19,28,23,.2);}
   .edash-item-tile:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px;}
   .edash-item-tile.is-drag-over{outline:2px dashed var(--accent-line);outline-offset:2px;}
   .edash-item-accent{height:3px;flex:none;}
