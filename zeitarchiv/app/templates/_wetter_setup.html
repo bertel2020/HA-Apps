@@ -212,13 +212,13 @@
         openRow(kind, idx) {
           const row = this.listRows(kind)[idx];
           this.listKind = kind; this.listIdx = idx; this.listNew = false;
-          this.draft = {entity_id: row.entity_id, name: row.name, room: row.room || ""};
+          this.draft = {entity_id: row.entity_id, name: row.name, room: row.room || "", tile: row.tile !== false};
           this.$nextTick(() => this.$refs.rowDlg.showModal());
         },
         addRow(kind) {
           const rows = this.listRows(kind);
           if (rows.length >= (kind === "extra" ? this.maxExtra : this.maxHeating)) return;
-          rows.push({entity_id: "", name: "", room: ""});
+          rows.push({entity_id: "", name: "", room: "", tile: true});
           this.openRow(kind, rows.length - 1);
           this.listNew = true;
         },
@@ -227,6 +227,7 @@
           const row = this.listRows(this.listKind)[this.listIdx];
           row.entity_id = this.draft.entity_id; row.name = this.draft.name.trim();
           row.room = this.listKind === "extra" ? this.draft.room.trim() : "";
+          row.tile = this.listKind === "extra" ? this.draft.tile : true;
           this.listNew = false;
           this.$refs.rowDlg.close();
         },
@@ -318,7 +319,9 @@
             <span class="wt-item-name" x-text="row.name || (row.entity_id ? nameFor(row.entity_id) : t('Sensor'))"></span>
           </div>
           <div class="wt-item-bottom">
-            <span class="wt-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) + (roomOf(row) ? ' · ' + roomOf(row) : '') : t('Nicht zugeordnet')"></span>
+            <span class="wt-item-chip" x-show="row.entity_id && roomOf(row)" x-text="roomOf(row)"></span>
+            <span class="wt-item-chip wt-item-chip-empty" x-show="row.entity_id && !roomOf(row)">{{ _("Ohne Raum") }}</span>
+            <span class="wt-item-meta" :class="{'is-empty': !row.entity_id}" x-text="row.entity_id ? nameFor(row.entity_id) : t('Nicht zugeordnet')"></span>
           </div>
         </div>
       </button>
@@ -327,7 +330,7 @@
       <span class="wt-item-add-label">{{ _("+ Sensor") }}</span>
     </button>
   </div>
-  <template x-for="row in extras"><span><input type="hidden" name="extra_entity_id" :value="row.entity_id"><input type="hidden" name="extra_name" :value="row.name"><input type="hidden" name="extra_room" :value="row.room || ''"></span></template>
+  <template x-for="row in extras"><span><input type="hidden" name="extra_entity_id" :value="row.entity_id"><input type="hidden" name="extra_name" :value="row.name"><input type="hidden" name="extra_room" :value="row.room || ''"><input type="hidden" name="extra_tile" :value="row.tile === false ? '0' : '1'"></span></template>
   </section>
 
   <section class="settings-section wt-section-regen">
@@ -482,6 +485,10 @@
                    :placeholder="areaOf(draft.entity_id) ? t('aus Home Assistant: {area}', {area: areaOf(draft.entity_id)}) : t('Raum (optional)')">
             <datalist id="wt-room-list"><template x-for="name in roomNames()" :key="name"><option :value="name"></option></template></datalist>
             <p class="wt-why">{{ _("Sensoren desselben Raums stehen in der Tabelle „Zeiträume im Vergleich“ zusammen. Leer lassen übernimmt den Raum aus Home Assistant.") }}</p>
+          </div>
+          <div class="field" x-show="listKind === 'extra'">
+            <label class="filter-chip"><input type="checkbox" x-model="draft.tile"><span>{{ _("Kachel in der Übersicht zeigen") }}</span></label>
+            <p class="wt-why">{{ _("Blendet nur die Kachel aus. Tabelle und Vergleichsdiagramme zeigen den Sensor weiter.") }}</p>
           </div>
         </div>
         <div class="wt-dialog-footer wt-dialog-footer-split">

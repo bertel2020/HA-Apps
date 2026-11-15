@@ -262,3 +262,19 @@ def test_a_closed_room_keeps_its_header_and_hides_its_rows(output) -> None:
 
 def test_without_floors_there_are_no_floor_headers(output) -> None:
     assert output["noFloorHeads"] == []
+
+
+def test_extra_sensor_without_tile_only_loses_its_tile(service) -> None:
+    """Der Schalter „Kachel in der Übersicht“ blendet nur die Kachel aus; Tabelle und Diagramme behalten den Sensor."""
+    from test_wetter import NOW, _add, _configure
+
+    for entity_id in ("sensor.t", "sensor.bad_t", "sensor.bad_h"):
+        _add(service, entity_id, "sensor", "measurement", "°C", [(NOW.timestamp() - 3600, 20.0)])
+    _configure(service, temperature="sensor.t", extra_temperatures=[
+        {"entity_id": "sensor.bad_t", "name": "Bad T", "tile": False}, {"entity_id": "sensor.bad_h", "name": "Bad H"},
+    ])
+    keys = [tile["key"] for tile in service.compute_tiles(NOW)]
+    assert "temperature:0" not in keys and "temperature:1" in keys
+    assert [row["key"] for row in service.compute_temperatures(3, NOW)["series"]] == ["temperature", "temperature:0", "temperature:1"]
+    assert wetter_rooms.entry("sensor.x", "X") == {"entity_id": "sensor.x", "name": "X"}
+    assert wetter_rooms.entry("sensor.x", "X", tile=False)["tile"] is False

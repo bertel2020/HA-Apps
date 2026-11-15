@@ -307,7 +307,9 @@ def _load_config(index: Index) -> dict:
     extras = data.get("extra_temperatures")
     if isinstance(extras, list):
         config["extra_temperatures"] = [
-            wetter_rooms.entry(str(row.get("entity_id") or ""), str(row.get("name") or ""), str(row.get("room") or ""))
+            wetter_rooms.entry(
+                str(row.get("entity_id") or ""), str(row.get("name") or ""), str(row.get("room") or ""), row.get("tile") is not False,
+            )
             for row in extras
             if isinstance(row, dict) and row.get("entity_id")
         ][:MAX_EXTRA_TEMPERATURES]
@@ -520,6 +522,8 @@ class WetterService:
             if specs and specs[-1]["key"] == f"temperature:{position}":
                 specs[-1]["room"] = wetter_rooms.room_of(extra, known)
                 specs[-1]["floor"] = wetter_rooms.floor_of(extra, known)
+                # Nur die Kachel der Übersicht; Tabelle und Diagramme zeigen den Sensor weiter.
+                specs[-1]["tile"] = extra.get("tile") is not False
         add("precip_mm", config["precip_mm"], role_label("precip_mm"), "counter")
         add("precip_dur", config["precip_dur"], role_label("precip_dur"), "switch")
         for key in ("humidity", "pressure", "wind", "gust", "radiation"):
@@ -1247,6 +1251,8 @@ class WetterService:
         yesterday = self.column_windows("gestern", now_local, "bis_jetzt", anchor)
         tiles = []
         for spec in self._row_specs(config):
+            if spec.get("tile") is False:
+                continue
             entity = self.deps.index.get_entity(spec["entity_id"])
             # Die Sonnenscheindauer liest die Stundenmittel eines Messwerts („sunshine“ ist nur die Anzeigeart).
             aggregation_type = "standard" if spec["kind"] == "sunshine" else spec["kind"]  # "standard"/"counter"/"switch" sind zugleich die Aggregationstypen
@@ -2181,6 +2187,7 @@ class WetterService:
             extra_entity_id: list[str] = Form([]),
             extra_name: list[str] = Form([]),
             extra_room: list[str] = Form([]),
+            extra_tile: list[str] = Form([]),
             blocks_submitted: str = Form(""),
             show_block: list[str] = Form([]),
             cards_submitted: str = Form(""),
@@ -2232,7 +2239,8 @@ class WetterService:
                     raise HTTPException(status_code=400, detail=tr("Unbekannte Entität: {entity_id}", entity_id=entity_id))
                 name = extra_name[position].strip() if position < len(extra_name) else ""
                 room = extra_room[position].strip() if position < len(extra_room) else ""
-                extras.append(wetter_rooms.entry(entity_id, name[:60], room))
+                tile = extra_tile[position] != "0" if position < len(extra_tile) else True
+                extras.append(wetter_rooms.entry(entity_id, name[:60], room, tile))
             config["extra_temperatures"] = extras[:MAX_EXTRA_TEMPERATURES]
             # Ohne das Marker-Feld (ältere Aufrufer) bleibt die bisherige Auswahl erhalten.
             if blocks_submitted:

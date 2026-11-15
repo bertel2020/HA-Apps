@@ -169,6 +169,13 @@
   .wt-item-meta{max-width:100%;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .wt-item-meta:not(.is-empty){color:var(--ink-muted);}
   .wt-item-meta.is-empty{font-style:italic;}
+  /* Raum eines weiteren Sensors als Chip wie die Gruppe der Verbraucher im Energiedashboard; ohne Raum gestrichelt. */
+  .wt-item-chip{
+    align-self:flex-start;max-width:100%;font-size:calc(10px * var(--font-scale, 1));padding:2px 7px;border-radius:999px;
+    background:var(--surface-alt);color:var(--ink-muted);border:1px solid var(--border);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-sizing:border-box;
+  }
+  .wt-item-chip-empty{background:none;border-style:dashed;border-color:var(--accent-line);color:var(--accent-line);}
   .wt-item-flag .wt-badge{margin-right:0;}
   .wt-item-warn{max-width:100%;font-size:calc(11.5px * var(--font-scale, 1));color:var(--warning);text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .wt-item-dialog{width:min(440px, calc(100vw - 32px));--dialog-accent:var(--wt-accent, var(--border-strong));}

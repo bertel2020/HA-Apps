@@ -43,12 +43,14 @@ def places(data_dir: Path) -> dict[str, dict[str, str | None]]:
     return found
 
 
-def entry(entity_id: str, name: str, room: str = "") -> dict[str, str]:
-    """Ein gespeicherter Eintrag der weiteren Sensoren; ``room`` steht nur da, wenn er gesetzt ist
-    (ältere Einstellungen und ihre Tests bleiben unverändert)."""
-    row = {"entity_id": entity_id, "name": name}
+def entry(entity_id: str, name: str, room: str = "", tile: bool = True) -> dict[str, str | bool]:
+    """Ein gespeicherter Eintrag der weiteren Sensoren; ``room`` und ``tile`` stehen nur da, wenn sie vom
+    Vorgabewert abweichen (ältere Einstellungen und ihre Tests bleiben unverändert)."""
+    row: dict[str, str | bool] = {"entity_id": entity_id, "name": name}
     if room.strip():
         row["room"] = room.strip()[:MAX_ROOM_LENGTH]
+    if not tile:
+        row["tile"] = False
     return row
 
 
