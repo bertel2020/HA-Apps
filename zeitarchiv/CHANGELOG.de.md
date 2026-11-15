@@ -12,7 +12,23 @@
 
 ## Unreleased
 
+### Neu
+
+- **Wetterdashboard**: Mehr Kontrolle bei den weiteren Sensoren
+  - Bis zu 60 weitere Sensoren (bisher 20)
+  - Neue Einstellung „Kachelgröße der weiteren Sensoren“ (automatisch, kleiner, größer) für die Kacheln auf dem Reiter „Temperatur & Klima“
+
+- **Wetterdashboard**: Etagen und Räume bei „Zeiträume im Vergleich“
+  - „Alles zuklappen“ und „Alles aufklappen“ über der Tabelle; die Etagenköpfe zeigen ihre Raumzahl
+  - Neue Einstellung „Etagen in der Tabelle“ legt fest, ob die Tabelle aufgeklappt oder zugeklappt startet
+  - Der Dialog „Räume“ hat den Bereich „Reihenfolge“ für Etagen und Räume; sie gilt für die Tabelle, die Raumkacheln und die Raumauswahl über den Diagrammen
+  - In der Raumauswahl über den Diagrammen blendet ein Klick auf eine Etage alle ihre Räume aus oder ein
+
 ### Behoben
+
+- **Entitätenliste**: Gespeicherte Spaltenbreiten nutzen den verfügbaren Platz
+  - Früher gezogene Breiten halten die Tabelle auf breiten Bildschirmen nicht mehr schmal
+  - Die Verhältnisse bleiben erhalten; „Spaltenbreiten zurücksetzen“ stellt die Standardbreiten wieder her
 
 - **Statistik**: „Wachstum über Zeit“ zeigt dieselbe Größe wie die Kachel „Größe“
   - Diagramm und Sparkline der Kachel enthalten jetzt auch Rollups und Hot Buffer

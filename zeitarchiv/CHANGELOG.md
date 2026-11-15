@@ -12,7 +12,23 @@
 
 ## Unreleased
 
+### New
+
+- **Weather dashboard**: More control over additional sensors
+  - Up to 60 additional sensors (was 20)
+  - New setting “Tile size of additional sensors” (automatic, smaller, larger) for the tiles on the “Temperature & climate” tab
+
+- **Weather dashboard**: Floors and rooms in “Periods compared”
+  - “Collapse all” and “Expand all” above the table; floor headers show their number of rooms
+  - New setting “Floors in the table” decides whether the table starts expanded or collapsed
+  - The “Rooms” dialog has an “Order” section to arrange floors and rooms; it applies to the table, the room tiles and the room selection above the charts
+  - In the room selection above the charts, a click on a floor hides or shows all its rooms
+
 ### Fixed
+
+- **Entity list**: Saved column widths now use the available width
+  - Widths dragged earlier no longer keep the table narrow on wide screens
+  - The proportions are kept; “Reset column widths” still restores the defaults
 
 - **Statistics**: “Growth over time” now shows the same size as the “Size” tile
   - The chart and the tile’s sparkline now include rollups and hot buffer
