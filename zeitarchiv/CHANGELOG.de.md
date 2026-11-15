@@ -10,6 +10,15 @@
 >
 > 🇬🇧 [English version](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md)
 
+## Unreleased
+
+### Behoben
+
+- **Statistik**: „Wachstum über Zeit“ zeigt dieselbe Größe wie die Kachel „Größe“
+  - Diagramm und Sparkline der Kachel enthalten jetzt auch Rollups und Hot Buffer
+  - Ältere Datenpunkte bleiben, wie sie waren; die Kurve springt deshalb einmal,
+    sobald der erste neue Punkt dazukommt
+
 ## 1.52.0 - 2026-11-15
 
 ### Neu

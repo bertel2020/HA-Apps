@@ -10,6 +10,15 @@
 >
 > 🇩🇪 [Änderungen auf Deutsch](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md)
 
+## Unreleased
+
+### Fixed
+
+- **Statistics**: “Growth over time” now shows the same size as the “Size” tile
+  - The chart and the tile’s sparkline now include rollups and hot buffer
+  - Older data points stay as they were, so the curve jumps once when the first
+    new point arrives
+
 ## 1.52.0 - 2026-11-15
 
 ### New
