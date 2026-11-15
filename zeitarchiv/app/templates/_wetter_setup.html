@@ -84,6 +84,8 @@
         roleLabels: { {% for key, label, types in roles %}{{ key | tojson }}: {{ _(label) | tojson }}{{ ',' if not loop.last }}{% endfor %} },
         activeRole: null, draftRole: "",
         extras: {{ config.extra_temperatures | tojson }},
+        floorOrder: {{ config.floor_order | tojson }},
+        roomOrder: {{ config.room_order | tojson }},
         heating: {{ config.heating | tojson }},
         counterOptions: {{ counter_options | tojson }},
         maxHeating: {{ max_heating }},
@@ -173,6 +175,53 @@
           const counts = new Map();
           this.extras.forEach((row) => { if (row.room) counts.set(row.room, (counts.get(row.room) || 0) + 1); });
           return [...counts].map(([name, count]) => ({name, count})).sort((a, b) => a.name.localeCompare(b.name));
+        },
+        // Etage eines Eintrags: die der Area aus Home Assistant; ein von Hand abweichend gesetzter Raum hat keine.
+        floorOf(row) {
+          const option = this.entityOptions.find((o) => o.entity_id === row.entity_id);
+          if (!option) return "";
+          if (row.room && row.room !== option.area) return "";
+          return option.floor || "";
+        },
+        // Etagen und ihre Räume in der gewählten Reihenfolge; „Ohne Etage“ bleibt zuletzt und ist nicht verschiebbar.
+        orderTree() {
+          const floors = new Map();
+          this.extras.forEach((row) => {
+            const room = this.roomOf(row);
+            if (!room) return;
+            const floor = this.floorOf(row);
+            if (!floors.has(floor)) floors.set(floor, []);
+            if (!floors.get(floor).includes(room)) floors.get(floor).push(room);
+          });
+          const sorted = (list, order) => list.map((name, index) => ({name, index}))
+            .sort((a, b) => ((order.indexOf(a.name) + 1 || order.length + 1) - (order.indexOf(b.name) + 1 || order.length + 1)) || a.index - b.index)
+            .map((e) => e.name);
+          const named = sorted([...floors.keys()].filter(Boolean), this.floorOrder);
+          if (floors.has("")) named.push("");
+          return named.map((floor) => ({floor, rooms: sorted(floors.get(floor), this.roomOrder)}));
+        },
+        storeOrder(tree) {
+          this.floorOrder = tree.map((entry) => entry.floor).filter(Boolean);
+          this.roomOrder = tree.flatMap((entry) => entry.rooms);
+        },
+        moveFloor(floor, step) {
+          const tree = this.orderTree();
+          const named = tree.filter((entry) => entry.floor);
+          const from = named.findIndex((entry) => entry.floor === floor);
+          const to = from + step;
+          if (from < 0 || to < 0 || to >= named.length) return;
+          [named[from], named[to]] = [named[to], named[from]];
+          this.storeOrder(named.concat(tree.filter((entry) => !entry.floor)));
+        },
+        moveRoom(floor, room, step) {
+          const tree = this.orderTree();
+          const entry = tree.find((e) => e.floor === floor);
+          if (!entry) return;
+          const from = entry.rooms.indexOf(room);
+          const to = from + step;
+          if (from < 0 || to < 0 || to >= entry.rooms.length) return;
+          [entry.rooms[from], entry.rooms[to]] = [entry.rooms[to], entry.rooms[from]];
+          this.storeOrder(tree);
         },
         // Umbenennen auf einen vorhandenen Raum führt beide zusammen.
         renameRoom(oldName, newValue) {
@@ -355,6 +404,8 @@
       <span class="wt-item-add-label">{{ _("+ Sensor") }}</span>
     </button>
   </div>
+  <template x-for="name in floorOrder"><input type="hidden" name="floor_order" :value="name"></template>
+  <template x-for="name in roomOrder"><input type="hidden" name="room_order" :value="name"></template>
   <template x-for="row in extras"><span><input type="hidden" name="extra_entity_id" :value="row.entity_id"><input type="hidden" name="extra_name" :value="row.name"><input type="hidden" name="extra_room" :value="row.room || ''"><input type="hidden" name="extra_tile" :value="row.tile === false ? '0' : '1'"></span></template>
   </section>
 
@@ -403,6 +454,13 @@
     {% endfor %}
   </div>
   <p class="wt-why">{{ _("Kleiner passt mehr Kacheln in eine Zeile, Größer weniger. Gilt für die Kacheln auf dem Reiter „Temperatur &amp; Klima“.") }}</p>
+  <h3 class="wt-group-h">{{ _("Etagen in der Tabelle") }}</h3>
+  <div class="wt-chips" role="radiogroup" aria-label="{{ _('Etagen in der Tabelle') }}">
+    {% for key, label in (("open", _("Aufgeklappt")), ("closed", _("Zugeklappt"))) %}
+    <label class="filter-chip"><input type="radio" name="floors_start" value="{{ key }}" {% if config.floors_start == key %}checked{% endif %}><span>{{ label }}</span></label>
+    {% endfor %}
+  </div>
+  <p class="wt-why">{{ _("Gilt beim ersten Öffnen der Tabelle „Zeiträume im Vergleich“. Danach merkt sich der Browser, was aufgeklappt war.") }}</p>
   </div>
   <h3 class="wt-group-h">{{ _("Blöcke der Vergleichstabelle") }}</h3>
   <input type="hidden" name="blocks_submitted" value="1">
@@ -557,6 +615,35 @@
       </template>
     </div>
     <p class="wt-why" x-show="!manualRooms().length">{{ _("Keine Räume von Hand gesetzt.") }}</p>
+    <h3 class="wt-group-h">{{ _("Reihenfolge") }}</h3>
+    <p class="wt-why">{{ _("Gilt für die Tabelle „Zeiträume im Vergleich“, die Raumkacheln und die Auswahl über den Diagrammen. Räume bleiben in ihrer Etage.") }}</p>
+    <div class="wt-order-list" x-show="orderTree().length">
+      <template x-for="entry in orderTree()" :key="'f:' + entry.floor">
+        <div style="display:grid;gap:6px;">
+          <div class="wt-order-row" x-show="entry.floor || orderTree().some((e) => e.floor)">
+            <span class="wt-order-name" x-text="entry.floor || t('Ohne Etage')"></span>
+            <span class="wt-order-arrows" x-show="entry.floor">
+              <button type="button" class="btn" @click="moveFloor(entry.floor, -1)" aria-label="{{ _('Nach oben') }}">↑</button>
+              <button type="button" class="btn" @click="moveFloor(entry.floor, 1)" aria-label="{{ _('Nach unten') }}">↓</button>
+            </span>
+          </div>
+          <template x-for="room in entry.rooms" :key="'r:' + entry.floor + ':' + room">
+            <div class="wt-order-row" :class="{'is-room': orderTree().some((e) => e.floor)}">
+              <span class="wt-order-name" x-text="room"></span>
+              <span class="wt-order-arrows">
+                <button type="button" class="btn" @click="moveRoom(entry.floor, room, -1)" aria-label="{{ _('Nach oben') }}">↑</button>
+                <button type="button" class="btn" @click="moveRoom(entry.floor, room, 1)" aria-label="{{ _('Nach unten') }}">↓</button>
+              </span>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
+    <p class="wt-why" x-show="!orderTree().length">{{ _("Noch keine Räume vorhanden.") }}</p>
+    <div class="actionbar" style="justify-content:space-between;">
+      <button type="button" class="btn" x-show="floorOrder.length || roomOrder.length" @click="floorOrder = []; roomOrder = []">{{ _("Zurücksetzen") }}</button>
+      <button type="button" class="btn" @click="$refs.roomsDlg.close()">{{ _("Fertig") }}</button>
+    </div>
   </dialog>
 
   <div class="actionbar" style="justify-content:flex-end;">

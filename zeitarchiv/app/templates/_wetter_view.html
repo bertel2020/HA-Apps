@@ -32,7 +32,13 @@
     <{{ "h2" if own else "h3" }} class="{{ 'wt-h2' if own else 'wt-h3' }}">{{ _("Zeiträume im Vergleich") }} {{ hint_button(_("Zeiträume im Vergleich")) }}</{{ "h2" if own else "h3" }}>
     {% call hint_body() %}<span x-show="vorjahr" x-text="modeHint()"></span>{% endcall %}
     {# Spaltenauswahl wie in der Entitätenliste: Knopf „Spalten ▾“ mit Popover (dd-picker). #}
-    <div class="dd-picker-wrap wt-controls-end">
+    {% if group == 'klima' %}<span class="wt-controls-end wt-fold-all">
+      <span x-show="foldable" x-cloak>
+        <button type="button" class="btn" @click="collapseAll(true)">{{ _("Alles zuklappen") }}</button>
+        <button type="button" class="btn" @click="collapseAll(false)">{{ _("Alles aufklappen") }}</button>
+      </span>
+    </span>{% endif %}
+    <div class="dd-picker-wrap{{ '' if group == 'klima' else ' wt-controls-end' }}">
       <button type="button" class="btn" onclick="toggleDDPicker('wt-cols-{{ sfx }}')">{{ _("Spalten ▾") }}</button>
       <div class="dd-picker-popover" id="wt-cols-{{ sfx }}-popover">
         <template x-for="key in columnKeys" :key="key">
@@ -182,7 +188,7 @@
 {% set show_yearmatrix = 'yearmatrix' not in hc %}
 {% set show_long = show_records or show_kenntage or show_monthyears or show_yearmatrix %}
 {% set show_heat = has_heating and 'heating' not in hc %}
-<div x-data='wetterDashboard({{ precip_modes | tojson }})' data-hints="collapsed" data-tile-style="{{ config.tile_style }}" data-klima-tiles="{{ config.klima_tiles }}" data-klima-size="{{ config.klima_size }}" style="--wt-room-min:{{ {'small': 190, 'large': 320}.get(config.klima_size, 250) }}px">
+<div x-data='wetterDashboard({{ precip_modes | tojson }})' data-hints="collapsed" data-tile-style="{{ config.tile_style }}" data-klima-tiles="{{ config.klima_tiles }}" data-klima-size="{{ config.klima_size }}" data-floors-start="{{ config.floors_start }}" data-room-order='{{ {"floors": config.floor_order, "rooms": config.room_order} | tojson }}' style="--wt-room-min:{{ {'small': 190, 'large': 320}.get(config.klima_size, 250) }}px">
   <div class="wt-title-row">
     <h1>{{ _("Wetterdashboard") }}</h1>
     <button type="button" class="wt-title-edit" title="{{ _('Rollen bearbeiten') }}"

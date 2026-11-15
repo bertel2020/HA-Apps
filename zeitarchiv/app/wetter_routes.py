@@ -248,8 +248,21 @@ KLIMA_TILES = ("single", "room")
 DEFAULT_KLIMA_TILES = "single"
 KLIMA_SIZES = ("auto", "small", "large")
 DEFAULT_KLIMA_SIZE = "auto"
+FLOORS_START = ("open", "closed")
+DEFAULT_FLOORS_START = "open"
+MAX_ORDER_NAMES = 200
 DEFAULT_RAIN_DAY_MM = 1.0  # DWD: Niederschlagstag ab 1 mm
 DEFAULT_RAIN_DAY_MINUTES = 10
+
+
+def _clean_order(value) -> list[str]:
+    """Reihenfolge von Etagen oder Räumen: Namen ohne Leerzeichen am Rand, ohne Doppelte und leere Einträge."""
+    names: list[str] = []
+    for name in value if isinstance(value, list) else []:
+        text = str(name).strip()[:60]
+        if text and text not in names:
+            names.append(text)
+    return names[:MAX_ORDER_NAMES]
 
 
 def _empty_config() -> dict:
@@ -276,6 +289,9 @@ def _empty_config() -> dict:
         "tile_style": DEFAULT_TILE_STYLE,
         "klima_tiles": DEFAULT_KLIMA_TILES,
         "klima_size": DEFAULT_KLIMA_SIZE,
+        "floors_start": DEFAULT_FLOORS_START,
+        "floor_order": [],
+        "room_order": [],
     }
 
 
@@ -353,6 +369,10 @@ def _load_config(index: Index) -> dict:
         config["klima_tiles"] = data["klima_tiles"]
     if data.get("klima_size") in KLIMA_SIZES:
         config["klima_size"] = data["klima_size"]
+    if data.get("floors_start") in FLOORS_START:
+        config["floors_start"] = data["floors_start"]
+    for key in ("floor_order", "room_order"):
+        config[key] = _clean_order(data.get(key))
     for key in ("heating_room", "heating_limit"):
         value = data.get(key)
         if isinstance(value, (int, float)) and not isinstance(value, bool) and 0 < value < 40:
@@ -2225,6 +2245,9 @@ class WetterService:
             tile_style: str = Form(""),
             klima_tiles: str = Form(""),
             klima_size: str = Form(""),
+            floors_start: str = Form(""),
+            floor_order: list[str] = Form([]),
+            room_order: list[str] = Form([]),
         ) -> HTMLResponse:
             submitted = {
                 "temperature": temperature, "precip_mm": precip_mm, "precip_dur": precip_dur,
@@ -2294,6 +2317,12 @@ class WetterService:
             if size and size not in KLIMA_SIZES:
                 raise HTTPException(status_code=400, detail=tr("Ungültige Kachelgröße: {value}", value=size))
             config["klima_size"] = size or _load_config(deps.index)["klima_size"]
+            start = floors_start.strip()
+            if start and start not in FLOORS_START:
+                raise HTTPException(status_code=400, detail=tr("Ungültige Vorgabe: {value}", value=start))
+            config["floors_start"] = start or _load_config(deps.index)["floors_start"]
+            config["floor_order"] = _clean_order(floor_order)
+            config["room_order"] = _clean_order(room_order)
             heating = []
             for position, entity_id in enumerate(heating_entity_id):
                 entity_id = entity_id.strip()

@@ -187,10 +187,12 @@ const onFloors = {...base, rows: [
   row('temperature:2', 'Bad Feuchte', '%', 'Bad', 66), row('temperature:3', 'Küche Sensor', '°C', 'Küche', 21),
   row('temperature:4', 'Dachboden', '°C', '', 9),
 ].map((r) => ({...r, floor: {Bad: 'Obergeschoss', Keller: 'Keller', Küche: 'Erdgeschoss'}[r.room] || ''}))};
-const floorHeads = (html) => [...html.matchAll(/<tr class="wt-floor[^"]*"><th[^>]*>(?:<span[^>]*>[^<]*<\/span> )?([^<]*)<\/th>/g)].map((m) => m[1]);
+const floorHeads = (html) => [...html.matchAll(/<tr class="wt-floor[^"]*"><th[^>]*>(?:<span[^>]*>[^<]*<\/span> )?([^<]*)(?:<span class="wt-floor-count">[^<]*<\/span>)?<\/th>/g)].map((m) => m[1]);
 const floorsOpen = R.weatherComparison(onFloors, 'klima', true, {interactive: true});
 const floorsClosed = R.weatherComparison(onFloors, 'klima', true, {interactive: true, closedFloors: ['Obergeschoss', '']});
 const floorsCard = R.weatherComparison(onFloors, 'klima', true);
+const floorsOrdered = R.weatherComparison(onFloors, 'klima', true, {interactive: true, floorOrder: ['Keller', 'Obergeschoss'], roomOrder: ['Bad']});
+const roomsOrdered = R.weatherComparison(rooms, 'klima', true, {roomOrder: ['Keller', 'Bad']});
 const roomsClosed = R.weatherComparison(onFloors, 'klima', true, {interactive: true, closedRooms: ['Bad']});
 const averages = R.weatherComparison(rooms, 'klima', true, {avgOnly: true});
 const unchanged = R.weatherComparison(flat, 'klima', true);
@@ -206,6 +208,8 @@ console.log(JSON.stringify({
   roomToggles: count(floorsOpen, 'data-room='), cardRoomToggles: count(floorsCard, 'data-room='),
   roomRowsOpen: count(floorsOpen, '<th scope="row">'), roomRowsClosed: count(roomsClosed, '<th scope="row">'),
   closedRoomMarked: count(roomsClosed, 'is-closed'), closedRoomStillListed: heads(roomsClosed),
+  orderedFloors: floorHeads(floorsOrdered), orderedRooms: heads(floorsOrdered), orderedRoomsFlat: heads(roomsOrdered),
+  floorCounts: [...floorsOpen.matchAll(/wt-floor-count">([^<]*)</g)].map((m) => m[1]),
   basisUntouched: R.weatherComparison({...rooms, rows: rooms.rows.map((r) => ({...r, key: 'temperature'}))}, 'basis', true, {avgOnly: true}).includes('Max'),
 }));
 """
@@ -243,6 +247,30 @@ def test_floors_group_the_rooms_with_unassigned_rooms_last(output) -> None:
     assert output["floorHeads"] == ["Obergeschoss", "Keller", "Erdgeschoss", "Ohne Etage"]
     assert output["floorRoomHeads"] == ["Bad", "Keller", "Küche", "Ohne Raum"]
     assert output["floorToggles"] == 4
+
+
+def test_a_chosen_order_sorts_floors_and_rooms_and_floors_show_their_room_count(output) -> None:
+    assert output["orderedFloors"] == ["Keller", "Obergeschoss", "Erdgeschoss", "Ohne Etage"]
+    assert output["orderedRoomsFlat"] == ["Keller", "Bad", "Ohne Raum"]
+    assert output["floorCounts"] == ["1 Raum", "1 Raum", "1 Raum", "1 Raum"]
+
+
+def test_floors_and_rooms_can_be_ordered_for_the_chart_selection() -> None:
+    assert _node(f'r.roomsOf({CMP}, {{rooms: ["Küche", "Bad"]}})') == ["Küche", "Bad", "Keller", ""]
+    assert [entry["floor"] for entry in _node(f'r.floorsOf({CMP}, {{floors: ["EG", "UG"]}})')] == ["EG", "UG", "OG", ""]
+
+
+def test_order_and_start_state_are_saved_and_cleaned(service) -> None:
+    from app import wetter_routes
+    from test_wetter import _configure
+
+    config = wetter_routes._load_config(service.deps.index)
+    assert (config["floors_start"], config["floor_order"], config["room_order"]) == ("open", [], [])
+    _configure(service, floors_start="closed", floor_order=[" OG ", "EG", "OG", ""], room_order=["Bad", "Bad", "Küche"])
+    config = wetter_routes._load_config(service.deps.index)
+    assert (config["floors_start"], config["floor_order"], config["room_order"]) == ("closed", ["OG", "EG"], ["Bad", "Küche"])
+    _configure(service, floors_start="unsinn")
+    assert wetter_routes._load_config(service.deps.index)["floors_start"] == "open"
 
 
 def test_closed_floors_hide_their_rooms_and_the_card_gets_headers_without_buttons(output) -> None:

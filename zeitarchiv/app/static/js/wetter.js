@@ -280,6 +280,9 @@
       tilesLoaded: false,
       tileCols: {basis: 4, wind: 3, klima: 3},
       // Einstellung „Weitere Sensoren“ (Kachelstil): eine Kachel je Raum statt je Sensor.
+      foldable: false,
+      floorsStart: (document.querySelector('[data-floors-start]') || {dataset: {}}).dataset.floorsStart || 'open',
+      roomOrder: (() => { try { return JSON.parse((document.querySelector('[data-room-order]') || {dataset: {}}).dataset.roomOrder || '{}') || {}; } catch (e) { return {}; } })(),
       klimaMinTile: {small: 110, large: 200}[(document.querySelector('[data-klima-size]') || {dataset: {}}).dataset.klimaSize] || 0,
       klimaRooms: (document.querySelector('[data-klima-tiles]') || {dataset: {}}).dataset.klimaTiles === 'room',
       tilesStand: '',
@@ -422,12 +425,42 @@
         if (lastTable) this.paintTables(lastTable);
       },
 
+      // Etagen (ohne Etagen: Räume) der Vergleichstabelle, für „Alles zuklappen“ und den Start zugeklappt.
+      collapseTargets(data) {
+        const rows = ((data && data.rows) || []).filter((row) => row.room && /^temperature:/.test(row.key));
+        const floors = [...new Set(rows.map((row) => row.floor || '').filter(Boolean))];
+        if (rows.some((row) => !row.floor)) floors.push('');
+        const hasFloors = rows.some((row) => row.floor);
+        return {floors: hasFloors ? floors : [], rooms: hasFloors ? [] : [...new Set(rows.map((row) => row.room))]};
+      },
+
+      collapseAll(closed) {
+        const targets = lastTable ? this.collapseTargets(lastTable) : {floors: [], rooms: []};
+        this.floorsClosed = closed ? targets.floors : [];
+        this.roomsClosed = closed ? targets.rooms : [];
+        writeStore({floorsClosed: this.floorsClosed, roomsClosed: this.roomsClosed});
+        if (lastTable) this.paintTables(lastTable);
+      },
+
       paintTables(data) {
+        // Erstes Öffnen ohne gemerkte Wahl: die Vorgabe aus dem Setup gilt („zugeklappt“ klappt alle Etagen zu).
+        if (data) {
+          const found = this.collapseTargets(data);
+          this.foldable = found.floors.length > 0 || found.rooms.length > 0;
+        }
+        if (!this._floorsSeeded && data) {
+          this._floorsSeeded = true;
+          if (this.floorsStart === 'closed' && !('floorsClosed' in readStore())) {
+            const targets = this.collapseTargets(data);
+            this.floorsClosed = targets.floors;
+            this.roomsClosed = targets.rooms;
+          }
+        }
         for (const group of GROUPS) {
           const table = this.$refs[refName('table', group)];
           const wrap = this.$refs[refName('tableWrap', group)];
           if (!table) continue;
-          table.innerHTML = renderTable(data, group, this.diff, {avgOnly: this.avgOnly, closedFloors: this.floorsClosed, closedRooms: this.roomsClosed, interactive: true});
+          table.innerHTML = renderTable(data, group, this.diff, {avgOnly: this.avgOnly, closedFloors: this.floorsClosed, closedRooms: this.roomsClosed, floorOrder: this.roomOrder.floors, roomOrder: this.roomOrder.rooms, interactive: true});
           this.bindFloors(table);
           // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
           wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1);
@@ -577,6 +610,13 @@
             parts: ordered.map((tile) => part(tile, count[kindOf(tile)] > 1 ? tile.label : (kindOf(tile) === 'humid' ? t('Luftfeuchte') : t('Temperatur')))),
           });
         });
+        const floorRank = (floor) => { const i = (this.roomOrder.floors || []).indexOf(floor); return i < 0 ? (this.roomOrder.floors || []).length : i; };
+        const roomRank = (name) => { const i = (this.roomOrder.rooms || []).indexOf(name); return i < 0 ? (this.roomOrder.rooms || []).length : i; };
+        if ((this.roomOrder.floors || []).length || (this.roomOrder.rooms || []).length) {
+          const indexed = out.map((entry, index) => ({entry, index}));
+          indexed.sort((a, b) => floorRank(a.entry.floor) - floorRank(b.entry.floor) || roomRank(a.entry.name) - roomRank(b.entry.name) || a.index - b.index);
+          out.splice(0, out.length, ...indexed.map((item) => item.entry));
+        }
         loose.forEach((tile) => out.push({key: tile.key, name: t('Ohne Raum'), floor: '', loose: true, parts: [part(tile, tile.label)]}));
         return out;
       },
@@ -1692,10 +1732,10 @@
 
       // Räume der weiteren Sensoren für die Auswahl über den Diagrammen; ab zwei Räumen sichtbar.
       roomChips() {
-        const rooms = this.tempCmp ? WetterRooms.roomsOf(this.tempCmp) : [];
+        const rooms = this.tempCmp ? WetterRooms.roomsOf(this.tempCmp, this.roomOrder) : [];
         if (rooms.length < 2) return [];
         // Mit Etagen aus Home Assistant stehen die Räume gruppiert, vor der ersten eines Etagenblocks der Name der Etage.
-        const floors = WetterRooms.floorsOf(this.tempCmp);
+        const floors = WetterRooms.floorsOf(this.tempCmp, this.roomOrder);
         const grouped = floors.some((entry) => entry.floor);
         const order = grouped ? floors.flatMap((entry) => entry.rooms.map((room) => ({room, floor: entry.floor}))) : rooms.map((room) => ({room, floor: ''}));
         const seen = new Set();

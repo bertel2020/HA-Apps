@@ -28,6 +28,14 @@
   .wt-kpis-lage .wt-tile{text-align:center;align-items:center;justify-items:center;border-left-width:1px;}
   /* Kachel je Raum (Einstellung „Weitere Sensoren in der Übersicht“): Titel, darunter Temperatur und Feuchte nebeneinander. */
   .wt-roomtiles{grid-template-columns:repeat(auto-fill,minmax(var(--wt-room-min,250px),1fr));}
+  .wt-fold-all .btn{padding:4px 10px;font-size:calc(13px * var(--font-scale, 1));}
+  .wt-floor-count{margin-left:10px;font-weight:400;color:var(--ink-faint);font-size:calc(12px * var(--font-scale, 1));}
+  .wt-order-list{display:grid;gap:6px;margin:4px 0 12px;}
+  .wt-order-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);}
+  .wt-order-row.is-room{margin-left:24px;color:var(--ink-muted);}
+  .wt-order-name{flex:1;min-width:0;overflow-wrap:anywhere;}
+  .wt-order-arrows{display:flex;gap:4px;}
+  .wt-order-arrows .btn{padding:2px 8px;min-width:0;line-height:1.2;}
   .wt-roomtile{min-width:0;display:flex;flex-direction:column;gap:10px;padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:var(--tile-wash, transparent), var(--surface);box-shadow:var(--shadow);}
   .wt-roomtile.is-loose{border-style:dashed;}
   .wt-roomtile-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
