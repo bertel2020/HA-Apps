@@ -300,3 +300,16 @@ def test_tiles_carry_room_and_floor_and_the_room_setting_defaults_to_single(serv
     assert wetter_routes._load_config(service.deps.index)["klima_tiles"] == "room"
     _configure(service, klima_tiles="unsinn")
     assert wetter_routes._load_config(service.deps.index)["klima_tiles"] == "single"
+
+
+def test_tile_size_setting_is_saved_and_validated(service) -> None:
+    """Kachelgröße der weiteren Sensoren: Standard automatisch, ungültige Werte ändern nichts; bis zu 60 Sensoren."""
+    from app import wetter_routes
+    from test_wetter import _configure
+
+    assert wetter_routes._load_config(service.deps.index)["klima_size"] == "auto"
+    _configure(service, klima_size="small")
+    assert wetter_routes._load_config(service.deps.index)["klima_size"] == "small"
+    _configure(service, klima_size="unsinn")
+    assert wetter_routes._load_config(service.deps.index)["klima_size"] == "auto"
+    assert wetter_routes.MAX_EXTRA_TEMPERATURES == 60

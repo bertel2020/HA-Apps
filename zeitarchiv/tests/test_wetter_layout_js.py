@@ -15,8 +15,10 @@ MODULE = APP / "static/js/wetter-layout.js"
 pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="node nicht installiert")
 
 
-def _columns(count: int, width: int, maximum: int | None = None) -> int:
+def _columns(count: int, width: int, maximum: int | None = None, min_tile: int | None = None) -> int:
     extra = "" if maximum is None else f", {maximum}"
+    if min_tile is not None:
+        extra = f", {maximum or 0}, {min_tile}"
     script = f"const h = require({json.dumps(str(MODULE))}); console.log(h.tileColumns({count}, {width}{extra}));"
     return int(subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True, timeout=30).stdout)
 
@@ -74,4 +76,11 @@ def test_the_wide_layout_caps_the_row_at_six_tiles(count: int, width: int, expec
 def test_only_the_wide_layout_passes_the_cap() -> None:
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "document.documentElement.dataset.pageLayout === 'wide' ? 6 : 0" in script
-    assert "WetterLayout.tileColumns(count, element.clientWidth, WIDE_TILE_MAX_COLUMNS)" in script
+    assert "WetterLayout.tileColumns(count, element.clientWidth, maxColumns, klima ? this.klimaMinTile : 0)" in script
+    assert "const maxColumns = klima && this.klimaMinTile < 150 && WIDE_TILE_MAX_COLUMNS ? 8 : WIDE_TILE_MAX_COLUMNS;" in script
+
+
+def test_a_smaller_minimum_tile_width_fits_more_columns() -> None:
+    assert _columns(30, 1200, None, 110) > _columns(30, 1200)
+    assert _columns(30, 1200, None, 200) < _columns(30, 1200)
+    assert _columns(30, 1200, None, 0) == _columns(30, 1200)

@@ -27,7 +27,7 @@
   .wt-lage-chip svg{width:14px;height:14px;color:var(--ink-muted);}
   .wt-kpis-lage .wt-tile{text-align:center;align-items:center;justify-items:center;border-left-width:1px;}
   /* Kachel je Raum (Einstellung „Weitere Sensoren in der Übersicht“): Titel, darunter Temperatur und Feuchte nebeneinander. */
-  .wt-roomtiles{grid-template-columns:repeat(auto-fill,minmax(250px,1fr));}
+  .wt-roomtiles{grid-template-columns:repeat(auto-fill,minmax(var(--wt-room-min,250px),1fr));}
   .wt-roomtile{min-width:0;display:flex;flex-direction:column;gap:10px;padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:var(--tile-wash, transparent), var(--surface);box-shadow:var(--shadow);}
   .wt-roomtile.is-loose{border-style:dashed;}
   .wt-roomtile-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}

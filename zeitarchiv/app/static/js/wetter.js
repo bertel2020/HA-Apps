@@ -280,6 +280,7 @@
       tilesLoaded: false,
       tileCols: {basis: 4, wind: 3, klima: 3},
       // Einstellung „Weitere Sensoren“ (Kachelstil): eine Kachel je Raum statt je Sensor.
+      klimaMinTile: {small: 110, large: 200}[(document.querySelector('[data-klima-size]') || {dataset: {}}).dataset.klimaSize] || 0,
       klimaRooms: (document.querySelector('[data-klima-tiles]') || {dataset: {}}).dataset.klimaTiles === 'room',
       tilesStand: '',
       tilesAt: null,
@@ -538,7 +539,10 @@
         for (const group of GROUPS) {
           const element = this.$refs[refName('tiles', group)];
           const count = this.tilesFor(group).length;
-          if (element && count && element.clientWidth) this.tileCols[group] = WetterLayout.tileColumns(count, element.clientWidth, WIDE_TILE_MAX_COLUMNS);
+          if (!element || !count || !element.clientWidth) continue;
+          const klima = group === 'klima';
+          const maxColumns = klima && this.klimaMinTile < 150 && WIDE_TILE_MAX_COLUMNS ? 8 : WIDE_TILE_MAX_COLUMNS;
+          this.tileCols[group] = WetterLayout.tileColumns(count, element.clientWidth, maxColumns, klima ? this.klimaMinTile : 0);
         }
       },
 

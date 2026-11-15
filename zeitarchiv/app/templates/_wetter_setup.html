@@ -396,6 +396,13 @@
     {% endfor %}
   </div>
   <p class="wt-why">{{ _("Nach Raum zeigt je Raum eine Kachel mit Temperatur und Luftfeuchte. Sensoren ohne Raum bleiben einzeln. Gilt für die Kacheln auf dem Reiter „Temperatur &amp; Klima“.") }}</p>
+  <h3 class="wt-group-h">{{ _("Kachelgröße der weiteren Sensoren") }}</h3>
+  <div class="wt-chips" role="radiogroup" aria-label="{{ _('Kachelgröße der weiteren Sensoren') }}">
+    {% for key, label in (("auto", _("Automatisch")), ("small", _("Kleiner")), ("large", _("Größer"))) %}
+    <label class="filter-chip"><input type="radio" name="klima_size" value="{{ key }}" {% if config.klima_size == key %}checked{% endif %}><span>{{ label }}</span></label>
+    {% endfor %}
+  </div>
+  <p class="wt-why">{{ _("Kleiner passt mehr Kacheln in eine Zeile, Größer weniger. Gilt für die Kacheln auf dem Reiter „Temperatur &amp; Klima“.") }}</p>
   </div>
   <h3 class="wt-group-h">{{ _("Blöcke der Vergleichstabelle") }}</h3>
   <input type="hidden" name="blocks_submitted" value="1">

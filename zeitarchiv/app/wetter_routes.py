@@ -111,7 +111,7 @@ ROLE_KEYS = tuple(key for key, _label, _types in ROLES)
 ROLE_TYPES = {key: types for key, _label, types in ROLES}
 ROLE_LABELS = {key: label for key, label, _types in ROLES}
 
-MAX_EXTRA_TEMPERATURES = 20
+MAX_EXTRA_TEMPERATURES = 60
 #: Blöcke der Vergleichstabelle, die sich in der Einrichtung ausblenden lassen (die Außentemperatur
 #: und Zusatzsensoren bleiben immer sichtbar).
 #: Zeiträume (Tage) des Temperaturvergleichs auf dem Reiter „Temperatur & Klima“; 365 heißt in der Oberfläche „12 Monate“
@@ -246,6 +246,8 @@ DEFAULT_TILE_STYLE = "plate"
 #: Kacheln der weiteren Sensoren auf dem Reiter „Temperatur & Klima“: „single“ je Sensor, „room“ je Raum.
 KLIMA_TILES = ("single", "room")
 DEFAULT_KLIMA_TILES = "single"
+KLIMA_SIZES = ("auto", "small", "large")
+DEFAULT_KLIMA_SIZE = "auto"
 DEFAULT_RAIN_DAY_MM = 1.0  # DWD: Niederschlagstag ab 1 mm
 DEFAULT_RAIN_DAY_MINUTES = 10
 
@@ -273,6 +275,7 @@ def _empty_config() -> dict:
         "lage_layout": DEFAULT_LAGE_LAYOUT,
         "tile_style": DEFAULT_TILE_STYLE,
         "klima_tiles": DEFAULT_KLIMA_TILES,
+        "klima_size": DEFAULT_KLIMA_SIZE,
     }
 
 
@@ -348,6 +351,8 @@ def _load_config(index: Index) -> dict:
         config["tile_style"] = data["tile_style"]
     if data.get("klima_tiles") in KLIMA_TILES:
         config["klima_tiles"] = data["klima_tiles"]
+    if data.get("klima_size") in KLIMA_SIZES:
+        config["klima_size"] = data["klima_size"]
     for key in ("heating_room", "heating_limit"):
         value = data.get(key)
         if isinstance(value, (int, float)) and not isinstance(value, bool) and 0 < value < 40:
@@ -2219,6 +2224,7 @@ class WetterService:
             lage_layout: str = Form(""),
             tile_style: str = Form(""),
             klima_tiles: str = Form(""),
+            klima_size: str = Form(""),
         ) -> HTMLResponse:
             submitted = {
                 "temperature": temperature, "precip_mm": precip_mm, "precip_dur": precip_dur,
@@ -2284,6 +2290,10 @@ class WetterService:
             if klima and klima not in KLIMA_TILES:
                 raise HTTPException(status_code=400, detail=tr("Ungültige Darstellung: {value}", value=klima))
             config["klima_tiles"] = klima or _load_config(deps.index)["klima_tiles"]
+            size = klima_size.strip()
+            if size and size not in KLIMA_SIZES:
+                raise HTTPException(status_code=400, detail=tr("Ungültige Kachelgröße: {value}", value=size))
+            config["klima_size"] = size or _load_config(deps.index)["klima_size"]
             heating = []
             for position, entity_id in enumerate(heating_entity_id):
                 entity_id = entity_id.strip()
