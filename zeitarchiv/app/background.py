@@ -46,6 +46,7 @@ from zoneinfo import ZoneInfo
 
 from .error_text import user_message
 from .i18n import N_, tr
+from .logging_setup import log_rate_limited
 from . import cleanup_stats, counter_auto, duplicates_auto
 from . import demo_mode
 from . import ha_integration
@@ -138,6 +139,12 @@ class BackgroundService:
 
     # Mindestabstand zwischen zwei Kurzzeilen eines dauerhaft scheiternden Wartungsschritts.
     _STEP_FAILURE_LOG_INTERVAL_SECONDS = 3600
+    # Ab dieser Dauer meldet ein Wartungsschritt sich im Protokoll (im Normalbetrieb dauern sie Millisekunden);
+    # je Schritt höchstens alle 5 Minuten, damit ein dauerhaft langsamer Schritt das Log nicht füllt.
+    _STEP_SLOW_SECONDS = 5.0
+    _STEP_SLOW_LOG_INTERVAL_SECONDS = 300.0
+    # Je Entität in der Ausreißer-Messung: nennt Entität und Zeilenzahl, die der Schritt-Eintrag nicht kennt.
+    _OUTLIER_RATE_ENTITY_SLOW_SECONDS = 3.0
 
     def __init__(self, deps: BackgroundDependencies) -> None:
         self.deps = deps
@@ -1001,9 +1008,22 @@ class BackgroundService:
         (nie gemessene zuerst, dann nur Entitäten mit neuen Werten)."""
         begonnen = time.monotonic()
         for entity in cleanup_stats.due_entities_for_outlier_rate(self.index, time.time()):
-            cleanup_stats.alltime_counts(
+            entity_started = time.monotonic()
+            counts = cleanup_stats.alltime_counts(
                 self.data_dir, self.index, self.tz, entity, datetime.now(self.tz), force=True
             )
+            entity_seconds = time.monotonic() - entity_started
+            if entity_seconds >= self._OUTLIER_RATE_ENTITY_SLOW_SECONDS:
+                log_rate_limited(
+                    logger,
+                    logging.WARNING,
+                    f"outlier_rate_slow:{entity['entity_id']}",
+                    "Langsame Ausreißer-Messung · event=outlier_rate_slow entity=%s rows=%s duration_ms=%.1f",
+                    entity["entity_id"],
+                    counts.get("all", "?") if isinstance(counts, dict) else "?",
+                    entity_seconds * 1000,
+                    interval_seconds=self._STEP_SLOW_LOG_INTERVAL_SECONDS,
+                )
             if (
                 time.monotonic() - begonnen >= cleanup_stats.OUTLIER_RATE_TICK_BUDGET_SECONDS
                 or self._maintenance_scheduler_stop.is_set()
@@ -1166,12 +1186,29 @@ class BackgroundService:
         der Duplikat-Scan) übersprang bei jedem 30-s-Takt alles danach —
         Backup-Zeitplan, Aufbewahrung, Kompaktierung und automatische Löschung
         liefen dann nie."""
+        started = time.monotonic()
         try:
             yield
         except Exception as exc:
             self._note_step_failure(name, exc)
         else:
             self._note_step_success(name)
+        finally:
+            self._note_step_duration(name, time.monotonic() - started)
+
+    def _note_step_duration(self, name: str, seconds: float) -> None:
+        """Meldet einen auffällig langen Wartungsschritt. Ohne diese Zeile fällt eine dauerhaft belastende
+        Hintergrundarbeit nur als CPU-Last auf, ohne dass das Protokoll sagt, welcher Schritt es ist."""
+        if seconds >= self._STEP_SLOW_SECONDS:
+            log_rate_limited(
+                logger,
+                logging.WARNING,
+                f"maintenance_step_slow:{name}",
+                "Langsamer Wartungsschritt · event=maintenance_step_slow step=%s duration_ms=%.1f",
+                name,
+                seconds * 1000,
+                interval_seconds=self._STEP_SLOW_LOG_INTERVAL_SECONDS,
+            )
 
     def _note_step_failure(self, name: str, exc: Exception) -> None:
         """Drosselt die Fehlermeldungen eines dauerhaft scheiternden Schritts:

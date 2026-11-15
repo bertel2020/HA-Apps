@@ -182,3 +182,28 @@ def test_throttling_is_tracked_per_step(dienst, caplog) -> None:
         _schritt(dienst, "b", RuntimeError("y"))
     gemeldet = [r.getMessage() for r in caplog.records if "event=maintenance_step_failed" in r.getMessage()]
     assert len(gemeldet) == 2
+
+
+def test_a_slow_step_logs_one_warning_and_fast_steps_log_nothing(dienst, monkeypatch, caplog) -> None:
+    from app import logging_setup
+
+    logging_setup._RATE_LIMIT_STATE.clear()
+    with caplog.at_level(logging.WARNING):
+        _schritt(dienst, "schnell")  # weit unter der Schwelle von 5 s
+        monkeypatch.setattr(BackgroundService, "_STEP_SLOW_SECONDS", 0.0)
+        _schritt(dienst, "langsam")
+        _schritt(dienst, "langsam")  # zweite Meldung desselben Schritts wird gedrosselt
+    gemeldet = [r.getMessage() for r in caplog.records if "event=maintenance_step_slow" in r.getMessage()]
+    assert len(gemeldet) == 1 and "step=langsam " in gemeldet[0] and "duration_ms=" in gemeldet[0]
+
+
+def test_a_slow_failing_step_is_reported_as_slow_too(dienst, monkeypatch, caplog) -> None:
+    from app import logging_setup
+
+    logging_setup._RATE_LIMIT_STATE.clear()
+    monkeypatch.setattr(BackgroundService, "_STEP_SLOW_SECONDS", 0.0)
+    with caplog.at_level(logging.WARNING):
+        _schritt(dienst, "langsam_kaputt", RuntimeError("x"))
+    texte = [r.getMessage() for r in caplog.records]
+    assert any("event=maintenance_step_slow step=langsam_kaputt" in t for t in texte)
+    assert any("event=maintenance_step_failed step=langsam_kaputt" in t for t in texte)
