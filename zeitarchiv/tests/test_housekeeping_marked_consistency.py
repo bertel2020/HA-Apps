@@ -601,7 +601,7 @@ def test_collect_gathers_several_filters_in_one_pass() -> None:
         factory, filter_="none", page=1, page_size=1, gap_threshold_minutes=None,
         outlier_factor=20.0, tz=TZ, collect={"outliers": 5, "duplicates": 1000},
     )
-    assert len(calls) == 2  # Zählen und Analysieren, unabhängig von der Zahl der Kategorien
+    assert len(calls) == 1  # Seite 1: nur ein Durchlauf (kein Vorlauf zum Zählen), unabhängig von der Zahl der Kategorien
     assert result["collected"]["outliers"]["total"] >= 1
     assert result["collected"]["duplicates"]["total"] == 2
     single = cleanup.analyze_raw_rows_page(

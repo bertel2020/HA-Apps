@@ -178,6 +178,28 @@ def test_counting_without_reasons_gives_identical_numbers() -> None:
     assert all(not flag["reason"] for row in nur_zaehlen["rows"] for flag in row.get("flags", []))
 
 
+def test_first_page_reads_the_rows_once_and_counts_all_rows_in_the_main_pass() -> None:
+    """Seite 1 braucht die Gesamtzahl vorab nicht: ein Lesedurchgang statt zwei, ``counts["all"]`` stimmt trotzdem.
+    Ab Seite 2 bleibt der Vorlauf, weil die Seite an die Seitenzahl geklemmt werden muss."""
+    rows = [(_ts(2024, 7, 1, h), float(h)) for h in range(24)]
+    aufrufe = []
+
+    def fabrik():
+        aufrufe.append(1)
+        return iter(rows)
+
+    options = dict(filter_="all", page_size=5, gap_threshold_minutes=None, outlier_factor=None, tz=TZ)
+    erste = cleanup.analyze_raw_rows_page(fabrik, page=1, **options)
+    assert len(aufrufe) == 1
+    assert erste["counts"]["all"] == 24 and erste["pagination"]["total"] == 24 and len(erste["rows"]) == 5
+    aufrufe.clear()
+    gesperrt = cleanup.analyze_raw_rows_page(fabrik, page=99, **options)  # wird auf die letzte Seite geklemmt
+    assert len(aufrufe) == 2
+    assert gesperrt["pagination"]["page"] == 5 and gesperrt["counts"]["all"] == 24
+    leer = cleanup.analyze_raw_rows_page(lambda: iter([]), page=1, **options)
+    assert leer["counts"]["all"] == 0 and leer["pagination"]["page"] == 1 and leer["rows"] == []
+
+
 def test_daily_counts_are_stored_with_the_alltime_stats() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
     try:
