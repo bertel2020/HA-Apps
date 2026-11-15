@@ -665,6 +665,7 @@
           out.push({
             key: 'temperature', role: 'temperature', icon: 'temp', label: temp.label, big: false, href: link(temp), title: '',
             value: this.tileValue(temp), sub: [adjective, this.tileSub(temp)].filter(Boolean).join('\n'),
+            line: [adjective, this.tileSub(temp)].filter(Boolean).join(' · '),
           });
         }
 
@@ -684,6 +685,8 @@
           out.push({
             key: 'rain', role: 'precip_mm', icon: 'drop', label: t('Regen'), big: false, href: link(first), title: '',
             value: rain ? escapeHtml(rain.text) : this.tileValue(first), sub: lines.join('\n'),
+            // Die Kachel zeigt nur „zuletzt“ und „heute“ in einer Zeile (so ist sie nicht höher als die anderen); „gestern“ steht im Tooltip.
+            line: [rain && rain.sub, today.join(' · ')].filter(Boolean).join(' · '),
           });
         }
 
@@ -697,6 +700,8 @@
             fromLage[tile.kind] = {
               key: tile.kind, role: tile.kind === 'sky' ? 'illuminance' : 'wind', icon: tile.icon, label: tile.label, big: false, href: '',
               title: '', value: escapeHtml(tile.value), sub: [tile.sub, tile.sub2, span].filter(Boolean).join('\n'),
+              // Eine Zeile mit Stärke, Geschwindigkeit und Tief/Hoch; Richtung und Böen stehen im Tooltip (und im Satz oben).
+              line: tile.kind === 'wind' ? [tile.sub, span].filter(Boolean).join(' · ') : '',
             };
           });
         }
