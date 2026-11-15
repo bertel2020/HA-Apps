@@ -77,7 +77,7 @@ def test_only_the_wide_layout_passes_the_cap() -> None:
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "document.documentElement.dataset.pageLayout === 'wide' ? 6 : 0" in script
     assert "WetterLayout.tileColumns(count, element.clientWidth, maxColumns, klima ? this.klimaMinTile : 0)" in script
-    assert "const maxColumns = klima && this.klimaMinTile < 150 && WIDE_TILE_MAX_COLUMNS ? 8 : WIDE_TILE_MAX_COLUMNS;" in script
+    assert "this.klimaMinTile < 150 && WIDE_TILE_MAX_COLUMNS ? (this.klimaMinTile < 100 ? 10 : 8) : WIDE_TILE_MAX_COLUMNS;" in script
 
 
 def test_a_smaller_minimum_tile_width_fits_more_columns() -> None:

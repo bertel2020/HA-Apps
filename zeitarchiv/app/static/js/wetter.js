@@ -283,7 +283,7 @@
       foldable: false,
       floorsStart: (document.querySelector('[data-floors-start]') || {dataset: {}}).dataset.floorsStart || 'open',
       roomOrder: (() => { try { return JSON.parse((document.querySelector('[data-room-order]') || {dataset: {}}).dataset.roomOrder || '{}') || {}; } catch (e) { return {}; } })(),
-      klimaMinTile: {small: 110, medium: 180, large: 240}[(document.querySelector('[data-klima-size]') || {dataset: {}}).dataset.klimaSize] || 0,
+      klimaMinTile: {small: 90, medium: 110, large: 180}[(document.querySelector('[data-klima-size]') || {dataset: {}}).dataset.klimaSize] || 0,
       klimaRooms: (document.querySelector('[data-klima-tiles]') || {dataset: {}}).dataset.klimaTiles === 'room',
       tilesStand: '',
       tilesAt: null,
@@ -574,7 +574,7 @@
           const count = this.tilesFor(group).length;
           if (!element || !count || !element.clientWidth) continue;
           const klima = group === 'klima';
-          const maxColumns = klima && this.klimaMinTile < 150 && WIDE_TILE_MAX_COLUMNS ? 8 : WIDE_TILE_MAX_COLUMNS;
+          const maxColumns = klima && this.klimaMinTile && this.klimaMinTile < 150 && WIDE_TILE_MAX_COLUMNS ? (this.klimaMinTile < 100 ? 10 : 8) : WIDE_TILE_MAX_COLUMNS;
           this.tileCols[group] = WetterLayout.tileColumns(count, element.clientWidth, maxColumns, klima ? this.klimaMinTile : 0);
         }
       },

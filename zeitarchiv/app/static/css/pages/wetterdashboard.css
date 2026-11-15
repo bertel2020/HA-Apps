@@ -28,6 +28,19 @@
   .wt-kpis-lage .wt-tile{text-align:center;align-items:center;justify-items:center;border-left-width:1px;}
   /* Kachel je Raum (Einstellung „Weitere Sensoren in der Übersicht“): Titel, darunter Temperatur und Feuchte nebeneinander. */
   .wt-roomtiles{grid-template-columns:repeat(auto-fill,minmax(var(--wt-room-min,250px),1fr));}
+  /* Kachelgröße „Klein“ der weiteren Sensoren: engere Kacheln mit kleineren Schriften (Einzelkacheln und Raumkacheln). */
+  [data-klima-size="small"][data-tile-style] .wt-tiles[data-group="klima"] .wt-tile{padding:6px 8px;}
+  [data-klima-size="small"][data-tile-style] .wt-tiles[data-group="klima"] .wt-tile-label{font-size:calc(9.5px * var(--font-scale, 1));letter-spacing:.04em;}
+  [data-klima-size="small"][data-tile-style] .wt-tiles[data-group="klima"] .wt-tile-value{font-size:calc(16px * var(--font-scale, 1));}
+  [data-klima-size="small"][data-tile-style] .wt-tiles[data-group="klima"] .wt-tile-value small{font-size:calc(10.5px * var(--font-scale, 1));margin-left:2px;}
+  [data-klima-size="small"][data-tile-style] .wt-tiles[data-group="klima"] .wt-tile-sub{font-size:calc(9.5px * var(--font-scale, 1));margin-top:0;}
+  [data-klima-size="small"][data-tile-style] .wt-roomtile{padding:9px 11px;gap:6px;border-radius:12px;}
+  [data-klima-size="small"][data-tile-style] .wt-roomtile-name{font-size:calc(11.5px * var(--font-scale, 1));}
+  [data-klima-size="small"][data-tile-style] .wt-roomtile-floor{font-size:calc(10px * var(--font-scale, 1));}
+  [data-klima-size="small"][data-tile-style] .wt-roomtile-parts{grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:8px;}
+  [data-klima-size="small"][data-tile-style] .wt-roomtile-label{font-size:calc(10.5px * var(--font-scale, 1));}
+  [data-klima-size="small"][data-tile-style] .wt-roomtile-part .wt-tile-value{font-size:calc(17px * var(--font-scale, 1));}
+  [data-klima-size="small"][data-tile-style] .wt-roomtile-part .wt-tile-sub{font-size:calc(9.5px * var(--font-scale, 1));}
   .wt-fold-all .btn{padding:4px 10px;font-size:calc(13px * var(--font-scale, 1));}
   .wt-floor-count{margin-left:10px;font-weight:400;color:var(--ink-faint);font-size:calc(12px * var(--font-scale, 1));}
   .wt-drag-handle{flex:none;cursor:grab;color:var(--ink-faint);user-select:none;padding:0 2px;font-size:calc(16px * var(--font-scale, 1));line-height:1;}
