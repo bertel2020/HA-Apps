@@ -37,6 +37,10 @@
 
 ### Geändert
 
+- **Einrichtung von Wetter- und Energiedashboard**: Ungespeicherte Änderungen sind besser zu erkennen
+  - „Speichern“ wird zum Hauptknopf mit dem Hinweis „Ungespeicherte Änderungen“, sobald es etwas zu speichern gibt
+  - Beim Verlassen über einen Link der App (Menü, Reiter) fragt ein eigener Dialog statt des Browserdialogs
+
 - **Wetterdashboard**: Ruhigere Übersicht
   - Große Zahlen auf den Kacheln, in der Überschrift und bei den Rekorden sind eine Stufe kleiner
   - Die obere Reihe der Wetterlage-Kacheln ist so hoch wie die untere: Regen zeigt kein „gestern“ mehr, Wind keine Richtung und keine Böen (beides steht weiter im Tooltip der Kachel)

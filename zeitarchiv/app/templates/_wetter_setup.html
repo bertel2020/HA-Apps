@@ -735,8 +735,9 @@
   </dialog>
 
   <div class="actionbar actionbar-sticky" style="justify-content:flex-end;">
+    <span class="unsaved-note">{{ _("Ungespeicherte Änderungen") }}</span>
     <a class="btn" href="wetterdashboard" data-unsaved-cancel>{{ _("Abbrechen") }}</a>
-    <button type="submit" class="btn" style="background:var(--accent-line);color:var(--accent-contrast);border-color:var(--accent-line);">{{ _("Speichern") }}</button>
+    <button type="submit" class="btn unsaved-save">{{ _("Speichern") }}</button>
   </div>
 </form>
 </div>

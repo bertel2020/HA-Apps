@@ -37,6 +37,10 @@
 
 ### Changed
 
+- **Weather and energy dashboard setup**: Unsaved changes are easier to see
+  - “Save” turns into the main button with a note “Unsaved changes” as soon as there is something to save
+  - Leaving through a link of the app (menu, tabs) asks in the app’s own dialog instead of the browser’s
+
 - **Weather dashboard**: Calmer overview
   - Large numbers on the tiles, in the headline and in the records are one step smaller
   - The top row of the weather situation tiles is as tall as the bottom one: rain no longer shows “yesterday”, wind no longer shows direction and gusts (both are still in the tile’s tooltip)

@@ -1843,6 +1843,14 @@ button[data-tooltip]{cursor:pointer;}
 @media (prefers-reduced-motion:reduce){
   .btn.htmx-request:not(.navbtn)::after,.btn[data-disabled-by-htmx]:not(.navbtn)::after{animation:none;}
 }
+/* Einrichtung von Wetter- und Energiedashboard: „Speichern“ ist zurückhaltend, solange nichts zu speichern ist, und wird zum
+   Hauptknopf mit Hinweis, sobald sich das Formular vom gespeicherten Stand unterscheidet (unsaved-guard.js setzt .is-dirty). */
+.unsaved-note{display:none;align-items:center;gap:8px;margin-right:auto;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+.unsaved-note::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--notice-warn, var(--accent-line));}
+form.is-dirty .unsaved-note{display:inline-flex;}
+.unsaved-save{transition:background-color .15s,color .15s,border-color .15s;}
+form.is-dirty .unsaved-save{background:var(--accent-line);border-color:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
+form.is-dirty .unsaved-save:hover:not(:disabled){opacity:.92;}
 .btn.primary,.btn-primary{background:var(--accent-line);border-color:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
 .btn.primary:hover:not(:disabled){opacity:.92;background:var(--accent-line);}
 .btn-danger,.btn.danger{border-color:var(--danger);color:var(--danger);background:var(--surface);}
