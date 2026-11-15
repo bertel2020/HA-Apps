@@ -34,13 +34,14 @@
   [data-klima-size="small"][data-tile-style] .wt-tiles[data-group="klima"] .wt-tile-value{font-size:calc(16px * var(--font-scale, 1));}
   [data-klima-size="small"][data-tile-style] .wt-tiles[data-group="klima"] .wt-tile-value small{font-size:calc(10.5px * var(--font-scale, 1));margin-left:2px;}
   [data-klima-size="small"][data-tile-style] .wt-tiles[data-group="klima"] .wt-tile-sub{font-size:calc(9.5px * var(--font-scale, 1));margin-top:0;}
-  [data-klima-size="small"][data-tile-style] .wt-roomtile{padding:9px 11px;gap:6px;border-radius:12px;}
-  [data-klima-size="small"][data-tile-style] .wt-roomtile-name{font-size:calc(11.5px * var(--font-scale, 1));}
-  [data-klima-size="small"][data-tile-style] .wt-roomtile-floor{font-size:calc(10px * var(--font-scale, 1));}
-  [data-klima-size="small"][data-tile-style] .wt-roomtile-parts{grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:8px;}
-  [data-klima-size="small"][data-tile-style] .wt-roomtile-label{font-size:calc(10.5px * var(--font-scale, 1));}
-  [data-klima-size="small"][data-tile-style] .wt-roomtile-part .wt-tile-value{font-size:calc(17px * var(--font-scale, 1));}
-  [data-klima-size="small"][data-tile-style] .wt-roomtile-part .wt-tile-sub{font-size:calc(9.5px * var(--font-scale, 1));}
+  [data-klima-size="small"][data-tile-style] .wt-roomtiles .wt-roomtile{padding:9px 11px;gap:6px;border-radius:12px;}
+  [data-klima-size="small"][data-tile-style] .wt-roomtiles .wt-roomtile-name{font-size:calc(11.5px * var(--font-scale, 1));}
+  [data-klima-size="small"][data-tile-style] .wt-roomtiles .wt-roomtile-floor{font-size:calc(10px * var(--font-scale, 1));}
+  [data-klima-size="small"][data-tile-style] .wt-roomtiles .wt-roomtile-parts{grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:8px;}
+  [data-klima-size="small"][data-tile-style] .wt-roomtiles .wt-roomtile-label{font-size:calc(10.5px * var(--font-scale, 1));}
+  [data-klima-size="small"][data-tile-style] .wt-roomtiles .wt-roomtile-part .wt-tile-value{font-size:calc(17px * var(--font-scale, 1));}
+  [data-klima-size="small"][data-tile-style] .wt-roomtiles .wt-roomtile-part .wt-tile-value small{font-size:calc(10px * var(--font-scale, 1));margin-left:2px;}
+  [data-klima-size="small"][data-tile-style] .wt-roomtiles .wt-roomtile-part .wt-tile-sub{font-size:calc(9.5px * var(--font-scale, 1));}
   .wt-fold-all .btn{padding:4px 10px;font-size:calc(13px * var(--font-scale, 1));}
   .wt-floor-count{margin-left:10px;font-weight:400;color:var(--ink-faint);font-size:calc(12px * var(--font-scale, 1));}
   /* Raumfarben (Setup → Räume): Diagrammfarbe als Rand und leichter Ton; ohne Farbe bleibt alles wie bisher. */
@@ -176,6 +177,7 @@
      Ecke, Titel + Beschreibung); die Rollenkacheln tragen dieselbe Farbe wie die Kacheln der Übersicht. */
   .wt-setup{display:flex;flex-direction:column;gap:0;}
   .wt-setup .actionbar{margin-top:20px;}
+  .wt-setup .actionbar-sticky{margin-top:20px;}
   .wt-section-messwerte{
     background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--chart-2) 16%, transparent), color-mix(in srgb, var(--chart-2) 5%, transparent) 70%), var(--surface);
     border-color:color-mix(in srgb, var(--chart-2) 30%, var(--border));}

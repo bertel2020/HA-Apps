@@ -28,6 +28,10 @@
   - Rooms get a colour in the “Rooms” dialog (eight colours, or “Assign colours” for all rooms at once)
   - The colour shows on the room selection above the charts, on the tiles of the “Temperature & climate” tab, on the room rows of “Periods compared”, and on the room labels in the setup
 
+### Changed
+
+- **Weather and energy dashboard setup**: “Save” and “Cancel” stay at the bottom edge of the window while you scroll
+
 ### Fixed
 
 - **Entity list**: Saved column widths now use the available width

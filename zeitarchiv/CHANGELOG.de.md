@@ -28,6 +28,10 @@
   - Räume bekommen im Dialog „Räume“ eine Farbe (acht Farben, oder „Farben verteilen“ für alle Räume auf einmal)
   - Die Farbe erscheint in der Raumauswahl über den Diagrammen, auf den Kacheln des Reiters „Temperatur & Klima“, in den Raumzeilen von „Zeiträume im Vergleich“ und bei den Raum-Bezeichnungen in der Einrichtung
 
+### Geändert
+
+- **Einrichtung von Wetter- und Energiedashboard**: „Speichern“ und „Abbrechen“ bleiben beim Scrollen am unteren Fensterrand sichtbar
+
 ### Behoben
 
 - **Entitätenliste**: Gespeicherte Spaltenbreiten nutzen den verfügbaren Platz
