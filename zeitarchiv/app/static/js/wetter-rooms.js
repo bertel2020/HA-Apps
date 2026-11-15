@@ -1,11 +1,8 @@
 // Räume der weiteren Sensoren im Wetterdashboard (Roadmap 1.51): welche Räume die Vergleichsdiagramme kennen und welche
 // Linien nach der Auswahl bleiben. Reine Funktionen über die Antwort von wetterdashboard/temperaturen: jede Reihe
-// hat key, label, room und floor; die Außenwerte (key „temperature“, „humidity“) haben keinen Raum und bleiben, bis der
-// Chip „Außen“ (OUTDOOR) sie abwählt.
+// hat key, label, room und floor; die Außenwerte (key „temperature“, „humidity“) haben keinen Raum und bleiben immer.
 (function (root) {
   const isExtra = (row) => String(row.key).startsWith('temperature:');
-  // Name des Chips „Außen“ in der Liste der abgewählten Einträge; kein Raumname kann so beginnen („@“ ist kein Teil davon).
-  const OUTDOOR = '@außen';
 
   // Räume in der Reihenfolge, in der sie zuerst vorkommen (Temperatur vor Feuchte), „Ohne Raum“ ('') zuletzt.
   function roomsOf(cmp) {
@@ -33,12 +30,12 @@
   }
 
   // Die Reihen, die nach der Auswahl bleiben; _i ist die Stelle in der ganzen Liste (die Farbe bleibt, wenn andere
-  // Linien ausgeblendet werden). off: Namen der abgewählten Räume; mit OUTDOOR fehlen auch die Außenwerte.
+  // Linien ausgeblendet werden). off: Namen der abgewählten Räume.
   function visible(list, off) {
-    return list.map((row, index) => ({...row, _i: index})).filter((row) => (isExtra(row) ? !off.includes(row.room || '') : !off.includes(OUTDOOR)));
+    return list.map((row, index) => ({...row, _i: index})).filter((row) => !isExtra(row) || !off.includes(row.room || ''));
   }
 
-  const api = {roomsOf, floorsOf, visible, OUTDOOR};
+  const api = {roomsOf, floorsOf, visible};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.WetterRooms = api;
 })(typeof window !== 'undefined' ? window : globalThis);
