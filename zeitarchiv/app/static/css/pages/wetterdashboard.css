@@ -199,6 +199,13 @@
   .wt-item-meta{max-width:100%;font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-faint);text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .wt-item-meta:not(.is-empty){color:var(--ink-muted);}
   .wt-item-meta.is-empty{font-style:italic;}
+  /* Nicht zugeordnete Kachel: gestrichelt, ohne Fläche, Balken und Icon grau, mit Plus – so sieht man auf einen Blick, was noch fehlt. */
+  .wt-item-tile.is-empty{background:transparent;border:1px dashed var(--border-strong);box-shadow:none;}
+  .wt-item-tile.is-empty[data-role]{--wt-accent:var(--border-strong);}
+  .wt-item-tile.is-empty .wt-item-glyph{opacity:.7;}
+  .wt-item-tile.is-empty .wt-item-name{color:var(--ink-muted);}
+  .wt-item-tile.is-empty .wt-item-meta{font-style:normal;color:var(--ink-faint);}
+  .wt-item-tile.is-empty .wt-item-meta::before{content:"+ ";}
   /* Raum eines weiteren Sensors als Chip wie die Gruppe der Verbraucher im Energiedashboard; ohne Raum gestrichelt. */
   .wt-item-chip{
     align-self:flex-start;max-width:100%;font-size:calc(10px * var(--font-scale, 1));padding:2px 7px;border-radius:999px;

@@ -275,7 +275,7 @@
   <h3 class="wt-group-h">{{ group_title }}</h3>
   <div class="wt-item-grid">
     {% for key, label, types in roles if key in in_group %}
-    <button type="button" class="wt-item-tile" data-role="{{ key }}" @click="openRole('{{ key }}')">
+    <button type="button" class="wt-item-tile" :class="{'is-empty': !roleVals['{{ key }}']}" data-role="{{ key }}" @click="openRole('{{ key }}')">
       <div class="wt-item-accent"></div>
       <div class="wt-item-body">
         <div class="wt-item-head">
@@ -335,7 +335,7 @@
   {% call hint_body() %}{{ _("Weitere Sensoren werden nie mit der Außentemperatur gemittelt. Ohne Raum bekommt jeder einen eigenen Block in der Tabelle; mit Raum stehen die Sensoren desselben Raums in einem Block. Sensoren mit der Geräteklasse Luftfeuchte oder der Einheit „%“ gelten als Feuchtesensoren und bekommen auf dem Reiter ein eigenes Diagramm.") }}{% endcall %}
   <div class="wt-item-grid wt-item-grid-list">
     <template x-for="(row, i) in extras" :key="i">
-      <button type="button" class="wt-item-tile" :data-role="extraKind(row)" @click="openRow('extra', i)">
+      <button type="button" class="wt-item-tile" :class="{'is-empty': !row.entity_id}" :data-role="extraKind(row)" @click="openRow('extra', i)">
         <div class="wt-item-accent"></div>
         <div class="wt-item-body">
           <div class="wt-item-head">
@@ -470,7 +470,7 @@
   <h3 class="wt-group-h">{{ _("Heizenergie") }}</h3>
   <div class="wt-item-grid wt-item-grid-list">
     <template x-for="(row, i) in heating" :key="i">
-      <button type="button" class="wt-item-tile" data-role="heating" @click="openRow('heating', i)">
+      <button type="button" class="wt-item-tile" :class="{'is-empty': !row.entity_id}" data-role="heating" @click="openRow('heating', i)">
         <div class="wt-item-accent"></div>
         <div class="wt-item-body">
           <div class="wt-item-head">
