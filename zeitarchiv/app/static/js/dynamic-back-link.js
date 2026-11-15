@@ -14,6 +14,7 @@
   const ROUTES = [
     {re: /^\/uebersicht(\/|$)/, text: t('zur Übersicht')},
     {re: /^\/energiedashboard(\/|$)/, text: t('zum Energiedashboard')},
+    {re: /^\/wetterdashboard(\/|$)/, text: t('zum Wetterdashboard')},
     {re: /^\/dashboards\/\d+/, text: t('zum Dashboard')},
     {re: /^\/dashboards(\/|$)/, text: t('zu den Dashboards')},
     {re: /^\/entities\/[^/]+/, text: t('zur Entität')},

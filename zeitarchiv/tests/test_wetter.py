@@ -1579,3 +1579,11 @@ def test_both_setups_warn_before_unsaved_changes_are_lost() -> None:
         html = (TEMPLATES / setup).read_text(encoding="utf-8")
         assert "data-unsaved-guard" in html and "data-unsaved-cancel" in html
         assert "js/unsaved-guard.js" in (TEMPLATES / page).read_text(encoding="utf-8")
+
+
+def test_entity_page_offers_a_way_back_to_the_weather_dashboard() -> None:
+    """Eine Kachel des Wetterdashboards führt zur Entität; deren dynamischer Zurück-Link kannte die Seite nicht."""
+    from _paths import APP
+
+    script = (APP / "static/js/dynamic-back-link.js").read_text(encoding="utf-8")
+    assert "wetterdashboard" in script and "zum Wetterdashboard" in script
