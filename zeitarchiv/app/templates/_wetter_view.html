@@ -346,6 +346,14 @@
           <button type="button" :aria-pressed="(precipMode === 'dur').toString()" @click="setPrecipMode('dur')">{{ _("Dauer") }}</button>
         </div>
         {% endif %}
+        <span class="wt-scope-years wt-controls-end" x-show="precipPastOptions().length" x-cloak>
+          <span class="wt-scope-lab"><b>{{ _("Vergleichsjahre") }}</b></span>
+          <div class="wt-seg" role="group" aria-label="{{ _('Vergleichsjahre') }}">
+            <template x-for="option in precipPastOptions()" :key="option.value">
+              <button type="button" :aria-pressed="(shownPrecipPast() === option.value).toString()" @click="setPrecipPast(option.value)" x-text="option.label"></button>
+            </template>
+          </div>
+        </span>
       </div>
       {% if show_precip_main %}
       <p class="wt-headline" x-show="precip" x-text="precipHeadline()"></p>

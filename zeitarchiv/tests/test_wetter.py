@@ -446,6 +446,8 @@ def test_phase_two_routes_through_the_app(client) -> None:
     _save = {**wetter_routes._empty_config(), "temperature": "sensor.wetter_test_temp2"}
     wetter_routes._save_config(index, _save)
     assert client.get("/wetterdashboard/niederschlag").status_code == 404  # keine Niederschlagsrolle
+    assert client.get("/wetterdashboard/niederschlag?past_years=-1").status_code == 400
+    assert client.get("/wetterdashboard/niederschlag?past_years=101").status_code == 400
     assert client.get("/wetterdashboard/monatsvergleich?metric=precip").status_code == 404
     assert client.get("/wetterdashboard/monatsvergleich?metric=unsinn").status_code == 400
     assert client.get("/wetterdashboard/monatsvergleich?metric=temperature").status_code == 200
@@ -1636,3 +1638,13 @@ def test_entity_page_offers_a_way_back_to_the_weather_dashboard() -> None:
 
     script = (APP / "static/js/dynamic-back-link.js").read_text(encoding="utf-8")
     assert "wetterdashboard" in script and "zum Wetterdashboard" in script
+
+
+def test_precipitation_card_has_a_choice_of_compared_years() -> None:
+    from _paths import APP, TEMPLATES
+
+    page = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+    assert page.count('@click="setPrecipPast(option.value)"') == 1
+    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "niederschlag?mode=${this.precipMode}&past_years=${this.precipPast === 'all' ? 0 : Number(this.precipPast)}" in script
+    assert "this.loadPrecip();" in script[script.index("setPrecipPast(value) {"):script.index("setPrecipMode(mode) {")]

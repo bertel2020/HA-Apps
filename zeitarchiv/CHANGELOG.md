@@ -34,6 +34,10 @@
   - Up to ten years, ending at the latest today; the choice is remembered
   - Periods longer than a year show the year on the axis
 
+- **Weather dashboard**: Years compared for precipitation
+  - New choice “Years compared” (3, 5, 10 or “All”) on the “Precipitation” tab, for the chart and the monthly table
+  - The average still uses all complete years in the archive
+
 - **Weather dashboard**: Room colours
   - Rooms get a colour in the “Rooms” dialog (eight colours, assigned automatically and changeable)
   - The colour shows on the room selection above the charts, on the tiles of the “Temperature & climate” tab, on the room rows of “Periods compared”, and on the room labels in the setup

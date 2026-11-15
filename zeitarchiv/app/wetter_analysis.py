@@ -91,7 +91,7 @@ def _cumulative(values: dict[int, float], last_slot: int, hold_to_end: bool = Fa
 
 def precipitation(
     daily: dict[date, float], today: date, wet_threshold: float, hold_to_end: bool = False,
-    archive_start: date | None = None,
+    archive_start: date | None = None, past_years: int = SHOWN_PAST_YEARS,
 ) -> dict:
     """Laufsummen je Jahr, Spanne der Vorjahre und Kennzahlen des laufenden Jahres.
 
@@ -102,7 +102,9 @@ def precipitation(
     mit Zeile. Nötig bei einem Regensensor ein/aus: ein Tag ohne Wechsel hat keine Zeile und ist
     trocken, nicht unbekannt. Beim Zähler fehlt ein Tag nur, wenn der Sensor ausgefallen ist.
     Dann gilt auch ein Jahr als vollständig, wenn das Archiv in dessen ersten Tagen begann
-    (archive_start), und Tage ohne Zeile zählen in der Trockenphase als trocken."""
+    (archive_start), und Tage ohne Zeile zählen in der Trockenphase als trocken.
+
+    past_years: wie viele frühere Jahre Diagramm und Monatstabelle zeigen (das Vorjahr eingerechnet); 0 = alle."""
     by_year: dict[int, dict[int, float]] = {}
     for day, value in daily.items():
         slot = slot_of(day)
@@ -155,7 +157,9 @@ def precipitation(
     return {
         "year": current_year,
         "today_slot": today_slot,
-        "months": _precipitation_months(daily, today, wet_threshold, complete, current_days),
+        "months": _precipitation_months(daily, today, wet_threshold, complete, current_days, past_years),
+        # Frühere Jahre im Archiv (Vorjahre bis zum ersten Jahr mit Werten): Grundlage der Auswahl „Vergleichsjahre“.
+        "past_available": max(0, current_year - min(by_year)) if by_year else 0,
         "daily": [round(current_values[slot], 3) if slot in current_values else None for slot in range(SLOTS)],
         "cumulative": cumulative.get(current_year, [None] * SLOTS),
         "previous": previous if previous and any(v is not None for v in previous) else None,
@@ -163,7 +167,7 @@ def precipitation(
         # Die älteren Jahre davor als schwache Linien: insgesamt SHOWN_PAST_YEARS frühere Jahre, das Vorjahr eingerechnet.
         "older": {
             str(year): cumulative[year]
-            for year in sorted((y for y in complete if y < current_year - 1), reverse=True)[: SHOWN_PAST_YEARS - 1]
+            for year in sorted((y for y in complete if y < current_year - 1), reverse=True)[: (past_years - 1 if past_years else None)]
         },
         "avg": avg, "low": low, "high": high,
         "avg_years": complete,
@@ -181,6 +185,7 @@ def precipitation(
 
 def _precipitation_months(
     daily: dict[date, float], today: date, wet_threshold: float, complete: list[int], current_days: dict[date, float],
+    past_years: int = SHOWN_PAST_YEARS,
 ) -> list[dict]:
     """Tabelle „Niederschlag je Monat“: laufendes Jahr, die Vorjahre (``past``, höchstens SHOWN_PAST_YEARS) und Ø der kompletten
     Vorjahre samt Regentagen.
@@ -193,6 +198,7 @@ def _precipitation_months(
         values = [daily[day] for d in range(1, last_day + 1) if (day := date(year, month, d)) in daily]
         return sum(values) if values else None
 
+    first_year = min(daily, default=today).year
     out = []
     for month in range(1, 13):
         running = month == today.month
@@ -202,7 +208,7 @@ def _precipitation_months(
         previous = month_sum(today.year - 1, month, last)
         past = {
             str(year): round(value, 3)
-            for year in range(today.year - 1, today.year - 1 - SHOWN_PAST_YEARS, -1)
+            for year in range(today.year - 1, today.year - 1 - (past_years or max(0, today.year - first_year)), -1)
             if (value := month_sum(year, month, last)) is not None
         }
         column = [month_sum(year, month, last) for year in complete]

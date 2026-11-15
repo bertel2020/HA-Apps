@@ -83,6 +83,23 @@ def test_older_years_are_capped_but_average_and_band_use_all_complete_years() ->
     assert result["older"]["2024"][0] == pytest.approx(6.0)
 
 
+def test_the_number_of_compared_years_can_be_chosen_and_the_average_stays_the_same() -> None:
+    daily = _years({year: float(year - 2018) for year in range(2019, 2026)})  # 2019 bis 2025, sieben Jahre
+    daily[date(2026, 1, 1)] = 1.0
+    today = date(2026, 1, 2)
+    three = wa.precipitation(daily, today, 1.0, past_years=3)
+    assert sorted(three["older"]) == ["2023", "2024"]  # das Vorjahr 2025 hat seine eigene Linie
+    everything = wa.precipitation(daily, today, 1.0, past_years=0)
+    assert sorted(everything["older"]) == ["2019", "2020", "2021", "2022", "2023", "2024"]
+    assert three["avg_years"] == everything["avg_years"] == list(range(2019, 2026))
+    assert three["avg"] == everything["avg"]
+    assert three["past_available"] == everything["past_available"] == 7
+    assert wa.precipitation(daily, today, 1.0)["past_available"] == 7
+    for result, years in ((three, 3), (everything, 7)):
+        shown = {year for row in result["months"] for year in row["past"]}
+        assert len(shown) == years and max(shown) == "2025" and min(shown) == str(2026 - years)
+
+
 def test_average_needs_two_years_for_the_comparison() -> None:
     result = wa.precipitation(_years({2025: 2.0}) | {date(2026, 1, 1): 1.0}, date(2026, 1, 2), 1.0)
     assert result["avg_to_date"] is None and result["avg_years"] == [2025]

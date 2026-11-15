@@ -222,6 +222,7 @@
       precipMode: (precipModes && precipModes[0]) || 'mm',
       precip: null,
       precipError: '',
+      precipPast: '5',       // Vergleichsjahre des Niederschlags: '3', '5', '10' oder 'all'
       tempCmp: null,
       // Abgewählte Räume der Vergleichsdiagramme (Namen); neue Räume sind zunächst sichtbar.
       roomsOff: [],
@@ -312,6 +313,7 @@
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
         if (typeof saved.avgOnly === 'boolean') this.avgOnly = saved.avgOnly;
+        if (['3', '5', '10', 'all'].includes(String(saved.precipPast))) this.precipPast = String(saved.precipPast);
         if (saved.tempRange && ISO_DAY.test(saved.tempRange.start || '') && ISO_DAY.test(saved.tempRange.end || '')) this.tempRange = {start: saved.tempRange.start, end: saved.tempRange.end};
         if (Array.isArray(saved.roomsOff)) this.roomsOff = saved.roomsOff.filter((name) => typeof name === 'string');
         if (Array.isArray(saved.floorsClosed)) this.floorsClosed = saved.floorsClosed.filter((name) => typeof name === 'string');
@@ -1881,13 +1883,35 @@
         this.precipError = '';
         const seq = ++this._precipSeq;
         try {
-          const data = await this.fetchJson(`wetterdashboard/niederschlag?mode=${this.precipMode}`);
+          const data = await this.fetchJson(`wetterdashboard/niederschlag?mode=${this.precipMode}&past_years=${this.precipPast === 'all' ? 0 : Number(this.precipPast)}`);
           if (seq !== this._precipSeq) return;  // eine neuere Anfrage hat überholt
           this.precip = data;
           this.$nextTick(() => this.drawPrecip());
         } catch (e) {
           if (seq === this._precipSeq) this.precipError = t('Der Niederschlag konnte nicht geladen werden.');
         }
+      },
+
+      // Auswahl „Vergleichsjahre“: 3, 5 und 10, soweit das Archiv mehr frühere Jahre hat, dazu „Alle (n)“; bei höchstens drei Jahren entfällt sie.
+      precipPastOptions() {
+        const count = this.precip ? this.precip.past_available || 0 : 0;
+        if (count <= 3) return [];
+        return [
+          ...[3, 5, 10].filter((n) => count > n).map((n) => ({value: String(n), label: String(n)})),
+          {value: 'all', label: t('Alle ({n})', {n: count})},
+        ];
+      },
+
+      // Ein gemerkter Wert, der nichts mehr kürzt, zeigt „Alle“.
+      shownPrecipPast() {
+        const count = this.precip ? this.precip.past_available || 0 : 0;
+        return this.precipPast !== 'all' && Number(this.precipPast) < count ? this.precipPast : 'all';
+      },
+
+      setPrecipPast(value) {
+        this.precipPast = value;
+        writeStore({precipPast: value});
+        this.loadPrecip();
       },
 
       setPrecipMode(mode) {
@@ -2075,7 +2099,7 @@
         const last = p.avg_years[p.avg_years.length - 1];
         // Vorjahre, die es gibt (neueste zuerst); eine leere Spalte zeigen wir nie.
         const past = [...new Set(p.months.flatMap((row) => Object.keys(row.past || {})))]
-          .sort().reverse().slice(0, heatChartCount() - 1);
+          .sort().reverse().slice(0, this.precipPast === '5' ? heatChartCount() - 1 : undefined);
         const head = [
           t('Monat'), String(p.year), ...past,
           first == null ? t('Ø') : t('Ø {from}–{to}', {from: first, to: last}), t('Abweichung'), t('Regentage'),

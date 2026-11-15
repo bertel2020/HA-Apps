@@ -1001,7 +1001,7 @@ class WetterService:
         config = _load_config(self.deps.index)
         return [kind for kind in ("mm", "dur") if (self._precip_role(config, kind) or ("", ""))[1] == kind]
 
-    def compute_precip(self, mode: str, now_local: datetime | None = None) -> dict | None:
+    def compute_precip(self, mode: str, now_local: datetime | None = None, past_years: int = analysis.SHOWN_PAST_YEARS) -> dict | None:
         config = _load_config(self.deps.index)
         role = self._precip_role(config, mode)
         if role is None:
@@ -1020,7 +1020,9 @@ class WetterService:
         archive_start = (
             datetime.fromtimestamp(entity["first_ts"], self.deps.tz).date() if entity and entity["first_ts"] else None
         )
-        result = analysis.precipitation(daily, now_local.date(), wet_threshold, hold_to_end=kind == "dur", archive_start=archive_start)
+        result = analysis.precipitation(
+            daily, now_local.date(), wet_threshold, hold_to_end=kind == "dur", archive_start=archive_start, past_years=past_years,
+        )
         return {
             **result, "mode": kind, "unit": "min" if kind == "dur" else (entity["unit"] or "mm"),
             "threshold": threshold, "entity_id": entity_id, "tz": str(self.deps.tz),
@@ -2453,9 +2455,11 @@ class WetterService:
                 raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
 
         @router.get("/wetterdashboard/niederschlag")
-        def wetterdashboard_precip(mode: str = "mm") -> dict:
+        def wetterdashboard_precip(mode: str = "mm", past_years: int = analysis.SHOWN_PAST_YEARS) -> dict:
             _require_configured()
-            result = self.compute_precip(mode)
+            if not 0 <= past_years <= 100:
+                raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
+            result = self.compute_precip(mode, past_years=past_years)
             if result is None:
                 raise HTTPException(status_code=404, detail=tr("Kein Niederschlag zugeordnet."))
             return result
