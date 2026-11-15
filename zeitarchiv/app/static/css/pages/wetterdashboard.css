@@ -190,7 +190,8 @@
     background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--chart-7) 16%, transparent), color-mix(in srgb, var(--chart-7) 5%, transparent) 70%), var(--surface);
     border-color:color-mix(in srgb, var(--chart-7) 30%, var(--border));}
   .wt-section-neutral{
-    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--ink-faint) 22%, transparent), color-mix(in srgb, var(--ink-faint) 8%, transparent) 70%), var(--surface);}
+    background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--ink-faint) 22%, transparent), color-mix(in srgb, var(--ink-faint) 8%, transparent) 70%), var(--surface);
+    border-color:color-mix(in srgb, var(--ink-faint) 30%, var(--border));}
   .wt-section-experimental{margin-top:32px;background:repeating-linear-gradient(135deg, var(--surface-alt) 0 12px, color-mix(in srgb, var(--surface-alt) 55%, var(--surface)) 12px 24px);border:1.5px dashed var(--ink-faint);}
   .wt-exp-feature{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px 6px;margin-top:12px;}
   .wt-thresholds-reset{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:4px;}

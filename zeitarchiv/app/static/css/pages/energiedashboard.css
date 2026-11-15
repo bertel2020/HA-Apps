@@ -819,10 +819,13 @@
      Farbe der Kartenkante. --ink-faint liegt weiter von der Fläche entfernt
      und landet bei derselben Dosierung (22%) bei 40/46 — also auf dem Niveau
      der übrigen Abschnitte, ohne dass eine Sonderdosierung nötig wäre.
-     Rahmenfarbe bleibt der Standard: eine getönte Kante ohne zugehörige
-     Rollenfarbe hätte nichts zu bedeuten. */
+     Rahmen: zuerst blieb er der Standard (--border), weil eine getönte Kante
+     ohne Rollenfarbe nichts zu bedeuten schien. Auf dem hellen Seitenton war er
+     aber kaum zu sehen (230 gegen 243), die neutralen Karten wirkten rahmenlos.
+     Jetzt dieselbe Dosierung wie bei den Rollenabschnitten (30 %), in Grau. */
   .edash-section-neutral{
     background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--ink-faint) 22%, transparent), color-mix(in srgb, var(--ink-faint) 8%, transparent) 70%), var(--surface);
+    border-color:color-mix(in srgb, var(--ink-faint) 30%, var(--border));
   }
   /* "Allgemein" ist weder eine Sankey-Rolle noch einer der neutralen
      Datenbereiche, sondern der Ort für Grundeinstellungen — und hebt sich
