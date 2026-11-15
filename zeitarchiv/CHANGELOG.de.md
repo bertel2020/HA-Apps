@@ -42,6 +42,9 @@
   - Neue Auswahl „Heizperioden“ (automatisch, 3, 5, 10 oder „Alle“) im Reiter „Heizen“, für die Streudiagramme, die Kacheln mit der Steigung und die Monatstabelle
   - Das Menü „Heizperiode“ steht jetzt rechts neben den Einstellungen
 
+- **Wetterdashboard**: Vergleichsjahre bei der Tageslänge
+  - Neue Auswahl „Vergleichsjahre“ (3, 5, 10 oder „Alle“) bei „Tageslänge im Jahresverlauf“ im Reiter „Wind & Sonne“
+
 - **Wetterdashboard**: Raumfarben
   - Räume bekommen im Dialog „Räume“ eine Farbe (acht Farben, automatisch vergeben und änderbar)
   - Die Farbe erscheint in der Raumauswahl über den Diagrammen, auf den Kacheln des Reiters „Temperatur & Klima“, in den Raumzeilen von „Zeiträume im Vergleich“ und bei den Raum-Bezeichnungen in der Einrichtung

@@ -513,7 +513,17 @@
     <p class="wt-hint" x-show="daylight && daylightHistoryNote()" x-text="daylightHistoryNote()" x-cloak></p>
     {% endif %}
     {% if show_dl_length %}
-    <h3 class="wt-h3 wt-dl-h" x-show="daylength" x-cloak>{{ _("Tageslänge im Jahresverlauf") }}</h3>
+    <div class="wt-controls wt-dl-h" x-show="daylength" x-cloak>
+      <h3 class="wt-h3">{{ _("Tageslänge im Jahresverlauf") }}</h3>
+      <span class="wt-scope-years wt-controls-end" x-show="daylengthPastOptions().length" x-cloak>
+        <span class="wt-scope-lab"><b>{{ _("Vergleichsjahre") }}</b></span>
+        <div class="wt-seg" role="group" aria-label="{{ _('Vergleichsjahre') }}">
+          <template x-for="option in daylengthPastOptions()" :key="option.value">
+            <button type="button" :aria-pressed="(shownDaylengthPast() === option.value).toString()" @click="setDaylengthPast(option.value)" x-text="option.label"></button>
+          </template>
+        </div>
+      </span>
+    </div>
     <div class="wt-chart wt-chart-short" x-show="daylength" x-cloak x-ref="daylengthChart"></div>
     <p class="hint hint-status" x-show="daylength" x-text="daylengthNote()" x-cloak></p>
     {% endif %}

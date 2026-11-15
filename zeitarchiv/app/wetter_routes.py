@@ -172,9 +172,12 @@ TILE_LABELS = {
 PV_UNIT_KW = {"W": 0.001, "kW": 1.0, "MW": 1000.0}
 
 
-def daylength_start(archive_start: date, today: date) -> date:
-    """Erster Tag des Jahresverlaufs der Tageslänge: Archivbeginn, frühestens der 1. Januar vor DAYLENGTH_PAST_YEARS Jahren."""
-    return max(archive_start, date(today.year - DAYLENGTH_PAST_YEARS, 1, 1))
+def daylength_start(archive_start: date, today: date, past_years: int = 0) -> date:
+    """Erster Tag des Jahresverlaufs der Tageslänge: Archivbeginn, frühestens der 1. Januar vor ``past_years`` Jahren
+    (Vorgabe DAYLENGTH_PAST_YEARS); ``past_years`` < 0 heißt alle Jahre ab Archivbeginn."""
+    if past_years < 0:
+        return archive_start
+    return max(archive_start, date(today.year - (past_years or DAYLENGTH_PAST_YEARS), 1, 1))
 
 
 def pv_scale_kw(unit: str | None) -> float | None:
@@ -1782,14 +1785,16 @@ class WetterService:
             row["sun_to"] = elevation_at(None if row["ongoing"] else row["to"])
         return True
 
-    def compute_daylength(self, now_local: datetime | None = None) -> dict | None:
+    def compute_daylength(self, now_local: datetime | None = None, past_years: int = DAYLENGTH_PAST_YEARS) -> dict | None:
         """Tageslänge je abgeschlossenem Tag laut Dämmerungssensor (Stunden), für den Jahresverlauf.
 
         Die Archivwerte sind Stundenmittel; der Übergang über die Tag-Schwelle wird zwischen zwei Stunden
         interpoliert. Fehlt ein Übergang (der Sensor beginnt mitten am Tag), zählt die Zahl heller Stunden.
 
         Ein Tag zählt nur mit mindestens ``DAYLENGTH_MIN_HOURS`` Stunden Werten; die Archive der Dämmerungssensoren
-        sind oft jung, Tage davor fehlen einfach. ``None`` ohne Rolle oder ohne auswertbaren Tag."""
+        sind oft jung, Tage davor fehlen einfach. ``None`` ohne Rolle oder ohne auswertbaren Tag.
+
+        ``past_years``: so viele frühere Jahre zeigt der Verlauf (Vorgabe DAYLENGTH_PAST_YEARS); 0 = alle ab Archivbeginn."""
         config = _load_config(self.deps.index)
         entity_id = config["illuminance_dawn"]
         entity = self.deps.index.get_entity(entity_id) if entity_id else None
@@ -1798,7 +1803,8 @@ class WetterService:
         tz = self.deps.tz
         now_local = now_local or datetime.now(tz)
         today = now_local.date()
-        first = daylength_start(datetime.fromtimestamp(entity["first_ts"], tz).date(), today)
+        archive_start = datetime.fromtimestamp(entity["first_ts"], tz).date()
+        first = daylength_start(archive_start, today, past_years if past_years else -1)
         start = datetime(first.year, first.month, first.day, tzinfo=tz)
         rows = self._rows(entity_id, "standard", start, now_local, now_local, query_mod.QueryReadCache())
         by_hour = {
@@ -1826,7 +1832,11 @@ class WetterService:
                 out.append([day.isoformat(), round(length / 3600.0, 2)])
         if not out:
             return None
-        return {"tz": str(tz), "days": out, "today": today.isoformat(), "approx": True}
+        return {
+            "tz": str(tz), "days": out, "today": today.isoformat(), "approx": True,
+            # Frühere Jahre im Archiv des Sensors: Grundlage der Auswahl „Vergleichsjahre“.
+            "past_available": max(0, today.year - archive_start.year),
+        }
 
     # -- Wetterlage ----------------------------------------------------------------------
 
@@ -2555,9 +2565,11 @@ class WetterService:
             return data
 
         @router.get("/wetterdashboard/tageslaenge")
-        def wetterdashboard_daylength() -> dict:
+        def wetterdashboard_daylength(past_years: int = DAYLENGTH_PAST_YEARS) -> dict:
             _require_configured()
-            data = self.compute_daylength()
+            if not 0 <= past_years <= 100:
+                raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
+            data = self.compute_daylength(past_years=past_years)
             if data is None:
                 raise HTTPException(status_code=409, detail=tr("Noch keine Tageslänge aus dem Dämmerungssensor vorhanden."))
             return data

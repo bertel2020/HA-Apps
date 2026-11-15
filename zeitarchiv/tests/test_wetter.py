@@ -1661,3 +1661,20 @@ def test_heating_card_has_a_choice_of_heating_periods_with_the_season_menu_on_th
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "info.periods.slice(0, this.heatShownCount(heatSeasonCount()))" in script
     assert "return this.heatShownCount(this.heatWide === undefined ? 4 : heatChartCount());" in script
+
+
+def test_daylength_card_has_a_choice_of_compared_years(client) -> None:
+    from _paths import APP, TEMPLATES
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_dawn", "sensor", "measurement", "lx")
+    index.set_setting(wetter_routes.SETTING_ENABLED, "1")
+    wetter_routes._save_config(index, {**wetter_routes._empty_config(), "temperature": "sensor.wetter_test_dawn", "illuminance_dawn": "sensor.wetter_test_dawn"})  # noqa: SLF001
+    assert client.get("/wetterdashboard/tageslaenge?past_years=-1").status_code == 400
+    assert client.get("/wetterdashboard/tageslaenge?past_years=101").status_code == 400
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    page = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+    assert page.count('@click="setDaylengthPast(option.value)"') == 1
+    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "tageslaenge?past_years=${this.daylengthPast === 'all' ? 0 : Number(this.daylengthPast)}" in script
+    assert "this.loadDaylength(true);" in script[script.index("setDaylengthPast(value) {"):script.index("daylengthNote() {")]

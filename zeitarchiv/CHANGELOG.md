@@ -42,6 +42,9 @@
   - New choice “Heating periods” (automatic, 3, 5, 10 or “All”) on the “Heating” tab, for the scatter charts, the slope tiles and the monthly table
   - The “Heating season” menu moved to the right of the controls
 
+- **Weather dashboard**: Years compared for day length
+  - New choice “Years compared” (3, 5, 10 or “All”) for “Day length over the year” on the “Wind & sun” tab
+
 - **Weather dashboard**: Room colours
   - Rooms get a colour in the “Rooms” dialog (eight colours, assigned automatically and changeable)
   - The colour shows on the room selection above the charts, on the tiles of the “Temperature & climate” tab, on the room rows of “Periods compared”, and on the room labels in the setup

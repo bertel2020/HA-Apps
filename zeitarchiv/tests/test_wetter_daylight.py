@@ -250,6 +250,9 @@ def test_daylength_interpolates_the_threshold_between_two_hours(service) -> None
     data = service.compute_daylength(NOW)
     # heute zählt nicht; statt voller Stunden (11, 12, 13) liegt der Übergang zwischen zwei Stundenwerten
     assert data["days"] == [["2026-08-17", 11.2], ["2026-08-18", 12.2], ["2026-08-19", 13.2]]
+    assert data["past_available"] == 0  # das Archiv des Sensors beginnt im laufenden Jahr: keine früheren Jahre
+    assert service.compute_daylength(NOW, past_years=0)["days"] == data["days"]  # alle Jahre
+    assert service.compute_daylength(NOW, past_years=3)["days"] == data["days"]
 
 
 def test_daylength_falls_back_to_bright_hours_without_a_crossing(service) -> None:
@@ -291,3 +294,6 @@ def test_daylength_reaches_back_five_full_years_at_most() -> None:
     today = date(2026, 11, 10)
     assert wetter_routes.daylength_start(date(2018, 3, 4), today) == date(2021, 1, 1)  # 2021 bis 2026: fünf frühere Jahre
     assert wetter_routes.daylength_start(date(2025, 6, 1), today) == date(2025, 6, 1)  # ein jüngeres Archiv bleibt, wie es ist
+    assert wetter_routes.daylength_start(date(2018, 3, 4), today, 3) == date(2023, 1, 1)  # drei frühere Jahre: 2023 bis 2026
+    assert wetter_routes.daylength_start(date(2018, 3, 4), today, 10) == date(2018, 3, 4)  # mehr als vorhanden: ab Archivbeginn
+    assert wetter_routes.daylength_start(date(2012, 3, 4), today, -1) == date(2012, 3, 4)  # alle Jahre

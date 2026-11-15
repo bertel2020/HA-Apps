@@ -251,6 +251,7 @@
       sunhours: null,
       sunhoursError: '',
       daylength: null,
+      daylengthPast: '5',    // Vergleichsjahre der Tageslänge: '3', '5', '10' oder 'all'
       hasPv: false,
       pv: null,
       pvError: '',
@@ -316,6 +317,7 @@
         if (typeof saved.avgOnly === 'boolean') this.avgOnly = saved.avgOnly;
         if (['3', '5', '10', 'all'].includes(String(saved.precipPast))) this.precipPast = String(saved.precipPast);
         if (['auto', '3', '5', '10', 'all'].includes(String(saved.heatShown))) this.heatShown = String(saved.heatShown);
+        if (['3', '5', '10', 'all'].includes(String(saved.daylengthPast))) this.daylengthPast = String(saved.daylengthPast);
         if (saved.tempRange && ISO_DAY.test(saved.tempRange.start || '') && ISO_DAY.test(saved.tempRange.end || '')) this.tempRange = {start: saved.tempRange.start, end: saved.tempRange.end};
         if (Array.isArray(saved.roomsOff)) this.roomsOff = saved.roomsOff.filter((name) => typeof name === 'string');
         if (Array.isArray(saved.floorsClosed)) this.floorsClosed = saved.floorsClosed.filter((name) => typeof name === 'string');
@@ -1606,14 +1608,35 @@
       },
 
       // Jahresverlauf der Tageslänge: eine Linie je Jahr über denselben Kalendertagen, stundengenau.
-      async loadDaylength() {
-        if (this.daylength) { this.$nextTick(() => this.drawDaylength()); return; }
+      async loadDaylength(force = false) {
+        if (this.daylength && !force) { this.$nextTick(() => this.drawDaylength()); return; }
         try {
-          this.daylength = await this.fetchJson('wetterdashboard/tageslaenge');
+          this.daylength = await this.fetchJson(`wetterdashboard/tageslaenge?past_years=${this.daylengthPast === 'all' ? 0 : Number(this.daylengthPast)}`);
           this.$nextTick(() => this.drawDaylength());
         } catch (e) {
           this.daylength = null;
         }
+      },
+
+      // Auswahl „Vergleichsjahre“ wie beim Niederschlag: 3, 5 und 10, soweit das Archiv mehr frühere Jahre hat, dazu „Alle (n)“.
+      daylengthPastOptions() {
+        const count = this.daylength ? this.daylength.past_available || 0 : 0;
+        if (count <= 3) return [];
+        return [
+          ...[3, 5, 10].filter((n) => count > n).map((n) => ({value: String(n), label: String(n)})),
+          {value: 'all', label: t('Alle ({n})', {n: count})},
+        ];
+      },
+
+      shownDaylengthPast() {
+        const count = this.daylength ? this.daylength.past_available || 0 : 0;
+        return this.daylengthPast !== 'all' && Number(this.daylengthPast) < count ? this.daylengthPast : 'all';
+      },
+
+      setDaylengthPast(value) {
+        this.daylengthPast = value;
+        writeStore({daylengthPast: value});
+        this.loadDaylength(true);  // die alte Kurve bleibt stehen, bis die neue da ist
       },
 
       daylengthNote() {
