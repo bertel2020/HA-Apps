@@ -10,6 +10,39 @@
 >
 > 🇩🇪 [Änderungen auf Deutsch](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md)
 
+## 1.52.0 - 2026-11-15
+
+### New
+
+- **Weather dashboard**: More sensors made clearer
+  - Optionally one tile per room with temperature and humidity instead of two
+    tiles; set under “Display” → “Additional sensors in the overview”, the
+    default stays “Individually”
+  - Each sensor can hide its tile in the overview; the table and the charts
+    keep showing it
+  - The “Rooms” button for the more sensors tidies up rooms set by hand
+    (rename, merge, delete); the room shows as a chip on the tile
+
+- **Setup**: Warning about unsaved changes
+  - In the weather and the energy dashboard the setup asks before changes are lost
+  - Unassigned tiles are dashed and grey, so they stand out
+  - The dialogs are wider and the entity search list shows more rows
+  - The section cards have more depth
+
+- **Entity**: “back to the weather dashboard” after a click on a tile
+
+### Changed
+
+- **Weather dashboard**: In the setup, “Display” now follows right after
+  “More sensors”
+- **Weather dashboard**: The outdoor lines in the comparison charts are named
+  “Outdoor temperature” and “Outdoor humidity”
+
+### Fixed
+
+- **Weather dashboard**: The tiles of the more sensors show the humidity icon
+  instead of the thermometer and are coloured instead of grey
+
 ## 1.51.0 - 2026-11-14
 
 ### New

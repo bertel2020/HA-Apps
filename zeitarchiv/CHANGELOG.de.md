@@ -10,6 +10,41 @@
 >
 > 🇬🇧 [English version](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md)
 
+## 1.52.0 - 2026-11-15
+
+### Neu
+
+- **Wetterdashboard**: Weitere Sensoren übersichtlicher
+  - Optional eine Kachel je Raum mit Temperatur und Luftfeuchte statt zwei
+    Kacheln; einzustellen unter „Anzeige“ → „Weitere Sensoren in der
+    Übersicht“, Standard bleibt „Einzeln“
+  - Je Sensor lässt sich die Kachel in der Übersicht ausblenden; Tabelle und
+    Diagramme zeigen ihn weiter
+  - Der Button „Räume“ bei den weiteren Sensoren räumt von Hand gesetzte Räume
+    auf (umbenennen, zusammenführen, löschen); der Raum steht als Chip auf der
+    Kachel
+
+- **Einrichtung**: Warnung bei ungespeicherten Änderungen
+  - Im Wetter- und im Energiedashboard fragt die Einrichtung nach, bevor
+    Änderungen verloren gehen
+  - Nicht zugeordnete Kacheln sind gestrichelt und grau und fallen auf
+  - Die Dialoge sind breiter, die Trefferliste der Entitätssuche zeigt mehr Zeilen
+  - Die Abschnittskarten haben mehr Tiefe
+
+- **Entität**: „zurück zum Wetterdashboard“ nach einem Klick auf eine Kachel
+
+### Geändert
+
+- **Wetterdashboard**: In der Einrichtung steht „Anzeige“ jetzt direkt hinter
+  „Weitere Sensoren“
+- **Wetterdashboard**: Die Außenlinien in den Vergleichsdiagrammen heißen
+  „Temperatur außen“ und „Luftfeuchte außen“
+
+### Behoben
+
+- **Wetterdashboard**: Die Kacheln der weiteren Sensoren zeigen das Feuchte-Symbol
+  statt des Thermometers und sind farbig statt grau
+
 ## 1.51.0 - 2026-11-14
 
 ### Neu
