@@ -341,3 +341,13 @@ def test_tile_size_setting_is_saved_and_validated(service) -> None:
     _configure(service, klima_size="unsinn")
     assert wetter_routes._load_config(service.deps.index)["klima_size"] == "auto"
     assert wetter_routes.MAX_EXTRA_TEMPERATURES == 60
+
+
+def test_floor_switch_hides_and_shows_all_rooms_of_a_floor() -> None:
+    rooms = '["Bad", "Büro"]'
+    assert _node(f'r.floorState({rooms}, [])') == "on"
+    assert _node(f'r.floorState({rooms}, ["Bad"])') == "part"
+    assert _node(f'r.floorState({rooms}, ["Bad", "Büro"])') == "off"
+    assert _node(f'r.toggleFloor({rooms}, ["Bad", "Küche"])') == ["Bad", "Küche", "Büro"]
+    assert _node(f'r.toggleFloor({rooms}, ["Bad", "Büro", "Küche"])') == ["Küche"]
+    assert _node(f'r.toggleFloor({rooms}, [])') == ["Bad", "Büro"]

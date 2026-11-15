@@ -1744,7 +1744,13 @@
         for (const {room, floor} of order) {
           if (seen.has(room)) continue;
           seen.add(room);
-          chips.push({name: room, label: room || t('Ohne Raum'), floorLabel: grouped && floor !== last ? (floor || t('Ohne Etage')) : '', on: !this.roomsOff.includes(room)});
+          const head = grouped && floor !== last;
+          const rooms = head ? (floors.find((entry) => entry.floor === floor) || {rooms: []}).rooms : [];
+          const state = head ? WetterRooms.floorState(rooms, this.roomsOff) : '';
+          chips.push({
+            name: room, label: room || t('Ohne Raum'), floor, floorLabel: head ? (floor || t('Ohne Etage')) : '',
+            floorState: state, floorMark: {on: '●', part: '◐', off: '○'}[state] || '', on: !this.roomsOff.includes(room),
+          });
           last = floor;
         }
         return chips;
@@ -1752,6 +1758,15 @@
 
       toggleRoom(name) {
         this.roomsOff = this.roomsOff.includes(name) ? this.roomsOff.filter((n) => n !== name) : [...this.roomsOff, name];
+        writeStore({roomsOff: this.roomsOff});
+        this.drawTemps();
+      },
+
+      // Klick auf eine Etage: alle ihre Räume aus- oder einblenden.
+      toggleFloorRooms(floor) {
+        const entry = WetterRooms.floorsOf(this.tempCmp, this.roomOrder).find((e) => e.floor === floor);
+        if (!entry) return;
+        this.roomsOff = WetterRooms.toggleFloor(entry.rooms, this.roomsOff);
         writeStore({roomsOff: this.roomsOff});
         this.drawTemps();
       },

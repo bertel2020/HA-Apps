@@ -47,7 +47,23 @@
     return list.map((row, index) => ({...row, _i: index})).filter((row) => !isExtra(row) || !off.includes(row.room || ''));
   }
 
-  const api = {roomsOf, floorsOf, visible, orderBy};
+  // Zustand einer Etage in der Auswahl über den Diagrammen: 'on' (alle Räume sichtbar), 'part' (einige), 'off' (alle
+  // ausgeblendet). off: Namen der abgewählten Räume.
+  function floorState(rooms, off) {
+    const hidden = rooms.filter((room) => off.includes(room)).length;
+    if (!rooms.length || hidden === 0) return 'on';
+    return hidden === rooms.length ? 'off' : 'part';
+  }
+
+  // Ein Klick auf die Etage: ist sie ganz aus, kommen alle Räume zurück, sonst werden alle ausgeblendet.
+  // Gibt die neue Liste der abgewählten Räume zurück; Räume anderer Etagen bleiben, wie sie sind.
+  function toggleFloor(rooms, off) {
+    return floorState(rooms, off) === 'off'
+      ? off.filter((room) => !rooms.includes(room))
+      : [...off, ...rooms.filter((room) => !off.includes(room))];
+  }
+
+  const api = {roomsOf, floorsOf, visible, orderBy, floorState, toggleFloor};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.WetterRooms = api;
 })(typeof window !== 'undefined' ? window : globalThis);

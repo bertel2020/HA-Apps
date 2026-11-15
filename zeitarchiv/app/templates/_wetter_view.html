@@ -141,7 +141,10 @@
 <div class="wt-rooms" role="group" aria-label="{{ _('Räume im Diagramm') }}" x-show="roomChips().length" x-cloak>
   <template x-for="chip in roomChips()" :key="chip.name">
     <span class="wt-room-item">
-      <span class="wt-room-floor" x-show="chip.floorLabel" x-text="chip.floorLabel"></span>
+      <button type="button" class="wt-room-floor" :class="{'is-off': chip.floorState === 'off'}" x-show="chip.floorLabel" @click="toggleFloorRooms(chip.floor)"
+              :aria-pressed="(chip.floorState !== 'off').toString()" :title="chip.floorState === 'off' ? t('Etage einblenden') : t('Etage ausblenden')">
+        <span aria-hidden="true" x-text="chip.floorMark"></span> <span x-text="chip.floorLabel"></span>
+      </button>
       <button type="button" class="wt-room-chip" :aria-pressed="chip.on.toString()" @click="toggleRoom(chip.name)" x-text="chip.label"></button>
     </span>
   </template>

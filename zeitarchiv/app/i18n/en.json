@@ -4091,6 +4091,8 @@
     "Letzter Lauf {time}: {total} Werte bei {entities} ({names}). Zurücknehmen geht in Housekeeping unter Duplikate.": "Last run {time}: {total} values across {entities} ({names}). You can undo it in Housekeeping under Duplicates."
   },
   "js": {
+    "Etage einblenden": "Show floor",
+    "Etage ausblenden": "Hide floor",
     "1 Raum": "1 room",
     "{count} Räume": "{count} rooms",
     "Fixierung aufheben und das Dashboard bearbeiten?": "Unlock this dashboard and edit it?",

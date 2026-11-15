@@ -2525,7 +2525,7 @@ button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
 .wt-room-chip[aria-pressed="true"]{background:var(--surface-alt);color:var(--ink);border-color:var(--accent-line);}
 .wt-room-all{border-style:dashed;}
 .wt-room-item{display:contents;}
-.wt-room-floor{flex:0 0 100%;font-size:calc(11px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);margin-top:2px;}
+.wt-room-floor{flex:0 0 100%;font-size:calc(11px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);margin-top:2px;font-family:inherit;background:none;border:0;padding:2px 0;text-align:left;cursor:pointer;}
 .wt-table tr.wt-floor th{font-size:calc(12px * var(--font-scale, 1));font-weight:600;color:var(--ink);text-align:left;padding:8px 10px;background:var(--surface-alt);border-bottom:1px solid var(--border-strong);white-space:nowrap;}
 .wt-table tr.is-toggle th{cursor:pointer;}
 .wt-table tr.is-toggle th:focus-visible{outline:2px solid var(--accent-line);outline-offset:-2px;}
@@ -2761,3 +2761,6 @@ html[data-popup] .settings-panel > .toolbar{margin-top:0;}
    Seiten am selben linken Rand (page-wide), damit sie beim Wechseln nicht springen. Der Inhalt von „Auswahl & Verlauf“
    und „Kategorien“ behält seine Breite (--page-narrow) und steht mittig; die Liste ist eine Tabelle und nutzt die ganze Breite. */
 .page-head-wide > :not(h1):not(.sub):not(.entity-tabs){max-width:var(--page-narrow);margin-left:auto;margin-right:auto;}
+
+.wt-room-floor.is-off{text-decoration:line-through;opacity:.7;}
+.wt-room-floor:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px;}
