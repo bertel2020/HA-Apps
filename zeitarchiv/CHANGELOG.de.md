@@ -24,6 +24,10 @@
   - Der Dialog „Räume“ hat den Bereich „Reihenfolge“ für Etagen und Räume; sie gilt für die Tabelle, die Raumkacheln und die Raumauswahl über den Diagrammen
   - In der Raumauswahl über den Diagrammen blendet ein Klick auf eine Etage alle ihre Räume aus oder ein
 
+- **Wetterdashboard**: Raumfarben
+  - Räume bekommen im Dialog „Räume“ eine Farbe (acht Farben, oder „Farben verteilen“ für alle Räume auf einmal)
+  - Die Farbe erscheint in der Raumauswahl über den Diagrammen, auf den Kacheln des Reiters „Temperatur & Klima“, in den Raumzeilen von „Zeiträume im Vergleich“ und bei den Raum-Bezeichnungen in der Einrichtung
+
 ### Behoben
 
 - **Entitätenliste**: Gespeicherte Spaltenbreiten nutzen den verfügbaren Platz

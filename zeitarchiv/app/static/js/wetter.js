@@ -281,6 +281,7 @@
       tileCols: {basis: 4, wind: 3, klima: 3},
       // Einstellung „Weitere Sensoren“ (Kachelstil): eine Kachel je Raum statt je Sensor.
       foldable: false,
+      roomColors: (() => { try { return JSON.parse((document.querySelector('[data-room-colors]') || {dataset: {}}).dataset.roomColors || '{}') || {}; } catch (e) { return {}; } })(),
       floorsStart: (document.querySelector('[data-floors-start]') || {dataset: {}}).dataset.floorsStart || 'open',
       roomOrder: (() => { try { return JSON.parse((document.querySelector('[data-room-order]') || {dataset: {}}).dataset.roomOrder || '{}') || {}; } catch (e) { return {}; } })(),
       klimaMinTile: {small: 90, medium: 110, large: 180}[(document.querySelector('[data-klima-size]') || {dataset: {}}).dataset.klimaSize] || 0,
@@ -425,6 +426,12 @@
         if (lastTable) this.paintTables(lastTable);
       },
 
+      tableRoomColors() {
+        const out = {};
+        Object.keys(this.roomColors).forEach((name) => { out[name] = this.roomColorOf(name); });
+        return out;
+      },
+
       // Etagen (ohne Etagen: Räume) der Vergleichstabelle, für „Alles zuklappen“ und den Start zugeklappt.
       collapseTargets(data) {
         const rows = ((data && data.rows) || []).filter((row) => row.room && /^temperature:/.test(row.key));
@@ -460,7 +467,7 @@
           const table = this.$refs[refName('table', group)];
           const wrap = this.$refs[refName('tableWrap', group)];
           if (!table) continue;
-          table.innerHTML = renderTable(data, group, this.diff, {avgOnly: this.avgOnly, closedFloors: this.floorsClosed, closedRooms: this.roomsClosed, floorOrder: this.roomOrder.floors, roomOrder: this.roomOrder.rooms, interactive: true});
+          table.innerHTML = renderTable(data, group, this.diff, {avgOnly: this.avgOnly, closedFloors: this.floorsClosed, closedRooms: this.roomsClosed, roomColors: this.tableRoomColors(), floorOrder: this.roomOrder.floors, roomOrder: this.roomOrder.rooms, interactive: true});
           this.bindFloors(table);
           // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
           wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1);
@@ -606,7 +613,7 @@
           const count = {temp: list.filter((tile) => kindOf(tile) === 'temp').length, humid: list.filter((tile) => kindOf(tile) === 'humid').length};
           const ordered = [...list.filter((tile) => kindOf(tile) === 'temp'), ...list.filter((tile) => kindOf(tile) === 'humid')];
           out.push({
-            key: 'room:' + name, name, floor: list[0].floor || '', loose: false,
+            key: 'room:' + name, name, floor: list[0].floor || '', loose: false, color: this.roomColorOf(name),
             parts: ordered.map((tile) => part(tile, count[kindOf(tile)] > 1 ? tile.label : (kindOf(tile) === 'humid' ? t('Luftfeuchte') : t('Temperatur')))),
           });
         });
@@ -1731,6 +1738,12 @@
       },
 
       // Räume der weiteren Sensoren für die Auswahl über den Diagrammen; ab zwei Räumen sichtbar.
+      // Farbe eines Raums aus dem Setup: die Diagrammfarbe als CSS-Wert, leer ohne Auswahl.
+      roomColorOf(room) {
+        const number = room ? this.roomColors[room] : '';
+        return /^[1-8]$/.test(number || '') ? 'var(--chart-' + number + ')' : '';
+      },
+
       roomChips() {
         const rooms = this.tempCmp ? WetterRooms.roomsOf(this.tempCmp, this.roomOrder) : [];
         if (rooms.length < 2) return [];
@@ -1748,7 +1761,7 @@
           const rooms = head ? (floors.find((entry) => entry.floor === floor) || {rooms: []}).rooms : [];
           const state = head ? WetterRooms.floorState(rooms, this.roomsOff) : '';
           chips.push({
-            name: room, label: room || t('Ohne Raum'), floor, floorLabel: head ? (floor || t('Ohne Etage')) : '',
+            name: room, label: room || t('Ohne Raum'), floor, color: this.roomColorOf(room), floorLabel: head ? (floor || t('Ohne Etage')) : '',
             floorState: state, floorMark: {on: '●', part: '◐', off: '○'}[state] || '', on: !this.roomsOff.includes(room),
           });
           last = floor;

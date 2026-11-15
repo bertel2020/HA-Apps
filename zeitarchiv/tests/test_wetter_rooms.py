@@ -191,6 +191,7 @@ const floorHeads = (html) => [...html.matchAll(/<tr class="wt-floor[^"]*"><th[^>
 const floorsOpen = R.weatherComparison(onFloors, 'klima', true, {interactive: true});
 const floorsClosed = R.weatherComparison(onFloors, 'klima', true, {interactive: true, closedFloors: ['Obergeschoss', '']});
 const floorsCard = R.weatherComparison(onFloors, 'klima', true);
+const colored = R.weatherComparison(rooms, 'klima', true, {roomColors: {Bad: 'var(--chart-3)'}});
 const floorsOrdered = R.weatherComparison(onFloors, 'klima', true, {interactive: true, floorOrder: ['Keller', 'Obergeschoss'], roomOrder: ['Bad']});
 const roomsOrdered = R.weatherComparison(rooms, 'klima', true, {roomOrder: ['Keller', 'Bad']});
 const roomsClosed = R.weatherComparison(onFloors, 'klima', true, {interactive: true, closedRooms: ['Bad']});
@@ -208,6 +209,7 @@ console.log(JSON.stringify({
   roomToggles: count(floorsOpen, 'data-room='), cardRoomToggles: count(floorsCard, 'data-room='),
   roomRowsOpen: count(floorsOpen, '<th scope="row">'), roomRowsClosed: count(roomsClosed, '<th scope="row">'),
   closedRoomMarked: count(roomsClosed, 'is-closed'), closedRoomStillListed: heads(roomsClosed),
+  coloredRows: count(colored, 'has-room-color'), uncoloredRows: count(grouped, 'has-room-color'),
   orderedFloors: floorHeads(floorsOrdered), orderedRooms: heads(floorsOrdered), orderedRoomsFlat: heads(roomsOrdered),
   floorCounts: [...floorsOpen.matchAll(/wt-floor-count">([^<]*)</g)].map((m) => m[1]),
   basisUntouched: R.weatherComparison({...rooms, rows: rooms.rows.map((r) => ({...r, key: 'temperature'}))}, 'basis', true, {avgOnly: true}).includes('Max'),
@@ -351,3 +353,15 @@ def test_floor_switch_hides_and_shows_all_rooms_of_a_floor() -> None:
     assert _node(f'r.toggleFloor({rooms}, ["Bad", "Küche"])') == ["Bad", "Küche", "Büro"]
     assert _node(f'r.toggleFloor({rooms}, ["Bad", "Büro", "Küche"])') == ["Küche"]
     assert _node(f'r.toggleFloor({rooms}, [])') == ["Bad", "Büro"]
+
+
+def test_room_colors_are_saved_cleaned_and_rendered_in_the_table(service, output) -> None:
+    """Raumfarben: nur die acht Diagrammfarben, je Raumname; die Tabelle färbt die Raumzeile, ohne Farbe bleibt sie wie bisher."""
+    from app import wetter_routes
+    from test_wetter import _configure
+
+    assert wetter_routes._load_config(service.deps.index)["room_colors"] == {}
+    _configure(service, room_colors={" Bad ": "3", "Küche": "9", "": "1", "Keller": "x", "Büro": 2})
+    assert wetter_routes._load_config(service.deps.index)["room_colors"] == {"Bad": "3", "Büro": "2"}
+    assert output["coloredRows"] == 1
+    assert output["uncoloredRows"] == 0

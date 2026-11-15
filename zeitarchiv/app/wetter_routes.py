@@ -251,6 +251,7 @@ DEFAULT_KLIMA_SIZE = "auto"
 FLOORS_START = ("open", "closed")
 DEFAULT_FLOORS_START = "open"
 MAX_ORDER_NAMES = 200
+ROOM_COLORS = tuple(str(number) for number in range(1, 9))  # Nummer der Diagrammfarbe (--chart-1 bis --chart-8)
 DEFAULT_RAIN_DAY_MM = 1.0  # DWD: Niederschlagstag ab 1 mm
 DEFAULT_RAIN_DAY_MINUTES = 10
 
@@ -263,6 +264,16 @@ def _clean_order(value) -> list[str]:
         if text and text not in names:
             names.append(text)
     return names[:MAX_ORDER_NAMES]
+
+
+def _clean_room_colors(value) -> dict[str, str]:
+    """Farbe je Raumname: nur Raumnamen mit einer der acht Diagrammfarben, gespeichert als Nummer."""
+    colors: dict[str, str] = {}
+    for name, number in (value.items() if isinstance(value, dict) else []):
+        text = str(name).strip()[:60]
+        if text and str(number) in ROOM_COLORS:
+            colors[text] = str(number)
+    return dict(list(colors.items())[:MAX_ORDER_NAMES])
 
 
 def _empty_config() -> dict:
@@ -292,6 +303,7 @@ def _empty_config() -> dict:
         "floors_start": DEFAULT_FLOORS_START,
         "floor_order": [],
         "room_order": [],
+        "room_colors": {},
     }
 
 
@@ -373,6 +385,7 @@ def _load_config(index: Index) -> dict:
         config["floors_start"] = data["floors_start"]
     for key in ("floor_order", "room_order"):
         config[key] = _clean_order(data.get(key))
+    config["room_colors"] = _clean_room_colors(data.get("room_colors"))
     for key in ("heating_room", "heating_limit"):
         value = data.get(key)
         if isinstance(value, (int, float)) and not isinstance(value, bool) and 0 < value < 40:
@@ -2248,6 +2261,8 @@ class WetterService:
             floors_start: str = Form(""),
             floor_order: list[str] = Form([]),
             room_order: list[str] = Form([]),
+            room_color_name: list[str] = Form([]),
+            room_color_value: list[str] = Form([]),
         ) -> HTMLResponse:
             submitted = {
                 "temperature": temperature, "precip_mm": precip_mm, "precip_dur": precip_dur,
@@ -2323,6 +2338,7 @@ class WetterService:
             config["floors_start"] = start or _load_config(deps.index)["floors_start"]
             config["floor_order"] = _clean_order(floor_order)
             config["room_order"] = _clean_order(room_order)
+            config["room_colors"] = _clean_room_colors(dict(zip(room_color_name, room_color_value)))
             heating = []
             for position, entity_id in enumerate(heating_entity_id):
                 entity_id = entity_id.strip()

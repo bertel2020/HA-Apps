@@ -43,11 +43,27 @@
   [data-klima-size="small"][data-tile-style] .wt-roomtile-part .wt-tile-sub{font-size:calc(9.5px * var(--font-scale, 1));}
   .wt-fold-all .btn{padding:4px 10px;font-size:calc(13px * var(--font-scale, 1));}
   .wt-floor-count{margin-left:10px;font-weight:400;color:var(--ink-faint);font-size:calc(12px * var(--font-scale, 1));}
+  /* Raumfarben (Setup → Räume): Diagrammfarbe als Rand und leichter Ton; ohne Farbe bleibt alles wie bisher. */
+  .wt-room-chip{display:inline-flex;align-items:center;gap:6px;}
+  .wt-room-chip.has-room-color::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--room-color);flex:none;}
+  .wt-room-chip.has-room-color[aria-pressed="true"]{border-color:var(--room-color);background:color-mix(in srgb, var(--room-color) 16%, transparent);}
+  .wt-roomtile.has-room-color{border-top:3px solid var(--room-color);background:linear-gradient(color-mix(in srgb, var(--room-color) 7%, transparent), color-mix(in srgb, var(--room-color) 7%, transparent)), var(--surface);}
+  [data-tile-style] .wt-tiles a.wt-tile.has-room-color{border-top:3px solid var(--room-color);background:linear-gradient(color-mix(in srgb, var(--room-color) 7%, transparent), color-mix(in srgb, var(--room-color) 7%, transparent)), var(--tile-wash), var(--surface);}
+  .wt-table tr.wt-grp.has-room-color th{border-left:4px solid var(--room-color);background:color-mix(in srgb, var(--room-color) 10%, var(--surface-alt));}
   .wt-drag-handle{flex:none;cursor:grab;color:var(--ink-faint);user-select:none;padding:0 2px;font-size:calc(16px * var(--font-scale, 1));line-height:1;}
   .wt-drag-handle:active{cursor:grabbing;}
   .wt-rooms-row.is-drag-over{outline:2px dashed var(--accent-line);outline-offset:2px;border-radius:8px;}
+  .wt-color-dot{all:unset;flex:none;box-sizing:border-box;width:18px;height:18px;border-radius:50%;border:1px dashed var(--border-stronger);cursor:pointer;}
+  .wt-color-dot.has-room-color{background:var(--room-color);border:1px solid var(--room-color);}
+  .wt-color-dot:focus-visible,.wt-color-opt:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px;}
+  .wt-color-pal{display:flex;flex-wrap:wrap;gap:8px;padding:8px 10px;margin-left:26px;border:1px solid var(--border-strong);border-radius:10px;background:var(--surface);width:max-content;max-width:100%;}
+  .wt-color-opt{all:unset;box-sizing:border-box;width:22px;height:22px;border-radius:50%;background:var(--room-color);cursor:pointer;}
+  .wt-color-opt.is-selected{outline:2px solid var(--ink);outline-offset:2px;}
+  .wt-color-none{background:none;border:1px dashed var(--border-stronger);}
+  .has-room-color.wt-item-chip{border-color:var(--room-color);background:color-mix(in srgb, var(--room-color) 16%, transparent);color:var(--ink);}
   .wt-rooms-floor{display:flex;flex-direction:column;gap:6px;}
-  .wt-rooms-row.is-nested{margin-left:24px;}
+  .wt-rooms-item{display:flex;flex-direction:column;gap:6px;}
+  .wt-rooms-item.is-nested{margin-left:24px;}
   .wt-rooms-floorhead{font-weight:600;}
   .wt-rooms-remove-space{flex:none;width:30px;}
   .wt-order-name{flex:1;min-width:0;overflow-wrap:anywhere;padding:6px 0;}

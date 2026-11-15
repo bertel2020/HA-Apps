@@ -106,7 +106,7 @@
   {# Optional (Einrichtung → Kachelstil): eine Kachel je Raum mit Temperatur und Feuchte; Sensoren ohne Raum bleiben einzeln. #}
   <div class="wt-tiles wt-roomtiles" x-ref="tilesRoomKlima" x-show="klimaRooms && roomTiles().length" x-cloak>
     <template x-for="room in roomTiles()" :key="room.key">
-      <div class="wt-roomtile" :class="{'is-loose': room.loose}">
+      <div class="wt-roomtile" :class="{'is-loose': room.loose, 'has-room-color': room.color}" :style="room.color ? '--room-color:' + room.color : ''">
         <span class="wt-roomtile-head"><span class="wt-roomtile-name" x-text="room.name"></span><span class="wt-roomtile-floor" x-text="room.floor"></span></span>
         <span class="wt-roomtile-parts">
           <template x-for="part in room.parts" :key="part.key">
@@ -123,7 +123,7 @@
   {% endif %}
   <div class="wt-tiles" data-group="{{ group }}" x-ref="tiles{{ group | capitalize }}" :style="'--wt-cols:' + tileCols.{{ group }}" x-show="tilesFor('{{ group }}').length{% if group == 'klima' %} && !klimaRooms{% endif %}" x-cloak>
     <template x-for="(tile, i) in tilesFor('{{ group }}')" :key="tile.key">
-      <a class="wt-tile" :class="{'wt-tile-wide': tileCols.{{ group }} > 1 && i === tilesFor('{{ group }}').length - 1 && tilesFor('{{ group }}').length % tileCols.{{ group }} === 1}" :data-role="tileRole(tile)" :href="'entities/' + encodeURIComponent(tile.entity_id)" :title="tileTitle(tile)">
+      <a class="wt-tile" :style="roomColorOf(tile.room) ? '--room-color:' + roomColorOf(tile.room) : ''" :class="{'has-room-color': roomColorOf(tile.room), 'wt-tile-wide': tileCols.{{ group }} > 1 && i === tilesFor('{{ group }}').length - 1 && tilesFor('{{ group }}').length % tileCols.{{ group }} === 1}" :data-role="tileRole(tile)" :href="'entities/' + encodeURIComponent(tile.entity_id)" :title="tileTitle(tile)">
         <span class="wt-tile-icon" x-html="iconSvg(tileIcon(tile))"></span>
         <span class="wt-tile-label" x-text="tile.label"></span>
         <span class="wt-tile-value" x-html="tileValue(tile)"></span>
@@ -145,7 +145,7 @@
               :aria-pressed="(chip.floorState !== 'off').toString()" :title="chip.floorState === 'off' ? t('Etage einblenden') : t('Etage ausblenden')">
         <span aria-hidden="true" x-text="chip.floorMark"></span> <span x-text="chip.floorLabel"></span>
       </button>
-      <button type="button" class="wt-room-chip" :aria-pressed="chip.on.toString()" @click="toggleRoom(chip.name)" x-text="chip.label"></button>
+      <button type="button" class="wt-room-chip" :class="{'has-room-color': chip.color}" :style="chip.color ? '--room-color:' + chip.color : ''" :aria-pressed="chip.on.toString()" @click="toggleRoom(chip.name)" x-text="chip.label"></button>
     </span>
   </template>
   <button type="button" class="wt-room-all" x-show="roomsOff.length" x-cloak @click="showAllRooms()">{{ _("Alle") }}</button>
@@ -191,7 +191,7 @@
 {% set show_yearmatrix = 'yearmatrix' not in hc %}
 {% set show_long = show_records or show_kenntage or show_monthyears or show_yearmatrix %}
 {% set show_heat = has_heating and 'heating' not in hc %}
-<div x-data='wetterDashboard({{ precip_modes | tojson }})' data-hints="collapsed" data-tile-style="{{ config.tile_style }}" data-klima-tiles="{{ config.klima_tiles }}" data-klima-size="{{ config.klima_size }}" data-floors-start="{{ config.floors_start }}" data-room-order='{{ {"floors": config.floor_order, "rooms": config.room_order} | tojson }}' style="--wt-room-min:{{ {'small': 150, 'medium': 190, 'large': 300}.get(config.klima_size, 250) }}px">
+<div x-data='wetterDashboard({{ precip_modes | tojson }})' data-hints="collapsed" data-tile-style="{{ config.tile_style }}" data-klima-tiles="{{ config.klima_tiles }}" data-klima-size="{{ config.klima_size }}" data-floors-start="{{ config.floors_start }}" data-room-colors='{{ config.room_colors | tojson }}' data-room-order='{{ {"floors": config.floor_order, "rooms": config.room_order} | tojson }}' style="--wt-room-min:{{ {'small': 150, 'medium': 190, 'large': 300}.get(config.klima_size, 250) }}px">
   <div class="wt-title-row">
     <h1>{{ _("Wetterdashboard") }}</h1>
     <button type="button" class="wt-title-edit" title="{{ _('Rollen bearbeiten') }}"
