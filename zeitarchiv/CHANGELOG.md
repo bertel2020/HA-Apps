@@ -37,6 +37,11 @@
 
 ### Changed
 
+- **Weather dashboard**: Calmer overview
+  - Large numbers on the tiles, in the headline and in the records are one step smaller
+  - The top row of the weather situation tiles is as tall as the bottom one: rain no longer shows “yesterday”, wind no longer shows direction and gusts (both are still in the tile’s tooltip)
+  - Records: “Sunniest month” is now a large value next to “Sunniest day”
+
 - **Weather and energy dashboard setup**: “Save” and “Cancel” stay at the bottom edge of the window while you scroll
 
 - **Outlier measurement in the background**: Needs noticeably less CPU on large entities

@@ -37,6 +37,11 @@
 
 ### Geändert
 
+- **Wetterdashboard**: Ruhigere Übersicht
+  - Große Zahlen auf den Kacheln, in der Überschrift und bei den Rekorden sind eine Stufe kleiner
+  - Die obere Reihe der Wetterlage-Kacheln ist so hoch wie die untere: Regen zeigt kein „gestern“ mehr, Wind keine Richtung und keine Böen (beides steht weiter im Tooltip der Kachel)
+  - Rekorde: „Sonnigster Monat“ ist jetzt ein großer Wert neben „Sonnigster Tag“
+
 - **Einrichtung von Wetter- und Energiedashboard**: „Speichern“ und „Abbrechen“ bleiben beim Scrollen am unteren Fensterrand sichtbar
 
 - **Ausreißer-Messung im Hintergrund**: Braucht bei großen Entitäten deutlich weniger CPU
