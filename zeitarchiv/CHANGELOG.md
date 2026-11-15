@@ -38,6 +38,10 @@
   - New choice “Years compared” (3, 5, 10 or “All”) on the “Precipitation” tab, for the chart and the monthly table
   - The average still uses all complete years in the archive
 
+- **Weather dashboard**: Choice of heating periods
+  - New choice “Heating periods” (automatic, 3, 5, 10 or “All”) on the “Heating” tab, for the scatter charts, the slope tiles and the monthly table
+  - The “Heating season” menu moved to the right of the controls
+
 - **Weather dashboard**: Room colours
   - Rooms get a colour in the “Rooms” dialog (eight colours, assigned automatically and changeable)
   - The colour shows on the room selection above the charts, on the tiles of the “Temperature & climate” tab, on the room rows of “Periods compared”, and on the room labels in the setup

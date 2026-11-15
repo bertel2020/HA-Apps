@@ -641,15 +641,25 @@
     <div class="card wt-card">
       <div class="wt-controls">
         <h2 class="wt-h2">{{ _("Heizen und Wetter") }}</h2>
-        <label class="wt-check" x-show="heat" x-cloak>{{ _("Heizperiode") }}
-          <select x-model="heatSeason" @change="drawHeat()">
-            <template x-for="period in heatPeriods()" :key="period"><option :value="period" x-text="heatLabel(period)"></option></template>
-          </select>
-        </label>
         <label class="wt-check" x-show="heat" x-cloak>{{ _("Raumtemperatur") }}
           <input type="text" class="wt-num" x-model="heatRoom" @input="drawHeat()" inputmode="decimal" size="3"> °C</label>
         <label class="wt-check" x-show="heat" x-cloak>{{ _("Heizgrenze") }}
           <input type="text" class="wt-num" x-model="heatLimit" @input="drawHeat()" inputmode="decimal" size="3"> °C</label>
+        <span class="wt-controls-end wt-heat-end">
+          <span class="wt-scope-years" x-show="heatShownOptions().length" x-cloak>
+            <span class="wt-scope-lab"><b>{{ _("Heizperioden") }}</b></span>
+            <div class="wt-seg" role="group" aria-label="{{ _('Heizperioden') }}">
+              <template x-for="option in heatShownOptions()" :key="option.value">
+                <button type="button" :aria-pressed="(shownHeatShown() === option.value).toString()" @click="setHeatShown(option.value)" x-text="option.label"></button>
+              </template>
+            </div>
+          </span>
+          <label class="wt-check" x-show="heat" x-cloak>{{ _("Heizperiode") }}
+            <select x-model="heatSeason" @change="drawHeat()">
+              <template x-for="period in heatPeriods()" :key="period"><option :value="period" x-text="heatLabel(period)"></option></template>
+            </select>
+          </label>
+        </span>
       </div>
     </div>
     <div class="wt-kpis" x-show="heatKpis().length" x-cloak :style="'--wt-cols:' + kpiCols(heatKpis().length)">

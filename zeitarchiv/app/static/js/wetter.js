@@ -271,6 +271,7 @@
       heatRoom: '20',
       heatLimit: '15',
       heatSeason: '',
+      heatShown: 'auto',     // Heizperioden in Streudiagramm, Kacheln und Tabelle: 'auto' (nach Fensterbreite), '3', '5', '10' oder 'all'
       heatBySun: false,
       heatError: '',
       matrix: null,
@@ -314,6 +315,7 @@
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
         if (typeof saved.avgOnly === 'boolean') this.avgOnly = saved.avgOnly;
         if (['3', '5', '10', 'all'].includes(String(saved.precipPast))) this.precipPast = String(saved.precipPast);
+        if (['auto', '3', '5', '10', 'all'].includes(String(saved.heatShown))) this.heatShown = String(saved.heatShown);
         if (saved.tempRange && ISO_DAY.test(saved.tempRange.start || '') && ISO_DAY.test(saved.tempRange.end || '')) this.tempRange = {start: saved.tempRange.start, end: saved.tempRange.end};
         if (Array.isArray(saved.roomsOff)) this.roomsOff = saved.roomsOff.filter((name) => typeof name === 'string');
         if (Array.isArray(saved.floorsClosed)) this.floorsClosed = saved.floorsClosed.filter((name) => typeof name === 'string');
@@ -2608,7 +2610,36 @@
       // Eine Zeile je Heizperiode unter dem Streudiagramm: Anstieg in kWh je Kelvin, Tage, R² im Tooltip.
       // Liest heatWide, damit Alpine die Kacheln neu zeichnet, wenn das Fenster die 1440-px-Grenze überschreitet.
       heatChartSeasons() {
-        return this.heatWide === undefined ? 4 : heatChartCount();
+        return this.heatShownCount(this.heatWide === undefined ? 4 : heatChartCount());
+      },
+
+      // Wie viele Heizperioden gezeigt werden: nach Fensterbreite („Automatisch“, übergeben als auto) oder nach der Auswahl.
+      heatShownCount(auto) {
+        if (this.heatShown === 'auto') return auto;
+        return this.heatShown === 'all' ? Infinity : Number(this.heatShown);
+      },
+
+      // Auswahl „Heizperioden“: Automatisch, 3, 5 und 10, soweit es mehr Perioden gibt, dazu „Alle (n)“; bis drei Perioden entfällt sie.
+      heatShownOptions() {
+        const count = this.heatPeriods().length;
+        if (count <= 3) return [];
+        return [
+          {value: 'auto', label: t('Automatisch')},
+          ...[3, 5, 10].filter((n) => count > n).map((n) => ({value: String(n), label: String(n)})),
+          {value: 'all', label: t('Alle ({n})', {n: count})},
+        ];
+      },
+
+      // Ein gemerkter Wert, der nichts mehr kürzt, zeigt „Alle“.
+      shownHeatShown() {
+        const count = this.heatPeriods().length;
+        return this.heatShown !== 'auto' && this.heatShown !== 'all' && Number(this.heatShown) >= count ? 'all' : this.heatShown;
+      },
+
+      setHeatShown(value) {
+        this.heatShown = value;
+        writeStore({heatShown: value});
+        this.drawHeat();
       },
 
       heatSlopes() {
@@ -2832,7 +2863,7 @@
         const o = this.heatOpts();
         const days = this.heat.days;
         const info = this.heatPeriodInfo();
-        const shown = info.periods.slice(0, heatSeasonCount());
+        const shown = info.periods.slice(0, this.heatShownCount(heatSeasonCount()));
         if (!shown.length) {
           table.innerHTML = `<tbody><tr><td>${escapeHtml(t('Noch keine Heiztage.'))}</td></tr></tbody>`;
           return;

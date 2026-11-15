@@ -42,6 +42,7 @@
   [data-klima-size="small"][data-tile-style] .wt-roomtiles .wt-roomtile-part .wt-tile-value{font-size:calc(17px * var(--font-scale, 1));}
   [data-klima-size="small"][data-tile-style] .wt-roomtiles .wt-roomtile-part .wt-tile-value small{font-size:calc(10px * var(--font-scale, 1));margin-left:2px;}
   [data-klima-size="small"][data-tile-style] .wt-roomtiles .wt-roomtile-part .wt-tile-sub{font-size:calc(9.5px * var(--font-scale, 1));}
+  .wt-heat-end{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;}
   .wt-fold-all .btn{padding:4px 10px;font-size:calc(13px * var(--font-scale, 1));}
   .wt-floor-count{margin-left:10px;font-weight:400;color:var(--ink-faint);font-size:calc(12px * var(--font-scale, 1));}
   /* Raumfarben (Setup → Räume): Diagrammfarbe als Rand und leichter Ton; ohne Farbe bleibt alles wie bisher. */

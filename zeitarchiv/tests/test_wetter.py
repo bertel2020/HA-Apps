@@ -1648,3 +1648,16 @@ def test_precipitation_card_has_a_choice_of_compared_years() -> None:
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "niederschlag?mode=${this.precipMode}&past_years=${this.precipPast === 'all' ? 0 : Number(this.precipPast)}" in script
     assert "this.loadPrecip();" in script[script.index("setPrecipPast(value) {"):script.index("setPrecipMode(mode) {")]
+
+
+def test_heating_card_has_a_choice_of_heating_periods_with_the_season_menu_on_the_right() -> None:
+    from _paths import APP, TEMPLATES
+
+    page = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+    heat = page[page.index('id="wt-panel-heat"'):]
+    assert heat.count('@click="setHeatShown(option.value)"') == 1
+    # Raumtemperatur und Heizgrenze stehen links, Auswahl der Perioden und das Menü „Heizperiode“ rechts davon.
+    assert heat.index('{{ _("Heizgrenze") }}') < heat.index('wt-heat-end') < heat.index('{{ _("Heizperiode") }}')
+    script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
+    assert "info.periods.slice(0, this.heatShownCount(heatSeasonCount()))" in script
+    assert "return this.heatShownCount(this.heatWide === undefined ? 4 : heatChartCount());" in script
