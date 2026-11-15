@@ -470,6 +470,8 @@
           temperature: 'temp', precip_mm: 'drop', precip_dur: 'rain', humidity: 'humid', pressure: 'gauge',
           wind: 'wind', gust: 'wind', radiation: 'bright', illuminance: 'sun',
         };
+        // Ein weiterer Sensor mit „%“ heißt zwar „temperature:N“, misst aber Feuchte.
+        if (String(tile.key).startsWith('temperature:') && tile.unit === '%') return 'humid';
         return icons[String(tile.key).split(':')[0]] || 'temp';
       },
 

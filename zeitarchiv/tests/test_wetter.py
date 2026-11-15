@@ -251,7 +251,7 @@ def test_temperature_comparison_has_a_series_per_sensor_and_leaves_thin_days_emp
     _configure(service, temperature="sensor.t", extra_temperatures=[{"entity_id": "sensor.n", "name": "Nord"}])
     data = service.compute_temperatures(7, NOW)
     assert data["dates"][-1] == "2026-08-20" and len(data["dates"]) == 7
-    assert [row["label"] for row in data["series"]] == ["Temperatur", "Nord"]
+    assert [row["label"] for row in data["series"]] == ["Temperatur außen", "Nord"]
     day = data["dates"].index("2026-08-19")
     assert data["series"][1]["values"][day] == 8.0
     assert data["series"][0]["values"][day] is not None
@@ -1397,9 +1397,28 @@ def test_humidity_extras_get_their_own_series_apart_from_the_temperatures(servic
         extra_temperatures=[{"entity_id": "sensor.n", "name": "Nord"}, {"entity_id": "sensor.f", "name": "Keller feucht"}],
     )
     data = service.compute_temperatures(7, NOW)
-    assert [row["label"] for row in data["series"]] == ["Temperatur", "Nord"]
+    assert [row["label"] for row in data["series"]] == ["Temperatur außen", "Nord"]
     assert [row["label"] for row in data["humidity"]] == ["Keller feucht"]
     assert all(row["unit"] == "%" for row in data["humidity"])
+
+
+def test_outdoor_humidity_series_is_named_like_the_table(service) -> None:
+    """Neben den Räumen heißt die Außenlinie „Luftfeuchte außen“, nicht nur „Luftfeuchte“."""
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(19, 12), 10.0)])
+    _add(service, "sensor.h", "sensor", "measurement", "%", [(_ts(19, 12), 70.0)])
+    _add(service, "sensor.f", "sensor", "measurement", "%", [(_ts(19, 12), 60.0)])
+    _configure(service, temperature="sensor.t", humidity="sensor.h",
+               extra_temperatures=[{"entity_id": "sensor.f", "name": "Keller"}])
+    data = service.compute_temperatures(7, NOW)
+    assert [row["label"] for row in data["humidity"]] == ["Luftfeuchte außen", "Keller"]
+
+
+def test_humidity_extra_tile_gets_the_humidity_icon() -> None:
+    """Ein weiterer Sensor heißt „temperature:N“; mit der Einheit „%“ muss die Kachel trotzdem das Feuchte-Icon tragen."""
+    source = _wetter_script()
+    block = source[source.index("tileIcon(tile) {"):]
+    block = block[: block.index("tileValue(tile)")]
+    assert "startsWith('temperature:') && tile.unit === '%'" in block and "return 'humid'" in block
 
 
 def test_sky_limits_form_fills_missing_fields_and_rejects_unordered_ones(client) -> None:

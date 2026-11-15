@@ -1131,7 +1131,7 @@ class WetterService:
         today = now_local.date()
         dates = [today - timedelta(days=offset) for offset in range(days - 1, -1, -1)]
 
-        def build(chosen: list[dict], first_key: str) -> list[dict]:
+        def build(chosen: list[dict]) -> list[dict]:
             series = []
             for spec in chosen:
                 by_day = {
@@ -1141,7 +1141,9 @@ class WetterService:
                 }
                 series.append({
                     "key": spec["key"], "entity_id": spec["entity_id"],
-                    "label": tr(TILE_LABELS[first_key]) if spec["key"] == first_key and first_key in TILE_LABELS else spec["label"],
+                    # Die Außenreihen heißen im Diagramm wie in der Tabelle („Temperatur außen“), nicht wie die Kacheln:
+                    # Neben den Räumen wäre „Temperatur“ oder „Luftfeuchte“ allein nicht als Außenwert erkennbar.
+                    "label": tr("Luftfeuchte außen") if spec["key"] == "humidity" else spec["label"],
                     "unit": spec["unit"],
                     # Raum und Etage der weiteren Sensoren für die Auswahl im Diagramm (die Außenwerte haben keinen).
                     "room": spec.get("room", ""), "floor": spec.get("floor", ""),
@@ -1150,8 +1152,8 @@ class WetterService:
             return series
 
         return {
-            "days": days, "dates": [day.isoformat() for day in dates], "series": build(specs, "temperature"),
-            "humidity": build(humidity_specs, "humidity") if humidity_specs else [],
+            "days": days, "dates": [day.isoformat() for day in dates], "series": build(specs),
+            "humidity": build(humidity_specs) if humidity_specs else [],
         }
 
     def compute_longterm(self, now_local: datetime | None = None, years: int = 0) -> dict | None:
