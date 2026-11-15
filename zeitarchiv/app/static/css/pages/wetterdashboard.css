@@ -49,8 +49,9 @@
   .wt-room-chip{display:inline-flex;align-items:center;gap:6px;}
   .wt-room-chip.has-room-color::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--room-color);flex:none;}
   .wt-room-chip.has-room-color[aria-pressed="true"]{border-color:var(--room-color);background:color-mix(in srgb, var(--room-color) 16%, transparent);}
-  .wt-roomtile.has-room-color{border-top:3px solid var(--room-color);background:linear-gradient(color-mix(in srgb, var(--room-color) 7%, transparent), color-mix(in srgb, var(--room-color) 7%, transparent)), var(--surface);}
-  [data-tile-style] .wt-tiles a.wt-tile.has-room-color{border-top:3px solid var(--room-color);background:linear-gradient(color-mix(in srgb, var(--room-color) 7%, transparent), color-mix(in srgb, var(--room-color) 7%, transparent)), var(--tile-wash), var(--surface);}
+  /* Raumfarbe auf Kacheln: nur Tönung und ein Hauch Farbe im Rand, wie die getönten Kacheln der Übersicht (kein Streifen). */
+  .wt-roomtile.has-room-color{border-color:color-mix(in srgb, var(--room-color) 32%, var(--border));background:radial-gradient(140% 140% at 0% 0%, color-mix(in srgb, var(--room-color) 16%, transparent), color-mix(in srgb, var(--room-color) 4%, transparent) 70%), var(--surface);}
+  [data-tile-style] .wt-tiles a.wt-tile.has-room-color{border-color:color-mix(in srgb, var(--room-color) 32%, var(--border));background:radial-gradient(140% 140% at 0% 0%, color-mix(in srgb, var(--room-color) 16%, transparent), color-mix(in srgb, var(--room-color) 4%, transparent) 70%), var(--surface);}
   .wt-table tr.wt-grp.has-room-color th{border-left:4px solid var(--room-color);background:color-mix(in srgb, var(--room-color) 10%, var(--surface-alt));}
   .wt-drag-handle{flex:none;cursor:grab;color:var(--ink-faint);user-select:none;padding:0 2px;font-size:calc(16px * var(--font-scale, 1));line-height:1;}
   .wt-drag-handle:active{cursor:grabbing;}
@@ -554,6 +555,9 @@
 .wt-tiles-lage{--wt-cols:3;}
 .wt-tiles-lage .wt-tile-sub{white-space:pre-line;}
 .wt-tiles-lage .wt-tile-static{cursor:default;}
+/* Alle Kacheln der Wetterlage gleich hoch (die höchste bestimmt die Reihenhöhe); der Inhalt bleibt oben. */
+[data-tile-style] .wt-tiles-lage:not([data-layout="strip"]){grid-auto-rows:1fr;}
+[data-tile-style] .wt-tiles-lage:not([data-layout="strip"]) .wt-tile{align-content:start;}
 [data-tile-style] .wt-tiles-lage a.wt-tile-static:hover{transform:none;box-shadow:none;}
 .wt-tile-k{display:none;}
 @media (max-width:760px){
