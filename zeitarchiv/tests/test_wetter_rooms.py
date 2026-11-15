@@ -273,8 +273,10 @@ def test_extra_sensor_without_tile_only_loses_its_tile(service) -> None:
     _configure(service, temperature="sensor.t", extra_temperatures=[
         {"entity_id": "sensor.bad_t", "name": "Bad T", "tile": False}, {"entity_id": "sensor.bad_h", "name": "Bad H"},
     ])
-    keys = [tile["key"] for tile in service.compute_tiles(NOW)]
+    keys = [tile["key"] for tile in service.compute_tiles(NOW, overview=True)]
     assert "temperature:0" not in keys and "temperature:1" in keys
+    # Die Lovelace-Karte wählt ihre Werte selbst: dort bleibt der Sensor wählbar und sichtbar.
+    assert "temperature:0" in [tile["key"] for tile in service.compute_tiles(NOW)]
     assert [row["key"] for row in service.compute_temperatures(3, NOW)["series"]] == ["temperature", "temperature:0", "temperature:1"]
     assert wetter_rooms.entry("sensor.x", "X") == {"entity_id": "sensor.x", "name": "X"}
     assert wetter_rooms.entry("sensor.x", "X", tile=False)["tile"] is False

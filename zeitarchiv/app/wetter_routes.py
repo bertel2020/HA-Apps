@@ -1245,9 +1245,10 @@ class WetterService:
 
     # -- Kacheln -----------------------------------------------------------------------
 
-    def compute_tiles(self, now_local: datetime | None = None, at: str | None = None) -> list[dict]:
+    def compute_tiles(self, now_local: datetime | None = None, at: str | None = None, overview: bool = False) -> list[dict]:
         """Kacheln für heute oder, mit ``at`` (Stichtag vor heute), für diesen Tag: Wert am Tagesende, Tiefst-
-        und Höchstwert des Tages, bei Zählern der Tag und der Vortag."""
+        und Höchstwert des Tages, bei Zählern der Tag und der Vortag. ``overview`` lässt die weiteren Sensoren weg, deren
+        Kachel in der Einrichtung abgeschaltet ist; die Lovelace-Karte wählt ihre Werte selbst und fragt ohne das Flag."""
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
         stichtag = parse_stichtag(at, now_local.date())
@@ -1257,7 +1258,7 @@ class WetterService:
         yesterday = self.column_windows("gestern", now_local, "bis_jetzt", anchor)
         tiles = []
         for spec in self._row_specs(config):
-            if spec.get("tile") is False:
+            if overview and spec.get("tile") is False:
                 continue
             entity = self.deps.index.get_entity(spec["entity_id"])
             # Die Sonnenscheindauer liest die Stundenmittel eines Messwerts („sunshine“ ist nur die Anzeigeart).
@@ -2482,6 +2483,6 @@ class WetterService:
             if not _is_configured(_load_config(deps.index)):
                 raise HTTPException(status_code=409, detail=tr("Noch nicht eingerichtet"))
             stichtag = parse_stichtag(date, datetime.now(deps.tz).date())
-            return {"tz": str(deps.tz), "at": stichtag.isoformat() if stichtag else None, "tiles": self.compute_tiles(at=date)}
+            return {"tz": str(deps.tz), "at": stichtag.isoformat() if stichtag else None, "tiles": self.compute_tiles(at=date, overview=True)}
 
         return router
