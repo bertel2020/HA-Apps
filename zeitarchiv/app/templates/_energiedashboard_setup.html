@@ -420,7 +420,7 @@
     <p class="hint hint-status" x-show="haNote" x-text="haNote" x-cloak></p>
   </div>
   {% if prefill_count %}<p class="hint hint-status">{{ _("{count} Zuordnungen aus dem Auswahl-Assistenten vorbelegt. Es wurde nichts gespeichert: prüfen und dann speichern.", count=prefill_count) }}</p>{% endif %}
-  <form hx-post="energiedashboard/setup" hx-target="#energiedashboard-root" hx-swap="innerHTML">
+  <form data-unsaved-guard hx-post="energiedashboard/setup" hx-target="#energiedashboard-root" hx-swap="innerHTML">
 
     <section class="settings-section edash-section-allgemein">
       <h2 class="settings-section-title">{{ _("Allgemein") }}</h2>
@@ -1213,7 +1213,7 @@
     </section>
 
     <div class="actionbar" style="justify-content:flex-end;">
-      <a class="btn" href="energiedashboard">{{ _("Abbrechen") }}</a>
+      <a class="btn" href="energiedashboard" data-unsaved-cancel>{{ _("Abbrechen") }}</a>
       <button type="submit" class="btn" style="background:var(--accent-line);color:var(--accent-contrast);border-color:var(--accent-line);">{{ _("Speichern") }}</button>
     </div>
   </form>

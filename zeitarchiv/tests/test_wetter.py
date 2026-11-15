@@ -1567,3 +1567,15 @@ def test_extra_sensor_tiles_get_the_color_role_of_their_kind() -> None:
     block = block[: block.index("tileIcon(tile)")]
     assert "startsWith('temperature:')" in block and "'humidity' : 'temperature'" in block
     assert ':data-role="tileRole(tile)"' in (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+
+
+def test_both_setups_warn_before_unsaved_changes_are_lost() -> None:
+    """Wetter- und Energie-Einrichtung speichern erst mit „Speichern“; Entwürfe gingen beim Verlassen still verloren."""
+    from _paths import APP, TEMPLATES
+
+    script = (APP / "static/js/unsaved-guard.js").read_text(encoding="utf-8")
+    assert "beforeunload" in script and "a[data-unsaved-cancel]" in script
+    for setup, page in (("_wetter_setup.html", "wetterdashboard.html"), ("_energiedashboard_setup.html", "energiedashboard.html")):
+        html = (TEMPLATES / setup).read_text(encoding="utf-8")
+        assert "data-unsaved-guard" in html and "data-unsaved-cancel" in html
+        assert "js/unsaved-guard.js" in (TEMPLATES / page).read_text(encoding="utf-8")

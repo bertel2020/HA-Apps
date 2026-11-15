@@ -5126,6 +5126,8 @@
     "Raum (optional)": "Room (optional)",
     "Feuchte": "Humidity",
     "Ohne Raum": "No room",
+    "Nicht gespeicherte Änderungen verwerfen?": "Discard unsaved changes?",
+    "Verwerfen": "Discard",
     "1 Sensor": "1 sensor",
     "{count} Sensoren": "{count} sensors",
     "Raum „{name}“ wird von 1 Sensor verwendet. Beim Löschen wird nur die Raum-Zuordnung von Hand entfernt; der Sensor nimmt wieder den Raum aus Home Assistant oder steht unter „Ohne Raum“.": "Room “{name}” is used by 1 sensor. Deleting only removes the manual room assignment; the sensor falls back to the room from Home Assistant or goes under “No room”.",
