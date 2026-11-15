@@ -298,3 +298,12 @@ def test_tiles_carry_room_and_floor_and_the_room_setting_defaults_to_single(serv
     assert wetter_routes._load_config(service.deps.index)["klima_tiles"] == "room"
     _configure(service, klima_tiles="unsinn")
     assert wetter_routes._load_config(service.deps.index)["klima_tiles"] == "single"
+
+
+def test_outdoor_chip_hides_only_the_outdoor_lines() -> None:
+    """Der Chip „Außen“ blendet die Außenwerte aus (sonst bleiben sie immer); die Räume bleiben unberührt."""
+    kept = _node(f'r.visible({CMP}.series, [r.OUTDOOR])')
+    assert [row["key"] for row in kept] == ["temperature:0", "temperature:1", "temperature:2"]
+    assert [row["key"] for row in _node(f'r.visible({CMP}.humidity, [r.OUTDOOR, "Bad"])')] == ["temperature:4"]
+    assert [row["_i"] for row in kept] == [1, 2, 3]  # die Farbe der Linien bleibt
+    assert _node("r.OUTDOOR") == "@außen"

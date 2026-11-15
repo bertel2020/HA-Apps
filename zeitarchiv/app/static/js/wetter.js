@@ -1686,17 +1686,18 @@
         if (data.humidity && data.humidity.length) this.drawComparison('humid', this.$refs.humidChart, data, WetterRooms.visible(data.humidity, off), '%', 0);
       },
 
-      // Räume der weiteren Sensoren für die Auswahl über den Diagrammen; ab zwei Räumen sichtbar.
+      // Auswahl über den Diagrammen: „Außen“ und die Räume der weiteren Sensoren; sichtbar, sobald es einen Raum gibt
+      // (der Chip „Außen“ allein ohne weitere Sensoren hätte keinen Sinn).
       roomChips() {
         const rooms = this.tempCmp ? WetterRooms.roomsOf(this.tempCmp) : [];
-        if (rooms.length < 2) return [];
+        if (!rooms.length) return [];
         // Mit Etagen aus Home Assistant stehen die Räume gruppiert, vor der ersten eines Etagenblocks der Name der Etage.
         const floors = WetterRooms.floorsOf(this.tempCmp);
         const grouped = floors.some((entry) => entry.floor);
         const order = grouped ? floors.flatMap((entry) => entry.rooms.map((room) => ({room, floor: entry.floor}))) : rooms.map((room) => ({room, floor: ''}));
         const seen = new Set();
         let last = null;
-        const chips = [];
+        const chips = [{name: WetterRooms.OUTDOOR, label: t('Außen'), floorLabel: '', on: !this.roomsOff.includes(WetterRooms.OUTDOOR)}];
         for (const {room, floor} of order) {
           if (seen.has(room)) continue;
           seen.add(room);
