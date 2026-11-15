@@ -204,6 +204,38 @@
           this.floorOrder = tree.map((entry) => entry.floor).filter(Boolean);
           this.roomOrder = tree.flatMap((entry) => entry.rooms);
         },
+        // Ziehen am Griff: Etagen untereinander, Räume nur innerhalb ihrer Etage.
+        orderDrag: null,
+        orderOver: "",
+        orderDragStart(kind, floor, name) { this.orderDrag = {kind, floor, name}; },
+        orderDragOver(kind, floor, name) {
+          const drag = this.orderDrag;
+          if (!drag || drag.kind !== kind || (kind === "room" && drag.floor !== floor)) return;
+          this.orderOver = kind === "floor" ? "f:" + floor : "r:" + floor + ":" + name;
+        },
+        orderDrop(kind, floor, name) {
+          const drag = this.orderDrag;
+          this.orderDragEnd();
+          if (!drag || drag.kind !== kind || (kind === "room" && drag.floor !== floor)) return;
+          const tree = this.orderTree();
+          if (kind === "floor") {
+            const named = tree.filter((entry) => entry.floor);
+            const from = named.findIndex((entry) => entry.floor === drag.floor);
+            const to = named.findIndex((entry) => entry.floor === floor);
+            if (from < 0 || to < 0 || from === to) return;
+            named.splice(to, 0, named.splice(from, 1)[0]);
+            this.storeOrder(named.concat(tree.filter((entry) => !entry.floor)));
+            return;
+          }
+          const entry = tree.find((e) => e.floor === floor);
+          if (!entry) return;
+          const from = entry.rooms.indexOf(drag.name);
+          const to = entry.rooms.indexOf(name);
+          if (from < 0 || to < 0 || from === to) return;
+          entry.rooms.splice(to, 0, entry.rooms.splice(from, 1)[0]);
+          this.storeOrder(tree);
+        },
+        orderDragEnd() { this.orderDrag = null; this.orderOver = ""; },
         moveFloor(floor, step) {
           const tree = this.orderTree();
           const named = tree.filter((entry) => entry.floor);
@@ -615,7 +647,11 @@
     <div class="wt-rooms-list" x-show="orderTree().length">
       <template x-for="entry in orderTree()" :key="'f:' + entry.floor">
         <div class="wt-rooms-floor">
-          <div class="wt-rooms-row wt-rooms-floorhead" x-show="orderTree().some((e) => e.floor)">
+          <div class="wt-rooms-row wt-rooms-floorhead" x-show="orderTree().some((e) => e.floor)"
+               :class="{'is-drag-over': orderOver === 'f:' + entry.floor && orderDrag && orderDrag.kind === 'floor'}"
+               @dragover.prevent="orderDragOver('floor', entry.floor, '')" @drop.prevent="orderDrop('floor', entry.floor, '')">
+            <span class="wt-drag-handle" :style="entry.floor ? '' : 'visibility:hidden'" draggable="true" title="{{ _('Ziehen zum Sortieren') }}" aria-hidden="true"
+                  @dragstart="orderDragStart('floor', entry.floor, '')" @dragend="orderDragEnd()">⠿</span>
             <span class="wt-order-name" x-text="entry.floor || t('Ohne Etage')"></span>
             <span class="wt-order-arrows" x-show="entry.floor">
               <button type="button" class="btn" @click="moveFloor(entry.floor, -1)" aria-label="{{ _('Nach oben') }}">↑</button>
@@ -624,7 +660,10 @@
             <span class="wt-rooms-remove-space" aria-hidden="true"></span>
           </div>
           <template x-for="room in entry.rooms" :key="'r:' + entry.floor + ':' + room">
-            <div class="wt-rooms-row" :class="{'is-nested': orderTree().some((e) => e.floor)}">
+            <div class="wt-rooms-row" :class="{'is-nested': orderTree().some((e) => e.floor), 'is-drag-over': orderOver === 'r:' + entry.floor + ':' + room && orderDrag && orderDrag.kind === 'room'}"
+                 @dragover.prevent="orderDragOver('room', entry.floor, room)" @drop.prevent="orderDrop('room', entry.floor, room)">
+              <span class="wt-drag-handle" draggable="true" title="{{ _('Ziehen zum Sortieren') }}" aria-hidden="true"
+                    @dragstart="orderDragStart('room', entry.floor, room)" @dragend="orderDragEnd()">⠿</span>
               <input type="text" x-show="isManualRoom(room)" :value="room" maxlength="60" @change="renameRoom(room, $event.target.value)">
               <span class="wt-order-name" x-show="!isManualRoom(room)" x-text="room"></span>
               <span class="wt-rooms-usage" x-text="roomCount(room) === 1 ? t('1 Sensor') : t('{count} Sensoren', {count: roomCount(room)})"></span>
@@ -642,7 +681,7 @@
     <p class="wt-why" x-show="!orderTree().length">{{ _("Noch keine Räume vorhanden.") }}</p>
     <div class="actionbar" style="justify-content:space-between;">
       <button type="button" class="btn" x-show="floorOrder.length || roomOrder.length" @click="floorOrder = []; roomOrder = []">{{ _("Zurücksetzen") }}</button>
-      <button type="button" class="btn" @click="$refs.roomsDlg.close()">{{ _("Fertig") }}</button>
+      <button type="button" class="btn" style="margin-left:auto;" @click="$refs.roomsDlg.close()">{{ _("Fertig") }}</button>
     </div>
   </dialog>
 

@@ -30,6 +30,9 @@
   .wt-roomtiles{grid-template-columns:repeat(auto-fill,minmax(var(--wt-room-min,250px),1fr));}
   .wt-fold-all .btn{padding:4px 10px;font-size:calc(13px * var(--font-scale, 1));}
   .wt-floor-count{margin-left:10px;font-weight:400;color:var(--ink-faint);font-size:calc(12px * var(--font-scale, 1));}
+  .wt-drag-handle{flex:none;cursor:grab;color:var(--ink-faint);user-select:none;padding:0 2px;font-size:calc(16px * var(--font-scale, 1));line-height:1;}
+  .wt-drag-handle:active{cursor:grabbing;}
+  .wt-rooms-row.is-drag-over{outline:2px dashed var(--accent-line);outline-offset:2px;border-radius:8px;}
   .wt-rooms-floor{display:flex;flex-direction:column;gap:6px;}
   .wt-rooms-row.is-nested{margin-left:24px;}
   .wt-rooms-floorhead{font-weight:600;}
