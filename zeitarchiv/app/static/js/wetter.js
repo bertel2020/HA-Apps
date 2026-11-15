@@ -212,6 +212,7 @@
 
   window.wetterDashboard = function wetterDashboard(precipModes) {
     return {
+      ...YearRange.mixin,
       tab: 'overview',
       precipModes: precipModes || [],
       precipMode: (precipModes && precipModes[0]) || 'mm',
@@ -232,7 +233,7 @@
       band: true,
       longterm: null,
       longError: '',
-      longRange: 'all',      // „Letzte 5 | Letzte 10 | Alle“ des Reiters Langzeit: gilt für Rekorde, Kenntage und die Jahres-Matrix
+      yearSel: 'all',        // Jahre-Auswahl des Reiters Langzeit („Letzte 5“, „Letzte 10“, „Alle“ oder „2019-2023“): gilt für Rekorde, Kenntage, Jahres-Matrix und Monatswerte
       hasConditions: false,
       conditions: null,
       _conditionsSeq: 0,
@@ -305,7 +306,7 @@
         if (Array.isArray(saved.roomsOff)) this.roomsOff = saved.roomsOff.filter((name) => typeof name === 'string');
         if (Array.isArray(saved.floorsClosed)) this.floorsClosed = saved.floorsClosed.filter((name) => typeof name === 'string');
         if (Array.isArray(saved.roomsClosed)) this.roomsClosed = saved.roomsClosed.filter((name) => typeof name === 'string');
-        if (['5', '10', 'all'].includes(saved.kenntageRange)) this.longRange = saved.kenntageRange;  // alter Schlüssel: die Wahl bleibt erhalten
+        if (/^(5|10|all|\d{4}-\d{4})$/.test(String(saved.kenntageRange))) this.yearSel = String(saved.kenntageRange);  // alter Schlüssel: die Wahl bleibt erhalten
         if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
         // Ausgeblendete Karten fehlen im Dokument: der erste vorhandene Reiter ist der Start, Diagramme ohne Karte laden nicht.
         const firstTab = this.$root.querySelector('[role="tab"]');
@@ -2082,60 +2083,49 @@
       async loadLongterm() {
         this.longError = '';
         try {
-          this.longterm = await this.fetchJson(`wetterdashboard/langzeit?years=${this.longYearsParam()}`);
+          this.longterm = await this.fetchJson(`wetterdashboard/langzeit?${YearRange.query(this.shownYearSel())}`);
           this.$nextTick(() => this.drawKenntage());
         } catch (e) {
           this.longError = t('Die Langzeitwerte konnten nicht geladen werden.');
         }
       },
 
-      // Jahre der Karte „Kenntage je Jahr“: alle oder die letzten fünf bzw. zehn.
+      // Jahre der Karte „Kenntage je Jahr“: nach der Jahre-Auswahl des Reiters (aufsteigend).
       kenntageYears() {
         const years = this.longterm ? Object.keys(this.longterm.kenntage).sort() : [];
-        return this.longRange === 'all' ? years : years.slice(-Number(this.longRange));
+        return YearRange.filter(years, this.shownYearSel(), true);
       },
 
-      // Jahre-Auswahl des Reiters Langzeit wie im Energiedashboard: „Letzte 5“, „Letzte 10“, „Alle (n)“; immer, sobald Jahre geladen sind;
-      // „Letzte 10“ erst ab mehr als zehn. Ein gemerkter Wert, der nichts mehr kürzt, zeigt „Alle“. Sie gilt für die ganze Seite.
-      longCount() {
-        return this.longterm ? Object.keys(this.longterm.kenntage).length : 0;
+      // Jahre mit Daten für die Jahre-Auswahl (Baustein YearRange.mixin): die Jahre der Kenntage, sobald geladen.
+      availableYears() {
+        return this.longterm ? Object.keys(this.longterm.kenntage).map(Number) : [];
       },
 
-      longOptions() {
-        const count = this.longCount();
-        return [
-          {value: '5', label: t('Letzte 5')},
-          ...(count > 10 ? [{value: '10', label: t('Letzte 10')}] : []),
-          {value: 'all', label: t('Alle ({n})', {n: count})},
-        ];
-      },
-
-      showLongChoice() {
-        return this.longCount() > 0;
-      },
-
-      longShownRange() {
-        return this.longRange !== 'all' && Number(this.longRange) < this.longCount() ? this.longRange : 'all';
-      },
-
-      // Anzahl der Jahre für den Server (Rekorde); 0 heißt alle.
-      longYearsParam() {
-        return this.longRange === 'all' ? 0 : Number(this.longRange);
-      },
-
-      setLongRange(range) {
-        this.longRange = range;
-        writeStore({kenntageRange: range});
+      // Übernimmt die Auswahl; die Rekorde zählen nur die gewählten Jahre und kommen deshalb neu vom Server.
+      setYearSel(value) {
+        this.yearSel = value;
+        writeStore({kenntageRange: value});
         this.drawKenntage();
         this.drawMatrix();
-        this.loadLongterm();  // die Rekorde zählen nur die gewählten Jahre: neu vom Server
+        this.drawTempYears();
+        this.loadLongterm();
       },
 
       // Die Matrix nur mit den gewählten (neuesten) Jahren; die Zeilen stehen neuestes Jahr zuerst.
       limitedMatrix(m) {
-        const rows = this.longRange === 'all' ? m.years.length : Number(this.longRange);
-        if (rows >= m.years.length) return m;
-        return {...m, years: m.years.slice(0, rows), cells: m.cells.filter((cell) => cell[1] < rows), missing: m.missing.filter((cell) => cell[1] < rows)};
+        // Die Zeilen sind die Jahre, neuestes zuerst; bei einem Bereich beginnt die Auswahl nicht unbedingt oben.
+        const selection = YearRange.parse(this.shownYearSel());
+        if (selection.kind === 'all') return m;
+        const inSelection = (index) => (selection.kind === 'last' ? index < selection.n : YearRange.filter([m.years[index]], this.shownYearSel()).length > 0);
+        const kept = m.years.map((year, index) => index).filter(inSelection);
+        if (kept.length >= m.years.length) return m;
+        const position = new Map(kept.map((index, i) => [index, i]));
+        const remap = (cell) => [cell[0], position.get(cell[1]), ...cell.slice(2)];
+        return {
+          ...m, years: kept.map((index) => m.years[index]),
+          cells: m.cells.filter((cell) => position.has(cell[1])).map(remap),
+          missing: m.missing.filter((cell) => position.has(cell[1])).map(remap),
+        };
       },
 
       kenntageNote() {
@@ -2302,7 +2292,7 @@
         const rows = {};
         for (const [year, values] of Object.entries(data.years)) rows[year] = values.map(scaled);
         const avg = data.avg.map(scaled);
-        const years = Object.keys(rows).sort().slice(-10);
+        const years = YearRange.filter(Object.keys(rows).sort(), this.shownYearSel(), true);
         const mean = (values) => values.reduce((a, b) => a + b, 0) / values.length;
         const present = (list) => list.filter((value) => value != null);
         // Temperatur: Jahres-Ø nur aus vorhandenen Monaten und erst ab sechs davon. Summen: nur kompletter, abgeschlossener
@@ -2936,6 +2926,8 @@
       recordsScope() {
         const l = this.longterm;
         if (!l || !l.records_since) return '';
+        const selection = YearRange.parse(this.shownYearSel());
+        if (selection.kind === 'range') return `${selection.from}–${selection.to}`;
         return t('seit {year}', {year: l.records_since.slice(0, 4)});
       },
 

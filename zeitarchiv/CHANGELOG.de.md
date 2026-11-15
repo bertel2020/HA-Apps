@@ -24,6 +24,11 @@
   - Der Dialog „Räume“ hat den Bereich „Reihenfolge“ für Etagen und Räume; sie gilt für die Tabelle, die Raumkacheln und die Raumauswahl über den Diagrammen
   - In der Raumauswahl über den Diagrammen blendet ein Klick auf eine Etage alle ihre Räume aus oder ein
 
+- **Wetter- und Energiedashboard**: Freie Wahl der Jahre im Reiter „Langzeit“
+  - Neben „Letzte 5“, „Letzte 10“ und „Alle“ öffnet der Knopf „Zeitraum“ die Wahl von „Von Jahr“ und „Bis Jahr“
+  - Sie gilt für alle Karten des Reiters (Rekorde, Kenntage, Matrix und die übrigen Diagramme) und wird gemerkt
+  - Wetterdashboard: „Monatswerte je Jahr“ folgt jetzt der Wahl, statt immer die letzten zehn Jahre zu zeigen
+
 - **Wetterdashboard**: Raumfarben
   - Räume bekommen im Dialog „Räume“ eine Farbe (acht Farben, automatisch vergeben und änderbar)
   - Die Farbe erscheint in der Raumauswahl über den Diagrammen, auf den Kacheln des Reiters „Temperatur & Klima“, in den Raumzeilen von „Zeiträume im Vergleich“ und bei den Raum-Bezeichnungen in der Einrichtung

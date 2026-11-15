@@ -1303,6 +1303,9 @@ def test_rekorde_zaehlen_nur_die_neuesten_jahre_der_auswahl(service, monkeypatch
     jahr = {r["key"]: r for r in neueste["records"]}["erzeugung"]
     assert jahr["value"] == 30.0 and neueste["since"] == "2026-01-01"
     assert service.compute_records(config, NOW, years=5)["since"] == "2025-07-01"   # mehr als vorhanden: alle
+    nur_2025 = service.compute_records(config, NOW, from_year=2025, to_year=2025)  # Bereich von … bis …
+    assert {r["key"]: r for r in nur_2025["records"]}["erzeugung"]["value"] == 50.0 and nur_2025["since"] == "2025-07-01"
+    assert service.compute_records(config, NOW, from_year=2026)["since"] == "2026-01-01"
     assert neueste["kenntage"] == alle["kenntage"]
 
 
@@ -1310,8 +1313,8 @@ def test_langzeit_laedt_die_rekorde_mit_der_jahresauswahl_neu() -> None:
     from _paths import APP, TEMPLATES
 
     script = (APP / "static/js/energie-langzeit.js").read_text(encoding="utf-8")
-    assert "energiedashboard/langzeit/records?years=${this.yearLimit || 0}" in script
-    assert "if (this.records) this.loadRecords();" in script[script.index("setYearLimit(value) {"):]
+    assert "energiedashboard/langzeit/records?${YearRange.query(this.shownYearSel())}" in script
+    assert "if (this.records) this.loadRecords();" in script[script.index("setYearSel(value) {"):]
     page = (TEMPLATES / "_energie_langzeit.html").read_text(encoding="utf-8")
     assert 'x-text="recordsScope()"' in page and "mindestens ein Jahr" not in page
 

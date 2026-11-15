@@ -528,16 +528,6 @@
     return `${html}</tbody>`;
   }
 
-  // Jahre-Auswahl der Karten: „Letzte 5“, „Letzte 10“ oder „Alle“, sobald Jahre geladen sind; „Letzte 10“ erst ab mehr
-  // als zehn (sonst wäre es dasselbe wie „Alle“).
-  const YEAR_STEP = 5;
-  const storedYearLimit = (value) => (value === YEAR_STEP || value === 10 ? value : 0);
-  const yearChoices = (count) => [
-    {value: YEAR_STEP, label: t('Letzte 5')},
-    ...(count > 10 ? [{value: 10, label: t('Letzte 10')}] : []),
-    {value: 0, label: t('Alle ({n})', {n: count})},
-  ];
-
   // Die Reiter „Vergleich“ und „Langzeit“ laden ihre Daten erst beim ersten Zeigen (Ereignis „energie-tab“).
   function onFirstShow(tabName, component, load) {
     window.addEventListener('energie-tab', (event) => {
@@ -988,8 +978,8 @@
 
   // ---- Jahresbilanz (Reiter „Langzeit“) ---------------------------------------------------------
   // Zeilen der Karte, ältestes Jahr links: Summen je Jahr für „Komplett“ (full) oder „Bis jetzt“ (ytd), höchstens `limit` Jahre.
-  function yearRows(data, count, limit) {
-    const list = limit ? data.years.slice(0, limit) : data.years;
+  function yearRows(data, count, selection) {
+    const list = YearRange.filter(data.years, selection);
     return list.slice().reverse().map((entry) => ({
       year: entry.year, partialFrom: entry.partial_from, m: entry[count], producers: data.producers || [],
       // Das laufende Jahr ist nur in „Komplett“ unvollständig; „Bis jetzt“ zählt alle Jahre gleich weit.
@@ -1236,6 +1226,7 @@
     const withMonths = shown('matrix') || shown('monatsvergleich');
     const withShares = withConsumers && shown('aufteilung');
     return {
+      ...YearRange.mixin,
       opened: false,
       months: null,
       cons: null,
@@ -1259,7 +1250,7 @@
       // Darstellung der Monatswerte: 'tab' (Jahre × Monate) oder 'line' (eine Linie je Jahr).
       lzView: shown('matrix') ? 'tab' : 'line',
       band: true,
-      yearLimit: 0,
+      yearSel: 'all',
       ktMode: 'full',
       ktDialog: {title: '', sub: '', html: '', error: ''},
       _kenntageSeq: 0,
@@ -1274,7 +1265,9 @@
 
       init() {
         const saved = readStore();
-        this.yearLimit = storedYearLimit(saved.yearLimit);
+        // Gemerkt als Text („5“, „10“, „all“, „2019-2023“); ältere Installationen haben die Zahl 0, 5 oder 10 unter „yearLimit“.
+        const storedSel = saved.yearSel !== undefined ? saved.yearSel : (saved.yearLimit === 5 || saved.yearLimit === 10 ? String(saved.yearLimit) : 'all');
+        this.yearSel = /^(5|10|all|\d{4}-\d{4})$/.test(String(storedSel)) ? String(storedSel) : 'all';
         if (saved.ktMode === 'full' || saved.ktMode === 'ytd') this.ktMode = saved.ktMode;
         if (saved.jbCount === 'full' || saved.jbCount === 'ytd') this.jbCount = saved.jbCount;
         if (saved.jbMode === 'kwh' || saved.jbMode === 'pct') this.jbMode = saved.jbMode;
@@ -1309,35 +1302,24 @@
         this.takeSelection();
       },
 
-      // Anzahl der Jahre im Archiv (0 = noch nicht geladen); die Jahre-Auswahl erscheint, sobald Jahre geladen sind.
-      yearCount() {
-        const m = this.months ? this.months.years.length : 0;
-        const c = this.cons && this.cons.years ? this.cons.years.length : 0;
-        const k = this.records && this.records.kenntage ? this.records.kenntage.years.length : 0;
-        const y = this.years ? this.years.years.length : 0;
-        const d = this.days ? this.days.years.length : 0;
-        const w = this.wx && this.wx.yield ? Object.keys(this.wx.yield.years).length : 0;
-        const x = this.temp ? this.temp.years.length : 0;
-        return Math.max(m, c, k, y, d, w, x);
-      },
-
-      yearOptions() {
-        return yearChoices(this.yearCount());
-      },
-
-      // Ein gemerkter Wert, der nichts mehr kürzt (zehn bei höchstens zehn Jahren), zeigt „Alle“.
-      shownYearLimit() {
-        return this.yearLimit && this.yearLimit < this.yearCount() ? this.yearLimit : 0;
-      },
-
-      showYearChoice() {
-        return this.yearCount() > 0;
+      // Jahre im Archiv (leer = noch nicht geladen); die Jahre-Auswahl erscheint, sobald Jahre geladen sind (Baustein YearRange.mixin).
+      availableYears() {
+        const all = new Set();
+        const add = (list) => (list || []).forEach((entry) => { const year = YearRange.yearOf(entry); if (Number.isFinite(year)) all.add(year); });
+        if (this.months) add(this.months.years);
+        if (this.cons) add(this.cons.years);
+        if (this.records && this.records.kenntage) add(this.records.kenntage.years);
+        if (this.years) add(this.years.years);
+        if (this.days) add(this.days.years);
+        if (this.wx && this.wx.yield) add(Object.keys(this.wx.yield.years));
+        if (this.temp) add(this.temp.years);
+        return [...all];
       },
 
       // Gilt für Jahresbilanz, Kenntage und die Monatswerte, damit alle dieselben Jahre und dieselbe Basis für Ø zeigen.
-      setYearLimit(value) {
-        this.yearLimit = value;
-        writeStore({yearLimit: value});
+      setYearSel(value) {
+        this.yearSel = value;
+        writeStore({yearSel: value});
         this.drawYears();
         this.drawSize();
         this.drawKenntage();
@@ -1370,7 +1352,7 @@
         const host = this.$refs.shares;
         if (!data || !data.years || !host) return;
         const pick = this.sizeSel && this.sizeSel.startsWith('c:') ? this.sizeSel.slice(2) : null;
-        const years = this.yearLimit ? data.years.slice(0, this.yearLimit) : data.years;
+        const years = YearRange.filter(data.years, this.shownYearSel());
         host.innerHTML = sharesYearsHtml(data, years, this.sharesMode, pick);
         host.classList.toggle('has-hl', !!pick);
         requestAnimationFrame(() => fitShareLabels(host));
@@ -1436,7 +1418,7 @@
       // Die gezeigten Jahre (neuestes zuerst), begrenzt durch „Letzte 5 | Alle“.
       dayYears() {
         if (!this.days) return [];
-        return this.yearLimit ? this.days.years.slice(0, this.yearLimit) : this.days.years;
+        return YearRange.filter(this.days.years, this.shownYearSel());
       },
 
       // Eine Zeile je Jahr: 20 Pixel plus Platz für Achse und Farbskala (wie im Wetterdashboard).
@@ -1591,7 +1573,7 @@
       // Die gezeigten Jahre des Streudiagramms (neuestes zuerst), begrenzt durch „Letzte 5 | Alle“.
       tempYears() {
         if (!this.temp) return [];
-        return this.yearLimit ? this.temp.years.slice(0, this.yearLimit) : this.temp.years;
+        return YearRange.filter(this.temp.years, this.shownYearSel());
       },
 
       tempPoints() {
@@ -1608,7 +1590,7 @@
         if (this.wxPart === 'yield' && this.wx.yield) {
           const yearsAll = this.wx.yield.years;
           const keys = Object.keys(yearsAll).map(Number).sort((a, b) => b - a);
-          const shownKeys = (this.yearLimit ? keys.slice(0, this.yearLimit) : keys).sort((a, b) => a - b);
+          const shownKeys = YearRange.filter(keys, this.shownYearSel()).sort((a, b) => a - b);
           const years = Object.fromEntries(shownKeys.map((year) => [year, yearsAll[year]]));
           const current = this.wx.current;
           const m = {
@@ -1670,7 +1652,7 @@
       drawYears() {
         const data = this.years;
         if (!data || !data.years.length) return;
-        const rows = yearRows(data, this.jbCount, this.yearLimit);
+        const rows = yearRows(data, this.jbCount, this.shownYearSel());
         const colors = palette();
         const draw = (key, option) => {
           const element = this.$refs[key];
@@ -1704,7 +1686,7 @@
         if (key.startsWith('c:') && this.cons && this.cons.years) {
           const item = consumerRows(this.cons).find((row) => row.key === key.slice(2));
           if (item && item.values) {
-            const years = this.yearLimit ? this.cons.years.slice(0, this.yearLimit) : this.cons.years;
+            const years = YearRange.filter(this.cons.years, this.shownYearSel());
             const role = {label: item.name, values: item.values, flags: item.flags || {}, partial_start: item.partial_start, better: 'down', unchecked: item.unchecked || 0};
             const data = this.cons;
             const href = (year, month) => {
@@ -1719,7 +1701,7 @@
           const roles = this.months.roles;
           const role = roles.find((r) => `r:${r.key}` === key) || roles[0] || null;
           if (role) {
-            const years = this.yearLimit ? this.months.years.slice(0, this.yearLimit) : this.months.years;
+            const years = YearRange.filter(this.months.years, this.shownYearSel());
             const href = (year, month) => this.matrixLink(role, year, month);
             return {m: {...this.months, years}, role, href, consumer: false};
           }
@@ -1826,7 +1808,7 @@
         this.recordsError = '';
         try {
           // Die Rekorde zählen nur die gewählten Jahre (0 = alle); die Kenntage liefert der Server immer vollständig.
-          const res = await fetch(`energiedashboard/langzeit/records?years=${this.yearLimit || 0}`);
+          const res = await fetch(`energiedashboard/langzeit/records?${YearRange.query(this.shownYearSel())}`);
           if (!res.ok) throw new Error(String(res.status));
           this.records = await res.json();
           this.$nextTick(() => this.drawKenntage());
@@ -1837,7 +1819,9 @@
 
       // Kurzer Zusatz zum Titel „Rekorde“: ab wann gezählt wird (hängt an der Jahresauswahl).
       recordsScope() {
-        return this.records && this.records.since ? t('seit {year}', {year: this.records.since.slice(0, 4)}) : '';
+        if (!this.records || !this.records.since) return '';
+        const selection = YearRange.parse(this.shownYearSel());
+        return selection.kind === 'range' ? `${selection.from}–${selection.to}` : t('seit {year}', {year: this.records.since.slice(0, 4)});
       },
 
       recordsNote() {
@@ -1899,8 +1883,8 @@
         const r = this.records;
         const host = this.$refs.kenntage;
         if (!r || !r.kenntage || !host) return;
-        host.innerHTML = energyKenntage(r.kenntage, {
-          ytd: this.ktMode === 'ytd', years: this.yearLimit, current: window.ServerTime.parts(Date.now() / 1000).year, interactive: true,
+        host.innerHTML = energyKenntage({...r.kenntage, years: YearRange.filter(r.kenntage.years, this.shownYearSel())}, {
+          ytd: this.ktMode === 'ytd', years: 0, current: window.ServerTime.parts(Date.now() / 1000).year, interactive: true,
         });
       },
 

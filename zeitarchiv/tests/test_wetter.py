@@ -1544,6 +1544,20 @@ def test_compute_longterm_passes_the_year_choice_to_the_records(service, monkeyp
     assert last_two["records_since"] == "2024-01-05" and last_two["records_days"] == 2
     assert {entry["key"]: entry for entry in last_two["records"]}["warmest_day"]["date"] == "2025-06-06"
     assert service.compute_longterm(NOW, years=10)["records_since"] == "2022-07-01"  # mehr als vorhanden: alle
+    von_bis = service.compute_longterm(NOW, from_year=2022, to_year=2024)  # Bereich: 2022 bis 2024, ohne 2025
+    assert von_bis["records_since"] == "2022-07-01" and von_bis["records_days"] == 2
+    assert {entry["key"]: entry for entry in von_bis["records"]}["warmest_day"]["date"] == "2022-07-01"
+    nur_ab = service.compute_longterm(NOW, from_year=2025)  # offenes Ende
+    assert nur_ab["records_since"] == "2025-06-06" and nur_ab["records_days"] == 1
+
+
+def test_year_span_validation() -> None:
+    from app import wetter_routes
+
+    assert wetter_routes.valid_year_span(0, 0) and wetter_routes.valid_year_span(2019, 2023) and wetter_routes.valid_year_span(2019, 0)
+    assert wetter_routes.valid_year_span(2023, 2023)
+    assert not wetter_routes.valid_year_span(2023, 2019) and not wetter_routes.valid_year_span(1800, 2023)
+    assert not wetter_routes.valid_year_span(0, 3000)
 
 
 def test_longterm_page_has_one_year_choice_for_all_cards() -> None:
@@ -1551,10 +1565,10 @@ def test_longterm_page_has_one_year_choice_for_all_cards() -> None:
     from _paths import APP, TEMPLATES
 
     page = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
-    assert page.count("setLongRange(option.value)") == 1 and "setKenntageRange" not in page
+    assert page.count("year_range_choice()") == 1 and "setKenntageRange" not in page
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
-    assert "wetterdashboard/langzeit?years=${this.longYearsParam()}" in script
-    assert "this.loadLongterm();" in script[script.index("setLongRange(range) {"):script.index("limitedMatrix(m) {")]
+    assert "wetterdashboard/langzeit?${YearRange.query(this.shownYearSel())}" in script
+    assert "this.loadLongterm();" in script[script.index("setYearSel(value) {"):script.index("limitedMatrix(m) {")]
     assert "this.matrix ? this.limitedMatrix(this.matrix)" in script and "const m = this.matrix ? this.limitedMatrix(this.matrix) : null;" in script
 
 

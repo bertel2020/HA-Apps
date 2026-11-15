@@ -2472,6 +2472,11 @@ button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
 .wt-controls-end{margin-left:auto;}
 /* Jahre-Auswahl des Reiters Langzeit (Energie, Wetter): rechts in der Reiterzeile (.dash-tabs-bar-end), wie der Zeitraum der anderen Reiter. */
 .wt-scope-years{display:flex;align-items:center;gap:10px;}
+.wt-yr{position:relative;display:inline-block;}
+.wt-yr-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:210px;display:flex;flex-direction:column;gap:10px;padding:12px 14px;background:var(--surface);border:1px solid var(--border-strong);border-radius:12px;box-shadow:0 8px 24px color-mix(in srgb, var(--ink) 16%, transparent);}
+.wt-yr-pop label{display:flex;flex-direction:column;gap:4px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
+.wt-yr-pop select{font:inherit;font-size:calc(13px * var(--font-scale, 1));padding:6px 8px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--ink);}
+.wt-yr-actions{display:flex;justify-content:space-between;gap:8px;}
 .wt-scope-lab{font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
 .wt-scope-lab b{color:var(--ink);font-weight:600;font-size:calc(14px * var(--font-scale, 1));}
 /* Zusatz hinter dem Titel „Rekorde“ der Langzeit-Reiter: ab wann gezählt wird. */

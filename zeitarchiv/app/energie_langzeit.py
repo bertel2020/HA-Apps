@@ -860,9 +860,10 @@ class EnergieLangzeitService:
             })
         return out
 
-    def compute_records(self, config: dict, now_local: datetime | None = None, years: int = 0) -> dict:
+    def compute_records(self, config: dict, now_local: datetime | None = None, years: int = 0, from_year: int = 0, to_year: int = 0) -> dict:
         """Rekordtage und Kenntage je Jahr aus den Tageswerten. ``years`` > 0 beschränkt die Rekorde auf die neuesten so
         vielen Jahre mit Daten (die Auswahl „Letzte 5“ der Seite), 0 heißt alle; die Kenntage liefern immer alle Jahre.
+        ``from_year``/``to_year`` (je 0 = offen) wählen stattdessen die Jahre von … bis ….
         Rekorde gibt es ab dem ersten Tag mit Werten; ``since`` nennt den Beginn des gezählten Zeitraums."""
         now_local = now_local or datetime.now(self.tz)
         roles = role_entities(config)
@@ -870,7 +871,10 @@ class EnergieLangzeitService:
         today = now_local.date()
         with_data = sorted({d["date"].year for d in all_days})
         first_year = with_data[-years] if 0 < years < len(with_data) else None  # None: alle Jahre
-        days = [d for d in all_days if first_year is None or d["date"].year >= first_year]
+        last_year = None
+        if from_year or to_year:
+            first_year, last_year = from_year or None, to_year or None
+        days = [d for d in all_days if (first_year is None or d["date"].year >= first_year) and (last_year is None or d["date"].year <= last_year)]
         span = (days[-1]["date"] - days[0]["date"]).days + 1 if days else 0
         records = []
         for key, role, label in RECORDS:

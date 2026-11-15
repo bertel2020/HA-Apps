@@ -256,6 +256,14 @@ DEFAULT_RAIN_DAY_MM = 1.0  # DWD: Niederschlagstag ab 1 mm
 DEFAULT_RAIN_DAY_MINUTES = 10
 
 
+def valid_year_span(from_year: int, to_year: int) -> bool:
+    """Von-/Bis-Jahr der Langzeit-Auswahl (0 = offen): vernünftige Jahreszahlen, Von nicht nach Bis."""
+    given = [year for year in (from_year, to_year) if year]
+    if any(not 1900 <= year <= 2200 for year in given):
+        return False
+    return not (from_year and to_year and from_year > to_year)
+
+
 def _clean_order(value) -> list[str]:
     """Reihenfolge von Etagen oder Räumen: Namen ohne Leerzeichen am Rand, ohne Doppelte und leere Einträge."""
     names: list[str] = []
@@ -1204,9 +1212,10 @@ class WetterService:
             "humidity": build(humidity_specs) if humidity_specs else [],
         }
 
-    def compute_longterm(self, now_local: datetime | None = None, years: int = 0) -> dict | None:
+    def compute_longterm(self, now_local: datetime | None = None, years: int = 0, from_year: int = 0, to_year: int = 0) -> dict | None:
         """Kenntage und Rekorde der Langzeit-Seite. ``years`` > 0 beschränkt die Rekorde auf die neuesten so vielen Jahre
-        mit Daten (wie die Auswahl „Letzte 5“ der Seite); 0 heißt alle. Die Kenntage liefern immer alle Jahre."""
+        mit Daten (wie die Auswahl „Letzte 5“ der Seite); 0 heißt alle. ``from_year``/``to_year`` (je 0 = offen) wählen
+        stattdessen die Jahre von … bis …. Die Kenntage liefern immer alle Jahre."""
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
         if not config["temperature"] or self.deps.index.get_entity(config["temperature"]) is None:
@@ -1217,7 +1226,10 @@ class WetterService:
         tz = self.deps.tz
         with_data = sorted({analysis.day_of(point, tz).year for point in points})
         first_year = with_data[-years] if 0 < years < len(with_data) else None  # None: alle Jahre
-        in_range = (lambda day: first_year is None or day.year >= first_year)  # noqa: E731
+        last_year = None
+        if from_year or to_year:
+            first_year, last_year = from_year or None, to_year or None
+        in_range = (lambda day: (first_year is None or day.year >= first_year) and (last_year is None or day.year <= last_year))  # noqa: E731
         found = analysis.records([p for p in points if in_range(analysis.day_of(p, tz))], tz, today)
         entries: list[dict] = []
         if found:
@@ -2471,9 +2483,11 @@ class WetterService:
             return result
 
         @router.get("/wetterdashboard/langzeit")
-        def wetterdashboard_longterm(years: int = 0) -> dict:
+        def wetterdashboard_longterm(years: int = 0, from_year: int = Query(0, alias="from"), to_year: int = Query(0, alias="to")) -> dict:
             _require_configured()
-            result = self.compute_longterm(years=max(0, min(years, 100)))
+            if not valid_year_span(from_year, to_year):
+                raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
+            result = self.compute_longterm(years=max(0, min(years, 100)), from_year=from_year, to_year=to_year)
             if result is None:
                 raise HTTPException(status_code=404, detail=tr("Noch nicht eingerichtet"))
             return result

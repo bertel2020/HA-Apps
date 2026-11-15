@@ -1,0 +1,24 @@
+{# Jahre-Auswahl der Langzeit-Reiter (Wetter und Energie): feste Knöpfe plus „Zeitraum“ mit Von-/Bis-Jahr. Die Komponente nutzt den
+   Baustein YearRange.mixin (static/js/year-range.js). #}
+{% macro year_range_choice() %}
+<div class="wt-yr" x-show="showYearChoice()" x-cloak @keydown.escape="yearRangeOpen = false">
+  <div class="wt-seg" role="group" aria-label="{{ _('Anzahl der Jahre') }}">
+    <template x-for="option in yearRangeOptions()" :key="option.value">
+      <button type="button" :aria-pressed="(shownYearSel() === option.value).toString()" @click="pickYearSel(option.value)" x-text="option.label"></button>
+    </template>
+    <button type="button" :aria-pressed="isCustomYearSel().toString()" :aria-expanded="yearRangeOpen.toString()" @click="openYearRange()"><span x-text="yearSelLabel()"></span> ▾</button>
+  </div>
+  <div class="wt-yr-pop" x-show="yearRangeOpen" x-cloak @click.outside="yearRangeOpen = false">
+    <label>{{ _("Von Jahr") }}
+      <select x-model="draftFrom"><template x-for="year in yearRangeChoices().slice().reverse()" :key="year"><option :value="String(year)" x-text="year"></option></template></select>
+    </label>
+    <label>{{ _("Bis Jahr") }}
+      <select x-model="draftTo"><template x-for="year in yearRangeChoices()" :key="year"><option :value="String(year)" x-text="year"></option></template></select>
+    </label>
+    <div class="wt-yr-actions">
+      <button type="button" class="btn" @click="pickYearSel('all')">{{ _("Zurücksetzen") }}</button>
+      <button type="button" class="btn" @click="applyYearRange()">{{ _("Übernehmen") }}</button>
+    </div>
+  </div>
+</div>
+{% endmacro %}
