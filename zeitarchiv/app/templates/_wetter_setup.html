@@ -75,6 +75,7 @@
 <form class="wt-setup" data-unsaved-guard hx-post="wetterdashboard/setup" hx-target="#wetter-root" hx-swap="innerHTML"
       {# Enter in einem Textfeld (Name, Suche im Picker) darf das Formular nicht absenden, sonst ist die Einrichtung gespeichert, aber der Entwurf nie übernommen. #}
       @keydown.enter="if ($event.target.tagName === 'INPUT') $event.preventDefault()"
+      x-init="fillColors(); $watch('extras', () => fillColors())"
       x-data='{
         entityOptions: {{ entity_options | tojson }},
         roleTypes: {{ role_types | tojson }},
@@ -274,17 +275,25 @@
         },
         setColor(room, number) {
           const next = {...this.roomColors};
-          if (number) next[room] = String(number); else delete next[room];
+          next[room] = String(number);
           this.roomColors = next;
           this.colorOpen = "";
         },
-        // Vergibt die Farben der Reihe nach an alle Räume in der angezeigten Reihenfolge.
-        spreadColors() {
-          const next = {};
-          let n = 0;
-          this.orderTree().forEach((entry) => entry.rooms.forEach((room) => { next[room] = String(n % 8 + 1); n += 1; }));
+        // Räume ohne Farbe bekommen automatisch eine: zuerst die noch nicht vergebenen, danach reihum.
+        fillColors() {
+          const rooms = [...new Set(this.extras.map((row) => this.roomOf(row)).filter(Boolean))];
+          const missing = rooms.filter((room) => !this.roomColors[room]);
+          if (!missing.length) return;
+          const next = {...this.roomColors};
+          const used = new Set(Object.values(next));
+          let turn = Object.keys(next).length;
+          missing.forEach((room) => {
+            const free = ["1", "2", "3", "4", "5", "6", "7", "8"].find((n) => !used.has(n));
+            next[room] = free || String(turn % 8 + 1);
+            used.add(next[room]);
+            turn += 1;
+          });
           this.roomColors = next;
-          this.colorOpen = "";
         },
         // Umbenennen auf einen vorhandenen Raum führt beide zusammen.
         renameRoom(oldName, newValue) {
@@ -710,7 +719,6 @@
             </div>
             <div class="wt-color-pal" x-show="colorOpen === room" x-cloak>
               {% for n in range(1, 9) %}<button type="button" class="wt-color-opt" style="--room-color:var(--chart-{{ n }})" :class="{'is-selected': roomColors[room] === '{{ n }}'}" aria-label="{{ _('Farbe') }} {{ n }}" @click="setColor(room, {{ n }})"></button>{% endfor %}
-              <button type="button" class="wt-color-opt wt-color-none" :class="{'is-selected': !roomColors[room]}" title="{{ _('Keine Farbe') }}" aria-label="{{ _('Keine Farbe') }}" @click="setColor(room, 0)"></button>
             </div>
             </div>
           </template>
@@ -721,7 +729,6 @@
     <div class="actionbar" style="justify-content:space-between;">
       <span style="display:flex;gap:8px;">
         <button type="button" class="btn" x-show="floorOrder.length || roomOrder.length" @click="floorOrder = []; roomOrder = []">{{ _("Zurücksetzen") }}</button>
-        <button type="button" class="btn" x-show="orderTree().length" @click="spreadColors()">{{ _("Farben verteilen") }}</button>
       </span>
       <button type="button" class="btn" style="margin-left:auto;" @click="$refs.roomsDlg.close()">{{ _("Fertig") }}</button>
     </div>

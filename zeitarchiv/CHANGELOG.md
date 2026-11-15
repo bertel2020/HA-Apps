@@ -25,7 +25,7 @@
   - In the room selection above the charts, a click on a floor hides or shows all its rooms
 
 - **Weather dashboard**: Room colours
-  - Rooms get a colour in the “Rooms” dialog (eight colours, or “Assign colours” for all rooms at once)
+  - Rooms get a colour in the “Rooms” dialog (eight colours, assigned automatically and changeable)
   - The colour shows on the room selection above the charts, on the tiles of the “Temperature & climate” tab, on the room rows of “Periods compared”, and on the room labels in the setup
 
 ### Changed

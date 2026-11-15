@@ -60,7 +60,6 @@
   .wt-color-pal{display:flex;flex-wrap:wrap;gap:8px;padding:8px 10px;margin-left:26px;border:1px solid var(--border-strong);border-radius:10px;background:var(--surface);width:max-content;max-width:100%;}
   .wt-color-opt{all:unset;box-sizing:border-box;width:22px;height:22px;border-radius:50%;background:var(--room-color);cursor:pointer;}
   .wt-color-opt.is-selected{outline:2px solid var(--ink);outline-offset:2px;}
-  .wt-color-none{background:none;border:1px dashed var(--border-stronger);}
   .has-room-color.wt-item-chip{border-color:var(--room-color);background:color-mix(in srgb, var(--room-color) 16%, transparent);color:var(--ink);}
   .wt-rooms-floor{display:flex;flex-direction:column;gap:6px;}
   .wt-rooms-item{display:flex;flex-direction:column;gap:6px;}
