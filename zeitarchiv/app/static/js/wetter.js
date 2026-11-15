@@ -3030,7 +3030,7 @@
         const groups = [
           ['temperature', ['highest', 'lowest'], ['warmest_day', 'coldest_day']],
           ['wind', ['strongest_gust', 'wettest_day', 'rainiest_day'], []],
-          ['sun', ['sunniest_day'], ['sunniest_month', 'longest_sunny_streak', 'longest_overcast_streak']],
+          ['sun', ['sunniest_day', 'sunniest_month'], ['longest_sunny_streak', 'longest_overcast_streak']],
         ];
         return groups
           .map(([key, heroes, rows]) => ({key, heroes: pick(heroes), rows: pick(rows)}))
