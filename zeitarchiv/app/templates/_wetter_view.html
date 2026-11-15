@@ -117,7 +117,7 @@
   {% endif %}
   <div class="wt-tiles" x-ref="tiles{{ group | capitalize }}" :style="'--wt-cols:' + tileCols.{{ group }}" x-show="tilesFor('{{ group }}').length{% if group == 'klima' %} && !klimaRooms{% endif %}" x-cloak>
     <template x-for="(tile, i) in tilesFor('{{ group }}')" :key="tile.key">
-      <a class="wt-tile" :class="{'wt-tile-wide': tileCols.{{ group }} > 1 && i === tilesFor('{{ group }}').length - 1 && tilesFor('{{ group }}').length % tileCols.{{ group }} === 1}" :data-role="tile.key" :href="'entities/' + encodeURIComponent(tile.entity_id)" :title="tileTitle(tile)">
+      <a class="wt-tile" :class="{'wt-tile-wide': tileCols.{{ group }} > 1 && i === tilesFor('{{ group }}').length - 1 && tilesFor('{{ group }}').length % tileCols.{{ group }} === 1}" :data-role="tileRole(tile)" :href="'entities/' + encodeURIComponent(tile.entity_id)" :title="tileTitle(tile)">
         <span class="wt-tile-icon" x-html="iconSvg(tileIcon(tile))"></span>
         <span class="wt-tile-label" x-text="tile.label"></span>
         <span class="wt-tile-value" x-html="tileValue(tile)"></span>

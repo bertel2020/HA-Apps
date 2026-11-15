@@ -466,6 +466,13 @@
         return t('Stand {time}', {time: this.tilesStand}) + ' · ' + t('Tiefstwert ▼ und Höchstwert ▲ von heute');
       },
 
+      // Rolle einer Kachel für ihre Farbe: Weitere Sensoren heißen „temperature:N“; mit der Einheit „%“ sind sie Feuchte.
+      tileRole(tile) {
+        const key = String(tile.key);
+        if (!key.startsWith('temperature:')) return key;
+        return tile.unit === '%' ? 'humidity' : 'temperature';
+      },
+
       // Icon einer Kachel nach ihrer Rolle (Zusatztemperaturen heißen „temperature:N“).
       tileIcon(tile) {
         const icons = {

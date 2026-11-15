@@ -1556,3 +1556,14 @@ def test_longterm_page_has_one_year_choice_for_all_cards() -> None:
     assert "wetterdashboard/langzeit?years=${this.longYearsParam()}" in script
     assert "this.loadLongterm();" in script[script.index("setLongRange(range) {"):script.index("limitedMatrix(m) {")]
     assert "this.matrix ? this.limitedMatrix(this.matrix)" in script and "const m = this.matrix ? this.limitedMatrix(this.matrix) : null;" in script
+
+
+def test_extra_sensor_tiles_get_the_color_role_of_their_kind() -> None:
+    """Weitere Sensoren („temperature:N“) fanden in der Farbtabelle keine Rolle und blieben grau; jetzt zählt die Einheit."""
+    from _paths import TEMPLATES
+
+    source = _wetter_script()
+    block = source[source.index("tileRole(tile) {"):]
+    block = block[: block.index("tileIcon(tile)")]
+    assert "startsWith('temperature:')" in block and "'humidity' : 'temperature'" in block
+    assert ':data-role="tileRole(tile)"' in (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
