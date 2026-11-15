@@ -14,40 +14,26 @@
 
 ### Neu
 
-- **Wetterdashboard**: Mehr Kontrolle bei den weiteren Sensoren
+- **Wetterdashboard**: Weitere Sensoren und Räume
   - Bis zu 60 weitere Sensoren (bisher 20)
   - Neue Einstellung „Kachelgröße der weiteren Sensoren“ (automatisch, klein, mittel, groß) für die Kacheln auf dem Reiter „Temperatur & Klima“
+  - Räume bekommen im Dialog „Räume“ eine Farbe (acht Farben, automatisch vergeben und änderbar); sie erscheint in der Raumauswahl über den Diagrammen, auf den Kacheln, in den Raumzeilen von „Zeiträume im Vergleich“ und bei den Raum-Bezeichnungen in der Einrichtung
+  - Der Dialog „Räume“ ordnet Etagen und Räume (am Griff ziehen oder mit den Pfeilen); die Reihenfolge gilt für die Tabelle, die Raumkacheln und die Raumauswahl über den Diagrammen
+  - In der Raumauswahl über den Diagrammen blendet ein Klick auf eine Etage alle ihre Räume aus oder ein
 
-- **Wetterdashboard**: Etagen und Räume bei „Zeiträume im Vergleich“
+- **Wetterdashboard**: „Zeiträume im Vergleich“
   - „Alles zuklappen“ und „Alles aufklappen“ über der Tabelle; die Etagenköpfe zeigen ihre Raumzahl
   - Neue Einstellung „Etagen in der Tabelle“ legt fest, ob die Tabelle aufgeklappt oder zugeklappt startet
-  - Der Dialog „Räume“ hat den Bereich „Reihenfolge“ für Etagen und Räume; sie gilt für die Tabelle, die Raumkacheln und die Raumauswahl über den Diagrammen
-  - In der Raumauswahl über den Diagrammen blendet ein Klick auf eine Etage alle ihre Räume aus oder ein
+
+- **Wetterdashboard**: Gezeigte Jahre und Zeiträume wählen
+  - „Temperaturen im Vergleich“: ein vierter Knopf „Eigener Zeitraum“ öffnet die Wahl von Start- und Endtag (bis zu zehn Jahre, das Ende höchstens heute; wird gemerkt; bei Zeiträumen über ein Jahr steht die Jahreszahl an der Achse)
+  - „Vergleichsjahre“ (3, 5, 10 oder „Alle“) für Diagramm und Tabelle beim Niederschlag (der Mittelwert nutzt weiter alle kompletten Jahre) und für die „Tageslänge im Jahresverlauf“
+  - „Heizperioden“ (automatisch, 3, 5, 10 oder „Alle“) für die Streudiagramme, die Kacheln mit der Steigung und die Monatstabelle im Reiter „Heizen“; das Menü „Heizperiode“ steht jetzt rechts
 
 - **Wetter- und Energiedashboard**: Freie Wahl der Jahre im Reiter „Langzeit“
   - Neben „Letzte 5“, „Letzte 10“ und „Alle“ öffnet der Knopf „Zeitraum“ die Wahl von „Von Jahr“ und „Bis Jahr“
   - Sie gilt für alle Karten des Reiters (Rekorde, Kenntage, Matrix und die übrigen Diagramme) und wird gemerkt
   - Wetterdashboard: „Monatswerte je Jahr“ folgt jetzt der Wahl, statt immer die letzten zehn Jahre zu zeigen
-
-- **Wetterdashboard**: Eigener Zeitraum bei „Temperaturen im Vergleich“
-  - Ein vierter Knopf „Eigener Zeitraum“ neben „7 Tage“, „30 Tage“ und „12 Monate“ öffnet die Wahl von Start- und Endtag
-  - Bis zu zehn Jahre, das Ende höchstens heute; die Wahl wird gemerkt
-  - Bei Zeiträumen über ein Jahr steht die Jahreszahl an der Achse
-
-- **Wetterdashboard**: Vergleichsjahre beim Niederschlag
-  - Neue Auswahl „Vergleichsjahre“ (3, 5, 10 oder „Alle“) im Reiter „Niederschlag“, für das Diagramm und die Monatstabelle
-  - Der Mittelwert nutzt weiter alle kompletten Jahre im Archiv
-
-- **Wetterdashboard**: Wahl der Heizperioden
-  - Neue Auswahl „Heizperioden“ (automatisch, 3, 5, 10 oder „Alle“) im Reiter „Heizen“, für die Streudiagramme, die Kacheln mit der Steigung und die Monatstabelle
-  - Das Menü „Heizperiode“ steht jetzt rechts neben den Einstellungen
-
-- **Wetterdashboard**: Vergleichsjahre bei der Tageslänge
-  - Neue Auswahl „Vergleichsjahre“ (3, 5, 10 oder „Alle“) bei „Tageslänge im Jahresverlauf“ im Reiter „Wind & Sonne“
-
-- **Wetterdashboard**: Raumfarben
-  - Räume bekommen im Dialog „Räume“ eine Farbe (acht Farben, automatisch vergeben und änderbar)
-  - Die Farbe erscheint in der Raumauswahl über den Diagrammen, auf den Kacheln des Reiters „Temperatur & Klima“, in den Raumzeilen von „Zeiträume im Vergleich“ und bei den Raum-Bezeichnungen in der Einrichtung
 
 ### Geändert
 

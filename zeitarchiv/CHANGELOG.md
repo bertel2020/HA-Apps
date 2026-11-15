@@ -14,40 +14,26 @@
 
 ### New
 
-- **Weather dashboard**: More control over additional sensors
+- **Weather dashboard**: Additional sensors and rooms
   - Up to 60 additional sensors (was 20)
   - New setting “Tile size of additional sensors” (automatic, small, medium, large) for the tiles on the “Temperature & climate” tab
+  - Rooms get a colour in the “Rooms” dialog (eight colours, assigned automatically and changeable); it shows on the room selection above the charts, on the tiles, on the room rows of “Periods compared” and on the room labels in the setup
+  - The “Rooms” dialog arranges floors and rooms (drag the handle or use the arrows); the order applies to the table, the room tiles and the room selection above the charts
+  - In the room selection above the charts, a click on a floor hides or shows all its rooms
 
-- **Weather dashboard**: Floors and rooms in “Periods compared”
+- **Weather dashboard**: “Periods compared”
   - “Collapse all” and “Expand all” above the table; floor headers show their number of rooms
   - New setting “Floors in the table” decides whether the table starts expanded or collapsed
-  - The “Rooms” dialog has an “Order” section to arrange floors and rooms; it applies to the table, the room tiles and the room selection above the charts
-  - In the room selection above the charts, a click on a floor hides or shows all its rooms
+
+- **Weather dashboard**: Choose the years and periods shown
+  - “Temperatures compared”: a fourth button “Custom period” opens a choice of start and end day (up to ten years, ending at the latest today; remembered; the axis shows the year for periods longer than a year)
+  - “Years compared” (3, 5, 10 or “All”) for the precipitation chart and table (the average still uses all complete years) and for “Day length over the year”
+  - “Heating periods” (automatic, 3, 5, 10 or “All”) for the scatter charts, the slope tiles and the monthly table on the “Heating” tab; the “Heating season” menu moved to the right
 
 - **Weather and energy dashboard**: Free choice of years on the “Long term” tab
   - Next to “Last 5”, “Last 10” and “All”, a “Period” button opens a choice of “From year” and “To year”
   - It applies to all cards of the tab (records, characteristic days, matrix and the other charts) and is remembered
   - Weather dashboard: “Monthly values per year” now follows the choice instead of always showing the last ten years
-
-- **Weather dashboard**: Custom period for “Temperatures compared”
-  - A fourth button “Custom period” next to “7 days”, “30 days” and “12 months” opens a choice of start and end day
-  - Up to ten years, ending at the latest today; the choice is remembered
-  - Periods longer than a year show the year on the axis
-
-- **Weather dashboard**: Years compared for precipitation
-  - New choice “Years compared” (3, 5, 10 or “All”) on the “Precipitation” tab, for the chart and the monthly table
-  - The average still uses all complete years in the archive
-
-- **Weather dashboard**: Choice of heating periods
-  - New choice “Heating periods” (automatic, 3, 5, 10 or “All”) on the “Heating” tab, for the scatter charts, the slope tiles and the monthly table
-  - The “Heating season” menu moved to the right of the controls
-
-- **Weather dashboard**: Years compared for day length
-  - New choice “Years compared” (3, 5, 10 or “All”) for “Day length over the year” on the “Wind & sun” tab
-
-- **Weather dashboard**: Room colours
-  - Rooms get a colour in the “Rooms” dialog (eight colours, assigned automatically and changeable)
-  - The colour shows on the room selection above the charts, on the tiles of the “Temperature & climate” tab, on the room rows of “Periods compared”, and on the room labels in the setup
 
 ### Changed
 
