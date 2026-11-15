@@ -30,10 +30,12 @@
   .wt-roomtiles{grid-template-columns:repeat(auto-fill,minmax(var(--wt-room-min,250px),1fr));}
   .wt-fold-all .btn{padding:4px 10px;font-size:calc(13px * var(--font-scale, 1));}
   .wt-floor-count{margin-left:10px;font-weight:400;color:var(--ink-faint);font-size:calc(12px * var(--font-scale, 1));}
-  .wt-order-list{display:grid;gap:6px;margin:4px 0 12px;}
-  .wt-order-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);}
-  .wt-order-row.is-room{margin-left:24px;color:var(--ink-muted);}
-  .wt-order-name{flex:1;min-width:0;overflow-wrap:anywhere;}
+  .wt-rooms-floor{display:flex;flex-direction:column;gap:6px;}
+  .wt-rooms-row.is-nested{margin-left:24px;}
+  .wt-rooms-floorhead{font-weight:600;}
+  .wt-rooms-remove-space{flex:none;width:30px;}
+  .wt-order-name{flex:1;min-width:0;overflow-wrap:anywhere;padding:6px 0;}
+  .wt-rooms-row input{flex:1;min-width:0;}
   .wt-order-arrows{display:flex;gap:4px;}
   .wt-order-arrows .btn{padding:2px 8px;min-width:0;line-height:1.2;}
   .wt-roomtile{min-width:0;display:flex;flex-direction:column;gap:10px;padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:var(--tile-wash, transparent), var(--surface);box-shadow:var(--shadow);}
