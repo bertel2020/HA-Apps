@@ -128,6 +128,10 @@
 
   // Datum eines Platzes; in UTC formatiert, damit die Zeitzone des Browsers kein Datum verschiebt.
   const utcDayMonth = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', timeZone: 'UTC'});
+  const utcDate = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'});
+  const utcDateShort = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'UTC'});
+  const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+  const MAX_TEMP_SPAN_DAYS = 3660;  // eigener Zeitraum: höchstens zehn Jahre (wie der Server)
   // Spalten der Jahr×Tag-Matrix: ein Schaltjahr, damit der 29.02. eine eigene Spalte hat.
   const slotLabel = (slot) => {
     const {month, day} = slotDate(slot);
@@ -225,6 +229,11 @@
       floorsClosed: [],
       roomsClosed: [],
       tempDays: 30,
+      tempRange: null,         // eigener Zeitraum {start, end} (ISO-Tage) statt der festen Tage
+      tempRangeOpen: false,
+      draftStart: '',
+      draftEnd: '',
+      tempRangeError: '',
       tempError: '',
       monthly: null,
       monthlyLoaded: false,  // einmal erfolgreich geladen: erst dann bleibt die Karte nach einem Ladefehler sichtbar
@@ -303,6 +312,7 @@
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
         if (typeof saved.avgOnly === 'boolean') this.avgOnly = saved.avgOnly;
+        if (saved.tempRange && ISO_DAY.test(saved.tempRange.start || '') && ISO_DAY.test(saved.tempRange.end || '')) this.tempRange = {start: saved.tempRange.start, end: saved.tempRange.end};
         if (Array.isArray(saved.roomsOff)) this.roomsOff = saved.roomsOff.filter((name) => typeof name === 'string');
         if (Array.isArray(saved.floorsClosed)) this.floorsClosed = saved.floorsClosed.filter((name) => typeof name === 'string');
         if (Array.isArray(saved.roomsClosed)) this.roomsClosed = saved.roomsClosed.filter((name) => typeof name === 'string');
@@ -1716,7 +1726,8 @@
         this.tempError = '';
         const seq = ++this._tempsSeq;
         try {
-          const data = await this.fetchJson(`wetterdashboard/temperaturen?days=${this.tempDays}`);
+          const range = this.tempRange ? `start=${this.tempRange.start}&end=${this.tempRange.end}` : `days=${this.tempDays}`;
+          const data = await this.fetchJson(`wetterdashboard/temperaturen?${range}`);
           if (seq !== this._tempsSeq) return;  // eine neuere Anfrage hat überholt
           this.tempCmp = data;
           this.$nextTick(() => this.drawTemps());
@@ -1727,6 +1738,46 @@
 
       setTempDays(days) {
         this.tempDays = days;
+        this.tempRange = null;
+        this.tempRangeOpen = false;
+        writeStore({tempRange: null});
+        this.loadTemps();
+      },
+
+      // Eigener Zeitraum der Temperaturen: Tag von … bis …, höchstens zehn Jahre, nicht über heute hinaus.
+      todayIso() {
+        const p = window.ServerTime.parts(Date.now() / 1000);
+        return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+      },
+
+      tempRangeLabel() {
+        const r = this.tempRange;
+        if (!r) return t('Eigener Zeitraum');
+        const format = (iso) => utcDate.format(new Date(`${iso}T12:00:00Z`));
+        return `${format(r.start)}–${format(r.end)}`;
+      },
+
+      openTempRange() {
+        if (this.tempRangeOpen) { this.tempRangeOpen = false; return; }
+        const today = this.todayIso();
+        this.draftEnd = this.tempRange ? this.tempRange.end : today;
+        this.draftStart = this.tempRange ? this.tempRange.start : (this.tempCmp && this.tempCmp.dates.length ? this.tempCmp.dates[0] : today);
+        this.tempRangeError = '';
+        this.tempRangeOpen = true;
+      },
+
+      applyTempRange() {
+        const start = this.draftStart;
+        const end = this.draftEnd;
+        if (!ISO_DAY.test(start) || !ISO_DAY.test(end)) { this.tempRangeError = t('Von und Bis wählen.'); return; }
+        if (end < start) { this.tempRangeError = t('Das Ende liegt vor dem Anfang.'); return; }
+        if (end > this.todayIso()) { this.tempRangeError = t('Das Ende liegt nach heute.'); return; }
+        const days = Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000) + 1;
+        if (days > MAX_TEMP_SPAN_DAYS) { this.tempRangeError = t('Der Zeitraum darf höchstens zehn Jahre lang sein.'); return; }
+        this.tempRangeError = '';
+        this.tempRangeOpen = false;
+        this.tempRange = {start, end};
+        writeStore({tempRange: this.tempRange});
         this.loadTemps();
       },
 
@@ -1795,7 +1846,9 @@
       drawComparison(name, element, data, series, fallbackUnit, decimals) {
         if (!element) return;
         const colors = palette();
-        const labels = data.dates.map((iso) => utcDayMonth.format(new Date(`${iso}T00:00:00Z`)));
+        // Über ein Jahr hinaus braucht der Tag die Jahreszahl (sonst wäre der 1.5. nicht von dem des Vorjahres zu unterscheiden).
+        const dayFormat = data.dates.length > 366 ? utcDateShort : utcDayMonth;
+        const labels = data.dates.map((iso) => dayFormat.format(new Date(`${iso}T00:00:00Z`)));
         const unit = (series[0] && series[0].unit) || fallbackUnit;
         // Die Farbe richtet sich nach der Stelle in der ganzen Liste (_i), nicht nach der in der Auswahl.
         const colorOf = (row, index) => this.heatColor(row._i != null ? row._i : index);

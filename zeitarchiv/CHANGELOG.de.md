@@ -29,6 +29,11 @@
   - Sie gilt für alle Karten des Reiters (Rekorde, Kenntage, Matrix und die übrigen Diagramme) und wird gemerkt
   - Wetterdashboard: „Monatswerte je Jahr“ folgt jetzt der Wahl, statt immer die letzten zehn Jahre zu zeigen
 
+- **Wetterdashboard**: Eigener Zeitraum bei „Temperaturen im Vergleich“
+  - Ein vierter Knopf „Eigener Zeitraum“ neben „7 Tage“, „30 Tage“ und „12 Monate“ öffnet die Wahl von Start- und Endtag
+  - Bis zu zehn Jahre, das Ende höchstens heute; die Wahl wird gemerkt
+  - Bei Zeiträumen über ein Jahr steht die Jahreszahl an der Achse
+
 - **Wetterdashboard**: Raumfarben
   - Räume bekommen im Dialog „Räume“ eine Farbe (acht Farben, automatisch vergeben und änderbar)
   - Die Farbe erscheint in der Raumauswahl über den Diagrammen, auf den Kacheln des Reiters „Temperatur & Klima“, in den Raumzeilen von „Zeiträume im Vergleich“ und bei den Raum-Bezeichnungen in der Einrichtung

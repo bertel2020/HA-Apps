@@ -117,6 +117,7 @@ MAX_EXTRA_TEMPERATURES = 60
 #: Zeiträume (Tage) des Temperaturvergleichs auf dem Reiter „Temperatur & Klima“; 365 heißt in der Oberfläche „12 Monate“
 #: wie bei den Kacheln (rollierend, nach dem tatsächlichen Fenster benannt).
 TEMPERATURE_DAYS = (7, 30, 365)
+MAX_TEMPERATURE_SPAN_DAYS = 3660  # eigener Zeitraum: höchstens zehn Jahre
 BLOCK_KEYS = ("kenntage", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation", "illuminance")
 #: Karten, die sich in der Einrichtung ein- und ausblenden lassen: (Schlüssel, Name, Rollen, von denen mindestens
 #: eine zugeordnet sein muss; „@extras“ und „@heating“ stehen für die Listen weiterer Sensoren und Heizzähler).
@@ -974,8 +975,9 @@ class WetterService:
                 return entity_id, kind
         return None
 
-    def _daily(self, entity_id: str, now_local: datetime, since: date | None = None) -> list:
-        """Tagesreihe ab dem 1. Januar des ersten Archivjahres; mit ``since`` erst ab Mitternacht dieses Tages.
+    def _daily(self, entity_id: str, now_local: datetime, since: date | None = None, until: date | None = None) -> list:
+        """Tagesreihe ab dem 1. Januar des ersten Archivjahres; mit ``since`` erst ab Mitternacht dieses Tages, mit ``until``
+        (einschließlich) nur bis zum Ende dieses Tages; ohne ``until`` bis jetzt.
 
         Ein Aufrufer, der nur die letzten Tage braucht, soll nicht die ganze Historie lesen: Das laufende Jahr
         wird nie zwischengespeichert, die Kosten wuchsen also mit jedem Tag seit dem 1. Januar und mit jedem Sensor."""
@@ -986,8 +988,11 @@ class WetterService:
         start = datetime.fromtimestamp(first, self.deps.tz).replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
         if since is not None:
             start = max(start, datetime(since.year, since.month, since.day, tzinfo=self.deps.tz))
+        end = now_local
+        if until is not None and until < now_local.date():
+            end = datetime(until.year, until.month, until.day, tzinfo=self.deps.tz) + timedelta(days=1) - timedelta(seconds=1)
         return query_mod.query_daily_series(
-            self.deps.data_dir, self.deps.index, entity_id, start, now_local, self.deps.tz, now_local,
+            self.deps.data_dir, self.deps.index, entity_id, start, end, self.deps.tz, now_local,
             query_mod.QueryReadCache(),
         )
 
@@ -1169,8 +1174,9 @@ class WetterService:
             "tz": str(self.deps.tz), "hours": hours,
         }
 
-    def compute_temperatures(self, days: int, now_local: datetime | None = None) -> dict | None:
-        """Tagesmittel der Außentemperatur und aller weiteren Sensoren für die letzten ``days`` Tage."""
+    def compute_temperatures(self, days: int, now_local: datetime | None = None, start: date | None = None, end: date | None = None) -> dict | None:
+        """Tagesmittel der Außentemperatur und aller weiteren Sensoren für die letzten ``days`` Tage; mit ``start``
+        (und ``end``, sonst heute) für einen eigenen Zeitraum. Ein Start vor dem Archivbeginn rückt auf den ersten Tag mit Daten."""
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
         all_specs = self._row_specs(config)
@@ -1185,14 +1191,24 @@ class WetterService:
         if humidity_specs:
             humidity_specs = [spec for spec in all_specs if spec["key"] == "humidity"] + humidity_specs
         today = now_local.date()
-        dates = [today - timedelta(days=offset) for offset in range(days - 1, -1, -1)]
+        if start is not None:
+            end = min(end or today, today)
+            firsts = [entity["first_ts"] for spec in all_specs if (entity := self.deps.index.get_entity(spec["entity_id"])) and entity["first_ts"]]
+            if firsts:
+                start = max(start, datetime.fromtimestamp(min(firsts), self.deps.tz).date())
+            start = min(start, end)
+            days = (end - start).days + 1
+            dates = [start + timedelta(days=offset) for offset in range(days)]
+        else:
+            end = None
+            dates = [today - timedelta(days=offset) for offset in range(days - 1, -1, -1)]
 
         def build(chosen: list[dict]) -> list[dict]:
             series = []
             for spec in chosen:
                 by_day = {
                     analysis.day_of(point, self.deps.tz): point.value
-                    for point in self._daily(spec["entity_id"], now_local, since=dates[0])
+                    for point in self._daily(spec["entity_id"], now_local, since=dates[0], until=dates[-1])
                     if point.covered and point.value is not None
                 }
                 series.append({
@@ -1208,7 +1224,7 @@ class WetterService:
             return series
 
         return {
-            "days": days, "dates": [day.isoformat() for day in dates], "series": build(specs),
+            "days": days, "custom": start is not None, "dates": [day.isoformat() for day in dates], "series": build(specs),
             "humidity": build(humidity_specs) if humidity_specs else [],
         }
 
@@ -2473,11 +2489,21 @@ class WetterService:
             return result
 
         @router.get("/wetterdashboard/temperaturen")
-        def wetterdashboard_temperatures(days: int = 30) -> dict:
+        def wetterdashboard_temperatures(days: int = 30, start: str = "", end: str = "") -> dict:
             _require_configured()
-            if days not in TEMPERATURE_DAYS:
+            first = last = None
+            if start:
+                today = datetime.now(self.deps.tz).date()
+                try:
+                    first = date.fromisoformat(start)
+                    last = date.fromisoformat(end) if end else today
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum.")) from None
+                if last > today or first > last or (last - first).days + 1 > MAX_TEMPERATURE_SPAN_DAYS:
+                    raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
+            elif days not in TEMPERATURE_DAYS:
                 raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
-            result = self.compute_temperatures(days)
+            result = self.compute_temperatures(days, start=first, end=last)
             if result is None:
                 raise HTTPException(status_code=404, detail=tr("Noch nicht eingerichtet"))
             return result

@@ -4095,6 +4095,11 @@
     "Letzter Lauf {time}: {total} Werte bei {entities} ({names}). Zurücknehmen geht in Housekeeping unter Duplikate.": "Last run {time}: {total} values across {entities} ({names}). You can undo it in Housekeeping under Duplicates."
   },
   "js": {
+    "Eigener Zeitraum": "Custom period",
+    "Von und Bis wählen.": "Choose a start and an end.",
+    "Das Ende liegt vor dem Anfang.": "The end is before the start.",
+    "Das Ende liegt nach heute.": "The end is after today.",
+    "Der Zeitraum darf höchstens zehn Jahre lang sein.": "The period can be at most ten years long.",
     "Etage einblenden": "Show floor",
     "Etage ausblenden": "Hide floor",
     "1 Raum": "1 room",

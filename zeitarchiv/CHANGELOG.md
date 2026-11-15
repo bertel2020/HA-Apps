@@ -29,6 +29,11 @@
   - It applies to all cards of the tab (records, characteristic days, matrix and the other charts) and is remembered
   - Weather dashboard: “Monthly values per year” now follows the choice instead of always showing the last ten years
 
+- **Weather dashboard**: Custom period for “Temperatures compared”
+  - A fourth button “Custom period” next to “7 days”, “30 days” and “12 months” opens a choice of start and end day
+  - Up to ten years, ending at the latest today; the choice is remembered
+  - Periods longer than a year show the year on the axis
+
 - **Weather dashboard**: Room colours
   - Rooms get a colour in the “Rooms” dialog (eight colours, assigned automatically and changeable)
   - The colour shows on the room selection above the charts, on the tiles of the “Temperature & climate” tab, on the room rows of “Periods compared”, and on the room labels in the setup

@@ -258,6 +258,40 @@ def test_temperature_comparison_has_a_series_per_sensor_and_leaves_thin_days_emp
     assert data["series"][0]["values"][day - 1] is None  # ein einzelner Wert reicht nicht für ein Tagesmittel
 
 
+def test_temperature_comparison_takes_an_own_period_with_start_and_end(service) -> None:
+    hours = [(_ts(19, hour), 10.0 + hour * 0.1) for hour in range(24)]
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(17, 1), 5.0)] + hours)
+    _configure(service, temperature="sensor.t")
+    data = service.compute_temperatures(7, NOW, start=date(2026, 8, 18), end=date(2026, 8, 19))
+    assert data["custom"] is True and data["days"] == 2 and data["dates"] == ["2026-08-18", "2026-08-19"]
+    assert data["series"][0]["values"][1] is not None  # 19.8.: ein ganzer Tag
+    past = service.compute_temperatures(7, NOW, start=date(2026, 8, 10), end=date(2026, 8, 19))
+    assert past["dates"][0] == "2026-08-17" and past["dates"][-1] == "2026-08-19"  # Start vor dem Archivbeginn rückt auf den ersten Tag
+    assert "2026-08-20" not in past["dates"]
+    open_end = service.compute_temperatures(7, NOW, start=date(2026, 8, 19))
+    assert open_end["dates"][-1] == "2026-08-20" and open_end["custom"] is True
+    assert service.compute_temperatures(7, NOW)["custom"] is False
+
+
+def test_temperature_comparison_route_validates_an_own_period(client) -> None:
+    from datetime import timedelta
+
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp11", "sensor", "measurement", "°C")
+    index.set_setting(wetter_routes.SETTING_ENABLED, "1")
+    wetter_routes._save_config(index, {**wetter_routes._empty_config(), "temperature": "sensor.wetter_test_temp11"})  # noqa: SLF001
+    today = datetime.now(TZ).date()
+    get = lambda query: client.get(f"/wetterdashboard/temperaturen?{query}")  # noqa: E731
+    assert get(f"start={today - timedelta(days=5)}&end={today}").status_code == 200
+    assert get(f"start={today - timedelta(days=5)}").status_code == 200  # ohne Ende bis heute
+    assert get("start=unsinn").status_code == 400
+    assert get(f"start={today}&end={today - timedelta(days=1)}").status_code == 400  # Ende vor Anfang
+    assert get(f"start={today - timedelta(days=1)}&end={today + timedelta(days=1)}").status_code == 400  # Ende nach heute
+    assert get(f"start={today - timedelta(days=3700)}&end={today}").status_code == 400  # länger als zehn Jahre
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
 def test_temperature_comparison_route_validates_the_period(client) -> None:
     from app.main import index
 
@@ -783,7 +817,8 @@ def test_reference_day_uses_the_dashboard_stichtag_bar_of_the_app() -> None:
     view = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
     page = (TEMPLATES / "wetterdashboard.html").read_text(encoding="utf-8")
     assert "{{ period_nav(true, true) }}" in view and "period_assets()" in page
-    assert "wt-daynav" not in view and 'type="date"' not in view
+    # Der Stichtag hat keine eigene Tagesauswahl; Datumsfelder gibt es nur im Menü „Eigener Zeitraum“ der Temperaturen.
+    assert "wt-daynav" not in view and view.count('type="date"') == 2 and 'x-model="draftStart"' in view
     script = _wetter_script()
     assert "Alpine.store('dashStichtag').date" in script and "'dashboard-stichtag'" in script
     assert "shiftStichtag" not in script and "setStichtag" not in script
