@@ -183,9 +183,11 @@ class OutlierDetector:
     """
 
     def __init__(
-        self, *, factor: float | None, mode: str, decimals: str, tz: ZoneInfo
+        self, *, factor: float | None, mode: str, decimals: str, tz: ZoneInfo, reasons: bool = True
     ) -> None:
         self.factor = factor
+        # False: nur zählen. Statt der Begründung kommt ein Platzhalter (nicht None), der Text wird nicht gebaut.
+        self.reasons = reasons
         self.mode = "counter" if mode == "counter" else "standard"
         self.decimals = decimals
         self.tz = tz
@@ -251,7 +253,7 @@ class OutlierDetector:
             if self.factor is not None and len(self._steps) >= COUNTER_OUTLIER_MIN_STEPS:
                 ueblich = statistics.median(self._steps)
                 if ueblich > 0 and zuwachs > self.factor * ueblich * spreizung:
-                    grund = (
+                    grund = _NO_REASON if not self.reasons else (
                         tr("Zuwachs {_format_val} ist das {_format_factor} des üblichen Zuwachses ({_format_val2}, Median der letzten {len}){_vorwert}", _format_val=_format_val(zuwachs, self.decimals), _format_factor=_format_factor(zuwachs / ueblich), _format_val2=_format_val(ueblich, self.decimals), len=len(self._steps), _vorwert=self._vorwert())
                     )
             # Zuwächse über eine Pause gehen nicht in den Bezug ein: sie wären größer als üblich und
@@ -281,12 +283,15 @@ class OutlierDetector:
             )
             self._last_far = value if weit else None
             if weit and not fortsetzung:
-                grund = (
+                grund = _NO_REASON if not self.reasons else (
                     tr("{_format_val} liegt {_format_factor} weiter vom Median der letzten {len} Werte ({_format_val2}) entfernt als üblich (±{_format_val3}){_vorwert}", _format_val=_format_val(value, self.decimals), _format_factor=_format_factor(abstand / streuung), len=len(self._values), _format_val2=_format_val(mitte, self.decimals), _format_val3=_format_val(streuung, self.decimals), _vorwert=self._vorwert())
                 )
         self._values.append(value)
         return grund
 
+
+# Platzhalter für „Befund ohne Text“ (reasons=False): die Prüfungen fragen nur `is not None` ab.
+_NO_REASON = ""
 
 # So viele Treffer hält analyze_raw_rows_page höchstens gleichzeitig als Zeilen im Speicher, bevor es für
 # tiefe Seiten auf zwei Durchläufe mit Fenster umschaltet (5.000 Wörterbücher sind rund 2 MB).
@@ -311,6 +316,7 @@ def analyze_raw_rows_page(
     outlier_mode: str = "standard",
     match_window: tuple[int, int] | None = None,
     collect: dict[str, int] | None = None,
+    reasons: bool = True,
 ) -> dict:
     """Analysiert beliebig viele sortierte Rohwerte mit begrenztem Speicher.
 
@@ -333,6 +339,9 @@ def analyze_raw_rows_page(
     ``outlier_factor`` ist ein VIELFACHES des für diese Entität Üblichen (nicht
     mehr ein Prozentsatz), ``outlier_mode`` wählt die Bezugsgröße dafür —
     beides steckt vollständig in OutlierDetector, siehe dort.
+
+    ``reasons=False`` zählt nur: Begründungstexte und ``flags`` werden nicht gebaut (für Aufrufer, die nur
+    ``counts``/``daily``/``pagination`` lesen). Die Zahlen sind mit ``reasons=True`` identisch.
     """
     total_rows = 0
     for _ts, _value in rows_factory():
@@ -347,14 +356,14 @@ def analyze_raw_rows_page(
             tz=tz, decimals=decimals, counter_decrease_enabled=counter_decrease_enabled,
             outlier_mode=outlier_mode,
         )
-        probe = analyze_raw_rows_page(rows_factory, page=1, page_size=1, **options)
+        probe = analyze_raw_rows_page(rows_factory, page=1, page_size=1, reasons=False, **options)
         matches = probe["pagination"]["total"]
         actual = max(1, min(requested_page, -(-matches // page_size)))
         # Seiten zeigen neueste zuerst: Seite n ist das Fenster n Seiten vor dem Ende.
         upper = matches - (actual - 1) * page_size
         return analyze_raw_rows_page(
             rows_factory, page=actual, page_size=page_size,
-            match_window=(max(0, upper - page_size), upper), **options,
+            match_window=(max(0, upper - page_size), upper), reasons=reasons, **options,
         )
     retained: deque[dict] = deque(maxlen=requested_page * page_size)
     collected = {name: deque(maxlen=limit) for name, limit in (collect or {}).items()}
@@ -375,8 +384,19 @@ def analyze_raw_rows_page(
     # ``counts``, damit die Tagessummen genau die Gesamtzahl ergeben.
     daily: dict[str, dict[str, int]] = {}
 
+    # Die Zeilen kommen aufsteigend: der Tag wird nur beim Tageswechsel neu berechnet.
+    day_span: list = [0.0, 0.0, ""]  # [von, bis), Tag
+
     def count_day(ts: float, key: str, amount: int = 1) -> None:
-        day = datetime.fromtimestamp(ts, tz).strftime("%Y-%m-%d")
+        if day_span[0] <= ts < day_span[1]:
+            day = day_span[2]
+        else:
+            local = datetime.fromtimestamp(ts, tz)
+            day = local.strftime("%Y-%m-%d")
+            start = datetime(local.year, local.month, local.day, tzinfo=tz).timestamp()
+            end = datetime.combine(local.date() + timedelta(days=1), datetime.min.time(), tzinfo=tz).timestamp()
+            if start <= ts < end:
+                day_span[:] = [start, end, day]
         bucket = daily.setdefault(day, {})
         bucket[key] = bucket.get(key, 0) + amount
 
@@ -394,7 +414,7 @@ def analyze_raw_rows_page(
     # Ausreißer-Erkennung, zwei Regeln je nach Entitätstyp — dieselbe Klasse,
     # die auch der nicht-streamende Pfad über detect_outliers() benutzt.
     outlier_detector = OutlierDetector(
-        factor=outlier_factor, mode=outlier_mode, decimals=decimals, tz=tz
+        factor=outlier_factor, mode=outlier_mode, decimals=decimals, tz=tz, reasons=reasons
     )
 
     selected_filter = filter_ if filter_ in {
@@ -407,10 +427,10 @@ def analyze_raw_rows_page(
             return
         duplicate_reason = None
         if len(group_rows) > 1:
-            formatted_values = " / ".join(
+            formatted_values = "" if not reasons else " / ".join(
                 _format_val(row["value"], decimals) for row in group_rows
             )
-            duplicate_reason = tr("{len}× derselbe Zeitstempel — Werte: {formatted_values}", len=len(group_rows), formatted_values=formatted_values)
+            duplicate_reason = _NO_REASON if not reasons else tr("{len}× derselbe Zeitstempel — Werte: {formatted_values}", len=len(group_rows), formatted_values=formatted_values)
         if group_outlier is not None:
             counts["outliers"] += 1
             count_day(group_ts, "outliers")
@@ -443,7 +463,7 @@ def analyze_raw_rows_page(
             row_matches = hits(selected_filter, repetition_reason, counter_decrease_reason)
             wanted = [name for name in collected if hits(name, repetition_reason, counter_decrease_reason)]
             if row_matches or wanted:
-                row["flags"] = [
+                row["flags"] = [] if not reasons else [
                     {"label": tr(label), "reason": reason}
                     for label, reason in (
                         ("Ausreißer", group_outlier),
@@ -473,7 +493,7 @@ def analyze_raw_rows_page(
         if previous_ts is not None and gap_seconds is not None:
             delta = ts - previous_ts
             if delta > gap_seconds:
-                group_gap = (
+                group_gap = _NO_REASON if not reasons else (
                     tr("{_format_duration} seit vorherigem Wert {_format_val} um {_format_ts} (Schwellwert: {_format_duration2})", _format_duration=_format_duration(delta), _format_val=_format_val(previous_value, decimals), _format_ts=_format_ts(previous_ts, tz), _format_duration2=_format_duration(gap_seconds))
                 )
         # Immer aufrufen, auch bei ausgeschalteter Erkennung: der Detektor baut
@@ -489,7 +509,7 @@ def analyze_raw_rows_page(
             last_kept_ts, last_kept_value = ts, value
             repetition_reason = None
         else:
-            repetition_reason = _repetition_reason(decimals, last_kept_ts, last_kept_value, tz)
+            repetition_reason = _NO_REASON if not reasons else _repetition_reason(decimals, last_kept_ts, last_kept_value, tz)
 
         counter_decrease_reason = None
         if counter_decrease_enabled:
@@ -500,7 +520,7 @@ def analyze_raw_rows_page(
                 and _dropped(counter_previous_value, value)
                 and not _is_planned_reset(counter_previous_ts, ts, counter_previous_value, value, following, tz)
             ):
-                counter_decrease_reason = _counter_decrease_reason(
+                counter_decrease_reason = _NO_REASON if not reasons else _counter_decrease_reason(
                     counter_previous_value, value
                 )
             # Bei identischem Zeitstempel bleibt das erste Vorkommen die

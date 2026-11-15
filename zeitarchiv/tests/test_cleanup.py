@@ -154,6 +154,30 @@ def test_daily_counts_add_up_to_the_totals() -> None:
         assert sum(day.get(key, 0) for day in daily.values()) == analysis["counts"][key]
 
 
+def test_counting_without_reasons_gives_identical_numbers() -> None:
+    """``reasons=False`` (Hintergrundzählung) baut keine Texte, muss aber dieselben Zahlen liefern wie der volle
+    Lauf — auch über Tageswechsel und die Zeitumstellung (27.10.2024), die der Tages-Cache überbrücken muss."""
+    rows = [
+        (_ts(2024, 10, 26, 23, 30), 10.0), (_ts(2024, 10, 26, 23, 30), 10.0),  # Duplikat
+        (_ts(2024, 10, 27, 1, 0), 10.0),  # Wiederholung
+        (_ts(2024, 10, 27, 1, 5), 12.0),
+        (_ts(2024, 10, 27, 6, 0), 5.0),  # Lücke + Zählerrückgang
+        (_ts(2024, 10, 28, 0, 10), 6.0),
+        (_ts(2024, 10, 28, 0, 20), 6.0),  # Wiederholung
+    ]
+    options = dict(
+        filter_="all", page=1, page_size=50, gap_threshold_minutes=60,
+        outlier_factor=None, tz=TZ, counter_decrease_enabled=True,
+    )
+    voll = cleanup.analyze_raw_rows_page(lambda: iter(rows), **options)
+    nur_zaehlen = cleanup.analyze_raw_rows_page(lambda: iter(rows), reasons=False, **options)
+    assert nur_zaehlen["counts"] == voll["counts"]
+    assert nur_zaehlen["daily"] == voll["daily"]
+    assert nur_zaehlen["pagination"]["total"] == voll["pagination"]["total"]
+    assert voll["counts"]["gaps"] >= 1 and voll["counts"]["repetitions"] >= 1 and voll["counts"]["duplicates"] == 2
+    assert all(not flag["reason"] for row in nur_zaehlen["rows"] for flag in row.get("flags", []))
+
+
 def test_daily_counts_are_stored_with_the_alltime_stats() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
     try:

@@ -161,6 +161,7 @@ def alltime_counts(
         decimals=entity["decimals"],
         counter_decrease_enabled=counter_decreases_flagged(entity),
         outlier_mode=outlier_mode(entity),
+        reasons=False,
     )
     counts = analysis["counts"]
     if index.finding_generation(entity_id) != generation:
