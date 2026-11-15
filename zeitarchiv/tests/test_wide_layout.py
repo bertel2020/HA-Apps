@@ -183,7 +183,7 @@ def test_heating_month_table_shows_more_seasons_only_in_the_wide_layout() -> Non
     source = (APP / "static" / "js" / "wetter.js").read_text(encoding="utf-8")
     assert "dataset.pageLayout !== 'wide' || !WIDE_TABLE.matches) return 3;" in source
     assert "return WIDER_TABLE.matches ? 5 : 4;" in source
-    assert "info.periods.slice(0, heatSeasonCount())" in source
+    assert "info.periods.slice(0, this.heatShownCount(heatSeasonCount()))" in source
     assert "(min-width:1200px)" in source and "(min-width:1440px)" in source
 
 

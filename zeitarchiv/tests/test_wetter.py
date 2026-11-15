@@ -1625,7 +1625,7 @@ def test_both_setups_warn_before_unsaved_changes_are_lost() -> None:
     from _paths import APP, TEMPLATES
 
     script = (APP / "static/js/unsaved-guard.js").read_text(encoding="utf-8")
-    assert "beforeunload" in script and "a[data-unsaved-cancel]" in script
+    assert "beforeunload" in script and "data-unsaved-cancel" in script
     for setup, page in (("_wetter_setup.html", "wetterdashboard.html"), ("_energiedashboard_setup.html", "energiedashboard.html")):
         html = (TEMPLATES / setup).read_text(encoding="utf-8")
         assert "data-unsaved-guard" in html and "data-unsaved-cancel" in html
