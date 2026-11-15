@@ -143,7 +143,13 @@
 
     const stored = loadWidths(state.key, headers.length);
     if (stored) {
-      applyWidths(state, stored);
+      // Gespeicherte Breiten stammen oft aus einem schmaleren Fenster bzw. aus der Zeit vor der
+      // Breiten Darstellung. Bleibt ihre Summe unter der verfügbaren Breite, werden sie
+      // proportional gestreckt, sonst steht die Tabelle schmal im breiten Rahmen. Gespeichert
+      // wird weiterhin nur nach einem echten Ziehen, die Verhältnisse bleiben also erhalten.
+      const sum = stored.reduce((a, b) => a + b, 0);
+      const avail = Math.floor(wrapper.clientWidth);
+      applyWidths(state, avail > sum ? stored.map(w => w * avail / sum) : stored);
       state.actions.hidden = false;
     } else {
       state.actions.hidden = true;
