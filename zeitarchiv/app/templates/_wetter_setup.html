@@ -168,6 +168,28 @@
         roomNames() {
           return [...new Set([...this.extras.map((r) => this.roomOf(r)), ...this.entityOptions.map((o) => o.area)].filter(Boolean))].sort();
         },
+        // Von Hand gesetzte Räume mit der Zahl ihrer Sensoren (Räume aus Home Assistant verwaltet Home Assistant).
+        manualRooms() {
+          const counts = new Map();
+          this.extras.forEach((row) => { if (row.room) counts.set(row.room, (counts.get(row.room) || 0) + 1); });
+          return [...counts].map(([name, count]) => ({name, count})).sort((a, b) => a.name.localeCompare(b.name));
+        },
+        // Umbenennen auf einen vorhandenen Raum führt beide zusammen.
+        renameRoom(oldName, newValue) {
+          const name = (newValue || "").trim();
+          if (!name || name === oldName) return;
+          this.extras.forEach((row) => { if (row.room === oldName) row.room = name; });
+        },
+        async deleteRoom(name, count) {
+          const ok = await window.appConfirm(
+            count === 1
+              ? t("Raum „{name}“ wird von 1 Sensor verwendet. Beim Löschen wird nur die Raum-Zuordnung von Hand entfernt; der Sensor nimmt wieder den Raum aus Home Assistant oder steht unter „Ohne Raum“.", {name})
+              : t("Raum „{name}“ wird von {count} Sensoren verwendet. Beim Löschen wird nur die Raum-Zuordnung von Hand entfernt; die Sensoren nehmen wieder den Raum aus Home Assistant oder stehen unter „Ohne Raum“.", {name, count}),
+            {danger: true, confirmLabel: t("Löschen")}
+          );
+          if (!ok) return;
+          this.extras.forEach((row) => { if (row.room === name) row.room = ""; });
+        },
         areaOf(id) {
           const option = this.entityOptions.find((o) => o.entity_id === id);
           return option ? option.area : "";
@@ -305,7 +327,10 @@
   </section>
 
   <section class="settings-section wt-section-neutral">
-  <h2 class="settings-section-title">{{ _("Weitere Sensoren") }} {{ hint_button(_("Weitere Sensoren")) }}</h2>
+  <div class="wt-section-head wt-section-head-center">
+    <h2 class="settings-section-title">{{ _("Weitere Sensoren") }} {{ hint_button(_("Weitere Sensoren")) }}</h2>
+    <button type="button" class="btn wt-manage-rooms-btn" @click="$refs.roomsDlg.showModal()">{{ _("Räume") }}</button>
+  </div>
   <p class="settings-section-description">{{ _("Zusätzliche Temperatur- oder Feuchtesensoren, zum Beispiel Keller, Dachboden oder Nordseite. Sie erscheinen auf dem Reiter „Temperatur &amp; Klima“.") }}</p>
   {% call hint_body() %}{{ _("Weitere Sensoren werden nie mit der Außentemperatur gemittelt. Ohne Raum bekommt jeder einen eigenen Block in der Tabelle; mit Raum stehen die Sensoren desselben Raums in einem Block. Sensoren mit der Geräteklasse Luftfeuchte oder der Einheit „%“ gelten als Feuchtesensoren und bekommen auf dem Reiter ein eigenes Diagramm.") }}{% endcall %}
   <div class="wt-item-grid wt-item-grid-list">
@@ -497,6 +522,25 @@
         </div>
       </div>
     </template>
+  </dialog>
+  <dialog class="detail-dialog wt-item-dialog wt-rooms-dialog" x-ref="roomsDlg" aria-labelledby="wt-rooms-dialog-title" @click="if ($event.target === $el) $el.close()">
+    <div class="detail-dialog-header">
+      <div>
+        <h2 id="wt-rooms-dialog-title">{{ _("Räume der weiteren Sensoren") }}</h2>
+        <p class="wt-why">{{ _("Zeigt die von Hand gesetzten Räume. Räume aus Home Assistant ändert du dort; hier gleichst du zum Beispiel Schreibweisen an. Ein vorhandener Name führt Räume zusammen.") }}</p>
+      </div>
+      <button type="button" class="btn" @click="$refs.roomsDlg.close()" aria-label="{{ _('Schließen') }}">✕</button>
+    </div>
+    <div class="wt-rooms-list" x-show="manualRooms().length">
+      <template x-for="r in manualRooms()" :key="r.name">
+        <div class="wt-rooms-row">
+          <input type="text" :value="r.name" maxlength="60" @change="renameRoom(r.name, $event.target.value)">
+          <span class="wt-rooms-usage" x-text="r.count === 1 ? t('1 Sensor') : t('{count} Sensoren', {count: r.count})"></span>
+          <button type="button" class="wt-rooms-remove" @click="deleteRoom(r.name, r.count)" title="{{ _('Raum löschen') }}">✕</button>
+        </div>
+      </template>
+    </div>
+    <p class="wt-why" x-show="!manualRooms().length">{{ _("Keine Räume von Hand gesetzt.") }}</p>
   </dialog>
 
   <div class="actionbar" style="justify-content:flex-end;">

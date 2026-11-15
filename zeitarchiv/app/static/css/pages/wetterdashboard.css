@@ -139,6 +139,19 @@
   .wt-group-h:first-of-type{margin-top:0;}
   .wt-section-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
   .wt-section-head .settings-section-title{margin:0 0 8px;}
+  .wt-section-head-center{align-items:center;}
+  .wt-section-head-center .settings-section-title{margin:0;}
+  .wt-manage-rooms-btn{flex:none;padding:5px 12px;font-size:calc(12px * var(--font-scale, 1));}
+  .wt-rooms-list{display:flex;flex-direction:column;gap:6px;}
+  .wt-rooms-row{display:flex;align-items:center;gap:8px;}
+  .wt-rooms-row input{
+    flex:1;min-width:0;font-size:calc(13px * var(--font-scale, 1));padding:8px 12px;border-radius:8px;
+    border:1px solid var(--border);background:var(--surface);color:var(--ink);box-sizing:border-box;
+  }
+  .wt-rooms-row input:focus{outline:none;border-color:var(--accent-line);}
+  .wt-rooms-usage{flex:none;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);white-space:nowrap;}
+  .wt-rooms-remove{all:unset;flex:none;cursor:pointer;padding:4px 8px;color:var(--ink-muted);}
+  .wt-rooms-remove:hover{color:var(--ink);}
   .wt-note{margin:0 0 12px;padding:8px 12px;border-radius:8px;background:var(--bg-accent);color:var(--text-accent);font-size:calc(13px * var(--font-scale, 1));}
   .wt-note-missing{background:var(--surface-alt);color:var(--ink-muted);}
   .wt-why{margin:0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);line-height:1.5;}
