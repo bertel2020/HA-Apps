@@ -1211,7 +1211,8 @@ class BackgroundService:
         while not self._maintenance_scheduler_stop.is_set():
             try:
                 with self._maintenance_step("stats_snapshot"):
-                    if self.index.record_stats_snapshot_if_stale():
+                    self._refresh_rollup_hot_size_if_stale()
+                    if self.index.record_stats_snapshot_if_stale(extra_size_bytes=self.rollup_hot_size_cached):
                         logger.debug(
                             "Stündlicher Statistik-Schnappschuss gespeichert · "
                             "event=hourly_stats_snapshot_completed"

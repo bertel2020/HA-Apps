@@ -792,6 +792,26 @@ def test_deleted_points_queries_use_covering_indexes_after_migration() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_stats_snapshot_includes_extra_size_and_migrates_old_table() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        index.get_or_create_entity("sensor.a", "sensor", "measurement", None)
+        assert index.record_stats_snapshot_if_stale(min_interval_seconds=0, extra_size_bytes=1000) is True
+        base = index.get_overview()["total_size_bytes"]
+        assert index.get_stats_snapshots(0.0)[0]["total_size_bytes"] == base + 1000
+
+        # Bestehende Datenbank von vor der Spalte: wird beim Öffnen ergänzt, alte Punkte zählen +0.
+        index._conn.execute("ALTER TABLE stats_snapshots DROP COLUMN extra_size_bytes")
+        index._conn.commit()
+        index.close()
+        index = Index(tmp / "index.sqlite")
+        assert index.get_stats_snapshots(0.0)[0]["total_size_bytes"] == base
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_record_stats_snapshot_if_stale_respects_min_interval() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-index-test-"))
     try:

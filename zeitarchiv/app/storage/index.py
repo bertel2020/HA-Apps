@@ -516,8 +516,11 @@ CREATE TABLE IF NOT EXISTS stats_snapshots (
     ts REAL NOT NULL,
     entity_count INTEGER NOT NULL,
     total_rows INTEGER NOT NULL,
-    total_size_bytes INTEGER NOT NULL
+    total_size_bytes INTEGER NOT NULL,
+    extra_size_bytes INTEGER NOT NULL DEFAULT 0
 );
+-- extra_size_bytes: Rollups + Hot Buffer zum Zeitpunkt des Schnappschusses (0 bei
+-- älteren Punkten, die nur das Archiv kannten). total_size_bytes bleibt das Archiv.
 
 -- RAM-Verbrauch dieses Addon-Containers, stündlich über die Supervisor-API
 -- abgefragt (Konzept "Über Zeitarchiv": RAM-Anzeige). Eigene Tabelle statt
@@ -1070,6 +1073,9 @@ class Index:
         ):
             if column not in bj_columns:
                 self._conn.execute(f"ALTER TABLE backup_jobs ADD COLUMN {column} {ddl}")
+        ss_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(stats_snapshots)")}
+        if "extra_size_bytes" not in ss_columns:
+            self._conn.execute("ALTER TABLE stats_snapshots ADD COLUMN extra_size_bytes INTEGER NOT NULL DEFAULT 0")
         columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(entities)")}
         if "friendly_name" not in columns:
             self._conn.execute("ALTER TABLE entities ADD COLUMN friendly_name TEXT")
@@ -4084,12 +4090,13 @@ class Index:
             row = self._conn.execute("SELECT MAX(last_ts) AS last_ts FROM entities").fetchone()
             return row["last_ts"] if row and row["last_ts"] is not None else None
 
-    def record_stats_snapshot_if_stale(self, min_interval_seconds: float = 3600) -> bool:
+    def record_stats_snapshot_if_stale(self, min_interval_seconds: float = 3600, extra_size_bytes: int = 0) -> bool:
         """Schreibt einen neuen Übersichts-Schnappschuss, aber nur wenn der
         letzte mindestens min_interval_seconds zurückliegt (Konzept Abschnitt
         03). Gibt zurück, ob tatsächlich ein Punkt geschrieben wurde. Fragt die
         Summen direkt ab statt über get_overview() zu gehen, weil self._lock
-        nicht reentrant ist."""
+        nicht reentrant ist. extra_size_bytes: Rollups + Hot Buffer, damit der
+        Verlauf dieselbe Größe zeigt wie die "Größe"-Kachel der Übersicht."""
         now = time.time()
         with self._lock, self._conn:
             latest_row = self._conn.execute("SELECT MAX(ts) AS latest FROM stats_snapshots").fetchone()
@@ -4106,15 +4113,18 @@ class Index:
                 """
             ).fetchone()
             self._conn.execute(
-                "INSERT INTO stats_snapshots (ts, entity_count, total_rows, total_size_bytes) VALUES (?, ?, ?, ?)",
-                (now, overview["entity_count"], overview["total_rows"], overview["total_size_bytes"]),
+                "INSERT INTO stats_snapshots (ts, entity_count, total_rows, total_size_bytes, extra_size_bytes) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (now, overview["entity_count"], overview["total_rows"], overview["total_size_bytes"],
+                 max(int(extra_size_bytes), 0)),
             )
             return True
 
     def get_stats_snapshots(self, since_ts: float) -> list[dict]:
         with self._lock, self._conn:
             rows = self._conn.execute(
-                "SELECT ts, entity_count, total_rows, total_size_bytes FROM stats_snapshots "
+                "SELECT ts, entity_count, total_rows, total_size_bytes + extra_size_bytes AS total_size_bytes "
+                "FROM stats_snapshots "
                 "WHERE ts >= ? ORDER BY ts",
                 (since_ts,),
             ).fetchall()
