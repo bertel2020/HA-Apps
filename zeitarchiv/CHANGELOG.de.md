@@ -39,6 +39,14 @@
 
 - **Einrichtung von Wetter- und Energiedashboard**: „Speichern“ und „Abbrechen“ bleiben beim Scrollen am unteren Fensterrand sichtbar
 
+- **Ausreißer-Messung im Hintergrund**: Braucht bei großen Entitäten deutlich weniger CPU
+  - Sie baut beim bloßen Zählen keine Erklärungstexte mehr und liest jede Entität einmal statt zweimal
+  - Die Übersicht der markierten Werte und die Bereinigungsseite zeigen dieselben Zahlen wie zuvor
+
+- **Protokoll**: Langsame Wartungsschritte werden gemeldet
+  - Ein Schritt, der länger als 5 Sekunden braucht, erscheint als „Langsamer Wartungsschritt“ mit Name und Dauer
+  - Die Ausreißer-Messung nennt zusätzlich die Entität und ihre Wertezahl, wenn eine länger als 3 Sekunden braucht
+
 ### Behoben
 
 - **Entitätenliste**: Gespeicherte Spaltenbreiten nutzen den verfügbaren Platz

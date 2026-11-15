@@ -39,6 +39,14 @@
 
 - **Weather and energy dashboard setup**: “Save” and “Cancel” stay at the bottom edge of the window while you scroll
 
+- **Outlier measurement in the background**: Needs noticeably less CPU on large entities
+  - It no longer builds explanatory texts while it only counts, and reads each entity once instead of twice
+  - The overview of flagged values and the cleanup page show the same numbers as before
+
+- **Log**: Slow maintenance steps are now reported
+  - A step that takes more than 5 seconds appears as “Slow maintenance step” with its name and duration
+  - The outlier measurement also names the entity and its number of values when one takes more than 3 seconds
+
 ### Fixed
 
 - **Entity list**: Saved column widths now use the available width
