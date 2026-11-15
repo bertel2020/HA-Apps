@@ -42,6 +42,8 @@
   - The chart and the tile’s sparkline now include rollups and hot buffer
   - Older data points stay as they were, so the curve jumps once when the first
     new point arrives
+  - A tooltip on the “Size” tile and a note under the chart say what is counted
+  - The total under the storage breakdown is now called “Total storage used”
 
 ## 1.52.0 - 2026-11-15
 

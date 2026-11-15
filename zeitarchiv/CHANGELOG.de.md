@@ -42,6 +42,10 @@
   - Diagramm und Sparkline der Kachel enthalten jetzt auch Rollups und Hot Buffer
   - Ältere Datenpunkte bleiben, wie sie waren; die Kurve springt deshalb einmal,
     sobald der erste neue Punkt dazukommt
+  - Ein Tooltip an der Kachel „Größe“ und ein Hinweis unter dem Diagramm sagen,
+    was mitgezählt wird
+  - Die Summe unter der Speicher-Aufschlüsselung heißt jetzt „Gesamter belegter
+    Speicher“
 
 ## 1.52.0 - 2026-11-15
 

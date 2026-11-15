@@ -106,7 +106,7 @@ def test_storage_usage_table_is_sortable_with_numeric_values_and_fixed_total() -
     html = _render_storage_table()
     assert 'class="dt stats-dt storage-usage-table" data-sortable' in html
     assert '<td data-sort="5">1 MB</td>' in html
-    assert '<tfoot><tr><td class="label"><strong>Gesamt</strong>' in html
+    assert '<tfoot><tr><td class="label"><strong>Gesamter belegter Speicher</strong>' in html
 
 
 def test_growth_chart_uses_dynamic_y_axes() -> None:

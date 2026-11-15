@@ -23,7 +23,7 @@
     <div class="stat-row">
       <div class="stat"><div class="label">{{ _("Entitäten") }}</div><div class="value">{{ entity_count }}</div></div>
       <div class="stat"><div class="label">{{ _("Datensätze gesamt") }}</div><div class="value">{{ total_rows }}</div></div>
-      <div class="stat"><div class="label">{{ _("Größe") }}</div><div class="value">{{ total_size }}</div></div>
+      <div class="stat" title="{{ _('Archiv + Rollups + Hot Buffer') }}"><div class="label">{{ _("Größe") }}</div><div class="value">{{ total_size }}</div></div>
       <div class="stat">
         <div class="label">{{ _("Neue Datensätze") }}</div>
         {% if new_rows_24h is not none %}
@@ -66,6 +66,7 @@
       </div>
       {% endif %}
     </div>
+    <p class="hint">{{ _("Größe wie in der Kachel „Größe“: Archiv + Rollups + Hot Buffer. Ältere Punkte enthalten nur das Archiv.") }}</p>
     <div class="card">
       <div id="growth-chart" style="{{ '' if has_growth_history else 'display:none;' }}"></div>
       {% if not has_growth_history %}
@@ -93,7 +94,7 @@
           </tr>
           {% endfor %}
           </tbody>
-          <tfoot><tr><td class="label"><strong>{{ _("Gesamt") }}</strong></td><td><strong>{{ storage_total_size }}</strong></td><td>100 %</td></tr></tfoot>
+          <tfoot><tr><td class="label"><strong>{{ _("Gesamter belegter Speicher") }}</strong></td><td><strong>{{ storage_total_size }}</strong></td><td>100 %</td></tr></tfoot>
         </table>
       </div>
     </div>
