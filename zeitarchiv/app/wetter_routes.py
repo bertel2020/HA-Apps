@@ -246,7 +246,7 @@ DEFAULT_TILE_STYLE = "plate"
 #: Kacheln der weiteren Sensoren auf dem Reiter „Temperatur & Klima“: „single“ je Sensor, „room“ je Raum.
 KLIMA_TILES = ("single", "room")
 DEFAULT_KLIMA_TILES = "single"
-KLIMA_SIZES = ("auto", "small", "large")
+KLIMA_SIZES = ("auto", "small", "medium", "large")
 DEFAULT_KLIMA_SIZE = "auto"
 FLOORS_START = ("open", "closed")
 DEFAULT_FLOORS_START = "open"

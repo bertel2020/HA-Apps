@@ -336,8 +336,8 @@ def test_tile_size_setting_is_saved_and_validated(service) -> None:
     from test_wetter import _configure
 
     assert wetter_routes._load_config(service.deps.index)["klima_size"] == "auto"
-    _configure(service, klima_size="small")
-    assert wetter_routes._load_config(service.deps.index)["klima_size"] == "small"
+    _configure(service, klima_size="medium")
+    assert wetter_routes._load_config(service.deps.index)["klima_size"] == "medium"
     _configure(service, klima_size="unsinn")
     assert wetter_routes._load_config(service.deps.index)["klima_size"] == "auto"
     assert wetter_routes.MAX_EXTRA_TEMPERATURES == 60

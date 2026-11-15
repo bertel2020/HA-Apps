@@ -16,7 +16,7 @@
 
 - **Wetterdashboard**: Mehr Kontrolle bei den weiteren Sensoren
   - Bis zu 60 weitere Sensoren (bisher 20)
-  - Neue Einstellung „Kachelgröße der weiteren Sensoren“ (automatisch, kleiner, größer) für die Kacheln auf dem Reiter „Temperatur & Klima“
+  - Neue Einstellung „Kachelgröße der weiteren Sensoren“ (automatisch, klein, mittel, groß) für die Kacheln auf dem Reiter „Temperatur & Klima“
 
 - **Wetterdashboard**: Etagen und Räume bei „Zeiträume im Vergleich“
   - „Alles zuklappen“ und „Alles aufklappen“ über der Tabelle; die Etagenköpfe zeigen ihre Raumzahl

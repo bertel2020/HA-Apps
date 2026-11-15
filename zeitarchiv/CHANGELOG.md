@@ -16,7 +16,7 @@
 
 - **Weather dashboard**: More control over additional sensors
   - Up to 60 additional sensors (was 20)
-  - New setting “Tile size of additional sensors” (automatic, smaller, larger) for the tiles on the “Temperature & climate” tab
+  - New setting “Tile size of additional sensors” (automatic, small, medium, large) for the tiles on the “Temperature & climate” tab
 
 - **Weather dashboard**: Floors and rooms in “Periods compared”
   - “Collapse all” and “Expand all” above the table; floor headers show their number of rooms

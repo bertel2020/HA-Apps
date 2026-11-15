@@ -191,7 +191,7 @@
 {% set show_yearmatrix = 'yearmatrix' not in hc %}
 {% set show_long = show_records or show_kenntage or show_monthyears or show_yearmatrix %}
 {% set show_heat = has_heating and 'heating' not in hc %}
-<div x-data='wetterDashboard({{ precip_modes | tojson }})' data-hints="collapsed" data-tile-style="{{ config.tile_style }}" data-klima-tiles="{{ config.klima_tiles }}" data-klima-size="{{ config.klima_size }}" data-floors-start="{{ config.floors_start }}" data-room-order='{{ {"floors": config.floor_order, "rooms": config.room_order} | tojson }}' style="--wt-room-min:{{ {'small': 190, 'large': 320}.get(config.klima_size, 250) }}px">
+<div x-data='wetterDashboard({{ precip_modes | tojson }})' data-hints="collapsed" data-tile-style="{{ config.tile_style }}" data-klima-tiles="{{ config.klima_tiles }}" data-klima-size="{{ config.klima_size }}" data-floors-start="{{ config.floors_start }}" data-room-order='{{ {"floors": config.floor_order, "rooms": config.room_order} | tojson }}' style="--wt-room-min:{{ {'small': 190, 'medium': 300, 'large': 380}.get(config.klima_size, 250) }}px">
   <div class="wt-title-row">
     <h1>{{ _("Wetterdashboard") }}</h1>
     <button type="button" class="wt-title-edit" title="{{ _('Rollen bearbeiten') }}"

@@ -283,7 +283,7 @@
       foldable: false,
       floorsStart: (document.querySelector('[data-floors-start]') || {dataset: {}}).dataset.floorsStart || 'open',
       roomOrder: (() => { try { return JSON.parse((document.querySelector('[data-room-order]') || {dataset: {}}).dataset.roomOrder || '{}') || {}; } catch (e) { return {}; } })(),
-      klimaMinTile: {small: 110, large: 200}[(document.querySelector('[data-klima-size]') || {dataset: {}}).dataset.klimaSize] || 0,
+      klimaMinTile: {small: 110, medium: 180, large: 240}[(document.querySelector('[data-klima-size]') || {dataset: {}}).dataset.klimaSize] || 0,
       klimaRooms: (document.querySelector('[data-klima-tiles]') || {dataset: {}}).dataset.klimaTiles === 'room',
       tilesStand: '',
       tilesAt: null,
