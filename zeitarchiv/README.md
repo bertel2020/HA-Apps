@@ -55,6 +55,8 @@ Zeitarchiv consists of two separate, independently versioned parts:
 
 | | |
 | --- | --- |
+| **Compact** | Completed months are stored in a columnar, lossless format (Parquet with zstd), so a long history takes little space |
+| **Editable** | The archive is not write-once: outliers, gaps, duplicates and counter decreases can be cleaned up, corrected or added to afterwards, right in the interface |
 | **Stores permanently** | Historical data is retained regardless of how long Home Assistant's own retention runs |
 | **Stays fast** | Charts over weeks, months or years load quickly, even with a very long history |
 | **Your own dashboards** | Freely combinable charts (line, bar, timeline) and comparison tables on any number of your own dashboards |
@@ -65,6 +67,9 @@ Zeitarchiv consists of two separate, independently versioned parts:
 | **Backup** | Verifiable, portable ZIP backups with schedule; a restore can bring back everything, single entities or just the settings |
 | **Demo mode** | Separate instance with synthetic showcase data, completely isolated from the real data — switchable via add-on option |
 | **Secured** | Runs behind Home Assistant's own login, write access strictly separated from the rest of the interface |
+
+Coming from InfluxDB, VictoriaMetrics or Grafana? See
+[Why not InfluxDB, VictoriaMetrics and Grafana?](#why-not-influxdb-victoriametrics-and-grafana).
 
 ## How the pieces fit together
 
@@ -548,6 +553,16 @@ For my requirements, however, these solutions meant:
 Despite a long time spent with these systems, I did not reach with them the
 combination of simple operation, long-term comparisons, data maintenance and
 Home Assistant integration that I had in mind.
+
+Two things set Zeitarchiv apart in everyday use:
+
+- **Compact:** completed months are stored in a columnar, lossless format
+  (Parquet with zstd). A long history stays small without being thinned out
+  into averages.
+- **Editable:** the archive can be corrected afterwards. Outliers, gaps,
+  duplicates and counter decreases are detected and can be cleaned up,
+  corrected or added to per entity, in the same interface and without writing
+  queries.
 
 Zeitarchiv is deliberately less universal. In return, archiving,
 visualization, year-over-year comparison, data maintenance, import, export,

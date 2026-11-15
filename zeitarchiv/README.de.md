@@ -58,6 +58,8 @@ Zeitarchiv besteht aus zwei getrennten, unabhängig versionierten Teilen:
 
 | | |
 | --- | --- |
+| **Kompakt** | Abgeschlossene Monate liegen in einem spaltenorientierten, verlustfreien Format (Parquet mit zstd), eine lange Historie braucht dadurch wenig Platz |
+| **Änderbar** | Das Archiv ist nicht „einmal geschrieben“: Ausreißer, Lücken, Duplikate und Zählerrückgänge lassen sich nachträglich bereinigen, korrigieren oder ergänzen, direkt in der Oberfläche |
 | **Speichert dauerhaft** | Verlaufsdaten bleiben erhalten, unabhängig davon, wie lange Home Assistants eigene Aufbewahrung läuft |
 | **Bleibt schnell** | Charts über Wochen, Monate oder Jahre laden zügig, auch bei sehr langer Historie |
 | **Eigene Dashboards** | Frei kombinierbare Charts (Linie, Balken, Zeitstrahl) und Vergleichstabellen auf beliebig vielen eigenen Dashboards |
@@ -68,6 +70,9 @@ Zeitarchiv besteht aus zwei getrennten, unabhängig versionierten Teilen:
 | **Sicherung** | Prüfbare, portable ZIP-Backups mit Zeitplan; die Wiederherstellung kann alles, einzelne Entitäten oder nur die Einstellungen zurückholen |
 | **Demo-Modus** | Eigene Instanz mit synthetischen Vorführdaten, komplett getrennt von den echten Daten — per Add-on-Option umschaltbar |
 | **Abgesichert** | Läuft hinter Home Assistants eigenem Login, Schreibzugriff strikt vom Rest der Oberfläche getrennt |
+
+Du kommst von InfluxDB, VictoriaMetrics oder Grafana? Siehe
+[Warum nicht InfluxDB, VictoriaMetrics und Grafana?](#warum-nicht-influxdb-victoriametrics-und-grafana).
 
 ## Zusammenspiel
 
@@ -585,6 +590,16 @@ Für meine Anforderungen bedeuteten diese Lösungen jedoch:
 Trotz langer Beschäftigung mit diesen Systemen erreichte ich damit nicht
 die Kombination aus einfacher Bedienung, langfristigen Vergleichen,
 Datenpflege und Home-Assistant-Integration, die ich mir vorgestellt hatte.
+
+Zwei Dinge unterscheiden Zeitarchiv im Alltag:
+
+- **Kompakt:** Abgeschlossene Monate liegen in einem spaltenorientierten,
+  verlustfreien Format (Parquet mit zstd). Eine lange Historie bleibt klein,
+  ohne zu Durchschnittswerten ausgedünnt zu werden.
+- **Änderbar:** Das Archiv lässt sich nachträglich korrigieren. Ausreißer,
+  Lücken, Duplikate und Zählerrückgänge werden erkannt und lassen sich je
+  Entität bereinigen, korrigieren oder ergänzen, in derselben Oberfläche und
+  ohne Abfragen zu schreiben.
 
 Zeitarchiv ist bewusst weniger universell. Dafür sind Archivierung,
 Visualisierung, Vorjahresvergleich, Datenpflege, Import, Export, Backup
