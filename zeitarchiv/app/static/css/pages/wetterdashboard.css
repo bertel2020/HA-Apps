@@ -219,7 +219,8 @@
   .wt-item-chip-empty{background:none;border-style:dashed;border-color:var(--accent-line);color:var(--accent-line);}
   .wt-item-flag .wt-badge{margin-right:0;}
   .wt-item-warn{max-width:100%;font-size:calc(11.5px * var(--font-scale, 1));color:var(--warning);text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .wt-item-dialog{width:min(440px, calc(100vw - 32px));--dialog-accent:var(--wt-accent, var(--border-strong));}
+  /* 560 px und eine höhere Trefferliste (--picker-h), damit die Entitätssuche mehr Zeilen zeigt. */
+  .wt-item-dialog{--picker-h:360px;width:min(560px, calc(100vw - 32px));--dialog-accent:var(--wt-accent, var(--border-strong));}
   .wt-item-dialog::before{content:"";position:absolute;top:0;left:0;right:0;height:4px;border-radius:14px 14px 0 0;background:var(--dialog-accent);}
   .wt-dialog-footer-split{justify-content:space-between;}
   .wt-item-grid-list{margin-bottom:6px;}

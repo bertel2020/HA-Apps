@@ -999,7 +999,7 @@
      (.detail-dialog, bis 860px, für Datenqualität/Kosten-Tabellen) — hier
      stehen nur 1-4 Felder für genau EINEN Eintrag, dieselbe Größenordnung
      wie .edash-gruppen-dialog. */
-  .edash-item-dialog{width:min(440px, calc(100vw - 32px));}
+  .edash-item-dialog{--picker-h:360px;width:min(560px, calc(100vw - 32px));}
   /* Farbiger Streifen oben im Popup, in derselben Rollenfarbe wie
      .edash-item-accent auf der zugehörigen Kachel — schließt den optischen
      Kreis "diese Kachel gehört zu diesem Popup", ohne (wie ein vollständig
