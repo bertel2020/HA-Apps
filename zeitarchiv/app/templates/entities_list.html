@@ -10,7 +10,7 @@
     <p class="sub">{{ _("Alle archivierten Entitäten — durchsuchen, filtern, je Entität zum Verlauf oder zur Konfiguration springen.") }}</p>
     {% with active = 'liste' %}{% include "_entities_tabs.html" %}{% endwith %}
 
-    <div class="settings-panel" id="entities-panel">
+    <div class="settings-panel is-raised" id="entities-panel">
 
         <div id="controls" hx-trigger="load, change from:#controls, keyup delay:300ms from:[name=search]"
              hx-get="entities-table" hx-include="#controls, [name=page_size]" hx-target="#entities-table" hx-swap="innerHTML">

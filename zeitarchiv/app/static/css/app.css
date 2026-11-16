@@ -2116,7 +2116,7 @@ table.dt tbody tr.has-pending-purge:hover td{background:var(--warning-soft);}
   scroll-margin-top:81px;background:var(--surface);border:1px solid var(--border);
   border-radius:12px;padding:22px 24px;box-shadow:var(--shadow);
 }
-/* Abschnittskarten mit mehr Tiefe (Housekeeping, Einstellungen, Statistik, Backup, Import, Export, Protokoll): derselbe Schatten wie die
+/* Abschnittskarten mit mehr Tiefe (Housekeeping, Einstellungen, Statistik, Backup, Import, Export, Protokoll, Entitäten, Charts, Tabellen, Dashboards): derselbe Schatten wie die
    Wetter-Karten (.wt-card), Grundschatten plus --tile-lift. Opt-in über .is-raised am Panel,
    weil .settings-section auch auf anderen Seiten (Logs, Dashboard-Setup) flach bleibt. */
 .settings-panel.is-raised .settings-section,
@@ -2124,6 +2124,7 @@ table.dt tbody tr.has-pending-purge:hover td{background:var(--warning-soft);}
 .settings-panel.is-raised > .stat-row .stat,
 .settings-panel.is-raised .status-card:not(.settings-section .status-card, .card .status-card),
 .settings-panel.is-raised .tbl-wrap:not(.settings-section .tbl-wrap, .card .tbl-wrap),
+.settings-panel.is-raised :is(.chart-card,.dash-card,.edash-pin-card),
 .settings-panel.is-raised#export-wizard,
 .settings-panel.is-raised #log-output{box-shadow:var(--shadow),var(--tile-lift);}
 .settings-panel .settings-section-title{
