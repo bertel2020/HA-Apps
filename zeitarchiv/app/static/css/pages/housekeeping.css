@@ -62,7 +62,7 @@
      Versuch mit überschlagenen Zeichenbreiten lag bei "Auflösung" 43px zu
      niedrig, der längste Wert brach dort still um. Wer die Werte ändert,
      misst besser nach, statt zu rechnen. */
-  #ausreisser table.stats-dt{min-width:610px;}
+  #ausreisser table.stats-dt{min-width:1190px;}
   #luecken-erkennung table.stats-dt{min-width:1180px;}
   .hk-col-chk{width:44px;}
   /* "Empfangene Werte" / "Gespeicherte Werte" */
@@ -381,4 +381,5 @@
 @media (min-width:821px){
   .hk-col-oo-steps{width:300px;}
   .hk-col-oo-err{width:110px;}
+  .hk-col-oo-act{width:150px;}
 }
