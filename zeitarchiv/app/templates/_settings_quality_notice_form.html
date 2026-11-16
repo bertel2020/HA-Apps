@@ -7,9 +7,12 @@
       <div class="settings-compact-label">{{ _("Neue Befunde melden bei") }} {{ hint_button(_('Neue Befunde melden bei')) }}</div>
       {% call hint_body('settings-compact-hint') %}{{ _("Welche Befundarten die Meldung „Neue Befunde in der Datenqualität“ auslösen. Die Datenqualität-Seite zeigt weiterhin alles.") }}{% endcall %}
     </div>
-    <div class="settings-compact-actions">
+    <div class="legend-metrics-row" style="padding:0;justify-content:flex-end;">
       {% for key, label in quality_notice_kind_options %}
-      <label><input type="checkbox" name="kind" value="{{ key }}" {% if key in quality_notice_kinds %}checked{% endif %}> {{ label }}</label>
+      <label class="filter-chip">
+        <input type="checkbox" name="kind" value="{{ key }}" {% if key in quality_notice_kinds %}checked{% endif %}>
+        <span>{{ label }}</span>
+      </label>
       {% endfor %}
     </div>
   </div>
