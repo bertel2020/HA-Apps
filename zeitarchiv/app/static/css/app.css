@@ -2807,7 +2807,8 @@ html[data-popup] .settings-panel > .toolbar{margin-top:0;}
 
 .wt-room-floor.is-off{text-decoration:line-through;opacity:.7;}
 .wt-room-floor:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px;}
-.wt-course-compare{display:inline-flex;align-items:center;gap:8px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);margin-left:auto;}
+.wt-course-compare{display:inline-flex;align-items:center;gap:8px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+.wt-course-row{justify-content:flex-end;}
 .wt-course-compare select{font:inherit;padding:5px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);}
 @media (max-width:640px){
   .wt-course .wt-seg{display:flex;flex-wrap:wrap;max-width:100%;}
