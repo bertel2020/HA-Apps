@@ -285,6 +285,7 @@
       pvError: '',
       daylightDays: 14,        // Länge der Tabelle „Die letzten Tage im Vergleich“
       pvSel: null,
+      pvHourMode: 'day',       // Stundendiagramm: 'day' (gewählter Tag) oder 'avg' (Mittel im Zeitraum)
       pvDays: 14,
       pvRange: null,           // eigener Zeitraum {start, end} statt der festen Tage
       pvRangeOpen: false,
@@ -368,6 +369,7 @@
         if (saved.tempRange && ISO_DAY.test(saved.tempRange.start || '') && ISO_DAY.test(saved.tempRange.end || '')) this.tempRange = {start: saved.tempRange.start, end: saved.tempRange.end};
         if ([7, 30, 365].includes(saved.courseDays)) this.courseDays = saved.courseDays;
         if ([7, 14, 30].includes(saved.pvDays)) this.pvDays = saved.pvDays;
+        if (['day', 'avg'].includes(saved.pvHourMode)) this.pvHourMode = saved.pvHourMode;
         if ([7, 14, 30].includes(saved.daylightDays)) this.daylightDays = saved.daylightDays;
         if (saved.pvRange && ISO_DAY.test(saved.pvRange.start || '') && ISO_DAY.test(saved.pvRange.end || '')) this.pvRange = {start: saved.pvRange.start, end: saved.pvRange.end};
         if (saved.courseRange && ISO_DAY.test(saved.courseRange.start || '') && ISO_DAY.test(saved.courseRange.end || '')) this.courseRange = {start: saved.courseRange.start, end: saved.courseRange.end};
@@ -1479,24 +1481,50 @@
         return {chip, text, kind};
       },
 
+      // Das Mittel gibt es nur, wenn genug Tage je Stunde vorliegen; sonst bleibt es beim gewählten Tag.
+      pvAvgMode() {
+        return this.pvHourMode === 'avg' && !!this.pv && !!(this.pv.hours && this.pv.hours.length);
+      },
+
+      // Die Stunden des Diagramms: die des gewählten Tages oder das Mittel über die gezeigten Tage.
+      pvHours() {
+        if (!this.pv) return [];
+        if (this.pvAvgMode()) return this.pv.hours || [];
+        const row = this.pvDay();
+        return row ? row.hours : [];
+      },
+
+      setPvHourMode(mode) {
+        if (this.pvHourMode === mode) return;
+        this.pvHourMode = mode;
+        writeStore({pvHourMode: mode});
+        this.$nextTick(() => this.drawPv());
+      },
+
       pvHourTitle() {
+        if (this.pvAvgMode()) return t('Typischer Verlauf: Ø der {n} Tage, je Stunde', {n: this.pv ? this.pv.days.length : 0});
         const row = this.pvDay();
         return row ? t('Ertrag gegenüber Erwartung am {day}, je Stunde', {day: this.pvDayLabel(row)}) : '';
       },
 
       pvHourNote() {
-        const row = this.pvDay();
-        const hours = row ? row.hours : [];
+        const hours = this.pvHours();
         if (hours.length < 2) return '';
         const low = hours.reduce((a, b) => (b.ratio < a.ratio ? b : a));
         const high = hours.reduce((a, b) => (b.ratio > a.ratio ? b : a));
+        if (this.pvAvgMode()) {
+          return t('Im Mittel liegt die Anlage um {low} Uhr bei {lowPct} % der Erwartung, um {high} Uhr bei {highPct} %. Je Stunde zählen nur Tage mit Werten, mindestens fünf.', {
+            low: low.hour, lowPct: num(low.ratio * 100, 0), high: high.hour, highPct: num(high.ratio * 100, 0),
+          });
+        }
         return t('Um {low} Uhr liefert die Anlage {lowPct} % der Erwartung, um {high} Uhr {highPct} %.', {
           low: low.hour, lowPct: num(low.ratio * 100, 0), high: high.hour, highPct: num(high.ratio * 100, 0),
         });
       },
 
       pvSelect(index) {
-        if (this.pvSel === index) return;
+        if (this.pvHourMode === 'avg') this.pvHourMode = 'day';  // ein Klick auf einen Tag zeigt dessen Stunden (nicht gemerkt)
+        if (this.pvSel === index) { this.drawPv(); return; }
         this.pvSel = index;
         this.drawPv();
       },
@@ -1561,26 +1589,33 @@
           requestAnimationFrame(() => chart.resize());
         }
         const hourElement = this.$refs.pvHourChart;
-        const day = this.pvDay();
-        if (hourElement && day && day.hours.length) {
+        const hours = this.pvHours();
+        const averaged = this.pvAvgMode();
+        if (hourElement && hours.length) {
           const limit = data.limit;
           const chart = chartFor('pvHour', hourElement);
           // Abweichung von 100 % als Balken um die Nulllinie; die Achse trägt wieder Prozent.
           chart.setOption({
             animation: false, grid: {left, right: 12, top: 12, bottom: 26, containLabel: false},
-            xAxis: {type: 'category', data: day.hours.map((row) => t('{hour} Uhr', {hour: row.hour})), ...axisStyle(colors), splitLine: {show: false}, axisLabel: {color: colors.text, fontSize: scaledFont(11), hideOverlap: true}, axisPointer: {type: 'none'}},
+            xAxis: {type: 'category', data: hours.map((row) => t('{hour} Uhr', {hour: row.hour})), ...axisStyle(colors), splitLine: {show: false}, axisLabel: {color: colors.text, fontSize: scaledFont(11), hideOverlap: true}, axisPointer: {type: 'none'}},
             yAxis: {type: 'value', min: -50, max: 50, interval: 25, ...axisStyle(colors), axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => `${value + 100} %`}},
             tooltip: {
               trigger: 'axis', confine: true, backgroundColor: colors.surface, borderColor: colors.grid,
               textStyle: {color: colors.ink, fontSize: scaledFont(12)},
               formatter: (params) => {
-                const row = day.hours[params[0].dataIndex];
-                return `<b>${escapeHtml(t('{hour} Uhr', {hour: row.hour}))}</b><br>${escapeHtml(num(row.ratio * 100, 0))} % ${escapeHtml(t('der Erwartung'))}`;
+                const row = hours[params[0].dataIndex];
+                const lines = [`<b>${escapeHtml(t('{hour} Uhr', {hour: row.hour}))}</b>`, `${escapeHtml(num(row.ratio * 100, 0))} % ${escapeHtml(t('der Erwartung'))}`];
+                if (row.actual != null && row.expected != null) {
+                  const kwh = {actual: num(row.actual, 1), expected: num(row.expected, 1)};
+                  lines.push(escapeHtml(averaged ? t('Ø Ertrag {actual} kWh · Ø erwartet {expected} kWh', kwh) : t('Ertrag {actual} kWh · erwartet {expected} kWh', kwh)));
+                }
+                if (averaged && row.days != null) lines.push(escapeHtml(t('an {n} Tagen', {n: row.days})));
+                return lines.join('<br>');
               },
             },
             series: [{
               type: 'bar', barMaxWidth: 26,
-              data: day.hours.map((row) => {
+              data: hours.map((row) => {
                 const deviation = Math.round(row.ratio * 100) - 100;
                 return {
                   value: deviation,

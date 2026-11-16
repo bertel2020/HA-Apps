@@ -533,9 +533,15 @@
     </div>
     <div class="wt-chart wt-pv-chart" x-show="pv" x-ref="pvChart"></div>
     <p class="hint hint-status" x-show="pv">{{ _("Ein Tag lässt sich anklicken.") }}</p>
-    <h3 class="wt-h3" x-show="pv && pvDay() && pvDay().hours.length" x-text="pvHourTitle()"></h3>
-    <div class="wt-chart wt-chart-short wt-pv-chart" x-show="pv && pvDay() && pvDay().hours.length" x-ref="pvHourChart"></div>
-    <p class="hint hint-status" x-show="pv && pvDay() && pvDay().hours.length" x-text="pvHourNote()"></p>
+    <div class="wt-controls wt-pv-hours-head" x-show="pv && (pvHours().length || (pv.hours && pv.hours.length))" x-cloak>
+      <h3 class="wt-h3" x-text="pvHourTitle()"></h3>
+      <div class="wt-seg wt-controls-end" role="group" aria-label="{{ _('Ansicht') }}" x-show="pv && pv.hours && pv.hours.length" x-cloak>
+        <button type="button" :aria-pressed="(!pvAvgMode()).toString()" @click="setPvHourMode('day')">{{ _("Gewählter Tag") }}</button>
+        <button type="button" :aria-pressed="pvAvgMode().toString()" @click="setPvHourMode('avg')">{{ _("Ø im Zeitraum") }}</button>
+      </div>
+    </div>
+    <div class="wt-chart wt-chart-short wt-pv-chart" x-show="pv && pvHours().length" x-ref="pvHourChart"></div>
+    <p class="hint hint-status" x-show="pv && pvHours().length" x-text="pvHourNote()"></p>
     <p class="hint hint-warn" x-show="pvError" x-text="pvError" x-cloak></p>
   </div>
   {% endif %}

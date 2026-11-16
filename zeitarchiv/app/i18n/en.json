@@ -3679,7 +3679,6 @@
     "{count} Sensoren": "{count} sensors",
     "Raum „{name}“ wird von 1 Sensor verwendet. Beim Löschen wird nur die Raum-Zuordnung von Hand entfernt; der Sensor nimmt wieder den Raum aus Home Assistant oder steht unter „Ohne Raum“.": "Room “{name}” is used by 1 sensor. Deleting only removes the manual room assignment; the sensor falls back to the room from Home Assistant or goes under “No room”.",
     "Raum „{name}“ wird von {count} Sensoren verwendet. Beim Löschen wird nur die Raum-Zuordnung von Hand entfernt; die Sensoren nehmen wieder den Raum aus Home Assistant oder stehen unter „Ohne Raum“.": "Room “{name}” is used by {count} sensors. Deleting only removes the manual room assignment; the sensors fall back to the room from Home Assistant or go under “No room”.",
-    "Ohne Raum": "No room",
     "Blendet nur die Kachel aus. Tabelle und Vergleichsdiagramme zeigen den Sensor weiter.": "Hides the tile only. The table and comparison charts still show the sensor.",
     "Ansichten des Wetterdashboards": "Weather dashboard views",
     "Ansichten des Energiedashboards": "Energy dashboard views",
@@ -3865,7 +3864,6 @@
     "Die Anfrage ist fehlgeschlagen. Bitte versuche es noch einmal.": "The request failed. Please try again.",
     "Die Antwort blieb aus. Ob die Wiederherstellung durchgeführt wurde, ist unklar: Prüfe vor einem neuen Versuch auf der Backup-Seite die Liste der Rollbacks.": "No answer came back. It is unclear whether the restore was carried out: Before trying again, check the list of rollbacks on the backup page.",
     "Der Monatsvergleich konnte nicht geladen werden.": "The monthly comparison could not be loaded.",
-    "Erneut versuchen": "Try again",
     "Ungültiger Zahlenwert in der Anfrage.": "Invalid number in the request.",
     "Sonne": "Sun",
     "Sonnentage": "Sunny days",
@@ -4053,7 +4051,6 @@
     "kWh am Tag": "kWh per day",
     "Jahressummen der Größe": "Annual totals of the selected item",
     "Unbekannte Größe: {value}": "Unknown size: {value}",
-    "Raum": "Room",
     "Sensoren desselben Raums stehen in der Tabelle „Zeiträume im Vergleich“ zusammen. Leer lassen übernimmt den Raum aus Home Assistant.": "Sensors of the same room are grouped in the “Periods compared” table. Leave empty to use the room from Home Assistant.",
     "Nur Mittelwerte": "Averages only",
     "Räume im Diagramm": "Rooms in the chart",
@@ -4199,7 +4196,9 @@
     "Tageswerte der letzten Tage oder eines eigenen Zeitraums: Temperatur als Tagesmittel, Niederschlag und Sonnenstunden als Tagessummen. Die gestrichelte Linie zeigt den Vergleichszeitraum gleicher Länge, Tag für Tag untereinander. Ab 61 Tagen stehen Wochenwerte.": "Daily values of the last days or of a custom period: temperature as the daily mean, precipitation and sunshine hours as daily totals. The dashed line shows the comparison period of the same length, day by day. From 61 days on, weekly values are shown.",
     "Vergleichen mit": "Compare with",
     "Vorjahreszeitraum": "Same period last year",
-    "Vorzeitraum": "Previous period"
+    "Vorzeitraum": "Previous period",
+    "Gewählter Tag": "Selected day",
+    "Ø im Zeitraum": "Average over the period"
   },
   "js": {
     "Eigener Zeitraum": "Custom period",
@@ -5317,6 +5316,11 @@
     "{delta} {unit} weniger als im Vorjahreszeitraum": "{delta} {unit} less than in the same period last year",
     "{delta} {unit} mehr als im Vorzeitraum": "{delta} {unit} more than in the previous period",
     "{delta} {unit} weniger als im Vorzeitraum": "{delta} {unit} less than in the previous period",
-    "(an {n} von {total} Tagen mit Werten in beiden Zeiträumen)": "(on {n} of {total} days with values in both periods)"
+    "(an {n} von {total} Tagen mit Werten in beiden Zeiträumen)": "(on {n} of {total} days with values in both periods)",
+    "Typischer Verlauf: Ø der {n} Tage, je Stunde": "Typical profile: average of the {n} days, by hour",
+    "Im Mittel liegt die Anlage um {low} Uhr bei {lowPct} % der Erwartung, um {high} Uhr bei {highPct} %. Je Stunde zählen nur Tage mit Werten, mindestens fünf.": "On average the system is at {lowPct} % of the expectation at {low}:00 and at {highPct} % at {high}:00. Only days with values count for each hour, at least five.",
+    "Ø Ertrag {actual} kWh · Ø erwartet {expected} kWh": "Avg. yield {actual} kWh · avg. expected {expected} kWh",
+    "Ertrag {actual} kWh · erwartet {expected} kWh": "Yield {actual} kWh · expected {expected} kWh",
+    "an {n} Tagen": "on {n} days"
   }
 }

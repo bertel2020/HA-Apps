@@ -86,3 +86,17 @@ def test_each_day_carries_its_hourly_ratio_and_skips_hours_with_tiny_expectation
     hours = {entry["hour"]: entry["ratio"] for entry in row["hours"]}
     assert 7 not in hours  # Erwartung unter 5 % der Spitze
     assert all(ratio == pytest.approx(0.6, abs=0.01) for hour, ratio in hours.items() if hour >= 8)
+
+
+def test_hours_carry_kwh_for_the_tooltip_and_the_average_skips_tiny_hours() -> None:
+    bad = DAY0 + timedelta(days=30)
+    pairs = _pairs(31, {bad: 0.6})
+    pairs += [(DAY0 + timedelta(days=o), 7, 3000.0, 0.01) for o in range(31)]
+    result = pv.evaluate(pairs, [bad])
+    entry = next(e for e in result["days"][0]["hours"] if e["hour"] == 12)
+    assert entry["actual"] == pytest.approx(entry["expected"] * 0.6, abs=0.05) and entry["expected"] > 0
+    shown = [DAY0 + timedelta(days=o) for o in range(20, 30)]
+    averaged = pv.evaluate(pairs, shown)["hours"]
+    assert 7 not in {row["hour"] for row in averaged}  # Erwartung im Mittel unter 5 % der Spitze
+    noon = next(row for row in averaged if row["hour"] == 12)
+    assert noon["actual"] == pytest.approx(noon["expected"], abs=0.1) and noon["days"] >= pv.MIN_RATIO_DAYS

@@ -86,7 +86,7 @@ def evaluate(pairs: list[tuple[date, int, float, float]], show_days: list[date])
             "flagged": expected >= min_expected and abs(deviation) > DEVIATION_LIMIT,
             # Verhältnis je Stunde dieses Tages, für die Anzeige des gewählten Tages.
             "hours": [
-                {"hour": hour, "ratio": round(power / reference, 3)}
+                {"hour": hour, "ratio": round(power / reference, 3), "actual": round(power, 2), "expected": round(reference, 2)}
                 for hour, power, reference in sorted(counted) if reference >= peak * MIN_HOUR_EXPECTED_SHARE
             ],
         })
@@ -97,8 +97,12 @@ def evaluate(pairs: list[tuple[date, int, float, float]], show_days: list[date])
     if not days_out:
         return None
     hours_out = [
-        {"hour": hour, "ratio": round(hour_actual[hour] / hour_expected[hour], 3), "days": hour_days[hour]}
+        {
+            "hour": hour, "ratio": round(hour_actual[hour] / hour_expected[hour], 3), "days": hour_days[hour],
+            # Mittel je Tag in kWh (die Stundenwerte sind kW über eine Stunde), für den Tooltip der Karte.
+            "actual": round(hour_actual[hour] / hour_days[hour], 2), "expected": round(hour_expected[hour] / hour_days[hour], 2),
+        }
         for hour in sorted(hour_days)
-        if hour_days[hour] >= MIN_RATIO_DAYS and hour_expected[hour] > 0
+        if hour_days[hour] >= MIN_RATIO_DAYS and hour_expected[hour] / hour_days[hour] >= peak * MIN_HOUR_EXPECTED_SHARE
     ]
     return {"days": days_out, "hours": hours_out, "peak_kw": round(peak, 2), "min_expected": round(min_expected, 2)}
