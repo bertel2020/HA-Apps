@@ -27,6 +27,8 @@
 
 ### Geändert
 
+- **Entitäten**: Die Entitätsliste merkt sich ihre Filter
+  - Suche, Favoriten, Typ, Kategorie und Einheit bleiben erhalten, wenn man eine Entität öffnet und zurückkehrt
 - **Export**: Das Limit je CSV-Datei steigt von 5 auf 10 Mio Zeilen
 - **Datenqualität**: Die Statuszeile heißt jetzt „zuletzt vor spätestens …“ statt „älteste Messung vor …“
 - **Datenqualität**: Deutlicherer Ladehinweis und einheitliche Filter

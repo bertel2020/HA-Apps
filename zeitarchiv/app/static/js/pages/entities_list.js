@@ -78,6 +78,53 @@
       const storedPage = parseInt(sessionStorage.getItem(PAGE_KEY) || '1', 10);
       if (Number.isFinite(storedPage) && storedPage > 1) document.getElementById('page-field').value = String(storedPage);
     } catch (_) { /* Seite 1 */ }
+    // Filter (Suche, Favoriten, Typ, Kategorie, Einheit) werden wie die Seite je Browser-Tab
+    // gemerkt: Wer eine Entität öffnet und zurückkehrt, findet die Liste so wieder, wie er sie
+    // verlassen hat. Wiederhergestellt wird vor dem ersten Laden der Tabelle; Filter einer
+    // ausgeblendeten Spalte bleiben außen vor (sonst unsichtbar wirksam, s. onColumnToggle).
+    const FILTER_KEY = 'zeitarchiv.entities.filters';
+    function saveEntitiesFilters() {
+      try {
+        const checked = name => Array.from(document.querySelectorAll(`input[name=${name}]:checked`)).map(cb => cb.value);
+        sessionStorage.setItem(FILTER_KEY, JSON.stringify({
+          search: document.querySelector('#controls [name=search]').value,
+          favorites: document.querySelector('#controls [name=favorites]').checked,
+          type: checked('type'),
+          category: checked('category'),
+          unit: document.getElementById('unit-filter-input').value,
+        }));
+      } catch (_) { /* nur Komfort */ }
+    }
+    function restoreEntitiesFilters() {
+      let f;
+      try { f = JSON.parse(sessionStorage.getItem(FILTER_KEY) || 'null'); } catch (_) { return; }
+      if (!f) return;
+      const shown = id => { const w = document.getElementById(id); return w && w.style.display !== 'none'; };
+      const controls = document.getElementById('controls');
+      if (typeof f.search === 'string') controls.querySelector('[name=search]').value = f.search;
+      controls.querySelector('[name=favorites]').checked = !!f.favorites;
+      if (shown('type-filter-wrap') && Array.isArray(f.type)) {
+        document.querySelectorAll('input[name=type]').forEach(cb => cb.checked = f.type.includes(cb.value));
+        updateTypeFilterLabel();
+      }
+      if (shown('category-filter-wrap') && Array.isArray(f.category)) {
+        document.querySelectorAll('input[name=category]').forEach(cb => cb.checked = f.category.includes(cb.value));
+        // Eine inzwischen gelöschte Kategorie darf nicht „nichts gewählt“ ergeben.
+        if (!document.querySelector('input[name=category]:checked')) {
+          document.querySelector('input[name=category][value=all]').checked = true;
+        }
+        updateCategoryFilterLabel();
+      }
+      if (shown('unit-filter-wrap') && typeof f.unit === 'string' && f.unit !== 'all') {
+        const row = Array.from(document.querySelectorAll('#unit-filter-popover .dd-picker-row')).find(r => r.dataset.value === f.unit);
+        if (row) {
+          document.getElementById('unit-filter-input').value = f.unit;
+          document.getElementById('unit-filter-btn').textContent = row.dataset.label + ' ▾';
+        }
+      }
+    }
+    document.getElementById('controls').addEventListener('change', saveEntitiesFilters);
+    document.querySelector('#controls [name=search]').addEventListener('input', saveEntitiesFilters);
     // Der Server begrenzt die Seite auf den gültigen Bereich (z. B. nach gelöschten
     // Entitäten) — den tatsächlich gezeigten Wert übernehmen, damit nichts Ungültiges hängen bleibt.
     document.getElementById('entities-table').addEventListener('htmx:afterSwap', () => {
@@ -482,3 +529,6 @@
       if (row && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); setSelectionCategory(row.dataset.category); }
     });
     syncSelectionUI();
+
+// Nach allen Deklarationen (TYPE_LABELS u. a.), aber vor dem ersten htmx-Laden von #controls.
+restoreEntitiesFilters();

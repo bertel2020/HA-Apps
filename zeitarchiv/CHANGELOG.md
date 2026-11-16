@@ -27,6 +27,8 @@
 
 ### Changed
 
+- **Entities**: The entity list remembers its filters
+  - Search, favorites, type, category and unit are still set when you open an entity and come back
 - **Export**: The limit per CSV file rises from 5 to 10 million rows
 - **Data quality**: The status line now reads “last measured at most … ago” instead of “oldest measurement … ago”
 - **Data quality**: Clearer loading and filters
