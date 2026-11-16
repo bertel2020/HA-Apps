@@ -17,7 +17,6 @@ from app.notices import (
     RECONCILE_STALLED_SECONDS,
     SCHEDULER_STALLED_SECONDS,
     build_notices,
-    gap_threshold_conflicts,
     latest_backup_info,
 )
 from app.storage.index import Index
@@ -565,86 +564,6 @@ def _build_notices_for_entities(index, db_path) -> list[dict]:
         reconcile_last_tick=time.time(),
         reconcile_in_progress=False,
     )
-
-
-def test_gap_threshold_conflict_notice_fires_for_resolution_alone() -> None:
-    """Vor der Generalisierung (nur main.py:3.1) erkannte dieser Guard nur
-    den Wertänderungsfilter — resolution="1h" mit gap_threshold="15" (kein
-    Filter) meldete bislang gar keine Lücken-Konflikt-Meldung, obwohl die
-    Kombination strukturell garantiert jeden Zyklus fälschlich als Lücke
-    zeigt."""
-    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
-    try:
-        db_path = tmp / "index.sqlite"
-        index = Index(db_path)
-        index.get_or_create_entity("sensor.a", "sensor", "measurement", "°C")
-        index.set_config("sensor.a", resolution="1h", gap_threshold="15", value_filter="off")
-
-        ids = [n["id"] for n in _build_notices_for_entities(index, db_path)]
-        assert "entities.gap_threshold_conflict" in ids
-        index.close()
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-
-
-def test_gap_threshold_conflict_notice_still_fires_for_value_filter() -> None:
-    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
-    try:
-        db_path = tmp / "index.sqlite"
-        index = Index(db_path)
-        index.get_or_create_entity("sensor.a", "sensor", "measurement", "°C")
-        index.set_config("sensor.a", resolution="raw", gap_threshold="30", value_filter="decimals")
-
-        ids = [n["id"] for n in _build_notices_for_entities(index, db_path)]
-        assert "entities.gap_threshold_conflict" in ids
-        index.close()
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-
-
-def test_gap_threshold_conflict_notice_absent_for_consistent_config() -> None:
-    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
-    try:
-        db_path = tmp / "index.sqlite"
-        index = Index(db_path)
-        index.get_or_create_entity("sensor.a", "sensor", "measurement", "°C")
-        index.set_config("sensor.a", resolution="1h", gap_threshold="60", value_filter="off")
-
-        ids = [n["id"] for n in _build_notices_for_entities(index, db_path)]
-        assert "entities.gap_threshold_conflict" not in ids
-        index.close()
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-
-
-def test_gap_threshold_conflicts_returns_row_details_for_housekeeping() -> None:
-    """gap_threshold_conflicts() ist die gemeinsame Grundlage für die Zähler-
-    Meldung oben UND die volle Liste in Housekeeping → Konfiguration
-    (main.py) — hier wird die Zeilenstruktur direkt geprüft, inkl. des
-    vorgeschlagenen Zielwerts."""
-    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-notices-test-"))
-    try:
-        db_path = tmp / "index.sqlite"
-        index = Index(db_path)
-        index.get_or_create_entity("sensor.a", "sensor", "measurement", "°C")
-        index.set_config("sensor.a", resolution="1h", gap_threshold="15", value_filter="off", custom_name="Küche")
-        index.get_or_create_entity("sensor.b", "sensor", "measurement", "°C")
-        index.set_config("sensor.b", resolution="1h", gap_threshold="60", value_filter="off")
-
-        rows = gap_threshold_conflicts(index)
-        assert len(rows) == 1
-        row = rows[0]
-        assert row["entity_id"] == "sensor.a"
-        assert row["friendly_name"] == "Küche"
-        assert row["resolution_label"] == "1 Std."
-        assert row["gap_threshold_label"] == "15 Minuten"
-        assert row["suggested_gap_label"] == "1 Stunde"
-        assert row["value_filter_active"] is False
-        index.close()
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-
-
 
 
 def _partial_import_notice(errors: list[str], skipped_rows: int) -> dict:

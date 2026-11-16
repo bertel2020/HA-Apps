@@ -134,7 +134,7 @@ def alltime_counts(
 
     generation = index.finding_generation(entity_id)
     window_start, window_end = rows_window("all", 0, now, entity["first_ts"], tz)
-    gap_threshold = entity["gap_threshold"]
+    gap_key = cleanup.gap_cache_key(entity)
     outlier_threshold = effective_outlier_threshold(
         entity["aggregation_type"], entity["outlier_threshold"]
     )
@@ -155,7 +155,7 @@ def alltime_counts(
         filter_="all",
         page=1,
         page_size=1,
-        gap_threshold_minutes=None if gap_threshold == "off" else float(gap_threshold),
+        **cleanup.gap_options(index, entity, window_start.timestamp(), window_end.timestamp()),
         outlier_factor=None if outlier_threshold == "off" else float(outlier_threshold),
         tz=tz,
         decimals=entity["decimals"],
@@ -171,7 +171,7 @@ def alltime_counts(
         return counts
     index.set_cleanup_alltime_stats(
         entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION,
-        daily=analysis["daily"], gap_threshold=gap_threshold,
+        daily=analysis["daily"], gap_threshold=gap_key,
     )
     return counts
 
@@ -229,7 +229,7 @@ def gaps_measured(entity, eintrag: dict | None) -> bool:
     Eintrag ist in diesem Punkt aktuell, die Zahl ist 0)."""
     if entity["gap_threshold"] == "off":
         return True
-    return eintrag is not None and eintrag.get("gap_threshold") == entity["gap_threshold"]
+    return eintrag is not None and eintrag.get("gap_threshold") == cleanup.gap_cache_key(entity)
 
 
 def rate_labels(rate: dict) -> dict:

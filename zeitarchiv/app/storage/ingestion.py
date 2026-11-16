@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo
 import pyarrow.parquet as pq
 
 from . import hotbuffer, resolution, rollup, rotate
+from . import retention as retention_mod
 from .coordinator import StorageCoordinator
 from .index import (
     STATE_IGNORED_TEXTS,
@@ -271,6 +272,7 @@ class IngestionService:
                 "Ingest-Ledger bereinigt · event=ingest_ledger_pruned removed=%d retention_days=7",
                 pruned,
             )
+            self._index.prune_receive_gaps(time.time(), retention_mod.RETENTION_DAYS)
 
     def recover_pending(self) -> int:
         """Schließt nach einem Prozessabbruch bereits persistierte Events ab."""

@@ -283,7 +283,7 @@ def test_monatswerte_tragen_luecken_und_zaehlersprung_je_monat(service) -> None:
         "sensor.pv",
         {"all": 10, "outliers": 0, "gaps": 2, "duplicates": 0, "repetitions": 0, "counter_decreases": 1},
         "50", OUTLIER_RULE_VERSION,
-        daily={"2025-03-04": {"gaps": 40}, "2025-03-20": {"counter_decreases": 1}}, gap_threshold="15",
+        daily={"2025-03-04": {"gaps": 40}, "2025-03-20": {"counter_decreases": 1}}, gap_threshold="r15",
     )
     daten = {"sensor.pv": {(2025, 3): 10.0}, "sensor.netz": {(2025, 3): 5.0}}
     config = _config(netzbezug="sensor.netz", erzeuger=[{"entity_id": "sensor.pv"}])
@@ -302,7 +302,7 @@ def _tageszaehler(service, entity_id: str, daily: dict) -> None:
     service.index.set_cleanup_alltime_stats(
         entity_id,
         {"all": 10, "outliers": 0, "gaps": 0, "duplicates": 0, "repetitions": 0, "counter_decreases": 0},
-        "50", OUTLIER_RULE_VERSION, daily=daily, gap_threshold="15",
+        "50", OUTLIER_RULE_VERSION, daily=daily, gap_threshold="r15",
     )
 
 

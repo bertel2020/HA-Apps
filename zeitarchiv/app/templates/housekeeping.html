@@ -140,12 +140,6 @@
         </p>
       </section>
 
-      <section id="luecken-erkennung" class="settings-section">
-        <h2 class="settings-section-title">{{ _("Lücken-Erkennung passt nicht zur Erfassung") }} {{ hint_button(_('Lücken-Erkennung passt nicht zur Erfassung')) }}</h2>
-        {% call hint_body('settings-section-description') %}{{ _("Entitäten, deren Lücken-Erkennung strukturell nie zutreffen kann &mdash; die gewählte Auflösung oder das Lebenszeichen des Wertänderungsfilters erzwingt selbst schon einen größeren Mindestabstand zwischen Werten. „Empfohlen“ ist die kleinste passende Stufe; Übernehmen setzt nur diese Schwelle, an den Daten ändert sich nichts. Wer die Erkennung feiner will, kürzt auf der Konfigurationsseite der Entität das Lebenszeichen oder wählt eine feinere Auflösung.") }}{% endcall %}
-        <div id="gap-conflicts">{% include "_gap_conflicts.html" %}</div>
-      </section>
-
       <section id="speicherplatz" class="settings-section">
         <h2 class="settings-section-title">{{ _("Speicherplatz") }} {{ hint_button(_('Speicherplatz')) }}</h2>
         {% call hint_body('settings-section-description') %}{{ _("Speicherindex prüfen und bereits markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen.") }}{% endcall %}
@@ -294,7 +288,6 @@
   const BASE = {{ app_root | tojson }};
 </script>
 <script src="{{ asset('js/pages/housekeeping.js') }}"></script>
-<script src="{{ asset('js/pages/gap_conflicts.js') }}"></script>
 <script src="{{ asset('js/settings-nav-scrollspy.js') }}"></script>
 <script src="{{ asset('js/table-cards.js') }}"></script>
 <script src="{{ asset('js/hint-toggle.js') }}"></script>

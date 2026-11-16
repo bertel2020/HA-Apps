@@ -122,7 +122,7 @@
       {% endfor %}
     </div>
   </span>
-  {% call hint_body() %}{{ _("Auch wenn der Wert unverändert bleibt, wird spätestens nach dieser Zeit ein Wert gespeichert, damit die Entität nicht tot aussieht. Ein kürzeres Lebenszeichen erlaubt eine feinere Lücken-Erkennung, speichert aber bei ruhigen Entitäten öfter.") }}{% endcall %}
+  {% call hint_body() %}{{ _("Auch wenn der Wert unverändert bleibt, wird spätestens nach dieser Zeit ein Wert gespeichert, damit die Entität nicht tot aussieht. Ein kürzeres Lebenszeichen speichert bei ruhigen Entitäten öfter. Die Lücken-Erkennung hängt nicht davon ab.") }}{% endcall %}
 </div>
 {% endif %}
 <div class="field cfg-row">
@@ -262,6 +262,9 @@
     </div>
   </span>
   {% call hint_body() %}{{ _("Ab welcher Pause die Bereinigungs-Seite eine Lücke markiert. „Aus“ blendet den Filter dort aus.") }}{% endcall %}
+  {% if gap_method == 'receive' %}
+  <p class="hint hint-status">{% if gap_since_label %}{{ _("Gezählt werden Pausen zwischen empfangenen Werten, ab {since}. Wertänderungsfilter, Auflösung und Lebenszeichen ändern daran nichts; „1 Minute“ gilt wie „5 Minuten“.", since=gap_since_label) }}{% else %}{{ _("Gezählt werden Pausen zwischen empfangenen Werten, sobald der erste Wert eintrifft. Wertänderungsfilter, Auflösung und Lebenszeichen ändern daran nichts; „1 Minute“ gilt wie „5 Minuten“.") }}{% endif %}</p>
+  {% endif %}
 </div>
 <div class="field cfg-row">
   <label>{{ _("Ausreißer-Erkennung") }} {{ hint_button(_('Ausreißer-Erkennung')) }}{{ adj('outlier_threshold') }}</label>
@@ -330,9 +333,3 @@
 {% set dup_field = duplicates_auto_field(entity_id) if duplicates_auto_field is defined else none %}
 {% if dup_field %}{% set dup_state = dup_field.dup_state %}{% include "_duplicates_auto_field.html" %}{% endif %}
 </section>
-{% if gap_threshold_auto_adjusted %}
-<script>
-  appAlert({{ gap_threshold_auto_adjusted_message | tojson }});
-</script>
-{% endif %}
-

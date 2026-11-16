@@ -99,6 +99,21 @@ VALUE_FILTER_HEARTBEAT_SECONDS = 6 * 60 * 60
 # sind). Standard = bisheriger fester Wert von 6 Stunden.
 DEFAULT_VALUE_FILTER_HEARTBEAT = str(VALUE_FILTER_HEARTBEAT_SECONDS // 60)
 
+# Empfangs-Lücken (Lücken-Erkennung): Pausen zwischen zwei EMPFANGENEN Werten, beim Eintreffen festgehalten,
+# unabhängig davon, ob der Wert gespeichert oder von Filter/Auflösung verworfen wurde. Kleinere Pausen wären bei
+# sprunghaften Sensoren eine Flut (gemessen: rund 790 Einträge pro Tag bei 5 Minuten über 70 Entitäten); die
+# Schwellen „1“ und „5 Minuten“ der Lücken-Erkennung gelten deshalb bei dieser Methode beide als 5 Minuten.
+MIN_RECEIVE_GAP_SECONDS = 300
+MAX_RECEIVE_GAPS_PER_ENTITY = 50_000
+RECEIVE_GAPS_MAX_AGE_DAYS = 730
+
+
+def gap_method(entity) -> str:
+    """Wie die Lücken-Erkennung dieser Entität arbeitet: ``"stored"`` (Pausen zwischen gespeicherten Werten, wenn
+    gespeichert gleich empfangen ist) oder ``"receive"`` (Pausen im Empfangsstrom, sobald Wertänderungsfilter oder
+    Auflösung Werte verwerfen — dann sagt der Speicher nichts mehr über die Lieferung)."""
+    return "receive" if entity["value_filter"] != "off" or entity["resolution"] != "raw" else "stored"
+
 
 def heartbeat_seconds(heartbeat: str | int | None) -> int:
     """Lebenszeichen-Abstand in Sekunden aus dem gespeicherten Minutenwert;
@@ -313,34 +328,9 @@ def entity_last_seen(entity) -> float | None:
     return max(seen, stored)
 
 
-def effective_gap_floor_minutes(
-    resolution: str, value_filter: str, heartbeat: str | int | None = None
-) -> int:
-    """Engste Lücken-Erkennung (Minuten), die bei dieser Auflösung/diesem
-    Wertänderungsfilter noch NICHT bei jedem normalen Zyklus fälschlich als
-    Lücke anschlagen würde — 0, wenn keiner von beiden einen Mindestabstand
-    erzwingt.
-
-    Zwei unabhängige Ursachen für einen Mindestabstand zwischen
-    gespeicherten Werten: `resolution` selbst (should_accept_write() oben
-    verwirft jeden Schreibversuch innerhalb des Intervalls, unabhängig vom
-    Wertänderungsfilter) und, falls aktiv, der Wertänderungsfilter
-    (should_accept_value() oben, spätestens nach dem je Entität
-    eingestellten Heartbeat ein Lebenszeichen). Eine gap_threshold-
-    Einstellung enger als das Maximum aus beiden meldet strukturell
-    garantiert Lücken, die keine sind — Aufrufer siehe should_raise_gap_
-    threshold() unten (Guard beim Ändern, aus main.py) und notices.py
-    (passive Meldung für bereits bestehende Kombinationen)."""
-    floor_seconds = _RESOLUTION_SECONDS.get(resolution, 0)
-    if value_filter == "decimals":
-        floor_seconds = max(floor_seconds, heartbeat_seconds(heartbeat))
-    return floor_seconds // 60
-
-
 # Aggregationstypen, für die die Ausreißer-Erkennung strukturell nichts
-# Sinnvolles liefern kann. Anders als bei effective_gap_floor_minutes() oben
-# liegt es nicht an einer Kombination von Einstellungen, sondern an der
-# Kennzahl selbst: die Regel misst, um welches VIELFACHE der üblichen Streuung
+# Sinnvolles liefern kann. Es liegt nicht an einer Kombination von
+# Einstellungen, sondern an der Kennzahl selbst: die Regel misst, um welches VIELFACHE der üblichen Streuung
 # ein Wert danebenliegt (cleanup.OutlierDetector).
 #
 # Bei 0/1-Werten gibt es diese übliche Streuung nicht. Der Median des Fensters
@@ -374,26 +364,6 @@ def effective_outlier_threshold(aggregation_type: str, outlier_threshold: str) -
     Entitätenliste und Formular nicht auseinanderlaufen können."""
     return outlier_threshold if outlier_detection_applies(aggregation_type) else "off"
 
-
-def should_raise_gap_threshold(
-    current_gap_threshold: str,
-    resolution: str,
-    value_filter: str,
-    valid_minute_tiers: list[int],
-    heartbeat: str | int | None = None,
-) -> tuple[bool, str]:
-    """True + anzuhebender Wert (kleinster Tarif aus `valid_minute_tiers` >=
-    Floor), wenn `current_gap_threshold` enger ist als
-    effective_gap_floor_minutes() erlaubt. `valid_minute_tiers` kommt vom
-    Aufrufer (main.py, aus GAP_THRESHOLD_LABELS) — der Index kennt bewusst
-    keine Anzeige-Labels, siehe set_config() oben."""
-    if current_gap_threshold == "off" or not current_gap_threshold.isdigit():
-        return False, current_gap_threshold
-    floor = effective_gap_floor_minutes(resolution, value_filter, heartbeat)
-    if not floor or int(current_gap_threshold) >= floor:
-        return False, current_gap_threshold
-    tiers = sorted(valid_minute_tiers)
-    return True, str(next((t for t in tiers if t >= floor), tiers[-1]))
 
 # Allowlist für ORDER BY — Spaltennamen lassen sich in SQLite nicht parametrisieren,
 # also nie direkt einen Request-Parameter in die Query interpolieren. Die Werte
@@ -438,6 +408,7 @@ CREATE TABLE IF NOT EXISTS entities (
     value_filter TEXT NOT NULL DEFAULT 'off',
     value_filter_heartbeat TEXT NOT NULL DEFAULT '360',
     last_seen_ts REAL,
+    receive_gaps_since REAL,
     ignore_values_enabled INTEGER NOT NULL DEFAULT 0,
     ignore_values TEXT NOT NULL DEFAULT '',
     gap_threshold TEXT NOT NULL DEFAULT '15',
@@ -650,6 +621,17 @@ CREATE INDEX IF NOT EXISTS idx_entity_actions_entity
 -- dem Dateianhang gespeichert; "done" wird gemeinsam mit den Entitäts-
 -- Metadaten committed. Nach einem Crash lässt sich über die Event-ID in Hot-
 -- CSV/Parquet eindeutig feststellen, ob nur der DB-Abschluss nachzuholen ist.
+-- Pausen zwischen zwei empfangenen Werten (Lücken-Erkennung, Methode "receive"); abgeleitete Daten, werden beim
+-- Wiederherstellen nicht übernommen. start_ts = zuletzt empfangener Wert davor, end_ts = der Wert, der die Pause
+-- beendet hat.
+CREATE TABLE IF NOT EXISTS receive_gaps (
+    entity_id TEXT NOT NULL,
+    start_ts REAL NOT NULL,
+    end_ts REAL NOT NULL,
+    PRIMARY KEY (entity_id, start_ts)
+);
+CREATE INDEX IF NOT EXISTS idx_receive_gaps_entity_end ON receive_gaps(entity_id, end_ts);
+
 CREATE TABLE IF NOT EXISTS ingested_events (
     event_id TEXT PRIMARY KEY,
     entity_id TEXT NOT NULL,
@@ -1120,6 +1102,9 @@ class Index:
             self._conn.execute("ALTER TABLE entities ADD COLUMN decimals TEXT NOT NULL DEFAULT 'auto'")
         if "value_filter" not in columns:
             self._conn.execute("ALTER TABLE entities ADD COLUMN value_filter TEXT NOT NULL DEFAULT 'off'")
+        if "receive_gaps_since" not in columns:
+            # Ab wann Empfangs-Lücken festgehalten werden (erster Wert nach dem Einbau); davor gibt es keine.
+            self._conn.execute("ALTER TABLE entities ADD COLUMN receive_gaps_since REAL")
         if "last_seen_ts" not in columns:
             # Zuletzt EMPFANGEN (auch wenn der Wert verworfen wurde); ohne Eintrag gilt last_ts.
             self._conn.execute("ALTER TABLE entities ADD COLUMN last_seen_ts REAL")
@@ -1950,6 +1935,50 @@ class Index:
             )
             return cursor.rowcount
 
+    def list_receive_gaps(
+        self, entity_id: str, from_ts: float | None = None, to_ts: float | None = None,
+        min_seconds: float = MIN_RECEIVE_GAP_SECONDS,
+    ) -> list[tuple[float, float]]:
+        """Empfangs-Pausen einer Entität als (Start, Ende), nach Ende aufsteigend, die länger als ``min_seconds`` dauern
+        und deren Ende im Fenster [from_ts, to_ts] liegt."""
+        query = "SELECT start_ts, end_ts FROM receive_gaps WHERE entity_id = ? AND end_ts - start_ts > ?"
+        params: list = [entity_id, min_seconds]
+        if from_ts is not None:
+            query += " AND end_ts >= ?"
+            params.append(from_ts)
+        if to_ts is not None:
+            query += " AND end_ts <= ?"
+            params.append(to_ts)
+        with self._lock:
+            return [(row["start_ts"], row["end_ts"]) for row in self._conn.execute(query + " ORDER BY end_ts", params)]
+
+    def prune_receive_gaps(self, now: float, retention_days: dict[str, float | None]) -> int:
+        """Räumt Empfangs-Pausen auf: älter als die Aufbewahrung der Entität (``retention_days``: Stufe → Tage,
+        ``None`` = unbegrenzt) bzw. höchstens zwei Jahre, dazu höchstens ``MAX_RECEIVE_GAPS_PER_ENTITY`` je Entität
+        (die ältesten gehen zuerst). Gibt die Zahl der gelöschten Einträge zurück."""
+        removed = 0
+        with self._lock, self._conn:
+            cutoff = now - RECEIVE_GAPS_MAX_AGE_DAYS * 86400
+            removed += self._conn.execute("DELETE FROM receive_gaps WHERE end_ts < ?", (cutoff,)).rowcount
+            for row in self._conn.execute("SELECT entity_id, retention FROM entities").fetchall():
+                days = retention_days.get(row["retention"])
+                if days:
+                    removed += self._conn.execute(
+                        "DELETE FROM receive_gaps WHERE entity_id = ? AND end_ts < ?",
+                        (row["entity_id"], now - days * 86400),
+                    ).rowcount
+            for row in self._conn.execute(
+                "SELECT entity_id FROM receive_gaps GROUP BY entity_id HAVING COUNT(*) > ?",
+                (MAX_RECEIVE_GAPS_PER_ENTITY,),
+            ).fetchall():
+                removed += self._conn.execute(
+                    """DELETE FROM receive_gaps WHERE entity_id = ? AND end_ts <= (
+                           SELECT end_ts FROM receive_gaps WHERE entity_id = ?
+                           ORDER BY end_ts DESC LIMIT 1 OFFSET ?)""",
+                    (row["entity_id"], row["entity_id"], MAX_RECEIVE_GAPS_PER_ENTITY),
+                ).rowcount
+        return removed
+
     def complete_ingest_event(
         self, event_id: str, entity_id: str, ts: float, *, recorded: bool,
         value: float | None = None,
@@ -1963,6 +1992,23 @@ class Index:
                 raise ValueError(tr("Unbekannte Event-ID kann nicht abgeschlossen werden"))
             if state["status"] == "done":
                 return
+            # Empfangs-Pause festhalten, bevor last_seen_ts vorrückt. Ohne bekannten Vorgänger (erster Wert nach dem
+            # Einbau) gibt es keine Pause; Nachzügler (ts <= last_seen_ts) erzeugen keine.
+            seen = self._conn.execute(
+                "SELECT last_seen_ts, receive_gaps_since FROM entities WHERE entity_id = ?", (entity_id,)
+            ).fetchone()
+            if seen is not None:
+                previous = seen["last_seen_ts"]
+                if previous is not None and ts - previous > MIN_RECEIVE_GAP_SECONDS:
+                    self._conn.execute(
+                        "INSERT OR IGNORE INTO receive_gaps (entity_id, start_ts, end_ts) VALUES (?, ?, ?)",
+                        (entity_id, previous, ts),
+                    )
+                if seen["receive_gaps_since"] is None:
+                    self._conn.execute(
+                        "UPDATE entities SET receive_gaps_since = ? WHERE entity_id = ?",
+                        (previous if previous is not None else ts, entity_id),
+                    )
             if recorded:
                 self._conn.execute(
                     """
@@ -4723,9 +4769,11 @@ class Index:
             self._conn.execute(
                 "DELETE FROM ingested_events WHERE entity_id = ?", (entity_id,)
             )
+            self._conn.execute("DELETE FROM receive_gaps WHERE entity_id = ?", (entity_id,))
             self._conn.execute(
                 """UPDATE entities
                    SET first_ts = NULL, last_ts = NULL, last_value = NULL, row_count = 0,
+                       last_seen_ts = NULL, receive_gaps_since = NULL,
                        deleted_count = 0, size_bytes = 0, updated_at = ?
                    WHERE entity_id = ?""",
                 (time.time(), entity_id),
@@ -4737,12 +4785,13 @@ class Index:
         with self._lock, self._conn:
             for table in (
                 "deleted_points", "ingested_events", "counter_mark_ignored", "duplicate_auto_ignored",
-                "compacted_months", "stats_snapshots",
+                "compacted_months", "stats_snapshots", "receive_gaps",
             ):
                 self._conn.execute(f"DELETE FROM {table}")  # noqa: S608 — feste Namen
             self._conn.execute(
                 """UPDATE entities
                    SET first_ts = NULL, last_ts = NULL, last_value = NULL, row_count = 0,
+                       last_seen_ts = NULL, receive_gaps_since = NULL,
                        deleted_count = 0, size_bytes = 0, counter_auto_since = NULL,
                        counter_auto_halted_at = NULL, duplicates_auto_halted_at = NULL, updated_at = ?""",
                 (time.time(),),
@@ -4791,6 +4840,7 @@ class Index:
                 "DELETE FROM deleted_points WHERE entity_id = ?", (entity_id,)
             )
             self._conn.execute("DELETE FROM duplicate_auto_ignored WHERE entity_id = ?", (entity_id,))
+            self._conn.execute("DELETE FROM receive_gaps WHERE entity_id = ?", (entity_id,))
             self._conn.execute(
                 "DELETE FROM ingested_events WHERE entity_id = ?", (entity_id,)
             )

@@ -1856,9 +1856,9 @@ between two stored values: 1, 3, 6, 12 or 24 hours, default 6 hours. The field
 only appears while the filter is active; the default for new entities is under
 Settings → Archiving.
 
-A shorter sign of life allows a finer [gap detection](#gap-detection) but
-stores a value more often for quiet sensors. A longer one saves space but
-raises the lower limit of the gap detection.
+A shorter sign of life stores a value more often for quiet sensors, a longer
+one saves space. It has no influence on [gap detection](#gap-detection): that
+counts pauses between **received** values, not between stored ones.
 
 ### Ignore values
 
@@ -1884,18 +1884,33 @@ it off keeps the list; it just no longer applies.
 
 ### Gap detection
 
-From which pause between two values the cleanup page marks a **gap**: 1, 5, 15,
-30 minutes, 1, 3, 6, 12, 24 hours — or Off. The marking is pure analysis; it
-changes nothing in the data.
+From which pause the cleanup page marks a **gap**: 1, 5, 15, 30 minutes, 1, 3,
+6, 12, 24 hours — or Off. The marking is pure analysis; it changes nothing in
+the data.
 
-**The value is raised automatically if it cannot apply.** A resolution of 1
-hour already enforces a minimum interval of one hour between values; a gap
-detection of 5 minutes would then trigger on *every* normal cycle. The same
-applies to the activated value change filter with its sign of life (default 6 hours).
-Zeitarchiv therefore raises the threshold to the next step that still makes
-sense when changing resolution or filter, and tells you so. Afterwards it can
-be reduced manually again at any time. Existing entities with such a
-combination are listed under **Housekeeping → Gap detection**.
+**How it is counted depends on the entity.**
+- **Without value change filter and with raw data**, stored equals received.
+  The intervals between stored values are counted, as it has always been.
+  Imports (CSV, Home Assistant, Symcon) are counted the same way.
+- **With value change filter or resolution**, Zeitarchiv deliberately does not
+  store every value. There, storage would show long quiet stretches as gaps
+  although the sensor is sending, and the sign of life would influence the
+  result. So Zeitarchiv records, as each value arrives, how long the pause
+  before it was, even if the value is not stored. These **pauses between
+  received values** are counted. Filter, resolution and sign of life do not
+  change that. The entity's configuration page says from when this applies.
+
+**Limits**
+- Pauses under 5 minutes are not recorded; “1 minute” counts like “5 minutes”
+  with this method.
+- Recording starts with the first value after the upgrade. Before that,
+  entities with filter or resolution have no assessment.
+- If a sensor only sends on change (Home Assistant does not report unchanged
+  states), a long pause is normal. Choose “Off” or a large threshold there.
+- The pauses are deleted after the entity's retention, after two years at the
+  latest; at most 50,000 per entity.
+- Whether an entity has failed is shown by **Inactive entities**, which uses the
+  last received value.
 
 ### Outlier detection
 
@@ -2267,7 +2282,7 @@ rule of their own:
 
 | Category | Rule | What "Clean up" concretely does |
 | --- | --- | --- |
-| **Gap** | The time distance between two consecutive values exceeds the threshold set per entity (**Gap detection**, in minutes; "Off" disables the detection completely) | Only a mark, no automatic action — gaps are shown, not deleted |
+| **Gap** | The time distance between two consecutive values exceeds the threshold set per entity (**Gap detection**, in minutes; "Off" disables the detection completely; for entities with filter or resolution the pauses between received values count, see [Gap detection](#gap-detection)) | Only a mark, no automatic action — gaps are shown, not deleted |
 | **Duplicate** | Two or more values share exactly the same timestamp (not just a similar one) | The chronologically first stored value is kept, all further ones at the same timestamp are proposed for deletion |
 | **Repeat** | A value is (after rounding to the configured decimal places) identical to the last *kept* value — the same rule that is also used continuously for condensing when new values arrive (see [Value change filter](#value-change-filter)) | The first value of a series of equal values is kept, all following ones are proposed — **unless** 6 hours have already passed since the last kept value (sign-of-life rule), in which case an unchanged value is kept as well |
 | **Counter decrease** | Only for counter entities: a value is lower than the immediately preceding kept value | A mark with an assessment (Probably a bad value, Probably a reset, Still open), **never** deleted unasked — a decrease can be a real event (e.g. meter replacement, reset after restart). The scheduled zeroing of a daily counter at midnight does not count |
@@ -2361,7 +2376,6 @@ settings:
 | **Inactive entities** | Entities without a new value for a selectable threshold (1 to 30 days). Entities never received always appear regardless of the threshold. Usually harmless (standby, rare sensor), but an early hint of a dead integration or a renamed/removed HA entity. |
 | **Duplicates** | Duplicate timestamps of the last 30 days detected archive-wide, per entity — the same hourly background snapshot that also triggers the "Duplicates found" notice. Removable via "Remove duplicates automatically" on the respective cleanup page, or with the **Remove automatically** switch in the section header (see below). |
 | **Outliers** | Entities for which the configured outlier threshold marks more than 1 % of their values — with threshold, absolute number and rate. Then the threshold is too tight for this signal: what gets marked is no longer the implausible but normal behavior. These are the same numbers shown below the threshold field of the respective entity (see [Configuring an entity](#configuring-an-entity)); the list calculates nothing of its own. No bulk correction — the appropriate threshold depends on the signal. |
-| **Gap detection** | Entities whose gap detection can structurally never apply because the chosen resolution or the sign of life of the value change filter itself already enforces a larger minimum interval between values (see [Configuring an entity](#configuring-an-entity)) — with resolution, sign of life, current and recommended gap detection and the number of gaps found (from data quality, “–” if not yet measured for the current threshold; the column is sortable). **Apply** sets the threshold of one row to the recommendation, with a selection **Apply recommendation (n)**, and **Apply all** does it for all; for several entities a confirmation first shows the split by step. This only changes the analysis threshold, never data, and the gaps are measured again automatically afterwards. A notice offers **Undo**. For finer detection, shorten the sign of life or choose a finer resolution on the entity's configuration page. |
 | **Storage** | Free storage on the host file system (tile with utilization bar — a different question from the numbers below, not Zeitarchiv's own storage consumption). The "Check storage" button triggers two separately reported checks at once: **Index consistency** (does the derived index cache match archive/hot buffer — deviations can be fixed via "Repair index") and **Data integrity** (are the raw data in the hot buffer itself still readable — damaged rows almost always arise from an unclean restart, power failure or hard kill, and are not repairable; the affected entity and month are listed, the value remains irretrievably lost). Below: permanently remove marked records from hot buffer and archive. The "Show marked records" button lists them beforehand in a searchable way — first per affected entity with count and last marking time (search field, pagination), a click on a row shows below, in the same dialog, the individual marked points in time including value. Purely read-only: the actual undoing of an individual mark continues to run via the entity itself (see [Cleanup](#cleanup)). Below that, the switch for automatic cleanup (off by default) and the minimum age of the deletion mark for it — removes only marks that are at least that old so that "Undo" for a row that was just deleted does not lead nowhere. If the preview reports "Deletion marks without matching raw data row", the associated raw data row had already been removed by a compaction or an expired retention — both have since cleaned up the affected marks themselves, so this number tends toward 0 over time. |
 | **Retention** | Overview of currently due and already deleted records; preview of due deletions; schedule for automatic enforcement (daily or weekly with weekday); run history. |
 | **Compact** | Switch for the automatic, retroactive compaction of archived months (off by default) and the minimum age for it — affects only entities with a compaction target set (see [Configuring an entity](#configuring-an-entity)). The manual Compact action, on the other hand, lies with the respective entity itself, in the editing area. |
@@ -2440,10 +2454,6 @@ backup/retention runs, Zeitarchiv checks, among other things:
   severity)
 - Entities marked as "Historic" that have delivered values again since being
   marked
-- Gap detection of an entity can structurally never apply because of its
-  resolution or the active value change filter (see [Housekeeping →
-  Configuration](#housekeeping) and [Configuring an
-  entity](#configuring-an-entity))
 - Outlier detection marks more than 1 % of all values for at least one entity.
   A single notice for the whole installation, even with a hundred affected
   entities: it names the count and the most pronounced case and leads to the

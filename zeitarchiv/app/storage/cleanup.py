@@ -36,6 +36,8 @@ from .hotbuffer import append as hot_append
 from .hotbuffer import hot_path, month_key, read_rows
 from .atomic import write_file_atomically
 from .index import (
+    MIN_RECEIVE_GAP_SECONDS,
+    gap_method,
     DeletedCounts, Index, deleted_values_of, filter_deleted_occurrences, marked_positions, resolution_seconds,
     should_accept_value,
 )
@@ -298,6 +300,88 @@ _NO_REASON = ""
 MAX_RETAINED_MATCHES = 5000
 
 
+class GapDetector:
+    """Entscheidet je Zeile, ob davor eine Lücke liegt — für beide Wege der Lücken-Erkennung.
+
+    * Gespeicherte Werte (``stored_until`` leer oder größer als die Zeit der Zeile): Abstand zur vorigen Zeile größer
+      als die Schwelle. Gilt für Entitäten, bei denen gespeichert gleich empfangen ist.
+    * Empfangs-Pausen (``receive_gaps``, aufsteigend nach Ende): eine Pause gehört zur ersten gespeicherten Zeile,
+      die zu ihrem Ende oder danach steht. Gespeicherte Abstände zählen dann nicht, ``stored_until`` ist 0. Damit
+      hängt das Ergebnis nicht davon ab, was Wertänderungsfilter, Auflösung oder Lebenszeichen gespeichert haben.
+    """
+
+    def __init__(
+        self, threshold_minutes: float | None, receive_gaps: list[tuple[float, float]] | None = None,
+        stored_until: float | None = None, *, decimals: str = "auto", tz: ZoneInfo, reasons: bool = True,
+    ) -> None:
+        self.seconds = None if threshold_minutes is None else threshold_minutes * 60
+        self.gaps = receive_gaps or []
+        self.stored_until = stored_until
+        self.decimals = decimals
+        self.tz = tz
+        self.reasons = reasons
+        self._next = 0
+
+    def check(self, ts: float, previous_ts: float | None, previous_value: float | None) -> str | None:
+        if self.seconds is None:
+            return None
+        found: tuple[float, float] | None = None
+        while self._next < len(self.gaps) and self.gaps[self._next][1] <= ts:
+            start, end = self.gaps[self._next]
+            self._next += 1
+            if end - start > self.seconds and (found is None or end - start > found[1] - found[0]):
+                found = (start, end)
+        if found is not None:
+            if not self.reasons:
+                return _NO_REASON
+            return tr(
+                "{_format_duration} ohne empfangenen Wert seit {_format_ts} (Schwellwert: {_format_duration2})",
+                _format_duration=_format_duration(found[1] - found[0]), _format_ts=_format_ts(found[0], self.tz),
+                _format_duration2=_format_duration(self.seconds),
+            )
+        if previous_ts is not None and (self.stored_until is None or ts < self.stored_until):
+            delta = ts - previous_ts
+            if delta > self.seconds:
+                if not self.reasons:
+                    return _NO_REASON
+                return tr(
+                    "{_format_duration} seit vorherigem Wert {_format_val} um {_format_ts} (Schwellwert: {_format_duration2})",
+                    _format_duration=_format_duration(delta), _format_val=_format_val(previous_value, self.decimals),
+                    _format_ts=_format_ts(previous_ts, self.tz), _format_duration2=_format_duration(self.seconds),
+                )
+        return None
+
+
+def gap_options(index, entity, from_ts: float | None = None, to_ts: float | None = None) -> dict:
+    """Parameter der Lücken-Erkennung für ``analyze_raw_rows_page`` und ``detect_gaps``: Schwelle in Minuten und, bei
+    Entitäten mit Filter oder Auflösung (``gap_method`` = receive), die Empfangs-Pausen im Fenster. Vor dem Beginn der
+    Aufzeichnung (``receive_gaps_since``) gibt es dort keine Bewertung; die Schwellen „1“ und „5 Minuten“ gelten beide
+    als 5 Minuten, weil kleinere Pausen nicht festgehalten werden."""
+    threshold = entity["gap_threshold"]
+    if threshold == "off":
+        return {"gap_threshold_minutes": None}
+    if gap_method(entity) == "stored":
+        return {"gap_threshold_minutes": float(threshold)}
+    minutes = max(float(threshold), MIN_RECEIVE_GAP_SECONDS / 60)
+    since = entity["receive_gaps_since"]
+    gaps = (
+        index.list_receive_gaps(
+            entity["entity_id"], from_ts=since if from_ts is None else max(from_ts, since), to_ts=to_ts,
+            min_seconds=minutes * 60,
+        )
+        if since is not None else []
+    )
+    return {"gap_threshold_minutes": minutes, "receive_gaps": gaps, "gap_stored_until": 0.0}
+
+
+def gap_cache_key(entity) -> str:
+    """Schlüssel, zu dem eine gezählte Lücken-Zahl gehört: Die Zahl gilt nur für genau diese Schwelle UND Methode."""
+    threshold = entity["gap_threshold"]
+    if threshold == "off" or gap_method(entity) == "stored":
+        return threshold
+    return f"r{max(float(threshold), MIN_RECEIVE_GAP_SECONDS / 60):g}"
+
+
 class ResultLimitExceeded(ValueError):
     """Eine Abfrage würde mehr Zeilen als erlaubt materialisieren."""
 
@@ -317,6 +401,8 @@ def analyze_raw_rows_page(
     match_window: tuple[int, int] | None = None,
     collect: dict[str, int] | None = None,
     reasons: bool = True,
+    receive_gaps: list[tuple[float, float]] | None = None,
+    gap_stored_until: float | None = None,
 ) -> dict:
     """Analysiert beliebig viele sortierte Rohwerte mit begrenztem Speicher.
 
@@ -359,7 +445,7 @@ def analyze_raw_rows_page(
         options = dict(
             filter_=filter_, gap_threshold_minutes=gap_threshold_minutes, outlier_factor=outlier_factor,
             tz=tz, decimals=decimals, counter_decrease_enabled=counter_decrease_enabled,
-            outlier_mode=outlier_mode,
+            outlier_mode=outlier_mode, receive_gaps=receive_gaps, gap_stored_until=gap_stored_until,
         )
         probe = analyze_raw_rows_page(rows_factory, page=1, page_size=1, reasons=False, **options)
         matches = probe["pagination"]["total"]
@@ -373,8 +459,8 @@ def analyze_raw_rows_page(
     retained: deque[dict] = deque(maxlen=requested_page * page_size)
     collected = {name: deque(maxlen=limit) for name, limit in (collect or {}).items()}
     collected_totals = dict.fromkeys(collected, 0)
-    gap_seconds = (
-        gap_threshold_minutes * 60 if gap_threshold_minutes is not None else None
+    gap_detector = GapDetector(
+        gap_threshold_minutes, receive_gaps, gap_stored_until, decimals=decimals, tz=tz, reasons=reasons,
     )
 
     counts = {
@@ -497,12 +583,9 @@ def analyze_raw_rows_page(
             group_outlier = None
             group_gap = None
 
-        if previous_ts is not None and gap_seconds is not None:
-            delta = ts - previous_ts
-            if delta > gap_seconds:
-                group_gap = _NO_REASON if not reasons else (
-                    tr("{_format_duration} seit vorherigem Wert {_format_val} um {_format_ts} (Schwellwert: {_format_duration2})", _format_duration=_format_duration(delta), _format_val=_format_val(previous_value, decimals), _format_ts=_format_ts(previous_ts, tz), _format_duration2=_format_duration(gap_seconds))
-                )
+        gap_reason = gap_detector.check(ts, previous_ts, previous_value)
+        if gap_reason is not None:
+            group_gap = gap_reason
         # Immer aufrufen, auch bei ausgeschalteter Erkennung: der Detektor baut
         # dabei seinen Bezug auf. Ein bereits markierter Zeitstempel bleibt
         # markiert — bei mehreren Werten auf derselben Sekunde genügt einer.
@@ -1103,6 +1186,8 @@ def detect_gaps(
     threshold_minutes: float | None,
     decimals: str,
     tz: ZoneInfo,
+    receive_gaps: list[tuple[float, float]] | None = None,
+    stored_until: float | None = None,
 ) -> dict[float, str]:
     """Markiert den Zeitstempel NACH einer Lücke, die den je Entität konfigurierten
     Minuten-Schwellwert überschreitet (Konfigurationsseite der Entität) — bewusst
@@ -1110,18 +1195,20 @@ def detect_gaps(
     Median abgeleiteten Heuristik: der Nutzer kennt das erwartete Sendeintervall
     seiner Entität besser als ein Median, der bei vielen Nachzüglern selbst schon
     verzerrt sein kann. threshold_minutes=None ("Aus" in der Konfiguration)
-    liefert immer {} (keine Lücken-Erkennung)."""
-    if threshold_minutes is None or len(rows) < 2:
+    liefert immer {} (keine Lücken-Erkennung).
+
+    Mit ``receive_gaps`` (Entitäten mit Filter oder Auflösung, siehe ``gap_options``) zählen die Pausen zwischen
+    empfangenen Werten, nicht die zwischen gespeicherten."""
+    if threshold_minutes is None or len(rows) < 2 and not receive_gaps:
         return {}
-    threshold_seconds = threshold_minutes * 60
+    detector = GapDetector(threshold_minutes, receive_gaps, stored_until, decimals=decimals, tz=tz)
     flagged: dict[float, str] = {}
-    for i in range(len(rows) - 1):
-        prev_ts, prev_value = rows[i]
-        delta = rows[i + 1][0] - prev_ts
-        if delta > threshold_seconds:
-            flagged[rows[i + 1][0]] = (
-                tr("{_format_duration} seit vorherigem Wert {_format_val} um {_format_ts} (Schwellwert: {_format_duration2})", _format_duration=_format_duration(delta), _format_val=_format_val(prev_value, decimals), _format_ts=_format_ts(prev_ts, tz), _format_duration2=_format_duration(threshold_seconds))
-            )
+    previous: tuple[float, float] | None = None
+    for ts, value in rows:
+        reason = detector.check(ts, previous[0] if previous else None, previous[1] if previous else None)
+        if reason is not None:
+            flagged[ts] = reason
+        previous = (ts, value)
     return flagged
 
 

@@ -124,12 +124,12 @@ from .storage.index import (
     DEFAULT_VALUE_FILTER,
     DEFAULT_VALUE_FILTER_HEARTBEAT,
     effective_outlier_threshold,
+    gap_method,
     MAX_IGNORE_VALUES,
     TooManyIgnoreValues,
     normalize_ignore_values,
     outlier_detection_applies,
     parse_ignore_values,
-    should_raise_gap_threshold,
     MAX_CUSTOM_NAME_LENGTH,
     MAX_SAVED_NAME_LENGTH,
     DuplicateNameError,
@@ -2563,9 +2563,9 @@ _INDEX_DETAIL_GROUPS = [
     {
         "label": N_("Schreibsicherheit und Bereinigung"),
         "description": (
-            N_("Idempotenzstatus eingehender Ereignisse und vorgemerkte, noch nicht physisch entfernte Rohwerte.")
+            N_("Idempotenzstatus eingehender Ereignisse, vorgemerkte, noch nicht physisch entfernte Rohwerte und die festgehaltenen Pausen zwischen empfangenen Werten.")
         ),
-        "tables": ["ingested_events", "deleted_points"],
+        "tables": ["ingested_events", "deleted_points", "receive_gaps"],
     },
     {
         "label": N_("Charts, Tabellen und Dashboards"),
@@ -2866,27 +2866,6 @@ def entities_table(
     )
 
 
-# Gültige Tarife für should_raise_gap_threshold() (index.py kennt bewusst keine Anzeige-Labels).
-_GAP_THRESHOLD_MINUTE_TIERS = [int(k) for k in GAP_THRESHOLD_LABELS if k != "off"]
-
-
-def _gap_threshold_auto_adjust_message(
-    reason: str, new_gap: str, resolution: str, *, label: str = "Lücken-Erkennung"
-) -> str:
-    """Erklärtext für appAlert() nach einer Anhebung durch
-    should_raise_gap_threshold() (label="Standard-Lücken-Erkennung" für die
-    globalen Standards)."""
-    new_label = GAP_THRESHOLD_LABELS.get(new_gap, new_gap)
-    cause = (
-        tr("Der Wertänderungsfilter überspringt unveränderte Werte und schreibt selbst erst nach spätestens {new_label} wieder", new_label=new_label)
-        if reason == "value_filter" else
-        tr("Die gewählte Auflösung „{get}“ lässt ohnehin nur alle {new_label} einen neuen Wert zu", get=RESOLUTION_LABELS.get(resolution, resolution), new_label=new_label)
-    )
-    return (
-        tr("{label} automatisch auf {new_label} gesetzt: {cause} — eine kürzere Lücken-Schwelle hätte das sonst laufend fälschlich als Lücke gemeldet. Lässt sich hier jederzeit wieder manuell verkleinern.", label=label, new_label=new_label, cause=cause)
-    )
-
-
 def _entity_config_adjusted(entity) -> dict[str, dict[str, str]]:
     """Felder der Konfiguration, die vom globalen Standard (Einstellungen → Archivierung)
     abweichen, mit Wert und Beschriftung des Standards (das Abzeichen setzt darauf zurück). Gesperrte Felder fehlen: dort gibt es
@@ -2977,6 +2956,11 @@ def _entity_config_context(entity) -> dict:
         "ignore_values_blocked": entity["aggregation_type"] in ("switch", "state"),
         "ignore_values_options": list(IGNORE_VALUES_LABELS.items()),
         "gap_threshold": entity["gap_threshold"],
+        "gap_method": gap_method(entity),
+        "gap_since_label": (
+            formats.format_date(datetime.fromtimestamp(entity["receive_gaps_since"], TZ))
+            if entity["receive_gaps_since"] is not None else None
+        ),
         "outlier_threshold": entity["outlier_threshold"],
         "outlier_blocked_reason": OUTLIER_BLOCKED_REASONS.get(entity["aggregation_type"]),
         "outlier_rate": _outlier_rate_labels(cleanup_stats.outlier_rate(index, entity)),
@@ -3145,25 +3129,9 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
             )
             if retention is not None:
                 _background.invalidate_retention_overview()
-            # Nur bei ÄNDERUNG von resolution/value_filter/Lebenszeichen auslösen, sonst würde ein späteres,
-            # bewusstes Verkleinern der Lücken-Erkennung bei nächster Gelegenheit zurückgedreht.
-            gap_threshold_auto_adjusted = False
-            gap_threshold_auto_adjusted_message = None
-            if value_filter == "decimals" or value_filter_heartbeat is not None or resolution is not None:
-                current = _require_entity(entity_id)
-                should_raise, new_gap = should_raise_gap_threshold(
-                    current["gap_threshold"], current["resolution"], current["value_filter"], _GAP_THRESHOLD_MINUTE_TIERS, current["value_filter_heartbeat"],
-                )
-                if should_raise:
-                    index.set_config(entity_id, gap_threshold=new_gap)
-                    gap_threshold_auto_adjusted = True
-                    reason = "value_filter" if current["value_filter"] == "decimals" else "resolution"
-                    gap_threshold_auto_adjusted_message = _gap_threshold_auto_adjust_message(reason, new_gap, current["resolution"])
             entity = _require_entity(entity_id)
             context = _entity_config_context(entity)
             context["saved"] = True
-            context["gap_threshold_auto_adjusted"] = gap_threshold_auto_adjusted
-            context["gap_threshold_auto_adjusted_message"] = gap_threshold_auto_adjusted_message
             return templates.TemplateResponse(request, "_entity_config_form.html", context)
 
     return await run_in_threadpool(update_locked)
@@ -5154,9 +5122,7 @@ def _rows_fragment(
             filter_=filter_,
             page=page,
             page_size=effective_page_size,
-            gap_threshold_minutes=(
-                None if gap_threshold == "off" else float(gap_threshold)
-            ),
+            **cleanup.gap_options(index, entity, window_start.timestamp(), window_end.timestamp()),
             outlier_factor=(
                 None if outlier_threshold == "off" else float(outlier_threshold)
             ),
@@ -5191,9 +5157,10 @@ def _rows_fragment(
             rows, None if outlier_threshold == "off" else float(outlier_threshold),
             entity["decimals"], TZ, mode=cleanup_stats.outlier_mode(entity),
         )
+        gap_args = cleanup.gap_options(index, entity, window_start.timestamp(), window_end.timestamp())
         gaps = cleanup.detect_gaps(
-            rows, None if gap_threshold == "off" else float(gap_threshold),
-            entity["decimals"], TZ,
+            rows, gap_args["gap_threshold_minutes"], entity["decimals"], TZ,
+            gap_args.get("receive_gaps"), gap_args.get("gap_stored_until"),
         )
         duplicates = cleanup.detect_duplicates(rows, entity["decimals"])
         repetitions = cleanup.detect_repetitions(rows, entity["decimals"], TZ)
@@ -5287,7 +5254,7 @@ def _rows_fragment(
         alltime_counts, alltime_stale = counts, False
         index.set_cleanup_alltime_stats(
             entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION,
-            daily=daily_counts, gap_threshold=gap_threshold,
+            daily=daily_counts, gap_threshold=cleanup.gap_cache_key(entity),
         )
     else:
         alltime_counts, alltime_stale = cleanup_stats.alltime_counts_or_invalidated(DATA_DIR, index, TZ, entity, now)
@@ -5854,7 +5821,6 @@ app.include_router(create_housekeeping_router(HousekeepingDependencies(
     retention_default_time=RETENTION_DEFAULT_TIME,
     retention_default_weekday=RETENTION_DEFAULT_WEEKDAY,
     chart_range_options=_CHART_RANGE_OPTIONS,
-    gap_threshold_minute_tiers=_GAP_THRESHOLD_MINUTE_TIERS,
     backup_weekday_options=BACKUP_WEEKDAY_OPTIONS,
     retention_progress=_background.retention_progress,
     storage_locked=_storage_locked,
@@ -5865,7 +5831,6 @@ app.include_router(create_housekeeping_router(HousekeepingDependencies(
     begin_retention_job=_background.begin_retention_job,
     finish_retention_job=_background.finish_retention_job,
     run_storage_reconciliation=_background.run_storage_reconciliation,
-    gap_threshold_auto_adjust_message=_gap_threshold_auto_adjust_message,
     set_next_retention_run=_background.set_next_retention_run,
     chart_type_label=chart_type_label,
     count_stale_entities=_count_stale_entities,

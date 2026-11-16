@@ -50,7 +50,7 @@ def _entity(index, entity_id, *, schwelle="50", markiert=None, gesamt=1000,
         index.set_cleanup_alltime_stats(
             entity_id, {"all": gesamt, "outliers": markiert},
             schwelle if gezaehlt_mit is None else gezaehlt_mit,
-            OUTLIER_RULE_VERSION, gap_threshold="15", daily={},
+            OUTLIER_RULE_VERSION, gap_threshold="r15", daily={},
         )
         if alter:
             eintrag = index.get_cleanup_alltime_stats(entity_id)
@@ -292,26 +292,26 @@ def test_the_scheduler_actually_runs_this_step() -> None:
 # --- Die Seite selbst --------------------------------------------------------
 
 
-def test_the_section_sits_between_duplicates_and_configuration(client) -> None:
+def test_the_section_sits_between_duplicates_and_storage(client) -> None:
     """Die Reihenfolge ist Teil der Aussage: erst was in den Daten steckt
-    (Duplikate, Ausreißer), dann was an den Einstellungen liegt (Lücken-Erkennung)."""
+    (Duplikate, Ausreißer), dann der Speicher."""
     html = client.get("/housekeeping").text
-    for marke in ('id="duplikate"', 'id="ausreisser"', 'id="luecken-erkennung"'):
+    for marke in ('id="duplikate"', 'id="ausreisser"', 'id="speicherplatz"'):
         assert marke in html, marke
-    assert html.index('id="duplikate"') < html.index('id="ausreisser"') < html.index('id="luecken-erkennung"')
+    assert html.index('id="duplikate"') < html.index('id="ausreisser"') < html.index('id="speicherplatz"')
     # Nur INNERHALB der Seitennavigation vergleichen: dieselben Anker stehen
     # auch in Meldungs-Links, die je nach Zustand der Testinstanz vor der
     # Navigation stehen können.
     nav = html[html.index('class="settings-nav"'):]
     nav = nav[:nav.index("</nav>")]
-    assert nav.index("housekeeping#duplikate") < nav.index("housekeeping#ausreisser") < nav.index("housekeeping#luecken-erkennung")
+    assert nav.index("housekeeping#duplikate") < nav.index("housekeeping#ausreisser") < nav.index("housekeeping#speicherplatz")
 
 
 def test_the_page_shows_how_far_the_measurement_got(client) -> None:
     """Ohne diese Zahl sähe „nichts gefunden" genauso aus wie „noch nichts
     gemessen" — der Unterschied ist für den Leser wesentlich."""
     html = client.get("/housekeeping").text
-    abschnitt = html[html.index('id="ausreisser"'):html.index('id="luecken-erkennung"')]
+    abschnitt = html[html.index('id="ausreisser"'):html.index('id="speicherplatz"')]
     assert "Entitäten mit Ausreißer-Erkennung sind gemessen" in abschnitt
 
 
@@ -339,7 +339,7 @@ def test_der_planer_misst_auch_entitaeten_ohne_ausreisser_erkennung(index):
     _entity(index, "sensor.pytest_ohne_erkennung", schwelle="off")
     index.set_first_ts_and_add_rows("sensor.pytest_ohne_erkennung", 1_700_000_000.0, 0)
     assert cleanup_stats.next_entity_for_outlier_rate(index, time.time())["entity_id"] == "sensor.pytest_ohne_erkennung"
-    index.set_cleanup_alltime_stats("sensor.pytest_ohne_erkennung", {"all": 10}, "off", OUTLIER_RULE_VERSION, gap_threshold="15", daily={})
+    index.set_cleanup_alltime_stats("sensor.pytest_ohne_erkennung", {"all": 10}, "off", OUTLIER_RULE_VERSION, gap_threshold="r15", daily={})
     assert cleanup_stats.next_entity_for_outlier_rate(index, time.time()) is None
 
 
@@ -351,7 +351,7 @@ def test_der_planer_ueberspringt_entitaeten_ohne_daten(index):
 def test_eintraege_ohne_tageszahlen_werden_neu_gemessen(index):
     _entity(index, "sensor.pytest_ohne_tage", schwelle="off")
     index.set_first_ts_and_add_rows("sensor.pytest_ohne_tage", 1_700_000_000.0, 0)
-    index.set_cleanup_alltime_stats("sensor.pytest_ohne_tage", {"all": 10}, "off", OUTLIER_RULE_VERSION, gap_threshold="15")
+    index.set_cleanup_alltime_stats("sensor.pytest_ohne_tage", {"all": 10}, "off", OUTLIER_RULE_VERSION, gap_threshold="r15")
     assert cleanup_stats.next_entity_for_outlier_rate(index, time.time())["entity_id"] == "sensor.pytest_ohne_tage"
 
 

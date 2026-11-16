@@ -576,7 +576,7 @@ def findings_for_entity(data_dir: Path, index: Index, tz: ZoneInfo, entity, now:
         filter_="none",
         page=1,
         page_size=1,
-        gap_threshold_minutes=None if gap_threshold == "off" else float(gap_threshold),
+        **cleanup.gap_options(index, entity, start.timestamp(), now.timestamp()),
         outlier_factor=None if outlier_threshold == "off" else float(outlier_threshold),
         tz=tz,
         decimals=decimals,

@@ -121,8 +121,3 @@
   </div>
 </div>
 {% if saved %}<p class="save-status">{{ _("✓ Gespeichert") }}</p>{% endif %}
-{% if gap_threshold_auto_adjusted %}
-<script>
-  appAlert({{ gap_threshold_auto_adjusted_message | tojson }});
-</script>
-{% endif %}

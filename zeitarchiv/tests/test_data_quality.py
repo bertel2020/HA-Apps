@@ -48,7 +48,7 @@ def _gesamt(index, entity_id, *, duplicates=0, counter_decreases=0, outliers=0):
         entity_id,
         {"all": 1000, "outliers": outliers, "gaps": 0, "duplicates": duplicates,
          "repetitions": 0, "counter_decreases": counter_decreases},
-        "50", OUTLIER_RULE_VERSION, gap_threshold="15",
+        "50", OUTLIER_RULE_VERSION, gap_threshold="r15",
     )
 
 
@@ -109,7 +109,7 @@ def test_ohne_ausreisser_erkennung_zaehlen_duplikate_trotzdem(index):
     _mit_daten(index, "sensor.a", schwelle="off")
     index.set_cleanup_alltime_stats(
         "sensor.a", {"all": 10, "duplicates": 4, "counter_decreases": 0}, "off", OUTLIER_RULE_VERSION,
-        gap_threshold="15"
+        gap_threshold="r15"
     )
     matrix = data_quality.build_matrix(index)
     assert matrix["pending"] == 0
@@ -244,7 +244,7 @@ def test_luecken_zaehlen_nur_mit_passender_schwelle(index):
     index.set_cleanup_alltime_stats(
         "sensor.a", {"all": 100, "outliers": 0, "gaps": 7, "duplicates": 0, "repetitions": 0,
                      "counter_decreases": 0},
-        "50", OUTLIER_RULE_VERSION, gap_threshold="15",
+        "50", OUTLIER_RULE_VERSION, gap_threshold="r15",
     )
     matrix = data_quality.build_matrix(index)
     assert matrix["rows"][0]["cells"]["gaps"]["count"] == 7
@@ -320,7 +320,7 @@ def _mit_tageszahlen(index, entity_id, daily, **counts):
         entity_id,
         {"all": 1000, "outliers": 0, "gaps": 0, "duplicates": 0, "repetitions": 0,
          "counter_decreases": 0, **counts},
-        "50", OUTLIER_RULE_VERSION, daily=daily, gap_threshold="15",
+        "50", OUTLIER_RULE_VERSION, daily=daily, gap_threshold="r15",
     )
 
 
@@ -425,7 +425,7 @@ def _mit_duplikaten(tmp, idx, entity_id, zusaetzliche):
     idx.set_cleanup_alltime_stats(
         entity_id, {"all": 2 + zusaetzliche, "duplicates": zusaetzliche, "gaps": 0, "outliers": 0,
                     "repetitions": 0, "counter_decreases": 0},
-        "50", OUTLIER_RULE_VERSION, daily={"2024-08-10": {"duplicates": zusaetzliche}}, gap_threshold="15",
+        "50", OUTLIER_RULE_VERSION, daily={"2024-08-10": {"duplicates": zusaetzliche}}, gap_threshold="r15",
     )
 
 

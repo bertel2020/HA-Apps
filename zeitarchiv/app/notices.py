@@ -33,11 +33,8 @@ from . import version_check
 from .i18n import N_, tr
 from .energiedashboard_routes import CONFIG_SCHEMA_VERSION, SETTING_CONFIG, SETTING_HOURLY_BACKFILL_PENDING
 from .formatting import (
-    GAP_THRESHOLD_LABELS,
-    VALUE_FILTER_HEARTBEAT_LABELS,
     decimals_to_int,
     format_int,
-    format_resolution,
     format_size,
     format_timestamp,
     format_value,
@@ -52,7 +49,6 @@ from .storage.index import (
     STATE_REJECTION_LIMIT,
     STATE_REJECTION_TYPE_MISMATCH,
     entity_last_seen,
-    should_raise_gap_threshold,
 )
 from .version import APP_VERSION
 
@@ -172,10 +168,6 @@ def forget_import_leftovers() -> None:
 # siehe hide_tip_today(). Bei einem mehrtägigen Fenster wäre der übernächste
 # Tag noch derselbe (ausgeblendete) Tipp gewesen.
 TIP_ROTATION_DAYS = 1
-# Gültige Tarife für should_raise_gap_threshold() (storage/index.py kennt
-# bewusst keine Anzeige-Labels).
-_GAP_THRESHOLD_MINUTE_TIERS = [int(k) for k in GAP_THRESHOLD_LABELS if k != "off"]
-
 # Feste Presets statt eines Datums-Pickers im ohnehin schon engen
 # Meldungs-Dropdown. "forever" (None) bleibt trotzdem sicher: der Fingerprint
 # in _is_muted() lässt die Meldung wieder auftauchen, sobald sich ihr Inhalt
@@ -191,39 +183,6 @@ SNOOZE_PRESETS = {
 SNOOZE_LABELS = {
     "1h": N_("1 Stunde"), "1d": N_("1 Tag"), "7d": N_("7 Tage"), "30d": N_("30 Tage"), "forever": N_("Dauerhaft"),
 }
-
-
-def gap_threshold_conflicts(index) -> list[dict]:
-    """Entitäten, deren Lücken-Erkennung strukturell nie zutreffen kann —
-    ihre Auflösung oder der aktive Wertänderungsfilter erzwingt selbst
-    schon einen größeren Mindestabstand zwischen Werten (siehe
-    effective_gap_floor_minutes() in storage/index.py). Einzige Quelle für
-    die entities.gap_threshold_conflict-Meldung unten (Zähler) UND
-    Housekeeping → Lücken-Erkennung (volle Liste) — beide dürfen nie
-    unterschiedliche Kriterien verwenden."""
-    rows = []
-    for e in index.list_entities():
-        should_flag, suggested_gap = should_raise_gap_threshold(
-            e["gap_threshold"], e["resolution"], e["value_filter"], _GAP_THRESHOLD_MINUTE_TIERS,
-            e["value_filter_heartbeat"],
-        )
-        if not should_flag:
-            continue
-        rows.append({
-            "entity_id": e["entity_id"],
-            "friendly_name": e["custom_name"] or e["friendly_name"] or e["entity_id"],
-            "resolution_label": format_resolution(e["resolution"]),
-            "gap_threshold_label": GAP_THRESHOLD_LABELS.get(e["gap_threshold"], e["gap_threshold"]),
-            "value_filter_active": e["value_filter"] == "decimals",
-            "heartbeat_label": (
-                VALUE_FILTER_HEARTBEAT_LABELS.get(e["value_filter_heartbeat"], e["value_filter_heartbeat"])
-                if e["value_filter"] == "decimals" else None
-            ),
-            "gap_threshold": e["gap_threshold"],
-            "suggested_gap": suggested_gap,
-            "suggested_gap_label": GAP_THRESHOLD_LABELS.get(suggested_gap, suggested_gap),
-        })
-    return rows
 
 
 # Wie lange ein verworfener Zustandswert als Hinweis stehen bleibt — eine Woche
@@ -661,26 +620,7 @@ def build_notices(
                 "link": "/import?tab=reports",
             })
 
-    # main.py verhindert das für NEUE Änderungen an resolution/value_filter
-    # automatisch (storage.index.should_raise_gap_threshold); diese Meldung
-    # deckt bereits bestehende Entitäten mit der riskanten Kombination ab,
-    # die die Automatik nicht rückwirkend anfasst — Details siehe
-    # gap_threshold_conflicts() oben (auch Grundlage für Housekeeping →
-    # Konfiguration).
     notices.extend(state_rejection_notices(index))
-
-    conflict_count = len(gap_threshold_conflicts(index))
-    if conflict_count:
-        notices.append({
-            "id": "entities.gap_threshold_conflict",
-            "severity": "warn",
-            "title": tr("Lücken-Erkennung kann strukturell nicht zutreffen"),
-            "detail": (
-                (tr("{conflict_count} Entität hat eine Lücken-Erkennung, die enger eingestellt ist als der Mindestabstand, den die gewählte Auflösung oder der aktive Wertänderungsfilter selbst zwischen gespeicherten Werten erzwingt — das führt zu falschen Lücken-Meldungen.", conflict_count=conflict_count) if conflict_count == 1 else tr("{conflict_count} Entitäten haben eine Lücken-Erkennung, die enger eingestellt ist als der Mindestabstand, den die gewählte Auflösung oder der aktive Wertänderungsfilter selbst zwischen gespeicherten Werten erzwingt — das führt zu falschen Lücken-Meldungen.", conflict_count=conflict_count))
-            ),
-            "meta": tr("Housekeeping"),
-            "link": "/housekeeping#luecken-erkennung",
-        })
 
     # Grundlage ist ausschließlich der ohnehin vorhandene Cache (der
     # Wartungsplaner füllt ihn, je Takt im Zeitbudget) — die Meldung rechnet

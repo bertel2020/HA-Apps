@@ -38,7 +38,7 @@
   table.stats-dt{table-layout:fixed;min-width:420px;}
   .stats-col-entity{width:78%;}
   .stats-col-value{width:22%;}
-  /* Ausreißer und Konfiguration haben VIER Spalten und können die beiden
+  /* Ausreißer hat VIER Spalten und können die beiden
      Klassen oben nicht mitbenutzen: 78% + 3 × 22% sind 144%. Bei
      table-layout:fixed rechnet der Browser das proportional herunter, die
      Entität-Spalte landete faktisch bei 54% und die drei Wert-Spalten bei je
@@ -63,23 +63,12 @@
      niedrig, der längste Wert brach dort still um. Wer die Werte ändert,
      misst besser nach, statt zu rechnen. */
   #ausreisser table.stats-dt{min-width:610px;}
-  #luecken-erkennung table.stats-dt{min-width:1260px;}
   /* gemessen 88 (Überschrift; "100×" wäre 65) */
   .hk-col-schwelle{width:92px;}
   /* gemessen 184 ("39.935 von 312.934"); 200 als Reserve für größere Archive */
   .hk-col-markiert{width:200px;}
   /* gemessen 93 ("100,00 %" wäre 98) */
   .hk-col-quote{width:100px;}
-  /* gemessen 271 ("Rohdaten + Wertänderungsfilter", längster Wert der Seite) */
-  .hk-col-aufloesung{width:276px;}
-  /* gemessen 151 (Überschrift; längster Wert "30 Minuten" nur 115) */
-  .hk-col-luecke{width:156px;}
-  /* gemessen 106 ("12 Stunden") */
-  .hk-col-empfohlen{width:112px;}
-  .hk-col-chk{width:44px;}
-  .hk-col-lebenszeichen{width:132px;}
-  /* Überschrift "Gefundene Lücken" */
-  .hk-col-anzahl{width:148px;}
   /* Abschnittstitel + Schwellwert-Dropdown ("Inaktive Entitäten") in
      einer Zeile, statt wie die übrigen Abschnitte nur eine Überschrift zu
      tragen — .settings-panel .hk-section-head .settings-section-title ist
@@ -335,16 +324,3 @@
   .dup-auto-switch{margin-left:0;flex-basis:100%;justify-content:space-between;}
   .dup-auto-cell{white-space:normal;}
 }
-
-/* Lücken-Erkennung: Auswahlleiste, Bestätigung, Meldung mit Rückgängig */
-#gap-conflicts .gc-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-bottom:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;}
-#gap-conflicts .gc-bar.has-selection{border-color:var(--accent-line);background:var(--accent-line-soft);}
-#gap-conflicts .gc-count{font-weight:600;margin-right:auto;}
-#gap-conflicts .gc-bar.has-selection .gc-count{color:var(--accent-line);}
-#gap-conflicts .gc-bar [hidden]{display:none;}
-#gap-conflicts .gc-confirm{margin-bottom:12px;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
-#gap-conflicts .gc-text{margin:0 0 10px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
-#gap-conflicts .gc-groups{margin:0 0 12px;padding-left:18px;}
-#gap-conflicts .gc-toast{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:10px;padding:10px 14px;border:1px solid var(--accent-line);border-radius:8px;background:var(--accent-line-soft);font-size:calc(13px * var(--font-scale, 1));}
-#gap-conflicts .gc-toast span{flex:1 1 240px;}
-#gap-conflicts td input[type=checkbox],#gap-conflicts th input[type=checkbox]{cursor:pointer;}

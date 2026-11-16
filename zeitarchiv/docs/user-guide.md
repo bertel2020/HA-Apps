@@ -2007,10 +2007,10 @@ zwischen zwei gespeicherten Werten zulässt: 1, 3, 6, 12 oder 24 Stunden,
 voreingestellt 6 Stunden. Das Feld erscheint nur bei aktivem Filter; der
 Standard für neue Entitäten steht unter Einstellungen → Archivierung.
 
-Ein kürzeres Lebenszeichen erlaubt eine feinere
-[Lücken-Erkennung](#lücken-erkennung), speichert aber bei ruhigen Sensoren
-öfter einen Wert. Ein längeres spart Platz, hebt aber die Untergrenze der
-Lücken-Erkennung an.
+Ein kürzeres Lebenszeichen speichert bei ruhigen Sensoren öfter einen Wert,
+ein längeres spart Platz. Auf die [Lücken-Erkennung](#lücken-erkennung) hat es
+keinen Einfluss: Sie zählt Pausen zwischen **empfangenen** Werten, nicht
+zwischen gespeicherten.
 
 ### Werte ignorieren
 
@@ -2042,15 +2042,31 @@ Ab welcher Pause zwischen zwei Werten die Bereinigungs-Seite eine **Lücke**
 markiert: 1, 5, 15, 30 Minuten, 1, 3, 6, 12, 24 Stunden — oder Aus. Die
 Markierung ist reine Analyse; an den Daten ändert sie nichts.
 
-**Der Wert wird automatisch angehoben, wenn er nicht zutreffen kann.** Eine
-Auflösung von 1 Stunde erzwingt selbst schon einen Mindestabstand von einer
-Stunde zwischen Werten; eine Lücken-Erkennung von 5 Minuten würde dann bei
-*jedem* normalen Zyklus anschlagen. Dasselbe gilt für den aktivierten
-Wertänderungsfilter mit seinem Lebenszeichen (voreingestellt 6 Stunden). Zeitarchiv hebt die
-Schwelle beim Ändern von Auflösung oder Filter deshalb auf die nächste Stufe,
-die noch sinnvoll ist, und sagt es dazu. Danach lässt sie sich jederzeit wieder
-manuell verkleinern. Bestehende Entitäten mit einer solchen Kombination listet
-**Housekeeping → Lücken-Erkennung**.
+**Wie gezählt wird, hängt von der Entität ab.**
+- **Ohne Wertänderungsfilter und mit Rohdaten** ist gespeichert gleich empfangen.
+  Gezählt werden die Abstände zwischen den gespeicherten Werten, wie es immer
+  war. Importe (CSV, Home Assistant, Symcon) zählen genauso.
+- **Mit Wertänderungsfilter oder Auflösung** speichert Zeitarchiv bewusst nicht
+  jeden Wert. Dort würde der Speicher lange Ruhephasen als Lücke zeigen, obwohl
+  der Sensor sendet, und das Lebenszeichen würde das Ergebnis beeinflussen.
+  Deshalb hält Zeitarchiv beim Eintreffen jedes Werts fest, wie lange die Pause
+  davor war, auch wenn der Wert nicht gespeichert wird. Gezählt werden diese
+  **Pausen zwischen empfangenen Werten**. Filter, Auflösung und Lebenszeichen
+  ändern daran nichts. Die Konfigurationsseite der Entität sagt, ab wann das
+  gilt.
+
+**Grenzen**
+- Pausen unter 5 Minuten werden nicht festgehalten; „1 Minute“ gilt bei dieser
+  Methode wie „5 Minuten“.
+- Die Aufzeichnung beginnt mit dem ersten Wert nach dem Einbau. Davor gibt es
+  bei Entitäten mit Filter oder Auflösung keine Bewertung.
+- Sendet ein Sensor nur bei Änderung (Home Assistant meldet unveränderte Zustände
+  nicht), ist eine lange Pause normal. Dort „Aus“ oder eine große Schwelle
+  wählen.
+- Die Pausen werden nach der Aufbewahrung der Entität, spätestens nach zwei
+  Jahren, gelöscht; je Entität höchstens 50.000.
+- Ob eine Entität ausgefallen ist, zeigt **Inaktive Entitäten**, das den
+  zuletzt empfangenen Wert nutzt.
 
 ### Ausreißer-Erkennung
 
@@ -2447,7 +2463,7 @@ folgen jeweils einer eigenen, festen Regel:
 
 | Kategorie | Regel | Was "Bereinigen" konkret tut |
 | --- | --- | --- |
-| **Lücke** | Der zeitliche Abstand zweier aufeinanderfolgender Werte überschreitet die je Entität eingestellte Schwelle (**Lücken-Erkennung**, in Minuten; "Aus" deaktiviert die Erkennung komplett) | Nur eine Markierung, keine automatische Aktion — Lücken werden angezeigt, nicht gelöscht |
+| **Lücke** | Der zeitliche Abstand zweier aufeinanderfolgender Werte überschreitet die je Entität eingestellte Schwelle (**Lücken-Erkennung**, in Minuten; "Aus" deaktiviert die Erkennung komplett; bei Entitäten mit Filter oder Auflösung zählen die Pausen zwischen empfangenen Werten, siehe [Lücken-Erkennung](#lücken-erkennung)) | Nur eine Markierung, keine automatische Aktion — Lücken werden angezeigt, nicht gelöscht |
 | **Duplikat** | Zwei oder mehr Werte teilen sich exakt denselben Zeitstempel (nicht nur einen ähnlichen) | Der chronologisch zuerst gespeicherte Wert bleibt erhalten, alle weiteren zum selben Zeitstempel werden zum Löschen vorgeschlagen |
 | **Wiederholung** | Ein Wert ist (nach Rundung auf die eingestellten Nachkommastellen) identisch zum zuletzt *behaltenen* Wert — dieselbe Regel, die auch beim Eintreffen neuer Werte laufend zur Verdichtung verwendet wird (siehe [Wertänderungsfilter](#entität-konfigurieren)) | Der erste Wert einer Serie gleicher Werte bleibt erhalten, alle folgenden werden vorgeschlagen — **außer** seit dem letzten behaltenen Wert sind bereits 6 Stunden vergangen (Lebenszeichenregel), dann bleibt auch ein unveränderter Wert erhalten |
 | **Zählerrückgang** | Nur bei Zähler-Entitäten: ein Wert liegt niedriger als der unmittelbar vorherige behaltene Wert | Eine Markierung mit Einordnung (Vermutlich Fehlwert, Vermutlich Reset, Noch offen), **niemals** ungefragt gelöscht — ein Rückgang kann ein echtes Ereignis sein (z. B. Zählertausch, Reset nach Neustart). Die planmäßige Nullung eines Tageszählers um Mitternacht zählt nicht |
@@ -2544,7 +2560,6 @@ wie die Einstellungen:
 | **Inaktive Entitäten** | Entitäten ohne neuen Wert seit einem wählbaren Schwellwert (1 bis 30 Tage). Nie empfangene Entitäten erscheinen unabhängig vom Schwellwert immer. Meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität. |
 | **Duplikate** | Archivweit erkannte doppelte Zeitstempel der letzten 30 Tage, je Entität — derselbe stündliche Hintergrund-Schnappschuss, der auch die Meldung „Duplikate gefunden" auslöst. Entfernbar über „Duplikate automatisch entfernen" auf der jeweiligen Bereinigungs-Seite oder mit dem Schalter **Automatisch entfernen** im Kopf des Abschnitts (siehe unten). |
 | **Ausreißer** | Entitäten, bei denen die eingestellte Ausreißer-Schwelle mehr als 1 % ihrer Werte markiert — mit Schwelle, absoluter Zahl und Quote. Dann ist die Schwelle für dieses Signal zu eng: markiert wird nicht mehr das Unplausible, sondern normales Verhalten. Es sind dieselben Zahlen, die unter dem Schwellenfeld der jeweiligen Entität stehen (siehe [Entität konfigurieren](#entität-konfigurieren)); die Liste rechnet nichts eigenes. Keine Sammel-Korrektur — die passende Schwelle hängt am Signal. |
-| **Lücken-Erkennung** | Entitäten, deren Lücken-Erkennung strukturell nie zutreffen kann, weil die gewählte Auflösung oder das Lebenszeichen des Wertänderungsfilters selbst schon einen größeren Mindestabstand zwischen Werten erzwingt (siehe [Entität konfigurieren](#entität-konfigurieren)) — mit Auflösung, Lebenszeichen, aktueller und empfohlener Lücken-Erkennung und der Zahl der gefundenen Lücken (aus der Datenqualität, „–“ wenn noch nicht zur aktuellen Schwelle gemessen; die Spalte ist sortierbar). **Übernehmen** setzt die Schwelle einer Zeile auf die Empfehlung, mit Auswahl **Empfehlung übernehmen (n)**, und **Alle übernehmen** tut es für alle; bei mehreren Entitäten zeigt eine Bestätigung vorher die Aufteilung nach Stufe. Das ändert nur die Schwelle der Analyse, keine Daten, und die Lücken werden danach automatisch neu gemessen. Ein Hinweis bietet **Rückgängig** an. Wer die Erkennung feiner will, kürzt auf der Konfigurationsseite der Entität das Lebenszeichen oder wählt eine feinere Auflösung. |
 | **Speicherplatz** | Freier Speicherplatz auf dem Host-Dateisystem (Kachel mit Auslastungsbalken — andere Frage als die Zahlen unten, nicht Zeitarchivs eigener Speicherverbrauch). Knopf „Speicher prüfen" löst zwei getrennt ausgewiesene Prüfungen auf einmal aus: **Indexkonsistenz** (stimmt der abgeleitete Index-Cache mit Archiv/Hot Buffer überein — Abweichungen sind über „Index reparieren" behebbar) und **Datenintegrität** (sind die Rohdaten im Hot Buffer selbst noch lesbar — beschädigte Zeilen entstehen fast immer durch einen unsauberen Neustart, Stromausfall oder harten Kill, und sind nicht reparierbar; betroffene Entität und Monat werden aufgelistet, der Wert bleibt unwiederbringlich verloren). Darunter: markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen. Der Knopf „Markierte Datensätze anzeigen" listet sie vorher durchsuchbar auf — erst je betroffene Entität mit Anzahl und letztem Markierungszeitpunkt (Suchfeld, Paginierung), ein Klick auf eine Zeile zeigt darunter im selben Dialog die einzelnen markierten Zeitpunkte samt Wert. Rein lesend: das eigentliche Rückgängigmachen einer einzelnen Markierung läuft weiterhin über die Entität selbst (siehe [Bereinigung](#bereinigung)). Darunter der Schalter für die automatische Bereinigung (standardmäßig aus) und das Mindestalter der Löschmarkierung dafür — entfernt nur Markierungen, die mindestens so lange her sind, damit „Rückgängig" für eine gerade erst gelöschte Zeile nicht ins Leere läuft. Meldet die Vorschau „Löschmarkierungen ohne passende Rohdatenzeile", war die zugehörige Rohdatenzeile bereits durch eine Verdichtung oder eine abgelaufene Aufbewahrung entfernt worden — beide räumen die betroffenen Markierungen seitdem selbst mit auf, diese Zahl geht mit der Zeit gegen 0. |
 | **Aufbewahrung** | Übersicht aktuell fälliger und bereits gelöschter Datensätze; Vorschau fälliger Löschungen; Zeitplan für automatische Durchsetzung (täglich oder wöchentlich mit Wochentag); Lauf-Historie. |
 | **Verdichten** | Schalter für die automatische, rückwirkende Verdichtung archivierter Monate (standardmäßig aus) und das Mindestalter dafür — betrifft nur Entitäten mit gesetztem Verdichtungsziel (siehe [Entität konfigurieren](#entität-konfigurieren)). Die manuelle Verdichten-Aktion liegt dagegen bei der jeweiligen Entität selbst, im Bearbeitungsbereich. |
@@ -2627,10 +2642,6 @@ Zeitarchiv unter anderem:
   Schweregrad)
 - Als „Historisch“ markierte Entitäten, die seit der Markierung wieder Werte
   geliefert haben
-- Lücken-Erkennung einer Entität kann durch ihre Auflösung oder den aktiven
-  Wertänderungsfilter strukturell nie zutreffen (siehe
-  [Housekeeping → Lücken-Erkennung](#housekeeping) und
-  [Entität konfigurieren](#entität-konfigurieren))
 - Ausreißer-Erkennung markiert bei mindestens einer Entität mehr als 1 % aller
   Werte. Eine einzige Meldung für die ganze Installation, auch bei hundert
   betroffenen Entitäten: sie nennt die Anzahl und den deutlichsten Fall und

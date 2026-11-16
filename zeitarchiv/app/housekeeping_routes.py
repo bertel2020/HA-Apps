@@ -81,15 +81,10 @@ from .progress import JobBusy, JobProgress
 from .route_support import MAX_FORM_FIELDS, STORAGE_LOCKED_TIMEOUT_SECONDS, UI_EXCLUSIVE_TIMEOUT_SECONDS
 from .storage import cleanup, rotate
 from .storage import reset as reset_storage
-from .storage.coordinator import CoordinatorBusy, StorageCoordinator
+from .storage.coordinator import StorageCoordinator
 from .storage.index import (
-    DEFAULT_GAP_THRESHOLD,
-    DEFAULT_RESOLUTION,
-    DEFAULT_VALUE_FILTER,
-    DEFAULT_VALUE_FILTER_HEARTBEAT,
     Index,
     entity_last_seen,
-    should_raise_gap_threshold,
 )
 
 
@@ -150,7 +145,6 @@ class HousekeepingDependencies:
     retention_default_time: str
     retention_default_weekday: int
     chart_range_options: list
-    gap_threshold_minute_tiers: list
     backup_weekday_options: list
     # Objekt, kein Wert: es wird in-place verändert, die Referenz bleibt.
     retention_progress: object
@@ -162,7 +156,6 @@ class HousekeepingDependencies:
     begin_retention_job: Callable[..., object]
     finish_retention_job: Callable[..., object]
     run_storage_reconciliation: Callable[..., dict]
-    gap_threshold_auto_adjust_message: Callable[..., str]
     set_next_retention_run: Callable[..., float | None]
     chart_type_label: Callable[..., str]
     count_stale_entities: Callable[..., int]
@@ -1087,107 +1080,6 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         _duplicates_auto_field_context(entity_id) if deps.index.get_entity(entity_id) is not None else None
     )
 
-    # --- Lücken-Erkennung: Empfehlungen übernehmen (Housekeeping) -------------------------------------------------
-    def _gap_conflicts_context(*, message: str | None = None, undo: list[str] | None = None, confirm: dict | None = None) -> dict:
-        """Zeilen des Abschnitts „Lücken-Erkennung“ samt Meldung (mit Rückgängig) oder Bestätigung. Die Lücken-Zahl
-        liest den Cache der Datenqualität; sie gilt nur zur aktuell eingestellten Schwelle (gaps_measured), sonst „–“."""
-        rows = notices_mod.gap_threshold_conflicts(deps.index)
-        entries = deps.index.list_cleanup_alltime_stats(with_daily=False)
-        entities = {e["entity_id"]: e for e in deps.index.list_entities()}
-        for row in rows:
-            entry = entries.get(row["entity_id"])
-            measured = entry is not None and "counts" in entry and cleanup_stats.gaps_measured(entities[row["entity_id"]], entry)
-            row["gaps"] = ((entry.get("counts") or {}).get("gaps") or 0) if measured else None
-            row["gaps_label"] = format_int(row["gaps"]) if measured else "–"
-        return {"rows": rows, "message": message, "undo": undo or [], "confirm": confirm}
-
-    def _gap_conflict_targets(form) -> list[dict]:
-        """Zu übernehmende Konflikte: „alle“ oder die gewählten Entitäten, jeweils neu aus dem aktuellen Stand berechnet
-        (nicht aus dem, was der Browser zuletzt sah). Eine inzwischen behobene Entität fällt still heraus."""
-        conflicts = {row["entity_id"]: row for row in notices_mod.gap_threshold_conflicts(deps.index)}
-        if form.get("all"):
-            return list(conflicts.values())
-        chosen = [str(v) for k, v in form.multi_items() if k == "entity_id"]
-        return [conflicts[i] for i in dict.fromkeys(chosen) if i in conflicts]
-
-    def _gap_groups(targets: list[dict]) -> list[dict]:
-        groups: dict[str, dict] = {}
-        for row in targets:
-            groups.setdefault(row["suggested_gap"], {"label": row["suggested_gap_label"], "count": 0})["count"] += 1
-        return [groups[k] for k in sorted(groups, key=int)]
-
-    def _gap_conflicts_response(request: Request, **context) -> HTMLResponse:
-        return deps.templates.TemplateResponse(request, "_gap_conflicts.html", {"gap_conflicts": _gap_conflicts_context(**context)})
-
-    @router.get("/housekeeping/luecken-erkennung", response_class=HTMLResponse)
-    def gap_conflicts_view(request: Request) -> HTMLResponse:
-        return _gap_conflicts_response(request)
-
-    @router.post("/housekeeping/luecken-erkennung/preview", response_class=HTMLResponse)
-    @_form_in_threadpool
-    def gap_conflicts_preview(request: Request, form) -> HTMLResponse:
-        targets = _gap_conflict_targets(form)
-        confirm = {
-            "all": bool(form.get("all")), "entity_ids": [t["entity_id"] for t in targets],
-            "count": len(targets), "groups": _gap_groups(targets),
-        }
-        return _gap_conflicts_response(request, confirm=confirm)
-
-    @router.post("/housekeeping/luecken-erkennung/apply", response_class=HTMLResponse)
-    @_form_in_threadpool
-    def gap_conflicts_apply(request: Request, form) -> HTMLResponse:
-        """Setzt die Lücken-Erkennung auf die Empfehlung und stößt die Neumessung der Lücken an. Nur die Schwelle
-        ändert sich, nie Daten; je Entität mit kurzer Sperre, eine gerade gesperrte (Backup, Import) bleibt stehen."""
-        targets = _gap_conflict_targets(form)
-        done: list[dict] = []
-        busy = 0
-        for row in targets:
-            try:
-                with deps.coordinator.entity(row["entity_id"], timeout=STORAGE_LOCKED_TIMEOUT_SECONDS):
-                    deps.index.set_config(row["entity_id"], gap_threshold=row["suggested_gap"])
-                done.append(row)
-            except CoordinatorBusy:
-                busy += 1
-        remeasured = data_quality.request_remeasure(deps.index, [r["entity_id"] for r in done]) if done else 0
-        if len(done) == 1:
-            message = tr("„{name}“: Lücken-Erkennung von {old} auf {new} gesetzt.", name=done[0]["friendly_name"],
-                         old=tr(str(done[0]["gap_threshold_label"])), new=tr(str(done[0]["suggested_gap_label"])))
-        elif done:
-            parts = ", ".join(f"{g['count']} × " + tr("auf {new}", new=tr(str(g["label"]))) for g in _gap_groups(done))
-            message = tr("{count} Entitäten angepasst: {parts}.", count=len(done), parts=parts)
-        else:
-            message = tr("Nichts zu übernehmen.")
-        if done:
-            message += " " + tr("Die Lücken werden neu gemessen.")
-        if busy:
-            message += " " + tr("{busy} Entität(en) waren gerade gesperrt und blieben unverändert.", busy=busy)
-        logger.info("Lücken-Erkennung übernommen · event=gap_threshold_recommendation_applied count=%d busy=%d remeasure=%d",
-                    len(done), busy, remeasured)
-        return _gap_conflicts_response(request, message=message, undo=[f"{r['entity_id']}|{r['gap_threshold']}" for r in done])
-
-    @router.post("/housekeeping/luecken-erkennung/undo", response_class=HTMLResponse)
-    @_form_in_threadpool
-    def gap_conflicts_undo(request: Request, form) -> HTMLResponse:
-        """Stellt die vorherigen Schwellen wieder her. Die Werte kommen vom Browser und werden gegen die Stufen und die
-        vorhandenen Entitäten geprüft; mehr als „Schwelle dieser Entität zurücksetzen“ ist damit nicht möglich."""
-        restored: list[str] = []
-        for key, value in form.multi_items():
-            if key != "undo" or "|" not in str(value):
-                continue
-            entity_id, _sep, old = str(value).rpartition("|")
-            if old not in GAP_THRESHOLD_LABELS or deps.index.get_entity(entity_id) is None:
-                continue
-            try:
-                with deps.coordinator.entity(entity_id, timeout=STORAGE_LOCKED_TIMEOUT_SECONDS):
-                    deps.index.set_config(entity_id, gap_threshold=old)
-                restored.append(entity_id)
-            except CoordinatorBusy:
-                continue
-        if restored:
-            data_quality.request_remeasure(deps.index, restored)
-        message = tr("{count} Änderung(en) zurückgenommen. Die Lücken werden neu gemessen.", count=len(restored))
-        return _gap_conflicts_response(request, message=message)
-
     @router.get("/housekeeping", response_class=HTMLResponse)
     def housekeeping_view(request: Request) -> HTMLResponse:
         """Sammelt Dinge, die niemandem auffallen, solange man nicht gezielt danach
@@ -1225,7 +1117,6 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 **_duplicates_context(rows=_duplicate_rows_for_display()),
                 **_counter_decreases_context(),
                 "data_quality": data_quality.build_matrix(deps.index),
-                "gap_conflicts": _gap_conflicts_context(),
                 "outlier_rates": cleanup_stats.outlier_rate_overview(deps.index),
                 "outlier_notable_percent": format_value(
                     cleanup_stats.OUTLIER_RATE_NOTABLE_PERCENT, 0
@@ -1267,32 +1158,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         for key, (value, _labels, _error) in fields.items():
             if value is not None:
                 deps.index.set_setting(key, str(value))
-        # Wie update_entity_config unten — nur bei ÄNDERUNG von default_resolution/default_value_filter auslösen.
-        gap_threshold_auto_adjusted = False
-        gap_threshold_auto_adjusted_message = None
-        default_resolution = fields["default_resolution"][0]
-        default_value_filter = fields["default_value_filter"][0]
-        default_heartbeat = fields["default_value_filter_heartbeat"][0]
-        if default_value_filter == "decimals" or default_heartbeat is not None or default_resolution is not None:
-            current_resolution = deps.index.get_setting("default_resolution", DEFAULT_RESOLUTION)
-            current_value_filter = deps.index.get_setting("default_value_filter", DEFAULT_VALUE_FILTER)
-            current_heartbeat = deps.index.get_setting(
-                "default_value_filter_heartbeat", DEFAULT_VALUE_FILTER_HEARTBEAT
-            )
-            current_gap = deps.index.get_setting("default_gap_threshold", DEFAULT_GAP_THRESHOLD)
-            should_raise, new_gap = should_raise_gap_threshold(
-                current_gap, current_resolution, current_value_filter, deps.gap_threshold_minute_tiers,
-                current_heartbeat,
-            )
-            if should_raise:
-                deps.index.set_setting("default_gap_threshold", new_gap)
-                gap_threshold_auto_adjusted = True
-                reason = "value_filter" if current_value_filter == "decimals" else "resolution"
-                gap_threshold_auto_adjusted_message = deps.gap_threshold_auto_adjust_message(
-                    reason, new_gap, current_resolution, label=tr("Standard-Lücken-Erkennung"))
         context = deps.settings_archivierung_context(saved=True)
-        context["gap_threshold_auto_adjusted"] = gap_threshold_auto_adjusted
-        context["gap_threshold_auto_adjusted_message"] = gap_threshold_auto_adjusted_message
         return deps.templates.TemplateResponse(request, "_settings_archivierung_form.html", context)
 
 
