@@ -297,7 +297,17 @@
       roomColors: (() => { try { return JSON.parse((document.querySelector('[data-room-colors]') || {dataset: {}}).dataset.roomColors || '{}') || {}; } catch (e) { return {}; } })(),
       floorsStart: (document.querySelector('[data-floors-start]') || {dataset: {}}).dataset.floorsStart || 'open',
       roomOrder: (() => { try { return JSON.parse((document.querySelector('[data-room-order]') || {dataset: {}}).dataset.roomOrder || '{}') || {}; } catch (e) { return {}; } })(),
-      klimaMinTile: {small: 90, medium: 110, large: 180}[(document.querySelector('[data-klima-size]') || {dataset: {}}).dataset.klimaSize] || 0,
+      // „Automatisch“ nimmt auf dem Handy (schmaler Bildschirm) die kleine Kachelgröße, sonst würde die Übersicht sehr lang.
+      klimaMinTile: (() => {
+        const host = document.querySelector('[data-klima-size]');
+        if (!host) return 0;
+        const phone = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 640px)').matches;
+        if (phone && host.dataset.klimaSize === 'auto') {
+          host.dataset.klimaSize = 'small';
+          host.style.setProperty('--wt-room-min', '150px');
+        }
+        return {small: 90, medium: 110, large: 180}[host.dataset.klimaSize] || 0;
+      })(),
       klimaRooms: (document.querySelector('[data-klima-tiles]') || {dataset: {}}).dataset.klimaTiles === 'room',
       tilesStand: '',
       tilesAt: null,
@@ -445,7 +455,7 @@
 
       tableRoomColors() {
         const out = {};
-        Object.keys(this.roomColors).forEach((name) => { out[name] = this.roomColorOf(name); });
+        Object.keys(this.roomColorNumbers()).forEach((name) => { out[name] = this.roomColorOf(name); });
         return out;
       },
 
@@ -1824,8 +1834,24 @@
       // Räume der weiteren Sensoren für die Auswahl über den Diagrammen; ab zwei Räumen sichtbar.
       // Farbe eines Raums aus dem Setup: die Diagrammfarbe als CSS-Wert, leer ohne Auswahl.
       roomColorOf(room) {
-        const number = room ? this.roomColors[room] : '';
+        const number = room ? this.roomColorNumbers()[room] : '';
         return /^[1-8]$/.test(number || '') ? 'var(--chart-' + number + ')' : '';
+      },
+
+      // Gespeicherte Farben; Räume ohne Eintrag (etwa frisch hinzugefügt) bekommen wie in der Einrichtung die nächste freie, danach reihum.
+      roomColorNumbers() {
+        const next = {...this.roomColors};
+        const rooms = this.tempCmp ? WetterRooms.roomsOf(this.tempCmp, {}).filter(Boolean) : [];
+        const used = new Set(Object.values(next));
+        let turn = Object.keys(next).length;
+        rooms.forEach((room) => {
+          if (next[room]) return;
+          const free = ['1', '2', '3', '4', '5', '6', '7', '8'].find((n) => !used.has(n));
+          next[room] = free || String(turn % 8 + 1);
+          used.add(next[room]);
+          turn += 1;
+        });
+        return next;
       },
 
       roomChips() {
@@ -1883,7 +1909,17 @@
         const labels = data.dates.map((iso) => dayFormat.format(new Date(`${iso}T00:00:00Z`)));
         const unit = (series[0] && series[0].unit) || fallbackUnit;
         // Die Farbe richtet sich nach der Stelle in der ganzen Liste (_i), nicht nach der in der Auswahl.
-        const colorOf = (row, index) => this.heatColor(row._i != null ? row._i : index);
+        // Zusatzsensoren mit Raum tragen die Raumfarbe (wie Auswahl, Kachel und Tabelle); weitere Linien desselben Raums gestrichelt.
+        const roomNumbers = this.roomColorNumbers();
+        const roomColorLine = (row) => (String(row.key).startsWith('temperature:') && row.room && roomNumbers[row.room]) ? cssVar('--chart-' + roomNumbers[row.room]) : '';
+        const colorOf = (row, index) => roomColorLine(row) || this.heatColor(row._i != null ? row._i : index);
+        const seenRooms = new Set();
+        const dashOf = (row) => {
+          if (!roomColorLine(row)) return 'solid';
+          const again = seenRooms.has(row.room);
+          seenRooms.add(row.room);
+          return again ? 'dashed' : 'solid';
+        };
         const names = series.map((row) => row.label);
         const chart = chartFor(name, element);
         chart.setOption({
@@ -1901,7 +1937,7 @@
           series: series.map((row, index) => ({
             name: row.label, type: 'line', data: row.values, symbol: 'none', connectNulls: false,
             z: index === 0 ? 5 : 2,
-            lineStyle: {color: colorOf(row, index), width: index === 0 ? 3 : 2},
+            lineStyle: {color: colorOf(row, index), width: index === 0 ? 3 : 2, type: dashOf(row)},
             itemStyle: {color: colorOf(row, index)},
           })),
         }, true);
