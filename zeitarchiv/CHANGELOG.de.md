@@ -26,15 +26,16 @@
   - Übernommen wird nur bei „zu empfindlich“; „Aus“ wird nie empfohlen
   - Die Meldung „Ausreißer-Erkennung markiert auffällig viel“ zählt zu empfindliche und nicht geeignete Entitäten
   - Nach dem Update misst Zeitarchiv jede Entität einmal neu, bei großen Historien dauert das
-- **Wetterdashboard**: Karte „Tagesverlauf im Vergleich“ in der Übersicht
-  - Temperatur, Niederschlag oder Sonnenstunden je Tag für 7 Tage, 30 Tage, 12 Monate oder einen eigenen Zeitraum (bis zu zehn Jahre)
-  - Vergleich mit dem Vorzeitraum oder dem Vorjahreszeitraum als gestrichelte Linie, oder ohne Vergleich; eine Zeile fasst ihn zusammen
-  - Ab etwa zwei Monaten zeigt die Karte Wochenwerte
-  - In der Kartenauswahl ein- und ausblendbar
-- **Wetterdashboard**: Zeiträume auf „Wind & Sonne“
-  - „PV und Helligkeit“: 7, 14 oder 30 Tage oder ein eigener Zeitraum (bis zu drei Monate)
-  - Das Stundendiagramm zeigt wahlweise den gewählten Tag oder das Mittel im Zeitraum; der Tooltip nennt Ertrag und Erwartung in kWh
-  - „Die letzten Tage im Vergleich“: 7, 14 oder 30 Tage
+- **Wetterdashboard**
+  - Karte „Tagesverlauf im Vergleich“ in der Übersicht
+    - Temperatur, Niederschlag oder Sonnenstunden je Tag für 7 Tage, 30 Tage, 12 Monate oder einen eigenen Zeitraum (bis zu zehn Jahre)
+    - Vergleich mit dem Vorzeitraum oder dem Vorjahreszeitraum als gestrichelte Linie, oder ohne Vergleich; eine Zeile fasst ihn zusammen
+    - Ab etwa zwei Monaten zeigt die Karte Wochenwerte
+    - In der Kartenauswahl ein- und ausblendbar
+  - Zeiträume auf „Wind & Sonne“
+    - „PV und Helligkeit“: 7, 14 oder 30 Tage oder ein eigener Zeitraum (bis zu drei Monate)
+    - Das Stundendiagramm zeigt wahlweise den gewählten Tag oder das Mittel im Zeitraum; der Tooltip nennt Ertrag und Erwartung in kWh
+    - „Die letzten Tage im Vergleich“: 7, 14 oder 30 Tage
 - **Wertänderungsfilter**: Das Lebenszeichen ist einstellbar
   - 1, 3, 6, 12 oder 24 Stunden, je Entität (bei aktivem Filter) und als Standard unter Einstellungen → Archivierung; bisher fest 6 Stunden
   - Die Lücken-Erkennung kennt dafür die Stufe „3 Stunden“; „1 Tag“ heißt dort „24 Stunden“
@@ -47,18 +48,20 @@
   - Entitäten mit mehr als 10 Mio Werten werden nicht mehr abgewiesen; ein Aufteilen von Hand entfällt
   - Neuer Knopf „Abbrechen“ in der Fortschrittsanzeige
   - Der Import hält die Oberfläche nur noch kurz je Abschnitt an
-- **Datenqualität**: Neu messen
-  - „Neu messen“ in der Statuszeile, der Auswahlleiste und je Zeile aktualisiert die Zahlen sofort, statt auf die nächste automatische Messung zu warten
-  - Die Statuszeile zeigt den Fortschritt, solange die Messung läuft
-- **Datenqualität**: Auswahl, welche Befundarten die Meldung „Neue Befunde in der Datenqualität“ auslösen
-  - Einstellungen → Meldungen; Lücken sind standardmäßig aus
-  - Die Datenqualität-Seite zeigt weiterhin alles
+- **Datenqualität**
+  - Neu messen
+    - „Neu messen“ in der Statuszeile, der Auswahlleiste und je Zeile aktualisiert die Zahlen sofort, statt auf die nächste automatische Messung zu warten
+    - Die Statuszeile zeigt den Fortschritt, solange die Messung läuft
+  - Auswahl, welche Befundarten die Meldung „Neue Befunde in der Datenqualität“ auslösen
+    - Einstellungen → Meldungen; Lücken sind standardmäßig aus
+    - Die Datenqualität-Seite zeigt weiterhin alles
 
 ### Geändert
 
-- **Wetterdashboard**: „Tageslicht“ auf „Wind & Sonne“ besteht aus drei Karten
-  - „Tageslicht“, „Die letzten Tage im Vergleich“ und „Tageslänge im Jahresverlauf“ haben je eine eigene Überschrift mit Hinweis und lassen sich einzeln ausblenden
-- **Wetterdashboard**: Das Tagesbild schreibt „2,4 h Sonne von 3 h Tageslicht“ statt „von 3 h Sonne“
+- **Wetterdashboard**
+  - „Tageslicht“ auf „Wind & Sonne“ besteht aus drei Karten
+    - „Tageslicht“, „Die letzten Tage im Vergleich“ und „Tageslänge im Jahresverlauf“ haben je eine eigene Überschrift mit Hinweis und lassen sich einzeln ausblenden
+  - Das Tagesbild schreibt „2,4 h Sonne von 3 h Tageslicht“ statt „von 3 h Sonne“
 - **Lücken-Erkennung**: Mit Wertänderungsfilter oder gröberer Auflösung zählt sie Pausen zwischen empfangenen Werten
   - Lebenszeichen, Filter und Auflösung verfälschen sie nicht mehr; gezählt wird ab dem Update, der Beginn steht auf der Konfigurationsseite
   - Die automatische Anhebung der Schwelle und die Meldung „Lücken-Erkennung kann strukturell nicht zutreffen“ entfallen
@@ -67,20 +70,23 @@
   - Gilt für Housekeeping, die Statuskachel und den Hinweis bei „Historisch“
 - **Entitäten**: Die Entitätsliste merkt sich ihre Filter
   - Suche, Favoriten, Typ, Kategorie und Einheit bleiben erhalten, wenn man eine Entität öffnet und zurückkehrt
-- **Export**: Das Limit je CSV-Datei steigt von 5 auf 10 Mio Zeilen
-- **Datenqualität**: „n. a.“ bei Zählerrückgängen wird erklärt
-  - Ein Satz unter der Tabelle nennt den Grund (state_class total), auch auf Touch-Geräten
-  - Die aufgeklappte Zeile sagt dasselbe, wenn es keine Einzelbefunde gibt
-- **CSV-Import**: Die Vorschau markiert Werte wie „34.049“ nicht mehr als mehrdeutig, wenn die Spalte den Dezimalpunkt eindeutig zeigt
-- **Datenqualität**: Die Statuszeile heißt jetzt „zuletzt vor spätestens …“ statt „älteste Messung vor …“
-- **Datenqualität**: Deutlicherer Ladehinweis und einheitliche Filter
-  - Beim Aufklappen einer Zeile erscheint ein Spinner mit dem Hinweis, dass große Entitäten bis zu einer Minute brauchen können; schlägt das Laden fehl, gibt es „Erneut versuchen“
-  - Suche und Filter nutzen dieselben Dropdowns wie der Rest der App
+- **CSV**
+  - Export: Das Limit je CSV-Datei steigt von 5 auf 10 Mio Zeilen
+  - Import: Die Vorschau markiert Werte wie „34.049“ nicht mehr als mehrdeutig, wenn die Spalte den Dezimalpunkt eindeutig zeigt
+- **Datenqualität**
+  - „n. a.“ bei Zählerrückgängen wird erklärt
+    - Ein Satz unter der Tabelle nennt den Grund (state_class total), auch auf Touch-Geräten
+    - Die aufgeklappte Zeile sagt dasselbe, wenn es keine Einzelbefunde gibt
+  - Die Statuszeile heißt jetzt „zuletzt vor spätestens …“ statt „älteste Messung vor …“
+  - Deutlicherer Ladehinweis und einheitliche Filter
+    - Beim Aufklappen einer Zeile erscheint ein Spinner mit dem Hinweis, dass große Entitäten bis zu einer Minute brauchen können; schlägt das Laden fehl, gibt es „Erneut versuchen“
+    - Suche und Filter nutzen dieselben Dropdowns wie der Rest der App
 
 ### Behoben
 
-- **Rücklinks**: Der Link „← zurück zu …“ auf Entitäts- und Bereinigungsseiten erscheint jetzt auch innerhalb von Home Assistant, wo der Browser die Herkunft nicht weitergibt, und erkennt Einstellungen, Backup und Logs als Herkunft
-- **Datenqualität**: Die Bereinigungsseite, aus der Datenqualität geöffnet, bietet jetzt immer den Weg zurück, auch innerhalb von Home Assistant, wo der Browser die Herkunft nicht weitergibt
+- **Rücklinks**
+  - Auf Entitäts- und Bereinigungsseiten erscheint der Link „← zurück zu …“ jetzt auch innerhalb von Home Assistant, wo der Browser die Herkunft nicht weitergibt, und erkennt Einstellungen, Backup und Logs als Herkunft
+  - Die Bereinigungsseite, aus der Datenqualität geöffnet, bietet jetzt immer den Weg zurück, auch innerhalb von Home Assistant
 - **Datenqualität**: „Dauerhaft ausblenden“ bei der Meldung „Neue Befunde“ hält jetzt, statt bei neuen Zahlen wiederzukommen
 
 ## 1.53.0 - 2026-11-15

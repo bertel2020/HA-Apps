@@ -26,15 +26,16 @@
   - Only “too sensitive” is applied; “Off” is never recommended
   - The notice “Outlier detection marks an unusual amount” counts too-sensitive and not-suitable entities
   - After the update Zeitarchiv measures every entity once more, which takes a while with large histories
-- **Weather dashboard**: “Daily course compared” card in the overview
-  - Temperature, precipitation or hours of sunshine per day for 7 days, 30 days, 12 months or a custom period (up to ten years)
-  - Comparison with the previous period or the same period last year as a dashed line, or none; one line sums it up
-  - From about two months on the card shows weekly values
-  - Can be shown or hidden in the card selection
-- **Weather dashboard**: Periods on “Wind & sun”
-  - “PV and brightness”: 7, 14 or 30 days or a custom period (up to three months)
-  - The hourly chart shows either the selected day or the average over the period; the tooltip gives yield and expectation in kWh
-  - “The last days compared”: 7, 14 or 30 days
+- **Weather dashboard**
+  - “Daily course compared” card in the overview
+    - Temperature, precipitation or hours of sunshine per day for 7 days, 30 days, 12 months or a custom period (up to ten years)
+    - Comparison with the previous period or the same period last year as a dashed line, or none; one line sums it up
+    - From about two months on the card shows weekly values
+    - Can be shown or hidden in the card selection
+  - Periods on “Wind & sun”
+    - “PV and brightness”: 7, 14 or 30 days or a custom period (up to three months)
+    - The hourly chart shows either the selected day or the average over the period; the tooltip gives yield and expectation in kWh
+    - “The last days compared”: 7, 14 or 30 days
 - **Value change filter**: The sign of life is adjustable
   - 1, 3, 6, 12 or 24 hours, per entity (with an active filter) and as a default under Settings → Archiving; previously fixed at 6 hours
   - Gap detection gains a “3 hours” level for it; “1 day” is now called “24 hours”
@@ -47,18 +48,20 @@
   - Entities with more than 10 million values are no longer rejected; splitting them by hand is no longer needed
   - New “Cancel” button in the progress display
   - The import only holds the interface up briefly per section
-- **Data quality**: Measure again
-  - “Measure again” in the status line, the selection bar and each row refreshes the numbers right away instead of waiting for the next automatic measurement
-  - The status line shows the progress while it runs
-- **Data quality**: Choose which kinds of findings trigger the “New findings in data quality” notice
-  - Settings → Notices; gaps are off by default
-  - The data quality page still shows everything
+- **Data quality**
+  - Measure again
+    - “Measure again” in the status line, the selection bar and each row refreshes the numbers right away instead of waiting for the next automatic measurement
+    - The status line shows the progress while it runs
+  - Choose which kinds of findings trigger the “New findings in data quality” notice
+    - Settings → Notices; gaps are off by default
+    - The data quality page still shows everything
 
 ### Changed
 
-- **Weather dashboard**: “Daylight” on “Wind & sun” consists of three cards
-  - “Daylight”, “The last days compared” and “Day length over the year” each have their own heading with a hint and can be hidden individually
-- **Weather dashboard**: The day overview reads “2.4 h of sun of 3 h of daylight” instead of “of 3 h sun”
+- **Weather dashboard**
+  - “Daylight” on “Wind & sun” consists of three cards
+    - “Daylight”, “The last days compared” and “Day length over the year” each have their own heading with a hint and can be hidden individually
+  - The day overview reads “2.4 h of sun of 3 h of daylight” instead of “of 3 h sun”
 - **Gap detection**: With a value change filter or a coarser resolution it counts pauses between received values
   - The sign of life, filter and resolution no longer distort it; counting starts with the update, the start is shown on the configuration page
   - The automatic raising of the threshold and the notice “Gap detection can structurally never apply” are gone
@@ -67,20 +70,23 @@
   - Applies to Housekeeping, the status tile and the note for “Historic”
 - **Entities**: The entity list remembers its filters
   - Search, favorites, type, category and unit are still set when you open an entity and come back
-- **Export**: The limit per CSV file rises from 5 to 10 million rows
-- **Data quality**: “n/a” for counter decreases is now explained
-  - A sentence below the table names the reason (state_class total), also on touch devices
-  - The expanded row says the same when there are no individual findings
-- **CSV import**: The preview no longer flags values like “34.049” as ambiguous when the column clearly shows the decimal point
-- **Data quality**: The status line now reads “last measured at most … ago” instead of “oldest measurement … ago”
-- **Data quality**: Clearer loading and filters
-  - Expanding a row shows a spinner with a note that large entities can take up to a minute, and offers “Try again” if loading fails
-  - Search and filters use the same dropdowns as the rest of the app
+- **CSV**
+  - Export: The limit per CSV file rises from 5 to 10 million rows
+  - Import: The preview no longer flags values like “34.049” as ambiguous when the column clearly shows the decimal point
+- **Data quality**
+  - “n/a” for counter decreases is now explained
+    - A sentence below the table names the reason (state_class total), also on touch devices
+    - The expanded row says the same when there are no individual findings
+  - The status line now reads “last measured at most … ago” instead of “oldest measurement … ago”
+  - Clearer loading and filters
+    - Expanding a row shows a spinner with a note that large entities can take up to a minute, and offers “Try again” if loading fails
+    - Search and filters use the same dropdowns as the rest of the app
 
 ### Fixed
 
-- **Back links**: The “← back to …” link on entity and cleanup pages now also appears inside Home Assistant, where the browser does not pass on where you came from; settings, backup and logs are recognised as origin too
-- **Data quality**: The cleanup page opened from the data quality page now always offers the way back, also inside Home Assistant where the browser does not pass on where you came from
+- **Back links**
+  - The “← back to …” link on entity and cleanup pages now also appears inside Home Assistant, where the browser does not pass on where you came from; settings, backup and logs are recognised as origin too
+  - The cleanup page opened from the data quality page now always offers the way back, also inside Home Assistant
 - **Data quality**: “Hide permanently” on the “New findings” notice now sticks instead of coming back when the numbers change
 
 ## 1.53.0 - 2026-11-15
