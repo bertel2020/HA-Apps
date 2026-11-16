@@ -14,12 +14,16 @@
 
 ### New
 
+- **Data quality**: Measure again
+  - “Measure again” in the status line, the selection bar and each row refreshes the numbers right away instead of waiting for the next automatic measurement
+  - The status line shows the progress while it runs
 - **Data quality**: Choose which kinds of findings trigger the “New findings in data quality” notice
   - Settings → Notices; gaps are off by default
   - The data quality page still shows everything
 
 ### Changed
 
+- **Data quality**: The status line now reads “last measured at most … ago” instead of “oldest measurement … ago”
 - **Data quality**: Clearer loading and filters
   - Expanding a row shows a spinner with a note that large entities can take up to a minute, and offers “Try again” if loading fails
   - Search and filters use the same dropdowns as the rest of the app

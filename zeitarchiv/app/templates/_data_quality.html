@@ -77,14 +77,23 @@
 {% if is_heat %}
 {% include "_data_quality_heatmap.html" %}
 {% else %}
+{# Auswahl: jede Zeile hat eine Checkbox (für „Neu messen“); „Duplikate entfernen …“ gilt nur den gewählten Zeilen mit Duplikaten. #}
+{% set all_ids = dq.rows | map(attribute='entity_id') | list %}
 {% set dup_ids = (dq.rows | selectattr('cells.duplicates') | map(attribute='entity_id') | list) if period == 'all' else [] %}
 <div x-data="{ selected: [] }">
+{# Zwei Formulare mit verdeckten Feldern aus der Auswahl: Duplikate nur für gewählte Zeilen mit Duplikaten (die Vorschau liest
+   sonst unnötig die Rohdaten der übrigen), „Neu messen“ für alle gewählten. #}
 <form id="dq-bulk-form" hx-post="{{ app_root }}/housekeeping/datenqualitaet/duplicates/preview"
-      hx-target="#dq-bulk-panel" hx-swap="innerHTML"></form>
+      hx-target="#dq-bulk-panel" hx-swap="innerHTML">
+  <template x-for="id in selected.filter(i => {{ dup_ids | tojson | forceescape }}.includes(i))" :key="id"><input type="hidden" name="entity_id" :value="id"></template>
+</form>
+<form id="dq-remeasure-form" hidden>
+  <template x-for="id in selected" :key="id"><input type="hidden" name="entity_id" :value="id"></template>
+</form>
 <div class="dq-bulkbar" x-show="selected.length" x-cloak>
   <span class="dq-bulkbar-count" x-text='selected.length + " " + {{ _("gewählt") | tojson }}'></span>
-  <button type="button" class="btn btn-sm dq-remeasure" hx-post="{{ app_root }}/housekeeping/datenqualitaet/neu-messen" hx-include="#dq-bulk-form" hx-swap="none" data-dq-remeasure data-none="{{ _('Nichts zu messen') }}"><span class="dq-remeasure-label">{{ _("Neu messen") }}</span></button>
-  <button type="submit" form="dq-bulk-form" class="btn btn-sm">{{ _("Duplikate entfernen …") }}</button>
+  <button type="button" class="btn btn-sm dq-remeasure" hx-post="{{ app_root }}/housekeeping/datenqualitaet/neu-messen" hx-include="#dq-remeasure-form" hx-swap="none" data-dq-remeasure data-none="{{ _('Nichts zu messen') }}"><span class="dq-remeasure-label">{{ _("Neu messen") }}</span></button>
+  <button type="submit" form="dq-bulk-form" class="btn btn-sm" x-show="selected.some(i => {{ dup_ids | tojson | forceescape }}.includes(i))" x-cloak>{{ _("Duplikate entfernen …") }}</button>
   <button type="button" class="btn btn-sm" @click="selected = []">{{ _("Auswahl aufheben") }}</button>
 </div>
 <div id="dq-bulk-panel"></div>
@@ -92,7 +101,7 @@
   {% if dq.rows %}
   <table class="dt dq-table">
     <thead><tr>
-      <th><div class="dq-entity-cell dq-head-cell">{% if dup_ids %}<input type="checkbox" class="dq-check" title="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" aria-label="{{ _('Alle mit Duplikaten auf dieser Seite wählen') }}" :checked="selected.length === {{ dup_ids | length }}" @change='selected = $event.target.checked ? {{ dup_ids | tojson }} : []'>{% else %}<span class="dq-check" aria-hidden="true"></span>{% endif %}<span class="dq-caret" aria-hidden="true"></span>{{ sort_link("name", _("Entität")) }}</div></th>
+      <th><div class="dq-entity-cell dq-head-cell"><input type="checkbox" class="dq-check" title="{{ _('Alle Zeilen auf dieser Seite wählen') }}" aria-label="{{ _('Alle Zeilen auf dieser Seite wählen') }}" :checked="selected.length === {{ all_ids | length }}" @change='selected = $event.target.checked ? {{ all_ids | tojson | forceescape }} : []'><span class="dq-caret" aria-hidden="true"></span>{{ sort_link("name", _("Entität")) }}</div></th>
       {% for col in dq.columns %}
       <th class="dq-num">{{ sort_link(col.key, labels[col.key]) }}</th>
       {% endfor %}
@@ -106,7 +115,7 @@
           @click="open = !open" @keydown.enter="open = !open">
         <td class="entity">
           <div class="dq-entity-cell">
-            {% if row.cells.duplicates and period == 'all' %}<input type="checkbox" class="dq-check" name="entity_id" value="{{ row.entity_id }}" form="dq-bulk-form" x-model="selected" @click.stop aria-label="{{ _('Für Sammelaktion wählen') }}">{% else %}<span class="dq-check" aria-hidden="true"></span>{% endif %}
+            <input type="checkbox" class="dq-check" value="{{ row.entity_id }}" x-model="selected" @click.stop aria-label="{{ _('Für Sammelaktion wählen') }}">
             <span class="dq-caret" aria-hidden="true">▸</span>
             <div class="dq-entity-text">
               <span class="name">{{ row.friendly_name }}</span>{% if row.friendly_name != row.entity_id %}<span class="id">{{ row.entity_id }}</span>{% endif %}

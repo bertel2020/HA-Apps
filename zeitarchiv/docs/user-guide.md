@@ -2478,6 +2478,10 @@ die **gesamte Historie** der Entität.
   Läuft die Erstmessung noch, steht dort „n von m Entitäten gemessen“ mit einer
   Fortschrittsleiste; sind Messungen älter als sechs Stunden, nennt die Zeile
   deren Zahl.
+  - **Neu messen** rechts in der Zeile misst alle Entitäten neu, die seit ihrer
+    letzten Messung neue Werte bekommen haben; stille Entitäten bleiben
+    unberührt. Die Messung läuft im Hintergrund, die Seite zeigt den Fortschritt
+    und lädt danach neu.
 - **Suche, Befund und Zeitraum**: nach Name oder ID suchen, auf einen
   Befundtyp einschränken und den Zeitraum wählen (7 Tage, 30 Tage, 1 Jahr,
   **Gesamt** — Standard). Sortiert wird per Klick auf eine Spaltenüberschrift;
@@ -2488,7 +2492,10 @@ die **gesamte Historie** der Entität.
   **Stand** (wann die Zahlen zuletzt gemessen wurden). Ein Klick auf eine Zahl
   öffnet **Werte bearbeiten** der Entität mit dem passenden Filter; ein Klick
   auf die Zeile klappt die jüngsten Einzelbefunde auf (bis zu fünf je Typ, mit
-  Begründung).
+  Begründung). Der Kreispfeil in der Spalte **Stand** (beim Darüberfahren, auf
+  dem Telefon immer sichtbar) misst nur diese Entität neu. Jede Zeile hat ein
+  Kontrollkästchen (das im Tabellenkopf wählt alle auf der Seite); die
+  Auswahlleiste bietet **Neu messen** für die gewählten Entitäten.
 
 **Farben** folgen derselben Regel wie in Werte bearbeiten (siehe
 [Bereinigung](#bereinigung)): **Gelb** heißt, dass sich aufräumen lässt
@@ -2500,9 +2507,9 @@ in Werte bearbeiten. Zähler mit **Rückgänge erlauben** zeigen kursiv „erlau
 Zähler der Klasse `total` ein „n. a.“, weil Home Assistant sie sinken lassen
 darf und sie deshalb nie auf Rückgänge geprüft werden.
 
-**Duplikate entfernen (Sammelaktion).** Bei Zeitraum **Gesamt** haben
-Entitäten mit Duplikaten ein Kontrollkästchen (das im Tabellenkopf wählt alle
-auf der Seite). **Duplikate entfernen …** zeigt eine Vorschau je Entität; nach
+**Duplikate entfernen (Sammelaktion).** Bei Zeitraum **Gesamt** erscheint
+in der Auswahlleiste **Duplikate entfernen …**, sobald unter den gewählten
+Entitäten welche mit Duplikaten sind (die übrigen bleiben unberührt). Es zeigt eine Vorschau je Entität; nach
 dem Bestätigen steht das Ergebnis mit **Rückgängig** da. Wie beim Löschen in
 Werte bearbeiten ist das zunächst ein Soft-Delete; der chronologisch zuerst
 gespeicherte Wert bleibt erhalten. Rückgängig gilt je Entität nur für die

@@ -14,12 +14,16 @@
 
 ### Neu
 
+- **Datenqualität**: Neu messen
+  - „Neu messen“ in der Statuszeile, der Auswahlleiste und je Zeile aktualisiert die Zahlen sofort, statt auf die nächste automatische Messung zu warten
+  - Die Statuszeile zeigt den Fortschritt, solange die Messung läuft
 - **Datenqualität**: Auswahl, welche Befundarten die Meldung „Neue Befunde in der Datenqualität“ auslösen
   - Einstellungen → Meldungen; Lücken sind standardmäßig aus
   - Die Datenqualität-Seite zeigt weiterhin alles
 
 ### Geändert
 
+- **Datenqualität**: Die Statuszeile heißt jetzt „zuletzt vor spätestens …“ statt „älteste Messung vor …“
 - **Datenqualität**: Deutlicherer Ladehinweis und einheitliche Filter
   - Beim Aufklappen einer Zeile erscheint ein Spinner mit dem Hinweis, dass große Entitäten bis zu einer Minute brauchen können; schlägt das Laden fehl, gibt es „Erneut versuchen“
   - Suche und Filter nutzen dieselben Dropdowns wie der Rest der App

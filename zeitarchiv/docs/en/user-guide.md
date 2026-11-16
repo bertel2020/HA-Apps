@@ -2298,6 +2298,10 @@ entity.
   While the first measurement is still running it says “n of m entities
   measured” with a progress bar; if measurements are older than six hours, the
   line gives their number.
+  - **Measure again** at the right of the line measures all entities that have
+    received new values since their last measurement; silent entities are left
+    alone. The measurement runs in the background, the page shows the progress
+    and reloads afterwards.
 - **Search, finding and period**: search by name or ID, restrict to one finding
   type and choose the period (7 days, 30 days, 1 year, **Total** — default).
   Sorting is by clicking a column heading; on the phone, where the headings
@@ -2307,7 +2311,10 @@ entity.
   plus **As of** (when the numbers were last measured). A click on a number
   opens **Edit values** of the entity with the matching filter; a click on the
   row unfolds the most recent individual findings (up to five per type, with
-  reason).
+  reason). The circular arrow in the **As of** column (on hover, always visible
+  on the phone) measures only this entity again. Every row has a checkbox (the
+  one in the table header selects all on the page); the selection bar offers
+  **Measure again** for the selected entities.
 
 **Colors** follow the same rule as in Edit values (see [Cleanup](#cleanup)):
 **yellow** means you can clean up (duplicates, counter decreases, outliers),
@@ -2319,9 +2326,9 @@ decreases** show “allowed” in italics, counters of the class `total` show
 “n/a”, because Home Assistant allows them to decrease and they are therefore
 never checked for decreases.
 
-**Remove duplicates (bulk action).** For the period **Total**, entities with
-duplicates have a checkbox (the one in the table header selects all on the
-page). **Remove duplicates …** shows a preview per entity; after confirming,
+**Remove duplicates (bulk action).** For the period **Total**, the selection
+bar shows **Remove duplicates …** as soon as the selected entities include
+some with duplicates (the others stay untouched). It shows a preview per entity; after confirming,
 the result appears with **Undo**. As with deleting in Edit values, this is
 a soft delete at first; the value stored first chronologically is kept. Undo
 applies per entity only to the most recently deleted batch, i.e. the run you

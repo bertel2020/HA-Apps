@@ -158,7 +158,16 @@ def test_sammelaktion_vorschau_loeschen_und_rueckgaengig(client) -> None:
     assert "Bestätigung" in client.post("/housekeeping/datenqualitaet/duplicates/preview", data=daten).text
 
 
-def test_tabelle_bietet_auswahl_nur_bei_duplikaten(client) -> None:
+def _duplikat_liste(html: str) -> str:
+    """Die Entitäten, für die „Duplikate entfernen“ angeboten wird (Liste in der Auswahlleiste)."""
+    import re
+
+    return re.search(r"selected\.some\(i => (\[.*?\])\.includes", html).group(1)
+
+
+def test_tabelle_bietet_auswahl_je_zeile_duplikate_nur_fuer_betroffene(client) -> None:
+    """Jede Zeile hat ein Kontrollkästchen (für „Neu messen“); „Duplikate entfernen“ bekommt nur die Zeilen mit
+    Duplikaten übergeben."""
     from app.main import index
 
     from app.storage.cleanup import OUTLIER_RULE_VERSION
@@ -167,25 +176,29 @@ def test_tabelle_bietet_auswahl_nur_bei_duplikaten(client) -> None:
         _entity(index, name)
         index.set_first_ts_and_add_rows(name, 1_700_000_000.0, 0)
         index.set_cleanup_alltime_stats(
-            name, {"all": 100, "duplicates": dup, "outliers": 1, "gaps": 0, "counter_decreases": 0},
+            name, {"all": 100, "duplicates": dup, "outliers": 1, "gaps": 0, "counter_decreases": 0 if dup else 3},
             "off", OUTLIER_RULE_VERSION, daily={}, gap_threshold="15",
         )
     html = client.get("/housekeeping/datenqualitaet?page_size=500").text
-    assert 'name="entity_id" value="sensor.pytest_dq_mit"' in html
-    assert 'name="entity_id" value="sensor.pytest_dq_ohne"' not in html
+    assert 'class="dq-check" value="sensor.pytest_dq_mit"' in html
+    assert 'class="dq-check" value="sensor.pytest_dq_ohne"' in html
+    liste = _duplikat_liste(html)  # die Datenbank der Tests teilt sich Entitäten, daher nur auf diese beiden prüfen
+    assert "&#34;sensor.pytest_dq_mit&#34;" in liste and "sensor.pytest_dq_ohne" not in liste
     assert 'id="dq-bulk-panel"' in html
+    assert 'id="dq-remeasure-form"' in html
 
 
 def test_zeitraum_auswahl_standard_gesamt_und_ohne_sammelaktion_im_fenster(client) -> None:
     from app.main import index
 
     _mit_duplikaten(index, "sensor.pytest_dq_zeitraum")
-    html = client.get("/housekeeping/datenqualitaet").text
+    html = client.get("/housekeeping/datenqualitaet?page_size=500").text
     assert 'name="period" id="dq-period-input" value="all"' in html
-    assert 'class="dq-check" name="entity_id"' in html
-    fenster = client.get("/housekeeping/datenqualitaet?period=7d").text
+    assert _duplikat_liste(html) != "[]"
+    fenster = client.get("/housekeeping/datenqualitaet?period=7d&page_size=500").text
     assert 'name="period" id="dq-period-input" value="7d"' in fenster
-    assert 'name="entity_id"' not in fenster  # Entfernen gilt für die ganze Historie
+    assert 'class="dq-check" value="sensor.' in fenster  # Neu messen geht in jedem Zeitraum
+    assert _duplikat_liste(fenster) == "[]"  # Entfernen gilt für die ganze Historie: im Fenster nie angeboten
 
 
 def test_alle_auswaehlen_liefert_gueltiges_attribut(client) -> None:
