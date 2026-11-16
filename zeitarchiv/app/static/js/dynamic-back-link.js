@@ -26,6 +26,9 @@
     {re: /^\/housekeeping\/datenqualitaet(\/|$)/, text: t('zur Datenqualität')},
     {re: /^\/housekeeping(\/|$)/, text: t('zum Housekeeping')},
     {re: /^\/import(\/|$)/, text: t('zum Import')},
+    {re: /^\/settings(\/|$)/, text: t('zu den Einstellungen')},
+    {re: /^\/backup(\/|$)/, text: t('zum Backup')},
+    {re: /^\/logs(\/|$)/, text: t('zu den Logs')},
   ];
 
   // Dieselbe app_root-Abzieh-Logik wie _rel in _topnav.html — macht den
@@ -38,9 +41,11 @@
 
   function init() {
     const container = document.querySelector('[data-dynamic-back]');
-    if (!container || !document.referrer) return;
+    // Ohne Referrer (HA-Ingress) die gemerkte Vorseite aus page-memory.js.
+    const referrer = document.referrer || window.zaPrevPage;
+    if (!container || !referrer) return;
     let ref;
-    try { ref = new URL(document.referrer); } catch (e) { return; }
+    try { ref = new URL(referrer); } catch (e) { return; }
     if (ref.origin !== location.origin) return;
 
     const root = container.dataset.appRoot || '';
@@ -99,8 +104,8 @@
     // Link-Klick landet dadurch wieder genau dort, ohne auf Browser-
     // Verlauf/bfcache angewiesen zu sein (funktioniert auch in einem neuen
     // Tab oder nach einem harten Reload).
-    remember(document.referrer, match.text);
-    render(document.referrer, match.text);
+    remember(referrer, match.text);
+    render(referrer, match.text);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

@@ -4962,7 +4962,7 @@ def entity_detail(
 @_storage_locked(lambda args: args["entity_id"])
 def entity_cleanup(
     request: Request, entity_id: str, filter: str = "all", range_key: str = Query("day", alias="range"),
-    date: str | None = None,
+    date: str | None = None, from_: str | None = Query(None, alias="from"),
 ) -> HTMLResponse:
     entity = _require_entity(entity_id)
     outlier_detection_enabled = effective_outlier_threshold(
@@ -5001,7 +5001,7 @@ def entity_cleanup(
             "counter_decrease_enabled": cleanup_stats.counter_decreases_flagged(entity),
             "initial_filter": initial_filter,
             "initial_range": initial_range,
-            "initial_offset": initial_offset,
+            "initial_offset": initial_offset, "from_quality": from_ == "datenqualitaet",  # Rücklink, auch ohne Referrer (HA-Ingress)
             "is_favorite": bool(entity["is_favorite"]),
             "aggregation_type": entity["aggregation_type"],
             "compact_target_options": list(COMPACT_TARGET_LABELS.items()),

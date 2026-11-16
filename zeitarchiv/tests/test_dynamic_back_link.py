@@ -17,8 +17,14 @@ JS = (APP / "static/js/dynamic-back-link.js").read_text(encoding="utf-8")
 
 
 def test_link_navigates_to_the_referrer_url_as_is() -> None:
-    assert "render(document.referrer, match.text);" in JS
+    assert "render(referrer, match.text);" in JS
+    assert "document.referrer || window.zaPrevPage" in JS  # ohne Referrer (HA-Ingress) die gemerkte Vorseite
 
 
 def test_energiedashboard_route_is_recognized() -> None:
     assert r"/^\/energiedashboard(\/|$)/" in JS
+
+
+def test_settings_backup_and_logs_are_recognized_origins() -> None:
+    for pattern in (r"/^\/settings(\/|$)/", r"/^\/backup(\/|$)/", r"/^\/logs(\/|$)/"):
+        assert pattern in JS

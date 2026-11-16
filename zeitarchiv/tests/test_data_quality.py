@@ -149,11 +149,11 @@ def test_links_tragen_filter_und_zeitraum(index):
     _mit_daten(index, "sensor.a")
     _gesamt(index, "sensor.a", duplicates=1, counter_decreases=1, outliers=2)
     zellen = data_quality.build_matrix(index)["rows"][0]["cells"]
-    assert zellen["duplicates"]["href"] == "entities/sensor.a/cleanup?filter=duplicates&range=all"
+    assert zellen["duplicates"]["href"] == "entities/sensor.a/cleanup?filter=duplicates&range=all&from=datenqualitaet"
     assert zellen["counter_decreases"]["href"] == (
-        "entities/sensor.a/cleanup?filter=counter_decreases&range=all"
+        "entities/sensor.a/cleanup?filter=counter_decreases&range=all&from=datenqualitaet"
     )
-    assert zellen["outliers"]["href"] == "entities/sensor.a/cleanup?filter=outliers&range=all"
+    assert zellen["outliers"]["href"] == "entities/sensor.a/cleanup?filter=outliers&range=all&from=datenqualitaet"
 
 
 @pytest.mark.parametrize(

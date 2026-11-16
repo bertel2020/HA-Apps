@@ -26,6 +26,8 @@
 
 ### Fixed
 
+- **Back links**: The “← back to …” link on entity and cleanup pages now also appears inside Home Assistant, where the browser does not pass on where you came from; settings, backup and logs are recognised as origin too
+- **Data quality**: The cleanup page opened from the data quality page now always offers the way back, also inside Home Assistant where the browser does not pass on where you came from
 - **Data quality**: “Hide permanently” on the “New findings” notice now sticks instead of coming back when the numbers change
 
 ## 1.53.0 - 2026-11-15

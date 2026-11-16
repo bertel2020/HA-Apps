@@ -26,7 +26,7 @@ def test_datenqualitaet_seite_zeigt_die_matrix_mit_link_auf_die_bereinigung(clie
         "off", OUTLIER_RULE_VERSION,
     )
     html = client.get("/housekeeping/datenqualitaet").text
-    assert 'href="/entities/sensor.pytest_dq_matrix/cleanup?filter=duplicates&amp;range=all"' in html
+    assert 'href="/entities/sensor.pytest_dq_matrix/cleanup?filter=duplicates&amp;range=all&amp;from=datenqualitaet"' in html
     # Die Zeile lädt ihre Einzelbefunde über einen absoluten Pfad: die Seite
     # liegt unter /housekeeping/, ein relativer Link würde dort ins Leere laufen.
     assert 'hx-get="/entities/sensor.pytest_dq_matrix/data-quality"' in html
@@ -338,3 +338,13 @@ def test_a_ticked_row_marks_exactly_its_own_value_among_equal_timestamps(client)
     assert index.get_deleted_counts_for_entity(entity_id).values_by_ts == {1700000000.0: [7.5]}
     client.post(f"/entities/{entity_id}/rows/delete", data={**form, "ts": "1700000100.0"})  # älteres Formular
     assert index.get_deleted_counts_for_entity(entity_id)[1700000100.0] == 1
+
+
+def test_bereinigung_zeigt_ruecklink_zur_datenqualitaet_ohne_referrer(client) -> None:
+    from app.main import index
+
+    _mit_duplikaten(index, "sensor.pytest_dq_rueck")
+    mit = client.get("/entities/sensor.pytest_dq_rueck/cleanup?filter=duplicates&range=all&from=datenqualitaet").text
+    assert 'href="/housekeeping/datenqualitaet"' in mit
+    ohne = client.get("/entities/sensor.pytest_dq_rueck/cleanup?filter=duplicates&range=all").text
+    assert 'href="/housekeeping/datenqualitaet"' not in ohne

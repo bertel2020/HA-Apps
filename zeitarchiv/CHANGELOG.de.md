@@ -26,6 +26,8 @@
 
 ### Behoben
 
+- **Rücklinks**: Der Link „← zurück zu …“ auf Entitäts- und Bereinigungsseiten erscheint jetzt auch innerhalb von Home Assistant, wo der Browser die Herkunft nicht weitergibt, und erkennt Einstellungen, Backup und Logs als Herkunft
+- **Datenqualität**: Die Bereinigungsseite, aus der Datenqualität geöffnet, bietet jetzt immer den Weg zurück, auch innerhalb von Home Assistant, wo der Browser die Herkunft nicht weitergibt
 - **Datenqualität**: „Dauerhaft ausblenden“ bei der Meldung „Neue Befunde“ hält jetzt, statt bei neuen Zahlen wiederzukommen
 
 ## 1.53.0 - 2026-11-15

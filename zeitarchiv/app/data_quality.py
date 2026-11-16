@@ -104,7 +104,8 @@ def paginate(rows: list[dict], page: int, page_size: int) -> tuple[list[dict], d
 def cleanup_href(entity_id: str, filter_: str, range_: str) -> str:
     """Relativer Link (wie die übrigen Links auf der Housekeeping-Seite) auf die
     Bereinigungsseite einer Entität mit gesetztem Filter und Zeitraum."""
-    query = urlencode({"filter": filter_, "range": range_})
+    # from: damit die Bereinigungsseite den Rückweg auch ohne Referrer (HA-Ingress) kennt.
+    query = urlencode({"filter": filter_, "range": range_, "from": "datenqualitaet"})
     return f"entities/{quote(entity_id, safe='.')}/cleanup?{query}"
 
 

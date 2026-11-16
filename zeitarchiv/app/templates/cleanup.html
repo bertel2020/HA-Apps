@@ -28,6 +28,7 @@
          anbieten — und den die Verlaufsseite an derselben Stelle schon hat,
          wodurch die drei Köpfe jetzt gleich aufgebaut sind. #}
       <a href="{{ app_root }}/entities">{{ _("← zurück zu Entitäten") }}</a>
+      {% if from_quality %} &middot; <a href="{{ app_root }}/housekeeping/datenqualitaet">{{ _("← zurück zur Datenqualität") }}</a>{% endif %}
     </p>
 
     {% include "_entity_facts.html" %}
