@@ -540,9 +540,8 @@
   </div>
   {% endif %}
 
-  {% if show_daylight %}
+  {% if show_daylight_main %}
   <div class="card wt-card" x-show="daylight || daylightError" x-cloak>
-    {% if show_daylight_main %}
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("Tageslicht") }} {{ hint_button(_("Tageslicht")) }}</h2>
       {% call hint_body() %}{{ _("Der Dämmerungssensor misst von 0 bis 1.000 lx. Die Kurve zeigt, wann es für den Sensor hell wird und wann nicht mehr, nicht den Sonnenstand: Dichte Wolken verschieben den Tagesbeginn nach hinten, Ausrichtung und Verschattung wirken ebenfalls. Die Schwellen für Nacht und Tag stehen in der Einrichtung.") }}{% endcall %}
@@ -561,10 +560,13 @@
     <div class="wt-chart" x-show="daylight" x-ref="daylightChart"></div>
     <p class="hint hint-warn" x-show="daylightNote()" x-text="daylightNote()" x-cloak></p>
     <p class="hint hint-warn" x-show="daylightError" x-text="daylightError" x-cloak></p>
-    {% endif %}
-    {% if show_dl_days %}
-    <div class="wt-controls wt-dl-h" x-show="daylight" x-cloak>
-      <h3 class="wt-h3">{{ _("Die letzten Tage im Vergleich") }}</h3>
+  </div>
+  {% endif %}
+  {% if show_dl_days %}
+  <div class="card wt-card" x-show="daylight{% if not show_daylight_main %} || daylightError{% endif %}" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Die letzten Tage im Vergleich") }} {{ hint_button(_("Die letzten Tage im Vergleich")) }}</h2>
+      {% call hint_body() %}{{ _("Pro Tag die Zeit, in der der Dämmerungssensor „Tag“ meldet, ihre Länge, die Änderung zum Vortag und die Dämmerung morgens und abends. Die Tabelle endet am Stichtag; Tage ohne Werte fehlen. Die Änderung zum Vortag steht nur bei minutengenauen Tagen.") }}{% endcall %}
       <div class="wt-seg wt-controls-end" role="group" aria-label="{{ _('Zeitraum') }}">
         <template x-for="n in [7, 14, 30]" :key="n">
           <button type="button" :aria-pressed="(daylightDays === n).toString()" @click="setDaylightDays(n)" x-text="t('{n} Tage', {n})"></button>
@@ -592,10 +594,14 @@
       </table>
     </div>
     <p class="wt-hint" x-show="daylight && daylightHistoryNote()" x-text="daylightHistoryNote()" x-cloak></p>
-    {% endif %}
-    {% if show_dl_length %}
-    <div class="wt-controls wt-dl-h" x-show="daylength" x-cloak>
-      <h3 class="wt-h3">{{ _("Tageslänge im Jahresverlauf") }}</h3>
+    {% if not show_daylight_main %}<p class="hint hint-warn" x-show="daylightError" x-text="daylightError" x-cloak></p>{% endif %}
+  </div>
+  {% endif %}
+  {% if show_dl_length %}
+  <div class="card wt-card" x-show="daylength" x-cloak>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Tageslänge im Jahresverlauf") }} {{ hint_button(_("Tageslänge im Jahresverlauf")) }}</h2>
+      {% call hint_body() %}{{ _("Die Länge der hellen Zeit über das Jahr, eine Linie je Jahr über denselben Kalendertagen, stundengenau. Sie hängt nicht vom Stichtag ab. Die Vergleichsjahre blenden frühere Jahre ein.") }}{% endcall %}
       <span class="wt-scope-years wt-controls-end" x-show="daylengthPastOptions().length" x-cloak>
         <span class="wt-scope-lab"><b>{{ _("Vergleichsjahre") }}</b></span>
         <div class="wt-seg" role="group" aria-label="{{ _('Vergleichsjahre') }}">
@@ -607,7 +613,6 @@
     </div>
     <div class="wt-chart wt-chart-short" x-show="daylength" x-cloak x-ref="daylengthChart"></div>
     <p class="hint hint-status" x-show="daylength" x-text="daylengthNote()" x-cloak></p>
-    {% endif %}
   </div>
   {% endif %}
   </section>

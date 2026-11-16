@@ -3734,6 +3734,8 @@
     "Nacht unter": "Night below",
     "Tag ab": "Day from",
     "Der Dämmerungssensor misst von 0 bis 1.000 lx. Die Kurve zeigt, wann es für den Sensor hell wird und wann nicht mehr, nicht den Sonnenstand: Dichte Wolken verschieben den Tagesbeginn nach hinten, Ausrichtung und Verschattung wirken ebenfalls. Die Schwellen für Nacht und Tag stehen in der Einrichtung.": "The dusk/dawn sensor measures from 0 to 1,000 lx. The curve shows when it gets bright for the sensor and when it stops, not the position of the sun: dense clouds push the start of the day back, and orientation and shading matter as well. The thresholds for night and day are set in the setup.",
+    "Pro Tag die Zeit, in der der Dämmerungssensor „Tag“ meldet, ihre Länge, die Änderung zum Vortag und die Dämmerung morgens und abends. Die Tabelle endet am Stichtag; Tage ohne Werte fehlen. Die Änderung zum Vortag steht nur bei minutengenauen Tagen.": "For each day, the time the twilight sensor reports “day”, its length, the change from the previous day and the dusk in the morning and evening. The table ends on the reference day; days without values are missing. The change from the previous day is only shown for days measured to the minute.",
+    "Die Länge der hellen Zeit über das Jahr, eine Linie je Jahr über denselben Kalendertagen, stundengenau. Sie hängt nicht vom Stichtag ab. Die Vergleichsjahre blenden frühere Jahre ein.": "The length of the bright time over the year, one line per year over the same calendar days, accurate to the hour. It does not depend on the reference day. The comparison years show earlier years.",
     "Die letzten Tage im Vergleich": "The last days compared",
     "Hell von–bis": "Light from–to",
     "Tageslänge": "Day length",
