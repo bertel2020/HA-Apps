@@ -65,6 +65,7 @@
 - **Lücken-Erkennung**: Mit Wertänderungsfilter oder gröberer Auflösung zählt sie Pausen zwischen empfangenen Werten
   - Lebenszeichen, Filter und Auflösung verfälschen sie nicht mehr; gezählt wird ab dem Update, der Beginn steht auf der Konfigurationsseite
   - Die automatische Anhebung der Schwelle und die Meldung „Lücken-Erkennung kann strukturell nicht zutreffen“ entfallen
+  - Der Housekeeping-Abschnitt „Konfiguration“ (Entitäten, bei denen die Lücken-Erkennung nie zutreffen kann) geht in „Lücken-Erkennung“ auf, siehe Neu
 - **Inaktive Entitäten**: Die Erkennung richtet sich nach empfangenen statt gespeicherten Werten
   - Ein Lebenszeichen des Wertänderungsfilters verdeckt keine ausgefallene Entität mehr
   - Gilt für Housekeeping, die Statuskachel und den Hinweis bei „Historisch“

@@ -65,6 +65,7 @@
 - **Gap detection**: With a value change filter or a coarser resolution it counts pauses between received values
   - The sign of life, filter and resolution no longer distort it; counting starts with the update, the start is shown on the configuration page
   - The automatic raising of the threshold and the notice “Gap detection can structurally never apply” are gone
+  - The Housekeeping section “Configuration” (entities for which gap detection can never apply) is absorbed into “Gap detection”, see New
 - **Inactive entities**: Detection is based on received instead of stored values
   - A sign of life of the value change filter no longer hides a failed entity
   - Applies to Housekeeping, the status tile and the note for “Historic”
