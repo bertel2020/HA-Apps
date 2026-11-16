@@ -280,6 +280,18 @@ def sniff_ts_format(path: Path, delimiter: str, has_header: bool, ts_col: int) -
 
 
 _AMBIGUOUS_THOUSANDS = re.compile(r"^[+-]?\d{1,3}[.,]\d{3}$")
+_ONE_SEPARATOR = re.compile(r"^[+-]?\d+([.,])(\d+)$")
+
+
+def _decimal_separators_in(values: list[str]) -> set[str]:
+    """Trenner, den die Vorschauspalte eindeutig als Dezimaltrenner benutzt: eine Zelle mit genau einem Trenner und
+    einer anderen Stellenzahl als drei ("34.05", "1.5", "12.3456") kann kein Tausendertrenner sein."""
+    found: set[str] = set()
+    for raw in values:
+        match = _ONE_SEPARATOR.match(raw.strip())
+        if match and len(match.group(2)) != 3:
+            found.add(match.group(1))
+    return found
 
 
 def describe_sample(
@@ -292,7 +304,10 @@ def describe_sample(
     oder ob das Zeitformat passt; erst der Dry Run sagte es, und auch dort nur
     als Zahl übersprungener Zeilen. ``ambiguous`` markiert Werte mit genau einem
     Trenner vor drei Ziffern ("1.572", "1,572"): sie lassen sich als Dezimal-
-    ODER Tausendertrenner lesen, der Import nimmt Dezimal."""
+    ODER Tausendertrenner lesen, der Import nimmt Dezimal. Hat dieselbe Spalte in
+    der Vorschau eine Zelle, die den Trenner eindeutig als Dezimaltrenner
+    zeigt (z. B. "34.05"), ist "34.049" dort nicht mehrdeutig."""
+    decimal_separators = _decimal_separators_in([row[value_col] for row in sample_rows if value_col < len(row)])
     out = []
     for row in sample_rows:
         raw_ts = row[ts_col] if ts_col < len(row) else ""
@@ -302,7 +317,11 @@ def describe_sample(
         out.append({
             "ts": datetime.fromtimestamp(ts, tz).strftime("%d.%m.%Y %H:%M") if ts is not None else None,
             "value": _format_number(value) if value is not None else None,
-            "ambiguous": value is not None and bool(_AMBIGUOUS_THOUSANDS.match(raw_value.strip())),
+            "ambiguous": (
+                value is not None
+                and bool(_AMBIGUOUS_THOUSANDS.match(raw_value.strip()))
+                and not any(separator in raw_value for separator in decimal_separators)
+            ),
         })
     return out
 

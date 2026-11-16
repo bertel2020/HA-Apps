@@ -1783,7 +1783,11 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         return deps.templates.TemplateResponse(
             request,
             "_data_quality_detail.html",
-            {"groups": data_quality.findings_for_entity(deps.data_dir, deps.index, deps.tz, entity)},
+            {
+                "groups": data_quality.findings_for_entity(deps.data_dir, deps.index, deps.tz, entity),
+                # state_class total: Zählerrückgänge werden nicht geprüft (siehe „n. a.“ in der Übersicht).
+                "counter_na": entity["state_class"] == "total",
+            },
         )
 
     def _bounded_entity_lock(entity_id: str):

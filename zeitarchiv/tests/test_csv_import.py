@@ -282,6 +282,26 @@ def test_describe_sample_shows_how_each_cell_is_read() -> None:
     assert result[3] == {"ts": "15.04.2026 00:00", "value": None, "ambiguous": False}
 
 
+def _ambiguous(values: list[str]) -> list[bool]:
+    rows = [["15.01.2026", value] for value in values]
+    return [entry["ambiguous"] for entry in csv_import.describe_sample(rows, 0, 1, "custom", "%d.%m.%Y", TZ)]
+
+
+def test_a_column_with_an_unambiguous_decimal_point_is_not_flagged_for_three_digit_values() -> None:
+    """"34.049" in einer Spalte mit "12.5" ist ein Dezimalpunkt, kein Tausendertrenner."""
+    assert _ambiguous(["34.049", "12.5", "7.25"]) == [False, False, False]
+    assert _ambiguous(["34,049", "12,5"]) == [False, False]
+
+
+def test_a_column_with_only_three_digit_values_stays_flagged() -> None:
+    assert _ambiguous(["34.049", "1.572"]) == [True, True]
+
+
+def test_the_other_separator_does_not_clear_the_flag() -> None:
+    # "12,5" zeigt Komma als Dezimaltrenner; "34.049" bleibt als Punkt-Wert mehrdeutig.
+    assert _ambiguous(["12,5", "34.049"]) == [False, True]
+
+
 def test_parse_rows_records_first_skipped_lines_with_reason() -> None:
     """Die Vorschau soll nennen, WELCHE Zeile woran scheitert, nicht nur eine Zahl."""
     tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-csv-test-"))

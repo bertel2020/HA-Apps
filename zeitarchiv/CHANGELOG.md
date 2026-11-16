@@ -30,6 +30,10 @@
 - **Entities**: The entity list remembers its filters
   - Search, favorites, type, category and unit are still set when you open an entity and come back
 - **Export**: The limit per CSV file rises from 5 to 10 million rows
+- **Data quality**: “n/a” for counter decreases is now explained
+  - A sentence below the table names the reason (state_class total), also on touch devices
+  - The expanded row says the same when there are no individual findings
+- **CSV import**: The preview no longer flags values like “34.049” as ambiguous when the column clearly shows the decimal point
 - **Data quality**: The status line now reads “last measured at most … ago” instead of “oldest measurement … ago”
 - **Data quality**: Clearer loading and filters
   - Expanding a row shows a spinner with a note that large entities can take up to a minute, and offers “Try again” if loading fails

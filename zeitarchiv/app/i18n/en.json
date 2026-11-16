@@ -2300,6 +2300,8 @@
     "Keine Entität ausgewählt": "No entity selected",
     "Import abgebrochen: {exc}": "Import aborted: {exc}",
     "Abschnitt": "section",
+    "n. a. bei Zählerrückgängen: Der Zähler hat die state_class total, bei der Rückgänge normal sind. Sie werden dort nicht geprüft.": "n/a for counter decreases: the counter has state_class total, where decreases are normal. They are not checked there.",
+    "Zählerrückgänge werden bei diesem Zähler nicht geprüft: Er hat die state_class total, bei der Rückgänge normal sind.": "Counter decreases are not checked for this counter: it has state_class total, where decreases are normal.",
     "Speichern fehlgeschlagen.": "Saving failed.",
     "Große Historie, in Abschnitten verarbeitet": "Large history, processed in sections",
     "{count} Abschnitte": "{count} sections",

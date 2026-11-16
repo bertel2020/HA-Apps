@@ -138,6 +138,9 @@
     </tbody>
     {% endfor %}
   </table>
+  {% if dq.rows | selectattr('counter_na') | list %}
+  <p class="hint">{{ _("n. a. bei Zählerrückgängen: Der Zähler hat die state_class total, bei der Rückgänge normal sind. Sie werden dort nicht geprüft.") }}</p>
+  {% endif %}
   {% else %}
   <div class="empty">{{ _("Keine Befunde gefunden.") }}</div>
   {% endif %}

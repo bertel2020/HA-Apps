@@ -50,6 +50,31 @@ def test_aufgeklappte_zeile_ohne_rohdaten_ist_leer_aber_erreichbar(client) -> No
     assert "Keine Einzelbefunde" in antwort.text
 
 
+def test_aufgeklappte_zeile_erklaert_n_a_bei_state_class_total(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.pytest_dq_total", "sensor", "total", "kWh")
+    index.get_or_create_entity("sensor.pytest_dq_messung", "sensor", "measurement", "°C")
+    mit = client.get("/entities/sensor.pytest_dq_total/data-quality").text
+    ohne = client.get("/entities/sensor.pytest_dq_messung/data-quality").text
+    assert "state_class total" in mit and "nicht geprüft" in mit
+    assert "state_class total" not in ohne
+
+
+def test_datenqualitaet_erklaert_n_a_sichtbar_unter_der_tabelle(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.pytest_dq_total_na", "sensor", "total", "kWh")
+    index.set_first_ts_and_add_rows("sensor.pytest_dq_total_na", 1_700_000_000.0, 3)
+    index.set_cleanup_alltime_stats(
+        "sensor.pytest_dq_total_na", {"all": 3, "duplicates": 1, "counter_decreases": 0}, "off", 1,
+    )
+    html = client.get("/housekeeping/datenqualitaet").text
+    assert "n. a." in html
+    # Nicht nur als Tooltip: ein Satz unter der Tabelle, der auch auf Touch-Geräten sichtbar ist.
+    assert "n. a. bei Zählerrückgängen:" in html
+
+
 def test_aufgeklappte_zeile_unbekannte_entitaet_ist_404(client) -> None:
     assert client.get("/entities/sensor.pytest_dq_gibt_es_nicht/data-quality").status_code == 404
 

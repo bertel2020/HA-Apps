@@ -30,6 +30,10 @@
 - **Entitäten**: Die Entitätsliste merkt sich ihre Filter
   - Suche, Favoriten, Typ, Kategorie und Einheit bleiben erhalten, wenn man eine Entität öffnet und zurückkehrt
 - **Export**: Das Limit je CSV-Datei steigt von 5 auf 10 Mio Zeilen
+- **Datenqualität**: „n. a.“ bei Zählerrückgängen wird erklärt
+  - Ein Satz unter der Tabelle nennt den Grund (state_class total), auch auf Touch-Geräten
+  - Die aufgeklappte Zeile sagt dasselbe, wenn es keine Einzelbefunde gibt
+- **CSV-Import**: Die Vorschau markiert Werte wie „34.049“ nicht mehr als mehrdeutig, wenn die Spalte den Dezimalpunkt eindeutig zeigt
 - **Datenqualität**: Die Statuszeile heißt jetzt „zuletzt vor spätestens …“ statt „älteste Messung vor …“
 - **Datenqualität**: Deutlicherer Ladehinweis und einheitliche Filter
   - Beim Aufklappen einer Zeile erscheint ein Spinner mit dem Hinweis, dass große Entitäten bis zu einer Minute brauchen können; schlägt das Laden fehl, gibt es „Erneut versuchen“

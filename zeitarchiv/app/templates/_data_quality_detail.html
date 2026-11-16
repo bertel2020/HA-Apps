@@ -20,3 +20,6 @@
 {% else %}
 <span class="hint">{{ _("Keine Einzelbefunde im betrachteten Zeitraum.") }}</span>
 {% endfor %}
+{% if counter_na %}
+<p class="hint">{{ _("Zählerrückgänge werden bei diesem Zähler nicht geprüft: Er hat die state_class total, bei der Rückgänge normal sind.") }}</p>
+{% endif %}
