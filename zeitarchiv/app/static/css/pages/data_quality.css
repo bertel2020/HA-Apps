@@ -3,7 +3,7 @@
    Einzelbefunde auf (_data_quality_detail.html). */
 table.dq-table{table-layout:auto;min-width:640px;}
 table.dq-table th.dq-num,table.dq-table td.dq-num{text-align:center;width:130px;}
-table.dq-table th.dq-stand,table.dq-table td.dq-stand{text-align:left;width:120px;white-space:nowrap;}
+table.dq-table th.dq-stand,table.dq-table td.dq-stand{text-align:left;width:170px;white-space:nowrap;}
 .dq-age{font-variant-numeric:tabular-nums;color:var(--ink-faint);font-size:calc(12.5px * var(--font-scale, 1));}
 .dq-age.is-old{color:var(--notice-warn);font-weight:600;}
 .dq-status{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 0 12px;padding:9px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--ink-muted);font-size:calc(13px * var(--font-scale, 1));}
@@ -142,3 +142,18 @@ a.dq-sort:hover,a.dq-sort.is-active{color:var(--ink);}
   .dq-sort-mobile{display:inline-flex;}
   .dq-search{flex:1 1 100%;min-width:0;}
 }
+
+/* Neu messen: Knopf in der Statuszeile, Kreispfeil je Zeile (erscheint beim Darüberfahren, auf Touch-Geräten immer) */
+.dq-remeasure{margin-left:auto;display:inline-flex;align-items:center;gap:6px;}
+.dq-remeasure.is-primary{background:var(--accent-line);border-color:var(--accent-line);color:#fff;}
+.dq-remeasure[disabled]{opacity:.6;cursor:default;}
+.dq-ico{width:14px;height:14px;flex:none;}
+.dq-stand-wrap{display:inline-flex;align-items:center;gap:6px;}
+.dq-row-remeasure{display:inline-grid;place-items:center;width:24px;height:24px;padding:0;border:0;border-radius:6px;background:none;color:var(--ink-faint);cursor:pointer;opacity:0;}
+.dq-row-remeasure .dq-ico{width:14px;height:14px;}
+tr.dq-row:hover .dq-row-remeasure,.dq-row-remeasure:focus-visible,.dq-row-remeasure.is-busy,.dq-row-remeasure[disabled]{opacity:1;}
+.dq-row-remeasure:hover{background:var(--accent-line-soft);color:var(--accent-line);}
+.is-busy .dq-ico,.dq-row-remeasure.is-busy .dq-ico,.dq-row-remeasure[disabled] .dq-ico{animation:dq-rot .8s linear infinite;}
+@keyframes dq-rot{to{transform:rotate(360deg);}}
+@media (hover:none){.dq-row-remeasure{opacity:1;}}
+@media (prefers-reduced-motion:reduce){.is-busy .dq-ico,.dq-row-remeasure.is-busy .dq-ico,.dq-row-remeasure[disabled] .dq-ico{animation:none;}}

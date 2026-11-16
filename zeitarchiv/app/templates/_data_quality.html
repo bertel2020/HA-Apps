@@ -15,7 +15,7 @@
    Die Zahlen darunter sind Cache-Stände des Wartungsplaners (siehe data_quality.build_matrix). #}
 {% set st = dq.status %}
 {% if st.total %}
-<div class="dq-status{% if st.measured < st.total %} is-running{% elif st.stale %} is-stale{% endif %}" role="status">
+<div id="dq-status" class="dq-status{% if st.measured < st.total %} is-running{% elif st.stale %} is-stale{% endif %}" role="status">
   <span class="dq-status-dot" aria-hidden="true"></span>
   {% if st.measured < st.total %}
   <strong>{{ _("{measured} von {total} Entitäten gemessen", measured=st.measured | format_int, total=st.total | format_int) }}</strong>
@@ -23,11 +23,19 @@
   <span class="dq-status-sep" aria-hidden="true">·</span><span>{{ _("Messung läuft im Hintergrund") }}</span>
   {% elif st.stale %}
   <strong>{{ _("{total} Entitäten gemessen", total=st.total | format_int) }}</strong>
-  <span class="dq-status-sep" aria-hidden="true">·</span><span>{{ _("{stale} älter als {hours} Std., älteste {oldest}", stale=st.stale | format_int, hours=st.stale_hours, oldest=st.oldest_label) }}</span>
+  <span class="dq-status-sep" aria-hidden="true">·</span><span>{{ _("{stale} älter als {hours} Std., älteste vor {oldest}", stale=st.stale | format_int, hours=st.stale_hours, oldest=st.oldest_label) }}</span>
   {% else %}
   <strong>{{ _("Alle {total} Entitäten gemessen", total=st.total | format_int) }}</strong>
-  {% if st.oldest_label %}<span class="dq-status-sep" aria-hidden="true">·</span><span>{{ _("älteste Messung {oldest}", oldest=st.oldest_label) }}</span>{% endif %}
+  {% if st.oldest_label %}<span class="dq-status-sep" aria-hidden="true">·</span><span>{{ _("zuletzt vor spätestens {oldest}", oldest=st.oldest_label) }}</span>{% endif %}
   {% endif %}
+  {% set running = st.measured < st.total %}
+  <button type="button" class="btn btn-sm dq-remeasure{% if st.stale and not running %} is-primary{% endif %}"
+          hx-post="{{ app_root }}/housekeeping/datenqualitaet/neu-messen" hx-swap="none" data-dq-remeasure
+          data-none="{{ _('Nichts zu messen') }}"{% if running %} disabled{% endif %}
+          title="{{ _('Misst die Entitäten neu, die seit der letzten Messung neue Werte bekommen haben.') }}">
+    <svg class="dq-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg>
+    <span class="dq-remeasure-label">{% if running %}{{ _("Läuft …") }}{% elif st.stale %}{{ _("{n} veraltete neu messen", n=st.stale | format_int) }}{% else %}{{ _("Neu messen") }}{% endif %}</span>
+  </button>
 </div>
 {% endif %}
 {% macro sort_link(key, label) %}{% set active = dq_state.sort == key %}{% set next_dir = ('asc' if dq_state.dir == 'desc' else 'desc') if active else ('asc' if key in ('name', 'measured') else 'desc') %}<a class="dq-sort{% if active %} is-active{% endif %}" href="{{ app_root }}/housekeeping/datenqualitaet{{ dq_url(sort=key, dir=next_dir, page=1) }}" title="{{ _('Sortieren') }}">{{ label }}{% if active %}<span class="dq-sort-arrow" aria-hidden="true">{{ '▾' if dq_state.dir == 'desc' else '▴' }}</span>{% endif %}</a>{% endmacro %}
@@ -75,6 +83,7 @@
       hx-target="#dq-bulk-panel" hx-swap="innerHTML"></form>
 <div class="dq-bulkbar" x-show="selected.length" x-cloak>
   <span class="dq-bulkbar-count" x-text='selected.length + " " + {{ _("gewählt") | tojson }}'></span>
+  <button type="button" class="btn btn-sm dq-remeasure" hx-post="{{ app_root }}/housekeeping/datenqualitaet/neu-messen" hx-include="#dq-bulk-form" hx-swap="none" data-dq-remeasure data-none="{{ _('Nichts zu messen') }}"><span class="dq-remeasure-label">{{ _("Neu messen") }}</span></button>
   <button type="submit" form="dq-bulk-form" class="btn btn-sm">{{ _("Duplikate entfernen …") }}</button>
   <button type="button" class="btn btn-sm" @click="selected = []">{{ _("Auswahl aufheben") }}</button>
 </div>
@@ -108,7 +117,11 @@
         {% set cell = row.cells[col.key] %}
         <td class="dq-num" data-label="{{ labels[col.key] }}">{% if cell %}<a class="dq-pill {{ col.severity }}" href="{{ app_root }}/{{ cell.href }}" @click.stop>{{ cell.label }}</a>{% elif col.key == 'counter_decreases' and row.counter_allowed %}<span class="dq-allowed" title="{{ _('Rückgänge sind für diesen Zähler erlaubt: keine Markierung, keine Meldung, kein Eintrag in Housekeeping.') }}">{{ _("erlaubt") }}</span>{% elif col.key == 'counter_decreases' and row.counter_na %}<span class="dq-allowed" title="{{ _('state_class total: Rückgänge sind bei diesem Zähler normal und werden nicht geprüft.') }}">{{ _("n. a.") }}</span>{% else %}<span class="dq-none">–</span>{% endif %}</td>
         {% endfor %}
-        <td class="dq-stand" data-label="{{ _('Stand') }}"><span class="dq-age{% if row.measured_old %} is-old{% endif %}"{% if row.measured_title %} title="{{ _('Gemessen am {ts}', ts=row.measured_title) }}"{% endif %}>{{ row.measured_label }}</span></td>
+        <td class="dq-stand" data-label="{{ _('Stand') }}"><span class="dq-stand-wrap"><span class="dq-age{% if row.measured_old %} is-old{% endif %}"{% if row.measured_title %} title="{{ _('Gemessen am {ts}', ts=row.measured_title) }}"{% endif %}>{% if row.queued %}{{ _("wird neu gemessen …") }}{% else %}{{ row.measured_label }}{% endif %}</span>
+          <button type="button" class="dq-row-remeasure" hx-post="{{ app_root }}/housekeeping/datenqualitaet/neu-messen" hx-vals='{{ {"entity_id": row.entity_id} | tojson | forceescape }}' hx-swap="none" data-dq-remeasure data-none="{{ _('Nichts zu messen') }}"
+                  title="{{ _('Diese Entität neu messen') }}" aria-label="{{ _('Diese Entität neu messen') }}" @click.stop @keydown.enter.stop{% if row.queued %} disabled{% endif %}>
+            <svg class="dq-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 4v5h-5"/></svg>
+          </button></span></td>
       </tr>
       <tr class="dq-detail" x-show="open" x-cloak>
         <td colspan="{{ dq.columns | length + 2 }}"><div id="dq-detail-{{ loop.index }}" class="dq-detail-body">{{ loading_html }}</div></td>

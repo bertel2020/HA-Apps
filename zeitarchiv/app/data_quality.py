@@ -335,7 +335,7 @@ def build_matrix(
       gemessen" aus.
     - ``status``: Gesamtstand der Messung (``total`` messbare Entitäten, ``measured``,
       ``stale`` = älter als die Erneuerungsgrenze des Wartungsplaners UND seitdem neue Werte,
-      ``oldest_label`` = älteste Messung unter den Entitäten mit neuen Werten; stille
+      ``oldest_label`` = Alter der ältesten Messung (Dauer ohne „vor“) unter den Entitäten mit neuen Werten; stille
       Entitäten werden nicht neu gemessen und gelten als aktuell)
     - je Zeile ``measured_at`` (Zeitpunkt der Gesamt-Zählung, None ohne), ``measured_label``
       ("vor 2 Std.") und ``measured_old`` (wie ``stale``: älter als die Erneuerungsgrenze und
@@ -369,6 +369,7 @@ def build_matrix(
     # Eine stille Entität gilt dagegen unbegrenzt als aktuell.
     ageing_times: list[float] = []
     changed_since: set[str] = set()
+    queued: set[str] = set()
     computed: dict[str, float | None] = {}
     for entity in index.list_entities():
         entity_id = entity["entity_id"]
@@ -387,10 +388,13 @@ def build_matrix(
         measurable += 1
         if entry is not None:
             computed[entity_id] = entry.get("computed_at")
+            if not entry.get("computed_at"):
+                queued.add(entity_id)
         if (
             entry is None or (outliers_on and entity_id not in measured_outliers) or not gaps_ok
             or (window_start and "daily" not in entry)
             or "counts" not in entry
+            or not entry.get("computed_at")  # Neu-Messung angefordert (Index.request_alltime_remeasure)
         ):
             pending += 1
         elif entry.get("computed_at") and (entity["last_ts"] or 0) > entry["computed_at"]:
@@ -439,6 +443,7 @@ def build_matrix(
             "cells": cells,
             "total": total,
             "measured_at": measured_at,
+            "queued": entity_id in queued,
             "measured_label": (
                 tr("vor {dauer}", dauer=format_uptime(now - measured_at)) if measured_at else tr("unbekannt")
             ),
@@ -473,11 +478,27 @@ def build_matrix(
             "measured": measurable - pending,
             "stale": sum(1 for t in ageing_times if now - t >= stale_after),
             "oldest_label": (
-                tr("vor {dauer}", dauer=format_uptime(now - min(ageing_times))) if ageing_times else ""
+                format_uptime(now - min(ageing_times)) if ageing_times else ""
             ),
             "stale_hours": round(stale_after / 3600),
         },
     }
+
+
+def request_remeasure(index: Index, entity_ids: list[str] | None = None) -> int:
+    """„Neu messen“ der Datenqualität: fordert die Gesamt-Zählung neu an, gemessen wird im nächsten
+    Wartungstakt. Mit ``entity_ids`` genau diese Entitäten. Ohne: alle, die seit ihrer Messung neue Werte
+    bekommen haben, also die, die der Planer ohnehin erneuern würde; stille Entitäten ändern sich nicht und
+    bleiben unberührt, so wird kein Vollscan aller Entitäten angestoßen. Gibt die Zahl der angeforderten
+    Entitäten zurück."""
+    if entity_ids is None:
+        eintraege = index.list_cleanup_alltime_stats(with_daily=False)
+        entity_ids = [
+            entity["entity_id"] for entity in index.list_entities()
+            if entity["first_ts"] and (eintraege.get(entity["entity_id"]) or {}).get("computed_at")
+            and (entity["last_ts"] or 0) > eintraege[entity["entity_id"]]["computed_at"]
+        ]
+    return index.request_alltime_remeasure(entity_ids)
 
 
 # Beschriftung der Markierung je Spalte, wie sie cleanup.analyze_raw_rows_page vergibt.

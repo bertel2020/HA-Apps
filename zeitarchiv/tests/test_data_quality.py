@@ -555,7 +555,7 @@ def test_stand_je_zeile_und_gesamtstatus(index):
     assert matrix["status"]["total"] == 3
     assert matrix["status"]["measured"] == 2
     assert matrix["status"]["stale"] == 0
-    assert matrix["status"]["oldest_label"] == "vor 2 Min."
+    assert matrix["status"]["oldest_label"] == "2 Min."
 
     spaeter = jetzt + cleanup_stats.OUTLIER_RATE_REFRESH_AGE_SECONDS + 60
     matrix = data_quality.build_matrix(index, now=spaeter)
@@ -564,6 +564,34 @@ def test_stand_je_zeile_und_gesamtstatus(index):
     assert zeilen["sensor.b"]["measured_old"] is False  # still: nichts zu erneuern
     assert matrix["status"]["stale"] == 1
     assert matrix["status"]["stale_hours"] == 6
+
+
+def test_neu_messen_entwertet_nur_angeforderte_und_zaehlt_als_laufend(index):
+    """„Neu messen“ entwertet den Eintrag (computed_at 0): der Wartungstakt misst ihn als erste Entität neu,
+    die Statuszeile zeigt „läuft“, die Zeile „wird neu gemessen“. Ohne Auswahl trifft es nur Entitäten mit neuen
+    Werten seit der Messung, stille bleiben unberührt."""
+    import time
+
+    from app import cleanup_stats
+
+    for name in ("sensor.a", "sensor.b", "sensor.c"):
+        _mit_daten(index, name)
+        _gesamt(index, name, duplicates=2)
+    index.record_write("sensor.a", time.time() + 30)  # nur sensor.a hat neue Werte
+
+    assert data_quality.request_remeasure(index) == 1  # ohne Auswahl: nur die mit neuen Werten
+    assert index.get_cleanup_alltime_stats("sensor.a")["computed_at"] == 0
+    assert index.get_cleanup_alltime_stats("sensor.b")["computed_at"]
+    assert index.get_cleanup_alltime_stats("sensor.a")["counts"]["duplicates"] == 2  # alte Zahlen bleiben
+    assert data_quality.request_remeasure(index) == 0  # schon angefordert: nichts doppelt
+
+    matrix = data_quality.build_matrix(index)
+    zeilen = {r["entity_id"]: r for r in matrix["rows"]}
+    assert zeilen["sensor.a"]["queued"] is True and zeilen["sensor.b"]["queued"] is False
+    assert matrix["status"]["measured"] == matrix["status"]["total"] - 1
+    assert "sensor.a" in [e["entity_id"] for e in cleanup_stats.due_entities_for_outlier_rate(index, time.time())]
+
+    assert data_quality.request_remeasure(index, ["sensor.c", "sensor.gibtsnicht"]) == 1  # gewählte Entitäten
 
 
 def test_entitaet_ohne_daten_zaehlt_nicht_im_gesamtstatus(index):
