@@ -277,3 +277,13 @@ def test_the_confirmation_is_a_modal_dialog_with_the_affected_entities(client, p
 def test_the_toast_after_applying_stays_in_the_page_and_not_in_a_dialog(client, profiled, remeasured) -> None:
     r = client.post("/housekeeping/luecken-erkennung/apply", data={"threshold": "60", "entity_id": ["sensor.go_test_a"]})
     assert "<dialog" not in r.text and "gc-toast" in r.text and "Rückgängig" in r.text
+
+
+def test_primary_buttons_use_the_class_that_survives_hover(client, profiled) -> None:
+    """`.btn:hover` (Hintergrund = Fläche) schlägt `.btn-primary` (weiße Schrift): Beim Darüberfahren stünde weißer Text
+    auf weißem Grund. Die Klasse `primary` hat dafür eine eigene Hover-Regel (`.btn.primary:hover`)."""
+    html = client.get("/housekeeping/luecken-erkennung").text
+    preview = client.post("/housekeeping/luecken-erkennung/recommend/preview", data={"all": "1"}).text
+    for fragment in (html, preview):
+        assert "btn-primary" not in fragment
+    assert "btn btn-sm primary" in html and "btn btn-sm primary" in preview

@@ -49,7 +49,7 @@
   </form>
   <div class="gc-modal-actions">
     <button type="button" class="btn btn-sm" data-gc-cancel hx-get="{{ go_url }}" hx-target="#gap-conflicts" hx-swap="innerHTML">{{ _("Abbrechen") }}</button>
-    <button type="button" class="btn btn-sm btn-primary" hx-post="{{ go_url }}{{ '/recommend' if recommend_mode else '' }}/apply" hx-include="#gc-confirm-form"
+    <button type="button" class="btn btn-sm primary" hx-post="{{ go_url }}{{ '/recommend' if recommend_mode else '' }}/apply" hx-include="#gc-confirm-form"
             hx-target="#gap-conflicts" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Übernehmen") }}</button>
   </div>
   {% else %}
@@ -64,11 +64,11 @@
     <span class="gc-count" data-gc-count data-n-all="{{ _('{count} Entitäten', count=go.rows | length) }}" data-n-sel="{{ _('{count} ausgewählt') }}">{{ _("{count} Entitäten", count=go.rows | length) }}</span>
     <span class="gc-group" data-gc-group="recommendation">
       <span class="gc-group-title">{{ _("Empfehlung") }}</span>
-      <button type="button" class="btn btn-sm btn-primary" data-gc-rec-sel hidden
+      <button type="button" class="btn btn-sm primary" data-gc-rec-sel hidden
               hx-post="{{ go_url }}/recommend/preview" hx-include="#gc-form" hx-target="#gap-conflicts" hx-swap="innerHTML"
               data-label="{{ _('Empfehlung übernehmen ({count})') }}">{{ _("Empfehlung übernehmen") }}</button>
       {% if go.actionable_count %}
-      <button type="button" class="btn btn-sm btn-primary" data-gc-rec-all
+      <button type="button" class="btn btn-sm primary" data-gc-rec-all
               hx-post="{{ go_url }}/recommend/preview" hx-vals='{"all": "1"}' hx-target="#gap-conflicts" hx-swap="innerHTML"
               title="{{ _('Entitäten, bei denen die Lücken-Erkennung zu empfindlich ist oder nicht geeignet scheint') }}">{{ _("Empfehlungen übernehmen ({count})", count=go.actionable_count) }}</button>
       {% endif %}

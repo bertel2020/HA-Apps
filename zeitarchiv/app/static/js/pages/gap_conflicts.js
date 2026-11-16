@@ -60,7 +60,7 @@
       if (cancel) cancel.click();
     }, {once: true});
     dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
-    const focus = dlg.querySelector('.btn-primary') || dlg.querySelector('[data-gc-cancel]');
+    const focus = dlg.querySelector('.btn.primary') || dlg.querySelector('[data-gc-cancel]');
     if (focus) focus.focus();
   }
   document.addEventListener('htmx:afterSettle', openModal);
