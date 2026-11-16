@@ -10,7 +10,7 @@
 >
 > 🇩🇪 [Änderungen auf Deutsch](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md)
 
-## Unreleased
+## 1.54.0 - 2026-11-16
 
 ### New
 

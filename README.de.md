@@ -16,7 +16,7 @@ werden.
 
 | App | Version | Beschreibung | Dokumentation |
 | --- | --- | --- | --- |
-| Zeitarchiv | [1.53.0](zeitarchiv/CHANGELOG.de.md)<br><sub>15.11.2026</sub> | Kompaktes Zeitreihen-Archiv mit Parquet, Ingress, Energie- und Wetterdashboard, Charts, Importen sowie sicherer Logging- und Ingest-Diagnose. | [Anleitung](zeitarchiv/README.md) · [Dokumentation](zeitarchiv/docs/README.md) |
+| Zeitarchiv | [1.54.0](zeitarchiv/CHANGELOG.de.md)<br><sub>16.11.2026</sub> | Kompaktes Zeitreihen-Archiv mit Parquet, Ingress, Energie- und Wetterdashboard, Charts, Importen sowie sicherer Logging- und Ingest-Diagnose. | [Anleitung](zeitarchiv/README.md) · [Dokumentation](zeitarchiv/docs/README.md) |
 
 Weitere Apps können später als zusätzlicher Ordner im Repository-Stamm ergänzt
 und in dieser Tabelle eingetragen werden.
