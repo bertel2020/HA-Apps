@@ -27,7 +27,7 @@
 
   // Vergleichstabelle und Gruppen: element-table-render.js (dieselbe Datei zeichnet die Tabelle in der Lovelace-Karte).
   const {weatherComparison: renderTable, inGroup} = window.ElementTableRender;
-  const {weatherMonthly, weatherMatrix, pastOpacity, legendEntry} = window.ElementChartRender;
+  const {weatherMonthly, weatherCourse, weatherMatrix, pastOpacity, legendEntry} = window.ElementChartRender;
   // Gruppen: „wind“ = Reiter „Wind & Sonne“, „klima“ = Zusatzsensoren (Schlüssel „temperature:N“) auf „Temperatur & Klima“,
   // alles andere steht in der Übersicht.
   // Tabellen und Kachelreihen je Gruppe: x-ref-Namen wie in _wetter_view.html (tiles<Gruppe>, table[Wrap]<Gruppe>, Übersicht ohne Gruppenname).
@@ -240,6 +240,18 @@
       monthlyLoaded: false,  // einmal erfolgreich geladen: erst dann bleibt die Karte nach einem Ladefehler sichtbar
       monthlyError: false,
       monthlyMetric: 'temperature',
+      // Tagesverlauf im Vergleich (Roadmap 1.59)
+      course: null,
+      courseMetric: 'temperature',
+      courseMetrics: [],
+      courseDays: 7,
+      courseRange: null,       // eigener Zeitraum {start, end} (ISO-Tage) statt der festen Tage
+      courseRangeOpen: false,
+      courseDraftStart: '',
+      courseDraftEnd: '',
+      courseRangeError: '',
+      courseCompare: 'previous',  // previous, year oder '' (kein Vergleich)
+      courseError: '',
       band: true,
       longterm: null,
       longError: '',
@@ -315,6 +327,7 @@
       _seq: 0,
       _tilesSeq: 0,
       _monthlySeq: 0,
+      _courseSeq: 0,
       _tempsSeq: 0,
       _precipSeq: 0,
       _matrixSeq: 0,
@@ -329,6 +342,9 @@
         if (['auto', '3', '5', '10', 'all'].includes(String(saved.heatShown))) this.heatShown = String(saved.heatShown);
         if (['3', '5', '10', 'all'].includes(String(saved.daylengthPast))) this.daylengthPast = String(saved.daylengthPast);
         if (saved.tempRange && ISO_DAY.test(saved.tempRange.start || '') && ISO_DAY.test(saved.tempRange.end || '')) this.tempRange = {start: saved.tempRange.start, end: saved.tempRange.end};
+        if ([7, 30, 365].includes(saved.courseDays)) this.courseDays = saved.courseDays;
+        if (saved.courseRange && ISO_DAY.test(saved.courseRange.start || '') && ISO_DAY.test(saved.courseRange.end || '')) this.courseRange = {start: saved.courseRange.start, end: saved.courseRange.end};
+        if (['previous', 'year', ''].includes(saved.courseCompare)) this.courseCompare = saved.courseCompare;
         if (Array.isArray(saved.roomsOff)) this.roomsOff = saved.roomsOff.filter((name) => typeof name === 'string');
         if (Array.isArray(saved.floorsClosed)) this.floorsClosed = saved.floorsClosed.filter((name) => typeof name === 'string');
         if (Array.isArray(saved.roomsClosed)) this.roomsClosed = saved.roomsClosed.filter((name) => typeof name === 'string');
@@ -344,6 +360,12 @@
         this.loadTiles();
         this.loadTable();
         if (this.$root.querySelector('[x-ref="monthlyChart"]')) this.loadMonthly();
+        const courseCard = this.$root.querySelector('[data-course-metrics]');
+        if (courseCard) {
+          try { this.courseMetrics = JSON.parse(courseCard.dataset.courseMetrics); } catch (e) { this.courseMetrics = []; }
+          this.courseMetric = this.courseMetrics.includes(saved.courseMetric) ? saved.courseMetric : (this.courseMetrics[0] || 'temperature');
+          if (this.courseMetrics.length) this.loadCourse();
+        }
         this.hasConditions = !!this.$root.querySelector('[data-wt-conditions]');
         if (this.hasConditions) this.startConditions();
         // Die Karte „Tageslicht“ gibt es nur mit zugeordneter Rolle; $refs sind in init() noch nicht angelegt.
@@ -875,6 +897,110 @@
         chart.setOption(weatherMonthly(m, {colors, band: this.band, narrow: element.clientWidth < 520, font: scaledFont}), true);
         restoreLegend('monthly', chart);
         // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
+        requestAnimationFrame(() => chart.resize());
+      },
+
+      // ---- Tagesverlauf im Vergleich: Tageswerte eines Zeitraums, optional gegen Vorzeitraum oder Vorjahr -------
+
+      async loadCourse() {
+        const seq = ++this._courseSeq;
+        this.courseError = '';
+        const range = this.courseRange ? `start=${this.courseRange.start}&end=${this.courseRange.end}` : `days=${this.courseDays}`;
+        try {
+          const data = await this.fetchJson(`wetterdashboard/tagesverlauf?metric=${this.courseMetric}&${range}&compare=${this.courseCompare}`);
+          if (seq !== this._courseSeq) return;  // eine neuere Anfrage hat überholt
+          this.course = data;
+          this.$nextTick(() => this.drawCourse());
+        } catch (e) {
+          if (seq === this._courseSeq) this.courseError = t('Der Tagesverlauf konnte nicht geladen werden.');
+        }
+      },
+
+      setCourseMetric(metric) {
+        this.courseMetric = metric;
+        writeStore({courseMetric: metric});
+        this.loadCourse();
+      },
+
+      setCourseDays(days) {
+        this.courseDays = days;
+        this.courseRange = null;
+        this.courseRangeOpen = false;
+        writeStore({courseDays: days, courseRange: null});
+        this.loadCourse();
+      },
+
+      setCourseCompare() {
+        writeStore({courseCompare: this.courseCompare});
+        this.loadCourse();
+      },
+
+      courseRangeLabel() {
+        const r = this.courseRange;
+        if (!r) return t('Eigener Zeitraum');
+        const format = (iso) => utcDate.format(new Date(`${iso}T12:00:00Z`));
+        return `${format(r.start)}–${format(r.end)}`;
+      },
+
+      openCourseRange() {
+        if (this.courseRangeOpen) { this.courseRangeOpen = false; return; }
+        const today = this.todayIso();
+        this.courseDraftEnd = this.courseRange ? this.courseRange.end : today;
+        this.courseDraftStart = this.courseRange ? this.courseRange.start : (this.course && this.course.from ? this.course.from : today);
+        this.courseRangeError = '';
+        this.courseRangeOpen = true;
+      },
+
+      applyCourseRange() {
+        const start = this.courseDraftStart;
+        const end = this.courseDraftEnd;
+        if (!ISO_DAY.test(start) || !ISO_DAY.test(end)) { this.courseRangeError = t('Von und Bis wählen.'); return; }
+        if (end < start) { this.courseRangeError = t('Das Ende liegt vor dem Anfang.'); return; }
+        if (end > this.todayIso()) { this.courseRangeError = t('Das Ende liegt nach heute.'); return; }
+        const days = Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000) + 1;
+        if (days > MAX_TEMP_SPAN_DAYS) { this.courseRangeError = t('Der Zeitraum darf höchstens zehn Jahre lang sein.'); return; }
+        this.courseRangeError = '';
+        this.courseRangeOpen = false;
+        this.courseRange = {start, end};
+        writeStore({courseRange: this.courseRange});
+        this.loadCourse();
+      },
+
+      courseCompareName() {
+        return this.courseCompare === 'year' ? t('Vorjahreszeitraum') : t('Vorzeitraum');
+      },
+
+      // Satz über dem Diagramm: Ø bzw. Summe und der Unterschied zum Vergleich (nur über Tage, an denen beide Werte haben).
+      courseSummary() {
+        const c = this.course;
+        const s = c && c.summary;
+        if (!s) return c ? t('Keine Werte in diesem Zeitraum.') : '';
+        const unit = c.unit;
+        const values = {value: num(s.value, c.unit === 'min' ? 0 : 1), unit, name: this.courseCompareName()};
+        let text = s.kind === 'mean' ? t('Ø {value} {unit}', values) : t('Summe {value} {unit}', values);
+        if (c.compare && s.compare != null) {
+          const diff = s.value - s.compare;
+          const delta = num(Math.abs(diff), c.unit === 'min' ? 0 : 1);
+          if (Math.round(Math.abs(diff) * 10) === 0) text += ', ' + (this.courseCompare === 'year' ? t('so viel wie im Vorjahreszeitraum') : t('so viel wie im Vorzeitraum'));
+          else if (s.kind === 'mean') text += ', ' + (this.courseCompare === 'year'
+            ? (diff > 0 ? t('{delta} K wärmer als im Vorjahreszeitraum', {delta}) : t('{delta} K kälter als im Vorjahreszeitraum', {delta}))
+            : (diff > 0 ? t('{delta} K wärmer als im Vorzeitraum', {delta}) : t('{delta} K kälter als im Vorzeitraum', {delta})));
+          else text += ', ' + (this.courseCompare === 'year'
+            ? (diff > 0 ? t('{delta} {unit} mehr als im Vorjahreszeitraum', {delta, unit}) : t('{delta} {unit} weniger als im Vorjahreszeitraum', {delta, unit}))
+            : (diff > 0 ? t('{delta} {unit} mehr als im Vorzeitraum', {delta, unit}) : t('{delta} {unit} weniger als im Vorzeitraum', {delta, unit})));
+          if (s.days < c.days) text += ' ' + t('(an {n} von {total} Tagen mit Werten in beiden Zeiträumen)', {n: s.days, total: c.days});
+        }
+        return text;
+      },
+
+      drawCourse() {
+        const d = this.course;
+        const element = this.$refs.courseChart;
+        if (!d || !element) return;
+        const colors = palette();
+        const chart = chartFor('course', element);
+        const nowName = this.courseRange ? this.courseRangeLabel() : t('Gewählter Zeitraum');
+        chart.setOption(weatherCourse(d, {colors, narrow: element.clientWidth < 520, font: scaledFont, nowName, compareName: this.courseCompareName()}), true);
         requestAnimationFrame(() => chart.resize());
       },
 

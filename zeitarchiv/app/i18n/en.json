@@ -4168,7 +4168,12 @@
     "{values} Werte wiederhergestellt.": "{values} values restored.",
     "Beim ersten Lauf würden {total} Duplikate bei {entities} entfernt:": "The first run would remove {total} duplicates from {entities}:",
     "{values} Werte bei {entities}": "{values} values across {entities}",
-    "Letzter Lauf {time}: {total} Werte bei {entities} ({names}). Zurücknehmen geht in Housekeeping unter Duplikate.": "Last run {time}: {total} values across {entities} ({names}). You can undo it in Housekeeping under Duplicates."
+    "Letzter Lauf {time}: {total} Werte bei {entities} ({names}). Zurücknehmen geht in Housekeeping unter Duplikate.": "Last run {time}: {total} values across {entities} ({names}). You can undo it in Housekeeping under Duplicates.",
+    "Tagesverlauf im Vergleich": "Daily course compared",
+    "Tageswerte der letzten Tage oder eines eigenen Zeitraums: Temperatur als Tagesmittel, Niederschlag und Sonnenstunden als Tagessummen. Die gestrichelte Linie zeigt den Vergleichszeitraum gleicher Länge, Tag für Tag untereinander. Ab 61 Tagen stehen Wochenwerte.": "Daily values of the last days or of a custom period: temperature as the daily mean, precipitation and sunshine hours as daily totals. The dashed line shows the comparison period of the same length, day by day. From 61 days on, weekly values are shown.",
+    "Vergleichen mit": "Compare with",
+    "Vorjahreszeitraum": "Same period last year",
+    "Vorzeitraum": "Previous period"
   },
   "js": {
     "Eigener Zeitraum": "Custom period",
@@ -5265,6 +5270,23 @@
     "{done} Zuordnungen übernommen, {check} unsichere ausgelassen. Es wurde nichts gespeichert: prüfen, ändern und dann speichern.": "{done} assignments taken over, {check} uncertain ones skipped. Nothing has been saved: check, adjust, then save.",
     "Nichts zu ergänzen: alle Rollen aus Home Assistant sind schon zugeordnet oder es gibt keine passenden archivierten Zähler.": "Nothing to add: all roles from Home Assistant are already assigned or there are no matching archived counters.",
     "Balken": "Bar",
-    "Linie": "Line"
+    "Linie": "Line",
+    "Vorzeitraum": "Previous period",
+    "Der Tagesverlauf konnte nicht geladen werden.": "The daily course could not be loaded.",
+    "Keine Werte in diesem Zeitraum.": "No values in this period.",
+    "Gewählter Zeitraum": "Selected period",
+    "Ø {value} {unit}": "Avg {value} {unit}",
+    "Summe {value} {unit}": "Total {value} {unit}",
+    "so viel wie im Vorjahreszeitraum": "the same as in the same period last year",
+    "so viel wie im Vorzeitraum": "the same as in the previous period",
+    "{delta} K wärmer als im Vorjahreszeitraum": "{delta} K warmer than in the same period last year",
+    "{delta} K kälter als im Vorjahreszeitraum": "{delta} K colder than in the same period last year",
+    "{delta} K wärmer als im Vorzeitraum": "{delta} K warmer than in the previous period",
+    "{delta} K kälter als im Vorzeitraum": "{delta} K colder than in the previous period",
+    "{delta} {unit} mehr als im Vorjahreszeitraum": "{delta} {unit} more than in the same period last year",
+    "{delta} {unit} weniger als im Vorjahreszeitraum": "{delta} {unit} less than in the same period last year",
+    "{delta} {unit} mehr als im Vorzeitraum": "{delta} {unit} more than in the previous period",
+    "{delta} {unit} weniger als im Vorzeitraum": "{delta} {unit} less than in the previous period",
+    "(an {n} von {total} Tagen mit Werten in beiden Zeiträumen)": "(on {n} of {total} days with values in both periods)"
   }
 }

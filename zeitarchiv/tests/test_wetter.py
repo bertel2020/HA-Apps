@@ -820,7 +820,7 @@ def test_reference_day_uses_the_dashboard_stichtag_bar_of_the_app() -> None:
     page = (TEMPLATES / "wetterdashboard.html").read_text(encoding="utf-8")
     assert "{{ period_nav(true, true) }}" in view and "period_assets()" in page
     # Der Stichtag hat keine eigene Tagesauswahl; Datumsfelder gibt es nur im Menü „Eigener Zeitraum“ der Temperaturen.
-    assert "wt-daynav" not in view and view.count('type="date"') == 2 and 'x-model="draftStart"' in view
+    assert "wt-daynav" not in view and view.count('type="date"') == 4 and 'x-model="draftStart"' in view  # Temperaturen und Tagesverlauf haben je Von und Bis
     script = _wetter_script()
     assert "Alpine.store('dashStichtag').date" in script and "'dashboard-stichtag'" in script
     assert "shiftStichtag" not in script and "setStichtag" not in script
@@ -1269,7 +1269,7 @@ def test_card_availability_follows_the_assigned_roles() -> None:
     available = {key for key in wetter_routes.CARD_KEYS if wetter_routes.card_available(key, config)}
     # ohne Helligkeit kein Tagesbild
     assert available == {
-        "basis", "compare", "monthly", "records", "kenntage", "monthyears", "yearmatrix",
+        "basis", "compare", "monthly", "course", "records", "kenntage", "monthyears", "yearmatrix",
         "daylight", "daylight_days", "daylength", "heating",
     }
 
@@ -1285,7 +1285,7 @@ def test_hidden_cards_are_saved_only_for_available_cards_and_hide_cards_and_tabs
     assert 'name="show_card"' in page and "cardAvailable(" in page
     # alles angehakt: nichts ausgeblendet
     long_cards = ["records", "kenntage", "monthyears", "yearmatrix"]
-    shown = ["basis", "compare", "monthly", "wind", *long_cards, "daylight", "daylight_days", "daylength", "heating"]
+    shown = ["basis", "compare", "monthly", "course", "wind", *long_cards, "daylight", "daylight_days", "daylength", "heating"]
     assert client.post("/wetterdashboard/setup", data={**base, "show_card": shown}).status_code == 200
     assert wetter_routes._load_config(index)["hidden_cards"] == []
     html = client.get("/wetterdashboard").text
@@ -1294,7 +1294,7 @@ def test_hidden_cards_are_saved_only_for_available_cards_and_hide_cards_and_tabs
     assert html.index('id="wt-tab-wind"') < html.index('id="wt-tab-long"')
     # Vergleichstabelle, Wind & Sonne, Langzeit abgewählt; Tageslicht (keine Rolle) und Heizen (kein Zähler) sind nicht wählbar
     assert client.post("/wetterdashboard/setup", data={**base, "show_card": ["basis", "monthly"]}).status_code == 200
-    assert wetter_routes._load_config(index)["hidden_cards"] == ["compare", "wind", *long_cards]
+    assert wetter_routes._load_config(index)["hidden_cards"] == ["compare", "course", "wind", *long_cards]
     html = client.get("/wetterdashboard").text
     assert 'id="wt-tab-wind"' not in html and 'id="wt-tab-long"' not in html and "data-wt-conditions" in html and 'x-ref="table"' not in html
     assert 'id="wt-tab-overview"' in html
@@ -1678,3 +1678,81 @@ def test_daylength_card_has_a_choice_of_compared_years(client) -> None:
     script = (APP / "static/js/wetter.js").read_text(encoding="utf-8")
     assert "tageslaenge?past_years=${this.daylengthPast === 'all' ? 0 : Number(this.daylengthPast)}" in script
     assert "this.loadDaylength(true);" in script[script.index("setDaylengthPast(value) {"):script.index("daylengthNote() {")]
+
+
+def _full_days(service, entity_id, days_values):
+    """Je Tag 24 Stundenwerte (ein abgedeckter Tag, Mittel = Wert)."""
+    points = [(_ts(day, hour), value) for day, value in days_values for hour in range(24)]
+    _add(service, entity_id, "sensor", "measurement", "°C", points)
+
+
+def test_daily_course_temperature_compares_with_the_previous_period_day_by_day(service) -> None:
+    _full_days(service, "sensor.t", [(17, 8.0), (18, 10.0), (19, 12.0)])
+    _configure(service, temperature="sensor.t")
+    data = service.compute_daily_course("temperature", start=date(2026, 8, 18), end=date(2026, 8, 19), compare="previous", now_local=NOW)
+    assert data["granularity"] == "day" and data["dates"] == ["2026-08-18", "2026-08-19"] and data["values"] == [10.0, 12.0]
+    assert data["compare"]["kind"] == "previous" and data["compare"]["dates"] == ["2026-08-16", "2026-08-17"]
+    assert data["compare"]["values"] == [None, 8.0]  # Tag 1 über Tag 1; der 16.8. hat keine Daten
+    # Der Vergleich zählt nur Tage, an denen beide Zeiträume einen Wert haben.
+    assert data["summary"] == {"kind": "mean", "days": 1, "value": 12.0, "compare": 8.0}
+
+
+def test_daily_course_without_compare_summarises_all_days_and_a_year_back_is_empty_without_archive(service) -> None:
+    _full_days(service, "sensor.t", [(18, 10.0), (19, 12.0)])
+    _configure(service, temperature="sensor.t")
+    plain = service.compute_daily_course("temperature", start=date(2026, 8, 18), end=date(2026, 8, 19), compare="", now_local=NOW)
+    assert plain["compare"] is None and plain["summary"] == {"kind": "mean", "days": 2, "value": 11.0, "compare": None}
+    year = service.compute_daily_course("temperature", start=date(2026, 8, 18), end=date(2026, 8, 19), compare="year", now_local=NOW)
+    assert year["compare"]["dates"] == ["2025-08-18", "2025-08-19"] and year["compare"]["values"] == [None, None]
+    assert year["summary"] is None  # kein gemeinsamer Tag
+
+
+def test_daily_course_precipitation_sums_the_counter_and_converts_the_rain_sensor_to_minutes(service) -> None:
+    _rain_setup(service)
+    _configure(service, temperature="sensor.t", precip_mm="sensor.regen", precip_dur="binary_sensor.regen")
+    rain = service.compute_daily_course("precip", start=date(2026, 8, 19), end=date(2026, 8, 20), compare="", now_local=NOW)
+    assert rain["unit"] == "mm" and rain["summary"]["kind"] == "sum"
+    assert rain["values"][0] == pytest.approx(2.0) and rain["values"][1] == pytest.approx(1.5)
+    assert rain["summary"]["value"] == pytest.approx(3.5)
+    _configure(service, temperature="sensor.t", precip_dur="binary_sensor.regen")
+    minutes = service.compute_daily_course("precip", start=date(2026, 8, 19), end=date(2026, 8, 20), compare="", now_local=NOW)
+    assert minutes["unit"] == "min" and minutes["values"][1] == pytest.approx(30.0)
+    assert minutes["values"][0] is None  # vor dem Archivbeginn des Sensors
+
+
+def test_daily_course_shows_weekly_blocks_from_61_days(service) -> None:
+    _full_days(service, "sensor.t", [(19, 12.0)])
+    _configure(service, temperature="sensor.t")
+    data = service.compute_daily_course("temperature", days=365, compare="previous", now_local=NOW)
+    assert data["granularity"] == "week" and data["days"] == 365
+    assert len(data["dates"]) == len(data["values"]) == len(data["compare"]["values"]) == 53  # 52 volle Wochen und ein Tag
+    assert data["dates"][0] == "2025-08-21" and data["values"][-1] is None
+    short = service.compute_daily_course("temperature", days=60, compare="", now_local=NOW)
+    assert short["granularity"] == "day" and len(short["dates"]) == 60
+
+
+def test_daily_course_is_none_for_unassigned_metrics(service) -> None:
+    _full_days(service, "sensor.t", [(19, 12.0)])
+    _configure(service, temperature="sensor.t")
+    assert service.compute_daily_course("precip", now_local=NOW) is None
+    assert service.compute_daily_course("sun", now_local=NOW) is None
+    assert service.compute_daily_course("temperature", now_local=NOW) is not None
+
+
+def test_daily_course_route_validates_the_request(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp12", "sensor", "measurement", "°C")
+    index.set_setting(wetter_routes.SETTING_ENABLED, "1")
+    wetter_routes._save_config(index, {**wetter_routes._empty_config(), "temperature": "sensor.wetter_test_temp12"})  # noqa: SLF001
+    today = datetime.now(TZ).date()
+    get = lambda query: client.get(f"/wetterdashboard/tagesverlauf?{query}")  # noqa: E731
+    assert get("metric=temperature&days=7").status_code == 200
+    assert get(f"metric=temperature&start={today - timedelta(days=5)}&compare=year").status_code == 200
+    assert get("metric=unsinn").status_code == 400
+    assert get("metric=temperature&compare=unsinn").status_code == 400
+    assert get("metric=temperature&days=14").status_code == 400
+    assert get(f"metric=temperature&start={today}&end={today - timedelta(days=1)}").status_code == 400
+    assert get(f"metric=temperature&start={today - timedelta(days=3700)}").status_code == 400
+    assert get("metric=precip&days=7").status_code == 404  # kein Niederschlag zugeordnet
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")

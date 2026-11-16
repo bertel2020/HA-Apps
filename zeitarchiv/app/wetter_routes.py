@@ -118,6 +118,9 @@ MAX_EXTRA_TEMPERATURES = 100
 #: wie bei den Kacheln (rollierend, nach dem tatsächlichen Fenster benannt).
 TEMPERATURE_DAYS = (7, 30, 365)
 MAX_TEMPERATURE_SPAN_DAYS = 3660  # eigener Zeitraum: höchstens zehn Jahre
+DAILY_COURSE_METRICS = ("temperature", "precip", "sun")
+DAILY_COURSE_COMPARES = ("", "previous", "year")
+DAILY_COURSE_WEEKLY_FROM = 61  # Zeiträume ab 61 Tagen zeigen Wochenwerte statt Tageswerte
 BLOCK_KEYS = ("kenntage", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation", "illuminance")
 #: Karten, die sich in der Einrichtung ein- und ausblenden lassen: (Schlüssel, Name, Rollen, von denen mindestens
 #: eine zugeordnet sein muss; „@extras“ und „@heating“ stehen für die Listen weiterer Sensoren und Heizzähler).
@@ -125,6 +128,7 @@ CARD_OPTIONS = (
     ("basis", N_("Wetterlage"), ("temperature", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation", "illuminance", "illuminance_dawn")),
     ("compare", N_("Zeiträume im Vergleich"), ("temperature", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation", "illuminance")),
     ("monthly", N_("Monatsvergleich"), ("temperature", "precip_mm", "precip_dur")),
+    ("course", N_("Tagesverlauf im Vergleich"), ("temperature", "precip_mm", "precip_dur", "illuminance")),
     ("precip", N_("Niederschlag"), ("precip_mm", "precip_dur")),
     ("precip_months", N_("Niederschlag je Monat"), ("precip_mm", "precip_dur")),
     ("klima", N_("Temperatur & Klima"), ("@extras",)),
@@ -155,7 +159,7 @@ CARD_SPLIT_CHILDREN = {
 #: Gliederung der Kartenauswahl nach Reiter des Dashboards (Reitername, Karten). „heating“ fehlt hier
 #: absichtlich: Der Reiter „Heizen“ ist experimentell und steht in der Einrichtung in einem eigenen Block.
 CARD_GROUPS = (
-    (N_("Übersicht"), ("basis", "compare", "dayimage", "monthly")),
+    (N_("Übersicht"), ("basis", "compare", "dayimage", "monthly", "course")),
     (N_("Niederschlag"), ("precip", "precip_months")),
     (N_("Temperatur & Klima"), ("klima", "tempcmp", "humidcmp")),
     (N_("Wind & Sonne"), ("wind", "sunhours", "daylight", "daylight_days", "daylength", "pvlight")),
@@ -1246,6 +1250,127 @@ class WetterService:
         return {
             "days": days, "custom": start is not None, "dates": [day.isoformat() for day in dates], "series": build(specs),
             "humidity": build(humidity_specs) if humidity_specs else [],
+        }
+
+    def _course_day_values(
+        self, metric: str, config: dict, dates: list[date], now_local: datetime,
+    ) -> tuple[list[float | None], str, str] | None:
+        """Tageswerte von ``metric`` für ``dates`` (zusammenhängende Tage): (Werte, Einheit, Entität) oder None, wenn die
+        Größe nicht zugeordnet ist. Ein Tag ohne Wert ist None, nie 0 (Ausnahme: Regensensor ab Archivbeginn)."""
+        first, last = dates[0], dates[-1]
+        if metric == "sun":
+            entity_id = config["illuminance"]
+            if not entity_id or self.deps.index.get_entity(entity_id) is None:
+                return None
+            by_day = {
+                entry["date"]: entry["hours"]
+                for entry in self._sun_days_cached(first, last, config, now_local) if entry["hours"] is not None
+            }
+            return [round(by_day[day], 1) if day in by_day else None for day in dates], "h", entity_id
+        dry_start = None
+        factor = 1.0
+        if metric == "temperature":
+            entity_id, unit = config["temperature"], ""
+        else:
+            role = self._precip_role(config, "mm")
+            if role is None:
+                return None
+            entity_id, kind = role
+            unit = "min" if kind == "dur" else ""
+            factor = 1.0 / 60.0 if kind == "dur" else 1.0
+        entity = self.deps.index.get_entity(entity_id) if entity_id else None
+        if entity is None:
+            return None
+        if metric == "precip" and unit == "min" and entity["first_ts"]:
+            dry_start = datetime.fromtimestamp(entity["first_ts"], self.deps.tz).date()
+        by_day = {
+            analysis.day_of(point, self.deps.tz): point.value
+            for point in self._daily(entity_id, now_local, since=first, until=last)
+            if point.value is not None and (metric != "temperature" or point.covered)
+        }
+        values: list[float | None] = []
+        for day in dates:
+            if day in by_day:
+                values.append(round(by_day[day] * factor, 1))
+            else:
+                values.append(0.0 if dry_start is not None and day >= dry_start else None)
+        return values, unit or entity["unit"] or "", entity_id
+
+    @staticmethod
+    def _course_buckets(values: list[float | None], dates: list[date], weekly: bool, mean: bool) -> tuple[list[date], list[float | None]]:
+        """Tageswerte unverändert oder zu Wochenblöcken ab dem ersten Tag (Mittel bzw. Summe der Tage mit Wert; ein Block
+        ohne Wert bleibt None)."""
+        if not weekly:
+            return dates, values
+        out_dates, out = [], []
+        for offset in range(0, len(values), 7):
+            block = [value for value in values[offset:offset + 7] if value is not None]
+            out_dates.append(dates[offset])
+            out.append(round(sum(block) / len(block) if mean else sum(block), 1) if block else None)
+        return out_dates, out
+
+    def compute_daily_course(
+        self, metric: str, days: int = 7, start: date | None = None, end: date | None = None, compare: str = "previous",
+        now_local: datetime | None = None,
+    ) -> dict | None:
+        """Tagesverlauf von Temperatur (Tagesmittel), Niederschlag oder Sonnenstunden (Tagessummen) der letzten ``days``
+        Tage oder von ``start`` bis ``end`` (sonst heute), optional mit einem Vergleichszeitraum gleicher Länge:
+        ``previous`` direkt davor, ``year`` dieselben Tage ein Jahr früher. Tag ``k`` des Vergleichs gehört zu Tag ``k`` des
+        Zeitraums. Ab ``DAILY_COURSE_WEEKLY_FROM`` Tagen kommen Wochenblöcke. ``summary`` fasst die Tage zusammen, an
+        denen beide Zeiträume einen Wert haben (ohne Vergleich: alle Tage des Zeitraums)."""
+        config = _load_config(self.deps.index)
+        now_local = now_local or datetime.now(self.deps.tz)
+        today = now_local.date()
+        if start is not None:
+            last = min(end or today, today)
+            first = min(start, last)
+            dates = [first + timedelta(days=offset) for offset in range((last - first).days + 1)]
+        else:
+            dates = [today - timedelta(days=offset) for offset in range(days - 1, -1, -1)]
+        found = self._course_day_values(metric, config, dates, now_local)
+        if found is None:
+            return None
+        values, unit, entity_id = found
+        weekly = len(dates) >= DAILY_COURSE_WEEKLY_FROM
+        mean = metric == "temperature"
+        bucket_dates, bucket_values = self._course_buckets(values, dates, weekly, mean)
+        compare_out = None
+        compare_values: list[float | None] | None = None
+        if compare:
+            if compare == "year":
+                try:
+                    shifted = dates[0].replace(year=dates[0].year - 1)
+                except ValueError:  # 29. Februar
+                    shifted = dates[0].replace(year=dates[0].year - 1, day=28)
+            else:
+                shifted = dates[0] - timedelta(days=len(dates))
+            compare_dates = [shifted + timedelta(days=offset) for offset in range(len(dates))]
+            other = self._course_day_values(metric, config, compare_dates, now_local)
+            compare_values = other[0] if other else [None] * len(dates)
+            c_dates, c_values = self._course_buckets(compare_values, compare_dates, weekly, mean)
+            compare_out = {
+                "kind": compare, "dates": [day.isoformat() for day in c_dates], "values": c_values,
+                "from": compare_dates[0].isoformat(), "to": compare_dates[-1].isoformat(),
+            }
+        pairs = [
+            (value, compare_values[position] if compare_values is not None else None)
+            for position, value in enumerate(values) if value is not None and (compare_values is None or compare_values[position] is not None)
+        ]
+        summary = None
+        if pairs:
+            current = [pair[0] for pair in pairs]
+            summary = {
+                "kind": "mean" if mean else "sum", "days": len(pairs),
+                "value": round(sum(current) / len(current) if mean else sum(current), 1),
+                "compare": None if compare_values is None else round(
+                    sum(pair[1] for pair in pairs) / len(pairs) if mean else sum(pair[1] for pair in pairs), 1
+                ),
+            }
+        return {
+            "metric": metric, "unit": unit, "entity_id": entity_id, "granularity": "week" if weekly else "day",
+            "custom": start is not None, "days": len(dates), "from": dates[0].isoformat(), "to": dates[-1].isoformat(),
+            "dates": [day.isoformat() for day in bucket_dates], "values": bucket_values,
+            "compare": compare_out, "summary": summary, "tz": str(self.deps.tz),
         }
 
     def compute_longterm(self, now_local: datetime | None = None, years: int = 0, from_year: int = 0, to_year: int = 0) -> dict | None:
@@ -2535,6 +2660,30 @@ class WetterService:
             result = self.compute_temperatures(days, start=first, end=last)
             if result is None:
                 raise HTTPException(status_code=404, detail=tr("Noch nicht eingerichtet"))
+            return result
+
+        @router.get("/wetterdashboard/tagesverlauf")
+        def wetterdashboard_daily_course(
+            metric: str = "temperature", days: int = 7, start: str = "", end: str = "", compare: str = "previous",
+        ) -> dict:
+            _require_configured()
+            if metric not in DAILY_COURSE_METRICS or compare not in DAILY_COURSE_COMPARES:
+                raise HTTPException(status_code=400, detail=tr("Ungültige Kennzahl."))
+            first = last = None
+            if start:
+                today = datetime.now(self.deps.tz).date()
+                try:
+                    first = date.fromisoformat(start)
+                    last = date.fromisoformat(end) if end else today
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum.")) from None
+                if last > today or first > last or (last - first).days + 1 > MAX_TEMPERATURE_SPAN_DAYS:
+                    raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
+            elif days not in TEMPERATURE_DAYS:
+                raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
+            result = self.compute_daily_course(metric, days, start=first, end=last, compare=compare)
+            if result is None:
+                raise HTTPException(status_code=404, detail=tr("Kein Niederschlag zugeordnet.") if metric == "precip" else tr("Noch nicht eingerichtet"))
             return result
 
         @router.get("/wetterdashboard/langzeit")

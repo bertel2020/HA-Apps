@@ -191,8 +191,10 @@
 {% set show_basis = 'basis' not in hc %}
 {% set show_compare = 'compare' not in hc %}
 {% set show_monthly = 'monthly' not in hc %}
+{% set course_metrics = (['temperature'] if config.temperature else []) + (['precip'] if precip_modes else []) + (['sun'] if has_dayimage else []) %}
+{% set show_course = 'course' not in hc and course_metrics %}
 {% set show_dayimage = has_dayimage and 'dayimage' not in hc %}
-{% set show_overview = show_basis or show_compare or show_dayimage or show_monthly %}
+{% set show_overview = show_basis or show_compare or show_dayimage or show_monthly or show_course %}
 {% set show_precip_main = precip_modes and 'precip' not in hc %}
 {% set show_precip_months = precip_modes and 'precip_months' not in hc %}
 {% set show_precip = show_precip_main or show_precip_months %}
@@ -352,6 +354,50 @@
     <p class="wt-headline" x-show="monthlyMetric === 'temperature' && headline()" x-text="headline()"></p>
     <p class="hint hint-warn" x-show="monthlyError" x-cloak>{{ _("Der Monatsvergleich konnte nicht geladen werden.") }} <button type="button" class="btn" @click="loadMonthly()">{{ _("Erneut versuchen") }}</button></p>
     <div class="wt-chart" x-ref="monthlyChart" x-show="monthly"></div>
+  </div>
+  {% endif %}
+  {% if show_course %}
+  <div class="card wt-card wt-course" data-course-metrics='{{ course_metrics | tojson }}'>
+    <div class="wt-controls">
+      <h2 class="wt-h2">{{ _("Tagesverlauf im Vergleich") }} {{ hint_button(_("Tagesverlauf im Vergleich")) }}</h2>
+      {% call hint_body() %}{{ _("Tageswerte der letzten Tage oder eines eigenen Zeitraums: Temperatur als Tagesmittel, Niederschlag und Sonnenstunden als Tagessummen. Die gestrichelte Linie zeigt den Vergleichszeitraum gleicher Länge, Tag für Tag untereinander. Ab 61 Tagen stehen Wochenwerte.") }}{% endcall %}
+      {% if course_metrics | length > 1 %}
+      <div class="wt-seg" role="group" aria-label="{{ _('Kennzahl') }}">
+        {% if config.temperature %}<button type="button" :aria-pressed="(courseMetric === 'temperature').toString()" @click="setCourseMetric('temperature')">{{ _("Temperatur") }}</button>{% endif %}
+        {% if precip_modes %}<button type="button" :aria-pressed="(courseMetric === 'precip').toString()" @click="setCourseMetric('precip')">{{ _("Niederschlag") }}</button>{% endif %}
+        {% if has_dayimage %}<button type="button" :aria-pressed="(courseMetric === 'sun').toString()" @click="setCourseMetric('sun')">{{ _("Sonnenstunden") }}</button>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="wt-controls">
+      <div class="wt-yr" @keydown.escape="courseRangeOpen = false">
+        <div class="wt-seg" role="group" aria-label="{{ _('Zeitraum') }}">
+          <template x-for="opt in [{days: 7, label: t('7 Tage')}, {days: 30, label: t('30 Tage')}, {days: 365, label: t('12 Monate')}]" :key="opt.days">
+            <button type="button" :aria-pressed="(!courseRange && courseDays === opt.days).toString()" @click="setCourseDays(opt.days)" x-text="opt.label"></button>
+          </template>
+          <button type="button" :aria-pressed="(!!courseRange).toString()" :aria-expanded="courseRangeOpen.toString()" @click="openCourseRange()"><span x-text="courseRangeLabel()"></span> ▾</button>
+        </div>
+        <div class="wt-yr-pop" x-show="courseRangeOpen" x-cloak @click.outside="courseRangeOpen = false">
+          <label>{{ _("Von") }} <input type="date" x-model="courseDraftStart" :max="todayIso()"></label>
+          <label>{{ _("Bis") }} <input type="date" x-model="courseDraftEnd" :max="todayIso()"></label>
+          <p class="hint hint-warn" x-show="courseRangeError" x-text="courseRangeError" x-cloak></p>
+          <div class="wt-yr-actions">
+            <button type="button" class="btn" @click="setCourseDays(7)">{{ _("Zurücksetzen") }}</button>
+            <button type="button" class="btn" @click="applyCourseRange()">{{ _("Übernehmen") }}</button>
+          </div>
+        </div>
+      </div>
+      <label class="wt-course-compare">{{ _("Vergleichen mit") }}
+        <select x-model="courseCompare" @change="setCourseCompare()">
+          <option value="previous">{{ _("Vorzeitraum") }}</option>
+          <option value="year">{{ _("Vorjahreszeitraum") }}</option>
+          <option value="">{{ _("Nichts") }}</option>
+        </select>
+      </label>
+    </div>
+    <p class="wt-headline" x-show="course && courseSummary()" x-text="courseSummary()"></p>
+    <p class="hint hint-warn" x-show="courseError" x-text="courseError" x-cloak></p>
+    <div class="wt-chart" x-ref="courseChart" x-show="course"></div>
   </div>
   {% endif %}
   </section>
