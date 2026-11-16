@@ -49,25 +49,29 @@
 <form id="gc-form">
   <div class="gc-bar" data-gc-bar>
     <span class="gc-count" data-gc-count data-n-all="{{ _('{count} Entitäten', count=go.rows | length) }}" data-n-sel="{{ _('{count} ausgewählt') }}">{{ _("{count} Entitäten", count=go.rows | length) }}</span>
-    <label class="gc-threshold">{{ _("Schwelle") }}
-      <select name="threshold" class="gc-select" aria-label="{{ _('Neue Schwelle der Lücken-Erkennung') }}">
+    <span class="gc-group" data-gc-group="recommendation">
+      <span class="gc-group-title">{{ _("Empfehlung") }}</span>
+      <button type="button" class="btn btn-sm btn-primary" data-gc-rec-sel hidden
+              hx-post="{{ go_url }}/recommend/preview" hx-include="#gc-form" hx-target="#gap-conflicts" hx-swap="innerHTML"
+              data-label="{{ _('Empfehlung übernehmen ({count})') }}">{{ _("Empfehlung übernehmen") }}</button>
+      {% if go.actionable_count %}
+      <button type="button" class="btn btn-sm btn-primary" data-gc-rec-all
+              hx-post="{{ go_url }}/recommend/preview" hx-vals='{"all": "1"}' hx-target="#gap-conflicts" hx-swap="innerHTML"
+              title="{{ _('Entitäten, bei denen die Lücken-Erkennung zu empfindlich ist oder nicht geeignet scheint') }}">{{ _("Empfehlungen übernehmen ({count})", count=go.actionable_count) }}</button>
+      {% endif %}
+    </span>
+    <span class="gc-group" data-gc-group="own">
+      <span class="gc-group-title">{{ _("Eigene Schwelle") }}</span>
+      <select name="threshold" class="gc-select" aria-label="{{ _('Schwelle, auf die gesetzt wird') }}">
         {% for key, label in go.threshold_options %}<option value="{{ key }}"{% if key == '15' %} selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
-    </label>
-    <button type="button" class="btn btn-sm btn-primary" data-gc-sel hidden
-            hx-post="{{ go_url }}/preview" hx-include="#gc-form" hx-target="#gap-conflicts" hx-swap="innerHTML"
-            data-label="{{ _('Auf Auswahl anwenden ({count})') }}">{{ _("Auf Auswahl anwenden") }}</button>
-    <button type="button" class="btn btn-sm btn-primary" data-gc-rec-sel hidden
-            hx-post="{{ go_url }}/recommend/preview" hx-include="#gc-form" hx-target="#gap-conflicts" hx-swap="innerHTML"
-            data-label="{{ _('Empfehlung übernehmen ({count})') }}">{{ _("Empfehlung übernehmen") }}</button>
+      <button type="button" class="btn btn-sm" data-gc-sel hidden
+              hx-post="{{ go_url }}/preview" hx-include="#gc-form" hx-target="#gap-conflicts" hx-swap="innerHTML"
+              data-label="{{ _('Auf Auswahl setzen ({count})') }}">{{ _("Auf Auswahl setzen") }}</button>
+      <button type="button" class="btn btn-sm" data-gc-all
+              hx-post="{{ go_url }}/preview" hx-vals='{"all": "1"}' hx-include="[name=threshold]" hx-target="#gap-conflicts" hx-swap="innerHTML">{{ _("Auf alle setzen ({count})", count=go.rows | length) }}</button>
+    </span>
     <button type="button" class="btn btn-sm" data-gc-clear hidden>{{ _("Auswahl aufheben") }}</button>
-    {% if go.actionable_count %}
-    <button type="button" class="btn btn-sm btn-primary" data-gc-rec-all
-            hx-post="{{ go_url }}/recommend/preview" hx-vals='{"all": "1"}' hx-target="#gap-conflicts" hx-swap="innerHTML"
-            title="{{ _('Entitäten, bei denen die Lücken-Erkennung zu empfindlich ist oder nicht geeignet scheint') }}">{{ _("Empfehlungen übernehmen ({count})", count=go.actionable_count) }}</button>
-    {% endif %}
-    <button type="button" class="btn btn-sm btn-primary" data-gc-all
-            hx-post="{{ go_url }}/preview" hx-vals='{"all": "1"}' hx-include="[name=threshold]" hx-target="#gap-conflicts" hx-swap="innerHTML">{{ _("Auf alle anwenden ({count})", count=go.rows | length) }}</button>
   </div>
   <div class="tbl-wrap">
     <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">

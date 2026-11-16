@@ -353,3 +353,7 @@
 #gap-conflicts .gc-chip-ok{background:var(--accent-line-soft);color:var(--accent-line);}
 #gap-conflicts .gc-chip-info{background:var(--surface-2, var(--border));color:var(--ink);}
 #gap-conflicts .gc-chip-muted{background:transparent;color:var(--ink-muted);border:1px solid var(--border);}
+#gap-conflicts .gc-group{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px 8px;}
+#gap-conflicts .gc-group + .gc-group{padding-left:12px;border-left:1px solid var(--border);}
+#gap-conflicts .gc-group-title{font-size:calc(12px * var(--font-scale, 1));font-weight:600;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.04em;}
+
