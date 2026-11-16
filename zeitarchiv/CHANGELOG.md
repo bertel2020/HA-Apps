@@ -14,6 +14,15 @@
 
 ### New
 
+- **Weather dashboard**: “Daily course compared” card in the overview
+  - Temperature, precipitation or hours of sunshine per day for 7 days, 30 days, 12 months or a custom period (up to ten years)
+  - Comparison with the previous period or the same period last year as a dashed line, or none; one line sums it up
+  - From about two months on the card shows weekly values
+  - Can be shown or hidden in the card selection
+- **Weather dashboard**: Periods on “Wind & sun”
+  - “PV and brightness”: 7, 14 or 30 days or a custom period (up to three months)
+  - The hourly chart shows either the selected day or the average over the period; the tooltip gives yield and expectation in kWh
+  - “The last days compared”: 7, 14 or 30 days
 - **Gap detection**: Recommendation for the threshold
   - The configuration page shows the recommended level and an assessment below the threshold field (too sensitive, fits, could be finer, not suitable); the recommendation is available after 14 days of observation
   - Housekeeping → Gap detection lists all entities with method, threshold, gaps found and assessment
@@ -47,6 +56,9 @@
 
 ### Changed
 
+- **Weather dashboard**: “Daylight” on “Wind & sun” consists of three cards
+  - “Daylight”, “The last days compared” and “Day length over the year” each have their own heading with a hint and can be hidden individually
+- **Weather dashboard**: The day overview reads “2.4 h of sun of 3 h of daylight” instead of “of 3 h sun”
 - **Gap detection**: With a value change filter or a coarser resolution it counts pauses between received values
   - The sign of life, filter and resolution no longer distort it; counting starts with the update, the start is shown on the configuration page
   - The automatic raising of the threshold and the notice “Gap detection can structurally never apply” are gone

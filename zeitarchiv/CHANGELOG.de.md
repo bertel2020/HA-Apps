@@ -14,6 +14,15 @@
 
 ### Neu
 
+- **Wetterdashboard**: Karte „Tagesverlauf im Vergleich“ in der Übersicht
+  - Temperatur, Niederschlag oder Sonnenstunden je Tag für 7 Tage, 30 Tage, 12 Monate oder einen eigenen Zeitraum (bis zu zehn Jahre)
+  - Vergleich mit dem Vorzeitraum oder dem Vorjahreszeitraum als gestrichelte Linie, oder ohne Vergleich; eine Zeile fasst ihn zusammen
+  - Ab etwa zwei Monaten zeigt die Karte Wochenwerte
+  - In der Kartenauswahl ein- und ausblendbar
+- **Wetterdashboard**: Zeiträume auf „Wind & Sonne“
+  - „PV und Helligkeit“: 7, 14 oder 30 Tage oder ein eigener Zeitraum (bis zu drei Monate)
+  - Das Stundendiagramm zeigt wahlweise den gewählten Tag oder das Mittel im Zeitraum; der Tooltip nennt Ertrag und Erwartung in kWh
+  - „Die letzten Tage im Vergleich“: 7, 14 oder 30 Tage
 - **Lücken-Erkennung**: Empfehlung für die Schwelle
   - Die Konfigurationsseite zeigt unter dem Schwellenfeld die empfohlene Stufe und eine Beurteilung (zu empfindlich, passt, könnte feiner sein, nicht geeignet); die Empfehlung steht nach 14 Tagen Beobachtung bereit
   - Housekeeping → Lücken-Erkennung listet alle Entitäten mit Methode, Schwelle, gefundenen Lücken und Beurteilung
@@ -47,6 +56,9 @@
 
 ### Geändert
 
+- **Wetterdashboard**: „Tageslicht“ auf „Wind & Sonne“ besteht aus drei Karten
+  - „Tageslicht“, „Die letzten Tage im Vergleich“ und „Tageslänge im Jahresverlauf“ haben je eine eigene Überschrift mit Hinweis und lassen sich einzeln ausblenden
+- **Wetterdashboard**: Das Tagesbild schreibt „2,4 h Sonne von 3 h Tageslicht“ statt „von 3 h Sonne“
 - **Lücken-Erkennung**: Mit Wertänderungsfilter oder gröberer Auflösung zählt sie Pausen zwischen empfangenen Werten
   - Lebenszeichen, Filter und Auflösung verfälschen sie nicht mehr; gezählt wird ab dem Update, der Beginn steht auf der Konfigurationsseite
   - Die automatische Anhebung der Schwelle und die Meldung „Lücken-Erkennung kann strukturell nicht zutreffen“ entfallen
