@@ -104,6 +104,9 @@ OUTLIER_RULE_VERSION = 4
 # Messwerte siehe OutlierDetector).
 OUTLIER_WINDOW = 15
 OUTLIER_MIN_VALUES = 5
+# Stufen, die für die Empfehlung der Schwelle mitgezählt werden: genau die wählbaren Vielfachen
+# (formatting.OUTLIER_THRESHOLD_LABELS ohne „Aus“), von fein nach grob.
+OUTLIER_TIERS = (10.0, 20.0, 50.0, 100.0)
 COUNTER_OUTLIER_WINDOW = 50
 COUNTER_OUTLIER_MIN_STEPS = 5
 # Nach einem Rückgang bleibt der Stand davor so lange die Bezugsgröße für den nächsten Zuwachs
@@ -187,9 +190,19 @@ class OutlierDetector:
     """
 
     def __init__(
-        self, *, factor: float | None, mode: str, decimals: str, tz: ZoneInfo, reasons: bool = True
+        self, *, factor: float | None, mode: str, decimals: str, tz: ZoneInfo, reasons: bool = True,
+        tiers: tuple[float, ...] = (),
     ) -> None:
         self.factor = factor
+        # Stufen, die zusätzlich mitgezählt werden (Empfehlung der Schwelle): Median und MAD des Fensters
+        # (bzw. der übliche Zuwachs) hängen nicht vom Faktor ab, je Stufe fehlt nur der eigene Zustand der
+        # Fortsetzungsregel. So genügt ein Durchlauf statt einer je Stufe. Die eigene Schwelle bleibt unberührt.
+        self._tiers = tuple(tiers)
+        self._tier_far: dict[float, float | None] = {t: None for t in self._tiers}
+        # Ergebnis des letzten check(): welche Stufen den Wert markiert hätten, und ob er beurteilbar war
+        # (True), mangels Streuung übersprungen wurde (False) oder gar nicht zur Prüfung stand (None).
+        self.tier_hits: dict[float, bool] = {}
+        self.judged: bool | None = None
         # False: nur zählen. Statt der Begründung kommt ein Platzhalter (nicht None), der Text wird nicht gebaut.
         self.reasons = reasons
         self.mode = "counter" if mode == "counter" else "standard"
@@ -209,6 +222,8 @@ class OutlierDetector:
         """Begründung, wenn `value` ein Ausreißer ist — sonst None. Muss für
         JEDEN Wert in zeitlicher Reihenfolge aufgerufen werden, auch wenn die
         Erkennung aus ist: die Aufrufe bilden den Bezug."""
+        self.tier_hits = {}
+        self.judged = None
         if self.mode == "counter":
             # Der Zähler führt seine Bezugsgröße selbst (siehe _check_counter).
             return self._check_counter(ts, value)
@@ -254,9 +269,13 @@ class OutlierDetector:
             if ueblich_dauer > 0 and dauer / ueblich_dauer > COUNTER_OUTLIER_GAP_SCALE_FROM:
                 spreizung = dauer / ueblich_dauer
         if zuwachs > 0:
-            if self.factor is not None and len(self._steps) >= COUNTER_OUTLIER_MIN_STEPS:
+            if (self.factor is not None or self._tiers) and len(self._steps) >= COUNTER_OUTLIER_MIN_STEPS:
                 ueblich = statistics.median(self._steps)
-                if ueblich > 0 and zuwachs > self.factor * ueblich * spreizung:
+                self.judged = ueblich > 0
+                if ueblich > 0:
+                    for t in self._tiers:
+                        self.tier_hits[t] = zuwachs > t * ueblich * spreizung
+                if self.factor is not None and ueblich > 0 and zuwachs > self.factor * ueblich * spreizung:
                     grund = _NO_REASON if not self.reasons else (
                         tr("Zuwachs {_format_val} ist das {_format_factor} des üblichen Zuwachses ({_format_val2}, Median der letzten {len}){_vorwert}", _format_val=_format_val(zuwachs, self.decimals), _format_factor=_format_factor(zuwachs / ueblich), _format_val2=_format_val(ueblich, self.decimals), len=len(self._steps), _vorwert=self._vorwert())
                     )
@@ -271,25 +290,32 @@ class OutlierDetector:
 
     def _check_standard(self, value: float) -> str | None:
         grund = None
-        if self.factor is not None and len(self._values) >= OUTLIER_MIN_VALUES:
+        if (self.factor is not None or self._tiers) and len(self._values) >= OUTLIER_MIN_VALUES:
             mitte = statistics.median(self._values)
             streuung = statistics.median([abs(v - mitte) for v in self._values])
             abstand = abs(value - mitte)
-            weit = streuung > 0 and abstand > self.factor * streuung
-            # Ein dauerhafter Niveauwechsel (Wolke über der Anlage, ein Gerät schaltet) ist EIN Sprung: der
-            # markierte Wert geht ins Fenster, der Median zieht erst nach etwa der Hälfte der Werte nach, und
-            # jeder Folgewert auf dem neuen Niveau wäre wieder „weit“ vom alten Median. Liegt er nahe am
-            # zuletzt weit entfernten Wert, ist das die Fortsetzung desselben Sprungs und keine neue Markierung.
-            # Gemessen an echten Leistungssensoren lagen 70–80 % der Markierungen in solchen Läufen.
-            fortsetzung = (
-                weit and self._last_far is not None
-                and abs(value - self._last_far) <= self.factor * streuung
-            )
-            self._last_far = value if weit else None
-            if weit and not fortsetzung:
-                grund = _NO_REASON if not self.reasons else (
-                    tr("{_format_val} liegt {_format_factor} weiter vom Median der letzten {len} Werte ({_format_val2}) entfernt als üblich (±{_format_val3}){_vorwert}", _format_val=_format_val(value, self.decimals), _format_factor=_format_factor(abstand / streuung), len=len(self._values), _format_val2=_format_val(mitte, self.decimals), _format_val3=_format_val(streuung, self.decimals), _vorwert=self._vorwert())
+            self.judged = streuung > 0
+            for t in self._tiers:
+                weit_t = streuung > 0 and abstand > t * streuung
+                fort_t = weit_t and self._tier_far[t] is not None and abs(value - self._tier_far[t]) <= t * streuung
+                self._tier_far[t] = value if weit_t else None
+                self.tier_hits[t] = weit_t and not fort_t
+            if self.factor is not None:
+                weit = streuung > 0 and abstand > self.factor * streuung
+                # Ein dauerhafter Niveauwechsel (Wolke über der Anlage, ein Gerät schaltet) ist EIN Sprung: der
+                # markierte Wert geht ins Fenster, der Median zieht erst nach etwa der Hälfte der Werte nach, und
+                # jeder Folgewert auf dem neuen Niveau wäre wieder „weit“ vom alten Median. Liegt er nahe am
+                # zuletzt weit entfernten Wert, ist das die Fortsetzung desselben Sprungs und keine neue Markierung.
+                # Gemessen an echten Leistungssensoren lagen 70–80 % der Markierungen in solchen Läufen.
+                fortsetzung = (
+                    weit and self._last_far is not None
+                    and abs(value - self._last_far) <= self.factor * streuung
                 )
+                self._last_far = value if weit else None
+                if weit and not fortsetzung:
+                    grund = _NO_REASON if not self.reasons else (
+                        tr("{_format_val} liegt {_format_factor} weiter vom Median der letzten {len} Werte ({_format_val2}) entfernt als üblich (±{_format_val3}){_vorwert}", _format_val=_format_val(value, self.decimals), _format_factor=_format_factor(abstand / streuung), len=len(self._values), _format_val2=_format_val(mitte, self.decimals), _format_val3=_format_val(streuung, self.decimals), _vorwert=self._vorwert())
+                    )
         self._values.append(value)
         return grund
 
@@ -433,6 +459,7 @@ def analyze_raw_rows_page(
     receive_gaps: list[tuple[float, float]] | None = None,
     gap_stored_until: float | None = None,
     gap_tiers_since: float | None = None,
+    outlier_tiers_since: float | None = None,
 ) -> dict:
     """Analysiert beliebig viele sortierte Rohwerte mit begrenztem Speicher.
 
@@ -536,8 +563,16 @@ def analyze_raw_rows_page(
     # Ausreißer-Erkennung, zwei Regeln je nach Entitätstyp — dieselbe Klasse,
     # die auch der nicht-streamende Pfad über detect_outliers() benutzt.
     outlier_detector = OutlierDetector(
-        factor=outlier_factor, mode=outlier_mode, decimals=decimals, tz=tz, reasons=reasons
+        factor=outlier_factor, mode=outlier_mode, decimals=decimals, tz=tz, reasons=reasons,
+        tiers=OUTLIER_TIERS if outlier_tiers_since is not None else (),
     )
+    # Treffer je Stufe seit ``outlier_tiers_since`` (Grundlage der Schwellen-Empfehlung): je Zeitstempel einmal
+    # (wie group_outlier), beurteilte und mangels Streuung übersprungene Werte je Zeile.
+    tier_hits_total = dict.fromkeys(OUTLIER_TIERS, 0)
+    tier_group_hits: set[float] = set()
+    tier_judged = 0
+    tier_blind = 0
+    tier_span: list[float] = []
 
     selected_filter = filter_ if filter_ in {
         "all", "outliers", "gaps", "duplicates", "repetitions", "counter_decreases", "none"
@@ -553,6 +588,8 @@ def analyze_raw_rows_page(
                 _format_val(row["value"], decimals) for row in group_rows
             )
             duplicate_reason = _NO_REASON if not reasons else tr("{len}× derselbe Zeitstempel — Werte: {formatted_values}", len=len(group_rows), formatted_values=formatted_values)
+        for tier in tier_group_hits:
+            tier_hits_total[tier] += 1
         if group_outlier is not None:
             counts["outliers"] += 1
             count_day(group_ts, "outliers")
@@ -626,6 +663,7 @@ def analyze_raw_rows_page(
             group_ts = ts
             group_outlier = None
             group_gap = None
+            tier_group_hits = set()
 
         gap_reason = gap_detector.check(ts, previous_ts, previous_value)
         if gap_reason is not None:
@@ -636,6 +674,13 @@ def analyze_raw_rows_page(
         outlier_reason = outlier_detector.check(ts, value)
         if outlier_reason is not None and group_outlier is None:
             group_outlier = outlier_reason
+        if outlier_tiers_since is not None and ts >= outlier_tiers_since:
+            tier_span[:] = [tier_span[0] if tier_span else ts, ts]
+            if outlier_detector.judged is True:
+                tier_judged += 1
+            elif outlier_detector.judged is False:
+                tier_blind += 1
+            tier_group_hits.update(t for t, hit in outlier_detector.tier_hits.items() if hit)
 
         if should_accept_value(
             "decimals", decimals, last_kept_value, last_kept_ts, value, ts
@@ -690,6 +735,14 @@ def analyze_raw_rows_page(
             "days": (tier_last - tier_first) / 86400 if tier_first is not None and tier_last is not None else 0.0,
             "events": tier_events,
             "tiers": {str(tier): count for tier, count in tier_counts.items()},
+        }
+    if outlier_tiers_since is not None:
+        extra["outlier_profile"] = {
+            "rule": OUTLIER_RULE_VERSION,
+            "days": (tier_span[1] - tier_span[0]) / 86400 if tier_span else 0.0,
+            "judged": tier_judged,
+            "blind": tier_blind,
+            "tiers": {format(tier, "g"): count for tier, count in tier_hits_total.items()},
         }
     return {
         **extra,

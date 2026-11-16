@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import gap_recommendation
+from . import gap_recommendation, outlier_recommendation
 from .formatting import OUTLIER_THRESHOLD_LABELS, format_int, format_value
 from .storage import cleanup
 from .storage import query as query_mod
@@ -164,6 +164,9 @@ def alltime_counts(
         outlier_mode=outlier_mode(entity),
         reasons=False,
         gap_tiers_since=now.timestamp() - gap_recommendation.WINDOW_DAYS * 86400,
+        outlier_tiers_since=(
+            None if outlier_threshold == "off" else now.timestamp() - outlier_recommendation.WINDOW_DAYS * 86400
+        ),
     )
     counts = analysis["counts"]
     if index.finding_generation(entity_id) != generation:
@@ -175,6 +178,7 @@ def alltime_counts(
         entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION,
         daily=analysis["daily"], gap_threshold=gap_key,
         gap_profile=analysis.get("gap_profile") if gap_method(entity) == "stored" else None,
+        outlier_profile=analysis.get("outlier_profile"),
     )
     return counts
 
@@ -237,6 +241,16 @@ def gaps_measured(entity, eintrag: dict | None) -> bool:
     # Bei gespeicherten Werten gehört das Pausen-Profil der Schwellen-Empfehlung zur Messung: Einträge aus der Zeit
     # davor werden einmal neu gemessen.
     return gap_method(entity) != "stored" or "1" in ((eintrag.get("gap_profile") or {}).get("tiers") or {})
+
+
+def outlier_profile_measured(entity, eintrag: dict | None) -> bool:
+    """Ob der Cache-Eintrag ein zur aktuellen Regel passendes Stufen-Profil enthält. Ohne Erkennung (Aus, blinde
+    Typen) gibt es keins und es wird keins gebraucht (True). Das Profil trägt seine Regelversion selbst: Einträge
+    aus der Zeit davor oder einer älteren Regel werden einmal neu gemessen."""
+    if effective_outlier_threshold(entity["aggregation_type"], entity["outlier_threshold"]) == "off":
+        return True
+    profil = (eintrag or {}).get("outlier_profile") or {}
+    return profil.get("rule") == cleanup.OUTLIER_RULE_VERSION
 
 
 def gaps_assessed(entity) -> bool:
@@ -354,6 +368,7 @@ def due_entities_for_outlier_rate(index: Index, now: float) -> list:
             or not berechnet
             or (not ohne_erkennung and _rate_from_entry(entity, eintrag) is None)
             or not gaps_measured(entity, eintrag)
+            or not outlier_profile_measured(entity, eintrag)
             or "daily" not in eintrag  # vor den Tageszählern gemessen: für die Heatmap neu rechnen
         ):
             faellig.append((0.0, entity))

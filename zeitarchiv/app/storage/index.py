@@ -4482,6 +4482,7 @@ class Index:
         daily: dict | None = None,
         gap_threshold: str | None = None,
         gap_profile: dict | None = None,
+        outlier_profile: dict | None = None,
     ) -> None:
         """`daily` sind die Befunde je Kalendertag ({"JJJJ-MM-TT": {Kategorie:
         Anzahl}}, nur Tage mit Befund), aus demselben Durchlauf wie `counts`.
@@ -4508,6 +4509,9 @@ class Index:
         if gap_profile is not None:
             # Pausen-Zähler je Stufe der letzten Wochen (gespeicherte Werte), Grundlage der Schwellen-Empfehlung.
             entry["gap_profile"] = gap_profile
+        if outlier_profile is not None:
+            # Treffer je Schwellen-Stufe der letzten Wochen (Regelversion im Profil), Grundlage der Schwellen-Empfehlung.
+            entry["outlier_profile"] = outlier_profile
         self.set_setting(self._CLEANUP_ALLTIME_STATS_PREFIX + entity_id, json.dumps(entry))
 
     def list_cleanup_alltime_stats(self, with_daily: bool = True) -> dict[str, dict]:

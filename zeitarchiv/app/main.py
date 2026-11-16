@@ -170,7 +170,7 @@ from .energiedashboard_routes import (
     is_energiedashboard_configured,
 )
 from .wetter_routes import WetterDependencies, WetterService, back_wetter, is_wetter_configured, wetter_role_count
-from . import cleanup_stats, counter_bulk, data_quality, entity_usage, gap_recommendation
+from . import cleanup_stats, counter_bulk, data_quality, entity_usage, gap_recommendation, outlier_recommendation
 from . import card_elements, dashboard_tiles, overview_tiles, page_layout, page_refresh
 from .dashboard_tiles import tile_metric_context as _tile_metric_context
 from .route_support import (
@@ -5161,6 +5161,10 @@ def _rows_fragment(
             counter_decrease_enabled=cleanup_stats.counter_decreases_flagged(entity),
             outlier_mode=cleanup_stats.outlier_mode(entity),
             gap_tiers_since=(now.timestamp() - gap_recommendation.WINDOW_DAYS * 86400) if range_key == "all" else None,
+            outlier_tiers_since=(
+                now.timestamp() - outlier_recommendation.WINDOW_DAYS * 86400
+                if range_key == "all" and outlier_threshold != "off" else None
+            ),
         )
         counts = analysis["counts"]
         daily_counts = analysis["daily"]
@@ -5289,6 +5293,7 @@ def _rows_fragment(
             entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION,
             daily=daily_counts, gap_threshold=cleanup.gap_cache_key(entity),
             gap_profile=analysis.get("gap_profile") if gap_method(entity) == "stored" else None,
+            outlier_profile=analysis.get("outlier_profile"),
         )
     else:
         alltime_counts, alltime_stale = cleanup_stats.alltime_counts_or_invalidated(DATA_DIR, index, TZ, entity, now)

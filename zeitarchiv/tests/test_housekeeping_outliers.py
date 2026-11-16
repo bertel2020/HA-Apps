@@ -51,6 +51,7 @@ def _entity(index, entity_id, *, schwelle="50", markiert=None, gesamt=1000,
             entity_id, {"all": gesamt, "outliers": markiert},
             schwelle if gezaehlt_mit is None else gezaehlt_mit,
             OUTLIER_RULE_VERSION, gap_threshold="r15", daily={},
+            outlier_profile={"rule": OUTLIER_RULE_VERSION, "days": 60.0, "judged": gesamt, "blind": 0, "tiers": {}},
         )
         if alter:
             eintrag = index.get_cleanup_alltime_stats(entity_id)
@@ -438,3 +439,77 @@ def test_der_takt_misst_mindestens_eine_entitaet_auch_wenn_sie_das_budget_spreng
     dienst, gemessen = _planer_mit(index, faellige, monkeypatch, budget=10.0, dauer=60.0)
     dienst._refresh_due_outlier_rates()
     assert gemessen == ["sensor.gross"]
+
+
+# --- Stufen-Profil der Empfehlung --------------------------------------------
+
+
+def test_entry_without_profile_is_due_again(index) -> None:
+    """Einträge aus der Zeit vor dem Stufen-Profil werden einmal neu gemessen."""
+    _entity(index, "sensor.profil", markiert=0, gesamt=1000)
+    index.record_write("sensor.profil", time.time())
+    assert cleanup_stats.next_entity_for_outlier_rate(index, time.time()) is None
+
+    eintrag = index.get_cleanup_alltime_stats("sensor.profil")
+    eintrag.pop("outlier_profile")
+    index.set_setting("cleanup_alltime_stats:sensor.profil", json.dumps(eintrag))
+    assert cleanup_stats.next_entity_for_outlier_rate(index, time.time())["entity_id"] == "sensor.profil"
+
+
+def test_profile_of_an_older_rule_is_due_again(index) -> None:
+    _entity(index, "sensor.regel", markiert=0, gesamt=1000)
+    index.record_write("sensor.regel", time.time())
+    eintrag = index.get_cleanup_alltime_stats("sensor.regel")
+    eintrag["outlier_profile"]["rule"] = OUTLIER_RULE_VERSION - 1
+    index.set_setting("cleanup_alltime_stats:sensor.regel", json.dumps(eintrag))
+    assert cleanup_stats.next_entity_for_outlier_rate(index, time.time())["entity_id"] == "sensor.regel"
+
+
+def test_switched_off_entity_needs_no_profile(index) -> None:
+    """Aus-Entitäten bekommen bewusst kein Profil (Kosten, bewusste Wahl)."""
+    index.get_or_create_entity("sensor.aus", "sensor", "measurement", "°C")
+    index.set_config("sensor.aus", outlier_threshold="off")
+    index.set_cleanup_alltime_stats("sensor.aus", {"all": 10}, "off", OUTLIER_RULE_VERSION, gap_threshold="r15", daily={})
+    index.record_write("sensor.aus", time.time())
+    assert cleanup_stats.next_entity_for_outlier_rate(index, time.time()) is None
+
+
+def test_analyzer_returns_profile_only_when_asked() -> None:
+    from zoneinfo import ZoneInfo
+
+    from app.storage import cleanup as cleanup_mod
+
+    tz = ZoneInfo("Europe/Berlin")
+    rows = [(i * 60.0, 20.0 + (i % 3) * 0.5) for i in range(200)]
+    rows[150] = (150 * 60.0, 5000.0)  # echter Fehler: auf jeder Stufe
+    rows[160] = (160 * 60.0, 20.0 + 14 * 0.5 * 1.0)  # Grenzfall: nur auf feinen Stufen
+
+    def lauf(**kw):
+        return cleanup_mod.analyze_raw_rows_page(
+            lambda: iter(rows), filter_="all", page=1, page_size=1, gap_threshold_minutes=None,
+            outlier_factor=50.0, tz=tz, **kw,
+        )
+
+    assert "outlier_profile" not in lauf()
+    profil = lauf(outlier_tiers_since=0.0)["outlier_profile"]
+    assert profil["rule"] == OUTLIER_RULE_VERSION
+    assert profil["tiers"]["100"] == 1 and profil["tiers"]["10"] >= profil["tiers"]["100"]
+    assert profil["judged"] > 150 and profil["blind"] == 0
+    assert lauf()["counts"] == lauf(outlier_tiers_since=0.0)["counts"]
+
+
+def test_profile_counts_one_hit_per_timestamp_and_only_inside_the_window() -> None:
+    from zoneinfo import ZoneInfo
+
+    from app.storage import cleanup as cleanup_mod
+
+    tz = ZoneInfo("Europe/Berlin")
+    rows = [(i * 60.0, 10.0 + (i % 2)) for i in range(100)]
+    rows += [(6000.0, 9000.0), (6000.0, 9500.0)]  # derselbe Zeitstempel: eine Gruppe
+    rows.append((50.0 * 60, 9999.0))  # unsortiert vermeiden: Fehler vor dem Fenster separat prüfen
+    rows.sort()
+    ergebnis = cleanup_mod.analyze_raw_rows_page(
+        lambda: iter(rows), filter_="all", page=1, page_size=1, gap_threshold_minutes=None,
+        outlier_factor=50.0, tz=tz, outlier_tiers_since=5000.0,
+    )["outlier_profile"]
+    assert ergebnis["tiers"]["100"] == 1  # Fehler bei 6000 s zählt einmal, der bei 3000 s liegt vor dem Fenster
