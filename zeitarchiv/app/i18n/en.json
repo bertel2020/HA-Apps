@@ -2292,6 +2292,7 @@
     "Keine Entität ausgewählt": "No entity selected",
     "Import abgebrochen: {exc}": "Import aborted: {exc}",
     "Abschnitt": "section",
+    "Speichern fehlgeschlagen.": "Saving failed.",
     "Große Historie, in Abschnitten verarbeitet": "Large history, processed in sections",
     "{count} Abschnitte": "{count} sections",
     "Import abgebrochen. Bereits geschriebene Monate bleiben erhalten.": "Import cancelled. Months already written are kept.",
