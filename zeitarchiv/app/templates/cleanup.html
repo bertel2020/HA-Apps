@@ -23,6 +23,7 @@
     </div>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
+      {% include "_entity_room.html" %}
       {# "← zurück zum Verlauf" stand hier, bis der Verlauf ein Reiter wurde.
          An seiner Stelle der Weg eine Ebene HÖHER, den die Reiter nicht
          anbieten — und den die Verlaufsseite an derselben Stelle schon hat,

@@ -29,6 +29,7 @@
     </div>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">
       {% if display_name != entity_id %}<code style="font-family:var(--font-mono);">{{ entity_id }}</code> &middot; {% endif %}
+      {% include "_entity_room.html" %}
       <a href="{{ app_root }}/entities">{{ _("&larr; zurück zu Entitäten") }}</a>
       {% if back_dashboard %}&middot; <a href="{{ app_root }}{{ back_dashboard.path }}" data-back-dashboard>{{ back_dashboard.label }}</a>{% endif %}
       {% if back_wetter %}&middot; <a href="{{ app_root }}{{ back_wetter.path }}" data-back-dashboard>{{ back_wetter.label }}</a>{% endif %}

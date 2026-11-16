@@ -16,7 +16,7 @@
 
 - **Entitäten**: Räume aus Home Assistant in der Entitätsliste
   - Neue Spalte „Raum“ (über „Spalten“) und ein Filter „Raum“ mit „Ohne Raum“; die Etage steht als Tooltip dabei
-  - Der Raum steht auch im Kopf der Entitätsseiten
+  - Der Raum steht auch unter dem Titel der Entitätsseiten
   - Räume sind nur lesbar; geändert werden sie in Home Assistant
   - Braucht die Integration (sie reicht die Räume weiter); ohne sie gibt es weder Spalte noch Filter
 - **Import**: InfluxDB-Import teilt große Entitäten automatisch in Abschnitte

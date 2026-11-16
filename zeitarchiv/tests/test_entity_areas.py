@@ -134,7 +134,11 @@ def test_header_of_the_room_column_is_not_a_sort_link(client, rooms) -> None:
     assert "sort=area" not in html
 
 
-def test_facts_bar_shows_the_room_read_only(client, rooms) -> None:
-    html = client.get(f"/entities/{IDS[0]}/config").text
-    assert "Hobbyraum" in html and "Erdgeschoss" in html
-    assert "Hobbyraum" not in client.get(f"/entities/{IDS[2]}/config").text
+def test_entity_pages_show_the_room_read_only_next_to_the_id(client, rooms) -> None:
+    for path in (f"/entities/{IDS[0]}/config", f"/entities/{IDS[0]}"):
+        html = client.get(path).text
+        assert 'class="entity-room"' in html and "Hobbyraum" in html and "Erdgeschoss" in html
+        assert html.index(IDS[0]) < html.index('class="entity-room"')
+    # ohne Raum: keine Pille, die Kennzahlen-Leiste hat keine eigene Zelle dafür
+    assert 'class="entity-room"' not in client.get(f"/entities/{IDS[2]}/config").text
+    assert "<dt>Raum</dt>" not in client.get(f"/entities/{IDS[0]}/config").text

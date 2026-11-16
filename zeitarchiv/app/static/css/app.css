@@ -1580,6 +1580,8 @@ tr.tbl-bold.tbl-separator-row .tbl-separator-label{font-weight:700;color:var(--i
 .cat-pill i{flex:none;width:8px;height:8px;border-radius:50%;background:var(--c);}
 .cat-pill span{overflow:hidden;text-overflow:ellipsis;}
 .cat-none{color:var(--ink-muted);}
+/* Raum aus Home Assistant in der Zeile unter dem Titel der Entitätsseiten (_entity_room.html) */
+.entity-room{display:inline-flex;align-items:center;gap:5px;padding:1px 9px;border:0.5px solid var(--border-strong);border-radius:999px;background:var(--surface);color:var(--ink);font-size:.85em;}
 .badge.counter{color:var(--accent-bar);border-color:var(--accent-bar);}
 .badge.standard{color:var(--accent-line);border-color:var(--accent-line);}
 .badge.switch{color:var(--ink-muted);}

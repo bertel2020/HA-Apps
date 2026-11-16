@@ -1,0 +1,4 @@
+{# Raum der Entität (aus Home Assistant, nur lesend) als Pille in der Zeile unter dem Titel, nach der
+   Entitäts-ID. Steht auf allen drei Entitätsseiten (Verlauf, Werte bearbeiten, Konfiguration); erwartet
+   `facts` aus main._entity_facts(). Ohne Raum (oder ohne Katalog) entsteht nichts. #}
+{% if facts.area %}<span class="entity-room" title="{{ _('Raum aus Home Assistant. Wird dort geändert.') }}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.400-6.500 11-6.500 11z"/><circle cx="12" cy="10" r="2.300"/></svg>{{ facts.area.area }}{% if facts.area.floor %} &middot; {{ facts.area.floor }}{% endif %}</span> &middot; {% endif %}
