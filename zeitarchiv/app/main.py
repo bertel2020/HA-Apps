@@ -5150,7 +5150,9 @@ def _rows_fragment(
             filter_=filter_,
             page=page,
             page_size=effective_page_size,
-            **cleanup.gap_options(index, entity, window_start.timestamp(), window_end.timestamp()),
+            **cleanup.gap_options(
+                index, entity, window_start.timestamp(), window_end.timestamp(), data_dir=DATA_DIR, tz=TZ
+            ),
             outlier_factor=(
                 None if outlier_threshold == "off" else float(outlier_threshold)
             ),
@@ -5186,7 +5188,9 @@ def _rows_fragment(
             rows, None if outlier_threshold == "off" else float(outlier_threshold),
             entity["decimals"], TZ, mode=cleanup_stats.outlier_mode(entity),
         )
-        gap_args = cleanup.gap_options(index, entity, window_start.timestamp(), window_end.timestamp())
+        gap_args = cleanup.gap_options(
+            index, entity, window_start.timestamp(), window_end.timestamp(), data_dir=DATA_DIR, tz=TZ
+        )
         gaps = cleanup.detect_gaps(
             rows, gap_args["gap_threshold_minutes"], entity["decimals"], TZ,
             gap_args.get("receive_gaps"), gap_args.get("gap_stored_until"),

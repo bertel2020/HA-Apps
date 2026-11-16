@@ -109,6 +109,25 @@ def test_restore_entities_recreates_a_missing_entity_and_undo_removes_it(live) -
     assert not (data_dir / "archive" / "sensor.gone").exists()
 
 
+def test_a_restored_missing_entity_starts_without_receive_state(live) -> None:
+    """Zuletzt empfangen und Beginn der Empfangs-Pausen kommen nicht aus dem Backup: Es hat die Pausen nicht, und ein
+    übernommener Beginn ließe den Zeitraum als „bewertet, 0 Lücken“ erscheinen."""
+    data_dir, index, coordinator = live
+    _entity(index, data_dir, "sensor.gone", [1.0, 2.0])
+    with index._lock, index._conn:
+        index._conn.execute(
+            "UPDATE entities SET last_seen_ts = ?, receive_gaps_since = ? WHERE entity_id = 'sensor.gone'", (TS, TS - 86400)
+        )
+    zip_path = _backup(data_dir, data_dir)
+    index.delete_entity("sensor.gone")
+    import shutil
+    shutil.rmtree(data_dir / "archive" / "sensor.gone")
+    with rs.BackupSource(zip_path) as source:
+        rs.restore_entities(data_dir, index, coordinator, source, ["sensor.gone"], TZ, source_label="b")
+    entity = index.get_entity("sensor.gone")
+    assert entity["last_seen_ts"] is None and entity["receive_gaps_since"] is None
+
+
 def test_restore_entities_keeps_local_entity_settings(live) -> None:
     data_dir, index, coordinator = live
     _entity(index, data_dir, "sensor.keep", [1.0])

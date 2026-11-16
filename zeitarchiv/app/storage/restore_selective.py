@@ -605,7 +605,12 @@ def _swap_entities(
                     for row in _rows(source.db, f"SELECT * FROM {table} WHERE {where} = ?", (entity_id,)):
                         _insert_row(conn, table, row, drop=("id",))
                 if not snapshots[entity_id]["existed"]:
-                    _insert_row(conn, "entities", backup_rows[entity_id], override={"updated_at": now})
+                    # Zuletzt empfangen und Beginn der Empfangs-Pausen gehören zur laufenden Installation: Das Backup hat die Pausen
+                    # nicht, und ein übernommener Beginn ließe den Zeitraum als „bewertet, 0 Lücken“ erscheinen.
+                    _insert_row(
+                        conn, "entities", backup_rows[entity_id],
+                        override={"updated_at": now, "last_seen_ts": None, "receive_gaps_since": None},
+                    )
                     # Wie die übrigen Einstellungen: nur, wenn die Entität lokal fehlte.
                     if entity_id in backup_categories and not _assign_category(
                         conn, entity_id, backup_categories[entity_id], created_categories

@@ -211,8 +211,60 @@ def test_gap_options_reads_the_pauses_from_the_start_of_recording(index) -> None
 def test_a_cached_count_is_only_valid_for_the_method_it_was_measured_with() -> None:
     plain = _entity()
     filtered = _entity(value_filter="decimals")
-    entry = {"gap_threshold": "15", "gap_profile": {"method": "stored", "days": 30, "events": 100, "tiers": {}}}
+    entry = {"gap_threshold": "15", "gap_profile": {"method": "stored", "days": 30, "events": 100, "tiers": {"1": 0, "5": 0}}}
     assert cleanup_stats.gaps_measured(plain, entry)
     assert not cleanup_stats.gaps_measured(plain, {"gap_threshold": "15"})  # ohne Pausen-Profil: einmal neu messen
     assert not cleanup_stats.gaps_measured(filtered, entry)
     assert cleanup_stats.gaps_measured(filtered, {"gap_threshold": "r15"})
+
+
+# --- Fenstergrenzen -----------------------------------------------------------------------------------------------
+
+from datetime import datetime  # noqa: E402
+
+from app.storage import hotbuffer  # noqa: E402
+
+
+def _t(day: int, hour: int, minute: int = 0) -> float:
+    return datetime(2026, 11, day, hour, minute, tzinfo=TZ).timestamp()
+
+
+def _counts(index, data_dir, entity, windows, now):
+    """Zählt die markierten Zeilen je Fenster [von, bis) mit der Zuordnung der Bereinigungs-Seite."""
+    result = []
+    for start, end in windows:
+        options = cleanup.gap_options(index, entity, start, end, data_dir=data_dir, tz=TZ, now=now)
+        analysis = cleanup.analyze_raw_rows_page(
+            lambda s=start, e=end: cleanup.iter_raw_rows(data_dir, index, entity["entity_id"], s, e, TZ, now=now),
+            filter_="gaps", page=1, page_size=50, outlier_factor=None, tz=TZ, reasons=False, **options,
+        )
+        result.append(analysis["counts"]["gaps"])
+    return result
+
+
+def test_a_pause_that_ends_before_the_window_belongs_to_the_next_stored_row(index, tmp_path) -> None:
+    """Mit Filter endet eine Pause um 23:50 mit einem verworfenen Wert, die nächste gespeicherte Zeile steht erst um
+    00:30 am Folgetag. Sie muss genau einmal gezählt werden: in der Ansicht des Folgetags, nicht verloren gehen und
+    nicht doppelt auftreten; die Summe der Tage ist die Gesamtzahl."""
+    now = datetime(2026, 11, 20, 12, tzinfo=TZ)
+    index.set_config(ENTITY, value_filter="decimals", gap_threshold="30")
+    for ts in (_t(10, 12), _t(10, 23), _t(11, 0, 30), _t(11, 6)):
+        hotbuffer.append(tmp_path, ENTITY, ts, 1.0, TZ)
+    # empfangene Werte: 22:00 (verworfen) … 23:50 (verworfen) = 110 Minuten Pause; Aufzeichnung ab dem 10.
+    index._conn.execute("UPDATE entities SET receive_gaps_since = ?, first_ts = ? WHERE entity_id = ?", (_t(10, 0), _t(10, 12), ENTITY))
+    index._conn.execute("INSERT INTO receive_gaps (entity_id, start_ts, end_ts) VALUES (?, ?, ?)", (ENTITY, _t(10, 22), _t(10, 23, 50)))
+    index._conn.commit()  # get_entity liest über eine eigene Verbindung
+    entity = index.get_entity(ENTITY)
+    day1, day2, total = _counts(
+        index, tmp_path, entity,
+        [(_t(10, 0), _t(11, 0)), (_t(11, 0), _t(12, 0)), (_t(10, 0), _t(12, 0))], now,
+    )
+    assert (day1, day2, total) == (0, 1, 1)
+
+
+def test_the_window_lookup_finds_the_last_stored_row_before_it(index, tmp_path) -> None:
+    now = datetime(2026, 11, 20, 12, tzinfo=TZ)
+    for ts in (_t(8, 12), _t(10, 23)):
+        hotbuffer.append(tmp_path, ENTITY, ts, 1.0, TZ)
+    assert cleanup.previous_stored_ts(tmp_path, index, ENTITY, _t(11, 0), TZ, now) == _t(10, 23)
+    assert cleanup.previous_stored_ts(tmp_path, index, ENTITY, _t(8, 12), TZ, now) is None  # nichts davor

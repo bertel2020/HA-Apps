@@ -19,11 +19,13 @@ from __future__ import annotations
 
 from .formatting import GAP_THRESHOLD_LABELS, format_value
 from .i18n import N_, tr
-from .storage.index import MIN_RECEIVE_GAP_SECONDS, entity_last_seen, gap_method
+from .storage.index import entity_last_seen, gap_method
 
 #: Stufen der Lücken-Erkennung in Minuten, aufsteigend (ohne „Aus“). Die Stufe „1 Minute“ fehlt: Pausen unter
 #: 5 Minuten werden nicht festgehalten, die Stufe gilt dort wie „5 Minuten“.
 TIERS = (5, 15, 30, 60, 180, 360, 720, 1440)
+#: Bei gespeicherten Werten ist „1 Minute“ eine echte Stufe (bei den Empfangs-Pausen gilt sie wie „5 Minuten“).
+STORED_TIERS = (1,) + TIERS
 #: Zeitraum, über den die Pausen gezählt werden.
 WINDOW_DAYS = 60
 #: Ziel: höchstens so viele Meldungen je 30 Tage (etwa eine pro Woche).
@@ -54,24 +56,30 @@ STATUS_DISABLED = "disabled"
 ACTIONABLE = (STATUS_TOO_SENSITIVE, STATUS_UNSUITABLE)
 
 
-def tier_index(threshold: str) -> int:
-    """Position der Stufe in ``TIERS``; „1“ gilt wie „5“, größere Werte als die letzte Stufe wie diese."""
+def tiers_for(method: str) -> tuple[int, ...]:
+    """Stufen (Minuten), die bei der Methode vorkommen."""
+    return STORED_TIERS if method == "stored" else TIERS
+
+
+def tier_index(threshold: str, tiers: tuple[int, ...] = TIERS) -> int:
+    """Position der Stufe in ``tiers``; kleinere Werte gelten wie die erste, größere wie die letzte Stufe."""
     minutes = float(threshold)
-    for position, tier in enumerate(TIERS):
+    for position, tier in enumerate(tiers):
         if minutes <= tier:
             return position
-    return len(TIERS) - 1
+    return len(tiers) - 1
 
 
-def empty_tiers() -> dict[int, int]:
-    return dict.fromkeys(TIERS, 0)
+def empty_tiers(method: str = "receive") -> dict[int, int]:
+    return dict.fromkeys(tiers_for(method), 0)
 
 
 def count_tiers(delta_seconds: float, tiers: dict[int, int]) -> None:
-    """Zählt eine Pause bei jeder Stufe mit, die sie überschreitet."""
-    if delta_seconds <= MIN_RECEIVE_GAP_SECONDS:
+    """Zählt eine Pause bei jeder Stufe mit, die sie überschreitet. Welche Stufen gezählt werden, bestimmt ``tiers``
+    (Empfangs-Methode: ab 5 Minuten, gespeicherte Werte: ab 1 Minute)."""
+    if not tiers or delta_seconds <= min(tiers) * 60:
         return
-    for tier in TIERS:
+    for tier in sorted(tiers):
         if delta_seconds > tier * 60:
             tiers[tier] += 1
         else:
@@ -103,20 +111,21 @@ def recommend(entity, profile: dict | None, now: float) -> dict:
     if seen is None or now - seen > SILENT_AFTER_DAYS * 86400:
         result["reason"] = "silent"
         return result
+    all_tiers = tiers_for(method)
     tiers = {int(k): int(v) for k, v in (profile.get("tiers") or {}).items()}
-    per30 = {tier: tiers.get(tier, 0) * 30.0 / days for tier in TIERS}
-    recommended = next((tier for tier in TIERS if per30[tier] <= TARGET_PER_30_DAYS), None)
+    per30 = {tier: tiers.get(tier, 0) * 30.0 / days for tier in all_tiers}
+    recommended = next((tier for tier in all_tiers if per30[tier] <= TARGET_PER_30_DAYS), None)
     result["recommended"] = str(recommended) if recommended is not None else "off"
     threshold = entity["gap_threshold"]
     if threshold == "off":
         result["status"] = STATUS_DISABLED
         return result
-    position = tier_index(threshold)
-    current = per30[TIERS[position]]
+    position = tier_index(threshold, all_tiers)
+    current = per30[all_tiers[position]]
     result["per30"] = current
     if current > TARGET_PER_30_DAYS * TOO_SENSITIVE_FACTOR:
         result["status"] = STATUS_UNSUITABLE if recommended is None else STATUS_TOO_SENSITIVE
-    elif recommended is not None and position - TIERS.index(recommended) >= FINER_BY_TIERS:
+    elif recommended is not None and position - all_tiers.index(recommended) >= FINER_BY_TIERS:
         result["status"] = STATUS_FINER
     else:
         result["status"] = STATUS_OK

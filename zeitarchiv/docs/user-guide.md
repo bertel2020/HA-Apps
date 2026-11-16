@@ -2045,7 +2045,10 @@ Markierung ist reine Analyse; an den Daten ändert sie nichts.
 **Wie gezählt wird, hängt von der Entität ab.**
 - **Ohne Wertänderungsfilter und mit Rohdaten** ist gespeichert gleich empfangen.
   Gezählt werden die Abstände zwischen den gespeicherten Werten, wie es immer
-  war. Importe (CSV, Home Assistant, Symcon) zählen genauso.
+  war. Importierte Werte (CSV, Home Assistant, Symcon) zählen nur bei solchen
+  Entitäten mit: Bei Entitäten mit Filter oder Auflösung (der Standard für neue
+  Entitäten) gibt es für den Zeitraum vor der Aufzeichnung keine Bewertung, auch
+  nicht für importierte Werte.
 - **Mit Wertänderungsfilter oder Auflösung** speichert Zeitarchiv bewusst nicht
   jeden Wert. Dort würde der Speicher lange Ruhephasen als Lücke zeigen, obwohl
   der Sensor sendet, und das Lebenszeichen würde das Ergebnis beeinflussen.
@@ -2066,7 +2069,9 @@ Markierung ist reine Analyse; an den Daten ändert sie nichts.
   nicht), ist eine lange Pause normal. Dort „Aus“ oder eine große Schwelle
   wählen.
 - Die Pausen werden nach der Aufbewahrung der Entität, spätestens nach zwei
-  Jahren, gelöscht; je Entität höchstens 50.000.
+  Jahren, gelöscht; je Entität höchstens 50.000. Bei unbegrenzter Aufbewahrung
+  sinkt die Zahl unter „Gesamt“ deshalb mit der Zeit, ohne dass sich Daten
+  ändern.
 - Ob eine Entität ausgefallen ist, zeigt **Inaktive Entitäten**, das den
   zuletzt empfangenen Wert nutzt.
 
@@ -2086,7 +2091,7 @@ stumme Entität bekommt keine, denn ohne Wert gibt es keine Pause.
 - **Passt**, **Ausgeschaltet** und **Noch keine Empfehlung** (mit Begründung im
   Tooltip) vervollständigen die Beurteilung.
 
-Wird die Entität im **Energiedashboard** verwendet und lautet die Empfehlung „Aus“, wird sie nicht von „Empfehlungen übernehmen“ erfasst, sondern nur einzeln: Dort wird bei „Aus“ der letzte Wert unbegrenzt fortgeschrieben und eine veraltete Reihe nicht gemeldet. Für einen Tarif-Helfer, der nur bei Änderung sendet, ist das richtig, für einen sonst regelmäßigen Preis-Sensor nicht; die Bestätigung weist darauf hin.
+Wird die Entität im **Energiedashboard** verwendet und lautet die Empfehlung „Aus“, wird sie nicht von „Empfehlungen übernehmen“ (alle) erfasst, sondern nur, wenn man sie selbst auswählt, dann mit einem Hinweis in der Bestätigung: Dort wird bei „Aus“ der letzte Wert unbegrenzt fortgeschrieben und eine veraltete Reihe nicht gemeldet. Für einen Tarif-Helfer, der nur bei Änderung sendet, ist das richtig, für einen sonst regelmäßigen Preis-Sensor nicht.
 
 Die Empfehlung ändert nie von selbst etwas. Sie steht in **Housekeeping →
 Lücken-Erkennung** und auf der Konfigurationsseite der Entität und wird mit

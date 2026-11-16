@@ -16,6 +16,7 @@ from ..i18n import tr
 
 import itertools
 import json
+import math
 import uuid
 import statistics
 import time
@@ -353,7 +354,27 @@ class GapDetector:
         return None
 
 
-def gap_options(index, entity, from_ts: float | None = None, to_ts: float | None = None) -> dict:
+#: So weit (in Tagen) wird vor einem Fenster nach der letzten gespeicherten Zeile gesucht, schrittweise 1, 7, 35 Tage.
+PREVIOUS_ROW_LOOKBACK_DAYS = (1, 7, 35)
+
+
+def previous_stored_ts(
+    data_dir: Path, index: Index, entity_id: str, before_ts: float, tz: ZoneInfo, now: datetime | None = None
+) -> float | None:
+    """Zeitstempel der letzten gespeicherten Zeile vor ``before_ts`` (innerhalb der letzten 35 Tage), sonst ``None``."""
+    for days in PREVIOUS_ROW_LOOKBACK_DAYS:
+        last = None
+        for ts, _value in iter_raw_rows(data_dir, index, entity_id, before_ts - days * 86400, before_ts, tz, now=now):
+            last = ts
+        if last is not None:
+            return last
+    return None
+
+
+def gap_options(
+    index, entity, from_ts: float | None = None, to_ts: float | None = None, *,
+    data_dir: Path | None = None, tz: ZoneInfo | None = None, now: datetime | None = None,
+) -> dict:
     """Parameter der Lücken-Erkennung für ``analyze_raw_rows_page`` und ``detect_gaps``: Schwelle in Minuten und, bei
     Entitäten mit Filter oder Auflösung (``gap_method`` = receive), die Empfangs-Pausen im Fenster. Vor dem Beginn der
     Aufzeichnung (``receive_gaps_since``) gibt es dort keine Bewertung; die Schwellen „1“ und „5 Minuten“ gelten beide
@@ -365,9 +386,16 @@ def gap_options(index, entity, from_ts: float | None = None, to_ts: float | None
         return {"gap_threshold_minutes": float(threshold)}
     minutes = max(float(threshold), MIN_RECEIVE_GAP_SECONDS / 60)
     since = entity["receive_gaps_since"]
+    lower = from_ts
+    if from_ts is not None and data_dir is not None and tz is not None and from_ts > (entity["first_ts"] or 0):
+        # Eine Pause gehört zur ersten gespeicherten Zeile ab ihrem Ende. Beginnt das Fenster mitten in einer Ruhephase,
+        # gehört deshalb auch eine Pause dazu, die schon VOR dem Fenster endete, solange danach keine Zeile mehr kam:
+        # ab der letzten Zeile vor dem Fenster (ausschließlich) zählen, sonst fehlt sie in diesem und im vorigen Fenster.
+        previous = previous_stored_ts(data_dir, index, entity["entity_id"], from_ts, tz, now)
+        lower = math.nextafter(previous, math.inf) if previous is not None else from_ts - PREVIOUS_ROW_LOOKBACK_DAYS[-1] * 86400
     gaps = (
         index.list_receive_gaps(
-            entity["entity_id"], from_ts=since if from_ts is None else max(from_ts, since), to_ts=to_ts,
+            entity["entity_id"], from_ts=since if lower is None else max(lower, since), to_ts=to_ts,
             min_seconds=minutes * 60,
         )
         if since is not None else []
@@ -578,7 +606,7 @@ def analyze_raw_rows_page(
         group_rows = []
 
     # Pausen-Zähler je Stufe seit ``gap_tiers_since`` (Grundlage der Schwellen-Empfehlung, gespeicherte Werte)
-    tier_counts = gap_recommendation.empty_tiers()
+    tier_counts = gap_recommendation.empty_tiers("stored")
     tier_events = 0
     tier_first: float | None = None
     tier_last: float | None = None

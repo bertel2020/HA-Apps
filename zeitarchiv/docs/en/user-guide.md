@@ -1891,7 +1891,9 @@ the data.
 **How it is counted depends on the entity.**
 - **Without value change filter and with raw data**, stored equals received.
   The intervals between stored values are counted, as it has always been.
-  Imports (CSV, Home Assistant, Symcon) are counted the same way.
+  Imported values (CSV, Home Assistant, Symcon) count only for such entities:
+  for entities with filter or resolution (the default for new entities) there is
+  no assessment for the period before recording, not even for imported values.
 - **With value change filter or resolution**, Zeitarchiv deliberately does not
   store every value. There, storage would show long quiet stretches as gaps
   although the sensor is sending, and the sign of life would influence the
@@ -1910,7 +1912,8 @@ the data.
 - If a sensor only sends on change (Home Assistant does not report unchanged
   states), a long pause is normal. Choose “Off” or a large threshold there.
 - The pauses are deleted after the entity's retention, after two years at the
-  latest; at most 50,000 per entity.
+  latest; at most 50,000 per entity. With unlimited retention the number under
+  “Total” therefore decreases over time without any data changing.
 - Whether an entity has failed is shown by **Inactive entities**, which uses the
   last received value.
 
@@ -1930,7 +1933,7 @@ seven days gets none, because without a value there is no pause.
 - **Fits**, **Switched off** and **No recommendation yet** (with the reason in
   the tooltip) complete the assessment.
 
-If the entity is used in the **energy dashboard** and the recommendation is “Off”, it is not covered by “Apply recommendations” but only individually: there, “Off” carries the last value forward without limit and does not report a stale series. For a tariff helper that only sends on change that is right, for a price sensor that otherwise reports regularly it is not; the confirmation points this out.
+If the entity is used in the **energy dashboard** and the recommendation is “Off”, it is not covered by “Apply recommendations” (all) but only when you select it yourself, then with a note in the confirmation: there, “Off” carries the last value forward without limit and does not report a stale series. For a tariff helper that only sends on change that is right, for a price sensor that otherwise reports regularly it is not.
 
 The recommendation never changes anything by itself. It appears in
 **Housekeeping → Gap detection** and on the entity's configuration page and is

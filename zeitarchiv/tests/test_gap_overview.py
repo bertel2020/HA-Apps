@@ -42,7 +42,7 @@ def test_the_section_is_in_the_page_and_in_the_navigation(client, entities) -> N
 
 def test_the_table_shows_method_threshold_and_measured_gaps(client, entities) -> None:
     index, _ids = entities
-    index.set_cleanup_alltime_stats("sensor.go_test_a", {"gaps": 7, "all": 100}, "off", 1, gap_threshold="15", gap_profile={})
+    index.set_cleanup_alltime_stats("sensor.go_test_a", {"gaps": 7, "all": 100}, "off", 1, gap_threshold="15", gap_profile={"tiers": {"1": 0}})
     html = client.get("/housekeeping/luecken-erkennung").text
     row_a = html[html.index("sensor.go_test_a"):]
     row_a = row_a[:row_a.index("</tr>")]
@@ -55,7 +55,7 @@ def test_the_table_shows_method_threshold_and_measured_gaps(client, entities) ->
 
 def test_the_most_gaps_come_first(client, entities) -> None:
     index, _ids = entities
-    index.set_cleanup_alltime_stats("sensor.go_test_b", {"gaps": 500, "all": 1000}, "off", 1, gap_threshold="15", gap_profile={})
+    index.set_cleanup_alltime_stats("sensor.go_test_b", {"gaps": 500, "all": 1000}, "off", 1, gap_threshold="15", gap_profile={"tiers": {"1": 0}})
     html = client.get("/housekeeping/luecken-erkennung").text
     assert html.index("sensor.go_test_b") < html.index("sensor.go_test_a")
 
@@ -147,7 +147,7 @@ def profiled(client, entities):
     index.set_cleanup_alltime_stats(
         ids[0], {"gaps": 120, "all": 5000}, "off", 1, gap_threshold="15",
         gap_profile={"method": "stored", "days": 30.0, "events": 4000,
-                     "tiers": {"5": 400, "15": 150, "30": 3, "60": 1, "180": 0, "360": 0, "720": 0, "1440": 0}},
+                     "tiers": {"1": 800, "5": 400, "15": 150, "30": 3, "60": 1, "180": 0, "360": 0, "720": 0, "1440": 0}},
     )
     index._conn.execute(
         "UPDATE entities SET receive_gaps_since = ?, last_seen_ts = ?, last_ts = ? WHERE entity_id = ?",
@@ -233,7 +233,7 @@ def test_off_is_never_part_of_apply_all_for_entities_in_the_energy_dashboard(cli
     index.set_cleanup_alltime_stats(
         ids[0], {"gaps": 900, "all": 5000}, "off", 1, gap_threshold="15",
         gap_profile={"method": "stored", "days": 30.0, "events": 4000,
-                     "tiers": {"5": 900, "15": 800, "30": 700, "60": 600, "180": 500, "360": 400, "720": 300, "1440": 200}},
+                     "tiers": {"1": 950, "5": 900, "15": 800, "30": 700, "60": 600, "180": 500, "360": 400, "720": 300, "1440": 200}},
     )
     _energy_uses(monkeypatch, ids[0])
     client.post("/housekeeping/luecken-erkennung/recommend/apply", data={"all": "1"})

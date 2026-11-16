@@ -236,7 +236,7 @@ def gaps_measured(entity, eintrag: dict | None) -> bool:
         return False
     # Bei gespeicherten Werten gehört das Pausen-Profil der Schwellen-Empfehlung zur Messung: Einträge aus der Zeit
     # davor werden einmal neu gemessen.
-    return gap_method(entity) != "stored" or "gap_profile" in eintrag
+    return gap_method(entity) != "stored" or "1" in ((eintrag.get("gap_profile") or {}).get("tiers") or {})
 
 
 def gaps_assessed(entity) -> bool:
