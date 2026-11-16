@@ -29,6 +29,21 @@
 - **Data quality**: Choose which kinds of findings trigger the “New findings in data quality” notice
   - Settings → Notices; gaps are off by default
   - The data quality page still shows everything
+- **Gap detection**: Recommendation for the threshold
+  - The configuration page shows the recommended level and an assessment below the threshold field (too sensitive, fits, could be finer, not suitable); the recommendation is available after 14 days of observation
+  - Housekeeping → Gap detection lists all entities with method, threshold, gaps found and assessment
+  - Recommendations can be applied one by one, by selection or all at once; for several entities at once a custom threshold also works
+  - A popup first shows the breakdown and the affected entities, afterwards there is “Undo”
+- **Outlier detection**: Recommendation for the threshold
+  - The assessment counts borderline cases, i.e. flags that disappear with the next coarser setting; real errors such as shifted digits do not count against the threshold
+  - Below the threshold field and in Housekeeping → Outliers each entity shows its assessment (too sensitive, fits, not suitable, barely effective, off) with the borderline cases per level
+  - Housekeeping → Outliers replaces the list of entities above 1 % rate with this overview, with filters, bulk action, popup and “Undo”
+  - Only “too sensitive” is applied; “Off” is never recommended
+  - The notice “Outlier detection marks an unusual amount” counts too-sensitive and not-suitable entities
+  - After the update Zeitarchiv measures every entity once more, which takes a while with large histories
+- **Value change filter**: The sign of life is adjustable
+  - 1, 3, 6, 12 or 24 hours, per entity (with an active filter) and as a default under Settings → Archiving; previously fixed at 6 hours
+  - Gap detection gains a “3 hours” level for it; “1 day” is now called “24 hours”
 
 ### Changed
 
@@ -43,6 +58,12 @@
 - **Data quality**: Clearer loading and filters
   - Expanding a row shows a spinner with a note that large entities can take up to a minute, and offers “Try again” if loading fails
   - Search and filters use the same dropdowns as the rest of the app
+- **Gap detection**: With a value change filter or a coarser resolution it counts pauses between received values
+  - The sign of life, filter and resolution no longer distort it; counting starts with the update, the start is shown on the configuration page
+  - The automatic raising of the threshold and the notice “Gap detection can structurally never apply” are gone
+- **Inactive entities**: Detection is based on received instead of stored values
+  - A sign of life of the value change filter no longer hides a failed entity
+  - Applies to Housekeeping, the status tile and the note for “Historic”
 
 ### Fixed
 

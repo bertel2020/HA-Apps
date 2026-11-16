@@ -29,6 +29,21 @@
 - **Datenqualität**: Auswahl, welche Befundarten die Meldung „Neue Befunde in der Datenqualität“ auslösen
   - Einstellungen → Meldungen; Lücken sind standardmäßig aus
   - Die Datenqualität-Seite zeigt weiterhin alles
+- **Lücken-Erkennung**: Empfehlung für die Schwelle
+  - Die Konfigurationsseite zeigt unter dem Schwellenfeld die empfohlene Stufe und eine Beurteilung (zu empfindlich, passt, könnte feiner sein, nicht geeignet); die Empfehlung steht nach 14 Tagen Beobachtung bereit
+  - Housekeeping → Lücken-Erkennung listet alle Entitäten mit Methode, Schwelle, gefundenen Lücken und Beurteilung
+  - Empfehlungen lassen sich einzeln, per Auswahl oder gesammelt übernehmen; für mehrere Entitäten zugleich geht auch eine eigene Schwelle
+  - Ein Popup zeigt vorher die Aufteilung und die betroffenen Entitäten, danach gibt es „Rückgängig“
+- **Ausreißer-Erkennung**: Empfehlung für die Schwelle
+  - Die Beurteilung zählt Grenzfälle, also Markierungen, die bei der nächstgröberen Einstellung verschwinden; echte Fehler wie verrutschte Ziffern zählen nicht gegen die Schwelle
+  - Unter dem Schwellenfeld und in Housekeeping → Ausreißer steht je Entität die Beurteilung (zu empfindlich, passt, nicht geeignet, greift kaum, ausgeschaltet) mit den Grenzfällen je Stufe
+  - Housekeeping → Ausreißer ersetzt die Liste der Entitäten über 1 % Quote durch diese Übersicht, mit Filtern, Sammelaktion, Popup und „Rückgängig“
+  - Übernommen wird nur bei „zu empfindlich“; „Aus“ wird nie empfohlen
+  - Die Meldung „Ausreißer-Erkennung markiert auffällig viel“ zählt zu empfindliche und nicht geeignete Entitäten
+  - Nach dem Update misst Zeitarchiv jede Entität einmal neu, bei großen Historien dauert das
+- **Wertänderungsfilter**: Das Lebenszeichen ist einstellbar
+  - 1, 3, 6, 12 oder 24 Stunden, je Entität (bei aktivem Filter) und als Standard unter Einstellungen → Archivierung; bisher fest 6 Stunden
+  - Die Lücken-Erkennung kennt dafür die Stufe „3 Stunden“; „1 Tag“ heißt dort „24 Stunden“
 
 ### Geändert
 
@@ -43,6 +58,12 @@
 - **Datenqualität**: Deutlicherer Ladehinweis und einheitliche Filter
   - Beim Aufklappen einer Zeile erscheint ein Spinner mit dem Hinweis, dass große Entitäten bis zu einer Minute brauchen können; schlägt das Laden fehl, gibt es „Erneut versuchen“
   - Suche und Filter nutzen dieselben Dropdowns wie der Rest der App
+- **Lücken-Erkennung**: Mit Wertänderungsfilter oder gröberer Auflösung zählt sie Pausen zwischen empfangenen Werten
+  - Lebenszeichen, Filter und Auflösung verfälschen sie nicht mehr; gezählt wird ab dem Update, der Beginn steht auf der Konfigurationsseite
+  - Die automatische Anhebung der Schwelle und die Meldung „Lücken-Erkennung kann strukturell nicht zutreffen“ entfallen
+- **Inaktive Entitäten**: Die Erkennung richtet sich nach empfangenen statt gespeicherten Werten
+  - Ein Lebenszeichen des Wertänderungsfilters verdeckt keine ausgefallene Entität mehr
+  - Gilt für Housekeeping, die Statuskachel und den Hinweis bei „Historisch“
 
 ### Behoben
 
