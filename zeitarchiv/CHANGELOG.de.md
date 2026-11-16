@@ -14,21 +14,6 @@
 
 ### Neu
 
-- **Entitäten**: Räume aus Home Assistant in der Entitätsliste
-  - Neue Spalte „Raum“ (über „Spalten“) und ein Filter „Raum“ mit „Ohne Raum“; die Etage steht als Tooltip dabei
-  - Der Raum steht auch unter dem Titel der Entitätsseiten
-  - Räume sind nur lesbar; geändert werden sie in Home Assistant
-  - Braucht die Integration (sie reicht die Räume weiter); ohne sie gibt es weder Spalte noch Filter
-- **Import**: InfluxDB-Import teilt große Entitäten automatisch in Abschnitte
-  - Entitäten mit mehr als 10 Mio Werten werden nicht mehr abgewiesen; ein Aufteilen von Hand entfällt
-  - Neuer Knopf „Abbrechen“ in der Fortschrittsanzeige
-  - Der Import hält die Oberfläche nur noch kurz je Abschnitt an
-- **Datenqualität**: Neu messen
-  - „Neu messen“ in der Statuszeile, der Auswahlleiste und je Zeile aktualisiert die Zahlen sofort, statt auf die nächste automatische Messung zu warten
-  - Die Statuszeile zeigt den Fortschritt, solange die Messung läuft
-- **Datenqualität**: Auswahl, welche Befundarten die Meldung „Neue Befunde in der Datenqualität“ auslösen
-  - Einstellungen → Meldungen; Lücken sind standardmäßig aus
-  - Die Datenqualität-Seite zeigt weiterhin alles
 - **Lücken-Erkennung**: Empfehlung für die Schwelle
   - Die Konfigurationsseite zeigt unter dem Schwellenfeld die empfohlene Stufe und eine Beurteilung (zu empfindlich, passt, könnte feiner sein, nicht geeignet); die Empfehlung steht nach 14 Tagen Beobachtung bereit
   - Housekeeping → Lücken-Erkennung listet alle Entitäten mit Methode, Schwelle, gefundenen Lücken und Beurteilung
@@ -44,9 +29,30 @@
 - **Wertänderungsfilter**: Das Lebenszeichen ist einstellbar
   - 1, 3, 6, 12 oder 24 Stunden, je Entität (bei aktivem Filter) und als Standard unter Einstellungen → Archivierung; bisher fest 6 Stunden
   - Die Lücken-Erkennung kennt dafür die Stufe „3 Stunden“; „1 Tag“ heißt dort „24 Stunden“
+- **Entitäten**: Räume aus Home Assistant in der Entitätsliste
+  - Neue Spalte „Raum“ (über „Spalten“) und ein Filter „Raum“ mit „Ohne Raum“; die Etage steht als Tooltip dabei
+  - Der Raum steht auch unter dem Titel der Entitätsseiten
+  - Räume sind nur lesbar; geändert werden sie in Home Assistant
+  - Braucht die Integration (sie reicht die Räume weiter); ohne sie gibt es weder Spalte noch Filter
+- **Import**: InfluxDB-Import teilt große Entitäten automatisch in Abschnitte
+  - Entitäten mit mehr als 10 Mio Werten werden nicht mehr abgewiesen; ein Aufteilen von Hand entfällt
+  - Neuer Knopf „Abbrechen“ in der Fortschrittsanzeige
+  - Der Import hält die Oberfläche nur noch kurz je Abschnitt an
+- **Datenqualität**: Neu messen
+  - „Neu messen“ in der Statuszeile, der Auswahlleiste und je Zeile aktualisiert die Zahlen sofort, statt auf die nächste automatische Messung zu warten
+  - Die Statuszeile zeigt den Fortschritt, solange die Messung läuft
+- **Datenqualität**: Auswahl, welche Befundarten die Meldung „Neue Befunde in der Datenqualität“ auslösen
+  - Einstellungen → Meldungen; Lücken sind standardmäßig aus
+  - Die Datenqualität-Seite zeigt weiterhin alles
 
 ### Geändert
 
+- **Lücken-Erkennung**: Mit Wertänderungsfilter oder gröberer Auflösung zählt sie Pausen zwischen empfangenen Werten
+  - Lebenszeichen, Filter und Auflösung verfälschen sie nicht mehr; gezählt wird ab dem Update, der Beginn steht auf der Konfigurationsseite
+  - Die automatische Anhebung der Schwelle und die Meldung „Lücken-Erkennung kann strukturell nicht zutreffen“ entfallen
+- **Inaktive Entitäten**: Die Erkennung richtet sich nach empfangenen statt gespeicherten Werten
+  - Ein Lebenszeichen des Wertänderungsfilters verdeckt keine ausgefallene Entität mehr
+  - Gilt für Housekeeping, die Statuskachel und den Hinweis bei „Historisch“
 - **Entitäten**: Die Entitätsliste merkt sich ihre Filter
   - Suche, Favoriten, Typ, Kategorie und Einheit bleiben erhalten, wenn man eine Entität öffnet und zurückkehrt
 - **Export**: Das Limit je CSV-Datei steigt von 5 auf 10 Mio Zeilen
@@ -58,12 +64,6 @@
 - **Datenqualität**: Deutlicherer Ladehinweis und einheitliche Filter
   - Beim Aufklappen einer Zeile erscheint ein Spinner mit dem Hinweis, dass große Entitäten bis zu einer Minute brauchen können; schlägt das Laden fehl, gibt es „Erneut versuchen“
   - Suche und Filter nutzen dieselben Dropdowns wie der Rest der App
-- **Lücken-Erkennung**: Mit Wertänderungsfilter oder gröberer Auflösung zählt sie Pausen zwischen empfangenen Werten
-  - Lebenszeichen, Filter und Auflösung verfälschen sie nicht mehr; gezählt wird ab dem Update, der Beginn steht auf der Konfigurationsseite
-  - Die automatische Anhebung der Schwelle und die Meldung „Lücken-Erkennung kann strukturell nicht zutreffen“ entfallen
-- **Inaktive Entitäten**: Die Erkennung richtet sich nach empfangenen statt gespeicherten Werten
-  - Ein Lebenszeichen des Wertänderungsfilters verdeckt keine ausgefallene Entität mehr
-  - Gilt für Housekeeping, die Statuskachel und den Hinweis bei „Historisch“
 
 ### Behoben
 

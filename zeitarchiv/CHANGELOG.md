@@ -14,21 +14,6 @@
 
 ### New
 
-- **Entities**: Rooms from Home Assistant in the entity list
-  - New column “Room” (via “Columns”) and a “Room” filter with “No room”; the floor shows as a tooltip
-  - The room also shows below the title of an entity’s pages
-  - Rooms are read only; change them in Home Assistant
-  - Needs the integration (it passes the rooms on); without it there is no column and no filter
-- **Import**: The InfluxDB import splits large entities into sections automatically
-  - Entities with more than 10 million values are no longer rejected; splitting them by hand is no longer needed
-  - New “Cancel” button in the progress display
-  - The import only holds the interface up briefly per section
-- **Data quality**: Measure again
-  - “Measure again” in the status line, the selection bar and each row refreshes the numbers right away instead of waiting for the next automatic measurement
-  - The status line shows the progress while it runs
-- **Data quality**: Choose which kinds of findings trigger the “New findings in data quality” notice
-  - Settings → Notices; gaps are off by default
-  - The data quality page still shows everything
 - **Gap detection**: Recommendation for the threshold
   - The configuration page shows the recommended level and an assessment below the threshold field (too sensitive, fits, could be finer, not suitable); the recommendation is available after 14 days of observation
   - Housekeeping → Gap detection lists all entities with method, threshold, gaps found and assessment
@@ -44,9 +29,30 @@
 - **Value change filter**: The sign of life is adjustable
   - 1, 3, 6, 12 or 24 hours, per entity (with an active filter) and as a default under Settings → Archiving; previously fixed at 6 hours
   - Gap detection gains a “3 hours” level for it; “1 day” is now called “24 hours”
+- **Entities**: Rooms from Home Assistant in the entity list
+  - New column “Room” (via “Columns”) and a “Room” filter with “No room”; the floor shows as a tooltip
+  - The room also shows below the title of an entity’s pages
+  - Rooms are read only; change them in Home Assistant
+  - Needs the integration (it passes the rooms on); without it there is no column and no filter
+- **Import**: The InfluxDB import splits large entities into sections automatically
+  - Entities with more than 10 million values are no longer rejected; splitting them by hand is no longer needed
+  - New “Cancel” button in the progress display
+  - The import only holds the interface up briefly per section
+- **Data quality**: Measure again
+  - “Measure again” in the status line, the selection bar and each row refreshes the numbers right away instead of waiting for the next automatic measurement
+  - The status line shows the progress while it runs
+- **Data quality**: Choose which kinds of findings trigger the “New findings in data quality” notice
+  - Settings → Notices; gaps are off by default
+  - The data quality page still shows everything
 
 ### Changed
 
+- **Gap detection**: With a value change filter or a coarser resolution it counts pauses between received values
+  - The sign of life, filter and resolution no longer distort it; counting starts with the update, the start is shown on the configuration page
+  - The automatic raising of the threshold and the notice “Gap detection can structurally never apply” are gone
+- **Inactive entities**: Detection is based on received instead of stored values
+  - A sign of life of the value change filter no longer hides a failed entity
+  - Applies to Housekeeping, the status tile and the note for “Historic”
 - **Entities**: The entity list remembers its filters
   - Search, favorites, type, category and unit are still set when you open an entity and come back
 - **Export**: The limit per CSV file rises from 5 to 10 million rows
@@ -58,12 +64,6 @@
 - **Data quality**: Clearer loading and filters
   - Expanding a row shows a spinner with a note that large entities can take up to a minute, and offers “Try again” if loading fails
   - Search and filters use the same dropdowns as the rest of the app
-- **Gap detection**: With a value change filter or a coarser resolution it counts pauses between received values
-  - The sign of life, filter and resolution no longer distort it; counting starts with the update, the start is shown on the configuration page
-  - The automatic raising of the threshold and the notice “Gap detection can structurally never apply” are gone
-- **Inactive entities**: Detection is based on received instead of stored values
-  - A sign of life of the value change filter no longer hides a failed entity
-  - Applies to Housekeeping, the status tile and the note for “Historic”
 
 ### Fixed
 
