@@ -162,14 +162,18 @@
 {% endmacro %}
 {% macro room_chips() %}
 <div class="wt-rooms" role="group" aria-label="{{ _('Räume im Diagramm') }}" x-show="roomChips().length" x-cloak>
-  <template x-for="chip in roomChips()" :key="chip.name">
-    <span class="wt-room-item">
-      <button type="button" class="wt-room-floor" :class="{'is-off': chip.floorState === 'off'}" x-show="chip.floorLabel" @click="toggleFloorRooms(chip.floor)"
-              :aria-pressed="(chip.floorState !== 'off').toString()" :title="chip.floorState === 'off' ? t('Etage einblenden') : t('Etage ausblenden')">
-        <span aria-hidden="true" x-text="chip.floorMark"></span> <span x-text="chip.floorLabel"></span>
+  <template x-for="group in roomGroups()" :key="group.key">
+    <div class="wt-room-group">
+      <button type="button" class="wt-room-floor" :class="{'is-off': group.floorState === 'off'}" x-show="group.floorLabel" @click="toggleFloorRooms(group.floor)"
+              :aria-pressed="(group.floorState !== 'off').toString()" :title="group.floorState === 'off' ? t('Etage einblenden') : t('Etage ausblenden')">
+        <span aria-hidden="true" x-text="group.floorMark"></span> <span x-text="group.floorLabel"></span>
       </button>
-      <button type="button" class="wt-room-chip" :class="{'has-room-color': chip.color}" :style="chip.color ? '--room-color:' + chip.color : ''" :aria-pressed="chip.on.toString()" @click="toggleRoom(chip.name)" x-text="chip.label"></button>
-    </span>
+      <div class="wt-room-chips">
+        <template x-for="chip in group.chips" :key="chip.name">
+          <button type="button" class="wt-room-chip" :class="{'has-room-color': chip.color}" :style="chip.color ? '--room-color:' + chip.color : ''" :aria-pressed="chip.on.toString()" @click="toggleRoom(chip.name)" x-text="chip.label"></button>
+        </template>
+      </div>
+    </div>
   </template>
   <button type="button" class="wt-room-all" x-show="roomsOff.length" x-cloak @click="showAllRooms()">{{ _("Alle") }}</button>
 </div>

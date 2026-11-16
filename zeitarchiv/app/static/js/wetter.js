@@ -2054,6 +2054,18 @@
         return chips;
       },
 
+      // Die Chips je Etage: der Etagenname steht links neben den Chips; ohne Etagen gibt es eine Gruppe ohne Namen.
+      roomGroups() {
+        const groups = [];
+        this.roomChips().forEach((chip) => {
+          if (!groups.length || chip.floorLabel) {
+            groups.push({key: chip.floorLabel || '-', floor: chip.floor, floorLabel: chip.floorLabel, floorState: chip.floorState, floorMark: chip.floorMark, chips: []});
+          }
+          groups[groups.length - 1].chips.push(chip);
+        });
+        return groups;
+      },
+
       toggleRoom(name) {
         this.roomsOff = this.roomsOff.includes(name) ? this.roomsOff.filter((n) => n !== name) : [...this.roomsOff, name];
         writeStore({roomsOff: this.roomsOff});
