@@ -271,6 +271,8 @@ def test_order_and_start_state_are_saved_and_cleaned(service) -> None:
     _configure(service, floors_start="closed", floor_order=[" OG ", "EG", "OG", ""], room_order=["Bad", "Bad", "Küche"])
     config = wetter_routes._load_config(service.deps.index)
     assert (config["floors_start"], config["floor_order"], config["room_order"]) == ("closed", ["OG", "EG"], ["Bad", "Küche"])
+    _configure(service, floors_start="rooms")
+    assert wetter_routes._load_config(service.deps.index)["floors_start"] == "rooms"
     _configure(service, floors_start="unsinn")
     assert wetter_routes._load_config(service.deps.index)["floors_start"] == "open"
 

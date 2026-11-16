@@ -231,7 +231,7 @@
       roomsClosed: [],
       tempDays: 30,
       tempRange: null,         // eigener Zeitraum {start, end} (ISO-Tage) statt der festen Tage
-      tempRangeOpen: false,
+      tempRangeOpen: '',
       draftStart: '',
       draftEnd: '',
       tempRangeError: '',
@@ -337,6 +337,9 @@
         // Ausgeblendete Karten fehlen im Dokument: der erste vorhandene Reiter ist der Start, Diagramme ohne Karte laden nicht.
         const firstTab = this.$root.querySelector('[role="tab"]');
         if (firstTab) this.tab = firstTab.id.replace('wt-tab-', '');
+        // ?tab=klima (Rücklink von der Entitätsseite) öffnet gleich diesen Reiter, soweit er vorhanden ist.
+        const wanted = new URLSearchParams(window.location.search).get('tab');
+        if (wanted && /^[a-z]+$/.test(wanted) && this.$root.querySelector('#wt-tab-' + wanted)) this.tab = wanted;
         if (this.tab !== 'overview') this.$nextTick(() => this.showTab(this.tab));
         this.loadTiles();
         this.loadTable();
@@ -459,19 +462,44 @@
         return out;
       },
 
-      // Etagen (ohne Etagen: Räume) der Vergleichstabelle, für „Alles zuklappen“ und den Start zugeklappt.
+      // Etagen (ohne Etagen: Räume) der Vergleichstabelle, für die Stufen „Alles zu“ und „Etagen auf, Räume zu“ und den Start der Tabelle.
       collapseTargets(data) {
         const rows = ((data && data.rows) || []).filter((row) => row.room && /^temperature:/.test(row.key));
         const floors = [...new Set(rows.map((row) => row.floor || '').filter(Boolean))];
         if (rows.some((row) => !row.floor)) floors.push('');
         const hasFloors = rows.some((row) => row.floor);
-        return {floors: hasFloors ? floors : [], rooms: hasFloors ? [] : [...new Set(rows.map((row) => row.room))]};
+        const rooms = [...new Set(rows.map((row) => row.room))];
+        return {floors: hasFloors ? floors : [], rooms: hasFloors ? [] : rooms, allRooms: rooms, hasFloors};
       },
 
-      collapseAll(closed) {
-        const targets = lastTable ? this.collapseTargets(lastTable) : {floors: [], rooms: []};
-        this.floorsClosed = closed ? targets.floors : [];
-        this.roomsClosed = closed ? targets.rooms : [];
+      // Drei Stufen: alles auf, Etagen auf und Räume zu, alles zu. Ohne Etagen gibt es nur auf und zu.
+      foldTargets(stage, data) {
+        const targets = this.collapseTargets(data);
+        if (stage === 'closed') return {floors: targets.floors, rooms: targets.rooms};
+        if (stage === 'rooms') return {floors: [], rooms: targets.allRooms};
+        return {floors: [], rooms: []};
+      },
+
+      // Welche Stufe gerade gilt; leer bei einer Mischung (einzelne Etagen oder Räume von Hand geändert).
+      foldStage() {
+        if (!lastTable) return '';
+        const same = (a, b) => a.length === b.length && a.every((name) => b.includes(name));
+        const targets = this.collapseTargets(lastTable);
+        const stages = targets.hasFloors ? ['open', 'rooms', 'closed'] : ['open', 'closed'];
+        return stages.find((stage) => {
+          const wanted = this.foldTargets(stage, lastTable);
+          return same(this.floorsClosed, wanted.floors) && same(this.roomsClosed, wanted.rooms);
+        }) || '';
+      },
+
+      foldHasFloors() {
+        return lastTable ? this.collapseTargets(lastTable).hasFloors : false;
+      },
+
+      setFold(stage) {
+        const wanted = this.foldTargets(stage, lastTable);
+        this.floorsClosed = wanted.floors;
+        this.roomsClosed = wanted.rooms;
         writeStore({floorsClosed: this.floorsClosed, roomsClosed: this.roomsClosed});
         if (lastTable) this.paintTables(lastTable);
       },
@@ -484,10 +512,10 @@
         }
         if (!this._floorsSeeded && data) {
           this._floorsSeeded = true;
-          if (this.floorsStart === 'closed' && !('floorsClosed' in readStore())) {
-            const targets = this.collapseTargets(data);
-            this.floorsClosed = targets.floors;
-            this.roomsClosed = targets.rooms;
+          if (this.floorsStart !== 'open' && !('floorsClosed' in readStore())) {
+            const wanted = this.foldTargets(this.floorsStart, data);
+            this.floorsClosed = wanted.floors;
+            this.roomsClosed = wanted.rooms;
           }
         }
         for (const group of GROUPS) {
@@ -633,7 +661,7 @@
         const part = (tile, label) => ({
           key: tile.key, kind: kindOf(tile), icon: kindOf(tile) === 'humid' ? 'humid' : 'temp', label,
           value: this.tileValue(tile), sub: this.tileSub(tile),
-          href: 'entities/' + encodeURIComponent(tile.entity_id), title: this.tileTitle(tile),
+          href: this.entityHref(tile.entity_id), title: this.tileTitle(tile),
         });
         const out = [];
         rooms.forEach((list, name) => {
@@ -667,7 +695,7 @@
         const c = this.conditions;
         const live = !!c && c.mode !== 'day';
         const out = [];
-        const link = (tile) => (tile ? 'entities/' + encodeURIComponent(tile.entity_id) : '');
+        const link = (tile) => (tile ? this.entityHref(tile.entity_id) : '');
 
         const temp = byKey('temperature');
         if (temp) {
@@ -725,7 +753,7 @@
         [...rest.filter((tile) => lead.includes(tile.key)).sort((x, y) => lead.indexOf(x.key) - lead.indexOf(y.key)),
           ...rest.filter((tile) => !lead.includes(tile.key))].forEach((tile) => {
           out.push({
-            key: tile.key, role: tile.key, icon: this.tileIcon(tile), label: tile.label, big: false, href: 'entities/' + encodeURIComponent(tile.entity_id),
+            key: tile.key, role: tile.key, icon: this.tileIcon(tile), label: tile.label, big: false, href: this.entityHref(tile.entity_id),
             title: '', value: this.tileValue(tile), sub: this.tileSub(tile),
           });
         });
@@ -739,6 +767,11 @@
       },
 
       // ---- Reiter und Diagramme (Phase 2) ----------------------------------------------------
+
+      // Kachel-Link zur Entität; ?from_wetter trägt den Reiter, damit die Seite einen Weg zurück anbieten kann.
+      entityHref(entityId) {
+        return 'entities/' + encodeURIComponent(entityId) + '?from_wetter=' + (this.tab === 'klima' ? 'klima' : 'overview');
+      },
 
       showTab(tab) {
         this.tab = tab;
@@ -1781,7 +1814,7 @@
       setTempDays(days) {
         this.tempDays = days;
         this.tempRange = null;
-        this.tempRangeOpen = false;
+        this.tempRangeOpen = '';
         writeStore({tempRange: null});
         this.loadTemps();
       },
@@ -1799,13 +1832,14 @@
         return `${format(r.start)}–${format(r.end)}`;
       },
 
-      openTempRange() {
-        if (this.tempRangeOpen) { this.tempRangeOpen = false; return; }
+      // `where` nennt die Karte (temp oder humid), von der aus das Fenster aufgeht: beide teilen sich die Auswahl, aber nur ein Fenster ist offen.
+      openTempRange(where) {
+        if (this.tempRangeOpen === where) { this.tempRangeOpen = ''; return; }
         const today = this.todayIso();
         this.draftEnd = this.tempRange ? this.tempRange.end : today;
         this.draftStart = this.tempRange ? this.tempRange.start : (this.tempCmp && this.tempCmp.dates.length ? this.tempCmp.dates[0] : today);
         this.tempRangeError = '';
-        this.tempRangeOpen = true;
+        this.tempRangeOpen = where;
       },
 
       applyTempRange() {
@@ -1817,7 +1851,7 @@
         const days = Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000) + 1;
         if (days > MAX_TEMP_SPAN_DAYS) { this.tempRangeError = t('Der Zeitraum darf höchstens zehn Jahre lang sein.'); return; }
         this.tempRangeError = '';
-        this.tempRangeOpen = false;
+        this.tempRangeOpen = '';
         this.tempRange = {start, end};
         writeStore({tempRange: this.tempRange});
         this.loadTemps();

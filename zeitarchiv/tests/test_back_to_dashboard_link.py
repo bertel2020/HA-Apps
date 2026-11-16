@@ -81,3 +81,22 @@ def test_usage_chips_open_the_default_dashboard_as_the_overview_page() -> None:
     """Chips „Verwendet in“ und Rücklink führen für das Standard-Dashboard auf dieselbe Seite wie die Topnav."""
     usage = template_text("_dashboard_usage.html")
     assert usage.count("'/uebersicht' if dashboard.is_default") == 2
+
+
+def test_entity_page_links_back_to_the_weather_dashboard_tab(client) -> None:
+    import html
+
+    _setup(client)
+    klima = [(h, html.unescape(t)) for h, t in _links(client.get("/entities/sensor.back_link?from_wetter=klima").text)]
+    assert ("/wetterdashboard?tab=klima", "← zurück zum Wetterdashboard, Temperatur & Klima") in klima
+    uebersicht = [(h, html.unescape(t)) for h, t in _links(client.get("/entities/sensor.back_link?from_wetter=overview").text)]
+    assert ("/wetterdashboard", "← zurück zum Wetterdashboard") in uebersicht
+    for wert in ("", "?from_wetter=heat", '?from_wetter="><script>'):
+        seite = client.get(f"/entities/sensor.back_link{wert}")
+        assert seite.status_code == 200
+        assert not any("wetterdashboard" in h for h, _t in _links(seite.text)), wert
+
+
+def test_weather_tiles_pass_their_tab_on_and_the_dashboard_opens_it() -> None:
+    js = (APP / "static" / "js" / "wetter.js").read_text(encoding="utf-8")
+    assert "?from_wetter=" in js and "URLSearchParams(window.location.search).get('tab')" in js

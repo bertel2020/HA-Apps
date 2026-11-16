@@ -167,7 +167,7 @@ from .energiedashboard_routes import (
     entity_has_energiedashboard_role,
     is_energiedashboard_configured,
 )
-from .wetter_routes import WetterDependencies, WetterService, is_wetter_configured, wetter_role_count
+from .wetter_routes import WetterDependencies, WetterService, back_wetter, is_wetter_configured, wetter_role_count
 from . import cleanup_stats, counter_bulk, data_quality, entity_usage
 from . import card_elements, dashboard_tiles, overview_tiles, page_layout, page_refresh
 from .dashboard_tiles import tile_metric_context as _tile_metric_context
@@ -4892,6 +4892,7 @@ def entity_detail(
     offset: int = 0,
     marked: bool = False,
     from_dashboard: str | None = None,
+    from_wetter: str | None = None,
 ) -> HTMLResponse:
     # URLs dieser Seite laufen über app_root: unter Ingress hat sie einen
     # dynamischen Pfad-Präfix, ein fest absoluter Pfad ("/api/query") würde
@@ -4921,6 +4922,7 @@ def entity_detail(
         {
             "entity_id": entity_id,
             "back_dashboard": _back_dashboard(from_dashboard),
+            "back_wetter": back_wetter(from_wetter),
             "friendly_name": entity["friendly_name"],
             "custom_name": entity["custom_name"] or "",
             "aggregation_type": entity["aggregation_type"],

@@ -638,7 +638,7 @@ def test_tiles_carry_the_entity_and_link_to_it_and_css_uses_defined_font_tokens(
     _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(20, 1), 12.0)])
     _configure(service, temperature="sensor.t")
     assert service.compute_tiles(NOW)[0]["entity_id"] == "sensor.t"
-    assert "'entities/' + encodeURIComponent(tile.entity_id)" in (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+    assert "entityHref(tile.entity_id)" in (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
     css = (APP / "static/css/pages/wetterdashboard.css").read_text(encoding="utf-8")
     assert "var(--mono)" not in css and "var(--sans)" not in css  # in app.css heißen die Schriften --font-mono/--font-display
 

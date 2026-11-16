@@ -252,7 +252,7 @@ KLIMA_TILES = ("single", "room")
 DEFAULT_KLIMA_TILES = "single"
 KLIMA_SIZES = ("auto", "small", "medium", "large")
 DEFAULT_KLIMA_SIZE = "auto"
-FLOORS_START = ("open", "closed")
+FLOORS_START = ("open", "rooms", "closed")
 DEFAULT_FLOORS_START = "open"
 MAX_ORDER_NAMES = 200
 ROOM_COLORS = tuple(str(number) for number in range(1, 9))  # Nummer der Diagrammfarbe (--chart-1 bis --chart-8)
@@ -276,6 +276,21 @@ def _clean_order(value) -> list[str]:
         if text and text not in names:
             names.append(text)
     return names[:MAX_ORDER_NAMES]
+
+
+WETTER_BACK_TABS = ("overview", "klima")
+
+
+def back_wetter(from_wetter: str | None) -> dict | None:
+    """Rücklink zum Reiter des Wetterdashboards, von dem aus eine Kachel geöffnet wurde (?from_wetter=…).
+
+    Serverseitig aus demselben Grund wie ``_back_dashboard`` in main.py: unter HA-Ingress fehlt der Referrer oft,
+    und er trüge ohnehin nicht den Reiter. Nur die Reiter mit Kacheln sind gültig, alles andere ergibt keinen Link."""
+    if from_wetter not in WETTER_BACK_TABS:
+        return None
+    if from_wetter == "klima":
+        return {"path": "/wetterdashboard?tab=klima", "label": tr("← zurück zum Wetterdashboard, Temperatur & Klima")}
+    return {"path": "/wetterdashboard", "label": tr("← zurück zum Wetterdashboard")}
 
 
 def _clean_room_colors(value) -> dict[str, str]:

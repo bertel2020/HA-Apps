@@ -35,8 +35,11 @@
     {# Spaltenauswahl wie in der Entitätenliste: Knopf „Spalten ▾“ mit Popover (dd-picker). #}
     {% if group == 'klima' %}<span class="wt-controls-end wt-fold-all">
       <span x-show="foldable" x-cloak>
-        <button type="button" class="btn" @click="collapseAll(true)">{{ _("Alles zuklappen") }}</button>
-        <button type="button" class="btn" @click="collapseAll(false)">{{ _("Alles aufklappen") }}</button>
+        <span class="wt-seg" role="group" aria-label="{{ _('Etagen und Räume') }}">
+          <button type="button" :aria-pressed="(foldStage() === 'open').toString()" @click="setFold('open')">{{ _("Alles auf") }}</button>
+          <button type="button" x-show="foldHasFloors()" x-cloak :aria-pressed="(foldStage() === 'rooms').toString()" @click="setFold('rooms')">{{ _("Etagen auf, Räume zu") }}</button>
+          <button type="button" :aria-pressed="(foldStage() === 'closed').toString()" @click="setFold('closed')">{{ _("Alles zu") }}</button>
+        </span>
       </span>
     </span>{% endif %}
     <div class="dd-picker-wrap{{ '' if group == 'klima' else ' wt-controls-end' }}">
@@ -124,7 +127,7 @@
   {% endif %}
   <div class="wt-tiles" data-group="{{ group }}" x-ref="tiles{{ group | capitalize }}" :style="'--wt-cols:' + tileCols.{{ group }}" x-show="tilesFor('{{ group }}').length{% if group == 'klima' %} && !klimaRooms{% endif %}" x-cloak>
     <template x-for="(tile, i) in tilesFor('{{ group }}')" :key="tile.key">
-      <a class="wt-tile" :style="roomColorOf(tile.room) ? '--room-color:' + roomColorOf(tile.room) : ''" :class="{'has-room-color': roomColorOf(tile.room), 'wt-tile-wide': tileCols.{{ group }} > 1 && i === tilesFor('{{ group }}').length - 1 && tilesFor('{{ group }}').length % tileCols.{{ group }} === 1}" :data-role="tileRole(tile)" :href="'entities/' + encodeURIComponent(tile.entity_id)" :title="tileTitle(tile)">
+      <a class="wt-tile" :style="roomColorOf(tile.room) ? '--room-color:' + roomColorOf(tile.room) : ''" :class="{'has-room-color': roomColorOf(tile.room), 'wt-tile-wide': tileCols.{{ group }} > 1 && i === tilesFor('{{ group }}').length - 1 && tilesFor('{{ group }}').length % tileCols.{{ group }} === 1}" :data-role="tileRole(tile)" :href="entityHref(tile.entity_id)" :title="tileTitle(tile)">
         <span class="wt-tile-icon" x-html="iconSvg(tileIcon(tile))"></span>
         <span class="wt-tile-label" x-text="tile.label"></span>
         <span class="wt-tile-value" x-html="tileValue(tile)"></span>
@@ -138,6 +141,25 @@
 </div>
 {% endmacro %}
 {# Auswahl der Räume über den Vergleichsdiagrammen (nur bei mindestens zwei Räumen); die Außenwerte bleiben immer. #}
+{% macro temp_range_choice(where) %}
+        <div class="wt-yr" @keydown.escape="tempRangeOpen = ''">
+          <div class="wt-seg" role="group" aria-label="{{ _('Zeitraum') }}">
+            <template x-for="opt in [{days: 7, label: t('7 Tage')}, {days: 30, label: t('30 Tage')}, {days: 365, label: t('12 Monate')}]" :key="opt.days">
+              <button type="button" :aria-pressed="(!tempRange && tempDays === opt.days).toString()" @click="setTempDays(opt.days)" x-text="opt.label"></button>
+            </template>
+            <button type="button" :aria-pressed="(!!tempRange).toString()" :aria-expanded="(tempRangeOpen === '{{ where }}').toString()" @click="openTempRange('{{ where }}')"><span x-text="tempRangeLabel()"></span> ▾</button>
+          </div>
+          <div class="wt-yr-pop" x-show="tempRangeOpen === '{{ where }}'" x-cloak @click.outside="tempRangeOpen = ''">
+            <label>{{ _("Von") }} <input type="date" x-model="draftStart" :max="todayIso()"></label>
+            <label>{{ _("Bis") }} <input type="date" x-model="draftEnd" :max="todayIso()"></label>
+            <p class="hint hint-warn" x-show="tempRangeError" x-text="tempRangeError" x-cloak></p>
+            <div class="wt-yr-actions">
+              <button type="button" class="btn" @click="setTempDays(30)">{{ _("Zurücksetzen") }}</button>
+              <button type="button" class="btn" @click="applyTempRange()">{{ _("Übernehmen") }}</button>
+            </div>
+          </div>
+        </div>
+{% endmacro %}
 {% macro room_chips() %}
 <div class="wt-rooms" role="group" aria-label="{{ _('Räume im Diagramm') }}" x-show="roomChips().length" x-cloak>
   <template x-for="chip in roomChips()" :key="chip.name">
@@ -387,23 +409,7 @@
       <div class="wt-controls">
         <h2 class="wt-h2">{{ _("Temperaturen im Vergleich") }} {{ hint_button(_("Temperaturen im Vergleich")) }}</h2>
         {% call hint_body() %}{{ _("Tagesmittel der Außentemperatur und der weiteren Sensoren. Tage mit zu wenigen Werten bleiben leer.") }}{% endcall %}
-        <div class="wt-yr" @keydown.escape="tempRangeOpen = false">
-          <div class="wt-seg" role="group" aria-label="{{ _('Zeitraum') }}">
-            <template x-for="opt in [{days: 7, label: t('7 Tage')}, {days: 30, label: t('30 Tage')}, {days: 365, label: t('12 Monate')}]" :key="opt.days">
-              <button type="button" :aria-pressed="(!tempRange && tempDays === opt.days).toString()" @click="setTempDays(opt.days)" x-text="opt.label"></button>
-            </template>
-            <button type="button" :aria-pressed="(!!tempRange).toString()" :aria-expanded="tempRangeOpen.toString()" @click="openTempRange()"><span x-text="tempRangeLabel()"></span> ▾</button>
-          </div>
-          <div class="wt-yr-pop" x-show="tempRangeOpen" x-cloak @click.outside="tempRangeOpen = false">
-            <label>{{ _("Von") }} <input type="date" x-model="draftStart" :max="todayIso()"></label>
-            <label>{{ _("Bis") }} <input type="date" x-model="draftEnd" :max="todayIso()"></label>
-            <p class="hint hint-warn" x-show="tempRangeError" x-text="tempRangeError" x-cloak></p>
-            <div class="wt-yr-actions">
-              <button type="button" class="btn" @click="setTempDays(30)">{{ _("Zurücksetzen") }}</button>
-              <button type="button" class="btn" @click="applyTempRange()">{{ _("Übernehmen") }}</button>
-            </div>
-          </div>
-        </div>
+        {{ temp_range_choice('temp') }}
       </div>
       {{ room_chips() }}
       <div class="wt-chart" x-ref="tempChart" x-show="!tempCmp || tempCmp.series.length"></div>
@@ -415,6 +421,7 @@
       <div class="wt-controls">
         <h2 class="wt-h2">{{ _("Luftfeuchte im Vergleich") }} {{ hint_button(_("Luftfeuchte im Vergleich")) }}</h2>
         {% call hint_body() %}{{ _("Tagesmittel der Luftfeuchte außen und der weiteren Feuchtesensoren, im selben Zeitraum wie die Temperaturen.") }}{% endcall %}
+        {{ temp_range_choice('humid') }}
       </div>
       {{ room_chips() }}
       <div class="wt-chart" x-ref="humidChart"></div>
