@@ -99,6 +99,11 @@ def recommend(entity, profile: dict | None, now: float) -> dict:
     if profile is None or profile.get("method") != method:
         result["reason"] = "unmeasured"
         return result
+    if method == "stored" and not {str(t) for t in STORED_TIERS} <= {str(k) for k in (profile.get("tiers") or {})}:
+        # Profil aus der Zeit vor der Stufe „1 Minute“: fehlende Zähler wären sonst Nullen und die feinste Stufe die
+        # „ruhigste“. Bis zur Neumessung gilt die Entität als nicht gemessen.
+        result["reason"] = "unmeasured"
+        return result
     days = float(profile.get("days") or 0.0)
     result["days"] = days
     if days < MIN_DAYS:

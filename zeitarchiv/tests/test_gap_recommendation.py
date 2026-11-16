@@ -139,3 +139,11 @@ def test_stored_one_minute_is_a_real_step_with_its_own_count() -> None:
     receive = rec.empty_tiers("receive")
     rec.count_tiers(120, receive)  # Empfangs-Methode: kleinere Pausen werden nicht festgehalten
     assert 1 not in receive and receive[5] == 0
+
+
+def test_an_old_profile_without_the_one_minute_counter_counts_as_unmeasured() -> None:
+    """Ein Pausen-Profil aus der Zeit vor der Stufe „1 Minute“ hat keinen Zähler dafür; ohne Prüfung wäre „1“ mit Null
+    Pausen die ruhigste Stufe und würde empfohlen, obwohl nichts gemessen ist."""
+    old = {"method": "stored", "days": 40.0, "events": 500, "tiers": {"5": 2888, "15": 2869, "30": 0, "60": 0}}
+    result = rec.recommend(_entity(gap_threshold="15"), old, NOW)
+    assert result["status"] == rec.STATUS_INSUFFICIENT and result["reason"] == "unmeasured" and result["recommended"] is None
