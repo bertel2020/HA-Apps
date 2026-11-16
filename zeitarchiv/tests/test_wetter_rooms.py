@@ -344,7 +344,7 @@ def test_tile_size_setting_is_saved_and_validated(service) -> None:
     assert wetter_routes._load_config(service.deps.index)["klima_size"] == "medium"
     _configure(service, klima_size="unsinn")
     assert wetter_routes._load_config(service.deps.index)["klima_size"] == "auto"
-    assert wetter_routes.MAX_EXTRA_TEMPERATURES == 60
+    assert wetter_routes.MAX_EXTRA_TEMPERATURES == 100
 
 
 def test_floor_switch_hides_and_shows_all_rooms_of_a_floor() -> None:

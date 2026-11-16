@@ -4539,6 +4539,7 @@
     "Neue Tabelle": "New table",
     "bis {cut}": "until {cut}",
     "Nicht zugeordnet": "Not assigned",
+    "{n} von {max} Sensoren": "{n} of {max} sensors",
     "Nicht konfiguriert": "Not configured",
     "Weniger anzeigen": "Show less",
     "+ {count} weitere anzeigen": "+ {count} more",

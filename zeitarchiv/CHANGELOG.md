@@ -33,7 +33,7 @@
 ### New
 
 - **Weather dashboard**: Additional sensors and rooms
-  - Up to 60 additional sensors (was 20)
+  - Up to 100 additional sensors (was 20)
   - New setting “Tile size of additional sensors” (automatic, small, medium, large) for the tiles on the “Temperature & climate” tab
   - Rooms get a colour in the “Rooms” dialog (eight colours, assigned automatically and changeable); it shows on the room selection above the charts, on the tiles, on the room rows of “Periods compared” and on the room labels in the setup
   - The “Rooms” dialog arranges floors and rooms (drag the handle or use the arrows); the order applies to the table, the room tiles and the room selection above the charts

@@ -482,6 +482,7 @@
       <span class="wt-item-add-label">{{ _("+ Sensor") }}</span>
     </button>
   </div>
+  <p class="wt-why" x-show="extras.length >= 20" x-cloak x-text="t('{n} von {max} Sensoren', {n: extras.length, max: maxExtra})"></p>
   <template x-for="name in floorOrder"><input type="hidden" name="floor_order" :value="name"></template>
   <template x-for="name in roomOrder"><input type="hidden" name="room_order" :value="name"></template>
   <template x-for="(number, name) in roomColors"><span><input type="hidden" name="room_color_name" :value="name"><input type="hidden" name="room_color_value" :value="number"></span></template>

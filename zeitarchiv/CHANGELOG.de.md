@@ -33,7 +33,7 @@
 ### Neu
 
 - **Wetterdashboard**: Weitere Sensoren und Räume
-  - Bis zu 60 weitere Sensoren (bisher 20)
+  - Bis zu 100 weitere Sensoren (bisher 20)
   - Neue Einstellung „Kachelgröße der weiteren Sensoren“ (automatisch, klein, mittel, groß) für die Kacheln auf dem Reiter „Temperatur & Klima“
   - Räume bekommen im Dialog „Räume“ eine Farbe (acht Farben, automatisch vergeben und änderbar); sie erscheint in der Raumauswahl über den Diagrammen, auf den Kacheln, in den Raumzeilen von „Zeiträume im Vergleich“ und bei den Raum-Bezeichnungen in der Einrichtung
   - Der Dialog „Räume“ ordnet Etagen und Räume (am Griff ziehen oder mit den Pfeilen); die Reihenfolge gilt für die Tabelle, die Raumkacheln und die Raumauswahl über den Diagrammen
