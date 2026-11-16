@@ -374,6 +374,14 @@
       {% endif %}
     </div>
     <div class="wt-controls wt-course-row">
+      <p class="wt-headline wt-course-summary" x-show="course && courseSummary()" x-text="courseSummary()"></p>
+      <label class="wt-course-compare">{{ _("Vergleichen mit") }}
+        <select x-model="courseCompare" @change="setCourseCompare()">
+          <option value="previous">{{ _("Vorzeitraum") }}</option>
+          <option value="year">{{ _("Vorjahreszeitraum") }}</option>
+          <option value="">{{ _("Nichts") }}</option>
+        </select>
+      </label>
       <div class="wt-yr" @keydown.escape="courseRangeOpen = false">
         <div class="wt-seg" role="group" aria-label="{{ _('Zeitraum') }}">
           <template x-for="opt in [{days: 7, label: t('7 Tage')}, {days: 30, label: t('30 Tage')}, {days: 365, label: t('12 Monate')}]" :key="opt.days">
@@ -391,15 +399,7 @@
           </div>
         </div>
       </div>
-      <label class="wt-course-compare">{{ _("Vergleichen mit") }}
-        <select x-model="courseCompare" @change="setCourseCompare()">
-          <option value="previous">{{ _("Vorzeitraum") }}</option>
-          <option value="year">{{ _("Vorjahreszeitraum") }}</option>
-          <option value="">{{ _("Nichts") }}</option>
-        </select>
-      </label>
     </div>
-    <p class="wt-headline" x-show="course && courseSummary()" x-text="courseSummary()"></p>
     <p class="hint hint-warn" x-show="courseError" x-text="courseError" x-cloak></p>
     <div class="wt-chart" x-ref="courseChart" x-show="course"></div>
   </div>
