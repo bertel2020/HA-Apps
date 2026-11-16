@@ -1859,7 +1859,7 @@ form.is-dirty .unsaved-note{display:inline-flex;}
 form.is-dirty .unsaved-save{background:var(--accent-line);border-color:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
 form.is-dirty .unsaved-save:hover:not(:disabled){opacity:.92;}
 .btn.primary,.btn-primary{background:var(--accent-line);border-color:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
-.btn.primary:hover:not(:disabled){opacity:.92;background:var(--accent-line);}
+.btn.primary:hover:not(:disabled),.btn-primary:hover:not(:disabled){opacity:.92;background:var(--accent-line);}
 .btn-danger,.btn.danger{border-color:var(--danger);color:var(--danger);background:var(--surface);}
 .btn-danger:hover,.btn.danger:hover{background:var(--danger-soft);}
 .btn-danger-outline{border-color:var(--danger);color:var(--danger);}
