@@ -298,6 +298,59 @@ def compute_fine_rollup_with_key(
     raise ValueError(tr("Unbekannter Aggregationstyp: {aggregation_type}", aggregation_type=aggregation_type))
 
 
+def compute_held_standard_rollup(
+    rows: list[tuple],
+    boundary_value: float | None,
+    bucket_key_fn,
+    bucket_next_fn,
+    window_start_ts: float,
+    hold_end_ts: float,
+) -> list[FineRow]:
+    """Messwert-Buckets, in denen jeder Rohwert gilt, bis der nächste kommt (wie der Verlauf in Home Assistant).
+
+    compute_fine_rollup_with_key() mittelt die Rohwerte eines Buckets nach Anzahl und lässt Buckets ohne Rohwert
+    weg. Bei einem Sensor, der beim Laufen oft und in der Pause gar nicht meldet (Wasserpumpe: ~265 W, dann
+    einmal 0 W), zählt die eine 0 gegen viele 265 — und die Pause ist eine Lücke, die die Linie schräg überbrückt.
+    Hier gilt dagegen jeder Wert von seinem Zeitstempel bis zum nächsten (der letzte bis ``hold_end_ts``), der
+    Mittelwert gewichtet nach Dauer, und jeder Bucket dazwischen bekommt den gehaltenen Wert.
+
+    boundary_value ist der letzte Rohwert vor dem Fenster; er gilt ab window_start_ts bis zum ersten Rohwert."""
+    timeline = [(max(row[0], window_start_ts), row[1]) for row in rows]
+    if boundary_value is not None and (not timeline or timeline[0][0] > window_start_ts):
+        timeline.insert(0, (window_start_ts, boundary_value))
+    # je Bucket: gewichtete Summe, Dauer, Min, Max, Zahl und Summe der Rohwerte (Rückfall ohne Dauer)
+    acc: dict[datetime, list[float]] = {}
+    for i, (start, value) in enumerate(timeline):
+        end = min(timeline[i + 1][0] if i + 1 < len(timeline) else hold_end_ts, hold_end_ts)
+        if start > hold_end_ts:
+            break
+        entry = acc.setdefault(bucket_key_fn(start), [0.0, 0.0, value, value, 0.0, 0.0])
+        entry[4] += 1
+        entry[5] += value
+        current = start
+        while current < end:
+            key = bucket_key_fn(current)
+            segment_end = min(end, bucket_next_fn(key).timestamp())
+            if segment_end <= current:
+                break
+            entry = acc.setdefault(key, [0.0, 0.0, value, value, 0.0, 0.0])
+            duration = segment_end - current
+            entry[0] += value * duration
+            entry[1] += duration
+            entry[2] = min(entry[2], value)
+            entry[3] = max(entry[3], value)
+            current = segment_end
+    return [
+        FineRow(
+            bucket_start=key.timestamp(),
+            value=entry[0] / entry[1] if entry[1] > 0 else entry[5] / entry[4],
+            min_value=entry[2],
+            max_value=entry[3],
+        )
+        for key, entry in sorted(acc.items())
+    ]
+
+
 def _compute_state_rollup(
     rows: list[tuple[float, float]],
     bucket_key_fn,

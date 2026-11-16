@@ -730,7 +730,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
             result = query_mod.query_series(
                 deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                 offset=offset, continuous=continuous, chart_type=chart_type,
-                read_cache=read_cache,
+                read_cache=read_cache, hold_fill=True,
             )
         if compare and not raw and not heatmap and not columns:
             compare_result = query_mod.query_series(
@@ -739,7 +739,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                 continuous=continuous,
                 year_over_year=compare_mode == "year", full_period=True,
                 chart_type=chart_type,
-                read_cache=read_cache,
+                read_cache=read_cache, hold_fill=True,
             )
             result.update(
                 compare_points=compare_result["points"],
@@ -841,6 +841,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     deps.data_dir, deps.index, entity_id, range, deps.tz, now,
                     offset=offset, continuous=continuous, year_over_year=year_over_year,
                     chart_type=series_kind(entity, kind_of.get(entity_id)), read_cache=entity_cache,
+                    hold_fill=True,
                 )
             entry = {
                 "entity_id": entity_id,
@@ -872,6 +873,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     continuous=continuous,
                     year_over_year=compare_mode == "year", full_period=True,
                     chart_type=series_kind(entity, kind_of.get(entity_id)), read_cache=entity_cache,
+                    hold_fill=True,
                 )
                 entry.update(
                     compare_points=compare_result["points"],

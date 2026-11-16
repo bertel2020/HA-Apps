@@ -451,8 +451,12 @@ def _query_live_fine(
     tz: ZoneInfo,
     now_local: datetime,
     read_cache: QueryReadCache | None = None,
+    hold_fill: bool = False,
 ) -> list[rollup.FineRow]:
-    """Stunde/Tag lesen IMMER Rohdaten, nie Rollups (Konzept Abschnitt 02) — über
+    """hold_fill: Messwert-Linien halten jeden Rohwert bis zum nächsten (siehe
+    rollup.compute_held_standard_rollup) — nur für die Anzeige im Chart, nicht für Tabellen und Summen.
+
+    Stunde/Tag lesen IMMER Rohdaten, nie Rollups (Konzept Abschnitt 02) — über
     cleanup.list_raw_rows, damit auch das Navigieren in einen bereits archivierten
     Vormonat funktioniert (liest dann aus dem Archiv statt aus dem Hot Buffer)."""
     bucket_seconds = (
@@ -473,13 +477,19 @@ def _query_live_fine(
             hot_rows_loader=read_cache.read_hot_rows if read_cache is not None else read_rows,
         )
     )
+    held = hold_fill and aggregation_type == "standard" and chart_type == "line"
     boundary = (
         _boundary_value(data_dir, entity_id, window_start.timestamp(), tz, read_cache, index=index)
-        if aggregation_type == "counter"
+        if aggregation_type == "counter" or held
         else None
     )
     key_fn = rollup.seconds_bucket_key(tz, bucket_seconds)
     next_fn = rollup.seconds_bucket_next(bucket_seconds)
+    if held:
+        return rollup.compute_held_standard_rollup(
+            rows, boundary, key_fn, next_fn, window_start.timestamp(),
+            min(window_end.timestamp(), now_local.timestamp()),
+        )
     fine, _ = rollup.compute_fine_rollup_with_key(
         rows, aggregation_type, key_fn, boundary, window_end.timestamp(), bucket_next_fn=next_fn
     )
@@ -1259,8 +1269,12 @@ def query_series(
     same_elapsed: bool = False,
     cap_to: timedelta | None = None,
     full_period: bool = False,
+    hold_fill: bool = False,
 ) -> dict:
-    """full_period: nur mit year_over_year — das Vorjahresfenster läuft bis zum Ende
+    """hold_fill: nur Stunde/Tag und nur Messwert-Linien — jeder Rohwert gilt bis zum nächsten, leere Buckets
+    bekommen den gehaltenen Wert (Chart-Anzeige; Tabellen und Summen lassen es aus).
+
+    full_period: nur mit year_over_year — das Vorjahresfenster läuft bis zum Ende
     der Vorjahresperiode statt nur bis zum Abstand, den die laufende Periode gerade
     hat. Für die Vergleichsreihe im Chart (zeigt den ganzen Vergleichszeitraum); der
     faire Vergleichswert der Tabellen bleibt beim gekappten Fenster.
@@ -1321,7 +1335,7 @@ def query_series(
     if range_key in ("hour", "day"):
         fine = _query_live_fine(
             data_dir, index, entity_id, aggregation_type, range_key, resolved_chart_type,
-            window_start, window_end, tz, now_local, read_cache
+            window_start, window_end, tz, now_local, read_cache, hold_fill
         )
     elif range_key in ("week", "month"):
         fine = _query_completed_plus_live_fine(
