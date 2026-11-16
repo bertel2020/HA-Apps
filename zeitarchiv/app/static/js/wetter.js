@@ -1423,10 +1423,10 @@
           const label = utcDayMonth.format(new Date(`${day.date}T12:00:00Z`));
           const has = !!day.class;
           const sub = has
-            ? t('{sun} von {bright} h Sonne', {sun: num(day.sun_hours, 1), bright: num(day.bright_hours, 0)})
+            ? t('{sun} h Sonne von {bright} h Tageslicht', {sun: num(day.sun_hours, 1), bright: num(day.bright_hours, 0)})
             : t('keine Klasse');
           const title = has
-            ? t('{day}: {kind} · {sun} h Sonne von {bright} h hell', {
+            ? t('{day}: {kind} · {sun} h Sonne von {bright} h Tageslicht', {
               day: day.today ? t('{day} (bisher)', {day: label}) : label, kind: this.dayimageKindName(day.class),
               sun: num(day.sun_hours, 1), bright: num(day.bright_hours, 1),
             })
