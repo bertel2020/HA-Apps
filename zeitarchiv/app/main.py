@@ -142,7 +142,7 @@ from .storage.coordinator import CoordinatorBusy, StorageCoordinator
 from .storage.paths import ENTITY_ID_MAX_LENGTH, ENTITY_ID_PATTERN, InvalidEntityIdError, validate_entity_id
 from .timezone_config import load_timezone
 from .version import APP_VERSION
-from . import ai_settings_routes, api_routes, dashboard_grid, entity_category_routes, ha_integration, selection_routes
+from . import ai_settings_routes, api_routes, dashboard_grid, entity_areas, entity_category_routes, ha_integration, selection_routes
 from .import_routes import ImportDependencies, ImportService
 from .index_optimization import (
     build_index_detail_context,
@@ -986,6 +986,7 @@ def entities_list_view(request: Request) -> HTMLResponse:
             "column_options": _entities_column_options(),
             "visible_columns": _entities_visible_columns(),
             "categories": index.list_entity_categories(),
+            "area_names": entity_areas.area_names(DATA_DIR),
         },
     )
 
@@ -2645,6 +2646,9 @@ ENTITIES_OPTIONAL_COLUMNS = [
     # Nur anbietbar, wenn es mindestens eine Kategorie gibt (ROADMAP 1.42),
     # siehe _entities_column_options().
     ("category", N_("Kategorie")),
+    # Nur anbietbar, wenn die Integration Räume geschickt hat (Katalog), siehe
+    # _entities_column_options(); nicht sortierbar, weil die Räume nicht in der Datenbank liegen.
+    ("area", N_("Raum")),
     ("first_ts", N_("Erster Wert")),
     ("last_ts", N_("Letzter Wert")),
     ("resolution", N_("Auflösung")),
@@ -2678,6 +2682,9 @@ def _entities_visible_columns() -> set[str]:
         columns.discard("size")
     if not has_categories:
         columns.discard("category")
+    # „Raum“ ist nie Vorgabe (eine Spalte mehr in einer ohnehin breiten Liste), nur auf Wunsch.
+    if not entity_areas.area_map(DATA_DIR):
+        columns.discard("area")
     return columns
 
 
@@ -2694,9 +2701,13 @@ def _add_category_column() -> None:
 
 
 def _entities_column_options() -> list[tuple[str, str]]:
-    """Spaltenauswahl der Liste; „Kategorie“ nur, solange es Kategorien gibt."""
+    """Spaltenauswahl der Liste; „Kategorie“ nur, solange es Kategorien gibt, „Raum“ nur mit Katalog."""
     has_categories = bool(index.list_entity_categories())
-    return [(key, label) for key, label in ENTITIES_OPTIONAL_COLUMNS if key != "category" or has_categories]
+    has_areas = bool(entity_areas.area_map(DATA_DIR))
+    return [
+        (key, label) for key, label in ENTITIES_OPTIONAL_COLUMNS
+        if (key != "category" or has_categories) and (key != "area" or has_areas)
+    ]
 
 
 def _entities_table_response(
@@ -2711,17 +2722,21 @@ def _entities_table_response(
     favorites_only: bool = False,
     visible_columns: set[str] | None = None,
     category_filter: list[str] | None = None,
+    area_filter: list[str] | None = None,
 ) -> HTMLResponse:
     if visible_columns is None:
         visible_columns = _entities_visible_columns()
+    # Der Raum-Filter wirkt nur, solange die Spalte sichtbar ist (wie Typ und Einheit: ein
+    # Filter ohne sichtbare Spalte wäre unsichtbar wirksam).
+    area_sets = entity_areas.area_filter(DATA_DIR, area_filter) if "area" in visible_columns else None
     total = index.count_entities(
         search=search or None, type_filter=type_filter, unit_filter=unit_filter, favorites_only=favorites_only,
-        category_filter=category_filter,
+        category_filter=category_filter, area_filter=area_sets,
     )
     pagination = _paginate_meta(total, page, page_size)
     page_matched = index.list_entities(
         search=search or None, type_filter=type_filter, unit_filter=unit_filter, sort=sort, direction=direction,
-        favorites_only=favorites_only, category_filter=category_filter,
+        favorites_only=favorites_only, category_filter=category_filter, area_filter=area_sets,
         limit=pagination["page_size"], offset=(pagination["page"] - 1) * pagination["page_size"],
     )
     # Nur die tatsächlich sichtbaren Spalten formatieren statt immer alle elf
@@ -2732,6 +2747,7 @@ def _entities_table_response(
     # is_favorite werden immer gebraucht (Entität-Spalte, Favoriten-Stern).
     categories = {c["id"]: c for c in index.list_entity_categories()}
     category_of = index.category_map_for([row["entity_id"] for row in page_matched]) if "category" in visible_columns else {}
+    areas = entity_areas.area_map(DATA_DIR) if "area" in visible_columns else {}
     rows = []
     for row in page_matched:
         entry = {
@@ -2746,6 +2762,8 @@ def _entities_table_response(
         }
         if "category" in visible_columns:
             entry["category"] = categories.get(category_of.get(row["entity_id"]))
+        if "area" in visible_columns:
+            entry["area"] = areas.get(row["entity_id"])
         if "type" in visible_columns:
             entry["aggregation_type"] = row["aggregation_type"]
             entry["type_label"] = format_type(row["aggregation_type"])
@@ -2849,6 +2867,7 @@ def entities_table(
     page_size: int = 20,
     favorites: bool = False,
     category: list[str] = Query(["all"]),
+    area: list[str] = Query(["all"]),
     columns: list[str] = Query([]),
     columns_submitted: bool = False,
 ) -> HTMLResponse:
@@ -2862,7 +2881,7 @@ def entities_table(
         index.set_setting("entities_columns", ",".join(c for c in columns if c in valid))
     return _entities_table_response(
         request, search, type, unit, sort, dir, page, page_size, favorites, _entities_visible_columns(),
-        category_filter=category,
+        category_filter=category, area_filter=area,
     )
 
 

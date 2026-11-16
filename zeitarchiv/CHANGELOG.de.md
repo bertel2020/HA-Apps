@@ -14,6 +14,11 @@
 
 ### Neu
 
+- **Entitäten**: Räume aus Home Assistant in der Entitätsliste
+  - Neue Spalte „Raum“ (über „Spalten“) und ein Filter „Raum“ mit „Ohne Raum“; die Etage steht als Tooltip dabei
+  - Der Raum steht auch im Kopf der Entitätsseiten
+  - Räume sind nur lesbar; geändert werden sie in Home Assistant
+  - Braucht die Integration (sie reicht die Räume weiter); ohne sie gibt es weder Spalte noch Filter
 - **Import**: InfluxDB-Import teilt große Entitäten automatisch in Abschnitte
   - Entitäten mit mehr als 10 Mio Werten werden nicht mehr abgewiesen; ein Aufteilen von Hand entfällt
   - Neuer Knopf „Abbrechen“ in der Fortschrittsanzeige

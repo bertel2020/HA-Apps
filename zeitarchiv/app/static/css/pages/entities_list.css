@@ -45,6 +45,7 @@
   .col-fav{width:40px;}
   .col-entity{width:330px;}    /* längster aktueller friendly_name ("Proxon FWT Energy (Tariff 1)") ≈ 172px + deutlich mehr Puffer für den nun verfügbaren Platz */
   .col-category{width:140px;}  /* Pille: Punkt + Name, lange Namen kürzt „…“ */
+  .col-area{width:140px;}      /* Raumname, lange Namen kürzt „…“ */
   .col-type{width:112px;}      /* Badge "Standard"/"Schalter" ≈ 68px + Puffer */
   .col-date{width:126px;}      /* "22.05.2014" ≈ 73px + Puffer */
   .col-resolution{width:104px;} /* "Rohdaten" ≈ 59px + Puffer */
@@ -69,6 +70,8 @@
   .entities-dt th.col-type,.entities-dt td.col-type,
   .entities-dt th.col-unit,.entities-dt td.col-unit{text-align:center;}
   .entities-dt th.col-date,.entities-dt td.col-date{text-align:left;}
+  .entities-dt th.col-area,.entities-dt td.col-area{text-align:left;}
+  .entities-dt td.col-area{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .entities-dt th.col-rows,.entities-dt td.col-rows,
   .entities-dt th.col-size,.entities-dt td.col-size,
   .entities-dt th.col-resolution,.entities-dt td.col-resolution,

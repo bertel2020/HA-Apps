@@ -2228,6 +2228,7 @@ class Index:
         unit_filter: str | None,
         favorites_only: bool,
         category_filter: list[str] | None = None,
+        area_filter: tuple[list[str], list[str] | None] | None = None,
     ) -> tuple[list[str], list[str]]:
         if isinstance(type_filter, str):
             type_filter = [type_filter]
@@ -2269,6 +2270,21 @@ class Index:
             if without:
                 parts.append("entities.entity_id NOT IN (SELECT entity_id FROM entity_category)")
             conditions.append("(" + " OR ".join(parts) + ")")
+        # Raum: (Entitäten in den gewählten Räumen, Entitäten mit irgendeinem Raum oder None).
+        # Die Räume liegen nicht in der Datenbank (Katalog der Integration, siehe
+        # entity_areas.py), die Entitätslisten kommen deshalb als JSON-Parameter — ohne
+        # Obergrenze für die Zahl der Platzhalter.
+        if area_filter is not None:
+            include, with_area = area_filter
+            parts = []
+            if include:
+                parts.append("entities.entity_id IN (SELECT value FROM json_each(?))")
+                params.append(json.dumps(include))
+            if with_area is not None:
+                parts.append("entities.entity_id NOT IN (SELECT value FROM json_each(?))")
+                params.append(json.dumps(with_area))
+            # Nur „Raum ohne Treffer“ gewählt (z. B. ein Raum ohne Entitäten): nichts passt.
+            conditions.append("(" + " OR ".join(parts) + ")" if parts else "0")
         return conditions, params
 
     def list_entities(
@@ -2282,6 +2298,7 @@ class Index:
         limit: int | None = None,
         offset: int = 0,
         category_filter: list[str] | None = None,
+        area_filter: tuple[list[str], list[str] | None] | None = None,
     ) -> list[sqlite3.Row]:
         """search filtert per LIKE auf entity_id/friendly_name, type_filter auf
         aggregation_type — ein einzelner Typ (Rückwärtskompatibilität), eine Liste
@@ -2311,7 +2328,7 @@ class Index:
         direction_sql = "DESC" if direction == "desc" else "ASC"
 
         conditions, params = self._entity_filter_conditions(
-            search, type_filter, unit_filter, favorites_only, category_filter
+            search, type_filter, unit_filter, favorites_only, category_filter, area_filter
         )
 
         query = "SELECT entities.* FROM entities"
@@ -2336,11 +2353,12 @@ class Index:
         unit_filter: str | None = None,
         favorites_only: bool = False,
         category_filter: list[str] | None = None,
+        area_filter: tuple[list[str], list[str] | None] | None = None,
     ) -> int:
         """Gesamtzahl der Treffer für dieselben Filter wie list_entities() —
         Grundlage für die Seiteninfo bei SQL-seitiger Pagination (ZP-004)."""
         conditions, params = self._entity_filter_conditions(
-            search, type_filter, unit_filter, favorites_only, category_filter
+            search, type_filter, unit_filter, favorites_only, category_filter, area_filter
         )
         query = "SELECT COUNT(*) AS total FROM entities"
         if conditions:

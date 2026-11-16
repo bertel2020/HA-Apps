@@ -160,7 +160,11 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     # Am 16. November 2026 auf 5.890 angehoben: Das einstellbare Lebenszeichen des Wertänderungsfilters
     # (Entitäts-Konfiguration, globaler Standard, Lücken-Untergrenze) braucht in main.py Kontext, Formularfeld,
     # Prüfung und Speichern. main.py: 5.880. Der benannte Ausweg bleibt der Schnitt der Dashboard-Kontext-Bauer.
-    assert len(main.splitlines()) < 5_890
+    # Am 16. November 2026 auf 5.910 angehoben: Die Raum-Spalte und der Raum-Filter der Entitätsliste
+    # (Spaltenauswahl, Filter an Zähler und Liste, Zelle, Route) brauchen in main.py rund 15 Zeilen; die Räume
+    # selbst und ihre Abfrage stehen in entity_areas.py. main.py: 5.904. Der benannte Ausweg bleibt der Schnitt
+    # der Dashboard-Kontext-Bauer.
+    assert len(main.splitlines()) < 5_910
 
 
 def test_api_router_has_explicit_runtime_dependencies_and_all_api_routes() -> None:

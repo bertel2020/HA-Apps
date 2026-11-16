@@ -1,0 +1,140 @@
+"""Räume in der Entitätsliste (Discussion 51, Wunsch 3): Zuordnung aus dem Katalog,
+Filter, Spalte und Anzeige in der Kennzahlen-Leiste. Die Räume kommen nur lesend aus
+dem Katalog der Integration; ohne Katalog gibt es weder Spalte noch Filter."""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+import pytest
+
+from _paths import APP  # noqa: F401  (legt den App-Pfad auf sys.path)
+
+IDS = ["sensor.room_a", "sensor.room_b", "sensor.room_c", "sensor.room_d"]
+
+
+@pytest.fixture()
+def data_dir() -> Path:
+    return Path(os.environ["ZEITARCHIV_DATA_DIR"])
+
+
+@pytest.fixture()
+def rooms(client, data_dir):
+    """Vier Entitäten; a und b im Hobbyraum bzw. Küche, c und d ohne Raum (d fehlt im Katalog)."""
+    from app import main, selection_catalog
+
+    for entity_id in IDS:
+        main.index.get_or_create_entity(entity_id, "sensor", "measurement", "kWh")
+    (data_dir / selection_catalog.FILENAME).unlink(missing_ok=True)
+    selection_catalog.save(data_dir, [
+        {"entity_id": IDS[0], "area": "Hobbyraum", "floor": "Erdgeschoss"},
+        {"entity_id": IDS[1], "area": "Küche", "floor": None},
+        {"entity_id": IDS[2], "area": None},
+    ])
+    yield IDS
+    (data_dir / selection_catalog.FILENAME).unlink(missing_ok=True)
+    for entity_id in IDS:
+        if main.index.get_entity(entity_id) is not None:
+            main.index.delete_entity(entity_id)
+    main.index._conn.execute("DELETE FROM settings WHERE key = 'entities_columns'")
+    main.index._conn.commit()
+
+
+def _found(*selected: str) -> list[str]:
+    from app import entity_areas, main
+
+    sets = entity_areas.area_filter(Path(os.environ["ZEITARCHIV_DATA_DIR"]), list(selected))
+    return [r["entity_id"] for r in main.index.list_entities(search="sensor.room_", area_filter=sets)]
+
+
+def test_area_map_only_lists_entities_with_a_room(client, rooms, data_dir) -> None:
+    from app import entity_areas
+
+    assert entity_areas.area_map(data_dir) == {
+        IDS[0]: {"area": "Hobbyraum", "floor": "Erdgeschoss"},
+        IDS[1]: {"area": "Küche", "floor": None},
+    }
+    assert entity_areas.area_names(data_dir) == ["Hobbyraum", "Küche"]
+
+
+def test_area_map_follows_a_newer_catalog(client, rooms, data_dir) -> None:
+    from app import entity_areas, selection_catalog
+
+    assert entity_areas.area_map(data_dir)
+    selection_catalog.save(data_dir, [{"entity_id": IDS[3], "area": "Bad"}])
+    assert list(entity_areas.area_map(data_dir)) == [IDS[3]]
+
+
+def test_no_catalog_means_no_rooms(client, data_dir) -> None:
+    from app import entity_areas, selection_catalog
+
+    (data_dir / selection_catalog.FILENAME).unlink(missing_ok=True)
+    assert entity_areas.area_map(data_dir) == {}
+    assert entity_areas.area_names(data_dir) == []
+
+
+def test_filter_by_room_and_by_none(client, rooms) -> None:
+    assert _found("Hobbyraum") == [IDS[0]]
+    assert _found("Hobbyraum", "Küche") == [IDS[0], IDS[1]]
+    assert _found("none") == [IDS[2], IDS[3]]  # c ohne Raum, d unbekannt
+    assert _found("Küche", "none") == [IDS[1], IDS[2], IDS[3]]
+    assert _found("all") == IDS  # kein Filter
+    assert _found("Gibt es nicht") == []
+
+
+def test_count_matches_the_list(client, rooms, data_dir) -> None:
+    from app import entity_areas, main
+
+    sets = entity_areas.area_filter(data_dir, ["Hobbyraum", "none"])
+    assert main.index.count_entities(search="sensor.room_", area_filter=sets) == 3
+
+
+def test_column_filter_and_cell_in_the_list(client, rooms) -> None:
+    from app import main
+
+    main.index.set_setting("entities_columns", "type,area")
+    page = client.get("/entities").text
+    assert 'id="area-filter-popover"' in page and 'value="Hobbyraum"' in page and 'value="none"' in page
+
+    html = client.get("/entities-table", params={"search": "sensor.room_", "area": ["Küche"]}).text
+    assert "sensor.room_b" in html and "sensor.room_a" not in html
+    assert "col-area" in html
+
+    full = client.get("/entities-table", params={"search": "sensor.room_"}).text
+    assert "Hobbyraum" in full and "Erdgeschoss" in full  # Etage als Tooltip
+
+
+def test_filter_is_ignored_while_the_column_is_hidden(client, rooms) -> None:
+    from app import main
+
+    main.index.set_setting("entities_columns", "type")
+    html = client.get("/entities-table", params={"search": "sensor.room_", "area": ["Küche"]}).text
+    assert "sensor.room_a" in html and "sensor.room_b" in html
+    assert "col-area" not in html
+
+
+def test_room_is_offered_only_with_a_catalog(client, data_dir) -> None:
+    from app import main, selection_catalog
+
+    (data_dir / selection_catalog.FILENAME).unlink(missing_ok=True)
+    assert "area" not in {key for key, _ in main._entities_column_options()}
+    main.index.set_setting("entities_columns", "type,area")
+    assert "area" not in main._entities_visible_columns()
+    assert 'id="area-filter-popover"' not in client.get("/entities").text
+    main.index._conn.execute("DELETE FROM settings WHERE key = 'entities_columns'")
+    main.index._conn.commit()
+
+
+def test_header_of_the_room_column_is_not_a_sort_link(client, rooms) -> None:
+    from app import main
+
+    main.index.set_setting("entities_columns", "area")
+    html = client.get("/entities-table", params={"search": "sensor.room_"}).text
+    assert "sort=area" not in html
+
+
+def test_facts_bar_shows_the_room_read_only(client, rooms) -> None:
+    html = client.get(f"/entities/{IDS[0]}/config").text
+    assert "Hobbyraum" in html and "Erdgeschoss" in html
+    assert "Hobbyraum" not in client.get(f"/entities/{IDS[2]}/config").text

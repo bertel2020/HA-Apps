@@ -14,6 +14,11 @@
 
 ### New
 
+- **Entities**: Rooms from Home Assistant in the entity list
+  - New column “Room” (via “Columns”) and a “Room” filter with “No room”; the floor shows as a tooltip
+  - The room also shows in the header of an entity’s pages
+  - Rooms are read only; change them in Home Assistant
+  - Needs the integration (it passes the rooms on); without it there is no column and no filter
 - **Import**: The InfluxDB import splits large entities into sections automatically
   - Entities with more than 10 million values are no longer rejected; splitting them by hand is no longer needed
   - New “Cancel” button in the progress display

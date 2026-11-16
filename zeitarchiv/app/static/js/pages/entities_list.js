@@ -51,6 +51,30 @@
       btn.textContent = t('Kategorie: ') + checked.map(cb => cb.parentElement.textContent.trim()).join(', ') + ' ▾';
     }
 
+    // Raum-Filter: dieselbe Mehrfachauswahl mit „Alle“ wie bei Kategorie; „Ohne Raum“ (Wert none)
+    // für Entitäten, die in Home Assistant keinem Raum zugeordnet sind.
+    function onAreaAllChange(checkbox) {
+      if (checkbox.checked) {
+        document.querySelectorAll('input[name=area]:not([value=all])').forEach(cb => cb.checked = false);
+      } else {
+        checkbox.checked = true;
+      }
+    }
+    function onAreaSpecificChange() {
+      document.querySelector('input[name=area][value=all]').checked = false;
+      const anyChecked = Array.from(document.querySelectorAll('input[name=area]:not([value=all])')).some(cb => cb.checked);
+      if (!anyChecked) document.querySelector('input[name=area][value=all]').checked = true;
+    }
+    function updateAreaFilterLabel() {
+      const checked = Array.from(document.querySelectorAll('input[name=area]:checked'));
+      const btn = document.getElementById('area-filter-btn');
+      if (!checked.length || checked.some(cb => cb.value === 'all')) {
+        btn.textContent = t('Raum: Alle ▾');
+        return;
+      }
+      btn.textContent = t('Raum: ') + checked.map(cb => cb.parentElement.textContent.trim()).join(', ') + ' ▾';
+    }
+
     // page-field ist die einzige Quelle der Wahrheit für die Seiten-Navigation —
     // jeder Control, der die zugrunde liegende Trefferliste ändert (Suche, Typ-
     // Filter, Zeilen/Seite), setzt page zurück auf 1.
@@ -91,6 +115,7 @@
           favorites: document.querySelector('#controls [name=favorites]').checked,
           type: checked('type'),
           category: checked('category'),
+          area: checked('area'),
           unit: document.getElementById('unit-filter-input').value,
         }));
       } catch (_) { /* nur Komfort */ }
@@ -114,6 +139,14 @@
           document.querySelector('input[name=category][value=all]').checked = true;
         }
         updateCategoryFilterLabel();
+      }
+      if (shown('area-filter-wrap') && Array.isArray(f.area)) {
+        document.querySelectorAll('input[name=area]').forEach(cb => cb.checked = f.area.includes(cb.value));
+        // Ein inzwischen verschwundener Raum darf nicht „nichts gewählt“ ergeben.
+        if (!document.querySelector('input[name=area]:checked')) {
+          document.querySelector('input[name=area][value=all]').checked = true;
+        }
+        updateAreaFilterLabel();
       }
       if (shown('unit-filter-wrap') && typeof f.unit === 'string' && f.unit !== 'all') {
         const row = Array.from(document.querySelectorAll('#unit-filter-popover .dd-picker-row')).find(r => r.dataset.value === f.unit);
@@ -186,6 +219,14 @@
         if (!visible && wrap) {
           document.querySelectorAll('input[name=category]').forEach(cb => cb.checked = cb.value === 'all');
           updateCategoryFilterLabel();
+        }
+      }
+      if (key === 'area') {
+        const wrap = document.getElementById('area-filter-wrap');
+        if (wrap) wrap.style.display = visible ? 'inline-block' : 'none';
+        if (!visible && wrap) {
+          document.querySelectorAll('input[name=area]').forEach(cb => cb.checked = cb.value === 'all');
+          updateAreaFilterLabel();
         }
       }
       if (key === 'unit') {

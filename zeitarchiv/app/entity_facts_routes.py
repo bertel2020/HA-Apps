@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter
 
-from . import value_range
+from . import entity_areas, value_range
 from .formatting import (
     decimals_to_int,
     format_int,
@@ -90,6 +90,8 @@ class EntityFacts:
             "last_ago": tr("vor {dauer}", dauer=" ".join(format_uptime(max(0.0, time.time() - last_ts)).split()[:2])) if last_ts else "",
             "extra": self._extra(entity),
             "category": self._category(entity["entity_id"]),
+            # Raum aus Home Assistant (Katalog der Integration), nur lesend; None ohne Katalog oder Raum.
+            "area": entity_areas.area_map(self.deps.data_dir).get(entity["entity_id"]),
         }
 
     def _category(self, entity_id: str) -> dict | None:

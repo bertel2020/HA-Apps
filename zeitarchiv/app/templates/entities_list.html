@@ -41,6 +41,18 @@
             </div>
           </span>
           {% endif %}
+          {% if area_names %}
+          <span id="area-filter-wrap" class="dd-picker-wrap" style="display:{{ 'inline-block' if 'area' in visible_columns else 'none' }};">
+            <button type="button" class="btn" id="area-filter-btn" onclick="toggleDDPicker('area-filter')">{{ _("Raum: Alle ▾") }}</button>
+            <div class="dd-picker-popover dd-picker-popover-left" id="area-filter-popover">
+              <label class="dd-picker-row"><input type="checkbox" name="area" value="all" checked onchange="onAreaAllChange(this); resetEntitiesPage(); updateAreaFilterLabel();"><span>{{ _("Alle") }}</span></label>
+              {% for a in area_names %}
+              <label class="dd-picker-row"><input type="checkbox" name="area" value="{{ a }}" onchange="onAreaSpecificChange(); resetEntitiesPage(); updateAreaFilterLabel();"><span>{{ a }}</span></label>
+              {% endfor %}
+              <label class="dd-picker-row"><input type="checkbox" name="area" value="none" onchange="onAreaSpecificChange(); resetEntitiesPage(); updateAreaFilterLabel();"><span class="cat-none">{{ _("Ohne Raum") }}</span></label>
+            </div>
+          </span>
+          {% endif %}
           <span id="unit-filter-wrap" class="dd-picker-wrap" style="display:{{ 'inline-block' if 'unit' in visible_columns else 'none' }};">
             <button type="button" class="btn" id="unit-filter-btn" onclick="toggleDDPicker('unit-filter')">{{ _("Einheit: Alle ▾") }}</button>
             <input type="hidden" name="unit" id="unit-filter-input" value="all">

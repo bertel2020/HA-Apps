@@ -18,6 +18,12 @@
     <dt>{{ _("Typ · Einheit") if facts.unit else _("Typ") }}</dt>
     <dd><span class="badge {{ aggregation_type }}"{% if facts.state_class %} title="{{ facts.state_class }}"{% endif %}>{{ facts.type_label }}</span>{% if facts.unit %} {{ facts.unit }}{% endif %}{% if facts.category %}<span class="entity-fact-cat"><span class="cat-pill" style="--c:var(--chart-{{ facts.category.color_slot }});" title="{{ _("Kategorie") }}: {{ facts.category.name }}"><i aria-hidden="true"></i><span>{{ facts.category.name }}</span></span></span>{% endif %}</dd>
   </div>
+  {% if facts.area %}
+  <div class="entity-fact">
+    <dt>{{ _("Raum") }}</dt>
+    <dd title="{{ _('Wird in Home Assistant geändert') }}">{{ facts.area.area }}{% if facts.area.floor %}<small>{{ facts.area.floor }}</small>{% endif %}</dd>
+  </div>
+  {% endif %}
   <div class="entity-fact">
     <dt>{{ _("Erster Wert") }}</dt>
     <dd>{{ facts.first_ts }}{% if facts.first_ts_time %}<small>{{ facts.first_ts_time }}</small>{% endif %}</dd>
