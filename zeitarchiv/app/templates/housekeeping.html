@@ -140,6 +140,12 @@
         </p>
       </section>
 
+      <section id="luecken-erkennung" class="settings-section">
+        <h2 class="settings-section-title">{{ _("Lücken-Erkennung") }} {{ hint_button(_('Lücken-Erkennung')) }}</h2>
+        {% call hint_body('settings-section-description') %}{{ _("Wie die Lücken-Erkennung je Entität arbeitet und wie viele Lücken sie gefunden hat. Ohne Wertänderungsfilter und mit Rohdaten werden die Abstände zwischen gespeicherten Werten gezählt; mit Filter oder Auflösung die Pausen zwischen empfangenen Werten, unabhängig von Filter, Auflösung und Lebenszeichen. Die Zahl gilt zur eingestellten Schwelle; „–“ heißt noch nicht gemessen. Die Schwelle lässt sich hier für mehrere Entitäten zugleich setzen. Das ändert nur die Einstellung, keine Daten.") }}{% endcall %}
+        <div id="gap-conflicts">{% include "_gap_overview.html" %}</div>
+      </section>
+
       <section id="speicherplatz" class="settings-section">
         <h2 class="settings-section-title">{{ _("Speicherplatz") }} {{ hint_button(_('Speicherplatz')) }}</h2>
         {% call hint_body('settings-section-description') %}{{ _("Speicherindex prüfen und bereits markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen.") }}{% endcall %}
@@ -288,6 +294,7 @@
   const BASE = {{ app_root | tojson }};
 </script>
 <script src="{{ asset('js/pages/housekeeping.js') }}"></script>
+<script src="{{ asset('js/pages/gap_conflicts.js') }}"></script>
 <script src="{{ asset('js/settings-nav-scrollspy.js') }}"></script>
 <script src="{{ asset('js/table-cards.js') }}"></script>
 <script src="{{ asset('js/hint-toggle.js') }}"></script>

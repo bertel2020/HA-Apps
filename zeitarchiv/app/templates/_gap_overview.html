@@ -1,0 +1,92 @@
+{# Abschnitt „Lücken-Erkennung“ in Housekeeping: alle Entitäten mit Methode, Schwelle und gefundenen Lücken, dazu die
+   Sammelaktion „Schwelle setzen“ (einzeln gewählt oder für alle) mit Bestätigung und Rückgängig. Wird per htmx als
+   Ganzes getauscht (Vorschau, Ergebnis, Rückgängig). #}
+{% set go = gap_overview %}
+{% set go_url = app_root ~ '/housekeeping/luecken-erkennung' %}
+{% if go.message %}
+<div class="gc-toast" role="status">
+  <span>{{ go.message }}</span>
+  {% if go.undo %}
+  <form class="gc-undo" hx-post="{{ go_url }}/undo" hx-target="#gap-conflicts" hx-swap="innerHTML">
+    {% for item in go.undo %}<input type="hidden" name="undo" value="{{ item }}">{% endfor %}
+    <button type="submit" class="btn btn-sm">{{ _("Rückgängig") }}</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+{% if go.confirm %}
+<div class="gc-confirm">
+  <h3 class="eyebrow">{{ _("Schwelle setzen") }}</h3>
+  {% if go.confirm.count %}
+  <p class="gc-text">{{ _("Bei {count} Entität(en) wird die Lücken-Erkennung auf {new} gesetzt. Daten bleiben unverändert, und du kannst es danach rückgängig machen.", count=go.confirm.count, new=go.confirm.threshold_label) }}</p>
+  <ul class="gc-groups">
+    {% for group in go.confirm.groups %}<li>{{ group.count }} &times; {{ _("von {old}", old=group.label) }}</li>{% endfor %}
+  </ul>
+  <form id="gc-confirm-form">
+    <input type="hidden" name="threshold" value="{{ go.confirm.threshold }}">
+    {% if go.confirm.all %}<input type="hidden" name="all" value="1">{% else %}{% for entity_id in go.confirm.entity_ids %}<input type="hidden" name="entity_id" value="{{ entity_id }}">{% endfor %}{% endif %}
+  </form>
+  <div class="actionbar">
+    <button type="button" class="btn btn-primary" hx-post="{{ go_url }}/apply" hx-include="#gc-confirm-form"
+            hx-target="#gap-conflicts" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Übernehmen") }}</button>
+    <button type="button" class="btn" hx-get="{{ go_url }}" hx-target="#gap-conflicts" hx-swap="innerHTML">{{ _("Abbrechen") }}</button>
+  </div>
+  {% else %}
+  <p class="gc-text">{{ _("Nichts zu ändern.") }}</p>
+  <div class="actionbar"><button type="button" class="btn" hx-get="{{ go_url }}" hx-target="#gap-conflicts" hx-swap="innerHTML">{{ _("Schließen") }}</button></div>
+  {% endif %}
+</div>
+{% endif %}
+{% if go.rows %}
+<form id="gc-form">
+  <div class="gc-bar" data-gc-bar>
+    <span class="gc-count" data-gc-count data-n-all="{{ _('{count} Entitäten', count=go.rows | length) }}" data-n-sel="{{ _('{count} ausgewählt') }}">{{ _("{count} Entitäten", count=go.rows | length) }}</span>
+    <label class="gc-threshold">{{ _("Schwelle") }}
+      <select name="threshold" class="gc-select" aria-label="{{ _('Neue Schwelle der Lücken-Erkennung') }}">
+        {% for key, label in go.threshold_options %}<option value="{{ key }}"{% if key == '15' %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <button type="button" class="btn btn-sm btn-primary" data-gc-sel hidden
+            hx-post="{{ go_url }}/preview" hx-include="#gc-form" hx-target="#gap-conflicts" hx-swap="innerHTML"
+            data-label="{{ _('Auf Auswahl anwenden ({count})') }}">{{ _("Auf Auswahl anwenden") }}</button>
+    <button type="button" class="btn btn-sm" data-gc-clear hidden>{{ _("Auswahl aufheben") }}</button>
+    <button type="button" class="btn btn-sm btn-primary" data-gc-all
+            hx-post="{{ go_url }}/preview" hx-vals='{"all": "1"}' hx-include="[name=threshold]" hx-target="#gap-conflicts" hx-swap="innerHTML">{{ _("Auf alle anwenden ({count})", count=go.rows | length) }}</button>
+  </div>
+  <div class="tbl-wrap">
+    <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
+      <colgroup>
+        <col class="hk-col-chk"><col><col class="hk-col-methode"><col class="hk-col-luecke"><col class="hk-col-anzahl"><col class="hk-col-aufzeichnung">
+      </colgroup>
+      <thead><tr>
+        <th data-no-sort><input type="checkbox" data-gc-check-all aria-label="{{ _('Alle auf der Seite auswählen') }}"></th>
+        <th>{{ _("Entität") }}</th><th>{{ _("Gezählt wird") }}</th><th>{{ _("Lücken-Erkennung") }}</th>
+        <th>{{ _("Gefundene Lücken") }}</th><th>{{ _("Aufzeichnung seit") }}</th>
+      </tr></thead>
+      <tbody>
+      {% for row in go.rows %}
+      <tr>
+        <td><input type="checkbox" name="entity_id" value="{{ row.entity_id }}" data-gc-check aria-label="{{ _('{name} auswählen', name=row.friendly_name) }}"></td>
+        <td class="entity" data-sort="{{ row.friendly_name }}">
+          <a href="entities/{{ row.entity_id }}/config" class="entity-tooltip-host">
+            {% if row.friendly_name != row.entity_id %}
+            <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
+            {% else %}
+            <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
+            {% endif %}
+            <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name }}</strong><code>{{ row.entity_id }}</code></span>
+          </a>
+        </td>
+        <td>{{ row.method_label }}</td>
+        <td data-sort="{{ row.threshold if row.threshold != 'off' else 999999 }}">{{ row.threshold_label }}</td>
+        <td data-sort="{{ row.gaps if row.gaps is not none else -1 }}"{% if row.gaps is none and row.threshold != 'off' %} title="{{ _('Noch nicht zur aktuellen Schwelle gemessen') }}"{% endif %}>{{ row.gaps_label }}</td>
+        <td>{{ row.since_label }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>
+{% else %}
+<div class="tbl-wrap"><div class="empty">{{ _("Keine Entitäten.") }}</div></div>
+{% endif %}

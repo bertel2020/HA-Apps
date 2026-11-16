@@ -82,9 +82,12 @@ from .route_support import MAX_FORM_FIELDS, STORAGE_LOCKED_TIMEOUT_SECONDS, UI_E
 from .storage import cleanup, rotate
 from .storage import reset as reset_storage
 from .storage.coordinator import StorageCoordinator
+from .storage.coordinator import CoordinatorBusy
 from .storage.index import (
+    STATE_TYPE,
     Index,
     entity_last_seen,
+    gap_method,
 )
 
 
@@ -1080,6 +1083,131 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         _duplicates_auto_field_context(entity_id) if deps.index.get_entity(entity_id) is not None else None
     )
 
+    # --- Lücken-Erkennung: Übersicht und Sammelaktion (Housekeeping) ---------------------------------------------
+    def _gap_overview_context(*, message: str | None = None, undo: list[str] | None = None, confirm: dict | None = None) -> dict:
+        """Zeilen des Abschnitts „Lücken-Erkennung“: je Entität Methode, Schwelle, gefundene Lücken (aus dem Cache der
+        Datenqualität, nur zur aktuellen Schwelle und Methode gültig, sonst „–“) und Beginn der Aufzeichnung."""
+        entries = deps.index.list_cleanup_alltime_stats(with_daily=False)
+        rows = []
+        for entity in deps.index.list_entities():
+            if entity["aggregation_type"] == STATE_TYPE:
+                continue
+            entity_id = entity["entity_id"]
+            method = gap_method(entity)
+            entry = entries.get(entity_id)
+            off = entity["gap_threshold"] == "off"
+            measured = not off and entry is not None and "counts" in entry and cleanup_stats.gaps_measured(entity, entry)
+            gaps = ((entry.get("counts") or {}).get("gaps") or 0) if measured else None
+            since = entity["receive_gaps_since"]
+            rows.append({
+                "entity_id": entity_id,
+                "friendly_name": entity["custom_name"] or entity["friendly_name"] or entity_id,
+                "method": method,
+                "method_label": tr("Empfangene Werte") if method == "receive" else tr("Gespeicherte Werte"),
+                "threshold": entity["gap_threshold"],
+                "threshold_label": GAP_THRESHOLD_LABELS.get(entity["gap_threshold"], entity["gap_threshold"]),
+                "gaps": gaps,
+                "gaps_label": format_int(gaps) if gaps is not None else "–",
+                "since_label": (
+                    formats.format_date(datetime.fromtimestamp(since, deps.tz)) if since is not None else tr("noch nicht begonnen")
+                ) if method == "receive" else "–",
+            })
+        rows.sort(key=lambda r: (r["gaps"] is None, -(r["gaps"] or 0), r["friendly_name"].lower()))
+        return {
+            "rows": rows, "message": message, "undo": undo or [], "confirm": confirm,
+            "threshold_options": list(GAP_THRESHOLD_LABELS.items()),
+        }
+
+    def _gap_overview_targets(form) -> tuple[list[dict], str | None]:
+        """Zu ändernde Entitäten (alle oder die gewählten) und die gewünschte Schwelle. Entitäten, die schon darauf
+        stehen oder nicht in der Übersicht vorkommen, fallen heraus; ungültige Schwellen werden abgelehnt."""
+        threshold = form.get("threshold")
+        if threshold is None or str(threshold) not in GAP_THRESHOLD_LABELS:
+            raise HTTPException(status_code=400, detail=tr("Ungültiger Lücken-Schwellwert"))
+        threshold = str(threshold)
+        listed = {row["entity_id"]: row for row in _gap_overview_context()["rows"]}
+        chosen = list(listed) if form.get("all") else [str(v) for k, v in form.multi_items() if k == "entity_id"]
+        targets = [listed[i] for i in dict.fromkeys(chosen) if i in listed and listed[i]["threshold"] != threshold]
+        return targets, threshold
+
+    def _gap_groups(targets: list[dict]) -> list[dict]:
+        groups: dict[str, dict] = {}
+        for row in targets:
+            groups.setdefault(row["threshold"], {"label": row["threshold_label"], "count": 0})["count"] += 1
+        return sorted(groups.values(), key=lambda g: -g["count"])
+
+    def _gap_overview_response(request: Request, **context) -> HTMLResponse:
+        return deps.templates.TemplateResponse(request, "_gap_overview.html", {"gap_overview": _gap_overview_context(**context)})
+
+    @router.get("/housekeeping/luecken-erkennung", response_class=HTMLResponse)
+    def gap_overview_view(request: Request) -> HTMLResponse:
+        return _gap_overview_response(request)
+
+    @router.post("/housekeeping/luecken-erkennung/preview", response_class=HTMLResponse)
+    @_form_in_threadpool
+    def gap_overview_preview(request: Request, form) -> HTMLResponse:
+        targets, threshold = _gap_overview_targets(form)
+        confirm = {
+            "all": bool(form.get("all")), "entity_ids": [t["entity_id"] for t in targets], "count": len(targets),
+            "threshold": threshold, "threshold_label": GAP_THRESHOLD_LABELS[threshold], "groups": _gap_groups(targets),
+        }
+        return _gap_overview_response(request, confirm=confirm)
+
+    @router.post("/housekeeping/luecken-erkennung/apply", response_class=HTMLResponse)
+    @_form_in_threadpool
+    def gap_overview_apply(request: Request, form) -> HTMLResponse:
+        """Setzt die Schwelle der gewählten Entitäten und stößt die Neumessung der Lücken an. Nur die Einstellung
+        ändert sich, nie Daten; je Entität mit kurzer Sperre, eine gerade gesperrte (Backup, Import) bleibt stehen."""
+        targets, threshold = _gap_overview_targets(form)
+        done: list[dict] = []
+        busy = 0
+        for row in targets:
+            try:
+                with deps.coordinator.entity(row["entity_id"], timeout=STORAGE_LOCKED_TIMEOUT_SECONDS):
+                    deps.index.set_config(row["entity_id"], gap_threshold=threshold)
+                done.append(row)
+            except CoordinatorBusy:
+                busy += 1
+        remeasured = data_quality.request_remeasure(deps.index, [r["entity_id"] for r in done]) if done else 0
+        new_label = tr(str(GAP_THRESHOLD_LABELS[threshold]))
+        if len(done) == 1:
+            message = tr("„{name}“: Lücken-Erkennung von {old} auf {new} gesetzt.", name=done[0]["friendly_name"],
+                         old=tr(str(done[0]["threshold_label"])), new=new_label)
+        elif done:
+            message = tr("{count} Entitäten auf {new} gesetzt.", count=len(done), new=new_label)
+        else:
+            message = tr("Nichts zu ändern.")
+        if done:
+            message += " " + tr("Die Lücken werden neu gemessen.")
+        if busy:
+            message += " " + tr("{busy} Entität(en) waren gerade gesperrt und blieben unverändert.", busy=busy)
+        logger.info("Lücken-Erkennung gesetzt · event=gap_threshold_bulk_set count=%d threshold=%s busy=%d remeasure=%d",
+                    len(done), threshold, busy, remeasured)
+        return _gap_overview_response(request, message=message, undo=[f"{r['entity_id']}|{r['threshold']}" for r in done])
+
+    @router.post("/housekeeping/luecken-erkennung/undo", response_class=HTMLResponse)
+    @_form_in_threadpool
+    def gap_overview_undo(request: Request, form) -> HTMLResponse:
+        """Stellt die vorherigen Schwellen wieder her. Die Werte kommen vom Browser und werden gegen die Stufen und die
+        vorhandenen Entitäten geprüft; mehr als „Schwelle dieser Entität zurücksetzen“ ist damit nicht möglich."""
+        restored: list[str] = []
+        for key, value in form.multi_items():
+            if key != "undo" or "|" not in str(value):
+                continue
+            entity_id, _sep, old = str(value).rpartition("|")
+            if old not in GAP_THRESHOLD_LABELS or deps.index.get_entity(entity_id) is None:
+                continue
+            try:
+                with deps.coordinator.entity(entity_id, timeout=STORAGE_LOCKED_TIMEOUT_SECONDS):
+                    deps.index.set_config(entity_id, gap_threshold=old)
+                restored.append(entity_id)
+            except CoordinatorBusy:
+                continue
+        if restored:
+            data_quality.request_remeasure(deps.index, restored)
+        message = tr("{count} Änderung(en) zurückgenommen. Die Lücken werden neu gemessen.", count=len(restored))
+        return _gap_overview_response(request, message=message)
+
     @router.get("/housekeeping", response_class=HTMLResponse)
     def housekeeping_view(request: Request) -> HTMLResponse:
         """Sammelt Dinge, die niemandem auffallen, solange man nicht gezielt danach
@@ -1117,6 +1245,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 **_duplicates_context(rows=_duplicate_rows_for_display()),
                 **_counter_decreases_context(),
                 "data_quality": data_quality.build_matrix(deps.index),
+                "gap_overview": _gap_overview_context(),
                 "outlier_rates": cleanup_stats.outlier_rate_overview(deps.index),
                 "outlier_notable_percent": format_value(
                     cleanup_stats.OUTLIER_RATE_NOTABLE_PERCENT, 0
