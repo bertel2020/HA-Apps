@@ -179,6 +179,8 @@
   .wt-setup{display:flex;flex-direction:column;gap:0;}
   .wt-setup .actionbar{margin-top:20px;}
   .wt-setup .actionbar-sticky{margin-top:20px;}
+  .wt-save-error{margin-right:auto;color:var(--danger);font-size:calc(13px * var(--font-scale, 1));}
+  .wt-save-error[hidden]{display:none;}
   .wt-section-messwerte{
     background:radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--chart-2) 16%, transparent), color-mix(in srgb, var(--chart-2) 5%, transparent) 70%), var(--surface);
     border-color:color-mix(in srgb, var(--chart-2) 30%, var(--border));}

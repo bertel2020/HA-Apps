@@ -73,6 +73,10 @@
 <p class="sub">{{ _("Wie euer Wetter war — Messwerte, Regen und Heizbedarf an einem Ort.") }}</p>
 
 <form class="wt-setup" data-unsaved-guard hx-post="wetterdashboard/setup" hx-target="#wetter-root" hx-swap="innerHTML"
+      {# Lehnt der Server das Speichern ab (400), tauscht htmx nichts aus: Der Grund steht sonst nirgends. #}
+      hx-on::before-request="this.querySelector('.wt-save-error').hidden = true"
+      hx-on::response-error="const box = this.querySelector('.wt-save-error'); let msg = ''; try { msg = JSON.parse(event.detail.xhr.responseText).detail; } catch (e) {} box.textContent = (typeof msg === 'string' && msg) ? msg : {{ _('Speichern fehlgeschlagen.') | tojson | forceescape }}; box.hidden = false;"
+      hx-on::send-error="const box = this.querySelector('.wt-save-error'); box.textContent = {{ _('Speichern fehlgeschlagen.') | tojson | forceescape }}; box.hidden = false;"
       {# Enter in einem Textfeld (Name, Suche im Picker) darf das Formular nicht absenden, sonst ist die Einrichtung gespeichert, aber der Entwurf nie übernommen. #}
       @keydown.enter="if ($event.target.tagName === 'INPUT') $event.preventDefault()"
       x-init="fillColors(); $watch('extras', () => fillColors())"
@@ -736,6 +740,7 @@
   </dialog>
 
   <div class="actionbar actionbar-sticky" style="justify-content:flex-end;">
+    <span class="wt-save-error" role="alert" hidden></span>
     <span class="unsaved-note">{{ _("Ungespeicherte Änderungen") }}</span>
     <a class="btn" href="wetterdashboard" data-unsaved-cancel>{{ _("Abbrechen") }}</a>
     <button type="submit" class="btn unsaved-save">{{ _("Speichern") }}</button>
