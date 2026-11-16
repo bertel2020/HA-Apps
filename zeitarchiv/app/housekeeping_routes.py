@@ -41,7 +41,7 @@ from fastapi.templating import Jinja2Templates
 
 from . import formats
 from . import cleanup_stats
-from . import cleanup_tile, counter_auto, counter_bulk, data_quality, duplicates_auto, gap_recommendation
+from . import cleanup_tile, counter_auto, counter_bulk, data_quality, duplicates_auto, entity_usage, gap_recommendation
 from . import demo_mode
 from . import notices as notices_mod
 from .backup_scheduler import parse_schedule_time
@@ -1090,6 +1090,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         entries = deps.index.list_cleanup_alltime_stats(with_daily=False)
         entities = [e for e in deps.index.list_entities() if e["aggregation_type"] != STATE_TYPE]
         recommendations = gap_recommendation.recommendations(deps.index, entities, entries, time.time())
+        energy_texts = entity_usage.energy_entity_ids(deps.index)
         rows = []
         for entity in entities:
             entity_id = entity["entity_id"]
@@ -1099,7 +1100,10 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             method = gap_method(entity)
             entry = entries.get(entity_id)
             off = entity["gap_threshold"] == "off"
-            measured = not off and entry is not None and "counts" in entry and cleanup_stats.gaps_measured(entity, entry)
+            measured = (
+                not off and entry is not None and "counts" in entry and cleanup_stats.gaps_measured(entity, entry)
+                and cleanup_stats.gaps_assessed(entity)
+            )
             gaps = ((entry.get("counts") or {}).get("gaps") or 0) if measured else None
             since = entity["receive_gaps_since"]
             rows.append({
@@ -1116,9 +1120,16 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 ) if method == "receive" else "–",
                 "recommended": recommendation["recommended"],
                 "differs": differs,
-                "actionable": differs and recommendation["status"] in gap_recommendation.ACTIONABLE,
+                "energy": entity_id in energy_texts,
+                # „Aus“ hat im Energiedashboard eine Nebenwirkung (siehe ENERGY_OFF_NOTE): nur einzeln und bewusst.
+                "actionable": (
+                    differs and recommendation["status"] in gap_recommendation.ACTIONABLE
+                    and not (recommendation["recommended"] == "off" and entity_id in energy_texts)
+                ),
                 **details,
             })
+            if recommendation["recommended"] == "off" and entity_id in energy_texts and differs:
+                rows[-1]["status_tip"] += " " + tr(str(gap_recommendation.ENERGY_OFF_NOTE))
         rows.sort(key=lambda r: (r["rank"], r["gaps"] is None, -(r["gaps"] or 0), r["friendly_name"].lower()))
         return {
             "rows": rows, "message": message, "undo": undo or [], "confirm": confirm,
@@ -1158,6 +1169,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         confirm = {
             "all": bool(form.get("all")), "entity_ids": [t["entity_id"] for t in targets], "count": len(targets),
             "threshold": threshold, "threshold_label": GAP_THRESHOLD_LABELS[threshold], "groups": _gap_groups(targets),
+            "energy_names": [t["friendly_name"] for t in targets if t["energy"]] if threshold == "off" else [],
         }
         return _gap_overview_response(request, confirm=confirm)
 
@@ -1225,6 +1237,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             "mode": "recommend", "all": bool(form.get("all")), "entity_ids": [t["entity_id"] for t in targets],
             "count": len(targets),
             "groups": [{"old": o, "new": n, "count": c} for (o, n), c in sorted(groups.items(), key=lambda kv: -kv[1])],
+            "energy_names": [t["friendly_name"] for t in targets if t["energy"] and t["recommended"] == "off"],
         }
         return _gap_overview_response(request, confirm=confirm)
 

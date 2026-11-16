@@ -2905,10 +2905,27 @@ def _entity_config_adjusted(entity) -> dict[str, dict[str, str]]:
 def _gap_recommendation_context(entity) -> dict:
     """Empfehlung für die Lücken-Erkennung dieser Entität samt Beschriftungen für die Konfigurationsseite."""
     result = gap_recommendation.recommendation_for(index, entity, time.time())
+    energy_note = (
+        tr(str(gap_recommendation.ENERGY_OFF_NOTE))
+        if result["recommended"] == "off" and entity["entity_id"] in entity_usage.energy_entity_ids(index) else None
+    )
     return {
         **gap_recommendation.describe(entity, result), "status": result["status"], "recommended": result["recommended"],
-        "differs": gap_recommendation.differs(entity, result),
+        "differs": gap_recommendation.differs(entity, result), "energy_note": energy_note,
     }
+
+
+def _gap_note(entity) -> str | None:
+    """Hinweis auf der Bereinigungs-Seite, wie die Lücken dieser Entität gezählt werden (nur Empfangs-Methode)."""
+    if entity["gap_threshold"] == "off" or gap_method(entity) != "receive":
+        return None
+    since = entity["receive_gaps_since"]
+    if since is None:
+        return tr("Lücken: Gezählt werden Pausen zwischen empfangenen Werten, sobald der erste Wert eintrifft. Bis dahin gibt es hier keine Bewertung.")
+    return tr(
+        "Lücken: Gezählt werden Pausen zwischen empfangenen Werten, ab {since}. Davor gibt es bei dieser Entität keine Bewertung.",
+        since=formats.format_date(datetime.fromtimestamp(since, TZ)),
+    )
 
 
 def _entity_config_context(entity) -> dict:
@@ -4986,6 +5003,7 @@ def entity_cleanup(
             "first_date": first_date,
             "last_date": last_date,
             "gap_detection_enabled": entity["gap_threshold"] != "off",
+            "gap_note": _gap_note(entity),
             "outlier_detection_enabled": outlier_detection_enabled,
             "counter_decrease_enabled": cleanup_stats.counter_decreases_flagged(entity),
             "initial_filter": initial_filter,
@@ -5294,6 +5312,7 @@ def _rows_fragment(
             "total_row_count_label": format_int(_visible_row_count(entity)),
             "pagination": pagination,
             "gap_detection_enabled": gap_threshold != "off",
+            "gap_note": _gap_note(entity),
             "outlier_detection_enabled": outlier_threshold != "off",
             "counter_decrease_enabled": cleanup_stats.counter_decreases_flagged(entity),
             "last_batch_count": index.last_deleted_batch_size(entity_id),

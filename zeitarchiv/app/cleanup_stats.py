@@ -239,6 +239,13 @@ def gaps_measured(entity, eintrag: dict | None) -> bool:
     return gap_method(entity) != "stored" or "gap_profile" in eintrag
 
 
+def gaps_assessed(entity) -> bool:
+    """Ob die Lücken-Zahl dieser Entität etwas aussagt: bei gespeicherten Werten immer, bei der Empfangs-Methode erst, wenn
+    die Aufzeichnung begonnen hat (davor ist „0“ keine Bewertung, sondern ein leeres Feld). Nur für die Anzeige:
+    ``gaps_measured`` bleibt davon unberührt, sonst würde der Wartungsplaner eine nie beginnende Entität endlos neu messen."""
+    return gap_method(entity) == "stored" or entity["receive_gaps_since"] is not None
+
+
 def rate_labels(rate: dict) -> dict:
     """Fertige Beschriftungen einer Quote für die Vorlagen — Prozent mit Komma,
     Zahlen mit Tausenderpunkt, Schwelle als "50×". Hier statt in jeder Vorlage,

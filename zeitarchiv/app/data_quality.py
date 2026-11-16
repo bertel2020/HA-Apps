@@ -194,7 +194,7 @@ def build_heatmap(index: Index, *, days: int, kind: str, today: date) -> dict:
         valid = {"duplicates", "counter_decreases"}
         if entity_id in measured_outliers:
             valid.add("outliers")
-        if gaps_ok:
+        if gaps_ok and cleanup_stats.gaps_assessed(entity):
             valid.add("gaps")
         use = [key for key in keys if key in valid]
         daily = entry["daily"]
@@ -265,12 +265,12 @@ def monthly_findings(index: Index, entity_ids) -> dict[str, dict]:
         months: dict[str, dict[str, int]] = {}
         for day, per_day in daily.items():
             for key in ("gaps", "counter_decreases"):
-                if key == "gaps" and not gaps_ok:
+                if key == "gaps" and not (gaps_ok and cleanup_stats.gaps_assessed(entity)):
                     continue
                 if n := per_day.get(key, 0):
                     bucket = months.setdefault(day[:7], {})
                     bucket[key] = bucket.get(key, 0) + n
-        result[entity_id] = {"measured": True, "gaps_measured": gaps_ok, "months": months}
+        result[entity_id] = {"measured": True, "gaps_measured": gaps_ok and cleanup_stats.gaps_assessed(entity), "months": months}
     return result
 
 
@@ -409,7 +409,7 @@ def build_matrix(
                             window[key] += per_day.get(key, 0)
                 counts["duplicates"][entity_id] = window["duplicates"]
                 counts["counter_decreases"][entity_id] = window["counter_decreases"]
-                if gaps_ok:
+                if gaps_ok and cleanup_stats.gaps_assessed(entity):
                     counts["gaps"][entity_id] = window["gaps"]
                 if entity_id in measured_outliers:
                     counts["outliers"][entity_id] = window["outliers"]
@@ -418,7 +418,7 @@ def build_matrix(
                 entry_counts = entry.get("counts") or {}
                 counts["duplicates"][entity_id] = entry_counts.get("duplicates") or 0
                 counts["counter_decreases"][entity_id] = entry_counts.get("counter_decreases") or 0
-                if gaps_ok:
+                if gaps_ok and cleanup_stats.gaps_assessed(entity):
                     counts["gaps"][entity_id] = entry_counts.get("gaps") or 0
             if entity_id in measured_outliers:
                 counts["outliers"][entity_id] = measured_outliers[entity_id]

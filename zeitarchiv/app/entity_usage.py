@@ -39,6 +39,12 @@ def _energy_config(index: Index) -> dict:
     return _load_config(index)
 
 
+def energy_entity_ids(index: Index) -> set[str]:
+    """Alle Texte der Energiedashboard-Konfiguration; wer prüfen will, ob eine Entität dort vorkommt, schneidet sie mit
+    seinen Entitäts-IDs (eine Abfrage statt ``find_usages`` samt Diagrammen und Tabellen)."""
+    return {value for _path, value in _walk_strings(_energy_config(index))}
+
+
 def find_usages(index: Index, entity_ids: Iterable[str]) -> dict[str, list[dict]]:
     """``{entity_id: [Verwendung, …]}`` für jede angefragte Entität (leere Liste = ungenutzt).
 

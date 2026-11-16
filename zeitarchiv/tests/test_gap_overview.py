@@ -217,3 +217,43 @@ def test_the_configuration_page_offers_the_recommendation(client, profiled) -> N
     assert "gap_threshold" in html and "&#34;30&#34;" in html  # Knopf mit dem empfohlenen Wert
     quiet = client.get("/entities/sensor.go_test_b/config").text
     assert "Noch keine Empfehlung" in quiet and "Empfehlung übernehmen" not in quiet
+
+
+# --- Energiedashboard und Bereinigungs-Hinweis ---------------------------------------------------------------------
+
+def _energy_uses(monkeypatch, *entity_ids: str) -> None:
+    from app import entity_usage
+
+    monkeypatch.setattr(entity_usage, "energy_entity_ids", lambda index: set(entity_ids))
+
+
+def test_off_is_never_part_of_apply_all_for_entities_in_the_energy_dashboard(client, profiled, remeasured, monkeypatch) -> None:
+    index, ids = profiled
+    index._conn.execute("UPDATE entities SET resolution = 'raw' WHERE entity_id = ?", (ids[0],))
+    index.set_cleanup_alltime_stats(
+        ids[0], {"gaps": 900, "all": 5000}, "off", 1, gap_threshold="15",
+        gap_profile={"method": "stored", "days": 30.0, "events": 4000,
+                     "tiers": {"5": 900, "15": 800, "30": 700, "60": 600, "180": 500, "360": 400, "720": 300, "1440": 200}},
+    )
+    _energy_uses(monkeypatch, ids[0])
+    client.post("/housekeeping/luecken-erkennung/recommend/apply", data={"all": "1"})
+    assert index.get_entity(ids[0])["gap_threshold"] == "15"  # nicht geeignet → Aus, aber im Energiedashboard: nicht in „alle“
+    assert index.get_entity(ids[2])["gap_threshold"] == "30"  # die übrigen werden übernommen
+    assert "Wird im Energiedashboard verwendet" in client.get("/housekeeping/luecken-erkennung").text
+
+
+def test_the_confirmation_names_energy_entities_that_would_be_switched_off(client, profiled, monkeypatch) -> None:
+    index, ids = profiled
+    _energy_uses(monkeypatch, ids[1])
+    r = client.post("/housekeeping/luecken-erkennung/preview", data={"threshold": "off", "entity_id": [ids[0], ids[1]]})
+    assert "Wird im Energiedashboard verwendet: sensor.go_test_b" in r.text
+    r = client.post("/housekeeping/luecken-erkennung/preview", data={"threshold": "60", "entity_id": [ids[0], ids[1]]})
+    assert "Energiedashboard" not in r.text
+
+
+def test_the_cleanup_page_says_how_gaps_are_counted_for_receive_entities(client, profiled) -> None:
+    index, ids = profiled
+    html = client.get(f"/entities/{ids[2]}/rows?range=all").text
+    assert "Gezählt werden Pausen zwischen empfangenen Werten, ab" in html
+    plain = client.get(f"/entities/{ids[0]}/rows?range=all").text
+    assert "Gezählt werden Pausen" not in plain

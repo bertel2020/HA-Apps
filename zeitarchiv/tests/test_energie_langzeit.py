@@ -279,6 +279,7 @@ def test_monatswerte_tragen_luecken_und_zaehlersprung_je_monat(service) -> None:
     for eid in ("sensor.pv", "sensor.netz"):
         _archiv(service, eid, _monat(2025, 1))
     service.index.set_config("sensor.pv", outlier_threshold="50")
+    service.index._conn.execute("UPDATE entities SET receive_gaps_since = 1.0 WHERE entity_id = 'sensor.pv'")
     service.index.set_cleanup_alltime_stats(
         "sensor.pv",
         {"all": 10, "outliers": 0, "gaps": 2, "duplicates": 0, "repetitions": 0, "counter_decreases": 1},
@@ -299,6 +300,7 @@ def test_monatswerte_tragen_luecken_und_zaehlersprung_je_monat(service) -> None:
 
 def _tageszaehler(service, entity_id: str, daily: dict) -> None:
     service.index.set_config(entity_id, outlier_threshold="50")
+    service.index._conn.execute("UPDATE entities SET receive_gaps_since = 1.0 WHERE entity_id = ?", (entity_id,))
     service.index.set_cleanup_alltime_stats(
         entity_id,
         {"all": 10, "outliers": 0, "gaps": 0, "duplicates": 0, "repetitions": 0, "counter_decreases": 0},

@@ -2059,7 +2059,9 @@ Markierung ist reine Analyse; an den Daten ändert sie nichts.
 - Pausen unter 5 Minuten werden nicht festgehalten; „1 Minute“ gilt bei dieser
   Methode wie „5 Minuten“.
 - Die Aufzeichnung beginnt mit dem ersten Wert nach dem Einbau. Davor gibt es
-  bei Entitäten mit Filter oder Auflösung keine Bewertung.
+  bei Entitäten mit Filter oder Auflösung keine Bewertung; die Bereinigungs-Seite
+  sagt, ab wann gezählt wird, und Datenqualität und Housekeeping zeigen bis dahin
+  „–“ statt einer Null.
 - Sendet ein Sensor nur bei Änderung (Home Assistant meldet unveränderte Zustände
   nicht), ist eine lange Pause normal. Dort „Aus“ oder eine große Schwelle
   wählen.
@@ -2083,6 +2085,8 @@ stumme Entität bekommt keine, denn ohne Wert gibt es keine Pause.
   über der empfohlenen; kürzere Ausfälle blieben unbemerkt. Nur ein Hinweis.
 - **Passt**, **Ausgeschaltet** und **Noch keine Empfehlung** (mit Begründung im
   Tooltip) vervollständigen die Beurteilung.
+
+Wird die Entität im **Energiedashboard** verwendet und lautet die Empfehlung „Aus“, wird sie nicht von „Empfehlungen übernehmen“ erfasst, sondern nur einzeln: Dort wird bei „Aus“ der letzte Wert unbegrenzt fortgeschrieben und eine veraltete Reihe nicht gemeldet. Für einen Tarif-Helfer, der nur bei Änderung sendet, ist das richtig, für einen sonst regelmäßigen Preis-Sensor nicht; die Bestätigung weist darauf hin.
 
 Die Empfehlung ändert nie von selbst etwas. Sie steht in **Housekeeping →
 Lücken-Erkennung** und auf der Konfigurationsseite der Entität und wird mit

@@ -30,6 +30,9 @@
     {% for group in go.confirm.groups %}<li>{{ group.count }} &times; {{ _("von {old}", old=group.label) }}</li>{% endfor %}
   </ul>
   {% endif %}
+  {% if go.confirm.energy_names %}
+  <p class="gc-text gc-warn">{{ _("Wird im Energiedashboard verwendet: {names}. Bei „Aus“ wird der letzte Wert dort unbegrenzt fortgeschrieben und eine veraltete Reihe nicht gemeldet. Das ist für einen Tarif-Helfer richtig, der nur bei Änderung sendet, für einen sonst regelmäßigen Preis-Sensor nicht.", names=go.confirm.energy_names | join(", ")) }}</p>
+  {% endif %}
   <form id="gc-confirm-form">
     {% if not recommend_mode %}<input type="hidden" name="threshold" value="{{ go.confirm.threshold }}">{% endif %}
     {% if go.confirm.all %}<input type="hidden" name="all" value="1">{% else %}{% for entity_id in go.confirm.entity_ids %}<input type="hidden" name="entity_id" value="{{ entity_id }}">{% endfor %}{% endif %}

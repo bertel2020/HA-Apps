@@ -18,7 +18,7 @@ Eine Empfehlung ändert nie von selbst etwas; übernommen wird nur auf Klick.
 from __future__ import annotations
 
 from .formatting import GAP_THRESHOLD_LABELS, format_value
-from .i18n import tr
+from .i18n import N_, tr
 from .storage.index import MIN_RECEIVE_GAP_SECONDS, entity_last_seen, gap_method
 
 #: Stufen der Lücken-Erkennung in Minuten, aufsteigend (ohne „Aus“). Die Stufe „1 Minute“ fehlt: Pausen unter
@@ -38,6 +38,11 @@ FINER_BY_TIERS = 2
 #: Entitäten ohne Wert seit so vielen Tagen gelten als stumm: ohne Wert entsteht keine Pause, die Zahl 0 wäre
 #: sonst eine falsche Entwarnung.
 SILENT_AFTER_DAYS = 7
+
+#: Hinweis für Entitäten, die im Energiedashboard vorkommen: Dort bedeutet „Aus“ bei einem Faktor (Preis, CO2), dass der
+#: letzte Wert unbegrenzt fortgeschrieben und eine veraltete Reihe nicht mehr gemeldet wird. Für einen Tarif-Helfer, der nur
+#: bei Änderung sendet, ist das gewollt, für einen sonst regelmäßigen Preis-Sensor verdeckt es einen Ausfall.
+ENERGY_OFF_NOTE = N_("Wird im Energiedashboard verwendet: Bei „Aus“ wird der letzte Wert dort unbegrenzt fortgeschrieben und eine veraltete Reihe nicht gemeldet. Deshalb nur einzeln übernehmen.")
 
 STATUS_INSUFFICIENT = "insufficient"
 STATUS_TOO_SENSITIVE = "too_sensitive"

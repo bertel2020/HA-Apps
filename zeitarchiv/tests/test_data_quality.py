@@ -37,6 +37,8 @@ def index():
 def _entity(index, entity_id, *, name=None, schwelle="50"):
     index.get_or_create_entity(entity_id, "sensor", "measurement", "kWh")
     index.set_config(entity_id, outlier_threshold=schwelle, custom_name=name)
+    # Die Aufzeichnung der Empfangs-Pausen läuft schon (Standard: Filter an, also Methode „receive“).
+    index._conn.execute("UPDATE entities SET receive_gaps_since = 1.0 WHERE entity_id = ?", (entity_id,))
 
 
 def _gesamt(index, entity_id, *, duplicates=0, counter_decreases=0, outliers=0):
@@ -686,3 +688,17 @@ def test_dauerhaft_stumm_haelt_trotz_wechselnder_zahlen():
     assert notices._is_muted(meldung("7 neue Befunde"), alt, 0.0)
     # Andere Meldungen vergleichen weiter den Text
     assert not notices._is_muted({"id": "x", "detail": "neu"}, alt, 0.0)
+
+
+def test_luecken_ohne_begonnene_aufzeichnung_sind_keine_null(index):
+    """Bei der Empfangs-Methode ist „0 Lücken“ vor dem Beginn der Aufzeichnung keine Bewertung: die Matrix führt die
+    Lücken dort nicht als Zelle."""
+    _mit_daten(index, "sensor.a")
+    index.set_cleanup_alltime_stats(
+        "sensor.a", {"all": 100, "outliers": 0, "gaps": 7, "duplicates": 3, "repetitions": 0, "counter_decreases": 0},
+        "50", OUTLIER_RULE_VERSION, gap_threshold="r15",
+    )
+    assert data_quality.build_matrix(index)["rows"][0]["cells"]["gaps"]["count"] == 7
+    index._conn.execute("UPDATE entities SET receive_gaps_since = NULL WHERE entity_id = 'sensor.a'")
+    cells = data_quality.build_matrix(index)["rows"][0]["cells"]
+    assert cells["gaps"] is None or not cells["gaps"].get("count")
