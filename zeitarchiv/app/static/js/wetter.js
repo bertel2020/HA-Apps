@@ -151,6 +151,21 @@
   // Auf schmalen Bildschirmen bricht die Legende in zwei Zeilen um und braucht mehr Platz über dem Diagramm.
   const gridFor = (element, extra) => ({...gridBox, top: element.clientWidth < 520 ? 74 : 34, ...extra});
 
+  // Viele Legendeneinträge brechen in mehrere Zeilen um (Handy, viele Räume): der Kopf über dem Diagramm
+  // wächst mit, sonst läuft die Legende in die Linien. Breite je Eintrag grob geschätzt (Symbol + Text + Abstand).
+  function gridForLegend(element, names, extra) {
+    const font = scaledFont(12);
+    const width = Math.max(element.clientWidth - 16, 120);
+    let rows = 1;
+    let used = 0;
+    names.forEach((name) => {
+      const item = 18 + 5 + String(name).length * font * 0.58 + 10;
+      if (used && used + item > width) { rows += 1; used = 0; }
+      used += item;
+    });
+    return gridFor(element, {top: Math.max(element.clientWidth < 520 ? 74 : 34, rows * (font + 10) + 10), ...extra});
+  }
+
   function legendBox(colors, data) {
     return {data, top: 0, textStyle: {color: colors.text, fontSize: scaledFont(12)}, itemWidth: 18, itemHeight: 8};
   }
@@ -2083,7 +2098,7 @@
         const names = series.map((row) => row.label);
         const chart = chartFor(name, element);
         chart.setOption({
-          animation: false, grid: gridFor(element, {right: 8}), legend: legendBox(colors, names),
+          animation: false, grid: gridForLegend(element, names, {right: 8}), legend: legendBox(colors, names),
           xAxis: {type: 'category', data: labels, boundaryGap: false, ...axisStyle(colors), splitLine: {show: false}},
           yAxis: {type: 'value', scale: true, name: unit, nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
           tooltip: tooltipBox(colors, (params) => {
