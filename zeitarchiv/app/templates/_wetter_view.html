@@ -563,7 +563,14 @@
     <p class="hint hint-warn" x-show="daylightError" x-text="daylightError" x-cloak></p>
     {% endif %}
     {% if show_dl_days %}
-    <h3 class="wt-h3 wt-dl-h" x-show="daylight">{{ _("Die letzten Tage im Vergleich") }}</h3>
+    <div class="wt-controls wt-dl-h" x-show="daylight" x-cloak>
+      <h3 class="wt-h3">{{ _("Die letzten Tage im Vergleich") }}</h3>
+      <div class="wt-seg wt-controls-end" role="group" aria-label="{{ _('Zeitraum') }}">
+        <template x-for="n in [7, 14, 30]" :key="n">
+          <button type="button" :aria-pressed="(daylightDays === n).toString()" @click="setDaylightDays(n)" x-text="t('{n} Tage', {n})"></button>
+        </template>
+      </div>
+    </div>
     <div class="tbl-wrap wt-table-wrap" x-show="daylight">
       <table class="wt-table wt-table-full wt-dl-table">
         <thead><tr>

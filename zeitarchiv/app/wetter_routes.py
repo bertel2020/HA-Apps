@@ -228,6 +228,7 @@ DEFAULT_DAYLIGHT_DAY_LX = 400.0
 DAYLIGHT_NIGHT_RANGE_LX = (1.0, 200.0)
 DAYLIGHT_DAY_RANGE_LX = (50.0, 990.0)
 DAYLIGHT_COMPARE_DAYS = 14  # Tage in der Vergleichstabelle unter der Kurve (wie Tagesbild und PV)
+DAYLIGHT_COMPARE_OPTIONS = (7, 14, 30)
 DAYLENGTH_MIN_HOURS = 12  # Stunden mit Werten, ab denen ein Tag für den Jahresverlauf zählt
 DAYLENGTH_PAST_YEARS = 5  # so viele frühere Jahre zeigt der Jahresverlauf höchstens (wie die anderen Jahresdiagramme)
 #: Süd-Helligkeit der Eltako-Station sättigt hier; darüber steht „ab“ statt eines Messwerts.
@@ -1875,7 +1876,9 @@ class WetterService:
             **summary,
         }
 
-    def compute_daylight(self, at: str | None = None, now_local: datetime | None = None) -> dict | None:
+    def compute_daylight(
+        self, at: str | None = None, now_local: datetime | None = None, days: int = DAYLIGHT_COMPARE_DAYS,
+    ) -> dict | None:
         """Kurve und Kennzahlen für einen Tag (Standard heute) plus ein Vergleich der letzten Tage; None ohne Rolle."""
         config = _load_config(self.deps.index)
         entity_id = config["illuminance_dawn"]
@@ -1884,11 +1887,11 @@ class WetterService:
         now_local = now_local or datetime.now(self.deps.tz)
         selected = parse_stichtag(at, now_local.date()) or now_local.date()
         read_cache = query_mod.QueryReadCache()
-        days = [selected - timedelta(days=offset) for offset in range(DAYLIGHT_COMPARE_DAYS)]
-        results = [self._daylight_day(entity_id, day, config, now_local, read_cache) for day in days]
+        shown = [selected - timedelta(days=offset) for offset in range(days)]
+        results = [self._daylight_day(entity_id, day, config, now_local, read_cache) for day in shown]
         compare_keys = ("date", "resolution", "from", "to", "length", "morning", "evening", "approx", "ongoing")
         compare = [{key: row[key] for key in compare_keys} for row in results]
-        has_elevation = self._add_sun_elevation(compare, config, days[-1], now_local, read_cache)
+        has_elevation = self._add_sun_elevation(compare, config, shown[-1], now_local, read_cache)
         return {
             "tz": str(self.deps.tz),
             "unit": "lx",
@@ -2707,9 +2710,11 @@ class WetterService:
             return result
 
         @router.get("/wetterdashboard/tageslicht")
-        def wetterdashboard_daylight(date: str | None = None) -> dict:
+        def wetterdashboard_daylight(date: str | None = None, days: int = DAYLIGHT_COMPARE_DAYS) -> dict:
             _require_configured()
-            data = self.compute_daylight(date)
+            if days not in DAYLIGHT_COMPARE_OPTIONS:
+                raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
+            data = self.compute_daylight(date, days=days)
             if data is None:
                 raise HTTPException(status_code=409, detail=tr("Keine Entität für „Helligkeit Dämmerung“ zugeordnet."))
             return data

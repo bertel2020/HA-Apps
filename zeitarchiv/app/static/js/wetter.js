@@ -283,6 +283,7 @@
       hasPv: false,
       pv: null,
       pvError: '',
+      daylightDays: 14,        // Länge der Tabelle „Die letzten Tage im Vergleich“
       pvSel: null,
       pvDays: 14,
       pvRange: null,           // eigener Zeitraum {start, end} statt der festen Tage
@@ -367,6 +368,7 @@
         if (saved.tempRange && ISO_DAY.test(saved.tempRange.start || '') && ISO_DAY.test(saved.tempRange.end || '')) this.tempRange = {start: saved.tempRange.start, end: saved.tempRange.end};
         if ([7, 30, 365].includes(saved.courseDays)) this.courseDays = saved.courseDays;
         if ([7, 14, 30].includes(saved.pvDays)) this.pvDays = saved.pvDays;
+        if ([7, 14, 30].includes(saved.daylightDays)) this.daylightDays = saved.daylightDays;
         if (saved.pvRange && ISO_DAY.test(saved.pvRange.start || '') && ISO_DAY.test(saved.pvRange.end || '')) this.pvRange = {start: saved.pvRange.start, end: saved.pvRange.end};
         if (saved.courseRange && ISO_DAY.test(saved.courseRange.start || '') && ISO_DAY.test(saved.courseRange.end || '')) this.courseRange = {start: saved.courseRange.start, end: saved.courseRange.end};
         if (['previous', 'year', ''].includes(saved.courseCompare)) this.courseCompare = saved.courseCompare;
@@ -1724,12 +1726,19 @@
         return facts;
       },
 
+      setDaylightDays(days) {
+        if (this.daylightDays === days) return;
+        this.daylightDays = days;
+        writeStore({daylightDays: days});
+        this.loadDaylight();
+      },
+
       async loadDaylight() {
         const stichtag = this.stichtag();
         const seq = ++this._daylightSeq;
         this.daylightError = '';
         try {
-          const data = await this.fetchJson(`wetterdashboard/tageslicht${stichtag ? `?date=${encodeURIComponent(stichtag)}` : ''}`);
+          const data = await this.fetchJson(`wetterdashboard/tageslicht?days=${this.daylightDays}${stichtag ? `&date=${encodeURIComponent(stichtag)}` : ''}`);
           if (seq !== this._daylightSeq) return;  // ein neuerer Tag hat überholt
           this.daylight = data;
           this.$nextTick(() => this.drawDaylight());

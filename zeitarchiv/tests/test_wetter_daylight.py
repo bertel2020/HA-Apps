@@ -152,6 +152,26 @@ def test_compute_daylight_from_the_raw_values_of_one_day(service) -> None:
     assert data["compare"][1]["resolution"] is None  # kein Wert, keine erfundene Länge
 
 
+def test_daylight_comparison_length_is_selectable(service) -> None:
+    _add(service, "sensor.t", "°C", [(_ts(19, 8), 10.0)])
+    _add(service, "sensor.daemm", "lx", RAMP)
+    _configure(service, temperature="sensor.t", illuminance_dawn="sensor.daemm")
+    for days in wetter_routes.DAYLIGHT_COMPARE_OPTIONS:
+        data = service.compute_daylight("2026-08-19", NOW, days=days)
+        assert len(data["compare"]) == days
+        assert data["compare"][0]["date"] == "2026-08-19"
+
+
+def test_daylight_route_validates_the_comparison_length(client) -> None:
+    from app.main import index
+
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    index.get_or_create_entity("sensor.licht_test_temp2", "sensor", "measurement", "°C")
+    assert client.post("/wetterdashboard/setup", data={"temperature": "sensor.licht_test_temp2"}).status_code == 200
+    assert client.get("/wetterdashboard/tageslicht?days=5").status_code == 400
+    assert client.get("/wetterdashboard/tageslicht?days=30").status_code == 409  # gültig, aber keine Rolle
+
+
 def test_compute_daylight_without_role_or_entity_is_none(service) -> None:
     _configure(service, temperature="sensor.t")
     assert service.compute_daylight(None, NOW) is None
