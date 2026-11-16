@@ -294,24 +294,24 @@ def test_the_scheduler_actually_runs_this_step() -> None:
 
 def test_the_section_sits_between_duplicates_and_configuration(client) -> None:
     """Die Reihenfolge ist Teil der Aussage: erst was in den Daten steckt
-    (Duplikate, Ausreißer), dann was an den Einstellungen liegt."""
+    (Duplikate, Ausreißer), dann was an den Einstellungen liegt (Lücken-Erkennung)."""
     html = client.get("/housekeeping").text
-    for marke in ('id="duplikate"', 'id="ausreisser"', 'id="konfiguration"'):
+    for marke in ('id="duplikate"', 'id="ausreisser"', 'id="luecken-erkennung"'):
         assert marke in html, marke
-    assert html.index('id="duplikate"') < html.index('id="ausreisser"') < html.index('id="konfiguration"')
+    assert html.index('id="duplikate"') < html.index('id="ausreisser"') < html.index('id="luecken-erkennung"')
     # Nur INNERHALB der Seitennavigation vergleichen: dieselben Anker stehen
     # auch in Meldungs-Links, die je nach Zustand der Testinstanz vor der
     # Navigation stehen können.
     nav = html[html.index('class="settings-nav"'):]
     nav = nav[:nav.index("</nav>")]
-    assert nav.index("housekeeping#duplikate") < nav.index("housekeeping#ausreisser") < nav.index("housekeeping#konfiguration")
+    assert nav.index("housekeeping#duplikate") < nav.index("housekeeping#ausreisser") < nav.index("housekeeping#luecken-erkennung")
 
 
 def test_the_page_shows_how_far_the_measurement_got(client) -> None:
     """Ohne diese Zahl sähe „nichts gefunden" genauso aus wie „noch nichts
     gemessen" — der Unterschied ist für den Leser wesentlich."""
     html = client.get("/housekeeping").text
-    abschnitt = html[html.index('id="ausreisser"'):html.index('id="konfiguration"')]
+    abschnitt = html[html.index('id="ausreisser"'):html.index('id="luecken-erkennung"')]
     assert "Entitäten mit Ausreißer-Erkennung sind gemessen" in abschnitt
 
 

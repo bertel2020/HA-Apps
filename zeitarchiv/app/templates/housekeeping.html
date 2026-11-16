@@ -140,40 +140,10 @@
         </p>
       </section>
 
-      <section id="konfiguration" class="settings-section">
-        <h2 class="settings-section-title">{{ _("Konfiguration") }} {{ hint_button(_('Konfiguration')) }}</h2>
-        {% call hint_body('settings-section-description') %}{{ _("Entitäten, deren Lücken-Erkennung strukturell nie zutreffen kann &mdash; die gewählte Auflösung oder der aktive Wertänderungsfilter erzwingt selbst schon einen größeren Mindestabstand zwischen Werten.") }}{% if gap_threshold_conflicts %} {{ _("Nicht in einem Zug korrigierbar: je nach Entität hilft eine gröbere Lücken-Erkennung oder eine feinere Auflösung &mdash; auf der jeweiligen Konfigurationsseite.") }}{% endif %}{% endcall %}
-        <div class="tbl-wrap">
-          {% if gap_threshold_conflicts %}
-          <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
-            <colgroup>
-              <col><col class="hk-col-aufloesung"><col class="hk-col-luecke"><col class="hk-col-empfohlen">
-            </colgroup>
-            <thead><tr><th>{{ _("Entität") }}</th><th>{{ _("Auflösung") }}</th><th>{{ _("Lücken-Erkennung") }}</th><th>{{ _("Empfohlen") }}</th></tr></thead>
-            <tbody>
-            {% for row in gap_threshold_conflicts %}
-            <tr>
-              <td class="entity" data-sort="{{ row.friendly_name }}">
-                <a href="entities/{{ row.entity_id }}/config" class="entity-tooltip-host">
-                  {% if row.friendly_name != row.entity_id %}
-                  <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
-                  {% else %}
-                  <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
-                  {% endif %}
-                  <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name }}</strong><code>{{ row.entity_id }}</code></span>
-                </a>
-              </td>
-              <td>{{ row.resolution_label }}{% if row.value_filter_active %} {{ _("+ Wertänderungsfilter") }}{% endif %}</td>
-              <td>{{ row.gap_threshold_label }}</td>
-              <td>{{ row.suggested_gap_label }}</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-          </table>
-          {% else %}
-          <div class="empty">{{ _("Keine widersprüchlichen Kombinationen gefunden.") }}</div>
-          {% endif %}
-        </div>
+      <section id="luecken-erkennung" class="settings-section">
+        <h2 class="settings-section-title">{{ _("Lücken-Erkennung passt nicht zur Erfassung") }} {{ hint_button(_('Lücken-Erkennung passt nicht zur Erfassung')) }}</h2>
+        {% call hint_body('settings-section-description') %}{{ _("Entitäten, deren Lücken-Erkennung strukturell nie zutreffen kann &mdash; die gewählte Auflösung oder das Lebenszeichen des Wertänderungsfilters erzwingt selbst schon einen größeren Mindestabstand zwischen Werten. „Empfohlen“ ist die kleinste passende Stufe; Übernehmen setzt nur diese Schwelle, an den Daten ändert sich nichts. Wer die Erkennung feiner will, kürzt auf der Konfigurationsseite der Entität das Lebenszeichen oder wählt eine feinere Auflösung.") }}{% endcall %}
+        <div id="gap-conflicts">{% include "_gap_conflicts.html" %}</div>
       </section>
 
       <section id="speicherplatz" class="settings-section">
@@ -324,6 +294,7 @@
   const BASE = {{ app_root | tojson }};
 </script>
 <script src="{{ asset('js/pages/housekeeping.js') }}"></script>
+<script src="{{ asset('js/pages/gap_conflicts.js') }}"></script>
 <script src="{{ asset('js/settings-nav-scrollspy.js') }}"></script>
 <script src="{{ asset('js/table-cards.js') }}"></script>
 <script src="{{ asset('js/hint-toggle.js') }}"></script>

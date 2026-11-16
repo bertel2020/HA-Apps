@@ -34,6 +34,7 @@ from .i18n import N_, tr
 from .energiedashboard_routes import CONFIG_SCHEMA_VERSION, SETTING_CONFIG, SETTING_HOURLY_BACKFILL_PENDING
 from .formatting import (
     GAP_THRESHOLD_LABELS,
+    VALUE_FILTER_HEARTBEAT_LABELS,
     decimals_to_int,
     format_int,
     format_resolution,
@@ -198,7 +199,7 @@ def gap_threshold_conflicts(index) -> list[dict]:
     schon einen größeren Mindestabstand zwischen Werten (siehe
     effective_gap_floor_minutes() in storage/index.py). Einzige Quelle für
     die entities.gap_threshold_conflict-Meldung unten (Zähler) UND
-    Housekeeping → Konfiguration (main.py, volle Liste) — beide dürfen nie
+    Housekeeping → Lücken-Erkennung (volle Liste) — beide dürfen nie
     unterschiedliche Kriterien verwenden."""
     rows = []
     for e in index.list_entities():
@@ -214,6 +215,12 @@ def gap_threshold_conflicts(index) -> list[dict]:
             "resolution_label": format_resolution(e["resolution"]),
             "gap_threshold_label": GAP_THRESHOLD_LABELS.get(e["gap_threshold"], e["gap_threshold"]),
             "value_filter_active": e["value_filter"] == "decimals",
+            "heartbeat_label": (
+                VALUE_FILTER_HEARTBEAT_LABELS.get(e["value_filter_heartbeat"], e["value_filter_heartbeat"])
+                if e["value_filter"] == "decimals" else None
+            ),
+            "gap_threshold": e["gap_threshold"],
+            "suggested_gap": suggested_gap,
             "suggested_gap_label": GAP_THRESHOLD_LABELS.get(suggested_gap, suggested_gap),
         })
     return rows
@@ -672,7 +679,7 @@ def build_notices(
                 (tr("{conflict_count} Entität hat eine Lücken-Erkennung, die enger eingestellt ist als der Mindestabstand, den die gewählte Auflösung oder der aktive Wertänderungsfilter selbst zwischen gespeicherten Werten erzwingt — das führt zu falschen Lücken-Meldungen.", conflict_count=conflict_count) if conflict_count == 1 else tr("{conflict_count} Entitäten haben eine Lücken-Erkennung, die enger eingestellt ist als der Mindestabstand, den die gewählte Auflösung oder der aktive Wertänderungsfilter selbst zwischen gespeicherten Werten erzwingt — das führt zu falschen Lücken-Meldungen.", conflict_count=conflict_count))
             ),
             "meta": tr("Housekeeping"),
-            "link": "/housekeeping#konfiguration",
+            "link": "/housekeeping#luecken-erkennung",
         })
 
     # Grundlage ist ausschließlich der ohnehin vorhandene Cache (der
