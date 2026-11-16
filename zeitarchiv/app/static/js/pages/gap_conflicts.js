@@ -46,4 +46,22 @@
   });
   document.body.addEventListener('htmx:afterSwap', function (e) { if (e.target.id === 'gap-conflicts') update(); });
   document.addEventListener('DOMContentLoaded', update);
+
+  // Bestätigung als <dialog>: nach jedem Tausch des Abschnitts öffnen. Schließen ohne Entscheidung (Escape, Klick auf den
+  // Hintergrund) verhält sich wie „Abbrechen“ und lädt den Abschnitt neu.
+  function openModal() {
+    const r = root();
+    const dlg = r && r.querySelector('dialog[data-gc-modal]');
+    if (!dlg || dlg.open) return;
+    dlg.showModal();
+    dlg.addEventListener('close', function () {
+      if (!dlg.isConnected) return;
+      const cancel = dlg.querySelector('[data-gc-cancel]');
+      if (cancel) cancel.click();
+    }, {once: true});
+    dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
+    const focus = dlg.querySelector('.btn-primary') || dlg.querySelector('[data-gc-cancel]');
+    if (focus) focus.focus();
+  }
+  document.addEventListener('htmx:afterSettle', openModal);
 })();

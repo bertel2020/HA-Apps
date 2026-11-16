@@ -774,6 +774,7 @@
     "Ungültiges Lebenszeichen des Wertänderungsfilters": "Invalid sign of life for the value change filter",
     "Lebenszeichen des Wertfilters": "Value filter sign of life",
     "Standard-Lebenszeichen des Wertfilters": "Default value filter sign of life",
+    "Betroffene Entitäten ({count})": "Affected entities ({count})",
     "Lücken: Gezählt werden Pausen zwischen empfangenen Werten, ab {since}. Davor gibt es bei dieser Entität keine Bewertung.": "Gaps: pauses between received values are counted, from {since}. Before that this entity has no assessment.",
     "Lücken: Gezählt werden Pausen zwischen empfangenen Werten, sobald der erste Wert eintrifft. Bis dahin gibt es hier keine Bewertung.": "Gaps: pauses between received values are counted as soon as the first value arrives. Until then there is no assessment here.",
     "Wird im Energiedashboard verwendet: Bei „Aus“ wird der letzte Wert dort unbegrenzt fortgeschrieben und eine veraltete Reihe nicht gemeldet. Deshalb nur einzeln übernehmen.": "Used in the energy dashboard: with “Off” the last value is carried forward there without limit and a stale series is not reported. So apply this one individually only.",

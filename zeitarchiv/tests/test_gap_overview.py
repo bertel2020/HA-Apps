@@ -257,3 +257,23 @@ def test_the_cleanup_page_says_how_gaps_are_counted_for_receive_entities(client,
     assert "Gezählt werden Pausen zwischen empfangenen Werten, ab" in html
     plain = client.get(f"/entities/{ids[0]}/rows?range=all").text
     assert "Gezählt werden Pausen" not in plain
+
+
+# --- Bestätigung als Popup ---------------------------------------------------------------------------------------
+
+def test_the_confirmation_is_a_modal_dialog_with_the_affected_entities(client, profiled) -> None:
+    r = client.post("/housekeeping/luecken-erkennung/recommend/preview", data={"entity_id": ["sensor.go_test_a", "sensor.go_test_c"]})
+    assert "<dialog" in r.text and "data-gc-modal" in r.text
+    assert "Betroffene Entitäten (2)" in r.text
+    for entity_id in ("sensor.go_test_a", "sensor.go_test_c"):
+        assert entity_id in r.text.split("<details")[1].split("</details>")[0]
+    assert "15 Minuten &rarr; 30 Minuten" in r.text
+    own = client.post("/housekeeping/luecken-erkennung/preview", data={"threshold": "60", "entity_id": ["sensor.go_test_a"]})
+    assert "<dialog" in own.text and "15 Minuten &rarr; 1 Stunde" in own.text
+    empty = client.post("/housekeeping/luecken-erkennung/preview", data={"threshold": "15", "entity_id": ["sensor.go_test_a"]})
+    assert "<dialog" in empty.text and "Nichts zu ändern." in empty.text and "data-gc-cancel" in empty.text
+
+
+def test_the_toast_after_applying_stays_in_the_page_and_not_in_a_dialog(client, profiled, remeasured) -> None:
+    r = client.post("/housekeeping/luecken-erkennung/apply", data={"threshold": "60", "entity_id": ["sensor.go_test_a"]})
+    assert "<dialog" not in r.text and "gc-toast" in r.text and "Rückgängig" in r.text

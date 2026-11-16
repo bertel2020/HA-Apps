@@ -340,7 +340,6 @@
 #gap-conflicts .gc-count{font-weight:600;margin-right:auto;}
 #gap-conflicts .gc-bar.has-selection .gc-count{color:var(--accent-line);}
 #gap-conflicts .gc-bar [hidden]{display:none;}
-#gap-conflicts .gc-confirm{margin-bottom:12px;padding:14px 16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);}
 #gap-conflicts .gc-text{margin:0 0 10px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
 #gap-conflicts .gc-groups{margin:0 0 12px;padding-left:18px;}
 #gap-conflicts .gc-toast{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:10px;padding:10px 14px;border:1px solid var(--accent-line);border-radius:8px;background:var(--accent-line-soft);font-size:calc(13px * var(--font-scale, 1));}
@@ -357,4 +356,15 @@
 #gap-conflicts .gc-group + .gc-group{padding-left:12px;border-left:1px solid var(--border);}
 #gap-conflicts .gc-group-title{font-size:calc(12px * var(--font-scale, 1));font-weight:600;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.04em;}
 #gap-conflicts .gc-warn{color:var(--warning);}
+#gap-conflicts .gc-modal{width:min(620px,calc(100vw - 32px));}
+#gap-conflicts .gc-modal-title{margin:0 0 10px;font-size:calc(16px * var(--font-scale, 1));}
+#gap-conflicts .gc-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}
+#gap-conflicts .gc-entities{margin:0 0 4px;}
+#gap-conflicts .gc-entities summary{cursor:pointer;font-weight:600;font-size:calc(13px * var(--font-scale, 1));}
+#gap-conflicts .gc-entity-list{list-style:none;margin:8px 0 0;padding:0;max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;}
+#gap-conflicts .gc-entity-list li{display:flex;justify-content:space-between;gap:12px;padding:6px 10px;border-bottom:1px solid var(--border);font-size:calc(13px * var(--font-scale, 1));}
+#gap-conflicts .gc-entity-list li:last-child{border-bottom:0;}
+#gap-conflicts .gc-entity-name{min-width:0;overflow-wrap:anywhere;}
+#gap-conflicts .gc-entity-id{display:block;font-family:var(--font-mono);font-size:calc(11.5px * var(--font-scale, 1));color:var(--ink-muted);}
+#gap-conflicts .gc-entity-change{white-space:nowrap;color:var(--ink-muted);}
 

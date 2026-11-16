@@ -16,8 +16,10 @@
 {% endif %}
 {% if go.confirm %}
 {% set recommend_mode = go.confirm.mode == 'recommend' %}
-<div class="gc-confirm">
-  <h3 class="eyebrow">{{ _("Empfehlung übernehmen") if recommend_mode else _("Schwelle setzen") }}</h3>
+{# Bestätigung als modales Popup (wie die Duplikat-Automatik): Sie steht sonst oberhalb der Leiste und bleibt unbemerkt, wenn man
+   zur Tabelle gescrollt hat. Schließen ohne Entscheidung (Escape, Klick daneben, „Abbrechen“) lädt den Abschnitt neu. #}
+<dialog class="detail-dialog gc-modal" data-gc-modal aria-labelledby="gc-modal-title">
+  <h3 class="gc-modal-title" id="gc-modal-title">{{ _("Empfehlung übernehmen") if recommend_mode else _("Schwelle setzen") }}</h3>
   {% if go.confirm.count %}
   {% if recommend_mode %}
   <p class="gc-text">{{ _("Bei {count} Entität(en) wird die Lücken-Erkennung auf die Empfehlung gesetzt. Daten bleiben unverändert, und du kannst es danach rückgängig machen.", count=go.confirm.count) }}</p>
@@ -33,20 +35,28 @@
   {% if go.confirm.energy_names %}
   <p class="gc-text gc-warn">{{ _("Wird im Energiedashboard verwendet: {names}. Bei „Aus“ wird der letzte Wert dort unbegrenzt fortgeschrieben und eine veraltete Reihe nicht gemeldet. Das ist für einen Tarif-Helfer richtig, der nur bei Änderung sendet, für einen sonst regelmäßigen Preis-Sensor nicht.", names=go.confirm.energy_names | join(", ")) }}</p>
   {% endif %}
+  <details class="gc-entities">
+    <summary>{{ _("Betroffene Entitäten ({count})", count=go.confirm.count) }}</summary>
+    <ul class="gc-entity-list">
+      {% for item in go.confirm.entities %}
+      <li><span class="gc-entity-name">{{ item.name }}{% if item.name != item.id %} <span class="gc-entity-id">{{ item.id }}</span>{% endif %}</span><span class="gc-entity-change">{{ item.old }} &rarr; {{ item.new }}</span></li>
+      {% endfor %}
+    </ul>
+  </details>
   <form id="gc-confirm-form">
     {% if not recommend_mode %}<input type="hidden" name="threshold" value="{{ go.confirm.threshold }}">{% endif %}
     {% if go.confirm.all %}<input type="hidden" name="all" value="1">{% else %}{% for entity_id in go.confirm.entity_ids %}<input type="hidden" name="entity_id" value="{{ entity_id }}">{% endfor %}{% endif %}
   </form>
-  <div class="actionbar">
-    <button type="button" class="btn btn-primary" hx-post="{{ go_url }}{{ '/recommend' if recommend_mode else '' }}/apply" hx-include="#gc-confirm-form"
+  <div class="gc-modal-actions">
+    <button type="button" class="btn btn-sm" data-gc-cancel hx-get="{{ go_url }}" hx-target="#gap-conflicts" hx-swap="innerHTML">{{ _("Abbrechen") }}</button>
+    <button type="button" class="btn btn-sm btn-primary" hx-post="{{ go_url }}{{ '/recommend' if recommend_mode else '' }}/apply" hx-include="#gc-confirm-form"
             hx-target="#gap-conflicts" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Übernehmen") }}</button>
-    <button type="button" class="btn" hx-get="{{ go_url }}" hx-target="#gap-conflicts" hx-swap="innerHTML">{{ _("Abbrechen") }}</button>
   </div>
   {% else %}
   <p class="gc-text">{{ _("Nichts zu ändern.") }}</p>
-  <div class="actionbar"><button type="button" class="btn" hx-get="{{ go_url }}" hx-target="#gap-conflicts" hx-swap="innerHTML">{{ _("Schließen") }}</button></div>
+  <div class="gc-modal-actions"><button type="button" class="btn btn-sm" data-gc-cancel hx-get="{{ go_url }}" hx-target="#gap-conflicts" hx-swap="innerHTML">{{ _("Schließen") }}</button></div>
   {% endif %}
-</div>
+</dialog>
 {% endif %}
 {% if go.rows %}
 <form id="gc-form">

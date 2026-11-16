@@ -330,16 +330,16 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "last_label": f"{format_day_month_timestamp(last['ts'], deps.tz)} {format_time(last['ts'], deps.tz)[:5]}",
                 "change": tr(
                     "{previous} → {value}",
-                    previous=_keep_together(notices_mod.counter_value_label(last["previous"], row)),
-                    value=_keep_together(notices_mod.counter_value_label(last["value"], row)),
+                    previous=_keep_together(notices_mod.counter_drop_labels(last["previous"], last["value"], row)[0]),
+                    value=_keep_together(notices_mod.counter_drop_labels(last["previous"], last["value"], row)[1]),
                 ),
                 "verdict": verdict,
                 "note": note,
                 "returning_detail": [
                     {
                         "when": f"{format_day_month_timestamp(item['ts'], deps.tz)} {format_time(item['ts'], deps.tz)[:5]}",
-                        "value": _keep_together(notices_mod.counter_value_label(item["value"], row)),
-                        "previous": _keep_together(notices_mod.counter_value_label(item["previous"], row)),
+                        "value": _keep_together(notices_mod.counter_drop_labels(item["previous"], item["value"], row)[1]),
+                        "previous": _keep_together(notices_mod.counter_drop_labels(item["previous"], item["value"], row)[0]),
                     }
                     for item in reversed(row.get("returning_items") or [])
                 ],
@@ -1170,6 +1170,10 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             "all": bool(form.get("all")), "entity_ids": [t["entity_id"] for t in targets], "count": len(targets),
             "threshold": threshold, "threshold_label": GAP_THRESHOLD_LABELS[threshold], "groups": _gap_groups(targets),
             "energy_names": [t["friendly_name"] for t in targets if t["energy"]] if threshold == "off" else [],
+            "entities": [
+                {"name": t["friendly_name"], "id": t["entity_id"], "old": t["threshold_label"], "new": GAP_THRESHOLD_LABELS[threshold]}
+                for t in targets
+            ],
         }
         return _gap_overview_response(request, confirm=confirm)
 
@@ -1238,6 +1242,10 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             "count": len(targets),
             "groups": [{"old": o, "new": n, "count": c} for (o, n), c in sorted(groups.items(), key=lambda kv: -kv[1])],
             "energy_names": [t["friendly_name"] for t in targets if t["energy"] and t["recommended"] == "off"],
+            "entities": [
+                {"name": t["friendly_name"], "id": t["entity_id"], "old": t["threshold_label"], "new": t["recommended_label"]}
+                for t in targets
+            ],
         }
         return _gap_overview_response(request, confirm=confirm)
 
