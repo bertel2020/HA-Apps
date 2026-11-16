@@ -1,7 +1,3 @@
-  /* Abschnittskarten mit mehr Tiefe: derselbe Schatten wie die Wetter-Karten
-     (.wt-card) — Grundschatten plus --tile-lift. Nur hier, die Einstellungen-
-     Abschnitte behalten den flachen Schatten. */
-  .hk-panel .settings-section{box-shadow:var(--shadow),var(--tile-lift);}
   /* Chart/Tabelle-Unterscheidung in der ansonsten typübergreifenden Liste —
      dieselbe visuelle Sprache wie die Entitätstyp-Badges (.badge in
      app.css), nur zwei neue Farbvarianten statt die vorhandenen (counter/

@@ -13,7 +13,7 @@
     <div class="settings-layout">
       {% set nav_active = 'darstellung' %}
       {% include "_settings_nav.html" %}
-      <div class="settings-panel">
+      <div class="settings-panel is-raised">
         <section id="darstellung" class="settings-section">
           <h2 class="settings-section-title">{{ _("Darstellung") }} {{ hint_button(_('Darstellung')) }}</h2>
           {% call hint_body('settings-section-description') %}{{ _("Aussehen der App sowie Standardwerte für Chart-Optionen festlegen.") }}{% endcall %}
