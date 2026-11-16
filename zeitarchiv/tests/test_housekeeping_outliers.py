@@ -329,22 +329,37 @@ def test_the_page_shows_the_assessment_filters(client) -> None:
         assert text in abschnitt or "Keine Entität hat die Ausreißer-Erkennung eingeschaltet." in abschnitt
 
 
-def test_the_manual_names_the_same_mark_and_interval_as_the_code() -> None:
-    """Die Marke und der Auffrisch-Abstand stehen als Zahl im Handbuch. Genau
+def test_the_manual_names_the_same_numbers_as_the_code() -> None:
+    """Ziel, Schwellen und Mindestmengen der Empfehlung sowie der Auffrisch-Abstand stehen als Zahl im Handbuch. Genau
     solche Zahlen veralten still, wenn jemand die Konstante ändert."""
-    kapitel = (DOCS / "user-guide.md").read_text(encoding="utf-8")
-    abschnitt = kapitel[kapitel.index("## Housekeeping"):kapitel.index("### Tipps")]
-    flach = " ".join(abschnitt.split())
+    from app import outlier_recommendation as rec
 
-    marke = int(cleanup_stats.OUTLIER_RATE_NOTABLE_PERCENT)
-    assert cleanup_stats.OUTLIER_RATE_NOTABLE_PERCENT == marke, "Nachkommastelle nicht beschrieben"
-    assert f"mehr als {marke} % ihrer Werte markiert" in flach
-    assert f"mehr als {marke} % aller Werte" in flach
+    ziel = rec.TARGET_BORDERLINE_PER_30_DAYS
+    texte = {
+        "de": (DOCS / "user-guide.md").read_text(encoding="utf-8"),
+        "en": (DOCS / "en" / "user-guide.md").read_text(encoding="utf-8"),
+    }
+    erwartet = {
+        "de": [
+            f"höchstens {ziel} Grenzfälle je 30 Tage", f"mehr als {ziel * rec.TOO_SENSITIVE_FACTOR} Grenzfälle je",
+            f"weniger als {rec.MIN_DAYS} Tage beobachtet", f"weniger als {rec.MIN_JUDGED} beurteilte Werte",
+            f"seit mehr als {rec.SILENT_AFTER_DAYS} Tagen kein Wert", f"Ab {int(rec.BLIND_SHARE_NOTE * 100)} % übersprungener",
+            f"über die letzten {rec.WINDOW_DAYS} Tage", "etwa alle sechs Stunden auf",
+        ],
+        "en": [
+            f"at most {ziel} borderline cases per 30 days", f"more than {ziel * rec.TOO_SENSITIVE_FACTOR} borderline cases per",
+            f"observed for less than {rec.MIN_DAYS} days", f"fewer than {rec.MIN_JUDGED} judged values",
+            f"no value for more than {rec.SILENT_AFTER_DAYS} days", f"From {int(rec.BLIND_SHARE_NOTE * 100)} % skipped values",
+            f"over the last {rec.WINDOW_DAYS} days", "about every six hours",
+        ],
+    }
+    for sprache, text in texte.items():
+        flach = " ".join(text.split())
+        for satz in erwartet[sprache]:
+            assert satz in flach, (sprache, satz)
 
-    # Im Handbuch ausgeschrieben ("sechs Stunden"), deshalb hier über die
-    # Zahl geprüft statt über den Wortlaut.
+    # Im Handbuch ausgeschrieben ("sechs Stunden"), deshalb hier über die Zahl geprüft statt über den Wortlaut.
     assert cleanup_stats.OUTLIER_RATE_REFRESH_AGE_SECONDS // 3600 == 6
-    assert "etwa alle sechs Stunden auf" in flach
 
 
 def test_der_planer_misst_auch_entitaeten_ohne_ausreisser_erkennung(index):

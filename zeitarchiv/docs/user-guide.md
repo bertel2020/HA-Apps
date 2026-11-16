@@ -2173,6 +2173,35 @@ Schwelle, erscheint stattdessen **Jetzt prüfen**; steht sie schon da, lässt si
 sich mit **Neu berechnen** auffrischen. Die Berechnung liest den gesamten
 Bestand der Entität und läuft deshalb nur auf Klick.
 
+**Empfehlung für die Schwelle.** Unter dem Feld steht eine Beurteilung. Sie zählt
+nicht, wie viel markiert wird, denn echte Fehler (eine verrutschte Ziffer liegt
+beim 10.000- bis 10.000.000-Fachen) werden auf **jeder** Stufe gefunden und
+sagen nichts über die Schwelle. Gezählt werden **Grenzfälle**: Markierungen, die
+bei der nächstgröberen Einstellung (bis 100×) verschwinden, also normales
+Verhalten, das fälschlich markiert wird. Das geschieht je 30 Tage über die
+letzten 60 Tage und ist deshalb auch für einen Sensor mit Messwert alle zehn
+Sekunden vergleichbar mit einem Stundenwert.
+
+- **Empfohlen** ist die kleinste Stufe, ab der **alle gröberen** höchstens
+  4 Grenzfälle je 30 Tage haben (etwa einer pro Woche). Alle gröberen, weil eine
+  gröbere Stufe wegen der Sprung-Regel gelegentlich sogar mehr markiert als eine
+  feinere.
+- **Zu empfindlich:** Die aktuelle Stufe liefert mehr als 12 Grenzfälle je
+  30 Tage. Nur hier bietet die App an, die Empfehlung zu übernehmen.
+- **Passt:** Die aktuelle Stufe liegt im Ziel. Eine feinere wird nie vorgeschlagen.
+- **Nicht geeignet:** Schon bei 100× gibt es mehr als 4 Treffer je 30 Tage. Das
+  können echte Fehler sein (dann hilft die Bereinigung) oder die Erkennung passt
+  nicht zu dieser Entität. Die App ändert hier nichts.
+- **Greift kaum:** Bei mindestens der Hälfte der Werte gibt es keine übliche
+  Schwankung (z. B. Windstärke in ganzen Stufen). Eine Stufe zu empfehlen wäre
+  eine falsche Entwarnung. Ab 20 % übersprungener Werte steht ein Hinweis dabei.
+- **Ausgeschaltet:** Entitäten mit „Aus“ werden nicht mitgemessen.
+- **Noch keine Empfehlung:** weniger als 14 Tage beobachtet, weniger als 500
+  beurteilte Werte, seit mehr als 7 Tagen kein Wert, oder noch nicht gemessen.
+
+„Aus“ wird nie empfohlen, es versteckte genau die Fehler, um die es geht. Eine
+Empfehlung ändert nie von selbst etwas.
+
 > **Nach dem Update von einer älteren Version:** Die Schwelle war früher ein
 > Prozentsatz (5, 10, 25, 50, 100 %). Gespeicherte Einstellungen werden einmalig
 > auf die neue Leiter übernommen, und zwar nach ihrem Platz darauf — die
@@ -2209,8 +2238,9 @@ Bestand**: Sie werden bei jedem Aufruf der Bereinigungs-Seite aus den Rohwerten
 des angezeigten Zeitraums neu gerechnet, nichts davon wird gespeichert, und die
 Daten selbst bleiben unberührt. Eine geänderte Schwelle gilt deshalb sofort und
 rückwirkend — es gibt keinen Bestand alter Markierungen, der nachgezogen werden
-müsste. (Einzige Ausnahme ist die Quote unter dem Schwellenfeld: die gehört zu
-einem Vollscan über die ganze Historie und wird nur auf Klick aufgefrischt.)
+müsste. (Einzige Ausnahme sind die Quote und die Empfehlung unter dem Schwellenfeld: die
+gehören zu einem Vollscan über die ganze Historie und werden im Hintergrund
+bzw. auf Klick aufgefrischt.)
 
 ### Datenverwaltung
 
@@ -2588,7 +2618,7 @@ wie die Einstellungen:
 | **Zählerrückgänge** | Zähler mit Rückgängen der letzten 30 Tage, je Entität mit Einordnung (Vermutlich Fehlwert, Vermutlich Reset, Noch offen) und Begründung. Bei „Vermutlich Reset“ steht darunter **Rückgänge erlauben**. Eine Sammelaktion markiert alle zurückkehrenden Rückgänge (Fehlwerte) in einem Schritt zur Löschung; sie landen im Reiter „Markiert“ der jeweiligen Entität und lassen sich gemeinsam zurücknehmen |
 | **Inaktive Entitäten** | Entitäten ohne neuen Wert seit einem wählbaren Schwellwert (1 bis 30 Tage). Nie empfangene Entitäten erscheinen unabhängig vom Schwellwert immer. Meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität. |
 | **Duplikate** | Archivweit erkannte doppelte Zeitstempel der letzten 30 Tage, je Entität — derselbe stündliche Hintergrund-Schnappschuss, der auch die Meldung „Duplikate gefunden" auslöst. Entfernbar über „Duplikate automatisch entfernen" auf der jeweiligen Bereinigungs-Seite oder mit dem Schalter **Automatisch entfernen** im Kopf des Abschnitts (siehe unten). |
-| **Ausreißer** | Entitäten, bei denen die eingestellte Ausreißer-Schwelle mehr als 1 % ihrer Werte markiert — mit Schwelle, absoluter Zahl und Quote. Dann ist die Schwelle für dieses Signal zu eng: markiert wird nicht mehr das Unplausible, sondern normales Verhalten. Es sind dieselben Zahlen, die unter dem Schwellenfeld der jeweiligen Entität stehen (siehe [Entität konfigurieren](#entität-konfigurieren)); die Liste rechnet nichts eigenes. Keine Sammel-Korrektur — die passende Schwelle hängt am Signal. |
+| **Ausreißer** | Alle Entitäten mit Ausreißer-Erkennung und die Beurteilung ihrer Schwelle (zu empfindlich, passt, nicht geeignet, greift kaum, ausgeschaltet), mit den **Grenzfällen je 30 Tage** je Stufe, den **echten Fehlern** (Treffer, die auch bei 100× bleiben) und der empfohlenen Stufe (siehe [Ausreißer-Erkennung](#ausreißer-erkennung)). Filter über der Tabelle zeigen jeweils eine Beurteilung. Übernommen wird nur „zu empfindlich“: einzeln, mit Kontrollkästchen oder gesammelt mit **Alle zu empfindlichen übernehmen**; ein Popup zeigt vorher die Aufteilung und die betroffenen Entitäten, danach bietet ein Hinweis **Rückgängig** an, und die Zahlen werden neu gemessen. Bei „nicht geeignet“ führt ein Knopf zur Bereinigung. Das ändert nur die Einstellung, keine Daten. |
 | **Lücken-Erkennung** | Alle Entitäten mit Methode (gespeicherte oder empfangene Werte), eingestellter Schwelle, Zahl der gefundenen Lücken (aus der Datenqualität, sortierbar, „–“ wenn noch nicht zur aktuellen Schwelle gemessen) und Beginn der Aufzeichnung (siehe [Lücken-Erkennung](#lücken-erkennung)). Dazu kommen die empfohlene Schwelle und die Beurteilung der aktuellen (siehe [Lücken-Erkennung](#lücken-erkennung)). Mit Kontrollkästchen und **Empfehlung übernehmen** oder **Empfehlungen übernehmen** (alle zu empfindlichen und nicht geeigneten) übernimmt man die Empfehlung; mit dem Feld **Eigene Schwelle** und **Auf Auswahl setzen** oder **Auf alle setzen** setzt man eine frei gewählte Schwelle für mehrere Entitäten zugleich (oder schaltet die Erkennung aus); ein Popup zeigt vorher die Aufteilung und die betroffenen Entitäten, danach bietet ein Hinweis **Rückgängig** an, und die Lücken werden neu gemessen. Das ändert nur die Einstellung, keine Daten. |
 | **Speicherplatz** | Freier Speicherplatz auf dem Host-Dateisystem (Kachel mit Auslastungsbalken — andere Frage als die Zahlen unten, nicht Zeitarchivs eigener Speicherverbrauch). Knopf „Speicher prüfen" löst zwei getrennt ausgewiesene Prüfungen auf einmal aus: **Indexkonsistenz** (stimmt der abgeleitete Index-Cache mit Archiv/Hot Buffer überein — Abweichungen sind über „Index reparieren" behebbar) und **Datenintegrität** (sind die Rohdaten im Hot Buffer selbst noch lesbar — beschädigte Zeilen entstehen fast immer durch einen unsauberen Neustart, Stromausfall oder harten Kill, und sind nicht reparierbar; betroffene Entität und Monat werden aufgelistet, der Wert bleibt unwiederbringlich verloren). Darunter: markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen. Der Knopf „Markierte Datensätze anzeigen" listet sie vorher durchsuchbar auf — erst je betroffene Entität mit Anzahl und letztem Markierungszeitpunkt (Suchfeld, Paginierung), ein Klick auf eine Zeile zeigt darunter im selben Dialog die einzelnen markierten Zeitpunkte samt Wert. Rein lesend: das eigentliche Rückgängigmachen einer einzelnen Markierung läuft weiterhin über die Entität selbst (siehe [Bereinigung](#bereinigung)). Darunter der Schalter für die automatische Bereinigung (standardmäßig aus) und das Mindestalter der Löschmarkierung dafür — entfernt nur Markierungen, die mindestens so lange her sind, damit „Rückgängig" für eine gerade erst gelöschte Zeile nicht ins Leere läuft. Meldet die Vorschau „Löschmarkierungen ohne passende Rohdatenzeile", war die zugehörige Rohdatenzeile bereits durch eine Verdichtung oder eine abgelaufene Aufbewahrung entfernt worden — beide räumen die betroffenen Markierungen seitdem selbst mit auf, diese Zahl geht mit der Zeit gegen 0. |
 | **Aufbewahrung** | Übersicht aktuell fälliger und bereits gelöschter Datensätze; Vorschau fälliger Löschungen; Zeitplan für automatische Durchsetzung (täglich oder wöchentlich mit Wochentag); Lauf-Historie. |
@@ -2601,15 +2631,14 @@ Jeder Bereich verlinkt aus der passenden Systemmeldung (siehe unten), falls
 gerade etwas ansteht — Housekeeping selbst muss dafür nicht regelmäßig
 aufgesucht werden.
 
-**Woher die Ausreißer-Quoten kommen:** Sie zu ermitteln heißt, die komplette
+**Woher die Ausreißer-Beurteilung kommt:** Sie zu ermitteln heißt, die komplette
 Historie einer Entität zu lesen — für alle Entitäten auf einmal wäre das bei
 jedem Seitenaufruf zu teuer. Zeitarchiv rechnet deshalb im Hintergrund eine
 Entität nach der anderen durch und frischt jede etwa alle sechs Stunden auf.
-Unter der Liste steht, wie weit das ist („4 von 5 Entitäten … gemessen"); wer
-nicht warten will, findet auf der Konfigurationsseite der Entität den Knopf
-**Jetzt prüfen**. Eine leere Liste bei noch offenen Messungen heißt also „bis
-hierhin nichts gefunden", nicht „alles geprüft" — deshalb nennt der Abschnitt
-auch dann den höchsten bisher gemessenen Wert.
+Wer nicht warten will, findet auf der Konfigurationsseite der Entität den Knopf
+**Jetzt prüfen**. „Noch keine Empfehlung“ mit dem Grund „noch nicht gemessen“
+heißt also: Die Messung kommt noch. Nach einem Update wird einmal jede Entität
+neu gemessen, bei großen Historien dauert das.
 
 ### Was gerade läuft
 
@@ -2672,11 +2701,11 @@ Zeitarchiv unter anderem:
   Schweregrad)
 - Als „Historisch“ markierte Entitäten, die seit der Markierung wieder Werte
   geliefert haben
-- Ausreißer-Erkennung markiert bei mindestens einer Entität mehr als 1 % aller
-  Werte. Eine einzige Meldung für die ganze Installation, auch bei hundert
-  betroffenen Entitäten: sie nennt die Anzahl und den deutlichsten Fall und
-  führt zur Liste (siehe [Housekeeping → Ausreißer](#housekeeping)). Reine
-  Auskunft, deshalb stummschaltbar
+- Die Schwelle der Ausreißer-Erkennung passt bei mindestens einer Entität nicht
+  (zu empfindlich, oder auch bei 100× viele Treffer). Eine einzige Meldung für
+  die ganze Installation, auch bei hundert betroffenen Entitäten: sie nennt die
+  Anzahl je Art und führt zur Liste (siehe [Housekeeping → Ausreißer](#housekeeping)).
+  Reine Auskunft, deshalb stummschaltbar
 - Tageslastprofil im Energiedashboard wird nach einer Konfigurationsänderung
   noch rückwirkend vervollständigt
 - Freier Speicherplatz auf dem Host-Dateisystem wird knapp (zweistufig:

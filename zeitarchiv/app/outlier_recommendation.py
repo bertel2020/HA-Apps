@@ -187,3 +187,13 @@ def describe(entity, result: dict) -> dict:
         "recommended_label": recommended, "status_label": label, "status_tip": tip, "tone": tone,
         "rank": STATUS_RANK[status],
     }
+
+
+def config_context(index, entity, now: float) -> dict:
+    """Beurteilung samt Beschriftungen für die Konfigurationsseite der Entität. ``differs`` ist nur wahr, wenn die aktuelle
+    Schwelle zu empfindlich ist: nur dann wird eine Änderung angeboten."""
+    result = recommendation_for(index, entity, now)
+    return {
+        **describe(entity, result), "status": result["status"], "recommended": result["recommended"],
+        "differs": differs(entity, result) and result["status"] in ACTIONABLE,
+    }

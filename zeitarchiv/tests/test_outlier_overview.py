@@ -114,3 +114,24 @@ def test_undo_restores_the_previous_threshold(client, entities, remeasured) -> N
 def test_undo_ignores_invalid_values(client, entities, remeasured, value) -> None:
     client.post("/housekeeping/ausreisser/undo", data={"undo": value})
     assert entities.get_entity(IDS[0])["outlier_threshold"] == "20" and remeasured == []
+
+
+# --- Konfigurationsseite -------------------------------------------------------
+
+
+def _config(client, entity_id):
+    return client.get(f"/entities/{entity_id}/config").text
+
+
+def test_config_page_offers_the_recommendation_only_when_too_sensitive(client, entities) -> None:
+    html = _config(client, IDS[0])
+    assert "Zu empfindlich" in html and "Empfehlung übernehmen" in html
+    assert '{&#34;outlier_threshold&#34;: &#34;50&#34;}' in html or '{&#34;outlier_threshold&#34;: &#34;100&#34;}' in html
+    quiet = _config(client, IDS[1])
+    assert "Passt" in quiet and '{&#34;outlier_threshold&#34;' not in quiet
+
+
+def test_config_page_explains_unsuitable_and_unmeasured(client, entities) -> None:
+    assert "Nicht geeignet" in _config(client, IDS[2])
+    off = _config(client, IDS[3])
+    assert "Ausgeschaltet" in off and "Die Erkennung ist aus." in off

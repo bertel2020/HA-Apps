@@ -2014,6 +2014,34 @@ the rate has not been calculated yet or belongs to a different threshold,
 with **Recalculate**. The calculation reads the entire inventory of the entity
 and therefore runs only on click.
 
+**Recommendation for the threshold.** Below the field there is an assessment. It
+does not count how much is marked, because real errors (a shifted digit is
+10,000 to 10,000,000 times the usual) are found at **every** level and say
+nothing about the threshold. What is counted are **borderline cases**: flags
+that disappear with the next coarser setting (up to 100×), i.e. normal
+behavior that is wrongly flagged. This is counted per 30 days over the last 60
+days, so a sensor reporting every ten seconds is comparable to an hourly one.
+
+- **Recommended** is the smallest level from which **all coarser ones** have at
+  most 4 borderline cases per 30 days (about one per week). All coarser ones,
+  because a coarser level can occasionally flag more than a finer one because of
+  the jump rule.
+- **Too sensitive:** the current level yields more than 12 borderline cases per
+  30 days. Only here does the app offer to apply the recommendation.
+- **Fits:** the current level is within the target. A finer one is never suggested.
+- **Not suitable:** even at 100× there are more than 4 hits per 30 days. These
+  can be real errors (then cleanup helps) or detection does not suit this
+  entity. The app changes nothing here.
+- **Barely effective:** for at least half of the values there is no usual
+  variation (e.g. wind force in whole steps). Recommending a level would be a
+  false all-clear. From 20 % skipped values a note is added.
+- **Off:** entities set to "Off" are not measured.
+- **No recommendation yet:** observed for less than 14 days, fewer than 500
+  judged values, no value for more than 7 days, or not measured yet.
+
+"Off" is never recommended, as it would hide exactly the errors this is about.
+A recommendation never changes anything by itself.
+
 > **After updating from an older version:** The threshold used to be a
 > percentage (5, 10, 25, 50, 100 %). Saved settings are carried over once to
 > the new ladder, by their position on it — the most sensitive old step becomes
@@ -2049,9 +2077,9 @@ whole inventory**: they are recalculated from the raw values of the displayed
 period on every visit to the cleanup page, none of it is stored, and the data
 itself remains untouched. A changed threshold therefore applies immediately
 and retroactively — there is no inventory of old marks that would have to be
-caught up. (The only exception is the rate below the threshold field: it
-belongs to a full scan over the entire history and is only refreshed on
-click.)
+caught up. (The only exceptions are the rate and the recommendation below the threshold
+field: they belong to a full scan over the entire history and are refreshed in
+the background or on click.)
 
 ### Data management
 
@@ -2403,7 +2431,7 @@ settings:
 | **Counter decreases** | Counters with decreases in the last 30 days, per entity with assessment (Probably a bad value, Probably a reset, Still open) and reason. For “Probably a reset”, **Allow decreases** is below it. A bulk action marks all returning decreases (bad values) for deletion in one step; they end up in the “Marked” tab of the respective entity and can be undone together |
 | **Inactive entities** | Entities without a new value for a selectable threshold (1 to 30 days). Entities never received always appear regardless of the threshold. Usually harmless (standby, rare sensor), but an early hint of a dead integration or a renamed/removed HA entity. |
 | **Duplicates** | Duplicate timestamps of the last 30 days detected archive-wide, per entity — the same hourly background snapshot that also triggers the "Duplicates found" notice. Removable via "Remove duplicates automatically" on the respective cleanup page, or with the **Remove automatically** switch in the section header (see below). |
-| **Outliers** | Entities for which the configured outlier threshold marks more than 1 % of their values — with threshold, absolute number and rate. Then the threshold is too tight for this signal: what gets marked is no longer the implausible but normal behavior. These are the same numbers shown below the threshold field of the respective entity (see [Configuring an entity](#configuring-an-entity)); the list calculates nothing of its own. No bulk correction — the appropriate threshold depends on the signal. |
+| **Outliers** | All entities with outlier detection and the assessment of their threshold (too sensitive, fits, not suitable, barely effective, off), with the **borderline cases per 30 days** per level, the **real errors** (hits that remain even at 100×) and the recommended level (see [Outlier detection](#outlier-detection)). Filters above the table show one assessment each. Only "too sensitive" is applied: individually, with checkboxes, or together with **Apply all too-sensitive**; a popup first shows the breakdown and the affected entities, afterwards a notice offers **Undo**, and the numbers are remeasured. For "not suitable" a button leads to cleanup. This only changes the setting, not data. |
 | **Gap detection** | All entities with method (stored or received values), configured threshold, number of gaps found (from data quality, sortable, “–” if not yet measured for the current threshold) and start of recording (see [Gap detection](#gap-detection)). The recommended threshold and the assessment of the current one are added (see [Gap detection](#gap-detection)). With checkboxes and **Apply recommendation** or **Apply recommendations** (all too sensitive and unsuitable ones) the recommendation is applied; with the **Own threshold** field and **Set on selection** or **Set on all** a freely chosen threshold is set for several entities at once (or detection is switched off); a pop-up first shows the split and the affected entities, afterwards a notice offers **Undo**, and the gaps are measured again. This only changes the setting, not data. |
 | **Storage** | Free storage on the host file system (tile with utilization bar — a different question from the numbers below, not Zeitarchiv's own storage consumption). The "Check storage" button triggers two separately reported checks at once: **Index consistency** (does the derived index cache match archive/hot buffer — deviations can be fixed via "Repair index") and **Data integrity** (are the raw data in the hot buffer itself still readable — damaged rows almost always arise from an unclean restart, power failure or hard kill, and are not repairable; the affected entity and month are listed, the value remains irretrievably lost). Below: permanently remove marked records from hot buffer and archive. The "Show marked records" button lists them beforehand in a searchable way — first per affected entity with count and last marking time (search field, pagination), a click on a row shows below, in the same dialog, the individual marked points in time including value. Purely read-only: the actual undoing of an individual mark continues to run via the entity itself (see [Cleanup](#cleanup)). Below that, the switch for automatic cleanup (off by default) and the minimum age of the deletion mark for it — removes only marks that are at least that old so that "Undo" for a row that was just deleted does not lead nowhere. If the preview reports "Deletion marks without matching raw data row", the associated raw data row had already been removed by a compaction or an expired retention — both have since cleaned up the affected marks themselves, so this number tends toward 0 over time. |
 | **Retention** | Overview of currently due and already deleted records; preview of due deletions; schedule for automatic enforcement (daily or weekly with weekday); run history. |
@@ -2416,15 +2444,14 @@ Each area is linked from the matching system notice (see below) if something is
 currently pending — Housekeeping itself does not have to be visited regularly
 for that.
 
-**Where the outlier rates come from:** Determining them means reading the
+**Where the outlier assessment comes from:** Determining it means reading the
 complete history of an entity — for all entities at once that would be too
 expensive on every page visit. Zeitarchiv therefore calculates one entity
 after another in the background and refreshes each about every six hours.
-Below the list it says how far along this is ("4 of 5 entities … measured");
-anyone who does not want to wait will find the **Check now** button on the
-entity's configuration page. An empty list with measurements still open thus
-means "nothing found so far", not "everything checked" — which is why the
-section names the highest value measured so far even then.
+Anyone who does not want to wait will find the **Check now** button on the
+entity's configuration page. "No recommendation yet" with the reason "not
+measured yet" thus means the measurement is still to come. After an update
+every entity is measured once more, which takes a while with large histories.
 
 ### What is running right now
 
@@ -2483,11 +2510,11 @@ backup/retention runs, Zeitarchiv checks, among other things:
   severity)
 - Entities marked as "Historic" that have delivered values again since being
   marked
-- Outlier detection marks more than 1 % of all values for at least one entity.
-  A single notice for the whole installation, even with a hundred affected
-  entities: it names the count and the most pronounced case and leads to the
-  list (see [Housekeeping → Outliers](#housekeeping)). Pure information, hence
-  mutable
+- The outlier detection threshold does not fit at least one entity (too
+  sensitive, or many hits even at 100×). A single notice for the whole
+  installation, even with a hundred affected entities: it names the count per
+  kind and leads to the list (see [Housekeeping → Outliers](#housekeeping)).
+  Pure information, hence mutable
 - Daily load profile in the energy dashboard is still being completed
   retroactively after a configuration change
 - Free storage on the host file system is running low (two-tiered:

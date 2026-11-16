@@ -329,6 +329,17 @@
             hx-target="#config-form" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Jetzt prüfen") }}</button>
   </p>
   {% endif %}
+  {# Beurteilung der Schwelle aus dem Stufen-Profil (siehe outlier_recommendation): Die Stufe wird nur angeboten, wenn die
+     aktuelle zu empfindlich ist. „Passt“ und „Nicht geeignet“ ändern nichts, „Aus“ wird nie empfohlen. #}
+  <p class="hint hint-status">
+    <strong>{{ _("Empfehlung") }}:</strong>
+    {% if outlier_recommendation.differs %}{{ outlier_recommendation.recommended_label }} &middot; {% endif %}{{ outlier_recommendation.status_label }}. {{ outlier_recommendation.status_tip }}
+    {% if outlier_recommendation.differs %}
+    <button type="button" class="btn btn-sm" hx-post="{{ app_root }}/entities/{{ entity_id }}/config"
+            hx-vals='{{ {"outlier_threshold": outlier_recommendation.recommended} | tojson | forceescape }}'
+            hx-target="#config-form" hx-swap="innerHTML">{{ _("Empfehlung übernehmen") }}</button>
+    {% endif %}
+  </p>
   {% endif %}
   {% if not outlier_blocked_reason %}
   {% call hint_body() %}{{ _("Ab welchem Vielfachen des für diese Entität Üblichen ein Wert als Ausreißer markiert wird — bei Zählern bezogen auf den üblichen Zuwachs, bei allen anderen Sensoren auf die übliche Schwankung der letzten 15 Werte. Kleinere Zahl = empfindlicher, „Aus“ schaltet die Erkennung ab. Mehr dazu im Handbuch.") }}{% endcall %}

@@ -3010,6 +3010,7 @@ def _entity_config_context(entity) -> dict:
         "outlier_threshold": entity["outlier_threshold"],
         "outlier_blocked_reason": OUTLIER_BLOCKED_REASONS.get(entity["aggregation_type"]),
         "outlier_rate": _outlier_rate_labels(cleanup_stats.outlier_rate(index, entity)),
+        "outlier_recommendation": outlier_recommendation.config_context(index, entity, time.time()),
         "display_mode": entity["display_mode"],
         "compact_target": entity["compact_target"],
         "compact_target_blocked_reason": COMPACT_TARGET_BLOCKED_REASONS.get(entity["aggregation_type"]),
