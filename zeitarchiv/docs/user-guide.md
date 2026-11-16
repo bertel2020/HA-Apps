@@ -1994,8 +1994,9 @@ gespeicherten gleichen — spart bei trägen Sensoren erheblich Platz.
 gespeichert** (1, 3, 6, 12 oder 24 Stunden, voreingestellt 6 Stunden), auch
 wenn sich nichts geändert hat. Dieses Lebenszeichen ist der Unterschied zwischen
 „der Sensor meldet unverändert 21,0 °C" und „der Sensor meldet gar nichts
-mehr" — ohne es wäre beides in den Daten nicht zu unterscheiden, und die
-Inaktivitäts-Meldung würde falsch anschlagen.
+mehr" — ohne es wäre beides in den Daten nicht zu unterscheiden. Die
+Erkennung inaktiver Entitäten hängt nicht davon ab: Sie zählt jeden
+empfangenen Wert, auch einen vom Filter verworfenen.
 
 Bei neu erkannten Entitäten standardmäßig aktiv.
 

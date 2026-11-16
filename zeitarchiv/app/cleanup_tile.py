@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 from . import duplicates_auto, purge_auto
 from .formatting import format_int, format_timestamp
 from .i18n import tr
+from .storage.index import entity_last_seen
 
 
 def _plural(count: int, one: str, many: str) -> str:
@@ -61,7 +62,7 @@ def inactive_entities(index, now: float | None = None) -> int:
     limit = INACTIVE_AFTER_DAYS * 86400
     return sum(
         1 for entity in index.list_entities()
-        if not entity["historic"] and (entity["last_ts"] is None or now - entity["last_ts"] >= limit)
+        if not entity["historic"] and (entity_last_seen(entity) is None or now - entity_last_seen(entity) >= limit)
     )
 
 

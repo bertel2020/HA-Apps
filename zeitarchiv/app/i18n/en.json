@@ -1304,7 +1304,7 @@
     "CSV-Export": "CSV export",
     "Zeitarchiv — Housekeeping": "Zeitarchiv — Housekeeping",
     "Dinge, die im Alltag leicht untergehen.": "Things that easily get lost in everyday use.",
-    "Letzter Wert liegt länger als der gewählte Schwellwert zurück (<code>entities.last_ts</code>) &mdash; meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität.": "Last value is older than the chosen threshold (<code>entities.last_ts</code>) &mdash; usually harmless (standby, rare sensor), but an early hint of a dead integration or a renamed/removed HA entity.",
+    "Der zuletzt empfangene Wert liegt länger als der gewählte Schwellwert zurück (auch verworfene Werte zählen als empfangen) &mdash; meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität.": "The last received value is older than the chosen threshold (discarded values count as received) &mdash; usually harmless (standby, rare sensor), but an early hint of a dead integration or a renamed/removed HA entity.",
     "seit": "since",
     "Archivweit erkannte doppelte Zeitstempel, letzte 30 Tage.": "Duplicate timestamps detected across the archive, last 30 days.",
     "Keine Duplikate in den letzten 30 Tagen gefunden.": "No duplicates found in the last 30 days.",

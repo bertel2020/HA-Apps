@@ -1610,3 +1610,32 @@ def test_gap_floor_follows_the_heartbeat() -> None:
     tiers = [1, 5, 15, 30, 60, 180, 360, 720, 1440]
     assert should_raise_gap_threshold("15", "raw", "decimals", tiers, "180") == (True, "180")
     assert should_raise_gap_threshold("180", "raw", "decimals", tiers, "180") == (False, "180")
+
+
+def test_last_seen_is_updated_by_discarded_values(tmp_path) -> None:
+    """Ein vom Filter verworfener Wert zählt als empfangen: last_ts bleibt, last_seen_ts rückt vor."""
+    from app.storage.index import Index, entity_last_seen
+
+    index = Index(tmp_path / "index.db")
+    index.get_or_create_entity("sensor.ruhig", "sensor", None, None)
+    index.claim_ingest_event("e1", "sensor.ruhig", 1000.0)
+    index.complete_ingest_event("e1", "sensor.ruhig", 1000.0, recorded=True, value=21.0)
+    index.claim_ingest_event("e2", "sensor.ruhig", 5000.0)
+    index.complete_ingest_event("e2", "sensor.ruhig", 5000.0, recorded=False)
+    entity = index.get_entity("sensor.ruhig")
+    assert entity["last_ts"] == 1000.0
+    assert entity["last_seen_ts"] == 5000.0
+    assert entity_last_seen(entity) == 5000.0
+    # ein älterer, nachgelieferter Wert lässt den Zeitpunkt nicht zurückspringen
+    index.claim_ingest_event("e3", "sensor.ruhig", 2000.0)
+    index.complete_ingest_event("e3", "sensor.ruhig", 2000.0, recorded=False)
+    assert index.get_entity("sensor.ruhig")["last_seen_ts"] == 5000.0
+
+
+def test_entity_last_seen_falls_back_to_last_ts() -> None:
+    from app.storage.index import entity_last_seen
+
+    assert entity_last_seen({"last_seen_ts": None, "last_ts": 7.0}) == 7.0
+    assert entity_last_seen({"last_seen_ts": None, "last_ts": None}) is None
+    assert entity_last_seen({"last_seen_ts": 9.0, "last_ts": None}) == 9.0
+    assert entity_last_seen({"last_seen_ts": 3.0, "last_ts": 7.0}) == 7.0

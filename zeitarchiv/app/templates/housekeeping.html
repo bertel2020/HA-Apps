@@ -41,7 +41,7 @@
              hint-toggle.js den Hinweis dort sucht (siehe _hints.html, zweite
              Form). Aufgeklappt rutscht er über order/flex-basis unter die
              Zeile, damit die Zeitraum-Auswahl rechts stehen bleibt. #}
-          {% call hint_body('settings-section-description') %}{{ _("Letzter Wert liegt länger als der gewählte Schwellwert zurück (<code>entities.last_ts</code>) &mdash; meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität.") }}{% endcall %}
+          {% call hint_body('settings-section-description') %}{{ _("Der zuletzt empfangene Wert liegt länger als der gewählte Schwellwert zurück (auch verworfene Werte zählen als empfangen) &mdash; meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität.") }}{% endcall %}
           {# data-sort-host: table-cards.js hängt sein Sortiermenü (nur auf dem
              Telefon, siehe dort) hier hinein statt über die Tabelle — dann
              stehen „seit …“ und „Sortieren“ in EINER Zeile statt in zweien.

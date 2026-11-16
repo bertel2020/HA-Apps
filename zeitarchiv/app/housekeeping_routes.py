@@ -88,6 +88,7 @@ from .storage.index import (
     DEFAULT_VALUE_FILTER,
     DEFAULT_VALUE_FILTER_HEARTBEAT,
     Index,
+    entity_last_seen,
     should_raise_gap_threshold,
 )
 
@@ -828,7 +829,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
 
 
     def _stale_entities_context(days: str = _STALE_ENTITIES_DEFAULT_DAYS, hist_open: bool = False) -> dict:
-        """Entitäten, deren letzter Wert (entities.last_ts, ohnehin vorhanden —
+        """Entitäten, deren letzter EMPFANGENER Wert (entities.last_seen_ts, sonst last_ts —
         kein neuer Hintergrundjob nötig) länger als der gewählte Schwellwert
         zurückliegt. Meist harmlos (Gerät im Standby, seltener Sensor), aber ein
         früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte
@@ -874,7 +875,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         rows = []
         historic_rows = []
         for entity in deps.index.list_entities():
-            last_ts = entity["last_ts"]
+            last_ts = entity_last_seen(entity)
             days_ago = None if last_ts is None else (now_ts - last_ts) / 86400
             if entity["historic"]:
                 historic_rows.append(_row(entity, last_ts, days_ago))

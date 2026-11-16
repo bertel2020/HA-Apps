@@ -50,6 +50,7 @@ from .storage.index import (
     MAX_STATES_PER_ENTITY,
     STATE_REJECTION_LIMIT,
     STATE_REJECTION_TYPE_MISMATCH,
+    entity_last_seen,
     should_raise_gap_threshold,
 )
 from .version import APP_VERSION
@@ -986,7 +987,8 @@ def build_notices(
 
 
 def _bucket_inactive_entities(index, tz: ZoneInfo) -> dict[str, int]:
-    """Zählt Entitäten ohne neuen Wert (entities.last_ts, ohnehin vorhanden)
+    """Zählt Entitäten ohne neuen Wert (entities.last_seen_ts: zuletzt EMPFANGEN,
+    nicht zuletzt gespeichert — ein Filter darf eine tote Entität nicht verdecken)
     in drei EXKLUSIVE Bänder nach Tagen seit dem letzten Wert — dieselbe
     günstige Grundlage wie das "Inaktive Entitäten"-Dropdown auf der
     Housekeeping-Seite (main.py, _stale_entities_context), hier aber bewusst
@@ -998,7 +1000,7 @@ def _bucket_inactive_entities(index, tz: ZoneInfo) -> dict[str, int]:
     for entity in index.list_entities():
         if entity["historic"]:
             continue
-        last_ts = entity["last_ts"]
+        last_ts = entity_last_seen(entity)
         if last_ts is None:
             counts["error"] += 1
             continue
@@ -1018,7 +1020,8 @@ def _count_alive_historic_entities(index) -> int:
     Ohne Markierzeitpunkt (ältere Markierungen) keine Aussage, also nicht gezählt."""
     return sum(
         1 for e in index.list_entities()
-        if e["historic"] and e["historic_since"] is not None and e["last_ts"] is not None and e["last_ts"] > e["historic_since"]
+        if e["historic"] and e["historic_since"] is not None
+        and (entity_last_seen(e) or 0) > e["historic_since"]
     )
 
 

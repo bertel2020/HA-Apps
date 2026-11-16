@@ -1843,8 +1843,9 @@ one — saves considerable space with sluggish sensors.
 **At the latest after the configured sign of life a value is stored anyway**
 (1, 3, 6, 12 or 24 hours, default 6 hours), even if nothing has changed. This sign of life is the difference between "the sensor reports an
 unchanged 21.0 °C" and "the sensor reports nothing at all anymore" — without
-it, the two could not be distinguished in the data, and the inactivity notice
-would trigger wrongly.
+it, the two could not be distinguished in the data. Detection of inactive
+entities does not depend on it: it counts every received value, including one
+the filter discarded.
 
 Active by default for newly detected entities.
 

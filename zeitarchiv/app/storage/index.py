@@ -301,6 +301,18 @@ def should_ignore_value(enabled: int | bool, ignore_values: str, value: float) -
     return False
 
 
+def entity_last_seen(entity) -> float | None:
+    """Zeitpunkt des zuletzt EMPFANGENEN Werts — auch wenn Wertänderungsfilter,
+    Auflösung oder „Werte ignorieren“ ihn nicht gespeichert haben (``last_seen_ts``);
+    ``last_ts`` dagegen ist der letzte gespeicherte Wert. Grundlage jeder
+    Inaktivitäts-Erkennung: sonst verdeckt ein Filter eine tote Entität bis zum
+    nächsten Lebenszeichen. Ohne ``last_seen_ts`` (Altbestand) gilt ``last_ts``."""
+    seen, stored = entity["last_seen_ts"], entity["last_ts"]
+    if seen is None or stored is None:
+        return stored if seen is None else seen
+    return max(seen, stored)
+
+
 def effective_gap_floor_minutes(
     resolution: str, value_filter: str, heartbeat: str | int | None = None
 ) -> int:
@@ -425,6 +437,7 @@ CREATE TABLE IF NOT EXISTS entities (
     decimals TEXT NOT NULL DEFAULT 'auto',
     value_filter TEXT NOT NULL DEFAULT 'off',
     value_filter_heartbeat TEXT NOT NULL DEFAULT '360',
+    last_seen_ts REAL,
     ignore_values_enabled INTEGER NOT NULL DEFAULT 0,
     ignore_values TEXT NOT NULL DEFAULT '',
     gap_threshold TEXT NOT NULL DEFAULT '15',
@@ -1107,6 +1120,9 @@ class Index:
             self._conn.execute("ALTER TABLE entities ADD COLUMN decimals TEXT NOT NULL DEFAULT 'auto'")
         if "value_filter" not in columns:
             self._conn.execute("ALTER TABLE entities ADD COLUMN value_filter TEXT NOT NULL DEFAULT 'off'")
+        if "last_seen_ts" not in columns:
+            # Zuletzt EMPFANGEN (auch wenn der Wert verworfen wurde); ohne Eintrag gilt last_ts.
+            self._conn.execute("ALTER TABLE entities ADD COLUMN last_seen_ts REAL")
         if "value_filter_heartbeat" not in columns:
             self._conn.execute(
                 "ALTER TABLE entities ADD COLUMN value_filter_heartbeat TEXT NOT NULL DEFAULT '360'"
@@ -1958,10 +1974,17 @@ class Index:
                             ELSE last_value
                         END,
                         last_ts = MAX(COALESCE(last_ts, ?), ?),
+                        last_seen_ts = MAX(COALESCE(last_seen_ts, ?), ?),
                         updated_at = ?
                     WHERE entity_id = ?
                     """,
-                    (ts, ts, value, ts, value, ts, ts, time.time(), entity_id),
+                    (ts, ts, value, ts, value, ts, ts, ts, ts, time.time(), entity_id),
+                )
+            else:
+                # Verworfen (Filter, Auflösung, ignorierter Wert): empfangen wurde er trotzdem.
+                self._conn.execute(
+                    "UPDATE entities SET last_seen_ts = MAX(COALESCE(last_seen_ts, ?), ?) WHERE entity_id = ?",
+                    (ts, ts, entity_id),
                 )
             self._conn.execute(
                 "UPDATE ingested_events SET status = 'done', recorded = ?, completed_at = ? "
