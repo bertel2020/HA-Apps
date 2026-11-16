@@ -74,7 +74,7 @@
       <thead><tr>
         <th data-no-sort><input type="checkbox" data-gc-check-all aria-label="{{ _('Alle auf der Seite auswählen') }}"></th>
         <th>{{ _("Entität") }}</th><th>{{ _("Schwelle") }}</th><th data-no-sort>{{ _("Grenzfälle je 30 Tage") }}</th>
-        <th>{{ _("Echte Fehler") }}</th><th>{{ _("Empfohlen") }}</th><th>{{ _("Beurteilung") }}</th><th data-no-sort></th>
+        <th class="oo-num">{{ _("Echte Fehler") }}</th><th>{{ _("Empfohlen") }}</th><th>{{ _("Beurteilung") }}</th><th data-no-sort></th>
       </tr></thead>
       <tbody>
       {% for row in oo.rows %}
@@ -91,17 +91,17 @@
           </a>
         </td>
         <td data-sort="{{ row.threshold if row.threshold != 'off' else 999999 }}">{{ row.threshold_label }}</td>
-        <td>{% if row.steps %}<span class="oo-steps">{% for step in row.steps %}<span class="oo-step{% if step.current %} cur{% endif %}{% if step.recommended %} rec{% endif %}">{{ step.label }} {{ step.count }}</span>{% endfor %}</span>{% else %}–{% endif %}</td>
-        <td data-sort="{{ row.errors if row.errors is not none else -1 }}">{{ row.errors_label }}</td>
+        <td>{% if row.steps %}<span class="oo-steps">{% for step in row.steps %}<span class="oo-step{% if step.current %} cur{% endif %}{% if step.recommended %} rec{% endif %}"><span>{{ step.label }}</span><span>{{ step.count }}</span></span>{% endfor %}</span>{% else %}–{% endif %}</td>
+        <td class="oo-num" data-sort="{{ row.errors if row.errors is not none else -1 }}">{{ row.errors_label }}</td>
         <td>{{ row.recommended_label }}</td>
         <td data-sort="{{ row.rank }}"><span class="gc-chip gc-chip-{{ row.tone }}" title="{{ row.status_tip }}">{{ row.status_label }}</span></td>
-        <td>{% if row.actionable %}<button type="button" class="btn btn-sm" hx-post="{{ oo_url }}/recommend/preview" hx-vals='{"entity_id": "{{ row.entity_id }}"}' hx-target="#outlier-overview" hx-swap="innerHTML">{{ _("Übernehmen") }}</button>{% elif row.status == 'unsuitable' %}<a class="btn btn-sm" href="entities/{{ row.entity_id }}/cleanup?filter=outliers&amp;range=all">{{ _("Bereinigung öffnen") }}</a>{% endif %}</td>
+        <td class="oo-act">{% if row.actionable %}<button type="button" class="btn btn-sm" hx-post="{{ oo_url }}/recommend/preview" hx-vals='{"entity_id": "{{ row.entity_id }}"}' hx-target="#outlier-overview" hx-swap="innerHTML">{{ _("Übernehmen") }}</button>{% elif row.status == 'unsuitable' %}<a class="btn btn-sm" href="entities/{{ row.entity_id }}/cleanup?filter=outliers&amp;range=all">{{ _("Bereinigung öffnen") }}</a>{% endif %}</td>
       </tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
-  <p class="oo-key">{{ _("Grenzfälle sind Markierungen, die bei der nächstgröberen Einstellung verschwinden. Umrandet ist die aktuelle Schwelle, unterstrichen die empfohlene. „Echte Fehler“ sind Treffer je 30 Tage, die auch bei 100× bleiben.") }}</p>
+  <p class="oo-key">{{ _("Grenzfälle sind Markierungen, die bei der nächstgröberen Einstellung verschwinden. Gefüllt ist die aktuelle Schwelle, gestrichelt die empfohlene. „Echte Fehler“ sind Treffer je 30 Tage, die auch bei 100× bleiben.") }}</p>
 </form>
 {% else %}
 <div class="tbl-wrap"><div class="empty">{{ _("Keine Entität hat die Ausreißer-Erkennung eingeschaltet.") }}</div></div>

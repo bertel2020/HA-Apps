@@ -151,7 +151,7 @@ def _label(threshold: str | None) -> str:
 
 def describe(entity, result: dict) -> dict:
     """Beschriftungen zu einer Empfehlung: ``recommended_label``, ``status_label``, ``status_tip`` (Begründung), ``tone``
-    (``warn``, ``ok``, ``muted``) und ``rank`` (Sortierung)."""
+    (``warn``, ``err``, ``ok``, ``muted``) und ``rank`` (Sortierung)."""
     status = result["status"]
     current = _label(entity["outlier_threshold"])
     recommended = _label(result["recommended"])
@@ -170,7 +170,7 @@ def describe(entity, result: dict) -> dict:
         label, tone = tr("Zu empfindlich"), "warn"
         tip = tr("Bei {current} {borderline} Grenzfälle je 30 Tage, die bei gröberer Einstellung verschwinden; das Ziel sind höchstens {target}.", current=current, borderline=borderline, target=target)
     elif status == STATUS_UNSUITABLE:
-        label, tone = tr("Nicht geeignet"), "warn"
+        label, tone = tr("Nicht geeignet"), "err"
         tip = tr("Auch bei 100× {errors} Treffer je 30 Tage: entweder echte Fehler (Bereinigung prüfen) oder die Erkennung passt nicht zu dieser Entität.", errors=errors)
     elif status == STATUS_BLIND:
         label, tone = tr("Greift kaum"), "muted"

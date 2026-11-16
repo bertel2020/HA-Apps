@@ -1302,7 +1302,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             steps = [
                 {
                     "label": tr(str(OUTLIER_THRESHOLD_LABELS[str(tier)])), "count": format_value(count, 0),
-                    "current": str(tier) == entity["outlier_threshold"], "recommended": show_recommended and str(tier) == recommended,
+                    "current": str(tier) == entity["outlier_threshold"], "recommended": show_recommended and differs and str(tier) == recommended,
                 }
                 for tier, count in sorted((recommendation["tier_borderline"] or {}).items())
             ]
@@ -1314,7 +1314,10 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 "status": recommendation["status"],
                 "steps": steps,
                 "errors": recommendation["errors"],
-                "errors_label": format_value(recommendation["errors"], 1) if recommendation["errors"] is not None else "–",
+                "errors_label": (
+                    format_value(recommendation["errors"], 1 if recommendation["errors"] < 10 else 0)
+                    if recommendation["errors"] is not None else "–"
+                ),
                 "recommended": recommended if show_recommended else None,
                 "differs": differs,
                 "actionable": differs and recommendation["status"] in outlier_recommendation.ACTIONABLE,

@@ -62,7 +62,7 @@
      Versuch mit überschlagenen Zeichenbreiten lag bei "Auflösung" 43px zu
      niedrig, der längste Wert brach dort still um. Wer die Werte ändert,
      misst besser nach, statt zu rechnen. */
-  #ausreisser table.stats-dt{min-width:1190px;}
+  #ausreisser table.stats-dt{min-width:1260px;}
   #luecken-erkennung table.stats-dt{min-width:1180px;}
   .hk-col-chk{width:44px;}
   /* "Empfangene Werte" / "Gespeicherte Werte" */
@@ -372,14 +372,16 @@
 #outlier-overview .oo-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
 #outlier-overview .oo-chip{font:inherit;font-size:calc(13px * var(--font-scale, 1));padding:4px 12px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--ink);cursor:pointer;}
 #outlier-overview .oo-chip[aria-pressed="true"]{border-color:var(--accent-line);background:var(--accent-line-soft);color:var(--accent-line);font-weight:600;}
-#outlier-overview .oo-steps{display:flex;flex-wrap:wrap;gap:4px;}
-#outlier-overview .oo-step{font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));padding:1px 6px;border:1px solid var(--border);border-radius:6px;color:var(--ink-muted);white-space:nowrap;}
+#outlier-overview .oo-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;}
+#outlier-overview .oo-step{display:flex;justify-content:space-between;gap:6px;white-space:nowrap;font-family:var(--font-mono);font-size:calc(12px * var(--font-scale, 1));padding:1px 6px;border:1px solid var(--border);border-radius:6px;color:var(--ink-muted);white-space:nowrap;}
 #outlier-overview .oo-step.cur{border-color:var(--accent-line);color:var(--accent-line);background:var(--accent-line-soft);font-weight:600;}
-#outlier-overview .oo-step.rec{box-shadow:inset 0 -2px 0 var(--accent-line);}
-#outlier-overview .gc-chip-err{background:var(--warning-soft);color:var(--warning);}
+#outlier-overview .oo-step.rec{border-style:dashed;border-color:var(--accent-line);color:var(--accent-line);}
+#outlier-overview .oo-num,#outlier-overview th.oo-num{text-align:right;font-variant-numeric:tabular-nums;}
+#outlier-overview .oo-act .btn{white-space:nowrap;}
+#outlier-overview .gc-chip-err{background:var(--danger-soft);color:var(--danger);}
 #outlier-overview .oo-key{margin:8px 2px 0;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);}
 @media (min-width:821px){
-  .hk-col-oo-steps{width:300px;}
+  .hk-col-oo-steps{width:350px;}
   .hk-col-oo-err{width:110px;}
-  .hk-col-oo-act{width:150px;}
+  .hk-col-oo-act{width:170px;}
 }
