@@ -140,10 +140,10 @@ def receive_profile(entity, counts: dict[int, int] | None, now: float) -> dict |
     return {"method": "receive", "days": (now - max(cutoff, since)) / 86400, "tiers": counts or {}}
 
 
-def recommendations(index, entities, stats: dict[str, dict], now: float) -> dict[str, dict]:
+def recommendations(index, entities, stats: dict[str, dict], now: float, only: str | None = None) -> dict[str, dict]:
     """Empfehlungen für viele Entitäten auf einmal (eine Abfrage für alle Empfangs-Zähler); ``stats`` sind die gecachten
     Gesamt-Zählungen (``Index.list_cleanup_alltime_stats``), aus denen das Profil der gespeicherten Werte kommt."""
-    counts = index.receive_gap_tier_counts(TIERS, now - WINDOW_DAYS * 86400)
+    counts = index.receive_gap_tier_counts(TIERS, now - WINDOW_DAYS * 86400, only)
     out = {}
     for entity in entities:
         entity_id = entity["entity_id"]
@@ -160,9 +160,8 @@ def recommendations(index, entities, stats: dict[str, dict], now: float) -> dict
 
 def recommendation_for(index, entity, now: float) -> dict:
     """Empfehlung einer einzelnen Entität (Konfigurationsseite)."""
-    return recommendations(index, [entity], {entity["entity_id"]: index.get_cleanup_alltime_stats(entity["entity_id"]) or {}}, now)[
-        entity["entity_id"]
-    ]
+    entity_id = entity["entity_id"]
+    return recommendations(index, [entity], {entity_id: index.get_cleanup_alltime_stats(entity_id) or {}}, now, only=entity_id)[entity_id]
 
 
 #: Reihenfolge der Beurteilungen in Listen: zuerst, was Aufmerksamkeit braucht.

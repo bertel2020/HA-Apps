@@ -1952,16 +1952,21 @@ class Index:
         with self._lock:
             return [(row["start_ts"], row["end_ts"]) for row in self._conn.execute(query + " ORDER BY end_ts", params)]
 
-    def receive_gap_tier_counts(self, tiers: tuple[int, ...], from_ts: float) -> dict[str, dict[int, int]]:
+    def receive_gap_tier_counts(
+        self, tiers: tuple[int, ...], from_ts: float, entity_id: str | None = None
+    ) -> dict[str, dict[int, int]]:
         """Je Entität, wie viele Empfangs-Pausen seit ``from_ts`` (und seit Beginn ihrer Aufzeichnung) länger waren als
-        jede der Stufen (Minuten); Entitäten ohne Pause fehlen. Eine Abfrage für alle."""
+        jede der Stufen (Minuten); Entitäten ohne Pause fehlen. Eine Abfrage für alle, oder nur für ``entity_id``
+        (Konfigurationsseite: dort genügt der Index über Entität und Ende, gemessen 1 statt rund 100 ms)."""
         columns = ", ".join(f"SUM(CASE WHEN g.end_ts - g.start_ts > {int(tier) * 60} THEN 1 ELSE 0 END)" for tier in tiers)
         query = (  # noqa: S608 — Stufen sind ganze Zahlen aus einer festen Liste
             f"SELECT g.entity_id, {columns} FROM receive_gaps g JOIN entities e ON e.entity_id = g.entity_id "
-            "WHERE g.end_ts >= ? AND g.end_ts >= COALESCE(e.receive_gaps_since, 0) GROUP BY g.entity_id"
+            "WHERE g.end_ts >= ? AND g.end_ts >= COALESCE(e.receive_gaps_since, 0)"
+            + (" AND g.entity_id = ?" if entity_id is not None else "") + " GROUP BY g.entity_id"
         )
+        params = (from_ts,) if entity_id is None else (from_ts, entity_id)
         with self._lock:
-            return {row[0]: {tier: row[i + 1] for i, tier in enumerate(tiers)} for row in self._conn.execute(query, (from_ts,))}
+            return {row[0]: {tier: row[i + 1] for i, tier in enumerate(tiers)} for row in self._conn.execute(query, params)}
 
     def prune_receive_gaps(self, now: float, retention_days: dict[str, float | None]) -> int:
         """Räumt Empfangs-Pausen auf: älter als die Aufbewahrung der Entität (``retention_days``: Stufe → Tage,
