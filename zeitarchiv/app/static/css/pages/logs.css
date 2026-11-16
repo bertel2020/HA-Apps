@@ -5,7 +5,7 @@
      Werkzeugleiste. */
   .log-settings-panel{margin-bottom:16px;}
   .log-settings-section{
-    padding:14px 18px;box-shadow:none;background:var(--surface-alt);
+    padding:14px 18px;background:var(--surface-alt);
   }
   .log-settings-section .settings-subsection-title{margin:0 0 8px;}
   .log-settings-section .settings-compact-row{padding:8px 0;}
