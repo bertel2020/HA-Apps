@@ -61,11 +61,11 @@ def recommend(entity, profile: dict | None, now: float) -> dict:
 
     ``profile``: ``{"rule", "days", "judged", "blind", "tiers": {"10": n, …}}`` (siehe ``analyze_raw_rows_page``) oder
     ``None``. Ergebnis: ``status`` (``STATUS_*``), ``recommended`` (Stufe als Text oder ``None``), ``borderline`` (Grenzfälle
-    je 30 Tage bei der aktuellen Stufe), ``errors`` (Treffer je 30 Tage, die auch bei 100× bleiben), ``blind_share``,
+    je 30 Tage bei der aktuellen Stufe), ``tier_borderline`` (dasselbe je Stufe), ``errors`` (Treffer je 30 Tage, die auch bei 100× bleiben), ``blind_share``,
     ``days`` und ``reason`` (``unmeasured``, ``few_days``, ``few_judged``, ``silent``)."""
     result = {
         "status": STATUS_INSUFFICIENT, "recommended": None, "borderline": None, "errors": None,
-        "blind_share": None, "days": None, "reason": None,
+        "blind_share": None, "days": None, "reason": None, "tier_borderline": None,
     }
     if effective_outlier_threshold(entity["aggregation_type"], entity["outlier_threshold"]) == "off":
         result["status"] = STATUS_DISABLED
@@ -99,6 +99,7 @@ def recommend(entity, profile: dict | None, now: float) -> dict:
     errors = counts[TIERS[-1]]
     borderline = {tier: max(0, counts[tier] - errors) * 30.0 / days for tier in TIERS}
     result["errors"] = errors * 30.0 / days
+    result["tier_borderline"] = borderline
     if result["errors"] > TARGET_BORDERLINE_PER_30_DAYS:
         # Selbst die gröbste Stufe meldet oft: kein Thema der Stufe (echte Fehler oder passt nicht zur Entität).
         result["status"] = STATUS_UNSUITABLE

@@ -42,6 +42,7 @@ from fastapi.templating import Jinja2Templates
 from . import formats
 from . import cleanup_stats
 from . import cleanup_tile, counter_auto, counter_bulk, data_quality, duplicates_auto, entity_usage, gap_recommendation
+from . import outlier_recommendation
 from . import demo_mode
 from . import notices as notices_mod
 from .backup_scheduler import parse_schedule_time
@@ -88,6 +89,7 @@ from .storage.index import (
     Index,
     entity_last_seen,
     gap_method,
+    outlier_detection_applies,
 )
 
 
@@ -1277,6 +1279,148 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         message = tr("{count} Änderung(en) zurückgenommen. Die Lücken werden neu gemessen.", count=len(restored))
         return _gap_overview_response(request, message=message)
 
+    # --- Ausreißer-Erkennung: Beurteilung und Sammelaktion (Housekeeping) ----------------------------------------
+    _OUTLIER_FILTERS = ("all", "too_sensitive", "unsuitable", "blind", "ok", "disabled")
+
+    def _outlier_overview_context(
+        *, message: str | None = None, undo: list[str] | None = None, confirm: dict | None = None, status: str = "all",
+    ) -> dict:
+        """Zeilen des Abschnitts „Ausreißer“: je Entität mit Ausreißer-Erkennung Schwelle, Beurteilung und die Grenzfälle
+        je Stufe (aus dem Stufen-Profil im Cache, siehe outlier_recommendation). Entitäten, bei denen die Erkennung
+        strukturell nicht angeboten wird (Schalter, Zustände), kommen nicht vor."""
+        entries = deps.index.list_cleanup_alltime_stats(with_daily=False)
+        entities = [e for e in deps.index.list_entities() if outlier_detection_applies(e["aggregation_type"])]
+        recommendations = outlier_recommendation.recommendations(entities, entries, time.time())
+        rows = []
+        for entity in entities:
+            entity_id = entity["entity_id"]
+            recommendation = recommendations[entity_id]
+            details = outlier_recommendation.describe(entity, recommendation)
+            differs = outlier_recommendation.differs(entity, recommendation)
+            recommended = recommendation["recommended"]
+            show_recommended = recommended is not None and recommendation["status"] != outlier_recommendation.STATUS_UNSUITABLE
+            steps = [
+                {
+                    "label": tr(str(OUTLIER_THRESHOLD_LABELS[str(tier)])), "count": format_value(count, 0),
+                    "current": str(tier) == entity["outlier_threshold"], "recommended": show_recommended and str(tier) == recommended,
+                }
+                for tier, count in sorted((recommendation["tier_borderline"] or {}).items())
+            ]
+            rows.append({
+                "entity_id": entity_id,
+                "friendly_name": entity["custom_name"] or entity["friendly_name"] or entity_id,
+                "threshold": entity["outlier_threshold"],
+                "threshold_label": OUTLIER_THRESHOLD_LABELS.get(entity["outlier_threshold"], entity["outlier_threshold"]),
+                "status": recommendation["status"],
+                "steps": steps,
+                "errors": recommendation["errors"],
+                "errors_label": format_value(recommendation["errors"], 1) if recommendation["errors"] is not None else "–",
+                "recommended": recommended if show_recommended else None,
+                "differs": differs,
+                "actionable": differs and recommendation["status"] in outlier_recommendation.ACTIONABLE,
+                **details,
+            })
+            if not show_recommended:
+                rows[-1]["recommended_label"] = "–"
+        rows.sort(key=lambda r: (r["rank"], -(r["errors"] or 0), r["friendly_name"].lower()))
+        counts = {key: sum(1 for r in rows if r["status"] == key) for key in _OUTLIER_FILTERS[1:]}
+        counts["insufficient"] = sum(1 for r in rows if r["status"] == outlier_recommendation.STATUS_INSUFFICIENT)
+        shown = rows if status == "all" else [r for r in rows if r["status"] == status]
+        return {
+            "rows": shown, "total": len(rows), "counts": counts, "status": status, "message": message,
+            "undo": undo or [], "confirm": confirm,
+            "actionable_count": sum(1 for r in rows if r["actionable"]),
+        }
+
+    def _outlier_recommendation_targets(form) -> list[dict]:
+        """Entitäten, bei denen die Empfehlung etwas ändert: für „alle“ nur die zu empfindlichen, bei einer Auswahl jede
+        gewählte mit abweichender Empfehlung. Die Empfehlung wird hier neu berechnet, nicht aus dem Browser übernommen."""
+        listed = {row["entity_id"]: row for row in _outlier_overview_context()["rows"]}
+        if form.get("all"):
+            return [row for row in listed.values() if row["actionable"]]
+        chosen = [str(v) for k, v in form.multi_items() if k == "entity_id"]
+        return [listed[i] for i in dict.fromkeys(chosen) if i in listed and listed[i]["differs"]]
+
+    def _outlier_overview_response(request: Request, **context) -> HTMLResponse:
+        return deps.templates.TemplateResponse(request, "_outlier_overview.html", {"outlier_overview": _outlier_overview_context(**context)})
+
+    @router.get("/housekeeping/ausreisser", response_class=HTMLResponse)
+    def outlier_overview_view(request: Request, status: str = "all") -> HTMLResponse:
+        return _outlier_overview_response(request, status=status if status in _OUTLIER_FILTERS else "all")
+
+    @router.post("/housekeeping/ausreisser/recommend/preview", response_class=HTMLResponse)
+    @_form_in_threadpool
+    def outlier_recommend_preview(request: Request, form) -> HTMLResponse:
+        targets = _outlier_recommendation_targets(form)
+        groups: dict[tuple[str, str], int] = {}
+        for row in targets:
+            key = (str(row["threshold_label"]), row["recommended_label"])
+            groups[key] = groups.get(key, 0) + 1
+        confirm = {
+            "all": bool(form.get("all")), "entity_ids": [t["entity_id"] for t in targets], "count": len(targets),
+            "groups": [{"old": o, "new": n, "count": c} for (o, n), c in sorted(groups.items(), key=lambda kv: -kv[1])],
+            "entities": [
+                {"name": t["friendly_name"], "id": t["entity_id"], "old": t["threshold_label"], "new": t["recommended_label"]}
+                for t in targets
+            ],
+        }
+        return _outlier_overview_response(request, confirm=confirm)
+
+    @router.post("/housekeeping/ausreisser/recommend/apply", response_class=HTMLResponse)
+    @_form_in_threadpool
+    def outlier_recommend_apply(request: Request, form) -> HTMLResponse:
+        """Setzt die empfohlene Schwelle je Entität und stößt die Neumessung an. Nur die Einstellung ändert sich, nie
+        Daten; je Entität mit kurzer Sperre, eine gerade gesperrte (Backup, Import) bleibt stehen."""
+        done: list[dict] = []
+        busy = 0
+        for row in _outlier_recommendation_targets(form):
+            try:
+                with deps.coordinator.entity(row["entity_id"], timeout=STORAGE_LOCKED_TIMEOUT_SECONDS):
+                    deps.index.set_config(row["entity_id"], outlier_threshold=row["recommended"])
+                done.append(row)
+            except CoordinatorBusy:
+                busy += 1
+        remeasured = data_quality.request_remeasure(deps.index, [r["entity_id"] for r in done]) if done else 0
+        if len(done) == 1:
+            row = done[0]
+            message = tr("„{name}“: Ausreißer-Schwelle von {old} auf {new} gesetzt.", name=row["friendly_name"],
+                         old=tr(str(row["threshold_label"])), new=row["recommended_label"])
+        elif done:
+            message = tr("{count} Empfehlungen übernommen.", count=len(done))
+        else:
+            message = tr("Nichts zu ändern.")
+        if done:
+            message += " " + tr("Die Ausreißer werden neu gemessen.")
+        if busy:
+            message += " " + tr("{busy} Entität(en) waren gerade gesperrt und blieben unverändert.", busy=busy)
+        logger.info("Ausreißer-Schwelle gesetzt · event=outlier_threshold_bulk_set count=%d busy=%d remeasure=%d",
+                    len(done), busy, remeasured)
+        return _outlier_overview_response(request, message=message, undo=[f"{r['entity_id']}|{r['threshold']}" for r in done])
+
+    @router.post("/housekeeping/ausreisser/undo", response_class=HTMLResponse)
+    @_form_in_threadpool
+    def outlier_overview_undo(request: Request, form) -> HTMLResponse:
+        """Stellt die vorherigen Schwellen wieder her. Die Werte kommen vom Browser und werden gegen die Stufen und die
+        vorhandenen Entitäten geprüft; mehr als „Schwelle dieser Entität zurücksetzen“ ist damit nicht möglich."""
+        restored: list[str] = []
+        for key, value in form.multi_items():
+            if key != "undo" or "|" not in str(value):
+                continue
+            entity_id, _sep, old = str(value).rpartition("|")
+            entity = deps.index.get_entity(entity_id)
+            if old not in OUTLIER_THRESHOLD_LABELS or entity is None or not outlier_detection_applies(entity["aggregation_type"]):
+                continue
+            try:
+                with deps.coordinator.entity(entity_id, timeout=STORAGE_LOCKED_TIMEOUT_SECONDS):
+                    deps.index.set_config(entity_id, outlier_threshold=old)
+                restored.append(entity_id)
+            except CoordinatorBusy:
+                continue
+        if restored:
+            data_quality.request_remeasure(deps.index, restored)
+        message = tr("{count} Änderung(en) zurückgenommen. Die Ausreißer werden neu gemessen.", count=len(restored))
+        return _outlier_overview_response(request, message=message)
+
     @router.get("/housekeeping", response_class=HTMLResponse)
     def housekeeping_view(request: Request) -> HTMLResponse:
         """Sammelt Dinge, die niemandem auffallen, solange man nicht gezielt danach
@@ -1315,10 +1459,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                 **_counter_decreases_context(),
                 "data_quality": data_quality.build_matrix(deps.index),
                 "gap_overview": _gap_overview_context(),
-                "outlier_rates": cleanup_stats.outlier_rate_overview(deps.index),
-                "outlier_notable_percent": format_value(
-                    cleanup_stats.OUTLIER_RATE_NOTABLE_PERCENT, 0
-                ),
+                "outlier_overview": _outlier_overview_context(),
                 **_stale_entities_context(),
                 **_host_disk_usage_context(),
                 **_settings_storage_index_context(),

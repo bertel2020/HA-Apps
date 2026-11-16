@@ -154,42 +154,55 @@ def test_the_labels_are_german_and_shared_with_the_form_field(index) -> None:
 # --- Die Meldung -------------------------------------------------------------
 
 
+def _judged(index, entity_id, tiers, *, schwelle="20", days=60.0):
+    """Entität mit Stufen-Profil im Cache, so wie es der Gesamt-Durchlauf ablegt (Treffer je Stufe über `days` Tage)."""
+    index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+    index.set_config(entity_id, outlier_threshold=schwelle)
+    index.record_write(entity_id, time.time())
+    index.set_cleanup_alltime_stats(
+        entity_id, {"all": 5000, "outliers": 0}, schwelle, OUTLIER_RULE_VERSION, gap_threshold="r15", daily={},
+        outlier_profile={"rule": OUTLIER_RULE_VERSION, "days": days, "judged": 5000, "blind": 0, "tiers": tiers},
+    )
+
+
+NOISY = {"10": 900, "20": 900, "50": 900, "100": 0}      # Grenzfälle auf allen feinen Stufen, bei 100× keine
+UNSUITABLE = {"10": 900, "20": 800, "50": 700, "100": 600}  # auch bei 100× laut
+
+
 def test_the_notice_appears_once_for_the_whole_installation(index) -> None:
     """Eine Meldung, egal ob eine oder hundert Entitäten betroffen sind: das
     Meldungs-Center trägt Titel, zwei Sätze und einen Link, und hundert
     einzelne Meldungen müsste man hundertmal stummschalten."""
     for i in range(100):
-        _entity(index, f"sensor.v{i:03d}", markiert=50 + i, gesamt=1000)
+        _judged(index, f"sensor.v{i:03d}", NOISY)
 
     treffer = [n for n in _notices(index, Path("x")) if n["id"] == "entities.outlier_rate_high"]
     assert len(treffer) == 1
     assert treffer[0]["link"] == "/housekeeping#ausreisser"
-    assert "100 Entitäten" in treffer[0]["detail"]
+    assert "100 mit zu empfindlicher Schwelle" in treffer[0]["detail"]
 
 
-def test_the_notice_names_the_worst_case_and_stays_one_sentence(index) -> None:
-    _entity(index, "sensor.schlimm", markiert=90, gesamt=1000, name="PV-Leistung")
-    _entity(index, "sensor.mittel", markiert=20, gesamt=1000)
+def test_the_notice_counts_both_kinds_and_stays_short(index) -> None:
+    _judged(index, "sensor.zu_eng", NOISY)
+    _judged(index, "sensor.zu_eng2", NOISY)
+    _judged(index, "sensor.laut", UNSUITABLE, schwelle="50")
 
     meldung = next(n for n in _notices(index, Path("x")) if n["id"] == "entities.outlier_rate_high")
-    assert "PV-Leistung mit 9,00 %" in meldung["detail"]
-    assert "sensor.mittel" not in meldung["detail"]
-    # Nicht länger werdend: die Zahl ändert sich, der Satzbau nicht.
+    assert "2 mit zu empfindlicher Schwelle" in meldung["detail"]
+    assert "1 mit vielen Treffern auch bei 100×" in meldung["detail"]
+    assert "sensor." not in meldung["detail"]
     assert len(meldung["detail"]) < 250
 
 
-def test_the_notice_is_grammatical_for_a_single_entity(index) -> None:
-    _entity(index, "sensor.eine", markiert=90, gesamt=1000, name="PV-Leistung")
+def test_the_notice_names_only_the_kind_that_exists(index) -> None:
+    _judged(index, "sensor.laut", UNSUITABLE, schwelle="50")
     meldung = next(n for n in _notices(index, Path("x")) if n["id"] == "entities.outlier_rate_high")
-    assert "Bei 1 Entität markiert" in meldung["detail"]
-    assert "Entitäten" not in meldung["detail"]
-    assert meldung["detail"].endswith(
-        "Eine zu enge Schwelle markiert normales Verhalten als verdächtig."
-    )
+    assert "zu empfindlicher" not in meldung["detail"]
+    assert "vielen Treffern auch bei 100×" in meldung["detail"]
 
 
 def test_no_notice_without_conspicuous_entities(index) -> None:
-    _entity(index, "sensor.ruhig", markiert=2, gesamt=1000)
+    _judged(index, "sensor.ruhig", {"10": 0, "20": 0, "50": 0, "100": 0})
     _entity(index, "sensor.ungemessen")
     ids = [n["id"] for n in _notices(index, Path("x"))]
     assert "entities.outlier_rate_high" not in ids
@@ -308,12 +321,12 @@ def test_the_section_sits_between_duplicates_and_storage(client) -> None:
     assert nav.index("housekeeping#duplikate") < nav.index("housekeeping#ausreisser") < nav.index("housekeeping#speicherplatz")
 
 
-def test_the_page_shows_how_far_the_measurement_got(client) -> None:
-    """Ohne diese Zahl sähe „nichts gefunden" genauso aus wie „noch nichts
-    gemessen" — der Unterschied ist für den Leser wesentlich."""
+def test_the_page_shows_the_assessment_filters(client) -> None:
     html = client.get("/housekeeping").text
-    abschnitt = html[html.index('id="ausreisser"'):html.index('id="speicherplatz"')]
-    assert "Entitäten mit Ausreißer-Erkennung sind gemessen" in abschnitt
+    abschnitt = html[html.index('id="ausreisser"'):html.index('id="luecken-erkennung"')]
+    assert 'id="outlier-overview"' in abschnitt and "data-gc-root" in abschnitt
+    for text in ("Zu empfindlich", "Nicht geeignet", "Greift kaum", "Passt", "Ausgeschaltet"):
+        assert text in abschnitt or "Keine Entität hat die Ausreißer-Erkennung eingeschaltet." in abschnitt
 
 
 def test_the_manual_names_the_same_mark_and_interval_as_the_code() -> None:

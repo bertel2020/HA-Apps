@@ -1,0 +1,108 @@
+{# Abschnitt „Ausreißer“ in Housekeeping: je Entität mit Ausreißer-Erkennung die Beurteilung der Schwelle (Grenzfälle je
+   Stufe, Empfehlung) mit Sammelaktion, Bestätigung als Popup und Rückgängig. Wird per htmx als Ganzes getauscht
+   (Filter, Vorschau, Ergebnis, Rückgängig). Dieselben Bedienelemente und Skripte wie bei der Lücken-Erkennung. #}
+{% set oo = outlier_overview %}
+{% set oo_url = app_root ~ '/housekeeping/ausreisser' %}
+{% if oo.message %}
+<div class="gc-toast" role="status">
+  <span>{{ oo.message }}</span>
+  {% if oo.undo %}
+  <form class="gc-undo" hx-post="{{ oo_url }}/undo" hx-target="#outlier-overview" hx-swap="innerHTML">
+    {% for item in oo.undo %}<input type="hidden" name="undo" value="{{ item }}">{% endfor %}
+    <button type="submit" class="btn btn-sm">{{ _("Rückgängig") }}</button>
+  </form>
+  {% endif %}
+</div>
+{% endif %}
+{% if oo.confirm %}
+<dialog class="detail-dialog gc-modal" data-gc-modal aria-labelledby="oo-modal-title">
+  <h3 class="gc-modal-title" id="oo-modal-title">{{ _("Empfehlung übernehmen") }}</h3>
+  {% if oo.confirm.count %}
+  <p class="gc-text">{{ _("Bei {count} Entität(en) wird die Schwelle der Ausreißer-Erkennung auf die Empfehlung gesetzt. Daten bleiben unverändert, echte Fehler werden weiter gefunden, und du kannst es danach rückgängig machen.", count=oo.confirm.count) }}</p>
+  <ul class="gc-groups">
+    {% for group in oo.confirm.groups %}<li>{{ group.count }} &times; {{ group.old }} &rarr; {{ group.new }}</li>{% endfor %}
+  </ul>
+  <details class="gc-entities">
+    <summary>{{ _("Betroffene Entitäten ({count})", count=oo.confirm.count) }}</summary>
+    <ul class="gc-entity-list">
+      {% for item in oo.confirm.entities %}
+      <li><span class="gc-entity-name">{{ item.name }}{% if item.name != item.id %} <span class="gc-entity-id">{{ item.id }}</span>{% endif %}</span><span class="gc-entity-change">{{ item.old }} &rarr; {{ item.new }}</span></li>
+      {% endfor %}
+    </ul>
+  </details>
+  <form id="oo-confirm-form">
+    {% if oo.confirm.all %}<input type="hidden" name="all" value="1">{% else %}{% for entity_id in oo.confirm.entity_ids %}<input type="hidden" name="entity_id" value="{{ entity_id }}">{% endfor %}{% endif %}
+  </form>
+  <div class="gc-modal-actions">
+    <button type="button" class="btn btn-sm" data-gc-cancel hx-get="{{ oo_url }}" hx-target="#outlier-overview" hx-swap="innerHTML">{{ _("Abbrechen") }}</button>
+    <button type="button" class="btn btn-sm primary" hx-post="{{ oo_url }}/recommend/apply" hx-include="#oo-confirm-form"
+            hx-target="#outlier-overview" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Übernehmen") }}</button>
+  </div>
+  {% else %}
+  <p class="gc-text">{{ _("Nichts zu ändern.") }}</p>
+  <div class="gc-modal-actions"><button type="button" class="btn btn-sm" data-gc-cancel hx-get="{{ oo_url }}" hx-target="#outlier-overview" hx-swap="innerHTML">{{ _("Schließen") }}</button></div>
+  {% endif %}
+</dialog>
+{% endif %}
+{% if oo.total %}
+<div class="oo-chips">
+  {% for key, label, count in [('all', _("Alle"), oo.total), ('too_sensitive', _("Zu empfindlich"), oo.counts.too_sensitive), ('unsuitable', _("Nicht geeignet"), oo.counts.unsuitable), ('blind', _("Greift kaum"), oo.counts.blind), ('ok', _("Passt"), oo.counts.ok), ('disabled', _("Ausgeschaltet"), oo.counts.disabled)] %}
+  <button type="button" class="oo-chip" aria-pressed="{{ 'true' if oo.status == key else 'false' }}"
+          hx-get="{{ oo_url }}?status={{ key }}" hx-target="#outlier-overview" hx-swap="innerHTML">{{ label }} {{ count }}</button>
+  {% endfor %}
+</div>
+<form id="oo-form">
+  <div class="gc-bar" data-gc-bar>
+    <span class="gc-count" data-gc-count data-n-all="{{ _('{count} Entitäten', count=oo.rows | length) }}" data-n-sel="{{ _('{count} ausgewählt') }}">{{ _("{count} Entitäten", count=oo.rows | length) }}</span>
+    <span class="gc-group" data-gc-group="recommendation">
+      <button type="button" class="btn btn-sm primary" data-gc-rec-sel hidden
+              hx-post="{{ oo_url }}/recommend/preview" hx-include="#oo-form" hx-target="#outlier-overview" hx-swap="innerHTML"
+              data-label="{{ _('Empfehlung übernehmen ({count})') }}">{{ _("Empfehlung übernehmen") }}</button>
+      {% if oo.actionable_count %}
+      <button type="button" class="btn btn-sm primary" data-gc-rec-all
+              hx-post="{{ oo_url }}/recommend/preview" hx-vals='{"all": "1"}' hx-target="#outlier-overview" hx-swap="innerHTML"
+              title="{{ _('Entitäten, bei denen die Ausreißer-Erkennung zu empfindlich ist') }}">{{ _("Alle zu empfindlichen übernehmen ({count})", count=oo.actionable_count) }}</button>
+      {% endif %}
+    </span>
+    <button type="button" class="btn btn-sm" data-gc-clear hidden>{{ _("Auswahl aufheben") }}</button>
+  </div>
+  <div class="tbl-wrap">
+    <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
+      <colgroup>
+        <col class="hk-col-chk"><col><col class="hk-col-schwelle"><col class="hk-col-oo-steps"><col class="hk-col-oo-err"><col class="hk-col-empf"><col class="hk-col-beurt"><col class="hk-col-aktion">
+      </colgroup>
+      <thead><tr>
+        <th data-no-sort><input type="checkbox" data-gc-check-all aria-label="{{ _('Alle auf der Seite auswählen') }}"></th>
+        <th>{{ _("Entität") }}</th><th>{{ _("Schwelle") }}</th><th data-no-sort>{{ _("Grenzfälle je 30 Tage") }}</th>
+        <th>{{ _("Echte Fehler") }}</th><th>{{ _("Empfohlen") }}</th><th>{{ _("Beurteilung") }}</th><th data-no-sort></th>
+      </tr></thead>
+      <tbody>
+      {% for row in oo.rows %}
+      <tr>
+        <td>{% if row.actionable %}<input type="checkbox" name="entity_id" value="{{ row.entity_id }}" data-gc-check aria-label="{{ _('{name} auswählen', name=row.friendly_name) }}">{% endif %}</td>
+        <td class="entity" data-sort="{{ row.friendly_name }}">
+          <a href="entities/{{ row.entity_id }}/config" class="entity-tooltip-host">
+            {% if row.friendly_name != row.entity_id %}
+            <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
+            {% else %}
+            <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
+            {% endif %}
+            <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name }}</strong><code>{{ row.entity_id }}</code></span>
+          </a>
+        </td>
+        <td data-sort="{{ row.threshold if row.threshold != 'off' else 999999 }}">{{ row.threshold_label }}</td>
+        <td>{% if row.steps %}<span class="oo-steps">{% for step in row.steps %}<span class="oo-step{% if step.current %} cur{% endif %}{% if step.recommended %} rec{% endif %}">{{ step.label }} {{ step.count }}</span>{% endfor %}</span>{% else %}–{% endif %}</td>
+        <td data-sort="{{ row.errors if row.errors is not none else -1 }}">{{ row.errors_label }}</td>
+        <td>{{ row.recommended_label }}</td>
+        <td data-sort="{{ row.rank }}"><span class="gc-chip gc-chip-{{ row.tone }}" title="{{ row.status_tip }}">{{ row.status_label }}</span></td>
+        <td>{% if row.actionable %}<button type="button" class="btn btn-sm" hx-post="{{ oo_url }}/recommend/preview" hx-vals='{"entity_id": "{{ row.entity_id }}"}' hx-target="#outlier-overview" hx-swap="innerHTML">{{ _("Übernehmen") }}</button>{% elif row.status == 'unsuitable' %}<a class="btn btn-sm" href="entities/{{ row.entity_id }}/cleanup?filter=outliers&amp;range=all">{{ _("Bereinigung öffnen") }}</a>{% endif %}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="oo-key">{{ _("Grenzfälle sind Markierungen, die bei der nächstgröberen Einstellung verschwinden. Umrandet ist die aktuelle Schwelle, unterstrichen die empfohlene. „Echte Fehler“ sind Treffer je 30 Tage, die auch bei 100× bleiben.") }}</p>
+</form>
+{% else %}
+<div class="tbl-wrap"><div class="empty">{{ _("Keine Entität hat die Ausreißer-Erkennung eingeschaltet.") }}</div></div>
+{% endif %}

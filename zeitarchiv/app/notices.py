@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import cleanup_stats, counter_auto, data_quality, duplicates_auto
+from . import counter_auto, data_quality, duplicates_auto, outlier_recommendation
 from . import purge_auto
 from . import ha_integration
 from . import tips as tips_mod
@@ -49,6 +49,7 @@ from .storage.index import (
     STATE_REJECTION_LIMIT,
     STATE_REJECTION_TYPE_MISMATCH,
     entity_last_seen,
+    outlier_detection_applies,
 )
 from .version import APP_VERSION
 
@@ -630,22 +631,25 @@ def build_notices(
     # Entitäten passen dort nicht hinein — und hundert einzelne Meldungen wären
     # schlimmer, weil das Stummschalten je Meldung gedacht ist. Sie zählt und
     # verweist, sie zählt nicht auf.
-    auffaellige = cleanup_stats.outlier_rate_overview(index)["rows"]
-    if auffaellige:
-        schlimmster = auffaellige[0]
-        anzahl = len(auffaellige)
-        marke = format_value(cleanup_stats.OUTLIER_RATE_NOTABLE_PERCENT, 0)
-        beispiel = (
-            tr("{friendly_name} mit {percent_label} %", friendly_name=schlimmster['friendly_name'], percent_label=schlimmster['percent_label'])
-        )
+    beurteilt = outlier_recommendation.recommendations(
+        [e for e in index.list_entities() if outlier_detection_applies(e["aggregation_type"])],
+        index.list_cleanup_alltime_stats(with_daily=False), time.time(),
+    )
+    zu_empfindlich = sum(1 for r in beurteilt.values() if r["status"] == outlier_recommendation.STATUS_TOO_SENSITIVE)
+    ungeeignet = sum(1 for r in beurteilt.values() if r["status"] == outlier_recommendation.STATUS_UNSUITABLE)
+    if zu_empfindlich or ungeeignet:
+        teile = []
+        if zu_empfindlich:
+            teile.append(tr("{anzahl} mit zu empfindlicher Schwelle", anzahl=zu_empfindlich))
+        if ungeeignet:
+            teile.append(tr("{anzahl} mit vielen Treffern auch bei 100×", anzahl=ungeeignet))
         notices.append({
             "id": "entities.outlier_rate_high",
             "severity": "info",
             "title": tr("Ausreißer-Erkennung markiert auffällig viel"),
             "detail": (
-                (tr("Bei {anzahl} Entität markiert die eingestellte Schwelle mehr als {marke} % aller Werte", anzahl=anzahl, marke=marke) if anzahl == 1 else tr("Bei {anzahl} Entitäten markiert die eingestellte Schwelle mehr als {marke} % aller Werte", anzahl=anzahl, marke=marke))
-                + (tr(" — am deutlichsten {beispiel}.", beispiel=beispiel) if anzahl != 1 else f": {beispiel}.")
-                + tr(" Eine zu enge Schwelle markiert normales Verhalten als verdächtig.")
+                tr("Bei der Ausreißer-Erkennung passt die Schwelle nicht zu allen Entitäten: {teile}.", teile=", ".join(teile))
+                + " " + tr("Eine zu empfindliche Schwelle markiert normales Verhalten als verdächtig.")
             ),
             "meta": tr("Housekeeping"),
             "link": "/housekeeping#ausreisser",

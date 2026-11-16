@@ -85,65 +85,14 @@
 
       <section id="ausreisser" class="settings-section">
         <h2 class="settings-section-title">{{ _("Ausreißer") }} {{ hint_button(_('Ausreißer')) }}</h2>
-        {# Der Rat, der früher unter der Tabelle stand, steckt jetzt mit im
-           selben Hinweis: er gehört zur Frage „was mache ich damit?" und hätte
-           als zweiter Info-Knopf im selben Abschnitt nur verwirrt. #}
-        {% call hint_body('settings-section-description') %}{{ _("Entitäten, deren Ausreißer-Erkennung mehr als {outlier_notable_percent}&nbsp;% ihrer Werte markiert &mdash; dann ist die Schwelle für dieses Signal zu eng eingestellt, und die Bereinigungs-Seite zeigt normales Verhalten als verdächtig. Dieselben Zahlen stehen unter dem Schwellenfeld der jeweiligen Entität.", outlier_notable_percent=outlier_notable_percent) }}{% if outlier_rates.rows %} {{ _("Eine zu enge Schwelle korrigiert man je Entität: Konfigurationsseite öffnen, eine Stufe höher wählen, Quote neu berechnen.") }}{% endif %}{% endcall %}
-        <div class="tbl-wrap">
-          {% if outlier_rates.rows %}
-          <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
-            <colgroup>
-              <col><col class="hk-col-schwelle"><col class="hk-col-markiert"><col class="hk-col-quote">
-            </colgroup>
-            <thead><tr><th>{{ _("Entität") }}</th><th>{{ _("Schwelle") }}</th><th>{{ _("Markiert") }}</th><th>{{ _("Quote") }}</th></tr></thead>
-            <tbody>
-            {% for row in outlier_rates.rows %}
-            <tr>
-              <td class="entity" data-sort="{{ row.friendly_name }}">
-                <a href="entities/{{ row.entity_id }}/cleanup?filter=outliers&amp;range=all" class="entity-tooltip-host">
-                  {% if row.friendly_name != row.entity_id %}
-                  <span class="name">{{ row.friendly_name }}</span><span class="id">{{ row.entity_id }}</span>
-                  {% else %}
-                  <span class="name" style="font-family:var(--font-mono);">{{ row.entity_id }}</span>
-                  {% endif %}
-                  <span class="entity-tooltip" role="tooltip"><strong>{{ row.friendly_name }}</strong><code>{{ row.entity_id }}</code></span>
-                </a>
-              </td>
-              <td>{{ row.threshold_label }}</td>
-              <td data-sort="{{ row.marked }}">{{ _("{marked_label} von {total_label}", marked_label=row.marked_label, total_label=row.total_label) }}</td>
-              <td data-sort="{{ row.percent }}">{{ row.percent_label }} %</td>
-            </tr>
-            {% endfor %}
-            </tbody>
-          </table>
-          {% else %}
-          {# Ein leerer Abschnitt, der den höchsten gemessenen Wert nennt, ist
-             deutlich mehr wert als „nichts gefunden": er belegt, dass gemessen
-             wurde, und sagt, wie weit es bis zur Marke ist. #}
-          <div class="empty">
-            {% if outlier_rates.highest %}
-            {{ _("Keine auffälligen Quoten. Höchster gemessener Wert: {percent_label} % bei {friendly_name}.", percent_label=outlier_rates.highest.percent_label, friendly_name=outlier_rates.highest.friendly_name) }}
-            {% elif outlier_rates.pending %}
-            {{ _("Noch nichts gemessen &mdash; die Quoten werden nach und nach im Hintergrund berechnet.") }}
-            {% else %}
-            {{ _("Keine Entität hat die Ausreißer-Erkennung eingeschaltet.") }}
-            {% endif %}
-          </div>
-          {% endif %}
-        </div>
-        <p class="hint hint-status" style="margin-top:14px;">
-          {% if outlier_rates.pending -%}
-          {{ _("{measured} von {v1} Entitäten mit Ausreißer-Erkennung sind gemessen, jeweils über ihre komplette Historie. Die übrigen misst der Hintergrundlauf nach und nach &mdash; einzelne sofort mit „Jetzt prüfen“ auf ihrer Konfigurationsseite.", measured=outlier_rates.measured, v1=(outlier_rates.measured + outlier_rates.pending)) }}
-          {%- else -%}
-          {{ _("Alle {measured} Entitäten mit Ausreißer-Erkennung sind gemessen, jeweils über ihre komplette Historie.", measured=outlier_rates.measured) }}
-          {%- endif %}
-        </p>
+        {% call hint_body('settings-section-description') %}{{ _("Wie gut die Schwelle der Ausreißer-Erkennung zu jeder Entität passt. Gezählt werden Grenzfälle: Markierungen, die bei der nächstgröberen Einstellung (bis 100×) verschwinden, also normales Verhalten, das fälschlich markiert wird. Echte Fehler wie verrutschte Ziffern werden auf jeder Stufe gefunden und zählen nicht gegen die Schwelle. „Empfohlen“ ist die kleinste Stufe, ab der alle gröberen in den letzten 60 Tagen höchstens etwa einen Grenzfall pro Woche liefern; sie steht nach mindestens 14 Tagen Beobachtung bereit. Das ändert nur die Einstellung, keine Daten. „Aus“ wird nie empfohlen.") }}{% endcall %}
+        <div id="outlier-overview" data-gc-root>{% include "_outlier_overview.html" %}</div>
       </section>
 
       <section id="luecken-erkennung" class="settings-section">
         <h2 class="settings-section-title">{{ _("Lücken-Erkennung") }} {{ hint_button(_('Lücken-Erkennung')) }}</h2>
         {% call hint_body('settings-section-description') %}{{ _("Wie die Lücken-Erkennung je Entität arbeitet und wie viele Lücken sie gefunden hat. Ohne Wertänderungsfilter und mit Rohdaten werden die Abstände zwischen gespeicherten Werten gezählt; mit Filter oder Auflösung die Pausen zwischen empfangenen Werten, unabhängig von Filter, Auflösung und Lebenszeichen. Die Zahl gilt zur eingestellten Schwelle; „–“ heißt noch nicht gemessen. „Empfohlen“ ist die kleinste Stufe, bei der die Entität in den letzten 60 Tagen höchstens etwa einmal pro Woche anschlagen würde; sie steht nach mindestens 14 Tagen Beobachtung bereit. Die Schwelle lässt sich hier für mehrere Entitäten zugleich setzen oder auf die Empfehlung stellen. Das ändert nur die Einstellung, keine Daten.") }}{% endcall %}
-        <div id="gap-conflicts">{% include "_gap_overview.html" %}</div>
+        <div id="gap-conflicts" data-gc-root>{% include "_gap_overview.html" %}</div>
       </section>
 
       <section id="speicherplatz" class="settings-section">
