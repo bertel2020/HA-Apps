@@ -2828,6 +2828,16 @@ prüfen“, Vorschau (Dry Run), Import starten.
   geschrieben. Der Import läuft im Hintergrund mit Fortschritt je Entität und
   darf die Seite verlassen. Bricht er ab, bleiben die bis dahin geschriebenen
   Entitäten erhalten; ein erneuter Import ergänzt nur Fehlendes.
+  - **Abschnitte:** Hat eine Entität sehr viele Werte (Richtwert: mehr als
+    2 Mio), wird sie automatisch in Abschnitte aus ganzen Monaten geteilt und
+    abschnittsweise abgerufen und geschrieben. Die Anzeige nennt den Abschnitt
+    und seinen Zeitraum, der Bericht die Zahl der Abschnitte. Ein früher nötiges
+    Aufteilen von Hand (z. B. quartalsweise) entfällt. Ein einzelner Monat
+    mit mehr als 10 Mio Werten wird weiterhin abgewiesen.
+  - **Abbrechen:** Der Knopf „Abbrechen“ in der Fortschrittsanzeige beendet den
+    Import vor dem nächsten Abschnitt. Der laufende Schreibvorgang wird noch
+    fertiggestellt; bereits geschriebene Monate bleiben, ein erneuter Import
+    überspringt sie.
 - **Einmalig:** Es wird nicht fortlaufend synchronisiert. Vorhandene
   Zeitstempel und Werte werden nie ersetzt.
 
@@ -2900,7 +2910,7 @@ CSV. Mehrere Entitäten in einer gemeinsamen Datei gibt es bewusst nicht: Rohwer
 haben je Entität eigene Zeitstempel, die Datei bestünde größtenteils aus leeren
 Zellen. Die Spalten sind `timestamp` (lokale Zeit), `unix_ts` und `value`.
 
-Das Exportlimit von 5 Millionen Zeilen gilt je Datei. Bei Sekundenwerten
+Das Exportlimit von 10 Millionen Zeilen gilt je Datei. Bei Sekundenwerten
 (rund 2 Millionen Zeilen pro Jahr) ist ein Jahr also noch möglich, mehrere Jahre
 roh nicht mehr — dafür Zeitraum oder Auflösung anpassen. Die Zeilenzahl vorab
 ist eine Schätzung: zur Löschung markierte Werte sind nicht abgezogen, ein

@@ -10,6 +10,7 @@ import json
 import urllib.error
 import urllib.parse
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -418,3 +419,98 @@ def test_check_connection_passes_wrong_database_and_credentials_on(monkeypatch) 
     _fake(monkeypatch, lambda params: json.dumps({"error": "database not found: \"nope\""}).encode())
     with pytest.raises(influxdb_import.InfluxApiError, match="Datenbank"):
         influxdb_import.check_connection("http://influx:8086", "nope", None)
+
+
+# ------------------------------------------------------------ Abschnitte großer Entitäten
+
+BERLIN = ZoneInfo("Europe/Berlin")
+
+
+def _day(year: int, month: int, day: int) -> int:
+    return int(datetime(year, month, day, tzinfo=timezone.utc).timestamp() * 1000)
+
+
+def test_monthly_counts_sum_measurements_and_group_by_local_month(monkeypatch) -> None:
+    seen = _fake(monkeypatch, lambda params: _reply(
+        _values("W", [[_day(2026, 1, 31), 5], [_day(2026, 2, 1), 7]], columns=("time", "count")),
+        # Einheitenwechsel: dieselbe Entität in einem zweiten Measurement
+        _values("kW", [[_day(2026, 2, 2), 3]], columns=("time", "count")),
+    ))
+    counts = influxdb_import.fetch_monthly_counts(
+        "sensor.pv", datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 3, 1, tzinfo=timezone.utc), BERLIN,
+    )
+    # 1.2. 00:00 UTC ist in Berlin schon 01:00 am 1.2.; 31.1. 00:00 UTC bleibt im Januar.
+    assert counts == {(2026, 1): 5, (2026, 2): 10}
+    query = params_of(seen[0])["q"][0]
+    assert 'count("value")' in query and "GROUP BY time(1d) fill(none)" in query
+    assert '"domain" = \'sensor\' AND "entity_id" = \'pv\'' in query
+
+
+def test_monthly_counts_ignore_rows_outside_the_window_and_broken_rows(monkeypatch) -> None:
+    _fake(monkeypatch, lambda params: _reply(_values("W", [
+        [0, 99], [_day(2026, 1, 10), 4], [_day(2026, 1, 11), 0], ["x", 1], [_day(2026, 1, 12)],
+    ], columns=("time", "count"))))
+    counts = influxdb_import.fetch_monthly_counts(
+        "sensor.pv", datetime(2026, 1, 1, tzinfo=timezone.utc), datetime(2026, 2, 1, tzinfo=timezone.utc), BERLIN,
+    )
+    assert counts == {(2026, 1): 4}
+
+
+def test_state_entities_are_counted_on_the_text_field(monkeypatch) -> None:
+    seen = _fake(monkeypatch, lambda params: _reply())
+    influxdb_import.fetch_monthly_counts(
+        "sensor.modus", START, START + timedelta(days=1), BERLIN, state=True,
+    )
+    assert 'count("state")' in params_of(seen[0])["q"][0]
+
+
+def _span(months: dict, target: int, start=None, end=None):
+    start = start or datetime(2026, 1, 1, tzinfo=BERLIN)
+    end = end or datetime(2026, 12, 1, tzinfo=BERLIN)
+    return influxdb_import.plan_sections(months, start, end, BERLIN, target)
+
+
+def test_a_small_history_is_one_section() -> None:
+    assert _span({(2026, 1): 10, (2026, 2): 10}, target=100) == [
+        (datetime(2026, 1, 1, tzinfo=BERLIN), datetime(2026, 12, 1, tzinfo=BERLIN))
+    ]
+    assert len(_span({}, target=100)) == 1  # ohne Zählung ebenso
+
+
+def test_sections_pack_whole_months_up_to_the_target() -> None:
+    sections = _span({(2026, 1): 40, (2026, 2): 40, (2026, 3): 40, (2026, 4): 40, (2026, 5): 40}, target=100)
+    assert [(s.month, e.month) for s, e in sections] == [(1, 3), (3, 5), (5, 12)]
+    # Genau am Zielwert bleibt es ein Abschnitt, einer darüber teilt.
+    assert len(_span({(2026, 1): 50, (2026, 2): 50}, target=100)) == 1
+    assert len(_span({(2026, 1): 50, (2026, 2): 51}, target=100)) == 2
+
+
+def test_sections_are_contiguous_and_cover_the_whole_range() -> None:
+    start, end = datetime(2025, 11, 15, 8, tzinfo=BERLIN), datetime(2026, 9, 10, tzinfo=BERLIN)
+    months = {(2025, 11): 60, (2025, 12): 60, (2026, 1): 60, (2026, 2): 60, (2026, 3): 60, (2026, 8): 60}
+    sections = influxdb_import.plan_sections(months, start, end, BERLIN, 100)
+    assert sections[0][0] == start and sections[-1][1] == end
+    for (_, previous_end), (next_start, _) in zip(sections, sections[1:], strict=False):
+        assert previous_end == next_start  # keine Lücke, keine Überschneidung
+    assert all(s < e for s, e in sections)
+
+
+def test_section_boundaries_are_local_month_starts_even_across_daylight_saving() -> None:
+    sections = _span({(2026, 3): 80, (2026, 4): 80, (2026, 5): 80}, target=100)
+    for _, boundary in sections[:-1]:
+        local = boundary.astimezone(BERLIN)
+        assert (local.day, local.hour, local.minute) == (1, 0, 0)
+    # April beginnt in Berlin in der Sommerzeit: 31.3. 22:00 UTC.
+    assert sections[1][0].astimezone(timezone.utc) == datetime(2026, 3, 31, 22, tzinfo=timezone.utc)
+
+
+def test_one_month_over_the_target_stays_a_section_of_its_own() -> None:
+    sections = _span({(2026, 1): 10, (2026, 2): 500, (2026, 3): 10}, target=100)
+    assert [(s.month, e.month) for s, e in sections] == [(1, 2), (2, 3), (3, 12)]
+
+
+def test_a_cancelled_fetch_stops_with_import_cancelled(monkeypatch) -> None:
+    _fake(monkeypatch, lambda params: _reply(_values("W", [[BASE, 1.0]])))
+    with pytest.raises(influxdb_import.ImportCancelled):
+        influxdb_import.fetch_history_rows("sensor.pv", START, START + timedelta(days=1), should_cancel=lambda: True)
+

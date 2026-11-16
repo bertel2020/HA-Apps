@@ -72,7 +72,7 @@ operations, each checked **before** the actual processing:
 | Events per write batch | 1,000 |
 | Entities per multi-query | 25 |
 | Points per raw value query | 100,000 |
-| Rows per CSV export | 5,000,000 |
+| Rows per CSV export | 10,000,000 |
 | Import rows per entity | 10,000,000 |
 | ZIP upload | 2 GiB |
 | CSV upload | 256 MiB |

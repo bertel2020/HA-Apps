@@ -276,3 +276,163 @@ def test_vm_connection_check_uses_the_form_address(service, monkeypatch) -> None
     monkeypatch.setattr(vm_import, "check_connection", fail)
     template, context = asyncio.run(endpoint(_request("/import/vm/connection", [])))
     assert context["ok"] is False and "nicht erreichbar" in context["message"]
+
+
+# ------------------------------------------------------------ Abschnitte großer Entitäten
+
+MONTHS = ((2026, 1), (2026, 2), (2026, 3))
+
+
+def _stamp(year: int, month: int, minute: int) -> int:
+    return int(datetime(year, month, 15, 12, minute, tzinfo=timezone.utc).timestamp() * 1000)
+
+
+def _sectioned(on_history=None):
+    """Drei Monate mit je drei Punkten; die Zählabfrage meldet je Monat drei Punkte."""
+
+    def handler(params, request) -> bytes:
+        query = params["q"][0]
+        if "GROUP BY time(1d)" in query:
+            return json.dumps({"results": [{"series": [{"name": "W", "columns": ["time", "count"], "values": [
+                [int(datetime(y, m, 15, tzinfo=timezone.utc).timestamp() * 1000), 3] for y, m in MONTHS
+            ]}]}]}).encode()
+        if "'demo'" in query:
+            low = int(query.split("time >= ")[1].split("ms")[0])
+            high = int(query.split("time < ")[1].split("ms")[0])
+            if on_history:
+                on_history(low)
+            rows = [[_stamp(y, m, i), 10.0 + i] for y, m in MONTHS for i in range(3) if low <= _stamp(y, m, i) < high]
+            return json.dumps({"results": [{"series": [{"name": "W", "columns": ["time", "value"], "values": rows}]}]}).encode()
+        return b""
+
+    return handler
+
+
+def _run_import(service, fields=FORM):
+    endpoint = _endpoint(service, "/import/influxdb/start", "POST")
+    asyncio.run(endpoint(_request("/import/influxdb/start", fields)))
+    progress = service._influx._progress
+    for _ in range(200):
+        stand = progress.snapshot()
+        if not stand["running"]:
+            return stand["result"]
+        time.sleep(0.05)
+    raise AssertionError("Import lief nicht durch")
+
+
+def test_a_large_history_is_imported_in_sections_and_nothing_is_lost(service, monkeypatch) -> None:
+    monkeypatch.setattr(influxdb_import, "SECTION_TARGET_ROWS", 4)
+    seen = _fake_influx(monkeypatch, _sectioned())
+    result = _run_import(service)
+
+    assert result["errors"] == []
+    (item,) = result["items"]
+    assert item["sections"] == 3
+    assert item["result"].imported_months == ["2026-01", "2026-02", "2026-03"]
+    assert item["result"].rows_imported == 9 and item["result"].skipped_months == []
+    # Gelesen wurde je Abschnitt, nicht die ganze Historie in einem Zug.
+    history_queries = [r.full_url for r, _ in seen if "time+%3E%3D" in r.full_url and "GROUP+BY+time" not in r.full_url]
+    assert len(history_queries) >= 3
+
+
+def test_each_section_writes_under_the_entity_lock_not_the_global_one(service, monkeypatch) -> None:
+    monkeypatch.setattr(influxdb_import, "SECTION_TARGET_ROWS", 4)
+    _fake_influx(monkeypatch, _sectioned())
+    coordinator = service.deps.coordinator
+    entity_calls, original = [], coordinator.entity
+
+    def spy(entity_id):
+        entity_calls.append(entity_id)
+        return original(entity_id)
+
+    monkeypatch.setattr(coordinator, "entity", spy)
+    in_write = []
+    original_import = import_routes.symcon_import.import_rows
+
+    def guarded(*args, **kwargs):
+        # exclusive() hält auch jede entity()-Sperre an; hier darf der Schreibvorgang nur unter entity() laufen.
+        in_write.append(len(entity_calls))
+        return original_import(*args, **kwargs)
+
+    monkeypatch.setattr(import_routes.symcon_import, "import_rows", guarded)
+    result = _run_import(service)
+    assert result["errors"] == []
+    assert entity_calls.count("sensor.demo") == 3  # je Abschnitt einmal, dazwischen freigegeben
+    assert in_write == [1, 2, 3]
+
+
+def test_a_small_history_stays_one_section(service, monkeypatch) -> None:
+    _fake_influx(monkeypatch, _sectioned())
+    result = _run_import(service)
+    (item,) = result["items"]
+    assert item["sections"] == 1 and item["result"].rows_imported == 9
+
+
+def test_cancelling_between_sections_keeps_what_is_written_and_marks_the_rest(service, monkeypatch) -> None:
+    monkeypatch.setattr(influxdb_import, "SECTION_TARGET_ROWS", 4)
+    second_section_start = int(datetime(2026, 2, 1, tzinfo=ZoneInfo("Europe/Berlin")).timestamp() * 1000)
+
+    def cancel_when_second_section_starts(low: int) -> None:
+        if low >= second_section_start:
+            service._influx._cancel.set()
+
+    _fake_influx(monkeypatch, _sectioned(on_history=cancel_when_second_section_starts))
+    result = _run_import(service)
+
+    (item,) = result["items"]
+    assert item["result"].imported_months == ["2026-01"]
+    assert any("abgebrochen" in e for e in result["errors"])
+
+
+def test_a_second_run_after_a_cancel_skips_the_written_months_without_duplicates(service, monkeypatch) -> None:
+    monkeypatch.setattr(influxdb_import, "SECTION_TARGET_ROWS", 4)
+    _fake_influx(monkeypatch, _sectioned())
+    first = _run_import(service)
+    assert first["errors"] == []
+    second = _run_import(service)
+    (item,) = second["items"]
+    assert item["result"].rows_imported == 0
+    assert item["result"].skipped_months == ["2026-01", "2026-02", "2026-03"]
+
+
+def test_one_failing_section_is_reported_with_its_months_and_the_others_are_written(service, monkeypatch) -> None:
+    monkeypatch.setattr(influxdb_import, "SECTION_TARGET_ROWS", 4)
+    base = _sectioned()
+    feb = int(datetime(2026, 2, 1, tzinfo=ZoneInfo("Europe/Berlin")).timestamp() * 1000)
+
+    def handler(params, request) -> bytes:
+        query = params["q"][0]
+        if "'demo'" in query and "GROUP BY" not in query:
+            low = int(query.split("time >= ")[1].split("ms")[0])
+            if low == feb:
+                raise influxdb_import.InfluxApiError("InfluxDB meldet: kaputt")
+        return base(params, request)
+
+    def fake(request, verify_tls=True):
+        params = urllib.parse.parse_qs(urllib.parse.urlsplit(request.full_url).query)
+        return iter(handler(params, request).splitlines())
+
+    monkeypatch.setattr(influxdb_import, "_open_lines", fake)
+    result = _run_import(service)
+    (item,) = result["items"]
+    assert item["result"].imported_months == ["2026-01", "2026-03"]
+    assert any("Abschnitt 2/3" in e and "2026-02" in e and "kaputt" in e for e in result["errors"])
+
+
+def test_the_dry_run_plans_sections_and_sums_them(service, monkeypatch) -> None:
+    monkeypatch.setattr(influxdb_import, "SECTION_TARGET_ROWS", 4)
+    _fake_influx(monkeypatch, _sectioned())
+    endpoint = _endpoint(service, "/import/influxdb/dry-run", "POST")
+    _, context = asyncio.run(endpoint(_request("/import/influxdb/dry-run", FORM)))
+    assert not context["errors"]
+    (item,) = context["items"]
+    assert item["sections"] == 3 and item["plan"].rows_to_import + item["plan"].rows_to_merge == 9
+    assert item["plan"].months_to_import == ["2026-01", "2026-02", "2026-03"]
+    assert "9" in item["available_label"]
+
+
+def test_the_cancel_route_only_acts_on_a_running_import(service) -> None:
+    endpoint = _endpoint(service, "/import/influxdb/cancel", "POST")
+    template, context = endpoint(_request("/import/influxdb/cancel", []))
+    assert template == "_job_progress.html" and context["cancel_url"] == "import/influxdb/cancel"
+    assert not service._influx._cancel.is_set()  # nichts läuft: nichts vorzumerken

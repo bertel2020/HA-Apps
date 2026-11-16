@@ -78,7 +78,7 @@ Verarbeitung:
 | Events je Schreibbatch | 1.000 |
 | Entitäten je Multi-Abfrage | 25 |
 | Punkte je Rohwertabfrage | 100.000 |
-| Zeilen je CSV-Export | 5.000.000 |
+| Zeilen je CSV-Export | 10.000.000 |
 | Importzeilen je Entität | 10.000.000 |
 | ZIP-Upload | 2 GiB |
 | CSV-Upload | 256 MiB |

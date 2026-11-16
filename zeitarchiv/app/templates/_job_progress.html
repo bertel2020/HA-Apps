@@ -10,6 +10,8 @@
      note         optional: Hinweiszeile unter dem Balken. Muss im Container
                   stehen — ein Geschwister des Containers würde bei jedem
                   Poll (outerHTML) ein weiteres Mal angehängt.
+     cancel_url   optional: Endpunkt, der den Auftrag zum Abbruch vormerkt (POST)
+                  und wieder diese Anzeige liefert. Ohne Wert kein Knopf.
      poll_url     Endpunkt, der entweder wieder diese Anzeige liefert oder,
                   sobald der Auftrag durch ist, das Endergebnis OHNE
                   hx-trigger — dadurch endet das Polling von selbst, ohne
@@ -43,5 +45,9 @@
   <div class="job-progress-track">
     <div class="job-progress-fill" style="width:{{ percent }}%"></div>
   </div>
+  {% if cancel_url %}
+  <button type="button" class="btn btn-danger-outline"
+          hx-post="{{ cancel_url }}" hx-target="#{{ progress_id }}" hx-swap="outerHTML">{{ _("Abbrechen") }}</button>
+  {% endif %}
   {% if note %}<p class="marked-danger-note">{{ note }}</p>{% endif %}
 </div>

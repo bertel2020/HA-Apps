@@ -10,7 +10,14 @@ Anders als beim VictoriaMetrics-Import werden die Entitäten nacheinander
 abgerufen, geschrieben und wieder freigegeben, statt zuerst ALLE im
 Arbeitsspeicher zu sammeln: Bei einer langen Historie (gemeldet: rund 400 Mio
 Zeilen für etwa 200 Entitäten) wäre das nicht tragbar. Der Abruf läuft vor
-jeder Sperre, ``exclusive()`` hält nur das Schreiben einer einzelnen Entität.
+jeder Sperre, die Entitätssperre hält nur das Schreiben eines einzelnen
+Abschnitts.
+
+Große Entitäten werden in Abschnitte geteilt (influxdb_import.plan_sections):
+Eine Entität mit mehr als 10 Mio Punkten wurde früher abgewiesen und musste von
+Hand zeitraumweise importiert werden. Jetzt wird je Abschnitt abgerufen,
+geschrieben und freigegeben; der Import ist zwischen den Abschnitten
+abbrechbar und lässt sich wiederholen (vorhandene Monate werden übersprungen).
 
 Das Passwort verlässt die Anfrage nie: Es steht weder im Verfügbarkeits-Cache
 noch im Importbericht noch in einem Log, und die Seite schreibt es nicht
@@ -55,6 +62,42 @@ INFLUX_RANGE_PRESET_DAYS = {"30d": 30, "90d": 90, "365d": 365}
 INFLUX_MAX_RANGE_DAYS = 3650
 # Ab wann die angezeigte Verfügbarkeit als veraltet gilt (wie beim HA-Import).
 AVAILABILITY_STALE_SECONDS = 15 * 60
+
+
+def _merge(parts: list):  # noqa: ANN202 — ImportPlan/ImportResult
+    """Fasst die Ergebnisse mehrerer Abschnitte einer Entität zusammen: Zahlen
+    werden addiert, Listen verkettet (ohne Doppelte, in Reihenfolge), bei Texten
+    und sonstigen Werten gilt der erste nicht leere."""
+    merged = dataclasses.replace(parts[0])
+    for part in parts[1:]:
+        for field in dataclasses.fields(merged):
+            current, other = getattr(merged, field.name), getattr(part, field.name)
+            if isinstance(current, bool):
+                continue
+            if isinstance(current, int):
+                setattr(merged, field.name, current + other)
+            elif isinstance(current, list):
+                setattr(merged, field.name, current + [item for item in other if item not in current])
+            elif not current and other:
+                setattr(merged, field.name, other)
+    return merged
+
+
+@dataclasses.dataclass
+class _Span:
+    """Erster und letzter Zeitstempel und Zahl der gelesenen Werte einer
+    Entität über alle Abschnitte (die Zeilen selbst werden freigegeben)."""
+
+    first_ts: float | None = None
+    last_ts: float | None = None
+    count: int = 0
+
+    def add(self, history: ha_import.HistoryFetchResult) -> None:
+        if not history.rows:
+            return
+        self.first_ts = history.rows[0][0] if self.first_ts is None else min(self.first_ts, history.rows[0][0])
+        self.last_ts = history.rows[-1][0] if self.last_ts is None else max(self.last_ts, history.rows[-1][0])
+        self.count += len(history.rows)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -104,6 +147,9 @@ class InfluxImportService:
         self.owner = owner
         self.deps = owner.deps
         self._progress = JobProgress("influxdb-import", unit=N_("Entitäten"), label=N_("InfluxDB-Import"))
+        # Abbruch durch den Nutzer: wird vor jedem Abschnitt und im Abruf geprüft,
+        # nie während eines Schreibvorgangs.
+        self._cancel = threading.Event()
         # Genau ein Eintrag (zuletzt geprüfte Adresse/Datenbank/Zeitraum), wie
         # beim VictoriaMetrics-Reiter.
         self._availability_lock = threading.Lock()
@@ -220,7 +266,10 @@ class InfluxImportService:
         }
 
     def _progress_context(self) -> dict:
-        return {**self._progress.snapshot(), "progress_id": "influx-progress", "poll_url": "import/influxdb/progress"}
+        return {
+            **self._progress.snapshot(), "progress_id": "influx-progress", "poll_url": "import/influxdb/progress",
+            "cancel_url": "import/influxdb/cancel",
+        }
 
     # ------------------------------------------------------------------ Abruf
 
@@ -239,8 +288,25 @@ class InfluxImportService:
         )
         return influxdb_import.fetch_history_rows(
             entity_id, start, end, config.base_url, config.database, config.auth, config.verify_tls,
-            state_mapper=mapper,
+            state_mapper=mapper, should_cancel=None if dry else self._cancel.is_set,
         )
+
+    def _sections(
+        self, entity_id: str, config: _Config, start: datetime, end: datetime,
+    ) -> list[tuple[datetime, datetime]]:
+        """Abschnitte der Entität: ein Abschnitt bis zur Zielgröße, sonst ganze
+        lokale Monate (siehe influxdb_import.plan_sections)."""
+        months = influxdb_import.fetch_monthly_counts(
+            entity_id, start, end, self.deps.tz, config.base_url, config.database, config.auth,
+            config.verify_tls, state=bool(self._state_entity_ids([entity_id])),
+        )
+        return influxdb_import.plan_sections(months, start, end, self.deps.tz)
+
+    def _section_label(self, section: tuple[datetime, datetime]) -> str:
+        """„2025-01 – 2025-03“ (lokale Monate, Ende einschließlich)."""
+        first = section[0].astimezone(self.deps.tz)
+        last = (section[1] - timedelta(seconds=1)).astimezone(self.deps.tz)
+        return f"{first:%Y-%m}" if (first.year, first.month) == (last.year, last.month) else f"{first:%Y-%m} – {last:%Y-%m}"
 
     def _fetch_availability(
         self, entity_ids: list[str], config: _Config, start: datetime, end: datetime,
@@ -256,16 +322,15 @@ class InfluxImportService:
             )
             return {}, str(exc)
 
-    def _available_label(self, history: ha_import.HistoryFetchResult) -> str:
-        if not history.rows:
+    def _available_label(self, span: _Span) -> str:
+        if span.first_ts is None or span.last_ts is None:
             return tr("Keine Werte im gewählten Zeitraum gefunden")
-        first_ts, last_ts = history.rows[0][0], history.rows[-1][0]
         return (
-            f"{format_timestamp(first_ts, self.deps.tz)} – {format_timestamp(last_ts, self.deps.tz)} · "
-            f"{format_int(len(history.rows))} {tr('Werte')}"
+            f"{format_timestamp(span.first_ts, self.deps.tz)} – {format_timestamp(span.last_ts, self.deps.tz)} · "
+            f"{format_int(span.count)} {tr('Werte')}"
         )
 
-    def _item_head(self, entity_id: str, history: ha_import.HistoryFetchResult) -> dict:
+    def _item_head(self, entity_id: str, span: _Span) -> dict:
         entity = self.deps.index.get_entity(entity_id)
         return {
             "entity_id": entity_id,
@@ -274,7 +339,7 @@ class InfluxImportService:
                 entity["friendly_name"] if entity else None,
                 entity["custom_name"] if entity else None,
             ),
-            "available_label": self._available_label(history),
+            "available_label": self._available_label(span),
         }
 
     # ------------------------------------------------------------------ Routen
@@ -361,22 +426,38 @@ class InfluxImportService:
             def plan_all() -> None:
                 for entity_id in entity_ids:
                     try:
-                        history = self._fetch_history(entity_id, config, start, end, dry=True)
+                        sections = self._sections(entity_id, config, start, end)
                     except (influxdb_import.InfluxApiError, ValueError) as exc:
                         logger.warning("InfluxDB-Historie für %s nicht abrufbar · %s", entity_id, exc)
                         errors.append(f"{entity_id}: {exc}")
                         continue
-                    with deps.coordinator.entities([entity_id]):
+                    span, plans = _Span(), []
+                    for number, section in enumerate(sections, 1):
+                        prefix = (
+                            f"{entity_id} ({tr('Abschnitt')} {number}/{len(sections)}, {self._section_label(section)})"
+                            if len(sections) > 1 else entity_id
+                        )
                         try:
-                            plan = symcon_import.plan_import_rows(
-                                deps.data_dir, deps.index, history.rows, entity_id, deps.tz,
-                                source_label=entity_id, skipped_rows=history.skipped,
-                                include_existing_months=config.include_existing_months,
-                            )
-                        except ValueError as exc:
-                            errors.append(f"{entity_id}: {exc}")
+                            history = self._fetch_history(entity_id, config, section[0], section[1], dry=True)
+                        except (influxdb_import.InfluxApiError, ValueError) as exc:
+                            logger.warning("InfluxDB-Historie für %s nicht abrufbar · %s", entity_id, exc)
+                            errors.append(f"{prefix}: {exc}")
                             continue
-                    items.append({**self._item_head(entity_id, history), "plan": plan})
+                        span.add(history)
+                        with deps.coordinator.entities([entity_id]):
+                            try:
+                                plans.append(symcon_import.plan_import_rows(
+                                    deps.data_dir, deps.index, history.rows, entity_id, deps.tz,
+                                    source_label=entity_id, skipped_rows=history.skipped,
+                                    include_existing_months=config.include_existing_months,
+                                ))
+                            except ValueError as exc:
+                                errors.append(f"{prefix}: {exc}")
+                                continue
+                    if plans:
+                        items.append({
+                            **self._item_head(entity_id, span), "plan": _merge(plans), "sections": len(sections),
+                        })
 
             await run_in_threadpool(plan_all)
             logger.debug(
@@ -415,6 +496,8 @@ class InfluxImportService:
                     for item in items:
                         result_payload = dataclasses.asdict(item["result"])
                         result_payload["available_label"] = item["available_label"]
+                        if item.get("sections", 1) > 1:
+                            result_payload["sections"] = item["sections"]
                         report_results.append(result_payload)
                     import_reports.create(
                         deps.data_dir,
@@ -432,6 +515,8 @@ class InfluxImportService:
                 errors: list[str] = list(vorab_fehler)
                 reconciliation_report = None
                 written: list[str] = []
+                cancelled = False
+                self._cancel.clear()
                 logger.info(
                     "InfluxDB-Import gestartet · Entitäten=%d · Zeitraum=%s", len(entity_ids), config.range_preset,
                 )
@@ -441,28 +526,59 @@ class InfluxImportService:
                 )
                 try:
                     for nummer, entity_id in enumerate(entity_ids):
+                        if self._cancel.is_set():
+                            cancelled = True
+                            break
                         self._progress.advance(nummer, entity_id)
                         try:
-                            history = self._fetch_history(entity_id, config, start, end, dry=False)
+                            sections = self._sections(entity_id, config, start, end)
                         except (influxdb_import.InfluxApiError, ValueError) as exc:
                             logger.warning("InfluxDB-Historie für %s nicht abrufbar · %s", entity_id, exc)
                             errors.append(f"{entity_id}: {exc}")
                             continue
-                        head = self._item_head(entity_id, history)
-                        with deps.coordinator.exclusive():
+                        span, results = _Span(), []
+                        for number, section in enumerate(sections, 1):
+                            if self._cancel.is_set():
+                                cancelled = True
+                                break
+                            section_text = f"{tr('Abschnitt')} {number}/{len(sections)}, {self._section_label(section)}"
+                            prefix = f"{entity_id} ({section_text})" if len(sections) > 1 else entity_id
+                            if len(sections) > 1:
+                                self._progress.advance(nummer, f"{entity_id} · {section_text}")
                             try:
-                                result = symcon_import.import_rows(
-                                    deps.data_dir, deps.index, history.rows, entity_id, deps.tz,
-                                    source_label=entity_id, skipped_rows=history.skipped,
-                                    include_existing_months=config.include_existing_months,
-                                )
-                            except ValueError as exc:
-                                errors.append(f"{entity_id}: {exc}")
+                                history = self._fetch_history(entity_id, config, section[0], section[1], dry=False)
+                            except influxdb_import.ImportCancelled:
+                                cancelled = True
+                                break
+                            except (influxdb_import.InfluxApiError, ValueError) as exc:
+                                logger.warning("InfluxDB-Historie für %s nicht abrufbar · %s", entity_id, exc)
+                                errors.append(f"{prefix}: {exc}")
                                 continue
-                        # Die Zeilen sind geschrieben; nur die kleine Ergebnisübersicht bleibt.
-                        del history
-                        written.append(entity_id)
-                        items.append({**head, "result": result})
+                            span.add(history)
+                            # Entitätssperre statt exclusive(): geschrieben wird genau diese Entität
+                            # (Archiv, Rollups, Hot Buffer, Indexzeilen); die globale Sperre hielte
+                            # sonst auch Live-Aufnahme und Oberfläche für die ganze Schreibdauer an.
+                            with deps.coordinator.entity(entity_id):
+                                try:
+                                    results.append(symcon_import.import_rows(
+                                        deps.data_dir, deps.index, history.rows, entity_id, deps.tz,
+                                        source_label=entity_id, skipped_rows=history.skipped,
+                                        include_existing_months=config.include_existing_months,
+                                    ))
+                                except ValueError as exc:
+                                    errors.append(f"{prefix}: {exc}")
+                                    continue
+                            # Die Zeilen sind geschrieben; nur die kleine Ergebnisübersicht bleibt.
+                            del history
+                        if results:
+                            written.append(entity_id)
+                            items.append({
+                                **self._item_head(entity_id, span), "result": _merge(results),
+                                "sections": len(sections),
+                            })
+                        if cancelled:
+                            errors.append(tr("Import abgebrochen. Bereits geschriebene Monate bleiben erhalten."))
+                            break
                     self._progress.advance(len(entity_ids), "")
                     if written:
                         with deps.coordinator.exclusive():
@@ -503,6 +619,15 @@ class InfluxImportService:
                 self._progress.start(run_import, logger)
             except JobBusy:
                 logger.info("InfluxDB-Import bereits aktiv · event=influxdb_import_already_running")
+            return deps.templates.TemplateResponse(request, "_job_progress.html", self._progress_context())
+
+        @router.post("/import/influxdb/cancel", response_class=HTMLResponse)
+        def import_influxdb_cancel(request: Request) -> HTMLResponse:
+            """Bricht zwischen zwei Abschnitten bzw. im Abruf ab; ein Schreibvorgang
+            läuft immer zu Ende. Der Knopf zeigt danach wieder die Fortschrittsanzeige."""
+            if self._progress.snapshot()["running"]:
+                self._cancel.set()
+                logger.info("InfluxDB-Import: Abbruch angefordert · event=influxdb_import_cancel_requested")
             return deps.templates.TemplateResponse(request, "_job_progress.html", self._progress_context())
 
         @router.get("/import/influxdb/progress", response_class=HTMLResponse)

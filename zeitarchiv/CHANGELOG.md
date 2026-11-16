@@ -14,6 +14,10 @@
 
 ### New
 
+- **Import**: The InfluxDB import splits large entities into sections automatically
+  - Entities with more than 10 million values are no longer rejected; splitting them by hand is no longer needed
+  - New “Cancel” button in the progress display
+  - The import only holds the interface up briefly per section
 - **Data quality**: Measure again
   - “Measure again” in the status line, the selection bar and each row refreshes the numbers right away instead of waiting for the next automatic measurement
   - The status line shows the progress while it runs
@@ -23,6 +27,7 @@
 
 ### Changed
 
+- **Export**: The limit per CSV file rises from 5 to 10 million rows
 - **Data quality**: The status line now reads “last measured at most … ago” instead of “oldest measurement … ago”
 - **Data quality**: Clearer loading and filters
   - Expanding a row shows a spinner with a note that large entities can take up to a minute, and offers “Try again” if loading fails

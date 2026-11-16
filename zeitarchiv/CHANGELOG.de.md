@@ -14,6 +14,10 @@
 
 ### Neu
 
+- **Import**: InfluxDB-Import teilt große Entitäten automatisch in Abschnitte
+  - Entitäten mit mehr als 10 Mio Werten werden nicht mehr abgewiesen; ein Aufteilen von Hand entfällt
+  - Neuer Knopf „Abbrechen“ in der Fortschrittsanzeige
+  - Der Import hält die Oberfläche nur noch kurz je Abschnitt an
 - **Datenqualität**: Neu messen
   - „Neu messen“ in der Statuszeile, der Auswahlleiste und je Zeile aktualisiert die Zahlen sofort, statt auf die nächste automatische Messung zu warten
   - Die Statuszeile zeigt den Fortschritt, solange die Messung läuft
@@ -23,6 +27,7 @@
 
 ### Geändert
 
+- **Export**: Das Limit je CSV-Datei steigt von 5 auf 10 Mio Zeilen
 - **Datenqualität**: Die Statuszeile heißt jetzt „zuletzt vor spätestens …“ statt „älteste Messung vor …“
 - **Datenqualität**: Deutlicherer Ladehinweis und einheitliche Filter
   - Beim Aufklappen einer Zeile erscheint ein Spinner mit dem Hinweis, dass große Entitäten bis zu einer Minute brauchen können; schlägt das Laden fehl, gibt es „Erneut versuchen“

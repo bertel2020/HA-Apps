@@ -31,6 +31,16 @@ je Zeile) und wird zeilenweise gelesen — gemessen 3 Mio Punkte in 1,9 s statt
 10,4 s mit ``LIMIT``/``OFFSET``. Zusätzlich wird in Zeitfenstern abgefragt,
 damit auch eine mehrjährige Historie nie als eine einzige Abfrage läuft.
 
+Große Entitäten: Statt eine Historie mit mehr als ``max_rows`` Punkten
+abzuweisen, wird sie in Abschnitte geteilt (``plan_sections``): vorab zählt
+``fetch_monthly_counts`` die Punkte je Tag, daraus werden ganze lokale Monate
+zu Abschnitten von etwa ``SECTION_TARGET_ROWS`` Punkten gepackt. Die Grenzen
+liegen zwingend an Monatsanfängen in der lokalen Zeit: der generische Importkern
+überspringt einen Monat, für den es schon eine Archivdatei gibt, ein
+Abschnittsende mitten im Monat würde den Rest dieses Monats also still
+verwerfen. ``max_rows`` gilt dadurch je Abschnitt, als harte Sicherung für den
+Arbeitsspeicher.
+
 Gibt wie vm_import.py bereits geparste (ts, value)-Zeilen zurück, die
 unverändert an symcon_import.py::plan_import_rows()/import_rows()
 weitergereicht werden; die Ergebnistypen sind die aus ha_import.py.
@@ -51,6 +61,7 @@ import urllib.parse
 import urllib.request
 from collections.abc import Callable, Iterator
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from ..i18n import tr
 from ..limits import MAX_IMPORT_ROWS_PER_ENTITY
@@ -73,12 +84,23 @@ CHUNK_SIZE = 20_000
 # Verfügbarkeit: so viele Entitäten je Abfrage (Regex auf den Tag entity_id).
 ENTITY_BATCH_SIZE = 40
 
+# Zielgröße eines Abschnitts in Punkten. Die harte Grenze je Abschnitt bleibt
+# MAX_IMPORT_ROWS_PER_ENTITY; der Abstand fängt ab, dass die Tageszählung in UTC
+# an den lokalen Monatsgrenzen um Stunden danebenliegt. Gemessen an einem echten
+# Bestand (Raspberry Pi 4): Quartale mit rund 1,8 Mio Punkten brauchten 3 bis 6
+# Minuten und liefen sauber durch.
+SECTION_TARGET_ROWS = 2_000_000
+
 VALUE_FIELD = "value"
 STATE_FIELD = "state"
 
 
 class InfluxApiError(RuntimeError):
     """InfluxDB nicht erreichbar oder die Anfrage schlägt fehl."""
+
+
+class ImportCancelled(Exception):  # noqa: N818 — Abbruch durch den Nutzer, kein Fehler
+    """Der Nutzer hat den Import abgebrochen (siehe ``should_cancel``)."""
 
 
 def normalize_base_url(base_url: str | None) -> str:
@@ -268,6 +290,7 @@ def fetch_history_rows(
     verify_tls: bool = True,
     state_mapper: Callable[[str, float], float | None] | None = None,
     max_rows: int = MAX_IMPORT_ROWS_PER_ENTITY,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> HistoryFetchResult:
     """Liest die Rohpunkte einer Entität zeitfensterweise über GET /query.
     Mehrere Serien und Measurements derselben Entität (Umbenennung,
@@ -276,7 +299,9 @@ def fetch_history_rows(
     der generische Importkern strikt aufsteigende Zeitstempel bekommt.
 
     Mit ``state_mapper`` (Zustands-Entität) wird das Textfeld ``state``
-    gelesen, sonst das Zahlenfeld ``value``."""
+    gelesen, sonst das Zahlenfeld ``value``. ``max_rows`` gilt für diesen
+    Aufruf (bei geteilter Historie je Abschnitt); ``should_cancel`` wird je
+    Antwortzeile geprüft und beendet den Abruf mit ``ImportCancelled``."""
     field = STATE_FIELD if state_mapper is not None else VALUE_FIELD
     result = HistoryFetchResult()
     points: dict[float, float] = {}
@@ -294,6 +319,8 @@ def fetch_history_rows(
             {"chunked": "true", "chunk_size": str(CHUNK_SIZE)},
         )
         for res in _results(_open_lines(request, verify_tls)):
+            if should_cancel is not None and should_cancel():
+                raise ImportCancelled
             for series in res.get("series") or []:
                 for stamp, raw in series.get("values") or []:
                     if state_mapper is not None:
@@ -322,6 +349,78 @@ def fetch_history_rows(
         window_start = window_end
     result.rows = sorted(points.items())
     return result
+
+
+def fetch_monthly_counts(
+    entity_id: str,
+    start: datetime,
+    end: datetime,
+    tz: ZoneInfo,
+    base_url: str | None = None,
+    database: str | None = None,
+    auth: tuple[str, str] | None = None,
+    verify_tls: bool = True,
+    state: bool = False,
+) -> dict[tuple[int, int], int]:
+    """Punkte je lokalem Monat im Fenster ``[start, end)``, über alle Serien und
+    Measurements der Entität. Gezählt wird je UTC-Tag (``GROUP BY time(1d)``)
+    und danach dem lokalen Monat des Tagesbeginns zugeschlagen — an den
+    Monatsgrenzen kann ein Tag um die Zeitzonenverschiebung danebenliegen, das
+    ist für die Abschnittsgröße unerheblich. Tage ohne Punkte fehlen
+    (``fill(none)``). Antworten außerhalb des Fensters werden verworfen."""
+    field = STATE_FIELD if state else VALUE_FIELD
+    query = (
+        f'SELECT count("{field}") FROM /.*/ WHERE {_entity_filter(entity_id)} '
+        f"AND time >= {int(start.timestamp() * 1000)}ms AND time < {int(end.timestamp() * 1000)}ms "
+        "GROUP BY time(1d) fill(none)"
+    )
+    request = _request(base_url or DEFAULT_BASE_URL, database or DEFAULT_DATABASE, query, auth)
+    low, high = start.timestamp() * 1000, end.timestamp() * 1000
+    months: dict[tuple[int, int], int] = {}
+    for res in _results(_open_lines(request, verify_tls)):
+        for series in res.get("series") or []:
+            for row in series.get("values") or []:
+                try:
+                    stamp, number = float(row[0]), int(row[1])
+                except (IndexError, TypeError, ValueError):
+                    continue
+                if number <= 0 or not low <= stamp < high:
+                    continue
+                local = datetime.fromtimestamp(stamp / 1000.0, tz)
+                key = (local.year, local.month)
+                months[key] = months.get(key, 0) + number
+    return months
+
+
+def plan_sections(
+    months: dict[tuple[int, int], int],
+    start: datetime,
+    end: datetime,
+    tz: ZoneInfo,
+    target_rows: int | None = None,
+) -> list[tuple[datetime, datetime]]:
+    """Teilt ``[start, end)`` in aufeinanderfolgende Abschnitte.
+
+    Ganze lokale Monate werden aufsteigend zusammengepackt, bis ein weiterer
+    Monat ``target_rows`` überschritten hätte; ein einzelner Monat bleibt immer
+    ganz. Abschnittsgrenzen sind lokale Monatsanfänge (siehe Moduldocstring),
+    der erste Abschnitt beginnt bei ``start``, der letzte endet bei ``end``;
+    das Ende eines Abschnitts ist der Anfang des nächsten, es gibt weder Lücken
+    noch Überschneidungen. Ohne Zählung (oder bis ``target_rows``) ist es genau
+    ein Abschnitt."""
+    target_rows = target_rows or SECTION_TARGET_ROWS
+    boundaries: list[datetime] = []
+    running = 0
+    for year, month in sorted(months):
+        count = months[(year, month)]
+        if running and running + count > target_rows:
+            boundary = datetime(year, month, 1, tzinfo=tz)
+            if start < boundary < end:
+                boundaries.append(boundary)
+                running = 0
+        running += count
+    edges = [start, *boundaries, end]
+    return list(zip(edges[:-1], edges[1:], strict=True))
 
 
 def fetch_availability(

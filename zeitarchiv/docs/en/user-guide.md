@@ -2668,7 +2668,7 @@ each. Several entities in one shared file are deliberately not offered: raw
 values have their own timestamps per entity, so the file would consist mostly of
 empty cells. The columns are `timestamp` (local time), `unix_ts` and `value`.
 
-The export limit of 5 million rows applies per file. For per-second values
+The export limit of 10 million rows applies per file. For per-second values
 (about 2 million rows per year), one year is still possible, several years raw
 are not — adjust the period or the resolution. The row count shown beforehand
 is an estimate: values marked for deletion are not subtracted, and a partially
