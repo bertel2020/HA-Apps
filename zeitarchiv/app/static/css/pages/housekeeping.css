@@ -55,7 +55,8 @@
      Die eigenen min-width je Tabelle ersetzen die 420px oben (die für zwei
      Spalten gelten): Summe der Wert-Spalten plus rund 220px Sockel für Name
      und ID. Darunter scrollt .tbl-wrap waagerecht, statt die Entität-Spalte
-     bis zur Unlesbarkeit zu quetschen. */
+     bis zur Unlesbarkeit zu quetschen.
+
      Die Breiten sind im Browser GEMESSEN, nicht geschätzt: je Spalte der
      breiteste Inhalt aus Überschrift und allen Zellen, mit nowrap gerendert,
      plus 28px Innenabstand (table.dt td: padding 8px 14px). Ein erster
