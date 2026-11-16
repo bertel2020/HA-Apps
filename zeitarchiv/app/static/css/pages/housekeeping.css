@@ -63,7 +63,7 @@
      niedrig, der längste Wert brach dort still um. Wer die Werte ändert,
      misst besser nach, statt zu rechnen. */
   #ausreisser table.stats-dt{min-width:610px;}
-  #luecken-erkennung table.stats-dt{min-width:1090px;}
+  #luecken-erkennung table.stats-dt{min-width:1260px;}
   /* gemessen 88 (Überschrift; "100×" wäre 65) */
   .hk-col-schwelle{width:92px;}
   /* gemessen 184 ("39.935 von 312.934"); 200 als Reserve für größere Archive */
