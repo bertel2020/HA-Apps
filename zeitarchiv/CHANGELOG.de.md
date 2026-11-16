@@ -14,15 +14,6 @@
 
 ### Neu
 
-- **Wetterdashboard**: Karte „Tagesverlauf im Vergleich“ in der Übersicht
-  - Temperatur, Niederschlag oder Sonnenstunden je Tag für 7 Tage, 30 Tage, 12 Monate oder einen eigenen Zeitraum (bis zu zehn Jahre)
-  - Vergleich mit dem Vorzeitraum oder dem Vorjahreszeitraum als gestrichelte Linie, oder ohne Vergleich; eine Zeile fasst ihn zusammen
-  - Ab etwa zwei Monaten zeigt die Karte Wochenwerte
-  - In der Kartenauswahl ein- und ausblendbar
-- **Wetterdashboard**: Zeiträume auf „Wind & Sonne“
-  - „PV und Helligkeit“: 7, 14 oder 30 Tage oder ein eigener Zeitraum (bis zu drei Monate)
-  - Das Stundendiagramm zeigt wahlweise den gewählten Tag oder das Mittel im Zeitraum; der Tooltip nennt Ertrag und Erwartung in kWh
-  - „Die letzten Tage im Vergleich“: 7, 14 oder 30 Tage
 - **Lücken-Erkennung**: Empfehlung für die Schwelle
   - Die Konfigurationsseite zeigt unter dem Schwellenfeld die empfohlene Stufe und eine Beurteilung (zu empfindlich, passt, könnte feiner sein, nicht geeignet); die Empfehlung steht nach 14 Tagen Beobachtung bereit
   - Housekeeping → Lücken-Erkennung listet alle Entitäten mit Methode, Schwelle, gefundenen Lücken und Beurteilung
@@ -35,6 +26,15 @@
   - Übernommen wird nur bei „zu empfindlich“; „Aus“ wird nie empfohlen
   - Die Meldung „Ausreißer-Erkennung markiert auffällig viel“ zählt zu empfindliche und nicht geeignete Entitäten
   - Nach dem Update misst Zeitarchiv jede Entität einmal neu, bei großen Historien dauert das
+- **Wetterdashboard**: Karte „Tagesverlauf im Vergleich“ in der Übersicht
+  - Temperatur, Niederschlag oder Sonnenstunden je Tag für 7 Tage, 30 Tage, 12 Monate oder einen eigenen Zeitraum (bis zu zehn Jahre)
+  - Vergleich mit dem Vorzeitraum oder dem Vorjahreszeitraum als gestrichelte Linie, oder ohne Vergleich; eine Zeile fasst ihn zusammen
+  - Ab etwa zwei Monaten zeigt die Karte Wochenwerte
+  - In der Kartenauswahl ein- und ausblendbar
+- **Wetterdashboard**: Zeiträume auf „Wind & Sonne“
+  - „PV und Helligkeit“: 7, 14 oder 30 Tage oder ein eigener Zeitraum (bis zu drei Monate)
+  - Das Stundendiagramm zeigt wahlweise den gewählten Tag oder das Mittel im Zeitraum; der Tooltip nennt Ertrag und Erwartung in kWh
+  - „Die letzten Tage im Vergleich“: 7, 14 oder 30 Tage
 - **Wertänderungsfilter**: Das Lebenszeichen ist einstellbar
   - 1, 3, 6, 12 oder 24 Stunden, je Entität (bei aktivem Filter) und als Standard unter Einstellungen → Archivierung; bisher fest 6 Stunden
   - Die Lücken-Erkennung kennt dafür die Stufe „3 Stunden“; „1 Tag“ heißt dort „24 Stunden“

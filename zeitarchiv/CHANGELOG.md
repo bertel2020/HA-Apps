@@ -14,15 +14,6 @@
 
 ### New
 
-- **Weather dashboard**: “Daily course compared” card in the overview
-  - Temperature, precipitation or hours of sunshine per day for 7 days, 30 days, 12 months or a custom period (up to ten years)
-  - Comparison with the previous period or the same period last year as a dashed line, or none; one line sums it up
-  - From about two months on the card shows weekly values
-  - Can be shown or hidden in the card selection
-- **Weather dashboard**: Periods on “Wind & sun”
-  - “PV and brightness”: 7, 14 or 30 days or a custom period (up to three months)
-  - The hourly chart shows either the selected day or the average over the period; the tooltip gives yield and expectation in kWh
-  - “The last days compared”: 7, 14 or 30 days
 - **Gap detection**: Recommendation for the threshold
   - The configuration page shows the recommended level and an assessment below the threshold field (too sensitive, fits, could be finer, not suitable); the recommendation is available after 14 days of observation
   - Housekeeping → Gap detection lists all entities with method, threshold, gaps found and assessment
@@ -35,6 +26,15 @@
   - Only “too sensitive” is applied; “Off” is never recommended
   - The notice “Outlier detection marks an unusual amount” counts too-sensitive and not-suitable entities
   - After the update Zeitarchiv measures every entity once more, which takes a while with large histories
+- **Weather dashboard**: “Daily course compared” card in the overview
+  - Temperature, precipitation or hours of sunshine per day for 7 days, 30 days, 12 months or a custom period (up to ten years)
+  - Comparison with the previous period or the same period last year as a dashed line, or none; one line sums it up
+  - From about two months on the card shows weekly values
+  - Can be shown or hidden in the card selection
+- **Weather dashboard**: Periods on “Wind & sun”
+  - “PV and brightness”: 7, 14 or 30 days or a custom period (up to three months)
+  - The hourly chart shows either the selected day or the average over the period; the tooltip gives yield and expectation in kWh
+  - “The last days compared”: 7, 14 or 30 days
 - **Value change filter**: The sign of life is adjustable
   - 1, 3, 6, 12 or 24 hours, per entity (with an active filter) and as a default under Settings → Archiving; previously fixed at 6 hours
   - Gap detection gains a “3 hours” level for it; “1 day” is now called “24 hours”
