@@ -2125,8 +2125,12 @@ table.dt tbody tr.has-pending-purge:hover td{background:var(--warning-soft);}
 .settings-panel.is-raised .status-card:not(.settings-section .status-card, .card .status-card),
 .settings-panel.is-raised .tbl-wrap:not(.settings-section .tbl-wrap, .card .tbl-wrap),
 .settings-panel.is-raised :is(.chart-card,.dash-card,.edash-pin-card),
+.settings-panel.is-raised .report-card,
 .settings-panel.is-raised#export-wizard,
 .settings-panel.is-raised #log-output{box-shadow:var(--shadow),var(--tile-lift);}
+/* Übersicht und Dashboard-Seiten: Kacheln und Kopfleisten ohne .settings-panel, deshalb ohne Opt-in.
+   Doppelte Klasse, weil entities.css/die Leistenregeln mit gleicher Spezifität sonst gewinnen. */
+.card.ov-tile,.dash-tabs-bar.dash-tabs-bar,.dash-sticky-bar.dash-sticky-bar{box-shadow:var(--shadow),var(--tile-lift);}
 .settings-panel .settings-section-title{
   margin:0 0 8px;font-size:calc(17px * var(--font-scale, 1));font-weight:700;line-height:1.3;color:var(--ink);
 }
