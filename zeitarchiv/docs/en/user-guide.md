@@ -96,6 +96,7 @@ internals for developers are in the other documents of this folder (see
   - [Symcon](#symcon)
   - [CSV](#csv)
   - [Home Assistant](#home-assistant)
+  - [InfluxDB](#influxdb-experimental)
   - [Reports](#reports)
   - [Duplicate protection](#duplicate-protection)
   - [CSV export](#csv-export)
@@ -2602,6 +2603,44 @@ metadata, it should be shared only selectively.
 This import requires the add-on permission `homeassistant_api` as well as a
 Home Assistant installation with Supervisor (not available with Home
 Assistant Container).
+
+### InfluxDB (experimental)
+
+One-off import of the history from a standalone **InfluxDB 1.x** that the Home
+Assistant `influxdb` integration has written to (InfluxDB 2.x and 3.x are not
+supported).
+
+Sequence: check the address and database, enter a user and password if
+needed, choose the period, mark entities, optionally "Check availability",
+preview (dry run), start the import.
+
+- **Address:** The default is the internal add-on hostname. It contains an
+  installation-dependent part and can be adjusted. For an https address with a
+  self-signed certificate, turn off "Verify certificate".
+- **Credentials:** User and password are optional. The password is not stored,
+  appears in no import report and is kept in memory only for the duration of
+  the query. After reloading the page it has to be entered again.
+- **Mapping:** The selection offers entities that have already sent at least
+  one live value to Zeitarchiv. The lookup uses domain and entity ID, not the
+  display name. A renamed entity or one with a changed unit sits in several
+  series in InfluxDB; they are merged into one time series.
+- **Values:** The stored raw values are read, not aggregated ones. State
+  entities are mapped via their text.
+- **Large volumes:** The entities are retrieved and written one after another.
+  The import runs in the background with progress per entity and may be left
+  by navigating away. If it stops, the entities written so far are kept; a
+  repeated import only adds what is missing.
+  - **Sections:** An entity with very many values (rule of thumb: more than
+    2 million) is split automatically into sections of whole months, which are
+    retrieved and written section by section. The display names the section
+    and its period, the report the number of sections. Splitting by hand (e.g.
+    by quarter), as was needed before, is no longer necessary. A single month
+    with more than 10 million values is still rejected.
+  - **Cancel:** The "Cancel" button in the progress display ends the import
+    before the next section. The write in progress is still completed; months
+    already written are kept, and a repeated import skips them.
+- **One-off:** There is no continuous synchronisation. Existing timestamps and
+  values are never replaced.
 
 ### Reports
 
