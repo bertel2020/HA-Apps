@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 from datetime import datetime
@@ -1155,6 +1156,38 @@ def test_compact_raw_values_counter_keeps_last_value_per_bucket_and_marks_reset_
         assert marker["target_resolution"] == "5min"
 
         index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_compact_raw_values_requests_a_remeasure_of_the_quality_numbers() -> None:
+    """Nach dem Verdichten gilt die zwischengespeicherte Gesamt-Zählung der Datenqualität nicht mehr (sonst zeigt
+    die Übersicht alte Zahlen, während die Detailansicht schon neu rechnet)."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.temp"
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+        base = _ts(2024, 7, 5, 8) + 1
+        archive_dir = tmp / "archive" / entity_id
+        archive_dir.mkdir(parents=True)
+        pq.write_table(
+            pa.table({
+                "ts": [base, base + 10], "value": [20.0, 22.0],
+                "min_value": [None, None], "max_value": [None, None],
+            }),
+            archive_dir / "2024-07.parquet",
+        )
+        index.add_row_count(entity_id, 2)
+        index.set_first_ts(entity_id, base)
+        key = Index._CLEANUP_ALLTIME_STATS_PREFIX + entity_id
+        index.set_setting(key, json.dumps({"computed_at": 1234.0}))
+
+        cleanup.compact_raw_values(
+            tmp, index, entity_id, base, base + 10, "5min", TZ, now=datetime(2024, 8, 15, tzinfo=TZ)
+        )
+
+        assert json.loads(index.get_setting(key))["computed_at"] == 0
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

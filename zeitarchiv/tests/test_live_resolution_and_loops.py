@@ -138,6 +138,34 @@ def test_a_late_value_in_a_window_that_already_has_a_row_stays_a_separate_point(
     assert len(stamps) == len(set(stamps))
 
 
+def test_a_late_value_for_a_minute_that_already_has_a_row_stays_a_separate_point_with_one_window(tmp_path: Path) -> None:
+    """Nur ein offenes Fenster, das schon eine aufgelöste Zeile hat: früher entstand eine zweite Zeile mit
+    gleichem Zeitstempel (Duplikat im Live-Betrieb)."""
+    path = _file(tmp_path, [_resolved(1800.0), _resolved(3600.0), _raw(1000.0, 7.0, "spaet")])
+    resolution.collapse_pending_window(path, 1800)
+    rows = hotbuffer.read_full_rows(path)
+    assert [record[0] for record in rows] == [1800.0, 3600.0, 1000.0]
+    assert rows[2] == (1000.0, 7.0, "spaet", None, None)
+    # Fällt der verspätete Wert in genau das Fenster der letzten aufgelösten Zeile, gilt dasselbe.
+    path = _file(tmp_path, [_resolved(1800.0), _resolved(3600.0), _raw(3000.0, 7.0, "spaet")])
+    resolution.collapse_pending_window(path, 1800)
+    stamps = [record[0] for record in hotbuffer.read_full_rows(path)]
+    assert stamps == [1800.0, 3600.0, 3000.0]
+    assert len(stamps) == len(set(stamps))
+
+
+def test_the_normal_close_of_a_window_does_not_scan_the_whole_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Der Normalfall (ein Fenster hinter der letzten aufgelösten Zeile) liest nur das Dateiende."""
+    path = _file(tmp_path, [_resolved(1800.0), _resolved(3600.0), _raw(5000.0, 10.0, "a"), _raw(5300.0, 20.0, "b")])
+
+    def fail(_path: Path):
+        raise AssertionError("ganze Datei gelesen")
+
+    monkeypatch.setattr(resolution, "_resolved_timestamps", fail)
+    resolution.collapse_pending_window(path, 1800)
+    assert hotbuffer.read_full_rows(path)[-1] == (5400.0, 15.0, None, 10.0, 20.0)
+
+
 def test_a_value_added_by_hand_does_not_shift_the_mean_when_the_window_closes(tmp_path: Path) -> None:
     """Der Weg, auf dem eine Zeile aus einem früheren Fenster am Dateiende landet: ein von Hand nachgetragener
     Wert (verspätete Ereignisse filtert die Aufnahme schon vorher aus)."""

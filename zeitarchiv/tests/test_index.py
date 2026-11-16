@@ -1573,3 +1573,15 @@ def test_entity_last_seen_falls_back_to_last_ts() -> None:
     assert entity_last_seen({"last_seen_ts": None, "last_ts": None}) is None
     assert entity_last_seen({"last_seen_ts": 9.0, "last_ts": None}) == 9.0
     assert entity_last_seen({"last_seen_ts": 3.0, "last_ts": 7.0}) == 7.0
+
+
+def test_deleting_an_entity_uses_an_index_on_the_event_ledger(tmp_path: Path) -> None:
+    """Ohne Index auf ingested_events(entity_id) ist das Löschen einer Entität ein Volldurchlauf über das Ereignisbuch."""
+    index = Index(tmp_path / "index.sqlite")
+    try:
+        plan = index._conn.execute(
+            "EXPLAIN QUERY PLAN DELETE FROM ingested_events WHERE entity_id = ?", ("sensor.x",)
+        ).fetchall()
+        assert any("idx_ingested_events_entity" in str(row[-1]) for row in plan), plan
+    finally:
+        index.close()

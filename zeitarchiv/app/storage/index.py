@@ -645,6 +645,10 @@ CREATE INDEX IF NOT EXISTS idx_ingested_events_status
     ON ingested_events(status);
 CREATE INDEX IF NOT EXISTS idx_ingested_events_status_completed
     ON ingested_events(status, completed_at);
+-- Entität löschen: DELETE ... WHERE entity_id = ? lief ohne diesen Index als Volldurchlauf über das ganze
+-- Ereignisbuch (gemeldet: 20 bis 30 s je Entität auf einem Raspberry Pi 4).
+CREATE INDEX IF NOT EXISTS idx_ingested_events_entity
+    ON ingested_events(entity_id);
 
 -- Abgelegte Charts (Konzept "Offene Punkte": eigener Bereich zum Erstellen und
 -- "Ablegen" von Charts, inkl. Multi-Entitäts-Charts). entity_ids als

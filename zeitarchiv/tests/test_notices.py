@@ -608,3 +608,15 @@ def test_partial_import_notice_omits_zero_counts() -> None:
     notice = _partial_import_notice(errors=[], skipped_rows=3)
     assert "Fehler" not in notice["detail"]
     assert "Nicht importierbare Zeilen: 3" in notice["detail"]
+
+
+def test_counter_drop_labels_show_more_digits_when_rounding_hides_the_difference() -> None:
+    """Shelly rundet um 0,001 kWh: bei zwei Dezimalstellen stünde sonst „von 1.780,66 auf 1.780,66“."""
+    from app.notices import counter_drop_labels
+
+    row = {"decimals": "2", "unit": "kWh"}
+    previous, value = counter_drop_labels(1780.661, 1780.660, row)
+    assert previous != value
+    assert previous.startswith("1.780,66") and value.startswith("1.780,66")
+    # Unterscheiden sich die Texte schon, bleibt die eingestellte Stellenzahl.
+    assert counter_drop_labels(1780.66, 1700.1, row) == ("1.780,66 kWh", "1.700,10 kWh")

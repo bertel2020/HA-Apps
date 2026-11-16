@@ -24,7 +24,7 @@ import math
 from pathlib import Path
 
 from .atomic import write_file_atomically
-from .hotbuffer import HotRecord, format_record, iter_records, read_tail_after
+from .hotbuffer import HotRecord, _parse_line, format_record, iter_records, read_tail_after
 
 _COPY_BLOCK = 1024 * 1024
 
@@ -62,6 +62,37 @@ def pending_bucket_end(path: Path, interval_seconds: int) -> float | None:
 
 def _resolved_timestamps(path: Path) -> set[float]:
     return {record[0] for record in iter_records(path) if _is_resolved(record)}
+
+
+def _last_resolved_timestamp(path: Path, offset: int) -> float | None:
+    """Zeitstempel der letzten aufgelösten Zeile vor ``offset`` (dem Beginn der offenen Rohzeilen).
+
+    Gelesen wird nur ein Block vor dem Offset, nicht die ganze Datei: Die Prüfung läuft bei jedem Schließen
+    eines Fensters, bei 1-min-Auflösung also jede Minute und Entität."""
+    if offset <= 0:
+        return None
+    block = 4096
+    with path.open("rb") as handle:
+        while True:
+            start = max(0, offset - block)
+            handle.seek(start)
+            data = handle.read(offset - start)
+            lines = data.split(b"\n")
+            if start > 0:
+                lines = lines[1:]  # die erste Zeile im Block ist vermutlich angeschnitten
+            for raw in reversed(lines):
+                text = raw.decode("utf-8", errors="replace").strip()
+                if not text:
+                    continue
+                try:
+                    record = _parse_line(text)
+                except ValueError:
+                    continue
+                if record is not None and _is_resolved(record):
+                    return record[0]
+            if start == 0:
+                return None
+            block *= 2
 
 
 def _replace_tail(path: Path, offset: int, tail: list[HotRecord]) -> None:
@@ -107,7 +138,15 @@ def collapse_pending_window(path: Path, interval_seconds: int) -> int:
     groups: dict[float, list[HotRecord]] = {}
     for record in pending:
         groups.setdefault(bucket_end(interval_seconds, record[0]), []).append(record)
-    taken = _resolved_timestamps(path) if len(groups) > 1 else set()
+    # Mehrere Fenster: immer prüfen. Nur ein Fenster: ein verspäteter Wert kann in eine Minute fallen, die schon
+    # eine aufgelöste Zeile hat (Wartungslauf oder Absturz hat sie geschlossen, bevor der Wert eintraf). Dann
+    # entstünde eine zweite Zeile mit gleichem Zeitstempel. Aufgelöste Zeilen stehen aufsteigend, deshalb ist
+    # die Suche nur nötig, wenn das Fenster nicht hinter der letzten aufgelösten Zeile liegt (der Normalfall).
+    if len(groups) > 1:
+        taken = _resolved_timestamps(path)
+    else:
+        last_resolved = _last_resolved_timestamp(path, offset)
+        taken = _resolved_timestamps(path) if last_resolved is not None and min(groups) <= last_resolved else set()
     tail: list[HotRecord] = []
     for end_ts in sorted(groups):
         rows = groups[end_ts]

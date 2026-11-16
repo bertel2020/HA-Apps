@@ -2247,6 +2247,11 @@ def compact_raw_values(
         months_compacted.append(f"{year:04d}-{month:02d}")
         stale_markers_removed += remove_deleted_points_for_month(index, entity_id, year, month, tz)
 
+    if months_compacted:
+        # Verdichten ändert Duplikate, Lücken und Ausreißer. Ohne das zeigt die Übersicht der Datenqualität noch
+        # die alten Zahlen (zwischengespeicherte Gesamt-Zählung), während die Detailansicht schon neu rechnet.
+        index.invalidate_finding_caches(entity_id)
+
     return {
         "rows_before": rows_before,
         "rows_after": rows_after,

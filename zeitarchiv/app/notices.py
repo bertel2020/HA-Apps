@@ -1151,6 +1151,22 @@ def counter_value_label(value: float, row: dict) -> str:
     return f"{label} {row['unit']}" if row.get("unit") else label
 
 
+def counter_drop_labels(previous: float, value: float, row: dict) -> tuple[str, str]:
+    """Vorwert und Wert eines Rückgangs als Text. Weichen sie nur hinter der eingestellten Stellenzahl ab
+    (Shelly-Rundung um 0,001 kWh bei zwei Dezimalstellen), stünde sonst „von 1.780,66 kWh auf 1.780,66 kWh“ da:
+    dann werden so viele Stellen gezeigt, bis der Unterschied sichtbar ist (höchstens sechs)."""
+    decimals = decimals_to_int(row.get("decimals"))
+    label = counter_value_label(previous, row), counter_value_label(value, row)
+    if decimals is None or label[0] != label[1]:
+        return label
+    for extra in range(decimals + 1, 7):
+        wider = {**row, "decimals": str(extra)}
+        label = counter_value_label(previous, wider), counter_value_label(value, wider)
+        if label[0] != label[1]:
+            break
+    return label
+
+
 def counter_pattern_notice(row: dict) -> dict:
     """Ein Zähler, dessen Stand an mehreren Tagen kurz abfiel und zurückkehrte: das spricht für ein Problem
     an der Quelle (Gerät, Integration), nicht an einzelnen Werten. Ersetzt für diesen Zähler die
@@ -1204,10 +1220,10 @@ def counter_decrease_notice(rows: list[dict], tz: ZoneInfo) -> dict | None:
             name=name, count=format_int(row["count"]), when=when,
         )
     else:
+        previous_label, value_label = counter_drop_labels(last["previous"], last["value"], row)
         detail = tr(
             "Bei „{name}“ fiel der Zählerstand am {when} von {previous} auf {value}.",
-            name=name, when=when, previous=counter_value_label(last["previous"], row),
-            value=counter_value_label(last["value"], row),
+            name=name, when=when, previous=previous_label, value=value_label,
         )
         if last["returns"]:
             detail += " " + tr(
