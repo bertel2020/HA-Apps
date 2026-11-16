@@ -129,8 +129,8 @@
           {{ nav_icon('system') }}{{ _("System") }}{{ nav_chevron() }}
         </button>
         <div class="topnav-menu" x-show="systemOpen" x-cloak @click="systemOpen = false">
-          <a class="{{ 'is-active' if nav_statistik }}" href="{{ app_root }}/statistik">{{ nav_icon('statistik') }}{{ _("Statistik") }}</a>
           <a class="{{ 'is-active' if nav_housekeeping }}" href="{{ app_root }}/housekeeping">{{ nav_icon('housekeeping') }}{{ _("Housekeeping") }}</a>
+          <a class="{{ 'is-active' if nav_statistik }}" href="{{ app_root }}/statistik">{{ nav_icon('statistik') }}{{ _("Statistik") }}</a>
           <a class="{{ 'is-active' if nav_import }}" href="{{ app_root }}/import">{{ nav_icon('import') }}{{ _("Import") }}</a>
           <a class="{{ 'is-active' if nav_export }}" href="{{ app_root }}/export">{{ nav_icon('export') }}{{ _("Export") }}</a>
           <a class="{{ 'is-active' if nav_backup }}" href="{{ app_root }}/backup">{{ nav_icon('backup') }}{{ _("Backup / Restore") }}</a>
@@ -331,8 +331,8 @@
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="topnav-chevron" :class="{ 'is-open': drawerSystemOpen }" aria-hidden="true"><polyline points="6,9 12,15 18,9"/></svg>
       </button>
       <div class="topnav-drawer-sub" x-show="drawerSystemOpen">
-        <a class="{{ 'is-active' if nav_statistik }}" href="{{ app_root }}/statistik">{{ _("Statistik") }}</a>
         <a class="{{ 'is-active' if nav_housekeeping }}" href="{{ app_root }}/housekeeping">{{ _("Housekeeping") }}</a>
+        <a class="{{ 'is-active' if nav_statistik }}" href="{{ app_root }}/statistik">{{ _("Statistik") }}</a>
         <a class="{{ 'is-active' if nav_import }}" href="{{ app_root }}/import">{{ _("Import") }}</a>
         <a class="{{ 'is-active' if nav_export }}" href="{{ app_root }}/export">{{ _("Export") }}</a>
         <a class="{{ 'is-active' if nav_backup }}" href="{{ app_root }}/backup">{{ _("Backup / Restore") }}</a>
