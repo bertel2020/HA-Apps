@@ -1840,13 +1840,24 @@ value. "Automatic" behaves like 3 here.
 Skips values that, according to the decimal places rule, equal the last stored
 one — saves considerable space with sluggish sensors.
 
-**At the latest every 6 hours a value is stored anyway**, even if nothing has
-changed. This sign of life is the difference between "the sensor reports an
+**At the latest after the configured sign of life a value is stored anyway**
+(1, 3, 6, 12 or 24 hours, default 6 hours), even if nothing has changed. This sign of life is the difference between "the sensor reports an
 unchanged 21.0 °C" and "the sensor reports nothing at all anymore" — without
 it, the two could not be distinguished in the data, and the inactivity notice
 would trigger wrongly.
 
 Active by default for newly detected entities.
+
+### Sign of life
+
+The longest interval the [value change filter](#value-change-filter) allows
+between two stored values: 1, 3, 6, 12 or 24 hours, default 6 hours. The field
+only appears while the filter is active; the default for new entities is under
+Settings → Archiving.
+
+A shorter sign of life allows a finer [gap detection](#gap-detection) but
+stores a value more often for quiet sensors. A longer one saves space but
+raises the lower limit of the gap detection.
 
 ### Ignore values
 
@@ -1873,13 +1884,13 @@ it off keeps the list; it just no longer applies.
 ### Gap detection
 
 From which pause between two values the cleanup page marks a **gap**: 1, 5, 15,
-30 minutes, 1, 6, 12 hours, 1 day — or Off. The marking is pure analysis; it
+30 minutes, 1, 3, 6, 12, 24 hours — or Off. The marking is pure analysis; it
 changes nothing in the data.
 
 **The value is raised automatically if it cannot apply.** A resolution of 1
 hour already enforces a minimum interval of one hour between values; a gap
 detection of 5 minutes would then trigger on *every* normal cycle. The same
-applies to the activated value change filter with its 6-hour sign of life.
+applies to the activated value change filter with its sign of life (default 6 hours).
 Zeitarchiv therefore raises the threshold to the next step that still makes
 sense when changing resolution or filter, and tells you so. Afterwards it can
 be reduced manually again at any time. Existing entities with such a
@@ -2282,7 +2293,7 @@ entity.
 - **Key figures** at the top: how many entities are affected (of all) and the
   total per finding type. They change neither with the search nor with the
   filter.
-- **Status line** below: “All n entities measured · oldest measurement … ago”.
+- **Status line** below: “All n entities measured · last measured at most … ago”.
   While the first measurement is still running it says “n of m entities
   measured” with a progress bar; if measurements are older than six hours, the
   line gives their number.

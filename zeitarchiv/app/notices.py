@@ -202,7 +202,8 @@ def gap_threshold_conflicts(index) -> list[dict]:
     rows = []
     for e in index.list_entities():
         should_flag, suggested_gap = should_raise_gap_threshold(
-            e["gap_threshold"], e["resolution"], e["value_filter"], _GAP_THRESHOLD_MINUTE_TIERS
+            e["gap_threshold"], e["resolution"], e["value_filter"], _GAP_THRESHOLD_MINUTE_TIERS,
+            e["value_filter_heartbeat"],
         )
         if not should_flag:
             continue

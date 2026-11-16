@@ -36,7 +36,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from . import formats
@@ -64,6 +64,7 @@ from .formatting import (
     PURGE_MIN_AGE_DAYS_LABELS,
     RESOLUTION_LABELS,
     RETENTION_LABELS,
+    VALUE_FILTER_HEARTBEAT_LABELS,
     VALUE_FILTER_LABELS,
     entity_display_name,
     format_compact_target,
@@ -85,6 +86,7 @@ from .storage.index import (
     DEFAULT_GAP_THRESHOLD,
     DEFAULT_RESOLUTION,
     DEFAULT_VALUE_FILTER,
+    DEFAULT_VALUE_FILTER_HEARTBEAT,
     Index,
     should_raise_gap_threshold,
 )
@@ -1152,6 +1154,7 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
             "default_retention": (form.get("default_retention"), RETENTION_LABELS, tr("Ungültige Aufbewahrung")),
             "default_decimals": (form.get("default_decimals"), DECIMALS_LABELS, tr("Ungültige Nachkommastellen")),
             "default_value_filter": (form.get("default_value_filter"), VALUE_FILTER_LABELS, tr("Ungültiger Wertänderungsfilter")),
+            "default_value_filter_heartbeat": (form.get("default_value_filter_heartbeat"), VALUE_FILTER_HEARTBEAT_LABELS, tr("Ungültiges Lebenszeichen des Wertänderungsfilters")),
             "default_gap_threshold": (form.get("default_gap_threshold"), GAP_THRESHOLD_LABELS, tr("Ungültige Lücken-Erkennung")),
             "default_outlier_threshold": (form.get("default_outlier_threshold"), OUTLIER_THRESHOLD_LABELS, tr("Ungültige Ausreißer-Erkennung")),
             "default_compact_target": (form.get("default_compact_target"), COMPACT_TARGET_LABELS, tr("Ungültiges Verdichtungsziel")),
@@ -1167,12 +1170,17 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         gap_threshold_auto_adjusted_message = None
         default_resolution = fields["default_resolution"][0]
         default_value_filter = fields["default_value_filter"][0]
-        if default_value_filter == "decimals" or default_resolution is not None:
+        default_heartbeat = fields["default_value_filter_heartbeat"][0]
+        if default_value_filter == "decimals" or default_heartbeat is not None or default_resolution is not None:
             current_resolution = deps.index.get_setting("default_resolution", DEFAULT_RESOLUTION)
             current_value_filter = deps.index.get_setting("default_value_filter", DEFAULT_VALUE_FILTER)
+            current_heartbeat = deps.index.get_setting(
+                "default_value_filter_heartbeat", DEFAULT_VALUE_FILTER_HEARTBEAT
+            )
             current_gap = deps.index.get_setting("default_gap_threshold", DEFAULT_GAP_THRESHOLD)
             should_raise, new_gap = should_raise_gap_threshold(
-                current_gap, current_resolution, current_value_filter, deps.gap_threshold_minute_tiers
+                current_gap, current_resolution, current_value_filter, deps.gap_threshold_minute_tiers,
+                current_heartbeat,
             )
             if should_raise:
                 deps.index.set_setting("default_gap_threshold", new_gap)
@@ -1617,6 +1625,16 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         oder Imports hinge der Request sonst unbegrenzt; die Entität landet stattdessen unter „nicht
         verarbeitet“ und die übrigen laufen weiter."""
         return deps.coordinator.entity(entity_id, timeout=STORAGE_LOCKED_TIMEOUT_SECONDS)
+
+    @router.post("/housekeeping/datenqualitaet/neu-messen")
+    async def data_quality_remeasure(request: Request) -> JSONResponse:
+        """„Neu messen“: mit gewählten Entitäten genau diese, ohne alle mit neuen Werten seit der letzten
+        Messung (siehe data_quality.request_remeasure). Die Messung selbst läuft im Wartungstakt."""
+        entity_ids = [
+            str(v) for k, v in (await request.form(max_fields=MAX_FORM_FIELDS)).multi_items() if k == "entity_id"
+        ]
+        requested = await run_in_threadpool(data_quality.request_remeasure, deps.index, entity_ids or None)
+        return JSONResponse({"requested": requested})
 
     @router.post("/housekeeping/datenqualitaet/duplicates/preview", response_class=HTMLResponse)
     async def data_quality_duplicates_preview(request: Request) -> HTMLResponse:

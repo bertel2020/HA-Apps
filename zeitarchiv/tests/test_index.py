@@ -1580,3 +1580,33 @@ def test_should_raise_gap_threshold_rounds_up_to_smallest_covering_tier() -> Non
     should_raise, new_gap = should_raise_gap_threshold("5", "15min", "off", [1, 10, 100])
     assert should_raise is True
     assert new_gap == "100"
+
+
+def test_heartbeat_seconds_falls_back_to_default() -> None:
+    from app.storage.index import VALUE_FILTER_HEARTBEAT_SECONDS, heartbeat_seconds
+
+    assert heartbeat_seconds("60") == 3600
+    assert heartbeat_seconds("1440") == 86400
+    for broken in (None, "", "x", "0", "-5"):
+        assert heartbeat_seconds(broken) == VALUE_FILTER_HEARTBEAT_SECONDS
+
+
+def test_should_accept_value_uses_configured_heartbeat() -> None:
+    from app.storage.index import should_accept_value
+
+    args = ("decimals", "1", 21.0, 1000.0, 21.04)
+    assert not should_accept_value(*args, 1000.0 + 2 * 3600, "180")
+    assert should_accept_value(*args, 1000.0 + 3 * 3600, "180")
+    assert not should_accept_value(*args, 1000.0 + 5 * 3600)  # Standard: 6 Stunden
+    assert should_accept_value(*args, 1000.0 + 6 * 3600)
+
+
+def test_gap_floor_follows_the_heartbeat() -> None:
+    from app.storage.index import effective_gap_floor_minutes, should_raise_gap_threshold
+
+    assert effective_gap_floor_minutes("raw", "decimals", "60") == 60
+    assert effective_gap_floor_minutes("raw", "decimals", "1440") == 1440
+    assert effective_gap_floor_minutes("raw", "off", "1440") == 0
+    tiers = [1, 5, 15, 30, 60, 180, 360, 720, 1440]
+    assert should_raise_gap_threshold("15", "raw", "decimals", tiers, "180") == (True, "180")
+    assert should_raise_gap_threshold("180", "raw", "decimals", tiers, "180") == (False, "180")

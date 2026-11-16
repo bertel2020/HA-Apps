@@ -238,6 +238,15 @@ VALUE_FILTER_LABELS = {
     "off": N_("Aus"),
     "decimals": N_("Gleiche gerundete Werte filtern"),
 }
+# Lebenszeichen des Wertänderungsfilters: dieselben Schlüssel (Minuten) und
+# Texte wie die Lücken-Erkennung, damit die Empfehlung genau auf einer Stufe landet.
+VALUE_FILTER_HEARTBEAT_LABELS = {
+    "60": N_("1 Stunde"),
+    "180": N_("3 Stunden"),
+    "360": N_("6 Stunden"),
+    "720": N_("12 Stunden"),
+    "1440": N_("24 Stunden"),
+}
 IGNORE_VALUES_LABELS = {
     "off": N_("Aus"),
     "on": N_("Ein"),
@@ -248,9 +257,10 @@ GAP_THRESHOLD_LABELS = {
     "15": N_("15 Minuten"),
     "30": N_("30 Minuten"),
     "60": N_("1 Stunde"),
+    "180": N_("3 Stunden"),
     "360": N_("6 Stunden"),
     "720": N_("12 Stunden"),
-    "1440": N_("1 Tag"),
+    "1440": N_("24 Stunden"),
     "off": N_("Aus"),
 }
 DISPLAY_MODE_LABELS = {

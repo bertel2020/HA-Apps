@@ -157,7 +157,10 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     # gespeicherten Chart ein weiteres Feld (series_style) an vier Stellen von main.py (Editor-Kontext, Speichermodell,
     # Speichern, Ändern; Duplizieren reicht es durch). Die Bereinigung steht in chart_types.py. main.py: 5.863.
     # Der benannte Ausweg bleibt der Schnitt der Dashboard-Kontext-Bauer (siehe oben).
-    assert len(main.splitlines()) < 5_870
+    # Am 16. November 2026 auf 5.890 angehoben: Das einstellbare Lebenszeichen des Wertänderungsfilters
+    # (Entitäts-Konfiguration, globaler Standard, Lücken-Untergrenze) braucht in main.py Kontext, Formularfeld,
+    # Prüfung und Speichern. main.py: 5.880. Der benannte Ausweg bleibt der Schnitt der Dashboard-Kontext-Bauer.
+    assert len(main.splitlines()) < 5_890
 
 
 def test_api_router_has_explicit_runtime_dependencies_and_all_api_routes() -> None:

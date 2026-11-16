@@ -69,10 +69,10 @@ def test_the_gap_ladder_is_complete() -> None:
     geprüft statt über die Labels (die Minuten dort heißen „1 Minute", im Text
     steht die kompakte Aufzählung „1, 5, 15, 30 Minuten")."""
     stufen = [k for k in GAP_THRESHOLD_LABELS if k != "off"]
-    assert stufen == ["1", "5", "15", "30", "60", "360", "720", "1440"], (
+    assert stufen == ["1", "5", "15", "30", "60", "180", "360", "720", "1440"], (
         "Leiter geändert — die Aufzählung im Handbuch muss nachgezogen werden"
     )
-    for teil in ("1, 5, 15, 30 Minuten", "1, 6, 12 Stunden", "1 Tag"):
+    for teil in ("1, 5, 15, 30 Minuten", "1, 3, 6, 12, 24 Stunden"):
         assert teil in ABSCHNITT, teil
 
 
@@ -80,7 +80,7 @@ def test_the_named_constants_match_the_code() -> None:
     """Namenslänge, Lebenszeichen-Abstand und die Fenstergröße der
     Ausreißer-Erkennung stehen als Zahl im Text."""
     assert f"bis {MAX_CUSTOM_NAME_LENGTH} Zeichen" in ABSCHNITT
-    assert f"alle {VALUE_FILTER_HEARTBEAT_SECONDS // 3600} Stunden" in ABSCHNITT
+    assert f"voreingestellt {VALUE_FILTER_HEARTBEAT_SECONDS // 3600} Stunden" in ABSCHNITT
     assert OUTLIER_WINDOW == 15 and "letzten fünfzehn Werte" in ABSCHNITT
     assert COUNTER_OUTLIER_WINDOW == 50 and "letzten 50 Zuwächse" in ABSCHNITT
 

@@ -40,8 +40,8 @@ Flow per event, under the **entity lock** (`StorageCoordinator.entity()`, see
    afterwards condense it window by window into one avg/min/max row
    (`resolution.py`) — no `skipped` here.
 6. **Value change filter** (`should_accept_value`) — skips subsequent values
-   that are equal after rounding, but keeps a sign of life at least every six
-   hours (prevents a chart from showing a gap for a sensor that has been
+   that are equal after rounding, but keeps a value at the latest after the per-entity
+   sign of life (default six hours) (prevents a chart from showing a gap for a sensor that has been
    unchanged for days).
 7. **Counter decrease detection**: for `state_class = total_increasing`, a
    lower subsequent value is only **logged** (`logger.warning`, visible under

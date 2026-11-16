@@ -63,7 +63,7 @@ _HOT_NAME_RE = r"^{id}-\d{{4}}-\d{{2}}\.csv$"
 ENTITY_GROUPS: dict[str, tuple[str, ...]] = {
     "name": ("custom_name",),
     "ret": ("retention", "resolution", "compact_target", "hourly_rollup"),
-    "filter": ("value_filter", "ignore_values_enabled", "ignore_values", "gap_threshold", "outlier_threshold", "duplicates_auto"),
+    "filter": ("value_filter", "value_filter_heartbeat", "ignore_values_enabled", "ignore_values", "gap_threshold", "outlier_threshold", "duplicates_auto"),
     "counter": ("counter_decreases", "counter_auto_mark"),
     "disp": ("decimals", "display_mode", "chart_options", "is_favorite"),
     # Keine Spalte von entities, sondern die Zuordnung in entity_category (Name
@@ -86,6 +86,7 @@ _COLUMN_LABELS = {
     "compact_target": N_("Verdichtung"),
     "hourly_rollup": N_("Stunden-Rollup"),
     "value_filter": N_("Wertfilter"),
+    "value_filter_heartbeat": N_("Lebenszeichen des Wertfilters"),
     "ignore_values_enabled": N_("Werte ignorieren"),
     "ignore_values": N_("Zu ignorierende Werte"),
     "gap_threshold": N_("Lückengrenze"),
@@ -120,6 +121,7 @@ GENERAL_SETTINGS: list[tuple[str, str]] = [
     ("default_retention", N_("Standard-Aufbewahrung")),
     ("default_decimals", N_("Standard-Nachkommastellen")),
     ("default_value_filter", N_("Standard-Wertfilter")),
+    ("default_value_filter_heartbeat", N_("Standard-Lebenszeichen des Wertfilters")),
     ("default_gap_threshold", N_("Standard-Lückengrenze")),
     ("default_outlier_threshold", N_("Standard-Ausreißergrenze")),
     ("default_compact_target", N_("Standard-Verdichtung")),
@@ -345,6 +347,7 @@ def _prettify(column: str, value: object) -> str:
         "resolution": formatting.RESOLUTION_LABELS,
         "compact_target": formatting.COMPACT_TARGET_LABELS,
         "value_filter": formatting.VALUE_FILTER_LABELS,
+        "value_filter_heartbeat": formatting.VALUE_FILTER_HEARTBEAT_LABELS,
         "decimals": formatting.DECIMALS_LABELS,
     }.get(column)
     if labels is not None and str(value) in labels:

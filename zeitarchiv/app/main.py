@@ -62,6 +62,7 @@ from .formatting import (
     RESOLUTION_BLOCKED_REASONS,
     RESOLUTION_LABELS,
     RETENTION_LABELS,
+    VALUE_FILTER_HEARTBEAT_LABELS,
     VALUE_FILTER_LABELS,
     IGNORE_VALUES_LABELS,
     decimals_to_int,
@@ -121,6 +122,7 @@ from .storage.index import (
     DEFAULT_RESOLUTION,
     DEFAULT_RETENTION,
     DEFAULT_VALUE_FILTER,
+    DEFAULT_VALUE_FILTER_HEARTBEAT,
     effective_outlier_threshold,
     MAX_IGNORE_VALUES,
     TooManyIgnoreValues,
@@ -994,6 +996,7 @@ def _settings_archivierung_context(saved: bool = False) -> dict:
         "default_retention": index.get_setting("default_retention", DEFAULT_RETENTION),
         "default_decimals": index.get_setting("default_decimals", DEFAULT_DECIMALS),
         "default_value_filter": index.get_setting("default_value_filter", DEFAULT_VALUE_FILTER),
+        "default_value_filter_heartbeat": index.get_setting("default_value_filter_heartbeat", DEFAULT_VALUE_FILTER_HEARTBEAT),
         "default_gap_threshold": index.get_setting("default_gap_threshold", DEFAULT_GAP_THRESHOLD),
         "default_outlier_threshold": index.get_setting("default_outlier_threshold", DEFAULT_OUTLIER_THRESHOLD),
         "default_compact_target": index.get_setting("default_compact_target", DEFAULT_COMPACT_TARGET),
@@ -1001,6 +1004,7 @@ def _settings_archivierung_context(saved: bool = False) -> dict:
         "retention_options": list(RETENTION_LABELS.items()),
         "decimals_options": list(DECIMALS_LABELS.items()),
         "value_filter_options": list(VALUE_FILTER_LABELS.items()),
+        "value_filter_heartbeat_options": list(VALUE_FILTER_HEARTBEAT_LABELS.items()),
         "gap_threshold_options": list(GAP_THRESHOLD_LABELS.items()),
         "outlier_threshold_options": list(OUTLIER_THRESHOLD_LABELS.items()),
         "compact_target_options": list(COMPACT_TARGET_LABELS.items()),
@@ -2891,12 +2895,12 @@ def _entity_config_adjusted(entity) -> dict[str, dict[str, str]]:
     defaults = _settings_archivierung_context()
     kind = entity["aggregation_type"]
     expected = {name: defaults[f"default_{name}"] for name in (
-        "resolution", "retention", "decimals", "value_filter", "gap_threshold", "outlier_threshold", "compact_target")}
+        "resolution", "retention", "decimals", "value_filter", "value_filter_heartbeat", "gap_threshold", "outlier_threshold", "compact_target")}
     if kind == "state":
         expected.update(resolution="raw", compact_target="off", value_filter="off")
     labels = {
         "resolution": RESOLUTION_LABELS, "retention": RETENTION_LABELS, "decimals": DECIMALS_LABELS,
-        "value_filter": VALUE_FILTER_LABELS, "gap_threshold": GAP_THRESHOLD_LABELS,
+        "value_filter": VALUE_FILTER_LABELS, "value_filter_heartbeat": VALUE_FILTER_HEARTBEAT_LABELS, "gap_threshold": GAP_THRESHOLD_LABELS,
         "outlier_threshold": OUTLIER_THRESHOLD_LABELS, "compact_target": COMPACT_TARGET_LABELS,
     }
     blocked = {
@@ -2905,7 +2909,7 @@ def _entity_config_adjusted(entity) -> dict[str, dict[str, str]]:
     }
     titles = {
         "resolution": N_("Auflösung"), "retention": N_("Aufbewahrung"), "decimals": N_("Nachkommastellen"),
-        "value_filter": N_("Wertänderungsfilter"), "gap_threshold": N_("Lücken-Erkennung"),
+        "value_filter": N_("Wertänderungsfilter"), "value_filter_heartbeat": N_("Lebenszeichen"), "gap_threshold": N_("Lücken-Erkennung"),
         "outlier_threshold": N_("Ausreißer-Erkennung"), "compact_target": N_("Verdichtungsziel"),
     }
     return {
@@ -2915,6 +2919,7 @@ def _entity_config_adjusted(entity) -> dict[str, dict[str, str]]:
         }
         for name, value in expected.items()
         if entity[name] != value and kind not in blocked.get(name, {})
+        and not (name == "value_filter_heartbeat" and entity["value_filter"] != "decimals")  # nur bei aktivem Filter
     }
 
 
@@ -2966,6 +2971,7 @@ def _entity_config_context(entity) -> dict:
         "retention": entity["retention"],
         "decimals": decimals,
         "value_filter": entity["value_filter"],
+        "value_filter_heartbeat": entity["value_filter_heartbeat"],
         "ignore_values_mode": "on" if entity["ignore_values_enabled"] else "off",
         "ignore_values": entity["ignore_values"].replace(";", "; "),
         "ignore_values_blocked": entity["aggregation_type"] in ("switch", "state"),
@@ -2981,6 +2987,7 @@ def _entity_config_context(entity) -> dict:
         "retention_options": list(RETENTION_LABELS.items()),
         "decimals_options": list(DECIMALS_LABELS.items()),
         "value_filter_options": list(VALUE_FILTER_LABELS.items()),
+        "value_filter_heartbeat_options": list(VALUE_FILTER_HEARTBEAT_LABELS.items()),
         "gap_threshold_options": list(GAP_THRESHOLD_LABELS.items()),
         "outlier_threshold_options": list(OUTLIER_THRESHOLD_LABELS.items()),
         "display_mode_options": list(DISPLAY_MODE_LABELS.items()),
@@ -3039,6 +3046,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
     retention = form.get("retention")
     decimals = form.get("decimals")
     value_filter = form.get("value_filter")
+    value_filter_heartbeat = form.get("value_filter_heartbeat")
     ignore_values_mode = form.get("ignore_values_mode")
     ignore_values_text = form.get("ignore_values")
     gap_threshold = form.get("gap_threshold")
@@ -3061,6 +3069,8 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
         raise HTTPException(status_code=400, detail=tr("Ungültige Nachkommastellen-Angabe"))
     if value_filter is not None and value_filter not in VALUE_FILTER_LABELS:
         raise HTTPException(status_code=400, detail=tr("Ungültiger Wertänderungsfilter"))
+    if value_filter_heartbeat is not None and value_filter_heartbeat not in VALUE_FILTER_HEARTBEAT_LABELS:
+        raise HTTPException(status_code=400, detail=tr("Ungültiges Lebenszeichen des Wertänderungsfilters"))
     if ignore_values_mode is not None and ignore_values_mode not in IGNORE_VALUES_LABELS:
         raise HTTPException(status_code=400, detail=tr("Ungültige Angabe bei „Werte ignorieren“"))
     if gap_threshold is not None and gap_threshold not in GAP_THRESHOLD_LABELS:
@@ -3124,6 +3134,7 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
                 retention=str(retention) if retention is not None else None,
                 decimals=str(decimals) if decimals is not None else None,
                 value_filter=str(value_filter) if value_filter is not None else None,
+                value_filter_heartbeat=str(value_filter_heartbeat) if value_filter_heartbeat is not None else None,
                 gap_threshold=str(gap_threshold) if gap_threshold is not None else None,
                 outlier_threshold=str(outlier_threshold) if outlier_threshold is not None else None,
                 display_mode=str(display_mode) if display_mode is not None else None,
@@ -3134,14 +3145,14 @@ async def update_entity_config(request: Request, entity_id: str) -> HTMLResponse
             )
             if retention is not None:
                 _background.invalidate_retention_overview()
-            # Nur bei ÄNDERUNG von resolution/value_filter auslösen, sonst würde ein späteres,
+            # Nur bei ÄNDERUNG von resolution/value_filter/Lebenszeichen auslösen, sonst würde ein späteres,
             # bewusstes Verkleinern der Lücken-Erkennung bei nächster Gelegenheit zurückgedreht.
             gap_threshold_auto_adjusted = False
             gap_threshold_auto_adjusted_message = None
-            if value_filter == "decimals" or resolution is not None:
+            if value_filter == "decimals" or value_filter_heartbeat is not None or resolution is not None:
                 current = _require_entity(entity_id)
                 should_raise, new_gap = should_raise_gap_threshold(
-                    current["gap_threshold"], current["resolution"], current["value_filter"], _GAP_THRESHOLD_MINUTE_TIERS
+                    current["gap_threshold"], current["resolution"], current["value_filter"], _GAP_THRESHOLD_MINUTE_TIERS, current["value_filter_heartbeat"],
                 )
                 if should_raise:
                     index.set_config(entity_id, gap_threshold=new_gap)

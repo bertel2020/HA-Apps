@@ -94,6 +94,21 @@ DEFAULT_OUTLIER_THRESHOLD = "50"
 # stillschweigend alle.
 DEFAULT_COMPACT_TARGET = "off"
 VALUE_FILTER_HEARTBEAT_SECONDS = 6 * 60 * 60
+# Lebenszeichen des Wertänderungsfilters je Entität, in Minuten als Text
+# (dieselbe Schreibweise wie gap_threshold, damit die Stufen deckungsgleich
+# sind). Standard = bisheriger fester Wert von 6 Stunden.
+DEFAULT_VALUE_FILTER_HEARTBEAT = str(VALUE_FILTER_HEARTBEAT_SECONDS // 60)
+
+
+def heartbeat_seconds(heartbeat: str | int | None) -> int:
+    """Lebenszeichen-Abstand in Sekunden aus dem gespeicherten Minutenwert;
+    ein fehlender oder unlesbarer Wert fällt auf den Standard zurück, damit
+    ein beschädigter Eintrag den Schreibpfad nicht lahmlegt."""
+    try:
+        minutes = int(heartbeat) if heartbeat is not None else 0
+    except (TypeError, ValueError):
+        minutes = 0
+    return minutes * 60 if minutes > 0 else VALUE_FILTER_HEARTBEAT_SECONDS
 
 # Zeitraum und Kennzahlen einer Werte-Kachel (dashboard_pins, siehe die
 # Spaltenkommentare dort). Hier statt in query.py, weil der Setter unten
@@ -211,14 +226,16 @@ def should_accept_value(
     last_ts: float | None,
     new_value: float,
     new_ts: float,
+    heartbeat: str | int | None = None,
 ) -> bool:
     """Prüft den optionalen Wertänderungsfilter einer Entität.
 
     ``decimals`` entspricht der sichtbaren Genauigkeit: ``auto`` zeigt höchstens
     drei Nachkommastellen und wird deshalb wie ``3`` behandelt. Auch bei
-    unverändertem gerundetem Wert wird spätestens alle sechs Stunden ein
-    Lebenszeichen gespeichert, damit lange konstante Verläufe und ``last_ts``
-    nicht vollständig stehen bleiben.
+    unverändertem gerundetem Wert wird spätestens nach ``heartbeat`` Minuten
+    (Standard sechs Stunden, je Entität einstellbar) ein Lebenszeichen
+    gespeichert, damit lange konstante Verläufe und ``last_ts`` nicht
+    vollständig stehen bleiben.
     """
     if value_filter != "decimals" or last_value is None or last_ts is None:
         return True
@@ -228,7 +245,7 @@ def should_accept_value(
         precision = 3
     if round(last_value, precision) != round(new_value, precision):
         return True
-    return new_ts - last_ts >= VALUE_FILTER_HEARTBEAT_SECONDS
+    return new_ts - last_ts >= heartbeat_seconds(heartbeat)
 
 
 MAX_IGNORE_VALUES = 10
@@ -284,7 +301,9 @@ def should_ignore_value(enabled: int | bool, ignore_values: str, value: float) -
     return False
 
 
-def effective_gap_floor_minutes(resolution: str, value_filter: str) -> int:
+def effective_gap_floor_minutes(
+    resolution: str, value_filter: str, heartbeat: str | int | None = None
+) -> int:
     """Engste Lücken-Erkennung (Minuten), die bei dieser Auflösung/diesem
     Wertänderungsfilter noch NICHT bei jedem normalen Zyklus fälschlich als
     Lücke anschlagen würde — 0, wenn keiner von beiden einen Mindestabstand
@@ -294,15 +313,15 @@ def effective_gap_floor_minutes(resolution: str, value_filter: str) -> int:
     gespeicherten Werten: `resolution` selbst (should_accept_write() oben
     verwirft jeden Schreibversuch innerhalb des Intervalls, unabhängig vom
     Wertänderungsfilter) und, falls aktiv, der Wertänderungsfilter
-    (should_accept_value() oben, spätestens alle
-    VALUE_FILTER_HEARTBEAT_SECONDS ein Lebenszeichen). Eine gap_threshold-
+    (should_accept_value() oben, spätestens nach dem je Entität
+    eingestellten Heartbeat ein Lebenszeichen). Eine gap_threshold-
     Einstellung enger als das Maximum aus beiden meldet strukturell
     garantiert Lücken, die keine sind — Aufrufer siehe should_raise_gap_
     threshold() unten (Guard beim Ändern, aus main.py) und notices.py
     (passive Meldung für bereits bestehende Kombinationen)."""
     floor_seconds = _RESOLUTION_SECONDS.get(resolution, 0)
     if value_filter == "decimals":
-        floor_seconds = max(floor_seconds, VALUE_FILTER_HEARTBEAT_SECONDS)
+        floor_seconds = max(floor_seconds, heartbeat_seconds(heartbeat))
     return floor_seconds // 60
 
 
@@ -345,7 +364,11 @@ def effective_outlier_threshold(aggregation_type: str, outlier_threshold: str) -
 
 
 def should_raise_gap_threshold(
-    current_gap_threshold: str, resolution: str, value_filter: str, valid_minute_tiers: list[int]
+    current_gap_threshold: str,
+    resolution: str,
+    value_filter: str,
+    valid_minute_tiers: list[int],
+    heartbeat: str | int | None = None,
 ) -> tuple[bool, str]:
     """True + anzuhebender Wert (kleinster Tarif aus `valid_minute_tiers` >=
     Floor), wenn `current_gap_threshold` enger ist als
@@ -354,7 +377,7 @@ def should_raise_gap_threshold(
     keine Anzeige-Labels, siehe set_config() oben."""
     if current_gap_threshold == "off" or not current_gap_threshold.isdigit():
         return False, current_gap_threshold
-    floor = effective_gap_floor_minutes(resolution, value_filter)
+    floor = effective_gap_floor_minutes(resolution, value_filter, heartbeat)
     if not floor or int(current_gap_threshold) >= floor:
         return False, current_gap_threshold
     tiers = sorted(valid_minute_tiers)
@@ -401,6 +424,7 @@ CREATE TABLE IF NOT EXISTS entities (
     retention TEXT NOT NULL DEFAULT 'unlimited',
     decimals TEXT NOT NULL DEFAULT 'auto',
     value_filter TEXT NOT NULL DEFAULT 'off',
+    value_filter_heartbeat TEXT NOT NULL DEFAULT '360',
     ignore_values_enabled INTEGER NOT NULL DEFAULT 0,
     ignore_values TEXT NOT NULL DEFAULT '',
     gap_threshold TEXT NOT NULL DEFAULT '15',
@@ -1083,6 +1107,10 @@ class Index:
             self._conn.execute("ALTER TABLE entities ADD COLUMN decimals TEXT NOT NULL DEFAULT 'auto'")
         if "value_filter" not in columns:
             self._conn.execute("ALTER TABLE entities ADD COLUMN value_filter TEXT NOT NULL DEFAULT 'off'")
+        if "value_filter_heartbeat" not in columns:
+            self._conn.execute(
+                "ALTER TABLE entities ADD COLUMN value_filter_heartbeat TEXT NOT NULL DEFAULT '360'"
+            )
         if "ignore_values_enabled" not in columns:
             self._conn.execute("ALTER TABLE entities ADD COLUMN ignore_values_enabled INTEGER NOT NULL DEFAULT 0")
         if "ignore_values" not in columns:
@@ -1811,7 +1839,7 @@ class Index:
                 self._conn.execute(
                     "SELECT key, value FROM settings WHERE key IN "
                     "('default_resolution', 'default_retention', 'default_decimals', "
-                    "'default_value_filter', 'default_gap_threshold', 'default_outlier_threshold', "
+                    "'default_value_filter', 'default_value_filter_heartbeat', 'default_gap_threshold', 'default_outlier_threshold', "
                     "'default_compact_target')"
                 ).fetchall()
             )
@@ -1819,6 +1847,9 @@ class Index:
             retention = default_rows.get("default_retention", DEFAULT_RETENTION)
             decimals = default_rows.get("default_decimals", DEFAULT_DECIMALS)
             value_filter = default_rows.get("default_value_filter", DEFAULT_VALUE_FILTER)
+            value_filter_heartbeat = default_rows.get(
+                "default_value_filter_heartbeat", DEFAULT_VALUE_FILTER_HEARTBEAT
+            )
             gap_threshold = default_rows.get("default_gap_threshold", DEFAULT_GAP_THRESHOLD)
             outlier_threshold = default_rows.get("default_outlier_threshold", DEFAULT_OUTLIER_THRESHOLD)
             compact_target = default_rows.get("default_compact_target", DEFAULT_COMPACT_TARGET)
@@ -1832,9 +1863,9 @@ class Index:
                 """
                 INSERT INTO entities
                     (entity_id, aggregation_type, resolution, retention, decimals, value_filter,
-                     gap_threshold, outlier_threshold, compact_target,
+                     value_filter_heartbeat, gap_threshold, outlier_threshold, compact_target,
                      unit, state_class, friendly_name, row_count, size_bytes, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)
                 """,
                 (
                     entity_id,
@@ -1843,6 +1874,7 @@ class Index:
                     retention,
                     decimals,
                     value_filter,
+                    value_filter_heartbeat,
                     gap_threshold,
                     outlier_threshold,
                     compact_target,
@@ -1970,6 +2002,7 @@ class Index:
         retention: str | None = None,
         decimals: str | None = None,
         value_filter: str | None = None,
+        value_filter_heartbeat: str | None = None,
         gap_threshold: str | None = None,
         outlier_threshold: str | None = None,
         display_mode: str | None = None,
@@ -1997,6 +2030,9 @@ class Index:
         if value_filter is not None:
             updates.append("value_filter = ?")
             params.append(value_filter)
+        if value_filter_heartbeat is not None:
+            updates.append("value_filter_heartbeat = ?")
+            params.append(value_filter_heartbeat)
         if ignore_values_enabled is not None:
             updates.append("ignore_values_enabled = ?")
             params.append(int(ignore_values_enabled))
@@ -4245,6 +4281,28 @@ class Index:
             if isinstance(entry, dict):
                 entry["computed_at"] = 0
                 self.set_setting(key, json.dumps(entry))
+
+    def request_alltime_remeasure(self, entity_ids) -> int:
+        """Fordert die Gesamt-Zählung dieser Entitäten neu an (Datenqualität → „Neu messen“): der Eintrag gilt als
+        ungültig (computed_at 0), der nächste Wartungstakt misst sie als erste neu (cleanup_stats.
+        due_entities_for_outlier_rate). Die alten Zahlen bleiben bis dahin stehen. Anders als
+        invalidate_finding_caches rührt das die globale Duplikat-Zählung nicht an. Entitäten ohne Eintrag sind
+        ohnehin fällig. Gibt zurück, wie viele Einträge entwertet wurden."""
+        angefordert = 0
+        for entity_id in entity_ids:
+            key = self._CLEANUP_ALLTIME_STATS_PREFIX + entity_id
+            raw = self.get_setting(key)
+            if raw is None:
+                continue
+            try:
+                entry = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(entry, dict) and entry.get("computed_at"):
+                entry["computed_at"] = 0
+                self.set_setting(key, json.dumps(entry))
+                angefordert += 1
+        return angefordert
 
     def invalidate_counter_decrease_snapshot(self) -> None:
         """Nach dem Markieren: die Meldung soll nicht eine Stunde lang auf einen Rückgang

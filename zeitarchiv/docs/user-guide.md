@@ -1990,13 +1990,26 @@ also ein gefilterter Wert. „Automatisch" verhält sich dabei wie 3.
 Überspringt Werte, die nach der Nachkommastellen-Regel dem zuletzt
 gespeicherten gleichen — spart bei trägen Sensoren erheblich Platz.
 
-**Spätestens alle 6 Stunden wird trotzdem ein Wert gespeichert**, auch wenn
-sich nichts geändert hat. Dieses Lebenszeichen ist der Unterschied zwischen
+**Spätestens nach dem eingestellten Lebenszeichen wird trotzdem ein Wert
+gespeichert** (1, 3, 6, 12 oder 24 Stunden, voreingestellt 6 Stunden), auch
+wenn sich nichts geändert hat. Dieses Lebenszeichen ist der Unterschied zwischen
 „der Sensor meldet unverändert 21,0 °C" und „der Sensor meldet gar nichts
 mehr" — ohne es wäre beides in den Daten nicht zu unterscheiden, und die
 Inaktivitäts-Meldung würde falsch anschlagen.
 
 Bei neu erkannten Entitäten standardmäßig aktiv.
+
+### Lebenszeichen
+
+Der längste Abstand, den der [Wertänderungsfilter](#wertänderungsfilter)
+zwischen zwei gespeicherten Werten zulässt: 1, 3, 6, 12 oder 24 Stunden,
+voreingestellt 6 Stunden. Das Feld erscheint nur bei aktivem Filter; der
+Standard für neue Entitäten steht unter Einstellungen → Archivierung.
+
+Ein kürzeres Lebenszeichen erlaubt eine feinere
+[Lücken-Erkennung](#lücken-erkennung), speichert aber bei ruhigen Sensoren
+öfter einen Wert. Ein längeres spart Platz, hebt aber die Untergrenze der
+Lücken-Erkennung an.
 
 ### Werte ignorieren
 
@@ -2025,14 +2038,14 @@ nicht mehr.
 ### Lücken-Erkennung
 
 Ab welcher Pause zwischen zwei Werten die Bereinigungs-Seite eine **Lücke**
-markiert: 1, 5, 15, 30 Minuten, 1, 6, 12 Stunden, 1 Tag — oder Aus. Die
+markiert: 1, 5, 15, 30 Minuten, 1, 3, 6, 12, 24 Stunden — oder Aus. Die
 Markierung ist reine Analyse; an den Daten ändert sie nichts.
 
 **Der Wert wird automatisch angehoben, wenn er nicht zutreffen kann.** Eine
 Auflösung von 1 Stunde erzwingt selbst schon einen Mindestabstand von einer
 Stunde zwischen Werten; eine Lücken-Erkennung von 5 Minuten würde dann bei
 *jedem* normalen Zyklus anschlagen. Dasselbe gilt für den aktivierten
-Wertänderungsfilter mit seinen 6 Stunden Lebenszeichen. Zeitarchiv hebt die
+Wertänderungsfilter mit seinem Lebenszeichen (voreingestellt 6 Stunden). Zeitarchiv hebt die
 Schwelle beim Ändern von Auflösung oder Filter deshalb auf die nächste Stufe,
 die noch sinnvoll ist, und sagt es dazu. Danach lässt sie sich jederzeit wieder
 manuell verkleinern. Bestehende Entitäten mit einer solchen Kombination listet
@@ -2460,7 +2473,7 @@ die **gesamte Historie** der Entität.
 
 - **Kennzahlen** oben: wie viele Entitäten betroffen sind (von allen) und die
   Summe je Befundtyp. Sie ändern sich weder mit der Suche noch mit dem Filter.
-- **Statuszeile** darunter: „Alle n Entitäten gemessen · älteste Messung vor …“.
+- **Statuszeile** darunter: „Alle n Entitäten gemessen · zuletzt vor spätestens …“.
   Läuft die Erstmessung noch, steht dort „n von m Entitäten gemessen“ mit einer
   Fortschrittsleiste; sind Messungen älter als sechs Stunden, nennt die Zeile
   deren Zahl.

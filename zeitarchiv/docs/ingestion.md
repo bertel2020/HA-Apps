@@ -40,8 +40,8 @@ siehe [architecture.md](architecture.md)):
    und fassen ihn erst nachträglich fensterweise zu einer Ø/Min/Max-Zeile
    zusammen (`resolution.py`) — kein `skipped` hier.
 6. **Wertänderungsfilter** (`should_accept_value`) — überspringt gerundet
-   gleiche Folgewerte, behält aber mindestens alle sechs Stunden ein
-   Lebenszeichen (verhindert, dass ein Chart bei einem seit Tagen
+   gleiche Folgewerte, behält aber spätestens nach dem je Entität
+   eingestellten Lebenszeichen (Standard sechs Stunden) einen Wert (verhindert, dass ein Chart bei einem seit Tagen
    unveränderten Sensor eine Lücke zeigt).
 7. **Zähler-Rückgang-Erkennung**: bei `state_class = total_increasing` wird
    ein niedrigerer Folgewert nur **protokolliert** (`logger.warning`,

@@ -106,8 +106,25 @@
       {% endfor %}
     </div>
   </span>
-  {% call hint_body() %}{{ _("Überspringt Werte, die nach der Nachkommastellen-Regel dem Vorwert gleichen. Spätestens alle 6 Stunden bleibt ein Lebenszeichen erhalten.") }}{% endcall %}
+  {% call hint_body() %}{{ _("Überspringt Werte, die nach der Nachkommastellen-Regel dem Vorwert gleichen. Spätestens nach dem eingestellten Lebenszeichen bleibt trotzdem ein Wert erhalten.") }}{% endcall %}
 </div>
+{% if value_filter == 'decimals' %}
+<div class="field cfg-row">
+  <label>{{ _("Lebenszeichen") }} {{ hint_button(_('Lebenszeichen')) }}{{ adj('value_filter_heartbeat') }}</label>
+  <p class="cfg-short">{{ _("Längster Abstand zwischen zwei gespeicherten Werten") }}</p>
+  <span class="dd-picker-wrap">
+    <button type="button" class="btn" id="value-filter-heartbeat-btn" onclick="toggleDDPicker('value-filter-heartbeat')">{% for k, l in value_filter_heartbeat_options %}{% if k == value_filter_heartbeat %}{{ l }}{% endif %}{% endfor %} ▾</button>
+    <input type="hidden" name="value_filter_heartbeat" id="value-filter-heartbeat-input" value="{{ value_filter_heartbeat }}"
+           hx-post="{{ app_root }}/entities/{{ entity_id }}/config" hx-trigger="change" hx-target="#config-form" hx-swap="innerHTML">
+    <div class="dd-picker-popover" id="value-filter-heartbeat-popover">
+      {% for key, label in value_filter_heartbeat_options %}
+      <div class="dd-picker-row" onclick="selectDDOption('value-filter-heartbeat', '{{ key }}', '{{ label }}')">{{ label }}</div>
+      {% endfor %}
+    </div>
+  </span>
+  {% call hint_body() %}{{ _("Auch wenn der Wert unverändert bleibt, wird spätestens nach dieser Zeit ein Wert gespeichert, damit die Entität nicht tot aussieht. Ein kürzeres Lebenszeichen erlaubt eine feinere Lücken-Erkennung, speichert aber bei ruhigen Entitäten öfter.") }}{% endcall %}
+</div>
+{% endif %}
 <div class="field cfg-row">
   <label>{{ _("Werte ignorieren") }} {{ hint_button(_('Werte ignorieren')) }}</label>
   {% if ignore_values_blocked %}<p class="cfg-short">{{ _("Für Schalter nicht verfügbar") }}</p>{% else %}<p class="cfg-short">{{ _("Bestimmte Rohwerte beim Erfassen verwerfen") }}</p>{% endif %}

@@ -542,6 +542,7 @@ class IngestionService:
             entity["last_ts"],
             event.value,
             event.ts,
+            entity["value_filter_heartbeat"],
         ):
             self._complete(event, recorded=False)
             return "filtered"

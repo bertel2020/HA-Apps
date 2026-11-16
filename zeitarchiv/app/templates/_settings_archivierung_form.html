@@ -76,6 +76,21 @@
   </div>
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
+      <div class="settings-compact-label">{{ _("Standard-Lebenszeichen") }}</div>
+    </div>
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn btn-sm" id="default-value-filter-heartbeat-btn" onclick="toggleDDPicker('default-value-filter-heartbeat')">{% for k, l in value_filter_heartbeat_options %}{% if k == default_value_filter_heartbeat %}{{ l }}{% endif %}{% endfor %} ▾</button>
+      <input type="hidden" name="default_value_filter_heartbeat" id="default-value-filter-heartbeat-input" value="{{ default_value_filter_heartbeat }}"
+             hx-post="settings/archivierung" hx-trigger="change" hx-target="#archivierung-form" hx-swap="innerHTML">
+      <div class="dd-picker-popover" id="default-value-filter-heartbeat-popover">
+        {% for key, label in value_filter_heartbeat_options %}
+        <div class="dd-picker-row" onclick="selectDDOption('default-value-filter-heartbeat', '{{ key }}', '{{ label }}')">{{ label }}</div>
+        {% endfor %}
+      </div>
+    </span>
+  </div>
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
       <div class="settings-compact-label">{{ _("Standard-Lücken-Erkennung") }}</div>
     </div>
     <span class="dd-picker-wrap">
