@@ -192,6 +192,8 @@ def pv_scale_kw(unit: str | None) -> float | None:
         return PV_UNIT_KW[unit]
     return {"w": PV_UNIT_KW["W"], "kw": PV_UNIT_KW["kW"]}.get(unit.lower())
 PV_DAYS = 14
+PV_DAY_OPTIONS = (7, 14, 30)  # feste Zeiträume der Karte „PV und Helligkeit“
+PV_MAX_SPAN_DAYS = 92  # eigener Zeitraum: höchstens drei Monate (je Tag wird ein 28-Tage-Lernfenster gerechnet)
 #: Luftdruck: Faktor nach hPa und Schwelle, unter der die Tagestendenz als „stabil“ gilt.
 PRESSURE_UNIT_HPA = {"hPa": 1.0, "mbar": 1.0, "Pa": 0.01, "kPa": 10.0, "inHg": 33.8639}
 PRESSURE_STEADY_HPA = 1.0
@@ -1646,7 +1648,9 @@ class WetterService:
         conditions = self.compute_conditions_day(sun["date"], now_local, include_today=True)
         return {"sun": sun, "conditions": conditions}
 
-    def compute_pv(self, now_local: datetime | None = None, days: int = PV_DAYS) -> dict | None:
+    def compute_pv(
+        self, now_local: datetime | None = None, days: int = PV_DAYS, start: date | None = None, end: date | None = None,
+    ) -> dict | None:
         """PV-Ertrag gegen Helligkeit der letzten abgeschlossenen Tage (Regeln siehe ``wetter_pv``); ``None`` ohne beide Rollen.
 
         Ein Süd-Sensor, der sättigt, schreibt bei unverändertem Wert keine Zeile; genau die sonnigsten Stunden
@@ -1664,14 +1668,20 @@ class WetterService:
         tz = self.deps.tz
         now_local = now_local or datetime.now(tz)
         today = now_local.date()
-        first = today - timedelta(days=days + pv_mod.WINDOW_DAYS)
-        start = datetime(first.year, first.month, first.day, tzinfo=tz)
+        # Gezeigt werden nur abgeschlossene Tage; ein eigener Zeitraum endet spätestens gestern.
+        last_shown = min(end, today - timedelta(days=1)) if start is not None and end is not None else today - timedelta(days=1)
+        first_shown = start if start is not None else last_shown - timedelta(days=days - 1)
+        if first_shown > last_shown:
+            return None
+        first = first_shown - timedelta(days=pv_mod.WINDOW_DAYS)
+        read_from = datetime(first.year, first.month, first.day, tzinfo=tz)
+        read_to = min(now_local, datetime(last_shown.year, last_shown.month, last_shown.day, tzinfo=tz) + timedelta(days=1))
         read_cache = query_mod.QueryReadCache()
         lux_rows = sorted(
-            (row for row in self._rows(lux_id, "standard", start, now_local, now_local, read_cache) if row.value is not None),
+            (row for row in self._rows(lux_id, "standard", read_from, read_to, now_local, read_cache) if row.value is not None),
             key=lambda row: row.bucket_start,
         )
-        pv_rows = [row for row in self._rows(pv_id, "standard", start, now_local, now_local, read_cache) if row.value is not None]
+        pv_rows = [row for row in self._rows(pv_id, "standard", read_from, read_to, now_local, read_cache) if row.value is not None]
         stamps = [row.bucket_start for row in lux_rows]
         lux_at = {row.bucket_start: row.value for row in lux_rows}
         pairs = []
@@ -1687,7 +1697,7 @@ class WetterService:
             if lux is None:
                 continue
             pairs.append((moment.date(), moment.hour, float(lux), max(0.0, row.value * scale)))
-        shown = [today - timedelta(days=offset) for offset in range(days, 0, -1)]
+        shown = [first_shown + timedelta(days=offset) for offset in range((last_shown - first_shown).days + 1)]
         result = pv_mod.evaluate(pairs, shown)
         if result is None:
             return None
@@ -2739,9 +2749,21 @@ class WetterService:
             return data
 
         @router.get("/wetterdashboard/pv")
-        def wetterdashboard_pv() -> dict:
+        def wetterdashboard_pv(days: int = PV_DAYS, start: str = "", end: str = "") -> dict:
             _require_configured()
-            data = self.compute_pv()
+            first = last = None
+            if start:
+                today = datetime.now(self.deps.tz).date()
+                try:
+                    first = date.fromisoformat(start)
+                    last = date.fromisoformat(end) if end else today
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum.")) from None
+                if last > today or first > last or (last - first).days + 1 > PV_MAX_SPAN_DAYS:
+                    raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
+            elif days not in PV_DAY_OPTIONS:
+                raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
+            data = self.compute_pv(days=days, start=first, end=last)
             if data is None:
                 raise HTTPException(status_code=409, detail=tr("Noch keine PV-Leistung mit Helligkeit zum Vergleichen vorhanden."))
             return data

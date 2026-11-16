@@ -820,7 +820,7 @@ def test_reference_day_uses_the_dashboard_stichtag_bar_of_the_app() -> None:
     page = (TEMPLATES / "wetterdashboard.html").read_text(encoding="utf-8")
     assert "{{ period_nav(true, true) }}" in view and "period_assets()" in page
     # Der Stichtag hat keine eigene Tagesauswahl; Datumsfelder gibt es nur im Menü „Eigener Zeitraum“ der Temperaturen.
-    assert "wt-daynav" not in view and view.count('type="date"') == 4 and 'x-model="draftStart"' in view  # Temperaturen und Tagesverlauf haben je Von und Bis
+    assert "wt-daynav" not in view and view.count('type="date"') == 6 and 'x-model="draftStart"' in view  # Temperaturen, Tagesverlauf und PV haben je Von und Bis
     script = _wetter_script()
     assert "Alpine.store('dashStichtag').date" in script and "'dashboard-stichtag'" in script
     assert "shiftStichtag" not in script and "setStichtag" not in script
@@ -1123,6 +1123,27 @@ def test_pv_compares_the_closed_days_with_the_learned_expectation(service) -> No
     assert rows["19"]["flagged"] is True and rows["19"]["deviation"] == pytest.approx(-50.0, abs=2.0)
     assert rows["19"]["actual"] == pytest.approx(12.0)  # acht Stunden zu 1,5 kW, die Lücke um 11 Uhr zählt mit
     assert data["window"] == 28 and data["limit"] == 15
+
+
+def test_pv_shows_a_custom_range_and_only_closed_days(service) -> None:
+    _pv_data(service, last_factor=0.5)
+    data = service.compute_pv(NOW, start=date(2026, 8, 17), end=date(2026, 8, 18))
+    assert [row["date"][-2:] for row in data["days"]] == ["17", "18"]  # das Lernfenster davor zählt nicht mit
+    # Ein Zeitraum bis heute endet gestern, ein Zeitraum nur aus heute ergibt nichts.
+    assert [row["date"][-2:] for row in service.compute_pv(NOW, start=date(2026, 8, 18), end=date(2026, 8, 20))["days"]] == ["18", "19"]
+    assert service.compute_pv(NOW, start=date(2026, 8, 20), end=date(2026, 8, 20)) is None
+    assert [row["date"][-2:] for row in service.compute_pv(NOW, days=7)["days"]][-1] == "19"
+
+
+def test_pv_route_validates_the_range(client) -> None:
+    from app.main import index
+
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    index.get_or_create_entity("sensor.wetter_test_temp6", "sensor", "measurement", "°C")
+    assert client.post("/wetterdashboard/setup", data={"temperature": "sensor.wetter_test_temp6"}).status_code == 200
+    for query in ("days=5", "start=nope", "start=2999-01-01", "start=2026-02-01&end=2026-01-01", "start=2026-01-01&end=2026-08-01"):
+        assert client.get(f"/wetterdashboard/pv?{query}").status_code == 400, query
+    assert client.get("/wetterdashboard/pv?days=30").status_code in (200, 404, 409)  # gültig, je nach Einrichtung
 
 
 def test_pv_needs_both_roles_and_a_power_unit(service) -> None:

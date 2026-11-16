@@ -132,6 +132,7 @@
   const utcDateShort = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'UTC'});
   const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
   const MAX_TEMP_SPAN_DAYS = 3660;  // eigener Zeitraum: höchstens zehn Jahre (wie der Server)
+  const MAX_PV_SPAN_DAYS = 92;  // PV und Helligkeit: höchstens drei Monate (wie der Server)
   // Spalten der Jahr×Tag-Matrix: ein Schaltjahr, damit der 29.02. eine eigene Spalte hat.
   const slotLabel = (slot) => {
     const {month, day} = slotDate(slot);
@@ -283,6 +284,12 @@
       pv: null,
       pvError: '',
       pvSel: null,
+      pvDays: 14,
+      pvRange: null,           // eigener Zeitraum {start, end} statt der festen Tage
+      pvRangeOpen: false,
+      pvDraftStart: '',
+      pvDraftEnd: '',
+      pvRangeError: '',
       _sunhoursSeq: 0,
       hasDayimage: false,
       dayimage: null,
@@ -343,6 +350,7 @@
       _tilesSeq: 0,
       _monthlySeq: 0,
       _courseSeq: 0,
+      _pvSeq: 0,
       _tempsSeq: 0,
       _precipSeq: 0,
       _matrixSeq: 0,
@@ -358,6 +366,8 @@
         if (['3', '5', '10', 'all'].includes(String(saved.daylengthPast))) this.daylengthPast = String(saved.daylengthPast);
         if (saved.tempRange && ISO_DAY.test(saved.tempRange.start || '') && ISO_DAY.test(saved.tempRange.end || '')) this.tempRange = {start: saved.tempRange.start, end: saved.tempRange.end};
         if ([7, 30, 365].includes(saved.courseDays)) this.courseDays = saved.courseDays;
+        if ([7, 14, 30].includes(saved.pvDays)) this.pvDays = saved.pvDays;
+        if (saved.pvRange && ISO_DAY.test(saved.pvRange.start || '') && ISO_DAY.test(saved.pvRange.end || '')) this.pvRange = {start: saved.pvRange.start, end: saved.pvRange.end};
         if (saved.courseRange && ISO_DAY.test(saved.courseRange.start || '') && ISO_DAY.test(saved.courseRange.end || '')) this.courseRange = {start: saved.courseRange.start, end: saved.courseRange.end};
         if (['previous', 'year', ''].includes(saved.courseCompare)) this.courseCompare = saved.courseCompare;
         if (Array.isArray(saved.roomsOff)) this.roomsOff = saved.roomsOff.filter((name) => typeof name === 'string');
@@ -1369,14 +1379,60 @@
       // ---- PV und Helligkeit (experimentell): Tagesertrag gegen die Erwartung aus der Süd-Helligkeit -------
 
       async loadPv() {
+        const seq = ++this._pvSeq;
         this.pvError = '';
         try {
-          this.pv = await this.fetchJson('wetterdashboard/pv');
-          for (const row of this.pv.days) row.hours = row.hours || [];
+          const range = this.pvRange ? `start=${this.pvRange.start}&end=${this.pvRange.end}` : `days=${this.pvDays}`;
+          const data = await this.fetchJson(`wetterdashboard/pv?${range}`);
+          if (seq !== this._pvSeq) return;  // eine neuere Anfrage hat überholt
+          for (const row of data.days) row.hours = row.hours || [];
+          this.pv = data;
+          this.pvSel = null;
           this.$nextTick(() => this.drawPv());
         } catch (e) {
+          if (seq !== this._pvSeq) return;
+          this.pv = null;  // kein veraltetes Diagramm unter der Fehlermeldung
           this.pvError = t('Der Vergleich von PV-Leistung und Helligkeit konnte nicht geladen werden.');
         }
+      },
+
+      setPvDays(days) {
+        this.pvDays = days;
+        this.pvRange = null;
+        this.pvRangeOpen = false;
+        writeStore({pvDays: days, pvRange: null});
+        this.loadPv();
+      },
+
+      pvRangeLabel() {
+        const r = this.pvRange;
+        if (!r) return t('Eigener Zeitraum');
+        const format = (iso) => utcDate.format(new Date(`${iso}T12:00:00Z`));
+        return `${format(r.start)}–${format(r.end)}`;
+      },
+
+      openPvRange() {
+        if (this.pvRangeOpen) { this.pvRangeOpen = false; return; }
+        const today = this.todayIso();
+        this.pvDraftEnd = this.pvRange ? this.pvRange.end : today;
+        this.pvDraftStart = this.pvRange ? this.pvRange.start : (this.pv && this.pv.days.length ? this.pv.days[0].date : today);
+        this.pvRangeError = '';
+        this.pvRangeOpen = true;
+      },
+
+      applyPvRange() {
+        const start = this.pvDraftStart;
+        const end = this.pvDraftEnd;
+        if (!ISO_DAY.test(start) || !ISO_DAY.test(end)) { this.pvRangeError = t('Von und Bis wählen.'); return; }
+        if (end < start) { this.pvRangeError = t('Das Ende liegt vor dem Anfang.'); return; }
+        if (end > this.todayIso()) { this.pvRangeError = t('Das Ende liegt nach heute.'); return; }
+        const days = Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000) + 1;
+        if (days > MAX_PV_SPAN_DAYS) { this.pvRangeError = t('Der Zeitraum darf höchstens drei Monate lang sein.'); return; }
+        this.pvRangeError = '';
+        this.pvRangeOpen = false;
+        this.pvRange = {start, end};
+        writeStore({pvRange: this.pvRange});
+        this.loadPv();
       },
 
       // Der gewählte Tag der Karte; ohne Auswahl der letzte.

@@ -503,6 +503,23 @@
     <div class="wt-controls">
       <h2 class="wt-h2">{{ _("PV und Helligkeit") }} {{ hint_button(_("PV und Helligkeit")) }}</h2>
       {% call hint_body() %}{{ _("Die Erwartung wird aus den letzten 28 Tagen gelernt: je Helligkeitsstufe der Median der Stundenleistung. Die Karte zeigt, ob der Tagesertrag dazu passt; sie ist eine Messung, keine Prognose. Eine Abweichung über 15 % wird markiert, aber nur an Tagen mit nennenswerter Erwartung. Temperatur, Abregelung und ein voller Akku senken die Leistung, ohne dass die Anlage schlechter wird. Der Süd-Sensor misst an einem Punkt, im Sommer sättigt er mittags (98.800 lx), dann sagt die Helligkeit über die Leistung nur noch wenig. Das Verhältnis nach Uhrzeit zeigt, ob die Anlage morgens oder abends systematisch abweicht (Ausrichtung der Module, Verschattung).") }}{% endcall %}
+      <div class="wt-yr wt-controls-end" @keydown.escape="pvRangeOpen = false">
+        <div class="wt-seg" role="group" aria-label="{{ _('Zeitraum') }}">
+          <template x-for="opt in [{days: 7, label: t('7 Tage')}, {days: 14, label: t('14 Tage')}, {days: 30, label: t('30 Tage')}]" :key="opt.days">
+            <button type="button" :aria-pressed="(!pvRange && pvDays === opt.days).toString()" @click="setPvDays(opt.days)" x-text="opt.label"></button>
+          </template>
+          <button type="button" :aria-pressed="(!!pvRange).toString()" :aria-expanded="pvRangeOpen.toString()" @click="openPvRange()"><span x-text="pvRangeLabel()"></span> ▾</button>
+        </div>
+        <div class="wt-yr-pop" x-show="pvRangeOpen" x-cloak @click.outside="pvRangeOpen = false">
+          <label>{{ _("Von") }} <input type="date" x-model="pvDraftStart" :max="todayIso()"></label>
+          <label>{{ _("Bis") }} <input type="date" x-model="pvDraftEnd" :max="todayIso()"></label>
+          <p class="hint hint-warn" x-show="pvRangeError" x-text="pvRangeError" x-cloak></p>
+          <div class="wt-yr-actions">
+            <button type="button" class="btn" @click="setPvDays(14)">{{ _("Zurücksetzen") }}</button>
+            <button type="button" class="btn" @click="applyPvRange()">{{ _("Übernehmen") }}</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="wt-pv-status" x-show="pv" x-cloak>
       <span class="wt-pv-chip" :data-kind="pvStatus().kind" x-text="pvStatus().chip"></span>
