@@ -1912,6 +1912,26 @@ the data.
 - Whether an entity has failed is shown by **Inactive entities**, which uses the
   last received value.
 
+**Recommendation for the threshold.** Zeitarchiv suggests a threshold per entity:
+the smallest step at which it would have fired at most about once a week (4
+notices per 30 days) over the last 60 days. A notice should be something rare,
+otherwise it is ignored; the entity itself provides the yardstick. The
+recommendation is available after at least 14 days of observation (for stored
+values also after 30 intervals); an entity that has been silent for more than
+seven days gets none, because without a value there is no pause.
+- **Too sensitive:** the current threshold fires more than three times as often
+  as the target.
+- **Not suitable:** even 24 hours fires too often, typical for sensors that only
+  send on change. “Off” is recommended.
+- **Could be finer:** the current threshold is at least two steps above the
+  recommended one; shorter failures would go unnoticed. Only a hint.
+- **Fits**, **Switched off** and **No recommendation yet** (with the reason in
+  the tooltip) complete the assessment.
+
+The recommendation never changes anything by itself. It appears in
+**Housekeeping → Gap detection** and on the entity's configuration page and is
+applied with one click.
+
 ### Outlier detection
 
 Marks **implausible single values** on the cleanup page: shifted digits,
@@ -2376,7 +2396,7 @@ settings:
 | **Inactive entities** | Entities without a new value for a selectable threshold (1 to 30 days). Entities never received always appear regardless of the threshold. Usually harmless (standby, rare sensor), but an early hint of a dead integration or a renamed/removed HA entity. |
 | **Duplicates** | Duplicate timestamps of the last 30 days detected archive-wide, per entity — the same hourly background snapshot that also triggers the "Duplicates found" notice. Removable via "Remove duplicates automatically" on the respective cleanup page, or with the **Remove automatically** switch in the section header (see below). |
 | **Outliers** | Entities for which the configured outlier threshold marks more than 1 % of their values — with threshold, absolute number and rate. Then the threshold is too tight for this signal: what gets marked is no longer the implausible but normal behavior. These are the same numbers shown below the threshold field of the respective entity (see [Configuring an entity](#configuring-an-entity)); the list calculates nothing of its own. No bulk correction — the appropriate threshold depends on the signal. |
-| **Gap detection** | All entities with method (stored or received values), configured threshold, number of gaps found (from data quality, sortable, “–” if not yet measured for the current threshold) and start of recording (see [Gap detection](#gap-detection)). With checkboxes and **Apply to selection** or **Apply to all** the threshold is set for several entities at once (or detection is switched off); a confirmation first shows the split, afterwards a notice offers **Undo**, and the gaps are measured again. This only changes the setting, not data. |
+| **Gap detection** | All entities with method (stored or received values), configured threshold, number of gaps found (from data quality, sortable, “–” if not yet measured for the current threshold) and start of recording (see [Gap detection](#gap-detection)). The recommended threshold and the assessment of the current one are added (see [Gap detection](#gap-detection)). With checkboxes and **Apply recommendation** or **Apply recommendations** (all too sensitive and unsuitable ones) the recommendation is applied; with **Apply to selection** or **Apply to all** a freely chosen threshold is set for several entities at once (or detection is switched off); a confirmation first shows the split, afterwards a notice offers **Undo**, and the gaps are measured again. This only changes the setting, not data. |
 | **Storage** | Free storage on the host file system (tile with utilization bar — a different question from the numbers below, not Zeitarchiv's own storage consumption). The "Check storage" button triggers two separately reported checks at once: **Index consistency** (does the derived index cache match archive/hot buffer — deviations can be fixed via "Repair index") and **Data integrity** (are the raw data in the hot buffer itself still readable — damaged rows almost always arise from an unclean restart, power failure or hard kill, and are not repairable; the affected entity and month are listed, the value remains irretrievably lost). Below: permanently remove marked records from hot buffer and archive. The "Show marked records" button lists them beforehand in a searchable way — first per affected entity with count and last marking time (search field, pagination), a click on a row shows below, in the same dialog, the individual marked points in time including value. Purely read-only: the actual undoing of an individual mark continues to run via the entity itself (see [Cleanup](#cleanup)). Below that, the switch for automatic cleanup (off by default) and the minimum age of the deletion mark for it — removes only marks that are at least that old so that "Undo" for a row that was just deleted does not lead nowhere. If the preview reports "Deletion marks without matching raw data row", the associated raw data row had already been removed by a compaction or an expired retention — both have since cleaned up the affected marks themselves, so this number tends toward 0 over time. |
 | **Retention** | Overview of currently due and already deleted records; preview of due deletions; schedule for automatic enforcement (daily or weekly with weekday); run history. |
 | **Compact** | Switch for the automatic, retroactive compaction of archived months (off by default) and the minimum age for it — affects only entities with a compaction target set (see [Configuring an entity](#configuring-an-entity)). The manual Compact action, on the other hand, lies with the respective entity itself, in the editing area. |

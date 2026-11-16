@@ -20,6 +20,11 @@
     sel.textContent = n ? sel.dataset.label.replace('{count}', n) : sel.textContent;
     bar.querySelector('[data-gc-clear]').hidden = !n;
     bar.querySelector('[data-gc-all]').hidden = n > 0;
+    const recSel = bar.querySelector('[data-gc-rec-sel]');
+    recSel.hidden = !n;
+    if (n) recSel.textContent = recSel.dataset.label.replace('{count}', n);
+    const recAll = bar.querySelector('[data-gc-rec-all]');
+    if (recAll) recAll.hidden = n > 0;
     const head = r.querySelector('[data-gc-check-all]');
     const shown = boxes().filter(visible);
     if (head) head.checked = shown.length > 0 && shown.every(function (b) { return b.checked; });

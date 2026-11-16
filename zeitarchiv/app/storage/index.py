@@ -1952,6 +1952,17 @@ class Index:
         with self._lock:
             return [(row["start_ts"], row["end_ts"]) for row in self._conn.execute(query + " ORDER BY end_ts", params)]
 
+    def receive_gap_tier_counts(self, tiers: tuple[int, ...], from_ts: float) -> dict[str, dict[int, int]]:
+        """Je Entität, wie viele Empfangs-Pausen seit ``from_ts`` (und seit Beginn ihrer Aufzeichnung) länger waren als
+        jede der Stufen (Minuten); Entitäten ohne Pause fehlen. Eine Abfrage für alle."""
+        columns = ", ".join(f"SUM(CASE WHEN g.end_ts - g.start_ts > {int(tier) * 60} THEN 1 ELSE 0 END)" for tier in tiers)
+        query = (  # noqa: S608 — Stufen sind ganze Zahlen aus einer festen Liste
+            f"SELECT g.entity_id, {columns} FROM receive_gaps g JOIN entities e ON e.entity_id = g.entity_id "
+            "WHERE g.end_ts >= ? AND g.end_ts >= COALESCE(e.receive_gaps_since, 0) GROUP BY g.entity_id"
+        )
+        with self._lock:
+            return {row[0]: {tier: row[i + 1] for i, tier in enumerate(tiers)} for row in self._conn.execute(query, (from_ts,))}
+
     def prune_receive_gaps(self, now: float, retention_days: dict[str, float | None]) -> int:
         """Räumt Empfangs-Pausen auf: älter als die Aufbewahrung der Entität (``retention_days``: Stufe → Tage,
         ``None`` = unbegrenzt) bzw. höchstens zwei Jahre, dazu höchstens ``MAX_RECEIVE_GAPS_PER_ENTITY`` je Entität
@@ -4461,6 +4472,7 @@ class Index:
         outlier_rule: int | None = None,
         daily: dict | None = None,
         gap_threshold: str | None = None,
+        gap_profile: dict | None = None,
     ) -> None:
         """`daily` sind die Befunde je Kalendertag ({"JJJJ-MM-TT": {Kategorie:
         Anzahl}}, nur Tage mit Befund), aus demselben Durchlauf wie `counts`.
@@ -4484,6 +4496,9 @@ class Index:
         }
         if daily is not None:
             entry["daily"] = daily
+        if gap_profile is not None:
+            # Pausen-Zähler je Stufe der letzten Wochen (gespeicherte Werte), Grundlage der Schwellen-Empfehlung.
+            entry["gap_profile"] = gap_profile
         self.set_setting(self._CLEANUP_ALLTIME_STATS_PREFIX + entity_id, json.dumps(entry))
 
     def list_cleanup_alltime_stats(self, with_daily: bool = True) -> dict[str, dict]:

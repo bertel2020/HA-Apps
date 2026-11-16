@@ -16,10 +16,11 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from . import gap_recommendation
 from .formatting import OUTLIER_THRESHOLD_LABELS, format_int, format_value
 from .storage import cleanup
 from .storage import query as query_mod
-from .storage.index import Index, effective_outlier_threshold
+from .storage.index import Index, effective_outlier_threshold, gap_method
 
 # Zeiträume der Bereinigungsseite — dieselben Perioden wie im Chart
 # (entity_detail.html/query._window(), Konsistenz zwischen beiden Werkzeugen),
@@ -162,6 +163,7 @@ def alltime_counts(
         counter_decrease_enabled=counter_decreases_flagged(entity),
         outlier_mode=outlier_mode(entity),
         reasons=False,
+        gap_tiers_since=now.timestamp() - gap_recommendation.WINDOW_DAYS * 86400,
     )
     counts = analysis["counts"]
     if index.finding_generation(entity_id) != generation:
@@ -172,6 +174,7 @@ def alltime_counts(
     index.set_cleanup_alltime_stats(
         entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION,
         daily=analysis["daily"], gap_threshold=gap_key,
+        gap_profile=analysis.get("gap_profile") if gap_method(entity) == "stored" else None,
     )
     return counts
 
@@ -229,7 +232,11 @@ def gaps_measured(entity, eintrag: dict | None) -> bool:
     Eintrag ist in diesem Punkt aktuell, die Zahl ist 0)."""
     if entity["gap_threshold"] == "off":
         return True
-    return eintrag is not None and eintrag.get("gap_threshold") == cleanup.gap_cache_key(entity)
+    if eintrag is None or eintrag.get("gap_threshold") != cleanup.gap_cache_key(entity):
+        return False
+    # Bei gespeicherten Werten gehört das Pausen-Profil der Schwellen-Empfehlung zur Messung: Einträge aus der Zeit
+    # davor werden einmal neu gemessen.
+    return gap_method(entity) != "stored" or "gap_profile" in eintrag
 
 
 def rate_labels(rate: dict) -> dict:

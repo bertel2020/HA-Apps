@@ -170,7 +170,7 @@ from .energiedashboard_routes import (
     is_energiedashboard_configured,
 )
 from .wetter_routes import WetterDependencies, WetterService, back_wetter, is_wetter_configured, wetter_role_count
-from . import cleanup_stats, counter_bulk, data_quality, entity_usage
+from . import cleanup_stats, counter_bulk, data_quality, entity_usage, gap_recommendation
 from . import card_elements, dashboard_tiles, overview_tiles, page_layout, page_refresh
 from .dashboard_tiles import tile_metric_context as _tile_metric_context
 from .route_support import (
@@ -2902,6 +2902,15 @@ def _entity_config_adjusted(entity) -> dict[str, dict[str, str]]:
     }
 
 
+def _gap_recommendation_context(entity) -> dict:
+    """Empfehlung für die Lücken-Erkennung dieser Entität samt Beschriftungen für die Konfigurationsseite."""
+    result = gap_recommendation.recommendation_for(index, entity, time.time())
+    return {
+        **gap_recommendation.describe(entity, result), "status": result["status"], "recommended": result["recommended"],
+        "differs": gap_recommendation.differs(entity, result),
+    }
+
+
 def _entity_config_context(entity) -> dict:
     """Gemeinsamer Kontext für die volle Konfigurationsseite (GET) und das per
     htmx nachgeladene/gespeicherte Formular-Fragment (POST) — beide zeigen
@@ -2957,6 +2966,7 @@ def _entity_config_context(entity) -> dict:
         "ignore_values_options": list(IGNORE_VALUES_LABELS.items()),
         "gap_threshold": entity["gap_threshold"],
         "gap_method": gap_method(entity),
+        "gap_recommendation": _gap_recommendation_context(entity),
         "gap_since_label": (
             formats.format_date(datetime.fromtimestamp(entity["receive_gaps_since"], TZ))
             if entity["receive_gaps_since"] is not None else None
@@ -5130,6 +5140,7 @@ def _rows_fragment(
             decimals=entity["decimals"],
             counter_decrease_enabled=cleanup_stats.counter_decreases_flagged(entity),
             outlier_mode=cleanup_stats.outlier_mode(entity),
+            gap_tiers_since=(now.timestamp() - gap_recommendation.WINDOW_DAYS * 86400) if range_key == "all" else None,
         )
         counts = analysis["counts"]
         daily_counts = analysis["daily"]
@@ -5255,6 +5266,7 @@ def _rows_fragment(
         index.set_cleanup_alltime_stats(
             entity_id, counts, outlier_threshold, cleanup.OUTLIER_RULE_VERSION,
             daily=daily_counts, gap_threshold=cleanup.gap_cache_key(entity),
+            gap_profile=analysis.get("gap_profile") if gap_method(entity) == "stored" else None,
         )
     else:
         alltime_counts, alltime_stale = cleanup_stats.alltime_counts_or_invalidated(DATA_DIR, index, TZ, entity, now)

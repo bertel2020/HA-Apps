@@ -15,19 +15,27 @@
 </div>
 {% endif %}
 {% if go.confirm %}
+{% set recommend_mode = go.confirm.mode == 'recommend' %}
 <div class="gc-confirm">
-  <h3 class="eyebrow">{{ _("Schwelle setzen") }}</h3>
+  <h3 class="eyebrow">{{ _("Empfehlung übernehmen") if recommend_mode else _("Schwelle setzen") }}</h3>
   {% if go.confirm.count %}
+  {% if recommend_mode %}
+  <p class="gc-text">{{ _("Bei {count} Entität(en) wird die Lücken-Erkennung auf die Empfehlung gesetzt. Daten bleiben unverändert, und du kannst es danach rückgängig machen.", count=go.confirm.count) }}</p>
+  <ul class="gc-groups">
+    {% for group in go.confirm.groups %}<li>{{ group.count }} &times; {{ group.old }} &rarr; {{ group.new }}</li>{% endfor %}
+  </ul>
+  {% else %}
   <p class="gc-text">{{ _("Bei {count} Entität(en) wird die Lücken-Erkennung auf {new} gesetzt. Daten bleiben unverändert, und du kannst es danach rückgängig machen.", count=go.confirm.count, new=go.confirm.threshold_label) }}</p>
   <ul class="gc-groups">
     {% for group in go.confirm.groups %}<li>{{ group.count }} &times; {{ _("von {old}", old=group.label) }}</li>{% endfor %}
   </ul>
+  {% endif %}
   <form id="gc-confirm-form">
-    <input type="hidden" name="threshold" value="{{ go.confirm.threshold }}">
+    {% if not recommend_mode %}<input type="hidden" name="threshold" value="{{ go.confirm.threshold }}">{% endif %}
     {% if go.confirm.all %}<input type="hidden" name="all" value="1">{% else %}{% for entity_id in go.confirm.entity_ids %}<input type="hidden" name="entity_id" value="{{ entity_id }}">{% endfor %}{% endif %}
   </form>
   <div class="actionbar">
-    <button type="button" class="btn btn-primary" hx-post="{{ go_url }}/apply" hx-include="#gc-confirm-form"
+    <button type="button" class="btn btn-primary" hx-post="{{ go_url }}{{ '/recommend' if recommend_mode else '' }}/apply" hx-include="#gc-confirm-form"
             hx-target="#gap-conflicts" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Übernehmen") }}</button>
     <button type="button" class="btn" hx-get="{{ go_url }}" hx-target="#gap-conflicts" hx-swap="innerHTML">{{ _("Abbrechen") }}</button>
   </div>
@@ -49,18 +57,27 @@
     <button type="button" class="btn btn-sm btn-primary" data-gc-sel hidden
             hx-post="{{ go_url }}/preview" hx-include="#gc-form" hx-target="#gap-conflicts" hx-swap="innerHTML"
             data-label="{{ _('Auf Auswahl anwenden ({count})') }}">{{ _("Auf Auswahl anwenden") }}</button>
+    <button type="button" class="btn btn-sm btn-primary" data-gc-rec-sel hidden
+            hx-post="{{ go_url }}/recommend/preview" hx-include="#gc-form" hx-target="#gap-conflicts" hx-swap="innerHTML"
+            data-label="{{ _('Empfehlung übernehmen ({count})') }}">{{ _("Empfehlung übernehmen") }}</button>
     <button type="button" class="btn btn-sm" data-gc-clear hidden>{{ _("Auswahl aufheben") }}</button>
+    {% if go.actionable_count %}
+    <button type="button" class="btn btn-sm btn-primary" data-gc-rec-all
+            hx-post="{{ go_url }}/recommend/preview" hx-vals='{"all": "1"}' hx-target="#gap-conflicts" hx-swap="innerHTML"
+            title="{{ _('Entitäten, bei denen die Lücken-Erkennung zu empfindlich ist oder nicht geeignet scheint') }}">{{ _("Empfehlungen übernehmen ({count})", count=go.actionable_count) }}</button>
+    {% endif %}
     <button type="button" class="btn btn-sm btn-primary" data-gc-all
             hx-post="{{ go_url }}/preview" hx-vals='{"all": "1"}' hx-include="[name=threshold]" hx-target="#gap-conflicts" hx-swap="innerHTML">{{ _("Auf alle anwenden ({count})", count=go.rows | length) }}</button>
   </div>
   <div class="tbl-wrap">
     <table class="dt stats-dt" data-sortable data-paginate data-page-size="10">
       <colgroup>
-        <col class="hk-col-chk"><col><col class="hk-col-methode"><col class="hk-col-luecke"><col class="hk-col-anzahl"><col class="hk-col-aufzeichnung">
+        <col class="hk-col-chk"><col><col class="hk-col-methode"><col class="hk-col-luecke"><col class="hk-col-empf"><col class="hk-col-beurt"><col class="hk-col-anzahl"><col class="hk-col-aufzeichnung">
       </colgroup>
       <thead><tr>
         <th data-no-sort><input type="checkbox" data-gc-check-all aria-label="{{ _('Alle auf der Seite auswählen') }}"></th>
         <th>{{ _("Entität") }}</th><th>{{ _("Gezählt wird") }}</th><th>{{ _("Lücken-Erkennung") }}</th>
+        <th>{{ _("Empfohlen") }}</th><th>{{ _("Beurteilung") }}</th>
         <th>{{ _("Gefundene Lücken") }}</th><th>{{ _("Aufzeichnung seit") }}</th>
       </tr></thead>
       <tbody>
@@ -79,6 +96,8 @@
         </td>
         <td>{{ row.method_label }}</td>
         <td data-sort="{{ row.threshold if row.threshold != 'off' else 999999 }}">{{ row.threshold_label }}</td>
+        <td>{{ row.recommended_label }}</td>
+        <td data-sort="{{ row.rank }}"><span class="gc-chip gc-chip-{{ row.tone }}" title="{{ row.status_tip }}">{{ row.status_label }}</span></td>
         <td data-sort="{{ row.gaps if row.gaps is not none else -1 }}"{% if row.gaps is none and row.threshold != 'off' %} title="{{ _('Noch nicht zur aktuellen Schwelle gemessen') }}"{% endif %}>{{ row.gaps_label }}</td>
         <td>{{ row.since_label }}</td>
       </tr>

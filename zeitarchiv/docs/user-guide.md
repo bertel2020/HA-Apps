@@ -2068,6 +2068,26 @@ Markierung ist reine Analyse; an den Daten ändert sie nichts.
 - Ob eine Entität ausgefallen ist, zeigt **Inaktive Entitäten**, das den
   zuletzt empfangenen Wert nutzt.
 
+**Empfehlung für die Schwelle.** Zeitarchiv schlägt je Entität eine Schwelle vor:
+die kleinste Stufe, bei der sie in den letzten 60 Tagen höchstens etwa einmal
+pro Woche (4 Meldungen je 30 Tage) angeschlagen hätte. Eine Meldung soll etwas
+Seltenes sein, sonst wird sie ignoriert; die Messlatte liefert die Entität
+selbst. Die Empfehlung steht nach mindestens 14 Tagen Beobachtung bereit (bei
+gespeicherten Werten zusätzlich nach 30 Abständen); eine seit über sieben Tagen
+stumme Entität bekommt keine, denn ohne Wert gibt es keine Pause.
+- **Zu empfindlich:** Die aktuelle Schwelle schlägt mehr als dreimal so oft an
+  wie das Ziel.
+- **Nicht geeignet:** Selbst 24 Stunden schlagen zu oft an, typisch bei
+  Sensoren, die nur bei Änderung senden. Empfohlen wird „Aus“.
+- **Könnte feiner sein:** Die aktuelle Schwelle liegt mindestens zwei Stufen
+  über der empfohlenen; kürzere Ausfälle blieben unbemerkt. Nur ein Hinweis.
+- **Passt**, **Ausgeschaltet** und **Noch keine Empfehlung** (mit Begründung im
+  Tooltip) vervollständigen die Beurteilung.
+
+Die Empfehlung ändert nie von selbst etwas. Sie steht in **Housekeeping →
+Lücken-Erkennung** und auf der Konfigurationsseite der Entität und wird mit
+einem Klick übernommen.
+
 ### Ausreißer-Erkennung
 
 Markiert **unplausible Einzelwerte** auf der Bereinigungs-Seite: verrutschte
@@ -2560,7 +2580,7 @@ wie die Einstellungen:
 | **Inaktive Entitäten** | Entitäten ohne neuen Wert seit einem wählbaren Schwellwert (1 bis 30 Tage). Nie empfangene Entitäten erscheinen unabhängig vom Schwellwert immer. Meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität. |
 | **Duplikate** | Archivweit erkannte doppelte Zeitstempel der letzten 30 Tage, je Entität — derselbe stündliche Hintergrund-Schnappschuss, der auch die Meldung „Duplikate gefunden" auslöst. Entfernbar über „Duplikate automatisch entfernen" auf der jeweiligen Bereinigungs-Seite oder mit dem Schalter **Automatisch entfernen** im Kopf des Abschnitts (siehe unten). |
 | **Ausreißer** | Entitäten, bei denen die eingestellte Ausreißer-Schwelle mehr als 1 % ihrer Werte markiert — mit Schwelle, absoluter Zahl und Quote. Dann ist die Schwelle für dieses Signal zu eng: markiert wird nicht mehr das Unplausible, sondern normales Verhalten. Es sind dieselben Zahlen, die unter dem Schwellenfeld der jeweiligen Entität stehen (siehe [Entität konfigurieren](#entität-konfigurieren)); die Liste rechnet nichts eigenes. Keine Sammel-Korrektur — die passende Schwelle hängt am Signal. |
-| **Lücken-Erkennung** | Alle Entitäten mit Methode (gespeicherte oder empfangene Werte), eingestellter Schwelle, Zahl der gefundenen Lücken (aus der Datenqualität, sortierbar, „–“ wenn noch nicht zur aktuellen Schwelle gemessen) und Beginn der Aufzeichnung (siehe [Lücken-Erkennung](#lücken-erkennung)). Mit Kontrollkästchen und **Auf Auswahl anwenden** oder **Auf alle anwenden** setzt man die Schwelle für mehrere Entitäten zugleich (oder schaltet die Erkennung aus); eine Bestätigung zeigt vorher die Aufteilung, danach bietet ein Hinweis **Rückgängig** an, und die Lücken werden neu gemessen. Das ändert nur die Einstellung, keine Daten. |
+| **Lücken-Erkennung** | Alle Entitäten mit Methode (gespeicherte oder empfangene Werte), eingestellter Schwelle, Zahl der gefundenen Lücken (aus der Datenqualität, sortierbar, „–“ wenn noch nicht zur aktuellen Schwelle gemessen) und Beginn der Aufzeichnung (siehe [Lücken-Erkennung](#lücken-erkennung)). Dazu kommen die empfohlene Schwelle und die Beurteilung der aktuellen (siehe [Lücken-Erkennung](#lücken-erkennung)). Mit Kontrollkästchen und **Empfehlung übernehmen** oder **Empfehlungen übernehmen** (alle zu empfindlichen und nicht geeigneten) übernimmt man die Empfehlung; mit **Auf Auswahl anwenden** oder **Auf alle anwenden** setzt man eine frei gewählte Schwelle für mehrere Entitäten zugleich (oder schaltet die Erkennung aus); eine Bestätigung zeigt vorher die Aufteilung, danach bietet ein Hinweis **Rückgängig** an, und die Lücken werden neu gemessen. Das ändert nur die Einstellung, keine Daten. |
 | **Speicherplatz** | Freier Speicherplatz auf dem Host-Dateisystem (Kachel mit Auslastungsbalken — andere Frage als die Zahlen unten, nicht Zeitarchivs eigener Speicherverbrauch). Knopf „Speicher prüfen" löst zwei getrennt ausgewiesene Prüfungen auf einmal aus: **Indexkonsistenz** (stimmt der abgeleitete Index-Cache mit Archiv/Hot Buffer überein — Abweichungen sind über „Index reparieren" behebbar) und **Datenintegrität** (sind die Rohdaten im Hot Buffer selbst noch lesbar — beschädigte Zeilen entstehen fast immer durch einen unsauberen Neustart, Stromausfall oder harten Kill, und sind nicht reparierbar; betroffene Entität und Monat werden aufgelistet, der Wert bleibt unwiederbringlich verloren). Darunter: markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen. Der Knopf „Markierte Datensätze anzeigen" listet sie vorher durchsuchbar auf — erst je betroffene Entität mit Anzahl und letztem Markierungszeitpunkt (Suchfeld, Paginierung), ein Klick auf eine Zeile zeigt darunter im selben Dialog die einzelnen markierten Zeitpunkte samt Wert. Rein lesend: das eigentliche Rückgängigmachen einer einzelnen Markierung läuft weiterhin über die Entität selbst (siehe [Bereinigung](#bereinigung)). Darunter der Schalter für die automatische Bereinigung (standardmäßig aus) und das Mindestalter der Löschmarkierung dafür — entfernt nur Markierungen, die mindestens so lange her sind, damit „Rückgängig" für eine gerade erst gelöschte Zeile nicht ins Leere läuft. Meldet die Vorschau „Löschmarkierungen ohne passende Rohdatenzeile", war die zugehörige Rohdatenzeile bereits durch eine Verdichtung oder eine abgelaufene Aufbewahrung entfernt worden — beide räumen die betroffenen Markierungen seitdem selbst mit auf, diese Zahl geht mit der Zeit gegen 0. |
 | **Aufbewahrung** | Übersicht aktuell fälliger und bereits gelöschter Datensätze; Vorschau fälliger Löschungen; Zeitplan für automatische Durchsetzung (täglich oder wöchentlich mit Wochentag); Lauf-Historie. |
 | **Verdichten** | Schalter für die automatische, rückwirkende Verdichtung archivierter Monate (standardmäßig aus) und das Mindestalter dafür — betrifft nur Entitäten mit gesetztem Verdichtungsziel (siehe [Entität konfigurieren](#entität-konfigurieren)). Die manuelle Verdichten-Aktion liegt dagegen bei der jeweiligen Entität selbst, im Bearbeitungsbereich. |

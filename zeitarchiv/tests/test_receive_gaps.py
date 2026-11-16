@@ -211,7 +211,8 @@ def test_gap_options_reads_the_pauses_from_the_start_of_recording(index) -> None
 def test_a_cached_count_is_only_valid_for_the_method_it_was_measured_with() -> None:
     plain = _entity()
     filtered = _entity(value_filter="decimals")
-    entry = {"gap_threshold": "15"}
+    entry = {"gap_threshold": "15", "gap_profile": {"method": "stored", "days": 30, "events": 100, "tiers": {}}}
     assert cleanup_stats.gaps_measured(plain, entry)
+    assert not cleanup_stats.gaps_measured(plain, {"gap_threshold": "15"})  # ohne Pausen-Profil: einmal neu messen
     assert not cleanup_stats.gaps_measured(filtered, entry)
     assert cleanup_stats.gaps_measured(filtered, {"gap_threshold": "r15"})

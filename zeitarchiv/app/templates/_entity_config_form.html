@@ -265,6 +265,16 @@
   {% if gap_method == 'receive' %}
   <p class="hint hint-status">{% if gap_since_label %}{{ _("Gezählt werden Pausen zwischen empfangenen Werten, ab {since}. Wertänderungsfilter, Auflösung und Lebenszeichen ändern daran nichts; „1 Minute“ gilt wie „5 Minuten“.", since=gap_since_label) }}{% else %}{{ _("Gezählt werden Pausen zwischen empfangenen Werten, sobald der erste Wert eintrifft. Wertänderungsfilter, Auflösung und Lebenszeichen ändern daran nichts; „1 Minute“ gilt wie „5 Minuten“.") }}{% endif %}</p>
   {% endif %}
+  <p class="hint hint-status">
+    <strong>{{ _("Empfehlung") }}:</strong>
+    {% if gap_recommendation.status == 'insufficient' %}{{ gap_recommendation.status_label }}. {{ gap_recommendation.status_tip }}
+    {% else %}{{ gap_recommendation.recommended_label }} &middot; {{ gap_recommendation.status_label }}. {{ gap_recommendation.status_tip }}{% endif %}
+    {% if gap_recommendation.differs %}
+    <button type="button" class="btn btn-sm" hx-post="{{ app_root }}/entities/{{ entity_id }}/config"
+            hx-vals='{{ {"gap_threshold": gap_recommendation.recommended} | tojson | forceescape }}'
+            hx-target="#config-form" hx-swap="innerHTML">{{ _("Empfehlung übernehmen") }}</button>
+    {% endif %}
+  </p>
 </div>
 <div class="field cfg-row">
   <label>{{ _("Ausreißer-Erkennung") }} {{ hint_button(_('Ausreißer-Erkennung')) }}{{ adj('outlier_threshold') }}</label>

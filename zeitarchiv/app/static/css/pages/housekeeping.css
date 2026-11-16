@@ -63,12 +63,14 @@
      niedrig, der längste Wert brach dort still um. Wer die Werte ändert,
      misst besser nach, statt zu rechnen. */
   #ausreisser table.stats-dt{min-width:610px;}
-  #luecken-erkennung table.stats-dt{min-width:900px;}
+  #luecken-erkennung table.stats-dt{min-width:1180px;}
   .hk-col-chk{width:44px;}
   /* "Empfangene Werte" / "Gespeicherte Werte" */
   .hk-col-methode{width:170px;}
   .hk-col-luecke{width:156px;}
   .hk-col-anzahl{width:148px;}
+  .hk-col-empf{width:112px;}
+  .hk-col-beurt{width:172px;}
   .hk-col-aufzeichnung{width:150px;}
   /* gemessen 88 (Überschrift; "100×" wäre 65) */
   .hk-col-schwelle{width:92px;}
@@ -346,3 +348,8 @@
 #gap-conflicts td input[type=checkbox],#gap-conflicts th input[type=checkbox]{cursor:pointer;}
 #gap-conflicts .gc-select{font:inherit;font-size:calc(13px * var(--font-scale, 1));padding:5px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--ink);}
 #gap-conflicts .gc-threshold{display:inline-flex;align-items:center;gap:8px;font-size:calc(13px * var(--font-scale, 1));color:var(--ink-muted);}
+#gap-conflicts .gc-chip{display:inline-block;padding:2px 9px;border-radius:999px;font-size:calc(12px * var(--font-scale, 1));font-weight:600;white-space:nowrap;cursor:help;}
+#gap-conflicts .gc-chip-warn{background:var(--warning-soft);color:var(--warning);}
+#gap-conflicts .gc-chip-ok{background:var(--accent-line-soft);color:var(--accent-line);}
+#gap-conflicts .gc-chip-info{background:var(--surface-2, var(--border));color:var(--ink);}
+#gap-conflicts .gc-chip-muted{background:transparent;color:var(--ink-muted);border:1px solid var(--border);}

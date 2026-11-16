@@ -30,6 +30,7 @@ import pyarrow.parquet as pq
 
 from .. import formats
 from ..formatting import decimals_to_int, format_value
+from .. import gap_recommendation
 from . import hotbuffer, rollup
 from . import resolution as resolution_mod
 from .hotbuffer import append as hot_append
@@ -403,6 +404,7 @@ def analyze_raw_rows_page(
     reasons: bool = True,
     receive_gaps: list[tuple[float, float]] | None = None,
     gap_stored_until: float | None = None,
+    gap_tiers_since: float | None = None,
 ) -> dict:
     """Analysiert beliebig viele sortierte Rohwerte mit begrenztem Speicher.
 
@@ -446,6 +448,7 @@ def analyze_raw_rows_page(
             filter_=filter_, gap_threshold_minutes=gap_threshold_minutes, outlier_factor=outlier_factor,
             tz=tz, decimals=decimals, counter_decrease_enabled=counter_decrease_enabled,
             outlier_mode=outlier_mode, receive_gaps=receive_gaps, gap_stored_until=gap_stored_until,
+            gap_tiers_since=gap_tiers_since,
         )
         probe = analyze_raw_rows_page(rows_factory, page=1, page_size=1, reasons=False, **options)
         matches = probe["pagination"]["total"]
@@ -574,9 +577,22 @@ def analyze_raw_rows_page(
                 total_matches += 1
         group_rows = []
 
+    # Pausen-Zähler je Stufe seit ``gap_tiers_since`` (Grundlage der Schwellen-Empfehlung, gespeicherte Werte)
+    tier_counts = gap_recommendation.empty_tiers()
+    tier_events = 0
+    tier_first: float | None = None
+    tier_last: float | None = None
+
     seen_rows = 0
     for ts, value, following in _with_following(rows_factory()):
         seen_rows += 1
+        if gap_tiers_since is not None and ts >= gap_tiers_since:
+            if tier_first is None:
+                tier_first = ts
+            elif previous_ts is not None and ts > previous_ts and previous_ts >= gap_tiers_since:
+                tier_events += 1
+                gap_recommendation.count_tiers(ts - previous_ts, tier_counts)
+            tier_last = ts
         if group_ts is None or ts != group_ts:
             flush_group()
             group_ts = ts
@@ -640,6 +656,13 @@ def analyze_raw_rows_page(
             name: {"rows": list(reversed(found)), "total": collected_totals[name]} for name, found in collected.items()
         }
     } if collect else {}
+    if gap_tiers_since is not None:
+        extra["gap_profile"] = {
+            "method": "stored",
+            "days": (tier_last - tier_first) / 86400 if tier_first is not None and tier_last is not None else 0.0,
+            "events": tier_events,
+            "tiers": {str(tier): count for tier, count in tier_counts.items()},
+        }
     return {
         **extra,
         "rows": page_rows,
