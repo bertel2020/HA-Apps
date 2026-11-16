@@ -181,10 +181,10 @@ def test_zeitraum_auswahl_standard_gesamt_und_ohne_sammelaktion_im_fenster(clien
 
     _mit_duplikaten(index, "sensor.pytest_dq_zeitraum")
     html = client.get("/housekeeping/datenqualitaet").text
-    assert re.search(r'<option value="all"\s+selected>', html)
+    assert 'name="period" id="dq-period-input" value="all"' in html
     assert 'class="dq-check" name="entity_id"' in html
     fenster = client.get("/housekeeping/datenqualitaet?period=7d").text
-    assert re.search(r'<option value="7d"\s+selected>', fenster)
+    assert 'name="period" id="dq-period-input" value="7d"' in fenster
     assert 'name="entity_id"' not in fenster  # Entfernen gilt für die ganze Historie
 
 

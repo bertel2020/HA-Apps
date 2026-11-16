@@ -10,6 +10,24 @@
 >
 > 🇬🇧 [English version](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md)
 
+## Unreleased
+
+### Neu
+
+- **Datenqualität**: Auswahl, welche Befundarten die Meldung „Neue Befunde in der Datenqualität“ auslösen
+  - Einstellungen → Meldungen; Lücken sind standardmäßig aus
+  - Die Datenqualität-Seite zeigt weiterhin alles
+
+### Geändert
+
+- **Datenqualität**: Deutlicherer Ladehinweis und einheitliche Filter
+  - Beim Aufklappen einer Zeile erscheint ein Spinner mit dem Hinweis, dass große Entitäten bis zu einer Minute brauchen können; schlägt das Laden fehl, gibt es „Erneut versuchen“
+  - Suche und Filter nutzen dieselben Dropdowns wie der Rest der App
+
+### Behoben
+
+- **Datenqualität**: „Dauerhaft ausblenden“ bei der Meldung „Neue Befunde“ hält jetzt, statt bei neuen Zahlen wiederzukommen
+
 ## 1.53.0 - 2026-11-15
 
 ### Neu

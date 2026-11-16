@@ -1255,6 +1255,16 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
         )
 
 
+    @router.post("/settings/quality-notice-kinds", response_class=HTMLResponse)
+    @_form_in_threadpool
+    def settings_quality_notice_kinds(request: Request, form) -> HTMLResponse:
+        """Befundarten, die die Meldung „Neue Befunde in der Datenqualität“ auslösen."""
+        data_quality.set_notice_kinds(deps.index, form.getlist("kind"))
+        return deps.templates.TemplateResponse(
+            request, "_settings_quality_notice_form.html", data_quality.notice_kinds_context(deps.index)
+        )
+
+
     @router.post("/settings/storage-index/check", response_class=HTMLResponse)
     def settings_storage_index_check(request: Request) -> HTMLResponse:
         """Erstellt eine rein lesende Vorschau möglicher Indexabweichungen."""

@@ -501,7 +501,7 @@ def test_mark_seen_from_a_built_matrix_does_not_rebuild_it(env, monkeypatch) -> 
         raise AssertionError("Matrix wurde ein zweites Mal gebaut")
 
     monkeypatch.setattr(data_quality, "build_matrix", must_not_run)
-    data_quality.mark_seen(index, [{"entity_id": "sensor.a", "total": 2}])
+    data_quality.mark_seen(index, [{"entity_id": "sensor.a", "total": 2, "cells": {"duplicates": {"count": 2}}}])
     import json as _json
 
     assert _json.loads(index.get_setting(data_quality.SEEN_SETTING)) == {"sensor.a": 2}  # ohne die gelöschte Entität

@@ -1,0 +1,16 @@
+{% from "_hints.html" import hint_button, hint_body %}
+{# Auswahl, welche Befundarten die Glocken-Meldung „Neue Befunde in der Datenqualität“ auslösen —
+   eigenes Partial, damit eine Änderung nur dieses Fragment neu lädt. #}
+<form class="settings-compact-list" hx-post="settings/quality-notice-kinds" hx-trigger="change" hx-target="#quality-notice-form" hx-swap="innerHTML">
+  <div class="settings-compact-row">
+    <div class="settings-compact-row-text">
+      <div class="settings-compact-label">{{ _("Neue Befunde melden bei") }} {{ hint_button(_('Neue Befunde melden bei')) }}</div>
+      {% call hint_body('settings-compact-hint') %}{{ _("Welche Befundarten die Meldung „Neue Befunde in der Datenqualität“ auslösen. Die Datenqualität-Seite zeigt weiterhin alles.") }}{% endcall %}
+    </div>
+    <div class="settings-compact-actions">
+      {% for key, label in quality_notice_kind_options %}
+      <label><input type="checkbox" name="kind" value="{{ key }}" {% if key in quality_notice_kinds %}checked{% endif %}> {{ label }}</label>
+      {% endfor %}
+    </div>
+  </div>
+</form>

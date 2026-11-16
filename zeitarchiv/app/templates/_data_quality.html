@@ -35,25 +35,30 @@
 {% set period = dq.period %}
 {% set period_labels = {'7d': _("7 Tage"), '30d': _("30 Tage"), 'year': _("1 Jahr"), 'all': _("Gesamt")} %}
 {% set sort_labels = {'total': _("Summe"), 'name': _("Name"), 'duplicates': labels.duplicates, 'counter_decreases': labels.counter_decreases, 'outliers': labels.outliers, 'gaps': labels.gaps, 'measured': _("Stand (älteste zuerst)")} %}
+{# Filter als App-Standard-Dropdown (dd-picker, siehe js/dd-picker.js): verdecktes Feld trägt den Wert und
+   schickt das Formular beim change-Ereignis ab. #}
+{% macro dq_picker(prefix, name, title, options, current) %}
+{% set ns = namespace(label='') %}{% for key, label in options if key == current %}{% set ns.label = label %}{% endfor %}
+<span class="dd-picker-wrap">
+  <button type="button" class="btn" id="{{ prefix }}-btn" onclick="toggleDDPicker('{{ prefix }}')">{{ title }}: {{ ns.label }} ▾</button>
+  <input type="hidden" name="{{ name }}" id="{{ prefix }}-input" value="{{ current }}" onchange="this.form.submit()">
+  <div class="dd-picker-popover" id="{{ prefix }}-popover">
+    {% for key, label in options %}
+    <div class="dd-picker-row{% if key == current %} active{% endif %}" onclick="selectDDOption('{{ prefix }}', '{{ key }}', {{ (title ~ ': ' ~ label) | tojson | forceescape }})">{{ label }}</div>
+    {% endfor %}
+  </div>
+</span>
+{% endmacro %}
+{% set kind_options = [('all', _("Alle Befunde"))] %}{% for col in dq.columns %}{% set added = kind_options.append((col.key, labels[col.key])) %}{% endfor %}
+{% set loading_html %}<span class="dq-loading" role="status"><span class="dq-spinner" aria-hidden="true"></span><span>{{ _("Rohdaten werden gelesen …") }} <span class="hint">{{ _("Das kann bei großen Entitäten bis zu einer Minute dauern.") }}</span></span></span>{% endset %}
+<template id="dq-error-template" data-loading="{{ loading_html | forceescape }}"><span class="dq-error">{{ _("Die Einzelbefunde konnten nicht geladen werden.") }} <button type="button" class="btn btn-sm">{{ _("Erneut versuchen") }}</button></span></template>
 <div class="dq-toolbar">
   <form class="dq-filters" method="get" action="{{ app_root }}/housekeeping/datenqualitaet">
-    <input type="search" class="dq-search" name="q" value="{{ dq_state.q }}" placeholder="{{ _('Entität suchen …') }}" aria-label="{{ _('Entität suchen') }}">
-    <label for="dq-kind">{{ _("Befund") }}</label>
-    <select id="dq-kind" name="kind" onchange="this.form.submit()">
-      <option value="all" {% if dq_state.kind == 'all' %}selected{% endif %}>{{ _("Alle Befunde") }}</option>
-      {% for col in dq.columns %}<option value="{{ col.key }}" {% if dq_state.kind == col.key %}selected{% endif %}>{{ labels[col.key] }}</option>{% endfor %}
-    </select>
-    <label for="dq-period">{{ _("Zeitraum") }}</label>
-    <select id="dq-period" name="period" onchange="this.form.submit()">
-      {% for key, label in period_labels.items() %}
-      <option value="{{ key }}" {% if period == key %}selected{% endif %}>{{ label }}</option>
-      {% endfor %}
-    </select>
+    <input type="search" class="search dq-search" name="q" value="{{ dq_state.q }}" placeholder="{{ _('Entität suchen …') }}" aria-label="{{ _('Entität suchen') }}">
+    {{ dq_picker('dq-kind', 'kind', _("Befund"), kind_options, dq_state.kind) }}
+    {{ dq_picker('dq-period', 'period', _("Zeitraum"), period_labels.items() | list, period) }}
     <span class="dq-sort-mobile">
-      <label for="dq-sort">{{ _("Sortierung") }}</label>
-      <select id="dq-sort" name="sort" onchange="this.form.submit()">
-        {% for key, label in sort_labels.items() %}<option value="{{ key }}" {% if dq_state.sort == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
-      </select>
+      {{ dq_picker('dq-sort', 'sort', _("Sortierung"), sort_labels.items() | list, dq_state.sort) }}
     </span>
     <input type="hidden" name="dir" value="{{ dq_state.dir }}">
     <input type="hidden" name="page_size" value="{{ dq_state.page_size }}">
@@ -87,7 +92,7 @@
     {% for row in dq.rows %}
     <tbody class="dq-entity" x-data="{ open: false }">
       <tr class="dq-row" :class="{ 'is-open': open }" tabindex="0"
-          hx-get="{{ app_root }}/entities/{{ row.entity_id }}/data-quality" hx-trigger="click once, keydown[key=='Enter'] once"
+          hx-get="{{ app_root }}/entities/{{ row.entity_id }}/data-quality" hx-trigger="click once, keydown[key=='Enter'] once, dq-retry"
           hx-target="#dq-detail-{{ loop.index }}" hx-swap="innerHTML"
           @click="open = !open" @keydown.enter="open = !open">
         <td class="entity">
@@ -106,7 +111,7 @@
         <td class="dq-stand" data-label="{{ _('Stand') }}"><span class="dq-age{% if row.measured_old %} is-old{% endif %}"{% if row.measured_title %} title="{{ _('Gemessen am {ts}', ts=row.measured_title) }}"{% endif %}>{{ row.measured_label }}</span></td>
       </tr>
       <tr class="dq-detail" x-show="open" x-cloak>
-        <td colspan="{{ dq.columns | length + 2 }}"><div id="dq-detail-{{ loop.index }}" class="dq-detail-body"><span class="hint">{{ _("Lädt …") }}</span></div></td>
+        <td colspan="{{ dq.columns | length + 2 }}"><div id="dq-detail-{{ loop.index }}" class="dq-detail-body">{{ loading_html }}</div></td>
       </tr>
     </tbody>
     {% endfor %}

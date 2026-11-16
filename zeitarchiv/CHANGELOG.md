@@ -10,6 +10,24 @@
 >
 > 🇩🇪 [Änderungen auf Deutsch](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md)
 
+## Unreleased
+
+### New
+
+- **Data quality**: Choose which kinds of findings trigger the “New findings in data quality” notice
+  - Settings → Notices; gaps are off by default
+  - The data quality page still shows everything
+
+### Changed
+
+- **Data quality**: Clearer loading and filters
+  - Expanding a row shows a spinner with a note that large entities can take up to a minute, and offers “Try again” if loading fails
+  - Search and filters use the same dropdowns as the rest of the app
+
+### Fixed
+
+- **Data quality**: “Hide permanently” on the “New findings” notice now sticks instead of coming back when the numbers change
+
 ## 1.53.0 - 2026-11-15
 
 ### New

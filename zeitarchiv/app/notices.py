@@ -893,6 +893,9 @@ def build_notices(
             ),
             "meta": tr("Datenqualität"),
             "link": "/housekeeping/datenqualitaet",
+            # Der Text trägt Zahlen, die sich ständig ändern — ein Vergleich
+            # darauf ließe „Dauerhaft“ nie halten.
+            "mute_fingerprint": "data_quality_new",
         })
 
     if stale_entity_count:
@@ -1135,6 +1138,12 @@ def _is_muted(notice: dict, mute_entry: dict | None, now: float) -> bool:
     # Fingerprint: nur stumm, solange sich der Inhalt seit dem Stummschalten
     # nicht geändert hat — sonst könnte eine später deutlich verschärfte
     # Bedingung hinter einer alten Stummschaltung verschwinden.
+    # Meldungen, deren Text ständig wechselnde Zahlen trägt, geben stattdessen
+    # einen festen "mute_fingerprint" an — sonst käme eine „dauerhaft“
+    # ausgeblendete Meldung bei jeder neuen Zahl wieder. Ältere Einträge ohne
+    # gespeicherten Fingerprint gelten dabei als passend.
+    if "mute_fingerprint" in notice:
+        return mute_entry.get("fingerprint", notice["mute_fingerprint"]) == notice["mute_fingerprint"]
     snapshot = mute_entry.get("detail_snapshot")
     return snapshot is None or snapshot == notice["detail"]
 
@@ -1338,7 +1347,10 @@ def latest_backup_info(index) -> dict | None:
     return info
 
 
-def mute_notice(index, notice_id: str, title: str, detail: str, meta: str, until: float | None = None) -> None:
+def mute_notice(
+    index, notice_id: str, title: str, detail: str, meta: str, until: float | None = None,
+    fingerprint: str | None = None,
+) -> None:
     mutes = _load_mutes(index)
     mutes[notice_id] = {
         "title": title,
@@ -1347,6 +1359,8 @@ def mute_notice(index, notice_id: str, title: str, detail: str, meta: str, until
         "muted_at": time.time(),
         "until": until,
     }
+    if fingerprint is not None:
+        mutes[notice_id]["fingerprint"] = fingerprint
     _save_mutes(index, mutes)
 
 

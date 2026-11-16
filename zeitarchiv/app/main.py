@@ -1329,7 +1329,7 @@ def _settings_notices_context() -> dict:
         "muted_notices": muted,
         "tips_enabled": "1" if notices_mod.tips_enabled(index) else "0",
         "tips_on_off_options": list(_ON_OFF_LABELS.items()),
-        "tips_list": notices_mod.list_tips_with_status(index, TZ),
+        "tips_list": notices_mod.list_tips_with_status(index, TZ), **data_quality.notice_kinds_context(index),
     }
 
 
@@ -1399,7 +1399,7 @@ async def mute_notice_route(request: Request, notice_id: str) -> dict:
             raise HTTPException(status_code=400, detail=tr("Ungültige Dauer"))
         seconds = notices_mod.SNOOZE_PRESETS[duration]
         until = time.time() + seconds if seconds is not None else None
-        notices_mod.mute_notice(index, notice_id, notice["title"], notice["detail"], notice["meta"], until=until)
+        notices_mod.mute_notice(index, notice_id, notice["title"], notice["detail"], notice["meta"], until=until, fingerprint=notice.get("mute_fingerprint"))
         remaining = _collect_all_notices()
         return {"success": True, "remaining_count": len(remaining)}
 

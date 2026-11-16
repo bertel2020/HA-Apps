@@ -617,3 +617,44 @@ def test_monatsbefunde_zaehlen_luecken_nur_mit_passender_schwelle(index):
     ergebnis = data_quality.monthly_findings(index, ["sensor.a"])
     assert ergebnis["sensor.a"]["gaps_measured"] is False
     assert ergebnis["sensor.a"]["months"] == {"2025-03": {"counter_decreases": 1}}
+
+
+def test_meldung_zaehlt_nur_gewaehlte_befundarten_luecken_standardmaessig_aus(index):
+    def neu_lesen():
+        data_quality._totals_cache["key"] = None
+
+    assert data_quality.notice_kinds(index) == ["duplicates", "counter_decreases", "outliers"]
+    _mit_tageszahlen(index, "sensor.a", {}, duplicates=1, gaps=1)
+    neu_lesen()
+    assert data_quality.new_findings(index) is None  # Anfangsstand
+
+    _mit_tageszahlen(index, "sensor.a", {}, duplicates=1, gaps=50)
+    neu_lesen()
+    assert data_quality.new_findings(index) is None  # nur Lücken dazugekommen
+
+    _mit_tageszahlen(index, "sensor.a", {}, duplicates=1, gaps=50, counter_decreases=2)
+    neu_lesen()
+    assert data_quality.new_findings(index) == {"new": 2, "entities": 1}
+
+    # Auswahl ändern setzt den Stand neu: kein Altbestand als „neu“
+    data_quality.set_notice_kinds(index, ["duplicates", "gaps"])
+    neu_lesen()
+    assert data_quality.notice_kinds(index) == ["duplicates", "gaps"]
+    assert data_quality.new_findings(index) is None
+    _mit_tageszahlen(index, "sensor.a", {}, duplicates=1, gaps=53, counter_decreases=2)
+    neu_lesen()
+    assert data_quality.new_findings(index) == {"new": 3, "entities": 1}
+
+
+def test_dauerhaft_stumm_haelt_trotz_wechselnder_zahlen():
+    from app import notices
+
+    def meldung(detail):
+        return {"id": "housekeeping.data_quality_new", "detail": detail, "mute_fingerprint": "data_quality_new"}
+
+    stumm = {"detail_snapshot": "3 neue Befunde", "until": None, "fingerprint": "data_quality_new"}
+    assert notices._is_muted(meldung("7 neue Befunde"), stumm, 0.0)
+    alt = {"detail_snapshot": "3 neue Befunde", "until": None}  # Eintrag von vor dem Fix
+    assert notices._is_muted(meldung("7 neue Befunde"), alt, 0.0)
+    # Andere Meldungen vergleichen weiter den Text
+    assert not notices._is_muted({"id": "x", "detail": "neu"}, alt, 0.0)

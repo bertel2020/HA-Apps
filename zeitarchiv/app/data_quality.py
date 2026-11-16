@@ -771,10 +771,47 @@ def _totals_from(index: Index, rows: list[dict]) -> dict[str, int]:
     """Befunde je gemessener Entität aus den Zeilen einer Gesamt-Matrix (build_matrix mit Zeitraum „Gesamt“).
     Nur Entitäten, die es noch gibt: Zählungen gelöschter Entitäten blieben sonst für immer im „gesehen“-Stand."""
     known = {entity["entity_id"] for entity in index.list_entities()}
+    kinds = notice_kinds(index)
     totals = {entity_id: 0 for entity_id in index.list_cleanup_alltime_stats(with_daily=False) if entity_id in known}
     for row in rows:
-        totals[row["entity_id"]] = row["total"]
+        totals[row["entity_id"]] = sum((row["cells"].get(kind) or {}).get("count", 0) for kind in kinds)
     return totals
+
+
+# Welche Befundarten die Glocken-Meldung „Neue Befunde“ auslösen. Lücken sind
+# standardmäßig aus (in der Matrix ebenfalls nur gedämpft, severity "mute").
+NOTICE_KINDS_SETTING = "data_quality_notice_kinds"
+NOTICE_KINDS = ("duplicates", "counter_decreases", "outliers", "gaps")
+NOTICE_KINDS_DEFAULT = ("duplicates", "counter_decreases", "outliers")
+
+
+def notice_kinds(index: Index) -> list[str]:
+    raw = index.get_setting(NOTICE_KINDS_SETTING)
+    if raw is None:
+        return list(NOTICE_KINDS_DEFAULT)
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return list(NOTICE_KINDS_DEFAULT)
+    if not isinstance(data, list):
+        return list(NOTICE_KINDS_DEFAULT)
+    return [kind for kind in NOTICE_KINDS if kind in data]
+
+
+def notice_kinds_context(index: Index) -> dict:
+    """Template-Werte für die Auswahl in Einstellungen → Meldungen."""
+    labels = _heatmap_labels()
+    return {
+        "quality_notice_kinds": notice_kinds(index),
+        "quality_notice_kind_options": [(kind, labels[kind]) for kind in NOTICE_KINDS],
+    }
+
+
+def set_notice_kinds(index: Index, kinds: list[str]) -> None:
+    """Speichert die Auswahl und setzt den „gesehen“-Stand neu: Er ist je Auswahl summiert, ein alter
+    Stand würde sonst bei einer neu aktivierten Art den ganzen Bestand als „neu“ melden."""
+    index.set_setting(NOTICE_KINDS_SETTING, json.dumps([k for k in NOTICE_KINDS if k in kinds]))
+    mark_seen(index)
 
 
 def current_totals(index: Index, *, max_age: float = _TOTALS_MAX_AGE) -> dict[str, int]:
