@@ -312,6 +312,9 @@
       if (nextBtn) nextBtn.disabled = vmPage >= totalPages;
       refreshVmMarkedCount();  // Zähler von „Alle gefilterten markieren“ folgt Suche und Filter
       vmFilter.render();       // Chip-Zähler (u. a. „Markiert“) folgen der Auswahl
+      // Ansicht merken: „Verfügbarkeit prüfen“ tauscht die ganze Sektion aus und würde sonst Suche,
+      // Filter, Sortierung und Seite verwerfen (wie bei Home Assistant).
+      window.__vmView = { search: vmSearch, filters: vmFilter.state(), sortKey: vmSortKey, sortDir: vmSortDir, page: vmPage, pageSize: vmPageSize };
     }
     function setVmPageSize(value) {
       const parsed = parseInt(value, 10);
@@ -334,6 +337,19 @@
     window.onVmConfigChanged = onVmConfigChanged;
     window.setVmPageSize = setVmPageSize;
     window.stepVmPage = stepVmPage;
+    const savedVmView = window.__vmView;
+    if (savedVmView) {
+      vmSearch = savedVmView.search || '';
+      vmFilter.restore(savedVmView.filters);
+      vmSortKey = savedVmView.sortKey || null;
+      vmSortDir = savedVmView.sortDir || 'asc';
+      vmPage = savedVmView.page || 1;
+      vmPageSize = savedVmView.pageSize || 20;
+      const searchInput = (vmScope || document).querySelector('#vm-entity-search');
+      if (searchInput) searchInput.value = vmSearch;
+      const sizeSelect = (vmScope || document).querySelector('#vm-page-size');
+      if (sizeSelect) sizeSelect.value = String(vmPageSize);
+    }
     vmFilter.render();
     refreshVmMarkedCount();
     applyVmPaging();

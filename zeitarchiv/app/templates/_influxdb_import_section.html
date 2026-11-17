@@ -340,6 +340,9 @@
       if (nextBtn) nextBtn.disabled = influxPage >= totalPages;
       refreshInfluxMarkedCount();  // Zähler von „Alle gefilterten markieren“ folgt Suche und Filter
       influxFilter.render();       // Chip-Zähler (u. a. „Markiert“) folgen der Auswahl
+      // Ansicht merken: „Verfügbarkeit prüfen“ tauscht die ganze Sektion aus und würde sonst Suche,
+      // Filter, Sortierung und Seite verwerfen (wie bei Home Assistant).
+      window.__influxView = { search: influxSearch, filters: influxFilter.state(), sortKey: influxSortKey, sortDir: influxSortDir, page: influxPage, pageSize: influxPageSize };
     }
     function setInfluxPageSize(value) {
       const parsed = parseInt(value, 10);
@@ -372,6 +375,19 @@
     window.onInfluxConfigChanged = onInfluxConfigChanged;
     window.setInfluxPageSize = setInfluxPageSize;
     window.stepInfluxPage = stepInfluxPage;
+    const savedInfluxView = window.__influxView;
+    if (savedInfluxView) {
+      influxSearch = savedInfluxView.search || '';
+      influxFilter.restore(savedInfluxView.filters);
+      influxSortKey = savedInfluxView.sortKey || null;
+      influxSortDir = savedInfluxView.sortDir || 'asc';
+      influxPage = savedInfluxView.page || 1;
+      influxPageSize = savedInfluxView.pageSize || 20;
+      const searchInput = (influxScope || document).querySelector('#influx-entity-search');
+      if (searchInput) searchInput.value = influxSearch;
+      const sizeSelect = (influxScope || document).querySelector('#influx-page-size');
+      if (sizeSelect) sizeSelect.value = String(influxPageSize);
+    }
     influxFilter.render();
     refreshInfluxMarkedCount();
     applyInfluxPaging();
