@@ -75,7 +75,7 @@
           @click.stop="clearSelection()" title="{{ _('Auswahl leeren') }}" aria-label="{{ _('Auswahl leeren') }}">✕</button>
   <div class="dd-picker-popover dd-picker-popover-alpine" x-show="open" x-cloak style="max-height:220px;overflow-y:auto;">
     <input type="search" class="dd-picker-popover-search" x-ref="search" x-model="search" placeholder="{{ _('Suchen oder neu anlegen …') }}">
-    <template x-for="g in filtered()" :key="g">
+    <template x-for="(g, gi) in filtered()" :key="gi + '-' + g">
       <div class="dd-picker-row" :class="{active: value === g}" @click="select(g)">
         <span x-text="g"></span>
       </div>
@@ -116,7 +116,9 @@
 </script>
 
 <div x-data='{
-  entityOptions: {{ entity_options | tojson }},
+  {# Doppelte entity_id/Gruppennamen würden in x-for doppelte :key liefern; Alpine bricht dann die ganze Render-Runde ab
+     (Kacheln bleiben leer). Deshalb beim Laden bereinigen. #}
+  entityOptions: ({{ entity_options | tojson }}).filter((o, i, a) => o.entity_id && a.findIndex(x => x.entity_id === o.entity_id) === i),
   // Root-Spiegel der Einzelfeld-Rollen (Netz/Kosten/Prognose/CO2) — der
   // TATSÄCHLICHE Stand nach dem letzten "Übernehmen" je Popup (siehe draft
   // unten). Kacheln lesen NUR diese Root-Felder, nie draft direkt — deshalb
@@ -200,7 +202,7 @@
   // Eigenständige, per Namen referenzierte Gruppen-Liste (siehe group-picker.js) —
   // bleibt bestehen, auch wenn gerade kein Verbraucher sie trägt (genau wie
   // Tags/Labels in Home Assistant unabhängig vom einzelnen Gerät existieren).
-  gruppen: {{ (config.verbraucher_gruppen or []) | tojson }},
+  gruppen: [...new Set(({{ (config.verbraucher_gruppen or []) | tojson }}).filter(g => typeof g === "string" && g.trim()))],
   newGroupName: "",
   // Serverseitig aufgelöste Kapazität je bereits konfiguriertem Speicher
   // (echter letzter archivierter Rohwert, bereits Wh->kWh umgerechnet —
@@ -829,7 +831,7 @@
           <input type="hidden" name="verbraucher_parent" :value="row.parent || ''">
         </span>
       </template>
-      <template x-for="g in gruppen" :key="'hidden-' + g">
+      <template x-for="(g, gi) in gruppen" :key="'hidden-' + gi + '-' + g">
         <input type="hidden" name="verbraucher_gruppen" :value="g">
       </template>
     </section>
@@ -1232,7 +1234,7 @@
       <form method="dialog"><button class="btn" aria-label="{{ _('Dialog schließen') }}">{{ _("Schließen") }}</button></form>
     </div>
     <div class="edash-gruppen-list" x-show="gruppen.length">
-      <template x-for="g in gruppen" :key="g">
+      <template x-for="(g, gi) in gruppen" :key="gi + '-' + g">
         <div class="edash-gruppen-row">
           <input type="text" class="edash-gruppen-rename-input" :value="g" @change="renameGroup(g, $event.target.value)" maxlength="40">
           <span class="edash-gruppen-usage" x-text="groupUsage(g) + ' Verbraucher'"></span>
