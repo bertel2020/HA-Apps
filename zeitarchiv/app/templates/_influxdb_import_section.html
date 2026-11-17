@@ -81,14 +81,14 @@
     </div>
 
     <div class="ha-import-check-row">
-      <button type="button" class="btn" id="influx-availability-btn" title="{{ _('Prüft nur die markierten Entitäten') }}" hx-post="import/influxdb/availability" hx-include="#influx-form" hx-target="#influx-section" hx-swap="outerHTML" hx-disabled-elt="this" hx-indicator="#influx-availability-status">
+      <button type="button" class="btn" id="influx-availability-btn" title="{{ _('Prüft die markierten Entitäten, ohne Markierung alle angezeigten') }}" hx-post="import/influxdb/availability" hx-include="#influx-form" hx-vals="js:{...influxCheckScope()}" hx-target="#influx-section" hx-swap="outerHTML" hx-disabled-elt="this" hx-indicator="#influx-availability-status">
         {{ _("Verfügbarkeit prüfen") }}
       </button>
       <span class="ha-checked-at {{ 'is-error' if influx_availability_error else ('is-checked' if influx_availability_checked_at_label else 'is-idle') }}" id="influx-availability-status" data-changed="{{ _('Einstellung geändert · neu prüfen') }}">
         <span class="ha-status-idle">{% if influx_availability_checked_at_label %}{{ _("Geprüft: {ha_availability_checked_at_label}", ha_availability_checked_at_label=influx_availability_checked_at_label) }}{% else %}{{ _("Noch nicht geprüft") }}{% endif %}{% if influx_availability_stale %} · <span class="ha-stale-badge" title="{{ _('Vor mehr als 15 Minuten geprüft — der tatsächliche Stand in InfluxDB kann sich seither geändert haben.') }}">{{ _("⏳ Nicht mehr taufrisch") }}</span>{% endif %}</span>
         <span class="htmx-indicator">{{ _("Prüfung läuft …") }}</span>
       </span>
-      <span class="ha-check-hint" id="influx-availability-hint">{{ _("Zuerst Entitäten in der Tabelle markieren") }}</span>
+      <span class="ha-check-hint" id="influx-availability-hint">{{ _("Ohne Markierung werden alle angezeigten Entitäten geprüft") }}</span>
     </div>
   </div>
 
@@ -112,15 +112,19 @@
       </colgroup>
       <tr>
         <th><input type="checkbox" onchange="toggleAllInfluxRows(this)" title="{{ _('Alle auf dieser Seite markieren') }}"></th>
-        <th>{{ _("Entität") }}</th>
-        <th>{{ _("Typ") }}</th>
-        <th>{{ _("Einheit") }}</th>
-        <th>{{ _("Verfügbar") }}</th>
+        <th><a href="#" data-sort-key="entity" onclick="sortInfluxTable('entity');return false;">{{ _("Entität") }}<span class="sort-arrow"></span></a></th>
+        <th><a href="#" data-sort-key="type" onclick="sortInfluxTable('type');return false;">{{ _("Typ") }}<span class="sort-arrow"></span></a></th>
+        <th><a href="#" data-sort-key="unit" onclick="sortInfluxTable('unit');return false;">{{ _("Einheit") }}<span class="sort-arrow"></span></a></th>
+        <th><a href="#" data-sort-key="available" onclick="sortInfluxTable('available');return false;">{{ _("Verfügbar") }}<span class="sort-arrow"></span></a></th>
       </tr>
       {% for entity in influx_entities %}
       <tr data-entity-id="{{ entity.entity_id }}"
           class="{{ 'marked' if entity.entity_id in influx_selected_ids }}"
-          data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id) | lower }}">
+          data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id) | lower }}"
+          data-sort-entity="{{ (entity.friendly_name or entity.entity_id) | lower }}"
+          data-sort-type="{{ entity.type_label }}"
+          data-sort-unit="{{ entity.unit or '' }}"
+          data-sort-available="{{ entity.available_first_ts if entity.available_first_ts is not none else '' }}">
         <td>
           <input type="checkbox" class="influx-mark-checkbox" name="entity_ids" value="{{ entity.entity_id }}" onchange="onInfluxMarkChange(this)" {% if entity.entity_id in influx_selected_ids %}checked{% endif %}>
         </td>
@@ -179,6 +183,8 @@
     let influxPageSize = 20;
     let influxPage = 1;
     let influxSearch = '';
+    let influxSortKey = null;
+    let influxSortDir = 'asc';
 
     function fill(template, values) {
       return template.replace(/\{(\w+)\}/g, (_, key) => values[key]);
@@ -192,8 +198,6 @@
       const count = document.querySelectorAll('.influx-mark-checkbox:checked').length;
       const chip = document.getElementById('influx-marked-count');
       if (chip) { chip.classList.toggle('active', count > 0); chip.textContent = fill(chip.dataset.template, { n: count }); }
-      const availabilityButton = document.getElementById('influx-availability-btn');
-      if (availabilityButton) availabilityButton.disabled = count === 0;
       const availabilityHint = document.getElementById('influx-availability-hint');
       if (availabilityHint) availabilityHint.style.display = count === 0 ? '' : 'none';
     }
@@ -227,14 +231,34 @@
       if (status) { status.classList.remove('is-checked', 'is-error'); status.classList.add('is-idle'); }
       if (idle) idle.textContent = status.dataset.changed;
     }
+    function sortInfluxTable(key) {
+      if (influxSortKey === key) {
+        influxSortDir = influxSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        influxSortKey = key;
+        influxSortDir = 'asc';
+      }
+      influxPage = 1;
+      applyInfluxPaging();
+    }
+    // „Prüfen“ ohne Markierung: alle Treffer der Suche (über alle Seiten) — als check_ids,
+    // NICHT als entity_ids, sonst gälte danach alles als markiert.
+    function influxCheckScope() {
+      if (document.querySelector('.influx-mark-checkbox:checked')) return {};
+      const rows = Array.from(document.querySelectorAll('#influx-import-table tr[data-entity-id]'))
+        .filter((row) => !(influxSearch && !(row.dataset.search || '').includes(influxSearch)));
+      return { check_ids: rows.map((row) => row.dataset.entityId) };
+    }
     function applyInfluxPaging() {
       const table = document.getElementById('influx-import-table');
       if (!table) return;
-      const rows = Array.from(table.querySelectorAll('tr[data-entity-id]'));
-      // Markierte Zeilen immer zuerst; Array.prototype.sort ist stabil, die
-      // Reihenfolge innerhalb der Gruppen bleibt also erhalten.
-      rows.sort((a, b) => (b.classList.contains('marked') ? 1 : 0) - (a.classList.contains('marked') ? 1 : 0));
+      // Markierte Zeilen immer zuerst; innerhalb der Gruppen gilt die gewählte
+      // Spaltensortierung, ohne sie bleibt die Reihenfolge erhalten.
+      const rows = window.importSort.sortRows(
+        Array.from(table.querySelectorAll('tr[data-entity-id]')), influxSortKey, influxSortDir, { markedFirst: true },
+      );
       rows.forEach((row) => table.appendChild(row));
+      window.importSort.updateArrows(table, influxSortKey, influxSortDir);
       const isFilteredOut = (row) => influxSearch && !(row.dataset.search || '').includes(influxSearch);
       rows.filter(isFilteredOut).forEach((row) => { row.style.display = 'none'; });
       const visible = rows.filter((row) => !isFilteredOut(row));
@@ -275,6 +299,8 @@
 
     window.rememberInfluxPassword = rememberInfluxPassword;
     window.onInfluxSearch = onInfluxSearch;
+    window.sortInfluxTable = sortInfluxTable;
+    window.influxCheckScope = influxCheckScope;
     window.onInfluxMarkChange = onInfluxMarkChange;
     window.toggleAllInfluxRows = toggleAllInfluxRows;
     window.onInfluxRangeChange = onInfluxRangeChange;

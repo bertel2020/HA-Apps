@@ -398,6 +398,8 @@ class ImportService:
                     "row_count": v.row_count,
                     "period_start": period_start,
                     "period_end": period_end,
+                    # Roher Zeitstempel für die Sortierung der Spalte „Zeitraum“.
+                    "first_ts": v.first_ts or None,
                     "preview": preview,
                 }
             )
@@ -3542,7 +3544,10 @@ class ImportService:
             (
                 selected_ids, range_preset, date_from, date_to, include_existing_months, base_url,
             ) = self._vm_form_params(form)
-            known_ids, unknown_ids = self._known_ha_entity_ids(selected_ids)
+            # Ohne Markierung prüft der Knopf alle angezeigten Entitäten (check_ids),
+            # genau wie beim Home-Assistant-Import — und markiert dabei nichts.
+            check_ids = [str(value) for value in form.getlist("check_ids")] if not selected_ids else []
+            known_ids, unknown_ids = self._known_ha_entity_ids(selected_ids or check_ids)
             if unknown_ids:
                 logger.warning(
                     "VictoriaMetrics-Verfügbarkeitsprüfung: unbekannte Entitäts-IDs verworfen · %s", unknown_ids
@@ -3571,7 +3576,7 @@ class ImportService:
                 date_to=date_to, include_existing_months=include_existing_months, base_url=base_url,
             )
             if not known_ids:
-                context["vm_availability_error"] = tr("Bitte mindestens eine Entität markieren.")
+                context["vm_availability_error"] = tr("Keine Entität zum Prüfen: nichts markiert und kein Treffer in der Liste.")
             return self.deps.templates.TemplateResponse(request, "_vm_import_section.html", context)
 
 

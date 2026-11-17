@@ -233,10 +233,41 @@
      Host selbst — sonst schneidet dessen overflow:hidden den eigenen
      Tooltip mit ab) federt die schmalere Entität-Spalte dafür ab. */
   .ha-col-entity{width:225px;}
-  /* Breite Darstellung (ab 1200 px, wie die übrigen Regeln dazu): die Entität bekommt mehr Platz,
-     damit lange Namen und IDs weniger oft gekürzt werden. */
+  /* Breite Darstellung (ab 1200 px, wie die übrigen Regeln dazu): Die festen Pixelbreiten oben
+     sind für 1120 px gedacht; auf 1920 px blieben die Spalten schmal und der Überschuss ginge an
+     wenige davon. Prozentwerte verteilen die Fläche gleichmäßig. Die Summe bleibt bei 100 %,
+     auch wenn alle optionalen Spalten sichtbar sind; fehlen welche (kein Raum, ausgeblendet),
+     wächst der Rest anteilig. */
   @media (min-width:1200px){
-    :root[data-page-layout="wide"] .ha-col-entity{width:340px;}
+    :root[data-page-layout="wide"] #ha-import-table .symcon-col-check{width:3%;}
+    :root[data-page-layout="wide"] #ha-import-table .ha-col-entity{width:18%;}
+    :root[data-page-layout="wide"] #ha-import-table .ha-col-type{width:7%;}
+    :root[data-page-layout="wide"] #ha-import-table .ha-col-unit{width:5%;}
+    :root[data-page-layout="wide"] #ha-import-table .ha-col-category{width:10%;}
+    :root[data-page-layout="wide"] #ha-import-table .ha-col-area{width:9%;}
+    :root[data-page-layout="wide"] #ha-import-table .ha-col-art{width:9%;}
+    :root[data-page-layout="wide"] #ha-import-table .ha-col-available{width:14%;}
+    :root[data-page-layout="wide"] #ha-import-table .ha-col-status{width:9%;}
+    :root[data-page-layout="wide"] #ha-import-table .ha-col-last{width:9%;}
+    :root[data-page-layout="wide"] #ha-import-table .ha-col-mode{width:7%;}
+    /* VictoriaMetrics und InfluxDB: fünf Spalten. */
+    :root[data-page-layout="wide"] #vm-import-table .symcon-col-check,
+    :root[data-page-layout="wide"] #influx-import-table .symcon-col-check{width:3%;}
+    :root[data-page-layout="wide"] #vm-import-table .ha-col-entity,
+    :root[data-page-layout="wide"] #influx-import-table .ha-col-entity{width:40%;}
+    :root[data-page-layout="wide"] #vm-import-table .ha-col-type,
+    :root[data-page-layout="wide"] #influx-import-table .ha-col-type{width:12%;}
+    :root[data-page-layout="wide"] #vm-import-table .ha-col-unit,
+    :root[data-page-layout="wide"] #influx-import-table .ha-col-unit{width:10%;}
+    :root[data-page-layout="wide"] #vm-import-table .ha-col-available,
+    :root[data-page-layout="wide"] #influx-import-table .ha-col-available{width:35%;}
+    /* Symcon: die Zuordnung zur HA-Entität bekommt weiter den Rest. */
+    :root[data-page-layout="wide"] #import-table .symcon-col-check{width:3%;}
+    :root[data-page-layout="wide"] #import-table .symcon-col-id{width:6%;}
+    :root[data-page-layout="wide"] #import-table .symcon-col-name{width:16%;}
+    :root[data-page-layout="wide"] #import-table .symcon-col-period{width:14%;}
+    :root[data-page-layout="wide"] #import-table .symcon-col-rows{width:8%;}
+    :root[data-page-layout="wide"] #import-table .symcon-col-unit{width:7%;}
   }
   .ha-col-unit{width:60px;}
   .ha-col-type{width:118px;}

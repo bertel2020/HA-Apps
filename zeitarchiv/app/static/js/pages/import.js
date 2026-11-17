@@ -536,6 +536,8 @@
     let importPage = 1;
     let hideUnreadable = true;  // Standard: nicht lesbare Zeilen erstmal ausblenden (Chip startet "aktiv")
     let importSearch = '';
+    let importSortKey = null;
+    let importSortDir = 'asc';
     function toggleHideUnreadable(btn) {
       hideUnreadable = !hideUnreadable;
       btn.classList.toggle('active', hideUnreadable);
@@ -547,10 +549,29 @@
       importPage = 1;
       applyImportPaging();
     }
+    function sortImportTable(key) {
+      if (importSortKey === key) {
+        importSortDir = importSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        importSortKey = key;
+        importSortDir = 'asc';
+      }
+      importPage = 1;
+      applyImportPaging();
+    }
+    window.sortImportTable = sortImportTable;
     function applyImportPaging() {
       const table = document.getElementById('import-table');
       if (!table) return;
-      const allRows = Array.from(table.querySelectorAll('tr[data-variable-id]'));
+      let allRows = Array.from(table.querySelectorAll('tr[data-variable-id]'));
+      if (importSortKey) {
+        // Die gewählte HA-Entität steht nur im Eingabefeld, nicht in einem data-Attribut.
+        allRows = window.importSort.sortRows(allRows, importSortKey, importSortDir, {
+          getValue: (row, key) => (key === 'entity' ? (row.querySelector('.map-input')?.value || '') : undefined),
+        });
+        allRows.forEach((row) => row.parentNode.appendChild(row));
+      }
+      window.importSort.updateArrows(table, importSortKey, importSortDir);
       const isFilteredOut = row =>
         (hideUnreadable && row.classList.contains('unreadable')) ||
         (importSearch &&

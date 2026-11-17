@@ -2,6 +2,7 @@
 {% block title %}{{ _("Zeitarchiv — Import") }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/import.css') }}">
+<script src="{{ asset('js/import-sort.js') }}"></script>
 {% endblock %}
 {% block content %}
   
@@ -108,10 +109,13 @@
             {% if settings_imported %}<col class="symcon-col-name">{% endif %}
             <col class="symcon-col-period"><col class="symcon-col-rows"><col class="symcon-col-unit"><col class="symcon-col-entity">
           </colgroup>
-          <tr><th><input type="checkbox" onchange="toggleAllImportRows(this)" title="{{ _('Alle auf dieser Seite markieren') }}"></th><th>{{ _("Symcon-ID") }}</th>{% if settings_imported %}<th>{{ _("Symcon-Name") }}</th>{% endif %}<th>{{ _("Zeitraum") }}</th><th>{{ _("Datensätze") }}</th><th>{{ _("Einheit") }}</th><th>{{ _("→ HA-Entität") }}</th></tr>
+          <tr><th><input type="checkbox" onchange="toggleAllImportRows(this)" title="{{ _('Alle auf dieser Seite markieren') }}"></th><th><a href="#" data-sort-key="id" onclick="sortImportTable('id');return false;">{{ _("Symcon-ID") }}<span class="sort-arrow"></span></a></th>{% if settings_imported %}<th><a href="#" data-sort-key="name" onclick="sortImportTable('name');return false;">{{ _("Symcon-Name") }}<span class="sort-arrow"></span></a></th>{% endif %}<th><a href="#" data-sort-key="period" onclick="sortImportTable('period');return false;">{{ _("Zeitraum") }}<span class="sort-arrow"></span></a></th><th><a href="#" data-sort-key="rows" onclick="sortImportTable('rows');return false;">{{ _("Datensätze") }}<span class="sort-arrow"></span></a></th><th><a href="#" data-sort-key="unit" onclick="sortImportTable('unit');return false;">{{ _("Einheit") }}<span class="sort-arrow"></span></a></th><th><a href="#" data-sort-key="entity" onclick="sortImportTable('entity');return false;">{{ _("→ HA-Entität") }}<span class="sort-arrow"></span></a></th></tr>
           {% for row in rows %}
           <tr class="{{ '' if row.readable else 'unreadable' }}" data-variable-id="{{ row.variable_id }}" data-symcon-unit="{{ row.symcon_unit or '' }}"
-              data-search="{{ ((row.symcon_name or '') ~ ' ' ~ (row.symcon_parent or '')) | lower }}">
+              data-search="{{ ((row.symcon_name or '') ~ ' ' ~ (row.symcon_parent or '')) | lower }}"
+              data-sort-id="{{ row.variable_id }}" data-sort-name="{{ (row.symcon_name or '') | lower }}"
+              data-sort-period="{{ row.first_ts if row.first_ts is not none else '' }}" data-sort-rows="{{ row.row_count }}"
+              data-sort-unit="{{ (row.symcon_states.values() | join(', ') if row.symcon_states else (row.symcon_unit or '')) | lower }}">
             <td>{% if row.readable %}<input type="checkbox" class="mark-checkbox" onchange="onMarkChange(this)">{% endif %}</td>
             <td class="mono">{{ row.variable_id }}</td>
             {% if settings_imported %}

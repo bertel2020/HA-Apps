@@ -22,7 +22,10 @@
   - “Check availability” without a marked entity checks all listed entities and fills “Status” (“Data available” or “No data”); new “Mark all filtered” button; filter chips can be combined (e.g. “Never imported” and “Data available”); search, filter and sorting survive a check
   - The preview runs in the background with a progress display
 - **Import**: Wide layout
-  - The Import page follows the “Wide layout” setting
+  - The Import page follows the “Wide layout” setting; the columns of the import tables share the width evenly
+- **Import**: Symcon, VictoriaMetrics and InfluxDB tables
+  - Columns can be sorted by clicking the heading
+  - “Check availability” also works without a marked entity (VictoriaMetrics, InfluxDB) and then checks all listed ones
 
 ### Changed
 

@@ -375,8 +375,12 @@ class InfluxImportService:
             Klick, jede Prüfung ist eine Netzwerkabfrage. Rendert die ganze
             Sektion neu und reicht die angehakten Entitäten durch, damit die
             Auswahl erhalten bleibt."""
-            config = self._config(await request.form())
-            known_ids, unknown_ids = self.owner._known_ha_entity_ids(config.entity_ids)
+            form = await request.form()
+            config = self._config(form)
+            # Ohne Markierung prüft der Knopf alle angezeigten Entitäten (check_ids),
+            # genau wie beim Home-Assistant-Import — und markiert dabei nichts.
+            check_ids = [str(value) for value in form.getlist("check_ids")] if not config.entity_ids else []
+            known_ids, unknown_ids = self.owner._known_ha_entity_ids(config.entity_ids or check_ids)
             if unknown_ids:
                 logger.warning("InfluxDB-Verfügbarkeitsprüfung: unbekannte Entitäts-IDs verworfen · %s", unknown_ids)
             if known_ids:
@@ -400,7 +404,7 @@ class InfluxImportService:
                     )
             context = self.context(selected_ids=set(config.entity_ids), config=config)
             if not known_ids:
-                context["influx_availability_error"] = tr("Bitte mindestens eine Entität markieren.")
+                context["influx_availability_error"] = tr("Keine Entität zum Prüfen: nichts markiert und kein Treffer in der Liste.")
             return deps.templates.TemplateResponse(request, "_influxdb_import_section.html", context)
 
         @router.post("/import/influxdb/dry-run", response_class=HTMLResponse)

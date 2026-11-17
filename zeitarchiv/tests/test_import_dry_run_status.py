@@ -146,3 +146,46 @@ def test_failed_check_does_not_claim_there_is_no_data(client, entities, monkeypa
     }).text
     row = html[html.index('data-entity-id="sensor.dry_new"'):]
     assert 'data-status=""' in row[: row.index("</tr>")]
+
+
+def _vm_influx_post(client, monkeypatch, entities, target: str):
+    """Prüft ohne Markierung bei VictoriaMetrics bzw. InfluxDB: die angezeigten Entitäten gehen als check_ids."""
+    from app import import_routes, influxdb_import_routes
+    from app.storage import ha_import
+
+    seen: dict[str, list[str]] = {}
+
+    def fake(self, entity_ids, *args, **kwargs):
+        seen["ids"] = list(entity_ids)
+        return {e: ha_import.EntityAvailability(e, first_ts=1.0, last_ts=2.0, count=3) for e in entity_ids}, None
+
+    if target == "vm":
+        monkeypatch.setattr(import_routes.ImportService, "_fetch_vm_availability", fake)
+        path = "/import/vm/availability"
+    else:
+        monkeypatch.setattr(influxdb_import_routes.InfluxImportService, "_fetch_availability", fake)
+        path = "/import/influxdb/availability"
+    html = client.post(path, data={"check_ids": entities[:2], "base_url": "http://127.0.0.1:1", "database": "d"}).text
+    return seen, html
+
+
+@pytest.mark.parametrize("target", ["vm", "influx"])
+def test_vm_and_influx_check_without_marking_use_listed_entities(client, entities, monkeypatch, target) -> None:
+    seen, html = _vm_influx_post(client, monkeypatch, entities, target)
+    assert seen["ids"] == IDS[:2]
+    assert "Keine Entität zum Prüfen" not in html
+    assert "checked" not in html.split('name="entity_ids"')[1].split(">")[0]
+
+
+def test_import_tables_have_sortable_headers() -> None:
+    """Symcon, VictoriaMetrics und InfluxDB sortieren wie die Home-Assistant-Tabelle."""
+    from _paths import TEMPLATES
+
+    for name, keys in (
+        ("import.html", ("id", "period", "rows", "unit", "entity")),
+        ("_vm_import_section.html", ("entity", "type", "unit", "available")),
+        ("_influxdb_import_section.html", ("entity", "type", "unit", "available")),
+    ):
+        text = (TEMPLATES / name).read_text(encoding="utf-8")
+        for key in keys:
+            assert f'data-sort-key="{key}"' in text, (name, key)
