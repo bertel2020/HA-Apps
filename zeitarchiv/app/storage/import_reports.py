@@ -93,6 +93,9 @@ def create(
         temporary.replace(destination)
     finally:
         temporary.unlink(missing_ok=True)
+    # Gilt für alle Importarten: create() ist die einzige Stelle, an der ein Lauf abgeschlossen wird.
+    from . import import_last
+    import_last.record(data_dir, report)
     return report
 
 

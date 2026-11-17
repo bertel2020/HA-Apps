@@ -152,3 +152,40 @@ def test_availability_endpoint_checks_only_marked_entities(service, monkeypatch)
     entities = {row["entity_id"]: row for row in context["ha_entities"]}
     assert entities["sensor.demo"]["has_data"] is True
     assert entities["sensor.other"]["has_data"] is None
+
+
+def test_context_carries_room_and_category_for_the_import_table(service, tmp_path) -> None:
+    # Ohne Katalog und ohne Kategorien gibt es die beiden Spalten nicht.
+    ctx = service._ha_import_context(history_source="raw", period="hour")
+    assert ctx["ha_has_areas"] is False and ctx["ha_has_categories"] is False
+    assert ctx["ha_entities"][0]["area"] is None and ctx["ha_entities"][0]["category"] is None
+
+    (tmp_path / "selection_catalog.json").write_text(
+        '{"entities": [{"entity_id": "sensor.demo", "area": "Küche", "floor": "EG"}]}', encoding="utf-8"
+    )
+    category_id = service.deps.index.create_entity_category("Klima")
+    service.deps.index.set_entities_category(["sensor.demo"], category_id)
+
+    ctx = service._ha_import_context(history_source="raw", period="hour")
+    assert ctx["ha_has_areas"] is True and ctx["ha_has_categories"] is True
+    entity = ctx["ha_entities"][0]
+    assert entity["area"] == "Küche"
+    assert entity["category"]["name"] == "Klima"
+
+
+def test_context_marks_last_import_and_never_imported(service, tmp_path) -> None:
+    ctx = service._ha_import_context(history_source="raw", period="hour")
+    entity = ctx["ha_entities"][0]
+    assert entity["last_import_ts"] is None and entity["last_import_label"] is None
+
+    from datetime import datetime, timezone
+    from app.storage import import_reports
+    import_reports.create(
+        tmp_path, source_type="ha", started_at=datetime.now(timezone.utc),
+        source={"filename": "Home Assistant", "size_bytes": 0},
+        configuration={"history_source": "stats"},
+        results=[{"entity_id": "sensor.demo", "rows_imported": 5}], errors=[],
+    )
+    entity = service._ha_import_context(history_source="raw", period="hour")["ha_entities"][0]
+    assert entity["last_import_ts"] is not None and entity["last_import_label"]
+    assert entity["last_import_mode"] == "stats" and entity["last_import_mode_label"]

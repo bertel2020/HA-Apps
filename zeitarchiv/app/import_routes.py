@@ -35,7 +35,7 @@ from starlette.background import BackgroundTask
 
 import pyarrow.parquet as pq
 
-from . import formats
+from . import entity_areas, formats
 from . import notices as notices_mod
 from .formatting import (
     entity_display_name,
@@ -56,7 +56,7 @@ from .limits import (
 from .influxdb_import_routes import InfluxImportService
 from .progress import JobBusy, JobProgress, register_source
 from .route_support import UI_EXCLUSIVE_TIMEOUT_SECONDS, UploadLimitExceeded, copy_upload_limited, dir_size
-from .storage import csv_import, ha_import, ha_statistics, hotbuffer, import_reports, symcon_import, vm_import
+from .storage import csv_import, ha_import, ha_statistics, hotbuffer, import_last, import_reports, symcon_import, vm_import
 from .storage.coordinator import StorageCoordinator
 from .storage.index import Index
 from .storage.paths import entity_dir
@@ -255,6 +255,11 @@ class ImportService:
         # nicht zwei verschiedene Wörter für denselben Schritt benutzen.
         register_source("symcon-import", tr("Symcon-Import"), self._symcon_activity)
         self._ha_availability_cache = _HaAvailabilityCache()
+        # Ergebnis des letzten Dry Runs je Entität und Konfiguration (gleicher
+        # Schlüssel wie die Verfügbarkeit), nur im Prozessspeicher: eine
+        # Vorschau ist jederzeit per Klick neu abrufbar und kein Importzustand.
+        self._ha_dry_run_lock = threading.Lock()
+        self._ha_dry_run_status: dict[str, dict[str, dict]] = {}
         self._vm_progress = JobProgress("vm-import", unit=N_("Entitäten"), label=N_("VictoriaMetrics-Import"))
         # Genau ein Eintrag (zuletzt geprüfte Adresse/Zeitraum) statt eines
         # Caches je Konfiguration wie bei HA: es gibt hier keine Quellen-/
@@ -578,6 +583,64 @@ class ImportService:
 
         threading.Thread(target=worker, daemon=True).start()
 
+    @staticmethod
+    def _ha_dry_run_statuses(
+        entity_ids: list[str], items: list[dict], errors: list[str],
+    ) -> dict[str, dict]:
+        """Status je Entität aus dem Ergebnis eines Dry Runs, für die Status-Spalte.
+
+        ok = nichts mehr zu importieren, new = neue Werte gefunden (rows = Zahl),
+        none = Home Assistant liefert keine Daten, err = Abruf oder Planung fehlgeschlagen.
+        Fehlermeldungen tragen die Entität vorn („sensor.x: …“); eine Entität ohne
+        Ergebnis und ohne erkennbare Meldung gilt als Fehler, nicht als vollständig."""
+        statuses: dict[str, dict] = {}
+        for item in items:
+            plan = item["plan"]
+            rows = plan.rows_to_import + plan.rows_to_merge + plan.rows_to_update + plan.rows_to_recover
+            if not item.get("source_rows"):
+                statuses[item["entity_id"]] = {"state": "none", "rows": 0}
+            elif rows > 0:
+                statuses[item["entity_id"]] = {"state": "new", "rows": rows}
+            else:
+                statuses[item["entity_id"]] = {"state": "ok", "rows": 0}
+        for message in errors:
+            entity_id = message.split(":", 1)[0].strip()
+            if entity_id in entity_ids and entity_id not in statuses:
+                statuses[entity_id] = {"state": "err", "rows": 0}
+        for entity_id in entity_ids:
+            statuses.setdefault(entity_id, {"state": "err", "rows": 0})
+        return statuses
+
+    def _ha_dry_run_store(self, key: str, statuses: dict[str, dict]) -> None:
+        now = datetime.now(timezone.utc).timestamp()
+        with self._ha_dry_run_lock:
+            entry = self._ha_dry_run_status.setdefault(key, {})
+            for entity_id, status in statuses.items():
+                entry[entity_id] = {**status, "at": now}
+
+    def _last_import_fields(self, entry: dict | None) -> dict:
+        """Spalten „Letzter Import“ und „Importmodus“ für eine Zeile der Import-Tabelle.
+        Ohne Eintrag war die Entität noch nie Ziel eines Imports (leer, nicht „0“)."""
+        labels = {
+            "full": tr("Vollimport"), "raw": tr("Rohhistorie"), "stats": tr("Langzeitstatistik"),
+            "csv": "CSV", "symcon": "Symcon", "vm": "VictoriaMetrics", "influxdb": "InfluxDB",
+        }
+        ts = None
+        if entry:
+            try:
+                ts = datetime.fromisoformat(entry["ts"]).timestamp()
+            except (KeyError, TypeError, ValueError):
+                ts = None
+        if ts is None:
+            return {"last_import_ts": None, "last_import_label": None, "last_import_mode": None, "last_import_mode_label": None}
+        mode = entry.get("mode") or ""
+        return {
+            "last_import_ts": ts,
+            "last_import_label": f"{format_timestamp(ts, self.deps.tz)} {format_time(ts, self.deps.tz)}",
+            "last_import_mode": mode,
+            "last_import_mode_label": labels.get(mode, mode),
+        }
+
     def _ha_import_context(self,
         selected_ids: set[str] | None = None,
         range_preset: str = "max",
@@ -633,7 +696,26 @@ class ImportService:
         checked_at = cache_entry["checked_at"] if cache_entry else None
         stale = checked_at is not None and (now.timestamp() - checked_at) > HA_AVAILABILITY_STALE_SECONDS
         entities = []
-        for row in self.deps.index.list_entities():
+        entity_rows = self.deps.index.list_entities()
+        # Raum und Kategorie wie in der Entitätenliste: Räume kommen aus dem
+        # Katalog der Integration (fehlt er, gibt es keine Räume), Kategorien
+        # aus dem Index. Die Spalten erscheinen nur, wenn es etwas anzuzeigen
+        # gibt — sonst wären sie reine Leerspalten.
+        areas = entity_areas.area_map(self.deps.data_dir)
+        categories = {c["id"]: c for c in self.deps.index.list_entity_categories()}
+        last_imports = import_last.load(self.deps.data_dir)
+        with self._ha_dry_run_lock:
+            dry_status = dict(self._ha_dry_run_status.get(self._ha_cache_key(
+                history_source, period, range_preset, stats_range_preset, include_long_term_stats,
+            ), {}))
+        dry_latest = max((entry["at"] for entry in dry_status.values()), default=None)
+        category_of: dict[str, int] = {}
+        if categories:
+            all_ids = [row["entity_id"] for row in entity_rows]
+            # Stückweise, damit die SQLite-Grenze für Platzhalter nie greift.
+            for offset in range(0, len(all_ids), 500):
+                category_of.update(self.deps.index.category_map_for(all_ids[offset:offset + 500]))
+        for row in entity_rows:
             entity_id = row["entity_id"]
             avail = availability.get(entity_id)
             not_supported = avail is not None and not avail.supported
@@ -664,6 +746,11 @@ class ImportService:
                 "unit": row["unit"],
                 "aggregation_type": row["aggregation_type"],
                 "type_label": format_type(row["aggregation_type"]),
+                "area": (areas.get(entity_id) or {}).get("area"),
+                "category": categories.get(category_of.get(entity_id)),
+                **self._last_import_fields(last_imports.get(entity_id)),
+                "dry_state": (dry_status.get(entity_id) or {}).get("state"),
+                "dry_rows": (dry_status.get(entity_id) or {}).get("rows", 0),
                 "has_data": avail.has_data if avail is not None else None,
                 "supported": avail.supported if avail is not None else None,
                 "available_label": available_label,
@@ -679,6 +766,13 @@ class ImportService:
             "ha_available": ha_available,
             "ha_error": None if ha_available else tr("Supervisor ist in dieser Umgebung nicht verfügbar"),
             "ha_entities": entities,
+            "ha_has_dry": bool(dry_status),
+            "ha_dry_checked_at_label": (
+                f"{format_timestamp(dry_latest, self.deps.tz)} {format_time(dry_latest, self.deps.tz)}"
+                if dry_latest is not None else None
+            ),
+            "ha_has_areas": bool(areas),
+            "ha_has_categories": bool(categories),
             "ha_selected_ids": selected_ids or set(),
             "ha_availability_checked": cache_entry is not None,
             "ha_availability_error": availability_error,
@@ -2145,7 +2239,7 @@ class ImportService:
             die Seite zeigt bis dahin dieselbe Fortschrittsanzeige wie nach einem
             Upload — synchron würde das bei einem großen Export die Seite für die
             volle Scan-Dauer blockieren."""
-            active_tab = tab if tab in {"symcon", "csv", "ha", "vm", "influxdb", "reports"} else "symcon"
+            active_tab = tab if tab in {"symcon", "csv", "ha", "vm", "influxdb", "reports"} else "ha"
             common_context = {
                 "active_import_tab": active_tab,
                 **self.deps.reports_context(source, status, search, date_from, date_to, sort, dir, page, page_size),
@@ -2914,11 +3008,14 @@ class ImportService:
 
         @router.post("/import/ha/dry-run", response_class=HTMLResponse)
         async def import_ha_dry_run(request: Request) -> HTMLResponse:
-            """Vorschau ohne Schreibvorgang — eigene Vorlage (_ha_import_dry_run.html)
-            statt der mit Symcon/CSV geteilten _import_dry_run.html: zeigt zusätzlich
-            den tatsächlich in HA gefundenen Zeitraum/Punkteanzahl je Entität, was nur
-            beim HA-Import überhaupt einen Sinn ergibt (Symcon/CSV kennen ihre Quelle
-            vollständig, ohne HAs begrenzte Recorder-Aufbewahrung)."""
+            """Vorschau ohne Schreibvorgang. Das Ergebnis steht als Status je
+            Entität direkt in der Tabelle (Spalte „Status“, siehe
+            _ha_dry_run_statuses()); die Antwort rendert deshalb die ganze
+            Sektion neu, wie die Verfügbarkeitsprüfung. Die ausführliche Liste
+            (eigene Vorlage _ha_import_dry_run.html statt der mit Symcon/CSV
+            geteilten _import_dry_run.html: sie zeigt zusätzlich den in HA
+            gefundenen Zeitraum/Punkteanzahl je Entität) steht eingeklappt
+            darunter, damit keine Angabe verloren geht."""
             form = await request.form()
             (
                 raw_entity_ids, range_preset, date_from, date_to,
@@ -2928,13 +3025,31 @@ class ImportService:
             entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
             items: list[dict] = []
             errors: list[str] = [tr("{entity_id}: nicht in Zeitarchiv bekannt", entity_id=entity_id) for entity_id in unknown_ids]
-            context = {"history_source": history_source, "period": period}
+            def render_section(statuses: dict[str, dict] | None = None) -> HTMLResponse:
+                if statuses:
+                    self._ha_dry_run_store(
+                        self._ha_cache_key(
+                            history_source, period, range_preset, stats_range_preset, include_long_term_stats,
+                        ),
+                        statuses,
+                    )
+                section_context = self._ha_import_context(
+                    selected_ids=set(raw_entity_ids), range_preset=range_preset,
+                    date_from=date_from, date_to=date_to,
+                    history_source=history_source, period=period,
+                    include_existing_months=include_existing_months,
+                    stats_range_preset=stats_range_preset,
+                    include_long_term_stats=include_long_term_stats,
+                )
+                section_context["ha_dry_run"] = {
+                    "items": items, "errors": errors, "history_source": history_source, "period": period,
+                }
+                return self.deps.templates.TemplateResponse(request, "_ha_import_section.html", section_context)
+
             if not entity_ids:
                 if not unknown_ids:
                     errors.append(tr("Bitte mindestens eine Entität auswählen."))
-                return self.deps.templates.TemplateResponse(
-                    request, "_ha_import_dry_run.html", {**context, "items": items, "errors": errors}
-                )
+                return render_section()
 
             start, stats_start, end = self._ha_request_ranges(
                 range_preset, date_from, date_to, history_source, stats_range_preset
@@ -2972,6 +3087,7 @@ class ImportService:
                                 entity["custom_name"] if entity else None,
                             ),
                             "available_label": self._ha_available_label(history, history_source),
+                            "source_rows": len(history.rows),
                             "plan": plan,
                             "full_summary": (
                                 self._ha_full_summary(history) if history_source == "full" else None
@@ -2997,9 +3113,7 @@ class ImportService:
                 ),
                 len(errors),
             )
-            return self.deps.templates.TemplateResponse(
-                request, "_ha_import_dry_run.html", {**context, "items": items, "errors": errors}
-            )
+            return render_section(self._ha_dry_run_statuses(entity_ids, items, errors))
 
 
         @router.post("/import/ha/debug")

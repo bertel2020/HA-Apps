@@ -142,3 +142,21 @@ def test_entity_pages_show_the_room_read_only_next_to_the_id(client, rooms) -> N
     # ohne Raum: keine Pille, die Kennzahlen-Leiste hat keine eigene Zelle dafür
     assert 'class="entity-room"' not in client.get(f"/entities/{IDS[2]}/config").text
     assert "<dt>Raum</dt>" not in client.get(f"/entities/{IDS[0]}/config").text
+
+
+def test_import_page_shows_room_and_category_columns(client, rooms) -> None:
+    """Import → Home Assistant: Raum und Kategorie als Spalten, nur wenn es sie gibt."""
+    from app import main
+
+    html = client.get("/import?tab=ha").text
+    assert 'data-sort-key="area"' in html
+    assert 'data-sort-key="category"' not in html  # noch keine Kategorie angelegt
+
+    category_id = main.index.create_entity_category("Energie")
+    try:
+        main.index.set_entities_category([rooms[0]], category_id)
+        html = client.get("/import?tab=ha").text
+        assert 'data-sort-key="category"' in html
+        assert "Hobbyraum" in html and "Energie" in html
+    finally:
+        main.index.delete_entity_category(category_id)

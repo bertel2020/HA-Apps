@@ -21,7 +21,7 @@
       document.getElementById('tab-btn-vm').classList.toggle('active', name === 'vm');
       document.getElementById('tab-btn-influxdb').classList.toggle('active', name === 'influxdb');
       document.getElementById('tab-btn-reports').classList.toggle('active', name === 'reports');
-      if (name === 'symcon') url.searchParams.delete('tab');
+      if (name === 'ha') url.searchParams.delete('tab');  // Standardreiter
       else url.searchParams.set('tab', name);
       history.replaceState(null, '', url);
     }

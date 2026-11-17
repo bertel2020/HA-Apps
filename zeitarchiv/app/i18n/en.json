@@ -4126,7 +4126,6 @@
     "Die Linie bekommt eine eigene Achse, ihre Skala richtet sich nur nach ihr": "The line gets its own axis; its scale follows only that line",
     "Ungültige Darstellung je Serie": "Invalid appearance per series",
     "Zuerst Entitäten in der Tabelle markieren": "Mark entities in the table first",
-    "InfluxDB (experimentell)": "InfluxDB (experimental)",
     "Dieser Import ist neu und noch nicht an großen echten Datenbeständen erprobt. Zunächst nur wenige Entitäten übernehmen und das Ergebnis prüfen.": "This import is new and has not yet been tried on large real data sets. Import only a few entities first and check the result.",
     "Verbindung prüfen": "Check connection",
     "Prüft Adresse ohne etwas zu importieren": "Checks the address without importing anything",

@@ -110,6 +110,21 @@
   <div class="toolbar import-filter-toolbar" style="flex-wrap:wrap;overflow:visible;">
     <input type="search" class="search" id="ha-entity-search" placeholder="{{ _('Entität suchen …') }}" oninput="onHaSearch(this.value)">
     <span class="count-chip" id="ha-marked-count">{{ _("0 markiert") }}</span>
+    {% if ha_dry_checked_at_label %}<span class="ha-checked-at is-checked" title="{{ _('Zeitpunkt der letzten Vorschau (Dry Run) für diese Einstellungen') }}">{{ _("Vorschau: {t}", t=ha_dry_checked_at_label) }}</span>{% endif %}
+    <span class="dd-picker-wrap">
+      <button type="button" class="btn" id="ha-cols-btn" onclick="toggleDDPicker('ha-cols')" title="{{ _('Spalten ein- und ausblenden') }}">{{ _("Spalten") }} ▾</button>
+      <span class="dd-picker-popover" id="ha-cols-popover">
+        <label class="dd-picker-row"><input type="checkbox" data-ha-col="type" checked onchange="onHaColumnToggle(this)"> {{ _("Typ") }}</label>
+        <label class="dd-picker-row"><input type="checkbox" data-ha-col="unit" checked onchange="onHaColumnToggle(this)"> {{ _("Einheit") }}</label>
+        {% if ha_has_areas %}<label class="dd-picker-row"><input type="checkbox" data-ha-col="area" checked onchange="onHaColumnToggle(this)"> {{ _("Raum") }}</label>{% endif %}
+        {% if ha_has_categories %}<label class="dd-picker-row"><input type="checkbox" data-ha-col="category" checked onchange="onHaColumnToggle(this)"> {{ _("Kategorie") }}</label>{% endif %}
+        <label class="dd-picker-row"><input type="checkbox" data-ha-col="art" checked onchange="onHaColumnToggle(this)"> {{ _("Art") }}</label>
+        <label class="dd-picker-row"><input type="checkbox" data-ha-col="available" checked onchange="onHaColumnToggle(this)"> {{ _("Verfügbar") }}</label>
+        <label class="dd-picker-row"><input type="checkbox" data-ha-col="status" checked onchange="onHaColumnToggle(this)"> {{ _("Status") }}</label>
+        <label class="dd-picker-row"><input type="checkbox" data-ha-col="last" checked onchange="onHaColumnToggle(this)"> {{ _("Letzter Import") }}</label>
+        <label class="dd-picker-row"><input type="checkbox" data-ha-col="mode" onchange="onHaColumnToggle(this)"> {{ _("Importmodus") }}</label>
+      </span>
+    </span>
     {# Rechtsbündige Gruppe am Ende der Toolbar, wie in entity_detail.html/
        chart_editor.html (.toolbar-right in app.css) — beide Knöpfe in EINEM
        Behälter, nicht margin-left:auto auf dem ersten, sonst würde nur er
@@ -118,11 +133,22 @@
       {# Der Dry Run holt dieselben Daten wie der Import (ein Roundtrip je
          Entität), schreibt aber nichts und hat deshalb keine Zahl, gegen die
          ein Balken laufen könnte — hier reicht der Läuft-Chip. #}
-      <button type="button" class="btn" hx-post="import/ha/dry-run" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML"
+      <button type="button" class="btn" hx-post="import/ha/dry-run" hx-include="#ha-form" hx-target="#ha-section" hx-swap="outerHTML"
               hx-disabled-elt="this">{{ _("Vorschau (Dry Run)") }}</button>
       <button type="button" class="btn primary" hx-post="import/ha/start" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML"
               hx-disabled-elt="this">{{ _("Vollimport starten") if ha_history_source == "full" else _("Import starten") }}</button>
     </div>
+  </div>
+
+  <div class="ha-filter-row" id="ha-filter-row">
+    <span class="ha-filter-label">{{ _("Filter") }}</span>
+    <button type="button" class="ha-filter-chip active" data-ha-filter="all" onclick="setHaFilter('all')">{{ _("Alle") }}<span class="n"></span></button>
+    <button type="button" class="ha-filter-chip" data-ha-filter="never" onclick="setHaFilter('never')">{{ _("Nie importiert") }}<span class="n"></span></button>
+    {% if ha_has_dry %}
+    <button type="button" class="ha-filter-chip" data-ha-filter="new" onclick="setHaFilter('new')">{{ _("Importierbar") }}<span class="n"></span></button>
+    <button type="button" class="ha-filter-chip" data-ha-filter="ok" onclick="setHaFilter('ok')">{{ _("Vollständig") }}<span class="n"></span></button>
+    <button type="button" class="ha-filter-chip" data-ha-filter="problem" onclick="setHaFilter('problem')">{{ _("Fehler / keine Daten") }}<span class="n"></span></button>
+    {% endif %}
   </div>
 
   <div class="tbl-wrap">
@@ -130,20 +156,34 @@
       <colgroup>
         <col class="symcon-col-check">
         <col class="ha-col-entity">
-        <col class="ha-col-type"><col class="ha-col-unit"><col class="ha-col-art"><col class="ha-col-available">
+        <col class="ha-col-type ha-c-type"><col class="ha-col-unit ha-c-unit">
+        {% if ha_has_areas %}<col class="ha-col-area ha-c-area">{% endif %}
+        {% if ha_has_categories %}<col class="ha-col-category ha-c-category">{% endif %}
+        <col class="ha-col-art ha-c-art"><col class="ha-col-available ha-c-available"><col class="ha-col-status ha-c-status"><col class="ha-col-last ha-c-last"><col class="ha-col-mode ha-c-mode">
       </colgroup>
       <tr>
         <th><input type="checkbox" onchange="toggleAllHaRows(this)" title="{{ _('Alle auf dieser Seite markieren') }}"></th>
-        <th><a href="#" onclick="sortHaTable('entity');return false;">{{ _("Entität") }}<span class="sort-arrow"></span></a></th>
-        <th><a href="#" onclick="sortHaTable('type');return false;">{{ _("Typ") }}<span class="sort-arrow"></span></a></th>
-        <th><a href="#" onclick="sortHaTable('unit');return false;">{{ _("Einheit") }}<span class="sort-arrow"></span></a></th>
-        <th><a href="#" onclick="sortHaTable('art');return false;">{{ _("Art") }}<span class="sort-arrow"></span></a></th>
-        <th><a href="#" onclick="sortHaTable('available');return false;">{{ _("Verfügbar") }}<span class="sort-arrow"></span></a></th>
+        <th><a href="#" data-sort-key="entity" onclick="sortHaTable('entity');return false;">{{ _("Entität") }}<span class="sort-arrow"></span></a></th>
+        <th class="ha-c-type"><a href="#" data-sort-key="type" onclick="sortHaTable('type');return false;">{{ _("Typ") }}<span class="sort-arrow"></span></a></th>
+        <th class="ha-c-unit"><a href="#" data-sort-key="unit" onclick="sortHaTable('unit');return false;">{{ _("Einheit") }}<span class="sort-arrow"></span></a></th>
+        {% if ha_has_areas %}<th class="ha-c-area"><a href="#" data-sort-key="area" onclick="sortHaTable('area');return false;">{{ _("Raum") }}<span class="sort-arrow"></span></a></th>{% endif %}
+        {% if ha_has_categories %}<th class="ha-c-category"><a href="#" data-sort-key="category" onclick="sortHaTable('category');return false;">{{ _("Kategorie") }}<span class="sort-arrow"></span></a></th>{% endif %}
+        <th class="ha-c-art"><a href="#" data-sort-key="art" onclick="sortHaTable('art');return false;">{{ _("Art") }}<span class="sort-arrow"></span></a></th>
+        <th class="ha-c-available"><a href="#" data-sort-key="available" onclick="sortHaTable('available');return false;">{{ _("Verfügbar") }}<span class="sort-arrow"></span></a></th>
+        <th class="ha-c-status"><a href="#" data-sort-key="status" onclick="sortHaTable('status');return false;">{{ _("Status") }}<span class="sort-arrow"></span></a></th>
+        <th class="ha-c-last"><a href="#" data-sort-key="last" onclick="sortHaTable('last');return false;">{{ _("Letzter Import") }}<span class="sort-arrow"></span></a></th>
+        <th class="ha-c-mode"><a href="#" data-sort-key="mode" onclick="sortHaTable('mode');return false;">{{ _("Importmodus") }}<span class="sort-arrow"></span></a></th>
       </tr>
       {% for entity in ha_entities %}
       <tr data-entity-id="{{ entity.entity_id }}"
           class="{{ 'marked' if entity.entity_id in ha_selected_ids }}"
-          data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id) | lower }}"
+          data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id ~ ' ' ~ (entity.area or '') ~ ' ' ~ (entity.category.name if entity.category else '')) | lower }}"
+          data-sort-area="{{ (entity.area or '') | lower }}"
+          data-status="{{ entity.dry_state or '' }}"
+          data-sort-status="{{ {'new': 1, 'err': 2, 'ok': 3, 'none': 4}.get(entity.dry_state, '') }}"
+          data-sort-last="{{ entity.last_import_ts if entity.last_import_ts is not none else '' }}"
+          data-sort-mode="{{ (entity.last_import_mode_label or '') | lower }}"
+          data-sort-category="{{ (entity.category.name if entity.category else '') | lower }}"
           data-sort-entity="{{ (entity.friendly_name or entity.entity_id) | lower }}"
           data-sort-unit="{{ entity.unit or '' }}"
           data-sort-type="{{ entity.type_label }}"
@@ -162,9 +202,11 @@
             </span>
           </a>
         </td>
-        <td><span class="badge {{ entity.aggregation_type }}">{{ entity.type_label }}</span></td>
-        <td>{{ entity.unit or "—" }}</td>
-        <td>
+        <td class="ha-c-type"><span class="badge {{ entity.aggregation_type }}">{{ entity.type_label }}</span></td>
+        <td class="ha-c-unit">{{ entity.unit or "—" }}</td>
+        {% if ha_has_areas %}<td class="ha-c-area">{% if entity.area %}<span class="ha-cell-clip" title="{{ entity.area }}">{{ entity.area }}</span>{% else %}<span class="cat-none">—</span>{% endif %}</td>{% endif %}
+        {% if ha_has_categories %}<td class="ha-c-category">{% if entity.category %}<span class="cat-pill" style="--c:var(--chart-{{ entity.category.color_slot }});" title="{{ entity.category.name }}"><i aria-hidden="true"></i><span>{{ entity.category.name }}</span></span>{% else %}<span class="cat-none">—</span>{% endif %}</td>{% endif %}
+        <td class="ha-c-art">
           {% if entity.has_data is none %}
           <span class="ha-art-badge unknown" title="{{ _('Zeitraum wählen und &bdquo;Verfügbarkeit prüfen&ldquo; klicken') }}">–</span>
           {% elif ha_history_source == "full" and entity.full_details %}
@@ -185,7 +227,7 @@
           <span class="ha-art-badge no-data">{{ _("Keine Langzeitstatistik") if ha_history_source == "stats" else _("Keine Rohhistorie") }}</span>
           {% endif %}
         </td>
-        <td class="mono" style="font-size:calc(12px * var(--font-scale, 1));">
+        <td class="mono ha-c-available" style="font-size:calc(12px * var(--font-scale, 1));">
           {% if ha_history_source == "full" and entity.full_details %}
           <div class="ha-available-line"><strong>{{ _('Roh:') }}</strong> {{ entity.full_details.raw.label }}</div>
           {% if entity.full_details.stats_enabled %}
@@ -198,11 +240,28 @@
           {{ entity.available_label or "—" }}
           {% endif %}
         </td>
+        <td class="ha-c-status">
+          {% if entity.dry_state == 'new' %}<span class="ha-status new"><i aria-hidden="true">+</i><span>{{ _("Importierbar") }}<small>{{ _("{n} Zeilen", n=(entity.dry_rows | format_int)) }}</small></span></span>
+          {% elif entity.dry_state == 'ok' %}<span class="ha-status ok"><i aria-hidden="true">✓</i><span>{{ _("Vollständig") }}</span></span>
+          {% elif entity.dry_state == 'none' %}<span class="ha-status none"><i aria-hidden="true">–</i><span>{{ _("Keine Daten") }}</span></span>
+          {% elif entity.dry_state == 'err' %}<span class="ha-status err"><i aria-hidden="true">!</i><span>{{ _("Fehler") }}</span></span>
+          {% else %}<span class="ha-status idle" title="{{ _('Noch keine Vorschau (Dry Run) für diese Entität') }}"><i aria-hidden="true"></i><span>{{ _("Nicht geprüft") }}</span></span>{% endif %}
+        </td>
+        <td class="ha-c-last mono" style="font-size:calc(12px * var(--font-scale, 1));">{% if entity.last_import_label %}{{ entity.last_import_label }}{% else %}<span class="ha-never">{{ _("nie") }}</span>{% endif %}</td>
+        <td class="ha-c-mode">{% if entity.last_import_mode_label %}<span class="ha-cell-clip" title="{{ entity.last_import_mode_label }}">{{ entity.last_import_mode_label }}</span>{% else %}<span class="cat-none">—</span>{% endif %}</td>
       </tr>
       {% endfor %}
     </table>
   </div>
 
+  {% if ha_has_dry %}
+  <div class="ha-status-legend">
+    <span><b>+</b> {{ _("Importierbar: neue Werte gefunden") }}</span>
+    <span><b>✓</b> {{ _("Vollständig: nichts mehr zu importieren") }}</span>
+    <span><b>–</b> {{ _("Keine Daten in Home Assistant") }}</span>
+    <span><b>!</b> {{ _("Fehler beim Abruf") }}</span>
+  </div>
+  {% endif %}
   <div class="pager" style="justify-content:space-between;">
     <div style="display:flex;align-items:center;gap:10px;">
       <span class="pager-range" id="ha-pager-range"></span>
@@ -218,6 +277,14 @@
     </select>
   </div>
 
+  {% if ha_dry_run %}
+  <details class="ha-dry-details" {% if ha_dry_run.errors %}open{% endif %}>
+    <summary>{{ _("Details zur Vorschau") }} ({{ ha_dry_run["items"] | length }})</summary>
+    {% with items=ha_dry_run["items"], errors=ha_dry_run.errors, history_source=ha_dry_run.history_source, period=ha_dry_run.period %}
+    {% include "_ha_import_dry_run.html" %}
+    {% endwith %}
+  </details>
+  {% endif %}
   <div id="ha-import-output" hx-get="import/ha/progress" hx-trigger="load" hx-swap="innerHTML"></div>
 </form>
 {% endif %}
@@ -234,6 +301,40 @@
     let haSearch = '';
     let haSortKey = null;
     let haSortDir = 'asc';
+    let haFilter = 'all';
+
+    // Filter-Chips: reine Ansicht über die Zeilen (data-status aus der
+    // letzten Vorschau, data-sort-last leer = nie importiert). Wie die Suche
+    // blendet der Filter nur aus, die Markierung bleibt erhalten.
+    function haRowMatchesFilter(row, filter) {
+      const status = row.dataset.status || '';
+      if (filter === 'never') return (row.dataset.sortLast || '') === '';
+      if (filter === 'new' || filter === 'ok') return status === filter;
+      if (filter === 'problem') return status === 'err' || status === 'none';
+      return true;
+    }
+    // Beim Austausch der Sektion (htmx outerHTML) läuft dieses Skript, solange die
+    // alte Sektion noch im Dokument steht: gleiche IDs doppelt, document-weite
+    // Abfragen zählten dann jede Zeile zweimal. Deshalb nur die eigene Sektion
+    // (das Element direkt vor dem Skript) abfragen.
+    const haRoot = document.currentScript ? document.currentScript.previousElementSibling : null;
+    function refreshHaFilterChips() {
+      const scope = haRoot && haRoot.id === 'ha-section' ? haRoot : document;
+      const rows = Array.from(scope.querySelectorAll('#ha-import-table tr[data-entity-id]'));
+      scope.querySelectorAll('[data-ha-filter]').forEach((chip) => {
+        const filter = chip.dataset.haFilter;
+        const count = rows.filter((row) => haRowMatchesFilter(row, filter)).length;
+        const n = chip.querySelector('.n');
+        if (n) n.textContent = count;
+        chip.classList.toggle('active', filter === haFilter);
+      });
+    }
+    function setHaFilter(filter) {
+      haFilter = filter;
+      haPage = 1;
+      refreshHaFilterChips();
+      applyHaPaging();
+    }
 
     function onHaSearch(value) {
       haSearch = value.trim().toLowerCase();
@@ -250,12 +351,42 @@
       }
       haPage = 1;
       document.querySelectorAll('#ha-import-table th a').forEach((a) => {
-        const active = a.textContent.trim().toLowerCase().startsWith(key === 'available' ? 'verfügbar' : key === 'entity' ? 'entität' : key === 'unit' ? 'einheit' : key === 'type' ? 'typ' : 'art');
+        const active = a.dataset.sortKey === key;
         a.classList.toggle('active', active);
         const arrow = a.querySelector('.sort-arrow');
         if (arrow) arrow.textContent = active ? (haSortDir === 'asc' ? ' ↑' : ' ↓') : '';
       });
       applyHaPaging();
+    }
+
+    // Spaltenwahl: pro Browser gemerkt (localStorage), nicht in den Einstellungen
+    // der Installation. Ausgeblendet wird über eine Klasse an der Tabelle, die
+    // gleichnamigen <col>/<th>/<td> (.ha-c-<Schlüssel>) verschwinden gemeinsam.
+    const HA_COLUMNS_KEY = 'zeitarchiv.import.ha.hiddenColumns';
+    function loadHiddenHaColumns() {
+      try {
+        const stored = localStorage.getItem(HA_COLUMNS_KEY);
+        if (stored === null) return ['mode'];  // Standard: Importmodus ausgeblendet
+        const raw = JSON.parse(stored);
+        return Array.isArray(raw) ? raw.filter((k) => typeof k === 'string') : [];
+      } catch (e) { return ['mode']; }
+    }
+    function applyHaColumns() {
+      const table = document.getElementById('ha-import-table');
+      if (!table) return;
+      const hidden = loadHiddenHaColumns();
+      document.querySelectorAll('[data-ha-col]').forEach((box) => {
+        const key = box.dataset.haCol;
+        box.checked = !hidden.includes(key);
+        table.classList.toggle('ha-hide-' + key, hidden.includes(key));
+      });
+    }
+    function onHaColumnToggle(box) {
+      const key = box.dataset.haCol;
+      const hidden = loadHiddenHaColumns().filter((k) => k !== key);
+      if (!box.checked) hidden.push(key);
+      try { localStorage.setItem(HA_COLUMNS_KEY, JSON.stringify(hidden)); } catch (e) { /* ohne Speicher: gilt nur bis zum Neuladen */ }
+      applyHaColumns();
     }
 
     function refreshHaMarkedCount() {
@@ -328,8 +459,12 @@
         const bMarked = b.classList.contains('marked');
         if (aMarked !== bMarked) return aMarked ? -1 : 1;
         if (!attr) return 0;
-        const av = a.dataset[attr] ?? '';
-        const bv = b.dataset[attr] ?? '';
+        // „Letzter Import“: nie importiert zählt als ältester Wert (aufsteigend
+        // zuerst) — genau diese Entitäten will man damit finden. Bei allen
+        // anderen Spalten stehen leere Werte immer am Ende.
+        const emptyAs = haSortKey === 'last' ? '-1' : '';
+        const av = (a.dataset[attr] ?? '') || emptyAs;
+        const bv = (b.dataset[attr] ?? '') || emptyAs;
         if (av === '' && bv === '') return 0;
         if (av === '') return 1;   // Werte ohne Verfügbarkeitsprüfung/Einheit
         if (bv === '') return -1;  // immer ans Ende, unabhängig von der Richtung.
@@ -340,7 +475,8 @@
       });
       rows.forEach((row) => table.appendChild(row));
 
-      const isFilteredOut = (row) => haSearch && !(row.dataset.search || '').includes(haSearch);
+      const isFilteredOut = (row) => (haSearch && !(row.dataset.search || '').includes(haSearch))
+        || !haRowMatchesFilter(row, haFilter);
       rows.filter(isFilteredOut).forEach((row) => { row.style.display = 'none'; });
       const visible = rows.filter((row) => !isFilteredOut(row));
 
@@ -372,6 +508,8 @@
       applyHaPaging();
     }
 
+    window.onHaColumnToggle = onHaColumnToggle;
+    window.setHaFilter = setHaFilter;
     window.onHaSearch = onHaSearch;
     window.sortHaTable = sortHaTable;
     window.onHaMarkChange = onHaMarkChange;
@@ -383,6 +521,8 @@
     window.setHaPageSize = setHaPageSize;
     window.stepHaPage = stepHaPage;
     refreshHaMarkedCount();
+    applyHaColumns();
+    refreshHaFilterChips();
     applyHaPaging();
   })();
 </script>

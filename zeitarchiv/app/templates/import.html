@@ -5,18 +5,18 @@
 {% endblock %}
 {% block content %}
   
-  <div class="page">
+  <div class="page page-wide">
     <h1>{{ _("Import") }}</h1>
     <p class="sub">{{ _("Bestehende Daten aus anderen Quellen einlesen — als Symcon-<code>db</code>-Export oder als CSV-Datei mit freier Spalten-/Format-Zuordnung.") }}</p>
 
     <div class="settings-panel is-raised">
 
     <div class="import-tabs">
-      <button type="button" class="import-tab-btn{% if active_import_tab == 'symcon' %} active{% endif %}" id="tab-btn-symcon" onclick="showImportTab('symcon')">{{ _("Symcon") }}</button>
-      <button type="button" class="import-tab-btn{% if active_import_tab == 'csv' %} active{% endif %}" id="tab-btn-csv" onclick="showImportTab('csv')">{{ _("CSV-Datei") }}</button>
       <button type="button" class="import-tab-btn{% if active_import_tab == 'ha' %} active{% endif %}" id="tab-btn-ha" onclick="showImportTab('ha')">{{ _("Home Assistant") }}</button>
+      <button type="button" class="import-tab-btn{% if active_import_tab == 'symcon' %} active{% endif %}" id="tab-btn-symcon" onclick="showImportTab('symcon')">{{ _("Symcon") }}</button>
       <button type="button" class="import-tab-btn{% if active_import_tab == 'vm' %} active{% endif %}" id="tab-btn-vm" onclick="showImportTab('vm')">{{ _("VictoriaMetrics") }}</button>
-      <button type="button" class="import-tab-btn{% if active_import_tab == 'influxdb' %} active{% endif %}" id="tab-btn-influxdb" onclick="showImportTab('influxdb')">{{ _("InfluxDB (experimentell)") }}</button>
+      <button type="button" class="import-tab-btn{% if active_import_tab == 'influxdb' %} active{% endif %}" id="tab-btn-influxdb" onclick="showImportTab('influxdb')">{{ _("InfluxDB") }}</button>
+      <button type="button" class="import-tab-btn{% if active_import_tab == 'csv' %} active{% endif %}" id="tab-btn-csv" onclick="showImportTab('csv')">{{ _("CSV-Datei") }}</button>
       <button type="button" class="import-tab-btn{% if active_import_tab == 'reports' %} active{% endif %}" id="tab-btn-reports" onclick="showImportTab('reports')">{{ _("Reports") }}</button>
     </div>
 
