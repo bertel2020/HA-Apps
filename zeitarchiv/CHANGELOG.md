@@ -14,11 +14,6 @@
 
 ### New
 
-- **Weather dashboard**: time ranges and cards
-  - “PV and brightness” shows 7, 14 or 30 days or a custom range (up to three months)
-  - The hourly PV curve shows either “Selected day” or “Average over the period”; the tooltip also gives the values in kWh
-  - “The last days compared” shows 7, 14 or 30 days
-  - “Daylight”, “The last days compared” and “Day length over the year” are separate cards with a title and a hint
 - **Entities**: filter
   - A “Filter” menu replaces the four selection fields for type, category, room and unit
   - The chosen values appear as tags below the bar; remove them one by one or with “Reset all filters”

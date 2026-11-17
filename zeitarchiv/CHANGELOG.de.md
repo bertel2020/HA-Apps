@@ -14,11 +14,6 @@
 
 ### Neu
 
-- **Wetterdashboard**: Zeiträume und Karten
-  - „PV und Helligkeit“ zeigt 7, 14 oder 30 Tage oder einen eigenen Zeitraum (bis zu drei Monate)
-  - Die PV-Stundenkurve zeigt wahlweise „Gewählter Tag“ oder „Ø im Zeitraum“; der Tooltip nennt die Werte zusätzlich in kWh
-  - „Die letzten Tage im Vergleich“ zeigt 7, 14 oder 30 Tage
-  - „Tageslicht“, „Die letzten Tage im Vergleich“ und „Tageslänge im Jahresverlauf“ sind eigene Karten mit Titel und Hinweis
 - **Entitäten**: Filter
   - Ein Menü „Filter“ ersetzt die vier Auswahlfelder für Typ, Kategorie, Raum und Einheit
   - Die gewählten Werte stehen als Tags unter der Leiste, einzeln entfernbar oder mit „Alle Filter zurücksetzen“
