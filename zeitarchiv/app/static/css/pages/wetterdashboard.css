@@ -576,6 +576,12 @@
 [data-tile-style] .wt-tiles-lage[data-layout="strip"] .wt-tile-icon{position:static;grid-area:icon;inset:auto;width:20px;height:20px;padding:0;opacity:1;background:none;color:var(--wt-accent);}
 /* Raumkacheln: das kleine Symbol vor Temperatur/Feuchte bleibt im Text, auch mit Kachelstil „Getönte Fläche"/„Plakette" (sonst wird es zum großen Hintergrundsymbol und landet am Seitenrand). */
 [data-tile-style] .wt-roomtiles .wt-roomtile-label .wt-tile-icon{position:static;grid-area:auto;inset:auto;width:16px;height:16px;padding:0;margin:0;opacity:1;background:none;border-radius:0;color:var(--wt-accent);}
+/* Raumkacheln: die Werte stehen in allen Kacheln unten auf einer Höhe (auch wenn der Raumname zweizeilig ist);
+   auf dem Handy bleibt vor dem Wert nur das Symbol, der Text steht im Tooltip und für Screenreader. */
+.wt-roomtiles .wt-roomtile-parts{margin-top:auto;}
+@media (max-width:640px){
+  .wt-roomtiles .wt-roomtile-label > span:not(.wt-tile-icon){position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+}
 [data-tile-style] .wt-tiles-lage[data-layout="strip"] .wt-tile-label,
 [data-tile-style] .wt-tiles-lage[data-layout="strip"] .wt-tile-sub{display:none;}
 [data-tile-style] .wt-tiles-lage[data-layout="strip"] .wt-tile-value{font-size:calc(16.5px * var(--font-scale, 1));line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}

@@ -70,6 +70,15 @@
     }
   }
 
+  // Raumfarbe 1–8: die Diagrammfarbe; 9–16 heller, 17–24 dunkler (gleicher Farbton, damit viele Räume nie dieselbe Farbe teilen).
+  function roomColorCss(number) {
+    const n = Number(number);
+    if (!Number.isInteger(n) || n < 1 || n > 24) return '';
+    const base = 'var(--chart-' + ((n - 1) % 8 + 1) + ')';
+    if (n <= 8) return base;
+    return 'color-mix(in srgb, ' + base + (n <= 16 ? ' 55%, white)' : ' 60%, black)');
+  }
+
   function scaledFont(size) {
     return Math.round(size * (parseFloat(cssVar('--font-scale')) || 1) * 10) / 10;
   }
@@ -2110,7 +2119,7 @@
       // Farbe eines Raums aus dem Setup: die Diagrammfarbe als CSS-Wert, leer ohne Auswahl.
       roomColorOf(room) {
         const number = room ? this.roomColorNumbers()[room] : '';
-        return /^[1-8]$/.test(number || '') ? 'var(--chart-' + number + ')' : '';
+        return roomColorCss(number);
       },
 
       // Gespeicherte Farben; Räume ohne Eintrag (etwa frisch hinzugefügt) bekommen wie in der Einrichtung die nächste freie, danach reihum.
@@ -2121,8 +2130,9 @@
         let turn = Object.keys(next).length;
         rooms.forEach((room) => {
           if (next[room]) return;
-          const free = ['1', '2', '3', '4', '5', '6', '7', '8'].find((n) => !used.has(n));
-          next[room] = free || String(turn % 8 + 1);
+          // Nach den acht Diagrammfarben folgen aufgehellte (9–16) und abgedunkelte (17–24) Abwandlungen: so gleicht keine Raumfarbe der anderen.
+          const free = Array.from({length: 24}, (_, k) => String(k + 1)).find((n) => !used.has(n));
+          next[room] = free || String(turn % 24 + 1);
           used.add(next[room]);
           turn += 1;
         });
@@ -2198,7 +2208,7 @@
         // Die Farbe richtet sich nach der Stelle in der ganzen Liste (_i), nicht nach der in der Auswahl.
         // Zusatzsensoren mit Raum tragen die Raumfarbe (wie Auswahl, Kachel und Tabelle); weitere Linien desselben Raums gestrichelt.
         const roomNumbers = this.roomColorNumbers();
-        const roomColorLine = (row) => (String(row.key).startsWith('temperature:') && row.room && roomNumbers[row.room]) ? cssVar('--chart-' + roomNumbers[row.room]) : '';
+        const roomColorLine = (row) => (String(row.key).startsWith('temperature:') && row.room && roomNumbers[row.room]) ? resolveColor(roomColorCss(roomNumbers[row.room])) : '';
         const colorOf = (row, index) => roomColorLine(row) || this.heatColor(row._i != null ? row._i : index);
         const seenRooms = new Set();
         const dashOf = (row) => {
@@ -2208,9 +2218,12 @@
           return again ? 'dashed' : 'solid';
         };
         const names = series.map((row) => row.label);
+        // Die Legende bekommt zusätzliche Höhe, die Zeichenfläche bleibt gleich groß (Handy: viele Räume).
+        const grid = gridForLegend(element, names, {right: 8});
+        element.style.height = ((element.clientWidth < 520 ? 260 : 340) + grid.top) + 'px';
         const chart = chartFor(name, element);
         chart.setOption({
-          animation: false, grid: gridForLegend(element, names, {right: 8}), legend: legendBox(colors, names),
+          animation: false, grid, legend: legendBox(colors, names),
           xAxis: {type: 'category', data: labels, boundaryGap: false, ...axisStyle(colors), splitLine: {show: false}},
           yAxis: {type: 'value', scale: true, name: unit, nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
           tooltip: tooltipBox(colors, (params) => {
