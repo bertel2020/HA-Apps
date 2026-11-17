@@ -43,7 +43,7 @@ from .formatting import (
 )
 from .i18n import N_, tr
 from .progress import JobBusy, JobProgress
-from .storage import ha_import, import_reports, influxdb_import, symcon_import
+from .storage import ha_import, import_last, import_reports, influxdb_import, symcon_import
 from .storage.index import STATE_TYPE
 
 logger = logging.getLogger(__name__)
@@ -221,6 +221,7 @@ class InfluxImportService:
         entities = []
         entity_rows = self.deps.index.list_entities()
         areas, categories, category_of = self.owner._area_category_lookup(entity_rows)
+        last_imports = import_last.load(self.deps.data_dir)
         for row in entity_rows:
             entity_id = row["entity_id"]
             avail = availability.get(entity_id)
@@ -243,6 +244,7 @@ class InfluxImportService:
                 "available_first_ts": avail.first_ts if avail is not None else None,
                 "area": (areas.get(entity_id) or {}).get("area"),
                 "category": categories.get(category_of.get(entity_id)),
+                **self.owner._last_import_fields(last_imports.get(entity_id)),
             })
         return {
             "influx_has_areas": bool(areas),

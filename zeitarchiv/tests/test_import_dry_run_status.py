@@ -214,3 +214,33 @@ def test_availability_checks_can_be_cancelled() -> None:
         # Direkt hinter dem Status-Chip, sonst greift die Regel „.htmx-request + .ha-cancel-check“ nicht.
         chip = text.index(f'id="{prefix}-availability-status"')
         assert text.index("ha-cancel-check", chip) < text.index(f'id="{prefix}-availability-hint"', chip)
+
+
+def test_vm_and_influx_tables_show_last_import(client, entities) -> None:
+    """Letzter Import und der Filter „Nie importiert“ gibt es auch bei VictoriaMetrics und InfluxDB."""
+    import os
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    from app.storage import import_last, import_reports
+
+    data_dir = Path(os.environ["ZEITARCHIV_DATA_DIR"])
+    report = import_reports.create(
+        data_dir, source_type="csv", started_at=datetime.now(timezone.utc),
+        source={"filename": "x.csv", "size_bytes": 0}, configuration={},
+        results=[{"entity_id": IDS[0], "rows_imported": 4}], errors=[],
+    )
+    try:
+        html = client.get("/import").text
+        for prefix in ("vm", "influx"):
+            table = html[html.index(f'id="{prefix}-import-table"'):]
+            table = table[: table.index("</table>")]
+            row = table[table.index(f'data-entity-id="{IDS[0]}"'):]
+            row = row[: row.index("</tr>")]
+            assert 'data-sort-last=""' not in row and "CSV" in row
+            other = table[table.index(f'data-entity-id="{IDS[1]}"'):]
+            assert 'data-sort-last=""' in other[: other.index("</tr>")]
+            assert f'id="{prefix}-filter-never"' in html and f'id="{prefix}-mark-filtered"' in html
+    finally:
+        import_reports.delete(data_dir, report["id"])
+        (data_dir / import_last.FILENAME).unlink(missing_ok=True)

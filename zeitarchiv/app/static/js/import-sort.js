@@ -21,12 +21,14 @@
 
   // Liest den Sortierwert einer Zeile. ``getValue`` darf für Spalten ohne festes
   // data-Attribut (z. B. die gewählte HA-Entität eines Eingabefelds) einen eigenen Wert liefern.
-  function rowValue(row, key, getValue) {
+  function rowValue(row, key, getValue, oldestWhenEmpty) {
     if (getValue) {
       const own = getValue(row, key);
       if (own !== undefined) return String(own).toLowerCase();
     }
-    return row.dataset['sort' + key.charAt(0).toUpperCase() + key.slice(1)] ?? '';
+    const value = row.dataset['sort' + key.charAt(0).toUpperCase() + key.slice(1)] ?? '';
+    // „Letzter Import“: nie importiert gilt als ältester Wert (aufsteigend zuerst).
+    return value === '' && oldestWhenEmpty && oldestWhenEmpty.includes(key) ? '-1' : value;
   }
 
   // Ordnet die Zeilen: markierte zuerst (wenn ``markedFirst``), innerhalb der Gruppen nach
@@ -40,7 +42,7 @@
         if (am !== bm) return am ? -1 : 1;
       }
       if (!key) return 0;
-      return compareValues(rowValue(a, key, opts.getValue), rowValue(b, key, opts.getValue), dir);
+      return compareValues(rowValue(a, key, opts.getValue, opts.oldestWhenEmpty), rowValue(b, key, opts.getValue, opts.oldestWhenEmpty), dir);
     });
   }
 

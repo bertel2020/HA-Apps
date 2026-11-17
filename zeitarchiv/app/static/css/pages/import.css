@@ -257,17 +257,19 @@
     :root[data-page-layout="wide"] #vm-import-table .symcon-col-check,
     :root[data-page-layout="wide"] #influx-import-table .symcon-col-check{width:3%;}
     :root[data-page-layout="wide"] #vm-import-table .ha-col-entity,
-    :root[data-page-layout="wide"] #influx-import-table .ha-col-entity{width:30%;}
+    :root[data-page-layout="wide"] #influx-import-table .ha-col-entity{width:26%;}
     :root[data-page-layout="wide"] #vm-import-table .ha-col-type,
-    :root[data-page-layout="wide"] #influx-import-table .ha-col-type{width:10%;}
+    :root[data-page-layout="wide"] #influx-import-table .ha-col-type{width:9%;}
     :root[data-page-layout="wide"] #vm-import-table .ha-col-unit,
-    :root[data-page-layout="wide"] #influx-import-table .ha-col-unit{width:8%;}
+    :root[data-page-layout="wide"] #influx-import-table .ha-col-unit{width:7%;}
     :root[data-page-layout="wide"] #vm-import-table .ha-col-category,
-    :root[data-page-layout="wide"] #influx-import-table .ha-col-category{width:12%;}
+    :root[data-page-layout="wide"] #influx-import-table .ha-col-category{width:11%;}
     :root[data-page-layout="wide"] #vm-import-table .ha-col-area,
-    :root[data-page-layout="wide"] #influx-import-table .ha-col-area{width:11%;}
+    :root[data-page-layout="wide"] #influx-import-table .ha-col-area{width:10%;}
     :root[data-page-layout="wide"] #vm-import-table .ha-col-available,
-    :root[data-page-layout="wide"] #influx-import-table .ha-col-available{width:26%;}
+    :root[data-page-layout="wide"] #influx-import-table .ha-col-available{width:24%;}
+    :root[data-page-layout="wide"] #vm-import-table .ha-col-last,
+    :root[data-page-layout="wide"] #influx-import-table .ha-col-last{width:10%;}
     /* Symcon: die Zuordnung zur HA-Entität bekommt weiter den Rest. */
     :root[data-page-layout="wide"] #import-table .symcon-col-check{width:3%;}
     :root[data-page-layout="wide"] #import-table .symcon-col-id{width:6%;}
@@ -289,6 +291,7 @@
   .ha-col-last{width:140px;}
   .ha-col-mode{width:130px;}
   .ha-never{color:var(--accent-bar);}
+  .ha-last-mode{display:block;color:var(--ink-faint);font-size:calc(11px * var(--font-scale, 1));}
   .ha-cell-clip{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   /* Typ und Art zentriert — über Klassen statt :nth-child(), weil Raum und
      Kategorie je nach Katalog/Kategorien davor stehen und die Spalten ausblendbar sind. */

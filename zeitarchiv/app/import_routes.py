@@ -874,6 +874,7 @@ class ImportService:
         entities = []
         entity_rows = self.deps.index.list_entities()
         areas, categories, category_of = self._area_category_lookup(entity_rows)
+        last_imports = import_last.load(self.deps.data_dir)
         for row in entity_rows:
             entity_id = row["entity_id"]
             avail = availability.get(entity_id)
@@ -896,6 +897,7 @@ class ImportService:
                 "available_first_ts": avail.first_ts if avail is not None else None,
                 "area": (areas.get(entity_id) or {}).get("area"),
                 "category": categories.get(category_of.get(entity_id)),
+                **self._last_import_fields(last_imports.get(entity_id)),
             })
         return {
             "vm_has_areas": bool(areas),

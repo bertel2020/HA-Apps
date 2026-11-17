@@ -96,6 +96,7 @@
 
   <div class="toolbar import-filter-toolbar" style="flex-wrap:wrap;overflow:visible;">
     <input type="search" class="search" id="influx-entity-search" placeholder="{{ _('Entität suchen …') }}" oninput="onInfluxSearch(this.value)">
+    <button type="button" class="btn" id="influx-mark-filtered" data-label-mark="{{ _('Alle gefilterten markieren') }}" data-label-unmark="{{ _('Markierung der gefilterten aufheben') }}" title="{{ _('Markiert alle Zeilen, die zu Suche und Filtern passen, auch auf anderen Seiten') }}" onclick="toggleInfluxMarkFiltered()"></button>
     <span class="count-chip" id="influx-marked-count" data-template="{{ _('{n} markiert') }}">{{ _("{n} markiert", n=0) }}</span>
     <div class="toolbar-right">
       <button type="button" class="btn" hx-post="import/influxdb/dry-run" hx-include="#influx-form" hx-target="#influx-import-output" hx-swap="innerHTML"
@@ -103,6 +104,12 @@
       <button type="button" class="btn primary" hx-post="import/influxdb/start" hx-include="#influx-form" hx-target="#influx-import-output" hx-swap="innerHTML"
               hx-disabled-elt="this">{{ _("Import starten") }}</button>
     </div>
+  </div>
+
+  <div class="ha-filter-row">
+    <span class="ha-filter-label">{{ _("Filter") }}</span>
+    <button type="button" class="ha-filter-chip active" id="influx-filter-all" onclick="setInfluxFilter(false)">{{ _("Alle") }}<span class="n"></span></button>
+    <button type="button" class="ha-filter-chip" id="influx-filter-never" onclick="setInfluxFilter(true)">{{ _("Nie importiert") }}<span class="n"></span></button>
   </div>
 
   <div class="tbl-wrap">
@@ -113,7 +120,7 @@
         <col class="ha-col-type"><col class="ha-col-unit">
         {% if influx_has_categories %}<col class="ha-col-category">{% endif %}
         {% if influx_has_areas %}<col class="ha-col-area">{% endif %}
-        <col class="ha-col-available">
+        <col class="ha-col-available"><col class="ha-col-last">
       </colgroup>
       <tr>
         <th><input type="checkbox" onchange="toggleAllInfluxRows(this)" title="{{ _('Alle auf dieser Seite markieren') }}"></th>
@@ -123,11 +130,13 @@
         {% if influx_has_categories %}<th><a href="#" data-sort-key="category" onclick="sortInfluxTable('category');return false;">{{ _("Kategorie") }}<span class="sort-arrow"></span></a></th>{% endif %}
         {% if influx_has_areas %}<th><a href="#" data-sort-key="area" onclick="sortInfluxTable('area');return false;">{{ _("Raum") }}<span class="sort-arrow"></span></a></th>{% endif %}
         <th><a href="#" data-sort-key="available" onclick="sortInfluxTable('available');return false;">{{ _("Verfügbar") }}<span class="sort-arrow"></span></a></th>
+        <th><a href="#" data-sort-key="last" onclick="sortInfluxTable('last');return false;">{{ _("Letzter Import") }}<span class="sort-arrow"></span></a></th>
       </tr>
       {% for entity in influx_entities %}
       <tr data-entity-id="{{ entity.entity_id }}"
           class="{{ 'marked' if entity.entity_id in influx_selected_ids }}"
           data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id ~ ' ' ~ (entity.area or '') ~ ' ' ~ (entity.category.name if entity.category else '')) | lower }}"
+          data-sort-last="{{ entity.last_import_ts if entity.last_import_ts is not none else '' }}"
           data-sort-area="{{ (entity.area or '') | lower }}"
           data-sort-category="{{ (entity.category.name if entity.category else '') | lower }}"
           data-sort-entity="{{ (entity.friendly_name or entity.entity_id) | lower }}"
@@ -161,6 +170,7 @@
           <span class="ha-art-badge no-data">{{ entity.available_label }}</span>
           {% endif %}
         </td>
+        <td>{% if entity.last_import_label %}<span class="mono" style="font-size:calc(12px * var(--font-scale, 1));">{{ entity.last_import_label }}</span><small class="ha-last-mode">{{ entity.last_import_mode_label }}</small>{% else %}<span class="ha-never">{{ _("nie") }}</span>{% endif %}</td>
       </tr>
       {% endfor %}
     </table>
@@ -195,6 +205,7 @@
     let influxPage = 1;
     let influxSearch = '';
     let influxSortKey = null;
+    let influxNeverOnly = false;
     let influxSortDir = 'asc';
 
     function fill(template, values) {
@@ -209,6 +220,13 @@
       const count = document.querySelectorAll('.influx-mark-checkbox:checked').length;
       const chip = document.getElementById('influx-marked-count');
       if (chip) { chip.classList.toggle('active', count > 0); chip.textContent = fill(chip.dataset.template, { n: count }); }
+      const markButton = document.getElementById('influx-mark-filtered');
+      if (markButton) {
+        const rows = influxFilteredRows();
+        const allMarked = rows.length > 0 && rows.every((row) => row.classList.contains('marked'));
+        markButton.textContent = (allMarked ? markButton.dataset.labelUnmark : markButton.dataset.labelMark) + ' (' + rows.length + ')';
+        markButton.disabled = rows.length === 0;
+      }
       const availabilityHint = document.getElementById('influx-availability-hint');
       if (availabilityHint) availabilityHint.style.display = count === 0 ? '' : 'none';
     }
@@ -252,13 +270,45 @@
       influxPage = 1;
       applyInfluxPaging();
     }
-    // „Prüfen“ ohne Markierung: alle Treffer der Suche (über alle Seiten) — als check_ids,
-    // NICHT als entity_ids, sonst gälte danach alles als markiert.
+    // Zeilen, die zu Suche UND Filter passen (über alle Seiten).
+    function influxRowVisible(row) {
+      if (influxSearch && !(row.dataset.search || '').includes(influxSearch)) return false;
+      if (influxNeverOnly && (row.dataset.sortLast || '') !== '') return false;
+      return true;
+    }
+    function influxFilteredRows() {
+      return Array.from(document.querySelectorAll('#influx-import-table tr[data-entity-id]')).filter(influxRowVisible);
+    }
+    function setInfluxFilter(neverOnly) {
+      influxNeverOnly = neverOnly;
+      influxPage = 1;
+      refreshInfluxFilterChips();
+      applyInfluxPaging();
+    }
+    function refreshInfluxFilterChips() {
+      const rows = Array.from(document.querySelectorAll('#influx-import-table tr[data-entity-id]'));
+      const all = document.getElementById('influx-filter-all');
+      const never = document.getElementById('influx-filter-never');
+      if (all) { all.classList.toggle('active', !influxNeverOnly); all.querySelector('.n').textContent = rows.length; }
+      if (never) { never.classList.toggle('active', influxNeverOnly); never.querySelector('.n').textContent = rows.filter((row) => (row.dataset.sortLast || '') === '').length; }
+    }
+    // „Prüfen“ ohne Markierung: alle Treffer von Suche und Filter, über alle Seiten — als
+    // check_ids, NICHT als entity_ids, sonst gälte danach alles als markiert.
     function influxCheckScope() {
       if (document.querySelector('.influx-mark-checkbox:checked')) return {};
-      const rows = Array.from(document.querySelectorAll('#influx-import-table tr[data-entity-id]'))
-        .filter((row) => !(influxSearch && !(row.dataset.search || '').includes(influxSearch)));
-      return { check_ids: rows.map((row) => row.dataset.entityId) };
+      return { check_ids: influxFilteredRows().map((row) => row.dataset.entityId) };
+    }
+    function toggleInfluxMarkFiltered() {
+      const rows = influxFilteredRows();
+      const allMarked = rows.length > 0 && rows.every((row) => row.classList.contains('marked'));
+      rows.forEach((row) => {
+        const cb = row.querySelector('.influx-mark-checkbox');
+        if (!cb) return;
+        cb.checked = !allMarked;
+        row.classList.toggle('marked', !allMarked);
+      });
+      refreshInfluxMarkedCount();
+      applyInfluxPaging();
     }
     function applyInfluxPaging() {
       const table = document.getElementById('influx-import-table');
@@ -266,11 +316,11 @@
       // Markierte Zeilen immer zuerst; innerhalb der Gruppen gilt die gewählte
       // Spaltensortierung, ohne sie bleibt die Reihenfolge erhalten.
       const rows = window.importSort.sortRows(
-        Array.from(table.querySelectorAll('tr[data-entity-id]')), influxSortKey, influxSortDir, { markedFirst: true },
+        Array.from(table.querySelectorAll('tr[data-entity-id]')), influxSortKey, influxSortDir, { markedFirst: true, oldestWhenEmpty: ['last'] },
       );
       rows.forEach((row) => table.appendChild(row));
       window.importSort.updateArrows(table, influxSortKey, influxSortDir);
-      const isFilteredOut = (row) => influxSearch && !(row.dataset.search || '').includes(influxSearch);
+      const isFilteredOut = (row) => !influxRowVisible(row);
       rows.filter(isFilteredOut).forEach((row) => { row.style.display = 'none'; });
       const visible = rows.filter((row) => !isFilteredOut(row));
       const total = visible.length;
@@ -287,6 +337,7 @@
       if (prevBtn) prevBtn.disabled = influxPage <= 1;
       const nextBtn = document.getElementById('influx-pager-next');
       if (nextBtn) nextBtn.disabled = influxPage >= totalPages;
+      refreshInfluxMarkedCount();  // Zähler von „Alle gefilterten markieren“ folgt Suche und Filter
     }
     function setInfluxPageSize(value) {
       const parsed = parseInt(value, 10);
@@ -311,6 +362,8 @@
     window.rememberInfluxPassword = rememberInfluxPassword;
     window.onInfluxSearch = onInfluxSearch;
     window.sortInfluxTable = sortInfluxTable;
+    window.setInfluxFilter = setInfluxFilter;
+    window.toggleInfluxMarkFiltered = toggleInfluxMarkFiltered;
     window.influxCheckScope = influxCheckScope;
     window.onInfluxMarkChange = onInfluxMarkChange;
     window.toggleAllInfluxRows = toggleAllInfluxRows;
@@ -318,6 +371,7 @@
     window.onInfluxConfigChanged = onInfluxConfigChanged;
     window.setInfluxPageSize = setInfluxPageSize;
     window.stepInfluxPage = stepInfluxPage;
+    refreshInfluxFilterChips();
     refreshInfluxMarkedCount();
     applyInfluxPaging();
   })();
