@@ -10,7 +10,7 @@
 >
 > 🇩🇪 [Änderungen auf Deutsch](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md)
 
-## Unreleased
+## 1.55.0 - 2026-11-17
 
 ### New
 
@@ -43,6 +43,13 @@
 
 ### Changed
 
+- **Weather dashboard**: refinements
+  - Room selection: the floor name no longer wraps, and there are no large gaps on phones
+  - Comparison charts keep their drawing area, even when the legend has several rows
+  - Room tiles show only the icon on phones, the values sit on one line
+  - With more than eight rooms there are further shades, so no colour appears twice
+  - The range selection wraps on phones
+  - Coming from the weather dashboard, only the link back to it is shown
 - **Import**: Tabs
   - New order: Home Assistant, Symcon, VictoriaMetrics, InfluxDB, CSV file, Reports; Home Assistant opens first
   - InfluxDB is no longer marked as experimental

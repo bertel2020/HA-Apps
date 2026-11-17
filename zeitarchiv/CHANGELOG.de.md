@@ -10,7 +10,7 @@
 >
 > 🇬🇧 [English version](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md)
 
-## Unreleased
+## 1.55.0 - 2026-11-17
 
 ### Neu
 
@@ -43,6 +43,13 @@
 
 ### Geändert
 
+- **Wetterdashboard**: Nachbesserungen
+  - Raumauswahl: Der Etagenname bricht nicht mehr um, am Handy entstehen keine großen Lücken mehr
+  - Vergleichsdiagramme behalten ihre Zeichenfläche, auch wenn die Legende mehrere Zeilen hat
+  - Raumkacheln zeigen am Handy nur das Symbol, die Werte stehen auf einer Höhe
+  - Bei mehr als acht Räumen gibt es weitere Farbtöne, damit keine Farbe doppelt vorkommt
+  - Die Zeitraum-Auswahl bricht am Handy um
+  - Wer aus dem Wetterdashboard kommt, sieht nur den Link dorthin zurück
 - **Import**: Reiter
   - Neue Reihenfolge: Home Assistant, Symcon, VictoriaMetrics, InfluxDB, CSV-Datei, Reports; Home Assistant öffnet zuerst
   - InfluxDB ist nicht mehr als experimentell gekennzeichnet
