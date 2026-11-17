@@ -549,6 +549,16 @@
       importPage = 1;
       applyImportPaging();
     }
+    // Bricht eine laufende Prüfung im Browser ab (htmx:abort). Die Prüfungen lesen nur; der
+    // Server-Thread läuft bis zum Zeitlimit aus (30 s VictoriaMetrics, 60 s InfluxDB) und
+    // schreibt nichts. Wer sich bei der Adresse vertippt hat, muss darauf nicht warten.
+    function cancelImportRequest(button) {
+      const trigger = document.getElementById(button.dataset.requestButton);
+      if (trigger) htmx.trigger(trigger, 'htmx:abort');
+      const result = document.getElementById(button.dataset.result);
+      if (result) result.textContent = button.dataset.cancelled;
+    }
+    window.cancelImportRequest = cancelImportRequest;
     function sortImportTable(key) {
       if (importSortKey === key) {
         importSortDir = importSortDir === 'asc' ? 'desc' : 'asc';

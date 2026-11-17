@@ -18,7 +18,8 @@
         <button type="button" class="btn" id="vm-connection-btn" title="{{ _('Prüft Adresse ohne etwas zu importieren') }}" hx-post="import/vm/connection" hx-include="#vm-form" hx-target="#vm-connection-result" hx-swap="innerHTML" hx-disabled-elt="this" hx-indicator="#vm-connection-wait">
           {{ _("Verbindung prüfen") }}
         </button>
-        <span id="vm-connection-wait" class="ha-conn-slot"><span class="htmx-indicator">{{ _("Prüfung läuft …") }}</span></span>
+        <span id="vm-connection-wait" class="ha-conn-slot"><span class="htmx-indicator">{{ _("Prüfung läuft …") }}</span>
+          <button type="button" class="btn htmx-indicator" data-request-button="vm-connection-btn" data-result="vm-connection-result" data-cancelled="{{ _('Abgebrochen.') }}" onclick="cancelImportRequest(this)" title="{{ _('Bricht die Prüfung ab, falls die Adresse nicht stimmt') }}">{{ _("Abbrechen") }}</button></span>
         <span id="vm-connection-result"></span>
       </div>
     </div>

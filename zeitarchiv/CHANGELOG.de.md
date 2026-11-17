@@ -26,6 +26,7 @@
 - **Import**: Tabellen von Symcon, VictoriaMetrics und InfluxDB
   - Spalten lassen sich per Klick auf die Überschrift sortieren
   - „Verfügbarkeit prüfen“ geht auch ohne markierte Entität (VictoriaMetrics, InfluxDB) und prüft dann alle angezeigten
+  - „Verbindung prüfen“ lässt sich abbrechen, etwa nach einem Tippfehler in der Adresse
 
 ### Geändert
 

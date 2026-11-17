@@ -189,3 +189,15 @@ def test_import_tables_have_sortable_headers() -> None:
         text = (TEMPLATES / name).read_text(encoding="utf-8")
         for key in keys:
             assert f'data-sort-key="{key}"' in text, (name, key)
+
+
+def test_connection_checks_can_be_cancelled() -> None:
+    """VictoriaMetrics und InfluxDB: Wer sich bei der Adresse vertippt hat, wartet nicht auf das Zeitlimit."""
+    from _paths import PAGE_JS, TEMPLATES
+
+    for name, prefix in (("_vm_import_section.html", "vm"), ("_influxdb_import_section.html", "influx")):
+        text = (TEMPLATES / name).read_text(encoding="utf-8")
+        assert f'data-request-button="{prefix}-connection-btn"' in text
+        assert f'id="{prefix}-connection-btn"' in text and f'id="{prefix}-connection-result"' in text
+        assert 'onclick="cancelImportRequest(this)"' in text
+    assert "htmx.trigger(trigger, 'htmx:abort')" in (PAGE_JS / "import.js").read_text(encoding="utf-8")

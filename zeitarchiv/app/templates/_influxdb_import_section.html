@@ -46,7 +46,8 @@
         <button type="button" class="btn" id="influx-connection-btn" title="{{ _('Prüft Adresse, Zugangsdaten und Datenbank ohne etwas zu importieren') }}" hx-post="import/influxdb/connection" hx-include="#influx-form" hx-target="#influx-connection-result" hx-swap="innerHTML" hx-disabled-elt="this" hx-indicator="#influx-connection-wait">
           {{ _("Verbindung prüfen") }}
         </button>
-        <span id="influx-connection-wait" class="ha-conn-slot"><span class="htmx-indicator">{{ _("Prüfung läuft …") }}</span></span>
+        <span id="influx-connection-wait" class="ha-conn-slot"><span class="htmx-indicator">{{ _("Prüfung läuft …") }}</span>
+          <button type="button" class="btn htmx-indicator" data-request-button="influx-connection-btn" data-result="influx-connection-result" data-cancelled="{{ _('Abgebrochen.') }}" onclick="cancelImportRequest(this)" title="{{ _('Bricht die Prüfung ab, falls die Adresse nicht stimmt') }}">{{ _("Abbrechen") }}</button></span>
         <span id="influx-connection-result"></span>
       </div>
     </div>

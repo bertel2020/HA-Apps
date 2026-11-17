@@ -1086,6 +1086,8 @@
     "Spalten": "Columns",
     "Spalten ein- und ausblenden": "Show or hide columns",
     "Letzter Import": "Last import",
+    "Abgebrochen.": "Cancelled.",
+    "Bricht die Prüfung ab, falls die Adresse nicht stimmt": "Cancels the check, e.g. if the address is wrong",
     "Prüft die markierten Entitäten, ohne Markierung alle angezeigten": "Checks the marked entities, or all listed ones if none is marked",
     "Keine Entität zum Prüfen: nichts markiert und kein Treffer in der Liste.": "Nothing to check: no entity marked and no match in the list.",
     "Daten vorhanden": "Data available",

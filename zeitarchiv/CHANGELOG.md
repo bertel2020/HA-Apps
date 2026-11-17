@@ -26,6 +26,7 @@
 - **Import**: Symcon, VictoriaMetrics and InfluxDB tables
   - Columns can be sorted by clicking the heading
   - “Check availability” also works without a marked entity (VictoriaMetrics, InfluxDB) and then checks all listed ones
+  - “Check connection” can be cancelled, e.g. after a typo in the address
 
 ### Changed
 
