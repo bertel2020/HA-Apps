@@ -12,6 +12,22 @@
 
 ## Unreleased
 
+### New
+
+- **Import**: Table on the Home Assistant tab
+  - New columns “Category” and “Room” (only if categories or rooms exist), “Status”, “Last import” and “Import mode”; the columns can be shown, hidden and sorted via “Columns”, the choice is remembered per browser
+  - “Last import” covers every kind of import; entities that were never imported can be found with “never” and the filter “Never imported”
+  - The preview (dry run) writes its result into the table: importable, complete, no data or error; filters and a legend sit above and below the table
+  - The previous detailed list stays below the table, collapsed as “Preview details”
+- **Import**: Wide layout
+  - The Import page follows the “Wide layout” setting
+
+### Changed
+
+- **Import**: Tabs
+  - New order: Home Assistant, Symcon, VictoriaMetrics, InfluxDB, CSV file, Reports; Home Assistant opens first
+  - InfluxDB is no longer marked as experimental
+
 ### Fixed
 
 - **Compacting**: Value at a month boundary

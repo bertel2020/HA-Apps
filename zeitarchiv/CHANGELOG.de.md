@@ -12,6 +12,22 @@
 
 ## Unreleased
 
+### Neu
+
+- **Import**: Tabelle im Reiter Home Assistant
+  - Neue Spalten „Kategorie“ und „Raum“ (nur, wenn es Kategorien oder Räume gibt), „Status“, „Letzter Import“ und „Importmodus“; die Spalten lassen sich über „Spalten“ ein- und ausblenden und sortieren, die Auswahl wird pro Browser gemerkt
+  - „Letzter Import“ erfasst jede Importart; nie importierte Entitäten findest du mit „nie“ und dem Filter „Nie importiert“
+  - Die Vorschau (Dry Run) trägt ihr Ergebnis in die Tabelle ein: importierbar, vollständig, keine Daten oder Fehler; Filter und eine Legende stehen über und unter der Tabelle
+  - Die bisherige ausführliche Liste steht eingeklappt als „Details zur Vorschau“ unter der Tabelle
+- **Import**: Breite Darstellung
+  - Die Importseite folgt der Einstellung „Breite Darstellung“
+
+### Geändert
+
+- **Import**: Reiter
+  - Neue Reihenfolge: Home Assistant, Symcon, VictoriaMetrics, InfluxDB, CSV-Datei, Reports; Home Assistant öffnet zuerst
+  - InfluxDB ist nicht mehr als experimentell gekennzeichnet
+
 ### Behoben
 
 - **Verdichten**: Wert an der Monatsgrenze

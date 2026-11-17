@@ -116,8 +116,8 @@
       <span class="dd-picker-popover" id="ha-cols-popover">
         <label class="dd-picker-row"><input type="checkbox" data-ha-col="type" checked onchange="onHaColumnToggle(this)"> {{ _("Typ") }}</label>
         <label class="dd-picker-row"><input type="checkbox" data-ha-col="unit" checked onchange="onHaColumnToggle(this)"> {{ _("Einheit") }}</label>
-        {% if ha_has_areas %}<label class="dd-picker-row"><input type="checkbox" data-ha-col="area" checked onchange="onHaColumnToggle(this)"> {{ _("Raum") }}</label>{% endif %}
         {% if ha_has_categories %}<label class="dd-picker-row"><input type="checkbox" data-ha-col="category" checked onchange="onHaColumnToggle(this)"> {{ _("Kategorie") }}</label>{% endif %}
+        {% if ha_has_areas %}<label class="dd-picker-row"><input type="checkbox" data-ha-col="area" checked onchange="onHaColumnToggle(this)"> {{ _("Raum") }}</label>{% endif %}
         <label class="dd-picker-row"><input type="checkbox" data-ha-col="art" checked onchange="onHaColumnToggle(this)"> {{ _("Art") }}</label>
         <label class="dd-picker-row"><input type="checkbox" data-ha-col="available" checked onchange="onHaColumnToggle(this)"> {{ _("Verfügbar") }}</label>
         <label class="dd-picker-row"><input type="checkbox" data-ha-col="status" checked onchange="onHaColumnToggle(this)"> {{ _("Status") }}</label>
@@ -157,8 +157,8 @@
         <col class="symcon-col-check">
         <col class="ha-col-entity">
         <col class="ha-col-type ha-c-type"><col class="ha-col-unit ha-c-unit">
-        {% if ha_has_areas %}<col class="ha-col-area ha-c-area">{% endif %}
         {% if ha_has_categories %}<col class="ha-col-category ha-c-category">{% endif %}
+        {% if ha_has_areas %}<col class="ha-col-area ha-c-area">{% endif %}
         <col class="ha-col-art ha-c-art"><col class="ha-col-available ha-c-available"><col class="ha-col-status ha-c-status"><col class="ha-col-last ha-c-last"><col class="ha-col-mode ha-c-mode">
       </colgroup>
       <tr>
@@ -166,8 +166,8 @@
         <th><a href="#" data-sort-key="entity" onclick="sortHaTable('entity');return false;">{{ _("Entität") }}<span class="sort-arrow"></span></a></th>
         <th class="ha-c-type"><a href="#" data-sort-key="type" onclick="sortHaTable('type');return false;">{{ _("Typ") }}<span class="sort-arrow"></span></a></th>
         <th class="ha-c-unit"><a href="#" data-sort-key="unit" onclick="sortHaTable('unit');return false;">{{ _("Einheit") }}<span class="sort-arrow"></span></a></th>
-        {% if ha_has_areas %}<th class="ha-c-area"><a href="#" data-sort-key="area" onclick="sortHaTable('area');return false;">{{ _("Raum") }}<span class="sort-arrow"></span></a></th>{% endif %}
         {% if ha_has_categories %}<th class="ha-c-category"><a href="#" data-sort-key="category" onclick="sortHaTable('category');return false;">{{ _("Kategorie") }}<span class="sort-arrow"></span></a></th>{% endif %}
+        {% if ha_has_areas %}<th class="ha-c-area"><a href="#" data-sort-key="area" onclick="sortHaTable('area');return false;">{{ _("Raum") }}<span class="sort-arrow"></span></a></th>{% endif %}
         <th class="ha-c-art"><a href="#" data-sort-key="art" onclick="sortHaTable('art');return false;">{{ _("Art") }}<span class="sort-arrow"></span></a></th>
         <th class="ha-c-available"><a href="#" data-sort-key="available" onclick="sortHaTable('available');return false;">{{ _("Verfügbar") }}<span class="sort-arrow"></span></a></th>
         <th class="ha-c-status"><a href="#" data-sort-key="status" onclick="sortHaTable('status');return false;">{{ _("Status") }}<span class="sort-arrow"></span></a></th>
@@ -204,8 +204,8 @@
         </td>
         <td class="ha-c-type"><span class="badge {{ entity.aggregation_type }}">{{ entity.type_label }}</span></td>
         <td class="ha-c-unit">{{ entity.unit or "—" }}</td>
-        {% if ha_has_areas %}<td class="ha-c-area">{% if entity.area %}<span class="ha-cell-clip" title="{{ entity.area }}">{{ entity.area }}</span>{% else %}<span class="cat-none">—</span>{% endif %}</td>{% endif %}
         {% if ha_has_categories %}<td class="ha-c-category">{% if entity.category %}<span class="cat-pill" style="--c:var(--chart-{{ entity.category.color_slot }});" title="{{ entity.category.name }}"><i aria-hidden="true"></i><span>{{ entity.category.name }}</span></span>{% else %}<span class="cat-none">—</span>{% endif %}</td>{% endif %}
+        {% if ha_has_areas %}<td class="ha-c-area">{% if entity.area %}<span class="ha-cell-clip" title="{{ entity.area }}">{{ entity.area }}</span>{% else %}<span class="cat-none">—</span>{% endif %}</td>{% endif %}
         <td class="ha-c-art">
           {% if entity.has_data is none %}
           <span class="ha-art-badge unknown" title="{{ _('Zeitraum wählen und &bdquo;Verfügbarkeit prüfen&ldquo; klicken') }}">–</span>
