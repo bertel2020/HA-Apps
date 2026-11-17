@@ -5,7 +5,9 @@
 (function () {
   'use strict';
 
-  const MARKED = '[aria-selected="true"], [aria-current], .is-active';
+  // Zeilen mit seitlichem Scrollen: Reiter, das Menü der Einstellungen/Housekeeping (am Handy eine Zeile) und die Modus-Pillen.
+  const SELECTOR = '.entity-tabs, .settings-nav, .edit-tabs';
+  const MARKED = '[aria-selected="true"], [aria-current], .is-active, .active';
 
   function arrow(side) {
     const b = document.createElement('button');
@@ -54,7 +56,7 @@
   }
 
   function init(root) {
-    (root || document).querySelectorAll('.entity-tabs').forEach(setup);
+    (root || document).querySelectorAll(SELECTOR).forEach(setup);
   }
 
   document.addEventListener('DOMContentLoaded', () => init());
@@ -64,7 +66,7 @@
         for (const r of records) {
           r.addedNodes.forEach((n) => {
             if (n.nodeType !== 1) return;
-            if (n.matches && n.matches('.entity-tabs')) setup(n);
+            if (n.matches && n.matches(SELECTOR)) setup(n);
             else if (n.querySelector) init(n);
           });
         }
