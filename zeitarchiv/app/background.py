@@ -1350,6 +1350,20 @@ class BackgroundService:
                 "Verwaiste Löschmarkierungen konnten nicht aufgeräumt werden · "
                 "event=stale_deleted_points_backfill_failed"
             )
+        # Einmalig beim Start: Grenzzeilen verdichteter Monate (Zeitstempel = Beginn des Folgemonats, aber in der
+        # Datei des alten Monats) zurück in den eigenen Monat setzen. Idempotent.
+        try:
+            moved = cleanup.repair_compacted_month_boundary_rows(self.data_dir, self.index, self.tz)
+            if moved:
+                logger.info(
+                    "Grenzzeilen verdichteter Monate korrigiert · event=compacted_boundary_rows_repaired rows=%d",
+                    moved,
+                )
+        except Exception:
+            logger.exception(
+                "Grenzzeilen verdichteter Monate konnten nicht korrigiert werden · "
+                "event=compacted_boundary_rows_repair_failed"
+            )
         # Einmalig beim Start: retention.enforce_retention_for_entity() räumte
         # deleted_points ebenfalls nicht auf, wenn die Aufbewahrung einen
         # kompletten Archiv-Monat löschte (derselbe Fund, 18.09.2026) — anders

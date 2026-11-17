@@ -10,6 +10,14 @@
 >
 > 🇩🇪 [Änderungen auf Deutsch](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md)
 
+## Unreleased
+
+### Fixed
+
+- **Compacting**: Value at a month boundary
+  - The last window of a month (e.g. 31.12. 23:55–24:00) was stamped with the start of the next month and could not be shown, corrected or deleted in "Edit values" while still counting in monthly and hourly values
+  - It now stays inside its month (23:59:59); existing data is repaired automatically on start
+
 ## 1.54.0 - 2026-11-16
 
 ### New

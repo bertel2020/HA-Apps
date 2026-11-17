@@ -10,6 +10,14 @@
 >
 > 🇬🇧 [English version](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md)
 
+## Unreleased
+
+### Behoben
+
+- **Verdichten**: Wert an der Monatsgrenze
+  - Das letzte Fenster eines Monats (z. B. 31.12. 23:55–24:00) bekam den Zeitstempel des Folgemonats und war in „Werte bearbeiten“ weder sichtbar noch korrigier- oder löschbar, floss aber in Monats- und Stundenwerte ein
+  - Es bleibt jetzt in seinem Monat (23:59:59); bestehende Daten werden beim Start automatisch repariert
+
 ## 1.54.0 - 2026-11-16
 
 ### Neu

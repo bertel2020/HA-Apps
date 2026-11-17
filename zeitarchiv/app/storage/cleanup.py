@@ -2007,6 +2007,7 @@ def _compacted_rows_for_month(
     rows: list[tuple[float, float, float | None, float | None]],
     aggregation_type: str,
     interval: int,
+    month_end: float | None = None,
 ) -> list[tuple[float, float, float | None, float | None]]:
     """Bucketet einen sortierten Monat auf `interval` und aggregiert je
     Bucket typabhängig. Gemeinsam von compact_raw_values() und
@@ -2026,7 +2027,12 @@ def _compacted_rows_for_month(
     bilden, dieselbe akzeptierte Vereinfachung wie bei der Live-Auflösung."""
     buckets: dict[float, list[tuple[float, float, float | None, float | None]]] = {}
     for row in rows:
-        buckets.setdefault(resolution_mod.bucket_end(interval, row[0]), []).append(row)
+        key = resolution_mod.bucket_end(interval, row[0])
+        # Letztes Fenster eines Monats: Bucket-Ende wäre der Beginn des Folgemonats, die Zeile bleibt aber in
+        # der Datei dieses Monats (Tagesansicht/Korrigieren fänden sie nicht) → auf month_end - 1 s begrenzen.
+        if month_end is not None and key >= month_end:
+            key = month_end - 1
+        buckets.setdefault(key, []).append(row)
 
     if aggregation_type == "counter":
         decreases = detect_counter_decreases([(r[0], r[1]) for r in rows])
@@ -2044,6 +2050,12 @@ def _compacted_rows_for_month(
             new_rows.append((bucket_ts, sum(values) / len(values), min(mins), max(maxs)))
     new_rows.sort(key=lambda r: (r[0], r[1]))
     return new_rows
+
+
+def _month_end_ts(year: int, month: int, tz: ZoneInfo) -> float:
+    """Beginn des Folgemonats als Zeitstempel."""
+    next_year, next_month = (year + 1, 1) if month == 12 else (year, month + 1)
+    return datetime(next_year, next_month, 1, tzinfo=tz).timestamp()
 
 
 def _compactable_months(
@@ -2140,7 +2152,7 @@ def preview_compact_raw_values(
         if not rows:
             continue
         rows_before += len(rows) + filtered_out
-        rows_after += len(_compacted_rows_for_month(rows, aggregation_type, interval))
+        rows_after += len(_compacted_rows_for_month(rows, aggregation_type, interval, _month_end_ts(year, month, tz)))
     return {"rows_before": rows_before, "rows_after": rows_after, "months": len(months)}
 
 
@@ -2180,6 +2192,36 @@ def remove_deleted_points_for_already_compacted_months(index: Index, tz: ZoneInf
     total = 0
     for row in index.list_all_compacted_months():
         total += remove_deleted_points_for_month(index, row["entity_id"], row["year"], row["month"], tz)
+    return total
+
+
+def repair_compacted_month_boundary_rows(data_dir: Path, index: Index, tz: ZoneInfo) -> int:
+    """Einmaliger Nachzieh-Lauf beim Start: Das Verdichten stempelte das letzte Fenster eines Monats mit dem
+    Beginn des Folgemonats (z. B. 01.01. 00:00), ließ die Zeile aber in der Datei des alten Monats. Dort
+    fanden Tagesansicht und Korrigieren sie nicht. Setzt solche Zeilen in jedem verdichteten Monat auf
+    Monatsende - 1 s (23:59:59) zurück. Idempotent: findet danach nichts mehr. Gibt die Anzahl
+    korrigierter Zeilen zurück."""
+    total = 0
+    for row in index.list_all_compacted_months():
+        entity_id, year, month = row["entity_id"], row["year"], row["month"]
+        entity = index.get_entity(entity_id)
+        if entity is None:
+            continue
+        archive_path = entity_dir(data_dir, "archive", entity_id) / f"{year:04d}-{month:02d}.parquet"
+        if not archive_path.exists():
+            continue
+        month_end = _month_end_ts(year, month, tz)
+        rows = _read_archive_month_full(archive_path)
+        if not any(r[0] >= month_end for r in rows):
+            continue
+        fixed = [(month_end - 1 if r[0] >= month_end else r[0], r[1], r[2], r[3]) for r in rows]
+        total += sum(1 for r in rows if r[0] >= month_end)
+        fixed.sort(key=lambda r: (r[0], r[1]))
+        _rewrite_archive_month(
+            data_dir, index, entity_id, entity["aggregation_type"], fixed, year, month, tz,
+            hourly_rollup=bool(entity["hourly_rollup"]),
+        )
+        index.invalidate_finding_caches(entity_id)
     return total
 
 
@@ -2288,7 +2330,7 @@ def compact_raw_values(
         rows, filtered_out = _month_rows_without_marked(index, entity_id, archive_path, year, month, tz)
         if not rows:
             continue
-        new_rows = _compacted_rows_for_month(rows, aggregation_type, interval)
+        new_rows = _compacted_rows_for_month(rows, aggregation_type, interval, _month_end_ts(year, month, tz))
         rows_before += len(rows) + filtered_out
         rows_after += len(new_rows)
         _rewrite_archive_month(

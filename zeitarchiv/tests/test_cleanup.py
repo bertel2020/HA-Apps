@@ -1160,6 +1160,65 @@ def test_compact_raw_values_counter_keeps_last_value_per_bucket_and_marks_reset_
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _write_month_end_fixture(tmp: Path, entity_id: str, rows_ts: list[float], values: list[float]):
+    index = Index(tmp / "index.sqlite")
+    index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+    archive_dir = tmp / "archive" / entity_id
+    archive_dir.mkdir(parents=True)
+    archive_path = archive_dir / "2025-12.parquet"
+    pq.write_table(
+        pa.table({
+            "ts": rows_ts, "value": values,
+            "min_value": [None] * len(rows_ts), "max_value": [None] * len(rows_ts),
+        }),
+        archive_path,
+    )
+    index.add_row_count(entity_id, len(rows_ts))
+    index.set_first_ts(entity_id, rows_ts[0])
+    return index, archive_path
+
+
+def test_compact_raw_values_keeps_last_window_of_month_inside_its_month() -> None:
+    """Das letzte Fenster (31.12. 23:55-24:00) bekäme als Bucket-Ende den 01.01. 00:00, bliebe aber in der
+    Dezember-Datei — Tagesansicht und Korrigieren fänden es nicht. Es bleibt deshalb bei 23:59:59."""
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        month_end = _ts(2026, 1, 1, 0)
+        entity_id = "sensor.temp"
+        index, archive_path = _write_month_end_fixture(
+            tmp, entity_id, [month_end - 400, month_end - 60, month_end - 30], [1.0, 2.0, 4.0]
+        )
+        cleanup.compact_raw_values(
+            tmp, index, entity_id, month_end - 400, month_end, "5min", TZ, now=datetime(2026, 3, 1, tzinfo=TZ)
+        )
+        ts_values = sorted(r["ts"] for r in pq.read_table(archive_path).to_pylist())
+        assert max(ts_values) == month_end - 1
+        assert all(t < month_end for t in ts_values)
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_repair_compacted_month_boundary_rows_moves_row_back_into_its_month() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-cleanup-test-"))
+    try:
+        month_end = _ts(2026, 1, 1, 0)
+        entity_id = "sensor.temp"
+        index, archive_path = _write_month_end_fixture(
+            tmp, entity_id, [month_end - 300, month_end], [1.0, 6548.39]
+        )
+        index.set_compacted_month(entity_id, 2025, 12, "5min", 0.0)
+
+        assert cleanup.repair_compacted_month_boundary_rows(tmp, index, TZ) == 1
+        ts_values = sorted(r["ts"] for r in pq.read_table(archive_path).to_pylist())
+        assert ts_values == [month_end - 300, month_end - 1]
+        # Idempotent
+        assert cleanup.repair_compacted_month_boundary_rows(tmp, index, TZ) == 0
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_compact_raw_values_requests_a_remeasure_of_the_quality_numbers() -> None:
     """Nach dem Verdichten gilt die zwischengespeicherte Gesamt-Zählung der Datenqualität nicht mehr (sonst zeigt
     die Übersicht alte Zahlen, während die Detailansicht schon neu rechnet)."""
