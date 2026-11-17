@@ -41,16 +41,6 @@
       const anyChecked = Array.from(document.querySelectorAll('input[name=category]:not([value=all])')).some(cb => cb.checked);
       if (!anyChecked) document.querySelector('input[name=category][value=all]').checked = true;
     }
-    function updateCategoryFilterLabel() {
-      const checked = Array.from(document.querySelectorAll('input[name=category]:checked'));
-      const btn = document.getElementById('category-filter-btn');
-      if (!checked.length || checked.some(cb => cb.value === 'all')) {
-        btn.textContent = t('Kategorie: Alle ▾');
-        return;
-      }
-      btn.textContent = t('Kategorie: ') + checked.map(cb => cb.parentElement.textContent.trim()).join(', ') + ' ▾';
-    }
-
     // Raum-Filter: dieselbe Mehrfachauswahl mit „Alle“ wie bei Kategorie; „Ohne Raum“ (Wert none)
     // für Entitäten, die in Home Assistant keinem Raum zugeordnet sind.
     function onAreaAllChange(checkbox) {
@@ -65,16 +55,6 @@
       const anyChecked = Array.from(document.querySelectorAll('input[name=area]:not([value=all])')).some(cb => cb.checked);
       if (!anyChecked) document.querySelector('input[name=area][value=all]').checked = true;
     }
-    function updateAreaFilterLabel() {
-      const checked = Array.from(document.querySelectorAll('input[name=area]:checked'));
-      const btn = document.getElementById('area-filter-btn');
-      if (!checked.length || checked.some(cb => cb.value === 'all')) {
-        btn.textContent = t('Raum: Alle ▾');
-        return;
-      }
-      btn.textContent = t('Raum: ') + checked.map(cb => cb.parentElement.textContent.trim()).join(', ') + ' ▾';
-    }
-
     // page-field ist die einzige Quelle der Wahrheit für die Seiten-Navigation —
     // jeder Control, der die zugrunde liegende Trefferliste ändert (Suche, Typ-
     // Filter, Zeilen/Seite), setzt page zurück auf 1.
@@ -130,7 +110,6 @@
       controls.querySelector('[name=favorites]').checked = !!f.favorites;
       if (shown('type-filter-wrap') && Array.isArray(f.type)) {
         document.querySelectorAll('input[name=type]').forEach(cb => cb.checked = f.type.includes(cb.value));
-        updateTypeFilterLabel();
       }
       if (shown('category-filter-wrap') && Array.isArray(f.category)) {
         document.querySelectorAll('input[name=category]').forEach(cb => cb.checked = f.category.includes(cb.value));
@@ -138,7 +117,6 @@
         if (!document.querySelector('input[name=category]:checked')) {
           document.querySelector('input[name=category][value=all]').checked = true;
         }
-        updateCategoryFilterLabel();
       }
       if (shown('area-filter-wrap') && Array.isArray(f.area)) {
         document.querySelectorAll('input[name=area]').forEach(cb => cb.checked = f.area.includes(cb.value));
@@ -146,13 +124,11 @@
         if (!document.querySelector('input[name=area]:checked')) {
           document.querySelector('input[name=area][value=all]').checked = true;
         }
-        updateAreaFilterLabel();
       }
       if (shown('unit-filter-wrap') && typeof f.unit === 'string' && f.unit !== 'all') {
         const row = Array.from(document.querySelectorAll('#unit-filter-popover .dd-picker-row')).find(r => r.dataset.value === f.unit);
         if (row) {
           document.getElementById('unit-filter-input').value = f.unit;
-          document.getElementById('unit-filter-btn').textContent = row.dataset.label + ' ▾';
         }
       }
     }
@@ -184,19 +160,63 @@
     // und bleibt deshalb eigene Logik — nutzt von dort nur toggleDDPicker()
     // fürs Öffnen/Schließen des Popovers.
 
-    // Button-Beschriftung spiegelt die aktuelle Typ-Auswahl, damit sie ohne
-    // geöffnetes Popover erkennbar bleibt (analog zu "Vergleichen"-Button in
-    // chart_editor.html, der ebenfalls den aktiven Modus im Label zeigt).
+    // Die gewählten Filter stehen als Tags unter der Leiste (mit × zum Zurücknehmen), die Zahl am Knopf
+    // „Filter ▾“ zählt sie. Alle drei Beschriftungs-Funktionen der früheren Einzelfelder laufen hier zusammen,
+    // damit die onchange-Handler der Haken unverändert bleiben.
     const TYPE_LABELS = {standard: t('Standard'), counter: t('Zähler'), switch: t('Schalter'), state: t('Zustand')};
-    function updateTypeFilterLabel() {
-      const checked = Array.from(document.querySelectorAll('input[name=type]:checked'));
-      const btn = document.getElementById('type-filter-btn');
-      if (!checked.length || checked.some(cb => cb.value === 'all')) {
-        btn.textContent = t('Typ: Alle ▾');
-        return;
+    const FILTER_GROUPS = [
+      {key: 'type', wrap: 'type-filter-wrap', title: t('Typ'), label: cb => TYPE_LABELS[cb.value]},
+      {key: 'category', wrap: 'category-filter-wrap', title: t('Kategorie'), label: cb => cb.parentElement.textContent.trim()},
+      {key: 'area', wrap: 'area-filter-wrap', title: t('Raum'), label: cb => cb.parentElement.textContent.trim()},
+    ];
+    function updateFilterSummary() {
+      const tags = [];
+      FILTER_GROUPS.forEach(group => {
+        const wrap = document.getElementById(group.wrap);
+        if (!wrap || wrap.style.display === 'none') return;
+        document.querySelectorAll(`input[name=${group.key}]:checked`).forEach(cb => {
+          if (cb.value === 'all') return;
+          tags.push({title: group.title, text: group.label(cb), undo: () => { cb.checked = false; cb.dispatchEvent(new Event('change', {bubbles: true})); }});
+        });
+      });
+      const unit = document.getElementById('unit-filter-input');
+      const unitWrap = document.getElementById('unit-filter-wrap');
+      if (unit && unit.value !== 'all' && unitWrap.style.display !== 'none') {
+        const row = Array.from(document.querySelectorAll('#unit-filter-popover .dd-picker-row')).find(r => r.dataset.value === unit.value);
+        tags.push({title: t('Einheit'), text: row ? row.dataset.label : unit.value, undo: () => selectUnit('all')});
       }
-      btn.textContent = t('Typ: ') + checked.map(cb => TYPE_LABELS[cb.value]).join(', ') + ' ▾';
+      document.querySelectorAll('#unit-filter-popover .dd-picker-row').forEach(r => r.classList.toggle('active', !!unit && r.dataset.value === unit.value));
+      const box = document.getElementById('ent-filter-tags');
+      box.replaceChildren(...tags.map(tag => {
+        const el = document.createElement('span');
+        el.className = 'ent-filter-tag';
+        el.append(`${tag.title}: ${tag.text}`);
+        const x = document.createElement('button');
+        x.type = 'button';
+        x.textContent = '×';
+        x.setAttribute('aria-label', t('Filter entfernen'));
+        x.addEventListener('click', () => { tag.undo(); });
+        el.append(x);
+        return el;
+      }));
+      box.hidden = !tags.length;
+      document.getElementById('ent-filter-count').textContent = tags.length ? ` ${tags.length}` : '';
+      document.getElementById('ent-filter-btn').classList.toggle('is-active', tags.length > 0);
+      // Das Menü entfällt, wenn keine seiner Gruppen sichtbar ist.
+      const any = ['type-filter-wrap', 'category-filter-wrap', 'area-filter-wrap', 'unit-filter-wrap']
+        .some(id => { const w = document.getElementById(id); return w && w.style.display !== 'none'; });
+      document.getElementById('ent-filter-wrap').style.display = any ? '' : 'none';
     }
+    const updateTypeFilterLabel = updateFilterSummary;
+    const updateCategoryFilterLabel = updateFilterSummary;
+    const updateAreaFilterLabel = updateFilterSummary;
+    // Einheit: Einfachauswahl über das verdeckte Feld; das Tag-× setzt sie auf „Alle“ zurück.
+    function selectUnit(value) {
+      const row = Array.from(document.querySelectorAll('#unit-filter-popover .dd-picker-row')).find(r => r.dataset.value === value);
+      selectDDOption('unit-filter', value, row ? row.dataset.label : value);
+      resetEntitiesPage();
+    }
+    document.getElementById('unit-filter-input').addEventListener('change', updateFilterSummary);
 
     // Filter, die zu einer gerade ausgeblendeten Spalte gehören (aktuell nur
     // Typ und Einheit), sofort mitausblenden UND zurücksetzen — ein aktiver,
@@ -206,36 +226,17 @@
     // das hier ist nur der Filter-Teil, den htmx nicht mitbekommt (er liegt
     // in #controls selbst, wird also nicht neu vom Server gerendert).
     function onColumnToggle(key, visible) {
-      if (key === 'type') {
-        document.getElementById('type-filter-wrap').style.display = visible ? 'inline-block' : 'none';
-        if (!visible) {
-          document.querySelectorAll('input[name=type]').forEach(cb => cb.checked = cb.value === 'all');
-          updateTypeFilterLabel();
-        }
-      }
-      if (key === 'category') {
-        const wrap = document.getElementById('category-filter-wrap');
-        if (wrap) wrap.style.display = visible ? 'inline-block' : 'none';
-        if (!visible && wrap) {
-          document.querySelectorAll('input[name=category]').forEach(cb => cb.checked = cb.value === 'all');
-          updateCategoryFilterLabel();
-        }
-      }
-      if (key === 'area') {
-        const wrap = document.getElementById('area-filter-wrap');
-        if (wrap) wrap.style.display = visible ? 'inline-block' : 'none';
-        if (!visible && wrap) {
-          document.querySelectorAll('input[name=area]').forEach(cb => cb.checked = cb.value === 'all');
-          updateAreaFilterLabel();
-        }
-      }
-      if (key === 'unit') {
-        document.getElementById('unit-filter-wrap').style.display = visible ? 'inline-block' : 'none';
-        if (!visible) {
+      const wrap = document.getElementById(key + '-filter-wrap');
+      if (!wrap || !['type', 'category', 'area', 'unit'].includes(key)) return;
+      wrap.style.display = visible ? 'block' : 'none';
+      if (!visible) {
+        if (key === 'unit') {
           document.getElementById('unit-filter-input').value = 'all';
-          document.getElementById('unit-filter-btn').textContent = t('Einheit: Alle ▾');
+        } else {
+          document.querySelectorAll(`input[name=${key}]`).forEach(cb => cb.checked = cb.value === 'all');
         }
       }
+      updateFilterSummary();
     }
 
     // ---- Auswahl für „Löschen …“ ------------------------------------------------------------
@@ -573,3 +574,4 @@
 
 // Nach allen Deklarationen (TYPE_LABELS u. a.), aber vor dem ersten htmx-Laden von #controls.
 restoreEntitiesFilters();
+updateFilterSummary();

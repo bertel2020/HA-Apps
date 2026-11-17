@@ -176,3 +176,18 @@
   .del-backup-status:empty{display:none;}
   .del-backup-status.is-error{color:var(--danger);font-weight:600;}
   .del-foot{margin:10px 0 0;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-faint);line-height:1.5;text-align:left;}
+
+  /* Filtermenü der Liste: ein Knopf, Gruppen nebeneinander, gewählte Werte als Tags darunter (Aussehen wie in den Import-Tabellen). */
+  .ent-filter-n{margin-left:2px;font-family:var(--font-mono);}
+  .ent-filter .btn.is-active{border-color:var(--accent-line);color:var(--accent-line);}
+  .ent-filter-pop{width:min(620px,88vw);max-height:min(640px,80vh);}
+  .ent-filter-pop.open{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;align-items:start;}
+  .ent-filter-pop [hidden]{display:none !important;}
+  .ent-filter-group h4{margin:0 0 6px;font-size:calc(11px * var(--font-scale, 1));text-transform:uppercase;letter-spacing:.07em;color:var(--ink-faint);font-weight:600;}
+  .ent-filter-foot{grid-column:1/-1;margin:0;padding-top:8px;border-top:1px solid var(--border);color:var(--ink-muted);font-size:calc(12px * var(--font-scale, 1));}
+  .ent-filter-tags{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:-6px 0 14px;}
+  .ent-filter-tags[hidden]{display:none;}
+  .ent-filter-tag{display:inline-flex;align-items:center;gap:4px;padding:2px 4px 2px 9px;background:var(--accent-line-soft);color:var(--accent-line);border:1px solid var(--accent-line);border-radius:6px;font-size:calc(12.5px * var(--font-scale, 1));}
+  .ent-filter-tag button{border:0;background:none;color:inherit;cursor:pointer;font-size:15px;line-height:1;padding:0 4px;}
+  .ent-filter-group .dd-picker-row.active[data-value="all"]{background:none;color:inherit;font-weight:400;}
+  #unit-filter-popover{max-height:200px;overflow-y:auto;}
