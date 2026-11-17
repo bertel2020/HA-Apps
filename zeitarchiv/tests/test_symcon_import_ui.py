@@ -39,7 +39,7 @@ def test_symcon_delete_redirects_to_styled_import_page() -> None:
     route_end = MAIN.index('@router.post("/import/dry-run"', route_start)
     route = MAIN[route_start:route_end]
     assert "RedirectResponse" in route
-    assert 'url=f"{app_root}/import"' in route
+    assert 'url=f"{app_root}/import?tab=symcon"' in route
     assert "status_code=303" in route
     assert 'TemplateResponse(request, "import.html"' not in route
 

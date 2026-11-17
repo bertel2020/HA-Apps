@@ -748,7 +748,7 @@ def build_notices(
                     tr("{format_size} entpackte Quelldaten aus einem Import liegen unverändert seit {days} im Datenverzeichnis. Zeitarchiv behält sie absichtlich, damit sich Zuordnung und Probelauf ohne erneuten Upload wiederholen lassen — nach einem abgeschlossenen Import werden sie nicht mehr gebraucht und lassen sich unter Import mit „Daten löschen“ entfernen.", format_size=format_size(_import_leftovers['bytes']), days=(tr("{count} Tag", count=age_days) if age_days == 1 else tr("{count} Tagen", count=age_days)))
                 ),
                 "meta": tr("Import"),
-                "link": "/import",
+                "link": "/import?tab=symcon",
             })
 
     removable_rows = purge_totals.get("removable_rows", 0)

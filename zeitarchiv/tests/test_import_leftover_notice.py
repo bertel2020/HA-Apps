@@ -47,7 +47,7 @@ def test_it_reports_the_case_that_prompted_it(client) -> None:
     # Der Weg zum vorhandenen Knopf gehört in den Text, sonst ist die Meldung
     # eine Feststellung ohne Ausweg.
     assert "Daten löschen" in notice["detail"]
-    assert notice["link"] == "/import"
+    assert notice["link"] == "/import?tab=symcon"
 
 
 def test_it_is_information_and_can_be_silenced(client) -> None:

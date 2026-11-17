@@ -2213,7 +2213,7 @@ class ImportService:
         @router.get("/import", response_class=HTMLResponse)
         def import_page(
             request: Request,
-            tab: str = "symcon",
+            tab: str = "ha",
             source: str = "all",
             status: str = "all",
             search: str = "",
@@ -2418,7 +2418,7 @@ class ImportService:
             # zu /import/static/... aufgelöst und ein Reload würde den Lösch-POST erneut
             # absenden. app_root berücksichtigt dabei Home Assistants Ingress-Präfix.
             app_root = self.deps.app_root_context(request)["app_root"]
-            return RedirectResponse(url=f"{app_root}/import", status_code=303)
+            return RedirectResponse(url=f"{app_root}/import?tab=symcon", status_code=303)
 
 
 

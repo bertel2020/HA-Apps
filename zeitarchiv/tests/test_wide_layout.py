@@ -199,3 +199,10 @@ def test_heating_month_table_gets_even_columns_only_in_the_switch_block() -> Non
     assert css.count(rule) == 1
     assert css[: css.index(rule)].rfind("@media (min-width:1200px){") > css[: css.index(rule)].rfind("@media (min-width:1500px){")
     assert ".wt-heat-table thead th.wt-dh{width:150px;}" in css
+
+
+def test_import_page_opens_home_assistant_tab_by_default(client) -> None:
+    """Ohne ?tab= ist Home Assistant der Startreiter; ein ausdrücklicher Reiter bleibt erhalten."""
+    html = client.get("/import").text
+    assert 'import-tab-btn active" id="tab-btn-ha"' in html
+    assert 'import-tab-btn active" id="tab-btn-symcon"' in client.get("/import?tab=symcon").text
