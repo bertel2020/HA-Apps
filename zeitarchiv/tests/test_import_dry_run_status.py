@@ -130,3 +130,19 @@ def test_check_without_marking_covers_listed_entities_and_marks_nothing(client, 
 def test_check_with_nothing_to_check_reports_it(client, entities) -> None:
     html = client.post("/import/ha/availability", data={"history_source": "raw", "period": "hour"}).text
     assert "Keine Entität zum Prüfen" in html
+
+
+def test_failed_check_does_not_claim_there_is_no_data(client, entities, monkeypatch) -> None:
+    """Ein fehlgeschlagener Abruf liefert leere Ergebnisse; „Keine Daten“ wäre dann falsch."""
+    from app import import_routes
+    from app.storage import ha_import
+
+    def failing(self, entity_ids, start, end, history_source="raw", period="hour"):
+        return {e: ha_import.EntityAvailability(e) for e in entity_ids}, "Supervisor nicht erreichbar"
+
+    monkeypatch.setattr(import_routes.ImportService, "_fetch_ha_availability", failing)
+    html = client.post("/import/ha/availability", data={
+        "check_ids": IDS[:1], "history_source": "raw", "period": "hour", "range_preset": "max",
+    }).text
+    row = html[html.index('data-entity-id="sensor.dry_new"'):]
+    assert 'data-status=""' in row[: row.index("</tr>")]

@@ -774,8 +774,13 @@ class ImportService:
                 # Status-Spalte: Ergebnis der Vorschau, solange es eines gibt, sonst
                 # die billigere Verfügbarkeitsprüfung („found“ = in Home Assistant
                 # gefunden, „none“ = keine Daten bzw. nicht unterstützt).
+                # Bei einem Abruffehler (availability_error) heißt „keine Daten“ nur, dass nichts
+                # ankam, nicht, dass Home Assistant nichts hat: dann bleibt der Status leer.
                 "status": (dry_status.get(entity_id) or {}).get("state") or (
-                    None if avail is None else ("found" if avail.supported and avail.has_data else "none")
+                    None if avail is None else (
+                        "found" if avail.supported and avail.has_data
+                        else (None if availability_error else "none")
+                    )
                 ),
                 "has_data": avail.has_data if avail is not None else None,
                 "supported": avail.supported if avail is not None else None,
