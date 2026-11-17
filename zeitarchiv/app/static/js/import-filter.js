@@ -94,7 +94,8 @@
         reset.type = 'button';
         reset.className = 'ha-filter-reset';
         reset.dataset.filterReset = '';
-        reset.textContent = root.dataset.resetLabel || '×';
+        const labelHolder = root.dataset.resetLabel ? root : root.querySelector('[data-reset-label]');
+        reset.textContent = (labelHolder && labelHolder.dataset.resetLabel) || '×';
         box.appendChild(reset);
       }
       box.hidden = activeCount() === 0;

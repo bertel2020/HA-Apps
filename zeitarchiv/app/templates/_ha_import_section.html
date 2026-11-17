@@ -319,7 +319,7 @@
     // ergeben genau die Entitäten, die noch fehlen.
     const HA_OLD_DAYS = 30;
     const haFilter = window.importFilter.create({
-      root: haRoot && haRoot.id === 'ha-section' ? haRoot : document.getElementById('ha-section'),
+      root: (haRoot && haRoot.id === 'ha-section' ? haRoot : document).querySelector('#ha-filter'),
       getRows: () => Array.from((haRoot || document).querySelectorAll('#ha-import-table tr[data-entity-id]')),
       onChange: () => { haPage = 1; applyHaPaging(); },
       tests: {

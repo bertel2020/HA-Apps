@@ -270,9 +270,13 @@
       applyInfluxPaging();
     }
     // Filterleiste (Chips und Attribute): Zustand und Zeichnen im gemeinsamen Modul, hier nur die Tests.
+    // Beim Austausch der Sektion (htmx outerHTML) steht die alte noch im Dokument, wenn dieses Skript läuft:
+    // gleiche IDs doppelt. Die Leiste und ihre Zeilen kommen deshalb aus der eigenen Sektion (dem Element
+    // direkt vor dem Skript).
+    const influxScope = document.currentScript ? document.currentScript.previousElementSibling : null;
     const influxFilter = window.importFilter.create({
-      root: document.getElementById('influx-filter'),
-      getRows: () => Array.from(document.querySelectorAll('#influx-import-table tr[data-entity-id]')),
+      root: (influxScope || document).querySelector('#influx-filter'),
+      getRows: () => Array.from((influxScope || document).querySelectorAll('#influx-import-table tr[data-entity-id]')),
       onChange: () => { influxPage = 1; applyInfluxPaging(); },
       tests: {
         never: (row) => (row.dataset.sortLast || '') === '',

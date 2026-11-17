@@ -242,9 +242,13 @@
       applyVmPaging();
     }
     // Filterleiste (Chips und Attribute): Zustand und Zeichnen im gemeinsamen Modul, hier nur die Tests.
+    // Beim Austausch der Sektion (htmx outerHTML) steht die alte noch im Dokument, wenn dieses Skript läuft:
+    // gleiche IDs doppelt. Die Leiste und ihre Zeilen kommen deshalb aus der eigenen Sektion (dem Element
+    // direkt vor dem Skript).
+    const vmScope = document.currentScript ? document.currentScript.previousElementSibling : null;
     const vmFilter = window.importFilter.create({
-      root: document.getElementById('vm-filter'),
-      getRows: () => Array.from(document.querySelectorAll('#vm-import-table tr[data-entity-id]')),
+      root: (vmScope || document).querySelector('#vm-filter'),
+      getRows: () => Array.from((vmScope || document).querySelectorAll('#vm-import-table tr[data-entity-id]')),
       onChange: () => { vmPage = 1; applyVmPaging(); },
       tests: {
         never: (row) => (row.dataset.sortLast || '') === '',
