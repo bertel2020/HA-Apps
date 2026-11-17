@@ -96,20 +96,21 @@
     </div>
 
     <div class="ha-import-check-row">
-      <button type="button" class="btn" id="ha-availability-btn" title="{{ _('Prüft nur die markierten Entitäten') }}" hx-post="import/ha/availability" hx-include="#ha-form" hx-target="#ha-section" hx-swap="outerHTML" hx-disabled-elt="this" hx-indicator="#ha-availability-status">
+      <button type="button" class="btn" id="ha-availability-btn" title="{{ _('Prüft die markierten Entitäten, ohne Markierung alle angezeigten') }}" hx-post="import/ha/availability" hx-include="#ha-form" hx-vals="js:{...haCheckScope()}" hx-target="#ha-section" hx-swap="outerHTML" hx-disabled-elt="this" hx-indicator="#ha-availability-status">
         {{ _("Verfügbarkeit prüfen") }}
       </button>
       <span class="ha-checked-at {{ 'is-error' if ha_availability_error else ('is-checked' if ha_availability_checked_at_label else 'is-idle') }}" id="ha-availability-status" title="{{ _('Status der Verfügbarkeitsprüfung für diesen Importmodus') }}">
         <span class="ha-status-idle">{% if ha_availability_checked_at_label %}{{ _("Geprüft: {ha_availability_checked_at_label}", ha_availability_checked_at_label=ha_availability_checked_at_label) }}{% else %}{{ _("Noch nicht geprüft") }}{% endif %}{% if ha_availability_stale %} · <span class="ha-stale-badge" title="{{ _('Vor mehr als 15 Minuten geprüft — der tatsächliche Stand in Home Assistant kann sich seither geändert haben.') }}">{{ _("⏳ Nicht mehr taufrisch") }}</span>{% endif %}</span>
         <span class="htmx-indicator">{{ _("Prüfung läuft …") }}</span>
       </span>
-      <span class="ha-check-hint" id="ha-availability-hint">{{ _("Zuerst Entitäten in der Tabelle markieren") }}</span>
+      <span class="ha-check-hint" id="ha-availability-hint">{{ _("Ohne Markierung werden alle angezeigten Entitäten geprüft") }}</span>
     </div>
   </div>
 
   <div class="toolbar import-filter-toolbar" style="flex-wrap:wrap;overflow:visible;">
     <input type="search" class="search" id="ha-entity-search" placeholder="{{ _('Entität suchen …') }}" oninput="onHaSearch(this.value)">
     <span class="count-chip" id="ha-marked-count">{{ _("0 markiert") }}</span>
+    <button type="button" class="btn" id="ha-mark-filtered" data-label-mark="{{ _('Alle gefilterten markieren') }}" data-label-unmark="{{ _('Markierung der gefilterten aufheben') }}" onclick="toggleHaMarkFiltered()" title="{{ _('Markiert alle Zeilen, die zu Suche und Filtern passen, auch auf anderen Seiten') }}">{{ _("Alle gefilterten markieren") }}</button>
     {% if ha_dry_checked_at_label %}<span class="ha-checked-at is-checked" title="{{ _('Zeitpunkt der letzten Vorschau (Dry Run) für diese Einstellungen') }}">{{ _("Vorschau: {t}", t=ha_dry_checked_at_label) }}</span>{% endif %}
     <span class="dd-picker-wrap">
       <button type="button" class="btn" id="ha-cols-btn" onclick="toggleDDPicker('ha-cols')" title="{{ _('Spalten ein- und ausblenden') }}">{{ _("Spalten") }} ▾</button>
@@ -144,6 +145,9 @@
     <span class="ha-filter-label">{{ _("Filter") }}</span>
     <button type="button" class="ha-filter-chip active" data-ha-filter="all" onclick="setHaFilter('all')">{{ _("Alle") }}<span class="n"></span></button>
     <button type="button" class="ha-filter-chip" data-ha-filter="never" onclick="setHaFilter('never')">{{ _("Nie importiert") }}<span class="n"></span></button>
+    {% if ha_has_status %}
+    <button type="button" class="ha-filter-chip" data-ha-filter="found" onclick="setHaFilter('found')">{{ _("Daten vorhanden") }}<span class="n"></span></button>
+    {% endif %}
     {% if ha_has_dry %}
     <button type="button" class="ha-filter-chip" data-ha-filter="new" onclick="setHaFilter('new')">{{ _("Importierbar") }}<span class="n"></span></button>
     <button type="button" class="ha-filter-chip" data-ha-filter="ok" onclick="setHaFilter('ok')">{{ _("Vollständig") }}<span class="n"></span></button>
@@ -179,8 +183,8 @@
           class="{{ 'marked' if entity.entity_id in ha_selected_ids }}"
           data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id ~ ' ' ~ (entity.area or '') ~ ' ' ~ (entity.category.name if entity.category else '')) | lower }}"
           data-sort-area="{{ (entity.area or '') | lower }}"
-          data-status="{{ entity.dry_state or '' }}"
-          data-sort-status="{{ {'new': 1, 'err': 2, 'ok': 3, 'none': 4}.get(entity.dry_state, '') }}"
+          data-status="{{ entity.status or '' }}"
+          data-sort-status="{{ {'new': 1, 'found': 2, 'err': 3, 'ok': 4, 'none': 5}.get(entity.status, '') }}"
           data-sort-last="{{ entity.last_import_ts if entity.last_import_ts is not none else '' }}"
           data-sort-mode="{{ (entity.last_import_mode_label or '') | lower }}"
           data-sort-category="{{ (entity.category.name if entity.category else '') | lower }}"
@@ -241,10 +245,11 @@
           {% endif %}
         </td>
         <td class="ha-c-status">
-          {% if entity.dry_state == 'new' %}<span class="ha-status new"><i aria-hidden="true">+</i><span>{{ _("Importierbar") }}<small>{{ _("{n} Zeilen", n=(entity.dry_rows | format_int)) }}</small></span></span>
-          {% elif entity.dry_state == 'ok' %}<span class="ha-status ok"><i aria-hidden="true">✓</i><span>{{ _("Vollständig") }}</span></span>
-          {% elif entity.dry_state == 'none' %}<span class="ha-status none"><i aria-hidden="true">–</i><span>{{ _("Keine Daten") }}</span></span>
-          {% elif entity.dry_state == 'err' %}<span class="ha-status err"><i aria-hidden="true">!</i><span>{{ _("Fehler") }}</span></span>
+          {% if entity.status == 'found' %}<span class="ha-status found" title="{{ _('In Home Assistant gefunden, noch keine Vorschau') }}"><i aria-hidden="true">•</i><span>{{ _("Daten vorhanden") }}</span></span>
+          {% elif entity.status == 'new' %}<span class="ha-status new"><i aria-hidden="true">+</i><span>{{ _("Importierbar") }}<small>{{ _("{n} Zeilen", n=(entity.dry_rows | format_int)) }}</small></span></span>
+          {% elif entity.status == 'ok' %}<span class="ha-status ok"><i aria-hidden="true">✓</i><span>{{ _("Vollständig") }}</span></span>
+          {% elif entity.status == 'none' %}<span class="ha-status none"><i aria-hidden="true">–</i><span>{{ _("Keine Daten") }}</span></span>
+          {% elif entity.status == 'err' %}<span class="ha-status err"><i aria-hidden="true">!</i><span>{{ _("Fehler") }}</span></span>
           {% else %}<span class="ha-status idle" title="{{ _('Noch keine Vorschau (Dry Run) für diese Entität') }}"><i aria-hidden="true"></i><span>{{ _("Nicht geprüft") }}</span></span>{% endif %}
         </td>
         <td class="ha-c-last mono" style="font-size:calc(12px * var(--font-scale, 1));">{% if entity.last_import_label %}{{ entity.last_import_label }}{% else %}<span class="ha-never">{{ _("nie") }}</span>{% endif %}</td>
@@ -254,8 +259,9 @@
     </table>
   </div>
 
-  {% if ha_has_dry %}
+  {% if ha_has_status %}
   <div class="ha-status-legend">
+    <span><b>•</b> {{ _("Daten vorhanden: in Home Assistant gefunden, noch keine Vorschau") }}</span>
     <span><b>+</b> {{ _("Importierbar: neue Werte gefunden") }}</span>
     <span><b>✓</b> {{ _("Vollständig: nichts mehr zu importieren") }}</span>
     <span><b>–</b> {{ _("Keine Daten in Home Assistant") }}</span>
@@ -301,7 +307,14 @@
     let haSearch = '';
     let haSortKey = null;
     let haSortDir = 'asc';
-    let haFilter = 'all';
+    // Aktive Filter-Chips (UND-verknüpft, leer = alle). „Nie importiert“ und
+    // „Daten vorhanden“ zusammen ergeben genau die Entitäten, die noch fehlen.
+    const haFilters = new Set();
+    // Beim Austausch der Sektion (htmx outerHTML) läuft dieses Skript, solange die
+    // alte Sektion noch im Dokument steht: gleiche IDs doppelt, document-weite
+    // Abfragen zählten dann jede Zeile zweimal. Deshalb für die Chip-Zähler nur
+    // die eigene Sektion (das Element direkt vor dem Skript) abfragen.
+    const haRoot = document.currentScript ? document.currentScript.previousElementSibling : null;
 
     // Filter-Chips: reine Ansicht über die Zeilen (data-status aus der
     // letzten Vorschau, data-sort-last leer = nie importiert). Wie die Suche
@@ -309,30 +322,59 @@
     function haRowMatchesFilter(row, filter) {
       const status = row.dataset.status || '';
       if (filter === 'never') return (row.dataset.sortLast || '') === '';
+      if (filter === 'found') return status === 'found' || status === 'new' || status === 'ok';
       if (filter === 'new' || filter === 'ok') return status === filter;
       if (filter === 'problem') return status === 'err' || status === 'none';
       return true;
     }
-    // Beim Austausch der Sektion (htmx outerHTML) läuft dieses Skript, solange die
-    // alte Sektion noch im Dokument steht: gleiche IDs doppelt, document-weite
-    // Abfragen zählten dann jede Zeile zweimal. Deshalb nur die eigene Sektion
-    // (das Element direkt vor dem Skript) abfragen.
-    const haRoot = document.currentScript ? document.currentScript.previousElementSibling : null;
+    function haRowMatchesFilters(row) {
+      for (const filter of haFilters) if (!haRowMatchesFilter(row, filter)) return false;
+      return true;
+    }
+    // Zeilen, die zu Suche UND Filtern passen — über alle Seiten, nicht nur die sichtbare.
+    function haFilteredRows() {
+      const table = document.getElementById('ha-import-table');
+      if (!table) return [];
+      return Array.from(table.querySelectorAll('tr[data-entity-id]')).filter((row) =>
+        !(haSearch && !(row.dataset.search || '').includes(haSearch)) && haRowMatchesFilters(row));
+    }
     function refreshHaFilterChips() {
       const scope = haRoot && haRoot.id === 'ha-section' ? haRoot : document;
       const rows = Array.from(scope.querySelectorAll('#ha-import-table tr[data-entity-id]'));
       scope.querySelectorAll('[data-ha-filter]').forEach((chip) => {
         const filter = chip.dataset.haFilter;
-        const count = rows.filter((row) => haRowMatchesFilter(row, filter)).length;
+        const count = filter === 'all' ? rows.length : rows.filter((row) => haRowMatchesFilter(row, filter)).length;
         const n = chip.querySelector('.n');
         if (n) n.textContent = count;
-        chip.classList.toggle('active', filter === haFilter);
+        chip.classList.toggle('active', filter === 'all' ? haFilters.size === 0 : haFilters.has(filter));
       });
     }
     function setHaFilter(filter) {
-      haFilter = filter;
+      if (filter === 'all') haFilters.clear();
+      else if (haFilters.has(filter)) haFilters.delete(filter);
+      else haFilters.add(filter);
       haPage = 1;
       refreshHaFilterChips();
+      applyHaPaging();
+    }
+
+    // „Prüfen“ ohne Markierung: alle angezeigten (gefilterten) Entitäten. Als
+    // eigener Parameter check_ids, NICHT als entity_ids — sonst gälte danach alles
+    // als markiert (siehe /import/ha/availability).
+    function haCheckScope() {
+      if (document.querySelector('.ha-mark-checkbox:checked')) return {};
+      return { check_ids: haFilteredRows().map((row) => row.dataset.entityId) };
+    }
+    function toggleHaMarkFiltered() {
+      const rows = haFilteredRows();
+      const allMarked = rows.length > 0 && rows.every((row) => row.classList.contains('marked'));
+      rows.forEach((row) => {
+        const cb = row.querySelector('.ha-mark-checkbox');
+        if (!cb) return;
+        cb.checked = !allMarked;
+        row.classList.toggle('marked', !allMarked);
+      });
+      refreshHaMarkedCount();
       applyHaPaging();
     }
 
@@ -350,13 +392,16 @@
         haSortDir = 'asc';
       }
       haPage = 1;
+      updateHaSortArrows();
+      applyHaPaging();
+    }
+    function updateHaSortArrows() {
       document.querySelectorAll('#ha-import-table th a').forEach((a) => {
-        const active = a.dataset.sortKey === key;
+        const active = a.dataset.sortKey === haSortKey;
         a.classList.toggle('active', active);
         const arrow = a.querySelector('.sort-arrow');
         if (arrow) arrow.textContent = active ? (haSortDir === 'asc' ? ' ↑' : ' ↓') : '';
       });
-      applyHaPaging();
     }
 
     // Spaltenwahl: pro Browser gemerkt (localStorage), nicht in den Einstellungen
@@ -393,10 +438,16 @@
       const count = document.querySelectorAll('.ha-mark-checkbox:checked').length;
       const chip = document.getElementById('ha-marked-count');
       if (chip) { chip.classList.toggle('active', count > 0); chip.textContent = count + ' markiert'; }
-      const availabilityButton = document.getElementById('ha-availability-btn');
-      if (availabilityButton) availabilityButton.disabled = count === 0;
       const availabilityHint = document.getElementById('ha-availability-hint');
       if (availabilityHint) availabilityHint.style.display = count === 0 ? '' : 'none';
+      // „Alle gefilterten markieren“ wird zum „Aufheben“, sobald alle Treffer markiert sind.
+      const markButton = document.getElementById('ha-mark-filtered');
+      if (markButton) {
+        const rows = haFilteredRows();
+        const allMarked = rows.length > 0 && rows.every((row) => row.classList.contains('marked'));
+        markButton.textContent = (allMarked ? markButton.dataset.labelUnmark : markButton.dataset.labelMark) + ' (' + rows.length + ')';
+        markButton.disabled = rows.length === 0;
+      }
     }
     function onHaMarkChange(checkbox) {
       checkbox.closest('tr').classList.toggle('marked', checkbox.checked);
@@ -476,7 +527,7 @@
       rows.forEach((row) => table.appendChild(row));
 
       const isFilteredOut = (row) => (haSearch && !(row.dataset.search || '').includes(haSearch))
-        || !haRowMatchesFilter(row, haFilter);
+        || !haRowMatchesFilters(row);
       rows.filter(isFilteredOut).forEach((row) => { row.style.display = 'none'; });
       const visible = rows.filter((row) => !isFilteredOut(row));
 
@@ -496,6 +547,10 @@
       if (prevBtn) prevBtn.disabled = haPage <= 1;
       const nextBtn = document.getElementById('ha-pager-next');
       if (nextBtn) nextBtn.disabled = haPage >= totalPages;
+      refreshHaMarkedCount();  // Zähler „alle gefilterten markieren“ folgt Suche und Filtern
+      // Ansicht merken: Prüfen, Vorschau und Quellenwechsel tauschen die ganze
+      // Sektion aus und würden sonst Suche, Filter, Sortierung und Seite verwerfen.
+      window.__haView = { search: haSearch, filters: Array.from(haFilters), sortKey: haSortKey, sortDir: haSortDir, page: haPage, pageSize: haPageSize };
     }
     function setHaPageSize(value) {
       const parsed = parseInt(value, 10);
@@ -510,6 +565,8 @@
 
     window.onHaColumnToggle = onHaColumnToggle;
     window.setHaFilter = setHaFilter;
+    window.haCheckScope = haCheckScope;
+    window.toggleHaMarkFiltered = toggleHaMarkFiltered;
     window.onHaSearch = onHaSearch;
     window.sortHaTable = sortHaTable;
     window.onHaMarkChange = onHaMarkChange;
@@ -520,6 +577,20 @@
     window.onHaRangeChanged = onHaRangeChanged;
     window.setHaPageSize = setHaPageSize;
     window.stepHaPage = stepHaPage;
+    const savedView = window.__haView;
+    if (savedView) {
+      haSearch = savedView.search || '';
+      (savedView.filters || []).forEach((filter) => { if (document.querySelector('[data-ha-filter="' + filter + '"]')) haFilters.add(filter); });
+      haSortKey = savedView.sortKey || null;
+      haSortDir = savedView.sortDir || 'asc';
+      haPage = savedView.page || 1;
+      haPageSize = savedView.pageSize || 20;
+      const searchInput = document.getElementById('ha-entity-search');
+      if (searchInput) searchInput.value = haSearch;
+      const sizeSelect = document.getElementById('ha-page-size');
+      if (sizeSelect) sizeSelect.value = String(haPageSize);
+      updateHaSortArrows();
+    }
     refreshHaMarkedCount();
     applyHaColumns();
     refreshHaFilterChips();

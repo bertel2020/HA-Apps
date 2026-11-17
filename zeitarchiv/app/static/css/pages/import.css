@@ -321,6 +321,7 @@
   .ha-status i{font-style:normal;flex:none;width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;font-size:12px;font-weight:700;
     background:color-mix(in srgb, var(--c) 16%, transparent);color:var(--c);}
   .ha-status small{display:block;color:var(--ink-faint);font-size:calc(11px * var(--font-scale, 1));}
+  .ha-status.found{--c:var(--ink-muted);}
   .ha-status.ok{--c:var(--positive);}
   .ha-status.new{--c:var(--accent-line);}
   .ha-status.err{--c:var(--danger);}

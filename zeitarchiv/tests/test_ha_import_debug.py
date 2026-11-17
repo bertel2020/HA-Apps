@@ -89,8 +89,10 @@ def test_ha_import_ui_uses_standard_button_and_readable_status_chip() -> None:
     assert "Prüfung läuft …" in section
     assert 'id="ha-entity-search"' in section
     assert 'name="check_entity_ids"' not in section
-    assert "Prüft nur die markierten Entitäten" in section
-    assert "availabilityButton.disabled = count === 0" in section
+    assert "Prüft die markierten Entitäten, ohne Markierung alle angezeigten" in section
+    # Ohne Markierung prüft der Knopf alle angezeigten Entitäten, er ist also nie gesperrt.
+    assert "availabilityButton.disabled" not in section
+    assert 'hx-vals="js:{...haCheckScope()}"' in section
     assert 'class="ha-available-line"' in section
     assert 'formaction="import/ha/debug"' in dry_run
 

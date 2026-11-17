@@ -751,6 +751,12 @@ class ImportService:
                 **self._last_import_fields(last_imports.get(entity_id)),
                 "dry_state": (dry_status.get(entity_id) or {}).get("state"),
                 "dry_rows": (dry_status.get(entity_id) or {}).get("rows", 0),
+                # Status-Spalte: Ergebnis der Vorschau, solange es eines gibt, sonst
+                # die billigere Verfügbarkeitsprüfung („found“ = in Home Assistant
+                # gefunden, „none“ = keine Daten bzw. nicht unterstützt).
+                "status": (dry_status.get(entity_id) or {}).get("state") or (
+                    None if avail is None else ("found" if avail.supported and avail.has_data else "none")
+                ),
                 "has_data": avail.has_data if avail is not None else None,
                 "supported": avail.supported if avail is not None else None,
                 "available_label": available_label,
@@ -767,6 +773,7 @@ class ImportService:
             "ha_error": None if ha_available else tr("Supervisor ist in dieser Umgebung nicht verfügbar"),
             "ha_entities": entities,
             "ha_has_dry": bool(dry_status),
+            "ha_has_status": bool(dry_status) or (cache_entry is not None and availability_error is None),
             "ha_dry_checked_at_label": (
                 f"{format_timestamp(dry_latest, self.deps.tz)} {format_time(dry_latest, self.deps.tz)}"
                 if dry_latest is not None else None
@@ -2923,7 +2930,13 @@ class ImportService:
                 include_existing_months, stats_range_preset, include_long_term_stats,
             ) = self._ha_form_params(form)
             history_source, period = self._ha_source_params(form)
-            known_ids, unknown_ids = self._known_ha_entity_ids(selected_ids)
+            # Ohne Markierung prüft der Knopf alle gerade angezeigten (gefilterten)
+            # Entitäten; die Seite schickt sie als check_ids. Das ist ausdrücklich
+            # KEINE Auswahl: ha_selected_ids bleibt, was angehakt war, sonst stünde
+            # nach der Prüfung alles markiert und ein Klick auf „Import starten“
+            # würde alles importieren.
+            check_ids = [str(value) for value in form.getlist("check_ids")] if not selected_ids else []
+            known_ids, unknown_ids = self._known_ha_entity_ids(selected_ids or check_ids)
             if unknown_ids:
                 # Kommt normalerweise nicht vor (die Zeilen kommen alle aus
                 # index.list_entities()) — deutet auf ein manipuliertes/
@@ -2967,7 +2980,7 @@ class ImportService:
                     include_long_term_stats=include_long_term_stats,
                 )
             if not known_ids:
-                context["ha_availability_error"] = tr("Bitte mindestens eine Entität markieren.")
+                context["ha_availability_error"] = tr("Keine Entität zum Prüfen: nichts markiert und kein Treffer in der Liste.")
             return self.deps.templates.TemplateResponse(
                 request, "_ha_import_section.html", context
             )
