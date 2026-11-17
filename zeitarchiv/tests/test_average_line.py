@@ -129,6 +129,30 @@ def test_the_option_is_actually_stored_per_entity(client) -> None:
     assert optionen["show_marked"] is True
 
 
+def test_rolling_only_is_stored_for_entity_and_chart_and_drawn_without_the_raw_line(client) -> None:
+    """„Nur gleitend“: die Rohlinie wird nicht gezeichnet, nur die geglättete Kurve. Der Wert muss durch beide
+    Speicherwege (Entität, gespeichertes Chart) und die drei Zeichner."""
+    from app.main import _resolve_entity_chart_options, index
+
+    index.get_or_create_entity("sensor.avgonly", "sensor", "measurement", "°C")
+    schnappschuss = {
+        "continuous": False, "raw": False, "chart_type": "line", "show_points": False,
+        "show_values": False, "dynamic_y_axis": False, "chart_stats": True,
+        "show_marked": True, "average_line": True, "average_style": "rolling_only",
+        "legend_metrics": ["min"], "legend_style": "chips", "decimals": "auto",
+    }
+    assert client.post("/entities/sensor.avgonly/chart-options", json=schnappschuss).status_code == 200
+    assert _resolve_entity_chart_options(index.get_entity("sensor.avgonly"))["average_style"] == "rolling_only"
+    assert client.post("/entities/sensor.avgonly/chart-options", json={**schnappschuss, "average_style": "x"}).status_code == 422
+    body = {"name": "Nur gleitend", "entity_ids": ["sensor.avgonly"], "range_key": "day", "average_line": True,
+            "average_style": "rolling_only"}
+    chart_id = client.post("/charts", json=body).json()["id"]
+    assert index.get_saved_chart(chart_id)["average_style"] == "rolling_only"
+    assert client.post("/charts", json={**body, "average_style": "x"}).status_code in (400, 422)
+    tiles = tile_js()
+    assert "averageStyle === 'rolling_only'" in tiles and "opacity: rollingOnly ? 0" in tiles
+
+
 def test_the_dashboard_tile_gets_the_option_from_its_chart(client) -> None:
     """Ein angeheftetes Chart soll nicht anders aussehen als dasselbe Chart auf
     seiner eigenen Seite. Die Kachel liest die Einstellung aus dem

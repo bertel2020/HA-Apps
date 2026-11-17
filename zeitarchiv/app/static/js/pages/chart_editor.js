@@ -2448,8 +2448,10 @@
             // (Bucket-SUMME) ergäbe ein "gleitender Durchschnitt der Summen"
             // keine klar lesbare Aussage, deshalb dort schlicht keine
             // Zusatzlinie statt einer verwirrenden.
-            const showRollingAverage = this.averageLine && !isStackedBar && this.averageStyle === 'rolling'
+            const showRollingAverage = this.averageLine && !isStackedBar && (this.averageStyle === 'rolling' || this.averageStyle === 'rolling_only')
               && chartType === 'line' && mainPoints.length >= 3;
+            // „Nur gleitend“: die Rohlinie bleibt für den Tooltip in den Daten, wird aber nicht gezeichnet.
+            const rollingOnly = showRollingAverage && this.averageStyle === 'rolling_only';
             const main = {
               name: displayName,
               type: chartType,
@@ -2476,7 +2478,7 @@
               // Bei aktiver Trendlinie tritt die rohe (verrauschte) Kurve
               // zurück, bleibt aber sichtbar — die Trendlinie ist die
               // Ergänzung, nicht der Ersatz.
-              lineStyle: {width: 1.5, color, opacity: showRollingAverage ? 0.45 : 1},
+              lineStyle: {width: 1.5, color, opacity: rollingOnly ? 0 : (showRollingAverage ? 0.45 : 1)},
               itemStyle: {color},
               // "Werte anzeigen" (Optionen-Menü) — Zahl direkt über jedem Balken/
               // Punkt, zusätzlich zum Tooltip. Nur die Hauptserie, nicht die
@@ -2524,7 +2526,8 @@
               // dieselbe Opacity wie auf der Dashboard-Kachel (dashboard-
               // tiles.js), damit ein angeheftetes Chart nicht anders aussieht
               // als auf seiner eigenen Seite.
-              if (this.areaFill) main.areaStyle = {color, opacity: 0.08};
+              if (this.areaFill && !rollingOnly) main.areaStyle = {color, opacity: 0.08};
+              if (rollingOnly) main.symbol = 'none';
             }
             // Durchschnittslinie (Optionen-Menü, "Darstellung") — je Serie eine,
             // in deren eigener Farbe und auf deren eigener y-Achse

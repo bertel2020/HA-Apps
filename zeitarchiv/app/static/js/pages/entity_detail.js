@@ -1586,7 +1586,7 @@ function selectBrush() {
           //
           // Der Wert kommt aus denselben Punkten wie die Legende, Zahl und
           // Linie stimmen hier also immer überein.
-          const rolling = this.averageLine && this.averageStyle === 'rolling' && this.chartType === 'line';
+          const rolling = this.averageLine && (this.averageStyle === 'rolling' || this.averageStyle === 'rolling_only') && this.chartType === 'line';
           const durchschnitt = this.averageLine && !rolling ? averageOf(this.points.map(p => p.value)) : null;
           if (this.chartType === 'line' && this.areaFill) {
             series[0].areaStyle = {color: getComputedStyle(document.body).getPropertyValue('--chart-line'), opacity: 0.08};
@@ -1603,6 +1603,12 @@ function selectBrush() {
               lineStyle: {width: 2.5, color: getComputedStyle(document.body).getPropertyValue('--chart-line')},
               z: 3,
             });
+            if (this.averageStyle === 'rolling_only' && this.points.length >= 3) {
+              // „Nur gleitend“: die Rohlinie bleibt für den Tooltip in den Daten, wird aber nicht gezeichnet.
+              series[0].lineStyle = {...series[0].lineStyle, opacity: 0};
+              series[0].symbol = 'none';
+              delete series[0].areaStyle;
+            }
           }
           if (durchschnitt !== null) {
             series[0].markLine = {

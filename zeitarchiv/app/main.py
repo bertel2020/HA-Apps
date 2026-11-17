@@ -3234,7 +3234,7 @@ class _EntityChartOptionsBody(BaseModel):
     # Wechsel-Protokoll unter dem Zeitstrahl (nur Zustands-Entitäten).
     state_log: bool = True
     area_fill: bool = True
-    average_style: Literal["flat", "rolling"] = "flat"
+    average_style: Literal["flat", "rolling", "rolling_only"] = "flat"
 
 
 @app.post("/entities/{entity_id}/chart-options")
@@ -3484,7 +3484,7 @@ _GLOBAL_LEGEND_SIZES = {"normal", "small"}
 # "Flach" (bisherige waagerechte Durchschnittslinie) oder "Gleitend" (neue
 # Trendlinie über Linien-Serien) — verschachtelt unter "Durchschnittslinie",
 # siehe chart_editor.js render()/movingAverage().
-_CHART_AVERAGE_STYLES = {"flat", "rolling"}
+_CHART_AVERAGE_STYLES = {"flat", "rolling", "rolling_only"}
 # "Aggregation" (Optionen-Menü, nur bei Darstellungsart "Donut" sichtbar) —
 # welcher Einzelwert je Serie deren Anteil am Donut bildet, siehe
 # chart_editor.js renderDonut().

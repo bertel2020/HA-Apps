@@ -122,7 +122,7 @@ def editor_display_prefill(params, metrics: set[str], styles: set[str], decimals
         out["legend_style"] = params["legend_style"]
     if params.get("legend_size") in ("normal", "small"):
         out["legend_size"] = params["legend_size"]
-    if params.get("average_style") in ("flat", "rolling"):
+    if params.get("average_style") in ("flat", "rolling", "rolling_only"):
         out["average_style"] = params["average_style"]
     chosen = [m for m in params.get("legend_metrics", "").split(",") if m in metrics]
     if chosen:
