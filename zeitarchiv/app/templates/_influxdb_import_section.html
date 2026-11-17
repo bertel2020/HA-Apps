@@ -1,3 +1,4 @@
+{% from "_import_filter.html" import filter_bar with context %}
 <div id="influx-section">
 {% if influx_availability_error %}
 <div class="callout" style="border-left-color:var(--danger);">
@@ -106,11 +107,8 @@
     </div>
   </div>
 
-  <div class="ha-filter-row">
-    <span class="ha-filter-label">{{ _("Filter") }}</span>
-    <button type="button" class="ha-filter-chip active" id="influx-filter-all" onclick="setInfluxFilter(false)">{{ _("Alle") }}<span class="n"></span></button>
-    <button type="button" class="ha-filter-chip" id="influx-filter-never" onclick="setInfluxFilter(true)">{{ _("Nie importiert") }}<span class="n"></span></button>
-  </div>
+  {% set influx_chips = [("never", _("Nie importiert")), ("yes", _("Daten vorhanden")), ("no", _("Keine Daten")), ("marked", _("Markiert"))] %}
+  {{ filter_bar("influx", influx_chips, influx_filter_groups) }}
 
   <div class="tbl-wrap">
     <table id="influx-import-table" class="dt symcon-import-table ha-import-table">
@@ -136,6 +134,8 @@
       <tr data-entity-id="{{ entity.entity_id }}"
           class="{{ 'marked' if entity.entity_id in influx_selected_ids }}"
           data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id ~ ' ' ~ (entity.area or '') ~ ' ' ~ (entity.category.name if entity.category else '')) | lower }}"
+          data-f-category="{{ entity.category.name if entity.category else '' }}" data-f-area="{{ entity.area or '' }}" data-f-type="{{ entity.type_label }}"
+          data-has-data="{{ '' if entity.has_data is none else ('1' if entity.has_data else '0') }}"
           data-sort-last="{{ entity.last_import_ts if entity.last_import_ts is not none else '' }}"
           data-sort-area="{{ (entity.area or '') | lower }}"
           data-sort-category="{{ (entity.category.name if entity.category else '') | lower }}"
@@ -205,7 +205,6 @@
     let influxPage = 1;
     let influxSearch = '';
     let influxSortKey = null;
-    let influxNeverOnly = false;
     let influxSortDir = 'asc';
 
     function fill(template, values) {
@@ -270,27 +269,25 @@
       influxPage = 1;
       applyInfluxPaging();
     }
-    // Zeilen, die zu Suche UND Filter passen (über alle Seiten).
+    // Filterleiste (Chips und Attribute): Zustand und Zeichnen im gemeinsamen Modul, hier nur die Tests.
+    const influxFilter = window.importFilter.create({
+      root: document.getElementById('influx-filter'),
+      getRows: () => Array.from(document.querySelectorAll('#influx-import-table tr[data-entity-id]')),
+      onChange: () => { influxPage = 1; applyInfluxPaging(); },
+      tests: {
+        never: (row) => (row.dataset.sortLast || '') === '',
+        yes: (row) => row.dataset.hasData === '1',
+        no: (row) => row.dataset.hasData === '0',
+        marked: (row) => row.classList.contains('marked'),
+      },
+    });
+    // Zeilen, die zu Suche UND Filtern passen (über alle Seiten).
     function influxRowVisible(row) {
       if (influxSearch && !(row.dataset.search || '').includes(influxSearch)) return false;
-      if (influxNeverOnly && (row.dataset.sortLast || '') !== '') return false;
-      return true;
+      return influxFilter.matches(row);
     }
     function influxFilteredRows() {
       return Array.from(document.querySelectorAll('#influx-import-table tr[data-entity-id]')).filter(influxRowVisible);
-    }
-    function setInfluxFilter(neverOnly) {
-      influxNeverOnly = neverOnly;
-      influxPage = 1;
-      refreshInfluxFilterChips();
-      applyInfluxPaging();
-    }
-    function refreshInfluxFilterChips() {
-      const rows = Array.from(document.querySelectorAll('#influx-import-table tr[data-entity-id]'));
-      const all = document.getElementById('influx-filter-all');
-      const never = document.getElementById('influx-filter-never');
-      if (all) { all.classList.toggle('active', !influxNeverOnly); all.querySelector('.n').textContent = rows.length; }
-      if (never) { never.classList.toggle('active', influxNeverOnly); never.querySelector('.n').textContent = rows.filter((row) => (row.dataset.sortLast || '') === '').length; }
     }
     // „Prüfen“ ohne Markierung: alle Treffer von Suche und Filter, über alle Seiten — als
     // check_ids, NICHT als entity_ids, sonst gälte danach alles als markiert.
@@ -338,6 +335,7 @@
       const nextBtn = document.getElementById('influx-pager-next');
       if (nextBtn) nextBtn.disabled = influxPage >= totalPages;
       refreshInfluxMarkedCount();  // Zähler von „Alle gefilterten markieren“ folgt Suche und Filter
+      influxFilter.render();       // Chip-Zähler (u. a. „Markiert“) folgen der Auswahl
     }
     function setInfluxPageSize(value) {
       const parsed = parseInt(value, 10);
@@ -362,7 +360,6 @@
     window.rememberInfluxPassword = rememberInfluxPassword;
     window.onInfluxSearch = onInfluxSearch;
     window.sortInfluxTable = sortInfluxTable;
-    window.setInfluxFilter = setInfluxFilter;
     window.toggleInfluxMarkFiltered = toggleInfluxMarkFiltered;
     window.influxCheckScope = influxCheckScope;
     window.onInfluxMarkChange = onInfluxMarkChange;
@@ -371,7 +368,7 @@
     window.onInfluxConfigChanged = onInfluxConfigChanged;
     window.setInfluxPageSize = setInfluxPageSize;
     window.stepInfluxPage = stepInfluxPage;
-    refreshInfluxFilterChips();
+    influxFilter.render();
     refreshInfluxMarkedCount();
     applyInfluxPaging();
   })();

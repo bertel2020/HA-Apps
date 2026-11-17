@@ -1,3 +1,4 @@
+{% from "_import_filter.html" import filter_bar with context %}
 <div id="ha-section">
 {% if not ha_available %}
 <div class="callout" style="border-left-color:var(--danger);">
@@ -142,19 +143,13 @@
     </div>
   </div>
 
-  <div class="ha-filter-row" id="ha-filter-row">
-    <span class="ha-filter-label">{{ _("Filter") }}</span>
-    <button type="button" class="ha-filter-chip active" data-ha-filter="all" onclick="setHaFilter('all')">{{ _("Alle") }}<span class="n"></span></button>
-    <button type="button" class="ha-filter-chip" data-ha-filter="never" onclick="setHaFilter('never')">{{ _("Nie importiert") }}<span class="n"></span></button>
-    {% if ha_has_status %}
-    <button type="button" class="ha-filter-chip" data-ha-filter="found" onclick="setHaFilter('found')">{{ _("Daten vorhanden") }}<span class="n"></span></button>
-    {% endif %}
-    {% if ha_has_dry %}
-    <button type="button" class="ha-filter-chip" data-ha-filter="new" onclick="setHaFilter('new')">{{ _("Importierbar") }}<span class="n"></span></button>
-    <button type="button" class="ha-filter-chip" data-ha-filter="ok" onclick="setHaFilter('ok')">{{ _("Vollständig") }}<span class="n"></span></button>
-    <button type="button" class="ha-filter-chip" data-ha-filter="problem" onclick="setHaFilter('problem')">{{ _("Fehler / keine Daten") }}<span class="n"></span></button>
-    {% endif %}
-  </div>
+  {% set ha_chips = [("never", _("Nie importiert"))] %}
+  {% if ha_has_status %}{% set ha_chips = ha_chips + [("found", _("Daten vorhanden"))] %}{% endif %}
+  {% if ha_has_dry %}{% set ha_chips = ha_chips + [("new", _("Importierbar")), ("ok", _("Vollständig")), ("problem", _("Fehler / keine Daten"))] %}{% endif %}
+  {% set ha_chips = ha_chips + [("old", _("Länger nicht importiert (30 Tage)"))] %}
+  {% if ha_has_status %}{% set ha_chips = ha_chips + [("unsupported", _("Nicht unterstützt"))] %}{% endif %}
+  {% set ha_chips = ha_chips + [("marked", _("Markiert"))] %}
+  {{ filter_bar("ha", ha_chips, ha_filter_groups) }}
 
   <div class="tbl-wrap">
     <table id="ha-import-table" class="dt symcon-import-table ha-import-table">
@@ -184,6 +179,8 @@
           class="{{ 'marked' if entity.entity_id in ha_selected_ids }}"
           data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id ~ ' ' ~ (entity.area or '') ~ ' ' ~ (entity.category.name if entity.category else '')) | lower }}"
           data-sort-area="{{ (entity.area or '') | lower }}"
+          data-f-category="{{ entity.category.name if entity.category else '' }}" data-f-area="{{ entity.area or '' }}" data-f-type="{{ entity.type_label }}"
+          data-unsupported="{{ '1' if entity.supported == false else '' }}"
           data-status="{{ entity.status or '' }}"
           data-sort-status="{{ {'new': 1, 'found': 2, 'err': 3, 'ok': 4, 'none': 5}.get(entity.status, '') }}"
           data-sort-last="{{ entity.last_import_ts if entity.last_import_ts is not none else '' }}"
@@ -308,9 +305,6 @@
     let haSearch = '';
     let haSortKey = null;
     let haSortDir = 'asc';
-    // Aktive Filter-Chips (UND-verknüpft, leer = alle). „Nie importiert“ und
-    // „Daten vorhanden“ zusammen ergeben genau die Entitäten, die noch fehlen.
-    const haFilters = new Set();
     // Beim Austausch der Sektion (htmx outerHTML) läuft dieses Skript, solange die
     // alte Sektion noch im Dokument steht: gleiche IDs doppelt, document-weite
     // Abfragen zählten dann jede Zeile zweimal. Deshalb für die Chip-Zähler nur
@@ -320,43 +314,32 @@
     // Filter-Chips: reine Ansicht über die Zeilen (data-status aus der
     // letzten Vorschau, data-sort-last leer = nie importiert). Wie die Suche
     // blendet der Filter nur aus, die Markierung bleibt erhalten.
-    function haRowMatchesFilter(row, filter) {
-      const status = row.dataset.status || '';
-      if (filter === 'never') return (row.dataset.sortLast || '') === '';
-      if (filter === 'found') return status === 'found' || status === 'new' || status === 'ok';
-      if (filter === 'new' || filter === 'ok') return status === filter;
-      if (filter === 'problem') return status === 'err' || status === 'none';
-      return true;
-    }
-    function haRowMatchesFilters(row) {
-      for (const filter of haFilters) if (!haRowMatchesFilter(row, filter)) return false;
-      return true;
-    }
+    // Filterleiste (Chips und Attribute): Zustand und Zeichnen im gemeinsamen Modul,
+    // hier stehen nur die Tests der Chips. „Nie importiert“ und „Daten vorhanden“ zusammen
+    // ergeben genau die Entitäten, die noch fehlen.
+    const HA_OLD_DAYS = 30;
+    const haFilter = window.importFilter.create({
+      root: haRoot && haRoot.id === 'ha-section' ? haRoot : document.getElementById('ha-section'),
+      getRows: () => Array.from((haRoot || document).querySelectorAll('#ha-import-table tr[data-entity-id]')),
+      onChange: () => { haPage = 1; applyHaPaging(); },
+      tests: {
+        never: (row) => (row.dataset.sortLast || '') === '',
+        found: (row) => ['found', 'new', 'ok'].includes(row.dataset.status || ''),
+        new: (row) => row.dataset.status === 'new',
+        ok: (row) => row.dataset.status === 'ok',
+        problem: (row) => ['err', 'none'].includes(row.dataset.status || ''),
+        old: (row) => (row.dataset.sortLast || '') !== '' && (Date.now() / 1000 - Number(row.dataset.sortLast)) > HA_OLD_DAYS * 86400,
+        unsupported: (row) => row.dataset.unsupported === '1',
+        marked: (row) => row.classList.contains('marked'),
+      },
+    });
+    function haRowMatchesFilters(row) { return haFilter.matches(row); }
     // Zeilen, die zu Suche UND Filtern passen — über alle Seiten, nicht nur die sichtbare.
     function haFilteredRows() {
       const table = document.getElementById('ha-import-table');
       if (!table) return [];
       return Array.from(table.querySelectorAll('tr[data-entity-id]')).filter((row) =>
         !(haSearch && !(row.dataset.search || '').includes(haSearch)) && haRowMatchesFilters(row));
-    }
-    function refreshHaFilterChips() {
-      const scope = haRoot && haRoot.id === 'ha-section' ? haRoot : document;
-      const rows = Array.from(scope.querySelectorAll('#ha-import-table tr[data-entity-id]'));
-      scope.querySelectorAll('[data-ha-filter]').forEach((chip) => {
-        const filter = chip.dataset.haFilter;
-        const count = filter === 'all' ? rows.length : rows.filter((row) => haRowMatchesFilter(row, filter)).length;
-        const n = chip.querySelector('.n');
-        if (n) n.textContent = count;
-        chip.classList.toggle('active', filter === 'all' ? haFilters.size === 0 : haFilters.has(filter));
-      });
-    }
-    function setHaFilter(filter) {
-      if (filter === 'all') haFilters.clear();
-      else if (haFilters.has(filter)) haFilters.delete(filter);
-      else haFilters.add(filter);
-      haPage = 1;
-      refreshHaFilterChips();
-      applyHaPaging();
     }
 
     // „Prüfen“ ohne Markierung: alle angezeigten (gefilterten) Entitäten. Als
@@ -549,9 +532,10 @@
       const nextBtn = document.getElementById('ha-pager-next');
       if (nextBtn) nextBtn.disabled = haPage >= totalPages;
       refreshHaMarkedCount();  // Zähler „alle gefilterten markieren“ folgt Suche und Filtern
+      haFilter.render();       // Chip-Zähler (u. a. „Markiert“) folgen der Auswahl
       // Ansicht merken: Prüfen, Vorschau und Quellenwechsel tauschen die ganze
       // Sektion aus und würden sonst Suche, Filter, Sortierung und Seite verwerfen.
-      window.__haView = { search: haSearch, filters: Array.from(haFilters), sortKey: haSortKey, sortDir: haSortDir, page: haPage, pageSize: haPageSize };
+      window.__haView = { search: haSearch, filters: haFilter.state(), sortKey: haSortKey, sortDir: haSortDir, page: haPage, pageSize: haPageSize };
     }
     function setHaPageSize(value) {
       const parsed = parseInt(value, 10);
@@ -565,7 +549,6 @@
     }
 
     window.onHaColumnToggle = onHaColumnToggle;
-    window.setHaFilter = setHaFilter;
     window.haCheckScope = haCheckScope;
     window.toggleHaMarkFiltered = toggleHaMarkFiltered;
     window.onHaSearch = onHaSearch;
@@ -581,7 +564,7 @@
     const savedView = window.__haView;
     if (savedView) {
       haSearch = savedView.search || '';
-      (savedView.filters || []).forEach((filter) => { if (document.querySelector('[data-ha-filter="' + filter + '"]')) haFilters.add(filter); });
+      haFilter.restore(savedView.filters);
       haSortKey = savedView.sortKey || null;
       haSortDir = savedView.sortDir || 'asc';
       haPage = savedView.page || 1;
@@ -594,7 +577,7 @@
     }
     refreshHaMarkedCount();
     applyHaColumns();
-    refreshHaFilterChips();
+    haFilter.render();
     applyHaPaging();
   })();
 </script>

@@ -1,8 +1,10 @@
 {% extends "base.html" %}
+{% from "_import_filter.html" import filter_bar with context %}
 {% block title %}{{ _("Zeitarchiv — Import") }}{% endblock %}
 {% block page_css %}
 <link rel="stylesheet" href="{{ asset('css/pages/import.css') }}">
 <script src="{{ asset('js/import-sort.js') }}"></script>
+<script src="{{ asset('js/import-filter.js') }}"></script>
 {% endblock %}
 {% block content %}
   
@@ -102,6 +104,11 @@
       </div>
 
       {% if rows %}
+      {# Chips zeigen, was an der Zuordnung noch zu tun ist; „Ohne Namen“ nur mit geladener settings.json. #}
+      {% set symcon_chips = [("unmapped", _("Nicht zugeordnet")), ("mapped", _("Zugeordnet")), ("unitdiff", _("Einheit weicht ab"))] %}
+      {% if settings_imported %}{% set symcon_chips = symcon_chips + [("unnamed", _("Ohne Namen"))] %}{% endif %}
+      {% set symcon_chips = symcon_chips + [("marked", _("Markiert"))] %}
+      {{ filter_bar("symcon", symcon_chips) }}
       <div class="tbl-wrap">
         <table id="import-table" class="dt symcon-import-table">
           <colgroup>
@@ -113,7 +120,7 @@
           {% for row in rows %}
           <tr class="{{ '' if row.readable else 'unreadable' }}" data-variable-id="{{ row.variable_id }}" data-symcon-unit="{{ row.symcon_unit or '' }}"
               data-search="{{ ((row.symcon_name or '') ~ ' ' ~ (row.symcon_parent or '')) | lower }}"
-              data-sort-id="{{ row.variable_id }}" data-sort-name="{{ (row.symcon_name or '') | lower }}"
+              data-named="{{ '1' if row.symcon_name else '' }}" data-sort-id="{{ row.variable_id }}" data-sort-name="{{ (row.symcon_name or '') | lower }}"
               data-sort-period="{{ row.first_ts if row.first_ts is not none else '' }}" data-sort-rows="{{ row.row_count }}"
               data-sort-unit="{{ (row.symcon_states.values() | join(', ') if row.symcon_states else (row.symcon_unit or '')) | lower }}">
             <td>{% if row.readable %}<input type="checkbox" class="mark-checkbox" onchange="onMarkChange(this)">{% endif %}</td>

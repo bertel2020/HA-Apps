@@ -179,3 +179,32 @@ def test_vm_and_influx_tables_show_room_and_category_columns(client, rooms) -> N
             assert "Hobbyraum" in table and "Verbrauch" in table
     finally:
         main.index.delete_entity_category(category_id)
+
+
+def test_import_filter_menu_lists_categories_rooms_and_types(client, rooms) -> None:
+    """Das Menü „Filter“ bietet nur Werte an, die in der Tabelle vorkommen (Home Assistant, VictoriaMetrics, InfluxDB)."""
+    from app import main
+
+    category_id = main.index.create_entity_category("Verbrauch")
+    try:
+        main.index.set_entities_category([rooms[0]], category_id)
+        html = client.get("/import").text
+        for prefix in ("ha", "vm", "influx"):
+            bar = html[html.index(f'id="{prefix}-filter"'):]
+            bar = bar[: bar.index('data-filter-tags')]
+            assert "data-filter-menu-btn" in bar
+            area = bar[bar.index('data-filter-group="area"'):]
+            assert "Hobbyraum" in area and "Küche" in area
+            assert 'value="Verbrauch"' in bar
+            assert 'data-filter-group="type"' in bar
+            assert 'data-filter-chip="never"' in bar
+    finally:
+        main.index.delete_entity_category(category_id)
+
+
+def test_symcon_filter_chips_are_rendered_when_variables_exist() -> None:
+    from _paths import TEMPLATES
+
+    text = (TEMPLATES / "import.html").read_text(encoding="utf-8")
+    for chip in ("unmapped", "mapped", "unitdiff", "unnamed", "marked"):
+        assert f'("{chip}"' in text

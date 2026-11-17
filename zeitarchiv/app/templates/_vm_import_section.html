@@ -1,3 +1,4 @@
+{% from "_import_filter.html" import filter_bar with context %}
 <div id="vm-section">
 {% if vm_availability_error %}
 <div class="callout" style="border-left-color:var(--danger);">
@@ -78,11 +79,8 @@
     </div>
   </div>
 
-  <div class="ha-filter-row">
-    <span class="ha-filter-label">{{ _("Filter") }}</span>
-    <button type="button" class="ha-filter-chip active" id="vm-filter-all" onclick="setVmFilter(false)">{{ _("Alle") }}<span class="n"></span></button>
-    <button type="button" class="ha-filter-chip" id="vm-filter-never" onclick="setVmFilter(true)">{{ _("Nie importiert") }}<span class="n"></span></button>
-  </div>
+  {% set vm_chips = [("never", _("Nie importiert")), ("yes", _("Daten vorhanden")), ("no", _("Keine Daten")), ("marked", _("Markiert"))] %}
+  {{ filter_bar("vm", vm_chips, vm_filter_groups) }}
 
   <div class="tbl-wrap">
     <table id="vm-import-table" class="dt symcon-import-table ha-import-table">
@@ -108,6 +106,8 @@
       <tr data-entity-id="{{ entity.entity_id }}"
           class="{{ 'marked' if entity.entity_id in vm_selected_ids }}"
           data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id ~ ' ' ~ (entity.area or '') ~ ' ' ~ (entity.category.name if entity.category else '')) | lower }}"
+          data-f-category="{{ entity.category.name if entity.category else '' }}" data-f-area="{{ entity.area or '' }}" data-f-type="{{ entity.type_label }}"
+          data-has-data="{{ '' if entity.has_data is none else ('1' if entity.has_data else '0') }}"
           data-sort-last="{{ entity.last_import_ts if entity.last_import_ts is not none else '' }}"
           data-sort-area="{{ (entity.area or '') | lower }}"
           data-sort-category="{{ (entity.category.name if entity.category else '') | lower }}"
@@ -177,7 +177,6 @@
     let vmPage = 1;
     let vmSearch = '';
     let vmSortKey = null;
-    let vmNeverOnly = false;
     let vmSortDir = 'asc';
 
     function fill(template, values) {
@@ -242,27 +241,25 @@
       vmPage = 1;
       applyVmPaging();
     }
-    // Zeilen, die zu Suche UND Filter passen (über alle Seiten).
+    // Filterleiste (Chips und Attribute): Zustand und Zeichnen im gemeinsamen Modul, hier nur die Tests.
+    const vmFilter = window.importFilter.create({
+      root: document.getElementById('vm-filter'),
+      getRows: () => Array.from(document.querySelectorAll('#vm-import-table tr[data-entity-id]')),
+      onChange: () => { vmPage = 1; applyVmPaging(); },
+      tests: {
+        never: (row) => (row.dataset.sortLast || '') === '',
+        yes: (row) => row.dataset.hasData === '1',
+        no: (row) => row.dataset.hasData === '0',
+        marked: (row) => row.classList.contains('marked'),
+      },
+    });
+    // Zeilen, die zu Suche UND Filtern passen (über alle Seiten).
     function vmRowVisible(row) {
       if (vmSearch && !(row.dataset.search || '').includes(vmSearch)) return false;
-      if (vmNeverOnly && (row.dataset.sortLast || '') !== '') return false;
-      return true;
+      return vmFilter.matches(row);
     }
     function vmFilteredRows() {
       return Array.from(document.querySelectorAll('#vm-import-table tr[data-entity-id]')).filter(vmRowVisible);
-    }
-    function setVmFilter(neverOnly) {
-      vmNeverOnly = neverOnly;
-      vmPage = 1;
-      refreshVmFilterChips();
-      applyVmPaging();
-    }
-    function refreshVmFilterChips() {
-      const rows = Array.from(document.querySelectorAll('#vm-import-table tr[data-entity-id]'));
-      const all = document.getElementById('vm-filter-all');
-      const never = document.getElementById('vm-filter-never');
-      if (all) { all.classList.toggle('active', !vmNeverOnly); all.querySelector('.n').textContent = rows.length; }
-      if (never) { never.classList.toggle('active', vmNeverOnly); never.querySelector('.n').textContent = rows.filter((row) => (row.dataset.sortLast || '') === '').length; }
     }
     // „Prüfen“ ohne Markierung: alle Treffer von Suche und Filter, über alle Seiten — als
     // check_ids, NICHT als entity_ids, sonst gälte danach alles als markiert.
@@ -310,6 +307,7 @@
       const nextBtn = document.getElementById('vm-pager-next');
       if (nextBtn) nextBtn.disabled = vmPage >= totalPages;
       refreshVmMarkedCount();  // Zähler von „Alle gefilterten markieren“ folgt Suche und Filter
+      vmFilter.render();       // Chip-Zähler (u. a. „Markiert“) folgen der Auswahl
     }
     function setVmPageSize(value) {
       const parsed = parseInt(value, 10);
@@ -324,7 +322,6 @@
 
     window.onVmSearch = onVmSearch;
     window.sortVmTable = sortVmTable;
-    window.setVmFilter = setVmFilter;
     window.toggleVmMarkFiltered = toggleVmMarkFiltered;
     window.vmCheckScope = vmCheckScope;
     window.onVmMarkChange = onVmMarkChange;
@@ -333,7 +330,7 @@
     window.onVmConfigChanged = onVmConfigChanged;
     window.setVmPageSize = setVmPageSize;
     window.stepVmPage = stepVmPage;
-    refreshVmFilterChips();
+    vmFilter.render();
     refreshVmMarkedCount();
     applyVmPaging();
   })();

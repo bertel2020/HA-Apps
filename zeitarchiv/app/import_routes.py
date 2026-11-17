@@ -655,6 +655,20 @@ class ImportService:
                 category_of.update(self.deps.index.category_map_for(all_ids[offset:offset + 500]))
         return areas, categories, category_of
 
+    @staticmethod
+    def _import_filter_groups(entities: list[dict]) -> list[tuple[str, str, list[str]]]:
+        """Auswahl für das Filtermenü der Import-Tabellen (Kategorie, Raum, Typ): die Werte, die in
+        den Zeilen tatsächlich vorkommen, alphabetisch. Gruppen ohne Werte entfallen."""
+        def values(getter) -> list[str]:
+            return sorted({value for value in (getter(entity) for entity in entities) if value}, key=str.casefold)
+
+        groups = [
+            ("category", tr("Kategorie"), values(lambda e: e["category"]["name"] if e.get("category") else "")),
+            ("area", tr("Raum"), values(lambda e: e.get("area") or "")),
+            ("type", tr("Typ"), values(lambda e: e.get("type_label") or "")),
+        ]
+        return [group for group in groups if group[2]]
+
     def _last_import_fields(self, entry: dict | None) -> dict:
         """Spalten „Letzter Import“ und „Importmodus“ für eine Zeile der Import-Tabelle.
         Ohne Eintrag war die Entität noch nie Ziel eines Imports (leer, nicht „0“)."""
@@ -807,6 +821,7 @@ class ImportService:
             "ha_available": ha_available,
             "ha_error": None if ha_available else tr("Supervisor ist in dieser Umgebung nicht verfügbar"),
             "ha_entities": entities,
+            "ha_filter_groups": self._import_filter_groups(entities),
             "ha_has_dry": bool(dry_status),
             "ha_has_status": bool(dry_status) or (cache_entry is not None and availability_error is None),
             "ha_dry_checked_at_label": (
@@ -900,6 +915,7 @@ class ImportService:
                 **self._last_import_fields(last_imports.get(entity_id)),
             })
         return {
+            "vm_filter_groups": self._import_filter_groups(entities),
             "vm_has_areas": bool(areas),
             "vm_has_categories": bool(categories),
             "vm_base_url": base_url,

@@ -21,6 +21,10 @@
   - The previous detailed list stays below the table, collapsed as “Preview details”
   - “Check availability” without a marked entity checks all listed entities and fills “Status” (“Data available” or “No data”); new “Mark all filtered” button; filter chips can be combined (e.g. “Never imported” and “Data available”); search, filter and sorting survive a check
   - The preview runs in the background with a progress display
+- **Import**: Filters
+  - The “Selection” menu filters the Home Assistant, VictoriaMetrics and InfluxDB tables by category, room and type; chosen values appear as tags that can be removed one by one
+  - New state filters: “Not imported for over 30 days”, “Not supported” and “Marked” (Home Assistant), “Data available”, “No data” and “Marked” (VictoriaMetrics, InfluxDB)
+  - Symcon: “Not mapped”, “Mapped”, “Unit differs”, “Without name” and “Marked” show what is still to do in the mapping
 - **Import**: Cancelling checks
   - “Check availability” (Home Assistant, VictoriaMetrics, InfluxDB) can be cancelled while it runs
 - **Import**: Wide layout

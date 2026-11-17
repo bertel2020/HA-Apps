@@ -135,6 +135,9 @@
     function updateUnitCheck(input) {
       const row = input.closest('tr[data-variable-id]');
       if (!row) return;
+      // Nur die Zähler der Filterleiste mitführen; die Sichtbarkeit ändert sich erst beim nächsten
+      // Filterklick, sonst verschwindet die Zeile, während man die Entität noch auswählt.
+      if (symconFilter) setTimeout(() => symconFilter.render(), 0);
       const panel = row.querySelector('.unit-conversion');
       const factor = row.querySelector('.factor-input');
       const option = Array.from(document.querySelectorAll('#entity-datalist option'))
@@ -521,6 +524,7 @@
       });
       rows.forEach(r => table.appendChild(r));
       const markedCount = table.querySelectorAll('tr.marked').length;
+      if (symconFilter) symconFilter.render();  // Zähler „Markiert“
       const chip = document.getElementById('marked-count');
       chip.classList.toggle('active', markedCount > 0);
       chip.textContent = t('{count} markiert',{count: markedCount});
@@ -572,6 +576,21 @@
       applyImportPaging();
     }
     window.sortImportTable = sortImportTable;
+    // Filterleiste: Was an der Zuordnung noch fehlt. Die Zuordnung steht nur im Eingabefeld und die
+    // Einheiten-Warnung im aufgeklappten Faktor-Feld, deshalb lesen die Tests die Zeile selbst.
+    const symconFilterRoot = document.getElementById('symcon-filter');
+    const symconFilter = symconFilterRoot ? window.importFilter.create({
+      root: symconFilterRoot,
+      getRows: () => Array.from(document.querySelectorAll('#import-table tr[data-variable-id]')).filter((row) => !row.classList.contains('unreadable')),
+      onChange: () => { importPage = 1; applyImportPaging(); },
+      tests: {
+        unmapped: (row) => !(row.querySelector('.map-input') && row.querySelector('.map-input').value.trim()),
+        mapped: (row) => !!(row.querySelector('.map-input') && row.querySelector('.map-input').value.trim()),
+        unitdiff: (row) => { const panel = row.querySelector('.unit-conversion'); return !!panel && !panel.hidden; },
+        unnamed: (row) => row.dataset.named !== '1',
+        marked: (row) => row.classList.contains('marked'),
+      },
+    }) : null;
     function applyImportPaging() {
       const table = document.getElementById('import-table');
       if (!table) return;
@@ -586,6 +605,7 @@
       window.importSort.updateArrows(table, importSortKey, importSortDir);
       const isFilteredOut = row =>
         (hideUnreadable && row.classList.contains('unreadable')) ||
+        (symconFilter && !symconFilter.matches(row)) ||
         (importSearch &&
           !row.dataset.variableId.toLowerCase().includes(importSearch) &&
           !(row.dataset.search || '').includes(importSearch));
@@ -620,6 +640,7 @@
       importPage += delta;
       applyImportPaging();
     }
+    if (symconFilter) symconFilter.render();
     applyImportPaging();
 
     if (SCANNING) document.addEventListener('DOMContentLoaded', () => pollUploadProgress());

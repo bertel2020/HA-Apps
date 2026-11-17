@@ -73,11 +73,11 @@ def test_dry_run_fills_status_column_and_filters(client, entities, monkeypatch) 
     assert status_of("sensor.dry_empty") == "none"
     assert status_of("sensor.dry_fail") == "err"
     # Filter-Chips und eingeklappte Details gibt es erst nach einer Vorschau.
-    assert 'data-ha-filter="new"' in html and "ha-dry-details" in html
+    assert 'data-filter-chip="new"' in html and "ha-dry-details" in html
 
     # Die Seite merkt sich die Vorschau für dieselben Einstellungen (Seitenwechsel).
     again = client.post("/import/ha/source", data={**form}).text
-    assert 'data-ha-filter="new"' in again
+    assert 'data-filter-chip="new"' in again
 
 
 def test_finished_preview_is_not_swapped_in_again_on_plain_page_load(client, entities, monkeypatch) -> None:
@@ -124,7 +124,7 @@ def test_check_without_marking_covers_listed_entities_and_marks_nothing(client, 
     assert 'data-status=""' in row("sensor.dry_fail")  # nicht geprüft
     # Nichts ist markiert, obwohl geprüft wurde.
     assert "checked" not in row("sensor.dry_new").split('class="ha-mark-checkbox"')[1].split(">")[0]
-    assert 'data-ha-filter="found"' in html
+    assert 'data-filter-chip="found"' in html
 
 
 def test_check_with_nothing_to_check_reports_it(client, entities) -> None:
@@ -240,7 +240,7 @@ def test_vm_and_influx_tables_show_last_import(client, entities) -> None:
             assert 'data-sort-last=""' not in row and "CSV" in row
             other = table[table.index(f'data-entity-id="{IDS[1]}"'):]
             assert 'data-sort-last=""' in other[: other.index("</tr>")]
-            assert f'id="{prefix}-filter-never"' in html and f'id="{prefix}-mark-filtered"' in html
+            assert f'id="{prefix}-filter"' in html and 'data-filter-chip="never"' in html and f'id="{prefix}-mark-filtered"' in html
     finally:
         import_reports.delete(data_dir, report["id"])
         (data_dir / import_last.FILENAME).unlink(missing_ok=True)

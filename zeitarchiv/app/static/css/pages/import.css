@@ -376,6 +376,19 @@
   .ha-filter-chip:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px;}
   .ha-filter-chip.active{background:var(--accent-line-soft);border-color:var(--accent-line);color:var(--accent-line);font-weight:600;}
   .ha-filter-chip .n{margin-left:5px;font-family:var(--font-mono);opacity:.8;}
+  .ha-filter-bar{display:flex;flex-direction:column;gap:6px;padding:6px 0 10px;}
+  .ha-filter-bar .ha-filter-row{padding:0;}
+  .ha-filter-menu{position:relative;display:inline-block;}
+  .ha-filter-pop{position:absolute;left:0;top:calc(100% + 6px);z-index:20;width:min(560px,86vw);display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;padding:12px 14px;background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 10px 24px -8px rgba(0,0,0,.28);}
+  .ha-filter-pop[hidden]{display:none;}
+  .ha-filter-group h4{margin:0 0 6px;font-size:calc(11px * var(--font-scale, 1));text-transform:uppercase;letter-spacing:.07em;color:var(--ink-faint);font-weight:600;}
+  .ha-filter-group label{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:calc(13px * var(--font-scale, 1));cursor:pointer;}
+  .ha-filter-foot{grid-column:1/-1;margin:0;padding-top:8px;border-top:1px solid var(--border);color:var(--ink-muted);font-size:calc(12px * var(--font-scale, 1));}
+  .ha-filter-tags{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
+  .ha-filter-tags[hidden]{display:none;}
+  .ha-filter-tag{display:inline-flex;align-items:center;gap:4px;padding:2px 4px 2px 9px;background:var(--accent-line-soft);color:var(--accent-line);border:1px solid var(--accent-line);border-radius:6px;font-size:calc(12.5px * var(--font-scale, 1));}
+  .ha-filter-tag button{border:0;background:none;color:inherit;cursor:pointer;font-size:15px;line-height:1;padding:0 4px;}
+  .ha-filter-reset{border:0;background:none;color:var(--ink-muted);text-decoration:underline;cursor:pointer;font:inherit;font-size:calc(12.5px * var(--font-scale, 1));}
   .ha-status-legend{display:flex;flex-wrap:wrap;gap:6px 18px;padding:8px 2px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);}
   .ha-dry-details{margin-top:14px;}
   .ha-dry-details > summary{cursor:pointer;color:var(--ink-muted);font-size:calc(13px * var(--font-scale, 1));padding:6px 0;}

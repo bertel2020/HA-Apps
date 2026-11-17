@@ -21,6 +21,10 @@
   - Die bisherige ausführliche Liste steht eingeklappt als „Details zur Vorschau“ unter der Tabelle
   - „Verfügbarkeit prüfen“ ohne markierte Entität prüft alle angezeigten Entitäten und füllt „Status“ („Daten vorhanden“ oder „Keine Daten“); neuer Knopf „Alle gefilterten markieren“; die Filter lassen sich kombinieren (z. B. „Nie importiert“ und „Daten vorhanden“); Suche, Filter und Sortierung bleiben nach einer Prüfung erhalten
   - Die Vorschau läuft im Hintergrund mit Fortschrittsanzeige
+- **Import**: Filter
+  - Das Menü „Auswahl“ filtert die Tabellen von Home Assistant, VictoriaMetrics und InfluxDB nach Kategorie, Raum und Typ; die gewählten Werte stehen als Tags, die sich einzeln entfernen lassen
+  - Neue Zustandsfilter: „Länger nicht importiert (30 Tage)“, „Nicht unterstützt“ und „Markiert“ (Home Assistant), „Daten vorhanden“, „Keine Daten“ und „Markiert“ (VictoriaMetrics, InfluxDB)
+  - Symcon: „Nicht zugeordnet“, „Zugeordnet“, „Einheit weicht ab“, „Ohne Namen“ und „Markiert“ zeigen, was an der Zuordnung noch zu tun ist
 - **Import**: Prüfungen abbrechen
   - „Verfügbarkeit prüfen“ (Home Assistant, VictoriaMetrics, InfluxDB) lässt sich während der Prüfung abbrechen
 - **Import**: Breite Darstellung

@@ -247,6 +247,7 @@ class InfluxImportService:
                 **self.owner._last_import_fields(last_imports.get(entity_id)),
             })
         return {
+            "influx_filter_groups": self.owner._import_filter_groups(entities),
             "influx_has_areas": bool(areas),
             "influx_has_categories": bool(categories),
             "influx_base_url": config.base_url,

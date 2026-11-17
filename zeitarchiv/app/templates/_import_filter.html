@@ -1,0 +1,36 @@
+{# Filterleiste der Import-Tabellen: Menü „Filter ▾“ für Attribute (Kategorie, Raum, Typ), Zustands-Chips
+   und darunter die gewählten Attribute als Tags. Die Bedienung steckt in js/import-filter.js und hängt
+   nur an den data-filter-*-Attributen, nicht an IDs.
+
+     prefix  Namensraum für die ID der Leiste
+     chips   Liste von (id, Beschriftung); „Alle“ kommt immer dazu
+     groups  Liste von (Schlüssel, Beschriftung, Werte). Der Schlüssel benennt das data-f-<Schlüssel>-Attribut
+             der Zeilen. Ohne Gruppen entfällt das Menü (Symcon). #}
+{% macro filter_bar(prefix, chips, groups=[]) %}
+<div class="ha-filter-bar" id="{{ prefix }}-filter" data-reset-label="{{ _('Attributfilter zurücksetzen') }}">
+  <div class="ha-filter-row">
+    <span class="ha-filter-label">{{ _("Filter") }}</span>
+    {% if groups %}
+    <span class="ha-filter-menu">
+      <button type="button" class="ha-filter-chip" data-filter-menu-btn aria-haspopup="true" aria-expanded="false">{{ _("Auswahl") }} ▾<span class="n" data-filter-menu-count></span></button>
+      <div class="ha-filter-pop" data-filter-pop hidden role="group" aria-label="{{ _('Filter nach Kategorie, Raum und Typ') }}">
+        {% for key, label, values in groups %}
+        <div class="ha-filter-group" data-filter-group="{{ key }}" data-label="{{ label }}">
+          <h4>{{ label }}</h4>
+          {% for value in values %}
+          <label><input type="checkbox" data-filter-attr data-group="{{ key }}" value="{{ value }}"> {{ value }}</label>
+          {% endfor %}
+        </div>
+        {% endfor %}
+        <p class="ha-filter-foot">{{ _("Mehrfachauswahl: innerhalb einer Gruppe ODER, zwischen Gruppen UND") }}</p>
+      </div>
+    </span>
+    {% endif %}
+    <button type="button" class="ha-filter-chip active" data-filter-chip="all">{{ _("Alle") }}<span class="n"></span></button>
+    {% for id, label in chips %}
+    <button type="button" class="ha-filter-chip" data-filter-chip="{{ id }}">{{ label }}<span class="n"></span></button>
+    {% endfor %}
+  </div>
+  <div class="ha-filter-tags" data-filter-tags hidden></div>
+</div>
+{% endmacro %}
