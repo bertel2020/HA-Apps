@@ -14,6 +14,17 @@
 
 ### New
 
+- **Weather dashboard**: time ranges and cards
+  - “PV and brightness” shows 7, 14 or 30 days or a custom range (up to three months)
+  - The hourly PV curve shows either “Selected day” or “Average over the period”; the tooltip also gives the values in kWh
+  - “The last days compared” shows 7, 14 or 30 days
+  - “Daylight”, “The last days compared” and “Day length over the year” are separate cards with a title and a hint
+- **Entities**: filter
+  - A “Filter” menu replaces the four selection fields for type, category, room and unit
+  - The chosen values appear as tags below the bar; remove them one by one or with “Reset all filters”
+- **Charts**: appearance per series
+  - Average line “Rolling only”: shows only the smoothed line, the raw line is hidden (the tooltip still gives the real values)
+  - “In legend” chip per series: switched off, the series stays in the chart and the tooltip but no longer appears in the legend and statistics
 - **Import**: Table on the Home Assistant tab
   - New columns “Category” and “Room” (only if categories or rooms exist), “Status”, “Last import” and “Import mode”; the columns can be shown, hidden and sorted via “Columns”, the choice is remembered per browser
   - “Last import” covers every kind of import; entities that were never imported can be found with “never” and the filter “Never imported”

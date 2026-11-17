@@ -14,6 +14,17 @@
 
 ### Neu
 
+- **Wetterdashboard**: Zeiträume und Karten
+  - „PV und Helligkeit“ zeigt 7, 14 oder 30 Tage oder einen eigenen Zeitraum (bis zu drei Monate)
+  - Die PV-Stundenkurve zeigt wahlweise „Gewählter Tag“ oder „Ø im Zeitraum“; der Tooltip nennt die Werte zusätzlich in kWh
+  - „Die letzten Tage im Vergleich“ zeigt 7, 14 oder 30 Tage
+  - „Tageslicht“, „Die letzten Tage im Vergleich“ und „Tageslänge im Jahresverlauf“ sind eigene Karten mit Titel und Hinweis
+- **Entitäten**: Filter
+  - Ein Menü „Filter“ ersetzt die vier Auswahlfelder für Typ, Kategorie, Raum und Einheit
+  - Die gewählten Werte stehen als Tags unter der Leiste, einzeln entfernbar oder mit „Alle Filter zurücksetzen“
+- **Charts**: Darstellung je Serie
+  - Durchschnittslinie „Nur gleitend“: zeigt nur die geglättete Linie, die Rohlinie ist ausgeblendet (im Tooltip stehen weiter die echten Werte)
+  - Chip „In Legende“ je Serie: ausgeschaltet bleibt die Serie im Diagramm und im Tooltip, steht aber nicht mehr in Legende und Statistik
 - **Import**: Tabelle im Reiter Home Assistant
   - Neue Spalten „Kategorie“ und „Raum“ (nur, wenn es Kategorien oder Räume gibt), „Status“, „Letzter Import“ und „Importmodus“; die Spalten lassen sich über „Spalten“ ein- und ausblenden und sortieren, die Auswahl wird pro Browser gemerkt
   - „Letzter Import“ erfasst jede Importart; nie importierte Entitäten findest du mit „nie“ und dem Filter „Nie importiert“
