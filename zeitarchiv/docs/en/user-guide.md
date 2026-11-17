@@ -96,7 +96,7 @@ internals for developers are in the other documents of this folder (see
   - [Symcon](#symcon)
   - [CSV](#csv)
   - [Home Assistant](#home-assistant)
-  - [InfluxDB](#influxdb-experimental)
+  - [InfluxDB](#influxdb)
   - [Reports](#reports)
   - [Duplicate protection](#duplicate-protection)
   - [CSV export](#csv-export)
@@ -2541,7 +2541,8 @@ rest of the day without interrupting the rotation.
 
 ## Import and export
 
-Reachable via **Import**, four tabs:
+Reachable via **Import** with the tabs Home Assistant (opened first), Symcon,
+VictoriaMetrics, InfluxDB, CSV file and Reports:
 
 ### Symcon
 
@@ -2598,12 +2599,45 @@ Procedure: choose import mode and period (the available presets differ by
 source — for long-term statistics, for example, "Last year" is additionally
 available), optionally "Check availability" for a preview of which entities in
 Home Assistant actually have data of the chosen source and for which period.
-Only the marked entities are checked; unmarked rows remain unchanged. The check
+The marked entities are checked; if none is marked, all listed ones, so with an
+active filter only the hits. The selection stays unchanged, the check marks
+nothing. The check
 result is kept per source/resolution — even after a page change or a switch
 between full import, raw history and long-term statistics, until the next
 restart of the add-on. A status chip to the right of "Check availability"
 shows the running check status and afterwards the time of the last check; from
 15 minutes on, a notice appears that the state may be outdated.
+
+The table shows for each entity type, unit, category and room (the latter two
+only if categories or rooms exist), "Kind" and "Available" from the availability
+check, the **status**, the **last import** and optionally the **import mode**.
+"Columns" shows and hides columns (the choice is remembered per browser; the
+import mode is hidden at first); a click on a heading sorts.
+
+- **Status:** "Not checked", after "Check availability" "Data available" or "No
+  data", after a preview "Importable" (with the number of new rows), "Complete"
+  (nothing left to import), "No data" or "Error". The result of the preview
+  takes precedence over that of the check.
+- **Last import:** time of the entity's last completed import, whether from
+  Home Assistant, CSV, Symcon, VictoriaMetrics or InfluxDB; "never" if there is
+  none. It also stays when the corresponding report is deleted. Sorted
+  ascending, the never-imported entities come first. The **import mode** names
+  the kind of that import.
+- **Filters:** chips above the table with a count: "Never imported", "Data
+  available" (after a check or preview) as well as "Importable", "Complete" and
+  "Errors / no data" (after a preview). The chips can be combined: "Never
+  imported" and "Data available" give exactly the entities that are still
+  missing. Search, filters, sorting and page are kept when the table is redrawn
+  after a check or preview.
+- **Marking:** the header checkbox marks the rows of the current page, "Mark
+  all filtered" all hits of search and filters, also on other pages (and
+  removes the marking again).
+
+The preview (dry run) fetches the data per entity from Home Assistant just
+like the import and therefore runs in the background with a progress display
+(entity by entity); it writes nothing. Its result appears as the status in the
+table, the detailed list per entity below it, collapsed, under "Preview
+details".
 
 With the full import, raw and statistics periods are chosen separately. The
 dry run reports for each entity both ranges used, the calculated interface,
@@ -2631,7 +2665,7 @@ This import requires the add-on permission `homeassistant_api` as well as a
 Home Assistant installation with Supervisor (not available with Home
 Assistant Container).
 
-### InfluxDB (experimental)
+### InfluxDB
 
 One-off import of the history from a standalone **InfluxDB 1.x** that the Home
 Assistant `influxdb` integration has written to (InfluxDB 2.x and 3.x are not

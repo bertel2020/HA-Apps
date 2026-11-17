@@ -96,6 +96,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
   - [Symcon](#symcon)
   - [CSV](#csv)
   - [Home Assistant](#home-assistant)
+  - [InfluxDB](#influxdb)
   - [Reports](#reports)
   - [Duplikatschutz](#duplikatschutz)
   - [CSV-Export](#csv-export)
@@ -2733,7 +2734,8 @@ unterbrechen.
 
 ## Import und Export
 
-Erreichbar über **Import**, vier Reiter:
+Erreichbar über **Import** mit den Reitern Home Assistant (zuerst geöffnet), Symcon,
+VictoriaMetrics, InfluxDB, CSV-Datei und Reports:
 
 ### Symcon
 
@@ -2793,14 +2795,46 @@ Ablauf: Importmodus und Zeitraum wählen (die verfügbaren Voreinstellungen unte
 sich je nach Quelle — bei Langzeitstatistik steht z. B. zusätzlich "Letztes
 Jahr" zur Verfügung), optional "Verfügbarkeit prüfen" für eine Vorschau,
 welche Entitäten in Home Assistant tatsächlich Daten der gewählten Quelle
-haben und für welchen Zeitraum. Geprüft werden dabei ausschließlich die
-markierten Entitäten; unmarkierte Zeilen bleiben unverändert. Das
+haben und für welchen Zeitraum. Geprüft werden die markierten Entitäten; ist nichts markiert, alle
+angezeigten, also bei aktivem Filter nur die Treffer. Die Auswahl bleibt dabei
+unverändert, die Prüfung markiert nichts. Das
 Prüfergebnis bleibt je Quelle/Auflösung erhalten — auch nach einem
 Seitenwechsel oder einem Wechsel zwischen
 Vollimport, Rohhistorie und Langzeitstatistik, bis zum nächsten Neustart des Add-ons.
 Ein Status-Chip rechts neben "Verfügbarkeit prüfen" zeigt den laufenden
 Prüfstatus und anschließend den Zeitpunkt der letzten Prüfung; ab 15 Minuten
 erscheint ein Hinweis, dass der Stand veraltet sein könnte.
+
+Die Tabelle zeigt je Entität Typ, Einheit, Kategorie und Raum (beide nur,
+wenn es Kategorien bzw. Räume gibt), „Art“ und „Verfügbar“ aus der
+Verfügbarkeitsprüfung, den **Status**, den **letzten Import** und optional den
+**Importmodus**. Über „Spalten“ lassen sich Spalten ein- und ausblenden (die
+Auswahl wird pro Browser gemerkt, der Importmodus ist zunächst ausgeblendet);
+ein Klick auf eine Überschrift sortiert.
+
+- **Status:** „Nicht geprüft“, nach „Verfügbarkeit prüfen“ „Daten vorhanden“ oder
+  „Keine Daten“, nach einer Vorschau „Importierbar“ (mit der Zahl neuer Zeilen),
+  „Vollständig“ (nichts mehr zu importieren), „Keine Daten“ oder „Fehler“. Das
+  Ergebnis der Vorschau hat Vorrang vor dem der Prüfung.
+- **Letzter Import:** Zeitpunkt des letzten abgeschlossenen Imports der
+  Entität, egal ob aus Home Assistant, CSV, Symcon, VictoriaMetrics oder
+  InfluxDB; „nie“, wenn es keinen gibt. Er bleibt auch erhalten, wenn der
+  zugehörige Report gelöscht wird. Aufsteigend sortiert stehen die nie
+  importierten Entitäten oben. Der **Importmodus** nennt die Art dieses Imports.
+- **Filter:** Chips über der Tabelle mit Zähler: „Nie importiert“, „Daten
+  vorhanden“ (nach Prüfung oder Vorschau) sowie „Importierbar“, „Vollständig“
+  und „Fehler / keine Daten“ (nach einer Vorschau). Die Chips lassen sich
+  kombinieren: „Nie importiert“ und „Daten vorhanden“ ergeben genau die
+  Entitäten, die noch fehlen. Suche, Filter, Sortierung und Seite bleiben
+  erhalten, wenn die Tabelle nach Prüfung oder Vorschau neu gezeichnet wird.
+- **Markieren:** Die Kopf-Checkbox markiert die Zeilen der aktuellen Seite,
+  „Alle gefilterten markieren“ alle Treffer von Suche und Filtern, auch auf
+  anderen Seiten (und hebt die Markierung wieder auf).
+
+Die Vorschau (Dry Run) holt wie der Import die Daten je Entität aus Home
+Assistant und läuft deshalb im Hintergrund mit Fortschrittsanzeige (Entität für
+Entität); sie schreibt nichts. Ihr Ergebnis steht als Status in der Tabelle, die
+ausführliche Liste je Entität darunter eingeklappt unter „Details zur Vorschau“.
 
 Beim Vollimport werden Roh- und Statistikzeitraum getrennt gewählt. Der Dry
 Run weist je Entität beide verwendeten Bereiche, die berechnete Schnittstelle,
@@ -2829,7 +2863,7 @@ Dieser Import benötigt die Add-on-Berechtigung `homeassistant_api` sowie
 eine Home-Assistant-Installation mit Supervisor (steht bei Home Assistant
 Container nicht zur Verfügung).
 
-### InfluxDB (experimentell)
+### InfluxDB
 
 Einmaliger Import der Historie aus einer eigenständigen **InfluxDB 1.x**, in
 die die Home-Assistant-Integration `influxdb` geschrieben hat (InfluxDB 2.x
