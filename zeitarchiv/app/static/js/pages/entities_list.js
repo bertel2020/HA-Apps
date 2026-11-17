@@ -199,6 +199,14 @@
         el.append(x);
         return el;
       }));
+      if (tags.length > 1) {
+        const reset = document.createElement('button');
+        reset.type = 'button';
+        reset.className = 'ent-filter-reset';
+        reset.textContent = t('Alle Filter zurücksetzen');
+        reset.addEventListener('click', resetAllFilters);
+        box.append(reset);
+      }
       box.hidden = !tags.length;
       document.getElementById('ent-filter-count').textContent = tags.length ? ` ${tags.length}` : '';
       document.getElementById('ent-filter-btn').classList.toggle('is-active', tags.length > 0);
@@ -206,6 +214,15 @@
       const any = ['type-filter-wrap', 'category-filter-wrap', 'area-filter-wrap', 'unit-filter-wrap']
         .some(id => { const w = document.getElementById(id); return w && w.style.display !== 'none'; });
       document.getElementById('ent-filter-wrap').style.display = any ? '' : 'none';
+    }
+    // Alle Filter auf einmal zurücknehmen: ein einziges change-Ereignis lädt die Liste nur einmal neu.
+    function resetAllFilters() {
+      ['type', 'category', 'area'].forEach(key => {
+        document.querySelectorAll(`input[name=${key}]`).forEach(cb => cb.checked = cb.value === 'all');
+      });
+      document.getElementById('unit-filter-input').value = 'all';
+      resetEntitiesPage();
+      document.getElementById('unit-filter-input').dispatchEvent(new Event('change', {bubbles: true}));
     }
     const updateTypeFilterLabel = updateFilterSummary;
     const updateCategoryFilterLabel = updateFilterSummary;
