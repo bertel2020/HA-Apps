@@ -19,6 +19,8 @@
   - „Letzter Import“ erfasst jede Importart; nie importierte Entitäten findest du mit „nie“ und dem Filter „Nie importiert“
   - Die Vorschau (Dry Run) trägt ihr Ergebnis in die Tabelle ein: importierbar, vollständig, keine Daten oder Fehler; Filter und eine Legende stehen über und unter der Tabelle
   - Die bisherige ausführliche Liste steht eingeklappt als „Details zur Vorschau“ unter der Tabelle
+  - „Verfügbarkeit prüfen“ ohne markierte Entität prüft alle angezeigten Entitäten und füllt „Status“ („Daten vorhanden“ oder „Keine Daten“); neuer Knopf „Alle gefilterten markieren“; die Filter lassen sich kombinieren (z. B. „Nie importiert“ und „Daten vorhanden“); Suche, Filter und Sortierung bleiben nach einer Prüfung erhalten
+  - Die Vorschau läuft im Hintergrund mit Fortschrittsanzeige
 - **Import**: Breite Darstellung
   - Die Importseite folgt der Einstellung „Breite Darstellung“
 

@@ -19,6 +19,8 @@
   - “Last import” covers every kind of import; entities that were never imported can be found with “never” and the filter “Never imported”
   - The preview (dry run) writes its result into the table: importable, complete, no data or error; filters and a legend sit above and below the table
   - The previous detailed list stays below the table, collapsed as “Preview details”
+  - “Check availability” without a marked entity checks all listed entities and fills “Status” (“Data available” or “No data”); new “Mark all filtered” button; filter chips can be combined (e.g. “Never imported” and “Data available”); search, filter and sorting survive a check
+  - The preview runs in the background with a progress display
 - **Import**: Wide layout
   - The Import page follows the “Wide layout” setting
 
