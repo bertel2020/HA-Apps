@@ -259,6 +259,9 @@ class ImportService:
         # Schlüssel wie die Verfügbarkeit), nur im Prozessspeicher: eine
         # Vorschau ist jederzeit per Klick neu abrufbar und kein Importzustand.
         self._ha_dry_run_lock = threading.Lock()
+        # Formularparameter der zuletzt gestarteten Vorschau: das Poll-Ziel zeichnet die Sektion
+        # damit neu, sobald der Auftrag durch ist.
+        self._ha_dry_run_request: dict | None = None
         self._ha_dry_run_status: dict[str, dict[str, dict]] = {}
         self._vm_progress = JobProgress("vm-import", unit=N_("Entitäten"), label=N_("VictoriaMetrics-Import"))
         # Genau ein Eintrag (zuletzt geprüfte Adresse/Zeitraum) statt eines
@@ -617,6 +620,23 @@ class ImportService:
             entry = self._ha_dry_run_status.setdefault(key, {})
             for entity_id, status in statuses.items():
                 entry[entity_id] = {**status, "at": now}
+
+    def _ha_dry_run_section(
+        self, request: Request, params: dict, items: list[dict], errors: list[str], *, retarget: bool = False,
+    ) -> HTMLResponse:
+        """Die Sektion mit Status in der Tabelle und der eingeklappten Detailliste.
+        ``retarget``: Antwort auf das Poll-Ziel der Fortschrittsanzeige, die sich selbst per
+        outerHTML ersetzt — die neue Sektion muss stattdessen die ganze alte ersetzen."""
+        context = self._ha_import_context(**params)
+        context["ha_dry_run"] = {
+            "items": items, "errors": errors,
+            "history_source": params["history_source"], "period": params["period"],
+        }
+        response = self.deps.templates.TemplateResponse(request, "_ha_import_section.html", context)
+        if retarget:
+            response.headers["HX-Retarget"] = "#ha-section"
+            response.headers["HX-Reswap"] = "outerHTML"
+        return response
 
     def _last_import_fields(self, entry: dict | None) -> dict:
         """Spalten „Letzter Import“ und „Importmodus“ für eine Zeile der Import-Tabelle.
@@ -1174,7 +1194,10 @@ class ImportService:
         return {
             **self._ha_progress.snapshot(),
             "progress_id": "ha-progress",
-            "poll_url": "import/ha/progress",
+            # Die Vorschau zeichnet am Ende die ganze Sektion neu; das tut nur das Poll-Ziel
+            # mit ?watch=dry-run. Ein bloßes Neuladen der Seite (ohne Parameter) soll die
+            # Sektion nach einer früheren Vorschau nicht noch einmal austauschen.
+            "poll_url": "import/ha/progress?watch=dry-run" if self._ha_progress.snapshot()["kind"] == "dry-run" else "import/ha/progress",
         }
 
 
@@ -3023,12 +3046,18 @@ class ImportService:
         async def import_ha_dry_run(request: Request) -> HTMLResponse:
             """Vorschau ohne Schreibvorgang. Das Ergebnis steht als Status je
             Entität direkt in der Tabelle (Spalte „Status“, siehe
-            _ha_dry_run_statuses()); die Antwort rendert deshalb die ganze
-            Sektion neu, wie die Verfügbarkeitsprüfung. Die ausführliche Liste
-            (eigene Vorlage _ha_import_dry_run.html statt der mit Symcon/CSV
-            geteilten _import_dry_run.html: sie zeigt zusätzlich den in HA
-            gefundenen Zeitraum/Punkteanzahl je Entität) steht eingeklappt
-            darunter, damit keine Angabe verloren geht."""
+            _ha_dry_run_statuses()); die Sektion wird deshalb am Ende neu
+            gezeichnet, wie nach der Verfügbarkeitsprüfung. Die ausführliche
+            Liste (eigene Vorlage _ha_import_dry_run.html statt der mit
+            Symcon/CSV geteilten _import_dry_run.html: sie zeigt zusätzlich den
+            in HA gefundenen Zeitraum/Punkteanzahl je Entität) steht
+            eingeklappt darunter, damit keine Angabe verloren geht.
+
+            Läuft im Hintergrund mit Fortschrittsanzeige, denn die Vorschau
+            holt wie der Import einen Roundtrip je Entität: bei einer
+            dreistelligen Auswahl sind das Minuten. Sie teilt sich den Auftrag
+            mit dem Import (``kind="dry-run"``), die beiden dürfen ohnehin nie
+            gleichzeitig laufen."""
             form = await request.form()
             (
                 raw_entity_ids, range_preset, date_from, date_to,
@@ -3036,97 +3065,115 @@ class ImportService:
             ) = self._ha_form_params(form)
             history_source, period = self._ha_source_params(form)
             entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
-            items: list[dict] = []
-            errors: list[str] = [tr("{entity_id}: nicht in Zeitarchiv bekannt", entity_id=entity_id) for entity_id in unknown_ids]
-            def render_section(statuses: dict[str, dict] | None = None) -> HTMLResponse:
-                if statuses:
-                    self._ha_dry_run_store(
-                        self._ha_cache_key(
-                            history_source, period, range_preset, stats_range_preset, include_long_term_stats,
-                        ),
-                        statuses,
-                    )
-                section_context = self._ha_import_context(
-                    selected_ids=set(raw_entity_ids), range_preset=range_preset,
-                    date_from=date_from, date_to=date_to,
-                    history_source=history_source, period=period,
-                    include_existing_months=include_existing_months,
-                    stats_range_preset=stats_range_preset,
-                    include_long_term_stats=include_long_term_stats,
-                )
-                section_context["ha_dry_run"] = {
-                    "items": items, "errors": errors, "history_source": history_source, "period": period,
-                }
-                return self.deps.templates.TemplateResponse(request, "_ha_import_section.html", section_context)
-
+            vorab_fehler = [tr("{entity_id}: nicht in Zeitarchiv bekannt", entity_id=entity_id) for entity_id in unknown_ids]
+            params = {
+                "selected_ids": set(raw_entity_ids), "range_preset": range_preset,
+                "date_from": date_from, "date_to": date_to,
+                "history_source": history_source, "period": period,
+                "include_existing_months": include_existing_months,
+                "stats_range_preset": stats_range_preset,
+                "include_long_term_stats": include_long_term_stats,
+            }
             if not entity_ids:
                 if not unknown_ids:
-                    errors.append(tr("Bitte mindestens eine Entität auswählen."))
-                return render_section()
+                    vorab_fehler.append(tr("Bitte mindestens eine Entität auswählen."))
+                return self._ha_dry_run_section(request, params, [], vorab_fehler)
 
-            start, stats_start, end = self._ha_request_ranges(
-                range_preset, date_from, date_to, history_source, stats_range_preset
-            )
-            if history_source == "full":
-                fetched, fetch_errors = await run_in_threadpool(
-                    self._fetch_ha_full_history,
-                    entity_ids, start, stats_start, end, include_long_term_stats,
+            def run_dry_run() -> dict:
+                items: list[dict] = []
+                errors: list[str] = list(vorab_fehler)
+                start, stats_start, end = self._ha_request_ranges(
+                    range_preset, date_from, date_to, history_source, stats_range_preset
                 )
-            else:
-                fetched, fetch_errors = await run_in_threadpool(
-                    self._fetch_ha_history, entity_ids, start, end, history_source, period
+
+                def melde_entitaet(nummer: int, entity_id: str) -> None:
+                    self._ha_progress.advance(nummer, entity_id)
+
+                # Der Vollimport holt je Entität zwei Dinge nacheinander
+                # (Rohhistorie, danach Statistik) und zählt deshalb gegen 2n —
+                # siehe _fetch_ha_full_history().
+                schritte = 2 * len(entity_ids) if history_source == "full" else len(entity_ids)
+                self._ha_progress.set_phase(
+                    N_("Schritt 1/2 · Daten werden aus Home Assistant geholt…"), schritte, unit=N_("Abrufe"),
                 )
-            errors.extend(fetch_errors)
+                if history_source == "full":
+                    fetched, fetch_errors = self._fetch_ha_full_history(
+                        entity_ids, start, stats_start, end, include_long_term_stats, on_entity=melde_entitaet,
+                    )
+                else:
+                    fetched, fetch_errors = self._fetch_ha_history(
+                        entity_ids, start, end, history_source, period, on_entity=melde_entitaet,
+                    )
+                errors.extend(fetch_errors)
 
-            def plan_locked() -> list[dict]:
-                with self.deps.coordinator.entities(list(fetched.keys())):
-                    result = []
-                    for entity_id, history in fetched.items():
-                        entity = self.deps.index.get_entity(entity_id)
-                        try:
-                            plan = symcon_import.plan_import_rows(
-                                self.deps.data_dir, self.deps.index, history.rows, entity_id, self.deps.tz,
-                                source_label=entity_id, skipped_rows=history.skipped,
-                                include_existing_months=include_existing_months, accepts_state=True,
-                            )
-                        except ValueError as exc:
-                            errors.append(f"{entity_id}: {exc}")
-                            continue
-                        result.append({
-                            "entity_id": entity_id,
-                            "friendly_name": entity_display_name(
-                                entity_id,
-                                entity["friendly_name"] if entity else None,
-                                entity["custom_name"] if entity else None,
-                            ),
-                            "available_label": self._ha_available_label(history, history_source),
-                            "source_rows": len(history.rows),
-                            "plan": plan,
-                            "full_summary": (
-                                self._ha_full_summary(history) if history_source == "full" else None
-                            ),
-                        })
-                    return result
+                if fetched:
+                    self._ha_progress.set_phase(
+                        N_("Schritt 2/2 · Vorschau wird berechnet…"), len(fetched), unit=N_("Entitäten"),
+                    )
+                    with self.deps.coordinator.entities(list(fetched.keys())):
+                        for nummer, (entity_id, history) in enumerate(fetched.items()):
+                            self._ha_progress.advance(nummer, entity_id)
+                            entity = self.deps.index.get_entity(entity_id)
+                            try:
+                                plan = symcon_import.plan_import_rows(
+                                    self.deps.data_dir, self.deps.index, history.rows, entity_id, self.deps.tz,
+                                    source_label=entity_id, skipped_rows=history.skipped,
+                                    include_existing_months=include_existing_months, accepts_state=True,
+                                )
+                            except ValueError as exc:
+                                errors.append(f"{entity_id}: {exc}")
+                                continue
+                            items.append({
+                                "entity_id": entity_id,
+                                "friendly_name": entity_display_name(
+                                    entity_id,
+                                    entity["friendly_name"] if entity else None,
+                                    entity["custom_name"] if entity else None,
+                                ),
+                                "available_label": self._ha_available_label(history, history_source),
+                                "source_rows": len(history.rows),
+                                "plan": plan,
+                                "full_summary": (
+                                    self._ha_full_summary(history) if history_source == "full" else None
+                                ),
+                            })
+                    self._ha_progress.advance(len(fetched), "")
+                # DEBUG statt INFO: Vorschauen ändern nichts (dieselbe Zurückhaltung
+                # wie beim Symcon-/CSV-Dry-Run, die ebenfalls nicht loggen) — aber
+                # anders als dort macht dieser Dry-Run einen echten HA-API-/WS-Aufruf,
+                # dessen Planungsergebnis bei der Fehlersuche wertvoll sein kann.
+                logger.debug(
+                    "HA-Dry-Run · Quelle=%s · Entitäten=%d · geplante Zeilen=%d · Fehler=%d",
+                    history_source,
+                    len(items),
+                    sum(
+                        item["plan"].rows_to_import
+                        + item["plan"].rows_to_merge
+                        + item["plan"].rows_to_update
+                        for item in items
+                    ),
+                    len(errors),
+                )
+                self._ha_dry_run_store(
+                    self._ha_cache_key(
+                        history_source, period, range_preset, stats_range_preset, include_long_term_stats,
+                    ),
+                    self._ha_dry_run_statuses(entity_ids, items, errors),
+                )
+                return {"items": items, "errors": errors}
 
-            if fetched:
-                items = await run_in_threadpool(plan_locked)
-            # DEBUG statt INFO: Vorschauen ändern nichts (dieselbe Zurückhaltung
-            # wie beim Symcon-/CSV-Dry-Run, die ebenfalls nicht loggen) — aber
-            # anders als dort macht dieser Dry-Run einen echten HA-API-/WS-Aufruf,
-            # dessen Planungsergebnis bei der Fehlersuche wertvoll sein kann.
-            logger.debug(
-                "HA-Dry-Run · Quelle=%s · Entitäten=%d · geplante Zeilen=%d · Fehler=%d",
-                history_source,
-                len(items),
-                sum(
-                    item["plan"].rows_to_import
-                    + item["plan"].rows_to_merge
-                    + item["plan"].rows_to_update
-                    for item in items
-                ),
-                len(errors),
+            previous = self._ha_dry_run_request
+            self._ha_dry_run_request = params
+            try:
+                self._ha_progress.start(run_dry_run, logger, kind="dry-run")
+            except JobBusy:
+                # Läuft schon etwas (Import oder eine frühere Vorschau): deren Anzeige
+                # zeigen und die Parameter der laufenden Vorschau nicht überschreiben.
+                self._ha_dry_run_request = previous
+                logger.info("HA-Auftrag bereits aktiv · event=ha_job_already_running")
+            return self.deps.templates.TemplateResponse(
+                request, "_job_progress.html", self._ha_progress_context()
             )
-            return render_section(self._ha_dry_run_statuses(entity_ids, items, errors))
 
 
         @router.post("/import/ha/debug")
@@ -3441,6 +3488,18 @@ class ImportService:
             if stand["running"]:
                 return self.deps.templates.TemplateResponse(
                     request, "_job_progress.html", self._ha_progress_context()
+                )
+            if stand["kind"] == "dry-run":
+                # Eine fertige Vorschau steht dauerhaft in der Status-Spalte; sie wird nur dem
+                # Fenster geliefert, das auf sie gewartet hat.
+                if request.query_params.get("watch") != "dry-run" or self._ha_dry_run_request is None:
+                    return HTMLResponse("")
+                vorschau = stand["result"] or {}
+                fehler = list(vorschau.get("errors", []))
+                if stand["error"]:
+                    fehler.append(f"Abgebrochen: {stand['error']}")
+                return self._ha_dry_run_section(
+                    request, self._ha_dry_run_request, vorschau.get("items", []), fehler, retarget=True,
                 )
             ergebnis = dict(stand["result"] or {"history_source": "raw", "period": "", "items": [], "errors": []})
             if stand["error"]:

@@ -134,7 +134,7 @@
       {# Der Dry Run holt dieselben Daten wie der Import (ein Roundtrip je
          Entität), schreibt aber nichts und hat deshalb keine Zahl, gegen die
          ein Balken laufen könnte — hier reicht der Läuft-Chip. #}
-      <button type="button" class="btn" hx-post="import/ha/dry-run" hx-include="#ha-form" hx-target="#ha-section" hx-swap="outerHTML"
+      <button type="button" class="btn" hx-post="import/ha/dry-run" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML"
               hx-disabled-elt="this">{{ _("Vorschau (Dry Run)") }}</button>
       <button type="button" class="btn primary" hx-post="import/ha/start" hx-include="#ha-form" hx-target="#ha-import-output" hx-swap="innerHTML"
               hx-disabled-elt="this">{{ _("Vollimport starten") if ha_history_source == "full" else _("Import starten") }}</button>

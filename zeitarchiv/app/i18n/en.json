@@ -2164,6 +2164,7 @@
     "CSV-Import": "CSV import",
     "Home-Assistant-Import": "Home Assistant import",
     "Schritt 1/2 · Daten werden aus Home Assistant geholt…": "Step 1/2 · Fetching data from Home Assistant…",
+    "Schritt 2/2 · Vorschau wird berechnet…": "Step 2/2 · Calculating preview…",
     "Schritt 2/2 · Werte werden geschrieben…": "Step 2/2 · Writing values…",
     "Importbericht wird geschrieben…": "Writing import report…",
     "Abrufe": "Requests",

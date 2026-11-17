@@ -29,10 +29,25 @@ def entities(client):
             main.index.delete_entity(entity_id)
 
 
+def _run_dry_run(client, form):
+    """Startet die Vorschau (Hintergrundauftrag) und wartet auf die fertige Sektion."""
+    started = client.post("/import/ha/dry-run", data=form)
+    assert "job-progress" in started.text  # sofort die Fortschrittsanzeige, keine Tabelle
+    for _ in range(100):
+        polled = client.get("/import/ha/progress?watch=dry-run")
+        if 'id="ha-section"' in polled.text:
+            return polled
+        time.sleep(0.05)
+    raise AssertionError("Vorschau wurde nicht fertig")
+
+
 def _fake_fetch(self, entity_ids, start, end, history_source, period, on_entity=None):
     from app.storage import ha_import
 
     now = time.time()
+    if on_entity:
+        for nummer, entity_id in enumerate(entity_ids):
+            on_entity(nummer, entity_id)
     fetched = {
         "sensor.dry_new": ha_import.HistoryFetchResult(rows=[(now - 3600, 1.0), (now - 1800, 2.0)]),
         "sensor.dry_empty": ha_import.HistoryFetchResult(rows=[]),
@@ -45,7 +60,10 @@ def test_dry_run_fills_status_column_and_filters(client, entities, monkeypatch) 
 
     monkeypatch.setattr(import_routes.ImportService, "_fetch_ha_history", _fake_fetch)
     form = {"entity_ids": IDS, "history_source": "raw", "period": "hour", "range_preset": "max"}
-    html = client.post("/import/ha/dry-run", data=form).text
+    response = _run_dry_run(client, form)
+    html = response.text
+    # Die fertige Sektion ersetzt die ganze alte, nicht nur die Fortschrittsanzeige.
+    assert response.headers["HX-Retarget"] == "#ha-section" and response.headers["HX-Reswap"] == "outerHTML"
 
     def status_of(entity_id: str) -> str:
         row = html[html.index(f'data-entity-id="{entity_id}"'):]
@@ -60,6 +78,15 @@ def test_dry_run_fills_status_column_and_filters(client, entities, monkeypatch) 
     # Die Seite merkt sich die Vorschau für dieselben Einstellungen (Seitenwechsel).
     again = client.post("/import/ha/source", data={**form}).text
     assert 'data-ha-filter="new"' in again
+
+
+def test_finished_preview_is_not_swapped_in_again_on_plain_page_load(client, entities, monkeypatch) -> None:
+    """Das Neuladen der Seite fragt das Poll-Ziel ohne ?watch: nach einer Vorschau kommt nichts zurück."""
+    from app import import_routes
+
+    monkeypatch.setattr(import_routes.ImportService, "_fetch_ha_history", _fake_fetch)
+    _run_dry_run(client, {"entity_ids": IDS, "history_source": "raw", "period": "hour", "range_preset": "max"})
+    assert client.get("/import/ha/progress").text == ""
 
 
 def test_dry_run_without_selection_reports_error_in_table_page(client, entities) -> None:
