@@ -1044,17 +1044,24 @@
     return {shown: ranked.slice(0, MAX_STACKED_PRODUCERS - 1), rest: ranked.slice(MAX_STACKED_PRODUCERS - 1)};
   }
 
+  // Breite eines Diagramms; ist es gerade verborgen, die des nächsten sichtbaren Elternelements oder des Fensters.
+  function visibleWidth(element) {
+    let node = element;
+    while (node && !node.clientWidth) node = node.parentElement;
+    return (node && node.clientWidth) || Math.max(window.innerWidth - 48, 280);
+  }
+
   // Vier Balken je Jahr; das laufende Jahr in „Komplett“ blass und gestrichelt. Bei mehreren Erzeugern ist der Balken „Erzeugung“
   // je Erzeuger gestapelt (Abstufungen der Farbe der Erzeugung), die Summe steht im Tooltip.
-  function yearBars(data, rows, colors, narrow) {
+  function yearBars(data, rows, colors, width) {
     const defs = [
       ['erzeugung', t('Erzeugung'), cssVar('--energy-solar')], ['netzbezug', t('Netzbezug'), cssVar('--energy-grid')],
       ['einspeisung', t('Einspeisung'), cssVar('--energy-export')], ['verbrauch', t('Verbrauch'), cssVar('--ink-faint')],
     ].filter(([key]) => data.roles.includes(key));
-    return {
+    const option = {
       animation: false,
-      // Schmal bricht die Legende in zwei Zeilen um: Platz nach oben, sonst überdeckt sie die Einheit.
-      grid: {left: 8, right: 12, top: narrow ? 80 : 36, bottom: 8, containLabel: true},
+      // Die Legende bricht um (bei mehreren Erzeugern schon auf dem Handy in drei Zeilen): Platz nach oben, sonst überdeckt sie die Einheit.
+      grid: {left: 8, right: 12, top: 36, bottom: 8, containLabel: true},
       legend: {top: 0, textStyle: {color: colors.text, fontSize: scaledFont(12)}, itemWidth: 12, itemHeight: 8},
       xAxis: {type: 'category', data: rows.map(yearLabel), ...yearAxis(colors, scaledFont(11)), splitLine: {show: false}},
       yAxis: {
@@ -1092,6 +1099,16 @@
         });
       }),
     };
+    const font = scaledFont(12);
+    let legendRows = 1;
+    let used = 0;
+    option.series.forEach((entry) => {
+      const item = 12 + 5 + String(entry.name).length * font * 0.58 + 10;
+      if (used && used + item > Math.max(width - 16, 120)) { legendRows += 1; used = 0; }
+      used += item;
+    });
+    option.grid.top = Math.max(36, legendRows * (font + 10) + 14);
+    return option;
   }
 
   // Anteile: „from“ = woher der Verbrauch kam (eigene Erzeugung, Netz), „to“ = wohin die Erzeugung ging (selbst genutzt, eingespeist).
@@ -1661,7 +1678,7 @@
           chart.setOption(option, true);
           requestAnimationFrame(() => chart.resize());
         };
-        if (this.jbMode === 'kwh') draw('jbBars', yearBars(data, rows, colors, (this.$refs.jbBars || {}).clientWidth < 520));
+        if (this.jbMode === 'kwh') draw('jbBars', yearBars(data, rows, colors, visibleWidth(this.$refs.jbBars)));
         else {
           draw('jbFrom', yearShares(rows, colors, 'from'));
           if (data.roles.includes('erzeugung')) draw('jbTo', yearShares(rows, colors, 'to'));
