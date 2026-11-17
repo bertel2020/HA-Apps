@@ -21,6 +21,8 @@
   - Die bisherige ausführliche Liste steht eingeklappt als „Details zur Vorschau“ unter der Tabelle
   - „Verfügbarkeit prüfen“ ohne markierte Entität prüft alle angezeigten Entitäten und füllt „Status“ („Daten vorhanden“ oder „Keine Daten“); neuer Knopf „Alle gefilterten markieren“; die Filter lassen sich kombinieren (z. B. „Nie importiert“ und „Daten vorhanden“); Suche, Filter und Sortierung bleiben nach einer Prüfung erhalten
   - Die Vorschau läuft im Hintergrund mit Fortschrittsanzeige
+- **Import**: Prüfungen abbrechen
+  - „Verfügbarkeit prüfen“ (Home Assistant, VictoriaMetrics, InfluxDB) lässt sich während der Prüfung abbrechen
 - **Import**: Breite Darstellung
   - Die Importseite folgt der Einstellung „Breite Darstellung“; die Spalten der Import-Tabellen teilen sich die Breite gleichmäßig
 - **Import**: Tabellen von Symcon, VictoriaMetrics und InfluxDB

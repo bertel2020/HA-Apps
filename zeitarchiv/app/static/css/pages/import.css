@@ -131,6 +131,9 @@
   .ha-checked-at.is-error{color:var(--danger);background:var(--danger-soft);border-color:var(--danger);}
   .ha-checked-at.htmx-request{color:var(--accent-line);background:var(--accent-line-soft);border-color:var(--accent-line);}
   .ha-checked-at.htmx-request .ha-status-idle{display:none;}
+  /* „Abbrechen“ direkt neben dem Status-Chip der Verfügbarkeitsprüfung, nur solange sie läuft. */
+  .ha-cancel-check{display:none;vertical-align:middle;}
+  .ha-checked-at.htmx-request + .ha-cancel-check{display:inline-block;}
   .ha-checked-at .htmx-indicator{display:none;opacity:1;}
   .ha-checked-at.htmx-request .htmx-indicator{display:inline;}
   .ha-stale-badge{display:inline-block;font-size:calc(10.5px * var(--font-scale, 1));font-weight:600;padding:1px 7px;border-radius:999px;border:1px solid var(--danger);color:var(--danger);background:var(--danger-soft);cursor:help;white-space:nowrap;margin-left:6px;vertical-align:middle;}

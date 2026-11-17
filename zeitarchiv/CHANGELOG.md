@@ -21,6 +21,8 @@
   - The previous detailed list stays below the table, collapsed as “Preview details”
   - “Check availability” without a marked entity checks all listed entities and fills “Status” (“Data available” or “No data”); new “Mark all filtered” button; filter chips can be combined (e.g. “Never imported” and “Data available”); search, filter and sorting survive a check
   - The preview runs in the background with a progress display
+- **Import**: Cancelling checks
+  - “Check availability” (Home Assistant, VictoriaMetrics, InfluxDB) can be cancelled while it runs
 - **Import**: Wide layout
   - The Import page follows the “Wide layout” setting; the columns of the import tables share the width evenly
 - **Import**: Symcon, VictoriaMetrics and InfluxDB tables

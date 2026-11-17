@@ -89,6 +89,7 @@
         <span class="ha-status-idle">{% if influx_availability_checked_at_label %}{{ _("Geprüft: {ha_availability_checked_at_label}", ha_availability_checked_at_label=influx_availability_checked_at_label) }}{% else %}{{ _("Noch nicht geprüft") }}{% endif %}{% if influx_availability_stale %} · <span class="ha-stale-badge" title="{{ _('Vor mehr als 15 Minuten geprüft — der tatsächliche Stand in InfluxDB kann sich seither geändert haben.') }}">{{ _("⏳ Nicht mehr taufrisch") }}</span>{% endif %}</span>
         <span class="htmx-indicator">{{ _("Prüfung läuft …") }}</span>
       </span>
+      <button type="button" class="btn ha-cancel-check" data-request-button="influx-availability-btn" data-result-selector="#influx-availability-status .ha-status-idle" data-cancelled="{{ _('Abgebrochen.') }}" onclick="cancelImportRequest(this)" title="{{ _('Bricht die Prüfung ab') }}">{{ _("Abbrechen") }}</button>
       <span class="ha-check-hint" id="influx-availability-hint">{{ _("Ohne Markierung werden alle angezeigten Entitäten geprüft") }}</span>
     </div>
   </div>

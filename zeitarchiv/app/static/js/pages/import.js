@@ -555,7 +555,9 @@
     function cancelImportRequest(button) {
       const trigger = document.getElementById(button.dataset.requestButton);
       if (trigger) htmx.trigger(trigger, 'htmx:abort');
-      const result = document.getElementById(button.dataset.result);
+      const result = button.dataset.result
+        ? document.getElementById(button.dataset.result)
+        : document.querySelector(button.dataset.resultSelector);
       if (result) result.textContent = button.dataset.cancelled;
     }
     window.cancelImportRequest = cancelImportRequest;

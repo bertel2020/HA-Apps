@@ -201,3 +201,16 @@ def test_connection_checks_can_be_cancelled() -> None:
         assert f'id="{prefix}-connection-btn"' in text and f'id="{prefix}-connection-result"' in text
         assert 'onclick="cancelImportRequest(this)"' in text
     assert "htmx.trigger(trigger, 'htmx:abort')" in (PAGE_JS / "import.js").read_text(encoding="utf-8")
+
+
+def test_availability_checks_can_be_cancelled() -> None:
+    from _paths import TEMPLATES
+
+    for name, prefix in (
+        ("_ha_import_section.html", "ha"), ("_vm_import_section.html", "vm"), ("_influxdb_import_section.html", "influx"),
+    ):
+        text = (TEMPLATES / name).read_text(encoding="utf-8")
+        assert f'data-request-button="{prefix}-availability-btn"' in text
+        # Direkt hinter dem Status-Chip, sonst greift die Regel „.htmx-request + .ha-cancel-check“ nicht.
+        chip = text.index(f'id="{prefix}-availability-status"')
+        assert text.index("ha-cancel-check", chip) < text.index(f'id="{prefix}-availability-hint"', chip)
