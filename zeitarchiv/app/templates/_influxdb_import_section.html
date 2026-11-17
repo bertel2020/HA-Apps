@@ -110,19 +110,26 @@
       <colgroup>
         <col class="symcon-col-check">
         <col class="ha-col-entity">
-        <col class="ha-col-type"><col class="ha-col-unit"><col class="ha-col-available">
+        <col class="ha-col-type"><col class="ha-col-unit">
+        {% if influx_has_categories %}<col class="ha-col-category">{% endif %}
+        {% if influx_has_areas %}<col class="ha-col-area">{% endif %}
+        <col class="ha-col-available">
       </colgroup>
       <tr>
         <th><input type="checkbox" onchange="toggleAllInfluxRows(this)" title="{{ _('Alle auf dieser Seite markieren') }}"></th>
         <th><a href="#" data-sort-key="entity" onclick="sortInfluxTable('entity');return false;">{{ _("Entität") }}<span class="sort-arrow"></span></a></th>
         <th><a href="#" data-sort-key="type" onclick="sortInfluxTable('type');return false;">{{ _("Typ") }}<span class="sort-arrow"></span></a></th>
         <th><a href="#" data-sort-key="unit" onclick="sortInfluxTable('unit');return false;">{{ _("Einheit") }}<span class="sort-arrow"></span></a></th>
+        {% if influx_has_categories %}<th><a href="#" data-sort-key="category" onclick="sortInfluxTable('category');return false;">{{ _("Kategorie") }}<span class="sort-arrow"></span></a></th>{% endif %}
+        {% if influx_has_areas %}<th><a href="#" data-sort-key="area" onclick="sortInfluxTable('area');return false;">{{ _("Raum") }}<span class="sort-arrow"></span></a></th>{% endif %}
         <th><a href="#" data-sort-key="available" onclick="sortInfluxTable('available');return false;">{{ _("Verfügbar") }}<span class="sort-arrow"></span></a></th>
       </tr>
       {% for entity in influx_entities %}
       <tr data-entity-id="{{ entity.entity_id }}"
           class="{{ 'marked' if entity.entity_id in influx_selected_ids }}"
-          data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id) | lower }}"
+          data-search="{{ ((entity.friendly_name or '') ~ ' ' ~ entity.entity_id ~ ' ' ~ (entity.area or '') ~ ' ' ~ (entity.category.name if entity.category else '')) | lower }}"
+          data-sort-area="{{ (entity.area or '') | lower }}"
+          data-sort-category="{{ (entity.category.name if entity.category else '') | lower }}"
           data-sort-entity="{{ (entity.friendly_name or entity.entity_id) | lower }}"
           data-sort-type="{{ entity.type_label }}"
           data-sort-unit="{{ entity.unit or '' }}"
@@ -142,6 +149,8 @@
         </td>
         <td><span class="badge {{ entity.aggregation_type }}">{{ entity.type_label }}</span></td>
         <td>{{ entity.unit or "—" }}</td>
+        {% if influx_has_categories %}<td>{% if entity.category %}<span class="cat-pill" style="--c:var(--chart-{{ entity.category.color_slot }});" title="{{ entity.category.name }}"><i aria-hidden="true"></i><span>{{ entity.category.name }}</span></span>{% else %}<span class="cat-none">—</span>{% endif %}</td>{% endif %}
+        {% if influx_has_areas %}<td>{% if entity.area %}<span class="ha-cell-clip" title="{{ entity.area }}">{{ entity.area }}</span>{% else %}<span class="cat-none">—</span>{% endif %}</td>{% endif %}
         <td class="mono" style="font-size:calc(12px * var(--font-scale, 1));">
           {% if entity.available_range %}
           <div>{{ entity.available_range }}</div>

@@ -219,7 +219,9 @@ class InfluxImportService:
         availability: dict[str, ha_import.EntityAvailability] = entry["availability"] if entry else {}
         checked_at = entry["checked_at"] if entry else None
         entities = []
-        for row in self.deps.index.list_entities():
+        entity_rows = self.deps.index.list_entities()
+        areas, categories, category_of = self.owner._area_category_lookup(entity_rows)
+        for row in entity_rows:
             entity_id = row["entity_id"]
             avail = availability.get(entity_id)
             available_range = available_count = available_label = None
@@ -239,8 +241,12 @@ class InfluxImportService:
                 "available_range": available_range,
                 "available_count": available_count,
                 "available_first_ts": avail.first_ts if avail is not None else None,
+                "area": (areas.get(entity_id) or {}).get("area"),
+                "category": categories.get(category_of.get(entity_id)),
             })
         return {
+            "influx_has_areas": bool(areas),
+            "influx_has_categories": bool(categories),
             "influx_base_url": config.base_url,
             "influx_default_base_url": influxdb_import.DEFAULT_BASE_URL,
             "influx_database": config.database,

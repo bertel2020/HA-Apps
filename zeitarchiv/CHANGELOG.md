@@ -27,6 +27,7 @@
   - The Import page follows the “Wide layout” setting; the columns of the import tables share the width evenly
 - **Import**: Symcon, VictoriaMetrics and InfluxDB tables
   - Columns can be sorted by clicking the heading
+  - VictoriaMetrics and InfluxDB also show “Category” and “Room” (only if categories or rooms exist)
   - “Check availability” also works without a marked entity (VictoriaMetrics, InfluxDB) and then checks all listed ones
   - “Check connection” can be cancelled, e.g. after a typo in the address
 

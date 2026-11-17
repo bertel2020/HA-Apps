@@ -640,6 +640,21 @@ class ImportService:
             response.headers["HX-Reswap"] = "outerHTML"
         return response
 
+    def _area_category_lookup(self, entity_rows: list) -> tuple[dict, dict, dict[str, int]]:
+        """Räume, Kategorien und die Zuordnung Entität → Kategorie für die Spalten
+        „Raum“ und „Kategorie“ der Import-Tabellen (wie in der Entitätenliste). Räume kommen
+        aus dem Katalog der Integration, Kategorien aus dem Index; gibt es keine, erscheint
+        die Spalte nicht."""
+        areas = entity_areas.area_map(self.deps.data_dir)
+        categories = {c["id"]: c for c in self.deps.index.list_entity_categories()}
+        category_of: dict[str, int] = {}
+        if categories:
+            all_ids = [row["entity_id"] for row in entity_rows]
+            # Stückweise, damit die SQLite-Grenze für Platzhalter nie greift.
+            for offset in range(0, len(all_ids), 500):
+                category_of.update(self.deps.index.category_map_for(all_ids[offset:offset + 500]))
+        return areas, categories, category_of
+
     def _last_import_fields(self, entry: dict | None) -> dict:
         """Spalten „Letzter Import“ und „Importmodus“ für eine Zeile der Import-Tabelle.
         Ohne Eintrag war die Entität noch nie Ziel eines Imports (leer, nicht „0“)."""
@@ -723,20 +738,13 @@ class ImportService:
         # Katalog der Integration (fehlt er, gibt es keine Räume), Kategorien
         # aus dem Index. Die Spalten erscheinen nur, wenn es etwas anzuzeigen
         # gibt — sonst wären sie reine Leerspalten.
-        areas = entity_areas.area_map(self.deps.data_dir)
-        categories = {c["id"]: c for c in self.deps.index.list_entity_categories()}
+        areas, categories, category_of = self._area_category_lookup(entity_rows)
         last_imports = import_last.load(self.deps.data_dir)
         with self._ha_dry_run_lock:
             dry_status = dict(self._ha_dry_run_status.get(self._ha_cache_key(
                 history_source, period, range_preset, stats_range_preset, include_long_term_stats,
             ), {}))
         dry_latest = max((entry["at"] for entry in dry_status.values()), default=None)
-        category_of: dict[str, int] = {}
-        if categories:
-            all_ids = [row["entity_id"] for row in entity_rows]
-            # Stückweise, damit die SQLite-Grenze für Platzhalter nie greift.
-            for offset in range(0, len(all_ids), 500):
-                category_of.update(self.deps.index.category_map_for(all_ids[offset:offset + 500]))
         for row in entity_rows:
             entity_id = row["entity_id"]
             avail = availability.get(entity_id)
@@ -864,7 +872,9 @@ class ImportService:
         availability: dict[str, ha_import.EntityAvailability] = entry["availability"] if entry else {}
         checked_at = entry["checked_at"] if entry else None
         entities = []
-        for row in self.deps.index.list_entities():
+        entity_rows = self.deps.index.list_entities()
+        areas, categories, category_of = self._area_category_lookup(entity_rows)
+        for row in entity_rows:
             entity_id = row["entity_id"]
             avail = availability.get(entity_id)
             available_range = available_count = available_label = None
@@ -884,8 +894,12 @@ class ImportService:
                 "available_range": available_range,
                 "available_count": available_count,
                 "available_first_ts": avail.first_ts if avail is not None else None,
+                "area": (areas.get(entity_id) or {}).get("area"),
+                "category": categories.get(category_of.get(entity_id)),
             })
         return {
+            "vm_has_areas": bool(areas),
+            "vm_has_categories": bool(categories),
             "vm_base_url": base_url,
             "vm_default_base_url": vm_import.DEFAULT_BASE_URL,
             "vm_entities": entities,

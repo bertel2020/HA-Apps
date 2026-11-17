@@ -160,3 +160,22 @@ def test_import_page_shows_room_and_category_columns(client, rooms) -> None:
         assert "Hobbyraum" in html and "Energie" in html
     finally:
         main.index.delete_entity_category(category_id)
+
+
+def test_vm_and_influx_tables_show_room_and_category_columns(client, rooms) -> None:
+    """Auch VictoriaMetrics und InfluxDB: Kategorie und Raum hinter der Einheit, nur wenn es sie gibt."""
+    from app import main
+
+    html = client.get("/import").text
+    assert html.count('data-sort-key="area"') >= 3  # Home Assistant, VictoriaMetrics, InfluxDB
+    category_id = main.index.create_entity_category("Verbrauch")
+    try:
+        main.index.set_entities_category([rooms[0]], category_id)
+        html = client.get("/import").text
+        for prefix in ("vm", "influx"):
+            table = html[html.index(f'id="{prefix}-import-table"'):]
+            table = table[: table.index("</table>")]
+            assert table.index('data-sort-key="unit"') < table.index('data-sort-key="category"') < table.index('data-sort-key="area"')
+            assert "Hobbyraum" in table and "Verbrauch" in table
+    finally:
+        main.index.delete_entity_category(category_id)

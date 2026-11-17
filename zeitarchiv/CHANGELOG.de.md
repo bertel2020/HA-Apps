@@ -27,6 +27,7 @@
   - Die Importseite folgt der Einstellung „Breite Darstellung“; die Spalten der Import-Tabellen teilen sich die Breite gleichmäßig
 - **Import**: Tabellen von Symcon, VictoriaMetrics und InfluxDB
   - Spalten lassen sich per Klick auf die Überschrift sortieren
+  - VictoriaMetrics und InfluxDB zeigen auch „Kategorie“ und „Raum“ (nur, wenn es Kategorien oder Räume gibt)
   - „Verfügbarkeit prüfen“ geht auch ohne markierte Entität (VictoriaMetrics, InfluxDB) und prüft dann alle angezeigten
   - „Verbindung prüfen“ lässt sich abbrechen, etwa nach einem Tippfehler in der Adresse
 
