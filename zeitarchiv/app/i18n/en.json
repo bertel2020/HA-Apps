@@ -4124,6 +4124,8 @@
     "Hier ist nichts vorausgewählt. Markiere, was archiviert werden soll.": "Nothing is preselected here. Mark what should be archived.",
     "Eigene Achse": "Own axis",
     "Die Linie bekommt eine eigene Achse, ihre Skala richtet sich nur nach ihr": "The line gets its own axis; its scale follows only that line",
+    "In Legende": "In legend",
+    "Serie in der Legende und der Statistik darunter aufführen": "Show the series in the legend and the statistics below it",
     "Ungültige Darstellung je Serie": "Invalid appearance per series",
     "Zuerst Entitäten in der Tabelle markieren": "Mark entities in the table first",
     "Dieser Import ist neu und noch nicht an großen echten Datenbeständen erprobt. Zunächst nur wenige Entitäten übernehmen und das Ergebnis prüfen.": "This import is new and has not yet been tried on large real data sets. Import only a few entities first and check the result.",

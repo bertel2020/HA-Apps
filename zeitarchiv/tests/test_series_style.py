@@ -47,6 +47,26 @@ def test_clean_drops_empty_and_broken_input() -> None:
     assert series_style_clean({VALUE: {"axis": "own"}}, IDS) == {VALUE: {"axis": "own"}}
 
 
+def test_legend_flag_is_kept_for_every_entity_type_and_only_when_false() -> None:
+    raw = {
+        COUNTER: {"legend": False, "kind": "line"},
+        SWITCH: {"legend": False, "kind": "line", "axis": "own"},
+        VALUE: {"legend": True},
+        "sensor.fremd": {"legend": False},
+    }
+    assert series_style_clean(raw, IDS, TYPES) == {
+        COUNTER: {"kind": "line", "legend": False},
+        SWITCH: {"legend": False},
+    }
+
+
+def test_legend_flag_is_wired_in_editor_and_legend_render() -> None:
+    legend_js = (APP / "static/js/legend-render.js").read_text(encoding="utf-8")
+    assert "legend === false" in legend_js and "series.filter(inLegend)" in legend_js
+    assert "setInLegend" in EDITOR_JS and "this.inLegend(stat.entityId)" in EDITOR_JS
+    assert "setInLegend(id" in template_text("chart_editor.html")
+
+
 @pytest.fixture
 def ingested(client):
     from app import main

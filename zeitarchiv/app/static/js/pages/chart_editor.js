@@ -949,7 +949,7 @@
         get legendEntries() {
           const entries = [];
           const byKey = new Map();
-          this.seriesStats.forEach(stat => {
+          this.seriesStats.filter(stat => this.inLegend(stat.entityId)).forEach(stat => {
             if (!stat.stack || !stat.stackKey || stat.isState) { entries.push({group: false, key: stat.entityId, members: [stat]}); return; }
             let entry = byKey.get(stat.stackKey);
             if (!entry) { entry = {group: true, key: 'stack:' + stat.stackKey, name: stat.stack, members: []}; byKey.set(stat.stackKey, entry); entries.push(entry); }
@@ -1631,6 +1631,12 @@
           if (this.ownAxisOn(id)) return true;
           const mine = this.series.find(x => x.entity_id === id);
           return this.series.some(o => o.entity_id !== id && o.unit === mine.unit && o.aggregation_type !== 'state');
+        },
+        inLegend(id) { return !(this.seriesStyle[id] && this.seriesStyle[id].legend === false); },
+        setInLegend(id, on) {
+          const style = {...(this.seriesStyle[id] || {})};
+          if (on) delete style.legend; else style.legend = false;
+          this.writeSeriesStyle(id, style);
         },
         ownAxisOn(id) { return !!(this.seriesStyle[id] && this.seriesStyle[id].axis === 'own'); },
         setSeriesKind(id, value) {

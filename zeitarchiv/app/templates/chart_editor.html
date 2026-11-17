@@ -191,6 +191,9 @@
                   </template>
                   <option value="new">{{ _("Neuer Stapel …") }}</option>
                 </select>
+                <button type="button" class="chip entity-name-legend" :class="{active: inLegend(id)}" :aria-pressed="inLegend(id)"
+                        title="{{ _('Serie in der Legende und der Statistik darunter aufführen') }}"
+                        @click="setInLegend(id, !inLegend(id))">{{ _("In Legende") }}</button>
                 <span class="entity-name-right">
                   <button type="button" class="entity-name-hide" :class="{active: hiddenEntityIds.includes(id)}"
                           :title="hiddenEntityIds.includes(id) ? t('Serie einblenden') : t('Serie ausblenden')"
@@ -755,7 +758,7 @@
              keine sinnvollen Einträge (zwei eigenständige Jahresserien statt
              einer gedämpften Vergleichs-Nebenserie), deshalb zusätzlich
              ausgeblendet statt nur per hasData. -->
-        <div class="chart-legend" x-show="hasData && legendStyle !== 'off' && !yearsCompareActive && !multiYearActive && (legendStyle === 'chips' || !statsShown)">
+        <div class="chart-legend" x-show="hasData && legendStyle !== 'off' && !yearsCompareActive && !multiYearActive && legendEntries.length && (legendStyle === 'chips' || !statsShown)">
           <template x-for="entry in legendEntries" :key="entry.key">
            <span :class="entry.group ? 'chart-legend-group' : 'chart-legend-plain'">
             <span class="chart-legend-group-name" x-show="entry.group" x-text="entry.name"></span>
@@ -860,7 +863,7 @@
             </tbody>
           </table>
         </div>
-        <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && chartStats && !hasState && legendStyle === 'table' && !yearsCompareActive && !multiYearActive">
+        <div class="tbl-wrap chart-legend-table-wrap" x-show="hasData && chartStats && !hasState && legendEntries.length && legendStyle === 'table' && !yearsCompareActive && !multiYearActive">
           <table class="dt compact chart-legend-table">
             <thead>
               <tr>

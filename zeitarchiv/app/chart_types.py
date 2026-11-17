@@ -170,23 +170,26 @@ SERIES_STYLE_TYPES = ("counter", "standard")
 def series_style_clean(value: dict | None, entity_ids: list[str], aggregation_types: dict[str, str] | None = None) -> dict:
     """Darstellung je Serie (saved_charts.series_style).
 
-    Form: ``{entity_id: {"kind": "bar" | "line", "axis": "own"}}``. Beide Schlüssel sind optional: fehlt ``kind``,
+    Form: ``{entity_id: {"kind": "bar" | "line", "axis": "own", "legend": False}}``. Alle Schlüssel sind optional: fehlt ``kind``,
     gilt die Entitätsart (Zähler Balken, Messwert Linie), fehlt ``axis``, teilt die Serie die Achse ihrer Einheit.
+    ``legend: False`` nimmt die Serie aus der Legende (Zeile und Kennzahlen), gezeichnet wird sie weiter; es gilt für
+    jede Entitätsart, ``kind`` und ``axis`` nur für Zähler und Messwerte.
     ``axis`` gilt nur für Linien, bleibt aber gespeichert, wenn die Serie wieder Balken wird. Entitäten außerhalb des
     Charts, unbekannte Schlüssel oder Werte und (mit ``aggregation_types``) Schalter und Zustände fallen still weg;
     ein leerer Eintrag ebenso."""
     allowed = set(entity_ids)
-    out: dict[str, dict[str, str]] = {}
+    out: dict[str, dict[str, str | bool]] = {}
     for entity_id, style in (value if isinstance(value, dict) else {}).items():
         if entity_id not in allowed or not isinstance(style, dict):
             continue
-        if aggregation_types is not None and aggregation_types.get(entity_id) not in SERIES_STYLE_TYPES:
-            continue
-        clean: dict[str, str] = {}
-        if style.get("kind") in SERIES_STYLE_KINDS:
+        styleable = aggregation_types is None or aggregation_types.get(entity_id) in SERIES_STYLE_TYPES
+        clean: dict[str, str | bool] = {}
+        if styleable and style.get("kind") in SERIES_STYLE_KINDS:
             clean["kind"] = style["kind"]
-        if style.get("axis") == "own":
+        if styleable and style.get("axis") == "own":
             clean["axis"] = "own"
+        if style.get("legend") is False:
+            clean["legend"] = False
         if clean:
             out[entity_id] = clean
     return out
