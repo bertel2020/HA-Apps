@@ -233,6 +233,11 @@
      Host selbst — sonst schneidet dessen overflow:hidden den eigenen
      Tooltip mit ab) federt die schmalere Entität-Spalte dafür ab. */
   .ha-col-entity{width:225px;}
+  /* Breite Darstellung (ab 1200 px, wie die übrigen Regeln dazu): die Entität bekommt mehr Platz,
+     damit lange Namen und IDs weniger oft gekürzt werden. */
+  @media (min-width:1200px){
+    :root[data-page-layout="wide"] .ha-col-entity{width:340px;}
+  }
   .ha-col-unit{width:60px;}
   .ha-col-type{width:118px;}
   .ha-col-art{width:150px;}
