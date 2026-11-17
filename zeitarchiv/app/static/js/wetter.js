@@ -61,7 +61,8 @@
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = 1;
       const context = canvas.getContext('2d');
-      context.fillStyle = expression;
+      // Canvas kennt keine var(--…): zuerst durch den Wert der Variablen ersetzen, sonst bleibt die Farbe schwarz.
+      context.fillStyle = String(expression).replace(/var\((--[\w-]+)\)/g, (_, name) => cssVar(name) || 'transparent');
       context.fillRect(0, 0, 1, 1);
       const [r, g, b] = context.getImageData(0, 0, 1, 1).data;
       return `rgb(${r}, ${g}, ${b})`;
@@ -163,9 +164,17 @@
 
   // Viele Legendeneinträge brechen in mehrere Zeilen um (Handy, viele Räume): der Kopf über dem Diagramm
   // wächst mit, sonst läuft die Legende in die Linien. Breite je Eintrag grob geschätzt (Symbol + Text + Abstand).
+  // Breite des Diagramms; ist es gerade verborgen (Reiter nicht aktiv), zählt die des Elternelements oder des Fensters,
+  // sonst würde jeder Legendeneintrag als eigene Zeile gerechnet und das Diagramm riesig.
+  function chartWidth(element) {
+    let node = element;
+    while (node && !node.clientWidth) node = node.parentElement;
+    return (node && node.clientWidth) || Math.max(window.innerWidth - 48, 280);
+  }
+
   function gridForLegend(element, names, extra) {
     const font = scaledFont(12);
-    const width = Math.max(element.clientWidth - 16, 120);
+    const width = Math.max(chartWidth(element) - 16, 120);
     let rows = 1;
     let used = 0;
     names.forEach((name) => {
@@ -173,7 +182,7 @@
       if (used && used + item > width) { rows += 1; used = 0; }
       used += item;
     });
-    return gridFor(element, {top: Math.max(element.clientWidth < 520 ? 74 : 34, rows * (font + 10) + 10), ...extra});
+    return gridFor(element, {top: Math.max(chartWidth(element) < 520 ? 74 : 34, rows * (font + 10) + 10), ...extra});
   }
 
   function legendBox(colors, data) {
@@ -2220,7 +2229,7 @@
         const names = series.map((row) => row.label);
         // Die Legende bekommt zusätzliche Höhe, die Zeichenfläche bleibt gleich groß (Handy: viele Räume).
         const grid = gridForLegend(element, names, {right: 8});
-        element.style.height = ((element.clientWidth < 520 ? 260 : 340) + grid.top) + 'px';
+        element.style.height = ((chartWidth(element) < 520 ? 260 : 340) + grid.top) + 'px';
         const chart = chartFor(name, element);
         chart.setOption({
           animation: false, grid, legend: legendBox(colors, names),

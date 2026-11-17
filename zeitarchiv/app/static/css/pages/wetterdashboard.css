@@ -579,6 +579,13 @@
 /* Raumkacheln: die Werte stehen in allen Kacheln unten auf einer Höhe (auch wenn der Raumname zweizeilig ist);
    auf dem Handy bleibt vor dem Wert nur das Symbol, der Text steht im Tooltip und für Screenreader. */
 .wt-roomtiles .wt-roomtile-parts{margin-top:auto;}
+/* Handy: Etage unter dem Raumnamen statt daneben (kein Umbruch mitten im Wort), Werte kleiner und nie in zwei Zeilen. */
+@media (max-width:480px){
+  .wt-roomtiles .wt-roomtile{padding:12px;}
+  .wt-roomtiles .wt-roomtile-head{flex-direction:column;align-items:flex-start;gap:0;}
+  .wt-roomtiles .wt-roomtile-parts{gap:8px;}
+  .wt-roomtiles .wt-roomtile-part .wt-tile-value{font-size:calc(16px * var(--font-scale, 1));white-space:nowrap;}
+}
 @media (max-width:640px){
   .wt-roomtiles .wt-roomtile-label > span:not(.wt-tile-icon){position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
 }
@@ -617,4 +624,11 @@
   :root[data-page-layout="wide"] #wetter-root .wt-chart.wt-chart-short{height:230px;}
   :root[data-page-layout="wide"] #wetter-root .wt-chart.wt-kk-chart{height:190px;}
   :root[data-page-layout="wide"] #wetter-root .wt-day-dialog .wt-chart{height:220px;}
+}
+/* Handy: die großen Werte der Kacheln und die Hero-Zeile einen Schritt kleiner. */
+@media (max-width:640px){
+  [data-tile-style] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile-value{font-size:calc(clamp(18px, 14cqi, 22px) * var(--font-scale, 1));}
+  [data-tile-style] :is(.wt-tiles, .wt-kpis:not(.wt-kpis-lage)) .wt-tile-value small{font-size:calc(12px * var(--font-scale, 1));}
+  .wt-kpis-soft .wt-tile-value{font-size:calc(19px * var(--font-scale, 1));}
+  .wt-lage-hero .wt-lage{font-size:calc(28px * var(--font-scale, 1));}
 }
