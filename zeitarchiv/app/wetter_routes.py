@@ -173,6 +173,8 @@ TILE_LABELS = {
     "illuminance": N_("Sonnenschein"),
 }
 #: PV und Helligkeit: Leistungseinheiten (Faktor nach kW) und Anzahl der verglichenen Tage.
+#: Heizzähler: Energieeinheiten mit Faktor nach kWh. Andere Einheiten (m³) rechnet der Reiter Heizen nicht.
+HEATING_UNIT_SCALE = {"Wh": 0.001, "kWh": 1.0, "MWh": 1000.0}
 PV_UNIT_KW = {"W": 0.001, "kW": 1.0, "MW": 1000.0}
 
 
@@ -1092,20 +1094,36 @@ class WetterService:
         result.update(metric="sun", unit="h", entity_id=entity_id, tz=str(self.deps.tz), headline=None)
         return result
 
-    def heating_counters(self, config: dict) -> list[dict]:
-        """Heizzähler der Konfiguration, die es im Archiv als Zähler gibt (Name, Einheit, Faktor nach kWh)."""
-        counters = []
+    def _heating_rows(self, config: dict) -> list[tuple[dict, dict, str]]:
+        """Heizzähler der Konfiguration, die es im Archiv als Zähler gibt: (Zeile, Entität, Einheit)."""
+        rows = []
         for row in config.get("heating") or []:
             entity = self.deps.index.get_entity(row["entity_id"])
             if entity is None or entity["aggregation_type"] != "counter":
                 continue
-            unit = entity["unit"] or "kWh"
-            counters.append({
-                "entity_id": row["entity_id"], "unit": unit,
-                "name": row["name"] or entity_display_name(row["entity_id"], entity["friendly_name"], entity["custom_name"]),
-                "scale": {"Wh": 0.001, "MWh": 1000.0}.get(unit, 1.0),
-            })
-        return counters
+            rows.append((row, entity, entity["unit"] or "kWh"))
+        return rows
+
+    @staticmethod
+    def _heating_name(row: dict, entity: dict) -> str:
+        return row["name"] or entity_display_name(row["entity_id"], entity["friendly_name"], entity["custom_name"])
+
+    def heating_counters(self, config: dict) -> list[dict]:
+        """Heizzähler der Konfiguration in einer Energieeinheit (Name, Einheit, Faktor nach kWh).
+
+        Andere Einheiten (etwa m³ bei Gas) bleiben draußen: Ohne Brennwert lassen sie sich nicht in kWh
+        umrechnen, und als kWh gerechnet verfälschten sie Summe und Kennzahlen (siehe heating_skipped)."""
+        return [
+            {"entity_id": row["entity_id"], "unit": unit, "name": self._heating_name(row, entity), "scale": HEATING_UNIT_SCALE[unit]}
+            for row, entity, unit in self._heating_rows(config) if unit in HEATING_UNIT_SCALE
+        ]
+
+    def heating_skipped(self, config: dict) -> list[dict]:
+        """Heizzähler, die der Reiter Heizen wegen ihrer Einheit nicht rechnet (Name, Einheit)."""
+        return [
+            {"entity_id": row["entity_id"], "name": self._heating_name(row, entity), "unit": unit}
+            for row, entity, unit in self._heating_rows(config) if unit not in HEATING_UNIT_SCALE
+        ]
 
     def compute_heating(self, now_local: datetime | None = None) -> dict | None:
         """Tage der Heizperiode mit Außentemperatur und kWh je Heizzähler. Gradtagzahl, Ausgleichsgerade
@@ -1114,15 +1132,17 @@ class WetterService:
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
         counters = self.heating_counters(config)
+        skipped = self.heating_skipped(config)
         temperature = config["temperature"]
-        if not counters or not temperature or self.deps.index.get_entity(temperature) is None:
+        if not (counters or skipped) or not temperature or self.deps.index.get_entity(temperature) is None:
             return None
         days = analysis.heating_days(
             self._daily(temperature, now_local), [self._daily(c["entity_id"], now_local) for c in counters],
             [c["scale"] for c in counters], self.deps.tz, now_local.date(),
-        )
+        ) if counters else []
         return {
             "counters": [{"entity_id": c["entity_id"], "name": c["name"]} for c in counters],
+            "skipped": skipped,
             "days": days, "room": config["heating_room"], "limit": config["heating_limit"],
             "sun": self._heating_sun(days, config, now_local),
             "today": now_local.date().isoformat(), "tz": str(self.deps.tz),
@@ -2299,7 +2319,7 @@ class WetterService:
             "assign_query": urlencode([("assign", f"{role}:{entity_id}") for role, entity_id in assignments.items()]),
             "configured": _is_configured(config),
             "precip_modes": self.available_precip(),
-            "has_heating": bool(self.heating_counters(config)),
+            "has_heating": bool(self.heating_counters(config) or self.heating_skipped(config)),
             "has_windtiles": any(config[key] for key in ("wind", "gust", "radiation", "illuminance")),
             "has_windsun": any(config[key] for key in ("wind", "gust", "radiation", "illuminance", "illuminance_dawn")),
             "has_daylight": bool(config["illuminance_dawn"]),

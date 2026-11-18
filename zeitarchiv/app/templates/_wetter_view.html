@@ -796,6 +796,7 @@
       </div>
       <p class="hint hint-status" x-show="heatReadout()" x-text="heatReadout()"></p>
       <p class="hint hint-warn" x-show="heatError" x-text="heatError" x-cloak></p>
+      <p class="hint hint-warn" x-show="heat && heat.skipped.length" x-cloak x-text="heatSkippedText()"></p>
     </div>
     <div class="card wt-card" x-show="heat" x-cloak>
       <div class="wt-controls">

@@ -510,6 +510,28 @@ def test_heating_counters_ignore_non_counters_and_convert_units(service) -> None
     assert counters[1]["name"] == "Heizstab"
 
 
+def test_heating_counters_leave_out_units_without_a_kwh_conversion(service) -> None:
+    _add(service, "sensor.gas", "sensor", "total_increasing", "m³", [(_ts(19, 0), 100.0)])
+    _add(service, "sensor.stab", "sensor", "total_increasing", "kWh", [(_ts(19, 0), 5.0)])
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(19, 0), 1.0)])
+    _configure(service, temperature="sensor.t", heating=[
+        {"entity_id": "sensor.gas", "name": "Gas"}, {"entity_id": "sensor.stab", "name": ""},
+    ])
+    config = wetter_routes._load_config(service.deps.index)
+    assert [c["entity_id"] for c in service.heating_counters(config)] == ["sensor.stab"]
+    assert service.heating_skipped(config) == [{"entity_id": "sensor.gas", "name": "Gas", "unit": "m³"}]
+    data = service.compute_heating(NOW)
+    assert [c["entity_id"] for c in data["counters"]] == ["sensor.stab"] and data["skipped"][0]["unit"] == "m³"
+
+
+def test_compute_heating_with_only_unsupported_counters_still_reports_them(service) -> None:
+    _add(service, "sensor.gas", "sensor", "total_increasing", "m³", [(_ts(19, 0), 100.0)])
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(19, 0), 1.0)])
+    _configure(service, temperature="sensor.t", heating=[{"entity_id": "sensor.gas", "name": ""}])
+    data = service.compute_heating(NOW)
+    assert data["counters"] == [] and data["days"] == [] and data["skipped"][0]["entity_id"] == "sensor.gas"
+
+
 def test_compute_heating_needs_counters_and_a_temperature(service) -> None:
     _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(19, 0), 1.0)])
     _configure(service, temperature="sensor.t")

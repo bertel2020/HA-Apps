@@ -2911,6 +2911,12 @@
         return {room: read(this.heatRoom, 20), limit: read(this.heatLimit, 15), on: this.heatOn};
       },
 
+      // Zähler in einer Einheit ohne Umrechnung nach kWh (etwa m³) bleiben draußen; der Hinweis nennt sie.
+      heatSkippedText() {
+        const list = this.heat ? this.heat.skipped.map((c) => `${c.name} (${c.unit})`).join(', ') : '';
+        return t('Nicht berücksichtigt, weil die Einheit nicht in kWh umgerechnet werden kann: {list}. Der Reiter rechnet nur mit Wh, kWh und MWh.', {list});
+      },
+
       heatColor(index) {
         const colors = palette();
         return [colors.cur, colors.prev, colors.cold, cssVar('--chart-4'), cssVar('--chart-5'), cssVar('--chart-6')][index % 6];
