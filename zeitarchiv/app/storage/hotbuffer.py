@@ -130,6 +130,9 @@ def read_full_rows(path: Path) -> list[HotRecord]:
 
 def _parse_line(line: str) -> HotRecord | None:
     """Eine bereinigte, nicht leere Zeile als Datensatz; None bei zu wenigen Spalten, ValueError bei kaputten Zahlen."""
+    # Führende Nullbytes (Dateisystem-Rest nach hartem Kill, siehe iter_records) sind kein Teil des Werts;
+    # steht dahinter eine vollständige Zeile, wird sie gerettet statt jedes Mal als kaputt gemeldet.
+    line = line.replace("\x00", "")
     parts = line.split(",", 4)
     if len(parts) < 2:
         return None
@@ -166,8 +169,9 @@ def iter_records(path: Path, corrupt_lines: list[str] | None = None) -> Iterator
                 # noch nicht geflushten Zeile als Nullbytes zurückliefern (ext4 u. a.
                 # nach Stromausfall/hartem Kill) — eine einzelne so kaputte Zeile darf
                 # weder die Abfrage noch den Wartungsplaner noch den Crash-Reconciliation-
-                # Lauf für die ganze restliche Datei/Installation lahmlegen. Übersprungen
-                # statt repariert: der ursprüngliche Wert ist unwiederbringlich verloren.
+                # Lauf für die ganze restliche Datei/Installation lahmlegen. Reine Nullbyte-Reste vor
+                # einer vollständigen Zeile rettet _parse_line(); was danach noch nicht lesbar ist, ist verloren
+                # und wird übersprungen.
                 logger.warning(
                     "Kaputte Hot-Buffer-Zeile übersprungen · event=hotbuffer_corrupt_line "
                     "path=%s snippet=%r",

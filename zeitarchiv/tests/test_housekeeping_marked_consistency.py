@@ -586,6 +586,32 @@ def test_interrupted_archive_rewrite_gets_its_rollup_back_at_startup(env, monkey
     assert pq.read_table(path).num_rows == 3  # das Archiv selbst bleibt unberührt
 
 
+def test_empty_rollup_file_is_rebuilt_from_the_archive_at_startup(env) -> None:
+    from app.storage import rollup
+
+    tmp, index = env
+    entity_id = "sensor.a"
+    index.get_or_create_entity(entity_id, "sensor", "measurement", "W")
+    entity = index.get_entity(entity_id)
+    base = _ts(2024, 7, 5, 8)
+    archive_dir = tmp / "archive" / entity_id
+    archive_dir.mkdir(parents=True)
+    table = pa.table({"ts": [base, base + 60], "value": [1.0, 3.0]})
+    pq.write_table(table, archive_dir / "2024-07.parquet")
+    rollup.append_completed_month(tmp, entity_id, entity["aggregation_type"], table, 2024, 7, TZ)
+
+    segments = [p for p in (tmp / "rollup" / entity_id).glob("*.parquet/*.parquet")]
+    assert segments
+    for segment in segments:
+        segment.write_bytes(b"")  # Zustand nach hartem Kill ohne fsync
+
+    assert rollup.repair_pending(tmp, index, TZ) == 1
+    for segment in (tmp / "rollup" / entity_id).glob("*.parquet/*.parquet"):
+        assert segment.stat().st_size > 0
+        pq.read_table(segment)
+    assert rollup.repair_pending(tmp, index, TZ) == 0  # idempotent
+
+
 def test_collect_gathers_several_filters_in_one_pass() -> None:
     start = 1_700_000_000.0
     rows = [(start + i * 60.0, 20.0 + (i % 5) * 0.1) for i in range(60)]

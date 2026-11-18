@@ -24,6 +24,7 @@ import calendar
 import os
 from contextlib import contextmanager
 import json
+import logging
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -35,9 +36,11 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
-from .atomic import write_file_atomically
+from .atomic import replace_durably, write_file_atomically
 from .index import STATE_TYPE
 from .paths import entity_dir
+
+logger = logging.getLogger(__name__)
 
 FINE_LEVEL = {"counter": "tag", "standard": "stunde", "switch": "stunde", STATE_TYPE: "stunde"}
 
@@ -496,7 +499,9 @@ def _append_table(path: Path, new_rows: pa.Table, segment_key: str) -> None:
     target = dataset_dir / f"{segment_key}.parquet"
     temporary = dataset_dir / f".{segment_key}.tmp.parquet"
     pq.write_table(new_rows.sort_by("bucket_start"), temporary, compression="zstd")
-    temporary.replace(target)
+    # Mit fsync vor dem Umbenennen: sonst kann das Ziel nach Stromausfall/hartem Kill als 0-Byte-Datei
+    # zurückbleiben (Rename war schon auf der Platte, die Daten nicht).
+    replace_durably(temporary, target)
 
 
 def _aggregate_fine_to_month(rows: list[FineRow], aggregation_type: str, month_start_ts: float) -> FineRow:
@@ -852,10 +857,45 @@ def repair_pending(data_dir: Path, index, tz: ZoneInfo) -> int:
             )
         marker.unlink(missing_ok=True)
         repaired += 1
+    repaired += _rebuild_empty_rollup_files(data_dir, index, tz)
     # Reste abgebrochener Neuaufbauten (Staging-Ordner); beim Start läuft kein Neuaufbau.
     for leftover in data_dir.glob(".*-type-rebuild-*"):
         shutil.rmtree(leftover, ignore_errors=True)
     return repaired
+
+
+def _rebuild_empty_rollup_files(data_dir: Path, index, tz: ZoneInfo) -> int:
+    """Baut die Rollups von Entitäten neu auf, deren Rollup-Segment eine leere Datei (0 Bytes) ist.
+
+    So eine Datei bleibt zurück, wenn ein früherer Stand das Segment ohne fsync umbenannt hat und der Rechner
+    danach hart beendet wurde; jeder lesende Wartungsschritt scheitert sonst dauerhaft daran. Das Archiv ist
+    unverändert, also reicht ein Neuaufbau daraus. Gibt die Zahl der neu aufgebauten Entitäten zurück."""
+    rollup_root = data_dir / "rollup"
+    if not rollup_root.is_dir():
+        return 0
+    rebuilt = 0
+    for entity_folder in sorted(p for p in rollup_root.iterdir() if p.is_dir()):
+        empty = [
+            segment
+            for segment in entity_folder.glob("*.parquet/[!.]*.parquet")
+            if segment.is_file() and segment.stat().st_size == 0
+        ]
+        if not empty:
+            continue
+        entity = index.get_entity(entity_folder.name)
+        if entity is None:
+            continue
+        logger.warning(
+            "Leere Rollup-Datei gefunden, Rollups werden aus dem Archiv neu berechnet · "
+            "event=empty_rollup_rebuilt entity_id=%s files=%d",
+            entity["entity_id"], len(empty),
+        )
+        rebuild_entity_rollups(
+            data_dir, entity["entity_id"], entity["aggregation_type"], tz,
+            hourly_rollup=bool(entity["hourly_rollup"]),
+        )
+        rebuilt += 1
+    return rebuilt
 
 
 def replace_month(
