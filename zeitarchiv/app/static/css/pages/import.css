@@ -141,7 +141,7 @@
      einem zusammengesetzten Text — die zweite Zeile (Anzahl) bewusst
      leiser, sie ist die Detailinformation zur Zeitraum-Zeile darüber. */
   .ha-available-count{color:var(--ink-faint);font-size:calc(11px * var(--font-scale, 1));}
-  .ha-available-line{white-space:nowrap;}
+  .ha-available-line{overflow-wrap:anywhere;}
   .import-delete-row{display:flex;justify-content:flex-end;margin:-4px 0 8px;}
   .import-delete-row .btn-danger{font-weight:600;}
   .import-delete-button{min-width:154px;}

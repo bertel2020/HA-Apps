@@ -262,6 +262,9 @@ class ImportService:
         # Formularparameter der zuletzt gestarteten Vorschau: das Poll-Ziel zeichnet die Sektion
         # damit neu, sobald der Auftrag durch ist.
         self._ha_dry_run_request: dict | None = None
+        # Dasselbe für den Import: nach dem Lauf zeichnet das Poll-Ziel (?watch=import) die Tabelle neu,
+        # damit „Letzter Import“ und Status sofort stimmen.
+        self._ha_import_request: dict | None = None
         self._ha_dry_run_status: dict[str, dict[str, dict]] = {}
         self._vm_progress = JobProgress("vm-import", unit=N_("Entitäten"), label=N_("VictoriaMetrics-Import"))
         # Genau ein Eintrag (zuletzt geprüfte Adresse/Zeitraum) statt eines
@@ -622,6 +625,15 @@ class ImportService:
             entry = self._ha_dry_run_status.setdefault(key, {})
             for entity_id, status in statuses.items():
                 entry[entity_id] = {**status, "at": now}
+
+    def _ha_dry_run_discard(self, entity_ids: list[str]) -> None:
+        """Verwirft die Vorschau-Ergebnisse importierter Entitäten (alle Konfigurationen): nach dem
+        Import sind sie veraltet und würden in der Status-Spalte die Verfügbarkeitsprüfung
+        überdecken."""
+        with self._ha_dry_run_lock:
+            for entry in self._ha_dry_run_status.values():
+                for entity_id in entity_ids:
+                    entry.pop(entity_id, None)
 
     def _ha_dry_run_section(
         self, request: Request, params: dict, items: list[dict], errors: list[str], *, retarget: bool = False,
@@ -1236,7 +1248,10 @@ class ImportService:
             # Die Vorschau zeichnet am Ende die ganze Sektion neu; das tut nur das Poll-Ziel
             # mit ?watch=dry-run. Ein bloßes Neuladen der Seite (ohne Parameter) soll die
             # Sektion nach einer früheren Vorschau nicht noch einmal austauschen.
-            "poll_url": "import/ha/progress?watch=dry-run" if self._ha_progress.snapshot()["kind"] == "dry-run" else "import/ha/progress",
+            "poll_url": (
+                "import/ha/progress?watch=dry-run" if self._ha_progress.snapshot()["kind"] == "dry-run"
+                else ("import/ha/progress?watch=import" if self._ha_import_request is not None else "import/ha/progress")
+            ),
         }
 
 
@@ -3334,6 +3349,14 @@ class ImportService:
             history_source, period = self._ha_source_params(form)
             entity_ids, unknown_ids = self._known_ha_entity_ids(raw_entity_ids)
             vorab_fehler = [tr("{entity_id}: nicht in Zeitarchiv bekannt", entity_id=entity_id) for entity_id in unknown_ids]
+            import_params = {
+                "selected_ids": set(raw_entity_ids), "range_preset": range_preset,
+                "date_from": date_from, "date_to": date_to,
+                "history_source": history_source, "period": period,
+                "include_existing_months": include_existing_months,
+                "stats_range_preset": stats_range_preset,
+                "include_long_term_stats": include_long_term_stats,
+            }
             if not entity_ids:
                 # Nichts zu holen: sofort antworten statt einen Auftrag zu
                 # starten, der nur eine Fehlermeldung zu tragen hätte.
@@ -3467,6 +3490,7 @@ class ImportService:
                     )
                     try:
                         items, reconciliation_report = execute_ha_import(fetched, errors)
+                        self._ha_dry_run_discard([item["entity_id"] for item in items])
                         results = [item["result"] for item in items]
                         rows_imported = sum(r.rows_imported for r in results)
                         rows_merged = sum(r.rows_merged for r in results)
@@ -3510,6 +3534,7 @@ class ImportService:
 
             try:
                 self._ha_progress.start(run_ha_import, logger)
+                self._ha_import_request = import_params
             except JobBusy:
                 logger.info("HA-Import bereits aktiv · event=ha_import_already_running")
             return self.deps.templates.TemplateResponse(
@@ -3540,6 +3565,15 @@ class ImportService:
                 return self._ha_dry_run_section(
                     request, self._ha_dry_run_request, vorschau.get("items", []), fehler, retarget=True,
                 )
+            if request.query_params.get("watch") == "import" and self._ha_import_request is not None:
+                # Die Tabelle neu zeichnen (Letzter Import, Status); der Ergebnisblock kommt danach
+                # über den load-Trigger des frischen Ausgabe-Containers (Aufruf ohne ?watch).
+                response = self.deps.templates.TemplateResponse(
+                    request, "_ha_import_section.html", self._ha_import_context(**self._ha_import_request),
+                )
+                response.headers["HX-Retarget"] = "#ha-section"
+                response.headers["HX-Reswap"] = "outerHTML"
+                return response
             ergebnis = dict(stand["result"] or {"history_source": "raw", "period": "", "items": [], "errors": []})
             if stand["error"]:
                 ergebnis["errors"] = [*ergebnis.get("errors", []), f"Abgebrochen: {stand['error']}"]

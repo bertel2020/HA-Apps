@@ -244,3 +244,25 @@ def test_vm_and_influx_tables_show_last_import(client, entities) -> None:
     finally:
         import_reports.delete(data_dir, report["id"])
         (data_dir / import_last.FILENAME).unlink(missing_ok=True)
+
+
+def test_import_refreshes_table_and_drops_stale_preview_status(client, entities, monkeypatch) -> None:
+    """Nach dem Import zeichnet das Poll-Ziel (?watch=import) die Tabelle neu, und das Vorschau-
+    Ergebnis der importierten Entität verschwindet (sonst bliebe „Importierbar“ stehen)."""
+    from app import import_routes, main
+
+    monkeypatch.setattr(import_routes.ImportService, "_fetch_ha_history", _fake_fetch)
+    form = {"entity_ids": ["sensor.dry_new"], "history_source": "raw", "period": "hour", "range_preset": "max"}
+    _run_dry_run(client, form)
+    assert "sensor.dry_new" in next(iter(main._import_service._ha_dry_run_status.values()))
+
+    client.post("/import/ha/start", data=form)
+    for _ in range(100):
+        polled = client.get("/import/ha/progress?watch=import")
+        if 'id="ha-section"' in polled.text:
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("Import wurde nicht fertig")
+    assert polled.headers["HX-Retarget"] == "#ha-section" and polled.headers["HX-Reswap"] == "outerHTML"
+    assert "sensor.dry_new" not in next(iter(main._import_service._ha_dry_run_status.values()), {})
