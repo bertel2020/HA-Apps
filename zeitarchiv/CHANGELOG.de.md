@@ -10,6 +10,15 @@
 >
 > 🇬🇧 [English version](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md)
 
+## Unreleased
+
+### Behoben
+
+- **Import**: Tabelle im Reiter Home Assistant
+  - Nach einem Import aktualisiert sich die Tabelle sofort („Letzter Import“, Status), ein Neuladen der Seite ist nicht mehr nötig
+  - Ein früheres Dry-Run-Ergebnis bleibt nach dem Import nicht mehr in der Spalte „Status“ stehen
+  - Die Spalte „Verfügbar“ überlappt bei langen Zeiträumen nicht mehr die Spalte „Status“
+
 ## 1.55.0 - 2026-11-17
 
 ### Neu

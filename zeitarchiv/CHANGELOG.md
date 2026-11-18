@@ -10,6 +10,15 @@
 >
 > 🇩🇪 [Änderungen auf Deutsch](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md)
 
+## Unreleased
+
+### Fixed
+
+- **Import**: Table on the Home Assistant tab
+  - After an import the table now updates right away (“Last import”, status), no page reload needed
+  - A previous dry-run result no longer stays in the “Status” column after importing
+  - The “Available” column no longer overlaps “Status” with long date ranges
+
 ## 1.55.0 - 2026-11-17
 
 ### New
