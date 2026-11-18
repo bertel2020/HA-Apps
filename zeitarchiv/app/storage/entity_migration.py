@@ -37,6 +37,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from . import entity_removal, hotbuffer, rollup
+from .atomic import replace_durably
 from .cleanup import iter_raw_rows
 from .index import Index
 from .paths import entity_dir
@@ -289,7 +290,7 @@ def _overwrite_existing_values(
                 temporary = archive_path.with_name(f".{archive_path.name}.migrating")
                 try:
                     pq.write_table(new_table, temporary, compression="zstd")
-                    temporary.replace(archive_path)
+                    replace_durably(temporary, archive_path)
                 finally:
                     temporary.unlink(missing_ok=True)
                 index.add_size_bytes(target_entity_id, archive_path.stat().st_size - old_size)

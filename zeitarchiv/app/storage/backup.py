@@ -31,6 +31,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from . import zip_guard
+from .atomic import replace_durably
 from .coordinator import StorageCoordinator
 from .paths import entity_dir, storage_area_dir, validate_entity_id
 from ..limits import (
@@ -303,7 +304,7 @@ def create_backup(
         # bleibt für fremde/importierte Backups Default (siehe
         # backup_verify()/prepare_restore()/apply_pending_restore()).
         validate_backup(tmp_path, check_sqlite=consistent_sqlite, verify_checksums=False)
-        tmp_path.replace(dest_path)
+        replace_durably(tmp_path, dest_path)
         return manifest
     finally:
         sqlite_snapshot.unlink(missing_ok=True)

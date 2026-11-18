@@ -38,7 +38,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from . import hotbuffer, rollup, zip_guard
-from .atomic import write_file_atomically
+from .atomic import replace_durably, write_file_atomically
 from ..limits import (
     MAX_IMPORT_ROWS_PER_ENTITY,
     MAX_ZIP_COMPRESSION_RATIO,
@@ -1061,7 +1061,7 @@ def import_rows(
             temporary = archive_path.with_name(f".{archive_path.name}.importing")
             try:
                 pq.write_table(combined, temporary, compression="zstd")
-                temporary.replace(archive_path)
+                replace_durably(temporary, archive_path)
             finally:
                 temporary.unlink(missing_ok=True)
             index.add_size_bytes(entity_id, archive_path.stat().st_size - old_size)

@@ -121,7 +121,7 @@ def test_a_corrupt_hot_line_is_reported_as_corrupted_not_silently_dropped(tmp_pa
     hotbuffer.append(tmp_path, entity_id, 10.0, 1.0, TZ)
     hot_path = hotbuffer.hot_path(tmp_path, entity_id, 10.0, TZ)
     with hot_path.open("a", encoding="utf-8") as handle:
-        handle.write("\x00" * 100 + "1789930796.4,2.0\n")
+        handle.write("\x00" * 100 + "1789930796.4,abc\n")
     hotbuffer.append(tmp_path, entity_id, 30.0, 3.0, TZ)
 
     report = reconcile.audit_storage_metadata(tmp_path, index, TZ, repair=True)
