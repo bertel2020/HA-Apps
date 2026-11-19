@@ -315,6 +315,7 @@ def tiles_context(
     dashboard_locked = bool(dashboard["locked"]) if dashboard else False
     dashboard_precise = bool(dashboard["precise_mode"]) if dashboard else False
     dashboard_fill_gaps = bool(dashboard["fill_gaps"]) if dashboard else False
+    dashboard_legend_align = bool(dashboard["legend_align"]) if dashboard else False
     dashboard_grid_columns = int(dashboard["grid_columns"]) if dashboard else 3
     entity_rows = index.list_entities()
     all_entities = [
@@ -336,6 +337,8 @@ def tiles_context(
         # Lücken auffüllen: grid-auto-flow: dense (.dashboard-grid.is-dense) —
         # unabhängig vom Präzisen Modus, beide lassen sich frei kombinieren.
         "dashboard_fill_gaps": dashboard_fill_gaps,
+        # Legenden angleichen: Karten einer Rasterzeile bekommen gleich hohe Legenden (.dashboard-grid.is-aligned).
+        "dashboard_legend_align": dashboard_legend_align,
         # Kacheln pro Zeile (3 oder 4): bei 4 trägt das Raster data-columns="4" (breite Darstellung,
         # ab 1500 px vier Spalten, darunter kappt das CSS zu breite Kacheln) und das Größenmenü geht bis 4 (8).
         "dashboard_grid_columns": dashboard_grid_columns,

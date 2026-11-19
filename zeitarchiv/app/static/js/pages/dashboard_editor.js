@@ -7,6 +7,7 @@
         // Der Schalter steht nur bei eingeschalteter breiter Darstellung im Formular; sonst bleibt der gespeicherte Wert.
         fourColumns: DASHBOARD.gridColumns === 4,
         fillGaps: DASHBOARD.fillGaps,
+        legendAlign: DASHBOARD.legendAlign,
         periodNav: DASHBOARD.periodNav,
         saving: false,
         savedMessage: '',
@@ -49,6 +50,10 @@
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({fill_gaps: this.fillGaps}),
               });
               if (!fillGapsRes.ok) { appAlert(t('Speichern von "Lücken auffüllen" fehlgeschlagen.')); return; }
+              const legendAlignRes = await fetch(`${BASE}/dashboards/${this.dashboardId}/legend-align`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({legend_align: this.legendAlign}),
+              });
+              if (!legendAlignRes.ok) { appAlert(t('Speichern von "Legenden angleichen" fehlgeschlagen.')); return; }
               const periodNavRes = await fetch(`${BASE}/dashboards/${this.dashboardId}/period-nav`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({period_nav: this.periodNav}),
               });

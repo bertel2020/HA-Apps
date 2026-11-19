@@ -54,6 +54,8 @@
   const resizeObserver = typeof ResizeObserver === 'function'
     ? new ResizeObserver(entries => {
       entries.forEach(entry => resizePending.add(entry.target));
+      // Eine geänderte Kachelbreite ändert auch den Umbruch der Legenden (Chips): „Legenden angleichen“ neu messen.
+      scheduleAlignLegends();
       if (resizeQueued) return;
       resizeQueued = true;
       requestAnimationFrame(() => {
@@ -139,6 +141,38 @@
     if (!visible || !legend) { legendEl.innerHTML = ''; return; }
     const chartId = el.closest('.dtile')?.dataset.itemId;
     legendEl.innerHTML = renderLegendHtml(legend, legendHidden.get(chartId) || new Set());
+    scheduleAlignLegends();
+  }
+
+  // Dashboard-Einstellung „Legenden angleichen“ (.dashboard-grid.is-aligned): Kacheln, die in derselben Rasterzeile beginnen,
+  // bekommen als Mindesthöhe der Legende die der höchsten Legende. Die Charts enden dann gleich weit und die Legenden
+  // beginnen auf derselben Höhe; kürzere Legenden lassen unten Platz. Kacheln ohne sichtbare Legende zählen nicht mit.
+  // Ein Raster-Subgrid geht hier nicht: Titel, Chart und Legende einer Kachel sind keine Zeilen des Dashboard-Rasters.
+  let alignLegendsQueued = false;
+  function scheduleAlignLegends() {
+    if (alignLegendsQueued) return;
+    alignLegendsQueued = true;
+    // Ein kurzer Timer statt requestAnimationFrame: Im Hintergrund-Tab feuert dieses nie, das Flag bliebe gesetzt.
+    setTimeout(() => { alignLegendsQueued = false; alignLegends(); }, 30);
+  }
+
+  function alignLegends() {
+    document.querySelectorAll('.dashboard-grid').forEach(grid => {
+      const legends = [...grid.querySelectorAll('.dtile-legend.is-visible')];
+      legends.forEach(legendEl => { legendEl.style.minHeight = ''; });
+      if (!grid.classList.contains('is-aligned')) return;
+      const rows = new Map();
+      legends.forEach(legendEl => {
+        const top = Math.round(legendEl.closest('.dtile').getBoundingClientRect().top);
+        if (!rows.has(top)) rows.set(top, []);
+        rows.get(top).push(legendEl);
+      });
+      rows.forEach(list => {
+        if (list.length < 2) return;
+        const tallest = Math.max(...list.map(legendEl => legendEl.offsetHeight));
+        list.forEach(legendEl => { legendEl.style.minHeight = `${tallest}px`; });
+      });
+    });
   }
 
   // Klick/Enter/Leertaste auf einen Legenden-Chip ODER eine Tabellenzeile

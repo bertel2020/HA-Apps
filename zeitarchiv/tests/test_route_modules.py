@@ -164,7 +164,10 @@ def test_main_keeps_external_api_and_report_routes_out_of_the_monolith() -> None
     # (Spaltenauswahl, Filter an Zähler und Liste, Zelle, Route) brauchen in main.py rund 15 Zeilen; die Räume
     # selbst und ihre Abfrage stehen in entity_areas.py. main.py: 5.904. Der benannte Ausweg bleibt der Schnitt
     # der Dashboard-Kontext-Bauer.
-    assert len(main.splitlines()) < 5_910
+    # Am 19. November 2026 auf 5.930 angehoben: Die Dashboard-Einstellung „Legenden angleichen“ braucht wie
+    # „Lücken auffüllen“ ein Body-Modell und eine Route (rund 11 Zeilen); Spalte und Setter stehen in index.py.
+    # main.py: 5.918.
+    assert len(main.splitlines()) < 5_930
 
 
 def test_api_router_has_explicit_runtime_dependencies_and_all_api_routes() -> None:

@@ -717,6 +717,7 @@ CREATE TABLE IF NOT EXISTS dashboards (
     is_favorite INTEGER NOT NULL DEFAULT 0,
     precise_mode INTEGER NOT NULL DEFAULT 0,
     fill_gaps INTEGER NOT NULL DEFAULT 0,
+    legend_align INTEGER NOT NULL DEFAULT 0,
     period_nav INTEGER NOT NULL DEFAULT 0,
     grid_columns INTEGER NOT NULL DEFAULT 3
 );
@@ -1713,6 +1714,11 @@ class Index:
             # is-dense) — Standard aus, damit bestehende Dashboards ihre
             # heutige strikte Reihenfolge-Anordnung nicht ungefragt ändern.
             self._conn.execute("ALTER TABLE dashboards ADD COLUMN fill_gaps INTEGER NOT NULL DEFAULT 0")
+        if "legend_align" not in dashboards_columns:
+            # "Legenden angleichen": Karten in einer Rasterzeile bekommen gleich hohe Legenden, damit die Charts
+            # gleich weit enden (siehe alignLegends() in dashboard-tiles.js). Standard aus: Nur neu angelegte
+            # Dashboards starten mit an (create_dashboard), bestehende ändern ihr Aussehen nicht ungefragt.
+            self._conn.execute("ALTER TABLE dashboards ADD COLUMN legend_align INTEGER NOT NULL DEFAULT 0")
         if "period_nav" not in dashboards_columns:
             # Zeitraum-Navigation (Stichtag-Leiste über den Kacheln) — Standard
             # aus, damit kein bestehendes Dashboard ungefragt eine Leiste bekommt.
@@ -3167,7 +3173,7 @@ class Index:
             self._ensure_valid_name_locked("dashboards", name)
             max_pos = self._conn.execute("SELECT MAX(position) FROM dashboards").fetchone()[0]
             cursor = self._conn.execute(
-                "INSERT INTO dashboards (name, position) VALUES (?, ?)", (name, (max_pos or 0) + 1)
+                "INSERT INTO dashboards (name, position, legend_align) VALUES (?, ?, 1)", (name, (max_pos or 0) + 1)
             )
             return cursor.lastrowid
 
@@ -3250,6 +3256,13 @@ class Index:
             )
             return cursor.rowcount > 0
 
+    def set_dashboard_legend_align(self, dashboard_id: int, legend_align: bool) -> bool:
+        with self._lock, self._conn:
+            cursor = self._conn.execute(
+                "UPDATE dashboards SET legend_align = ? WHERE id = ?", (1 if legend_align else 0, dashboard_id)
+            )
+            return cursor.rowcount > 0
+
     def set_dashboard_period_nav(self, dashboard_id: int, period_nav: bool) -> bool:
         with self._lock, self._conn:
             cursor = self._conn.execute(
@@ -3265,7 +3278,7 @@ class Index:
         frisch angelegtes."""
         with self._lock, self._conn:
             row = self._conn.execute(
-                "SELECT name, precise_mode, fill_gaps, period_nav, grid_columns FROM dashboards WHERE id = ?",
+                "SELECT name, precise_mode, fill_gaps, legend_align, period_nav, grid_columns FROM dashboards WHERE id = ?",
                 (dashboard_id,),
             ).fetchone()
             if row is None:
@@ -3274,10 +3287,10 @@ class Index:
             # Die Kachelgrößen unten sind im Präzisen Modus verdoppelt und reichen bis zur Spaltenzahl;
             # die Kopie braucht dieselben Modi, sonst stünden Spannen bis 6 in einem 3-Spalten-Raster.
             cursor = self._conn.execute(
-                "INSERT INTO dashboards (name, position, precise_mode, fill_gaps, period_nav, grid_columns) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO dashboards (name, position, precise_mode, fill_gaps, legend_align, period_nav, grid_columns) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (self._copy_name_locked("dashboards", row["name"]), (max_pos or 0) + 1,
-                 row["precise_mode"], row["fill_gaps"], row["period_nav"], row["grid_columns"]),
+                 row["precise_mode"], row["fill_gaps"], row["legend_align"], row["period_nav"], row["grid_columns"]),
             )
             new_id = cursor.lastrowid
             pins = self._conn.execute(
@@ -4867,7 +4880,7 @@ class Index:
             self._conn.execute("DELETE FROM dashboards WHERE id != 1")
             self._conn.execute(
                 "UPDATE dashboards SET name = 'Übersicht', position = 0, is_default = 1, "
-                "locked = 0, is_favorite = 0, precise_mode = 0, fill_gaps = 0, period_nav = 0, grid_columns = 3 WHERE id = 1"
+                "locked = 0, is_favorite = 0, precise_mode = 0, fill_gaps = 0, legend_align = 0, period_nav = 0, grid_columns = 3 WHERE id = 1"
             )
             if keep_setting_prefixes:
                 clause = " AND ".join("key NOT LIKE ?" for _ in keep_setting_prefixes)

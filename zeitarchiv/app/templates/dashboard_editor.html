@@ -60,6 +60,17 @@
       <div class="field">
         <div class="field-switch-row">
           <span class="menu-toggle">
+            <input type="checkbox" id="dash-legend-align" x-model="legendAlign">
+            <span class="track"><span class="thumb"></span></span>
+          </span>
+          <label for="dash-legend-align">{{ _("Legenden angleichen") }} {{ hint_button(_('Legenden angleichen')) }}</label>
+        </div>
+        {% call hint_body() %}{{ _("Karten in derselben Zeile bekommen gleich hohe Legenden. Die Charts enden dann gleich weit, kürzere Legenden lassen unten Platz.") }}{% endcall %}
+      </div>
+
+      <div class="field">
+        <div class="field-switch-row">
+          <span class="menu-toggle">
             <input type="checkbox" id="dash-fill-gaps" x-model="fillGaps">
             <span class="track"><span class="thumb"></span></span>
           </span>
@@ -114,6 +125,7 @@
       preciseMode: {{ 'true' if dashboard and dashboard.precise_mode else 'false' }},
       gridColumns: {{ dashboard.grid_columns if dashboard else 3 }},
       fillGaps: {{ 'true' if dashboard and dashboard.fill_gaps else 'false' }},
+      legendAlign: {{ 'true' if dashboard and dashboard.legend_align else 'false' }},
       periodNav: {{ 'true' if dashboard and dashboard.period_nav else 'false' }},
     };
   </script>

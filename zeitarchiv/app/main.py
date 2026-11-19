@@ -4516,6 +4516,17 @@ def dashboards_fill_gaps(dashboard_id: int, body: _DashboardFillGapsBody) -> dic
     return {"ok": True, "fill_gaps": body.fill_gaps}
 
 
+class _DashboardLegendAlignBody(BaseModel):
+    legend_align: bool
+
+
+@app.post("/dashboards/{dashboard_id}/legend-align")
+def dashboards_legend_align(dashboard_id: int, body: _DashboardLegendAlignBody) -> dict:
+    if not index.set_dashboard_legend_align(dashboard_id, body.legend_align):
+        raise HTTPException(status_code=404, detail=tr("Dashboard nicht gefunden"))
+    return {"ok": True, "legend_align": body.legend_align}
+
+
 class _DashboardPeriodNavBody(BaseModel):
     period_nav: bool
 

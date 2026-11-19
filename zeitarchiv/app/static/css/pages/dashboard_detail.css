@@ -276,6 +276,10 @@
      entsprechen 1:1 der Legende der zugrundeliegenden Chart-Seite. */
   .dtile-legend{display:none;flex-wrap:wrap;gap:8px;padding-top:10px;flex:none;}
   .dtile-legend.is-visible{display:flex;}
+  /* „Legenden angleichen“: Chips bleiben oben, auch wenn die Legende durch die Mindesthöhe höher wird (alignLegends()). */
+  .dashboard-grid.is-aligned .dtile-legend{align-content:flex-start;}
+  /* Tabellen-Legende: der Rahmen füllt die Mindesthöhe, kürzere Tabellen enden mit Leerraum im Rahmen statt mit kürzerem Rahmen. */
+  .dashboard-grid.is-aligned .dtile-legend:has(> .tbl-wrap){align-content:stretch;}
   /* Tabellen-Stil (Legenden-Stil "Tabelle") als einzelnes Flex-Kind soll die
      volle Kachelbreite füllen statt (wie ein Chip) auf Inhaltsbreite zu
      schrumpfen. */
