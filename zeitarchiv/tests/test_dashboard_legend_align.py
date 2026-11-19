@@ -95,3 +95,19 @@ def test_dashboard_form_buttons_end_at_the_right_edge() -> None:
     css = (PAGE_CSS / "dashboard_editor.css").read_text(encoding="utf-8")
     assert ".save-row{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;justify-content:flex-end;}" in css
     assert "@media (max-width:480px){\n    .save-row{justify-content:flex-end;}" not in css
+
+
+def test_dashboard_form_is_a_card_with_two_groups_and_a_hint_button_per_row() -> None:
+    editor = template_text("dashboard_editor.html")
+    assert 'class="settings-section dash-editor-card"' in editor
+    assert editor.count('class="settings-subsection-title"') == 2
+    # Jede Zeile hat Schalter, Beschriftung und einen Hinweis, den das „i“ aufklappt (hint-toggle.js: Hinweis direkt hinter dem Label).
+    rows = editor.count('class="settings-compact-row"')
+    assert rows == 6
+    assert editor.count("hint_body('settings-compact-hint')") == rows
+    for key in ("dash-precise", "dash-four-columns", "dash-fill-gaps", "dash-legend-align", "dash-period-nav", "dash-locked"):
+        assert f'id="{key}"' in editor
+    labels = editor.split('class="settings-compact-label"')[1:]
+    assert len(labels) == rows and all("hint_button(" in part.split("</label>")[0] for part in labels)
+    css = (PAGE_CSS / "dashboard_editor.css").read_text(encoding="utf-8")
+    assert ".dash-editor-card{max-width:720px;}" in css

@@ -10,11 +10,12 @@
     <h1>{{ _("Dashboards") }}</h1>
     <p class="sub" data-dynamic-back data-app-root="{{ app_root }}">{{ _("Eigene, frei benennbare Dashboards zusätzlich zur Übersichtsseite. &middot;") }} <a href="{{ app_root }}/dashboards">{{ _("&larr; zurück zu Dashboards") }}</a></p>
 
-    <div class="settings-panel">
+    <div class="settings-panel is-raised">
+    <section class="settings-section dash-editor-card">
       <div class="dash-editor-title-row">
         <h2>{{ _("Dashboard bearbeiten") if dashboard else _("Neues Dashboard") }}</h2>
       </div>
-      <p class="sub">{{ _("Name und Fixierung dieses Dashboards.") }}</p>
+      <p class="sub">{{ _("Name und Darstellung dieses Dashboards.") }}</p>
 
       <div class="field">
         <label for="dash-name">{{ _("Name") }}</label>
@@ -22,72 +23,74 @@
       </div>
 
       {% if dashboard %}
-      <div class="field">
-        <div class="field-switch-row">
-          <span class="menu-toggle">
-            <input type="checkbox" id="dash-locked" x-model="locked">
-            <span class="track"><span class="thumb"></span></span>
-          </span>
-          <label for="dash-locked">{{ _("Fixiert") }} {{ hint_button(_('Fixiert')) }}</label>
-        </div>
-        {% call hint_body() %}{{ _("Verhindert versehentliche Änderungen am Kachel-Layout in der Dashboard-Ansicht.") }}{% endcall %}
-      </div>
-
-      <div class="field">
-        <div class="field-switch-row">
+      <div class="settings-subsection">
+        <h3 class="settings-subsection-title">{{ _("Layout") }}</h3>
+        <div class="settings-compact-row">
+          <div class="settings-compact-row-text">
+            <label class="settings-compact-label" for="dash-precise">{{ _("Präziser Modus") }} {{ hint_button(_('Präziser Modus')) }}</label>
+            {% call hint_body('settings-compact-hint') %}{{ _("Feineres Kachelraster (6 statt 3 Spalten) für genauere Größen und Anordnung. Bestehende Kacheln behalten dabei ihre bisherige Größe.") }}{% endcall %}
+          </div>
           <span class="menu-toggle">
             <input type="checkbox" id="dash-precise" x-model="preciseMode">
             <span class="track"><span class="thumb"></span></span>
           </span>
-          <label for="dash-precise">{{ _("Präziser Modus") }} {{ hint_button(_('Präziser Modus')) }}</label>
         </div>
-        {% call hint_body() %}{{ _("Feineres Kachelraster (6 statt 3 Spalten) für genauere Größen und Anordnung. Bestehende Kacheln behalten dabei ihre bisherige Größe.") }}{% endcall %}
-      </div>
-
-      {% if page_layout == 'wide' %}
-      <div class="field">
-        <div class="field-switch-row">
+        {% if page_layout == 'wide' %}
+        <div class="settings-compact-row">
+          <div class="settings-compact-row-text">
+            <label class="settings-compact-label" for="dash-four-columns">{{ _("4 Kacheln pro Zeile") }} {{ hint_button(_('4 Kacheln pro Zeile')) }}</label>
+            {% call hint_body('settings-compact-hint') %}{{ _("Auf großen Bildschirmen (ab etwa 1500 px Fensterbreite) vier statt drei Kacheln nebeneinander, im Präzisen Modus acht Spalten. Auf kleineren Bildschirmen bleibt es bei drei; zu breite Kacheln werden dort nur verkleinert angezeigt.") }}{% endcall %}
+          </div>
           <span class="menu-toggle">
             <input type="checkbox" id="dash-four-columns" x-model="fourColumns">
             <span class="track"><span class="thumb"></span></span>
           </span>
-          <label for="dash-four-columns">{{ _("4 Kacheln pro Zeile") }} {{ hint_button(_('4 Kacheln pro Zeile')) }}</label>
         </div>
-        {% call hint_body() %}{{ _("Auf großen Bildschirmen (ab etwa 1500 px Fensterbreite) vier statt drei Kacheln nebeneinander, im Präzisen Modus acht Spalten. Auf kleineren Bildschirmen bleibt es bei drei; zu breite Kacheln werden dort nur verkleinert angezeigt.") }}{% endcall %}
-      </div>
-      {% endif %}
-
-      <div class="field">
-        <div class="field-switch-row">
-          <span class="menu-toggle">
-            <input type="checkbox" id="dash-legend-align" x-model="legendAlign">
-            <span class="track"><span class="thumb"></span></span>
-          </span>
-          <label for="dash-legend-align">{{ _("Legenden angleichen") }} {{ hint_button(_('Legenden angleichen')) }}</label>
-        </div>
-        {% call hint_body() %}{{ _("Karten in derselben Zeile bekommen gleich hohe Legenden. Die Charts enden dann gleich weit, kürzere Legenden lassen unten Platz.") }}{% endcall %}
-      </div>
-
-      <div class="field">
-        <div class="field-switch-row">
+        {% endif %}
+        <div class="settings-compact-row">
+          <div class="settings-compact-row-text">
+            <label class="settings-compact-label" for="dash-fill-gaps">{{ _("Lücken auffüllen") }} {{ hint_button(_('Lücken auffüllen')) }}</label>
+            {% call hint_body('settings-compact-hint') %}{{ _("Spätere, kleinere Kacheln rutschen in freie Lücken statt strikt der Anheft-Reihenfolge zu folgen.") }}{% endcall %}
+          </div>
           <span class="menu-toggle">
             <input type="checkbox" id="dash-fill-gaps" x-model="fillGaps">
             <span class="track"><span class="thumb"></span></span>
           </span>
-          <label for="dash-fill-gaps">{{ _("Lücken auffüllen") }} {{ hint_button(_('Lücken auffüllen')) }}</label>
         </div>
-        {% call hint_body() %}{{ _("Spätere, kleinere Kacheln rutschen in freie Lücken statt strikt der Anheft-Reihenfolge zu folgen.") }}{% endcall %}
+        <div class="settings-compact-row">
+          <div class="settings-compact-row-text">
+            <label class="settings-compact-label" for="dash-legend-align">{{ _("Legenden angleichen") }} {{ hint_button(_('Legenden angleichen')) }}</label>
+            {% call hint_body('settings-compact-hint') %}{{ _("Karten in derselben Zeile bekommen gleich hohe Legenden. Die Charts enden dann gleich weit, kürzere Legenden lassen unten Platz.") }}{% endcall %}
+          </div>
+          <span class="menu-toggle">
+            <input type="checkbox" id="dash-legend-align" x-model="legendAlign">
+            <span class="track"><span class="thumb"></span></span>
+          </span>
+        </div>
       </div>
 
-      <div class="field">
-        <div class="field-switch-row">
+      <div class="settings-subsection">
+        <h3 class="settings-subsection-title">{{ _("Verhalten") }}</h3>
+        <div class="settings-compact-row">
+          <div class="settings-compact-row-text">
+            <label class="settings-compact-label" for="dash-period-nav">{{ _("Zeitraum-Navigation") }} {{ hint_button(_('Zeitraum-Navigation')) }}</label>
+            {% call hint_body('settings-compact-hint') %}{{ _("Blendet über den Kacheln eine Stichtag-Leiste ein. Damit springt das ganze Dashboard auf einen anderen Tag: Jede Kachel zeigt ihren Zeitraum, der diesen Tag enthält. Kacheln mit festem Zeitraum bleiben unverändert.") }}{% endcall %}
+          </div>
           <span class="menu-toggle">
             <input type="checkbox" id="dash-period-nav" x-model="periodNav">
             <span class="track"><span class="thumb"></span></span>
           </span>
-          <label for="dash-period-nav">{{ _("Zeitraum-Navigation") }} {{ hint_button(_('Zeitraum-Navigation')) }}</label>
         </div>
-        {% call hint_body() %}{{ _("Blendet über den Kacheln eine Stichtag-Leiste ein. Damit springt das ganze Dashboard auf einen anderen Tag: Jede Kachel zeigt ihren Zeitraum, der diesen Tag enthält. Kacheln mit festem Zeitraum bleiben unverändert.") }}{% endcall %}
+        <div class="settings-compact-row">
+          <div class="settings-compact-row-text">
+            <label class="settings-compact-label" for="dash-locked">{{ _("Fixiert") }} {{ hint_button(_('Fixiert')) }}</label>
+            {% call hint_body('settings-compact-hint') %}{{ _("Verhindert versehentliche Änderungen am Kachel-Layout in der Dashboard-Ansicht.") }}{% endcall %}
+          </div>
+          <span class="menu-toggle">
+            <input type="checkbox" id="dash-locked" x-model="locked">
+            <span class="track"><span class="thumb"></span></span>
+          </span>
+        </div>
       </div>
       {% endif %}
 
@@ -103,6 +106,7 @@
         <button type="button" class="btn primary" :disabled="saving" @click="save()">{{ _("Speichern") if dashboard else _("Dashboard erstellen") }}</button>
         <span class="save-status" x-show="savedMessage" x-text="savedMessage"></span>
       </div>
+    </section>
     </div>
   </div>
 
