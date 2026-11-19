@@ -5024,7 +5024,7 @@
     "Zu wenige Werte": "Too few values",
     "1.10.–{day}.{month}.": "1 Oct–{day}.{month}.",
     "Die Heizwerte konnten nicht geladen werden.": "The heating values could not be loaded.",
-    "Nicht berücksichtigt, weil die Einheit nicht in kWh umgerechnet werden kann: {list}. Der Reiter rechnet nur mit Wh, kWh und MWh.": "Not included, because the unit cannot be converted to kWh: {list}. This tab only works with Wh, kWh and MWh.",
+    "Nicht berücksichtigt (Einheit nicht verwendbar): {list}. Der Reiter rechnet mit Wh, kWh und MWh, oder nur mit m³-Zählern, wenn kein kWh-Zähler dabei ist.": "Not included (unit cannot be used): {list}. This tab works with Wh, kWh and MWh, or with m³ meters only when no kWh meter is assigned alongside.",
     "Gradtagzahl {tag} und Verbrauch je Monat": "Degree days {tag} and consumption per month",
     "Heizgrenze": "Heating limit",
     "Heizperiode": "Heating season",

@@ -3164,10 +3164,20 @@
         return {room: read(this.heatRoom, 20), limit: read(this.heatLimit, 15), on: this.heatOn};
       },
 
-      // Zähler in einer Einheit ohne Umrechnung nach kWh (etwa m³) bleiben draußen; der Hinweis nennt sie.
+      // Zähler in einer Einheit, die der Reiter nicht rechnet, bleiben draußen; der Hinweis nennt sie.
       heatSkippedText() {
         const list = this.heat ? this.heat.skipped.map((c) => `${c.name} (${c.unit})`).join(', ') : '';
-        return t('Nicht berücksichtigt, weil die Einheit nicht in kWh umgerechnet werden kann: {list}. Der Reiter rechnet nur mit Wh, kWh und MWh.', {list});
+        return t('Nicht berücksichtigt (Einheit nicht verwendbar): {list}. Der Reiter rechnet mit Wh, kWh und MWh, oder nur mit m³-Zählern, wenn kein kWh-Zähler dabei ist.', {list});
+      },
+
+      // Einheit der Zähler im Reiter: kWh, bei reinen Gaszählern m³. Die Texte stehen mit „kWh“ im
+      // Katalog; heatU setzt die Einheit nach der Übersetzung ein, damit nicht jeder Text doppelt vorliegen muss.
+      heatUnit() {
+        return (this.heat && this.heat.unit) || 'kWh';
+      },
+
+      heatU(text) {
+        return this.heatUnit() === 'kWh' ? text : text.replaceAll('kWh', this.heatUnit());
       },
 
       heatColor(index) {
@@ -3222,10 +3232,10 @@
         return [
           {
             icon: 'flame', accent: 'var(--chart-2)', label: active.length > 1 ? t('Verbrauch gesamt') : t('Verbrauch'),
-            value: escapeHtml(num(now.kwh, 0)) + '<small>kWh</small>', sub: parts || change(now.kwh, before && before.kwh),
+            value: escapeHtml(num(now.kwh, 0)) + `<small>${escapeHtml(this.heatUnit())}</small>`, sub: parts || change(now.kwh, before && before.kwh),
           },
           {
-            icon: 'gauge', accent: 'var(--chart-3)', label: t('kWh je Gradtag'),
+            icon: 'gauge', accent: 'var(--chart-3)', label: this.heatU(t('kWh je Gradtag')),
             value: escapeHtml(now.q == null ? '–' : num(now.q, 2)), sub: change(now.q, before && before.q),
           },
           {
@@ -3284,7 +3294,7 @@
           if (!line) return;
           const running = info.running && period === info.current;
           rows.push({
-            period, label: WetterHeating.label(period), color: this.heatColor(index), value: `${num(-line.slope, 2)} kWh/K`,
+            period, label: WetterHeating.label(period), color: this.heatColor(index), value: `${num(-line.slope, 2)} ${this.heatUnit()}/K`,
             sub: running ? `${t('{n} Tage', {n: line.n})} · ${t('bisher')}` : t('{n} Tage', {n: line.n}),
             title: `R² ${num(line.r2, 2)}`,
           });
@@ -3302,8 +3312,8 @@
         if (!this.heatSlopes().length) return '';
         const o = this.heatOpts();
         return this.heatFitFrom(o) === 0
-          ? t('Ein Punkt je Tag (kWh pro Tag). Die Linien zeigen den geglätteten Verlauf; kWh je Kelvin gilt für 0 bis {limit} °C, darunter verläuft der Verbrauch oft flacher.', {limit: num(o.limit, 0)})
-          : t('Ein Punkt je Tag (kWh pro Tag). Die Linien zeigen den geglätteten Verlauf; kWh je Kelvin gilt für Tage unter der Heizgrenze.');
+          ? this.heatU(t('Ein Punkt je Tag (kWh pro Tag). Die Linien zeigen den geglätteten Verlauf; kWh je Kelvin gilt für 0 bis {limit} °C, darunter verläuft der Verbrauch oft flacher.', {limit: num(o.limit, 0)}))
+          : this.heatU(t('Ein Punkt je Tag (kWh pro Tag). Die Linien zeigen den geglätteten Verlauf; kWh je Kelvin gilt für Tage unter der Heizgrenze.'));
       },
 
       drawHeat() {
@@ -3393,11 +3403,11 @@
         for (const kind of kinds) {
           const g = stats[kind];
           const sub = g.n
-            ? t('{n} Tage · Ø {temp} °C · {kwh} kWh/Tag', {n: g.n, temp: g.temp == null ? '–' : num(g.temp, 1), kwh: g.kwh == null ? '–' : num(g.kwh, 1)})
+            ? this.heatU(t('{n} Tage · Ø {temp} °C · {kwh} kWh/Tag', {n: g.n, temp: g.temp == null ? '–' : num(g.temp, 1), kwh: g.kwh == null ? '–' : num(g.kwh, 1)}))
             : t('Keine Tage');
           html += `<div class="wt-ts${g.n && g.n < 30 ? ' is-thin' : ''}" data-kind="${kind}">`
             + `<span class="wt-ts-k"><i></i>${escapeHtml(names[kind])}</span>`
-            + `<span class="wt-ts-v">${g.q == null ? '–' : escapeHtml(num(g.q, 2))}<small>kWh/Gt</small></span>`
+            + `<span class="wt-ts-v">${g.q == null ? '–' : escapeHtml(num(g.q, 2))}<small>${escapeHtml(this.heatUnit())}/Gt</small></span>`
             + `<span class="wt-ts-s">${escapeHtml(sub)}</span>`
             + (g.n && g.n < 30 ? `<span class="wt-ts-warn">${escapeHtml(t('wenig Tage, kaum aussagekräftig'))}</span>` : '')
             + '</div>';
@@ -3473,14 +3483,14 @@
           // Einheit an den Teilstrichen statt als Achsenname: der Name landete in diesem Diagramm mitten in der Legende.
           yAxis: {
             type: 'value', min: 0, ...axisStyle(colors),
-            axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => `${value} kWh`},
+            axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => `${value} ${this.heatUnit()}`},
           },
           tooltip: {
             trigger: 'item', confine: true, backgroundColor: colors.surface, borderColor: colors.grid,
             textStyle: {color: colors.ink, fontSize: scaledFont(12)},
             formatter: (param) => (param.data && param.data[2]
               ? `<b>${escapeHtml(new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'}).format(new Date(param.data[2] + 'T12:00:00Z')))}</b>`
-                + `<br>${escapeHtml(num(param.data[0], 1))} °C<br>${escapeHtml(num(param.data[1], 1))} kWh`
+                + `<br>${escapeHtml(num(param.data[0], 1))} °C<br>${escapeHtml(num(param.data[1], 1))} ${escapeHtml(this.heatUnit())}`
               : ''),
           },
           series,
@@ -3505,7 +3515,7 @@
         // Eine Zelle je Periode: kWh/Gt als Hauptzahl, darunter gedämpft Gradtage und kWh.
         const cell = (st, p) => (st && st.n
           ? `<td${isRun(p) ? ' class="wt-run"' : ''}><span class="wt-hv">${st.q == null ? '–' : escapeHtml(num(st.q, 2))}</span>`
-            + `<span class="wt-hs">${escapeHtml(num(st.gt, 0))} Gt · ${escapeHtml(num(st.kwh, 0))} kWh</span></td>`
+            + `<span class="wt-hs">${escapeHtml(num(st.gt, 0))} Gt · ${escapeHtml(num(st.kwh, 0))} ${escapeHtml(this.heatUnit())}</span></td>`
           : `<td class="wt-na${isRun(p) ? ' wt-run' : ''}">–</td>`);
         const cells = (list) => list.map((st, i) => cell(st, shown[i])).join('');
         // Veränderung als Pille: unter 1,5 % neutral, weniger kWh/Gt grün, mehr kWh/Gt rot.
@@ -3523,8 +3533,8 @@
         const delta = newer != null && older != null && shown.includes(newer) && shown.includes(older);
         let html = '<thead><tr><th></th>'
           + shown.map((p) => `<th${isRun(p) ? ' class="wt-run"' : ''}>${escapeHtml(WetterHeating.label(p))}${isRun(p) ? ' · ' + escapeHtml(t('läuft')) : ''}`
-            + `<span class="wt-sb">kWh/Gt</span></th>`).join('')
-          + (delta ? `<th class="wt-dh">Δ<span class="wt-sb">${escapeHtml(t('kWh/Gt {a} gegenüber {b}', {a: WetterHeating.label(newer), b: WetterHeating.label(older)}))}</span></th>` : '')
+            + `<span class="wt-sb">${escapeHtml(this.heatUnit())}/Gt</span></th>`).join('')
+          + (delta ? `<th class="wt-dh">Δ<span class="wt-sb">${escapeHtml(this.heatU(t('kWh/Gt {a} gegenüber {b}', {a: WetterHeating.label(newer), b: WetterHeating.label(older)})))}</span></th>` : '')
           + '</tr></thead><tbody>';
         const deltaCell = (a, b) => (delta ? change(a, b) : '');
         // Monate, in denen keine der gezeigten Heizperioden Werte hat (noch nicht erreicht), bleiben weg.
@@ -3566,7 +3576,7 @@
         const all = sums.reduce((a, v) => a + v, 0);
         if (!all) return t('Keine Werte in dieser Heizperiode.');
         return this.heat.counters
-          .map((counter, i) => `${counter.name} ${num(sums[i], 0)} kWh (${num(sums[i] / all * 100, 0)} %)`).join(' · ');
+          .map((counter, i) => `${counter.name} ${num(sums[i], 0)} ${this.heatUnit()} (${num(sums[i] / all * 100, 0)} %)`).join(' · ');
       },
 
       drawHeatShare() {
@@ -3584,13 +3594,13 @@
         chart.setOption({
           animation: false, grid: gridFor(element), legend: legendBox(colors, this.heat.counters.map((c) => c.name)),
           xAxis: {type: 'category', data: labels, ...axisStyle(colors), splitLine: {show: false}},
-          yAxis: {type: 'value', name: 'kWh', nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
+          yAxis: {type: 'value', name: this.heatUnit(), nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
           tooltip: tooltipBox(colors, (params) => {
             const total = params.reduce((a, p) => a + (p.value || 0), 0);
             return `<b>${escapeHtml(params[0].axisValue)}</b>` + params
               .filter((p) => p.value)
-              .map((p) => `<br>${escapeHtml(p.seriesName)}: ${escapeHtml(num(p.value, 1))} kWh (${escapeHtml(num(total ? p.value / total * 100 : 0, 0))} %)`).join('')
-              + `<br>${escapeHtml(t('Summe'))}: ${escapeHtml(num(total, 1))} kWh`;
+              .map((p) => `<br>${escapeHtml(p.seriesName)}: ${escapeHtml(num(p.value, 1))} ${escapeHtml(this.heatUnit())} (${escapeHtml(num(total ? p.value / total * 100 : 0, 0))} %)`).join('')
+              + `<br>${escapeHtml(t('Summe'))}: ${escapeHtml(num(total, 1))} ${escapeHtml(this.heatUnit())}`;
           }),
           series,
         }, true);

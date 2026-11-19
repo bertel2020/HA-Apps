@@ -88,7 +88,7 @@ ROLE_UNITS = {
     "sun_elevation": ["°"],
     "pv_power": ["kW", "W", "MW"],
     "extra": ["°C", "°F", "K", "%"],
-    "heating": ["kWh", "Wh", "MWh"],
+    "heating": ["kWh", "Wh", "MWh", "m³"],
 }
 #: Kurzhilfe je Rolle im Auswahldialog: was gemeint ist, mit Beispielen. Bei „Niederschlag (Menge)“
 #: steht der Typ-Grund dabei, weil dort Sensoren mit Momentanwert (state_class „measurement“) fehlen.
@@ -173,8 +173,10 @@ TILE_LABELS = {
     "illuminance": N_("Sonnenschein"),
 }
 #: PV und Helligkeit: Leistungseinheiten (Faktor nach kW) und Anzahl der verglichenen Tage.
-#: Heizzähler: Energieeinheiten mit Faktor nach kWh. Andere Einheiten (m³) rechnet der Reiter Heizen nicht.
+#: Heizzähler: Energieeinheiten mit Faktor nach kWh; Gaszähler in m³ rechnet der Reiter Heizen nur allein (in m³).
 HEATING_UNIT_SCALE = {"Wh": 0.001, "kWh": 1.0, "MWh": 1000.0}
+HEATING_GAS_UNITS = {"m³", "m3"}
+HEATING_GAS_UNIT = "m³"
 PV_UNIT_KW = {"W": 0.001, "kW": 1.0, "MW": 1000.0}
 
 
@@ -1190,22 +1192,33 @@ class WetterService:
     def _heating_name(row: dict, entity: dict) -> str:
         return row["name"] or entity_display_name(row["entity_id"], entity["friendly_name"], entity["custom_name"])
 
-    def heating_counters(self, config: dict) -> list[dict]:
-        """Heizzähler der Konfiguration in einer Energieeinheit (Name, Einheit, Faktor nach kWh).
+    def _heating_split(self, config: dict) -> tuple[list[dict], list[dict], str]:
+        """Heizzähler aufgeteilt in (gerechnete, übersprungene, Einheit des Reiters).
 
-        Andere Einheiten (etwa m³ bei Gas) bleiben draußen: Ohne Brennwert lassen sie sich nicht in kWh
-        umrechnen, und als kWh gerechnet verfälschten sie Summe und Kennzahlen (siehe heating_skipped)."""
-        return [
-            {"entity_id": row["entity_id"], "unit": unit, "name": self._heating_name(row, entity), "scale": HEATING_UNIT_SCALE[unit]}
-            for row, entity, unit in self._heating_rows(config) if unit in HEATING_UNIT_SCALE
-        ]
+        Energiezähler (Wh, kWh, MWh) rechnen in kWh. Gibt es keinen, rechnen Gaszähler in m³ unverändert, ohne
+        Brennwert wäre jede Umrechnung geraten. Mit beiden Arten bleiben die Gaszähler draußen: m³ und kWh
+        ließen sich nicht addieren. Jede andere Einheit bleibt immer draußen."""
+        energy, gas, other = [], [], []
+        for row, entity, unit in self._heating_rows(config):
+            name = self._heating_name(row, entity)
+            if unit in HEATING_UNIT_SCALE:
+                energy.append({"entity_id": row["entity_id"], "unit": unit, "name": name, "scale": HEATING_UNIT_SCALE[unit]})
+            elif unit in HEATING_GAS_UNITS:
+                gas.append({"entity_id": row["entity_id"], "unit": HEATING_GAS_UNIT, "name": name, "scale": 1.0})
+            else:
+                other.append({"entity_id": row["entity_id"], "name": name, "unit": unit})
+        skipped = [{k: c[k] for k in ("entity_id", "name", "unit")} for c in (gas if energy else [])] + other
+        if energy:
+            return energy, skipped, "kWh"
+        return gas, skipped, HEATING_GAS_UNIT if gas else "kWh"
+
+    def heating_counters(self, config: dict) -> list[dict]:
+        """Heizzähler, die der Reiter Heizen rechnet (Name, Einheit, Faktor in die Einheit des Reiters)."""
+        return self._heating_split(config)[0]
 
     def heating_skipped(self, config: dict) -> list[dict]:
         """Heizzähler, die der Reiter Heizen wegen ihrer Einheit nicht rechnet (Name, Einheit)."""
-        return [
-            {"entity_id": row["entity_id"], "name": self._heating_name(row, entity), "unit": unit}
-            for row, entity, unit in self._heating_rows(config) if unit not in HEATING_UNIT_SCALE
-        ]
+        return self._heating_split(config)[1]
 
     def compute_heating(self, now_local: datetime | None = None) -> dict | None:
         """Tage der Heizperiode mit Außentemperatur und kWh je Heizzähler. Gradtagzahl, Ausgleichsgerade
@@ -1213,8 +1226,7 @@ class WetterService:
         änderbar sind (siehe static/js/wetter-heating.js)."""
         config = _load_config(self.deps.index)
         now_local = now_local or datetime.now(self.deps.tz)
-        counters = self.heating_counters(config)
-        skipped = self.heating_skipped(config)
+        counters, skipped, unit = self._heating_split(config)
         temperature = config["temperature"]
         if not (counters or skipped) or not temperature or self.deps.index.get_entity(temperature) is None:
             return None
@@ -1224,7 +1236,7 @@ class WetterService:
         ) if counters else []
         return {
             "counters": [{"entity_id": c["entity_id"], "name": c["name"]} for c in counters],
-            "skipped": skipped,
+            "skipped": skipped, "unit": unit,
             "days": days, "room": config["heating_room"], "limit": config["heating_limit"],
             "sun": self._heating_sun(days, config, now_local),
             "today": now_local.date().isoformat(), "tz": str(self.deps.tz),
