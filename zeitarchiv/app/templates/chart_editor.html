@@ -490,7 +490,7 @@
                     <button :class="{active: normalize}" @click="normalize = true; render()">{{ _("Anteile (%)") }}</button>
                   </div>
                 </div>
-                <p class="color-hint menu-row-hint" x-show="stackPercentBlocked" x-cloak>{{ _("Anteile (%) wirken erst, wenn alle Balken in einem Stapel liegen. Solange Balken ohne Stapel dabei sind, bleiben die Werte absolut.") }}</p>
+                <p class="color-hint menu-row-hint" x-show="stackPercentBlocked" x-cloak>{{ _("Solange Balken ohne Stapel dabei sind, bleibt die Höhe absolut: Die Segmente zeigen ihren Anteil in %, über dem Balken steht die Summe.") }}</p>
                 <!-- "Horizontal" ergibt nur im Ranking-Vergleich Sinn (Auflösung
                      "Voll" — jede Entität bekommt dort ihre eigene Kategorie,
                      siehe render()/singleBucket, erst dann können lange

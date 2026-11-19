@@ -2221,6 +2221,11 @@
           const barOnlyAxis = new Set(
             units.filter(u => chartSeries.every((s, i) => axisKey(s) !== u || (s.chart_type === 'bar' && stackKeys[i])))
           );
+          // Trägt eine Achse neben gestapelten Balken auch Balken ohne Stapel oder Linien, bleibt sie absolut
+          // ("Balkenhöhe nach der Summe"): die Segmente zeigen ihren Anteil in %, die Summe steht über dem Balken.
+          const shareAxis = new Set(normalizeActive
+            ? units.filter(u => !barOnlyAxis.has(u) && chartSeries.some((s, i) => axisKey(s) === u && s.chart_type === 'bar' && stackKeys[i]))
+            : []);
           // Achsen mit MINDESTENS einer Balken-Serie (nicht nur reine
           // Balken-Achsen wie barOnlyAxis oben) dürfen "Dynamische Y-Achse"
           // nie übernehmen — sonst startet die Achse nicht bei 0 und
@@ -2243,11 +2248,14 @@
           // ts -> Summe je Achse, nur für tatsächlich normierte reine
           // Balken-Achsen.
           const axisTotals = new Map();
+          // Stapel auf einer absoluten Achse (shareAxis): ihre Summen beschriften nur, die Höhe bleibt.
+          const shareTotals = new Map();
           if (normalizeActive) {
             chartSeries.forEach((s, i) => {
               const u = axisKey(s);
-              if (!barOnlyAxis.has(u)) return;
+              if (!stackKeys[i] || s.chart_type !== 'bar' || !(barOnlyAxis.has(u) || shareAxis.has(u))) return;
               if (!axisTotals.has(stackKeys[i])) axisTotals.set(stackKeys[i], new Map());
+              if (shareAxis.has(u)) shareTotals.set(stackKeys[i], axisTotals.get(stackKeys[i]));
               const totals = axisTotals.get(stackKeys[i]);
               preparedPoints[i].forEach(p => totals.set(p.ts, (totals.get(p.ts) || 0) + p.value));
             });
@@ -2427,7 +2435,13 @@
             // bis windowEnd (nächster Block) ergibt bei einer einzelnen
             // Kategorie je Entität ohnehin keinen Sinn und entfällt deshalb
             // hier.
+            const shareStack = normalizeActive && !!stackKeys[i] && shareAxis.has(axisKey(s));
             const mainData = mainPoints.map(p => {
+              if (shareStack) {
+                // Höhe bleibt absolut; Feld 9 trägt den Anteil am Stapel für Beschriftung und Tooltip.
+                const total = axisTotals.get(stackKeys[i]).get(p.ts) || 0;
+                return [singleBucket ? slotOf[i] : p.ts * 1000, p.value, p.ts * 1000, s.unit, seriesDecimals, isDurationSeries(s), null, null, null, total ? (p.value / total) * 100 : 0];
+              }
               if (!axisNormalized) return [singleBucket ? slotOf[i] : p.ts * 1000, p.value, p.ts * 1000, s.unit, seriesDecimals, isDurationSeries(s)];
               // Felder 7–9: Originalwert/-einheit/-Nachkommastellen, nur für
               // den Tooltip (formatPointValue() liest sie nicht, siehe dort)
@@ -2494,11 +2508,17 @@
               // darüber — "darüber" wäre bei gestapelten Segmenten meist ein
               // fremdes Segment oder Whitespace, nicht das eigene.
               label: {
-                show: this.showValues,
+                show: this.showValues || shareStack,
                 position: isStackedBar ? 'inside' : (horizontalActive ? 'right' : 'top'),
                 fontSize: Math.round(10.5 * UI_FONT_SCALE * 10) / 10,
                 color: isStackedBar ? '#fff' : getComputedStyle(document.body).getPropertyValue('--ink-muted'),
-                formatter: params => formatPointValue(params.data, true),
+                // Schmale Balken: die Zahl ragt über den Rand, die Umrandung in der Segmentfarbe hält sie lesbar.
+                textBorderColor: shareStack ? color : undefined,
+                textBorderWidth: shareStack ? 2 : 0,
+                // Anteil am Stapel; sehr schmale Segmente bleiben ohne Zahl, sie passt nicht hinein.
+                formatter: params => params.data[9] != null
+                  ? (params.data[9] < 4 ? '' : `${fmtNum(params.data[9], 0)} %`)
+                  : formatPointValue(params.data, true),
               },
               // Deckelt die Balkenbreite auf einer Zeit-Achse — ohne diese
               // fehlt ECharts bei sehr wenigen Punkten (z. B. "Jahr" einer
@@ -2655,6 +2675,36 @@
               echartsSeries.push(cmp);
             }
           });
+          // Summe über jedem Stapel einer absoluten Achse: ein unsichtbares, leeres Segment obenauf, dessen
+          // Beschriftung die Summe zeigt. Es liegt im selben Stapel und sitzt deshalb genau über dem Balken.
+          shareTotals.forEach((totals, key) => {
+            let lastIndex = -1;
+            stackKeys.forEach((k, i) => { if (k === key) lastIndex = i; });
+            const last = chartSeries[lastIndex];
+            const decimals = this.effectiveDecimals(last);
+            echartsSeries.push({
+              name: `Σ ${stackNameByKey.get(key) || ''}`.trim(),
+              type: 'bar',
+              isTotalHelper: true,
+              silent: true,
+              tooltip: {show: false},
+              stack: key,
+              xAxisIndex: horizontalActive ? units.indexOf(axisKey(last)) : undefined,
+              yAxisIndex: horizontalActive ? 0 : units.indexOf(axisKey(last)),
+              encode: horizontalActive ? {x: 1, y: 0} : undefined,
+              data: [...totals.entries()].sort((a, b) => a[0] - b[0])
+                .map(([ts, total]) => [singleBucket ? slotOf[lastIndex] : ts * 1000, 0, ts * 1000, last.unit, decimals, isDurationSeries(last), null, null, null, null, total]),
+              barMaxWidth: 48,
+              itemStyle: {color: 'transparent'},
+              label: {
+                show: true,
+                position: horizontalActive ? 'right' : 'top',
+                fontSize: Math.round(10.5 * UI_FONT_SCALE * 10) / 10,
+                color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
+                formatter: params => formatPointValue([params.data[0], params.data[10], params.data[2], params.data[3], params.data[4], params.data[5]], true),
+              },
+            });
+          });
           padStackedSeries(echartsSeries);
           chartInstance.setOption({
             toolbox: toolboxOption(
@@ -2675,7 +2725,7 @@
             // left 24 statt 10: containLabel misst die breiteste Beschriftung etwas zu knapp, bei langen
             // Werten (z. B. „25,000 ct/kWh“) fehlte links eine Ziffer. AxisFit (axis-fit.js) setzt den Rand
             // nach dem Zeichnen aus der gemessenen Breite; 24 ist der Wert fürs erste Bild.
-            grid: {left: multiAxisSide ? Math.max(24, sideWidth('left')) : 24, right: multiAxisSide ? Math.max(10, sideWidth('right')) : 10, top: 28, bottom: 40, containLabel: !multiAxisSide},
+            grid: {left: multiAxisSide ? Math.max(24, sideWidth('left')) : 24, right: multiAxisSide ? Math.max(10, sideWidth('right')) : (shareAxis.size > 0 && horizontalActive ? 40 : 10), top: 28, bottom: 40, containLabel: !multiAxisSide},
             // min/max explizit auf das Abfragefenster fixiert, statt ECharts
             // per Default auf den tatsächlichen Datenbereich auto-fitten zu
             // lassen — sonst hört die Achse (und damit sichtbar der Chart) beim
@@ -2752,7 +2802,7 @@
                 // (tooltip-hold.js) — auch wenn sie am Cursor keinen eigenen Punkt hat.
                 const legendState = chartInstance.getOption().legend?.[0]?.selected || {};
                 const params = TooltipHold.complete(
-                  allParams.filter(p => p.data[1] != null),
+                  allParams.filter(p => p.data[1] != null && !(echartsSeries[p.seriesIndex] || {}).isTotalHelper),
                   holdSeries,
                   name => legendState[name] !== false
                 );
@@ -2772,9 +2822,10 @@
                 const faint = 'var(--ink-faint)';
                 const row = (p, withStamp) => {
                   const [, , , , , , absValue, absUnit, absDecimals] = p.data;
+                  // Absolute Achse mit Anteilen (Feld 9): der Wert steht vorn, der Anteil in Klammern.
                   const extra = absValue != null
                     ? ` <span style="color:${faint};">(${fmtNum(absValue, absDecimals)}${absUnit ? ' ' + escapeHtml(absUnit) : ''})</span>`
-                    : '';
+                    : (p.data[9] != null ? ` <span style="color:${faint};">(${fmtNum(p.data[9], 0)} %)</span>` : '');
                   return `<div style="display:flex;justify-content:space-between;gap:18px;margin-bottom:4px;">`
                        + `<span>${p.marker}${escapeHtml(p.seriesName)}</span>`
                        + `<span style="margin-left:8px;text-align:right;"><strong>${escapeHtml(formatPointValue(p.data))}${extra}</strong>`

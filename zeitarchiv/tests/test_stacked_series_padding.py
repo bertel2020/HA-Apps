@@ -69,5 +69,6 @@ def test_other_stacks_and_unstacked_series_are_left_alone(path: str) -> None:
 def test_tooltips_skip_padded_points() -> None:
     for path in FILES:
         source = (APP / path).read_text(encoding="utf-8")
-        assert "allParams.filter(p => p.data[1] != null)" in source, path
+        # Auffüll-Punkte fallen heraus; die Summenzeile über absoluten Stapeln (isTotalHelper) ebenfalls.
+        assert "allParams.filter(p => p.data[1] != null && !(echartsSeries[p.seriesIndex] || {}).isTotalHelper)" in source, path
         assert "padStackedSeries(echartsSeries)" in source, path
