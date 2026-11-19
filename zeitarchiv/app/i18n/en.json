@@ -4241,6 +4241,13 @@
   "js": {
     "Eigener Zeitraum": "Custom period",
     "Von und Bis wählen.": "Choose a start and an end.",
+    "Die Stundenwerte konnten nicht geladen werden.": "The hourly values could not be loaded.",
+    "Noch keine Stundenwerte.": "No hourly values yet.",
+    "Stundenwerte gibt es erst ab {date}.": "Hourly values are only available from {date}.",
+    "{value} {unit} an diesem Tag": "{value} {unit} on this day",
+    "{value} {unit} in {n} Tagen": "{value} {unit} in {n} days",
+    "{n} Regentage": "{n} rain days",
+    "stärkste Stunde {from}–{to} Uhr mit {value} {unit}": "strongest hour {from}–{to} with {value} {unit}",
     "Das Ende liegt vor dem Anfang.": "The end is before the start.",
     "Das Ende liegt nach heute.": "The end is after today.",
     "Der Zeitraum darf höchstens zehn Jahre lang sein.": "The period can be at most ten years long.",

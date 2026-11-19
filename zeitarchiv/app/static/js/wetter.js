@@ -142,6 +142,7 @@
   const utcDateShort = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'UTC'});
   const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
   const MAX_TEMP_SPAN_DAYS = 3660;  // eigener Zeitraum: höchstens zehn Jahre (wie der Server)
+  const MAX_PRECIP_HOURS_SPAN_DAYS = 92;  // Stundenchart des Niederschlags: höchstens drei Monate (wie der Server)
   const MAX_PV_SPAN_DAYS = 92;  // PV und Helligkeit: höchstens drei Monate (wie der Server)
   // Spalten der Jahr×Tag-Matrix: ein Schaltjahr, damit der 29.02. eine eigene Spalte hat.
   const slotLabel = (slot) => {
@@ -256,6 +257,14 @@
       precipMode: (precipModes && precipModes[0]) || 'mm',
       precip: null,
       precipError: '',
+      precipHours: null,       // Stundenwerte des Niederschlags (Reiter Niederschlag, unten)
+      precipHoursDays: 7,
+      precipHoursRange: null,  // eigener Zeitraum {start, end} statt der festen Tage
+      precipHoursRangeOpen: false,
+      precipHoursDraftStart: '',
+      precipHoursDraftEnd: '',
+      precipHoursRangeError: '',
+      precipHoursError: '',
       precipPast: '5',       // Vergleichsjahre des Niederschlags: '3', '5', '10' oder 'all'
       tempCmp: null,
       // Abgewählte Räume der Vergleichsdiagramme (Namen); neue Räume sind zunächst sichtbar.
@@ -373,6 +382,7 @@
       _pvSeq: 0,
       _tempsSeq: 0,
       _precipSeq: 0,
+      _precipHoursSeq: 0,
       _matrixSeq: 0,
 
       init() {
@@ -386,6 +396,8 @@
         if (['3', '5', '10', 'all'].includes(String(saved.daylengthPast))) this.daylengthPast = String(saved.daylengthPast);
         if (saved.tempRange && ISO_DAY.test(saved.tempRange.start || '') && ISO_DAY.test(saved.tempRange.end || '')) this.tempRange = {start: saved.tempRange.start, end: saved.tempRange.end};
         if ([7, 30, 365].includes(saved.courseDays)) this.courseDays = saved.courseDays;
+        if ([7, 14, 30].includes(saved.precipHoursDays)) this.precipHoursDays = saved.precipHoursDays;
+        if (saved.precipHoursRange && ISO_DAY.test(saved.precipHoursRange.start || '') && ISO_DAY.test(saved.precipHoursRange.end || '')) this.precipHoursRange = {start: saved.precipHoursRange.start, end: saved.precipHoursRange.end};
         if ([7, 14, 30].includes(saved.pvDays)) this.pvDays = saved.pvDays;
         if (['day', 'avg'].includes(saved.pvHourMode)) this.pvHourMode = saved.pvHourMode;
         if ([7, 14, 30].includes(saved.daylightDays)) this.daylightDays = saved.daylightDays;
@@ -845,6 +857,7 @@
       showTab(tab) {
         this.tab = tab;
         if (tab === 'precip' && !this.precip) this.loadPrecip();
+        if (tab === 'precip' && !this.precipHours) this.loadPrecipHours();
         if (tab === 'klima') { if (!this.tempCmp) this.loadTemps(); else this.$nextTick(() => this.drawTemps()); }
         if (tab === 'long' && !this.longterm) this.loadLongterm();
         if (tab === 'long' && !this.matrix) this.loadMatrix();
@@ -2297,7 +2310,139 @@
       setPrecipMode(mode) {
         this.precipMode = mode;
         this.precip = null;
+        this.precipHours = null;
         this.loadPrecip();
+        this.loadPrecipHours();
+      },
+
+      // ---- Stundenwerte: Niederschlag je Stunde, 7/14/30 Tage oder eigener Zeitraum (wie bei PV und Helligkeit) ----
+
+      async loadPrecipHours() {
+        const seq = ++this._precipHoursSeq;
+        this.precipHoursError = '';
+        const range = this.precipHoursRange ? `start=${this.precipHoursRange.start}&end=${this.precipHoursRange.end}` : `days=${this.precipHoursDays}`;
+        try {
+          const data = await this.fetchJson(`wetterdashboard/niederschlag-stunden?mode=${this.precipMode}&${range}`);
+          if (seq !== this._precipHoursSeq) return;  // eine neuere Anfrage hat überholt
+          this.precipHours = data;
+          this.$nextTick(() => this.drawPrecipHours());
+        } catch (e) {
+          if (seq === this._precipHoursSeq) this.precipHoursError = t('Die Stundenwerte konnten nicht geladen werden.');
+        }
+      },
+
+      setPrecipHoursDays(days) {
+        this.precipHoursDays = days;
+        this.precipHoursRange = null;
+        this.precipHoursRangeOpen = false;
+        writeStore({precipHoursDays: days, precipHoursRange: null});
+        this.loadPrecipHours();
+      },
+
+      precipHoursRangeLabel() {
+        const r = this.precipHoursRange;
+        if (!r) return t('Eigener Zeitraum');
+        const format = (iso) => utcDate.format(new Date(`${iso}T12:00:00Z`));
+        return r.start === r.end ? format(r.start) : `${format(r.start)}–${format(r.end)}`;
+      },
+
+      openPrecipHoursRange() {
+        if (this.precipHoursRangeOpen) { this.precipHoursRangeOpen = false; return; }
+        const today = this.todayIso();
+        this.precipHoursDraftEnd = this.precipHoursRange ? this.precipHoursRange.end : today;
+        this.precipHoursDraftStart = this.precipHoursRange ? this.precipHoursRange.start : (this.precipHours && this.precipHours.from ? this.precipHours.from : today);
+        this.precipHoursRangeError = '';
+        this.precipHoursRangeOpen = true;
+      },
+
+      applyPrecipHoursRange() {
+        const start = this.precipHoursDraftStart;
+        const end = this.precipHoursDraftEnd;
+        if (!ISO_DAY.test(start) || !ISO_DAY.test(end)) { this.precipHoursRangeError = t('Von und Bis wählen.'); return; }
+        if (end < start) { this.precipHoursRangeError = t('Das Ende liegt vor dem Anfang.'); return; }
+        if (end > this.todayIso()) { this.precipHoursRangeError = t('Das Ende liegt nach heute.'); return; }
+        const days = Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000) + 1;
+        if (days > MAX_PRECIP_HOURS_SPAN_DAYS) { this.precipHoursRangeError = t('Der Zeitraum darf höchstens drei Monate lang sein.'); return; }
+        this.precipHoursRangeError = '';
+        this.precipHoursRangeOpen = false;
+        this.precipHoursRange = {start, end};
+        writeStore({precipHoursRange: this.precipHoursRange});
+        this.loadPrecipHours();
+      },
+
+      // Satz über dem Chart: Summe, Regentage und stärkste Stunde; ohne Werte der Hinweis, ab wann es Stundenwerte gibt.
+      precipHoursHeadline() {
+        const h = this.precipHours;
+        if (!h) return '';
+        const unit = h.unit;
+        const decimals = unit === 'min' ? 0 : 1;
+        if (h.total == null) {
+          return h.available_from == null
+            ? t('Noch keine Stundenwerte.')
+            : t('Stundenwerte gibt es erst ab {date}.', {date: fmtDate(formats.dmy, h.available_from)});
+        }
+        const values = {value: num(h.total, decimals), unit, n: h.days};
+        let text = h.days === 1 ? t('{value} {unit} an diesem Tag', values) : t('{value} {unit} in {n} Tagen', values);
+        if (h.days > 1 && h.wet_days != null) text += ' · ' + t('{n} Regentage', {n: h.wet_days});
+        if (h.peak) {
+          const from = fmtDate(formats.hm, h.peak.start);
+          const to = fmtDate(formats.hm, h.peak.start + 3600);
+          text += ' · ' + t('stärkste Stunde {from}–{to} Uhr mit {value} {unit}', {from, to, value: num(h.peak.value, decimals), unit});
+        }
+        return text;
+      },
+
+      // Beginnt der Zeitraum vor dem ersten Stundenwert, steht der Hinweis darunter.
+      precipHoursNote() {
+        const h = this.precipHours;
+        if (!h || h.total == null || h.available_from == null) return '';
+        return h.hours.length && h.hours[0][0] < h.available_from
+          ? t('Stundenwerte gibt es erst ab {date}.', {date: fmtDate(formats.dmy, h.available_from)})
+          : '';
+      },
+
+      drawPrecipHours() {
+        const h = this.precipHours;
+        const element = this.$refs.precipHoursChart;
+        if (!h || !element || h.total == null) return;
+        const colors = palette();
+        const unit = h.unit;
+        const decimals = unit === 'min' ? 0 : 1;
+        const narrow = element.clientWidth < 520;
+        const stamps = h.hours.map((row) => row[0]);
+        const values = h.hours.map((row) => row[1]);
+        const single = h.days <= 2;
+        const midnight = (stamp) => fmtDate(formats.hm, stamp) === '00:00';
+        const dayStep = h.days <= 7 ? 1 : (h.days <= 14 ? 2 : (h.days <= 31 ? 5 : 10));
+        const chart = chartFor('precipHours', element);
+        chart.setOption({
+          animation: false, grid: gridFor(element, {top: 30, right: 16}),
+          xAxis: {
+            type: 'category', data: stamps, ...axisStyle(colors), splitLine: {show: false},
+            axisLabel: {
+              color: colors.text, fontSize: scaledFont(11), hideOverlap: true,
+              interval: (index) => {
+                if (single) return index % (narrow ? 6 : 3) === 0;
+                return midnight(stamps[index]) && Math.floor(index / 24) % dayStep === 0;
+              },
+              formatter: (stamp) => (single ? fmtDate(formats.hm, stamp).slice(0, 2) : fmtDate(formats.dm, stamp)),
+            },
+          },
+          yAxis: {type: 'value', min: 0, ...(unit === 'min' ? {max: 60} : {}), name: unit, nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
+          tooltip: tooltipBox(colors, (params) => {
+            const i = params[0].dataIndex;
+            const stamp = stamps[i];
+            const value = values[i];
+            const head = `<b>${escapeHtml(fmtDate(formats.dm, stamp))} ${escapeHtml(fmtDate(formats.hm, stamp))}–${escapeHtml(fmtDate(formats.hm, stamp + 3600))}</b>`;
+            return `${head}<br>${value == null ? '–' : `${escapeHtml(num(value, decimals))} ${escapeHtml(unit)}`}`;
+          }),
+          series: [{
+            type: 'bar', data: values, barCategoryGap: single ? '30%' : '10%', barMinWidth: 2,
+            itemStyle: {color: colors.cur},
+            label: single ? {show: true, position: 'top', color: colors.ink, fontSize: scaledFont(11), formatter: (point) => (point.value > 0 ? num(point.value, decimals) : '')} : {show: false},
+          }],
+        }, true);
+        requestAnimationFrame(() => chart.resize());
       },
 
       // Stunden statt Minuten, wenn der Niederschlag aus einem Regensensor stammt (Plan: „in Stunden“).
@@ -2421,13 +2566,13 @@
         olderYears.forEach((year, index) => legend.push(legendEntry(year, colors.prev, pastOpacity(index + 1))));
         // Reihenfolge der Legende wie im Monatsvergleich: laufendes Jahr, Vorjahr, ältere Jahre, Ø.
         if (hasAvg) legend.push('Ø', {...legendEntry(bandName, colors.prev, 0.35), icon: 'rect'});
-        legend.push({...legendEntry(t('Tageswert'), colors.cur, 0.5), icon: 'rect'});
+        legend.push({...legendEntry(t('Tageswert'), colors.cur, 0.85), icon: 'rect'});
         series.push({
           name: String(p.year), type: 'line', data: cumulative, symbol: 'none', z: 5,
           lineStyle: {color: colors.cur, width: 3}, itemStyle: {color: colors.cur},
         }, {
-          name: t('Tageswert'), type: 'bar', yAxisIndex: 1, data: nullable(p.daily, scale), barMaxWidth: 4,
-          itemStyle: {color: colors.cur, opacity: 0.45},
+          name: t('Tageswert'), type: 'bar', yAxisIndex: 1, data: nullable(p.daily, scale), barMaxWidth: 6, barMinWidth: 3,
+          itemStyle: {color: colors.cur, opacity: 0.85},
         });
         const chart = chartFor('precip', element);
         chart.setOption({

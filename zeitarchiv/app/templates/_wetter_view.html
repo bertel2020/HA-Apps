@@ -448,6 +448,34 @@
       {% endif %}
       <p class="hint hint-warn" x-show="precipError" x-text="precipError" x-cloak></p>
     </div>
+    {% if show_precip_main %}
+    <div class="card wt-card">
+      <div class="wt-controls">
+        <h2 class="wt-h2">{{ _("Stundenwerte") }}</h2>
+        <div class="wt-yr wt-controls-end" @keydown.escape="precipHoursRangeOpen = false">
+          <div class="wt-seg" role="group" aria-label="{{ _('Zeitraum') }}">
+            <template x-for="opt in [{days: 7, label: t('7 Tage')}, {days: 14, label: t('14 Tage')}, {days: 30, label: t('30 Tage')}]" :key="opt.days">
+              <button type="button" :aria-pressed="(!precipHoursRange && precipHoursDays === opt.days).toString()" @click="setPrecipHoursDays(opt.days)" x-text="opt.label"></button>
+            </template>
+            <button type="button" :aria-pressed="(!!precipHoursRange).toString()" :aria-expanded="precipHoursRangeOpen.toString()" @click="openPrecipHoursRange()"><span x-text="precipHoursRangeLabel()"></span> ▾</button>
+          </div>
+          <div class="wt-yr-pop" x-show="precipHoursRangeOpen" x-cloak @click.outside="precipHoursRangeOpen = false">
+            <label>{{ _("Von") }} <input type="date" x-model="precipHoursDraftStart" :max="todayIso()"></label>
+            <label>{{ _("Bis") }} <input type="date" x-model="precipHoursDraftEnd" :max="todayIso()"></label>
+            <p class="hint hint-warn" x-show="precipHoursRangeError" x-text="precipHoursRangeError" x-cloak></p>
+            <div class="wt-yr-actions">
+              <button type="button" class="btn" @click="setPrecipHoursDays(7)">{{ _("Zurücksetzen") }}</button>
+              <button type="button" class="btn" @click="applyPrecipHoursRange()">{{ _("Übernehmen") }}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="wt-headline" x-show="precipHours" x-text="precipHoursHeadline()"></p>
+      <div class="wt-chart" x-ref="precipHoursChart" x-show="precipHours && precipHours.total != null"></div>
+      <p class="hint hint-status" x-show="precipHoursNote()" x-text="precipHoursNote()" x-cloak></p>
+      <p class="hint hint-warn" x-show="precipHoursError" x-text="precipHoursError" x-cloak></p>
+    </div>
+    {% endif %}
   </section>
   {% endif %}
 

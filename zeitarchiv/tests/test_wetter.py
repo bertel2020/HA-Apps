@@ -842,7 +842,7 @@ def test_reference_day_uses_the_dashboard_stichtag_bar_of_the_app() -> None:
     page = (TEMPLATES / "wetterdashboard.html").read_text(encoding="utf-8")
     assert "{{ period_nav(true, true) }}" in view and "period_assets()" in page
     # Der Stichtag hat keine eigene Tagesauswahl; Datumsfelder gibt es nur im Menü „Eigener Zeitraum“ der Temperaturen.
-    assert "wt-daynav" not in view and view.count('type="date"') == 6 and 'x-model="draftStart"' in view  # Temperaturen, Tagesverlauf und PV haben je Von und Bis
+    assert "wt-daynav" not in view and view.count('type="date"') == 8 and 'x-model="draftStart"' in view  # Temperaturen, Tagesverlauf, PV und Niederschlagsstunden haben je Von und Bis
     script = _wetter_script()
     assert "Alpine.store('dashStichtag').date" in script and "'dashboard-stichtag'" in script
     assert "shiftStichtag" not in script and "setStichtag" not in script
@@ -1799,3 +1799,74 @@ def test_daily_course_route_validates_the_request(client) -> None:
     assert get(f"metric=temperature&start={today - timedelta(days=3700)}").status_code == 400
     assert get("metric=precip&days=7").status_code == 404  # kein Niederschlag zugeordnet
     index.set_setting(wetter_routes.SETTING_CONFIG, "")
+
+
+def test_precip_hours_for_the_counter_give_hourly_deltas_and_none_for_future_hours(service) -> None:
+    _rain_setup(service)
+    _configure(service, temperature="sensor.t", precip_mm="sensor.regen")
+    data = service.compute_precip_hours("mm", days=3, now_local=NOW)
+    by_start = {datetime.fromtimestamp(stamp, TZ): value for stamp, value in data["hours"]}
+    assert len(data["hours"]) == 72 and data["unit"] == "mm" and data["mode"] == "mm"
+    assert data["from"] == "2026-08-18" and data["to"] == "2026-08-20" and data["live"] is True
+    assert by_start[datetime(2026, 8, 19, 12, tzinfo=TZ)] == pytest.approx(2.0)
+    assert by_start[datetime(2026, 8, 20, 6, tzinfo=TZ)] == pytest.approx(1.5)
+    assert by_start[datetime(2026, 8, 19, 13, tzinfo=TZ)] == 0.0  # trocken, nicht unbekannt
+    assert by_start[datetime(2026, 8, 20, 13, tzinfo=TZ)] is None  # Zukunft
+    assert data["total"] == pytest.approx(3.5) and data["wet_days"] == 2
+    assert data["peak"] == {"start": _ts(19, 12), "value": pytest.approx(2.0)}
+
+
+def test_precip_hours_for_the_rain_sensor_are_minutes(service) -> None:
+    _rain_setup(service)
+    _configure(service, temperature="sensor.t", precip_dur="binary_sensor.regen")
+    data = service.compute_precip_hours("dur", start=date(2026, 8, 20), end=date(2026, 8, 20), now_local=NOW)
+    assert data["unit"] == "min" and data["mode"] == "dur" and len(data["hours"]) == 24 and data["custom"] is True
+    assert data["hours"][6][1] == pytest.approx(30.0)
+    assert data["hours"][5][1] is None  # vor dem Archivbeginn des Sensors (06:00)
+    assert data["hours"][7][1] == 0.0 and data["hours"][12][1] is None  # trocken bzw. Zukunft
+    assert data["total"] == pytest.approx(30.0) and data["peak"]["value"] == pytest.approx(30.0)
+
+
+def test_precip_hours_of_a_counter_without_hourly_rollup_start_at_the_current_month(service) -> None:
+    _rain_setup(service)
+    _configure(service, temperature="sensor.t", precip_mm="sensor.regen")
+    later = datetime(2026, 9, 5, 12, tzinfo=TZ)
+    data = service.compute_precip_hours("mm", start=date(2026, 8, 19), end=date(2026, 8, 20), now_local=later)
+    assert all(value is None for _stamp, value in data["hours"])  # August liegt vor dem Monatsanfang
+    assert data["total"] is None and data["wet_days"] is None
+    assert data["available_from"] == datetime(2026, 9, 1, tzinfo=TZ).timestamp()
+
+
+def test_precip_hours_is_none_without_a_role(service) -> None:
+    _rain_setup(service)
+    _configure(service, temperature="sensor.t")
+    assert service.compute_precip_hours("mm", now_local=NOW) is None
+
+
+def test_precip_hours_route_validates_the_request(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp13", "sensor", "measurement", "°C")
+    index.set_setting(wetter_routes.SETTING_ENABLED, "1")
+    wetter_routes._save_config(index, {**wetter_routes._empty_config(), "temperature": "sensor.wetter_test_temp13"})  # noqa: SLF001
+    today = datetime.now(TZ).date()
+    get = lambda query: client.get(f"/wetterdashboard/niederschlag-stunden?{query}")  # noqa: E731
+    assert get("days=7").status_code == 404  # kein Niederschlag zugeordnet
+    assert get("days=10").status_code == 400
+    assert get(f"start={today}&end={today - timedelta(days=1)}").status_code == 400
+    assert get(f"start={today - timedelta(days=93)}").status_code == 400
+    assert get("start=unsinn").status_code == 400
+
+
+def test_precipitation_tab_has_an_hourly_chart_with_the_standard_range_choice() -> None:
+    from _paths import TEMPLATES
+
+    view = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
+    script = _wetter_script()
+    assert 'x-ref="precipHoursChart"' in view and "setPrecipHoursDays(opt.days)" in view
+    assert "{days: 7, label: t('7 Tage')}, {days: 14, label: t('14 Tage')}, {days: 30, label: t('30 Tage')}" in view.split("Stundenwerte")[1]
+    assert "wetterdashboard/niederschlag-stunden?mode=${this.precipMode}" in script
+    # Der Wechsel zwischen Menge und Dauer lädt auch die Stundenwerte neu.
+    assert "this.loadPrecip();\n        this.loadPrecipHours();" in script
+    # Die Tagesbalken des Jahrescharts sind deckend und mindestens 3 px breit.
+    assert "barMinWidth: 3" in script and "itemStyle: {color: colors.cur, opacity: 0.85}" in script

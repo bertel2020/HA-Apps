@@ -118,6 +118,10 @@ MAX_EXTRA_TEMPERATURES = 100
 #: wie bei den Kacheln (rollierend, nach dem tatsächlichen Fenster benannt).
 TEMPERATURE_DAYS = (7, 30, 365)
 MAX_TEMPERATURE_SPAN_DAYS = 3660  # eigener Zeitraum: höchstens zehn Jahre
+#: Zeiträume (Tage) des Stundencharts im Reiter „Niederschlag“; dazu ein eigener Zeitraum bis zu so vielen Tagen
+#: (92 Tage sind höchstens 2.208 Stundenbalken).
+PRECIP_HOURS_DAYS = (7, 14, 30)
+MAX_PRECIP_HOURS_SPAN_DAYS = 92
 DAILY_COURSE_METRICS = ("temperature", "precip", "sun")
 DAILY_COURSE_COMPARES = ("", "previous", "year")
 DAILY_COURSE_WEEKLY_FROM = 61  # Zeiträume ab 61 Tagen zeigen Wochenwerte statt Tageswerte
@@ -1054,6 +1058,87 @@ class WetterService:
             **result, "mode": kind, "unit": "min" if kind == "dur" else (entity["unit"] or "mm"),
             "threshold": threshold, "entity_id": entity_id, "tz": str(self.deps.tz),
             "available": self.available_precip(),
+        }
+
+    def compute_precip_hours(
+        self, mode: str, days: int = 7, start: date | None = None, end: date | None = None,
+        now_local: datetime | None = None,
+    ) -> dict | None:
+        """Niederschlag je Stunde der letzten ``days`` Tage oder von ``start`` bis ``end`` (sonst heute).
+
+        ``hours`` enthält je Stunde ``[Beginn, Wert]``; ``None`` heißt „keine Angabe“ (Stunde in der Zukunft oder vor dem
+        Zeitpunkt, ab dem es Stundenwerte gibt), 0 heißt trocken. Zähler (mm) liefern Stundenwerte aus der Stundenstufe,
+        die es nur für Entitäten mit ``hourly_rollup`` auch für abgeschlossene Monate gibt; sonst reichen sie bis zum
+        Anfang des laufenden Monats zurück (``available_from``). Ein Regensensor (Dauer) hat Stundenzeilen schon immer;
+        seine Werte sind Minuten."""
+        config = _load_config(self.deps.index)
+        role = self._precip_role(config, mode)
+        if role is None:
+            return None
+        entity_id, kind = role
+        entity = self.deps.index.get_entity(entity_id)
+        if entity is None:
+            return None
+        tz = self.deps.tz
+        now_local = now_local or datetime.now(tz)
+        today = now_local.date()
+        if start is not None:
+            last = min(end or today, today)
+            first = min(start, last)
+        else:
+            last = today
+            first = today - timedelta(days=days - 1)
+        window_start = datetime(first.year, first.month, first.day, tzinfo=tz)
+        following = last + timedelta(days=1)
+        window_end = datetime(following.year, following.month, following.day, tzinfo=tz)
+        until = min(window_end, now_local)
+        first_entity_ts = entity["first_ts"]
+        if first_entity_ts is None:
+            available_from = None
+        elif kind == "dur" or entity["hourly_rollup"]:
+            available_from = datetime.fromtimestamp(first_entity_ts, tz).replace(minute=0, second=0, microsecond=0).timestamp()
+        else:
+            month_start = now_local.replace(day=1, hour=0, minute=0, second=0, microsecond=0).timestamp()
+            available_from = max(month_start, first_entity_ts)
+        values: dict[float, float] = {}
+        if available_from is not None and until > window_start:
+            read_cache = query_mod.QueryReadCache()
+            if kind == "dur":
+                values = {
+                    row.bucket_start: (row.on_seconds or 0.0) / 60.0
+                    for row in self._rows(entity_id, entity["aggregation_type"], window_start, until, now_local, read_cache)
+                }
+            else:
+                values = query_mod.query_hourly_counter_series(
+                    self.deps.data_dir, self.deps.index, entity_id, window_start, until, tz, now_local, read_cache,
+                )
+        hours: list[list] = []
+        stamp = window_start.timestamp()
+        end_ts = window_end.timestamp()
+        until_ts = until.timestamp()
+        per_day: dict[date, float] = {}
+        peak: dict | None = None
+        while stamp < end_ts:
+            known = available_from is not None and available_from <= stamp < until_ts
+            value = round(values.get(stamp, 0.0), 3) if known else None
+            hours.append([stamp, value])
+            if value is not None:
+                day = datetime.fromtimestamp(stamp, tz).date()
+                per_day[day] = per_day.get(day, 0.0) + value
+                if value > 0 and (peak is None or value > peak["value"]):
+                    peak = {"start": stamp, "value": value}
+            stamp += 3600.0
+        threshold = float(config["rain_day_minutes"] if kind == "dur" else config["rain_day_mm"])
+        wet_threshold = threshold if kind == "dur" else analysis.mm_to_unit(threshold, entity["unit"])
+        known_values = [value for _stamp, value in hours if value is not None]
+        return {
+            "mode": kind, "unit": "min" if kind == "dur" else (entity["unit"] or "mm"), "entity_id": entity_id,
+            "from": first.isoformat(), "to": last.isoformat(), "days": (last - first).days + 1,
+            "custom": start is not None, "hours": hours,
+            "total": round(sum(known_values), 3) if known_values else None,
+            "wet_days": sum(1 for total in per_day.values() if total >= wet_threshold) if per_day else None,
+            "peak": peak, "available_from": available_from, "live": until < window_end,
+            "available": self.available_precip(), "tz": str(tz),
         }
 
     def compute_monthly(self, metric: str, mode: str = "mm", now_local: datetime | None = None) -> dict | None:
@@ -2643,6 +2728,26 @@ class WetterService:
             if not 0 <= past_years <= 100:
                 raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
             result = self.compute_precip(mode, past_years=past_years)
+            if result is None:
+                raise HTTPException(status_code=404, detail=tr("Kein Niederschlag zugeordnet."))
+            return result
+
+        @router.get("/wetterdashboard/niederschlag-stunden")
+        def wetterdashboard_precip_hours(mode: str = "mm", days: int = 7, start: str = "", end: str = "") -> dict:
+            _require_configured()
+            first = last = None
+            if start:
+                today = datetime.now(self.deps.tz).date()
+                try:
+                    first = date.fromisoformat(start)
+                    last = date.fromisoformat(end) if end else today
+                except ValueError:
+                    raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum.")) from None
+                if last > today or first > last or (last - first).days + 1 > MAX_PRECIP_HOURS_SPAN_DAYS:
+                    raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
+            elif days not in PRECIP_HOURS_DAYS:
+                raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
+            result = self.compute_precip_hours(mode, days, start=first, end=last)
             if result is None:
                 raise HTTPException(status_code=404, detail=tr("Kein Niederschlag zugeordnet."))
             return result
