@@ -1870,3 +1870,5 @@ def test_precipitation_tab_has_an_hourly_chart_with_the_standard_range_choice() 
     assert "this.loadPrecip();\n        this.loadPrecipHours();" in script
     # Die Tagesbalken des Jahrescharts sind deckend und mindestens 3 px breit.
     assert "barMinWidth: 3" in script and "itemStyle: {color: colors.cur, opacity: 0.85}" in script
+    # Die rechte Achse der Balken trägt die Einheit („mm/Tag“, bei Dauer „h/Tag“).
+    assert "t('{unit}/Tag', {unit})" in script

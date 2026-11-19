@@ -2381,15 +2381,23 @@
             ? t('Noch keine Stundenwerte.')
             : t('Stundenwerte gibt es erst ab {date}.', {date: fmtDate(formats.dmy, h.available_from)});
         }
-        const values = {value: num(h.total, decimals), unit, n: h.days};
+        // Minuten ab einer Stunde als „4 h 35 min“, wie die Karte darüber in Stunden rechnet.
+        const total = unit === 'min' && h.total >= 60
+          ? {value: t('{hours} h {minutes} min', {hours: Math.floor(h.total / 60), minutes: Math.round(h.total % 60)}), unit: ''}
+          : {value: num(h.total, decimals), unit};
+        const values = {...total, n: h.days};
         let text = h.days === 1 ? t('{value} {unit} an diesem Tag', values) : t('{value} {unit} in {n} Tagen', values);
         if (h.days > 1 && h.wet_days != null) text += ' · ' + t('{n} Regentage', {n: h.wet_days});
         if (h.peak) {
           const from = fmtDate(formats.hm, h.peak.start);
           const to = fmtDate(formats.hm, h.peak.start + 3600);
-          text += ' · ' + t('stärkste Stunde {from}–{to} Uhr mit {value} {unit}', {from, to, value: num(h.peak.value, decimals), unit});
+          const peak = {from, to, value: num(h.peak.value, decimals), unit, date: fmtDate(formats.dm, h.peak.start)};
+          // Über mehrere Tage gehört das Datum der Stunde dazu.
+          text += ' · ' + (h.days > 1
+            ? t('stärkste Stunde am {date}, {from}–{to} Uhr mit {value} {unit}', peak)
+            : t('stärkste Stunde {from}–{to} Uhr mit {value} {unit}', peak));
         }
-        return text;
+        return text.replace(/\s+/g, ' ').trim();
       },
 
       // Beginnt der Zeitraum vor dem ersten Stundenwert, steht der Hinweis darunter.
@@ -2414,6 +2422,11 @@
         const single = h.days <= 2;
         const midnight = (stamp) => fmtDate(formats.hm, stamp) === '00:00';
         const dayStep = h.days <= 7 ? 1 : (h.days <= 14 ? 2 : (h.days <= 31 ? 5 : 10));
+        // Runde Schritte und Zahlen im Format der Seite (Komma statt Punkt); Minuten laufen fest bis 60.
+        const top = Math.max(0, ...values.filter((value) => value != null));
+        const step = unit === 'min' ? 15 : niceStep(top / 4);
+        const axisMax = unit === 'min' ? 60 : Math.max(step, Math.ceil(top / step - 1e-9) * step);
+        const axisDecimals = step < 1 ? 1 : 0;
         const chart = chartFor('precipHours', element);
         chart.setOption({
           animation: false, grid: gridFor(element, {top: 30, right: 16}),
@@ -2428,7 +2441,10 @@
               formatter: (stamp) => (single ? fmtDate(formats.hm, stamp).slice(0, 2) : fmtDate(formats.dm, stamp)),
             },
           },
-          yAxis: {type: 'value', min: 0, ...(unit === 'min' ? {max: 60} : {}), name: unit, nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
+          yAxis: {
+            type: 'value', min: 0, max: axisMax, interval: step, name: unit, nameTextStyle: {color: colors.text}, ...axisStyle(colors),
+            axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => num(value, axisDecimals)},
+          },
           tooltip: tooltipBox(colors, (params) => {
             const i = params[0].dataIndex;
             const stamp = stamps[i];
@@ -2607,7 +2623,17 @@
           series,
         }, true);
         // Ein eben erst sichtbar gewordener Reiter hat beim Anlegen noch keine Breite gehabt.
-        requestAnimationFrame(() => chart.resize());
+        requestAnimationFrame(() => {
+          chart.resize();
+          // Die Balken haben eine eigene Skala: Die Einheit steht über der obersten Marke der rechten Achse.
+          const y = chart.convertToPixel({yAxisIndex: 1}, dayTop);
+          if (Number.isFinite(y)) {
+            chart.setOption({graphic: [{
+              type: 'text', right: 2, top: Math.max(0, y - scaledFont(11) - 8), silent: true,
+              style: {text: t('{unit}/Tag', {unit}), fill: colors.text, fontSize: scaledFont(11)},
+            }]});
+          }
+        });
         this.drawPrecipTable(colors);
       },
 
