@@ -415,7 +415,7 @@
         <h2 class="wt-h2" :class="{'wt-h2-jump': stichtag()}" x-text="cardTitle()" @click="if (stichtag()) $store.dashStichtag.set(null)" :title="stichtag() ? t('Zurück zu heute') : ''"></h2>
       </div>
       <p class="wt-stand" x-show="tilesStand" x-cloak x-text="precipStand()"></p>
-      <div class="wt-tiles" :style="'--wt-cols:' + Math.min(4, precipTodayTiles().length)">
+      <div class="wt-tiles" :style="'--wt-cols:' + precipTileCols()">
         <template x-for="tile in precipTodayTiles()" :key="tile.key">
           <a class="wt-tile" :class="{'wt-tile-static': !tile.href}" :data-role="tile.role" :href="tile.href || null" :title="tile.title">
             <span class="wt-tile-icon" x-html="iconSvg(tile.icon)"></span>

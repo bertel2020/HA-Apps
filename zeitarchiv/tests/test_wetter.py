@@ -1865,6 +1865,7 @@ def test_precipitation_tab_follows_the_other_tabs_in_structure() -> None:
     # Stichtag-Leiste und „Heute“-Kacheln wie bei Temperatur & Klima und Wind & Sonne.
     assert "['overview', 'klima', 'wind', 'precip'].includes(tab)" in view
     assert "precipTodayTiles()" in view and "precipTodayTiles()" in script
+    assert "precipTileCols()" in view and "WetterLayout.tileColumns(this.precipTodayTiles().length" in script
     # Niederschlag im Vergleich: dieselbe Bedienung wie der Tagesverlauf (7 Tage, 30 Tage, 12 Monate, eigener Zeitraum).
     assert 'x-ref="pcmpChart"' in view and "setPcmpDays(opt.days)" in view and "setPcmpCompare()" in view
     assert "wetterdashboard/tagesverlauf?metric=precip&mode=${this.precipMode}" in script
@@ -1877,6 +1878,8 @@ def test_precipitation_tab_follows_the_other_tabs_in_structure() -> None:
     # Die Tagesbalken des Jahrescharts sind deckend und mindestens 3 px breit; die rechte Achse trägt die Einheit.
     assert "barMinWidth: 3" in script and "itemStyle: {color: colors.cur, opacity: 0.85}" in script
     assert "t('{unit}/Tag', {unit})" in script
+    # Der Satz über dem Vergleich ist eine Funktion beider Karten (Übersicht und Niederschlag); ein verirrter Aufruf bricht beide.
+    assert "this.courseSummaryOf(this.course, this.courseCompare)" in script and "name: compareName()" not in script
 
 
 def test_daily_course_precipitation_follows_the_chosen_mode(service) -> None:

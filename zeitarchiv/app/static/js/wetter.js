@@ -1048,7 +1048,7 @@
         const s = c && c.summary;
         if (!s) return c ? t('Keine Werte in diesem Zeitraum.') : '';
         const unit = c.unit;
-        const values = {value: num(s.value, c.unit === 'min' ? 0 : 1), unit, name: compareName()};
+        const values = {value: num(s.value, c.unit === 'min' ? 0 : 1), unit, name: compare === 'year' ? t('Vorjahreszeitraum') : t('Vorzeitraum')};
         let text = s.kind === 'mean' ? t('Ø {value} {unit}', values) : t('Summe {value} {unit}', values);
         if (c.compare && s.compare != null) {
           const diff = s.value - s.compare;
@@ -2508,6 +2508,12 @@
       precipStand() {
         if (this.tilesAt) return t('Tagesende');
         return t('Stand {time}', {time: this.tilesStand}) + ' · ' + t('Summe seit Mitternacht');
+      },
+
+      // Spalten der Kacheln nach der Breite des Reiters (wie bei den anderen Gruppen): auf dem Handy zwei statt drei in einer Reihe.
+      precipTileCols() {
+        const width = (this.$root && this.$root.clientWidth) || window.innerWidth;
+        return WetterLayout.tileColumns(this.precipTodayTiles().length, width - 48, 4, 0);
       },
 
       // Niederschlag und Regen (Dauer) wie in der Übersicht, dazu die stärkste Stunde des Tages und, solange es um heute geht, der aktuelle Zustand.
