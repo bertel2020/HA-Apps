@@ -96,5 +96,6 @@ def test_the_remaining_standalone_surfaces_carry_it_too() -> None:
     assert "box-shadow" not in seg[: seg.index("}")]
 
     # Einstellungen und Housekeeping: die Sprungleiste.
-    nav = app[app.index(".settings-nav{"):]
+    # Die erste Regel dieses Namens setzt nur die Pfeil-Variablen; die Fläche steht in der mehrzeiligen.
+    nav = app[app.index(".settings-nav{\n"):]
     assert "box-shadow:var(--shadow);" in nav[: nav.index("}")]

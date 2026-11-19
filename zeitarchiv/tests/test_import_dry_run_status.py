@@ -24,6 +24,12 @@ def entities(client):
     yield IDS
     main._import_service._ha_dry_run_status.clear()
     main._import_service._ha_availability_cache.entries.clear()
+    # Der Fortschritt des Dry Runs ist ebenfalls prozessweit: ohne Rücksetzen zeigt /import/ha/progress
+    # in jedem späteren Test das fertige Ergebnis statt der leeren Antwort.
+    progress = main._import_service._ha_progress
+    progress.started = False
+    progress.kind = ""
+    progress.result = None
     for entity_id in IDS:
         if main.index.get_entity(entity_id) is not None:
             main.index.delete_entity(entity_id)
