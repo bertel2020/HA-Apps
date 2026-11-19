@@ -12,18 +12,11 @@
      entity_detail.html/chart_editor.html/_dashboard_tile_menu.html), kein
      eigener .switch mehr — stand hier bis 0.8x als Parallelstruktur mit
      abweichender Größe (40x22 statt 34x20) und ohne :disabled-Abdunkelung. */
-  /* .save-row: dieselbe Regel wie chart_editor.css/table_editor.css (dort
-     bewusst dupliziert statt zentral in app.css, siehe Kommentar dort) —
-     fehlte hier bisher komplett, wodurch Speichern/Abbrechen/Löschen nur im
-     normalen Inline-Fluss liefen (~4px statt 10px Abstand, kein margin-top). */
-  .save-row{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;}
-  /* Löschen/Abbrechen/Speichern laufen am Schreibtisch im normalen Fluss
-     (linksbündig); auf dem schmalen Smartphone-Bildschirm sollen sie am
-     rechten Rand liegen statt am linken zu kleben, dieselbe Konvention wie
-     bestehende Dialog-Fußzeilen (.confirm-actions, .edash-dialog-footer). */
-  @media (max-width:480px){
-    .save-row{justify-content:flex-end;}
-  }
+  /* .save-row: wie in chart_editor.css/table_editor.css (dort bewusst dupliziert statt zentral in app.css, siehe
+     Kommentar dort). Dort füllt das Namensfeld (flex:1) die Zeile, sodass Löschen/Abbrechen/Speichern am rechten
+     Rand enden; hier gibt es kein Namensfeld in der Zeile, deshalb schiebt justify-content:flex-end sie an den rechten
+     Rand, wie die Dialog-Fußzeilen (.confirm-actions, .edash-dialog-footer). */
+  .save-row{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;justify-content:flex-end;}
   /* Optionen der Übersichtsseite beim Standard-Dashboard: durch eine Linie von den Dashboard-Schaltern abgesetzt. */
   .overview-options{margin-top:24px;padding-top:18px;border-top:1px solid var(--border);}
   .overview-options-title{margin:0 0 4px;font-size:calc(17px * var(--font-scale, 1));}

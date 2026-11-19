@@ -88,3 +88,10 @@ def test_grid_class_script_and_editor_are_wired_together() -> None:
 def test_energy_and_weather_dashboards_do_not_use_the_tile_grid() -> None:
     for name in ("energiedashboard.html", "_energiedashboard_view.html", "wetterdashboard.html", "_wetter_view.html"):
         assert "is-aligned" not in (TEMPLATES / name).read_text(encoding="utf-8")
+
+
+def test_dashboard_form_buttons_end_at_the_right_edge() -> None:
+    """Chart- und Tabellen-Editor tun das über das Namensfeld (flex:1); das Dashboard-Formular hat keines in der Zeile."""
+    css = (PAGE_CSS / "dashboard_editor.css").read_text(encoding="utf-8")
+    assert ".save-row{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;justify-content:flex-end;}" in css
+    assert "@media (max-width:480px){\n    .save-row{justify-content:flex-end;}" not in css
