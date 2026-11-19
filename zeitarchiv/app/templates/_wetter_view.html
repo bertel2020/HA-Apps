@@ -254,7 +254,7 @@
     <button type="button" role="tab" id="wt-tab-long" aria-controls="wt-panel-long" class="entity-tab" :class="{'is-active': tab === 'long'}" :aria-selected="(tab === 'long').toString()" :tabindex="tab === 'long' ? 0 : -1" @click="showTab('long')" @keydown="tabKey($event)">{{ _("Langzeit") }}</button>
     {% endif %}
   </nav>
-  <div class="dash-tabs-bar-end" x-show="['overview', 'klima', 'wind'].includes(tab)" x-cloak>{{ period_nav(true, true) }}</div>
+  <div class="dash-tabs-bar-end" x-show="['overview', 'klima', 'wind', 'precip'].includes(tab)" x-cloak>{{ period_nav(true, true) }}</div>
   {# Jahre-Auswahl des Reiters Langzeit: gilt für alle Karten des Reiters (Rekorde, Kenntage, Jahres-Matrix), deshalb wie der Zeitraum in der Reiterzeile. #}
   <div class="dash-tabs-bar-end wt-scope-years" x-show="tab === 'long' && showYearChoice()" x-cloak title="{{ _('gilt für alle Karten dieses Reiters') }}">
     <span class="wt-scope-lab"><b>{{ _("Jahre") }}</b></span>
@@ -409,9 +409,65 @@
 
   {% if show_precip %}
   <section x-show="tab === 'precip'" x-cloak role="tabpanel" id="wt-panel-precip" aria-labelledby="wt-tab-precip">
+    {% if show_precip_main %}
+    <div class="card wt-card wt-tilecard" x-show="precipTodayTiles().length" x-cloak>
+      <div class="wt-controls wt-card-head">
+        <h2 class="wt-h2" :class="{'wt-h2-jump': stichtag()}" x-text="cardTitle()" @click="if (stichtag()) $store.dashStichtag.set(null)" :title="stichtag() ? t('Zurück zu heute') : ''"></h2>
+      </div>
+      <p class="wt-stand" x-show="tilesStand" x-cloak x-text="precipStand()"></p>
+      <div class="wt-tiles" :style="'--wt-cols:' + Math.min(4, precipTodayTiles().length)">
+        <template x-for="tile in precipTodayTiles()" :key="tile.key">
+          <a class="wt-tile" :class="{'wt-tile-static': !tile.href}" :data-role="tile.role" :href="tile.href || null" :title="tile.title">
+            <span class="wt-tile-icon" x-html="iconSvg(tile.icon)"></span>
+            <span class="wt-tile-label" x-text="tile.label"></span>
+            <span class="wt-tile-value" x-html="tile.value"></span>
+            <span class="wt-tile-sub" x-text="tile.sub"></span>
+          </a>
+        </template>
+      </div>
+    </div>
+
     <div class="card wt-card">
       <div class="wt-controls">
-        {% if show_precip_main %}<h2 class="wt-h2">{{ _("Niederschlag seit Jahresbeginn") }}</h2>{% endif %}
+        <h2 class="wt-h2">{{ _("Niederschlag im Vergleich") }} {{ hint_button(_("Niederschlag im Vergleich")) }}</h2>
+        {% call hint_body() %}{{ _("Tageswerte der letzten Tage oder eines eigenen Zeitraums. Der Vergleichszeitraum hat dieselbe Länge, Tag für Tag untereinander. Ab 61 Tagen stehen Wochenwerte. Menge oder Dauer wählst du in der Karte „Niederschlag seit Jahresbeginn“.") }}{% endcall %}
+        <div class="wt-yr wt-controls-end" @keydown.escape="pcmpRangeOpen = false">
+          <div class="wt-seg" role="group" aria-label="{{ _('Zeitraum') }}">
+            <template x-for="opt in [{days: 7, label: t('7 Tage')}, {days: 30, label: t('30 Tage')}, {days: 365, label: t('12 Monate')}]" :key="opt.days">
+              <button type="button" :aria-pressed="(!pcmpRange && pcmpDays === opt.days).toString()" @click="setPcmpDays(opt.days)" x-text="opt.label"></button>
+            </template>
+            <button type="button" :aria-pressed="(!!pcmpRange).toString()" :aria-expanded="pcmpRangeOpen.toString()" @click="openPcmpRange()"><span x-text="pcmpRangeLabel()"></span> ▾</button>
+          </div>
+          <div class="wt-yr-pop" x-show="pcmpRangeOpen" x-cloak @click.outside="pcmpRangeOpen = false">
+            <label>{{ _("Von") }} <input type="date" x-model="pcmpDraftStart" :max="todayIso()"></label>
+            <label>{{ _("Bis") }} <input type="date" x-model="pcmpDraftEnd" :max="todayIso()"></label>
+            <p class="hint hint-warn" x-show="pcmpRangeError" x-text="pcmpRangeError" x-cloak></p>
+            <div class="wt-yr-actions">
+              <button type="button" class="btn" @click="setPcmpDays(30)">{{ _("Zurücksetzen") }}</button>
+              <button type="button" class="btn" @click="applyPcmpRange()">{{ _("Übernehmen") }}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="wt-controls wt-course-row">
+        <p class="wt-headline wt-course-summary" x-show="pcmp && pcmpSummary()" x-text="pcmpSummary()"></p>
+        <label class="wt-course-compare">{{ _("Vergleichen mit") }}
+          <select x-model="pcmpCompare" @change="setPcmpCompare()">
+            <option value="previous">{{ _("Vorzeitraum") }}</option>
+            <option value="year">{{ _("Vorjahreszeitraum") }}</option>
+            <option value="">{{ _("Nichts") }}</option>
+          </select>
+        </label>
+      </div>
+      <p class="hint hint-warn" x-show="pcmpError" x-text="pcmpError" x-cloak></p>
+      <div class="wt-chart" x-ref="pcmpChart" x-show="pcmp"></div>
+    </div>
+    {% endif %}
+
+    <div class="card wt-card">
+      <div class="wt-controls">
+        {% if show_precip_main %}<h2 class="wt-h2">{{ _("Niederschlag seit Jahresbeginn") }} {{ hint_button(_("Niederschlag seit Jahresbeginn")) }}</h2>
+        {% call hint_body() %}{{ _("Laufende Summe des Jahres gegen die Vorjahre und den Durchschnitt. Die Balken zeigen die Tageswerte auf einer eigenen Skala (rechts). Die Vergleichsjahre gelten für diese Karte und die Tabelle darunter.") }}{% endcall %}{% endif %}
         {% if precip_modes | length > 1 %}
         <div class="wt-seg" role="group" aria-label="{{ _('Art des Niederschlags') }}">
           <button type="button" :aria-pressed="(precipMode === 'mm').toString()" @click="setPrecipMode('mm')">{{ _("Menge") }}</button>
@@ -451,24 +507,8 @@
     {% if show_precip_main %}
     <div class="card wt-card">
       <div class="wt-controls">
-        <h2 class="wt-h2">{{ _("Stundenwerte") }}</h2>
-        <div class="wt-yr wt-controls-end" @keydown.escape="precipHoursRangeOpen = false">
-          <div class="wt-seg" role="group" aria-label="{{ _('Zeitraum') }}">
-            <template x-for="opt in [{days: 7, label: t('7 Tage')}, {days: 14, label: t('14 Tage')}, {days: 30, label: t('30 Tage')}]" :key="opt.days">
-              <button type="button" :aria-pressed="(!precipHoursRange && precipHoursDays === opt.days).toString()" @click="setPrecipHoursDays(opt.days)" x-text="opt.label"></button>
-            </template>
-            <button type="button" :aria-pressed="(!!precipHoursRange).toString()" :aria-expanded="precipHoursRangeOpen.toString()" @click="openPrecipHoursRange()"><span x-text="precipHoursRangeLabel()"></span> ▾</button>
-          </div>
-          <div class="wt-yr-pop" x-show="precipHoursRangeOpen" x-cloak @click.outside="precipHoursRangeOpen = false">
-            <label>{{ _("Von") }} <input type="date" x-model="precipHoursDraftStart" :max="todayIso()"></label>
-            <label>{{ _("Bis") }} <input type="date" x-model="precipHoursDraftEnd" :max="todayIso()"></label>
-            <p class="hint hint-warn" x-show="precipHoursRangeError" x-text="precipHoursRangeError" x-cloak></p>
-            <div class="wt-yr-actions">
-              <button type="button" class="btn" @click="setPrecipHoursDays(7)">{{ _("Zurücksetzen") }}</button>
-              <button type="button" class="btn" @click="applyPrecipHoursRange()">{{ _("Übernehmen") }}</button>
-            </div>
-          </div>
-        </div>
+        <h2 class="wt-h2">{{ _("Stundenwerte") }} {{ hint_button(_("Stundenwerte")) }}</h2>
+        {% call hint_body() %}{{ _("Niederschlag je Stunde am gewählten Tag. Den Tag bestimmt der Stichtag in der Reiterleiste, ohne Auswahl ist es heute. Bei Menge zählt der Zähler, bei Dauer die Minuten, die der Regensensor je Stunde an war. Stundenwerte eines Zählers gibt es für abgeschlossene Monate nur, wenn für ihn Stunden-Rollups geführt werden; sonst ab Monatsanfang.") }}{% endcall %}
       </div>
       <p class="wt-headline" x-show="precipHours" x-text="precipHoursHeadline()"></p>
       <div class="wt-chart" x-ref="precipHoursChart" x-show="precipHours && precipHours.total != null"></div>

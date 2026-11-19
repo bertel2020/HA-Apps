@@ -118,10 +118,6 @@ MAX_EXTRA_TEMPERATURES = 100
 #: wie bei den Kacheln (rollierend, nach dem tatsächlichen Fenster benannt).
 TEMPERATURE_DAYS = (7, 30, 365)
 MAX_TEMPERATURE_SPAN_DAYS = 3660  # eigener Zeitraum: höchstens zehn Jahre
-#: Zeiträume (Tage) des Stundencharts im Reiter „Niederschlag“; dazu ein eigener Zeitraum bis zu so vielen Tagen
-#: (92 Tage sind höchstens 2.208 Stundenbalken).
-PRECIP_HOURS_DAYS = (7, 14, 30)
-MAX_PRECIP_HOURS_SPAN_DAYS = 92
 DAILY_COURSE_METRICS = ("temperature", "precip", "sun")
 DAILY_COURSE_COMPARES = ("", "previous", "year")
 DAILY_COURSE_WEEKLY_FROM = 61  # Zeiträume ab 61 Tagen zeigen Wochenwerte statt Tageswerte
@@ -1061,10 +1057,11 @@ class WetterService:
         }
 
     def compute_precip_hours(
-        self, mode: str, days: int = 7, start: date | None = None, end: date | None = None,
+        self, mode: str, days: int = 1, start: date | None = None, end: date | None = None,
         now_local: datetime | None = None,
     ) -> dict | None:
-        """Niederschlag je Stunde der letzten ``days`` Tage oder von ``start`` bis ``end`` (sonst heute).
+        """Niederschlag je Stunde der letzten ``days`` Tage (Standard: heute) oder von ``start`` bis ``end``; die Karte fragt
+        einen einzelnen Tag, den Stichtag.
 
         ``hours`` enthält je Stunde ``[Beginn, Wert]``; ``None`` heißt „keine Angabe“ (Stunde in der Zukunft oder vor dem
         Zeitpunkt, ab dem es Stundenwerte gibt), 0 heißt trocken. Zähler (mm) liefern Stundenwerte aus der Stundenstufe,
@@ -1361,7 +1358,7 @@ class WetterService:
         }
 
     def _course_day_values(
-        self, metric: str, config: dict, dates: list[date], now_local: datetime,
+        self, metric: str, config: dict, dates: list[date], now_local: datetime, precip_mode: str = "mm",
     ) -> tuple[list[float | None], str, str] | None:
         """Tageswerte von ``metric`` für ``dates`` (zusammenhängende Tage): (Werte, Einheit, Entität) oder None, wenn die
         Größe nicht zugeordnet ist. Ein Tag ohne Wert ist None, nie 0 (Ausnahme: Regensensor ab Archivbeginn)."""
@@ -1380,7 +1377,7 @@ class WetterService:
         if metric == "temperature":
             entity_id, unit = config["temperature"], ""
         else:
-            role = self._precip_role(config, "mm")
+            role = self._precip_role(config, precip_mode)
             if role is None:
                 return None
             entity_id, kind = role
@@ -1419,7 +1416,7 @@ class WetterService:
 
     def compute_daily_course(
         self, metric: str, days: int = 7, start: date | None = None, end: date | None = None, compare: str = "previous",
-        now_local: datetime | None = None,
+        now_local: datetime | None = None, precip_mode: str = "mm",
     ) -> dict | None:
         """Tagesverlauf von Temperatur (Tagesmittel), Niederschlag oder Sonnenstunden (Tagessummen) der letzten ``days``
         Tage oder von ``start`` bis ``end`` (sonst heute), optional mit einem Vergleichszeitraum gleicher Länge:
@@ -1435,7 +1432,7 @@ class WetterService:
             dates = [first + timedelta(days=offset) for offset in range((last - first).days + 1)]
         else:
             dates = [today - timedelta(days=offset) for offset in range(days - 1, -1, -1)]
-        found = self._course_day_values(metric, config, dates, now_local)
+        found = self._course_day_values(metric, config, dates, now_local, precip_mode)
         if found is None:
             return None
         values, unit, entity_id = found
@@ -1453,7 +1450,7 @@ class WetterService:
             else:
                 shifted = dates[0] - timedelta(days=len(dates))
             compare_dates = [shifted + timedelta(days=offset) for offset in range(len(dates))]
-            other = self._course_day_values(metric, config, compare_dates, now_local)
+            other = self._course_day_values(metric, config, compare_dates, now_local, precip_mode)
             compare_values = other[0] if other else [None] * len(dates)
             c_dates, c_values = self._course_buckets(compare_values, compare_dates, weekly, mean)
             compare_out = {
@@ -2733,21 +2730,18 @@ class WetterService:
             return result
 
         @router.get("/wetterdashboard/niederschlag-stunden")
-        def wetterdashboard_precip_hours(mode: str = "mm", days: int = 7, start: str = "", end: str = "") -> dict:
+        def wetterdashboard_precip_hours(mode: str = "mm", date: str = "") -> dict:
             _require_configured()
-            first = last = None
-            if start:
+            day = None
+            if date:
                 today = datetime.now(self.deps.tz).date()
                 try:
-                    first = date.fromisoformat(start)
-                    last = date.fromisoformat(end) if end else today
+                    day = datetime.strptime(date, "%Y-%m-%d").date()
                 except ValueError:
                     raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum.")) from None
-                if last > today or first > last or (last - first).days + 1 > MAX_PRECIP_HOURS_SPAN_DAYS:
+                if day > today:
                     raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
-            elif days not in PRECIP_HOURS_DAYS:
-                raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
-            result = self.compute_precip_hours(mode, days, start=first, end=last)
+            result = self.compute_precip_hours(mode, start=day, end=day)
             if result is None:
                 raise HTTPException(status_code=404, detail=tr("Kein Niederschlag zugeordnet."))
             return result
@@ -2803,6 +2797,7 @@ class WetterService:
         @router.get("/wetterdashboard/tagesverlauf")
         def wetterdashboard_daily_course(
             metric: str = "temperature", days: int = 7, start: str = "", end: str = "", compare: str = "previous",
+            mode: str = "mm",
         ) -> dict:
             _require_configured()
             if metric not in DAILY_COURSE_METRICS or compare not in DAILY_COURSE_COMPARES:
@@ -2819,7 +2814,7 @@ class WetterService:
                     raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
             elif days not in TEMPERATURE_DAYS:
                 raise HTTPException(status_code=400, detail=tr("Ungültiger Zeitraum."))
-            result = self.compute_daily_course(metric, days, start=first, end=last, compare=compare)
+            result = self.compute_daily_course(metric, days, start=first, end=last, compare=compare, precip_mode=mode if mode in ("mm", "dur") else "mm")
             if result is None:
                 raise HTTPException(status_code=404, detail=tr("Kein Niederschlag zugeordnet.") if metric == "precip" else tr("Noch nicht eingerichtet"))
             return result

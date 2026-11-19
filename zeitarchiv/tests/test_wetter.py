@@ -1851,24 +1851,40 @@ def test_precip_hours_route_validates_the_request(client) -> None:
     wetter_routes._save_config(index, {**wetter_routes._empty_config(), "temperature": "sensor.wetter_test_temp13"})  # noqa: SLF001
     today = datetime.now(TZ).date()
     get = lambda query: client.get(f"/wetterdashboard/niederschlag-stunden?{query}")  # noqa: E731
-    assert get("days=7").status_code == 404  # kein Niederschlag zugeordnet
-    assert get("days=10").status_code == 400
-    assert get(f"start={today}&end={today - timedelta(days=1)}").status_code == 400
-    assert get(f"start={today - timedelta(days=93)}").status_code == 400
-    assert get("start=unsinn").status_code == 400
+    assert get("").status_code == 404  # kein Niederschlag zugeordnet
+    assert get(f"date={today}").status_code == 404
+    assert get(f"date={today + timedelta(days=1)}").status_code == 400  # nicht in der Zukunft
+    assert get("date=unsinn").status_code == 400
 
 
-def test_precipitation_tab_has_an_hourly_chart_with_the_standard_range_choice() -> None:
+def test_precipitation_tab_follows_the_other_tabs_in_structure() -> None:
     from _paths import TEMPLATES
 
     view = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
     script = _wetter_script()
-    assert 'x-ref="precipHoursChart"' in view and "setPrecipHoursDays(opt.days)" in view
-    assert "{days: 7, label: t('7 Tage')}, {days: 14, label: t('14 Tage')}, {days: 30, label: t('30 Tage')}" in view.split("Stundenwerte")[1]
-    assert "wetterdashboard/niederschlag-stunden?mode=${this.precipMode}" in script
-    # Der Wechsel zwischen Menge und Dauer lädt auch die Stundenwerte neu.
-    assert "this.loadPrecip();\n        this.loadPrecipHours();" in script
-    # Die Tagesbalken des Jahrescharts sind deckend und mindestens 3 px breit.
+    # Stichtag-Leiste und „Heute“-Kacheln wie bei Temperatur & Klima und Wind & Sonne.
+    assert "['overview', 'klima', 'wind', 'precip'].includes(tab)" in view
+    assert "precipTodayTiles()" in view and "precipTodayTiles()" in script
+    # Niederschlag im Vergleich: dieselbe Bedienung wie der Tagesverlauf (7 Tage, 30 Tage, 12 Monate, eigener Zeitraum).
+    assert 'x-ref="pcmpChart"' in view and "setPcmpDays(opt.days)" in view and "setPcmpCompare()" in view
+    assert "wetterdashboard/tagesverlauf?metric=precip&mode=${this.precipMode}" in script
+    # Stundenwerte: ein Tag, folgt dem Stichtag.
+    assert 'x-ref="precipHoursChart"' in view and "setPrecipHoursDays" not in view
+    assert "wetterdashboard/niederschlag-stunden?mode=${this.precipMode}${stichtag ?" in script
+    assert "this.precipHours = null;\n          if (this.tab === 'precip') this.loadPrecipHours();" in script
+    # Der Wechsel zwischen Menge und Dauer lädt alle drei Karten neu.
+    assert "this.loadPrecip();\n        this.loadPrecipHours();\n        this.loadPcmp();" in script
+    # Die Tagesbalken des Jahrescharts sind deckend und mindestens 3 px breit; die rechte Achse trägt die Einheit.
     assert "barMinWidth: 3" in script and "itemStyle: {color: colors.cur, opacity: 0.85}" in script
-    # Die rechte Achse der Balken trägt die Einheit („mm/Tag“, bei Dauer „h/Tag“).
     assert "t('{unit}/Tag', {unit})" in script
+
+
+def test_daily_course_precipitation_follows_the_chosen_mode(service) -> None:
+    _rain_setup(service)
+    _configure(service, temperature="sensor.t", precip_mm="sensor.regen", precip_dur="binary_sensor.regen")
+    minutes = service.compute_daily_course(
+        "precip", start=date(2026, 8, 19), end=date(2026, 8, 20), compare="", now_local=NOW, precip_mode="dur",
+    )
+    assert minutes["unit"] == "min" and minutes["values"][1] == pytest.approx(30.0)
+    amount = service.compute_daily_course("precip", start=date(2026, 8, 19), end=date(2026, 8, 20), compare="", now_local=NOW)
+    assert amount["unit"] == "mm" and amount["values"][1] == pytest.approx(1.5)
