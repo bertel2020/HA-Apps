@@ -19,7 +19,7 @@
   .save-row{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;justify-content:flex-end;}
   /* Das Formular steht in einer Karte mit begrenzter Breite (wie die Abschnitte der Einstellungsseite), damit
      Löschen/Abbrechen/Speichern am Ende der Karte rechts stehen und nicht am fernen Seitenrand. */
-  .dash-editor-card{max-width:720px;}
+  .dash-editor-card{max-width:840px;}
   .dash-editor-card .settings-subsection{margin-top:22px;}
   .dash-editor-card .settings-compact-row{padding:12px 0;}
   .dash-editor-card .settings-compact-label{font-size:calc(14px * var(--font-scale, 1));font-weight:600;cursor:pointer;}

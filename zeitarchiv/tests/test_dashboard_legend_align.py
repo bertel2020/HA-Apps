@@ -110,4 +110,4 @@ def test_dashboard_form_is_a_card_with_two_groups_and_a_hint_button_per_row() ->
     labels = editor.split('class="settings-compact-label"')[1:]
     assert len(labels) == rows and all("hint_button(" in part.split("</label>")[0] for part in labels)
     css = (PAGE_CSS / "dashboard_editor.css").read_text(encoding="utf-8")
-    assert ".dash-editor-card{max-width:720px;}" in css
+    assert ".dash-editor-card{max-width:840px;}" in css
