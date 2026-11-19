@@ -3416,6 +3416,7 @@ def entity_migrate_preview(request: Request, entity_id: str, body: _EntityMigrat
             "error": error,
             "result_first_ts": result_first_ts,
             "result_last_ts": result_last_ts,
+            "skipped_from": format_timestamp(plan.skipped_from_ts, TZ) if plan and plan.skipped_from_ts else None,
         },
     )
 
@@ -3453,6 +3454,7 @@ def entity_migrate_execute(entity_id: str, body: _EntityMigrateExecuteBody) -> d
         "rows_transferred": result.rows_transferred,
         "duplicate_rows": result.duplicate_rows,
         "overwritten_rows": result.overwritten_rows,
+        "skipped_counter_rows": result.skipped_counter_rows,
         "post_action": result.post_action,
         "overlap_resolution": result.overlap_resolution,
         "repointed_dashboards": result.repointed_dashboards,

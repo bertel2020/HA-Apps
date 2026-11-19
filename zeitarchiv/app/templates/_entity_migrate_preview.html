@@ -23,6 +23,12 @@
   </div>
   {% endif %}
 
+  {% if plan.skipped_counter_rows %}
+  <div class="migrate-banner warning">
+    {{ _("Beide Entitäten sind Zähler und überschneiden sich zeitlich. <strong>{rows}</strong> Werte der Quelle ab {from_ts} werden nicht übernommen, ab dort gilt nur noch die Ziel-Entität. Zähler mit unterschiedlichem Stand lassen sich nicht zeilenweise mischen, ohne den Verbrauch an diesem Tag zu verfälschen. Wird die Quelle gelöscht, gehen diese Werte mit ihr verloren.", rows=(plan.skipped_counter_rows | format_int), from_ts=skipped_from) }}
+  </div>
+  {% endif %}
+
   <div class="stat-row">
     <div class="stat"><div class="label">{{ _("Werden übertragen") }}</div><div class="value">{{ plan.rows_to_transfer | format_int }}</div></div>
     <div class="stat"><div class="label">{{ _("Zeitraum danach") }}</div><div class="value">{{ result_first_ts or "—" }} – {{ result_last_ts or "—" }}</div></div>

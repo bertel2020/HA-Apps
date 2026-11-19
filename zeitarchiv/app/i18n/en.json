@@ -876,6 +876,7 @@
     "Zeitraum danach": "Period after",
     "Überschneidend": "Overlapping",
     "Überschneidung im Zeitraum": "Overlap in the period",
+    "Beide Entitäten sind Zähler und überschneiden sich zeitlich. <strong>{rows}</strong> Werte der Quelle ab {from_ts} werden nicht übernommen, ab dort gilt nur noch die Ziel-Entität. Zähler mit unterschiedlichem Stand lassen sich nicht zeilenweise mischen, ohne den Verbrauch an diesem Tag zu verfälschen. Wird die Quelle gelöscht, gehen diese Werte mit ihr verloren.": "Both entities are counters and overlap in time. <strong>{rows}</strong> source values from {from_ts} on are not transferred; from there on only the target entity applies. Counters with different readings cannot be mixed row by row without distorting that day's consumption. If the source is deleted, these values are lost with it.",
     "{duplicate_rows} Zeitstempel kommen in Quelle UND Ziel bereits vor.": "{duplicate_rows} timestamps already exist in source AND target.",
     "Ziel-Werte behalten (empfohlen)": "Keep target values (recommended)",
     "Bei überlappenden Zeitstempeln gewinnt der bereits vorhandene Wert der Ziel-Entität.": "For overlapping timestamps, the existing value of the target entity wins.",

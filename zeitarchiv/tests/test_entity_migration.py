@@ -312,3 +312,68 @@ def test_source_and_target_must_differ(tmp_path: Path) -> None:
             entity_migration.plan_migration(tmp_path, index, "sensor.a", "sensor.a", TZ)
     finally:
         index.close()
+
+
+def _daily_counter_totals(rows: list[tuple[float, float]]) -> dict[str, float]:
+    """Tageswerte eines Zählers über dieselbe Verdichtung wie die App."""
+    from app.storage import rollup
+
+    fine, _ = rollup.compute_fine_rollup(rows, "counter", "tag", TZ, None, rows[-1][0] + 1)
+    return {datetime.fromtimestamp(row.bucket_start, TZ).strftime("%d.%m."): row.value for row in fine}
+
+
+def _counter_series(start: datetime, hours: int, base: float, minute: int = 0) -> list[tuple[float, float]]:
+    from datetime import timedelta
+
+    return [
+        ((start + timedelta(hours=h, minutes=minute)).timestamp(), base + 0.5 * h)
+        for h in range(hours)
+    ]
+
+
+def test_counter_migration_does_not_mix_overlapping_counter_baselines(tmp_path: Path) -> None:
+    """Regression: Alter Zähler (Basis 1500) läuft weiter, während der neue
+    (Basis 0) schon läuft. Früher verzahnte die Migration beide Reihen, jeder
+    Wechsel von der niedrigen auf die hohe Basis zählte als Verbrauch — der
+    Überlappungstag zeigte tausende kWh statt 12."""
+    index = Index(tmp_path / "index.sqlite")
+    try:
+        old = _counter_series(datetime(2026, 10, 10, tzinfo=TZ), 6 * 24, 1500.0)
+        new = _counter_series(datetime(2026, 10, 14, 12, tzinfo=TZ), 36, 0.0, minute=30)
+        _make_entity(index, tmp_path, "sensor.alt", "sensor", "total_increasing", "kWh", old)
+        _make_entity(index, tmp_path, "sensor.neu", "sensor", "total_increasing", "kWh", new)
+
+        plan = entity_migration.plan_migration(tmp_path, index, "sensor.alt", "sensor.neu", TZ)
+        assert plan.skipped_counter_rows > 0
+        assert plan.skipped_from_ts == new[0][0]
+
+        result = entity_migration.execute_migration(
+            tmp_path, index, "sensor.alt", "sensor.neu", TZ, post_action="keep",
+        )
+        assert result.skipped_counter_rows == plan.skipped_counter_rows
+
+        from app.storage.cleanup import iter_raw_rows
+
+        entity = index.get_entity("sensor.neu")
+        merged = sorted(iter_raw_rows(tmp_path, index, "sensor.neu", entity["first_ts"], entity["last_ts"] + 1, TZ))
+        assert all(ts < new[0][0] or value < 1000 for ts, value in merged if ts >= new[0][0])
+        totals = _daily_counter_totals(merged)
+        # Der Sprung von der alten auf die neue Basis (Zähler fällt) zählt als 0.
+        assert all(value <= 12.0 for value in totals.values()), totals
+    finally:
+        index.close()
+
+
+def test_counter_migration_without_overlap_keeps_all_rows(tmp_path: Path) -> None:
+    index = Index(tmp_path / "index.sqlite")
+    try:
+        old = _counter_series(datetime(2026, 10, 1, tzinfo=TZ), 48, 100.0)
+        new = _counter_series(datetime(2026, 10, 5, tzinfo=TZ), 24, 0.0)
+        _make_entity(index, tmp_path, "sensor.alt", "sensor", "total_increasing", "kWh", old)
+        _make_entity(index, tmp_path, "sensor.neu", "sensor", "total_increasing", "kWh", new)
+        plan = entity_migration.plan_migration(tmp_path, index, "sensor.alt", "sensor.neu", TZ)
+        assert plan.skipped_counter_rows == 0
+        assert plan.skipped_from_ts is None
+        assert plan.rows_to_transfer == len(old)
+    finally:
+        index.close()

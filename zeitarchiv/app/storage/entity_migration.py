@@ -21,6 +21,11 @@ plan_import_rows()/import_rows() als "duplicate" zählen), und schreibt genau
 diese Zeitstempel im Ziel-Archiv bzw. Hot Buffer direkt neu — ein bewusst auf
 die Migration begrenzter Sonderpfad, statt das gemeinsame, auch vom CSV-/
 Symcon-Import genutzte Import-Modul um eine Overwrite-Option zu erweitern.
+
+Zähler sind eine Ausnahme: Quellzeilen ab dem ersten Zeitstempel des Ziels
+werden nicht übernommen (_drop_counter_overlap()), weil zwei Zähler mit
+verschiedener Basis sich nicht zeilenweise mischen lassen. overlap_resolution
+hat bei Zählern dadurch keine Wirkung.
 """
 
 from __future__ import annotations
@@ -121,6 +126,26 @@ def _scaled(rows: list[tuple[float, float]], factor: float) -> list[tuple[float,
     return [(ts, value * factor) for ts, value in rows]
 
 
+def _drop_counter_overlap(
+    rows: list[tuple[float, float]], target: object,
+) -> tuple[list[tuple[float, float]], int]:
+    """Zähler: verwirft alle Quellzeilen ab dem ersten Zeitstempel des Ziels.
+
+    Die Zähler-Verdichtung (rollup.compute_fine_rollup_with_key) summiert die
+    Differenzen aufeinanderfolgender Rohwerte. Haben Quelle und Ziel
+    unterschiedliche Zählerbasen (typisch bei einem neuen Template-Sensor, der
+    bei 0 beginnt, während der alte bei 1500 steht), verzahnt additives
+    Einmischen die Quellzeilen zwischen die Zielzeilen — jeder Wechsel von der
+    niedrigen zur hohen Basis zählt dann als Verbrauch, der Überlappungstag wird
+    um ein Vielfaches überhöht. Ab dem Start des Ziels gilt deshalb allein das
+    Ziel. Gibt (verbleibende Zeilen, Anzahl verworfener Zeilen) zurück."""
+    if target["aggregation_type"] != "counter" or target["first_ts"] is None:
+        return rows, 0
+    cutoff = target["first_ts"]
+    kept = [(ts, value) for ts, value in rows if ts < cutoff]
+    return kept, len(rows) - len(kept)
+
+
 # Bekannte SI-Vorsatz-Stufen für die beiden physikalischen Größen, bei denen
 # ein Einheiten-Wechsel zwischen Quelle und Ziel in der Praxis vorkommt (ein
 # Gerät wird ersetzt und meldet fortan in Wh statt kWh, oder W statt kW) —
@@ -162,6 +187,11 @@ class MigrationPlan:
     duplicate_rows: int
     factor: float
     suggested_factor: float | None = None
+    # Zähler: Quellzeilen ab dem Start des Ziels, die nicht übernommen werden
+    # (siehe _drop_counter_overlap()); skipped_from_ts ist der erste
+    # Zeitstempel des Ziels.
+    skipped_counter_rows: int = 0
+    skipped_from_ts: float | None = None
 
 
 def plan_migration(
@@ -179,6 +209,7 @@ def plan_migration(
     _validate_factor(factor)
     source, target = _require_entities(index, source_entity_id, target_entity_id)
     rows = _scaled(_read_source_rows(data_dir, index, source_entity_id, tz), factor)
+    rows, skipped = _drop_counter_overlap(rows, target)
     import_plan = plan_import_rows(
         data_dir, index, rows, target_entity_id, tz,
         source_label=source_entity_id, factor=factor, include_existing_months=True,
@@ -199,6 +230,8 @@ def plan_migration(
         duplicate_rows=len(rows) - rows_to_transfer,
         factor=factor,
         suggested_factor=suggest_factor(source_unit, target_unit),
+        skipped_counter_rows=skipped,
+        skipped_from_ts=target["first_ts"] if skipped else None,
     )
 
 
@@ -211,6 +244,7 @@ class MigrationResult:
     rows_transferred: int
     duplicate_rows: int
     overwritten_rows: int = 0
+    skipped_counter_rows: int = 0
     repointed_dashboards: list[str] = field(default_factory=list)
 
 
@@ -360,6 +394,7 @@ def execute_migration(
     _validate_factor(factor)
     _, target = _require_entities(index, source_entity_id, target_entity_id)
     rows = _scaled(_read_source_rows(data_dir, index, source_entity_id, tz), factor)
+    rows, skipped_counter_rows = _drop_counter_overlap(rows, target)
     # Vor dem eigentlichen Import ermitteln — import_rows() unten schreibt
     # bereits neue Zeitstempel ins Ziel, der Stand DAVOR ist aber genau das,
     # was "überschneidend" bedeutet (siehe _existing_target_timestamps()).
@@ -398,5 +433,6 @@ def execute_migration(
         rows_transferred=rows_transferred,
         duplicate_rows=import_result.duplicate_rows,
         overwritten_rows=overwritten_rows,
+        skipped_counter_rows=skipped_counter_rows,
         repointed_dashboards=repointed,
     )
