@@ -3563,11 +3563,10 @@
         if (!this.heat) return '';
         const totals = this.heatShareTotals();
         const sums = this.heat.counters.map((_c, i) => totals.reduce((a, row) => a + row[i], 0));
-        const all = sums.reduce((a, v, i) => a + (this.heatOn[i] ? v : 0), 0);
+        const all = sums.reduce((a, v) => a + v, 0);
         if (!all) return t('Keine Werte in dieser Heizperiode.');
         return this.heat.counters
-          .map((counter, i) => (this.heatOn[i] ? `${counter.name} ${num(sums[i], 0)} kWh (${num(sums[i] / all * 100, 0)} %)` : ''))
-          .filter(Boolean).join(' · ');
+          .map((counter, i) => `${counter.name} ${num(sums[i], 0)} kWh (${num(sums[i] / all * 100, 0)} %)`).join(' · ');
       },
 
       drawHeatShare() {
@@ -3578,7 +3577,7 @@
         const labels = WetterHeating.MONTHS.map((month) => monthName(month, 'short'));
         const series = this.heat.counters.map((counter, i) => ({
           name: counter.name, type: 'bar', stack: 'kwh', barMaxWidth: 48,
-          data: totals.map((row) => (this.heatOn[i] ? Math.round(row[i] * 10) / 10 : 0)),
+          data: totals.map((row) => Math.round(row[i] * 10) / 10),
           itemStyle: {color: this.heatColor(i)},
         }));
         const chart = chartFor('heatShare', element);

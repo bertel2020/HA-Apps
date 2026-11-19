@@ -18,6 +18,7 @@
   - Room lines are drawn in their colour again instead of black
   - The gap above the legend no longer grows large when the chart was hidden
   - On phones the room tiles show the floor below the room name; large values are smaller; the heating-period selection wraps instead of overflowing
+  - “Share per meter” on the Heating tab always shows all meters, also when one is switched off above
 - **Energy dashboard**: the legend of the annual balance no longer covers the “kWh” unit on phones, also with several producers
 - **Tab rows**: wide tab rows and the Settings/Housekeeping menu show arrows when tabs are hidden at the edge; a tap scrolls further, the active tab is centred on load
 - **Import**: Table on the Home Assistant tab

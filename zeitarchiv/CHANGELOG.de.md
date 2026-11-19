@@ -18,6 +18,7 @@
   - Raumlinien werden wieder in ihrer Farbe gezeichnet statt schwarz
   - Der Abstand über der Legende wird nicht mehr riesig, wenn das Diagramm vorher verborgen war
   - Am Handy zeigen die Raumkacheln die Etage unter dem Raumnamen, große Werte sind kleiner, die Heizperioden-Auswahl bricht um statt überzulaufen
+  - „Anteil je Zähler“ im Reiter Heizen zeigt immer alle Zähler, auch wenn oben einer ausgeblendet ist
 - **Energiedashboard**: Die Legende der Jahresbilanz überdeckt am Handy nicht mehr die Einheit „kWh“, auch bei mehreren Erzeugern
 - **Reiterzeilen**: Breite Reiterzeilen und das Menü von Einstellungen/Housekeeping zeigen Pfeile, wenn Reiter am Rand verdeckt sind; ein Tipp scrollt weiter, der aktive Reiter wird beim Laden zentriert
 - **Import**: Tabelle im Reiter Home Assistant
