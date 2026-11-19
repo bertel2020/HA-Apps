@@ -1106,7 +1106,9 @@
           if (rain.last == null) sub = t('in den letzten {n} h kein Regen', {n: 48});
           else {
             const sameDay = fmtDate(formats.dm, rain.last) === fmtDate(formats.dm, this.conditions.now);
-            sub = t('zuletzt Regen um {time}', {time: (sameDay ? '' : fmtDate(formats.dm, rain.last) + ' ') + fmtDate(formats.hm, rain.last)});
+            sub = sameDay
+              ? t('zuletzt Regen um {time}', {time: fmtDate(formats.hm, rain.last)})
+              : t('zuletzt Regen am {time}', {time: fmtDate(formats.dm, rain.last) + ' ' + fmtDate(formats.hm, rain.last)});
           }
         }
         if (rain.raining == null && rain.mm_today) return {text: t('heute {value} {unit}', {value: num(rain.mm_today, 1), unit: rain.mm_unit || 'mm'}), sub};
@@ -1224,9 +1226,12 @@
               : t('Es regnet seit {h} h {m} min.', {h: Math.floor(minutes / 60), m: String(minutes % 60).padStart(2, '0')}));
           }
         } else if (rain && rain.raining === false) {
-          parts.push(rain.last != null
-            ? t('Aktuell trocken, zuletzt Regen um {time}.', {time: (fmtDate(formats.dm, rain.last) === fmtDate(formats.dm, c.now) ? '' : `${fmtDate(formats.dm, rain.last)} `) + fmtDate(formats.hm, rain.last)})
-            : t('Aktuell trocken.'));
+          const lastSameDay = rain.last != null && fmtDate(formats.dm, rain.last) === fmtDate(formats.dm, c.now);
+          parts.push(rain.last == null
+            ? t('Aktuell trocken.')
+            : lastSameDay
+              ? t('Aktuell trocken, zuletzt Regen um {time}.', {time: fmtDate(formats.hm, rain.last)})
+              : t('Aktuell trocken, zuletzt Regen am {time}.', {time: `${fmtDate(formats.dm, rain.last)} ${fmtDate(formats.hm, rain.last)}`}));
         }
         return parts.map(together);
       },
