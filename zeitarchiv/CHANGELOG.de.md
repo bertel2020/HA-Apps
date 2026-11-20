@@ -12,6 +12,26 @@
 
 ## Unreleased
 
+### Neu
+
+- **Wetterdashboard**
+  - Niederschlag: der Reiter ist wie Temperatur & Klima und Wind & Sonne aufgebaut
+    - Kacheln „Heute“, Stichtag-Leiste, „Niederschlag im Vergleich“ (7 Tage, 30 Tage, 12 Monate oder eigener Zeitraum, gegen Vorperiode oder Vorjahr)
+    - Neue Stundenwerte für einen Tag, als Menge oder als Dauer in Minuten je Stunde
+    - Die Tagesbalken im Jahreschart sind voll deckend und breiter; die rechte Achse zeigt ihre Einheit
+  - Heizen in m³
+    - Ein Gaszähler in m³ wird nicht mehr als kWh gerechnet; gibt es nur Gaszähler, rechnet und beschriftet der Reiter alles in m³
+    - Gibt es Zähler in Wh, kWh oder MWh, bleiben Gaszähler mit Hinweis draußen
+- **Dashboard**
+  - „Legenden angleichen“: Karten, die in derselben Zeile beginnen, bekommen Legenden gleicher Höhe, sodass die Charts gleich weit enden; neu angelegte Dashboards starten mit eingeschaltetem Schalter, bestehende bleiben unverändert
+  - Das Bearbeiten-Formular ist eine Karte mit den Gruppen „Layout“ und „Verhalten“; Löschen, Abbrechen und Speichern stehen rechts
+
+### Geändert
+
+- **Charts**: Anteile (%) neben Balken ohne Stapel
+  - Die Achse bleibt absolut; die Segmente zeigen ihren Anteil am Stapel, über dem Balken steht die Summe
+  - Ein reiner Stapel ohne Nachbarn wird weiter von 0 bis 100 % gezeichnet
+
 ### Behoben
 
 - **Wetterdashboard**: Nachbesserungen
@@ -19,12 +39,20 @@
   - Der Abstand über der Legende wird nicht mehr riesig, wenn das Diagramm vorher verborgen war
   - Am Handy zeigen die Raumkacheln die Etage unter dem Raumnamen, große Werte sind kleiner, die Heizperioden-Auswahl bricht um statt überzulaufen
   - „Anteil je Zähler“ im Reiter Heizen zeigt immer alle Zähler, auch wenn oben einer ausgeblendet ist
+  - Der Text „zuletzt Regen“ sagt „am 17.11. um 23:52“ statt „um“, wenn es nicht am selben Tag geregnet hat
 - **Energiedashboard**: Die Legende der Jahresbilanz überdeckt am Handy nicht mehr die Einheit „kWh“, auch bei mehreren Erzeugern
 - **Reiterzeilen**: Breite Reiterzeilen und das Menü von Einstellungen/Housekeeping zeigen Pfeile, wenn Reiter am Rand verdeckt sind; ein Tipp scrollt weiter, der aktive Reiter wird beim Laden zentriert
 - **Import**: Tabelle im Reiter Home Assistant
   - Nach einem Import aktualisiert sich die Tabelle sofort („Letzter Import“, Status), ein Neuladen der Seite ist nicht mehr nötig
   - Ein früheres Dry-Run-Ergebnis bleibt nach dem Import nicht mehr in der Spalte „Status“ stehen
   - Die Spalte „Verfügbar“ überlappt bei langen Zeiträumen nicht mehr die Spalte „Status“
+- **Migration**: Zähler
+  - Überlappende Werte der Quelle werden nicht mehr mit einem laufenden Zielzähler verzahnt; ab dem ersten Wert des Ziels gilt nur noch das Ziel, die Vorschau warnt davor
+  - Damit entfällt der überhöhte Verbrauch am Tag der Umstellung
+- **Archiv**: Robustheit nach Absturz oder Stromausfall
+  - Archivdateien und Backup-ZIPs werden vor dem Umbenennen auf die Platte geschrieben
+  - Leere Rollup-Dateien werden beim Start aus dem Archiv neu aufgebaut
+  - Nullbytes im Hot-Buffer machen eine Zeile nicht mehr unlesbar
 
 ## 1.55.0 - 2026-11-17
 

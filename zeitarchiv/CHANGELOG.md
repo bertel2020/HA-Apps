@@ -12,6 +12,26 @@
 
 ## Unreleased
 
+### New
+
+- **Weather dashboard**
+  - Precipitation: the tab is built like Temperature & Climate and Wind & Sun
+    - “Today” tiles, a reference-day bar, “Precipitation compared” (7 days, 30 days, 12 months or a custom period, against the previous period or the previous year)
+    - New hourly values for one day, as amount or as duration in minutes per hour
+    - Daily bars in the annual chart are fully opaque and wider; the right axis shows its unit
+  - Heating in m³
+    - A gas meter in m³ is no longer counted as kWh; with only gas meters the tab calculates and labels everything in m³
+    - With meters in Wh, kWh or MWh, gas meters stay out with a note
+- **Dashboard**
+  - “Align legends”: cards that start in the same row get legends of the same height, so the charts end at the same level; new dashboards start with it switched on, existing ones stay unchanged
+  - The edit form is a card with the groups “Layout” and “Behaviour”; Delete, Cancel and Save sit at the right
+
+### Changed
+
+- **Charts**: shares (%) next to bars without a stack
+  - The axis stays absolute; the segments show their share of the stack, the total stands above the bar
+  - A pure stack without neighbours is still drawn from 0 to 100 %
+
 ### Fixed
 
 - **Weather dashboard**: refinements
@@ -19,12 +39,20 @@
   - The gap above the legend no longer grows large when the chart was hidden
   - On phones the room tiles show the floor below the room name; large values are smaller; the heating-period selection wraps instead of overflowing
   - “Share per meter” on the Heating tab always shows all meters, also when one is switched off above
+  - The text “last rain” says “on 17.11. at 23:52” instead of “at” when it did not rain on the same day
 - **Energy dashboard**: the legend of the annual balance no longer covers the “kWh” unit on phones, also with several producers
 - **Tab rows**: wide tab rows and the Settings/Housekeeping menu show arrows when tabs are hidden at the edge; a tap scrolls further, the active tab is centred on load
 - **Import**: Table on the Home Assistant tab
   - After an import the table now updates right away (“Last import”, status), no page reload needed
   - A previous dry-run result no longer stays in the “Status” column after importing
   - The “Available” column no longer overlaps “Status” with long date ranges
+- **Migration**: counters
+  - Overlapping values of the source are no longer interleaved with a running target counter; from the first value of the target on, only the target counts, the preview warns about it
+  - This removes inflated consumption on the day of the switch
+- **Archive**: robustness after a crash or power failure
+  - Archive files and backup ZIPs are written to disk before they are renamed
+  - Empty rollup files are rebuilt from the archive at startup
+  - Null bytes in the hot buffer no longer make a row unreadable
 
 ## 1.55.0 - 2026-11-17
 
