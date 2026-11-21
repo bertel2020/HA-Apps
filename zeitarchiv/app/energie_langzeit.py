@@ -23,6 +23,7 @@ from __future__ import annotations
 import statistics
 import time
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -30,6 +31,7 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, Field
 
 from . import data_quality, period_columns
+from .energy_units import energy_unit_scale
 from .formatting import entity_display_name
 from .i18n import N_, tr
 from .storage import query as query_mod
@@ -418,7 +420,7 @@ class EnergieLangzeitService:
                 continue
             rows = self._rows(entity_id, start, end, now_local, read_cache)
             if rows:
-                total = (total or 0.0) + sum(row.value or 0.0 for row in rows)
+                total = (total or 0.0) + sum(row.value or 0.0 for row in rows) * energy_unit_scale(entity["unit"])
             elif entity["first_ts"] and entity["first_ts"] > start.timestamp():
                 first_in_window = min(first_in_window or entity["first_ts"], entity["first_ts"])
         return (round(total, 3) if total is not None else None), (first_in_window if total is None else None)
@@ -782,9 +784,10 @@ class EnergieLangzeitService:
                 points = query_mod.query_daily_series(
                     self.data_dir, self.index, entity_id, start, end, self.tz, now_local, read_cache,
                 )
+                scale = energy_unit_scale(entity["unit"])
                 per_entity.append((
                     entity["first_ts"],
-                    {datetime.fromtimestamp(p.day_start, self.tz).date(): (p.value or 0.0) for p in points},
+                    {datetime.fromtimestamp(p.day_start, self.tz).date(): (p.value or 0.0) * scale for p in points},
                 ))
             days: dict[date, float] = {}
             for day in {d for _first, series in per_entity for d in series}:
@@ -1158,9 +1161,13 @@ class EnergieLangzeitService:
 
         def daily(entity_id: str, entity: dict) -> list:
             start = datetime(*first_day(entity).timetuple()[:3], tzinfo=self.tz)
-            return query_mod.query_daily_series(
+            points = query_mod.query_daily_series(
                 self.data_dir, self.index, entity_id, start, midnight, self.tz, now_local, read_cache,
             )
+            scale = energy_unit_scale(entity["unit"])
+            if scale == 1.0:  # auch die Außentemperatur läuft hier durch
+                return points
+            return [replace(point, value=None if point.value is None else point.value * scale) for point in points]
 
         def day_of(point) -> date:
             return datetime.fromtimestamp(point.day_start, self.tz).date()

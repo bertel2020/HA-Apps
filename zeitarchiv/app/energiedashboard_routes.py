@@ -40,6 +40,7 @@ from . import energie_langzeit, wetter_routes
 from . import energiedashboard_buckets as eb
 from . import formats
 from .chart_period import calendar_bounds
+from .energy_units import ENERGY_UNITS, energy_unit_scale
 from .formatting import entity_display_name
 from .limits import MAX_RAW_QUERY_POINTS
 from .progress import JobProgress
@@ -705,11 +706,14 @@ class EnergieDashboardService:
         cached = read_cache.memo.get(memo_key)
         if cached is not None:
             return cached
+        entity = self.deps.index.get_entity(entity_id)
+        # Wh/MWh-Zähler werden hier nach kWh umgerechnet; alles andere (kWh, %, Preise) bleibt unverändert.
+        scale = energy_unit_scale(entity["unit"]) if entity is not None else 1.0
         result = query_mod.query_series(
             self.deps.data_dir, self.deps.index, entity_id, range_key,
             self.deps.tz, now, offset=offset, read_cache=read_cache, continuous=continuous,
         )
-        series = {p["ts"]: (p["value"] or 0.0) for p in result["points"]}
+        series = {p["ts"]: (p["value"] or 0.0) * scale for p in result["points"]}
         finer_range = _FINER_RANGE.get(range_key)
         if not continuous and offset == 0 and finer_range and series:
             # Letzten (noch laufenden) Bucket durch die feinere Aufschlüsselung
@@ -725,8 +729,7 @@ class EnergieDashboardService:
             if max(series) >= finer_result["window_start"]:
                 del series[max(series)]
             for point in finer_result["points"]:
-                series[point["ts"]] = point["value"] or 0.0
-        entity = self.deps.index.get_entity(entity_id)
+                series[point["ts"]] = (point["value"] or 0.0) * scale
         stale = True
         if entity is not None and entity["last_ts"]:
             stale = (now.timestamp() - entity["last_ts"]) > STALE_SECONDS
@@ -1274,7 +1277,7 @@ class EnergieDashboardService:
             entity = self.deps.index.get_entity(entity_id)
             if entity is None:
                 continue
-            if entity["unit"] and entity["unit"] != "kWh":
+            if entity["unit"] and entity["unit"] not in ENERGY_UNITS:
                 unit_issues.append(f"{label} ({entity['unit']})")
             if entity["aggregation_type"] != "counter":
                 type_issues.append(label)
@@ -1440,10 +1443,14 @@ class EnergieDashboardService:
             entity = self.deps.index.get_entity(entity_id)
             if entity is None or entity["aggregation_type"] != "counter" or not entity["hourly_rollup"]:
                 return None
-            energy_hourly = query_mod.query_hourly_counter_series(
-                self.deps.data_dir, self.deps.index, entity_id, window_start, window_end,
-                self.deps.tz, now, read_cache,
-            )
+            energy_scale = energy_unit_scale(entity["unit"])
+            energy_hourly = {
+                ts: value * energy_scale
+                for ts, value in query_mod.query_hourly_counter_series(
+                    self.deps.data_dir, self.deps.index, entity_id, window_start, window_end,
+                    self.deps.tz, now, read_cache,
+                ).items()
+            }
             if not energy_hourly:
                 return None
             erwartet = sum(entity_series(entity_id)[0].values())
@@ -1884,13 +1891,15 @@ class EnergieDashboardService:
                 return sum(values) / len(values) if values else None
             buckets: dict[float, float] = {}
             with_data: set[float] = set()
+            anomalie_entity = self.deps.index.get_entity(entity_id)
+            anomalie_scale = energy_unit_scale(anomalie_entity["unit"]) if anomalie_entity is not None else 1.0
             for coarse_offset in coarse_offsets:
                 result = query_mod.query_series(
                     self.deps.data_dir, self.deps.index, entity_id, anomalie_coarser,
                     self.deps.tz, now, offset=coarse_offset, read_cache=read_cache,
                 )
                 for point in result["points"]:
-                    buckets[point["ts"]] = point["value"] or 0.0
+                    buckets[point["ts"]] = (point["value"] or 0.0) * anomalie_scale
                     if point["value"] is not None:
                         with_data.add(point["ts"])
             # round() wie _series_total(), damit beide Wege bis auf die letzte
@@ -3450,10 +3459,14 @@ class EnergieDashboardService:
                 # gemeldet, hier einfach ignorieren statt falsche Zähler-
                 # Delta-Logik auf Rohwerte anzuwenden.
                 return {}
-            return query_mod.query_hourly_counter_series(
-                self.deps.data_dir, self.deps.index, entity_id, window_start, window_end,
-                self.deps.tz, now, read_cache,
-            )
+            scale = energy_unit_scale(entity["unit"])
+            return {
+                ts: value * scale
+                for ts, value in query_mod.query_hourly_counter_series(
+                    self.deps.data_dir, self.deps.index, entity_id, window_start, window_end,
+                    self.deps.tz, now, read_cache,
+                ).items()
+            }
 
         speicher_list = config.get("speicher") or []
         netzbezug_series = hourly(config.get("netzbezug"))

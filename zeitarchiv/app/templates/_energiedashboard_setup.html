@@ -533,7 +533,7 @@
               <div class="field"><label>{{ _("Name") }}</label><input type="text" x-model="draft.netzbezugName" placeholder="{{ _('Netzbezug') }}" maxlength="40"></div>
               <div class="field">
                 <label>{{ _("Entität *") }} {{ hint_button(_('Netzbezug-Entität')) }}</label>
-                {{ entity_field('netzbezug_draft', 'draft.netzbezug', "(id) => { draft.netzbezug = id; }", allow_units=['kWh'], require_counter=true) }}
+                {{ entity_field('netzbezug_draft', 'draft.netzbezug', "(id) => { draft.netzbezug = id; }", allow_units=['kWh', 'Wh'], require_counter=true) }}
                 {% call hint_body() %}{{ _('Zähler „aus dem Netz bezogene Energie" (kWh, steigend).') }}{% endcall %}
               </div>
             </div>
@@ -554,7 +554,7 @@
               <div class="field"><label>{{ _("Name") }}</label><input type="text" x-model="draft.einspeisungName" placeholder="{{ _('Einspeisung') }}" maxlength="40"></div>
               <div class="field">
                 <label>{{ _("Entität") }} {{ hint_button(_('Einspeisung-Entität')) }}</label>
-                {{ entity_field('einspeisung_draft', 'draft.einspeisung', "(id) => { draft.einspeisung = id; }", allow_units=['kWh'], require_counter=true) }}
+                {{ entity_field('einspeisung_draft', 'draft.einspeisung', "(id) => { draft.einspeisung = id; }", allow_units=['kWh', 'Wh'], require_counter=true) }}
                 {% call hint_body() %}{{ _('Zähler „ins Netz eingespeiste Energie" (kWh, steigend).') }}{% endcall %}
               </div>
             </div>
@@ -612,7 +612,7 @@
                     <div class="field"><label>{{ _("Name") }}</label><input type="text" x-model="draftRow.name" placeholder="{{ _('Name') }}" maxlength="40"></div>
                     <div class="field">
                       <label>{{ _("Entität") }} {{ hint_button(_('Erzeuger-Entität')) }}</label>
-                      {{ entity_field('erzeuger_entity_id_draft', 'draftRow.entity_id', "(id) => { draftRow.entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
+                      {{ entity_field('erzeuger_entity_id_draft', 'draftRow.entity_id', "(id) => { draftRow.entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh', 'Wh'], require_counter=true) }}
                       {% call hint_body() %}{{ _('Zähler „von diesem Erzeuger produzierte Energie" (kWh, steigend).') }}{% endcall %}
                     </div>
                     <div class="field">
@@ -687,12 +687,12 @@
                     <div class="field"><label>{{ _("Name") }}</label><input type="text" x-model="draftRow.name" placeholder="{{ _('z. B. Hausspeicher') }}" maxlength="40"></div>
                     <div class="field">
                       <label>{{ _("Entladung") }} {{ hint_button(_('Entladung')) }}</label>
-                      {{ entity_field('speicher_entladen_entity_id_draft', 'draftRow.entladen_entity_id', "(id) => { draftRow.entladen_entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
+                      {{ entity_field('speicher_entladen_entity_id_draft', 'draftRow.entladen_entity_id', "(id) => { draftRow.entladen_entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh', 'Wh'], require_counter=true) }}
                       {% call hint_body() %}{{ _('Zähler „aus dem Speicher entnommene Energie" (kWh, steigend).') }}{% endcall %}
                     </div>
                     <div class="field">
                       <label>{{ _("Ladung") }} {{ hint_button(_('Ladung')) }}</label>
-                      {{ entity_field('speicher_laden_entity_id_draft', 'draftRow.laden_entity_id', "(id) => { draftRow.laden_entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
+                      {{ entity_field('speicher_laden_entity_id_draft', 'draftRow.laden_entity_id', "(id) => { draftRow.laden_entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh', 'Wh'], require_counter=true) }}
                       {% call hint_body() %}{{ _('Zähler „in den Speicher geladene Energie" (kWh, steigend).') }}{% endcall %}
                     </div>
                     <div class="field">
@@ -781,7 +781,7 @@
                     <div class="field"><label>{{ _("Name") }}</label><input type="text" x-model="draftRow.name" placeholder="{{ _('Name') }}" maxlength="40"></div>
                     <div class="field">
                       <label>{{ _("Entität") }} {{ hint_button(_('Verbraucher-Entität')) }}</label>
-                      {{ entity_field('verbraucher_entity_id_draft', 'draftRow.entity_id', "(id) => { draftRow.entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh'], require_counter=true) }}
+                      {{ entity_field('verbraucher_entity_id_draft', 'draftRow.entity_id', "(id) => { draftRow.entity_id = id; if (!draftRow.name) draftRow.name = nameFor(id); }", allow_units=['kWh', 'Wh'], require_counter=true) }}
                       {% call hint_body() %}{{ _('Zähler „von diesem Verbraucher verbrauchte Energie" (kWh, steigend).') }}{% endcall %}
                     </div>
                     <div class="field" x-data="{open: false}" @click.outside="open = false">
