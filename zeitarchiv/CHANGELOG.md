@@ -14,6 +14,8 @@
 
 ### New
 
+- **Energy dashboard**
+  - Meters in Wh can be assigned to the roles (grid, feed-in, generation, storage, consumers); values are shown in kWh
 - **Import**
   - CSV and Symcon import: new option “Fill archive gaps” adds only missing timestamps to months that already exist; existing values stay unchanged
 

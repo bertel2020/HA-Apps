@@ -14,6 +14,8 @@
 
 ### Neu
 
+- **Energiedashboard**
+  - Zähler in Wh lassen sich den Rollen zuordnen (Netz, Einspeisung, Erzeuger, Speicher, Verbraucher); die Werte erscheinen in kWh
 - **Import**
   - CSV- und Symcon-Import: neue Option „Archivlücken füllen“ ergänzt in bereits vorhandenen Monaten nur fehlende Zeitstempel; vorhandene Werte bleiben unverändert
 
