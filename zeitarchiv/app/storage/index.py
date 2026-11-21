@@ -1936,6 +1936,21 @@ class Index:
             ).fetchall()
             return [dict(row) for row in rows]
 
+    def discard_stale_ingest_claims(self, created_before: float) -> list[str]:
+        """Verwirft offene Claims, die vor ``created_before`` angelegt wurden, und gibt die betroffenen Entitäten
+        zurück. Ein Claim ohne zugehörigen Datensatz entspricht keinem Claim: eine späte Wiederholung wird dann
+        ganz normal geschrieben statt als Duplikat verworfen."""
+        with self._lock, self._conn:
+            rows = self._conn.execute(
+                "SELECT DISTINCT entity_id FROM ingested_events WHERE status = 'processing' AND created_at < ?",
+                (created_before,),
+            ).fetchall()
+            self._conn.execute(
+                "DELETE FROM ingested_events WHERE status = 'processing' AND created_at < ?",
+                (created_before,),
+            )
+            return sorted(row["entity_id"] for row in rows)
+
     def prune_ingested_events(self, completed_before: float) -> int:
         """Begrenzt die Idempotenz-Tabelle auf das relevante Retry-Fenster."""
         with self._lock, self._conn:

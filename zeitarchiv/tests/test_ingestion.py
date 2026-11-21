@@ -560,6 +560,31 @@ def test_recovery_warns_about_old_processing_claim_with_age() -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_recovery_discards_claims_older_than_the_retention_window() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-ingestion-stale-claim-"))
+    index = Index(tmp / "index.sqlite")
+    stale, recent = _event("stale-open-claim"), _event("recent-open-claim")
+    try:
+        configure_logging("debug", "off")
+        index.get_or_create_entity(stale.entity_id, stale.domain, stale.state_class, stale.unit)
+        for event, age in ((stale, 8 * 24 * 3600), (recent, 600)):
+            index.claim_ingest_event(event.event_id, event.entity_id, event.ts)
+            with index._lock, index._conn:
+                index._conn.execute(
+                    "UPDATE ingested_events SET created_at = ? WHERE event_id = ?",
+                    (time.time() - age, event.event_id),
+                )
+        service = IngestionService(tmp, index, ZoneInfo("UTC"))
+        assert service.recover_pending() == 0
+        assert [c["event_id"] for c in index.list_processing_ingest_events()] == [recent.event_id]
+        assert any("event=ingest_pending_discarded" in line for line in local_log_lines(search="ingest_pending_discarded", limit=20))
+        # Eine späte Wiederholung wird normal geschrieben, nicht als Duplikat verworfen.
+        assert index.claim_ingest_event(stale.event_id, stale.entity_id, stale.ts)["is_new"] is True
+    finally:
+        index.close()
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_legacy_event_id_is_stable_and_content_sensitive() -> None:
     first = {"entity_id": "sensor.temp", "ts": 1.0, "value": 21.4}
     reordered = {"value": 21.4, "ts": 1.0, "entity_id": "sensor.temp"}

@@ -285,7 +285,7 @@ class IngestionService:
         )
         old_claims = [
             claim for claim in claims
-            if now - float(claim.get("created_at") or now) >= _PENDING_WARNING_SECONDS
+            if _PENDING_WARNING_SECONDS <= now - float(claim.get("created_at") or now) < _IDEMPOTENCY_RETENTION_SECONDS
         ]
         if old_claims:
             logger.warning(
@@ -317,6 +317,17 @@ class IngestionService:
                         claim["entity_id"],
                         claim["event_id"][:12],
                     )
+        # Was nach der Aufbewahrungsfrist der Idempotenz-Tabelle noch offen ist, wurde nie geschrieben (sonst hätte
+        # die Suche oben es gefunden) und wird auch nicht mehr wiederholt: der Claim wird verworfen, damit er nicht
+        # bei jedem Start erneut gemeldet wird.
+        discarded = self._index.discard_stale_ingest_claims(time.time() - _IDEMPOTENCY_RETENTION_SECONDS)
+        if discarded:
+            logger.warning(
+                "Alte offene Ingest-Claims ohne Datensatz verworfen · event=ingest_pending_discarded "
+                "entities=%d entity_ids=%s",
+                len(discarded),
+                ",".join(discarded[:10]) + ("…" if len(discarded) > 10 else ""),
+            )
         pruned = self._index.prune_ingested_events(
             time.time() - _IDEMPOTENCY_RETENTION_SECONDS
         )
