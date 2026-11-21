@@ -828,35 +828,51 @@ def repair_pending(data_dir: Path, index, tz: ZoneInfo) -> int:
     Idempotent. Gibt die Zahl der Monate zurück."""
     repaired = 0
     for marker in sorted((data_dir / "archive").glob(f"*/*{PENDING_SUFFIX}")):
-        entity = index.get_entity(marker.parent.name)
+        # Ein Fehler bei einer Entität darf die übrigen nicht blockieren; der Marker bleibt stehen,
+        # der nächste Start versucht es erneut.
         try:
-            year, month = int(marker.stem[:4]), int(marker.stem[5:7])
-        except ValueError:
+            entity = index.get_entity(marker.parent.name)
+            try:
+                year, month = int(marker.stem[:4]), int(marker.stem[5:7])
+            except ValueError:
+                marker.unlink(missing_ok=True)
+                continue
+            if entity is not None:
+                archive_path = marker.with_suffix(".parquet")
+                hourly = bool(entity["hourly_rollup"])
+                if archive_path.exists():
+                    replace_month(
+                        data_dir, entity["entity_id"], entity["aggregation_type"], pq.read_table(archive_path),
+                        year, month, tz, hourly_rollup=hourly,
+                    )
+                else:
+                    remove_month(
+                        data_dir, entity["entity_id"], entity["aggregation_type"], year, month, tz,
+                        hourly_rollup=hourly,
+                    )
             marker.unlink(missing_ok=True)
-            continue
-        if entity is not None:
-            archive_path = marker.with_suffix(".parquet")
-            hourly = bool(entity["hourly_rollup"])
-            if archive_path.exists():
-                replace_month(
-                    data_dir, entity["entity_id"], entity["aggregation_type"], pq.read_table(archive_path),
-                    year, month, tz, hourly_rollup=hourly,
-                )
-            else:
-                remove_month(
-                    data_dir, entity["entity_id"], entity["aggregation_type"], year, month, tz, hourly_rollup=hourly,
-                )
-        marker.unlink(missing_ok=True)
-        repaired += 1
-    for marker in sorted((data_dir / "archive").glob(f"*/{REBUILD_MARKER}")):
-        entity = index.get_entity(marker.parent.name)
-        if entity is not None:
-            rebuild_entity_rollups(
-                data_dir, entity["entity_id"], entity["aggregation_type"], tz,
-                hourly_rollup=bool(entity["hourly_rollup"]),
+            repaired += 1
+        except Exception:
+            logger.exception(
+                "Rollup-Reparatur eines Monats fehlgeschlagen, Marker bleibt · "
+                "event=pending_rollup_month_repair_failed entity_id=%s marker=%s",
+                marker.parent.name, marker.name,
             )
-        marker.unlink(missing_ok=True)
-        repaired += 1
+    for marker in sorted((data_dir / "archive").glob(f"*/{REBUILD_MARKER}")):
+        try:
+            entity = index.get_entity(marker.parent.name)
+            if entity is not None:
+                rebuild_entity_rollups(
+                    data_dir, entity["entity_id"], entity["aggregation_type"], tz,
+                    hourly_rollup=bool(entity["hourly_rollup"]),
+                )
+            marker.unlink(missing_ok=True)
+            repaired += 1
+        except Exception:
+            logger.exception(
+                "Rollup-Neuaufbau fehlgeschlagen, Marker bleibt · "
+                "event=pending_rollup_rebuild_failed entity_id=%s", marker.parent.name,
+            )
     repaired += _rebuild_empty_rollup_files(data_dir, index, tz)
     # Reste abgebrochener Neuaufbauten (Staging-Ordner); beim Start läuft kein Neuaufbau.
     for leftover in data_dir.glob(".*-type-rebuild-*"):
@@ -890,10 +906,17 @@ def _rebuild_empty_rollup_files(data_dir: Path, index, tz: ZoneInfo) -> int:
             "event=empty_rollup_rebuilt entity_id=%s files=%d",
             entity["entity_id"], len(empty),
         )
-        rebuild_entity_rollups(
-            data_dir, entity["entity_id"], entity["aggregation_type"], tz,
-            hourly_rollup=bool(entity["hourly_rollup"]),
-        )
+        try:
+            rebuild_entity_rollups(
+                data_dir, entity["entity_id"], entity["aggregation_type"], tz,
+                hourly_rollup=bool(entity["hourly_rollup"]),
+            )
+        except Exception:
+            logger.exception(
+                "Neuaufbau wegen leerer Rollup-Datei fehlgeschlagen · "
+                "event=empty_rollup_rebuild_failed entity_id=%s", entity["entity_id"],
+            )
+            continue
         rebuilt += 1
     return rebuilt
 

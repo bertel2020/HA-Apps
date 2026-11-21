@@ -612,6 +612,36 @@ def test_empty_rollup_file_is_rebuilt_from_the_archive_at_startup(env) -> None:
     assert rollup.repair_pending(tmp, index, TZ) == 0  # idempotent
 
 
+def test_repair_continues_with_other_entities_when_one_fails(env, monkeypatch, caplog) -> None:
+    from app.storage import rollup
+
+    tmp, index = env
+    base = _ts(2024, 7, 5, 8)
+    table = pa.table({"ts": [base, base + 60], "value": [1.0, 3.0]})
+    for entity_id in ("sensor.a", "sensor.b"):
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "W")
+        archive_dir = tmp / "archive" / entity_id
+        archive_dir.mkdir(parents=True)
+        pq.write_table(table, archive_dir / "2024-07.parquet")
+        (archive_dir / "2024-07.rollup-pending").touch()
+
+    real_replace = rollup.replace_month
+
+    def flaky(data_dir, entity_id, *args, **kwargs):
+        if entity_id == "sensor.a":
+            raise OSError("kaputtes Rollup")
+        return real_replace(data_dir, entity_id, *args, **kwargs)
+
+    monkeypatch.setattr(rollup, "replace_month", flaky)
+    assert rollup.repair_pending(tmp, index, TZ) == 1
+    assert (tmp / "archive" / "sensor.a" / "2024-07.rollup-pending").exists()  # bleibt für den nächsten Start
+    assert not (tmp / "archive" / "sensor.b" / "2024-07.rollup-pending").exists()
+    assert any("sensor.a" in r.getMessage() for r in caplog.records)
+
+    monkeypatch.setattr(rollup, "replace_month", real_replace)
+    assert rollup.repair_pending(tmp, index, TZ) == 1
+
+
 def test_collect_gathers_several_filters_in_one_pass() -> None:
     start = 1_700_000_000.0
     rows = [(start + i * 60.0, 20.0 + (i % 5) * 0.1) for i in range(60)]
