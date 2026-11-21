@@ -184,6 +184,12 @@
     <span>{{ _("Werte sind Summen je Zeitraum (z. B. Monatserträge) — als laufenden Zählerstand speichern") }}</span>
   </label>
 
+  <label class="csv-include-existing" style="display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:calc(13px * var(--font-scale, 1));">
+    <input type="checkbox" name="include_existing_months"{% if include_existing_months %} checked{% endif %}
+           hx-post="import/csv/preview" hx-include="#csv-form" hx-target="#csv-section" hx-swap="outerHTML">
+    <span>{{ _("Archivlücken füllen") }} &mdash; {{ _("Füllt in abgeschlossenen Monatsarchiven ausschließlich fehlende Zeitstempel. Vorhandene Werte bleiben unverändert. Betroffene Monatsarchive und Rollups werden anschließend neu aufgebaut. Für den laufenden Monat ist die Option nicht nötig.") }}</span>
+  </label>
+
   <div class="csv-action-row">
     <div class="field">
       <label>{{ _("Entität") }}</label>

@@ -10,6 +10,13 @@
 >
 > 🇩🇪 [Änderungen auf Deutsch](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md)
 
+## Unreleased
+
+### New
+
+- **Import**
+  - CSV import: new option “Fill archive gaps” adds only missing timestamps to months that already exist; existing values stay unchanged
+
 ## 1.56.0 - 2026-11-20
 
 ### New

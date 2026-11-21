@@ -10,6 +10,13 @@
 >
 > 🇬🇧 [English version](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md)
 
+## Unreleased
+
+### Neu
+
+- **Import**
+  - CSV-Import: neue Option „Archivlücken füllen“ ergänzt in bereits vorhandenen Monaten nur fehlende Zeitstempel; vorhandene Werte bleiben unverändert
+
 ## 1.56.0 - 2026-11-20
 
 ### Neu

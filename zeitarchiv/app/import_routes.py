@@ -1410,6 +1410,7 @@ class ImportService:
         custom_pattern: str = "",
         entity_id: str = "",
         cumulate: bool = False,
+        include_existing_months: bool = False,
         extra_mappings: list[dict] | None = None,
     ) -> dict:
         entity_rows = self.deps.index.list_entities()
@@ -1486,6 +1487,7 @@ class ImportService:
             "custom_pattern": custom_pattern,
             "entity_id": entity_id,
             "cumulate": cumulate,
+            "include_existing_months": include_existing_months,
             "extra_mappings": extra_mappings or [],
         }
 
@@ -1494,6 +1496,10 @@ class ImportService:
     @staticmethod
     def _csv_cumulate(form) -> bool:
         return form.get("cumulate") == "on"
+
+    @staticmethod
+    def _csv_include_existing(form) -> bool:
+        return form.get("include_existing_months") == "on"
 
 
 
@@ -2689,6 +2695,7 @@ class ImportService:
             form = await request.form()
             delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, entity_id = self._csv_form_params(form)
             cumulate = self._csv_cumulate(form)
+            include_existing_months = self._csv_include_existing(form)
             extra_mappings = self._csv_extra_mappings(form)
             if form.get("add_extra"):
                 extra_mappings.append({"col": min(value_col + 1, 99), "entity_id": ""})
@@ -2706,6 +2713,7 @@ class ImportService:
                         custom_pattern=custom_pattern,
                         entity_id=entity_id,
                         cumulate=cumulate,
+                        include_existing_months=include_existing_months,
                         extra_mappings=extra_mappings,
                     )
 
@@ -2728,6 +2736,7 @@ class ImportService:
             form = await request.form()
             delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, entity_id = self._csv_form_params(form)
             cumulate = self._csv_cumulate(form)
+            include_existing_months = self._csv_include_existing(form)
             pairs, pair_error = self._csv_pairs(value_col, entity_id, self._csv_extra_mappings(form))
             plans: list[symcon_import.ImportPlan] = []
             errors: list[str] = []
@@ -2758,6 +2767,7 @@ class ImportService:
                                 source_label=_csv_source_label(path, columns, col, len(pairs)),
                                 skipped_rows=parsed.skipped, accepts_state=True,
                                 skipped_examples=parsed.skipped_examples,
+                                include_existing_months=include_existing_months,
                             )
                         if dry_mapper is not None:
                             plan.new_states = dry_mapper.new_states
@@ -2823,6 +2833,7 @@ class ImportService:
             form = await request.form()
             delimiter, has_header, ts_col, value_col, ts_format, custom_pattern, entity_id = self._csv_form_params(form)
             cumulate = self._csv_cumulate(form)
+            include_existing_months = self._csv_include_existing(form)
             source_path = self._csv_uploaded_path()
             extra_mappings = self._csv_extra_mappings(form)
             pairs, pair_error = self._csv_pairs(value_col, entity_id, extra_mappings)
@@ -2865,6 +2876,7 @@ class ImportService:
                             "timestamp_column": ts_col,
                             "value_column": value_col,
                             "cumulate": cumulate,
+                            "include_existing_months": include_existing_months,
                             "extra_mappings": [
                                 {"value_column": m["col"], "entity_id": m["entity_id"]} for m in extra_mappings
                             ],
@@ -2927,6 +2939,7 @@ class ImportService:
                                 skipped_rows=parsed.skipped,
                                 on_month_done=lambda label, _anzahl: self._csv_progress.advance(detail=label),
                                 accepts_state=True,
+                                include_existing_months=include_existing_months,
                             )
                             reconciliation_report = self.deps.run_storage_reconciliation(entity_ids=[target], repair=True)
                         results.append(result)

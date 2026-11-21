@@ -78,3 +78,22 @@ def test_import_refuses_a_row_without_entity_and_repeated_entities(client) -> No
     assert "Bitte für jede Spalte eine Ziel-Entität auswählen." in leer
     doppelt = client.post("/import/csv/start", data={**base, "extra_col": "2", "extra_entity": "sensor.mc_pv"}).text
     assert "Jede Ziel-Entität darf nur einmal vorkommen." in doppelt
+
+
+def test_include_existing_months_fills_gaps_in_an_archived_month(client) -> None:
+    """Ohne die Option überspringt der CSV-Import einen vorhandenen Monat, mit ihr ergänzt er nur fehlende Zeitstempel."""
+    index.get_or_create_entity("sensor.mc_gap", "sensor", "total_increasing", "kWh")
+    data = {**FORM, "value_col": "1", "entity_id": "sensor.mc_gap"}
+    _upload(client, "Zeitraum;PV\n15.01.2026;10\n")
+    client.post("/import/csv/start", data=data)
+    _wait_for_result(client, "sensor.mc_gap")
+    assert index.get_entity("sensor.mc_gap")["row_count"] == 1
+
+    _upload(client, "Zeitraum;PV\n15.01.2026;10\n16.01.2026;11\n")
+    client.post("/import/csv/start", data=data)
+    _wait_for_result(client, "sensor.mc_gap")
+    assert index.get_entity("sensor.mc_gap")["row_count"] == 1
+
+    client.post("/import/csv/start", data={**data, "include_existing_months": "on"})
+    _wait_for_result(client, "sensor.mc_gap")
+    assert index.get_entity("sensor.mc_gap")["row_count"] == 2
