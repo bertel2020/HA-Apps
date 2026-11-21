@@ -20,7 +20,7 @@ def test_hint_describes_the_zip_upload_flow_without_bind_mount() -> None:
 
 
 def test_hint_describes_non_destructive_merge_precisely() -> None:
-    assert "Bestehende Monatsarchive werden nicht verändert" in SOURCE
+    assert "Bestehende Monatsarchive werden nur mit „Archivlücken füllen“ ergänzt" in SOURCE
     assert "nur noch nicht vorhandene Zeitstempel" in SOURCE
     assert "Rollups automatisch" in SOURCE
     assert "ein neuer ZIP-Upload ersetzt sie vollständig" in SOURCE

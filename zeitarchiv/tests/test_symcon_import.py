@@ -769,3 +769,37 @@ def _run_all() -> None:
 
 if __name__ == "__main__":
     _run_all()
+
+
+def test_import_variable_fills_gaps_in_an_existing_month_only_with_the_option() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="zeitarchiv-symcon-test-"))
+    try:
+        index = Index(tmp / "index.sqlite")
+        entity_id = "sensor.symcon_luecke"
+        index.get_or_create_entity(entity_id, "sensor", "measurement", "°C")
+        index.record_write(entity_id, _ts(2024, 8, 5))
+        source = tmp / "symcon"
+        _write_csv(source / "2024" / "06" / "50003.csv", [(_ts(2024, 6, 10), 20.0)])
+        variable = symcon_import.scan_source(source)[0]
+        symcon_import.import_variable(tmp, index, variable, entity_id, TZ)
+
+        _write_csv(source / "2024" / "06" / "50003.csv", [(_ts(2024, 6, 10), 99.0), (_ts(2024, 6, 11), 21.0)])
+        variable = symcon_import.scan_source(source)[0]
+        archive_path = tmp / "archive" / entity_id / "2024-06.parquet"
+
+        plan = symcon_import.plan_import(tmp, index, variable, entity_id, TZ)
+        assert plan.months_to_skip == ["2024-06"] and plan.months_to_update == []
+        symcon_import.import_variable(tmp, index, variable, entity_id, TZ)
+        assert pq.read_table(archive_path).num_rows == 1
+
+        plan = symcon_import.plan_import(tmp, index, variable, entity_id, TZ, include_existing_months=True)
+        assert plan.months_to_update == ["2024-06"] and plan.rows_to_update == 1
+        result = symcon_import.import_variable(tmp, index, variable, entity_id, TZ, include_existing_months=True)
+        assert result.rows_updated == 1
+        table = pq.read_table(archive_path)
+        assert sorted(zip(table.column("ts").to_pylist(), table.column("value").to_pylist())) == [
+            (_ts(2024, 6, 10), 20.0), (_ts(2024, 6, 11), 21.0),
+        ]
+        index.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)

@@ -1030,7 +1030,8 @@ class ImportService:
 
 
     def _run_import_background(self,
-        mapped: list[tuple[symcon_import.SymconVariable, str, float]]
+        mapped: list[tuple[symcon_import.SymconVariable, str, float]],
+        include_existing_months: bool = False,
     ) -> None:
         """Startet Planung und Schreibvorgang komplett im Hintergrund-Thread, damit
         /import/start sofort zurückkehrt — schon plan_import() liest für jede
@@ -1050,6 +1051,7 @@ class ImportService:
             target_units[target] = entity["unit"] if entity is not None else None
         configuration = {
             "settings_imported": bool(names),
+            "include_existing_months": include_existing_months,
             "mappings": [
                 {
                     "variable_id": variable.variable_id,
@@ -1090,8 +1092,11 @@ class ImportService:
                     plan = symcon_import.plan_import(
                         self.deps.data_dir, self.deps.index, variable, target_entity_id, self.deps.tz, factor=factor,
                         associations=self._symcon_associations(variable.variable_id),
+                        include_existing_months=include_existing_months,
                     )
-                    total_months += len(plan.months_to_import) + len(plan.months_to_merge)
+                    total_months += (
+                        len(plan.months_to_import) + len(plan.months_to_merge) + len(plan.months_to_update)
+                    )
                 except ValueError:
                     pass  # scheitert gleich nochmal in der Import-Phase, landet dann in errors
                 plans.append((variable, target_entity_id, factor))
@@ -1122,6 +1127,7 @@ class ImportService:
                         on_month_done=on_month_done,
                         factor=factor,
                         associations=self._symcon_associations(variable.variable_id),
+                        include_existing_months=include_existing_months,
                     )
                     with self._import_progress.lock:
                         self._import_progress.results.append(result)
@@ -1290,7 +1296,9 @@ class ImportService:
 
 
 
-    def _run_dry_run(self, mapped: list[tuple[symcon_import.SymconVariable, str, float]]) -> dict:
+    def _run_dry_run(
+        self, mapped: list[tuple[symcon_import.SymconVariable, str, float]], include_existing_months: bool = False
+    ) -> dict:
         """Die Planung selbst, im Hintergrund-Thread (siehe import_dry_run()).
 
         Sperrreihenfolge wie überall im Modul: erst die Quellsperre, dann die
@@ -1318,6 +1326,7 @@ class ImportService:
                                 self.deps.tz,
                                 factor=factor,
                                 associations=self._symcon_associations(variable.variable_id),
+                                include_existing_months=include_existing_months,
                             )
                         )
                     except ValueError as exc:
@@ -2525,6 +2534,7 @@ class ImportService:
             1,7 Minuten. Die Anzeige zählt gegen dieselbe Zahl wie die
             Planungsphase des Imports, damit beide Schritte gleich aussehen."""
             form = await request.form()
+            include_existing_months = self._csv_include_existing(form)
 
             def einreihen() -> None:
                 # _mapped_variables() gehört in den Request-Thread, nicht in den
@@ -2534,7 +2544,7 @@ class ImportService:
                 with self._import_source_lock:
                     mapped = self._mapped_variables(form)
                 self._dry_run_progress.start(
-                    lambda: self._run_dry_run(mapped), logger
+                    lambda: self._run_dry_run(mapped, include_existing_months), logger
                 )
 
             try:
@@ -2582,6 +2592,8 @@ class ImportService:
             wird duplikatsicher im Hot Buffer ergänzt. Dieselbe Klassifizierung wie
             /import/dry-run hält Vorschau und Ergebnis deckungsgleich."""
             form = await request.form()
+            include_existing_months = self._csv_include_existing(form)
+
             def admit_import() -> None:
                 with self._import_admission_lock:
                     with self._upload_progress.lock:
@@ -2592,7 +2604,7 @@ class ImportService:
                         raise HTTPException(status_code=409, detail=tr("Ein Upload oder Scan läuft bereits"))
                     if not already_running:
                         with self._import_source_lock:
-                            self._run_import_background(self._mapped_variables(form))
+                            self._run_import_background(self._mapped_variables(form), include_existing_months)
 
             await run_in_threadpool(admit_import)
             return self.deps.templates.TemplateResponse(request, "_import_progress.html", self._import_progress_context())

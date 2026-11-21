@@ -43,7 +43,7 @@
         <li>{{ _("Variablen markieren und Home-Assistant-Entitäten zuordnen. Bei abweichenden Einheiten den Hinweis prüfen und bei Bedarf einen Umrechnungsfaktor angeben, danach Vorschau und Import starten.") }}</li>
       </ol>
       <p class="symcon-import-note">
-        {{ _("Bestehende Monatsarchive werden nicht verändert; im laufenden Hot Buffer ergänzt der Import nur noch nicht vorhandene Zeitstempel. Danach berechnet Zeitarchiv die Rollups automatisch neu. Unlesbare Dateien werden gekennzeichnet, Bool-Werte auf 1/0 normalisiert und reine Textvariablen nicht importiert. Die hochgeladenen Quelldaten bleiben bis „Quelldaten löschen“ gespeichert; ein neuer ZIP-Upload ersetzt sie vollständig.") }}
+        {{ _("Bestehende Monatsarchive werden nur mit „Archivlücken füllen“ ergänzt, dann nur um fehlende Zeitstempel; im laufenden Hot Buffer ergänzt der Import nur noch nicht vorhandene Zeitstempel. Danach berechnet Zeitarchiv die Rollups automatisch neu. Unlesbare Dateien werden gekennzeichnet, Bool-Werte auf 1/0 normalisiert und reine Textvariablen nicht importiert. Die hochgeladenen Quelldaten bleiben bis „Quelldaten löschen“ gespeichert; ein neuer ZIP-Upload ersetzt sie vollständig.") }}
       </p>
     </div>
 
@@ -102,6 +102,11 @@
           <button type="button" class="btn primary" hx-post="import/start" hx-include="#import-form" hx-target="#import-output" hx-swap="innerHTML" hx-disabled-elt="this">{{ _("Import starten") }}</button>
         </div>
       </div>
+
+      <label class="csv-include-existing" style="display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:calc(13px * var(--font-scale, 1));">
+        <input type="checkbox" name="include_existing_months">
+        <span>{{ _("Archivlücken füllen") }} &mdash; {{ _("Füllt in abgeschlossenen Monatsarchiven ausschließlich fehlende Zeitstempel. Vorhandene Werte bleiben unverändert. Betroffene Monatsarchive und Rollups werden anschließend neu aufgebaut. Für den laufenden Monat ist die Option nicht nötig.") }}</span>
+      </label>
 
       {% if rows %}
       {# Chips zeigen, was an der Zuordnung noch zu tun ist; „Ohne Namen“ nur mit geladener settings.json. #}

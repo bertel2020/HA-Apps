@@ -15,7 +15,7 @@
 ### New
 
 - **Import**
-  - CSV import: new option “Fill archive gaps” adds only missing timestamps to months that already exist; existing values stay unchanged
+  - CSV and Symcon import: new option “Fill archive gaps” adds only missing timestamps to months that already exist; existing values stay unchanged
 
 ## 1.56.0 - 2026-11-20
 

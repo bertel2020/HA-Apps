@@ -15,7 +15,7 @@
 ### Neu
 
 - **Import**
-  - CSV-Import: neue Option „Archivlücken füllen“ ergänzt in bereits vorhandenen Monaten nur fehlende Zeitstempel; vorhandene Werte bleiben unverändert
+  - CSV- und Symcon-Import: neue Option „Archivlücken füllen“ ergänzt in bereits vorhandenen Monaten nur fehlende Zeitstempel; vorhandene Werte bleiben unverändert
 
 ## 1.56.0 - 2026-11-20
 

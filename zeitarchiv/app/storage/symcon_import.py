@@ -754,6 +754,7 @@ def plan_import(
     tz: ZoneInfo,
     factor: float = 1.0,
     associations: dict[int, str] | None = None,
+    include_existing_months: bool = False,
 ) -> ImportPlan:
     """Dry Run: berechnet, was import_variable() tun würde, ohne etwas zu
     schreiben (Konzept Abschnitt 03) — beliebig oft wiederholbar. Dünner
@@ -767,6 +768,7 @@ def plan_import(
         plan = plan_import_rows(
             data_dir, index, rows, entity_id, tz,
             source_label=variable.variable_id, skipped_rows=variable.skipped_rows, accepts_state=True,
+            include_existing_months=include_existing_months,
         )
         plan.new_states = mapper.new_states
         plan.refused_state_rows = mapper.refused
@@ -781,6 +783,7 @@ def plan_import(
         source_label=variable.variable_id,
         skipped_rows=variable.skipped_rows,
         factor=factor,
+        include_existing_months=include_existing_months,
     )
 
 
@@ -903,6 +906,7 @@ def import_variable(
     on_month_done: Callable[[str, int], None] | None = None,
     factor: float = 1.0,
     associations: dict[int, str] | None = None,
+    include_existing_months: bool = False,
 ) -> ImportResult:
     """Importiert die Rohdaten einer Symcon-Variable in eine bestehende
     Zeitarchiv-Entität — dünner Wrapper um import_rows() (siehe dort), liest
@@ -914,6 +918,7 @@ def import_variable(
             data_dir, index, states[0], entity_id, tz,
             source_label=variable.variable_id, skipped_rows=variable.skipped_rows,
             on_month_done=on_month_done, accepts_state=True,
+            include_existing_months=include_existing_months,
         )
     return import_rows(
         data_dir,
@@ -925,6 +930,7 @@ def import_variable(
         skipped_rows=variable.skipped_rows,
         on_month_done=on_month_done,
         factor=factor,
+        include_existing_months=include_existing_months,
     )
 
 
