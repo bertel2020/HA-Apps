@@ -224,9 +224,13 @@ def _validate_entity_id_or_400(entity_id: str) -> None:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-def _table_aggregates(result: dict) -> dict[str, float | None]:
-    """Verdichtet eine Chart-Serie auf die sechs Tabellen-Aggregationen."""
+def _table_aggregates(result: dict, empty_is_none: bool = False) -> dict[str, float | None]:
+    """Verdichtet eine Chart-Serie auf die sechs Tabellen-Aggregationen.
+
+    ``empty_is_none``: ein Zeitraum ohne einen einzigen Wert liefert für Σ, Ø und
+    "Automatisch" ``None`` statt 0 (Tabellen: fehlende Werte nicht als 0 weiterrechnen)."""
     points = result["points"]
+    has_values = any(point["value"] is not None for point in points)
     total = sum((point["value"] or 0.0) for point in points)
     average = total / len(points) if points else 0.0
     minima = [
@@ -243,6 +247,8 @@ def _table_aggregates(result: dict) -> dict[str, float | None]:
     # Zuletzt erfasster Wert des Zeitraums (letzter Punkt mit Wert); bei Standard-
     # Linien trägt der Randpunkt am Fensteranfang den Wert auch ohne neue Messung.
     last_values = [point["value"] for point in points if point["value"] is not None]
+    if empty_is_none and not has_values:
+        automatic = average = total = None
     return {
         "last": last_values[-1] if last_values else None,
         "auto": automatic,
@@ -393,7 +399,7 @@ def _table_comparison_aggregates(result: dict) -> dict[str, float | None] | None
     comparison_points = result.get("comparison_points")
     if comparison_points is None:
         return None
-    return _table_aggregates({**result, "points": comparison_points})
+    return _table_aggregates({**result, "points": comparison_points}, empty_is_none=True)
 
 
 def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
@@ -1089,7 +1095,7 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     # Tabellen brauchen nur einen Skalar je Zelle. Die teils
                     # tausenden Chart-Punkte nicht als JSON zum Browser zu
                     # schicken spart Transfer und dortige Reduktion.
-                    "aggregates": _table_aggregates(result),
+                    "aggregates": _table_aggregates(result, empty_is_none=True),
                     # Fairer Vergleichswert für same_elapsed-Spalten (Vortag
                     # bis zur selben Uhrzeit statt der ganze Vortag) — None,
                     # wenn kein fairer Vergleich angefordert wurde.

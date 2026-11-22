@@ -18,6 +18,15 @@
   - Zähler in Wh lassen sich den Rollen zuordnen (Netz, Einspeisung, Erzeuger, Speicher, Verbraucher); die Werte erscheinen in kWh
 - **Import**
   - CSV- und Symcon-Import: neue Option „Archivlücken füllen“ ergänzt in bereits vorhandenen Monaten nur fehlende Zeitstempel; vorhandene Werte bleiben unverändert
+- **Tabellen**
+  - Neue Zeilenoption „In Σ-Spalte“ (Automatisch, Ja, Nein)
+    - „Ja“ addiert die Zellwerte der Zeile, auch bei Messwerten und Formeln; „Nein“ lässt die Zeile aus
+
+### Behoben
+
+- **Tabellen**
+  - Fehlende Werte werden nicht mehr als 0 gerechnet: ein Zeitraum ohne Daten zeigt „–“, und Formeln, die ihn verwenden, bleiben leer statt einen Scheinwert zu zeigen
+    - Zähler ohne Daten in einem Zeitraum zeigen jetzt „–“ statt 0; echte Nullwerte bleiben 0
 
 ## 1.56.0 - 2026-11-20
 

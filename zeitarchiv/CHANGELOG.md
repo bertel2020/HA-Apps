@@ -18,6 +18,15 @@
   - Meters in Wh can be assigned to the roles (grid, feed-in, generation, storage, consumers); values are shown in kWh
 - **Import**
   - CSV and Symcon import: new option “Fill archive gaps” adds only missing timestamps to months that already exist; existing values stay unchanged
+- **Tables**
+  - New row option “In Σ column” (Automatic, Yes, No)
+    - “Yes” adds up the cell values of the row, also for measurements and formulas; “No” leaves the row out
+
+### Fixed
+
+- **Tables**
+  - Missing values are no longer calculated as 0: a period without data shows “–”, and formulas that use it stay empty instead of showing a made-up result
+    - Counters without data in a period now show “–” instead of 0; real zeros stay 0
 
 ## 1.56.0 - 2026-11-20
 

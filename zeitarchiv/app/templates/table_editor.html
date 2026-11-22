@@ -289,6 +289,15 @@
                             <label class="dd-picker-row" x-show="row.row_type === 'formula'"><input type="checkbox" x-model="row.accent"><span>{{ _("Hervorheben") }}</span></label>
                             <label class="dd-picker-row" x-show="row.row_type === 'entity' || row.row_type === 'group'"><input type="checkbox" x-model="row.percent_of_total"><span>{{ _("% Anteil") }}</span></label>
                             <label class="dd-picker-row" x-show="row.row_type === 'entity' || row.row_type === 'group'"><input type="checkbox" x-model="row.hide_if_empty"><span>{{ _("Bei 0 ausblenden") }}</span></label>
+                            <label class="dd-picker-row" style="flex-wrap:wrap;gap:4px" x-show="row.row_type === 'entity' || row.row_type === 'group' || row.row_type === 'formula'"
+                                   data-tooltip="{{ _('Ob die Σ-Spalte die Werte dieser Zeile addiert: Automatisch wie bisher, Ja immer, Nein nie') }}">
+                              <span style="white-space:nowrap">{{ _("In Σ-Spalte") }}</span>
+                              <select x-model="row.sum_mode" @change="recomputeRowSums()" style="flex:1 1 100%;min-width:0">
+                                <option value="auto">{{ _("Automatisch") }}</option>
+                                <option value="yes">{{ _("Ja") }}</option>
+                                <option value="no">{{ _("Nein") }}</option>
+                              </select>
+                            </label>
                           </div>
                         </span>
                         <div class="tbl-row-move">

@@ -4627,6 +4627,7 @@ class _TableColumnBody(BaseModel):
 
 
 _TABLE_ROW_AGGREGATIONS = ("auto", "avg", "min", "max", "sum", "last")
+_TABLE_ROW_SUM_MODES = ("auto", "yes", "no")
 # Zeilenbeschriftung/Abschnittsname — dieselbe Zahl wie das maxlength-Attribut
 # des Felds in table_editor.html, hier zusätzlich serverseitig durchgesetzt
 # (ein Request kann das clientseitige maxlength umgehen).
@@ -4661,6 +4662,10 @@ class _TableRowBody(BaseModel):
     # Werts den prozentualen Anteil an der Summe aller Entität-/Gruppen-Zeilen
     # derselben Spalte (bis zur vorherigen Trennlinie).
     percent_of_total: bool = False
+    # Nur für row_type "entity"/"group"/"formula" relevant — Beitrag zur Σ-Spalte:
+    # "auto" (bisheriges Verhalten), "yes" (Zellwerte der Zeile addieren, egal welche
+    # Aggregation) oder "no" (Zeile bleibt in der Σ-Spalte leer).
+    sum_mode: str = "auto"
     # Nur für row_type "entity"/"group" relevant — blendet die Zeile aus,
     # wenn sie in ALLEN sichtbaren Spalten entweder keinen Wert oder 0 hat
     # (z. B. ein stillgelegtes Gerät), ohne dass man sie manuell über
@@ -4818,6 +4823,8 @@ def _validate_table_body(body: _SaveTableBody) -> None:
             raise HTTPException(status_code=400, detail=tr("Zeile \"{label}\" braucht Summe oder Durchschnitt", label=r.label))
         if r.aggregation not in _TABLE_ROW_AGGREGATIONS:
             raise HTTPException(status_code=400, detail=tr("Zeile \"{label}\" hat eine ungültige Aggregation", label=r.label))
+        if r.sum_mode not in _TABLE_ROW_SUM_MODES:
+            raise HTTPException(status_code=400, detail=tr("Zeile \"{label}\" hat eine ungültige Σ-Einstellung", label=r.label))
     if body.style.borders not in _TABLE_BORDER_OPTIONS:
         raise HTTPException(status_code=400, detail=tr("Ungültige Rahmen-Option"))
     if body.style.density not in _TABLE_DENSITY_OPTIONS:

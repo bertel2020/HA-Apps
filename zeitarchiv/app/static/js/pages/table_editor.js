@@ -288,7 +288,7 @@
         columns: INITIAL_COLUMNS.map(c => ({decimals: 'auto', year_over_year: false, hidden: false, group_label: '', heatmap: false, width: null, in_sum: true, ...c, uid: uid(), offset: Math.min(c.offset || 0, 0)})),
         rows: INITIAL_ROWS.map(r => ({
           formula_unit: '', aggregation: 'auto', hidden: false, show_label: false, accent: false,
-          percent_of_total: false, hide_if_empty: false, hide_line: false,
+          percent_of_total: false, hide_if_empty: false, hide_line: false, sum_mode: 'auto',
           ...r, uid: uid(), pickerOpen: false, typePickerOpen: false, aggPickerOpen: false, optsPickerOpen: false, search: '',
         })),
         style: {...DEFAULT_STYLE, ...INITIAL_STYLE},
@@ -347,7 +347,7 @@
         // Der Menü-Button selbst wird aktiv, sobald irgendeine enthaltene
         // Option an ist — sonst müsste man das Menü öffnen, um das zu sehen.
         rowOptionsActive(row) {
-          return !!(row.bold || row.show_label || row.accent || row.percent_of_total || row.hide_if_empty || row.hide_line);
+          return !!(row.bold || row.show_label || row.accent || row.percent_of_total || row.hide_if_empty || row.hide_line || (row.sum_mode && row.sum_mode !== 'auto'));
         },
 
         // Manuelle Spaltenbreite (col.width/style.label_col_width, per
@@ -539,7 +539,7 @@
           this.rows.push({
             uid: uid(), label: '', row_type: type, entity_ids: [], formula: '', formula_unit: '',
             aggregation: type === 'summary' ? 'sum' : 'auto', bold: false, hidden: false, show_label: false,
-            accent: false, percent_of_total: false, hide_if_empty: false, hide_line: false, ...(extra || {}),
+            accent: false, percent_of_total: false, hide_if_empty: false, hide_line: false, sum_mode: 'auto', ...(extra || {}),
             pickerOpen: false, typePickerOpen: false, aggPickerOpen: false, optsPickerOpen: false, search: '',
           });
           this.load();
@@ -822,7 +822,7 @@
           const plainRows = this.rows.map(r => ({
             row_type: r.row_type, entity_ids: r.entity_ids, formula: r.formula,
             formula_unit: r.formula_unit || '', aggregation: r.aggregation || 'auto',
-            percent_of_total: !!r.percent_of_total,
+            percent_of_total: !!r.percent_of_total, sum_mode: r.sum_mode || 'auto',
           }));
           let result;
           try {
@@ -928,7 +928,7 @@
           const cols = this.columns.map(c => ({hidden: !!c.hidden, in_sum: c.in_sum !== false}));
           const rows = this.rows.map(r => ({
             row_type: r.row_type, formula: r.formula, formula_unit: r.formula_unit || '',
-            aggregation: r.aggregation || 'auto', percent_of_total: !!r.percent_of_total,
+            aggregation: r.aggregation || 'auto', percent_of_total: !!r.percent_of_total, sum_mode: r.sum_mode || 'auto',
           }));
           const sums = TableCompute.computeRowSums(cols, rows, this._computedValues, this._summable);
           const bySums = {};
@@ -1001,6 +1001,7 @@
               accent: r.row_type === 'formula' ? !!r.accent : false,
               percent_of_total: (r.row_type === 'entity' || r.row_type === 'group') ? !!r.percent_of_total : false,
               hide_if_empty: (r.row_type === 'entity' || r.row_type === 'group') ? !!r.hide_if_empty : false,
+              sum_mode: (r.row_type === 'entity' || r.row_type === 'group' || r.row_type === 'formula') ? (r.sum_mode || 'auto') : 'auto',
             })),
             style: this.style,
           };
