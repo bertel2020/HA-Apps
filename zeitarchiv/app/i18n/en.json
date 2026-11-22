@@ -4928,6 +4928,7 @@
     "Stärke {bft} · {kmh} km/h": "Force {bft} · {kmh} km/h",
     "Das Tageslicht konnte nicht geladen werden.": "Daylight could not be loaded.",
     "{h} h {m} min": "{h} h {m} min",
+    "{d} d {h} h": "{d} d {h} h",
     "{n} min": "{n} min",
     "ab {time}": "from {time}",
     "Für diesen Tag liegen keine Werte vor.": "There are no values for this day.",
