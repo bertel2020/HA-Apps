@@ -64,6 +64,11 @@
   .seg-toggle button+button{border-left:1px solid var(--border);}
   .seg-toggle button.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
   .seg-toggle button:hover:not(.active){background:var(--surface);}
+  /* Handy: die Leiste füllt die Breite des Blocks und bricht lange Beschriftungen um, statt über den Rand zu ragen. */
+  @media (max-width:480px){
+    .seg-toggle{display:flex;max-width:100%;}
+    .seg-toggle button{flex:1 1 0;min-width:0;padding:7px 6px;white-space:normal;text-align:center;}
+  }
   .ha-import-config{display:flex;flex-direction:column;align-items:flex-start;gap:14px;margin-bottom:20px;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--surface-alt);}
   .ha-import-config-block{display:flex;flex-direction:column;align-items:flex-start;gap:6px;width:100%;}
   .ha-import-config-label,.ha-import-field>span:first-child{font-family:var(--font-display);font-size:calc(12.5px * var(--font-scale, 1));font-weight:600;color:var(--ink-faint);}
@@ -331,11 +336,12 @@
 
   /* Reiter, die den Symcon-Assistenten und den eigenen CSV-Import sauber
      getrennt auf derselben Import-Seite halten, statt sich zu vermischen. */
-  .import-tabs{display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+  .import-tabs{display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;}
+  .import-tabs::-webkit-scrollbar{display:none;}
   .import-tab-btn{
     font-family:var(--font-display);font-size:calc(13.5px * var(--font-scale, 1));font-weight:600;color:var(--ink-faint);
-    background:none;border:none;border-bottom:2px solid transparent;padding:10px 4px;margin-bottom:-1px;
-    cursor:pointer;
+    background:none;border:none;border-bottom:2px solid transparent;padding:10px 4px;margin-bottom:0;
+    cursor:pointer;flex:none;white-space:nowrap;
   }
   .import-tab-btn.active{color:var(--accent-line);border-bottom-color:var(--accent-line);}
   .import-tab-btn:hover:not(.active){color:var(--ink);}

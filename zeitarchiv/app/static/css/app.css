@@ -1989,15 +1989,18 @@ form.is-dirty .unsaved-save:hover:not(:disabled){opacity:.92;}
 }
 .entity-tabs::-webkit-scrollbar{display:none;}
 /* Pfeile an zu breiten Reiterzeilen (tabs-scroll.js): kleben am Rand und nehmen im Fluss keinen Platz ein (Breite 26 px, Außenabstand hebt Breite und gap auf; --tabs-gap = gap der Zeile). */
-.entity-tabs-arrow{
+.entity-tabs-arrow.entity-tabs-arrow{
   flex:none;position:sticky;z-index:3;align-self:stretch;width:26px;margin:0 calc(-26px - var(--tabs-gap, 22px)) 0 0;padding:0 0 2px;
   border:0;cursor:pointer;font:inherit;font-size:calc(20px * var(--font-scale, 1));line-height:1;color:var(--accent-line);
   background:linear-gradient(to right,var(--tabs-fade,var(--bg)) 60%,transparent);
 }
-.entity-tabs-arrow[hidden]{display:none;}
-.entity-tabs-arrow-left{left:calc(-1 * var(--tabs-pad, 0px));}
-.entity-tabs-arrow-right{right:calc(-1 * var(--tabs-pad, 0px));margin:0 0 0 calc(-26px - var(--tabs-gap, 22px));text-align:right;background:linear-gradient(to left,var(--tabs-fade,var(--bg)) 60%,transparent);}
+.entity-tabs-arrow.entity-tabs-arrow[hidden]{display:none;}
+.entity-tabs-arrow.entity-tabs-arrow-left{left:calc(-1 * var(--tabs-pad, 0px));}
+.entity-tabs-arrow.entity-tabs-arrow-right{right:calc(-1 * var(--tabs-pad, 0px));margin:0 0 0 calc(-26px - var(--tabs-gap, 22px));text-align:right;background:linear-gradient(to left,var(--tabs-fade,var(--bg)) 60%,transparent);}
 .dash-tabs-bar .entity-tabs{--tabs-fade:var(--surface);}
+.seg,.wt-seg{--tabs-gap:0px;--tabs-fade:var(--surface);}
+.wt-seg .entity-tabs-arrow-left + button{border-left:0;}
+.import-tabs{--tabs-gap:8px;}
 .settings-nav{--tabs-gap:2px;--tabs-pad:10px;--tabs-fade:var(--surface-alt);}
 .edit-tabs{--tabs-gap:4px;}
 .entity-tab{
@@ -2580,6 +2583,10 @@ button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
 .wt-room-chip[aria-pressed="true"]{background:var(--surface-alt);color:var(--ink);border-color:var(--accent-line);}
 .wt-room-all{border-style:dashed;}
 .wt-room-floor{flex:0 0 10.5em;max-width:45%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:calc(11px * var(--font-scale, 1));font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-faint);margin-top:2px;font-family:inherit;background:none;border:0;padding:5px 0 2px;text-align:left;cursor:pointer;}
+.wt-legend-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;margin:0 0 4px;padding:7px 2px;font:inherit;font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink-muted);background:none;border:0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);border-radius:0;cursor:pointer;}
+.wt-legend-toggle[hidden]{display:none;}
+.wt-legend-toggle-mark{display:inline-block;font-size:calc(16px * var(--font-scale, 1));line-height:1;transition:transform .15s;}
+.wt-legend-toggle[aria-expanded="true"] .wt-legend-toggle-mark{transform:rotate(90deg);}
 /* Handy: Etage über den Chips. Muss NACH der Grundregel stehen, sonst gilt deren flex-basis 10.5em als Höhe in der Spalte (große Lücken). */
 @media (max-width:480px){.wt-room-group{flex-direction:column;align-items:stretch;gap:2px;}.wt-room-floor{flex:none;max-width:none;}.wt-room-chips{flex:none;}}
 .wt-table tr.wt-floor th{font-size:calc(12px * var(--font-scale, 1));font-weight:600;color:var(--ink);text-align:left;padding:8px 10px;background:var(--surface-alt);border-bottom:1px solid var(--border-strong);white-space:nowrap;}

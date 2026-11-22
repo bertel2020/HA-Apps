@@ -5,9 +5,10 @@
 (function () {
   'use strict';
 
-  // Zeilen mit seitlichem Scrollen: Reiter, das Menü der Einstellungen/Housekeeping (am Handy eine Zeile) und die Modus-Pillen.
-  const SELECTOR = '.entity-tabs, .settings-nav, .edit-tabs';
-  const MARKED = '[aria-selected="true"], [aria-current], .is-active, .active';
+  // Zeilen mit seitlichem Scrollen: Reiter, das Menü der Einstellungen/Housekeeping (am Handy eine Zeile), die Modus-Pillen,
+  // die Import-Reiter und die Auswahlleisten (.seg, .wt-seg).
+  const SELECTOR = '.entity-tabs, .settings-nav, .edit-tabs, .import-tabs, .seg, .wt-seg';
+  const MARKED = '[aria-selected="true"], [aria-pressed="true"], [aria-current], .is-active, .active';
 
   function arrow(side) {
     const b = document.createElement('button');

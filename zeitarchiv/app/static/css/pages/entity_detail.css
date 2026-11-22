@@ -26,6 +26,7 @@
     background:var(--surface);color:var(--ink-muted);cursor:pointer;white-space:nowrap;
   }
   .seg button:last-child{border-right:none;}
+  .seg button:has(+ .entity-tabs-arrow-right:last-child){border-right:none;}
   .seg button.active{background:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
   .seg button:disabled{opacity:.35;cursor:default;}
   /* Kleinere Variante innerhalb des Optionen-Menüs (Diagrammtyp,

@@ -160,6 +160,11 @@
           </div>
         </div>
 {% endmacro %}
+{% macro legend_toggle(key) %}
+<button type="button" class="wt-legend-toggle" x-show="cmpLegend.{{ key }}.toggle" x-cloak :aria-expanded="cmpLegendOpen.{{ key }}.toString()" @click="toggleCmpLegend('{{ key }}')">
+  <span x-text="t('Legende ({n} Linien)', {n: cmpLegend.{{ key }}.count})"></span><span class="wt-legend-toggle-mark" aria-hidden="true">›</span>
+</button>
+{% endmacro %}
 {% macro room_chips() %}
 <div class="wt-rooms" role="group" aria-label="{{ _('Räume im Diagramm') }}" x-show="roomChips().length" x-cloak>
   <template x-for="group in roomGroups()" :key="group.key">
@@ -530,6 +535,7 @@
         {{ temp_range_choice('temp') }}
       </div>
       {{ room_chips() }}
+      {{ legend_toggle('temps') }}
       <div class="wt-chart" x-ref="tempChart" x-show="!tempCmp || tempCmp.series.length"></div>
       <p class="hint hint-warn" x-show="tempError" x-text="tempError" x-cloak></p>
     </div>
@@ -542,6 +548,7 @@
         {{ temp_range_choice('humid') }}
       </div>
       {{ room_chips() }}
+      {{ legend_toggle('humid') }}
       <div class="wt-chart" x-ref="humidChart"></div>
     </div>
     {% endif %}

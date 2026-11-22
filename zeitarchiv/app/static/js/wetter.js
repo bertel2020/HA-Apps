@@ -173,7 +173,15 @@
     return (node && node.clientWidth) || Math.max(window.innerWidth - 48, 280);
   }
 
-  function gridForLegend(element, names, extra) {
+  // Die Höhe des Diagramms wächst um den Platz, den die Legende über das Mindestmaß hinaus braucht (Zeichenfläche bleibt gleich groß).
+  function growForLegend(element, grid, minTop) {
+    element.style.height = '';
+    const base = element.clientHeight;
+    const extra = Math.max(0, grid.top - minTop);
+    if (base && extra) element.style.height = (base + extra) + 'px';
+  }
+
+  function gridForLegend(element, names, extra, minTop) {
     const font = scaledFont(12);
     const width = Math.max(chartWidth(element) - 16, 120);
     let rows = 1;
@@ -183,7 +191,7 @@
       if (used && used + item > width) { rows += 1; used = 0; }
       used += item;
     });
-    return gridFor(element, {top: Math.max(chartWidth(element) < 520 ? 74 : 34, rows * (font + 10) + 10), ...extra});
+    return gridFor(element, {top: Math.max(minTop || (chartWidth(element) < 520 ? 74 : 34), rows * (font + 10) + 10), ...extra});
   }
 
   function legendBox(colors, data) {
@@ -272,6 +280,9 @@
       tempCmp: null,
       // Abgewählte Räume der Vergleichsdiagramme (Namen); neue Räume sind zunächst sichtbar.
       roomsOff: [],
+      // Legende der Vergleichsdiagramme am Handy: ab fünf Linien eingeklappt (je Diagramm: offen?) und die Angaben für den Schalter.
+      cmpLegendOpen: {temps: false, humid: false},
+      cmpLegend: {temps: {toggle: false, count: 0}, humid: {toggle: false, count: 0}},
       // Eingeklappte Etagen in der Tabelle „Zeiträume im Vergleich“ (Namen).
       floorsClosed: [],
       roomsClosed: [],
@@ -410,6 +421,7 @@
         if (saved.courseRange && ISO_DAY.test(saved.courseRange.start || '') && ISO_DAY.test(saved.courseRange.end || '')) this.courseRange = {start: saved.courseRange.start, end: saved.courseRange.end};
         if (['previous', 'year', ''].includes(saved.courseCompare)) this.courseCompare = saved.courseCompare;
         if (Array.isArray(saved.roomsOff)) this.roomsOff = saved.roomsOff.filter((name) => typeof name === 'string');
+        if (saved.cmpLegendOpen && typeof saved.cmpLegendOpen === 'object') this.cmpLegendOpen = {temps: !!saved.cmpLegendOpen.temps, humid: !!saved.cmpLegendOpen.humid};
         if (Array.isArray(saved.floorsClosed)) this.floorsClosed = saved.floorsClosed.filter((name) => typeof name === 'string');
         if (Array.isArray(saved.roomsClosed)) this.roomsClosed = saved.roomsClosed.filter((name) => typeof name === 'string');
         if (/^(5|10|all|\d{4}-\d{4})$/.test(String(saved.kenntageRange))) this.yearSel = String(saved.kenntageRange);  // alter Schlüssel: die Wahl bleibt erhalten
@@ -2008,9 +2020,11 @@
         // weiter im Norden bleibt Platz bis 0 h.
         const shortest = Math.min(...data.days.map((row) => row[1]));
         const floor = Math.max(0, Math.floor((shortest - 1) / 3) * 3);
+        const grid = gridForLegend(element, years, {right: 12}, 28);
+        growForLegend(element, grid, 28);
         const chart = chartFor('daylength', element);
         chart.setOption({
-          animation: false, grid: gridFor(element, {top: 28, right: 12}), legend: legendBox(colors, years),
+          animation: false, grid, legend: legendBox(colors, years),
           xAxis: {
             type: 'time', min: Date.UTC(2000, 0, 1), max: Date.UTC(2000, 11, 31), ...axisStyle(colors), splitLine: {show: false},
             axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (ms) => monthName(new Date(ms).getUTCMonth() + 1, 'short')},
@@ -2236,6 +2250,12 @@
         this.drawTemps();
       },
 
+      toggleCmpLegend(name) {
+        this.cmpLegendOpen = {...this.cmpLegendOpen, [name]: !this.cmpLegendOpen[name]};
+        writeStore({cmpLegendOpen: this.cmpLegendOpen});
+        this.drawTemps();
+      },
+
       // Linien je Sensor über die letzten Tage; die Einheit steht an der Achse (Temperatur und Feuchte nie gemischt).
       drawComparison(name, element, data, series, fallbackUnit, decimals) {
         if (!element) return;
@@ -2257,12 +2277,17 @@
           return again ? 'dashed' : 'solid';
         };
         const names = series.map((row) => row.label);
-        // Die Legende bekommt zusätzliche Höhe, die Zeichenfläche bleibt gleich groß (Handy: viele Räume).
-        const grid = gridForLegend(element, names, {right: 8});
-        element.style.height = ((chartWidth(element) < 520 ? 260 : 340) + grid.top) + 'px';
+        // Am Handy ist die Legende ab fünf Linien eingeklappt (Schalter über dem Diagramm); sonst bekommt sie zusätzliche Höhe,
+        // die Zeichenfläche bleibt gleich groß.
+        const narrow = chartWidth(element) < 520;
+        const collapsible = narrow && names.length > 4;
+        const legendHidden = collapsible && !this.cmpLegendOpen[name];
+        this.cmpLegend = {...this.cmpLegend, [name]: {toggle: collapsible, count: names.length}};
+        const grid = legendHidden ? gridFor(element, {right: 8, top: 30}) : gridForLegend(element, names, {right: 8});
+        element.style.height = ((narrow ? 260 : 340) + grid.top) + 'px';
         const chart = chartFor(name, element);
         chart.setOption({
-          animation: false, grid, legend: legendBox(colors, names),
+          animation: false, grid, legend: {...legendBox(colors, names), show: !legendHidden},
           xAxis: {type: 'category', data: labels, boundaryGap: false, ...axisStyle(colors), splitLine: {show: false}},
           yAxis: {type: 'value', scale: true, name: unit, nameTextStyle: {color: colors.text}, ...axisStyle(colors)},
           tooltip: tooltipBox(colors, (params) => {
@@ -2667,9 +2692,12 @@
           name: t('Tageswert'), type: 'bar', yAxisIndex: 1, data: nullable(p.daily, scale), barMaxWidth: 6, barMinWidth: 3,
           itemStyle: {color: colors.cur, opacity: 0.85},
         });
+        const precipMin = chartWidth(element) < 520 ? 100 : 34;
+        const grid = gridForLegend(element, legend.map((entry) => (typeof entry === 'string' ? entry : entry.name)), {right: 34}, precipMin);
+        growForLegend(element, grid, precipMin);
         const chart = chartFor('precip', element);
         chart.setOption({
-          animation: false, grid: gridFor(element, {right: 34, ...(element.clientWidth < 520 ? {top: 100} : {})}), legend: legendBox(colors, legend),
+          animation: false, grid, legend: legendBox(colors, legend),
           xAxis: {
             type: 'category', data: labels, boundaryGap: false, ...axisStyle(colors),
             axisLabel: {

@@ -5134,6 +5134,7 @@
     "Letzte 5": "Last 5",
     "Letzte 10": "Last 10",
     "Alle ({n})": "All ({n})",
+    "Legende ({n} Linien)": "Legend ({n} lines)",
     "Tage je Kalenderjahr mit einer Eigenschaft, die Regel steht unter dem Titel. Die Schwellen stellst du im Setup ein. Es zählen nur Tage mit allen Werten, ohne den Tag nach einem fehlenden Tag.": "Days per calendar year with a property; the rule is under the title. You set the thresholds in the setup. Only days with all values count, without the day after a missing day.",
     "Ganze Kalenderjahre. Das laufende Jahr (*) zählt bis heute.": "Full calendar years. The current year (*) counts up to today.",
     "Alle Jahre nur bis {date} gezählt, damit das laufende Jahr (*) vergleichbar ist.": "All years counted only up to {date}, so the current year (*) is comparable.",

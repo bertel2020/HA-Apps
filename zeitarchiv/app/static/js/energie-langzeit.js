@@ -1195,6 +1195,18 @@
     return {slope, intercept: my - slope * mx, r2: (sxy * sxy) / (sxx * syy), n};
   }
 
+  // Platz über dem Diagramm für eine Legende, die umbricht (Zeilen aus Namen und Breite geschätzt), mindestens minTop.
+  function legendTop(names, width, font, minTop) {
+    let rows = 1;
+    let used = 0;
+    names.forEach((name) => {
+      const item = 18 + 5 + String(name).length * font(12) * 0.58 + 10;
+      if (used && used + item > Math.max(width - 24, 120)) { rows += 1; used = 0; }
+      used += item;
+    });
+    return Math.max(minTop, rows * (font(12) + 10) + 14);
+  }
+
   // Farbe eines Jahres im Streudiagramm: das neueste in der ersten Farbe des Schemas, ältere der Reihe nach.
   const yearColor = (index) => cssVar(`--chart-${index % 7 + 1}`);
 
@@ -1220,7 +1232,7 @@
     const axis = {axisLine: {lineStyle: {color: colors.grid}}, axisTick: {show: false}, axisLabel: {color: colors.text, fontSize: font(11)}, splitLine: {lineStyle: {color: colors.grid}}};
     return {
       animation: false,
-      grid: {left: 8, right: 16, top: options.narrow ? 74 : 34, bottom: 28, containLabel: true},
+      grid: {left: 8, right: 16, top: legendTop(series.map((entry) => entry.name), options.width, font, options.narrow ? 74 : 34), bottom: 28, containLabel: true},
       legend: {data: series.map((entry) => entry.name), top: 0, right: 8, textStyle: {color: colors.text, fontSize: font(12)}, itemWidth: 18, itemHeight: 8},
       xAxis: {type: 'value', scale: true, name: unit, nameLocation: 'middle', nameGap: 26, nameTextStyle: {color: colors.text}, ...axis},
       yAxis: {type: 'value', name: t('kWh je Tag'), nameTextStyle: {color: colors.text}, ...axis},
@@ -1621,7 +1633,13 @@
         } else if (this.wxPart === 'temp' && this.temp && this.temp.enough) {
           const years = this.tempYears();
           const fit = linearFit(this.tempPoints());
-          chart.setOption(temperatureScatter(this.temp, years, fit, colors, {narrow: element.clientWidth < 520, font: scaledFont}), true);
+          const width = visibleWidth(element);
+          const scatter = temperatureScatter(this.temp, years, fit, colors, {narrow: width < 520, width, font: scaledFont});
+          element.style.height = '';
+          const baseHeight = element.clientHeight;
+          const extraTop = Math.max(0, scatter.grid.top - (width < 520 ? 74 : 34));
+          if (baseHeight && extraTop) element.style.height = (baseHeight + extraTop) + 'px';
+          chart.setOption(scatter, true);
           chart.off('click');
           chart.on('click', (param) => {
             if (param.seriesType === 'scatter' && param.data && param.data.date) window.location.href = `energiedashboard?date=${param.data.date}`;
