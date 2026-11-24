@@ -1814,6 +1814,16 @@ class ImportService:
         label = tr("Langzeitstatistik") if history_source == "stats" else tr("HA-Historie")
         fetched: dict[str, ha_import.HistoryFetchResult] = {}
         errors: list[str] = []
+        # Einheit der Statistik für den Hinweis in der Vorschau (ROADMAP 1.3). Ein Fehlschlag
+        # ist kein Importfehler: dann entfällt nur der Hinweis.
+        statistic_units: dict[str, str] = {}
+        if history_source == "stats":
+            try:
+                statistic_units = {
+                    eid: meta.unit for eid, meta in ha_statistics.fetch_statistic_meta(entity_ids).items() if meta.unit
+                }
+            except (ha_import.HaApiError, ValueError) as exc:
+                logger.debug("Statistik-Einheiten nicht abrufbar · %s", exc)
         for nummer, entity_id in enumerate(entity_ids):
             # Vor dem Abruf melden, nicht danach: Der Roundtrip IST die
             # Wartezeit, und die Anzeige soll sagen, worauf gerade gewartet
@@ -1839,6 +1849,8 @@ class ImportService:
                 errors.append(f"{entity_id}: {exc}")
                 continue
             fetched[entity_id] = history
+            if entity_id in statistic_units:
+                history.source_units = [statistic_units[entity_id]]
             # Ein nennenswerter Anteil übersprungener Punkte (nicht
             # numerisch/kein bekannter Schalter-Zustand bzw. kein mean/sum im
             # Statistik-Fenster) ist kein Fehler, aber ein Symptom für eine
@@ -2080,6 +2092,8 @@ class ImportService:
                     stats_supported=stats_supported if include_long_term_stats else None,
                     stats_requested=include_long_term_stats,
                 )
+                if stats is not None and meta is not None and meta.unit:
+                    fetched[entity_id].source_units = [meta.unit]
             except ValueError as exc:
                 errors.append(f"{entity_id} · Vollimport: {exc}")
         if on_entity is not None:
@@ -3201,6 +3215,7 @@ class ImportService:
                                     self.deps.data_dir, self.deps.index, history.rows, entity_id, self.deps.tz,
                                     source_label=entity_id, skipped_rows=history.skipped,
                                     include_existing_months=include_existing_months, accepts_state=True,
+                                    source_units=history.source_units,
                                 )
                             except ValueError as exc:
                                 errors.append(f"{entity_id}: {exc}")
