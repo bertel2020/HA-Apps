@@ -16,6 +16,8 @@
 
 - **Energy dashboard**
   - Meters in Wh can be assigned to the roles (grid, feed-in, generation, storage, consumers); values are shown in kWh
+- **Entities**
+  - A changed unit no longer mixes the archive: if an entity reports Wh instead of kWh (or W instead of kW), the new values are converted to the stored unit; other unit changes are reported as a notice
 - **Import**
   - CSV and Symcon import: new option “Fill archive gaps” adds only missing timestamps to months that already exist; existing values stay unchanged
 - **Tables**

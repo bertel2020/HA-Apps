@@ -47,6 +47,7 @@ from .cleanup import iter_raw_rows
 from .index import Index
 from .paths import entity_dir
 from .symcon_import import import_rows, plan_import_rows
+from .units import suggest_factor  # noqa: F401 - Tabelle liegt in units.py (Einheiten-Schutz teilt sie)
 from ..limits import MAX_IMPORT_ROWS_PER_ENTITY
 
 # "delete": Verschieben, Quelle inkl. Konfiguration entfernen (empfohlen).
@@ -144,33 +145,6 @@ def _drop_counter_overlap(
     cutoff = target["first_ts"]
     kept = [(ts, value) for ts, value in rows if ts < cutoff]
     return kept, len(rows) - len(kept)
-
-
-# Bekannte SI-Vorsatz-Stufen für die beiden physikalischen Größen, bei denen
-# ein Einheiten-Wechsel zwischen Quelle und Ziel in der Praxis vorkommt (ein
-# Gerät wird ersetzt und meldet fortan in Wh statt kWh, oder W statt kW) —
-# bewusst NICHT generisch für jede Einheit: "m" wäre sonst z. B. sowohl
-# Milli-Präfix als auch die Basiseinheit Meter, "kWh"/"kW" unterscheiden sich
-# nur im letzten Buchstaben und dürfen nie gegeneinander vorgeschlagen werden
-# (Energie ist keine Leistung) — zwei getrennte, explizite Tabellen statt
-# eines Präfix-Parsers vermeiden beide Fallen von vornherein.
-_ENERGY_UNIT_SCALE: dict[str, float] = {"Wh": 1.0, "kWh": 1_000.0, "MWh": 1_000_000.0, "GWh": 1_000_000_000.0}
-_POWER_UNIT_SCALE: dict[str, float] = {"W": 1.0, "kW": 1_000.0, "MW": 1_000_000.0, "GW": 1_000_000_000.0}
-
-
-def suggest_factor(source_unit: str, target_unit: str) -> float | None:
-    """Schlägt einen Umrechnungsfaktor vor, wenn Quelle und Ziel dieselbe
-    physikalische Größe nur in unterschiedlichem SI-Präfix messen (z. B. kWh
-    vs. Wh → 1000.0) — None, wenn beide Einheiten gleich sind (kein Faktor
-    nötig) oder keine bekannte, rein multiplikative Umrechnung existiert
-    (z. B. °C vs. °F, das bräuchte zusätzlich eine additive Verschiebung, die
-    das Migrations-Feature nicht unterstützt)."""
-    if not source_unit or not target_unit or source_unit == target_unit:
-        return None
-    for scale in (_ENERGY_UNIT_SCALE, _POWER_UNIT_SCALE):
-        if source_unit in scale and target_unit in scale:
-            return scale[source_unit] / scale[target_unit]
-    return None
 
 
 @dataclass

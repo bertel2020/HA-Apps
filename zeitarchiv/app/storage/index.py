@@ -21,6 +21,7 @@ from pathlib import Path
 
 from ..staleness import STALE_MODES
 from .paths import validate_entity_id
+from .units import conversion_factor
 
 # Muss mit custom_components/zeitarchiv/const.py übereinstimmen.
 SWITCH_DOMAINS = {
@@ -65,6 +66,10 @@ STATE_TILE_VIEWS = ("strip", "donut")
 # nicht (Zahl statt Text oder umgekehrt) bzw. Obergrenze an Zuständen erreicht.
 STATE_REJECTION_TYPE_MISMATCH = "type_mismatch"
 STATE_REJECTION_LIMIT = "state_limit"
+# Einheiten-Schutz (ROADMAP 1.3): Einheit des Events weicht von der gespeicherten
+# ab — umgerechnet bzw. nicht umrechenbar. Gleicher Speicher wie die Zustandsablehnungen.
+UNIT_REJECTION_CONVERTED = "unit_converted"
+UNIT_REJECTION_MISMATCH = "unit_mismatch"
 SETTING_STATE_REJECTIONS = "state_rejections"
 
 
@@ -1825,6 +1830,10 @@ class Index:
                             tr("Aggregationstyp von {entity_id} änderte sich von {old_type} zu {aggregation_type}; Rollup-Migration erforderlich", entity_id=entity_id, old_type=old_type, aggregation_type=aggregation_type)
                         )
                     on_type_change(old_type, aggregation_type, bool(row["hourly_rollup"]))
+                # Umrechenbare Einheit (Wh statt kWh): die gespeicherte bleibt
+                # maßgeblich, der Wert wird beim Aufnehmen umgerechnet (units.py).
+                if conversion_factor(unit, row["unit"]) is not None:
+                    unit = None
                 self._conn.execute(
                     """UPDATE entities
                        SET aggregation_type = ?, state_class = ?,

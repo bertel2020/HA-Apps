@@ -28,6 +28,8 @@ from .index import (
     Index,
     STATE_REJECTION_LIMIT,
     STATE_REJECTION_TYPE_MISMATCH,
+    UNIT_REJECTION_CONVERTED,
+    UNIT_REJECTION_MISMATCH,
     StateTypeMismatch,
     derive_type,
     resolution_seconds,
@@ -35,6 +37,7 @@ from .index import (
     should_accept_write,
     should_ignore_value,
 )
+from .units import conversion_factor, is_unit_mismatch
 from ..limits import MAX_EVENT_TS, MIN_EVENT_TS
 from ..logging_setup import log_rate_limited
 from ..progress import JobProgress
@@ -382,6 +385,46 @@ class IngestionService:
         self._state_rejection_written[key] = now
         self._index.record_state_rejection(entity_id, reason, now)
 
+    def _apply_unit_guard(self, event: IngestEvent) -> IngestEvent:
+        """Einheiten-Schutz (ROADMAP 1.3, Stufe 1): Die gespeicherte Einheit
+        bleibt maßgeblich. Meldet das Event eine andere Einheit derselben
+        Größe (Wh statt kWh), wird der Wert umgerechnet; ein nicht
+        umrechenbares Paar (°C/°F) läuft wie bisher durch und wird nur
+        gemeldet. Läuft vor Ignorier-Liste, Wertfilter und Rückgangsprüfung,
+        damit diese in einer einzigen Einheit vergleichen."""
+        existing = self._index.get_entity(event.entity_id)
+        if existing is None:
+            return event
+        stored_unit = existing["unit"]
+        factor = conversion_factor(event.unit, stored_unit)
+        if factor is not None:
+            self._record_state_rejection(event.entity_id, UNIT_REJECTION_CONVERTED)
+            log_rate_limited(
+                logger,
+                logging.INFO,
+                f"unit_converted:{event.entity_id}",
+                "Einheit umgerechnet · event=unit_converted entity_id=%s received=%s stored=%s",
+                event.entity_id,
+                event.unit,
+                stored_unit,
+                interval_seconds=3600,
+            )
+            # 12 signifikante Stellen: kein Rechenrauschen wie 1234.5000000000002.
+            return replace(event, value=float(f"{event.value * factor:.12g}"))
+        if is_unit_mismatch(event.unit, stored_unit):
+            self._record_state_rejection(event.entity_id, UNIT_REJECTION_MISMATCH)
+            log_rate_limited(
+                logger,
+                logging.WARNING,
+                f"unit_mismatch:{event.entity_id}",
+                "Einheit gewechselt, nicht umrechenbar · event=unit_mismatch entity_id=%s received=%s stored=%s",
+                event.entity_id,
+                event.unit,
+                stored_unit,
+                interval_seconds=3600,
+            )
+        return event
+
     def _log_state_mismatch(self, event: IngestEvent) -> None:
         self._record_state_rejection(event.entity_id, STATE_REJECTION_TYPE_MISMATCH)
         log_rate_limited(
@@ -457,6 +500,8 @@ class IngestionService:
             if state_value is None:
                 return "skipped"
             event = replace(event, value=state_value)
+        else:
+            event = self._apply_unit_guard(event)
         try:
             self._rebuild_if_type_changes(event)
             self._index.get_or_create_entity(

@@ -16,6 +16,8 @@
 
 - **Energiedashboard**
   - Zähler in Wh lassen sich den Rollen zuordnen (Netz, Einspeisung, Erzeuger, Speicher, Verbraucher); die Werte erscheinen in kWh
+- **Entitäten**
+  - Eine geänderte Einheit vermischt das Archiv nicht mehr: meldet eine Entität Wh statt kWh (oder W statt kW), werden die neuen Werte auf die gespeicherte Einheit umgerechnet; andere Einheitenwechsel erscheinen als Hinweis
 - **Import**
   - CSV- und Symcon-Import: neue Option „Archivlücken füllen“ ergänzt in bereits vorhandenen Monaten nur fehlende Zeitstempel; vorhandene Werte bleiben unverändert
 - **Tabellen**

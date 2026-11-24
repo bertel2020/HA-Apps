@@ -48,6 +48,8 @@ from .storage.index import (
     MAX_STATES_PER_ENTITY,
     STATE_REJECTION_LIMIT,
     STATE_REJECTION_TYPE_MISMATCH,
+    UNIT_REJECTION_CONVERTED,
+    UNIT_REJECTION_MISMATCH,
     entity_last_seen,
     outlier_detection_applies,
 )
@@ -235,6 +237,32 @@ def state_rejection_notices(index, now: float | None = None) -> list[dict]:
             ),
             "meta": tr("Entitäten"),
             "link": f"/entities/{limit_ids[0]}" if len(limit_ids) == 1 else "/entities",
+        })
+    converted_ids, converted_text = listed(UNIT_REJECTION_CONVERTED)
+    if converted_ids:
+        notices.append({
+            "id": "entities.unit_converted",
+            "severity": "info",
+            "title": tr("Einheit abweichend, Werte umgerechnet"),
+            "detail": tr(
+                "Diese Entitäten melden eine andere Einheit als gespeichert (z. B. Wh statt kWh). Die neuen Werte werden auf die gespeicherte Einheit umgerechnet: {entities}.",
+                entities=converted_text,
+            ),
+            "meta": tr("Entitäten"),
+            "link": f"/entities/{converted_ids[0]}" if len(converted_ids) == 1 else "/entities",
+        })
+    mismatch_unit_ids, mismatch_unit_text = listed(UNIT_REJECTION_MISMATCH)
+    if mismatch_unit_ids:
+        notices.append({
+            "id": "entities.unit_mismatch",
+            "severity": "warn",
+            "title": tr("Einheit gewechselt, nicht umrechenbar"),
+            "detail": tr(
+                "Diese Entitäten melden eine andere Einheit, die sich nicht umrechnen lässt (z. B. °C statt °F). Die Werte werden unverändert gespeichert, die Reihe enthält danach beide Einheiten: {entities}.",
+                entities=mismatch_unit_text,
+            ),
+            "meta": tr("Entitäten"),
+            "link": f"/entities/{mismatch_unit_ids[0]}" if len(mismatch_unit_ids) == 1 else "/entities",
         })
     return notices
 
