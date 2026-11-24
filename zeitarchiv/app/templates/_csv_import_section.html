@@ -39,6 +39,13 @@
           </div>
         </template>
         <input type="hidden" name="{{ field_name }}" :value="entityId">
+        {# Einheit der Ziel-Entität (ROADMAP 1.3): Die Datei trägt keine Einheit, der CSV-Import
+           rechnet nicht um. Wer sie vorbereitet, soll sehen, in welcher Einheit die Werte stehen
+           müssen. Reaktiv, damit die Zeile mit der Auswahl wechselt; ohne gespeicherte Einheit
+           (Schalter, Text) bleibt sie weg. #}
+        <small class="csv-target-unit" x-show="(options.find(o => o.entity_id === entityId) || {}).unit" x-cloak
+               style="display:block;margin-top:6px;font-size:calc(12px * var(--font-scale, 1));color:var(--ink-muted);"
+               x-text='{{ _("Gespeichert in {unit}. Die Werte der Datei müssen in dieser Einheit stehen.", unit="@@UNIT@@") | tojson }}.replace("@@UNIT@@", (options.find(o => o.entity_id === entityId) || {}).unit || "")'></small>
       </span>
 {% endmacro %}
 {% if not csv_uploaded %}

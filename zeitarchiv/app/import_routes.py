@@ -1447,6 +1447,7 @@ class ImportService:
                 "label": entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
                 "ha_name": row["friendly_name"] or row["entity_id"],
                 "is_custom": bool(row["custom_name"]),
+                "unit": row["unit"] or "",
             }
             for row in entity_rows
         ]

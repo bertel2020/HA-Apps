@@ -3118,6 +3118,7 @@
     "Seit wann": "Since when",
     "Werte verworfen: Typ passt nicht": "Values discarded: type does not match",
     "Die Quelle nennt die Einheit {unit}, das Ziel ist in {target} gespeichert. Die Werte werden nicht umgerechnet. Faktor zum Umrechnen: × {factor}.": "The source names the unit {unit}, the target is stored in {target}. The values are not converted. Conversion factor: × {factor}.",
+    "Gespeichert in {unit}. Die Werte der Datei müssen in dieser Einheit stehen.": "Stored in {unit}. The values in the file must be in this unit.",
     "Einheit abweichend, Werte umgerechnet": "Unit differs, values converted",
     "Diese Entitäten melden eine andere Einheit als gespeichert (z. B. Wh statt kWh). Die neuen Werte werden auf die gespeicherte Einheit umgerechnet: {entities}.": "These entities report a different unit than the stored one (e.g. Wh instead of kWh). The new values are converted to the stored unit: {entities}.",
     "Einheit gewechselt, nicht umrechenbar": "Unit changed, cannot be converted",
