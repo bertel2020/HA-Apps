@@ -8,6 +8,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
+from _paths import TEMPLATES
 
 pytest.importorskip("pyarrow")
 
@@ -176,8 +177,7 @@ def test_import_plan_carries_target_unit_and_the_hint() -> None:
 def _render_hint(**plan) -> str:
     from jinja2 import Environment, FileSystemLoader
 
-    root = Path(__file__).resolve().parents[1] / "addon" / "app" / "templates"
-    env = Environment(loader=FileSystemLoader(root))
+    env = Environment(loader=FileSystemLoader(TEMPLATES))
     env.globals["_"] = lambda text, **kw: text.format(**kw)
     env.filters["format_value"] = lambda v: f"{v:g}"
     return env.get_template("_import_unit_hint.html").render(plan=type("P", (), plan))
