@@ -66,6 +66,8 @@ MAX_MESSAGE_BYTES = 64 * 1024 * 1024
 MAX_MESSAGES_PER_CALL = 2000
 # Zeitfenster je Verbindung beim Abruf einer Entität: drei Jahre Stundenwerte in einer Gruppe.
 WINDOWS_PER_CONNECTION = 40
+# Bei mehreren Entitäten je Befehl: Fenster mal Entitäten je Verbindung (begrenzt den Speicher beim Zusammenführen).
+ID_WINDOWS_PER_CONNECTION = 200
 
 PERIODS = {"hour": N_("Stundenwerte"), "day": N_("Tageswerte")}
 DEFAULT_PERIOD = "hour"
@@ -276,20 +278,22 @@ def _chunk_ranges(start: datetime, end: datetime, period: str) -> list[tuple[dat
     return ranges
 
 
-def _window_responses(entity_id: str, ranges: list[tuple[datetime, datetime]], period: str):
-    """Antworten der Zeitfenster einer Entität in Reihenfolge, je Gruppe über EINE Verbindung.
+def _window_responses(statistic_ids: list[str], ranges: list[tuple[datetime, datetime]], period: str):
+    """Antworten der Zeitfenster für ``statistic_ids`` in Reihenfolge, je Gruppe über EINE Verbindung.
 
     Früher ging jedes Fenster über eine eigene WebSocket-Verbindung samt Anmeldung (bei drei Jahren
-    Stundenwerten 37 Verbindungen je Entität); ``_ws_call`` nimmt aber mehrere Befehle auf einmal. Die
-    Gruppen begrenzen, wie viele Antworten gleichzeitig im Speicher liegen."""
-    for group_start in range(0, len(ranges), WINDOWS_PER_CONNECTION):
-        group = ranges[group_start : group_start + WINDOWS_PER_CONNECTION]
+    Stundenwerten 37 Verbindungen); ``_ws_call`` nimmt aber mehrere Befehle auf einmal. Die Gruppen
+    begrenzen, wie viele Antworten gleichzeitig im Speicher liegen: höchstens ``WINDOWS_PER_CONNECTION``
+    Fenster, bei mehreren Entitäten weniger (Fenster mal Entitäten höchstens ``ID_WINDOWS_PER_CONNECTION``)."""
+    per_connection = max(1, min(WINDOWS_PER_CONNECTION, ID_WINDOWS_PER_CONNECTION // max(1, len(statistic_ids))))
+    for group_start in range(0, len(ranges), per_connection):
+        group = ranges[group_start : group_start + per_connection]
         yield from _ws_call([
             {
                 "type": "recorder/statistics_during_period",
                 "start_time": _iso(window_start),
                 "end_time": _iso(window_end),
-                "statistic_ids": [entity_id],
+                "statistic_ids": statistic_ids,
                 "period": period,
                 "types": ["mean", "state"],
             }
@@ -311,7 +315,7 @@ def fetch_statistics_rows(
     mehrere Chunks hinweg überschneiden sich nie."""
     result = HistoryFetchResult()
     seen_timestamps: set[float] = set()
-    for response in _window_responses(entity_id, _chunk_ranges(start, end, period), period):
+    for response in _window_responses([entity_id], _chunk_ranges(start, end, period), period):
         if not response.get("success"):
             raise HaApiError(f"Home-Assistant-API antwortete{_ws_error_detail(response)}")
         entries = (response.get("result") or {}).get(entity_id) or []
@@ -391,16 +395,7 @@ def fetch_statistics_availability(
     supported_ids = [eid for eid in entity_ids if meta[eid].supported]
     for batch_start in range(0, len(supported_ids), STATISTIC_BATCH_SIZE):
         batch = supported_ids[batch_start : batch_start + STATISTIC_BATCH_SIZE]
-        for window_start, window_end in _chunk_ranges(start, end, period):
-            responses = _ws_call([{
-                "type": "recorder/statistics_during_period",
-                "start_time": _iso(window_start),
-                "end_time": _iso(window_end),
-                "statistic_ids": batch,
-                "period": period,
-                "types": ["mean", "state"],
-            }])
-            response = responses[0]
+        for response in _window_responses(batch, _chunk_ranges(start, end, period), period):
             if not response.get("success"):
                 raise HaApiError(f"Home-Assistant-API antwortete{_ws_error_detail(response)}")
             payload = response.get("result") or {}

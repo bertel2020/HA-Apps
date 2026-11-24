@@ -388,3 +388,68 @@ def test_fetch_statistics_availability_tracks_first_last_and_count(monkeypatch) 
     assert avail.count == 2
     assert avail.first_ts == pytest.approx(ts1 / 1000)
     assert avail.last_ts == pytest.approx(ts2 / 1000)
+
+
+def _availability_ws(ids: list[str], calls: list[int], result_for_window=None):
+    """Fake für list_statistic_ids und statistics_during_period; zählt die Befehle je Verbindung."""
+
+    def fake_ws_call(commands):
+        if commands[0]["type"] == "recorder/list_statistic_ids":
+            return [{"id": 1, "type": "result", "success": True,
+                     "result": [{"statistic_id": i, "has_mean": True} for i in ids]}]
+        calls.append(len(commands))
+        return [
+            {"id": n, "type": "result", "success": True,
+             "result": result_for_window(n) if result_for_window else {}}
+            for n, _ in enumerate(commands, 1)
+        ]
+
+    return fake_ws_call
+
+
+def test_fetch_statistics_availability_groups_windows_per_connection(monkeypatch) -> None:
+    ids = [f"sensor.s{i}" for i in range(30)]
+    start = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    end = start + timedelta(days=30 * 37)  # 37 Fenster
+    calls: list[int] = []
+    monkeypatch.setattr(ha_statistics, "_ws_call", _availability_ws(ids, calls))
+
+    ha_statistics.fetch_statistics_availability(ids, start, end, "hour")
+
+    per_connection = ha_statistics.ID_WINDOWS_PER_CONNECTION // 30  # 6 Fenster bei 30 Entitäten
+    assert calls == [per_connection] * 6 + [37 - 6 * per_connection]
+    assert sum(calls) == 37
+
+
+def test_fetch_statistics_availability_keeps_each_window_in_order(monkeypatch) -> None:
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    end = start + timedelta(days=61)  # 3 Fenster zu je 30 Tagen
+    stamps = [int((start + timedelta(days=30 * n)).timestamp() * 1000) for n in range(3)]
+    calls: list[int] = []
+    monkeypatch.setattr(
+        ha_statistics, "_ws_call",
+        _availability_ws(["sensor.temp"], calls, lambda n: {"sensor.temp": [{"start": stamps[n - 1], "mean": float(n)}]}),
+    )
+
+    result = ha_statistics.fetch_statistics_availability(["sensor.temp"], start, end, "hour")
+
+    assert calls == [3]
+    avail = result["sensor.temp"]
+    assert avail.count == 3
+    assert avail.first_ts == pytest.approx(stamps[0] / 1000)
+    assert avail.last_ts == pytest.approx(stamps[2] / 1000)
+
+
+def test_window_group_size_shrinks_with_the_number_of_entities(monkeypatch) -> None:
+    ranges = [(datetime(2026, 1, 1, tzinfo=timezone.utc),) * 2] * 10
+    seen: list[int] = []
+    monkeypatch.setattr(
+        ha_statistics, "_ws_call",
+        lambda commands: seen.append(len(commands)) or [{"id": n, "success": True, "result": {}} for n, _ in enumerate(commands, 1)],
+    )
+    sizes = {}
+    for count in (1, 5, 40, 500):
+        seen.clear()
+        list(ha_statistics._window_responses([f"sensor.s{i}" for i in range(count)], ranges, "hour"))
+        sizes[count] = seen[0]
+    assert sizes == {1: 10, 5: 10, 40: 5, 500: 1}
