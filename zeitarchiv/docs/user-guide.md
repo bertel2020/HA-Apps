@@ -1704,7 +1704,11 @@ lassen sich wie Zeilen duplizieren (⧉).
 - **Aggregation je Zeile:** Automatisch (bei Zählern die Summe, sonst der
   Durchschnitt), Ø Durchschnitt, Min, Max oder Σ Summe. Min/Max nutzen dabei
   die echten Extremwerte der zugrunde liegenden Rohdaten, nicht den
-  Durchschnitt der kleinsten verfügbaren Zeitscheibe.
+  Durchschnitt der kleinsten verfügbaren Zeitscheibe. Bei Messwerten
+  (`state_class: measurement`) addiert „Σ Summe“ in Wochen- und Monatsspalten
+  die Stundenwerte, nicht die Tageswerte; ein Wert, der als 24 Stundenwerte
+  pro Tag gespeichert ist, zählt dann 24-mal. Für Tageswerte gilt: nur einen
+  Punkt pro Tag speichern oder „Aktueller Wert“ nehmen.
 - **Nachkommastellen je Spalte:** Automatisch oder fest 0–3.
 - **% Anteil** (Zeilen-Menü „Optionen"): zeigt statt des absoluten Werts den
   prozentualen Anteil an der Summe aller Entität-/Gruppen-Zeilen derselben

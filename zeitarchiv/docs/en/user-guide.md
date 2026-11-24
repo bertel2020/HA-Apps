@@ -1573,6 +1573,10 @@ duplicated like rows (⧉).
 - **Aggregation per row:** Automatic (sum for counters, otherwise the average),
   Ø average, Min, Max or Σ sum. Min/Max use the true extreme values of the
   underlying raw data, not the average of the smallest available time slice.
+  For measurements (`state_class: measurement`), “Σ Sum” in week and month
+  columns adds up the hourly values, not the daily values; a value stored as
+  24 hourly values per day then counts 24 times. For daily values, store only
+  one point per day or use “Current value”.
 - **Decimal places per column:** Automatic or fixed 0–3.
 - **% share** (row menu "Options"): shows instead of the absolute value the
   percentage share of the sum of all entity/group rows of the same column since
