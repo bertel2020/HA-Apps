@@ -249,13 +249,44 @@ def test_fetch_statistics_rows_chunks_long_ranges(monkeypatch) -> None:
     calls = []
 
     def fake_ws_call(commands):
-        calls.append(commands[0])
-        return [{"id": 1, "type": "result", "success": True, "result": {}}]
+        calls.append(commands)
+        return [{"id": i, "type": "result", "success": True, "result": {}} for i, _ in enumerate(commands, 1)]
 
     monkeypatch.setattr(ha_statistics, "_ws_call", fake_ws_call)
     ha_statistics.fetch_statistics_rows("sensor.temp", start, end, "hour")
 
-    assert len(calls) == 4  # 100 Tage / 30-Tage-Fenster aufgerundet
+    # 100 Tage / 30-Tage-Fenster aufgerundet = 4 Fenster, alle über EINE Verbindung.
+    assert len(calls) == 1 and len(calls[0]) == 4
+    assert [c["start_time"] for c in calls[0]] == sorted(c["start_time"] for c in calls[0])
+
+
+def test_fetch_statistics_rows_uses_one_connection_per_group_of_windows(monkeypatch) -> None:
+    start = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    end = start + timedelta(days=30 * 95)  # 95 Fenster -> 3 Gruppen zu je höchstens 40
+    calls = []
+
+    def fake_ws_call(commands):
+        calls.append(len(commands))
+        return [{"id": i, "type": "result", "success": True, "result": {}} for i, _ in enumerate(commands, 1)]
+
+    monkeypatch.setattr(ha_statistics, "_ws_call", fake_ws_call)
+    ha_statistics.fetch_statistics_rows("sensor.temp", start, end, "hour")
+
+    assert calls == [ha_statistics.WINDOWS_PER_CONNECTION, ha_statistics.WINDOWS_PER_CONNECTION, 15]
+
+
+def test_fetch_statistics_rows_reports_a_failed_window(monkeypatch) -> None:
+    start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    end = start + timedelta(days=61)
+
+    def fake_ws_call(commands):
+        ok = {"id": 1, "type": "result", "success": True, "result": {}}
+        failed = {"id": 2, "type": "result", "success": False, "error": {"code": "unknown_error", "message": "boom"}}
+        return [ok, failed, ok][: len(commands)]
+
+    monkeypatch.setattr(ha_statistics, "_ws_call", fake_ws_call)
+    with pytest.raises(ha_statistics.HaApiError):
+        ha_statistics.fetch_statistics_rows("sensor.temp", start, end, "hour")
 
 
 def test_fetch_statistics_rows_raises_when_exceeding_max_rows(monkeypatch) -> None:
@@ -288,11 +319,11 @@ def test_fetch_statistics_rows_deduplicates_chunk_boundary_and_records_reason(mo
     end = start + timedelta(days=31)
     ts = int(start.timestamp() * 1000)
     monkeypatch.setattr(ha_statistics, "_ws_call", lambda commands: [{
-        "id": 1,
+        "id": i,
         "type": "result",
         "success": True,
         "result": {"sensor.temp": [{"start": ts, "mean": 1.0}]},
-    }])
+    } for i, _ in enumerate(commands, 1)])
 
     result = ha_statistics.fetch_statistics_rows("sensor.temp", start, end, "hour")
 

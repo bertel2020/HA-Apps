@@ -64,6 +64,8 @@ MAX_MESSAGE_BYTES = 64 * 1024 * 1024
 # schickt (z. B. unerwartete Events) — recv(timeout=…) begrenzt bereits
 # die Wartezeit je Nachricht, dieser Zähler zusätzlich die Gesamtzahl.
 MAX_MESSAGES_PER_CALL = 2000
+# Zeitfenster je Verbindung beim Abruf einer Entität: drei Jahre Stundenwerte in einer Gruppe.
+WINDOWS_PER_CONNECTION = 40
 
 PERIODS = {"hour": N_("Stundenwerte"), "day": N_("Tageswerte")}
 DEFAULT_PERIOD = "hour"
@@ -274,6 +276,27 @@ def _chunk_ranges(start: datetime, end: datetime, period: str) -> list[tuple[dat
     return ranges
 
 
+def _window_responses(entity_id: str, ranges: list[tuple[datetime, datetime]], period: str):
+    """Antworten der Zeitfenster einer Entität in Reihenfolge, je Gruppe über EINE Verbindung.
+
+    Früher ging jedes Fenster über eine eigene WebSocket-Verbindung samt Anmeldung (bei drei Jahren
+    Stundenwerten 37 Verbindungen je Entität); ``_ws_call`` nimmt aber mehrere Befehle auf einmal. Die
+    Gruppen begrenzen, wie viele Antworten gleichzeitig im Speicher liegen."""
+    for group_start in range(0, len(ranges), WINDOWS_PER_CONNECTION):
+        group = ranges[group_start : group_start + WINDOWS_PER_CONNECTION]
+        yield from _ws_call([
+            {
+                "type": "recorder/statistics_during_period",
+                "start_time": _iso(window_start),
+                "end_time": _iso(window_end),
+                "statistic_ids": [entity_id],
+                "period": period,
+                "types": ["mean", "state"],
+            }
+            for window_start, window_end in group
+        ])
+
+
 def fetch_statistics_rows(
     entity_id: str,
     start: datetime,
@@ -288,16 +311,7 @@ def fetch_statistics_rows(
     mehrere Chunks hinweg überschneiden sich nie."""
     result = HistoryFetchResult()
     seen_timestamps: set[float] = set()
-    for window_start, window_end in _chunk_ranges(start, end, period):
-        responses = _ws_call([{
-            "type": "recorder/statistics_during_period",
-            "start_time": _iso(window_start),
-            "end_time": _iso(window_end),
-            "statistic_ids": [entity_id],
-            "period": period,
-            "types": ["mean", "state"],
-        }])
-        response = responses[0]
+    for response in _window_responses(entity_id, _chunk_ranges(start, end, period), period):
         if not response.get("success"):
             raise HaApiError(f"Home-Assistant-API antwortete{_ws_error_detail(response)}")
         entries = (response.get("result") or {}).get(entity_id) or []
