@@ -145,3 +145,47 @@ def test_state_entities_are_left_alone() -> None:
             state_class=None, unit="Wh", state="idle",
         ))
         assert state_rejection_notices(env.index) == []
+
+
+def test_unit_differences_only_lists_convertible_units() -> None:
+    from app.storage.units import unit_differences
+
+    assert unit_differences(["Wh", "sensor.pv", "kWh", "°F"], "kWh") == [("Wh", pytest.approx(0.001))]
+    assert unit_differences(["Wh", "Wh"], "kWh") == [("Wh", pytest.approx(0.001))]
+    assert unit_differences(["Wh"], None) == []
+    assert unit_differences(None, "kWh") == []
+
+
+def test_import_plan_carries_target_unit_and_the_hint() -> None:
+    from app.storage import symcon_import
+
+    with _Env() as env:
+        env.service.ingest(_event(0, 1.0, "kWh"))
+        plan = symcon_import.plan_import_rows(
+            env.tmp, env.index, [(BASE - 86400 * 40, 100.0)], "sensor.energy", ZoneInfo("UTC"),
+            source_label="x", source_units=["Wh", "sensor.energy"],
+        )
+        assert plan.target_unit == "kWh"
+        assert plan.unit_differences == [("Wh", pytest.approx(0.001))]
+        plain = symcon_import.plan_import_rows(
+            env.tmp, env.index, [(BASE - 86400 * 40, 100.0)], "sensor.energy", ZoneInfo("UTC"), source_label="x",
+        )
+        assert plain.unit_differences == []
+
+
+def _render_hint(**plan) -> str:
+    from jinja2 import Environment, FileSystemLoader
+
+    root = Path(__file__).resolve().parents[1] / "addon" / "app" / "templates"
+    env = Environment(loader=FileSystemLoader(root))
+    env.globals["_"] = lambda text, **kw: text.format(**kw)
+    env.filters["format_value"] = lambda v: f"{v:g}"
+    return env.get_template("_import_unit_hint.html").render(plan=type("P", (), plan))
+
+
+def test_hint_shows_for_a_difference_and_stays_quiet_otherwise() -> None:
+    text = _render_hint(unit_differences=[("Wh", 0.001)], target_unit="kWh", factor=1.0)
+    assert "Wh" in text and "kWh" in text and "0.001" in text
+    assert _render_hint(unit_differences=[], target_unit="kWh", factor=1.0).strip() == ""
+    # Hat der Nutzer schon einen Faktor gesetzt, wäre der Hinweis irreführend.
+    assert _render_hint(unit_differences=[("Wh", 0.001)], target_unit="kWh", factor=0.001).strip() == ""

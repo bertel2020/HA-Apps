@@ -463,6 +463,7 @@ class InfluxImportService:
                                     deps.data_dir, deps.index, history.rows, entity_id, deps.tz,
                                     source_label=entity_id, skipped_rows=history.skipped,
                                     include_existing_months=config.include_existing_months,
+                                    source_units=history.source_units,
                                 ))
                             except ValueError as exc:
                                 errors.append(f"{prefix}: {exc}")

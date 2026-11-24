@@ -94,6 +94,18 @@ def test_fetch_history_rows_merges_series_and_measurements_by_timestamp(monkeypa
     assert result.skipped == 0
 
 
+def test_fetch_history_rows_reports_the_measurement_names(monkeypatch) -> None:
+    """Der Measurement-Name ist in der Voreinstellung der HA-Integration die Einheit
+    (ROADMAP 1.3) und geht an die Import-Vorschau."""
+    _fake(monkeypatch, lambda params: _reply(
+        _values("Wh", [[BASE, 1000.0]]),
+        _values("kWh", [[BASE + 1000, 2.0]]),
+        _values("Wh", [[BASE + 2000, 3000.0]]),
+    ))
+    result = influxdb_import.fetch_history_rows("sensor.pv", START, START + timedelta(days=1))
+    assert result.source_units == ["Wh", "kWh"]
+
+
 def test_fetch_history_rows_reads_every_chunk_line(monkeypatch) -> None:
     """chunked=true liefert mehrere JSON-Zeilen — alle müssen gelesen werden."""
     _fake(monkeypatch, lambda params: b"\n".join([

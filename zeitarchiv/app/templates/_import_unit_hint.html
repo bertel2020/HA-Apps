@@ -1,0 +1,7 @@
+{#- Einheiten-Hinweis der Import-Vorschau (ROADMAP 1.3). Erwartet `plan`; zeigt nichts,
+    solange kein umrechenbarer Unterschied vorliegt oder schon ein Faktor gesetzt ist. -#}
+{% if plan.unit_differences and plan.factor == 1.0 %}
+{% for unit, factor in plan.unit_differences %}
+<p style="margin:6px 0 0;padding:8px 10px;border-radius:8px;background:var(--warning-soft);font-size:calc(12.5px * var(--font-scale, 1));color:var(--ink);">{{ _("Die Quelle nennt die Einheit {unit}, das Ziel ist in {target} gespeichert. Die Werte werden nicht umgerechnet. Faktor zum Umrechnen: × {factor}.", unit=unit, target=plan.target_unit, factor=(factor | format_value)) }}</p>
+{% endfor %}
+{% endif %}

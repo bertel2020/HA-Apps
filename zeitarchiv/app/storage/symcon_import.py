@@ -47,6 +47,7 @@ from ..limits import (
 )
 from .index import STATE_TYPE, Index
 from .paths import entity_dir
+from .units import unit_differences
 
 
 def extract_zip(
@@ -476,6 +477,10 @@ class ImportPlan:
     # Typisch, wenn Monatssummen statt laufender Zählerstände importiert werden.
     counter_decreases: int = 0
     counter_decrease_months: list[str] = field(default_factory=list)
+    # Einheiten-Hinweis (ROADMAP 1.3): gespeicherte Einheit des Ziels und die
+    # Einheiten der Quelle, die sich darauf umrechnen lassen, mit Faktor.
+    target_unit: str = ""
+    unit_differences: list[tuple[str, float]] = field(default_factory=list)
     # Ziel ist ein Zähler und der früheste importierte Wert liegt vor allen
     # vorhandenen Daten: er hat keinen Vorgänger, der Verlauf zeigt dort 0.
     # Monat ("JJJJ-MM") dieses ersten Werts, sonst leer.
@@ -808,6 +813,7 @@ def plan_import_rows(
     include_existing_months: bool = False,
     accepts_state: bool = False,
     skipped_examples: list[tuple[int, str, str]] | None = None,
+    source_units: list[str] | None = None,
 ) -> ImportPlan:
     """Generischer Dry-Run-Kern: berechnet, was import_rows() für bereits
     geparste (ts, value)-Zeilen tun würde, ohne etwas zu schreiben — von
@@ -864,6 +870,8 @@ def plan_import_rows(
         counter_decreases=decreases,
         counter_decrease_months=decrease_months,
         counter_first_month=_counter_first_month(rows, entity, tz),
+        target_unit=entity["unit"] or "",
+        unit_differences=unit_differences(source_units, entity["unit"]),
     )
 
 

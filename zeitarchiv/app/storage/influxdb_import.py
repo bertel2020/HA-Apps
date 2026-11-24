@@ -322,6 +322,9 @@ def fetch_history_rows(
             if should_cancel is not None and should_cancel():
                 raise ImportCancelled
             for series in res.get("series") or []:
+                name = series.get("name")
+                if isinstance(name, str) and name not in result.source_units:
+                    result.source_units.append(name)
                 for stamp, raw in series.get("values") or []:
                     if state_mapper is not None:
                         ts = stamp / 1000.0

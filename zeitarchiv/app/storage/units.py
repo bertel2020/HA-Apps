@@ -58,3 +58,16 @@ def is_unit_mismatch(event_unit: str | None, stored_unit: str | None) -> bool:
     if not event_unit or not stored_unit or event_unit == stored_unit:
         return False
     return suggest_factor(event_unit, stored_unit) is None
+
+
+def unit_differences(source_units: list[str] | None, target_unit: str | None) -> list[tuple[str, float]]:
+    """Quelleinheiten, die sich auf die gespeicherte Einheit umrechnen lassen
+    (Wh/kWh, W/kW, …), samt Faktor — für den Hinweis in der Import-Vorschau.
+    Nur umrechenbare Paare: Ein Measurement-Name (InfluxDB) kann auch eine
+    Entity-ID oder ein frei gewählter Text sein und ist dann keine Einheit."""
+    result: list[tuple[str, float]] = []
+    for unit in source_units or []:
+        factor = conversion_factor(unit, target_unit)
+        if factor is not None and (unit, factor) not in result:
+            result.append((unit, factor))
+    return result

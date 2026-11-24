@@ -60,6 +60,7 @@ from .storage import csv_import, ha_import, ha_statistics, hotbuffer, import_las
 from .storage.coordinator import StorageCoordinator
 from .storage.index import Index
 from .storage.paths import entity_dir
+from .storage.units import unit_differences
 from .version import APP_VERSION
 
 logger = logging.getLogger(__name__)
@@ -1317,18 +1318,20 @@ class ImportService:
                 for nummer, (variable, target_entity_id, factor) in enumerate(mapped):
                     self._dry_run_progress.advance(nummer, variable.variable_id)
                     try:
-                        plans.append(
-                            symcon_import.plan_import(
-                                self.deps.data_dir,
-                                self.deps.index,
-                                variable,
-                                target_entity_id,
-                                self.deps.tz,
-                                factor=factor,
-                                associations=self._symcon_associations(variable.variable_id),
-                                include_existing_months=include_existing_months,
-                            )
+                        plan = symcon_import.plan_import(
+                            self.deps.data_dir,
+                            self.deps.index,
+                            variable,
+                            target_entity_id,
+                            self.deps.tz,
+                            factor=factor,
+                            associations=self._symcon_associations(variable.variable_id),
+                            include_existing_months=include_existing_months,
                         )
+                        # Einheiten-Hinweis (ROADMAP 1.3): Profil-Einheit der Variable gegen die Ziel-Einheit.
+                        symcon_unit = self._load_symcon_names().get(variable.variable_id, {}).get("unit")
+                        plan.unit_differences = unit_differences([symcon_unit] if symcon_unit else [], plan.target_unit)
+                        plans.append(plan)
                     except ValueError as exc:
                         errors.append(f"{variable.variable_id} → {target_entity_id}: {exc}")
                 self._dry_run_progress.advance(len(mapped), "")

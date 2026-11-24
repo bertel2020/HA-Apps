@@ -289,6 +289,10 @@ class HistoryFetchResult:
     # True, wenn die Zeilen Zählerstände aus der Langzeitstatistik sind und auf
     # das Bucket-ENDE gestempelt wurden (siehe ha_statistics.fetch_statistics_rows).
     bucket_end_stamped: bool = False
+    # Nur InfluxDB: Namen der Measurements, aus denen die Zeilen stammen. In der
+    # Voreinstellung der HA-Integration ist das die Einheit (ROADMAP 1.3); der
+    # Name kann aber auch eine Entity-ID oder ein frei gewählter Text sein.
+    source_units: list[str] = field(default_factory=list)
 
 
 def _discard(result: HistoryFetchResult, reason: str, entry: object) -> None:
