@@ -199,6 +199,12 @@ def fetch_history_rows(
                 values, stamps = series["values"], series["timestamps"]
             except (ValueError, KeyError, TypeError) as exc:
                 raise VmApiError(tr("VictoriaMetrics lieferte keine gültige Export-Antwort")) from exc
+            # Einheit der Serie (ROADMAP 1.3): nur vorhanden, wenn die HA-Integration
+            # `unit_of_measurement` als Tag schreibt (`tags_attributes`).
+            metric = series.get("metric")
+            unit = metric.get("unit_of_measurement") if isinstance(metric, dict) else None
+            if isinstance(unit, str) and unit and unit not in result.source_units:
+                result.source_units.append(unit)
             for stamp, raw in zip(stamps, values):
                 value = _clean_value(raw)
                 if value is None:

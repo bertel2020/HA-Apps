@@ -3723,6 +3723,7 @@ class ImportService:
                                 self.deps.data_dir, self.deps.index, history.rows, entity_id, self.deps.tz,
                                 source_label=entity_id, skipped_rows=history.skipped,
                                 include_existing_months=include_existing_months,
+                                source_units=history.source_units,
                             )
                         except ValueError as exc:
                             errors.append(f"{entity_id}: {exc}")

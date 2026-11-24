@@ -20,7 +20,7 @@
   - A changed unit no longer mixes the archive: if an entity reports Wh instead of kWh (or W instead of kW), the new values are converted to the stored unit; other unit changes are reported as a notice
 - **Import**
   - CSV and Symcon import: new option “Fill archive gaps” adds only missing timestamps to months that already exist; existing values stay unchanged
-  - InfluxDB, Symcon and Home Assistant import (long-term statistics): the preview points out when the unit of the source (for example Wh) differs from the stored one (for example kWh) and shows the factor
+  - InfluxDB, VictoriaMetrics, Symcon and Home Assistant import (long-term statistics): the preview points out when the unit of the source (for example Wh) differs from the stored one (for example kWh) and shows the factor
 - **Tables**
   - New row option “In Σ column” (Automatic, Yes, No)
     - “Yes” adds up the cell values of the row, also for measurements and formulas; “No” leaves the row out

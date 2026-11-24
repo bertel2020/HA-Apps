@@ -64,6 +64,25 @@ def test_fetch_history_rows_merges_series_and_selects_value_series(monkeypatch) 
     assert params_of(seen[0])["match[]"] == ['{__name__="sensor.temp_value"}']
 
 
+def test_fetch_history_rows_reports_the_unit_tags_of_the_series(monkeypatch) -> None:
+    """Ändert sich die Einheit, legt VictoriaMetrics eine zweite Serie an (ROADMAP 1.3):
+    die Tags beider Serien gehen an die Import-Vorschau. Ohne Tag bleibt die Liste leer."""
+    base = int(START.timestamp() * 1000)
+    _fake_open(monkeypatch, lambda path, params: b"\n".join([
+        _export_line([base], [1000.0], unit_of_measurement="Wh"),
+        _export_line([base + 1000], [2.0], unit_of_measurement="kWh"),
+        _export_line([base + 2000], [3.0], unit_of_measurement="kWh"),
+        _export_line([base + 3000], [4.0]),
+        b"",
+    ]))
+    result = vm_import.fetch_history_rows("sensor.pv", START, START + timedelta(days=1), "http://vm:8428")
+    assert result.source_units == ["Wh", "kWh"]
+
+    _fake_open(monkeypatch, lambda path, params: _export_line([base], [1.0]) + b"\n")
+    result = vm_import.fetch_history_rows("sensor.pv", START, START + timedelta(days=1), "http://vm:8428")
+    assert result.source_units == []
+
+
 def params_of(request) -> dict:
     return urllib.parse.parse_qs(urllib.parse.urlsplit(request.full_url).query)
 

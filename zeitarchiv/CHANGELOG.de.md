@@ -20,7 +20,7 @@
   - Eine geänderte Einheit vermischt das Archiv nicht mehr: meldet eine Entität Wh statt kWh (oder W statt kW), werden die neuen Werte auf die gespeicherte Einheit umgerechnet; andere Einheitenwechsel erscheinen als Hinweis
 - **Import**
   - CSV- und Symcon-Import: neue Option „Archivlücken füllen“ ergänzt in bereits vorhandenen Monaten nur fehlende Zeitstempel; vorhandene Werte bleiben unverändert
-  - InfluxDB-, Symcon- und Home-Assistant-Import (Langzeitstatistik): Die Vorschau weist darauf hin, wenn die Einheit der Quelle (z. B. Wh) von der gespeicherten (z. B. kWh) abweicht, und nennt den Faktor
+  - InfluxDB-, VictoriaMetrics-, Symcon- und Home-Assistant-Import (Langzeitstatistik): Die Vorschau weist darauf hin, wenn die Einheit der Quelle (z. B. Wh) von der gespeicherten (z. B. kWh) abweicht, und nennt den Faktor
 - **Tabellen**
   - Neue Zeilenoption „In Σ-Spalte“ (Automatisch, Ja, Nein)
     - „Ja“ addiert die Zellwerte der Zeile, auch bei Messwerten und Formeln; „Nein“ lässt die Zeile aus

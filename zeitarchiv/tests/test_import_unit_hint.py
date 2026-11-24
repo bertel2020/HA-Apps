@@ -71,3 +71,40 @@ def test_same_unit_gives_no_hint(client, entity, monkeypatch) -> None:
 def test_missing_statistics_unit_gives_no_hint(client, entity, monkeypatch) -> None:
     _patch_statistics(monkeypatch, None)
     assert "Die Quelle nennt die Einheit" not in _run_dry_run(client, FORM)
+
+
+VM_ENTITY = "sensor.unit_hint_vm"
+
+
+@pytest.fixture()
+def vm_entity(client):
+    from app import main
+
+    main.index.get_or_create_entity(VM_ENTITY, "sensor", "total_increasing", "kWh")
+    yield VM_ENTITY
+    if main.index.get_entity(VM_ENTITY) is not None:
+        main.index.delete_entity(VM_ENTITY)
+
+
+def _vm_dry_run(client, monkeypatch, units: list[str]) -> str:
+    from app import import_routes
+    from app.storage import ha_import
+
+    now = time.time()
+
+    def fake_fetch(self, entity_ids, start, end, base_url, on_entity=None):
+        history = ha_import.HistoryFetchResult(rows=[(now - 7200, 1000.0), (now - 3600, 2000.0)], source_units=units)
+        return {VM_ENTITY: history}, []
+
+    monkeypatch.setattr(import_routes.ImportService, "_fetch_vm_history", fake_fetch)
+    return client.post("/import/vm/dry-run", data={"entity_ids": [VM_ENTITY], "range_preset": "max"}).text
+
+
+def test_victoriametrics_unit_tag_is_reported_in_the_dry_run(client, vm_entity, monkeypatch) -> None:
+    html = _vm_dry_run(client, monkeypatch, ["Wh", "kWh"])
+    assert html.count("Die Quelle nennt die Einheit") == 1  # kWh = gespeicherte Einheit, kein Hinweis
+    assert "Wh" in html
+
+
+def test_victoriametrics_without_unit_tag_gives_no_hint(client, vm_entity, monkeypatch) -> None:
+    assert "Die Quelle nennt die Einheit" not in _vm_dry_run(client, monkeypatch, [])
