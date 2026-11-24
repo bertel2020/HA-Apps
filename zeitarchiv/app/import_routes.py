@@ -266,6 +266,9 @@ class ImportService:
         # Dasselbe für den Import: nach dem Lauf zeichnet das Poll-Ziel (?watch=import) die Tabelle neu,
         # damit „Letzter Import“ und Status sofort stimmen.
         self._ha_import_request: dict | None = None
+        # Abbruch-Wunsch der laufenden Importe (ROADMAP 1.3-Umfeld): wird zwischen Entitäten geprüft, nie mitten in einem Schreibvorgang.
+        self._ha_cancel = threading.Event()
+        self._vm_cancel = threading.Event()
         self._ha_dry_run_status: dict[str, dict[str, dict]] = {}
         self._vm_progress = JobProgress("vm-import", unit=N_("Entitäten"), label=N_("VictoriaMetrics-Import"))
         # Genau ein Eintrag (zuletzt geprüfte Adresse/Zeitraum) statt eines
@@ -992,6 +995,8 @@ class ImportService:
         fetched: dict[str, ha_import.HistoryFetchResult] = {}
         errors: list[str] = []
         for nummer, entity_id in enumerate(entity_ids):
+            if self._vm_cancel.is_set():
+                break
             if on_entity is not None:
                 on_entity(nummer, entity_id)
             try:
@@ -1026,6 +1031,7 @@ class ImportService:
             **self._vm_progress.snapshot(),
             "progress_id": "vm-progress",
             "poll_url": "import/vm/progress",
+            "cancel_url": "import/vm/cancel",
         }
 
 
@@ -1259,6 +1265,8 @@ class ImportService:
                 "import/ha/progress?watch=dry-run" if self._ha_progress.snapshot()["kind"] == "dry-run"
                 else ("import/ha/progress?watch=import" if self._ha_import_request is not None else "import/ha/progress")
             ),
+            # Die Vorschau ändert nichts und läuft kurz; abbrechen lässt sich nur der Import.
+            "cancel_url": None if self._ha_progress.snapshot()["kind"] == "dry-run" else "import/ha/cancel",
         }
 
 
@@ -1826,6 +1834,8 @@ class ImportService:
             except (ha_import.HaApiError, ValueError) as exc:
                 logger.debug("Statistik-Einheiten nicht abrufbar · %s", exc)
         for nummer, entity_id in enumerate(entity_ids):
+            if self._ha_cancel.is_set():
+                break
             # Vor dem Abruf melden, nicht danach: Der Roundtrip IST die
             # Wartezeit, und die Anzeige soll sagen, worauf gerade gewartet
             # wird — nicht, was zuletzt fertig wurde.
@@ -2036,6 +2046,8 @@ class ImportService:
         # Wirklich zuerst alle Rohbereiche bestimmen: Erst deren frühester
         # verfügbarer Wert entscheidet, wo die Statistik später endet.
         for nummer, entity_id in enumerate(entity_ids):
+            if self._ha_cancel.is_set():
+                return {}, errors
             if on_entity is not None:
                 on_entity(nummer, entity_id)
             try:
@@ -2057,6 +2069,8 @@ class ImportService:
                 logger.warning("HA-Vollimport: Statistik-Metadaten nicht abrufbar · %s", exc)
 
         for nummer, entity_id in enumerate(entity_ids):
+            if self._ha_cancel.is_set():
+                return {}, errors
             if on_entity is not None:
                 on_entity(len(entity_ids) + nummer, entity_id)
             raw = raw_by_entity[entity_id]
@@ -3177,6 +3191,7 @@ class ImportService:
                 return self._ha_dry_run_section(request, params, [], vorab_fehler)
 
             def run_dry_run() -> dict:
+                self._ha_cancel.clear()
                 items: list[dict] = []
                 errors: list[str] = list(vorab_fehler)
                 start, stats_start, end = self._ha_request_ranges(
@@ -3421,7 +3436,12 @@ class ImportService:
                 beim CSV-Import daneben."""
                 with self.deps.coordinator.exclusive():
                     run_items = []
+                    cancelled = False
                     for nummer, (entity_id, history) in enumerate(fetched.items()):
+                        if self._ha_cancel.is_set():
+                            cancelled = True
+                            errors.append(tr("Import abgebrochen. Bereits geschriebene Entitäten bleiben erhalten."))
+                            break
                         self._ha_progress.advance(nummer, entity_id)
                         entity = self.deps.index.get_entity(entity_id)
                         try:
@@ -3447,9 +3467,11 @@ class ImportService:
                             ),
                         })
                     self._ha_progress.advance(len(fetched), "")
+                    # Nach einem Abbruch nur die geschriebenen Entitäten abgleichen.
+                    reconcile_ids = [item["entity_id"] for item in run_items] if cancelled else sorted(fetched.keys())
                     reconciliation = self.deps.run_storage_reconciliation(
-                        entity_ids=sorted(fetched.keys()), repair=True
-                    ) if fetched else None
+                        entity_ids=reconcile_ids, repair=True
+                    ) if reconcile_ids else None
                     return run_items, reconciliation
 
             def write_ha_report(
@@ -3499,6 +3521,7 @@ class ImportService:
                 items: list[dict] = []
                 errors: list[str] = list(vorab_fehler)
                 reconciliation_report = None
+                self._ha_cancel.clear()
                 logger.info(
                     "Home-Assistant-Import gestartet · Quelle=%s · Entitäten=%d · Zeitraum=%s",
                     history_source, len(entity_ids), range_preset,
@@ -3527,6 +3550,10 @@ class ImportService:
                         entity_ids, start, end, history_source, period, on_entity=melde_entitaet,
                     )
                 errors.extend(fetch_errors)
+                if self._ha_cancel.is_set():
+                    fetched = {}
+                    errors.append(tr("Import abgebrochen. Es wurde nichts geschrieben."))
+                    logger.info("Home-Assistant-Import abgebrochen (vor dem Schreiben) · event=ha_import_cancelled")
 
                 if fetched:
                     self._ha_progress.set_phase(
@@ -3585,6 +3612,16 @@ class ImportService:
                 request, "_job_progress.html", self._ha_progress_context()
             )
 
+
+        @router.post("/import/ha/cancel", response_class=HTMLResponse)
+        def import_ha_cancel(request: Request) -> HTMLResponse:
+            """Bricht zwischen zwei Entitäten ab; ein Schreibvorgang läuft immer zu Ende. Nur der Import,
+            nicht die Vorschau: Ein Abbruch vor dem Schreiben lässt alles unberührt."""
+            snapshot = self._ha_progress.snapshot()
+            if snapshot["running"] and snapshot["kind"] != "dry-run":
+                self._ha_cancel.set()
+                logger.info("Home-Assistant-Import: Abbruch angefordert · event=ha_import_cancel_requested")
+            return self.deps.templates.TemplateResponse(request, "_job_progress.html", self._ha_progress_context())
 
         @router.get("/import/ha/progress", response_class=HTMLResponse)
         def import_ha_progress(request: Request) -> HTMLResponse:
@@ -3778,7 +3815,12 @@ class ImportService:
             ) -> tuple[list[dict], dict | None]:
                 with self.deps.coordinator.exclusive():
                     run_items = []
+                    cancelled = False
                     for nummer, (entity_id, history) in enumerate(fetched.items()):
+                        if self._vm_cancel.is_set():
+                            cancelled = True
+                            errors.append(tr("Import abgebrochen. Bereits geschriebene Entitäten bleiben erhalten."))
+                            break
                         self._vm_progress.advance(nummer, entity_id)
                         entity = self.deps.index.get_entity(entity_id)
                         try:
@@ -3801,9 +3843,11 @@ class ImportService:
                             "result": result,
                         })
                     self._vm_progress.advance(len(fetched), "")
+                    # Nach einem Abbruch nur die geschriebenen Entitäten abgleichen.
+                    reconcile_ids = [item["entity_id"] for item in run_items] if cancelled else sorted(fetched.keys())
                     reconciliation = self.deps.run_storage_reconciliation(
-                        entity_ids=sorted(fetched.keys()), repair=True
-                    ) if fetched else None
+                        entity_ids=reconcile_ids, repair=True
+                    ) if reconcile_ids else None
                     return run_items, reconciliation
 
             def write_vm_report(
@@ -3839,6 +3883,7 @@ class ImportService:
                 items: list[dict] = []
                 errors: list[str] = list(vorab_fehler)
                 reconciliation_report = None
+                self._vm_cancel.clear()
                 logger.info(
                     "VictoriaMetrics-Import gestartet · Entitäten=%d · Zeitraum=%s", len(entity_ids), range_preset,
                 )
@@ -3850,6 +3895,10 @@ class ImportService:
                     entity_ids, start, end, base_url, on_entity=self._vm_progress.advance,
                 )
                 errors.extend(fetch_errors)
+                if self._vm_cancel.is_set():
+                    fetched = {}
+                    errors.append(tr("Import abgebrochen. Es wurde nichts geschrieben."))
+                    logger.info("VictoriaMetrics-Import abgebrochen (vor dem Schreiben) · event=vm_import_cancelled")
 
                 if fetched:
                     self._vm_progress.set_phase(
@@ -3893,6 +3942,14 @@ class ImportService:
                 request, "_job_progress.html", self._vm_progress_context()
             )
 
+
+        @router.post("/import/vm/cancel", response_class=HTMLResponse)
+        def import_vm_cancel(request: Request) -> HTMLResponse:
+            """Bricht zwischen zwei Entitäten ab; ein Schreibvorgang läuft immer zu Ende."""
+            if self._vm_progress.snapshot()["running"]:
+                self._vm_cancel.set()
+                logger.info("VictoriaMetrics-Import: Abbruch angefordert · event=vm_import_cancel_requested")
+            return self.deps.templates.TemplateResponse(request, "_job_progress.html", self._vm_progress_context())
 
         @router.get("/import/vm/progress", response_class=HTMLResponse)
         def import_vm_progress(request: Request) -> HTMLResponse:

@@ -21,6 +21,7 @@
 - **Import**
   - CSV and Symcon import: new option “Fill archive gaps” adds only missing timestamps to months that already exist; existing values stay unchanged
   - InfluxDB, VictoriaMetrics, Symcon and Home Assistant import (long-term statistics): the preview points out when the unit of the source (for example Wh) differs from the stored one (for example kWh) and shows the factor
+  - Home Assistant and VictoriaMetrics import: a running import can be cancelled; nothing is written if it is cancelled while fetching, and entities already written are kept
   - CSV import: the form shows the stored unit of the target entity, so the file can be prepared in the right unit
 - **Tables**
   - New row option “In Σ column” (Automatic, Yes, No)

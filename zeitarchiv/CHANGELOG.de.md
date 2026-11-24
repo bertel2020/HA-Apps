@@ -21,6 +21,7 @@
 - **Import**
   - CSV- und Symcon-Import: neue Option „Archivlücken füllen“ ergänzt in bereits vorhandenen Monaten nur fehlende Zeitstempel; vorhandene Werte bleiben unverändert
   - InfluxDB-, VictoriaMetrics-, Symcon- und Home-Assistant-Import (Langzeitstatistik): Die Vorschau weist darauf hin, wenn die Einheit der Quelle (z. B. Wh) von der gespeicherten (z. B. kWh) abweicht, und nennt den Faktor
+  - Home-Assistant- und VictoriaMetrics-Import: Ein laufender Import lässt sich abbrechen; beim Abbruch während des Abrufs wird nichts geschrieben, bereits geschriebene Entitäten bleiben erhalten
   - CSV-Import: Die Maske zeigt die gespeicherte Einheit der Ziel-Entität, damit die Datei in der richtigen Einheit vorbereitet werden kann
 - **Tabellen**
   - Neue Zeilenoption „In Σ-Spalte“ (Automatisch, Ja, Nein)
