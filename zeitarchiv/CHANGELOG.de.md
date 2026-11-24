@@ -10,10 +10,15 @@
 >
 > 🇬🇧 [English version](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md)
 
-## Unreleased
+## 1.57.0 - 2026-11-24
 
 ### Neu
 
+- **Wetterdashboard**
+  - Dauern in der Tabelle (Regenminuten, regenreichster Tag) bekommen eine zweite Zeile in Stunden bzw. Tagen und Stunden
+  - Am Handy lässt sich die Legende der Vergleichsdiagramme einklappen (ab fünf Linien)
+- **Handy**
+  - Import-Reiter und Auswahlleisten mit vielen Einträgen lassen sich mit Pfeilen verschieben; Legenden mit vielen Jahren verdecken das Diagramm nicht mehr
 - **Energiedashboard**
   - Zähler in Wh lassen sich den Rollen zuordnen (Netz, Einspeisung, Erzeuger, Speicher, Verbraucher); die Werte erscheinen in kWh
 - **Entitäten**
@@ -23,12 +28,17 @@
   - InfluxDB-, VictoriaMetrics-, Symcon- und Home-Assistant-Import (Langzeitstatistik): Die Vorschau weist darauf hin, wenn die Einheit der Quelle (z. B. Wh) von der gespeicherten (z. B. kWh) abweicht, und nennt den Faktor
   - Home-Assistant- und VictoriaMetrics-Import: Ein laufender Import lässt sich abbrechen; beim Abbruch während des Abrufs wird nichts geschrieben, bereits geschriebene Entitäten bleiben erhalten
   - CSV-Import: Die Maske zeigt die gespeicherte Einheit der Ziel-Entität, damit die Datei in der richtigen Einheit vorbereitet werden kann
+  - Home-Assistant-Statistik: weniger Verbindungen beim Abruf, auch bei der Verfügbarkeitsprüfung
 - **Tabellen**
   - Neue Zeilenoption „In Σ-Spalte“ (Automatisch, Ja, Nein)
     - „Ja“ addiert die Zellwerte der Zeile, auch bei Messwerten und Formeln; „Nein“ lässt die Zeile aus
 
 ### Behoben
 
+- **Wetterdashboard**: Auf dem iPhone zeigt die Raumauswahl keine Lücken mehr zwischen Etage und Raum-Chips
+- **Archiv**: Robustheit
+  - Eine fehlschlagende Entität stoppt die Reparatur der Rollup-Dateien für die anderen nicht mehr; Fehler werden je Entität protokolliert
+  - Alte offene Ingest-Claims (älter als 7 Tage) werden verworfen, statt bei jedem Start gemeldet zu werden
 - **Tabellen**
   - Fehlende Werte werden nicht mehr als 0 gerechnet: ein Zeitraum ohne Daten zeigt „–“, und Formeln, die ihn verwenden, bleiben leer statt einen Scheinwert zu zeigen
     - Zähler ohne Daten in einem Zeitraum zeigen jetzt „–“ statt 0; echte Nullwerte bleiben 0

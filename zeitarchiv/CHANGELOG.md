@@ -10,10 +10,15 @@
 >
 > 🇩🇪 [Änderungen auf Deutsch](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md)
 
-## Unreleased
+## 1.57.0 - 2026-11-24
 
 ### New
 
+- **Weather dashboard**
+  - Durations in the table (rain minutes, wettest day) get a second line in hours or days and hours
+  - On phones the legend of the comparison charts can be collapsed (from five lines)
+- **Phones**
+  - Import tabs and selection bars with many entries scroll with arrows; legends with many years no longer cover the chart
 - **Energy dashboard**
   - Meters in Wh can be assigned to the roles (grid, feed-in, generation, storage, consumers); values are shown in kWh
 - **Entities**
@@ -23,12 +28,17 @@
   - InfluxDB, VictoriaMetrics, Symcon and Home Assistant import (long-term statistics): the preview points out when the unit of the source (for example Wh) differs from the stored one (for example kWh) and shows the factor
   - Home Assistant and VictoriaMetrics import: a running import can be cancelled; nothing is written if it is cancelled while fetching, and entities already written are kept
   - CSV import: the form shows the stored unit of the target entity, so the file can be prepared in the right unit
+  - Home Assistant statistics: fewer connections when fetching, also for the availability check
 - **Tables**
   - New row option “In Σ column” (Automatic, Yes, No)
     - “Yes” adds up the cell values of the row, also for measurements and formulas; “No” leaves the row out
 
 ### Fixed
 
+- **Weather dashboard**: on the iPhone the room selection no longer shows gaps between the floor and the room chips
+- **Archive**: robustness
+  - A failing entity no longer stops the repair of the rollup files for the others; errors are logged per entity
+  - Old open ingest claims (older than 7 days) are discarded instead of being reported at every start
 - **Tables**
   - Missing values are no longer calculated as 0: a period without data shows “–”, and formulas that use it stay empty instead of showing a made-up result
     - Counters without data in a period now show “–” instead of 0; real zeros stay 0
