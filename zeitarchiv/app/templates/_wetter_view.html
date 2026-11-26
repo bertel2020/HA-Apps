@@ -69,7 +69,7 @@
   </div>
   <p class="hint hint-warn" x-show="error" x-text="error" x-cloak></p>
   <div class="tbl-wrap wt-table-wrap" x-ref="tableWrap{{ group | capitalize if group != 'basis' else '' }}">
-    <table class="wt-table" x-ref="table{{ group | capitalize if group != 'basis' else '' }}"><tbody><tr><td class="wt-loading">{{ _("Lädt …") }}</td></tr></tbody></table>
+    <table class="wt-table wt-climate-table" x-ref="table{{ group | capitalize if group != 'basis' else '' }}"><tbody><tr><td class="wt-loading">{{ _("Lädt …") }}</td></tr></tbody></table>
   </div>
 {% endmacro %}
 
