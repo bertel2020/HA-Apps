@@ -298,6 +298,14 @@
                                 <option value="no">{{ _("Nein") }}</option>
                               </select>
                             </label>
+                            <label class="dd-picker-row" style="flex-wrap:wrap;gap:4px" x-show="(row.row_type === 'entity' || row.row_type === 'group' || row.row_type === 'formula') && canShowDuration(row)"
+                                   data-tooltip="{{ _('Stunden als Tage, Stunden und Minuten anzeigen (nur bei Einheit h)') }}">
+                              <span style="white-space:nowrap">{{ _("Anzeige") }}</span>
+                              <select x-model="row.display_format" style="flex:1 1 100%;min-width:0">
+                                <option value="auto">{{ _("Automatisch") }}</option>
+                                <option value="duration">{{ _("Dauer (TT hh:mm)") }}</option>
+                              </select>
+                            </label>
                           </div>
                         </span>
                         <div class="tbl-row-move">

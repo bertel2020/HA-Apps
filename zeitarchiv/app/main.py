@@ -4677,6 +4677,7 @@ class _TableRowBody(BaseModel):
     # Trennlinie wird zur Leerzeile, hat aber weiter ihre Abschnittsgrenze
     # für Summenzeilen und Anteile.
     hide_line: bool = False
+    display_format: Literal["auto", "duration"] = "auto"  # entity/group/formula: "duration" zeigt Stunden als "TT hh:mm" (nur Einheit h), rein optisch
 
 
 class _TableStyleBody(BaseModel):

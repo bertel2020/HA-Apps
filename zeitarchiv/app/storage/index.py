@@ -853,7 +853,8 @@ CREATE TABLE IF NOT EXISTS table_rows (
     percent_of_total INTEGER NOT NULL DEFAULT 0,
     sum_mode TEXT NOT NULL DEFAULT 'auto',
     hide_if_empty INTEGER NOT NULL DEFAULT 0,
-    hide_line INTEGER NOT NULL DEFAULT 0
+    hide_line INTEGER NOT NULL DEFAULT 0,
+    display_format TEXT NOT NULL DEFAULT 'auto'
 );
 """
 
@@ -1538,6 +1539,9 @@ class Index:
         if "hide_line" not in table_row_columns:
             # Leerzeile: eine Trennlinie ohne sichtbare Linie (main.py _TableRowBody.hide_line).
             self._conn.execute("ALTER TABLE table_rows ADD COLUMN hide_line INTEGER NOT NULL DEFAULT 0")
+        if "display_format" not in table_row_columns:
+            # Zeilenweises Anzeigeformat: auto / duration (main.py _TableRowBody.display_format).
+            self._conn.execute("ALTER TABLE table_rows ADD COLUMN display_format TEXT NOT NULL DEFAULT 'auto'")
 
         table_column_columns = {row["name"] for row in self._conn.execute("PRAGMA table_info(table_columns)")}
         if "decimals" not in table_column_columns:
@@ -3955,8 +3959,8 @@ class Index:
         self._conn.executemany(
             "INSERT INTO table_rows "
             "(table_id, position, label, row_type, entity_ids, formula, formula_unit, bold, aggregation, hidden, "
-            "show_label, accent, percent_of_total, hide_if_empty, hide_line, sum_mode) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "show_label, accent, percent_of_total, hide_if_empty, hide_line, sum_mode, display_format) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 (
                     table_id, i, r["label"], r["row_type"], json.dumps(r["entity_ids"]),
@@ -3964,6 +3968,7 @@ class Index:
                     int(r.get("hidden", False)), int(r.get("show_label", False)), int(r.get("accent", False)),
                     int(r.get("percent_of_total", False)),
                     int(r.get("hide_if_empty", False)), int(r.get("hide_line", False)), r.get("sum_mode", "auto"),
+                    r.get("display_format", "auto"),
                 )
                 for i, r in enumerate(rows)
             ],
@@ -4066,7 +4071,7 @@ class Index:
                     "show_label": bool(r["show_label"]), "accent": bool(r["accent"]),
                     "percent_of_total": bool(r["percent_of_total"]),
                     "hide_if_empty": bool(r["hide_if_empty"]), "hide_line": bool(r["hide_line"]),
-                    "sum_mode": r["sum_mode"],
+                    "sum_mode": r["sum_mode"], "display_format": r["display_format"],
                 }
                 for r in row_rows
             ]

@@ -288,7 +288,7 @@
         columns: INITIAL_COLUMNS.map(c => ({decimals: 'auto', year_over_year: false, hidden: false, group_label: '', heatmap: false, width: null, in_sum: true, ...c, uid: uid(), offset: Math.min(c.offset || 0, 0)})),
         rows: INITIAL_ROWS.map(r => ({
           formula_unit: '', aggregation: 'auto', hidden: false, show_label: false, accent: false,
-          percent_of_total: false, hide_if_empty: false, hide_line: false, sum_mode: 'auto',
+          percent_of_total: false, hide_if_empty: false, hide_line: false, sum_mode: 'auto', display_format: 'auto',
           ...r, uid: uid(), pickerOpen: false, typePickerOpen: false, aggPickerOpen: false, optsPickerOpen: false, search: '',
         })),
         style: {...DEFAULT_STYLE, ...INITIAL_STYLE},
@@ -347,7 +347,7 @@
         // Der Menü-Button selbst wird aktiv, sobald irgendeine enthaltene
         // Option an ist — sonst müsste man das Menü öffnen, um das zu sehen.
         rowOptionsActive(row) {
-          return !!(row.bold || row.show_label || row.accent || row.percent_of_total || row.hide_if_empty || row.hide_line || (row.sum_mode && row.sum_mode !== 'auto'));
+          return !!(row.bold || row.show_label || row.accent || row.percent_of_total || row.hide_if_empty || row.hide_line || (row.sum_mode && row.sum_mode !== 'auto') || row.display_format === 'duration');
         },
 
         // Manuelle Spaltenbreite (col.width/style.label_col_width, per
@@ -539,7 +539,7 @@
           this.rows.push({
             uid: uid(), label: '', row_type: type, entity_ids: [], formula: '', formula_unit: '',
             aggregation: type === 'summary' ? 'sum' : 'auto', bold: false, hidden: false, show_label: false,
-            accent: false, percent_of_total: false, hide_if_empty: false, hide_line: false, sum_mode: 'auto', ...(extra || {}),
+            accent: false, percent_of_total: false, hide_if_empty: false, hide_line: false, sum_mode: 'auto', display_format: 'auto', ...(extra || {}),
             pickerOpen: false, typePickerOpen: false, aggPickerOpen: false, optsPickerOpen: false, search: '',
           });
           this.load();
@@ -698,7 +698,15 @@
         displayCell(row, col) {
           const cell = this.values[col.uid] && this.values[col.uid][row.uid];
           if (row.percent_of_total) return TableCompute.percentOfTotalCell(cell, this.sectionMemberCells(row, col));
-          return cell;
+          return TableCompute.durationCell(cell, row);
+        },
+        // Dauerformat nur anbieten, wenn die Zeile Stunden liefert (oder schon darauf steht, damit man es zurücksetzen kann).
+        canShowDuration(row) {
+          if (row.display_format === 'duration') return true;
+          return this.columns.some(col => {
+            const cell = this.values[col.uid] && this.values[col.uid][row.uid];
+            return !!cell && cell.value != null && cell.unit === 'h';
+          });
         },
         cellNumberParts(row, col) {
           const cell = this.displayCell(row, col);
@@ -788,7 +796,7 @@
           // table-compute.js. Statt einer vagen Phrase ("...zum aktuellen
           // Zeitpunkt") die tatsächliche Uhrzeit des Vergleichs-Cutoffs
           // (windowStart + elapsedSeconds derselben Spalte).
-          const comparisonValueStr = TableCompute.comparisonValueText(comparisonCell, comparisonCol.decimals);
+          const comparisonValueStr = TableCompute.comparisonValueText(comparisonCell, comparisonCol.decimals, row);
           if (!comparisonValueStr) return t('Gegenüber {label}', {label: comparisonLabel});
           const comparisonTimeStr = TableCompute.comparisonElapsedTimeText(
             this.windowStarts[comparisonCol.uid], this.elapsedSeconds[comparisonCol.uid], comparisonCol.range_key);
@@ -944,7 +952,7 @@
           const col = this.columns.find(c => !c.hidden && c.in_sum !== false);
           return col ? col.decimals : 'auto';
         },
-        sumCell(row) { return this.rowSums[row.uid] || null; },
+        sumCell(row) { return TableCompute.durationCell(this.rowSums[row.uid] || null, row); },
         sumNumberParts(row) {
           return TableCompute.cellNumberParts(this.sumCell(row), this.sumDecimals(row), this.style.explicit_missing);
         },
@@ -1002,6 +1010,7 @@
               percent_of_total: (r.row_type === 'entity' || r.row_type === 'group') ? !!r.percent_of_total : false,
               hide_if_empty: (r.row_type === 'entity' || r.row_type === 'group') ? !!r.hide_if_empty : false,
               sum_mode: (r.row_type === 'entity' || r.row_type === 'group' || r.row_type === 'formula') ? (r.sum_mode || 'auto') : 'auto',
+              display_format: (r.row_type === 'entity' || r.row_type === 'group' || r.row_type === 'formula') ? (r.display_format === 'duration' ? 'duration' : 'auto') : 'auto',
             })),
             style: this.style,
           };
