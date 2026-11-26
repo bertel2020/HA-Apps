@@ -670,7 +670,10 @@
         normalize: NORMALIZE,
         averageStyle: AVERAGE_STYLE,
         horizontal: HORIZONTAL,
-        raw: false,
+        // Gespeicherte Wahl, aber nur wo Rohwerte überhaupt möglich sind: bis
+        // Woche und nicht zusammen mit Periodenvergleich (Vergleich hat Vorrang,
+        // siehe toggleRaw()). Sonst bliebe ein unsichtbar aktives raw=true.
+        raw: RAW && !COMPARE && ['hour', 'day', 'week'].includes(RANGE_KEY),
         // Zeitstrahl (AN-Intervalle statt Linie/Balken) — wie auf der
         // Entität-eigenen Chart-Seite, hier nur sinnvoll/anwählbar, wenn ALLE
         // geladenen Serien Schalter sind (siehe allSwitch-Getter); bei
@@ -3607,6 +3610,7 @@
             average_line: this.averageLine,
             area_fill: this.areaFill,
             show_points: this.showPoints,
+            raw: this.raw,
             stacked: this.stacked,
             normalize: this.normalize,
             average_style: this.averageStyle,

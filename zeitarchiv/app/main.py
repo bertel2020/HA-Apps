@@ -3651,6 +3651,7 @@ def _chart_editor_context(chart: dict | None, prefill: dict | None = None) -> di
         "show_values": chart["show_values"] if chart else prefill.get("show_values", False),
         "average_line": chart["average_line"] if chart else prefill.get("average_line", False),
         "area_fill": chart["area_fill"] if chart else prefill.get("area_fill", True), "show_points": chart["show_points"] if chart else prefill.get("show_points", False),
+        "raw": chart["raw"] if chart else prefill.get("raw", False),
         "stacked": chart["stacked"] if chart else False,
         "normalize": chart["normalize"] if chart else False,
         "average_style": chart["average_style"] if chart else prefill.get("average_style", "flat"),
@@ -3728,6 +3729,7 @@ class _SaveChartBody(BaseModel):
     average_line: bool = False
     area_fill: bool = True
     show_points: bool = False
+    raw: bool = False
     stacked: bool = False
     normalize: bool = False
     average_style: str = "flat"
@@ -3788,7 +3790,7 @@ def charts_create(body: _SaveChartBody) -> dict:
         chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
         legend_style=body.legend_style, legend_size=body.legend_size, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
-        average_line=body.average_line, area_fill=body.area_fill, show_points=body.show_points,
+        average_line=body.average_line, area_fill=body.area_fill, show_points=body.show_points, raw=body.raw,
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
         horizontal=body.horizontal, donut_aggregation=body.donut_aggregation,
         period_anchor=period_anchor_or_400(body.period_anchor), compare_settings=compare_settings_or_400(body.compare_settings),
@@ -3850,7 +3852,7 @@ def charts_update(chart_id: int, body: _SaveChartBody) -> dict:
         dynamic_y_axis=body.dynamic_y_axis, chart_stats=body.chart_stats, legend_metrics=body.legend_metrics,
         legend_style=body.legend_style, legend_size=body.legend_size, chart_type=body.chart_type,
         decimals=body.decimals, show_values=body.show_values,
-        average_line=body.average_line, area_fill=body.area_fill, show_points=body.show_points,
+        average_line=body.average_line, area_fill=body.area_fill, show_points=body.show_points, raw=body.raw,
         stacked=body.stacked, normalize=body.normalize, average_style=body.average_style,
         horizontal=body.horizontal, donut_aggregation=body.donut_aggregation,
         period_anchor=period_anchor_or_400(body.period_anchor), compare_settings=compare_settings_or_400(body.compare_settings),
@@ -3895,7 +3897,7 @@ def charts_duplicate(chart_id: int) -> dict:
         chart_stats=chart["chart_stats"], legend_metrics=chart["legend_metrics"],
         legend_style=chart["legend_style"], legend_size=chart["legend_size"], chart_type=chart["chart_type"],
         decimals=chart["decimals"], show_values=chart["show_values"],
-        average_line=chart["average_line"], area_fill=chart["area_fill"], show_points=chart["show_points"],
+        average_line=chart["average_line"], area_fill=chart["area_fill"], show_points=chart["show_points"], raw=chart["raw"],
         stacked=chart["stacked"], normalize=chart["normalize"], average_style=chart["average_style"],
         horizontal=chart["horizontal"], donut_aggregation=chart["donut_aggregation"],
         period_anchor=chart["period_anchor"], compare_settings=chart["compare_settings"],

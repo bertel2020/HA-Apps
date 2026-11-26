@@ -10,6 +10,12 @@
 >
 > 🇩🇪 [Änderungen auf Deutsch](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md)
 
+## Unreleased
+
+### Fixed
+
+- **Charts**: "Raw values" is saved with the chart again; the switch in the editor no longer jumps back after reopening
+
 ## 1.57.0 - 2026-11-24
 
 ### New

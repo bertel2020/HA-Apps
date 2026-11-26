@@ -1375,6 +1375,15 @@ class Index:
             self._conn.execute(
                 "ALTER TABLE saved_charts ADD COLUMN area_fill INTEGER NOT NULL DEFAULT 1"
             )
+        if "raw" not in sc_columns:
+            # "Rohwerte" (Optionen-Menü, "Daten") — Einzelwerte statt Buckets.
+            # Wurde bislang nur im Editor-Zustand gehalten (fest false beim
+            # Öffnen) und beim Speichern verworfen, der Schalter sprang bei
+            # jedem Aufruf zurück. Default AUS: das entspricht dem bisherigen
+            # Verhalten bestehender Charts.
+            self._conn.execute(
+                "ALTER TABLE saved_charts ADD COLUMN raw INTEGER NOT NULL DEFAULT 0"
+            )
         if "show_points" not in sc_columns:
             # "Punkte" (Optionen-Menü, "Darstellung") — Datenpunkte auf der
             # Linie markieren. Wurde bislang nur im Editor-Zustand gehalten und
@@ -2981,6 +2990,7 @@ class Index:
         average_line: bool = False,
         area_fill: bool = True,
         show_points: bool = False,
+        raw: bool = False,
         stacked: bool = False,
         normalize: bool = False,
         average_style: str = "flat",
@@ -3001,10 +3011,10 @@ class Index:
                 "(name, entity_ids, range_key, continuous, entity_names, hidden_entity_ids, "
                 "resolution_preset, "
                 "dynamic_y_axis, dashboard_animation, chart_stats, legend_metrics, legend_style, legend_size, "
-                "chart_type, decimals, show_values, average_line, area_fill, show_points, stacked, normalize, "
+                "chart_type, decimals, show_values, average_line, area_fill, show_points, raw, stacked, normalize, "
                 "average_style, horizontal, donut_aggregation, period_anchor, compare_settings, "
                 "heatmap_states, series_colors, stack_groups, series_style, created_at, updated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     name, json.dumps(entity_ids), range_key, int(continuous),
                     json.dumps(entity_names or {}), json.dumps(hidden_entity_ids or []),
@@ -3012,7 +3022,7 @@ class Index:
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, legend_size, chart_type, decimals, int(show_values),
-                    int(average_line), int(area_fill), int(show_points), int(stacked), int(normalize),
+                    int(average_line), int(area_fill), int(show_points), int(raw), int(stacked), int(normalize),
                     average_style, int(horizontal), donut_aggregation, period_anchor,
                     json.dumps(compare_settings or {}), json.dumps(heatmap_states or {}),
                     json.dumps(series_colors or {}), json.dumps(stack_groups or {}), json.dumps(series_style or {}), now, now,
@@ -3042,6 +3052,7 @@ class Index:
         average_line: bool = False,
         area_fill: bool = True,
         show_points: bool = False,
+        raw: bool = False,
         stacked: bool = False,
         normalize: bool = False,
         average_style: str = "flat",
@@ -3061,7 +3072,7 @@ class Index:
                 "entity_names = ?, hidden_entity_ids = ?, resolution_preset = ?, "
                 "dynamic_y_axis = ?, dashboard_animation = ?, "
                 "chart_stats = ?, legend_metrics = ?, legend_style = ?, legend_size = ?, chart_type = ?, decimals = ?, "
-                "show_values = ?, average_line = ?, area_fill = ?, show_points = ?, stacked = ?, normalize = ?, "
+                "show_values = ?, average_line = ?, area_fill = ?, show_points = ?, raw = ?, stacked = ?, normalize = ?, "
                 "average_style = ?, horizontal = ?, donut_aggregation = ?, period_anchor = ?, "
                 "compare_settings = ?, heatmap_states = ?, series_colors = ?, stack_groups = ?, series_style = ?, updated_at = ? WHERE id = ?",
                 (
@@ -3071,7 +3082,7 @@ class Index:
                     int(dynamic_y_axis), int(dashboard_animation), int(chart_stats),
                     json.dumps(legend_metrics if legend_metrics is not None else ["sum"]),
                     legend_style, legend_size, chart_type, decimals, int(show_values),
-                    int(average_line), int(area_fill), int(show_points), int(stacked), int(normalize),
+                    int(average_line), int(area_fill), int(show_points), int(raw), int(stacked), int(normalize),
                     average_style, int(horizontal), donut_aggregation, period_anchor,
                     json.dumps(compare_settings or {}), json.dumps(heatmap_states or {}),
                     json.dumps(series_colors or {}), json.dumps(stack_groups or {}), json.dumps(series_style or {}), time.time(), chart_id,
@@ -3094,6 +3105,7 @@ class Index:
         d["average_line"] = bool(d.get("average_line", 0))
         d["area_fill"] = bool(d.get("area_fill", 1))
         d["show_points"] = bool(d.get("show_points", 0))
+        d["raw"] = bool(d.get("raw", 0))
         d["stacked"] = bool(d.get("stacked", 0))
         d["normalize"] = bool(d.get("normalize", 0))
         d["average_style"] = d.get("average_style") or "flat"

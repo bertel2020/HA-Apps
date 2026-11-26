@@ -10,6 +10,12 @@
 >
 > 🇬🇧 [English version](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md)
 
+## Unreleased
+
+### Behoben
+
+- **Charts**: „Rohwerte“ wird mit dem Chart gespeichert; der Schalter im Editor springt nach dem erneuten Öffnen nicht mehr zurück
+
 ## 1.57.0 - 2026-11-24
 
 ### Neu
