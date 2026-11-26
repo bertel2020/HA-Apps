@@ -140,10 +140,10 @@ def test_dashboard_width_and_row_height_rules_live_in_the_switch_block() -> None
     assert "max(var(--dashboard-row-height)" in block
 
 
-def test_energy_and_weather_pages_cap_their_content_at_1440px_inside_the_switch_block() -> None:
+def test_energy_and_weather_pages_use_the_full_width_inside_the_switch_block() -> None:
     for name, root in (("energiedashboard", "#energiedashboard-root"), ("wetterdashboard", "#wetter-root")):
         css = (PAGE_CSS / f"{name}.css").read_text(encoding="utf-8")
-        rule = f':root[data-page-layout="wide"] {root}{{max-width:1440px;margin-inline:auto;}}'
+        rule = f':root[data-page-layout="wide"] {root}{{max-width:none;}}'
         assert css.count(rule) == 1, name
         assert css[: css.index(rule)].rstrip().endswith("@media (min-width:1200px){"), name
     energy = (PAGE_CSS / "energiedashboard.css").read_text(encoding="utf-8")
@@ -176,7 +176,7 @@ def test_consumer_share_card_stays_stacked_like_the_supply_card_in_the_switch_bl
     css = (PAGE_CSS / "energiedashboard.css").read_text(encoding="utf-8")
     rule = ':root[data-page-layout="wide"] .edash-verbraucher-card .edash-share-wrap{flex-direction:column;align-items:stretch;gap:14px;}'
     assert css.count(rule) == 1
-    assert css[: css.index(rule)].count('#energiedashboard-root{max-width:1440px;margin-inline:auto;}') == 1
+    assert css[: css.index(rule)].count('#energiedashboard-root{max-width:none;}') == 1
 
 
 def test_heating_month_table_shows_more_seasons_only_in_the_wide_layout() -> None:
