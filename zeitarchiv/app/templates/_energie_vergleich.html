@@ -9,7 +9,7 @@
 {% set hidden = config.langzeit_ausblenden or [] %}
 {% set cons_shown = consumer_count > 0 and 'verbraucher' not in hidden %}
 {# Einfache Anführungszeichen, weil tojson doppelte liefert. #}
-<div x-data='energieVergleich({{ {"consumers": consumer_count > 0, "hidden": hidden} | tojson }})' data-hints="collapsed">
+<div x-data='energieVergleich({{ {"consumers": consumer_count > 0, "hidden": hidden, "colHighlight": config.col_highlight or "pairs"} | tojson }})' data-hints="collapsed">
   <p class="hint hint-warn" x-show="consumersError" x-text="consumersError" x-cloak></p>
 
   <div class="card wt-card">
@@ -32,13 +32,13 @@
           <template x-for="option in tablePeriodOptions()" :key="option.col">
             <label class="dd-picker-row"><input type="checkbox" :checked="cols().includes(option.col)"
               :disabled="cols().length === 1 && cols().includes(option.col)"
-              @change="toggleCol(option.col)"><span x-text="option.label"></span></label>
+              @change="toggleCol(option.col)"><span x-text="option.label"></span><button type="button" class="wt-star" :class="{'is-on': isHl(option.col)}" x-show="hlMode === 'custom'" x-cloak :aria-pressed="isHl(option.col).toString()" aria-label="{{ _('Hervorheben') }}" title="{{ _('Hervorheben') }}" @click.prevent.stop="toggleHl(option.col)" x-text="isHl(option.col) ? '★' : '☆'"></button></label>
           </template>
           <div class="menu-section-label wt-vt-menu-sep" x-show="tableYearOptions().length" x-cloak>{{ _("Einzelne Jahre") }}</div>
           <template x-for="option in tableYearOptions()" :key="option.col">
             <label class="dd-picker-row"><input type="checkbox" :checked="cols().includes(option.col)"
               :disabled="cols().length === 1 && cols().includes(option.col)"
-              @change="toggleCol(option.col)"><span x-text="option.label"></span></label>
+              @change="toggleCol(option.col)"><span x-text="option.label"></span><button type="button" class="wt-star" :class="{'is-on': isHl(option.col)}" x-show="hlMode === 'custom'" x-cloak :aria-pressed="isHl(option.col).toString()" aria-label="{{ _('Hervorheben') }}" title="{{ _('Hervorheben') }}" @click.prevent.stop="toggleHl(option.col)" x-text="isHl(option.col) ? '★' : '☆'"></button></label>
           </template>
         </div>
       </div>

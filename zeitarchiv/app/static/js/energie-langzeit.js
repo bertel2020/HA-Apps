@@ -559,6 +559,9 @@
     const hasCons = !!opts.consumers && !hidden.includes('verbraucher');
     return {
       hasCons,
+      // Spaltenhervorhebung: Modus aus der Einrichtung (off, pairs, main, custom), die markierten Zeiträume je Browser.
+      hlMode: ['off', 'pairs', 'main', 'custom'].includes(opts.colHighlight) ? opts.colHighlight : 'pairs',
+      hlCols: [],
       opened: false,
       table: null,
       cons: null,
@@ -591,6 +594,7 @@
           const known = COLUMN_KEYS.filter((key) => saved.columns.includes(key));
           if (known.length) this.tblCols = known;
         }
+        if (Array.isArray(saved.hlCols)) this.hlCols = saved.hlCols.map(String);
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
         if (saved.mode === 'bis_jetzt' || saved.mode === 'komplett') this.mode = saved.mode;
@@ -742,6 +746,18 @@
         return chosen.length ? chosen : [...DEFAULT_COLUMNS];
       },
 
+      // Stern im Menü „Spalten“: Zeitraum hervorheben oder nicht (nur im Modus „Eigene Auswahl“).
+      isHl(col) {
+        return this.hlCols.includes(String(col));
+      },
+
+      toggleHl(col) {
+        const key = String(col);
+        this.hlCols = this.isHl(key) ? this.hlCols.filter((c) => c !== key) : [...this.hlCols, key];
+        writeStore({hlCols: this.hlCols});
+        this.drawTable();
+      },
+
       // Eine Spalte an- oder abwählen; die letzte gewählte bleibt (das Kästchen ist dann gesperrt).
       toggleCol(col) {
         const current = this.cols();
@@ -861,6 +877,7 @@
           table: this.table, cons: this.cons, months: this.months, columns: cols, vorjahr: this.vorjahr, diff: this.diff,
           main: this.main, filter: this.shownFilter(), sort: this.sortState(), selected: this.sel,
         });
+        window.ElementTableRender.applyColumnHighlight(table, {mode: this.hlMode, keys: cols.map(String), selected: this.hlCols, vorjahr: this.vorjahr});
         // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
         if (wrap) requestAnimationFrame(() => wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1));
       },

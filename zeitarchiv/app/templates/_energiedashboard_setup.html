@@ -1181,6 +1181,15 @@
         </div>
       </div>
       <div class="field" style="margin:18px 0 6px;">
+        <label>{{ _("Spaltenhervorhebung") }}</label>
+        <div class="edash-toggle-list" role="radiogroup" aria-label="{{ _('Spaltenhervorhebung') }}">
+          {% for key, label in (("off", _("Aus")), ("pairs", _("Paare abwechselnd")), ("main", _("Hauptspalten")), ("custom", _("Eigene Auswahl"))) %}
+          <label class="filter-chip"><input type="radio" name="col_highlight" value="{{ key }}" {% if config.col_highlight == key %}checked{% endif %}><span>{{ label }}</span></label>
+          {% endfor %}
+        </div>
+        <p class="settings-section-description">{{ _("Hebt in der Tabelle „Zeiträume im Vergleich“ Spalten farblich ab. Bei „Eigene Auswahl“ markierst du die Zeiträume im Menü „Spalten“ mit dem Stern.") }}</p>
+      </div>
+      <div class="field" style="margin:18px 0 6px;">
         <label>{{ _("Schwellen der Kenntage") }} {{ hint_button(_('Kenntage-Schwellen')) }}</label>
       </div>
       <p class="settings-section-description">{{ _("Ein leeres Feld verwendet die Vorgabe.") }}</p>

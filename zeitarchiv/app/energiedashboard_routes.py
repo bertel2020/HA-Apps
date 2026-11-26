@@ -202,6 +202,10 @@ DEFAULT_HUB_NAME = N_("Haus")
 # dem Schnitt der Vorperioden — ein Prozentsatz ist dafür die richtige Größe,
 # weil beide Seiten dieselbe Größenordnung haben. Die Ausreißer-Erkennung sucht
 # dagegen unplausible EINZELwerte und misst deshalb in Vielfachen des Üblichen.
+# Spaltenhervorhebung der Vergleichstabelle (siehe app.css, data-col-hl): aus, Paare abwechselnd, nur Zeitraum-Spalten,
+# eigene Auswahl (die Zeiträume markiert man im Menü „Spalten“, gemerkt je Browser).
+COL_HIGHLIGHT_MODES = ("off", "pairs", "main", "custom")
+DEFAULT_COL_HIGHLIGHT = "pairs"
 ANOMALIE_SCHWELLE_LABELS = {"off": N_("Aus"), "25": "25 %", "50": "50 %", "100": "100 %", "200": "200 %", "300": "300 %"}
 # Anzahl vorheriger Perioden, deren Schnitt als "üblicher" Vergleichswert
 # dient — mehrere statt nur der einen Vorperiode, damit ein Gerät, das
@@ -283,6 +287,7 @@ def _empty_config() -> dict:
         # Im Reiter „Langzeit“ abgewählte Bereiche (siehe energie_langzeit.TABLE_BLOCKS und CARD_BLOCKS). Leer heißt: alles
         # sichtbar, auch für Configs aus älteren Versionen.
         "langzeit_ausblenden": [],
+        "col_highlight": DEFAULT_COL_HIGHLIGHT,
     }
 
 
@@ -3732,12 +3737,15 @@ class EnergieDashboardService:
             kt_schwach: str = Form(""),
             kt_einsp: str = Form(""),
             langzeit_zeigen: list[str] = Form([]),
+            col_highlight: str = Form(""),
         ) -> HTMLResponse:
             if not netzbezug.strip():
                 raise HTTPException(status_code=422, detail=tr("Netzbezug ist Pflicht"))
             if anomalie_schwelle not in ANOMALIE_SCHWELLE_LABELS:
                 raise HTTPException(status_code=422, detail=tr("Ungültige Auffälligkeiten-Schwelle"))
 
+            if col_highlight and col_highlight not in COL_HIGHLIGHT_MODES:
+                raise HTTPException(status_code=422, detail=tr("Ungültige Spaltenhervorhebung: {value}", value=col_highlight))
             # Abgewählt ist, was im Formular nicht angehakt ist; „energie“ lässt sich nicht abwählen.
             langzeit_ausblenden = [
                 key for key in (*energie_langzeit.TABLE_BLOCKS[1:], *energie_langzeit.CARD_BLOCKS)
@@ -3915,6 +3923,8 @@ class EnergieDashboardService:
                 "anomalie_schwelle": anomalie_schwelle,
                 "kenntage": kenntage,
                 "langzeit_ausblenden": langzeit_ausblenden,
+                # Ohne Angabe (ältere Aufrufer) bleibt die bisherige Wahl.
+                "col_highlight": col_highlight or _load_config(deps.index)["col_highlight"],
             }
             _save_config(deps.index, config)
             sync_hourly_rollup_flags(deps.index, [eid for eid, _ in self._config_entity_roles(config)])

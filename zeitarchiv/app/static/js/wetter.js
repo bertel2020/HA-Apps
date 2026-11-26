@@ -360,6 +360,11 @@
 
       columnKeys: COLUMN_KEYS,
       columns: [...COLUMN_KEYS],
+      // Spaltenhervorhebung: Modus aus der Einrichtung (off, pairs, main, custom), die markierten Zeiträume je Browser.
+      hlMode: (['off', 'pairs', 'main', 'custom'].includes((document.querySelector('[data-col-highlight]') || {dataset: {}}).dataset.colHighlight)
+        ? document.querySelector('[data-col-highlight]').dataset.colHighlight : 'pairs'),
+      hlCols: [],
+      tableKeys: [],
       yearKeys: [],  // wählbare einzelne Jahre (vom Server, neueste zuerst)
       vorjahr: true,
       diff: true,
@@ -403,6 +408,7 @@
       init() {
         const saved = readStore();
         if (Array.isArray(saved.columns)) this.columns = saved.columns.filter((key) => COLUMN_KEYS.includes(key) || /^j\d{4}$/.test(key));
+        if (Array.isArray(saved.hlCols)) this.hlCols = saved.hlCols.map(String);
         if (typeof saved.vorjahr === 'boolean') this.vorjahr = saved.vorjahr;
         if (typeof saved.diff === 'boolean') this.diff = saved.diff;
         if (typeof saved.avgOnly === 'boolean') this.avgOnly = saved.avgOnly;
@@ -480,6 +486,25 @@
       },
 
       columnName,
+
+      isHl(key) {
+        return this.hlCols.includes(key);
+      },
+
+      // Stern im Menü „Spalten“: Zeitraum hervorheben oder nicht (nur im Modus „Eigene Auswahl“); zeichnet ohne neu zu laden.
+      toggleHl(key) {
+        this.hlCols = this.isHl(key) ? this.hlCols.filter((k) => k !== key) : [...this.hlCols, key];
+        writeStore({hlCols: this.hlCols});
+        this.highlightTables();
+      },
+
+      highlightTables() {
+        for (const group of GROUPS) {
+          window.ElementTableRender.applyColumnHighlight(this.$refs[refName('table', group)], {
+            mode: this.hlMode, keys: this.tableKeys || [], selected: this.hlCols, vorjahr: !!(lastTable && lastTable.vorjahr),
+          });
+        }
+      },
 
       toggleColumn(key) {
         this.columns = this.columns.includes(key)
@@ -625,6 +650,8 @@
           if (!table) continue;
           table.innerHTML = renderTable(data, group, this.diff, {avgOnly: this.avgOnly, closedFloors: this.floorsClosed, closedRooms: this.roomsClosed, roomColors: this.tableRoomColors(), floorOrder: this.roomOrder.floors, roomOrder: this.roomOrder.rooms, interactive: true});
           this.bindFloors(table);
+          this.tableKeys = data.columns.map((col) => col.key);
+          window.ElementTableRender.applyColumnHighlight(table, {mode: this.hlMode, keys: this.tableKeys, selected: this.hlCols, vorjahr: !!data.vorjahr});
           // Scroll-Hinweis des App-Standards (.tbl-wrap.is-scrollable), nur wenn die Tabelle wirklich breiter ist.
           wrap.classList.toggle('is-scrollable', wrap.scrollWidth > wrap.clientWidth + 1);
         }

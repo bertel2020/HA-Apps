@@ -2573,6 +2573,22 @@ button.entity-tab{background:none;border:0;cursor:pointer;font-family:inherit;}
 .wt-table td.wt-na .wt-v{color:var(--ink-faint);font-weight:400;}
 .wt-table td .wt-dl.wt-dl-good{color:var(--positive);}
 .wt-table td .wt-dl.wt-dl-bad{color:var(--danger);}
+/* Spaltenhervorhebung (Einstellung „Spaltenhervorhebung“ in Wetter und Energie, Attribut data-col-hl an der Tabelle):
+   pairs = jedes zweite Zeitraum-Paar (Spalte + Vorjahr) getönt, main = nur die Zeitraum-Spalten, custom = die im Menü
+   „Spalten“ markierten Zeiträume (Klasse wt-hl, gesetzt von ElementTableRender.applyColumnHighlight). Getönt wird nur mit
+   Vorjahr (main, pairs); ohne Vorjahr wechselt pairs Spalte für Spalte. Gemischt wird immer mit --surface (Tinte 5 % bzw. Akzent), denn
+   --surface-alt liegt im hellen Schema kaum und im dunklen weit von --surface entfernt. Mit der Karte teilt sich die Tabelle nichts davon. */
+.wt-table[data-col-hl="pairs"]:has(thead th.wt-vj) :is(thead th,tbody td):is(:nth-child(4n+2),:nth-child(4n+3)),
+.wt-table[data-col-hl="pairs"]:not(:has(thead th.wt-vj)) :is(thead th,tbody td):nth-child(2n){background:color-mix(in srgb,var(--ink) 5%,var(--surface));}
+.wt-table[data-col-hl="pairs"]:has(thead th.wt-vj) .wt-sep{border-left:1.5px solid var(--border-strong);}
+.wt-table[data-col-hl="main"]:has(thead th.wt-vj) :is(thead th.wt-cur,tbody td.wt-sep),
+.wt-table[data-col-hl="custom"] :is(thead th,tbody td).wt-hl{background:color-mix(in srgb,var(--accent-line-soft) 60%,var(--surface));}
+.wt-table[data-col-hl="custom"] thead tr:first-child th.wt-hl{box-shadow:inset 0 2px 0 var(--accent-line);}
+/* Stern im Menü „Spalten“ (nur im Modus „Eigene Auswahl“ bedienbar). */
+.dd-picker-row .wt-star{margin-left:auto;padding:0 2px;border:0;background:transparent;font:inherit;font-size:calc(15px * var(--font-scale, 1));line-height:1;color:var(--ink-faint);cursor:pointer;}
+.dd-picker-row .wt-star.is-on{color:var(--accent-line);}
+.dd-picker-row .wt-star:disabled{opacity:.35;cursor:default;}
+.dd-picker-row .wt-star:focus-visible{outline:2px solid var(--accent-line);outline-offset:1px;border-radius:4px;}
 
 .wt-chart{width:100%;height:300px;}
 .wt-rooms{display:flex;flex-wrap:wrap;align-content:flex-start;gap:6px;margin:0 0 8px;}

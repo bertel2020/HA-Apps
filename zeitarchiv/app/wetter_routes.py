@@ -256,6 +256,10 @@ SUN_CACHE_CONFIG_KEYS = (
 LAGE_LAYOUTS = ("large", "compact", "strip")
 DEFAULT_LAGE_LAYOUT = "strip"
 #: Stil der Kacheln auf den Wetterseiten: ``plate`` (Icon in getönter Plakette) oder ``tint`` (Fläche in der Rollenfarbe).
+# Spaltenhervorhebung der Vergleichstabelle (siehe app.css, data-col-hl): aus, Paare abwechselnd, nur Zeitraum-Spalten,
+# eigene Auswahl (die Zeiträume markiert man im Menü „Spalten“, gemerkt je Browser).
+COL_HIGHLIGHT_MODES = ("off", "pairs", "main", "custom")
+DEFAULT_COL_HIGHLIGHT = "pairs"
 TILE_STYLES = ("plate", "tint")
 DEFAULT_TILE_STYLE = "plate"
 #: Kacheln der weiteren Sensoren auf dem Reiter „Temperatur & Klima“: „single“ je Sensor, „room“ je Raum.
@@ -336,6 +340,7 @@ def _empty_config() -> dict:
         "cards_detail": False,
         "lage_layout": DEFAULT_LAGE_LAYOUT,
         "tile_style": DEFAULT_TILE_STYLE,
+        "col_highlight": DEFAULT_COL_HIGHLIGHT,
         "klima_tiles": DEFAULT_KLIMA_TILES,
         "klima_size": DEFAULT_KLIMA_SIZE,
         "floors_start": DEFAULT_FLOORS_START,
@@ -415,6 +420,8 @@ def _load_config(index: Index) -> dict:
         config["lage_layout"] = data["lage_layout"]
     if data.get("tile_style") in TILE_STYLES:
         config["tile_style"] = data["tile_style"]
+    if data.get("col_highlight") in COL_HIGHLIGHT_MODES:
+        config["col_highlight"] = data["col_highlight"]
     if data.get("klima_tiles") in KLIMA_TILES:
         config["klima_tiles"] = data["klima_tiles"]
     if data.get("klima_size") in KLIMA_SIZES:
@@ -2563,6 +2570,7 @@ class WetterService:
             sky_sunny_lx: str = Form(""),
             lage_layout: str = Form(""),
             tile_style: str = Form(""),
+            col_highlight: str = Form(""),
             klima_tiles: str = Form(""),
             klima_size: str = Form(""),
             floors_start: str = Form(""),
@@ -2631,6 +2639,10 @@ class WetterService:
             if style and style not in TILE_STYLES:
                 raise HTTPException(status_code=400, detail=tr("Ungültiger Kachelstil: {value}", value=style))
             config["tile_style"] = style or _load_config(deps.index)["tile_style"]
+            highlight = col_highlight.strip()
+            if highlight and highlight not in COL_HIGHLIGHT_MODES:
+                raise HTTPException(status_code=400, detail=tr("Ungültige Spaltenhervorhebung: {value}", value=highlight))
+            config["col_highlight"] = highlight or _load_config(deps.index)["col_highlight"]
             klima = klima_tiles.strip()
             if klima and klima not in KLIMA_TILES:
                 raise HTTPException(status_code=400, detail=tr("Ungültige Darstellung: {value}", value=klima))
