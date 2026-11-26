@@ -19,3 +19,4 @@ htmlcov/
 *.log
 data/
 */screenshots/
+.prettierignore
