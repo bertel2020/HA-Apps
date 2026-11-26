@@ -601,11 +601,10 @@
   [data-tile-style] .wt-tiles-lage[data-layout="strip"]{--wt-cols:2;}
 }
 
-/* Breite Darstellung (experimentell): die Seite wächst mit dem Rahmen (.page-wide), der Inhalt bleibt in allen Reitern
-   bei 1440px und steht mittig — wie das Dashboard-Raster. Breiter würden Sankey, Heatmap und Diagramme mit fester Höhe
-   zu flachen Streifen. Nur ab 1200px und nur mit Schalter, sonst bleibt alles wie bisher. */
+/* Breite Darstellung (experimentell): die Seite wächst mit dem Rahmen (.page-wide), der Inhalt nutzt in allen Reitern
+   die volle Breite des Rahmens (kein 1440px-Limit mehr). Nur ab 1200px und nur mit Schalter, sonst bleibt alles wie bisher. */
 @media (min-width:1200px){
-  :root[data-page-layout="wide"] #wetter-root{max-width:1440px;margin-inline:auto;}
+  :root[data-page-layout="wide"] #wetter-root{max-width:none;}
   /* Tabellen in ihrer Inhaltsbreite (z. B. 987px) ließen im 1440px-Rahmen rechts eine leere Fläche: auf die Kartenbreite
      ziehen. min-width statt width, damit breitere Tabellen weiter im Wrapper scrollen. */
   :root[data-page-layout="wide"] #wetter-root .wt-table{min-width:100%;}
