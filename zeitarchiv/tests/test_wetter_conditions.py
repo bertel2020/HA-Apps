@@ -330,3 +330,76 @@ def test_last_precip_kind_prefers_the_rarer_kind_in_the_window() -> None:
     assert cond.last_precip_kind([(0.0, "rainy"), (until - 900, "snowy")], until) == "snow"
     assert cond.last_precip_kind([(0.0, "snowy"), (until - 900, "hail"), (until - 300, "rainy")], until) == "hail"
 
+
+def _add_state(service, entity_id, changes):
+    """Zustands-Entität (Typ „state“) mit ``(Zeit, Text)``-Wechseln; None heißt „nicht verfügbar“."""
+    deps = service.deps
+    deps.index.get_or_create_entity(entity_id, "weather", None, None, state=True)
+    for ts, text in changes:
+        value = -1.0 if text is None else float(deps.index.state_index(entity_id, text, None, ts))
+        hotbuffer.append(deps.data_dir, entity_id, ts, value, TZ)
+        deps.index.record_write(entity_id, ts, value)
+
+
+def _rain_with_state(service, rain_changes, state_changes, **roles):
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(11, 58), -1.3)])
+    _add(service, "binary_sensor.regen", "binary_sensor", None, "", rain_changes)
+    _add_state(service, "weather.lage", state_changes)
+    _configure(service, temperature="sensor.t", precip_dur="binary_sensor.regen", weather_state="weather.lage", **roles)
+    return service.compute_conditions(NOW)["rain"]
+
+
+def test_conditions_rain_names_the_kind_from_the_weather_state(service) -> None:
+    rain = _rain_with_state(service, [(_ts(11, 30), 1.0)], [(_ts(6, 0), "cloudy"), (_ts(11, 20), "snowy")])
+    assert rain["raining"] is True and rain["kind"] == "snow"
+    assert "last_kind" not in rain
+
+
+def test_conditions_rain_kind_follows_the_state_now_not_the_start(service) -> None:
+    rain = _rain_with_state(
+        service, [(_ts(11, 0), 1.0)],
+        [(_ts(6, 0), "cloudy"), (_ts(11, 5), "rainy"), (_ts(11, 40), "snowy-rainy")],
+    )
+    assert rain["kind"] == "sleet"
+
+
+def test_conditions_rain_without_a_kind_in_the_state_has_no_kind_field(service) -> None:
+    rain = _rain_with_state(service, [(_ts(11, 30), 1.0)], [(_ts(6, 0), "cloudy")])
+    assert rain["raining"] is True and "kind" not in rain  # der Zustand hinkt hinterher: neutraler Text
+    rain = _rain_with_state(service, [(_ts(11, 30), 1.0)], [(_ts(6, 0), "snowy"), (_ts(11, 45), None)])
+    assert "kind" not in rain  # „nicht verfügbar“ zählt als unbekannt
+
+
+def test_conditions_dry_names_the_kind_of_the_last_precipitation(service) -> None:
+    rain = _rain_with_state(
+        service, [(_ts(9, 0), 1.0), (_ts(9, 30), 0.0)],
+        [(_ts(6, 0), "cloudy"), (_ts(9, 10), "snowy"), (_ts(9, 20), "cloudy")],
+    )
+    assert rain["raining"] is False and rain["last"] == _ts(9, 30) and rain["last_kind"] == "snow"
+    assert "kind" not in rain
+
+
+def test_conditions_dry_ignores_a_kind_older_than_the_window(service) -> None:
+    rain = _rain_with_state(
+        service, [(_ts(9, 0), 1.0), (_ts(9, 30), 0.0)],
+        [(_ts(5, 0), "snowy"), (_ts(7, 0), "cloudy")],
+    )
+    assert rain["raining"] is False and "last_kind" not in rain
+
+
+def test_conditions_weather_state_is_ignored_for_other_entity_types(service) -> None:
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(11, 58), -1.3)])
+    _add(service, "binary_sensor.regen", "binary_sensor", None, "", [(_ts(11, 30), 1.0)])
+    _add(service, "sensor.zahl", "sensor", "measurement", "", [(_ts(11, 0), 1.0)])
+    _configure(service, temperature="sensor.t", precip_dur="binary_sensor.regen", weather_state="sensor.zahl")
+    assert "kind" not in service.compute_conditions(NOW)["rain"]
+    _configure(service, temperature="sensor.t", precip_dur="binary_sensor.regen", weather_state="weather.fehlt")
+    assert "kind" not in service.compute_conditions(NOW)["rain"]
+
+
+def test_conditions_weather_state_alone_adds_nothing(service) -> None:
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(11, 58), -1.3)])
+    _add_state(service, "weather.lage", [(_ts(11, 0), "snowy")])
+    _configure(service, temperature="sensor.t", weather_state="weather.lage")
+    assert (service.compute_conditions(NOW) or {}).get("rain") is None  # Phase 1: Ein/Aus-Sensor bleibt nötig
+

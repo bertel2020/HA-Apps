@@ -2160,6 +2160,26 @@ class WetterService:
             timeline.insert(0, (start, False))
         return timeline
 
+    def _state_timeline(
+        self, entity_id: str, now_local: datetime, read_cache: query_mod.QueryReadCache,
+    ) -> list[tuple[float, str | None]]:
+        """Wechsel einer Zustands-Entität im Rückblick der Regenauswertung als ``(Zeit, Text)``.
+
+        Maßgeblich ist der Rohwert (englischer Schlüssel), nie die Übersetzung. „Nicht verfügbar“ und unbekannte
+        Indizes ergeben None. Der erste Eintrag ist der Zustand am Anfang des Fensters, falls einer bekannt ist."""
+        texts = {row["idx"]: row["text"] for row in self.deps.index.get_state_map(entity_id)}
+        start = (now_local - timedelta(hours=conditions.RAIN_LOOKBACK_HOURS)).timestamp()
+        rows = list(query_mod.cleanup.iter_raw_rows(
+            self.deps.data_dir, self.deps.index, entity_id, start, now_local.timestamp(), self.deps.tz,
+            now=now_local, max_rows=query_mod.MAX_RAW_QUERY_POINTS,
+            hot_rows_loader=read_cache.read_hot_rows,
+        ))
+        timeline = [(ts, texts.get(int(round(value)))) for ts, value in rows]
+        initial = query_mod._boundary_value(self.deps.data_dir, entity_id, start, self.deps.tz, read_cache, index=self.deps.index)  # noqa: SLF001
+        if initial is not None:
+            timeline.insert(0, (start, texts.get(int(round(initial)))))
+        return timeline
+
     def compute_conditions(self, now_local: datetime | None = None) -> dict | None:
         """Wetterlage jetzt: Himmelsklasse, Wind, Regen und Temperatur; fehlt eine Rolle, fehlt ihr Teil (nie „unbekannt“)."""
         config = _load_config(self.deps.index)
@@ -2222,6 +2242,20 @@ class WetterService:
         rain = None
         if config["precip_dur"] and index.get_entity(config["precip_dur"]) is not None:
             rain = conditions.rain_state(self._rain_timeline(config["precip_dur"], now_local, read_cache), now_local.timestamp())
+        # Wetterzustand: sagt, welche Art Niederschlag der Ein/Aus-Sensor meldet. Fehlt er oder nennt er keine Art
+        # (cloudy, nicht verfügbar), fehlen die Felder, und die Anzeige fällt auf den neutralen Text zurück.
+        state_entity = index.get_entity(config["weather_state"]) if config["weather_state"] else None
+        if rain is not None and state_entity is not None and state_entity["aggregation_type"] == "state":
+            if rain["raining"]:
+                kind = conditions.kind_at(self._state_timeline(config["weather_state"], now_local, read_cache), now_local.timestamp())
+                if kind:
+                    rain["kind"] = kind
+            elif rain["raining"] is False and rain["last"] is not None:
+                last_kind = conditions.last_precip_kind(
+                    self._state_timeline(config["weather_state"], now_local, read_cache), rain["last"],
+                )
+                if last_kind:
+                    rain["last_kind"] = last_kind
         if config["precip_mm"] and index.get_entity(config["precip_mm"]) is not None:
             midnight = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
             today = self.summarize(
