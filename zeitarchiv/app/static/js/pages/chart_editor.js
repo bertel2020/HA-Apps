@@ -3518,34 +3518,9 @@
         // beim Überfahren einer Scheibe deren Wert. items[i] = {main, sub} je Scheibe, resting = {main, sub} oder null.
         donutCenterGraphic(text) {
           const css = getComputedStyle(document.body);
-          const ink = css.getPropertyValue('--ink').trim();
-          const inkMuted = css.getPropertyValue('--ink-muted').trim();
-          return {
-            id: 'donut-center', silent: true,
-            elements: [{
-              id: 'donut-center-text', type: 'text', left: 'center', top: 'middle', silent: true,
-              style: {
-                text: text ? `{m|${text.main}}\n{s|${text.sub}}` : '',
-                textAlign: 'center', textVerticalAlign: 'middle',
-                rich: {
-                  m: {fontSize: 22, fontWeight: 600, fill: ink, lineHeight: 28, align: 'center'},
-                  s: {fontSize: 12, fill: inkMuted, lineHeight: 16, align: 'center'},
-                },
-              },
-            }],
-          };
+          return StateEntities.centerGraphic(text, css.getPropertyValue('--ink').trim(), css.getPropertyValue('--ink-muted').trim());
         },
-        bindDonutCenter(items, resting) {
-          const set = text => chartInstance.setOption({graphic: [{id: 'donut-center', elements: [{id: 'donut-center-text', style: {
-            text: text ? `{m|${text.main}}\n{s|${text.sub}}` : '',
-          }}]}]});
-          if (this._donutOver) chartInstance.off('mouseover', this._donutOver);
-          if (this._donutOut) chartInstance.off('globalout', this._donutOut);
-          this._donutOver = params => { if (params.seriesType === 'pie' && items[params.dataIndex]) set(items[params.dataIndex]); };
-          this._donutOut = () => set(resting);
-          chartInstance.on('mouseover', this._donutOver);
-          chartInstance.on('globalout', this._donutOut);
-        },
+        bindDonutCenter(items, resting) { StateEntities.bindCenter(chartInstance, items, resting); },
         renderDonut() {
           if (!chartInstance) chartInstance = newChartInstance();
           if (this.hasState) { this.renderStateDonuts(); return; }

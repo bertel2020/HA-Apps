@@ -33,3 +33,10 @@ def test_the_donut_centre_text_is_bound_for_both_donut_kinds() -> None:
     """Mitte des Rings: Summe bzw. Einschaltdauer in Ruhe, beim Überfahren der Wert der Scheibe."""
     assert EDITOR_JS.count("this.bindDonutCenter(") == 2
     assert "donutCenterGraphic(" in EDITOR_JS
+
+
+def test_the_tile_draws_the_centre_text_only_when_it_fits() -> None:
+    """Kachel und Karte teilen sich die Bausteine mit dem Editor; kleine Kacheln lassen die Mitte weg."""
+    assert "function centerGraphic(" in STATE_JS and "function bindCenter(" in STATE_JS
+    assert TILE_JS.count("StateEntities.bindCenter(") == 2
+    assert "tileDonutCenterFits(chart)" in TILE_JS

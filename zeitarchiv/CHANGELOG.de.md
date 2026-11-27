@@ -36,7 +36,7 @@
 - **Energiedashboard**: Feste Preise (Netzbezug, Einspeisung, Eigenverbrauch) werden in Cent eingetragen; bei einem Wert unter 1 erscheint ein Hinweis mit Korrektur per Klick (z. B. 0,0764 statt 7,64)
 - **Charts**: „Donut“ lässt sich erst ab zwei Entitäten wählen; mit nur einem Wert war er ein voller Ring ohne Aussage (Zustands-Entitäten funktionieren weiter mit einer)
   - Ausnahme ist eine einzelne An/Aus-Entität: Ihr Donut teilt den Zeitraum in „An“ und „Aus“ auf (auch in Kacheln und der Lovelace-Karte)
-  - Der Chart-Editor zeigt in der Mitte des Donuts einen Wert: die Summe (bei An/Aus die Einschaltdauer), beim Überfahren einer Scheibe deren Wert
+  - Der Donut zeigt in der Mitte einen Wert: die Summe (bei An/Aus die Einschaltdauer), beim Überfahren einer Scheibe deren Wert; in Kacheln und der Lovelace-Karte nur, wenn genug Platz ist
 
 ### Behoben
 

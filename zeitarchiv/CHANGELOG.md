@@ -36,7 +36,7 @@
 - **Energy dashboard**: fixed prices (grid, feed-in, self-consumption) are entered in cents; a value below 1 now shows a hint with a one-click correction (e.g. 0.0764 instead of 7.64)
 - **Charts**: “Donut” can only be chosen with at least two entities; with a single value it was a full ring without information (state entities still work with one)
   - A single on/off entity is the exception: its donut splits the period into “On” and “Off” (also in tiles and the Lovelace card)
-  - The chart editor shows a value in the middle of the donut: the total (or the on-time of an on/off entity), and the value of a slice while hovering it
+  - The donut shows a value in the middle: the total (or the on-time of an on/off entity), and the value of a slice while hovering it; in tiles and the Lovelace card only when there is room for it
 
 ### Fixed
 
