@@ -1156,29 +1156,73 @@
         ][stage] || '';
       },
 
+      // Art des Niederschlags für die Anzeige: aus dem Wetterzustand, sonst bei Frost neutral (siehe wetter-rain.js).
+      rainKind(rain) {
+        return WetterRain.kindOf(rain, WetterRain.isCold(this.conditions && this.conditions.temp));
+      },
+
+      rainSince(rain) {
+        const parts = WetterRain.sinceParts(rain.minutes);
+        if (parts.over != null) return t('mehr als {n} h', {n: parts.over});
+        return parts.h == null ? t('{n} min', {n: parts.n}) : t('{h} h {m} min', {h: parts.h, m: parts.m});
+      },
+
+      rainLabel(kind) {
+        if (kind === 'snow') return t('Schnee');
+        if (kind === 'sleet') return t('Schneeregen');
+        if (kind === 'hail') return t('Hagel');
+        if (kind === 'precip') return t('Niederschlag');
+        return t('Regen');
+      },
+
+      rainTileSince(kind, since) {
+        if (kind === 'snow') return t('Schnee seit {since}', {since});
+        if (kind === 'sleet') return t('Schneeregen seit {since}', {since});
+        if (kind === 'hail') return t('Hagel seit {since}', {since});
+        if (kind === 'precip') return t('Niederschlag seit {since}', {since});
+        return t('Regen seit {since}', {since});
+      },
+
+      rainTileLast(kind, time, sameDay) {
+        if (kind === 'snow') return sameDay ? t('zuletzt Schnee um {time}', {time}) : t('zuletzt Schnee am {time}', {time});
+        if (kind === 'sleet') return sameDay ? t('zuletzt Schneeregen um {time}', {time}) : t('zuletzt Schneeregen am {time}', {time});
+        if (kind === 'hail') return sameDay ? t('zuletzt Hagel um {time}', {time}) : t('zuletzt Hagel am {time}', {time});
+        if (kind === 'precip') return sameDay ? t('zuletzt Niederschlag um {time}', {time}) : t('zuletzt Niederschlag am {time}', {time});
+        return sameDay ? t('zuletzt Regen um {time}', {time}) : t('zuletzt Regen am {time}', {time});
+      },
+
+      rainSentence(kind, since) {
+        if (kind === 'snow') return t('Es schneit seit {since}.', {since});
+        if (kind === 'sleet') return t('Es fällt Schneeregen seit {since}.', {since});
+        if (kind === 'hail') return t('Es hagelt seit {since}.', {since});
+        if (kind === 'precip') return t('Es fällt Niederschlag seit {since}.', {since});
+        return t('Es regnet seit {since}.', {since});
+      },
+
+      rainDrySentence(kind, time, sameDay) {
+        if (kind === 'snow') return sameDay ? t('Aktuell trocken, zuletzt Schnee um {time}.', {time}) : t('Aktuell trocken, zuletzt Schnee am {time}.', {time});
+        if (kind === 'sleet') return sameDay ? t('Aktuell trocken, zuletzt Schneeregen um {time}.', {time}) : t('Aktuell trocken, zuletzt Schneeregen am {time}.', {time});
+        if (kind === 'hail') return sameDay ? t('Aktuell trocken, zuletzt Hagel um {time}.', {time}) : t('Aktuell trocken, zuletzt Hagel am {time}.', {time});
+        if (kind === 'precip') return sameDay ? t('Aktuell trocken, zuletzt Niederschlag um {time}.', {time}) : t('Aktuell trocken, zuletzt Niederschlag am {time}.', {time});
+        return sameDay ? t('Aktuell trocken, zuletzt Regen um {time}.', {time}) : t('Aktuell trocken, zuletzt Regen am {time}.', {time});
+      },
+
       conditionsRain() {
         const rain = this.conditions && this.conditions.rain;
         if (!rain) return null;
         const mm = rain.mm_today ? ` · ${num(rain.mm_today, 1)} ${rain.mm_unit || 'mm'}` : '';
-        // Bei Frost sagt ein reiner Ein/Aus-Sensor nicht, ob es regnet oder schneit: neutraler Text.
-        const temp = this.conditions.temp;
-        const cold = !!(temp && temp.unit === '°C' && temp.value != null && temp.value <= 1);
+        const kind = this.rainKind(rain);
         if (rain.raining) {
-          if (rain.minutes == null) return {text: (cold ? t('Niederschlag') : t('Regen')) + mm, sub: t('seit mehr als {n} h', {n: 48})};
-          const minutes = Math.round(rain.minutes);
-          const since = minutes < 120
-            ? (cold ? t('Niederschlag seit {n} min', {n: minutes}) : t('Regen seit {n} min', {n: minutes}))
-            : (cold ? t('Niederschlag seit {h} h {m} min', {h: Math.floor(minutes / 60), m: String(minutes % 60).padStart(2, '0')}) : t('Regen seit {h} h {m} min', {h: Math.floor(minutes / 60), m: String(minutes % 60).padStart(2, '0')}));
-          return {text: since + mm, sub: t('Beginn {time}', {time: fmtDate(formats.hm, rain.since)})};
+          if (rain.minutes == null) return {text: this.rainLabel(kind) + mm, sub: t('seit mehr als {n} h', {n: 48})};
+          return {text: this.rainTileSince(kind, this.rainSince(rain)) + mm, sub: t('Beginn {time}', {time: fmtDate(formats.hm, rain.since)})};
         }
         let sub = '';
         if (rain.raining === false) {
-          if (rain.last == null) sub = cold ? t('in den letzten {n} h kein Niederschlag', {n: 48}) : t('in den letzten {n} h kein Regen', {n: 48});
+          if (rain.last == null) sub = WetterRain.isCold(this.conditions.temp) ? t('in den letzten {n} h kein Niederschlag', {n: 48}) : t('in den letzten {n} h kein Regen', {n: 48});
           else {
             const sameDay = fmtDate(formats.dm, rain.last) === fmtDate(formats.dm, this.conditions.now);
-            sub = sameDay
-              ? (cold ? t('zuletzt Niederschlag um {time}', {time: fmtDate(formats.hm, rain.last)}) : t('zuletzt Regen um {time}', {time: fmtDate(formats.hm, rain.last)}))
-              : (cold ? t('zuletzt Niederschlag am {time}', {time: fmtDate(formats.dm, rain.last) + ' ' + fmtDate(formats.hm, rain.last)}) : t('zuletzt Regen am {time}', {time: fmtDate(formats.dm, rain.last) + ' ' + fmtDate(formats.hm, rain.last)}));
+            const time = sameDay ? fmtDate(formats.hm, rain.last) : fmtDate(formats.dm, rain.last) + ' ' + fmtDate(formats.hm, rain.last);
+            sub = this.rainTileLast(kind, time, sameDay);
           }
         }
         if (rain.raining == null && rain.mm_today) return {text: t('heute {value} {unit}', {value: num(rain.mm_today, 1), unit: rain.mm_unit || 'mm'}), sub};
@@ -1288,24 +1332,17 @@
         else if (temp) parts.push(`${temp}.`);
         else if (wind) parts.push(t('{wind}.', {wind}));
         const rain = c.rain;
-        // Bei Frost sagt ein reiner Ein/Aus-Sensor nicht, ob es regnet oder schneit: neutraler Text.
-        const cold = !!(c.temp && c.temp.unit === '°C' && c.temp.value != null && c.temp.value <= 1);
         if (rain && rain.raining) {
-          if (rain.minutes == null) parts.push(cold ? t('Es fällt Niederschlag seit mehr als {n} h.', {n: 48}) : t('Es regnet seit mehr als {n} h.', {n: 48}));
-          else {
-            const minutes = Math.round(rain.minutes);
-            parts.push(minutes < 120
-              ? (cold ? t('Es fällt Niederschlag seit {n} min.', {n: minutes}) : t('Es regnet seit {n} min.', {n: minutes}))
-              : (cold ? t('Es fällt Niederschlag seit {h} h {m} min.', {h: Math.floor(minutes / 60), m: String(minutes % 60).padStart(2, '0')})
-                : t('Es regnet seit {h} h {m} min.', {h: Math.floor(minutes / 60), m: String(minutes % 60).padStart(2, '0')})));
-          }
+          parts.push(this.rainSentence(this.rainKind(rain), this.rainSince(rain)));
         } else if (rain && rain.raining === false) {
           const lastSameDay = rain.last != null && fmtDate(formats.dm, rain.last) === fmtDate(formats.dm, c.now);
           parts.push(rain.last == null
             ? t('Aktuell trocken.')
-            : lastSameDay
-              ? (cold ? t('Aktuell trocken, zuletzt Niederschlag um {time}.', {time: fmtDate(formats.hm, rain.last)}) : t('Aktuell trocken, zuletzt Regen um {time}.', {time: fmtDate(formats.hm, rain.last)}))
-              : (cold ? t('Aktuell trocken, zuletzt Niederschlag am {time}.', {time: `${fmtDate(formats.dm, rain.last)} ${fmtDate(formats.hm, rain.last)}`}) : t('Aktuell trocken, zuletzt Regen am {time}.', {time: `${fmtDate(formats.dm, rain.last)} ${fmtDate(formats.hm, rain.last)}`})));
+            : this.rainDrySentence(
+              this.rainKind(rain),
+              lastSameDay ? fmtDate(formats.hm, rain.last) : `${fmtDate(formats.dm, rain.last)} ${fmtDate(formats.hm, rain.last)}`,
+              lastSameDay,
+            ));
         }
         return parts.map(together);
       },
