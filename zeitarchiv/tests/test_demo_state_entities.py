@@ -23,6 +23,7 @@ def test_there_are_state_entities() -> None:
         "sensor.demo_saugroboter_status",
         "sensor.demo_waschmaschine_programm",
         "sensor.demo_heizung_betrieb",
+        "weather.demo_wetterzustand",
     }
 
 

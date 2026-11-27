@@ -22,8 +22,8 @@ from .selection_topics import WEATHER_PLATFORMS, _DEVICE_TEMP, is_outdoor
 
 #: Rollen, für die Vorschläge berechnet werden (Reihenfolge wie in der Einrichtung).
 ROLE_KEYS = (
-    "temperature", "precip_mm", "precip_dur", "humidity", "pressure", "wind", "gust", "radiation", "illuminance",
-    "illuminance_dawn", "wind_direction", "sun_elevation", "pv_power",
+    "temperature", "precip_mm", "precip_dur", "weather_state", "humidity", "pressure", "wind", "gust", "radiation",
+    "illuminance", "illuminance_dawn", "wind_direction", "sun_elevation", "pv_power",
 )
 
 _TEMP_UNITS = {"°c", "°f", "k"}
@@ -50,6 +50,15 @@ _PV_NOT = re.compile(r"(prognose|forecast|prediction|erwartung|estimate|string|b
 _PV_SMALL = re.compile(r"(balkon|stecker|plug|micro|mikro)", re.IGNORECASE)
 _POWER_UNITS = {"w", "kw", "mw"}
 _HEATING = re.compile(r"(heiz|w[äa]rmepumpe|waermepumpe|heat ?pump|heatpump|konvektor|heizstab|therme|fu(ß|ss)boden)", re.IGNORECASE)
+#: Wetterzustand: Name eines Sensors mit dem Zustand der Wetterlage (nicht Wetter-Code, Symbol oder Vorhersage).
+_WEATHER_STATE = re.compile(r"(wetter ?zustand|weather ?(condition|state)|wetter ?lage|bedingung|\bcondition\b)", re.IGNORECASE)
+_WEATHER_STATE_NOT = re.compile(r"(code|nummer|number|icon|symbol|forecast|vorhersage|prognose|vorschau)", re.IGNORECASE)
+_FORECAST = re.compile(r"(forecast|vorhersage|prognose)", re.IGNORECASE)
+#: Werte der Standardliste der Wetter-Entitäten von Home Assistant (englische Schlüssel, unabhängig von der Sprache).
+WEATHER_STATE_KEYS = frozenset({
+    "clear-night", "cloudy", "exceptional", "fog", "hail", "lightning", "lightning-rainy", "partlycloudy",
+    "pouring", "rainy", "snowy", "snowy-rainy", "sunny", "windy", "windy-variant",
+})
 _HINT_FIELDS = ("name", "device", "area")
 
 #: Mindestpunkte, damit ein Kandidat überhaupt in Frage kommt.
@@ -180,6 +189,26 @@ def _score(role: str, row: dict[str, Any], anchor: dict[str, Any] | None) -> tup
             add(1, tr("„Gesamt“ im Namen"))
         if points and _outdoor_or_station(row):
             add(1, tr("Wetter-Integration") if _weather_source(row) else tr("„Außen“ im Namen"))
+    elif role == "weather_state":
+        # Nur Text-Zustände mit den Schlüsseln der Standardliste; übersetzter Text („Bedeckt“) und Zahlencodes (804)
+        # passen nicht. Bei Katalogzeilen (nicht archiviert) ist der Typ unbekannt, dort zählen Domain und Name.
+        texts = {str(item).strip().lower() for item in row.get("state_texts") or ()}
+        known = texts & WEATHER_STATE_KEYS
+        if texts and not known:
+            return 0, []
+        if row["domain"] == "weather":
+            add(3, tr("Wetter-Entität"))
+            if not _FORECAST.search(text):
+                add(2, tr("keine Vorhersage"))
+        elif row["domain"] == "sensor":
+            if (kind != "state" and not row.get("from_catalog")) or _WEATHER_STATE_NOT.search(text):
+                return 0, []
+            if known:
+                add(3, tr("Standardwerte der Wetterlage"))
+            if _WEATHER_STATE.search(text):
+                add(3, tr("„Wetterzustand“ im Namen"))
+        else:
+            return 0, []
     elif role == "precip_dur":
         if kind != "switch" or row["domain"] != "binary_sensor" or not _RAIN.search(text):
             return 0, []
@@ -248,7 +277,7 @@ def _catalog_row(row: dict[str, Any]) -> dict[str, Any]:
             "counter" if row.get("state_class") == "total_increasing" else "standard"),
         "unit": row.get("unit"), "state_class": row.get("state_class"), "name": row.get("name"),
         "device_class": row.get("device_class"), "platform": row.get("platform"),
-        "device": row.get("device"), "area": row.get("area"),
+        "device": row.get("device"), "area": row.get("area"), "from_catalog": True,
     }
 
 
@@ -306,6 +335,7 @@ def suggest(
             "platform": extra.get("platform"),
             "device": extra.get("device"),
             "area": extra.get("area"),
+            "state_texts": entity.get("state_texts"),
         })
     known = {row["entity_id"] for row in rows}
     roles: dict[str, dict[str, Any]] = {}

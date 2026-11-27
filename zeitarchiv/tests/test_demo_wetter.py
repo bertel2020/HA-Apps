@@ -16,10 +16,13 @@ from app.demo_generation import (
     SUED_LUX_STEP,
     ROOM_ENTITY_IDS,
     WETTER_ENTITY_IDS,
+    WETTERZUSTAND_INDEX,
+    WETTERZUSTAND_STATES,
     WeatherContext,
     build_appliance_schedules,
     build_rain_schedule,
     demo_category_index,
+    gen_wetterzustand,
     localized_id,
     simulate_household,
 )
@@ -222,4 +225,74 @@ def test_weather_setup_assigns_the_flow_temperature_role() -> None:
 
     config = _weather_config(lambda entity_id: entity_id, lambda text: text)
     assert config["heating_flow"] == "sensor.demo_heizung_vorlauftemperatur"
+
+
+def _weather_state(sim: dict, start: datetime, days: int, seed: int = 11):
+    rows = gen_wetterzustand(
+        sim["outdoor_temp"], sim["regensensor"], sim["strahlung"], sim["humidity"],
+        start, start + timedelta(days=days), random.Random(seed),
+    )
+    names = {float(position): raw for position, (raw, _label) in enumerate(WETTERZUSTAND_STATES)}
+    names[-1.0] = None
+    return rows, names
+
+
+def test_weather_state_demo_entity_is_a_weather_state_entity_with_the_standard_values() -> None:
+    entity = next(e for e in DEMO_ENTITIES if e.entity_id == "weather.demo_wetterzustand")
+    assert entity.domain == "weather" and entity.states == WETTERZUSTAND_STATES
+    assert "weather.demo_wetterzustand" not in WETTER_ENTITY_IDS  # steht bei den Zustands-Entitäten, nicht am Ende
+    from app.wetter_autofill import WEATHER_STATE_KEYS
+
+    assert {raw for raw, _label in WETTERZUSTAND_STATES} <= WEATHER_STATE_KEYS  # nur Schlüssel der Standardliste
+    assert WETTERZUSTAND_INDEX["snowy"] == [raw for raw, _label in WETTERZUSTAND_STATES].index("snowy")
+
+
+def test_weather_state_history_has_only_valid_states_and_writes_only_changes(winter) -> None:
+    rows, names = _weather_state(winter, datetime(2024, 1, 1, tzinfo=TZ), 30)
+    assert len(rows) > 100
+    assert all(value in names for _ts, value in rows)
+    assert all(rows[i][1] != rows[i + 1][1] for i in range(len(rows) - 1))  # nur Wechsel
+    assert [ts for ts, _v in rows] == sorted(ts for ts, _v in rows)
+    kinds = {names[value] for _ts, value in rows}
+    assert {"cloudy", "clear-night"} & kinds and {"snowy", "snowy-rainy", "rainy"} & kinds
+
+
+def test_weather_state_kind_follows_the_temperature_while_it_rains(winter, summer) -> None:
+    for sim, start, forbidden in ((winter, datetime(2024, 1, 1, tzinfo=TZ), {"hail", "lightning-rainy"}),
+                                  (summer, datetime(2024, 7, 1, tzinfo=TZ), {"snowy", "snowy-rainy"})):
+        rows, names = _weather_state(sim, start, 30)
+        kinds = {names[value] for _ts, value in rows}
+        assert not kinds & forbidden, kinds
+    winter_kinds = {names[value] for _ts, value in _weather_state(winter, datetime(2024, 1, 1, tzinfo=TZ), 30)[0]}
+    assert "snowy" in winter_kinds or "snowy-rainy" in winter_kinds
+
+
+def test_weather_state_names_precipitation_during_every_rain_of_the_sensor(winter) -> None:
+    start = datetime(2024, 1, 1, tzinfo=TZ)
+    rows, names = _weather_state(winter, start, 30)
+    precip = {"rainy", "pouring", "lightning-rainy", "snowy", "snowy-rainy", "hail"}
+    intervals, began = [], None
+    for ts, value in sorted(winter["regensensor"]):
+        if value >= 0.5 and began is None:
+            began = ts
+        elif value < 0.5 and began is not None:
+            intervals.append((began, ts))
+            began = None
+    assert len(intervals) >= 3
+    for began, ended in intervals:
+        # Der Zustand folgt dem Sensor mit etwas Verzug: Irgendwo bis eine Stunde nach dem Ende steht Niederschlag.
+        assert any(names[v] in precip for ts, v in rows if began <= ts <= ended + 3600), (began, ended)
+    # Der Verzug kommt vor: Manche Regen beginnen, bevor der Zustand Niederschlag nennt
+    late = sum(
+        1 for began, ended in intervals
+        if not any(names[v] in precip for ts, v in rows if began <= ts <= began + 60)
+    )
+    assert late >= 1
+
+
+def test_weather_state_demo_role_is_assigned_in_the_demo_weather_setup() -> None:
+    from app.demo_seed import _weather_config
+
+    config = _weather_config(lambda entity_id: entity_id, lambda text: text)
+    assert config["weather_state"] == "weather.demo_wetterzustand"
 

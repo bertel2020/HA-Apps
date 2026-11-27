@@ -1972,3 +1972,17 @@ def test_weather_state_role_sits_in_the_setup_page_and_in_no_table_block() -> No
     for _key, _label, needs in wetter_routes.CARD_OPTIONS:
         assert "weather_state" not in needs  # die Rolle erzeugt keine eigene Karte
 
+
+def test_setup_suggestions_offer_the_weather_state_from_the_archived_texts(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("weather.wetter_test_lage7", "weather", None, None, state=True)
+    index.state_index("weather.wetter_test_lage7", "snowy", None, 1.0)
+    index.get_or_create_entity("sensor.wetter_test_text7", "sensor", None, None, state=True)
+    index.state_index("sensor.wetter_test_text7", "Bedeckt", None, 1.0)
+    roles = client.get("/wetterdashboard/setup/vorschlaege").json()["roles"]
+    pick = roles["weather_state"]
+    offered = [pick["entity_id"]] + [c["entity_id"] for c in pick["candidates"]]  # Testdaten anderer Tests teilen den Index
+    assert "weather.wetter_test_lage7" in offered
+    assert "sensor.wetter_test_text7" not in offered  # „Bedeckt“ ist kein Schlüssel der Standardliste
+

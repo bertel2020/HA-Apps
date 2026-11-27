@@ -43,6 +43,16 @@ def test_weather_card_separates_filled_suggested_and_open_roles(index) -> None:
     assert card["total"] == len(card["items"]) and card["set"] == 1
 
 
+def test_weather_card_suggests_the_weather_state_role_for_a_weather_entity(index) -> None:
+    index.set_setting(wetter_routes.SETTING_ENABLED, "1")
+    index.set_setting(wetter_routes.SETTING_CONFIG, json.dumps({}))
+    catalog = [*_CATALOG, {"entity_id": "weather.home", "domain": "weather", "name": "Zuhause", "platform": "met"}]
+    items = {item["label"]: item for item in selection_dashboards.wetter(index, catalog, set())["items"]}
+    assert items["Wetterzustand"]["state"] == "suggest" and items["Wetterzustand"]["ids"] == ["weather.home"]
+    plain = {item["label"]: item["state"] for item in selection_dashboards.wetter(index, _CATALOG, set())["items"]}
+    assert plain["Wetterzustand"] == "open"  # ohne Wetter-Entität im Katalog bleibt die Rolle offen
+
+
 def test_energy_card_has_one_entry_per_suggestion_never_several_sources_in_one(index) -> None:
     index.set_setting(edr.SETTING_ENABLED, "1")
     index.set_setting(edr.SETTING_CONFIG, json.dumps({**edr._empty_config(), "einspeisung": "sensor.einsp"}))  # noqa: SLF001

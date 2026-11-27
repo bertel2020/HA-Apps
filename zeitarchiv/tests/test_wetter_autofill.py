@@ -217,3 +217,65 @@ def test_suggest_for_entities_marks_several_close_candidates_as_check() -> None:
 def test_suggest_for_entities_with_unknown_entities_returns_nothing() -> None:
     assert wetter_autofill.suggest_for_entities(["sensor.gibt_es_nicht"], _full_catalog()) == {}
     assert wetter_autofill.suggest_for_entities([], _full_catalog()) == {}
+
+
+def _state(entity_id, texts=("cloudy", "snowy")):
+    return {**_entity(entity_id, kind="state"), "state_texts": list(texts)}
+
+
+def _weather_pick(archived, catalog=None):
+    labels = {row["entity_id"]: row["entity_id"].split(".", 1)[1].replace("_", " ") for row in archived}
+    return wetter_autofill.suggest(archived, labels, catalog)["roles"].get("weather_state")
+
+
+def test_weather_state_suggests_a_weather_entity_and_prefers_the_one_without_forecast() -> None:
+    pick = _weather_pick([_state("weather.forecast_home"), _state("weather.home")])
+    assert pick["entity_id"] == "weather.home" and pick["confidence"] == "ok"
+    assert [item["entity_id"] for item in pick["candidates"]] == ["weather.forecast_home"]
+    assert _weather_pick([_state("weather.forecast_home")])["entity_id"] == "weather.forecast_home"
+
+
+def test_weather_state_suggests_a_sensor_with_the_standard_values_and_a_fitting_name() -> None:
+    pick = _weather_pick([_state("sensor.wetterzustand", ("snowy", "rainy", "snowy-rainy"))])
+    assert pick["entity_id"] == "sensor.wetterzustand" and pick["confidence"] == "ok"
+    # Auch der Standardwert allein trägt einen Sensor, dessen Name nichts verrät
+    assert _weather_pick([_state("sensor.station_3", ("cloudy", "sunny"))])["entity_id"] == "sensor.station_3"
+
+
+def test_weather_state_rejects_translated_texts_and_numeric_codes() -> None:
+    # „Bedeckt“ ist übersetzter Text, kein Schlüssel der Standardliste
+    assert _weather_pick([_state("sensor.openweathermap_wetter", ("Bedeckt", "Leichter Regen"))]) is None
+    # Auch mit passendem Namen: bekannte Texte ohne Standardwert lehnen den Sensor ab
+    assert _weather_pick([_state("sensor.wetterzustand", ("Bedeckt",))]) is None
+    # Zahlencodes und Messwerte sind keine Text-Zustände
+    assert _weather_pick([_entity("sensor.openweathermap_wetter_code", kind="standard")]) is None
+    assert _weather_pick([_entity("sensor.wetterzustand", kind="standard")]) is None
+    assert _weather_pick([_state("sensor.wetter_code", ("cloudy",))]) is None
+    assert _weather_pick([_state("sensor.wetter_symbol", ("cloudy",))]) is None
+
+
+def test_weather_state_takes_the_condition_sensor_but_not_other_domains() -> None:
+    pick = _weather_pick([_state("sensor.openweathermap_condition", ("cloudy",)), _state("sensor.openweathermap_wetter", ("Bedeckt",))])
+    assert pick["entity_id"] == "sensor.openweathermap_condition"
+    assert _weather_pick([_state("binary_sensor.wetterzustand", ("snowy",))]) is None
+
+
+def test_weather_state_from_the_catalog_needs_no_archive_and_ignores_codes() -> None:
+    catalog = [
+        _catalog("weather.mycitylife", name="MyCityLife", platform="google_weather"),
+        _catalog("sensor.wetterzustand", name="Wetterzustand"),
+        _catalog("sensor.openweathermap_weather_code", name="OpenWeatherMap Wetter-Code"),
+    ]
+    picks = wetter_autofill.suggest_for_entities([row["entity_id"] for row in catalog], catalog)
+    assert picks["weather_state"]["entity_id"] in {"weather.mycitylife", "sensor.wetterzustand"}
+    assert "sensor.openweathermap_weather_code" not in {
+        pick["entity_id"] for role, pick in picks.items() if role == "weather_state"
+    } | {item["entity_id"] for item in picks["weather_state"]["candidates"]}
+    assert wetter_autofill.suggest_for_entities(["sensor.openweathermap_weather_code"], catalog).get("weather_state") is None
+    assert wetter_autofill.suggest_for_entities(["weather.mycitylife"], catalog, filled=["weather_state"]) .get("weather_state") is None
+
+
+def test_weather_state_role_is_part_of_the_suggested_roles() -> None:
+    assert "weather_state" in wetter_autofill.ROLE_KEYS
+    assert wetter_autofill.ROLE_KEYS.index("weather_state") == wetter_autofill.ROLE_KEYS.index("precip_dur") + 1
+

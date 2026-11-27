@@ -23,6 +23,7 @@ import random
 import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+import bisect
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -68,6 +69,9 @@ WETTER_ENTITY_IDS = (
     "sensor.demo_konvektoren_energie", "sensor.demo_helligkeit_sued", "sensor.demo_helligkeit_daemmerung",
     "sensor.demo_windrichtung", "sensor.demo_sonnenhoehe", "sensor.demo_heizung_vorlauftemperatur",
 )
+#: Der Wetterzustand ist eine Zustands-Entität und steht bei den übrigen (nicht am Ende von DEMO_ENTITIES). Er wird aus den
+#: Wetter-Reihen abgeleitet und hat eigene Zufallszahlen, damit die Folge der übrigen Reihen unverändert bleibt.
+WETTERZUSTAND_ENTITY_ID = "weather.demo_wetterzustand"
 
 #: Historie der Wetter-Reihen in Monaten (5 Jahre). Die Auswertungen über mehrere Jahre (Monatstabelle, Jahresmatrix,
 #: Kenntage, Rekorde, Heizen über mehrere Winter) brauchen mehr als die Sechs Monate des CLI-Standards.
@@ -117,6 +121,14 @@ WASCHPROGRAMM_STATES = (
     ("easy_care", "Pflegeleicht"), ("quick_30", "Kurz 30"), ("finished", "Fertig"),
 )
 HEIZUNG_BETRIEB_STATES = (("off", "Aus"), ("idle", "Leerlauf"), ("heating", "Heizen"))
+# Wetterzustand wie eine Wetter-Entität von Home Assistant ihn meldet (Schlüssel der Standardliste, englisch).
+# Die Reihenfolge legt die Indizes fest; gen_wetterzustand() liest sie über WETTERZUSTAND_INDEX.
+WETTERZUSTAND_STATES = (
+    ("clear-night", "Klare Nacht"), ("cloudy", "Bewölkt"), ("fog", "Nebel"), ("hail", "Hagel"),
+    ("lightning-rainy", "Gewitter mit Regen"), ("partlycloudy", "Teils bewölkt"), ("pouring", "Starkregen"),
+    ("rainy", "Regen"), ("snowy", "Schnee"), ("snowy-rainy", "Schneeregen"), ("sunny", "Sonnig"),
+)
+WETTERZUSTAND_INDEX = {raw: position for position, (raw, _label) in enumerate(WETTERZUSTAND_STATES)}
 
 
 DEMO_ENTITIES = [
@@ -279,6 +291,10 @@ DEMO_ENTITIES = [
                "sensor", None, None, states=WASCHPROGRAMM_STATES),
     DemoEntity("sensor.demo_heizung_betrieb", "Demo Heizung Betrieb",
                "sensor", None, None, states=HEIZUNG_BETRIEB_STATES),
+    # Wetterzustand (Rolle „Wetterzustand“ im Wetterdashboard, ROADMAP 1.73): wie eine Wetter-Entität, abgeleitet aus
+    # Regensensor, Außentemperatur, Strahlung und Luftfeuchte, siehe gen_wetterzustand().
+    DemoEntity("weather.demo_wetterzustand", "Demo Wetterzustand",
+               "weather", None, None, states=WETTERZUSTAND_STATES),
     # Migrationstest-Paar (Konzept-Erweiterung "Datensätze migrieren",
     # entity_migration.py) — kein Teil der eigentlichen Haushaltssimulation,
     # sondern gezielt für diese Funktion: eine "alte" Entität, die vor einigen
@@ -1596,6 +1612,122 @@ def gen_heizung_betrieb(start: datetime, end: datetime, heizung_rows: list[Row])
     return _state_rows(events, start, end)
 
 
+def _value_at(times: list[float], values: list[float], ts: float, default: float) -> float:
+    """Letzter Wert bis ``ts`` einer sortierten Reihe; davor ``default``."""
+    position = bisect.bisect_right(times, ts) - 1
+    return values[position] if position >= 0 else default
+
+
+def _rain_intervals(rain_rows: list[Row], end_ts: float) -> list[tuple[float, float]]:
+    """Zeiträume, in denen der Regensensor an war, aus seinen Wechseln."""
+    intervals: list[tuple[float, float]] = []
+    began: float | None = None
+    for ts, value in sorted(rain_rows):
+        if value >= 0.5 and began is None:
+            began = ts
+        elif value < 0.5 and began is not None:
+            intervals.append((began, ts))
+            began = None
+    if began is not None:
+        intervals.append((began, end_ts))
+    return intervals
+
+
+def gen_wetterzustand(
+    temp_rows: list[Row], rain_rows: list[Row], radiation_rows: list[Row], humidity_rows: list[Row],
+    start: datetime, end: datetime, rng: random.Random,
+) -> list[Row]:
+    """Wetterzustand wie eine Wetter-Entität, abgeleitet aus der Simulation (nur bei einem Wechsel geschrieben).
+
+    Niederschlag: Während der Regensensor an ist, nennt der Zustand die Art nach der Außentemperatur (Schnee bis
+    −0,5 °C, dazwischen Schneeregen, darüber Regen; selten Hagel oder Gewitter bei Wärme, Starkregen bei langem Regen).
+    Er hinkt dem Sensor wie bei echten Anbietern hinterher (meist ein paar Minuten, manchmal eine halbe Stunde), damit
+    auch der Rückfall der Wetterlage vorkommt. Ohne Niederschlag stündlich nach Strahlung und Luftfeuchte: sonnig,
+    teils bewölkt, bewölkt, Nebel, nachts klar. Selten nicht verfügbar (Ausfall des Anbieters)."""
+    if not temp_rows:
+        return []
+    start_ts, end_ts = start.timestamp(), end.timestamp()
+    temp_t, temp_v = [r[0] for r in temp_rows], [r[1] for r in temp_rows]
+    rad_t, rad_v = [r[0] for r in radiation_rows], [r[1] for r in radiation_rows]
+    hum_t, hum_v = [r[0] for r in humidity_rows], [r[1] for r in humidity_rows]
+
+    precipitation: list[tuple[float, float, int]] = []
+    for began, ended in _rain_intervals(rain_rows, end_ts):
+        lag = (25 + rng.random() * 20) * 60 if rng.random() < 0.15 else (2 + rng.random() * 10) * 60
+        shifted_start = began + lag
+        shifted_end = max(shifted_start + 300, ended + rng.random() * 20 * 60)
+        temperature = _value_at(temp_t, temp_v, (began + ended) / 2, 8.0)
+        hours = (ended - began) / 3600
+        if temperature <= -0.5:
+            kind = "snowy"
+        elif temperature <= 1.5:
+            kind = rng.choices(("snowy-rainy", "snowy", "rainy"), (0.7, 0.2, 0.1))[0]
+        elif temperature <= 4:
+            kind = rng.choices(("rainy", "snowy-rainy"), (0.85, 0.15))[0]
+        elif temperature >= 12 and hours < 0.7 and rng.random() < 0.25:
+            kind = rng.choice(("hail", "lightning-rainy", "lightning-rainy"))
+        elif hours > 2 and rng.random() < 0.3:
+            kind = "pouring"
+        else:
+            kind = "rainy"
+        precipitation.append((shifted_start, shifted_end, WETTERZUSTAND_INDEX[kind]))
+    precipitation.sort()
+
+    # Sonnenauf- und -untergang je Tag aus der Strahlung: Grundlage für die Bewölkung nach Tageszeit.
+    daylight: dict[str, list[float]] = {}
+    for ts, value in radiation_rows:
+        if value > 5:
+            day = datetime.fromtimestamp(ts, start.tzinfo).strftime("%Y-%m-%d")
+            span = daylight.setdefault(day, [ts, ts])
+            span[1] = ts
+
+    def sky(ts: float) -> int:
+        local = datetime.fromtimestamp(ts, start.tzinfo)
+        radiation = _value_at(rad_t, rad_v, ts, 0.0)
+        humidity = _value_at(hum_t, hum_v, ts, 70.0)
+        span = daylight.get(local.strftime("%Y-%m-%d"))
+        if radiation <= 5 or span is None or span[1] <= span[0]:
+            if humidity >= 96:
+                return WETTERZUSTAND_INDEX["fog"]
+            return WETTERZUSTAND_INDEX["clear-night" if humidity < 82 else "cloudy"]
+        if humidity >= 98 and radiation < 120:
+            return WETTERZUSTAND_INDEX["fog"]
+        clear_max = 575 + 275 * math.cos(2 * math.pi * (local.timetuple().tm_yday - 172) / 365)
+        shape = max(0.2, math.sin(math.pi * (ts - span[0]) / (span[1] - span[0])))
+        share = radiation / (clear_max * shape)
+        if share >= 0.6:
+            return WETTERZUSTAND_INDEX["sunny"]
+        return WETTERZUSTAND_INDEX["partlycloudy" if share >= 0.3 else "cloudy"]
+
+    marks = set()
+    hour = start.replace(minute=0, second=0, microsecond=0)
+    while hour.timestamp() < end_ts:
+        marks.add(hour.timestamp())
+        hour += timedelta(hours=1)
+    for began, ended, _kind in precipitation:
+        marks.update((began, ended))
+    outages: list[tuple[float, float]] = []
+    day = start.replace(hour=0, minute=0, second=0, microsecond=0)
+    while day < end:
+        if rng.random() < 0.015:
+            began = (day + timedelta(hours=rng.random() * 23)).timestamp()
+            outages.append((began, began + (20 + rng.random() * 60) * 60))
+        day += timedelta(days=1)
+    for began, ended in outages:
+        marks.update((began, ended))
+
+    events: list[Row] = [(start_ts, float(sky(start_ts)))]
+    for ts in sorted(marks):
+        if not start_ts <= ts < end_ts:
+            continue
+        if any(began <= ts < ended for began, ended in outages):
+            events.append((ts, float(STATE_UNAVAILABLE_INDEX)))
+            continue
+        kind = next((index for began, ended, index in precipitation if began <= ts < ended), None)
+        events.append((ts, float(kind if kind is not None else sky(ts))))
+    return _state_rows(events, start, end)
+
+
 def month_start(dt: datetime) -> datetime:
     return dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
@@ -2243,7 +2375,10 @@ def run_generation(
             heim_online_seed = _read_last_value(data_dir, "binary_sensor.demo_heimspeicher_online") or 0.0
             if on_status is not None:
                 on_status(f"Ergänze Demo-Daten ab {start.isoformat()} bis {now.isoformat()}.")
-                if any(index.get_entity(localized_id(entity_id, language)) is None for entity_id in WETTER_ENTITY_IDS):
+                if any(
+                    index.get_entity(localized_id(entity_id, language)) is None
+                    for entity_id in (*WETTER_ENTITY_IDS, WETTERZUSTAND_ENTITY_ID)
+                ):
                     on_status(
                         "Die Wetter-Entitäten für das Wetterdashboard fehlen in dieser Demo und starten nur ab jetzt; "
                         "für ihre Historie die Demo-Daten neu erzeugen (--clean)."
@@ -2422,6 +2557,13 @@ def run_generation(
     for entity_id, key in WEATHER_HISTORY_KEYS.items():
         if prehistory.get(key):
             rows_by_key[entity_id] = join_prehistory(prehistory[key], rows_by_key[entity_id])
+
+    rows_by_key[WETTERZUSTAND_ENTITY_ID] = gen_wetterzustand(
+        rows_by_key["sensor.demo_aussentemperatur"], rows_by_key["binary_sensor.demo_regensensor"],
+        rows_by_key["sensor.demo_strahlung"], rows_by_key["sensor.demo_luftfeuchte"],
+        datetime.fromtimestamp(rows_by_key["sensor.demo_aussentemperatur"][0][0], tz) if rows_by_key["sensor.demo_aussentemperatur"] else start,
+        now, random.Random(f"wetterzustand:{int(start.timestamp())}"),
+    )
 
     if not append or fell_back_to_full_history:
         # Ein Sprachwechsel soll den Datensatz ersetzen, nicht verdoppeln: IDs der anderen Sprache entfernen.

@@ -2568,9 +2568,11 @@ class WetterService:
                 row["entity_id"]: entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"])
                 for row in deps.index.list_entities()
             }
-            return wetter_autofill.suggest(
-                [dict(row) for row in deps.index.list_entities()], labels, catalog["entities"] if catalog else None,
-            )
+            archived = [dict(row) for row in deps.index.list_entities()]
+            for row in archived:
+                if row["aggregation_type"] == "state":  # Rohtexte der Zustände, für den Vorschlag „Wetterzustand“
+                    row["state_texts"] = [item["text"] for item in deps.index.get_state_map(row["entity_id"])]
+            return wetter_autofill.suggest(archived, labels, catalog["entities"] if catalog else None)
 
         @router.post("/wetterdashboard/setup", response_class=HTMLResponse)
         def wetterdashboard_setup_save(
