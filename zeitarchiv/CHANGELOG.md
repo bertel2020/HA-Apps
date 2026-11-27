@@ -43,6 +43,8 @@
 - **Charts**: the editor menu no longer shows options that do nothing for the chosen chart type
   - Timeline: “Points”, “Area” and “Line style”
   - Donut of state entities: “Aggregation”
+  - Bar charts: “Dynamic Y axis”
+  - Durations: “Decimal places” is greyed out, since durations always show hours and minutes
 
 ## 1.57.0 - 2026-11-24
 

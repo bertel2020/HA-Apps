@@ -536,8 +536,10 @@
                     <span class="track"><span class="thumb"></span></span>
                   </span>
                 </label>
-                <div class="menu-row menu-row-stack" x-show="!timeline && !hasState">
-                  <span class="menu-row-label">{{ _("Nachkommastellen") }}</span>
+                <div class="menu-row menu-row-stack" :class="{'is-disabled': allDuration}" x-show="!timeline && !hasState">
+                  <span class="menu-row-label">{{ _("Nachkommastellen") }}
+                    <span class="menu-note" x-show="allDuration">{{ _("Dauern zeigen immer Stunden und Minuten.") }}</span>
+                  </span>
                   <div class="seg">
                     <button :class="{active: decimals === 'auto'}" @click="decimals = 'auto'; render()">{{ _("Auto") }}</button>
                     <button :class="{active: decimals === '0'}" @click="decimals = '0'; render()">0</button>
@@ -547,7 +549,10 @@
                     <button :class="{active: decimals === '4'}" @click="decimals = '4'; render()">4</button>
                   </div>
                 </div>
-                <label class="menu-row" x-show="!donut && !timeline">
+                <!-- Eine Achse mit Balken ignoriert die Option (axisDynamic in
+                     render(): Balken müssen bei 0 beginnen) — bei reinen
+                     Balken-Charts gäbe es hier nichts zu schalten. -->
+                <label class="menu-row" x-show="!donut && !timeline && (hasLineSeries || !series.length)">
                   <span class="menu-row-label">{{ _("Dynamische Y-Achse") }}</span>
                   <span class="menu-toggle">
                     <!-- Bei Auflösung "Tag" (singleBucket, s. render()) sinnlos

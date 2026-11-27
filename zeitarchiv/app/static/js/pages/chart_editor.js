@@ -864,6 +864,10 @@
         // teilen den Ring nach Zuständen auf (renderStateDonuts()), dort genügt
         // eine. Vor dem ersten Laden gilt er als verfügbar, damit der Knopf nicht
         // kurz gesperrt aufblitzt (wie hasStateOrUnknown).
+        // Dauer-Serien (Schalter im Anzeigemodus „Zeit“) formatiert NumberFormat.fmtDuration
+        // als „2h 33m“ — Nachkommastellen werden dort nicht gelesen. Gilt für den ganzen
+        // Chart nur, wenn jede Serie eine Dauer-Serie ist (wie isDurationSeries() in render()).
+        get allDuration() { return this.series.length > 0 && this.series.every(s => s.aggregation_type === 'switch' && s.display_mode === 'time'); },
         get donutAvailable() { return this.hasStateOrUnknown || this.series.length >= 2; },
         get hasStateOrUnknown() { return this.hasState || !this.series.length; },
         // Balken-Ansicht der Zustände gewünscht — solange noch keine Serien

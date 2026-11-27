@@ -43,6 +43,8 @@
 - **Charts**: Das Editor-Menü zeigt keine Optionen mehr, die beim gewählten Diagrammtyp nichts bewirken
   - Zeitstrahl: „Punkte“, „Fläche“ und „Linienstil“
   - Donut bei Zustands-Entitäten: „Aggregation“
+  - Balken-Charts: „Dynamische Y-Achse“
+  - Dauern: „Nachkommastellen“ ist ausgegraut, da Dauern immer Stunden und Minuten zeigen
 
 ## 1.57.0 - 2026-11-24
 
