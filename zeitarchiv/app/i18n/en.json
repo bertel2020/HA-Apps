@@ -2617,6 +2617,7 @@
     "Zählerrückgänge erkannt": "Counter decreases detected",
     "Vermutlich Reset": "Probably a reset",
     "Spitze davor": "Spike before",
+    ", Folgewert {value} um {when}": ", next value {value} at {when}",
     "Nach Wert sortieren": "Sort by value",
     "Sortiert sind die ersten {count} Werte der Reihenfolge erreichbar; weitere liegen dahinter. Mit einem engeren Zeitraum oder einem Filter werden alle sichtbar.": "The first {count} values of the order are reachable; more lie beyond. A narrower period or a filter shows them all.",
     "Nach Zeitstempel sortieren": "Sort by timestamp",

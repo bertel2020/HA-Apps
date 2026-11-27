@@ -219,18 +219,27 @@ class OutlierDetector:
         # sind keine weiteren Ausreißer, siehe _check_standard().
         self._last_far: float | None = None
 
-    def check(self, ts: float, value: float) -> str | None:
+    def check(self, ts: float, value: float, following: tuple[float, float] | None = None) -> str | None:
         """Begründung, wenn `value` ein Ausreißer ist — sonst None. Muss für
         JEDEN Wert in zeitlicher Reihenfolge aufgerufen werden, auch wenn die
-        Erkennung aus ist: die Aufrufe bilden den Bezug."""
+        Erkennung aus ist: die Aufrufe bilden den Bezug.
+
+        ``following`` ist die nächste Zeile (Zeitstempel, Wert) oder None. Sie ändert nichts an der Erkennung, nur der
+        Begründung hängt sie den Folgewert an: ob der Stand danach wieder üblich ist (Fehlwert) oder oben bleibt (Sprung)."""
         self.tier_hits = {}
         self.judged = None
         if self.mode == "counter":
             # Der Zähler führt seine Bezugsgröße selbst (siehe _check_counter).
-            return self._check_counter(ts, value)
-        grund = self._check_standard(value)
-        self._previous = value
-        self._previous_ts = ts
+            grund = self._check_counter(ts, value)
+        else:
+            grund = self._check_standard(value)
+            self._previous = value
+            self._previous_ts = ts
+        if grund and grund != _NO_REASON and following is not None and following[0] > ts:
+            grund += tr(
+                ", Folgewert {value} um {when}",
+                value=_format_val(following[1], self.decimals), when=_format_ts(following[0], self.tz),
+            )
         return grund
 
     def _vorwert(self) -> str:
@@ -716,7 +725,7 @@ def analyze_raw_rows_page(
         # Immer aufrufen, auch bei ausgeschalteter Erkennung: der Detektor baut
         # dabei seinen Bezug auf. Ein bereits markierter Zeitstempel bleibt
         # markiert — bei mehreren Werten auf derselben Sekunde genügt einer.
-        outlier_reason = outlier_detector.check(ts, value)
+        outlier_reason = outlier_detector.check(ts, value, following)
         if outlier_reason is not None and group_outlier is None:
             group_outlier = outlier_reason
         if outlier_tiers_since is not None and ts >= outlier_tiers_since:
@@ -1402,8 +1411,8 @@ def detect_outliers(
         return {}
     detector = OutlierDetector(factor=factor, mode=mode, decimals=decimals, tz=tz)
     flagged: dict[float, str] = {}
-    for ts, value in rows:
-        reason = detector.check(ts, value)
+    for ts, value, following in _with_following(rows):
+        reason = detector.check(ts, value, following)
         if reason is not None and ts not in flagged:
             flagged[ts] = reason
     return flagged

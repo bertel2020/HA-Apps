@@ -55,6 +55,8 @@
 - **Zählerrückgänge**: Nach einer einzelnen Spitze nach oben steht der gute Folgewert nicht mehr als „Vermutlich Reset“ da
   - Die Einordnung heißt „Spitze davor“ und nennt die Spitze und den früheren Stand; die Spitze selbst markierst du als Ausreißer
   - Der Filter „Ausreißer“ weist bei Zählern darauf hin, dass ein fallender Stand (z. B. eine 0) unter „Zählerrückgänge“ steht
+- **Ausreißer**: Die Begründung nennt neben dem Vorwert auch den Folgewert
+  - So sieht man in der Zeile, ob der Stand danach wieder üblich ist (Fehlwert) oder oben bleibt (echter Sprung)
 
 ### Behoben
 

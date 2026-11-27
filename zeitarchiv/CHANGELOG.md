@@ -55,6 +55,8 @@
 - **Counter decreases**: after a single spike upwards, the good value that follows is no longer shown as “Probably a reset”
   - The assessment reads “Spike before” and names the spike and the earlier level; mark the spike as an outlier
   - On counters, the “Outliers” filter now points out that a falling reading (e.g. a 0) is listed under “Counter decreases”
+- **Outliers**: the reason names the next value as well as the previous one
+  - The row then shows whether the reading returns to normal afterwards (bad value) or stays high (real jump)
 
 ### Fixed
 

@@ -1674,3 +1674,25 @@ def test_in_memory_sort_matches_the_streaming_order() -> None:
             gap_threshold_minutes=None, outlier_factor=10, tz=TZ, sort=sort,
         )
         assert [ts for ts, _value in direkt] == [row["ts"] for row in streaming["rows"]], sort
+
+
+def test_outlier_reason_names_the_following_value() -> None:
+    """Der Nachsatz „Folgewert … um …“ zeigt, ob der Stand danach wieder üblich ist (Fehlwert) oder oben bleibt (Sprung).
+    Beide Wege (Speicher und Streaming) liefern denselben Text; ohne Folgewert (letzte Zeile) entfällt er."""
+    werte = [20.0, 20.1, 19.9, 20.0, 20.2, 19.8, 250.0, 20.1, 20.0, 20.2]
+    rows = [(float(i * 60), v) for i, v in enumerate(werte)]
+    direkt = cleanup.detect_outliers(rows, 10, decimals="auto", tz=TZ)
+    streaming = cleanup.analyze_raw_rows_page(
+        lambda: iter(rows), filter_="outliers", page=1, page_size=50,
+        gap_threshold_minutes=None, outlier_factor=10, tz=TZ,
+    )
+    reason = direkt[360.0]
+    assert "Vorwert 19,8" in reason and "Folgewert 20,1" in reason
+    assert reason.index("Vorwert") < reason.index("Folgewert")
+    assert [row["flags"][0]["reason"] for row in streaming["rows"]] == [direkt[row["ts"]] for row in streaming["rows"]]
+    # Letzte Zeile: kein Folgewert, kein Nachsatz.
+    ende = [*rows, (600.0, 250.0)]
+    assert "Folgewert" not in cleanup.detect_outliers(ende, 10, decimals="auto", tz=TZ)[600.0]
+    # Gleicher Zeitstempel zählt nicht als Folgewert.
+    doppelt = [*rows[:7], (360.0, 20.2), *rows[7:]]
+    assert "Folgewert" not in cleanup.detect_outliers(doppelt, 10, decimals="auto", tz=TZ).get(360.0, "")
