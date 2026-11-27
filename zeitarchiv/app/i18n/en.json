@@ -4263,7 +4263,9 @@
     "Vorzeitraum": "Previous period",
     "Gewählter Tag": "Selected day",
     "Ø im Zeitraum": "Average over the period",
-    "Nur gleitend": "Rolling only"
+    "Nur gleitend": "Rolling only",
+    "{wert} {subunit}/kWh sind nur {euro} {symbol}/kWh. Gemeint war vielleicht {vorschlag} {subunit}/kWh (= {wert} {symbol}/kWh)?": "{wert} {subunit}/kWh is only {euro} {symbol}/kWh. Did you mean {vorschlag} {subunit}/kWh (= {wert} {symbol}/kWh)?",
+    "übernehmen": "apply"
   },
   "js": {
     "Eigener Zeitraum": "Custom period",

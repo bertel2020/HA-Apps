@@ -89,6 +89,12 @@
   .edash-cost-gap-note p{margin:0;}
   .edash-cost-gap-note p + p{margin-top:4px;}
   .edash-cost-gap-note a{color:inherit;text-decoration:underline;white-space:nowrap;}
+  .edash-price-unit-warn{
+    margin:8px 0 0;padding:8px 12px;border-radius:8px;
+    background:var(--warning-soft);color:var(--warning);border:1px solid var(--warning);
+    line-height:1.5;
+  }
+  .edash-price-unit-warn .btn{margin-left:8px;padding:2px 10px;}
   .settings-panel .edash-price-advice{
     margin:14px 0 0;padding:9px 12px;border-radius:8px;border-left:3px solid var(--accent-line);
     background:var(--accent-line-soft);color:var(--ink);line-height:1.5;

@@ -61,6 +61,26 @@
 </span>
 {% endmacro %}
 
+{# Hinweis unter dem festen Preis (ct/kWh): Ein Wert unter 1 ist fast immer ein
+   Betrag in der Währung (z. B. 0,0764 statt 7,64) und würde um den Faktor 100
+   zu klein verrechnet. Nur Hinweis, kein Speicherstopp. Das Feld ist nicht
+   reaktiv (siehe number_field), deshalb liest der Hinweis den gespiegelten
+   Wert aus real_id bei jeder Eingabe neu. entity_expr: Alpine-Ausdruck der
+   gewählten Entität — mit Entität gilt der feste Wert nicht. #}
+{% macro price_unit_warning(real_id, entity_expr) %}
+<p class="hint edash-price-unit-warn" x-cloak
+   x-data='{ v: null, tpl: {{ _("{wert} {subunit}/kWh sind nur {euro} {symbol}/kWh. Gemeint war vielleicht {vorschlag} {subunit}/kWh (= {wert} {symbol}/kWh)?", wert="{wert}", subunit=currency_subunit_short, euro="{euro}", symbol=currency_info.symbol, vorschlag="{vorschlag}") | tojson }},
+            read() { const s = document.getElementById("{{ real_id }}").value; this.v = s === "" ? null : NumberFormat.parse(s); },
+            get low() { return !{{ entity_expr }} && this.v !== null && this.v > 0 && this.v < 1; },
+            num(x) { return Number(x.toPrecision(6)).toLocaleString(window.ZA_FORMAT, { maximumFractionDigits: 8 }); },
+            get msg() { return this.tpl.split("{wert}").join(this.num(this.v)).replace("{euro}", this.num(this.v / 100)).replace("{vorschlag}", this.num(this.v * 100)); },
+            apply() { const el = document.getElementById("{{ real_id }}"); const shown = el.closest("dialog").querySelector(".edash-fixed-price-input"); const nv = this.num(this.v * 100); shown.value = nv; el.value = nv; this.read(); } }'
+   x-init="read()" @input.window="read()" x-show="low">
+  <span x-text="msg"></span>
+  <button type="button" class="btn" @click="apply()">{{ _("übernehmen") }}</button>
+</p>
+{% endmacro %}
+
 {# Gruppen-Auswahl je Verbraucher-Zeile — dasselbe Such-Dropdown-Muster wie
    entity_field, aber ohne feste Optionsliste: "gruppen" (Root-x-data) wird
    per Referenz an groupPicker() durchgereicht, eine hier neu getippte
@@ -938,6 +958,7 @@
               {% call entity_field('preis_netzbezug_draft', 'draft.kostenBezugEntity', "(id) => { draft.kostenBezugEntity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
                 {{ number_field('preis_netzbezug_fixed_draft', (kb_fixed * 100) if kb_fixed is not none else none, '', 'x-show="!entityId" oninput="document.getElementById(\'preis_netzbezug_fixed_real\').value = event.target.value"', currency_subunit_short ~ '/kWh', 'edash-price-fixed-input') }}
               {% endcall %}
+              {{ price_unit_warning('preis_netzbezug_fixed_real', 'draft.kostenBezugEntity') }}
               {% call hint_body() %}{{ _("Fester Preis in {subunit}/kWh, wird mit dem bezogenen Strom verrechnet und ergibt die Netzbezug-Kosten. Eine Entität darf den Preis in der Währung je kWh (z. B. €/kWh) oder in {subunit}/kWh liefern, die App erkennt es an der Einheit.", subunit=currency_subunit) }}{% endcall %}
               <p class="hint edash-price-advice">{{ _("Am besten eine Entität oder einen Helfer (z. B. „Zahl“) verwenden: Jeder Wert gilt ab seinem Zeitpunkt, und bei einem Tarifwechsel bleiben frühere Monate richtig. Ein fester Wert gilt rückwirkend für alle Zeiträume. Bei einem Helfer, der sich nur selten ändert, in den Einstellungen der Entität die Lückenerkennung auf „Aus“ stellen — sonst fehlt der Preis, sobald der letzte Wert länger zurückliegt.") }}</p>
             </div>
@@ -962,6 +983,7 @@
               {% call entity_field('preis_einspeisung_draft', 'draft.kostenEinspeisungEntity', "(id) => { draft.kostenEinspeisungEntity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
                 {{ number_field('preis_einspeisung_fixed_draft', (ke_fixed * 100) if ke_fixed is not none else none, '', 'x-show="!entityId" oninput="document.getElementById(\'preis_einspeisung_fixed_real\').value = event.target.value"', currency_subunit_short ~ '/kWh', 'edash-price-fixed-input') }}
               {% endcall %}
+              {{ price_unit_warning('preis_einspeisung_fixed_real', 'draft.kostenEinspeisungEntity') }}
               {% call hint_body() %}{{ _("Feste Vergütung in {subunit}/kWh, wird mit der eingespeisten Energie verrechnet und ergibt den Einspeisung Erlös. Eine Entität darf den Preis in der Währung je kWh (z. B. €/kWh) oder in {subunit}/kWh liefern, die App erkennt es an der Einheit.", subunit=currency_subunit) }}{% endcall %}
               <p class="hint edash-price-advice">{{ _("Am besten eine Entität oder einen Helfer (z. B. „Zahl“) verwenden: Jeder Wert gilt ab seinem Zeitpunkt, und bei einem Tarifwechsel bleiben frühere Monate richtig. Ein fester Wert gilt rückwirkend für alle Zeiträume. Bei einem Helfer, der sich nur selten ändert, in den Einstellungen der Entität die Lückenerkennung auf „Aus“ stellen — sonst fehlt der Preis, sobald der letzte Wert länger zurückliegt.") }}</p>
             </div>
@@ -1012,6 +1034,7 @@
               {% call entity_field('preis_eigenverbrauch_draft', 'draft.kostenEigenverbrauchEntity', "(id) => { draft.kostenEigenverbrauchEntity = id; }", deny_units=OBVIOUSLY_WRONG_UNITS, inline_fallback=true) %}
                 {{ number_field('preis_eigenverbrauch_fixed_draft', (kev_fixed * 100) if kev_fixed is not none else none, '', 'x-show="!entityId" oninput="document.getElementById(\'preis_eigenverbrauch_fixed_real\').value = event.target.value"', currency_subunit_short ~ '/kWh', 'edash-price-fixed-input') }}
               {% endcall %}
+              {{ price_unit_warning('preis_eigenverbrauch_fixed_real', 'draft.kostenEigenverbrauchEntity') }}
               {% call hint_body() %}{{ _("Nur für Anlagen mit einer echten Zahlung auf selbst verbrauchten Strom (z. B. KWK-Zuschlag) — für die meisten Anlagen bleibt dieses Feld leer. Feste Vergütung in {subunit}/kWh, wird mit dem Eigenverbrauch (Erzeugung minus Einspeisung) verrechnet und fließt zusätzlich zum Einspeisung-Erlös in den Saldo ein. Eine Entität darf den Preis in der Währung je kWh (z. B. €/kWh) oder in {subunit}/kWh liefern, die App erkennt es an der Einheit.", subunit=currency_subunit) }}{% endcall %}
             </div>
             <div class="edash-dialog-footer" style="justify-content:space-between;">
