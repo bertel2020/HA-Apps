@@ -63,10 +63,12 @@
   - „Ausrichtung“ erst ab zwei Entitäten (bei einer war „Horizontal“ ein einzelner Balken); „Rollierend“ und „Dynamische Y-Achse“ entfallen in der horizontalen Ansicht
   - Legende „Aus“: „Statistik in Legende“ und „Legendengröße“ sind ausgeblendet (Chart-Editor und Entitätsseite)
   - Entitätsseite: „Nachkommastellen“, „Dynamische Y-Achse“ und „Durchschnittslinie“ sind bei den Diagrammtypen ausgeblendet, bei denen sie nichts bewirken; bei Schalter-Entitäten entfallen die „Nachkommastellen“ (auch in den Einstellungen einer Werte-Kachel), da sie „An“/„Aus“ oder eine Dauer zeigen
-- **Einstellungen**: Optionen, die ohne ihre Voraussetzung nichts bewirken, sind ausgegraut und behalten ihren gespeicherten Wert
+- **Einstellungen**: Optionen, die ohne ihre Voraussetzung nichts bewirken, sind ausgegraut oder ausgeblendet und behalten ihren gespeicherten Wert
   - Tabellen-Editor: „Einheiten ausrichten“ und „Einheiten kleiner“, solange die Einheiten ausgeblendet sind; „Vergleichsspalten absetzen“ und „Abweichung zum Vergleich“, solange die Tabelle keine Vergleichsspalte hat
   - Einrichtung Energiedashboard: „Nach Gruppe anzeigen“ bei den Verbraucheranteilen, solange die Kachel „Verbraucheranteile“ ausgeblendet ist; die Schwellen der Kenntage, solange ihr Bereich nicht angehakt ist
   - Einrichtung Wetterdashboard: die Schwellen für den Anteil am klaren Himmel ohne „Nach Sonnenstand“ und die Rolle „Sonnenhöhe“, Regentag nach Menge und nach Dauer ohne ihre Sensor-Rolle, die Heizschwellen ohne den Reiter „Heizen“
+  - Backup: Die Uhrzeit ist ausgeblendet, solange „Automatisch erstellen“ aus ist
+  - Archivierung: „Standard-Lebenszeichen“ ist ausgeblendet, solange der Standard-Wertänderungsfilter aus ist
 
 ## 1.57.0 - 2026-11-24
 

@@ -74,6 +74,9 @@
       </div>
     </span>
   </div>
+  {# Das Lebenszeichen gehört zum Wertänderungsfilter: wie im Formular einer Entität (_entity_config_form.html) steht es nur bei
+     aktivem Filter. Der gespeicherte Wert bleibt; jede Zeile sendet beim Ändern nur sich selbst, ein fehlendes Feld ändert nichts. #}
+  {% if default_value_filter == 'decimals' %}
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
       <div class="settings-compact-label">{{ _("Standard-Lebenszeichen") }}</div>
@@ -89,6 +92,7 @@
       </div>
     </span>
   </div>
+  {% endif %}
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
       <div class="settings-compact-label">{{ _("Standard-Lücken-Erkennung") }}</div>
