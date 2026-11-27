@@ -196,6 +196,10 @@
   {% endif %}
 </div>
 
+{# Ein fallender Zählerstand (z. B. eine 0 nach dem Neustart) ist kein Ausreißer, sondern ein Zählerrückgang und steht unter dem eigenen Filter. #}
+{% if filter == 'outliers' and counter_decrease_enabled %}
+<p class="rows-hint">{{ _("Fällt ein Zählerstand, zum Beispiel auf 0, ist das kein Ausreißer, sondern ein Zählerrückgang. Du findest ihn im Filter „Zählerrückgänge“.") }}</p>
+{% endif %}
 {% if rows %}
 {% set counter_verdicts_map = counter_verdicts(entity_id, rows) if counter_verdicts is defined and counter_decrease_enabled else {} %}
 {# Hinweis nur, wenn die Mehrheit der Rückgänge auf der Seite nach planmäßigem Reset aussieht: die Einstellung betrifft die ganze Entität, deshalb Link statt Knopf in der Zeile. #}
