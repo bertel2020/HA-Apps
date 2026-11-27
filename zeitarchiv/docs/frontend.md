@@ -200,7 +200,10 @@ Zeilen), nicht auf Alpines reaktivem UID-Zustand.
   Datenbank stammen (kein externer Angriffsvektor), weil ein handgebauter
   Parser für so einfache Ausdrücke die sauberere Wahl bleibt.
 - Der Server berechnet je Entität und Zeitraum die Aggregate `auto`/`avg`/
-  `min`/`max`/`sum`. Gruppen, Formeln und Nachkommastellen je Spalte bleiben
+  `min`/`max`/`sum`, bei Schaltern zusätzlich `count_last`/`count_avg`/`count_min`/`count_max`/`count_sum`.
+  Die Zeilen-Aggregation „Σ Einschaltungen“ (`count_sum`, im Editor nur bei Zeilen mit einem Schalter angeboten) liest
+  daraus; die Zelle trägt die Einheit „Einschaltungen“ und 0 Nachkommastellen; für alles, was kein Schalter ist, gibt
+  `memberValueFor()` `null` zurück statt eines Durchschnitts. Gruppen, Formeln und Nachkommastellen je Spalte bleiben
   clientseitige Darstellungslogik; gespeichert wird weiterhin nur die Struktur
   (siehe [data-model.md](data-model.md)).
 - Darstellungsoptionen liegen ausschließlich im `style_json` der Tabelle und
@@ -213,6 +216,11 @@ Zeilen), nicht auf Alpines reaktivem UID-Zustand.
   optional kleinere oder ausgerichtete Einheiten und ausgerichtete
   Dezimalstellen. Alte Tabellen behalten durch konservative Defaults ihre
   bisherige Darstellung.
+- **Dauerformat je Zeile (`row.display_format`):** `auto` oder `duration` für Entitäts-, Gruppen- und
+  Formelzeilen. `TableCompute.durationCell()` macht aus einer Zelle mit Einheit `h` den Text „TT hh:mm“
+  (volle Minuten, abgeschnitten; nur bei endlichem, nicht negativem Wert), `cellUnit()` unterdrückt dann die Einheit.
+  Rein Anzeige: Zellwerte, Summen und Formeln rechnen weiter in Stunden. Der Editor bietet die Option nur, wenn
+  die Zeile Stunden liefert (`canShowDuration()`) oder schon darauf steht. Gespeichert in `table_rows.display_format`.
 - **Layout-Lektion (siehe `table_editor.html`-Kommentare):** Zeilen-Buchstaben
   (A/B/C) als *separate* Tabelle neben statt als Spalte innerhalb der
   Haupttabelle zu rendern, klingt sauberer, führt aber zu Zeilenhöhen-Drift
@@ -642,14 +650,33 @@ Opacity (0,05 statt 0,08) als die Hauptserie — sie ist ohnehin schon
 gestrichelt/blasser, zwei gleich kräftige überlagerte Flächen hätten sich
 sonst optisch zugematscht.
 
-### Dauer-Anzeige (Schalter, Anzeigemodus „Zeit")
+### Dauer und Anzahl der Einschaltungen (Schalter)
 
-Ein Schalter mit `display_mode: "time"` bekommt in `chart_editor.js` und
+**Dauer.** Eine Schalter-Serie mit Bucket-Werten (Balken oder Linie, ohne Rohwerte) zeigt immer
+die Einschaltdauer, gleich welcher Anzeigemodus gewählt ist: Ohne Einheit wären es unlesbare
+Sekunden (266 = 4 Min. 26 s). Die Regel steht dreifach, damit sie nicht auseinanderläuft:
+`isDurationSeries()` in `chart_editor.js` und `entity_detail.js` sowie `durationSeries(s, raw)` in
+`chart-tile-render.js` (Kachel und Lovelace-Karte); sie lautet
+`aggregation_type === 'switch' && (display_mode === 'time' || !raw)`. Der Anzeigemodus
+entscheidet nur noch bei den 0/1-Rohwerten (Zeitstrahl); dort bietet die Legende „Min“, „Max“ und „Ø“
+nicht an, sie zeigten nur 0 und 1. Eine solche Serie bekommt in `chart_editor.js` und
 `dashboard-tiles.js` gleichermaßen einen eigenen, synthetischen Achsen-
 Schlüssel (`axisKey(s) = isDurationSeries(s) ? ' duration' : s.unit`) statt
 seiner echten, meist leeren `unit` — sonst teilte er sich fälschlich eine
 Achse mit unitlosen Standard-Entitäten und erschiene dort in Rohsekunden
 statt als „1h 30m" (`NumberFormat.fmtDuration`).
+
+**Anzahl.** Die Anzahl kommt vom Server als gewöhnliche Zähler-Serie (Einheit „Einschaltungen“,
+`source_type: "switch"`, siehe `app/switch_counts.py` und [api-reference.md](api-reference.md)); Chart-Editor,
+Kacheln und Karte brauchen dafür keinen eigenen Zeichenpfad, Summen, Achsen je Einheit, Stapel, Vergleich
+und Tabellen gelten für Zähler schon. Die Wahl je Serie (`seriesStyle[id].metric`, `duration`/`count`/`both`)
+reist als Abfrageparameter `metrics`; weil die Antwort je nach Wahl andere Serien enthält, lädt
+`setSeriesMetric()` neu. Eine Wahl, die dem Standard der Entität (`default_metric` aus
+`entities.display_mode`) entspricht, wird nicht gespeichert. Bei „Beides“ liefert der Server zusätzlich die Serie
+`<entity_id>#count` als Linie (`base_entity_id`); die Oberfläche legt sie auf die zweite Achse. Auf der
+Entitätsseite sitzt die Wahl als Segmentschalter „Anzeige“ im Optionen-Menü (`setSwitchMetric()`), die Vorgabe
+steht als `SWITCH_METRIC_DEFAULT` im Template. Eine unbekannte Anzahl bleibt `null`; fehlt sie im ganzen Zeitraum (`countsMissing`),
+sagt die Seite das in einem Hinweis, statt eine 0 zu zeigen.
 
 Bis 0.92.0 galt das nur im Chart-Editor. Die Dashboard-Kachel kannte den
 Anzeigemodus ausschließlich in ihrer selbstgebauten HTML-Legende (dort schon
@@ -663,6 +690,22 @@ verlöre genau der letzte, oft sichtbarste Punkt seine Formatierung.
 Die Durchschnittslinie (siehe oben) rechnet weiterhin ohne Dauer-Sonderfall in
 beiden Dateien — dasselbe, vorbestehende Verhalten wie vor diesem Fix, keine
 neue Inkonsistenz.
+
+### Donut: Mindestzahl, An/Aus und Mitte
+
+- **Wählbar** ist der Diagrammtyp im Chart-Editor über `donutAvailable`: mindestens zwei Serien, eine
+  Zustands-Entität oder genau ein Schalter (`singleSwitch`). Mit einem Messwert wäre er ein voller Ring ohne Aussage.
+- **Ein Schalter** teilt den Zeitraum in „An“ und „Aus“ (`StateEntities.onOffRows()` aus Einschaltdauer und
+  gelaufenem Fenster, gezeichnet mit `onOffSeries()`), im Editor wie in Kachel und Lovelace-Karte; das Feld
+  „Aggregation“ entfällt dort und bei Zustands-Entitäten.
+- **Mitte:** `StateEntities.centerGraphic()` setzt den Text, `bindCenter()` tauscht ihn beim Überfahren einer Scheibe
+  gegen deren Wert. In Ruhe steht die Summe, bei An/Aus die Einschaltdauer, bei Zustands-Entitäten der größte Zustand;
+  bei Messwerten nur mit Aggregation „Summe“ und gleicher Einheit aller Serien. Kachel und Karte zeigen sie nur, wenn
+  der Ring groß genug ist (`tileDonutCenterFits()`, `centerFits()`).
+- **Optionen ohne Wirkung werden ausgeblendet, nicht deaktiviert** (`x-show` im Optionen-Menü des Chart-Editors und der
+  Entitätsseite; der gespeicherte Wert bleibt erhalten): Zeitstrahl ohne Punkte/Fläche/Linienstil, Balken ohne
+  Dynamische Y-Achse, Dauern ohne Nachkommastellen, „Ausrichtung“ erst ab zwei Entitäten, bei Legende „Aus“ keine
+  Statistik und Größe.
 
 ### Markierungsquote der Ausreißer-Erkennung
 
@@ -717,10 +760,13 @@ sodass ohne Schalter nichts anders aussieht als vorher.
   `dashboard-tiles.js`) statt nur auf `window.resize`. Wetter-, Langzeit- und die meisten Energie-Diagramme haben
   schon eigene Beobachter; nur das Sankey des Energiedashboards hängt am Fenster und rechnet seine Mindesthöhe
   (≈ Breite / 3, nur bei breiter Darstellung) bei Größenänderung neu.
-- **Energie- und Wetterdashboard:** `.page-wide`, aber der Inhalt (`#energiedashboard-root`, `#wetter-root`) bleibt in
-  allen Reitern bei 1440 px und steht mittig (breiter würden Sankey, Heatmap und Diagramme mit fester Höhe zu
-  flachen Streifen; ein Rahmen für alle Reiter, damit nichts beim Reiterwechsel springt). Ab 1500 px sind die
-  Diagramme etwas höher (340/400 px, Heatmap 240 px), die Wetter-Tabellen füllen die Karte (`min-width:100%`).
+- **Energie- und Wetterdashboard:** `.page-wide`; der Inhalt (`#energiedashboard-root`, `#wetter-root`) hat dort
+  `max-width:none` und füllt in allen Reitern die volle Breite des Rahmens (bis 1920 px, darüber mittig), ein Rahmen
+  für alle Reiter, damit nichts beim Reiterwechsel springt. Weil Sankey, Heatmap und Diagramme mit fester Höhe sonst zu
+  flachen Streifen würden, sind die Diagramme ab 1500 px etwas höher (340/400 px, Heatmap 240 px); die Wetter-Tabellen
+  füllen die Karte (`min-width:100%`), das Tagesbild steht als 7 + 7 und die Heiz-Monatstabelle hat feste Spaltenbreiten
+  (`table-layout:fixed`). Das Raster der Dashboards bleibt bei `--dash-max` (1440 px, siehe oben); nur diese beiden Seiten
+  haben kein 1440-px-Limit mehr.
   Tooltips am rechten Kartenrand (Speicherstand, letzte zwei KPI-Kacheln) öffnen nach links, sonst entsteht bei
   1500–1920 px waagrechter Überlauf. Die Regeln stehen je Seiten-CSS, nicht in `app.css`: `.wt-chart`, `.wt-card`
   u. a. werden auch anderswo genutzt.
@@ -983,6 +1029,21 @@ die Liste im Panel sagt ohnehin, was.
   Entfernen) lebt in der umgebenden Komponente und kommt per Getter herein.
   Beide erwarten Optionen der Form `{entity_id, label, unit,
   aggregation_type}`, die Mehrfach-Variante zusätzlich `is_favorite`.
+- **Filtermenü als Chips** (`.ent-filter*` in `app.css`): Entitätenliste (`entities_list.html`,
+  `pages/entities_list.js`) und CSV-Export (`export.html`) teilen sich dasselbe Markup: Knopf „Filter ▾“ mit
+  Zähler, Popover mit Kopf (Titel, ⓘ-Hinweis zu ODER/UND, „Zurücksetzen“), einer Zeile je Gruppe (Typ,
+  Kategorie, Raum, Einheit) und einer Fußzeile (`.ent-filter-foot`) mit der Zahl der Treffer. Die Chips
+  sind weiter gewöhnliche `checkbox`-Felder (`name=type/category/area`) bzw. ein verstecktes
+  `unit`-Feld, das der Server liest; die Optik macht allein das CSS (`input:checked + span`), das Menü scrollt
+  nicht in sich selbst. Die Import-Tabellen (`_import_filter.html`, Makro `filter_bar`, `import-filter.js`) nutzen
+  dieselben Klassen für ihr Menü „Auswahl ▾“ (Kategorie, Raum, Typ); dort gelten die Zustands-Chips daneben
+  weiter als eigene Reihe.
+- **Spaltenhervorhebung** (Vergleichstabelle von Wetter- und Energiedashboard): Die Einstellung `col_highlight`
+  (`off`/`pairs`/`main`/`custom`) setzt `data-col-hl` an der Tabelle (`ElementTableRender.applyColumnHighlight()`
+  in `element-table-render.js`); `pairs` und `main` regelt allein das CSS (`.wt-table[data-col-hl=…]`), bei `custom`
+  bekommen die Zellen der gewählten Zeiträume (mit ihrer Vorjahr-Spalte) die Klasse `wt-hl`. Die Auswahl (Stern im
+  Menü „Spalten“) liegt je Browser in `hlCols` (`wetter.js`, `energie-langzeit.js`). Zusätze in Klammern
+  hinter einem Zeilennamen (`metricLabelHtml()`) stehen als `.wt-qual` in einer zweiten Zeile.
 - **`group-picker.js`** (Energiedashboard, Verbraucher-Gruppen): durchsuchbares
   Dropdown ohne feste Optionsliste — bestehenden Eintrag auswählen oder per
   Freitext einen neuen erzeugen (wie Tags/Labels in Home Assistant), analog zu

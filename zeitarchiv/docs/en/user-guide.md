@@ -482,7 +482,11 @@ from its point in time, and earlier months stay correct after a tariff
 change. A **fixed value applies retroactively to all periods** — if the tariff
 changes, the dashboard recalculates the past with the new value too. The
 energy price is entered in cents (or pence, rappen) per kWh, the standing
-charge in the currency itself **per month**.
+charge in the currency itself **per month**. A fixed price (grid, feed-in,
+self-consumption) below 1 almost always is an amount in the currency (e.g.
+0.0764 instead of 7.64) and would be counted 100 times too low; the field then
+shows a hint with a one-click correction. It is only a hint — saving is not
+blocked.
 
 **Dynamic tariff and average price.** If the energy price is an entity, the cost
 analysis also shows the **average electricity price** per kWh (costs ÷ grid
@@ -684,6 +688,11 @@ and feed-in, less grid import and consumption), red unfavorable.
   last year, “Complete” with the whole period of last year; last month is the
   same in both cases. “Show difference” shows or hides the difference line.
   The browser remembers the choice (columns, last year, difference).
+- **Column highlighting:** the setup (**Comparison and long-term**) tints
+  columns of the “Periods compared” table: **Off**, **Alternating pairs**
+  (default), **Main columns** or **Custom selection**. With the custom
+  selection, you mark the periods with a star in the **Columns** menu; the
+  selection is remembered by the browser.
 - **Ratios and storage:** Below consumption are self-consumption and
   self-sufficiency (calculated as on the overview); their difference to last
   year is in percentage points (pp). With storage assigned, rows for charge
@@ -798,13 +807,26 @@ matching type for each role and rejects wrong assignments.
 | Brightness (preferably the south sensor) | Measurement | Sunshine duration, sun hours, day class |
 | Brightness dawn | Measurement | Start and end of day, day length |
 | Wind direction, sun elevation | Measurement | only for the weather summary and daylight |
+| Weather condition | State (e.g. weather entity) | Kind of precipitation (rain, snow, sleet, hail), snowfall days |
+| Flow temperature | Measurement | Heating curve on the Heating tab |
 | PV power | Measurement (W, kW, MW) | Daily yield against expectation from brightness |
 
 A rain sensor that only reports on and off is enough: the page then shows rain
 minutes and rain days instead of millimetres. If you have both, both rows are
 shown side by side. Many on/off sensors also report “rain” in fog, dew or when
 the sensor is wet; the drying time then counts too. You set when a day counts
-as a rain day in setup (default 1 mm or 10 min). In the **Display** section you can hide blocks of the comparison table (key days, precipitation, rain, humidity, pressure, wind, gust, radiation); the outdoor temperature and additional sensors are always shown, and the tiles at the top do not change. The period of a column is in the tooltip of its heading ("ⓘ"), not on a line of its own. For max and min, the day appears as a small line under the value in the month, previous month and year columns; the difference to the previous year can be switched on and off in the "Previous year" menu with "Show difference" (remembered by the browser).
+as a rain day in setup (default 1 mm or 10 min).
+
+The optional role **Weather condition** tells what kind of precipitation it
+is. Assign a weather entity (`weather.*`) or a sensor with the same values
+(rainy, snowy, …), selected individually in the archive; sensors with
+translated text or a numeric code do not fit. The weather summary and the rain
+tile then say “Snow”, “Sleet” or “Hail” instead of “Rain”. Without it, they
+say “Precipitation” at or below 1 °C, since an on/off rain sensor cannot tell
+rain from snow. The role also feeds the snowfall figures on the
+[Long-term tab](#long-term-tab-1) of the weather dashboard.
+
+In the **Display** section you can hide blocks of the comparison table (key days, precipitation, rain, humidity, pressure, wind, gust, radiation); the outdoor temperature and additional sensors are always shown, and the tiles at the top do not change. The period of a column is in the tooltip of its heading ("ⓘ"), not on a line of its own. For max and min, the day appears as a small line under the value in the month, previous month and year columns; the difference to the previous year can be switched on and off in the "Previous year" menu with "Show difference" (remembered by the browser).
 
 Under **Display → Cards** every block of the tabs can be hidden on its own, grouped by tab: Overview (Weather conditions, Periods compared, Day overview, Monthly comparison), Precipitation (Precipitation, Precipitation per month), Temperature & climate (Temperature & climate, Temperature comparison, Humidity comparison), Wind & sun (Wind & sun, Hours of sunshine, Daylight, The last days compared, Day length over the year, PV and brightness) and Long-term (Records, Key days per year, Monthly values per year, Years compared, day by day). Only blocks with an assigned role are offered. A tab is missing when all its blocks are hidden. Only the Heating tab stays separate in the "Experimental" block.
 
@@ -819,7 +841,9 @@ selective restore brings it back as a whole ("Weather dashboard configuration").
 Tiles and comparison table share one card whose title names the day (Today, Yesterday, otherwise Looking back; a click on it jumps back to today). The tiles show the current value and the day's range for each role. The **Overview** holds temperature, precipitation, rain, humidity and pressure; wind, gust and radiation have their own **Wind & sun** tab, additional sensors the **Temperature & climate** tab (each appears only when something is assigned), with the same tiles and the same comparison table. The **Temperature & climate** tab also has the **Temperature comparison** chart: daily averages of the outdoor temperature and all additional sensors for 7, 30 or 90 days.
 The table below has the columns **Today, Yesterday, This month, Last month**
 and **This year**, each optionally with a **Last year** column next to it; the
-header shows the concrete period (“November”, “2026”). The difference to last
+header shows the concrete period (“November”, “2026”). A note in brackets after
+a row name (e.g. “from 60 % of clear sky”) appears small in a second line, so
+the first column can stay narrow. The difference to last
 year sits next to the current value and is deliberately neutral in colour, as
 warmer is not automatically better. For max and min a tooltip shows when the value
 occurred (the hour for today and yesterday, otherwise the day); the period of the last year is in the tooltip of the “Last year” column heading.
@@ -837,6 +861,13 @@ year. Completed periods (yesterday, last month) are the same in both cases. If
 a period has no data it shows “–”, never 0; a tooltip tells when the archive
 begins. The browser remembers the column selection.
 
+**Column highlighting.** In the setup under **Display**, **Column
+highlighting** tints columns of the “Periods compared” table: **Off**,
+**Alternating pairs** (default), **Main columns** or **Custom selection**. With
+the custom selection, you mark the periods with a star in the **Columns**
+menu; the selection is remembered by the browser. The energy dashboard has the
+same setting, on its Long-term tab.
+
 ### Sun, light and weather summary
 
 With a **brightness** (lx) the weather station gives more. The evaluation is not an official
@@ -845,7 +876,8 @@ saturates at about 98,800 lx. The thresholds are in setup under **Sun and daylig
 
 - **Weather summary** (Overview): a symbol and one word for the sky (overcast, cloudy, fair,
   sunny, twilight, night), a short sentence from temperature, wind (Beaufort, with direction
-  if **Wind direction** is assigned) and rain, plus details such as gusts, daily high and
+  if **Wind direction** is assigned) and precipitation (rain, snow, sleet or
+  hail with the role **Weather condition**, see [Roles](#roles)), plus details such as gusts, daily high and
   low, sun hours and "light until … yesterday". The class limits follow the sun threshold but
   can be set yourself in setup. For an earlier day it shows that day's summary. Under
   **Display** you choose the layout: **Large** (centred header above four tiles),
@@ -912,6 +944,21 @@ Pointing at a bar shows the split across months in the tooltip. Only completed d
 with at least 18 hours of values are counted. The same numbers appear as **Characteristic days** rows under the
 outdoor temperature in the comparison table (for month and year columns).
 
+With the role **Weather condition** (see [Roles](#roles)), snow is counted too:
+
+- **Snowfall days** is one more kind next to the characteristic days: a day
+  with snow or sleet according to the weather condition, lasting at least as
+  long as set for rain days.
+- **Snow seasons** lists one row per season (1 July to 30 June) with first and
+  last snow, days with snow, the longest streak and, with a precipitation
+  assignment, the precipitation of those days (water equivalent of the whole
+  days, not snow depth). A running season is marked, and a season without
+  snow says so.
+- The **records** add the longest snow streak, the earliest first snow and the
+  latest last snow.
+- Only days since the weather condition is archived are counted; earlier
+  winters are missing.
+
 **Mean temperature per month and year** shows one row per year, one column per month and
 the annual mean on the right. The colour shows how far a month deviates from the mean of
 that month over all completed years in the archive (blue colder, red warmer). Each cell
@@ -959,6 +1006,14 @@ the **heating limit** (default 15 °C, shown as a vertical line); its slope is l
 per kelvin" below. Room temperature (default 20 °C) and heating limit can be changed at the
 top, as can the selection of counters, without reloading; the browser remembers the values.
 
+**Heating curve.** With the optional role **Flow temperature** (the flow
+temperature of the heating in °C, e.g. of the heat pump) assigned, a **Flow
+temperature** chip appears above the scatter chart. It switches the chart to
+the daily mean of the flow temperature against the outdoor temperature, one
+colour per heating season, with the slope in “K/K” per season below. The
+daily mean is diluted when the heating is off for part of the day or heats
+water; the curve then gets flatter and noisier.
+
 The **degree-day figure** (G20/15 to VDI 3807) counts, for each day, room temperature minus
 daily mean, but only on days below the heating limit. **kWh per degree day** is the
 weather-adjusted consumption: it lets you compare cold and mild winters, which the plain total
@@ -985,10 +1040,18 @@ PV-controlled heating can reverse the effect, and thermal mass lets the previous
 ID. Via **Columns ▾**, twelve additional columns can be shown/hidden (type,
 first/last value, resolution, retention, unit, records, size, value filter,
 gap/outlier threshold, Historic; the last one is off by default) — the selection applies globally to the whole add-on,
-not just in the current browser. If the columns **Type** or **Unit** are
-shown, a matching filter appears next to them (type: default/counter/switch/state,
-multiple selection possible; unit: one of the units actually occurring). A
-click on a row opens the **history view** of that one entity.
+not just in the current browser. The **Filter ▾** menu offers its options as
+chips, one row per group — **Type** (default/counter/switch/state),
+**Category**, **Room** and **Unit** (one of the units actually occurring),
+each group only while its column is shown:
+
+- Several chips can be chosen: within a group they combine with OR, between
+  groups with AND (the hint is behind the ⓘ in the menu header).
+- The footer shows the number of matches while you choose; **Reset** in the
+  header clears all filters.
+- A selected unit is unselected by clicking it again.
+
+A click on a row opens the **history view** of that one entity.
 
 Every entity has three equal-ranking views, reachable via the tab row below
 the name: **History** (the diagram), **Edit values** (see [Cleanup](#cleanup))
@@ -1051,7 +1114,7 @@ assign in selection mode: mark entities, choose **Set category ▾** and click
 the category (or "No category" to release). A single entity can be set in its
 configuration, in the **Category** field.
 
-Next to the column the **Category: All ▾** filter appears: several categories
+The **Category** group appears in the **Filter ▾** menu: several categories
 can be chosen at once, **No category** shows what still needs sorting. If you
 hide the column, the filter is reset.
 
@@ -1061,8 +1124,8 @@ none, it is offered as "new" and created when you apply (the step says so).
 As long as you do not use categories yet, the field stays on "No category". The
 category applies to the entities that newly join the selection now, even before
 their first value arrives; those that already have a category keep it unless
-you tick **Also re-sort entities that already have a category**. Topic and
-category stay separate.
+you tick **Also re-sort entities that already have a category** (greyed out
+while “No category” is chosen). Topic and category stay separate.
 
 On the **Selection & history** tab a row **Filter by category** sits below the
 search (display only, as in the list, including "No category"); the category is
@@ -1102,10 +1165,19 @@ locally together with it, for existing entities as its own field group
 - **Raw values** shows every single stored measurement in the period instead of
   aggregated points — useful for closer inspection of short periods, limited
   by the query limit for very long periods.
+- For switches, **Display** (**Duration**, **Count**, **Both**) chooses what
+  the bars or the line show — the time switched on, the number of switch-ons,
+  or both (see [Display mode](#display-mode)). It starts with the display mode
+  of the entity.
 - The options menu shows only what actually has an effect for the current
   presentation: **Points** and **Raw values** belong to line charts, **Show
   values** to bars. When switching the chart type, the offered options change
   accordingly.
+  - **Decimal places**, **Dynamic Y axis** and **Average line** are hidden for
+    the chart types where they have no effect; for on/off entities there are
+    no decimal places, since they show “On”/“Off” or durations.
+  - With the legend set to “Off”, **Statistics in legend** and **Legend
+    size** are hidden.
 - **Dynamic Y axis** scales the axis to the actual range of values of the
   displayed period instead of starting at 0 — makes small fluctuations more
   visible, but can also exaggerate the visual size of changes. For bar charts
@@ -1359,6 +1431,18 @@ Own editor, reachable via **Charts** → new chart or editing an existing one
   decimal places, legend statistics — the same options as in the history view
   of a single entity, but here configured per chart instead of per entity;
   decimal places applies uniformly to all entities of the chart.
+- The editor menu shows only the options that do something for the chosen
+  chart type:
+  - Timeline: no **Points**, **Area** and **Line style**.
+  - Donut of state entities: no **Aggregation**.
+  - Bar charts: no **Dynamic Y axis**.
+  - Durations: no **Decimal places**, since durations always show hours and
+    minutes.
+  - **Orientation** only with at least two entities (with one, “Horizontal”
+    would be a single bar); in the horizontal view **Rolling** and **Dynamic
+    Y axis** are hidden.
+  - With the legend set to “Off”, **Statistics in legend** and **Legend
+    size** are hidden.
 - **Area** (only here, not in the history view of a single entity) subtly
   fills the area under line series — on by default, matching the previous
   appearance of the dashboard tile.
@@ -1376,6 +1460,11 @@ Own editor, reachable via **Charts** → new chart or editing an existing one
   original value in parentheses as well. With stacking active, comparison and
   average line are not available — a stacked series no longer starts at 0, and
   neither could then be drawn meaningfully.
+- For switch entities, the **Display** list per series (**Duration**,
+  **Count**, **Both**) chooses between the time switched on, the number of
+  switch-ons and both (duration as bars, count as a line on a second axis).
+  It starts with the display mode of the entity; see [Display
+  mode](#display-mode).
 - For switch entities only (`switch`, `binary_sensor` etc.), a **timeline** is
   available as in the history view — here as a multi-row presentation with one
   row per entity, so that the ON intervals of several switches can be compared
@@ -1390,7 +1479,13 @@ Via **Display type**, a chart can be shown as a donut instead of a time series
 — one share per entity instead of a time axis, for example to compare the
 consumption share of several devices in a total. **Aggregation** determines
 which value per entity forms the size of its share: Sum, Average or Last
-value. In donut mode, resolution, raw values, timeline, points, area, stacked,
+value. The donut is only offered with at least two entities; a single value
+would be a full ring without information. State entities still work with one,
+and so does a single on/off entity, whose donut splits the period into “On”
+and “Off” (also in tiles and the Lovelace card). The donut shows a value in
+the middle: the total (for an on/off entity the on-time, for a state entity
+the largest state), and the value of a slice while you hover over it; in
+tiles and the Lovelace card only when there is room for it. In donut mode, resolution, raw values, timeline, points, area, stacked,
 orientation, dynamic Y axis and average line drop out — all time-axis/bar
 concepts without an equivalent once there is no time axis anymore. **Rolling**
 remains available: it still determines which time window is queried at all, not
@@ -1577,6 +1672,13 @@ duplicated like rows (⧉).
   columns adds up the hourly values, not the daily values; a value stored as
   24 hourly values per day then counts 24 times. For daily values, store only
   one point per day or use “Current value”.
+  - For switches the list also offers **Σ Switch-ons**: how often the switch
+    was switched on in the period. For a period whose count is not recorded
+    yet there is no value (see [Display mode](#display-mode)).
+- **Duration format per row:** for rows with the unit h (entity, group and
+  formula rows), **Display** in the row menu can be set to “Automatic” or
+  “Duration (DD hh:mm)”: hours then appear as days, hours and minutes. This is
+  display only — values and totals stay in hours.
 - **Decimal places per column:** Automatic or fixed 0–3.
 - **% share** (row menu "Options"): shows instead of the absolute value the
   percentage share of the sum of all entity/group rows of the same column since
@@ -2061,6 +2163,32 @@ Only for switches (see below for which domains count):
 - **Time (duration)** instead shows the cumulative on-time per period,
   formatted readably (e.g. `1h 29m`) — useful for presence, door and motion
   sensors.
+- **Count (times switched on)** counts how often the switch was switched on
+  per period (off → on).
+- **Time and count** shows both: the duration as bars and the count as a line
+  on a second axis.
+
+The mode of the entity is the default in the history view, charts, dashboard
+tiles and the Lovelace card; there it can be changed per series (history
+view: options menu → **Display**; chart editor: per series, with **Duration**,
+**Count** or **Both**). Raw values and the timeline always show the 0/1 state.
+
+Bars and lines of on/off entities always show durations (e.g. `2h 7m`)
+instead of bare numbers, whichever mode is set — on the entity page, in the
+chart editor, in dashboard tiles and in the Lovelace card. The mode only
+applies to the raw 0/1 values (timeline); there the legend does not offer
+“Min”, “Max” and “Ø”, which would only show 0 and 1.
+
+**Counting switch-ons.** The count is stored per hour together with the
+on-time, so it is available for every period. Months that were archived
+before the count existed show no number: the period then says that the number
+of switch-ons has not been recorded yet (never 0, and a sum over a period with
+unknown parts is unknown as well). Under **Counting switch-ons** in the
+entity's configuration, a line states for how many archived months the count
+is still missing. They are calculated afterwards from the archive
+automatically after the update, or at any time with **Recalculate from the
+archive** (progress in the bell). Months whose raw data no longer exists
+remain unchanged.
 
 The domains `binary_sensor`, `switch`, `input_boolean`, `light`, `fan`,
 `automation`, `script`, `remote`, `siren`, `humidifier`, `update` and
@@ -2115,7 +2243,22 @@ immediately preceding value with its time:
 
 > `3 h 50 min since previous value 21.2 °C at 08:10`
 > `21.56 is 23× farther from the median of the last 15 values (24.27)`
-> `than usual (±0.12) — previous value 22.06 at 11.08.2026 00:01:41`
+> `than usual (±0.12) — previous value 22.06 at 11.08.2026 00:01:41, next value 22.1 at 11.08.2026 00:03:12`
+
+The reason names the previous and the next value, so you can see whether the
+reading returns to normal afterwards (bad value) or stays high (real jump).
+
+**Sorting.** The columns **Value**, **Timestamp** and **Status** of the list
+can be sorted by a click on the heading:
+
+- **Value:** a first click sorts descending (shifted digits come first), a
+  second one ascending (zeros come first), a third one back to time order.
+- **Timestamp:** switches between newest and oldest first.
+- **Status:** rows with findings first, then rows without findings first, then
+  back to time order.
+- The sort applies together with the filter and the period and is kept after
+  marking values. With the periods “Year” and “All”, the first 5,000 values
+  of the order are reachable; a note says so.
 
 Select individual entries or all together and delete — this is initially a
 **soft delete**: the values disappear immediately from every display (charts,
@@ -2131,7 +2274,7 @@ automatically treated as an error.
 **Colors: Can I do something?** The color of a marker says whether you can
 clean up — not how bad the finding is. **Yellow** means you can do something
 here (outlier, duplicate, repeat, counter decrease with “Probably a bad
-value”); a row with such a marker has a faint yellow background, and the
+value” or “Spike before”); a row with such a marker has a faint yellow background, and the
 strongest marker of the row decides. **Grey** is information only (gap, “Still
 open”). **Green-teal** means expected and fine (“Probably a reset”). Red is
 reserved for errors and the delete button. The same colors apply in the key
@@ -2144,6 +2287,9 @@ decrease, and a reason is in the tooltip (on the phone as a grey line below):
 - **Probably a bad value** — the reading returned to the old level shortly
   afterwards (“Reading back at … afterwards (after … min)”). A candidate for
   deletion.
+- **Spike before** — after a single spike upwards, this value is the good one
+  back at the earlier level. The assessment names the spike and the earlier
+  level; mark the spike as an outlier, not this value.
 - **Probably a reset** — the reading stayed low (“The reading stayed low
   afterwards”), for example after a meter replacement or a reset. If the
   counter resets on a schedule, you can record that in the entity's
@@ -2152,6 +2298,9 @@ decrease, and a reason is in the tooltip (on the phone as a grey line below):
 
 The scheduled reset of a daily counter (“… today”) at midnight does not count
 as a counter decrease and is neither marked nor counted.
+
+On counters, the **Outliers** filter points out that a falling reading (e.g. a
+0) is not an outlier but is listed under **Counter decreases**.
 
 Repeats (subsequent values equal after rounding) can also be condensed
 retroactively using the same six-hour sign-of-life rule as the ongoing value
@@ -2345,7 +2494,7 @@ rule of their own:
 | **Gap** | The time distance between two consecutive values exceeds the threshold set per entity (**Gap detection**, in minutes; "Off" disables the detection completely; for entities with filter or resolution the pauses between received values count, see [Gap detection](#gap-detection)) | Only a mark, no automatic action — gaps are shown, not deleted |
 | **Duplicate** | Two or more values share exactly the same timestamp (not just a similar one) | The chronologically first stored value is kept, all further ones at the same timestamp are proposed for deletion |
 | **Repeat** | A value is (after rounding to the configured decimal places) identical to the last *kept* value — the same rule that is also used continuously for condensing when new values arrive (see [Value change filter](#value-change-filter)) | The first value of a series of equal values is kept, all following ones are proposed — **unless** 6 hours have already passed since the last kept value (sign-of-life rule), in which case an unchanged value is kept as well |
-| **Counter decrease** | Only for counter entities: a value is lower than the immediately preceding kept value | A mark with an assessment (Probably a bad value, Probably a reset, Still open), **never** deleted unasked — a decrease can be a real event (e.g. meter replacement, reset after restart). The scheduled zeroing of a daily counter at midnight does not count |
+| **Counter decrease** | Only for counter entities: a value is lower than the immediately preceding kept value | A mark with an assessment (Probably a bad value, Spike before, Probably a reset, Still open), **never** deleted unasked — a decrease can be a real event (e.g. meter replacement, reset after restart). The scheduled zeroing of a daily counter at midnight does not count |
 
 Important: these marks are **not mutually exclusive**. One and the same value
 can, for example, be marked simultaneously as an outlier **and** as part of a
@@ -2432,7 +2581,7 @@ settings:
 | Area | Shows |
 | --- | --- |
 | **Data quality** | Totals of all finding types over the entire history and the button **Open overview** to the [Data quality](#data-quality) page. The sections below count duplicates and counter decreases only for the last 30 days |
-| **Counter decreases** | Counters with decreases in the last 30 days, per entity with assessment (Probably a bad value, Probably a reset, Still open) and reason. For “Probably a reset”, **Allow decreases** is below it. A bulk action marks all returning decreases (bad values) for deletion in one step; they end up in the “Marked” tab of the respective entity and can be undone together |
+| **Counter decreases** | Counters with decreases in the last 30 days, per entity with assessment (Probably a bad value, Spike before, Probably a reset, Still open) and reason. For “Probably a reset”, **Allow decreases** is below it. A bulk action marks all returning decreases (bad values) for deletion in one step; they end up in the “Marked” tab of the respective entity and can be undone together |
 | **Inactive entities** | Entities without a new value for a selectable threshold (1 to 30 days). Entities never received always appear regardless of the threshold. Usually harmless (standby, rare sensor), but an early hint of a dead integration or a renamed/removed HA entity. |
 | **Duplicates** | Duplicate timestamps of the last 30 days detected archive-wide, per entity — the same hourly background snapshot that also triggers the "Duplicates found" notice. Removable via "Remove duplicates automatically" on the respective cleanup page, or with the **Remove automatically** switch in the section header (see below). |
 | **Outliers** | All entities with outlier detection and the assessment of their threshold (too sensitive, fits, not suitable, barely effective, off), with the **borderline cases per 30 days** per level, the **real errors** (hits that remain even at 100×) and the recommended level (see [Outlier detection](#outlier-detection)). Filters above the table show one assessment each. Only "too sensitive" is applied: individually, with checkboxes, or together with **Apply all too-sensitive**; a popup first shows the breakdown and the affected entities, afterwards a notice offers **Undo**, and the numbers are remeasured. For "not suitable" a button leads to cleanup. This only changes the setting, not data. |
@@ -2567,6 +2716,13 @@ Freely map separator as well as time, value and target column, and check the
 result before the actual import (preview of the first rows with detected
 values).
 
+**Totals per period.** If a file holds totals (e.g. monthly yields) instead of
+running meter readings, tick **Values are totals per period … store them as a
+running meter reading**. The option only works for counters: with a sensor,
+switch or state entity as target it is greyed out and unticked (a sensor would
+have received summed-up values). The check also applies per target column
+when the form is submitted by other means.
+
 ### Home Assistant
 
 Take over existing recorder data directly from the running Home Assistant
@@ -2627,7 +2783,10 @@ import mode is hidden at first); a click on a heading sorts.
   none. It also stays when the corresponding report is deleted. Sorted
   ascending, the never-imported entities come first. The **import mode** names
   the kind of that import.
-- **Filters:** chips above the table with a count: "Never imported", "Data
+- **Filters:** the **Selection ▾** menu (category, room, type; also in the
+  VictoriaMetrics and InfluxDB tables) looks like the filter menu of the
+  entities list: chips, **Reset** and the number of matches. In addition,
+  chips above the table with a count: "Never imported", "Data
   available" (after a check or preview) as well as "Importable", "Complete" and
   "Errors / no data" (after a preview). The chips can be combined: "Never
   imported" and "Data available" give exactly the entities that are still
@@ -2756,8 +2915,9 @@ nor does a repeated Home Assistant import over the same period.
 
 Under **System → Export**, a wizard leads to the file in four steps:
 
-1. **Entities:** tick what should be exported — filtered by type, unit or
-   search term, or all at once.
+1. **Entities:** tick what should be exported — filtered by search term or by
+   type, category and unit, or all at once. The **Filter ▾** menu is the same
+   as in the entities list: chips, **Reset** and the number of matches.
 2. **Period:** everything, one year, one month, or a free from/to range. Pick a
    year for an annual backup, a single month for an analysis.
 3. **Resolution:** raw values, minute, hour or day. A coarser resolution makes
@@ -3008,7 +3168,7 @@ If you want to look something up later, download it first.
 
 | Area | Contains |
 | --- | --- |
-| **Appearance** | Language (Automatic/German/English — default German; "Automatic" follows the browser language; untranslated places appear in German), number and date format (Automatic/German/English UK/English US — "Automatic" follows the browser: `en-GB` → `1,234.5` and `07/10/2026`, `en-US` → `10/07/2026` with a 12-hour clock, `de-*` → `1.234,5` and `07.10.2026`; independent of the language; CSV exports and file names stay unchanged), currency (Automatic/EUR/GBP/USD/CHF — "Automatic" takes it from Home Assistant, otherwise euro; amounts are not converted, enter your prices again after changing it), start page (overview/energy dashboard/weather dashboard), color scheme (Zeitarchiv/Home Assistant/Modern), light/dark/automatic, font size, dashboard tile fade animation, wide layout (experimental; Off/On, default Off — from 1200 px window width the overview, dashboards, charts, tables, entities and housekeeping use up to 1920 px, centered beyond that; applies to the whole installation; other pages such as settings and the energy dashboard stay at 1120 px), starting values for the chart options of the entity history view |
+| **Appearance** | Language (Automatic/German/English — default German; "Automatic" follows the browser language; untranslated places appear in German), number and date format (Automatic/German/English UK/English US — "Automatic" follows the browser: `en-GB` → `1,234.5` and `07/10/2026`, `en-US` → `10/07/2026` with a 12-hour clock, `de-*` → `1.234,5` and `07.10.2026`; independent of the language; CSV exports and file names stay unchanged), currency (Automatic/EUR/GBP/USD/CHF — "Automatic" takes it from Home Assistant, otherwise euro; amounts are not converted, enter your prices again after changing it), start page (overview/energy dashboard/weather dashboard), color scheme (Zeitarchiv/Home Assistant/Modern), light/dark/automatic, font size, dashboard tile fade animation, wide layout (experimental; Off/On, default Off — from 1200 px window width the overview, dashboards, charts, tables, entities and housekeeping use up to 1920 px, centered beyond that; the energy and weather dashboard use the full width; applies to the whole installation; other pages such as settings stay at 1120 px), starting values for the chart options of the entity history view |
 | **Archiving** | Default values for newly detected entities (never act retroactively on existing entities): resolution, retention, decimal places, value change filter, gap/outlier detection |
 | **Notices** | Switch the tip display on/off and dialog with all tips (see [Housekeeping](#housekeeping)); overview of muted system notices with remaining duration, individually re-enableable early |
 | **Connection** | Show/regenerate API token, last received value, number of writes and auth errors since start, connected integration version with "last seen" time (notice for outdated or newly available version) |
@@ -3017,6 +3177,28 @@ If you want to look something up later, download it first.
 | **Reset** | Deletes data permanently — in two levels: **Delete measured values only** (entities, configuration, dashboards and settings are kept) or **Reset everything** (additionally entities, dashboards, saved charts and tables, activity log and settings, as on a fresh installation). The API token, the backup settings and all backup files are kept; the Home Assistant integration recreates entities with the next value. Key figures (entities, records, size) say beforehand what would be deleted. By default **a backup is created first** — if it fails, nothing is deleted. To confirm, you type the word “DELETE”. Not available in demo mode |
 | **Demo data** | Only visible with active demo mode or a leftover demo instance — see the separate section [Demo mode](#demo-mode) |
 | **About Zeitarchiv** | Version (with notice as soon as an update is available), time zone, data directory, links to documentation/changelog/bug report |
+
+Options that do nothing without their prerequisite are greyed out or hidden
+and keep their saved value, so they are there again when you switch the
+prerequisite back on:
+
+- **Table editor:** “Align units” and “Smaller units” while units are hidden;
+  “Set comparison columns apart” and “Deviation from comparison” while the
+  table has no comparison column.
+- **Energy dashboard setup:** “Show by group” for the consumer shares while
+  the “Consumer shares” tile is hidden; the “Key day thresholds” while the
+  “Characteristic days” section is unticked.
+- **Weather dashboard setup:** the share-of-clear-sky thresholds without “By
+  sun position” and the “Sun elevation” role, the rain day amount and
+  duration without their sensor role, and the heating thresholds without the
+  “Heating” tab.
+- **Backup:** the time of day while “Create automatically” is off.
+- **Archiving:** “Default sign of life” while the default value change
+  filter is off.
+- **Cleanup:** “Minimum age of the mark” while “Automatic cleanup” is off.
+- **Compaction:** “Minimum age” while “Automatic compaction” is off.
+- **Entity settings:** “Decimal places” is hidden for on/off and state
+  entities, which have none.
 
 A newly generated API token under **Connection** replaces the previous one
 immediately — the Zeitarchiv integration must then be updated with the new

@@ -33,6 +33,11 @@ Alle Pfade werden über `storage/paths.py` aufgelöst, das jede Entity-ID gegen
 über bereits vorhandene Symlinks). Kein Code-Pfad baut Dateinamen aus
 Nutzereingaben ohne diese Validierung.
 
+Eine leere Parquet-Datei (0 Bytes, etwa nach hartem Abbruch beim Schreiben) ist kein
+gültiges Parquet. `paths.parquet_files()` lässt sie aus jeder Dateiliste weg, sie zählt wie
+eine fehlende Datei und blockiert weder Neuaufbau noch Abgleich oder Energiedashboard;
+gewarnt wird je Pfad einmal pro Prozess (`event=empty_parquet_skipped`).
+
 ## Hot Buffer (laufender Monat)
 
 - Format: CSV, eine Zeile `ts,value[,event_id[,min_value,max_value]]` pro
@@ -108,10 +113,30 @@ auch Dekade) und nur bei Zählern `jahr.parquet` (bedient Dekade). Jede
 Zeile trägt `bucket_start` (Unix-Timestamp UTC) plus, je nach Typ,
 `value`/`min_value`/`max_value` (Zähler: Summe bzw. Bucket-Extremwerte;
 Standard: Mittelwert bzw. Extremwerte) oder `on_seconds` (Schalter:
-Einschaltdauer im Bucket). `min_value`/`max_value` werden aus den
+Einschaltdauer im Bucket) samt `on_count` (Schalter: Zahl der Einschaltungen, siehe unten). `min_value`/`max_value` werden aus den
 tatsächlichen Rohwerten des Buckets berechnet — Vergleichstabellen mit
 Aggregation "Min"/"Max" lesen daher das echte Extremum, nicht das Extremum
 der Bucket-Durchschnitte.
+
+**Einschaltungen (`on_count`).** Bei Schaltern trägt jede Rollup-Zeile zusätzlich `on_count`
+(`int32`): wie oft der Schalter im Bucket auf „an“ gewechselt hat. Gezählt wird nur ein
+Wechsel; der vom Fensteranfang übernommene Zustand und ein doppelt gemeldetes „an“ zählen
+nicht, ohne bekannten Vorzustand zählt das erste „an“. Ein Bucket mit Einschaltung, aber ohne
+Dauer bekommt trotzdem eine Zeile.
+
+- **`null` ist „nicht erfasst“, nie 0.** Segmente aus der Zeit vor der Zählung haben die Spalte
+  nicht. `rollup.read_rollup_table()` vereinheitlicht das Schema der Segmente, sonst
+  verschwände die Spalte, solange das älteste Segment sie nicht kennt. `rollup.sum_counts()`
+  ist unbekannt, sobald ein Teil unbekannt ist; eine Teilsumme wäre falsch niedrig.
+- **Nachlauf je Monat:** `rollup.backfill_switch_counts()` rechnet jeden archivierten Monat
+  ohne die Spalte aus dem Archiv neu (`replace_month()`), nicht den ganzen Rollup — Monate,
+  deren Rohdaten es nicht mehr gibt, bleiben unangetastet. Ein Monat gilt als erfasst, wenn sein
+  Segment in `monat.parquet` die Spalte hat (`switch_count_months()`).
+- **Auslöser:** nach dem Update der Wartungsplaner (Setting `switch_count_backfill_pending`,
+  Warteschlange der Schalter; höchstens eine Entität je 30-Sekunden-Takt, vor dem Rechnen aus
+  der Liste genommen, damit ein Fehler nicht endlos wiederholt wird) und der Knopf „Aus dem
+  Archiv nachrechnen“ in der Entitäts-Konfiguration (`POST /entities/{entity_id}/switch-counts/rebuild`;
+  `GET …/switch-counts` liefert den Stand). Beides nur für Schalter (sonst `400`).
 
 Ein Aggregationstyp-Wechsel einer Entität (selten, z. B. wenn Home Assistant
 eine `device_class` ändert) löst `rollup.rebuild_entity_rollups()` aus —
@@ -239,8 +264,8 @@ Existenz-Check in `Index.__init__()`.
 | `settings` | Generischer Key-Value-Store: globale Auflösungs-/Aufbewahrungs-Standards, Loglevel, Farbschema, API-Token, sowie **gecachte teure Vorschauen** und **HA-Integrations-Status** (siehe unten) |
 | `stats_snapshots`, `memory_snapshots` | Stündliche Schnappschüsse für Statistik-Verlaufsgrafiken |
 | `backup_jobs`, `retention_jobs` | Dauerhafte Job-Historie (Status, Fehler, Kennzahlen) — überlebt Neustarts, im Gegensatz zu einem reinen "letzter Lauf"-Zeitstempel. `backup_jobs` ist außerdem Grundlage für `Index.get_last_successful_backup_job()` — das `latest_backup`-Feld in `/api/notices` (siehe [api-reference.md](api-reference.md)) |
-| `saved_charts` | Gespeicherte Chart-**Abfragen** (Entitäten + Zeitraum-Einstellungen, Darstellungsoptionen wie `area_fill`, `show_points`), kein Datenschnappschuss — Werte werden bei jedem Aufruf live nachgeladen. `period_anchor` (JJJJ-MM-TT, optional) hält einen festen Zeitraum fest, leer = immer die laufende Periode. `compare_settings` (JSON) ist der gespeicherte Vergleich. `series_colors` (JSON `{entity_id: "palette:N" \| "#rrggbb"}`) hält eigene Serienfarben, fehlender Eintrag = Palettenfarbe nach Position |
-| `saved_tables`, `table_columns`, `table_rows` | Vergleichstabellen: Struktur (Zeilen=Größen, Spalten=Zeiträume) getrennt von `style_json` (rein optische Darstellung, siehe [frontend.md](frontend.md)) |
+| `saved_charts` | Gespeicherte Chart-**Abfragen** (Entitäten + Zeitraum-Einstellungen, Darstellungsoptionen wie `area_fill`, `show_points`), kein Datenschnappschuss — Werte werden bei jedem Aufruf live nachgeladen. `period_anchor` (JJJJ-MM-TT, optional) hält einen festen Zeitraum fest, leer = immer die laufende Periode. `compare_settings` (JSON) ist der gespeicherte Vergleich. `series_colors` (JSON `{entity_id: "palette:N" \| "#rrggbb"}`) hält eigene Serienfarben, fehlender Eintrag = Palettenfarbe nach Position. `series_style` (JSON `{entity_id: {…}}`) hält je Serie Abweichungen vom Standard; `metric` (`count`\|`both`) ist die gewählte Anzeige eines Schalters, fehlt der Schlüssel, folgt die Serie `entities.display_mode` (`onoff`, `time`, `count`, `both`) |
+| `saved_tables`, `table_columns`, `table_rows` | Vergleichstabellen: Struktur (Zeilen=Größen, Spalten=Zeiträume) getrennt von `style_json` (rein optische Darstellung, siehe [frontend.md](frontend.md)). `table_rows.aggregation` kennt neben `auto`/`avg`/`min`/`max`/`sum`/`last` auch `count_sum` (Einschaltungen eines Schalters); `table_rows.display_format` (`auto`\|`duration`) zeigt Stunden einer Zeile als „TT hh:mm“, rein optisch |
 | `dashboards`, `dashboard_pins` | Mehrere benannte Dashboards (Favorit, Standard, Präziser Modus, Lücken auffüllen, Zeitraum-Navigation, `grid_columns` 3|4 = Kacheln pro Zeile bei breiter Darstellung); eine gemeinsame Pin-Tabelle für Charts, Tabellen, direkt gepinnte Entitäten ("Werte-Kacheln") UND Sektions-Trenner (`item_type`/`item_id`/`item_entity_id`; `item_type='section'` trägt den Sektionsnamen in `title`, ohne eigenen `item_entity_id`), da alle gemeinsam sortiert werden müssen |
 
 ### Eindeutige Namen (`dashboards`, `saved_charts`, `saved_tables`)

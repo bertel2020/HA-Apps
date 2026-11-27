@@ -253,7 +253,7 @@ zum sechsten Mal von Hand entsteht:
   Der Kontextprozessor ruft es bei jeder Antwort auf, eine defekte Quelle
   darf nicht jede Seite mitreißen.
 
-Angemeldet sind alle dreizehn langen Aktionen:
+Angemeldet sind alle vierzehn langen Aktionen:
 
 | Auftrag | Läuft | Ausgelöst durch |
 | --- | --- | --- |
@@ -264,6 +264,7 @@ Angemeldet sind alle dreizehn langen Aktionen:
 | Rotation, Index-Optimierung | Request-Thread (`track()`) | Klick |
 | Speicherabgleich | Daemon-Thread beim Start | nichts |
 | Stunden-Rollup-Backfill | Wartungsplaner | Konfigurationsänderung, Minuten vorher |
+| Einschaltungen nachrechnen | Wartungsplaner (je Takt eine Entität) oder Request-Thread | nach dem Update von selbst, oder Klick „Aus dem Archiv nachrechnen“ |
 | Rollup-Neuaufbau | Schreibpfad (`/api/write`) | Home Assistant |
 | Demo-Daten-Erzeugung | Hintergrund-Thread (`demo_mode.demo_progress`, siehe oben) | Klick, Zeitplan oder Erststart im Demo-Modus |
 

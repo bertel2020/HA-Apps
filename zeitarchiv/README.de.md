@@ -64,7 +64,7 @@ Zeitarchiv besteht aus zwei getrennten, unabhängig versionierten Teilen:
 | **Bleibt schnell** | Charts über Wochen, Monate oder Jahre laden zügig, auch bei sehr langer Historie |
 | **Eigene Dashboards** | Frei kombinierbare Charts (Linie, Balken, Zeitstrahl) und Vergleichstabellen auf beliebig vielen eigenen Dashboards |
 | **Energiedashboard** | Eigene Sankey-Ansicht des Energieflusses mit Autarkie-, Kosten- und CO₂-Auswertung — auf Wunsch mit einem Klick aktiviert; der Reiter Langzeit vergleicht Zeiträume über die Jahre |
-| **Wetterdashboard** | Eigene Wetterseite mit Wetterlage, aktuellen Werten, Vorjahresvergleich, Niederschlag, Kenntagen, Sonnenscheindauer, Tageslicht und Heizgradtagen — ebenfalls mit einem Klick aktiviert |
+| **Wetterdashboard** | Eigene Wetterseite mit Wetterlage, aktuellen Werten, Vorjahresvergleich, Niederschlag, Kenntagen und Schneefalltagen, Sonnenscheindauer, Tageslicht, Heizgradtagen und Heizkurve — ebenfalls mit einem Klick aktiviert |
 | **Datenpflege** | Ausreißer, Lücken, Duplikate und Zählerrückgänge erkennen, korrigieren oder bereinigen — mit einer Datenqualität-Übersicht über alle Entitäten |
 | **Datenübernahme** | Bestehende Historie aus Symcon, CSV-Dateien oder direkt aus Home Assistant importieren |
 | **Sicherung** | Prüfbare, portable ZIP-Backups mit Zeitplan; die Wiederherstellung kann alles, einzelne Entitäten oder nur die Einstellungen zurückholen |
@@ -240,7 +240,8 @@ die Antwort auf die Frage, warum die App gerade wartet.
 **Charts und Tabellen.** Eigene Charts können mehrere Entitäten mit
 unterschiedlichen Einheiten überlagern. Vergleichstabellen kombinieren
 einzelne Entitäten, Summengruppen und Formeln über frei gewählte
-Zeitspalten (z. B. Monat für Monat über mehrere Jahre).
+Zeitspalten (z. B. Monat für Monat über mehrere Jahre). Bei Schaltern lassen
+sich Einschaltdauer, Anzahl der Einschaltungen oder beides zeigen.
 
 **Datenpflege.** Ausreißer, Lücken, doppelte Zeitstempel und gerundet
 gleiche Wiederholungen werden erkannt und lassen sich einzeln korrigieren

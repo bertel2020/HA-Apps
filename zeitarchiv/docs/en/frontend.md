@@ -637,9 +637,14 @@ The comparison secondary series (with active "Compare") gets a lower opacity
 anyway, two equally strong overlaid areas would otherwise have smeared
 visually.
 
-### Duration display (switch, display mode "Time")
+### Duration display (switch)
 
-A switch with `display_mode: "time"` gets, in `chart_editor.js` and
+The bucket values of a switch (bars/line without raw values) are on-seconds in
+every display mode, so they are always shown as a duration; the display mode
+only applies to the 0/1 raw values (timeline). The rule is
+`durationSeries(s, raw)` in `chart-tile-render.js`, with the same wording as
+`isDurationSeries()` in `chart_editor.js` and `entity_detail.js`. A duration
+series gets, in `chart_editor.js` and
 `dashboard-tiles.js` alike, its own synthetic axis key (`axisKey(s) =
 isDurationSeries(s) ? ' duration' : s.unit`) instead of its real, mostly empty
 `unit` — otherwise it would wrongly share an axis with unit-less standard
@@ -658,6 +663,20 @@ visible point would lose its formatting.
 The average line (see above) continues to calculate without a duration special
 case in both files — the same, pre-existing behavior as before this fix, no new
 inconsistency.
+
+### Number of switch-ons (switch)
+
+The count of switch-ons needs no drawing path of its own: `/api/query-multi`
+returns it, depending on `metrics`, as an ordinary counter series (unit
+“switch-ons”, `source_type: "switch"`; `switch_counts.py`), so chart editor,
+dashboard tiles and the Lovelace card, sums, axes per unit and stacking apply
+to it unchanged. With “Both” the duration series stays and the count follows
+as a line series `<entity_id>#count` (`base_entity_id` points to the entity)
+on its own axis. Without an entry in `metrics`, the display mode of the entity
+decides (`count`/`both`; `onoff` and `time` show the duration). The choice
+exists per series in the chart editor (`setSeriesMetric()`) and on the entity
+page (`setSwitchMetric()`, only for bars/line, not for timeline and raw
+values); table rows get the aggregation `count_sum` (“Σ Switch-ons”).
 
 ### Mark rate of the outlier detection
 
@@ -710,10 +729,12 @@ nothing looks different from before while the switch is off.
   `window.resize`. The weather, long-term and most energy charts already have their own observers; only the
   energy dashboard's Sankey hangs on the window and recomputes its minimum height (≈ width / 3, wide layout only)
   on resize.
-- **Energy and weather dashboard:** `.page-wide`, but the content (`#energiedashboard-root`, `#wetter-root`) stays at
-  1440 px in all tabs and is centered (wider would turn the Sankey, heatmap and fixed-height charts into flat
-  strips; one frame for all tabs so nothing jumps when switching tabs). From 1500 px the charts are somewhat taller
-  (340/400 px, heatmap 240 px), the weather tables fill the card (`min-width:100%`). Tooltips at the right card edge
+- **Energy and weather dashboard:** `.page-wide`, the content (`#energiedashboard-root`, `#wetter-root`) uses the
+  full width of the frame in all tabs (`max-width:none`, from 1200 px; no 1440 px limit anymore, one frame for all
+  tabs so nothing jumps when switching tabs). To keep the Sankey, heatmap and fixed-height charts from turning into
+  flat strips, the charts are somewhat taller from 1500 px (340/400 px, heatmap 240 px); the weather tables fill the
+  card (`min-width:100%`), the daily picture shows 7 + 7 days and the heating table gets fixed, narrow columns for
+  month names and Δ. Tooltips at the right card edge
   (storage level, last two KPI tiles) open to the left, otherwise 1500–1920 px get horizontal overflow. The rules
   live in each page CSS, not in `app.css`: `.wt-chart`, `.wt-card` etc. are used elsewhere too.
 - **Breakpoints:** 480/640/820 (mobile), new 1200/1500/1920 (only with the switch), plus the special cases

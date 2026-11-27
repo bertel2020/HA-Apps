@@ -160,6 +160,17 @@ first, years without any value are left out. `cut_points` is only set in the
 current year (`offset=0`) and holds each previous year up to the same day,
 otherwise `null`.
 
+`metrics` (optional, `entity_id:count,entity_id:both`): what a switch shows.
+`duration` (default, `entity_id:duration` for the explicit form) is the
+on-time in seconds. `count` replaces the series by the number of switch-ons
+as an ordinary counter series (unit “switch-ons”, `source_type: "switch"`),
+`both` keeps the duration series and adds the count as a line series
+`<entity_id>#count` (`base_entity_id` points to the entity). Without an entry,
+the display mode of the entity decides (`count`, `both`; `onoff` and `time`
+mean duration). Other values → `400`. In the points of a switch, `count` holds
+the number of switch-ons (0→1) in the bucket; `null` means “not recorded”
+(rollup from before the count existed), never 0.
+
 `at` (`YYYY-MM-DD`, optional): reference date of a dashboard's period
 navigation. Calendar ranges move to the period that contains this day (on top
 of `offset`, complete, not cut at that day), rolling ones end at the end of
@@ -185,7 +196,9 @@ entities and 100 columns). Example:
 
 The response contains, per column, the resolved time window and, per entity,
 the metadata as well as `aggregates` with `auto`, `avg`, `min`, `max` and
-`sum`. Complete point series are not transmitted. A request-local read cache
+`sum`; for switches additionally `count_last`, `count_avg`, `count_min`,
+`count_max` and `count_sum` (switch-ons; all `null` for a period without a
+recorded count, and `count_sum`/`count_avg` as soon as one part is unknown). Complete point series are not transmitted. A request-local read cache
 reuses source files across all columns; groups and formula rows are then
 computed by `table-compute.js` in the browser.
 

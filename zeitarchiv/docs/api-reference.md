@@ -146,7 +146,10 @@ Einzelentität, für die Entitäts-eigene Chart-Seite.
 **Antwort** (Kernfelder): `points` (`[{ts, value, min, max}]` — `min`/`max`
 nur bei aggregierten Buckets, aus den tatsächlichen Rohwerten des Buckets,
 siehe [data-model.md](data-model.md)), `window_start`/`window_end`,
-`period_end`, `is_current`, `aggregation_type`, `chart_type`.
+`period_end`, `is_current`, `aggregation_type`, `chart_type`. Bei Schaltern
+trägt jeder Punkt zusätzlich `count`: wie oft der Schalter im Bucket
+eingeschaltet wurde (Wechsel auf „an“); `null` heißt „nicht erfasst“ (Rollup
+aus der Zeit vor der Zählung), nie 0.
 
 ## `GET /api/query-multi` (Ingress-intern)
 
@@ -156,6 +159,22 @@ Wie `/api/query`, aber `entity_ids` (kommagetrennt, max.
 `{series: [...], window_start, window_end, period_end,
 is_current}`, ein Eintrag in `series` je Entität mit `friendly_name`, `unit`,
 `decimals`, `display_mode`, `aggregation_type`, `chart_type`, `points`.
+
+`metrics` (optional, kommagetrennt `entity_id:wert`) wählt je Schalter, was die
+Serie zeigt: `duration` (Einschaltdauer in Sekunden, Vorgabe), `count` (Anzahl
+der Einschaltungen) oder `both`. Ohne Eintrag gilt der Anzeigemodus der Entität
+(`display_mode` `count` bzw. `both`; `onoff` und `time` zeigen die Dauer); die
+Serie nennt ihn als `default_metric`. Für andere Entitätstypen und bei
+`raw=true` hat die Angabe keine Wirkung, ein ungültiger Wert ergibt `400`.
+
+- `count`: Die Dauer-Serie wird durch eine Zähler-Serie ersetzt. `points[].value`
+  ist die Anzahl, `unit` ist „Einschaltungen“, `aggregation_type` ist `counter`,
+  `source_type` nennt weiter `switch`. `compare_points`, `compare_cut_points` und
+  `years` sind entsprechend umgerechnet.
+- `both`: Die Dauer-Serie bleibt, dahinter steht die Zusatzserie
+  `<entity_id>#count` (`base_entity_id` nennt die Entität, `chart_type` ist `line`)
+  mit denselben Eigenschaften wie bei `count`.
+- Eine unbekannte Anzahl steht als `null`, nie als 0.
 
 `compare_mode` kennt hier zusätzlich `longterm` (im Chart-Editor
 „Langzeit“), zusammen mit `previous_years` (Default `1`, `0` = alle
@@ -190,7 +209,11 @@ Lädt alle Zeiträume einer Vergleichstabelle in einer gemeinsamen Anfrage
 ```
 
 Die Antwort enthält je Spalte das aufgelöste Zeitfenster und je Entität die
-Metadaten sowie `aggregates` mit `auto`, `avg`, `min`, `max` und `sum`.
+Metadaten sowie `aggregates` mit `auto`, `avg`, `min`, `max` und `sum`. Bei
+Schaltern kommen `count_last`, `count_avg`, `count_min`, `count_max` und
+`count_sum` (Einschaltungen) dazu; `count_sum` und `count_avg` sind `null`,
+sobald die Anzahl auch nur eines Punkts unbekannt ist (eine Teilsumme wäre zu
+niedrig).
 Vollständige Punktreihen werden nicht übertragen. Ein request-lokaler
 Lese-Cache verwendet Quelldateien über alle Spalten wieder; Gruppen und
 Formelzeilen berechnet anschließend `table-compute.js` im Browser.

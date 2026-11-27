@@ -33,6 +33,11 @@ against `^[a-z][a-z0-9_]*\.[a-z0-9_]+$` and checks every constructed path via
 already existing symlinks). No code path builds file names from user input
 without this validation.
 
+`paths.parquet_files()` lists Parquet files without empty (0-byte) ones, for
+example left by a hard abort while writing. Such a file is no valid Parquet; it
+counts like a missing file (rebuild, consistency check and energy dashboard
+skip it) and is warned about once per path and process.
+
 ## Hot buffer (current month)
 
 - Format: CSV, one line `ts,value[,event_id[,min_value,max_value]]` per
@@ -98,10 +103,25 @@ Additionally per entity `monat.parquet` (serves year, for standard/switch also
 decade) and, for counters only, `jahr.parquet` (serves decade). Each row carries
 `bucket_start` (Unix timestamp UTC) plus, depending on type,
 `value`/`min_value`/`max_value` (counter: sum or bucket extremes; standard:
-mean or extremes) or `on_seconds` (switch: on-time in the bucket).
+mean or extremes) or `on_seconds` (switch: on-time in the bucket) plus
+`on_count` (switch: number of switch-ons, 0→1, in the bucket).
 `min_value`/`max_value` are computed from the bucket's actual raw values —
 comparison tables with aggregation "Min"/"Max" therefore read the true
 extremum, not the extremum of the bucket averages.
+
+`on_count` (`int32`) only exists in segments written since the count was
+introduced; older segments lack the column, and `read_rollup_table()` unifies
+the schemas, so missing values read as `null`. `null` means “not recorded”,
+never 0: `rollup.sum_counts()` over a window with an unknown part is unknown
+as well, since a partial sum would look right but be too low. A month counts
+as recorded when its monthly segment has the column
+(`rollup.switch_count_months()`). The missing months are calculated from the
+archive month by month (`rollup.backfill_switch_counts()`, via `replace_month`
+like when archiving) — by button under the entity's configuration
+(`POST /entities/{entity_id}/switch-counts/rebuild`) or automatically after
+the update (step of the maintenance scheduler, one entity per tick; queue in
+the setting `switch_count_backfill_pending`, `switch_count_routes.py`). A full rebuild would lose months whose raw data no
+longer exists, hence the per-month run.
 
 An aggregation type change of an entity (rare, e.g. when Home Assistant changes
 a `device_class`) triggers `rollup.rebuild_entity_rollups()` — complete
@@ -211,7 +231,7 @@ column gets a default and an explicit existence check in `Index.__init__()`.
 
 | Table | Purpose |
 | --- | --- |
-| `entities` | One row per known entity: aggregation type, resolution, `compact_target` (compaction target, see above), retention, decimal places, value filter, “ignore values” (`ignore_values_enabled`, `ignore_values`), outlier/gap thresholds, `first_ts`/`last_ts`/`last_value` (state for idempotency and filter checks), `row_count`/`size_bytes`/`deleted_count` (for the statistics, maintained incrementally instead of being recounted on every display or joined against `deleted_points`), “Historic” (`historic`, plus `historic_since`/`historic_rows` as the reference for “still delivering values”: time and row count at marking; set/cleared only via `Index.set_entity_historic`) |
+| `entities` | One row per known entity: aggregation type, resolution, `compact_target` (compaction target, see above), retention, decimal places, value filter, “ignore values” (`ignore_values_enabled`, `ignore_values`), outlier/gap thresholds, `display_mode` (switch: `onoff`, `time`, `count` or `both`, the default of charts, tiles and the card), `first_ts`/`last_ts`/`last_value` (state for idempotency and filter checks), `row_count`/`size_bytes`/`deleted_count` (for the statistics, maintained incrementally instead of being recounted on every display or joined against `deleted_points`), “Historic” (`historic`, plus `historic_since`/`historic_rows` as the reference for “still delivering values”: time and row count at marking; set/cleared only via `Index.set_entity_historic`) |
 | `deleted_points` | Soft-delete marks, see above. Indexed on `(entity_id, ts)` and `(entity_id, deleted_at)` |
 | `compacted_months` | One entry per already compacted month (`entity_id, year, month` → `target_resolution`, `compacted_at`) — prevents a renewed compaction (see above) and is the basis of the deletion mark catch-up run at app start |
 | `entity_actions` | Log of the Correct/Add/Clean up/Compact operations (Housekeeping → Activity): `entity_id` (nullable — cleanup/automatic compaction often affect several), `action`/`trigger`/`status`/`rows_affected`, `detail` as free JSON instead of one column per action type |

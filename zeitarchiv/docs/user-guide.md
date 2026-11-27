@@ -394,7 +394,8 @@ etwas kommt; er erscheint nur, wenn es tatsächlich etwas zu scrollen gibt.
   (26 bzw. 48 Stunden, für Tageswerte), **Selten** (3 bzw. 7 Tage, für
   Zähler, die nur bei Aktivität melden) oder **Aus**. Alle Einstellungen einer Werte-Kachel liegen in einem eigenen,
   größeren Einstellungs-Popup (⋮), da hier deutlich mehr Optionen als bei
-  Chart-/Tabellen-Kacheln zusammenkommen.
+  Chart-/Tabellen-Kacheln zusammenkommen. Bei einem Schalter entfallen dort die
+  Nachkommastellen, weil er „An“/„Aus“ oder eine Dauer zeigt.
 - **Kachel hinzufügen:** die "+"-Kachel öffnet ein Popup mit Registerkarten
   für Charts, Tabellen, Werte-Kacheln und Sektionen, jeweils mit Suchfeld
   (Sektionen stattdessen mit Namensfeld). Charts und
@@ -523,7 +524,11 @@ ab seinem Zeitpunkt, und nach einem Tarifwechsel bleiben frühere Monate
 richtig. Ein **fester Wert gilt rückwirkend für alle Zeiträume** — ändert sich
 der Tarif, rechnet das Dashboard auch die Vergangenheit mit dem neuen Wert.
 Der Arbeitspreis wird in Cent (bzw. Pence, Rappen) je kWh eingegeben, der
-Grundpreis in der Währung selbst **pro Monat**.
+Grundpreis in der Währung selbst **pro Monat**. Das gilt für alle festen Preise
+(Netzbezug, Einspeisung, Eigenverbrauch). Steht dort ein Wert unter 1, ist meist
+der Betrag in der Währung gemeint (0,0764 statt 7,64) und die Kosten fielen um den
+Faktor 100 zu klein aus: Ein Hinweis nennt den vermuteten Wert und korrigiert ihn
+per Klick auf „übernehmen“. Gespeichert wird auch ohne Korrektur.
 
 **Dynamischer Tarif und Ø-Preis.** Ist der Arbeitspreis eine Entität, zeigt die
 Kostenanalyse zusätzlich den **durchschnittlichen Strompreis** je kWh (Kosten ÷
@@ -737,6 +742,11 @@ Verbrauch), rot ungünstig.
   Monat ist in beiden Fällen gleich. „Differenz anzeigen“ blendet die
   Differenzzeile ein oder aus. Die Auswahl (Spalten, Vorjahr, Differenz) merkt
   sich der Browser.
+- **Spaltenhervorhebung:** Die Einstellung steht im Setup unter „Vergleich und
+  Langzeit“ und hebt Spalten der Tabelle „Zeiträume im Vergleich“ farblich ab:
+  **Aus**, **Paare abwechselnd** (Vorgabe), **Hauptspalten** (nur die Zeiträume,
+  nicht das Vorjahr; wirkt nur mit Vorjahr-Spalten) oder **Eigene Auswahl**. Bei der eigenen Auswahl markiert ein
+  Stern im Menü „Spalten“ die Zeiträume (mit ihrem Vorjahr); sie gilt je Browser.
 - **Quoten und Speicher:** Unter dem Verbrauch stehen Eigenverbrauch und Autarkie
   (wie in der Übersicht gerechnet); ihre Differenz zum Vorjahr steht in
   Prozentpunkten (PP). Mit zugeordneten Speichern kommen die Zeilen Ladung und
@@ -850,17 +860,29 @@ Entitäten des passenden Typs und lehnt falsche Zuordnungen ab.
 | Außentemperatur (Pflicht) | Messwert | Max und Min mit Zeitpunkt, Ø |
 | Niederschlag (Menge) | Zähler | Summe, Regentage, nassester Tag |
 | Regen (ein/aus) | Schalter | Regenminuten, Regentage, regenreichster Tag |
+| Wetterzustand (optional) | Zustand | Art des Niederschlags (Regen, Schnee, Schneeregen, Hagel), Schneefalltage |
 | Luftfeuchte, Luftdruck, Wind, Böe, Strahlung | Messwert | Max und Min mit Zeitpunkt, Ø |
 | Helligkeit (am besten der Süd-Sensor) | Messwert | Sonnenscheindauer, Sonnenstunden, Tagesklasse |
 | Helligkeit Dämmerung | Messwert | Tagesbeginn und -ende, Tageslänge |
 | Windrichtung, Sonnenhöhe | Messwert | nur für Wetterlage bzw. Tageslicht |
 | PV-Leistung | Messwert (W, kW, MW) | Tagesertrag gegen Erwartung aus der Helligkeit |
+| Vorlauftemperatur (optional) | Messwert (°C) | Heizkurve auf dem Reiter Heizen |
 
 Ein Regensensor, der nur ein und aus meldet, reicht: Dann zeigt die Seite
 Regenminuten und Regentage statt Millimeter. Habt ihr beides, stehen beide
 Zeilen nebeneinander. Viele Ein/Aus-Sensoren melden auch bei Nebel, Tau oder
 nassem Sensor „Regen“, die Trocknungszeit zählt dann mit. Ab wann ein Tag als
 Regentag zählt, stellt ihr in der Einrichtung ein (Standard 1 mm bzw. 10 min).
+
+Die Zuordnung **Wetterzustand** ist optional. Gewählt wird eine Wetter-Entität (`weather.*`)
+oder ein Sensor mit denselben Werten (`rainy`, `snowy` …), der im Archiv einzeln ausgewählt sein
+muss; Sensoren mit übersetztem Text oder Zahlencode passen nicht.
+
+- Mit ihr sagen die Wetterlage und die Regen-Kachel, ob es regnet, schneit oder hagelt: Sie nennen
+  „Schnee“, „Schneeregen“ oder „Hagel“ statt „Regen“.
+- Ohne sie steht bei einer Außentemperatur von höchstens 1 °C „Niederschlag“, weil ein
+  Ein/Aus-Regensensor Regen und Schnee nicht unterscheiden kann.
+- Der Reiter **Langzeit** zählt mit ihr die Schneefalltage (siehe „Reiter Langzeit“ weiter unten).
 Im Bereich **Anzeige** lassen sich Blöcke der Vergleichstabelle ausblenden (Kenntage, Niederschlag, Regen, Luftfeuchte, Luftdruck, Wind, Böe, Strahlung); die Außentemperatur und weitere Sensoren bleiben immer sichtbar, die Kacheln oben ändern sich nicht. Der Zeitraum einer Spalte steht im Tooltip der Überschrift („ⓘ“), nicht als eigene Zeile. Bei Max und Min steht in Monat, Vormonat und Jahr der Tag als kleine Zeile unter dem Wert; die Differenz zum Vorjahr lässt sich im Menü „Vorjahr“ mit „Differenz anzeigen“ aus- und einschalten (merkt sich der Browser).
 
 Unter **Anzeige → Karten** lässt sich jeder Block der Reiter einzeln ausblenden, nach Reitern gegliedert: Übersicht (Wetterlage, Zeiträume im Vergleich, Tagesbild, Monatsvergleich), Niederschlag (Niederschlag, Niederschlag je Monat), Temperatur & Klima (Temperatur & Klima, Temperaturen im Vergleich, Luftfeuchte im Vergleich), Wind & Sonne (Wind & Sonne, Sonnenstunden, Tageslicht, Die letzten Tage im Vergleich, Tageslänge im Jahresverlauf, PV und Helligkeit) und Langzeit (Rekorde, Kenntage je Jahr, Monatswerte je Jahr, Jahre im Vergleich, Tag für Tag). Zur Wahl stehen nur Blöcke, für die eine Rolle zugeordnet ist. Ein Reiter fehlt, wenn alle seine Blöcke ausgeblendet sind. Nur der Reiter Heizen steht getrennt im Block „Experimentell“.
@@ -894,6 +916,20 @@ Vorjahreszeitraum. Abgeschlossene Zeiträume (Gestern, Letzter Monat) sind in
 beiden Fällen gleich. Fehlen für einen Zeitraum Daten, steht „–“, nie 0; ein
 Tooltip nennt, ab wann das Archiv beginnt. Die Auswahl der Spalten merkt sich
 der Browser.
+
+Zusätze in Klammern hinter einem Zeilennamen, etwa „(ab 60 % des klaren Himmels)“,
+stehen klein in einer zweiten Zeile; die erste Spalte kann dadurch schmaler werden.
+
+**Spaltenhervorhebung:** Die Einstellung steht in der Einrichtung unter **Anzeige** und
+hebt in der Tabelle „Zeiträume im Vergleich“ Spalten farblich ab.
+
+- **Aus:** keine Hervorhebung.
+- **Paare abwechselnd** (Vorgabe): Mit Vorjahr-Spalten wird jeder zweite Zeitraum samt
+  Vorjahr hinterlegt, sonst jede zweite Spalte.
+- **Hauptspalten:** die Spalten der Zeiträume, nicht die des Vorjahres; wirkt nur mit
+  Vorjahr-Spalten.
+- **Eigene Auswahl:** Im Menü **Spalten ▾** markiert ein Stern die Zeiträume, die hervorgehoben
+  werden (mit ihrer Vorjahr-Spalte). Die Auswahl gilt je Browser.
 
 ### Sonne, Licht und Wetterlage
 
@@ -974,6 +1010,23 @@ auf die Monate. Gezählt werden nur abgeschlossene Tage mit mindestens 18 Stunde
 als Zeilen **Kenntage** unter der Außentemperatur in der Vergleichstabelle (bei
 Monats- und Jahresspalten).
 
+Mit der Zuordnung **Wetterzustand** kommt Schnee dazu:
+
+- **Schneefalltage** erscheinen als weiteres kleines Diagramm bei den Kenntagen. Ein Schneefalltag
+  ist ein Tag mit Schnee oder Schneeregen laut Wetterzustand, mindestens so lange, wie bei den
+  Regentagen eingestellt (Hagel zählt nicht).
+- **Schnee-Saisons** (Karte unter den Kenntagen) listet je Saison, vom 1. Juli bis zum
+  30. Juni, den ersten und den letzten Schnee, die Tage mit Schnee (von der Zahl der Tage der
+  Saison) und die längste Folge. Die laufende Saison ist markiert.
+  - Mit einer Zuordnung für den Niederschlag zeigt die Tabelle auch den Niederschlag dieser
+    Tage, in mm, mit einem Regensensor in Stunden. Es ist das Wasseräquivalent der ganzen Tage,
+    keine Schneehöhe; Regen am selben Tag zählt mit. Fehlt an einem Schneefalltag der Wert,
+    steht „≥“ vor der Summe.
+- **Rekorde** nennen in der Gruppe Wind und Regen zusätzlich die längste Schneefolge, den
+  frühesten ersten Schnee und den spätesten letzten Schnee einer Saison.
+- Gezählt wird erst ab der Archivierung des Wetterzustands; frühere Winter fehlen. Ein Satz unter
+  der Tabelle nennt, seit wann das Archiv beginnt.
+
 **Mitteltemperatur je Monat und Jahr** zeigt eine Zeile je Jahr und eine Spalte je Monat
 sowie das Jahresmittel rechts. Die Farbe zeigt, wie weit ein Monat vom Mittel dieses
 Monats über alle abgeschlossenen Jahre im Archiv abweicht (blau kälter, rot wärmer);
@@ -1035,6 +1088,14 @@ Vorperioden, damit ein Winteranfang nicht wie ein Einbruch wirkt. Nur abgeschlos
 Bei mehreren Zählern zeigt **Anteil je Zähler** gestapelte Balken je Monat für eine wählbare
 Heizperiode, mit dem Anteil jedes Zählers in Prozent.
 
+**Heizkurve:** Ist in der Einrichtung von Heizen die optionale Zuordnung **Vorlauftemperatur**
+gesetzt, steht über dem Streudiagramm ein Chip „Vorlauftemperatur“. Er schaltet das Diagramm
+um: Jeder Punkt ist dann der Tages-Ø der Vorlauftemperatur gegen den Tages-Ø der
+Außentemperatur, also die Heizkurve der Anlage, statt kWh je Tag. Der Tages-Ø ist verwässert,
+wenn die Heizung zeitweise steht oder Warmwasser bereitet; die Kurve wird dann flacher und
+verrauschter als die eingestellte. Mit dem Chip entfällt „Punkte nach Sonne einfärben“; ein
+Klick auf einen Zähler schaltet zurück auf den Verbrauch.
+
 **Heizen und Sonne** (experimentell, mit zugeordneter Helligkeit): Mit „Punkte nach Sonne
 einfärben“ trägt das Streudiagramm Farbe und Form je Tagesklasse (sonnig, wechselhaft,
 trüb). Drei Kacheln vergleichen kWh je Gradtag nach Klasse, eine Leiste zeigt, wie sich die
@@ -1051,11 +1112,21 @@ oder die Entity-ID. Über **Spalten ▾** lassen sich zwölf zusätzliche Spalte
 ein-/ausblenden (Typ, Erster/Letzter Wert, Auflösung, Aufbewahrung, Einheit,
 Datensätze, Größe, Wertfilter, Lücken-/Ausreißer-Schwelle, Historisch; letztere
 ist standardmäßig aus) — die Auswahl
-gilt global fürs ganze Add-on, nicht nur im aktuellen Browser. Sind die
-Spalten **Typ** oder **Einheit** eingeblendet, erscheint daneben ein
-passender Filter (Typ: Standard/Zähler/Schalter/Zustand, mehrfach wählbar; Einheit:
-eine der tatsächlich vorkommenden Einheiten). Ein Klick auf eine Zeile öffnet
-die **Verlaufsansicht** dieser einen Entität.
+gilt global fürs ganze Add-on, nicht nur im aktuellen Browser. Der Knopf
+**Filter ▾** öffnet ein Menü, dessen Optionen als Chips stehen, je Gruppe in
+einer Zeile:
+
+- **Typ** (Standard/Zähler/Schalter/Zustand), **Kategorie** (mit „Ohne
+  Kategorie“) und **Raum** (mit „Ohne Raum“) sind mehrfach wählbar; bei der
+  **Einheit** gilt eine der tatsächlich vorkommenden Einheiten, ein erneuter Klick
+  wählt sie wieder ab.
+- Eine Gruppe steht nur im Menü, wenn ihre Spalte eingeblendet ist; Kategorie
+  und Raum außerdem nur, wenn es welche gibt.
+- Innerhalb einer Gruppe gilt ODER, zwischen den Gruppen UND (der Hinweis steht hinter
+  dem ⓘ in der Kopfzeile des Menüs). Die Fußzeile nennt beim Auswählen die Zahl der
+  Treffer, **Zurücksetzen** in der Kopfzeile löscht alle Filter.
+
+Ein Klick auf eine Zeile öffnet die **Verlaufsansicht** dieser einen Entität.
 
 Jede Entität hat drei gleichrangige Ansichten, erreichbar über die Reiterzeile
 unter dem Namen: **Verlauf** (das Diagramm), **Werte bearbeiten** (siehe
@@ -1122,8 +1193,8 @@ markieren, **Kategorie setzen ▾** wählen und die Kategorie anklicken (oder
 „Keine Kategorie“ zum Lösen). Einzeln geht es in der Konfiguration einer
 Entität im Feld **Kategorie**.
 
-Neben der Spalte erscheint der Filter **Kategorie: Alle ▾**: mehrere
-Kategorien lassen sich zugleich wählen, **Ohne Kategorie** zeigt, was noch
+Im Filtermenü gibt es die Gruppe **Kategorie**: mehrere Kategorien
+lassen sich zugleich wählen, **Ohne Kategorie** zeigt, was noch
 einzuordnen ist. Blendest du die Spalte aus, wird der Filter zurückgesetzt.
 
 Im **Auswahl-Assistenten** hat der Bestätigungsschritt ein Feld **Kategorie
@@ -1133,13 +1204,14 @@ Schritt dabei). Solange du noch keine Kategorien nutzt, bleibt das Feld auf
 „Keine Kategorie“. Die Kategorie gilt für die Entitäten, die jetzt neu in die
 Auswahl kommen, auch bevor ihr erster Wert da ist; schon einsortierte behalten
 ihre Kategorie, außer du setzt den Haken **Auch bereits einsortierte
-Entitäten umsortieren**. Thema und Kategorie bleiben getrennt.
+Entitäten umsortieren** (er ist nur wählbar, solange eine Kategorie gewählt ist, nicht bei
+„Keine Kategorie“). Thema und Kategorie bleiben getrennt.
 
 Im Reiter **Auswahl & Verlauf** steht unter der Suche eine Zeile **Nach Kategorie
 filtern** (nur Anzeige, wie in der Liste samt „Ohne Kategorie“); die Kategorie
 steht dort auch unter dem Namen jeder Entität.
 
-Auch der **Export** hat den Filter **Kategorie**, damit sich zum Beispiel alle
+Auch der **Export** hat die Filtergruppe **Kategorie**, damit sich zum Beispiel alle
 Entitäten der Wärmepumpe mit „Alle Entitäten wählen“ in einem Zug exportieren
 lassen. Backups sichern die Zuordnung mit. Der selektive Restore stellt sie
 über den Namen der Kategorie wieder her (eine fehlende Kategorie wird dabei
@@ -1172,6 +1244,11 @@ bei vorhandenen Entitäten als eigene Feldgruppe **Kategorie** unter
   als durchgehende Balken zeigt statt einzelner Punkte.
 - Linien lassen sich glätten (Optionen-Menü), was kurzfristiges Rauschen
   visuell unterdrückt, ohne die zugrunde liegenden Werte zu verändern.
+- **Anzeige** (Optionen-Menü, nur bei Schaltern mit Balken oder Linie): **Dauer**,
+  **Anzahl** der Einschaltungen oder **Beides** (Dauer als Balken, Anzahl als Linie auf der
+  rechten Achse). Vorgabe ist der [Anzeigemodus](#anzeigemodus) der Entität; der
+  Zeitstrahl und die Rohwerte zeigen 0/1. Fehlt die Anzahl für den Zeitraum noch, steht
+  ein Hinweis unter dem Chart.
 - **Rohwerte** zeigt statt aggregierter Punkte jeden einzelnen
   gespeicherten Messwert im Zeitraum — sinnvoll bei genauerer Prüfung
   kurzer Zeiträume, bei sehr langen Zeiträumen begrenzt durch das
@@ -1179,7 +1256,11 @@ bei vorhandenen Entitäten als eigene Feldgruppe **Kategorie** unter
 - Das Optionen-Menü zeigt nur, was für die aktuelle Darstellung überhaupt
   wirkt: **Punkte** und **Rohwerte** gehören zu Liniencharts, **Werte
   anzeigen** zu Balken. Beim Umschalten des Diagrammtyps wechseln die
-  angebotenen Optionen entsprechend mit.
+  angebotenen Optionen entsprechend mit; **Nachkommastellen**, **Dynamische
+  Y-Achse** und **Durchschnittslinie** fehlen bei den Diagrammtypen, bei denen
+  sie nichts bewirken, und bei Schaltern entfallen die Nachkommastellen, da
+  sie „An“/„Aus“ oder eine Dauer zeigen. Steht die Legende auf „Aus“, fehlen
+  auch „Statistik in Legende“ und „Legendengröße“.
 - **Dynamische Y-Achse** skaliert die Achse auf die tatsächliche
   Wertespanne des angezeigten Zeitraums statt bei 0 zu beginnen — macht
   kleine Schwankungen sichtbarer, kann die visuelle Größe von Änderungen
@@ -1494,15 +1575,39 @@ eines bestehenden (Kachelmenü ⋮).
   steht wie in der Verlaufsansicht ein **Zeitstrahl** zur Verfügung — hier
   als mehrzeilige Darstellung mit einer Zeile je Entität, sodass sich
   AN-Intervalle mehrerer Schalter direkt untereinander vergleichen lassen.
+- **Anzeige je Schalter:** Jede Schalter-Zeile unter **Ausgewählt** hat ein Feld
+  „Anzeige“ mit **Dauer**, **Anzahl** (der Einschaltungen) und **Beides** (Dauer als Balken,
+  Anzahl als Linie auf einer zweiten Achse). Ohne eigene Wahl gilt der
+  [Anzeigemodus](#anzeigemodus) der Entität; eine Wahl, die ihm entspricht, wird nicht
+  gespeichert, das Chart folgt ihm weiter. Das Feld fehlt bei Donut, Zeitstrahl und Rohwerten.
+  Balken und Linien eines Schalters zeigen sonst immer die Dauer (z. B. „2h 7m“).
 - Für **Zustands-Entitäten** (Text statt Zahl) gibt es Zeitstrahl, Anteile,
   Wechsel und Donut; sie lassen sich nur mit anderen Zustands-Entitäten
   kombinieren, siehe [Zustände](#zustände).
+- Das Optionen-Menü zeigt nur, was beim gewählten Diagrammtyp etwas bewirkt. Es fehlen
+  im Zeitstrahl „Punkte“, „Fläche“ und „Linienstil“, im Donut von Zustands-Entitäten
+  „Aggregation“, bei Balken „Dynamische Y-Achse“ und bei Dauern „Nachkommastellen“ (sie
+  zeigen immer Stunden und Minuten). „Ausrichtung“ gibt es erst ab zwei Entitäten;
+  „Rollierend“ und „Dynamische Y-Achse“ entfallen in der horizontalen Ansicht. Steht die
+  Legende auf „Aus“, sind „Statistik in Legende“ und „Legendengröße“ ausgeblendet.
 
 ### Donut statt Zeitverlauf
 
 Über **Diagrammtyp** lässt sich ein Chart statt als Zeitverlauf als
 Donut zeigen — ein Anteil je Entität statt einer Zeitachse, etwa um den
 Verbrauchsanteil mehrerer Geräte an einem Gesamtwert zu vergleichen.
+Der Donut steht erst ab zwei Entitäten zur Wahl; mit nur einem Wert wäre er ein
+voller Ring ohne Aussage. Zwei Ausnahmen:
+
+- **Zustands-Entitäten** funktionieren weiter mit einer Entität.
+- Bei einer einzelnen **An/Aus-Entität** teilt der Donut den Zeitraum in „An“ und
+  „Aus“ auf, auch in Kacheln und in der Lovelace-Karte. „Aggregation“ entfällt dort.
+
+In der Mitte des Rings steht ein Wert: in Ruhe die Summe (bei An/Aus die
+Einschaltdauer, bei Zustands-Entitäten der größte Zustand), beim Überfahren einer Scheibe
+deren Wert. Die Summe steht nur, wenn sie etwas bedeutet, also bei der Aggregation
+„Summe“ und gleicher Einheit aller Entitäten. In Kacheln und in der Lovelace-Karte
+erscheint der Wert nur, wenn genug Platz ist.
 **Aggregation** bestimmt dabei, welcher Wert je Entität die Größe ihres
 Anteils bildet: Summe, Durchschnitt oder Letzter Wert. Im Donut-Modus
 entfallen Auflösung, Rohwerte, Zeitstrahl, Punkte, Fläche, Gestapelt,
@@ -1616,9 +1721,8 @@ Zeitstrahl werden alle mit dem Chart gespeichert und
 gelten dann auch für dessen Vorschau auf Dashboards. Ebenfalls gespeichert
 werden eine angezeigte vergangene Periode und **Vergleichen** (samt Laufsumme
 und Soll Entität bzw. Jahren und Ø-Linie bei Langzeit); die Dashboard-Kachel zeigt
-den Vergleich mit (siehe unten). **Punkte an/aus und
-Rohwerte dagegen nicht** — beides sind reine Ansichtseinstellungen für den
-aktuellen Besuch und steht beim nächsten Öffnen wieder auf dem Ausgangswert.
+den Vergleich mit (siehe unten). Auch **Punkte an/aus** und **Rohwerte**
+werden gespeichert, ebenso eine ausdrücklich gewählte Anzeige je Schalter (Anzahl oder Beides).
 
 Ein gespeichertes Chart zeigt beim Ansehen immer die aktuell verfügbaren
 Daten, kein eingefrorener Schnappschuss zum Speicherzeitpunkt. Die geöffnete
@@ -1709,6 +1813,13 @@ lassen sich wie Zeilen duplizieren (⧉).
   die Stundenwerte, nicht die Tageswerte; ein Wert, der als 24 Stundenwerte
   pro Tag gespeichert ist, zählt dann 24-mal. Für Tageswerte gilt: nur einen
   Punkt pro Tag speichern oder „Aktueller Wert“ nehmen.
+  - **Σ Einschaltungen** steht nur bei Zeilen mit einem Schalter zur Wahl: Sie zählt, wie oft
+    er im Zeitraum eingeschaltet wurde (Einheit „Einschaltungen“, ganze Zahlen). Ist die Anzahl
+    für einen Zeitraum noch nicht erfasst (siehe [Anzeigemodus](#anzeigemodus)), bleibt die Zelle
+    leer.
+- **Anzeige je Zeile** (Zeilen-Menü „Optionen“, für Entitäts-, Gruppen- und Formelzeilen mit der
+  Einheit h): „Automatisch“ oder **Dauer (TT hh:mm)**. Letzteres zeigt Stunden als Tage, Stunden
+  und Minuten, z. B. „01 02:30“. Es ändert nur die Anzeige; Werte und Summen bleiben in Stunden.
 - **Nachkommastellen je Spalte:** Automatisch oder fest 0–3.
 - **% Anteil** (Zeilen-Menü „Optionen"): zeigt statt des absoluten Werts den
   prozentualen Anteil an der Summe aller Entität-/Gruppen-Zeilen derselben
@@ -1751,7 +1862,8 @@ Rein optische Einstellungen, wirken sich nie auf die berechneten Werte aus:
   hervorheben, Beschriftung fett.
 - **Vergleich:** Vergleichsspalten (Vortag, Vormonat, Vorjahr …) optisch
   absetzen, prozentuale Abweichung zur zugehörigen Vergleichsspalte
-  anzeigen.
+  anzeigen. Beides ist nur wählbar, solange die Tabelle eine Spalte mit
+  Versatz oder Vorjahresvergleich hat.
 - **Summenspalte:** Eine zusätzliche Spalte (links oder rechts der
   Zeiträume, Beschriftung frei wählbar) zeigt je Zeile die Summe über die
   Zeiträume. In jeder Spaltenkarte steht „In Summe einrechnen“, so lässt
@@ -1764,7 +1876,7 @@ Rein optische Einstellungen, wirken sich nie auf die berechneten Werte aus:
   doppelt gezählt wird. Die Spalte erscheint auch in Dashboard-Kacheln und
   im CSV-Export.
 - **Zahlen / Einheiten:** Einheiten ein-/ausblenden, in einer festen Spalte
-  ausrichten oder kleiner darstellen, Dezimaltrennzeichen spaltenweise
+  ausrichten oder kleiner darstellen (nur bei eingeblendeten Einheiten), Dezimaltrennzeichen spaltenweise
   ausrichten, fehlende Werte als „Keine Daten“ statt als Gedankenstrich
   ausschreiben.
 - **Layout:** Rahmen (horizontal/Gitter/ohne), Dichte (komfortabel/
@@ -1979,6 +2091,9 @@ Daten weiter an, egal was hier steht. Ein Blick auf **Housekeeping →
 Aufbewahrung** zeigt, wie viel bei der nächsten Durchsetzung wegfiele.
 
 ### Nachkommastellen
+
+Bei Schaltern und Zustands-Entitäten gibt es das Feld nicht: Sie zeigen „An“/„Aus“,
+eine Dauer oder einen Zustand statt einer Zahl.
 
 „Automatisch" zeigt bis zu drei Stellen und lässt Nullen am Ende weg (4 statt
 4,000). Eine feste Auswahl (0–3) rundet auf genau diese Stellen und füllt auf
@@ -2222,6 +2337,24 @@ Nur bei Schaltern (siehe unten, welche Domains dazugehören):
 - **Zeit (Dauer)** zeigt stattdessen die kumulierte Einschaltdauer je Zeitraum,
   lesbar formatiert (z. B. `1h 29m`) — sinnvoll bei Anwesenheits-, Tür- und
   Bewegungssensoren.
+- **Anzahl (Einschaltvorgänge)** zeigt, wie oft der Schalter im Zeitraum
+  eingeschaltet wurde.
+- **Zeit und Anzahl** zeigt beides: die Dauer als Balken, die Anzahl als Linie auf einer
+  zweiten Achse.
+
+Der Anzeigemodus der Entität ist die Vorgabe für Verlaufsansicht, Charts,
+Dashboard-Kacheln und die Lovelace-Karte; dort lässt er sich je Serie ändern (siehe
+[Darstellung](#darstellung) und [Entitäten und Darstellung](#entitäten-und-darstellung)).
+Balken und Linien eines Schalters zeigen sonst immer die Dauer, gleich welcher der beiden
+ersten Modi gewählt ist; „AN/AUS“ und „Zeit“ unterscheiden sich nur bei den 0/1-Rohwerten.
+Gezählt wird jeder Wechsel auf „an“; ein doppelt gemeldetes „an“ zählt nicht.
+
+**Einschaltungen zählen.** Die Konfiguration nennt unter dem Anzeigemodus, für wie viele
+archivierte Monate die Anzahl erfasst ist. Neue Monate bekommen sie beim Archivieren.
+Monate aus der Zeit davor rechnet die App nach dem Update von selbst nach (im Hintergrund,
+eine Entität je Wartungstakt) oder auf Klick auf **Aus dem Archiv nachrechnen**. Monate,
+deren Rohdaten es nicht mehr gibt, bleiben unberührt. Bis dahin meldet ein Zeitraum, dass die
+Anzahl noch nicht erfasst ist, und die Tabellenzeile „Σ Einschaltungen“ bleibt leer.
 
 Als Schalter gelten die Domains `binary_sensor`, `switch`, `input_boolean`,
 `light`, `fan`, `automation`, `script`, `remote`, `siren`, `humidifier`,
@@ -2276,7 +2409,9 @@ darin drei Bereiche:
 Erkannte Ausreißer, Lücken, Duplikate und gerundet gleiche Wiederholungen
 werden als Liste angezeigt, je mit einer kurzen Begründung — sichtbar, wenn
 der Mauszeiger auf der Markierung steht. Sie nennt die Regel, an der
-die Markierung hängt, und den unmittelbar vorhergehenden Wert mit Zeitpunkt:
+die Markierung hängt, und den unmittelbar vorhergehenden Wert mit Zeitpunkt; bei
+Ausreißern kommt der Folgewert dazu („…, Folgewert … um …“). So zeigt die Zeile, ob der Stand
+danach wieder üblich ist (Fehlwert) oder oben bleibt (echter Sprung):
 
 > `3 Std. 50 Min. seit vorherigem Wert 21,2 °C um 08:10`
 > `21,56 liegt 23× weiter vom Median der letzten 15 Werte (24,27) entfernt`
@@ -2285,6 +2420,16 @@ zusammen auswählen und löschen — das ist zunächst ein **Soft-Delete**: Die
 Werte verschwinden sofort aus jeder Anzeige (Charts, Tabellen, Rohwerte),
 sind aber über "Rückgängig (letzte Löschung)" wiederherstellbar, solange
 noch keine endgültige Bereinigung stattgefunden hat (siehe unten).
+
+**Sortieren.** Die Spalten der Liste lassen sich per Klick auf die Überschrift sortieren.
+Die Sortierung gilt zusammen mit Filter und Zeitraum und bleibt nach dem Markieren erhalten.
+
+- **Wert:** ein Klick sortiert absteigend (verrutschte Ziffern stehen oben), ein zweiter
+  aufsteigend (Nullen stehen oben), ein dritter wieder nach Zeit.
+- **Zeitstempel:** wechselt zwischen neueste und älteste zuerst.
+- **Status:** erst Zeilen mit Befund, dann Zeilen ohne Befund zuerst, dann wieder nach Zeit.
+- Bei den Zeiträumen „Jahr“ und „Gesamt“ sind die ersten 5.000 Werte der Reihenfolge
+  erreichbar; ein Hinweis nennt das. Ein engerer Zeitraum oder ein Filter macht alle sichtbar.
 
 Bei steigenden Zählern (Home-Assistant-`state_class` `total_increasing`,
 z. B. Energiezähler) werden niedrigere Folgewerte gesondert als mögliche
@@ -2295,7 +2440,7 @@ gültiges Ereignis sein kann und nicht automatisch als Fehler gilt.
 **Farben: Kann ich etwas tun?** Die Farbe einer Markierung sagt, ob sich
 aufräumen lässt — nicht, wie schlimm der Fund ist. **Gelb** heißt: hier kannst
 du etwas tun (Ausreißer, Duplikat, Wiederholung, Zählerrückgang mit „Vermutlich
-Fehlwert“); eine Zeile mit einer solchen Markierung hat einen zarten gelben
+Fehlwert“ oder „Spitze davor“); eine Zeile mit einer solchen Markierung hat einen zarten gelben
 Hintergrund, und die stärkste Markierung der Zeile entscheidet. **Grau** ist
 nur Information (Lücke, „Noch offen“). **Grün-türkis** heißt erwartet und in
 Ordnung („Vermutlich Reset“). Rot bleibt Fehlern und dem Löschen-Knopf
@@ -2314,7 +2459,14 @@ graue Zeile darunter):
   niedrig“), etwa bei einem Zählertausch oder einem Reset. Setzt sich der
   Zähler planmäßig zurück, lässt sich das in der Konfiguration der Entität
   mit **Rückgänge erlauben** festhalten.
+- **Spitze davor** — der Wert davor war eine einzelne Spitze nach oben, und dieser Wert
+  liegt wieder beim früheren Stand. Das Etikett nennt die Spitze und den früheren Stand;
+  als Ausreißer markierst du die Spitze, nicht diesen Wert.
 - **Noch offen** — es gibt noch zu wenige Folgewerte für eine Einschätzung.
+
+Fällt ein Zählerstand, zum Beispiel auf 0, ist das kein Ausreißer, sondern ein
+Zählerrückgang; der Filter **Ausreißer** weist bei Zählern darauf hin, dass er unter
+**Zählerrückgänge** steht.
 
 Der planmäßige Reset eines Tageszählers („… heute“) um Mitternacht zählt nicht
 als Zählerrückgang und wird weder markiert noch gezählt.
@@ -2530,7 +2682,7 @@ folgen jeweils einer eigenen, festen Regel:
 | **Lücke** | Der zeitliche Abstand zweier aufeinanderfolgender Werte überschreitet die je Entität eingestellte Schwelle (**Lücken-Erkennung**, in Minuten; "Aus" deaktiviert die Erkennung komplett; bei Entitäten mit Filter oder Auflösung zählen die Pausen zwischen empfangenen Werten, siehe [Lücken-Erkennung](#lücken-erkennung)) | Nur eine Markierung, keine automatische Aktion — Lücken werden angezeigt, nicht gelöscht |
 | **Duplikat** | Zwei oder mehr Werte teilen sich exakt denselben Zeitstempel (nicht nur einen ähnlichen) | Der chronologisch zuerst gespeicherte Wert bleibt erhalten, alle weiteren zum selben Zeitstempel werden zum Löschen vorgeschlagen |
 | **Wiederholung** | Ein Wert ist (nach Rundung auf die eingestellten Nachkommastellen) identisch zum zuletzt *behaltenen* Wert — dieselbe Regel, die auch beim Eintreffen neuer Werte laufend zur Verdichtung verwendet wird (siehe [Wertänderungsfilter](#entität-konfigurieren)) | Der erste Wert einer Serie gleicher Werte bleibt erhalten, alle folgenden werden vorgeschlagen — **außer** seit dem letzten behaltenen Wert sind bereits 6 Stunden vergangen (Lebenszeichenregel), dann bleibt auch ein unveränderter Wert erhalten |
-| **Zählerrückgang** | Nur bei Zähler-Entitäten: ein Wert liegt niedriger als der unmittelbar vorherige behaltene Wert | Eine Markierung mit Einordnung (Vermutlich Fehlwert, Vermutlich Reset, Noch offen), **niemals** ungefragt gelöscht — ein Rückgang kann ein echtes Ereignis sein (z. B. Zählertausch, Reset nach Neustart). Die planmäßige Nullung eines Tageszählers um Mitternacht zählt nicht |
+| **Zählerrückgang** | Nur bei Zähler-Entitäten: ein Wert liegt niedriger als der unmittelbar vorherige behaltene Wert | Eine Markierung mit Einordnung (Vermutlich Fehlwert, Spitze davor, Vermutlich Reset, Noch offen), **niemals** ungefragt gelöscht — ein Rückgang kann ein echtes Ereignis sein (z. B. Zählertausch, Reset nach Neustart). Die planmäßige Nullung eines Tageszählers um Mitternacht zählt nicht |
 
 Wichtig: Diese Markierungen schließen sich **nicht gegenseitig aus**. Ein
 und derselbe Wert kann z. B. gleichzeitig als Ausreißer **und** als Teil
@@ -2582,7 +2734,7 @@ die **gesamte Historie** der Entität.
 (Duplikate, Zählerrückgänge, Ausreißer), **Grau** ist nur Information (Lücken).
 Die Zählerrückgang-Zelle ist gelb, sobald die Zahl über null liegt — auch wenn
 darunter nur planmäßige Resets stehen: Die Übersicht kennt nur die Zahl, die
-Einordnung (Vermutlich Fehlwert, Vermutlich Reset, Noch offen) sieht man erst
+Einordnung (Vermutlich Fehlwert, Spitze davor, Vermutlich Reset, Noch offen) sieht man erst
 in Werte bearbeiten. Zähler mit **Rückgänge erlauben** zeigen kursiv „erlaubt“,
 Zähler der Klasse `total` ein „n. a.“, weil Home Assistant sie sinken lassen
 darf und sie deshalb nie auf Rückgänge geprüft werden.
@@ -2620,12 +2772,12 @@ wie die Einstellungen:
 | Bereich | Zeigt |
 | --- | --- |
 | **Datenqualität** | Summen aller Befundtypen über die gesamte Historie und der Knopf **Übersicht öffnen** zur Seite [Datenqualität](#datenqualität). Die Abschnitte darunter zählen Duplikate und Zählerrückgänge nur für die letzten 30 Tage |
-| **Zählerrückgänge** | Zähler mit Rückgängen der letzten 30 Tage, je Entität mit Einordnung (Vermutlich Fehlwert, Vermutlich Reset, Noch offen) und Begründung. Bei „Vermutlich Reset“ steht darunter **Rückgänge erlauben**. Eine Sammelaktion markiert alle zurückkehrenden Rückgänge (Fehlwerte) in einem Schritt zur Löschung; sie landen im Reiter „Markiert“ der jeweiligen Entität und lassen sich gemeinsam zurücknehmen |
+| **Zählerrückgänge** | Zähler mit Rückgängen der letzten 30 Tage, je Entität mit Einordnung (Vermutlich Fehlwert, Spitze davor, Vermutlich Reset, Noch offen) und Begründung. Bei „Vermutlich Reset“ steht darunter **Rückgänge erlauben**. Eine Sammelaktion markiert alle zurückkehrenden Rückgänge (Fehlwerte) in einem Schritt zur Löschung; sie landen im Reiter „Markiert“ der jeweiligen Entität und lassen sich gemeinsam zurücknehmen |
 | **Inaktive Entitäten** | Entitäten ohne neuen Wert seit einem wählbaren Schwellwert (1 bis 30 Tage). Nie empfangene Entitäten erscheinen unabhängig vom Schwellwert immer. Meist harmlos (Standby, seltener Sensor), aber ein früher Hinweis auf eine tote Integration oder eine umbenannte/entfernte HA-Entität. |
 | **Duplikate** | Archivweit erkannte doppelte Zeitstempel der letzten 30 Tage, je Entität — derselbe stündliche Hintergrund-Schnappschuss, der auch die Meldung „Duplikate gefunden" auslöst. Entfernbar über „Duplikate automatisch entfernen" auf der jeweiligen Bereinigungs-Seite oder mit dem Schalter **Automatisch entfernen** im Kopf des Abschnitts (siehe unten). |
 | **Ausreißer** | Alle Entitäten mit Ausreißer-Erkennung und die Beurteilung ihrer Schwelle (zu empfindlich, passt, nicht geeignet, greift kaum, ausgeschaltet), mit den **Grenzfällen je 30 Tage** je Stufe, den **echten Fehlern** (Treffer, die auch bei 100× bleiben) und der empfohlenen Stufe (siehe [Ausreißer-Erkennung](#ausreißer-erkennung)). Filter über der Tabelle zeigen jeweils eine Beurteilung. Übernommen wird nur „zu empfindlich“: einzeln, mit Kontrollkästchen oder gesammelt mit **Alle zu empfindlichen übernehmen**; ein Popup zeigt vorher die Aufteilung und die betroffenen Entitäten, danach bietet ein Hinweis **Rückgängig** an, und die Zahlen werden neu gemessen. Bei „nicht geeignet“ führt ein Knopf zur Bereinigung. Das ändert nur die Einstellung, keine Daten. |
 | **Lücken-Erkennung** | Alle Entitäten mit Methode (gespeicherte oder empfangene Werte), eingestellter Schwelle, Zahl der gefundenen Lücken (aus der Datenqualität, sortierbar, „–“ wenn noch nicht zur aktuellen Schwelle gemessen) und Beginn der Aufzeichnung (siehe [Lücken-Erkennung](#lücken-erkennung)). Dazu kommen die empfohlene Schwelle und die Beurteilung der aktuellen (siehe [Lücken-Erkennung](#lücken-erkennung)). Mit Kontrollkästchen und **Empfehlung übernehmen** oder **Empfehlungen übernehmen** (alle zu empfindlichen und nicht geeigneten) übernimmt man die Empfehlung; mit dem Feld **Eigene Schwelle** und **Auf Auswahl setzen** oder **Auf alle setzen** setzt man eine frei gewählte Schwelle für mehrere Entitäten zugleich (oder schaltet die Erkennung aus); ein Popup zeigt vorher die Aufteilung und die betroffenen Entitäten, danach bietet ein Hinweis **Rückgängig** an, und die Lücken werden neu gemessen. Das ändert nur die Einstellung, keine Daten. |
-| **Speicherplatz** | Freier Speicherplatz auf dem Host-Dateisystem (Kachel mit Auslastungsbalken — andere Frage als die Zahlen unten, nicht Zeitarchivs eigener Speicherverbrauch). Knopf „Speicher prüfen" löst zwei getrennt ausgewiesene Prüfungen auf einmal aus: **Indexkonsistenz** (stimmt der abgeleitete Index-Cache mit Archiv/Hot Buffer überein — Abweichungen sind über „Index reparieren" behebbar) und **Datenintegrität** (sind die Rohdaten im Hot Buffer selbst noch lesbar — beschädigte Zeilen entstehen fast immer durch einen unsauberen Neustart, Stromausfall oder harten Kill, und sind nicht reparierbar; betroffene Entität und Monat werden aufgelistet, der Wert bleibt unwiederbringlich verloren). Darunter: markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen. Der Knopf „Markierte Datensätze anzeigen" listet sie vorher durchsuchbar auf — erst je betroffene Entität mit Anzahl und letztem Markierungszeitpunkt (Suchfeld, Paginierung), ein Klick auf eine Zeile zeigt darunter im selben Dialog die einzelnen markierten Zeitpunkte samt Wert. Rein lesend: das eigentliche Rückgängigmachen einer einzelnen Markierung läuft weiterhin über die Entität selbst (siehe [Bereinigung](#bereinigung)). Darunter der Schalter für die automatische Bereinigung (standardmäßig aus) und das Mindestalter der Löschmarkierung dafür — entfernt nur Markierungen, die mindestens so lange her sind, damit „Rückgängig" für eine gerade erst gelöschte Zeile nicht ins Leere läuft. Meldet die Vorschau „Löschmarkierungen ohne passende Rohdatenzeile", war die zugehörige Rohdatenzeile bereits durch eine Verdichtung oder eine abgelaufene Aufbewahrung entfernt worden — beide räumen die betroffenen Markierungen seitdem selbst mit auf, diese Zahl geht mit der Zeit gegen 0. |
+| **Speicherplatz** | Freier Speicherplatz auf dem Host-Dateisystem (Kachel mit Auslastungsbalken — andere Frage als die Zahlen unten, nicht Zeitarchivs eigener Speicherverbrauch). Knopf „Speicher prüfen" löst zwei getrennt ausgewiesene Prüfungen auf einmal aus: **Indexkonsistenz** (stimmt der abgeleitete Index-Cache mit Archiv/Hot Buffer überein — Abweichungen sind über „Index reparieren" behebbar) und **Datenintegrität** (sind die Rohdaten im Hot Buffer selbst noch lesbar — beschädigte Zeilen entstehen fast immer durch einen unsauberen Neustart, Stromausfall oder harten Kill, und sind nicht reparierbar; betroffene Entität und Monat werden aufgelistet, der Wert bleibt unwiederbringlich verloren). Eine leere Archivdatei (0 Bytes, etwa nach einem harten Abbruch beim Schreiben) blockiert dabei weder Neuaufbau noch Abgleich noch das Energiedashboard: Sie wird wie eine fehlende Datei übersprungen. Darunter: markierte Datensätze endgültig aus Hot Buffer und Archiv entfernen. Der Knopf „Markierte Datensätze anzeigen" listet sie vorher durchsuchbar auf — erst je betroffene Entität mit Anzahl und letztem Markierungszeitpunkt (Suchfeld, Paginierung), ein Klick auf eine Zeile zeigt darunter im selben Dialog die einzelnen markierten Zeitpunkte samt Wert. Rein lesend: das eigentliche Rückgängigmachen einer einzelnen Markierung läuft weiterhin über die Entität selbst (siehe [Bereinigung](#bereinigung)). Darunter der Schalter für die automatische Bereinigung (standardmäßig aus) und das Mindestalter der Löschmarkierung dafür — entfernt nur Markierungen, die mindestens so lange her sind, damit „Rückgängig" für eine gerade erst gelöschte Zeile nicht ins Leere läuft. Meldet die Vorschau „Löschmarkierungen ohne passende Rohdatenzeile", war die zugehörige Rohdatenzeile bereits durch eine Verdichtung oder eine abgelaufene Aufbewahrung entfernt worden — beide räumen die betroffenen Markierungen seitdem selbst mit auf, diese Zahl geht mit der Zeit gegen 0. |
 | **Aufbewahrung** | Übersicht aktuell fälliger und bereits gelöschter Datensätze; Vorschau fälliger Löschungen; Zeitplan für automatische Durchsetzung (täglich oder wöchentlich mit Wochentag); Lauf-Historie. |
 | **Verdichten** | Schalter für die automatische, rückwirkende Verdichtung archivierter Monate (standardmäßig aus) und das Mindestalter dafür — betrifft nur Entitäten mit gesetztem Verdichtungsziel (siehe [Entität konfigurieren](#entität-konfigurieren)). Die manuelle Verdichten-Aktion liegt dagegen bei der jeweiligen Entität selbst, im Bearbeitungsbereich. |
 | **Aktivität** | Die letzten Korrektur-, Hinzufügen-, Bereinigen-, Verdichten- und Aufbewahrung-Vorgänge in einer Liste, mit Entität, Auslöser (manuell/automatisch), Zeilenzahl und Status — filterbar nach Entität, Aktionstyp, Status und Zeitraum. Ein Klick auf eine Verdichten- oder Bereinigen-Zeile zeigt ihr Detail (Zielauflösung, betroffener Zeitraum, Zeilen vorher/nachher). Backup steht dort nicht mit drin — es betrifft die ganze Installation, nicht einzelne Datensätze. |
@@ -2760,6 +2912,13 @@ Trennzeichen sowie Zeit-, Wert- und Zielspalte frei zuordnen, das Ergebnis
 vor dem eigentlichen Import prüfen (Vorschau der ersten Zeilen mit erkannten
 Werten).
 
+Ist das Ziel ein Zähler, erwartet der Import laufende Zählerstände. Enthält die
+Datei stattdessen Summen je Zeitraum (z. B. Monatserträge), speichert **Werte
+sind Summen je Zeitraum … als laufenden Zählerstand speichern** sie als
+Zählerstand. Die Option gibt es nur für Zähler: Bei einem Sensor, Schalter oder
+einer Zustands-Entität als Ziel ist sie ausgegraut und nicht gesetzt, weil die
+Werte sonst aufaddiert würden. Auch der Server prüft das für jede Zielspalte.
+
 ### Home Assistant
 
 Bestehende Recorder-Daten direkt aus der laufenden Home-Assistant-Instanz
@@ -2829,8 +2988,12 @@ ein Klick auf eine Überschrift sortiert.
   vorhanden“ (nach Prüfung oder Vorschau) sowie „Importierbar“, „Vollständig“
   und „Fehler / keine Daten“ (nach einer Vorschau). Die Chips lassen sich
   kombinieren: „Nie importiert“ und „Daten vorhanden“ ergeben genau die
-  Entitäten, die noch fehlen. Suche, Filter, Sortierung und Seite bleiben
-  erhalten, wenn die Tabelle nach Prüfung oder Vorschau neu gezeichnet wird.
+  Entitäten, die noch fehlen. Das Menü **Auswahl ▾** daneben filtert nach
+  Kategorie, Raum und Typ und sieht aus wie das Filtermenü der Entitätenliste:
+  Chips je Gruppe, **Zurücksetzen** und die Zahl der Treffer. Es gilt für die
+  Tabellen von Home Assistant, VictoriaMetrics und InfluxDB. Suche, Filter,
+  Sortierung und Seite bleiben erhalten, wenn die Tabelle nach Prüfung oder
+  Vorschau neu gezeichnet wird.
 - **Markieren:** Die Kopf-Checkbox markiert die Zeilen der aktuellen Seite,
   „Alle gefilterten markieren“ alle Treffer von Suche und Filtern, auch auf
   anderen Seiten (und hebt die Markierung wieder auf).
@@ -2961,8 +3124,10 @@ dupliziert also nichts, ebenso wenig ein wiederholter Home-Assistant-Import
 
 Unter **System → Export** führt ein Assistent in vier Schritten zur Datei:
 
-1. **Entitäten:** ankreuzen, was exportiert werden soll — gefiltert nach Typ,
-   Einheit oder Suchbegriff, auch alle auf einmal.
+1. **Entitäten:** ankreuzen, was exportiert werden soll — gefiltert über das
+   Menü **Filter ▾** (Typ, Kategorie, Einheit; dieselben Chips wie in der
+   Entitätenliste, mit **Zurücksetzen** und der Zahl der Treffer) oder über
+   einen Suchbegriff, auch alle auf einmal.
 2. **Zeitraum:** Alles, ein Jahr, ein Monat oder frei von/bis. Für ein
    Jahres-Backup ein Jahr wählen, für eine Auswertung einen einzelnen Monat.
 3. **Auflösung:** Rohwerte, Minute, Stunde oder Tag. Gröbere Auflösung macht
@@ -3239,7 +3404,7 @@ will, lädt es vorher herunter.
 
 | Bereich | Enthält |
 | --- | --- |
-| **Darstellung** | Sprache (Automatisch/Deutsch/English — Standard Deutsch; „Automatisch“ folgt der Browsersprache; nicht übersetzte Stellen erscheinen auf Deutsch), Zahlen- und Datumsformat (Automatisch/Deutsch/English UK/English US — „Automatisch“ folgt dem Browser: `en-GB` → `1,234.5` und `07/10/2026`, `en-US` → `10/07/2026` mit 12-Stunden-Uhr, `de-*` → `1.234,5` und `07.10.2026`; unabhängig von der Sprache; CSV-Exporte und Dateinamen bleiben unverändert), Währung (Automatisch/EUR/GBP/USD/CHF — „Automatisch“ übernimmt sie aus Home Assistant, sonst Euro; Beträge werden nicht umgerechnet, nach einem Wechsel die Preise neu eintragen), Startseite (Übersicht/Energiedashboard/Wetterdashboard), Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Breite Darstellung (experimentell; Aus/An, Standard Aus — ab 1200 px Fensterbreite nutzen Übersicht, Dashboards, Charts, Tabellen, Entitäten und Housekeeping bis 1920 px, darüber zentriert; gilt für die ganze Installation; andere Seiten wie Einstellungen und Energiedashboard bleiben bei 1120 px), Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
+| **Darstellung** | Sprache (Automatisch/Deutsch/English — Standard Deutsch; „Automatisch“ folgt der Browsersprache; nicht übersetzte Stellen erscheinen auf Deutsch), Zahlen- und Datumsformat (Automatisch/Deutsch/English UK/English US — „Automatisch“ folgt dem Browser: `en-GB` → `1,234.5` und `07/10/2026`, `en-US` → `10/07/2026` mit 12-Stunden-Uhr, `de-*` → `1.234,5` und `07.10.2026`; unabhängig von der Sprache; CSV-Exporte und Dateinamen bleiben unverändert), Währung (Automatisch/EUR/GBP/USD/CHF — „Automatisch“ übernimmt sie aus Home Assistant, sonst Euro; Beträge werden nicht umgerechnet, nach einem Wechsel die Preise neu eintragen), Startseite (Übersicht/Energiedashboard/Wetterdashboard), Farbschema (Zeitarchiv/Home Assistant/Modern), Hell/Dunkel/Automatisch, Schriftgröße, Dashboard-Kachel-Ein-/Ausblendanimation, Breite Darstellung (experimentell; Aus/An, Standard Aus — ab 1200 px Fensterbreite nutzen Übersicht, Dashboards, Charts, Tabellen, Entitäten und Housekeeping bis 1920 px, darüber zentriert; gilt für die ganze Installation; Energie- und Wetterdashboard füllen den Rahmen in allen Reitern ganz aus, andere Seiten wie Einstellungen bleiben bei 1120 px), Startwerte für die Chart-Optionen der Entität-Verlaufsansicht |
 | **Archivierung** | Standardwerte für neu erkannte Entitäten (wirken nie rückwirkend auf bestehende Entitäten): Auflösung, Aufbewahrung, Nachkommastellen, Wertänderungsfilter, Lücken-/Ausreißer-Erkennung |
 | **Meldungen** | Tipp-Anzeige an-/ausschalten und Dialog mit allen Tipps (siehe [Housekeeping](#housekeeping)); Übersicht stummgeschalteter Systemmeldungen mit verbleibender Dauer, einzeln vorzeitig wieder aktivierbar |
 | **Verbindung** | API-Token anzeigen/neu erzeugen, letzter empfangener Wert, Anzahl Schreibzugriffe und Auth-Fehler seit Start, verbundene Integrationsversion mit Zeitpunkt "zuletzt gesehen" (Hinweis bei veralteter oder neu verfügbarer Version) |
@@ -3248,6 +3413,26 @@ will, lädt es vorher herunter.
 | **Zurücksetzen** | Löscht Daten endgültig — in zwei Stufen: **Nur Messwerte löschen** (Entitäten, Konfiguration, Dashboards und Einstellungen bleiben) oder **Komplett zurücksetzen** (zusätzlich Entitäten, Dashboards, gespeicherte Charts und Tabellen, Aktivitätsprotokoll und Einstellungen, wie bei einer frischen Installation). Der API-Token, die Backup-Einstellungen und alle Backup-Dateien bleiben erhalten; die Home-Assistant-Integration legt Entitäten mit dem nächsten Wert neu an. Kennzahlen (Entitäten, Datensätze, Größe) nennen vorab, was gelöscht würde. Standardmäßig wird **vorher ein Backup erstellt** — schlägt es fehl, wird nichts gelöscht. Zum Bestätigen tippst du das Wort „LÖSCHEN“ ein. Im Demo-Modus nicht verfügbar |
 | **Demo-Daten** | Nur sichtbar mit aktivem Demo-Modus oder einer liegengebliebenen Demo-Instanz — siehe eigener Abschnitt [Demo-Modus](#demo-modus) |
 | **Über Zeitarchiv** | Version (mit Hinweis, sobald ein Update verfügbar ist), Zeitzone, Datenverzeichnis, Links zu Dokumentation/Changelog/Fehlermeldung |
+
+**Abhängige Optionen.** Eine Option, die ohne ihre Voraussetzung nichts bewirkt, ist ausgegraut
+oder ausgeblendet. Ihr gespeicherter Wert bleibt erhalten und gilt wieder, sobald die
+Voraussetzung erfüllt ist.
+
+- **Backup:** Die Uhrzeit fehlt, solange „Automatisch erstellen“ aus ist.
+- **Archivierung:** „Standard-Lebenszeichen“ fehlt, solange der Standard-Wertänderungsfilter
+  aus ist.
+- **Bereinigung und Verdichtung:** Das „Mindestalter der Markierung“ fehlt, solange die
+  „Automatische Bereinigung“ aus ist, das „Mindestalter“ der Verdichtung, solange die
+  „Automatische Verdichtung“ aus ist.
+- **Energiedashboard (Einrichtung):** „Nach Gruppe anzeigen“ bei den Verbraucheranteilen gilt
+  nur bei eingeblendeter Kachel „Verbraucheranteile“, die Schwellen der Kenntage nur für
+  angehakte Bereiche.
+- **Wetterdashboard (Einrichtung):** Die Schwellen für den Anteil am klaren Himmel gelten nur
+  mit „Nach Sonnenstand“ und der Rolle „Sonnenhöhe“, der Regentag nach Menge und nach Dauer
+  nur mit der jeweiligen Sensor-Rolle, die Heizschwellen nur mit dem Reiter „Heizen“.
+- **Tabellen-Editor:** siehe [Darstellung](#darstellung-1).
+- **Entität konfigurieren:** „Nachkommastellen“ gibt es bei Schaltern und Zustands-Entitäten
+  nicht, da sie „An“/„Aus“, eine Dauer oder einen Zustand zeigen.
 
 Ein neu erzeugter API-Token unter **Verbindung** ersetzt den bisherigen
 sofort — die Zeitarchiv-Integration muss danach mit dem neuen Token
