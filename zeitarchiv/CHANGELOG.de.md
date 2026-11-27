@@ -45,6 +45,8 @@
 - **Charts**: „Donut“ lässt sich erst ab zwei Entitäten wählen; mit nur einem Wert war er ein voller Ring ohne Aussage (Zustands-Entitäten funktionieren weiter mit einer)
   - Ausnahme ist eine einzelne An/Aus-Entität: Ihr Donut teilt den Zeitraum in „An“ und „Aus“ auf (auch in Kacheln und der Lovelace-Karte)
   - Der Donut zeigt in der Mitte einen Wert: die Summe (bei An/Aus die Einschaltdauer, bei Zustands-Entitäten der größte Zustand), beim Überfahren einer Scheibe deren Wert; in Kacheln und der Lovelace-Karte nur, wenn genug Platz ist
+- **Zählerrückgänge**: Nach einer einzelnen Spitze nach oben steht der gute Folgewert nicht mehr als „Vermutlich Reset“ da
+  - Die Einordnung heißt „Spitze davor“ und nennt die Spitze und den früheren Stand; die Spitze selbst markierst du als Ausreißer
 
 ### Behoben
 

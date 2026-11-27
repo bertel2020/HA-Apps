@@ -1262,6 +1262,8 @@ def counter_decrease_notice(rows: list[dict], tz: ZoneInfo) -> dict | None:
                 "Danach stieg er wieder auf {recovered}. Wahrscheinlich ein Fehlwert.",
                 recovered=counter_value_label(last["recovered_value"], row),
             )
+        elif last.get("level_before") is not None:
+            detail += " " + tr("Der Wert davor war vermutlich eine Spitze, dieser Wert ist der gute.")
         elif last["returns"] is False:
             detail += " " + tr("Er blieb danach niedrig, vermutlich ein Reset oder Zählertausch.")
     return {

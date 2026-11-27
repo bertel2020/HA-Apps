@@ -149,7 +149,7 @@ def test_the_cleanup_page_gets_a_followup_note_with_each_verdict(tmp_path) -> No
     assert zurueck["returns"] is True
     assert "Stand danach wieder bei" in zurueck["note"] and "Min." in zurueck["note"]
     bleibt = counter_bulk.verdict_details_for_rows(tmp_path, index, TZ, "sensor.z2", rows, now=now)[base + 2 * 300]
-    assert bleibt == {"returns": False, "note": "Stand blieb danach niedrig."}
+    assert bleibt == {"returns": False, "spike": False, "note": "Stand blieb danach niedrig."}
     index.close()
 
 

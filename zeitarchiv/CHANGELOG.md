@@ -45,6 +45,8 @@
 - **Charts**: “Donut” can only be chosen with at least two entities; with a single value it was a full ring without information (state entities still work with one)
   - A single on/off entity is the exception: its donut splits the period into “On” and “Off” (also in tiles and the Lovelace card)
   - The donut shows a value in the middle: the total (or the on-time of an on/off entity, or the largest state of a state entity), and the value of a slice while hovering it; in tiles and the Lovelace card only when there is room for it
+- **Counter decreases**: after a single spike upwards, the good value that follows is no longer shown as “Probably a reset”
+  - The assessment reads “Spike before” and names the spike and the earlier level; mark the spike as an outlier
 
 ### Fixed
 

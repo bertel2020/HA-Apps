@@ -206,3 +206,20 @@ def test_the_row_marker_skips_a_daily_reset_but_keeps_it_for_compaction() -> Non
     assert cleanup.detect_counter_decreases(reset, TZ) == {}
     midday = [(day + 40000, 12.5), (day + 40300, 0.0)]
     assert len(cleanup.detect_counter_decreases(midday, TZ)) == 1
+
+
+def test_a_single_spike_makes_the_following_value_the_good_one() -> None:
+    # 480 → 999.999 → 480,1: der Rückgang ist der gute Wert, die Spitze davor der Fehlwert.
+    item = cleanup.classify_counter_decreases(_rows(479.5, 479.6, 479.7, 999.999, 479.8, 479.9, 480.0))[0]
+    assert item["previous"] == 999.999 and item["value"] == 479.8
+    assert item["returns"] is not True
+    assert item["level_before"] == 479.7
+    # Markiert wird weiterhin nichts: die Einordnung ändert nur die Anzeige.
+    assert cleanup.marked_timestamps([item]) == []
+
+
+def test_a_dip_and_a_reset_are_not_taken_for_a_spike() -> None:
+    dip = cleanup.classify_counter_decreases(_rows(100, 101, 0, 101.5, 102))[0]
+    assert dip["returns"] is True and dip["level_before"] is None
+    reset = cleanup.classify_counter_decreases(_rows(500, 501, *[1 + i * 0.1 for i in range(14)]))[0]
+    assert reset["level_before"] is None

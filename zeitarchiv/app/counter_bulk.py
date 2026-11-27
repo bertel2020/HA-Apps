@@ -140,6 +140,17 @@ _LOOKBACK_SECONDS = 3 * 86400
 _LOOKAHEAD_SECONDS = 6 * 3600
 
 
+def _spike_note(item: dict, entity: dict) -> str:
+    """Satz für einen Rückgang, dessen Vorwert eine einzelne Spitze war: der Wert hier ist der gute."""
+    from .notices import counter_value_label
+
+    return tr(
+        "Der Wert davor ({spike}) war eine Spitze, dieser Wert liegt wieder beim früheren Stand ({level}). Als Ausreißer markieren, nicht diesen Wert.",
+        spike=counter_value_label(item["previous"], dict(entity)).replace(" ", "\u00a0"),
+        level=counter_value_label(item["level_before"], dict(entity)).replace(" ", "\u00a0"),
+    )
+
+
 def followup_note(item: dict, entity: dict) -> str:
     """Satz zur Einordnung eines Rückgangs: was danach mit dem Stand geschah. Dieselben Texte
     wie Housekeeping → Zählerrückgänge, damit beide Stellen dasselbe sagen."""
@@ -151,6 +162,8 @@ def followup_note(item: dict, entity: dict) -> str:
             minutes=max(1, round((item["recovered_after"] or 0) / 60)),
             value=counter_value_label(item["recovered_value"], dict(entity)).replace(" ", "\u00a0"),
         )
+    if item.get("level_before") is not None and item["returns"] is not True:
+        return _spike_note(item, entity)
     if item["returns"] is False:
         return tr("Stand blieb danach niedrig.")
     return tr("Zu wenig Folgewerte für eine Einschätzung.")
@@ -179,7 +192,10 @@ def verdict_details_for_rows(
         tz,
     )
     details = {
-        item["ts"]: {"returns": item["returns"], "note": followup_note(item, entity)}
+        item["ts"]: {
+            "returns": item["returns"], "spike": item.get("level_before") is not None and item["returns"] is not True,
+            "note": followup_note(item, entity),
+        }
         for item in decreases if item["ts"] in stamps
     }
     # Eine markierte Zeile ohne Einordnung gibt es nicht: was die Einordnung nicht findet

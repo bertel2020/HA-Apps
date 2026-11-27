@@ -1195,6 +1195,9 @@ def classify_counter_decreases(
     pending: list[dict] = []
     previous_ts: float | None = None
     previous_value: float | None = None
+    # Der Wert vor dem Vorwert: liegt der Vorwert darüber und der neue Wert wieder beim früheren Stand,
+    # war der Vorwert eine einzelne Spitze und der niedrigere Wert der gute (siehe ``level_before``).
+    before_value: float | None = None
     for ts, value, following in _with_following(rows):
         for item in list(pending):
             item["seen"] += 1
@@ -1219,12 +1222,22 @@ def classify_counter_decreases(
                 "ts": ts, "previous": previous_value, "value": value,
                 "returns": None, "recovered_value": None, "recovered_after": None, "seen": 0,
                 "marks": [ts],
+                # Stand vor einer einzelnen Spitze, sonst None: der Wert vor dem Vorwert, wenn der Vorwert
+                # darüber lag und der neue Wert nicht darunter fällt (480 → 999.999 → 480,1).
+                "level_before": before_value if (
+                    before_value is not None and _dropped(previous_value, before_value)
+                    and not _dropped(before_value, value)
+                ) else None,
             }
             found.append(item)
             pending.append(item)
+        before_value = previous_value
         previous_ts, previous_value = ts, value
     for item in found:
         item.pop("seen", None)
+        # Kehrt der Stand auf den Vorwert zurück, war der niedrige Wert der Fehlwert und keine Spitze davor.
+        if item["returns"]:
+            item["level_before"] = None
     return found
 
 
@@ -1279,7 +1292,10 @@ def scan_counter_decreases(
             "returning_items": [
                 {key: item[key] for key in ("ts", "previous", "value")} for item in decreases if item["returns"]
             ][-5:],
-            "last": {key: last[key] for key in ("ts", "previous", "value", "returns", "recovered_value", "recovered_after")},
+            "last": {
+                key: last[key]
+                for key in ("ts", "previous", "value", "returns", "recovered_value", "recovered_after", "level_before")
+            },
         })
     results.sort(key=lambda r: r["last"]["ts"], reverse=True)
     return results

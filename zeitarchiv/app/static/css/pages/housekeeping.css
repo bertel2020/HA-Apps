@@ -209,7 +209,7 @@
   display:inline-block;padding:1px 8px;border-radius:10px;font-weight:600;
   font-size:calc(12px * var(--font-scale, 1));background:var(--surface-alt);color:var(--ink-muted);
 }
-.counter-verdict.returns{background:var(--warning-soft);color:var(--notice-warn);}
+.counter-verdict.returns,.counter-verdict.spike{background:var(--warning-soft);color:var(--notice-warn);}
 .counter-verdict.stays{background:var(--accent-line-soft);color:var(--accent-line);}
 .counter-verdict.rule{background:var(--positive-soft, var(--surface-alt));color:var(--positive);margin-left:6px;}
 .counter-note{color:var(--ink-muted);font-size:calc(12.5px * var(--font-scale, 1));margin-top:2px;}

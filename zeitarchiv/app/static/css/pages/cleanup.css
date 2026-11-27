@@ -510,7 +510,7 @@
 .flag-badge.sev-info{background:var(--surface-alt);color:var(--ink-muted);}
 /* Zeilenhintergrund nur bei „Aufräumen möglich“; halbtransparent, damit er in langen Listen nicht schreit. */
 table.dt tr.flag-act td{background:color-mix(in srgb, var(--warning-soft) 55%, var(--surface));color:var(--ink);}
-.flag-badge.verdict-returns{background:var(--warning-soft);color:var(--notice-warn);}
+.flag-badge.verdict-returns,.flag-badge.verdict-spike{background:var(--warning-soft);color:var(--notice-warn);}
 .flag-badge.verdict-stays{background:var(--accent-line-soft);color:var(--accent-line);}
 .flag-badge.verdict-open{background:var(--surface-alt);color:var(--ink-muted);}
 /* Begründung zum Urteil eines Zählerrückgangs: am Desktop im Tooltip des Etiketts, auf dem

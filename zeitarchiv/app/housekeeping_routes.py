@@ -315,6 +315,9 @@ def create_housekeeping_router(deps: HousekeepingDependencies) -> APIRouter:
                     minutes=max(1, round((last["recovered_after"] or 0) / 60)),
                     value=_keep_together(notices_mod.counter_value_label(last["recovered_value"], row)),
                 )
+            elif last.get("level_before") is not None and last["returns"] is not True:
+                verdict = "spike"
+                note = counter_bulk.followup_note(last, row)
             elif last["returns"] is False:
                 verdict = "stays"
                 note = tr("Stand blieb danach niedrig. Setzt sich der Zähler planmäßig zurück?")
