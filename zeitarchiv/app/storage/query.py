@@ -123,7 +123,7 @@ class QueryReadCache:
         if key not in self._rollup_rows:
             path = rollup.rollup_path(data_dir, entity_id, level)
             self._rollup_rows[key] = (
-                _rollup_rows_from_table(pq.read_table(path)) if path.exists() else []
+                _rollup_rows_from_table(rollup.read_rollup_table(path)) if path.exists() else []
             )
         return self._rollup_rows[key]
 
@@ -480,7 +480,7 @@ def _query_live_fine(
     held = hold_fill and aggregation_type == "standard" and chart_type == "line"
     boundary = (
         _boundary_value(data_dir, entity_id, window_start.timestamp(), tz, read_cache, index=index)
-        if aggregation_type == "counter" or held
+        if aggregation_type in ("counter", "switch") or held
         else None
     )
     key_fn = rollup.seconds_bucket_key(tz, bucket_seconds)
@@ -507,7 +507,7 @@ def _rollup_rows_from_table(table) -> list[rollup.FineRow]:
     columns = table.column_names
     if "idx" in columns:
         return _state_rows_from_table(table)
-    present = [col for col in ("value", "min_value", "max_value", "on_seconds") if col in columns]
+    present = [col for col in ("value", "min_value", "max_value", "on_seconds", "on_count") if col in columns]
     bucket_starts = table.column("bucket_start").to_pylist()
     values_by_col = {col: table.column(col).to_pylist() for col in present}
     # Die beiden Formen, die es in Wirklichkeit gibt (Messwert mit Min/Max, Zähler), ohne je Zeile ein Wörterbuch für
@@ -577,7 +577,7 @@ def _fine_table_cached(path: Path):
         if cached is not None and cached[0] == fingerprint:
             _FINE_TABLE_CACHE.move_to_end(key)
             return cached[1]
-    table = pq.read_table(path)
+    table = rollup.read_rollup_table(path)
     size = table.nbytes
     if size > _FINE_TABLE_CACHE_MAX_BYTES // 4:
         return table  # eine einzelne Datei soll den Cache nicht allein füllen
@@ -642,6 +642,7 @@ def _aggregate_rollup_rows(
                 rollup.FineRow(
                     bucket_start=bucket_start,
                     on_seconds=sum(row.on_seconds or 0.0 for row in bucket_rows),
+                    on_count=rollup.sum_counts(bucket_rows),
                 )
             )
         else:
@@ -707,7 +708,7 @@ def _fine_rows_until(
     )
     boundary = (
         _boundary_value(data_dir, entity_id, raw_start.timestamp(), tz, read_cache, index=index)
-        if aggregation_type == "counter"
+        if aggregation_type in ("counter", "switch")
         else None
     )
     tail, _ = rollup.compute_fine_rollup_with_key(
@@ -793,7 +794,7 @@ def _query_completed_plus_live_fine(
         )
         boundary = (
             _boundary_value(data_dir, entity_id, live_start.timestamp(), tz, read_cache, index=index)
-            if aggregation_type == "counter"
+            if aggregation_type in ("counter", "switch")
             else None
         )
         key_fn = rollup.named_bucket_key(tz, level)
@@ -1094,7 +1095,7 @@ def _month_live_row(
         return None
     boundary = (
         _boundary_value(data_dir, entity_id, month_start.timestamp(), tz, read_cache, index=index)
-        if aggregation_type == "counter"
+        if aggregation_type in ("counter", "switch")
         else None
     )
     key_fn = rollup.named_bucket_key(tz, "monat")
@@ -1203,6 +1204,7 @@ def _query_year_level(
                     row = rollup.FineRow(
                         bucket_start=year_start.timestamp(),
                         on_seconds=sum(r.on_seconds or 0.0 for r in year_rows),
+                        on_count=rollup.sum_counts(year_rows),
                     )
                 else:
                     values = [r.value for r in year_rows if r.value is not None]

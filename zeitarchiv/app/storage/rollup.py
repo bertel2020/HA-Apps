@@ -52,6 +52,9 @@ class FineRow:
     min_value: float | None = None
     max_value: float | None = None
     on_seconds: float | None = None  # Schalter: Einschaltdauer in Sekunden
+    # Schalter: wie oft er im Bucket eingeschaltet wurde (0→1). None heißt "nicht erfasst" (Rollup aus der Zeit vor
+    # der Zählung), nie 0 — eine Summe über ein Fenster mit unbekannten Anteilen ist selbst unbekannt (sum_counts).
+    on_count: int | None = None
     # Zustand: Index -> (Sekunden in diesem Zustand, wie oft er im Bucket begann).
     # Die Summe der Begin-Zähler ergibt die Wechsel (ROADMAP 1.29).
     states: dict[int, tuple[float, int]] | None = None
@@ -70,6 +73,34 @@ def merge_state_rows(rows: list[FineRow], bucket_start: float) -> FineRow:
         bucket_start=bucket_start,
         states={idx: (seconds, entries) for idx, (seconds, entries) in sorted(merged.items())},
     )
+
+
+def sum_counts(rows: list[FineRow]) -> int | None:
+    """Summe der Einschaltvorgänge; unbekannt, sobald ein Teil unbekannt ist.
+
+    Eine Teilsumme wäre falsch niedrig und sähe richtig aus: Ein Monat, dessen erste Wochen aus der Zeit vor der
+    Zählung stammen, zeigte sonst \"3 Vorgänge\" statt \"nicht erfasst\"."""
+    total = 0
+    for row in rows:
+        if row.on_count is None:
+            return None
+        total += row.on_count
+    return total
+
+
+def read_rollup_table(path: Path) -> pa.Table:
+    """Liest eine Rollup-Datei oder ein Dataset-Verzeichnis mit einheitlichem Schema.
+
+    pyarrow nimmt bei einem Verzeichnis das Schema der ERSTEN Datei und lässt Spalten weg, die dort fehlen. Seit
+    ``on_count`` liegen bei Schaltern Segmente ohne und mit der Spalte nebeneinander; ohne diese Vereinheitlichung
+    verschwände die Spalte, solange das älteste Segment sie nicht kennt. Fehlende Werte kommen als null."""
+    if not path.is_dir():
+        return pq.read_table(path)
+    files = [f for f in parquet_files(path) if not f.name.startswith(".")]
+    if len(files) < 2:
+        return pq.read_table(path)
+    schema = pa.unify_schemas([pq.read_schema(f) for f in files])
+    return pq.read_table(path, schema=schema)
 
 
 def rollup_dir(data_dir: Path, entity_id: str) -> Path:
@@ -292,9 +323,22 @@ def compute_fine_rollup_with_key(
                     0.0, segment_end - current
                 )
                 current = segment_end
+        # Einschaltvorgänge: nur ein Wechsel auf "an" zählt. Der vom Fensteranfang übernommene Zustand ist keiner,
+        # und ein doppelt gemeldetes "an" (Import, Neustart von HA) auch nicht — dieselbe Regel wie bei den
+        # Zustands-Entitäten (_compute_state_rollup). Ohne bekannten Vorzustand zählt das erste "an".
+        starts: dict[datetime, int] = {}
+        was_on = None if boundary_value is None else boundary_value >= 0.5
+        for ts, value in rows:
+            is_on = value >= 0.5
+            if is_on and was_on is not True:
+                key = bucket_key_fn(ts)
+                starts[key] = starts.get(key, 0) + 1
+            was_on = is_on
+        # Ein Bucket mit Einschaltvorgang, aber ohne Dauer (An und Aus im selben Zeitstempel) bekommt trotzdem eine
+        # Zeile; ohne Dauer UND ohne Vorgang bleibt es bei keiner Zeile wie bisher.
         fine = [
-            FineRow(bucket_start=key.timestamp(), on_seconds=seconds)
-            for key, seconds in sorted(on_seconds.items())
+            FineRow(bucket_start=key.timestamp(), on_seconds=on_seconds.get(key, 0.0), on_count=starts.get(key, 0))
+            for key in sorted(on_seconds.keys() | starts.keys())
         ]
         return fine, None
 
@@ -422,7 +466,7 @@ def _fine_schema(aggregation_type: str) -> pa.Schema:
                 ("max_value", pa.float64()),
             ]
         )
-    return pa.schema([("bucket_start", pa.float64()), ("on_seconds", pa.float64())])
+    return pa.schema([("bucket_start", pa.float64()), ("on_seconds", pa.float64()), ("on_count", pa.int32())])
 
 
 def _fine_rows_to_table(rows: list[FineRow], aggregation_type: str) -> pa.Table:
@@ -463,6 +507,7 @@ def _fine_rows_to_table(rows: list[FineRow], aggregation_type: str) -> pa.Table:
         {
             "bucket_start": [r.bucket_start for r in rows],
             "on_seconds": [r.on_seconds for r in rows],
+            "on_count": [r.on_count for r in rows],
         },
         schema=_fine_schema(aggregation_type),
     )
@@ -519,7 +564,7 @@ def _aggregate_fine_to_month(rows: list[FineRow], aggregation_type: str, month_s
             min_value=min(all_min) if all_min else None,
             max_value=max(all_max) if all_max else None,
         )
-    return FineRow(bucket_start=month_start_ts, on_seconds=sum(r.on_seconds or 0.0 for r in rows))
+    return FineRow(bucket_start=month_start_ts, on_seconds=sum(r.on_seconds or 0.0 for r in rows), on_count=sum_counts(rows))
 
 
 aggregate_fine_to_month = _aggregate_fine_to_month
@@ -571,11 +616,11 @@ def append_completed_month(
             key=lambda row: (row[0], row[1]),
         )
 
-    # Zähler: Bezugswert für das erste Delta. Zustand: der Zustand, der beim
+    # Zähler: Bezugswert für das erste Delta. Zustand und Schalter: der Zustand, der beim
     # Monatsanfang schon galt (siehe compute_fine_rollup_with_key).
     boundary_value = (
         last_value_before_month(data_dir, entity_id, year, month)
-        if aggregation_type in ("counter", STATE_TYPE)
+        if aggregation_type in ("counter", "switch", STATE_TYPE)
         else None
     )
 
