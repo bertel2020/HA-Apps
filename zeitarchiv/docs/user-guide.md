@@ -39,7 +39,7 @@ für Schritt, aufgabenorientiert, jede Seite im Detail. Für einen kurzen
   - [Sonne, Licht und Wetterlage](#sonne-licht-und-wetterlage)
   - [Reiter Niederschlag](#reiter-niederschlag)
   - [Monatsvergleich](#monatsvergleich)
-  - [Reiter Langzeit](#reiter-langzeit)
+  - [Reiter Langzeit (Wetter)](#reiter-langzeit-wetter)
   - [Reiter Heizen](#reiter-heizen)
 - [Entitäten und Verläufe](#entitäten-und-verläufe)
   - [Mehrere Entitäten löschen](#mehrere-entitäten-löschen)
@@ -882,7 +882,7 @@ muss; Sensoren mit übersetztem Text oder Zahlencode passen nicht.
   „Schnee“, „Schneeregen“ oder „Hagel“ statt „Regen“.
 - Ohne sie steht bei einer Außentemperatur von höchstens 1 °C „Niederschlag“, weil ein
   Ein/Aus-Regensensor Regen und Schnee nicht unterscheiden kann.
-- Der Reiter **Langzeit** zählt mit ihr die Schneefalltage (siehe „Reiter Langzeit“ weiter unten).
+- Der Reiter **Langzeit** zählt mit ihr die Schneefalltage (siehe [Reiter Langzeit (Wetter)](#reiter-langzeit-wetter) weiter unten).
 Im Bereich **Anzeige** lassen sich Blöcke der Vergleichstabelle ausblenden (Kenntage, Niederschlag, Regen, Luftfeuchte, Luftdruck, Wind, Böe, Strahlung); die Außentemperatur und weitere Sensoren bleiben immer sichtbar, die Kacheln oben ändern sich nicht. Der Zeitraum einer Spalte steht im Tooltip der Überschrift („ⓘ“), nicht als eigene Zeile. Bei Max und Min steht in Monat, Vormonat und Jahr der Tag als kleine Zeile unter dem Wert; die Differenz zum Vorjahr lässt sich im Menü „Vorjahr“ mit „Differenz anzeigen“ aus- und einschalten (merkt sich der Browser).
 
 Unter **Anzeige → Karten** lässt sich jeder Block der Reiter einzeln ausblenden, nach Reitern gegliedert: Übersicht (Wetterlage, Zeiträume im Vergleich, Tagesbild, Monatsvergleich), Niederschlag (Niederschlag, Niederschlag je Monat), Temperatur & Klima (Temperatur & Klima, Temperaturen im Vergleich, Luftfeuchte im Vergleich), Wind & Sonne (Wind & Sonne, Sonnenstunden, Tageslicht, Die letzten Tage im Vergleich, Tageslänge im Jahresverlauf, PV und Helligkeit) und Langzeit (Rekorde, Kenntage je Jahr, Monatswerte je Jahr, Jahre im Vergleich, Tag für Tag). Zur Wahl stehen nur Blöcke, für die eine Rolle zugeordnet ist. Ein Reiter fehlt, wenn alle seine Blöcke ausgeblendet sind. Nur der Reiter Heizen steht getrennt im Block „Experimentell“.
@@ -997,7 +997,7 @@ Temperatur ein Satz wie „November bisher Ø 3,6 °C, 1,2 K kälter als der Ø 
 (1.–2., aus 3 Jahren)“: der laufende Monat bis gestern gegen dasselbe Stück der
 Vorjahre. Er erscheint ab zwei Vorjahren mit genug Werten.
 
-### Reiter Langzeit
+### Reiter Langzeit (Wetter)
 
 **Kenntage je Jahr** zählt nach den festen Schwellen des Deutschen
 Wetterdienstes: Frosttag (Tiefstwert unter 0 °C), Eistag (Höchstwert unter 0 °C),
@@ -1071,9 +1071,13 @@ erscheint der Reiter **Heizen**. Die Zähler werden zu einer Summe addiert; Zäh
 oder MWh rechnet die Seite in kWh um.
 
 Das **Streudiagramm** zeigt jeden Heiztag als Punkt: Tages-Ø der Außentemperatur gegen
-kWh, je Heizperiode in einer Farbe. Die Ausgleichsgerade läuft nur über die Tage unter der
-**Heizgrenze** (Standard 15 °C, als senkrechte Linie); ihre Steigung steht als „kWh je Kelvin“
-darunter. Raumtemperatur (Standard 20 °C) und Heizgrenze lassen sich oben ändern, ebenso die
+kWh, je Heizperiode in einer Farbe. Durch die Punkte läuft je Periode eine geglättete Linie
+über die Tage unter der **Heizgrenze** (Standard 15 °C, als senkrechte Linie); sie folgt dem
+Knick, wo der Verbrauch im Frost abflacht. Erst ab 20 Heiztagen einer Periode wird geglättet,
+vorher (etwa in der laufenden Periode) zeichnet die Seite stattdessen eine gerade
+Ausgleichslinie. Die Steigung „kWh je Kelvin“ steht darunter; sie ist die Steigung einer
+Ausgleichsgeraden über die Tage von 0 °C bis zur Heizgrenze (bei einer Heizgrenze von 5 °C
+oder darunter über alle Tage darunter), weil der Verbrauch im Frost oft flacher verläuft. Raumtemperatur (Standard 20 °C) und Heizgrenze lassen sich oben ändern, ebenso die
 Auswahl der Zähler, ohne neu zu laden; der Browser merkt sich die Werte.
 
 Die **Gradtagzahl** (G20/15 nach VDI 3807) zählt je Tag Raumtemperatur minus Tagesmittel,
@@ -1542,10 +1546,16 @@ eines bestehenden (Kachelmenü ⋮).
 - Beliebig viele Entitäten überlagern; unterschiedliche Einheiten erhalten
   automatisch getrennte Y-Achsen, sodass z. B. Temperatur und Luftfeuchte
   in einem Chart sinnvoll lesbar bleiben.
-- Ob eine Entität als Linie oder als Balken gezeichnet wird, lässt sich
-  nicht manuell wählen — das entscheidet die App automatisch nach
-  Entitätstyp (Zähler und Schalter als Balken, alles andere als Linie).
-  Nur der **Zeitstrahl** (siehe unten) ist eine bewusste Wahl.
+- **Darstellung je Serie:** Jede Zähler- oder Messwert-Zeile unter
+  **Ausgewählt** hat ein Feld „Darstellung“ mit **Auto**, **Balken** und
+  **Linie**. „Auto“ richtet sich nach dem Entitätstyp (Zähler als Balken,
+  Messwerte als Linie) und nennt in Klammern, was daraus wird. So lassen sich
+  Balken und Linien in einem Chart mischen, etwa ein Messwert als Balken oder
+  ein Zähler als Linie. Schalter bleiben Balken, Zustands-Entitäten haben ihren
+  Zeitstrahl; der **Zeitstrahl** (siehe unten) ist eine bewusste Wahl. Bei einer
+  Linie, die sich ihre Achse mit einer anderen Serie gleicher Einheit teilen
+  würde, bietet die Zeile außerdem **Eigene Achse**: Die Skala richtet sich dann
+  nur nach dieser Linie.
 - Punkte an/aus, Rohwerte, dynamische Y-Achse, Werte anzeigen,
   Durchschnittslinie, Nachkommastellen, Legenden-Statistik — dieselben
   Optionen wie in der Verlaufsansicht einer einzelnen Entität, hier aber je

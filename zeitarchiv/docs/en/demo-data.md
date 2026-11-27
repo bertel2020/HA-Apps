@@ -31,10 +31,11 @@ the files that a real instance would create too.
 
 The tables below list the German `entity_id`s; with `--language en` they follow the English name (`sensor.demo_gesamtwirkleistung` → `sensor.demo_total_active_power`).
 
-97 entities, thematically a single household with rooftop PV system (including
+99 entities, thematically a single household with rooftop PV system (including
 yield forecast), wallbox, an additional balcony power plant with its own
 storage, a larger home battery on the rooftop system and the grid CO2
-intensity, all with the prefix `demo_` in the entity ID (easy to recognize and
+intensity, plus a workshop behind a sub-meter, three text-state entities and
+two migration-test pairs, all with the prefix `demo_` in the entity ID (easy to recognize and
 selectively deletable):
 
 | Entity | Type | Unit | Pattern |
@@ -70,6 +71,10 @@ selectively deletable):
 | `sensor.demo_boiler_energie` | Counter (`total_increasing`) | kWh | Monotonically rising, exact integration of `demo_boiler` |
 | `sensor.demo_wallbox2_leistung` | Standard | W | Second, smaller charging unit (e-bike/second car), rarer than `demo_wallbox_leistung` (~18 % daily chance) |
 | `sensor.demo_wallbox2_energie` | Counter (`total_increasing`) | kWh | Monotonically rising, exact integration of `demo_wallbox2_leistung` |
+| `sensor.demo_werkstatt_energie` | Counter (`total_increasing`) | kWh | Sub-meter of the workshop: measures the three devices below plus a small remainder of its own (standby, sockets, an occasional workbench on Saturday and Sunday late morning), so the energy dashboard also shows the entry for remaining consumers; the workshop power also flows into the total active power |
+| `sensor.demo_werkstatt_kompressor_energie` | Counter (`total_increasing`) | kWh | Compressed-air compressor behind the sub-meter: weekdays 4–6 pm, weekends 9 am–1 pm, cycling (8 of 20 minutes running, about 1.1 kW) |
+| `sensor.demo_werkstatt_licht_energie` | Counter (`total_increasing`) | kWh | Workshop lighting behind the sub-meter: about 58 W, daily 4–9 pm and at the weekend 9 am–1 pm |
+| `sensor.demo_werkstatt_ladestation_energie` | Counter (`total_increasing`) | kWh | Battery charging station for tools behind the sub-meter: about 85 W, only at night (midnight to 5 am) |
 | `sensor.demo_pv_leistung` | Standard | W | Bell curve during the day, 0 at night; daylight length by season, damped by the same cloud cover as outdoor temperature/humidity |
 | `sensor.demo_pv_ertrag` | Counter (`total_increasing`) | kWh | Monotonically rising, exact integration of the PV power over time |
 | `sensor.demo_pv_prognose_rest_heute` | Standard | kWh | Like a Forecast.Solar sensor: estimated remaining yield of the rooftop system until sunset, roughly estimated once in the morning (with estimation error, not exact foreknowledge) and falls over the day toward 0 with the yield actually collected |
@@ -105,6 +110,9 @@ selectively deletable):
 | `binary_sensor.demo_praesenz_wohnzimmer` | Switch | — | Home/away with time-of-day-dependent probability and inertia (no switching every few minutes) |
 | `device_tracker.demo_smartphone` | Switch | — | Own, independent home/away simulation (`gen_presence()`) — example of the presence domains `device_tracker`/`person`, which are archived like switches (`home` → on, anything else → off) |
 | `binary_sensor.demo_regensensor` | Switch | — | One or several rain windows on some days, probability rises with that day's cloud cover |
+| `sensor.demo_saugroboter_status` | State | — | Robot vacuum: on weekdays (and some Saturdays) one run in the late morning — cleaning, often mopping, now and then an error with pause, then return to the dock; rarely briefly unavailable at night (Wi-Fi). Raw values like Home Assistant (`docked`, `cleaning`, `mopping`, `returning`, `paused`, `error`) |
+| `sensor.demo_waschmaschine_programm` | State | — | Washing machine program, derived from the cycles of `demo_waschmaschine_an`: a program at the start (`cotton_60`, `eco_40_60`, `easy_care`, `quick_30`), `finished` at the end, `off` once the door is opened (20 to 120 minutes later) |
+| `sensor.demo_heizung_betrieb` | State | — | Heating mode, derived from `demo_heizung`: `off` from May to September, otherwise `heating` while it draws power and `idle` without |
 | `sensor.demo_luftdruck` | Standard | hPa | Weather dashboard: high pressure in clear weather plus a slow wave (passing lows), continuous across midnight |
 | `sensor.demo_boe` | Standard | km/h | Weather dashboard: gust for the wind, always above it (on average about a third) |
 | `sensor.demo_strahlung` | Standard | W/m² | Weather dashboard: global radiation, same bell curve and cloudiness as `demo_pv_leistung` (peak about 1000) |
@@ -123,6 +131,10 @@ selectively deletable):
 | `sensor.demo_kitchen_temperature` / `_humidity` (German: `sensor.demo_kueche_temperatur` / `_luftfeuchte`) | Standard | °C / % | Room "Kitchen": peaks at mealtimes (breakfast later at the weekend), steam clears slowly after dinner |
 | `sensor.demo_bathroom_temperature` / `_humidity` (German: `sensor.demo_bad_temperatur` / `_luftfeuchte`) | Standard | °C / % | Room "Bathroom": shower peaks in the morning (later at the weekend) and evening, humidity briefly above 80 % |
 | `sensor.demo_basement_temperature` / `_humidity` (German: `sensor.demo_keller_temperatur` / `_luftfeuchte`) | Standard | °C / % | Room "Basement": slow annual curve (about 11 to 17 °C), clearly damper in summer (about 55 to 72 %) |
+| `sensor.demo_migration_alt_stromverbrauch` | Counter (`total_increasing`) | kWh | Migration test, pair 1, "old" entity: stops sending 45 days before now, as a device that has gone silent would |
+| `sensor.demo_migration_stromverbrauch` | Counter (`total_increasing`) | kWh | Migration test, pair 1, "new" entity: starts 60 days before now, so it overlaps the old one by 15 days (the migration preview then has something to show right away) |
+| `sensor.demo_migration2_alt_stromverbrauch` | Counter (`total_increasing`) | kWh | Migration test, pair 2, "old" entity: same timing as pair 1 |
+| `sensor.demo_migration2_stromverbrauch` | Counter (`total_increasing`) | **Wh** | Migration test, pair 2, "new" entity: same timing, but in Wh with values larger by a factor of 1000 — to try out the conversion factor when migrating (kWh → Wh) |
 
 Washing machine, dishwasher, dryer and wallbox each have two or three entities
 — instantaneous power (W), energy counter (kWh) and, for the three household
@@ -234,7 +246,7 @@ cd addon
 .venv/bin/python3 scripts/generate_demo_data.py --data-dir /path/to/data-directory
 ```
 
-With the default values, generates 6 months of history for all 97 demo entities
+With the default values, generates 6 months of history for all 99 demo entities
 in a fresh (or empty) target directory.
 
 More examples:
@@ -306,7 +318,7 @@ directly at the add-on data path, then start the add-on again. A prior backup
 
 ## Regenerating demo data (`--clean`)
 
-Before rewriting, `--clean` cleans the values of all 97 `demo_*` entities — like
+Before rewriting, `--clean` cleans the values of all 99 `demo_*` entities — like
 **Housekeeping → Storage** in the app, just for all demo entities at once,
 without opening the app. Deliberately `delete_all_values()` instead of
 `delete_entity()`: the entities themselves remain in the index continuously

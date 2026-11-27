@@ -253,13 +253,14 @@ zum sechsten Mal von Hand entsteht:
   Der Kontextprozessor ruft es bei jeder Antwort auf, eine defekte Quelle
   darf nicht jede Seite mitreißen.
 
-Angemeldet sind alle vierzehn langen Aktionen:
+Angemeldet sind alle siebzehn langen Aktionen:
 
 | Auftrag | Läuft | Ausgelöst durch |
 | --- | --- | --- |
 | Symcon-Vorschau, Symcon-Import | Hintergrund-Thread | Klick |
 | CSV-Import, Home-Assistant-Import | Hintergrund-Thread | Klick |
-| Bereinigung | Hintergrund-Thread | Klick |
+| VictoriaMetrics-Import, InfluxDB-Import | Hintergrund-Thread | Klick |
+| Bereinigung, Zurücksetzen | Hintergrund-Thread | Klick |
 | Backup, Aufbewahrung | Hintergrund-Thread | Klick oder Zeitplan |
 | Rotation, Index-Optimierung | Request-Thread (`track()`) | Klick |
 | Speicherabgleich | Daemon-Thread beim Start | nichts |
@@ -268,9 +269,10 @@ Angemeldet sind alle vierzehn langen Aktionen:
 | Rollup-Neuaufbau | Schreibpfad (`/api/write`) | Home Assistant |
 | Demo-Daten-Erzeugung | Hintergrund-Thread (`demo_mode.demo_progress`, siehe oben) | Klick, Zeitplan oder Erststart im Demo-Modus |
 
-Die unteren drei Zeilen sind der eigentliche Grund für die Registratur: Wer nichts
+Die Zeilen ohne Klick (Speicherabgleich, Stunden-Rollup-Backfill, Einschaltungen
+nachrechnen, Rollup-Neuaufbau) sind der eigentliche Grund für die Registratur: Wer nichts
 gedrückt hat, sucht für einen zähen Server auch keine Erklärung. Mehrere der
-Aufträge — Bereinigung, Backup, Aufbewahrung, Rotation, Index-Optimierung und
+Aufträge — Bereinigung, Zurücksetzen, Backup, Aufbewahrung, Rotation, Index-Optimierung und
 Teile der Importe — halten dabei `StorageCoordinator.exclusive()` und legen
 die gesamte Anwendung einschließlich der Aufnahme still. Sichtbar wird das
 nur in der Kopfleiste: Der eigene Ladezustand des Browsers erreicht immer nur

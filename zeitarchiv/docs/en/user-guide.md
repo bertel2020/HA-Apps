@@ -39,7 +39,7 @@ internals for developers are in the other documents of this folder (see
   - [Sun, light and weather summary](#sun-light-and-weather-summary)
   - [Precipitation tab](#precipitation-tab)
   - [Monthly comparison](#monthly-comparison)
-  - [Long-term tab](#long-term-tab)
+  - [Long-term tab (weather)](#long-term-tab-weather)
   - [Heating tab](#heating-tab)
 - [Entities and histories](#entities-and-histories)
   - [Deleting several entities](#deleting-several-entities)
@@ -824,7 +824,7 @@ translated text or a numeric code do not fit. The weather summary and the rain
 tile then say “Snow”, “Sleet” or “Hail” instead of “Rain”. Without it, they
 say “Precipitation” at or below 1 °C, since an on/off rain sensor cannot tell
 rain from snow. The role also feeds the snowfall figures on the
-[Long-term tab](#long-term-tab-1) of the weather dashboard.
+[Long-term tab](#long-term-tab-weather) of the weather dashboard.
 
 In the **Display** section you can hide blocks of the comparison table (key days, precipitation, rain, humidity, pressure, wind, gust, radiation); the outdoor temperature and additional sensors are always shown, and the tiles at the top do not change. The period of a column is in the tooltip of its heading ("ⓘ"), not on a line of its own. For max and min, the day appears as a small line under the value in the month, previous month and year columns; the difference to the previous year can be switched on and off in the "Previous year" menu with "Show difference" (remembered by the browser).
 
@@ -866,7 +866,7 @@ highlighting** tints columns of the “Periods compared” table: **Off**,
 **Alternating pairs** (default), **Main columns** or **Custom selection**. With
 the custom selection, you mark the periods with a star in the **Columns**
 menu; the selection is remembered by the browser. The energy dashboard has the
-same setting, on its Long-term tab.
+same setting, on its [Long-term tab](#long-term-tab).
 
 ### Sun, light and weather summary
 
@@ -932,7 +932,7 @@ as "November so far mean 3.6 °C, 1.2 K colder than the mean of 2023–2025 (1�
 3 years)": the running month up to yesterday against the same stretch of previous
 years. It appears from two previous years with enough values.
 
-### Long-term tab
+### Long-term tab (weather)
 
 **Characteristic days per year** counts by the fixed thresholds of the German
 Weather Service: frost day (minimum below 0 °C), ice day (maximum below 0 °C),
@@ -1001,9 +1001,11 @@ Heating energy** (heat pump, heating element, convectors, electric underfloor he
 converted to kWh.
 
 The **scatter chart** shows every heating day as a point: daily mean outdoor temperature
-against kWh, one colour per heating season. The regression line runs only over the days below
-the **heating limit** (default 15 °C, shown as a vertical line); its slope is listed as "kWh
-per kelvin" below. Room temperature (default 20 °C) and heating limit can be changed at the
+against kWh, one colour per heating season. Each season gets a smoothed line that follows the
+points, including the bend where consumption flattens out in frost; it covers only the days
+below the **heating limit** (default 15 °C, shown as a vertical line). With too few days (for
+example in early autumn) a straight line is drawn instead. Below the chart, a linear fit gives
+the slope as "kWh per kelvin" per season; it applies from 0 °C to the heating limit. Room temperature (default 20 °C) and heating limit can be changed at the
 top, as can the selection of counters, without reloading; the browser remembers the values.
 
 **Heating curve.** With the optional role **Flow temperature** (the flow
@@ -1423,10 +1425,11 @@ Own editor, reachable via **Charts** → new chart or editing an existing one
 - Overlay any number of entities; different units automatically get separate Y
   axes so that, e.g., temperature and humidity remain sensibly readable in one
   chart.
-- Whether an entity is drawn as a line or as a bar cannot be chosen manually —
-  the app decides automatically by entity type (counters and switches as bars,
-  everything else as a line). Only the **timeline** (see below) is a deliberate
-  choice.
+- Under **Selected**, the **Display** list per series chooses how an entity is
+  drawn: **Auto** (the app decides by entity type — counters and switches as
+  bars, everything else as a line; the current result is shown in brackets),
+  **Bar** or **Line**. The choice exists for counters and measured values;
+  switches stay bars (or the timeline, see below).
 - Points on/off, raw values, dynamic Y axis, show values, average line,
   decimal places, legend statistics — the same options as in the history view
   of a single entity, but here configured per chart instead of per entity;

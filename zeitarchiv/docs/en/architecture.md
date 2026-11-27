@@ -243,21 +243,24 @@ the sixth time:
   never raises: the context processor calls it on every response, a broken
   source must not drag down every page.
 
-All thirteen long actions are registered:
+All seventeen long actions are registered:
 
 | Job | Runs | Triggered by |
 | --- | --- | --- |
 | Symcon preview, Symcon import | Background thread | Click |
 | CSV import, Home Assistant import | Background thread | Click |
+| VictoriaMetrics import, InfluxDB import | Background thread | Click |
 | Cleanup | Background thread | Click |
+| Reset | Background thread | Click |
 | Backup, retention | Background thread | Click or schedule |
 | Rotation, index optimization | Request thread (`track()`) | Click |
 | Storage reconciliation | Daemon thread at startup | Nothing |
 | Hourly rollup backfill | Maintenance scheduler | Configuration change, minutes before |
+| Recalculating switch-ons | Maintenance scheduler (one entity per cycle) or request thread | By itself after the update, or click "Recalculate from the archive" |
 | Rollup rebuild | Write path (`/api/write`) | Home Assistant |
 | Demo data generation | Background thread (`demo_mode.demo_progress`, see above) | Click, schedule or first start in demo mode |
 
-The bottom three rows are the actual reason for the registry: anyone who
+The jobs that can start without a click (storage reconciliation, hourly rollup backfill, switch-on recalculation, rollup rebuild) are the actual reason for the registry: anyone who
 pressed nothing does not look for an explanation for a sluggish server either.
 Several of the jobs — cleanup, backup, retention, rotation, index optimization
 and parts of the imports — hold `StorageCoordinator.exclusive()` in the process

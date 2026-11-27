@@ -31,10 +31,11 @@ also genau die Dateien, die auch eine echte Instanz anlegen würde.
 
 Die Tabellen unten nennen die deutschen `entity_id`s; mit `--language en` heißen sie wie der englische Name (`sensor.demo_gesamtwirkleistung` → `sensor.demo_total_active_power`).
 
-97 Entitäten, thematisch ein einzelner Haushalt mit Dach-PV-Anlage
+99 Entitäten, thematisch ein einzelner Haushalt mit Dach-PV-Anlage
 (inkl. Ertrags-Prognose), Wallbox, einem zusätzlichen Balkonkraftwerk mit
-eigenem Speicher, einem größeren Heimspeicher an der Dachanlage und der
-Netz-CO2-Intensität, alle mit dem Präfix `demo_` in der Entity-ID (leicht
+eigenem Speicher, einem größeren Heimspeicher an der Dachanlage, einer
+Werkstatt mit Zwischenzähler, drei Zustands-Entitäten, zwei
+Migrationstest-Paaren und der Netz-CO2-Intensität, alle mit dem Präfix `demo_` in der Entity-ID (leicht
 wiederzuerkennen und gezielt löschbar):
 
 | Entität | Typ | Einheit | Muster |
@@ -70,6 +71,10 @@ wiederzuerkennen und gezielt löschbar):
 | `sensor.demo_boiler_energie` | Zähler (`total_increasing`) | kWh | Monoton steigend, exakte Integration von `demo_boiler` |
 | `sensor.demo_wallbox2_leistung` | Standard | W | Zweite, kleinere Ladeeinheit (E-Bike/Zweitwagen), seltener als `demo_wallbox_leistung` (~18 % Tageschance) |
 | `sensor.demo_wallbox2_energie` | Zähler (`total_increasing`) | kWh | Monoton steigend, exakte Integration von `demo_wallbox2_leistung` |
+| `sensor.demo_werkstatt_energie` | Zähler (`total_increasing`) | kWh | Zwischenzähler der Werkstatt: misst die drei Geräte dahinter plus einen kleinen eigenen Rest (Standby und Steckdosen rund 12 W, am Wochenende gelegentlich Werkbank), sodass das Energiedashboard auch „übrige Verbraucher“ zeigt; fließt in die Gesamtwirkleistung ein |
+| `sensor.demo_werkstatt_kompressor_energie` | Zähler (`total_increasing`) | kWh | Druckluftkompressor hinter dem Zwischenzähler: werktags nachmittags, am Wochenende vormittags, im Takt (8 von 20 Minuten Lauf, rund 1,1 kW) |
+| `sensor.demo_werkstatt_licht_energie` | Zähler (`total_increasing`) | kWh | Werkstattbeleuchtung hinter dem Zwischenzähler: abends, am Wochenende zusätzlich vormittags (rund 58 W) |
+| `sensor.demo_werkstatt_ladestation_energie` | Zähler (`total_increasing`) | kWh | Akku-Ladestation für Werkzeug hinter dem Zwischenzähler: nachts bis 5 Uhr (rund 85 W) |
 | `sensor.demo_pv_leistung` | Standard | W | Glockenkurve tagsüber, 0 nachts; Tageslichtlänge nach Jahreszeit, gedämpft durch dieselbe Bewölkung wie Außentemperatur/Luftfeuchte |
 | `sensor.demo_pv_ertrag` | Zähler (`total_increasing`) | kWh | Monoton steigend, exakte Integration der PV-Leistung über die Zeit |
 | `sensor.demo_pv_prognose_rest_heute` | Standard | kWh | Wie ein Forecast.Solar-Sensor: geschätzter Rest-Ertrag der Dachanlage bis Sonnenuntergang, einmal morgens grob geschätzt (mit Schätzfehler, nicht exaktem Vorauswissen) und sinkt über den Tag mit dem tatsächlich eingefahrenen Ertrag Richtung 0 |
@@ -105,6 +110,13 @@ wiederzuerkennen und gezielt löschbar):
 | `binary_sensor.demo_praesenz_wohnzimmer` | Schalter | — | Heim/Weg mit tageszeitabhängiger Wahrscheinlichkeit und Trägheit (kein Umschalten alle paar Minuten) |
 | `device_tracker.demo_smartphone` | Schalter | — | Eigene, unabhängige Heim/Weg-Simulation (`gen_presence()`) — Beispiel für die Anwesenheits-Domains `device_tracker`/`person`, die wie Schalter archiviert werden (`home` → an, alles andere → aus) |
 | `binary_sensor.demo_regensensor` | Schalter | — | Ein-/mehrmalige Regenfenster an manchen Tagen, Wahrscheinlichkeit steigt mit der Bewölkung dieses Tages |
+| `sensor.demo_saugroboter_status` | Zustand | — | Zustands-Entität (Text statt Zahl): Saugroboter mit Angedockt, Saugen, Wischen, Rückkehr zur Station, Pausiert und Fehler. An Werktagen ein Lauf am Vormittag, samstags manchmal, gelegentlich ein Fehler mit Pause; selten nachts kurz nicht verfügbar. Geschrieben nur bei einem Wechsel |
+| `sensor.demo_waschmaschine_programm` | Zustand | — | Zustands-Entität: Programm der Waschmaschine (Baumwolle 60, Eco 40-60, Pflegeleicht, Kurz 30), beim Zyklusende „Fertig“, nach 20 bis 120 Minuten „Aus“. Aus den Zyklen von `demo_waschmaschine_an` abgeleitet |
+| `sensor.demo_heizung_betrieb` | Zustand | — | Zustands-Entität: Aus, Leerlauf oder Heizen. Von Mai bis September „Aus“, sonst „Heizen“ bei Leistung von `demo_heizung` über 50 W, sonst „Leerlauf“ |
+| `sensor.demo_migration_alt_stromverbrauch` | Zähler (`total_increasing`) | kWh | Migrationstest, „alte“ Entität: hört 45 Tage vor „jetzt“ auf zu senden, wie ein ersetztes Gerät; nicht Teil der Haushaltssimulation |
+| `sensor.demo_migration_stromverbrauch` | Zähler (`total_increasing`) | kWh | Migrationstest, „neue“ Entität: beginnt 60 Tage vor „jetzt“ und überlappt die alte damit um 15 Tage, sodass die Vorschau „bereits im Ziel vorhanden“ etwas zeigt. Beide Paare werden bei jedem `--append`-Lauf komplett neu aufgebaut |
+| `sensor.demo_migration2_alt_stromverbrauch` | Zähler (`total_increasing`) | kWh | Zweites Migrationstest-Paar, „alte“ Entität, gleiche Zeitlogik wie das erste |
+| `sensor.demo_migration2_stromverbrauch` | Zähler (`total_increasing`) | **Wh** | Zweites Paar, „neue“ Entität, bewusst in Wh statt kWh (entsprechend größere Werte): macht den Umrechnungsfaktor (1000) im Migrations-Assistenten testbar |
 | `sensor.demo_luftdruck` | Standard | hPa | Wetterdashboard: Hochdruck bei klarem Wetter, dazu eine langsame Welle (durchziehende Tiefs), stetig auch um Mitternacht |
 | `sensor.demo_boe` | Standard | km/h | Wetterdashboard: Böe zum Wind, immer darüber (im Schnitt rund ein Drittel) |
 | `sensor.demo_strahlung` | Standard | W/m² | Wetterdashboard: Globalstrahlung, dieselbe Glockenkurve und Bewölkung wie `demo_pv_leistung` (Peak rund 1000) |
@@ -240,7 +252,7 @@ cd addon
 .venv/bin/python3 scripts/generate_demo_data.py --data-dir /pfad/zum/datenverzeichnis
 ```
 
-Erzeugt mit den Standardwerten 6 Monate Historie für alle 97 Demo-
+Erzeugt mit den Standardwerten 6 Monate Historie für alle 99 Demo-
 Entitäten in einem frischen (oder leeren) Zielverzeichnis.
 
 Weitere Beispiele:
@@ -314,7 +326,7 @@ Fall dringend empfohlen.
 
 ## Demo-Daten neu erzeugen (`--clean`)
 
-`--clean` bereinigt vor dem Neuschreiben die Werte aller 97 `demo_*`-
+`--clean` bereinigt vor dem Neuschreiben die Werte aller 99 `demo_*`-
 Entitäten — wie **Housekeeping → Speicherplatz** in der App, nur für alle
 Demo-Entitäten auf einmal, ohne die App zu öffnen. Bewusst
 `delete_all_values()` statt `delete_entity()`: die Entitäten selbst bleiben
