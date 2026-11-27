@@ -591,7 +591,7 @@
                      "Fläche" oben). Bei gemischten Linien-/Balken-Charts
                      bleibt die Zeile sichtbar und wirkt weiterhin nur auf die
                      Linien-Serien. -->
-                <div class="menu-row menu-row-stack" x-show="averageLine && !stackActive && hasLineSeries && !donut">
+                <div class="menu-row menu-row-stack" x-show="averageLine && !stackActive && hasLineSeries && !donut && !timeline">
                   <span class="menu-row-label">{{ _("Linienstil") }}</span>
                   <div class="seg">
                     <button :class="{active: averageStyle === 'flat'}" @click="averageStyle = 'flat'; render()">{{ _("Flach") }}</button>
