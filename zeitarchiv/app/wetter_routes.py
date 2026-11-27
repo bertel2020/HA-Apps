@@ -1578,13 +1578,46 @@ class WetterService:
                         # Die Tage reichen bis gestern: endet die Folge dort, läuft sie noch.
                         entry["ongoing"] = key.endswith("_streak") and entry.get("end") == (today - timedelta(days=1)).isoformat()
                         entries.append(entry)
+        snow = self._snow_longterm(config, now_local, in_range)
+        entries += snow.pop("entries")
         return {
             "kenntage": analysis.kenntage(points, self.deps.tz, today, temperature_unit),
             "sun_kenntage": sun_kenntage,
+            **snow,
             "records": entries, "records_since": found["since"] if found else None,
             "records_days": found["days"] if found else 0,
             "unit": entity["unit"] or "°C", "tz": str(self.deps.tz), "today": today.isoformat(),
             "current_year": today.year,
+        }
+
+    def _snow_longterm(self, config: dict, now_local: datetime, in_range: Callable[[date], bool]) -> dict:
+        """Schneefalltage, Saisons und Rekordzeilen der Langzeit-Seite (ROADMAP 1.75); ``entries`` sind die Rekordzeilen.
+
+        Ohne Rolle „Wetterzustand“ oder ohne Entität ist ``snow_enabled`` falsch und der Rest leer. Mit Rolle, aber ohne
+        abgeschlossenen Tag steht nur ``snow_since`` (Archivbeginn des Zustands) fest, damit die Seite „seit …“ sagen kann.
+        Kenntage und Saisons zeigen alle Jahre, die Rekorde nur die gewählten (wie die übrigen Rekorde)."""
+        entity_id = config.get("weather_state")
+        entity = self.deps.index.get_entity(entity_id) if entity_id else None
+        empty = {"snow_enabled": False, "snow_since": None, "snow_kenntage": None, "snow_seasons": [], "entries": []}
+        if entity is None or entity["aggregation_type"] != "state":
+            return empty
+        since = datetime.fromtimestamp(entity["first_ts"], self.deps.tz).date().isoformat() if entity["first_ts"] else None
+        days = self.snow_history(config, now_local)
+        if not days:
+            return {**empty, "snow_enabled": True, "snow_since": since}
+        min_s = float(config["rain_day_minutes"]) * 60.0
+        today = now_local.date()
+        entries = []
+        found = analysis.snow_records([day for day in days if in_range(day["date"])], min_s, today)
+        for key in ("longest_snow_streak", "earliest_first_snow", "latest_last_snow"):
+            if found and key in found:
+                entry = {"key": key, "entity_id": entity_id, "unit": "", **found[key]}
+                entry["offset_days"] = (date.fromisoformat(entry["date"]) - today).days
+                entries.append(entry)
+        return {
+            "snow_enabled": True, "snow_since": since, "snow_min_minutes": config["rain_day_minutes"],
+            "snow_kenntage": analysis.snow_kenntage(days, min_s),
+            "snow_seasons": analysis.snow_seasons(days, min_s, today), "entries": entries,
         }
 
     # -- Kacheln -----------------------------------------------------------------------

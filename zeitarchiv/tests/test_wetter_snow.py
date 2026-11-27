@@ -242,8 +242,8 @@ def test_records_pick_the_earliest_first_and_the_latest_last_snow_of_finished_se
 
     records = analysis.snow_records(days, MIN_S, date(2026, 11, 27))
 
-    assert records["earliest_first_snow"] == {"value": "2026/27", "date": "2026-10-20"}
-    assert records["latest_last_snow"] == {"value": "2024/25", "date": "2025-04-09"}
+    assert records["earliest_first_snow"] == {"season": "2026/27", "date": "2026-10-20"}
+    assert records["latest_last_snow"] == {"season": "2024/25", "date": "2025-04-09"}
     assert records["longest_snow_streak"]["value"] == 3
     assert records["longest_snow_streak"]["ongoing"] is False
 
@@ -255,3 +255,72 @@ def test_the_running_season_gives_no_latest_last_snow_and_a_streak_to_yesterday_
 
     assert "latest_last_snow" not in records
     assert records["longest_snow_streak"] == {"value": 2, "date": "2026-11-25", "end": "2026-11-26", "ongoing": True}
+
+
+# -- Route (Schritt 3) -----------------------------------------------------------------------
+
+def _with_temperature(ingest: IngestionService, index: Index, *days: datetime) -> None:
+    for day in days:
+        ingest.ingest(IngestEvent(
+            event_id=uuid.uuid4().hex, entity_id="sensor.t", domain="sensor", ts=day.timestamp(), value=1.0,
+            unit="°C", state_class="measurement",
+        ))
+
+
+def _longterm(setup, changes, now=datetime(2026, 12, 15, 12, tzinfo=TZ), **roles) -> dict:
+    service, ingest, index = setup
+    _with_temperature(ingest, index, datetime(2026, 11, 10, 12, tzinfo=TZ), datetime(2026, 12, 14, 12, tzinfo=TZ))
+    for text, ts in changes:
+        ingest.ingest(_state(text, ts))
+    _configure(index, temperature="sensor.t", **roles)
+    return service.compute_longterm(now)
+
+
+WINTER = (
+    ("cloudy", _ts(2026, 11, 10, 6)),
+    ("snowy", _ts(2026, 11, 10, 20)),
+    ("cloudy", _ts(2026, 11, 11, 2)),
+    ("snowy-rainy", _ts(2026, 11, 20, 8)),
+    ("cloudy", _ts(2026, 11, 20, 9)),
+    ("cloudy", _ts(2026, 12, 1, 8)),
+)
+
+
+def test_longterm_carries_snow_days_seasons_and_records(setup) -> None:
+    result = _longterm(setup, WINTER, weather_state=ENTITY)
+
+    assert result["snow_enabled"] is True
+    assert result["snow_since"] == "2026-11-10"
+    assert result["snow_kenntage"]["2026"]["snow"][10] == 3  # 10., 11. und 20.11.
+    season = result["snow_seasons"][0]
+    assert (season["season"], season["first"], season["last"], season["snow_days"]) == (
+        "2026/27", "2026-11-10", "2026-11-20", 3)
+    records = {entry["key"]: entry for entry in result["records"]}
+    assert records["longest_snow_streak"]["value"] == 2 and records["longest_snow_streak"]["ongoing"] is False
+    assert records["earliest_first_snow"]["season"] == "2026/27"
+    assert "latest_last_snow" not in records  # die einzige Saison läuft noch
+    assert records["longest_snow_streak"]["entity_id"] == ENTITY
+
+
+def test_longterm_uses_the_rain_day_minutes_as_the_minimum_duration(setup) -> None:
+    changes = (*WINTER[:3], ("snowy", _ts(2026, 11, 20, 8)), ("cloudy", _ts(2026, 11, 20, 8, 5)), WINTER[-1])
+
+    short = _longterm(setup, changes, weather_state=ENTITY, rain_day_minutes=10)
+
+    assert short["snow_kenntage"]["2026"]["snow"][10] == 2  # fünf Minuten am 20.11. reichen nicht
+    assert short["snow_min_minutes"] == 10
+
+
+def test_longterm_without_the_role_has_no_snow(setup) -> None:
+    result = _longterm(setup, WINTER)
+
+    assert result["snow_enabled"] is False
+    assert result["snow_kenntage"] is None and result["snow_seasons"] == []
+    assert not [entry for entry in result["records"] if "snow" in entry["key"]]
+
+
+def test_longterm_with_a_fresh_entity_only_says_since_when(setup) -> None:
+    result = _longterm(setup, [("snowy", _ts(2026, 12, 15, 6))], weather_state=ENTITY)
+
+    assert result["snow_enabled"] is True and result["snow_since"] == "2026-12-15"
+    assert result["snow_kenntage"] is None and result["snow_seasons"] == []

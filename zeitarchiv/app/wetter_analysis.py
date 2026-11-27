@@ -555,7 +555,7 @@ def snow_records(days: list[dict], min_snow_s: float, today: date) -> dict | Non
         return (date.fromisoformat(season[key]) - date(season["start_year"], 7, 1)).days
 
     def pick(season: dict, key: str) -> dict:
-        return {"value": season["season"], "date": season[key]}
+        return {"season": season["season"], "date": season[key]}
 
     out: dict = {}
     streaks = [season["longest"] for season in seasons if season["longest"]]
