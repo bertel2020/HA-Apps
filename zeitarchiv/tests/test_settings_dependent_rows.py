@@ -4,7 +4,7 @@
   /backup/schedule die Uhrzeit bei jedem Speichern schreibt und sonst den Vorgabewert eintrüge.
 * Archivierung: Das Standard-Lebenszeichen gehört zum Wertänderungsfilter und steht nur bei aktivem Filter (wie im Formular einer
   Entität).
-* Automatische Bereinigung: Das Mindestalter der Markierung liest nur der tägliche Lauf, und der nur bei eingeschalteter Automatik."""
+* Automatische Bereinigung und Verdichtung: Das Mindestalter liest nur der tägliche Lauf, und der nur bei eingeschalteter Automatik."""
 
 from __future__ import annotations
 
@@ -23,12 +23,18 @@ def restore_settings():
     from app.main import BACKUP_DEFAULT_TIME, BACKUP_DEFAULT_WEEKDAY  # noqa: PLC0415
     from app.storage.index import DEFAULT_VALUE_FILTER, DEFAULT_VALUE_FILTER_HEARTBEAT  # noqa: PLC0415
 
-    from app.formatting import DEFAULT_PURGE_AUTO_ENABLED, DEFAULT_PURGE_MIN_AGE_DAYS  # noqa: PLC0415
+    from app.formatting import (  # noqa: PLC0415
+        DEFAULT_COMPACT_AUTO_ENABLED,
+        DEFAULT_COMPACT_MIN_AGE_MONTHS,
+        DEFAULT_PURGE_AUTO_ENABLED,
+        DEFAULT_PURGE_MIN_AGE_DAYS,
+    )
 
     fallback = {
         "backup_schedule": "off", "backup_schedule_time": BACKUP_DEFAULT_TIME, "backup_schedule_weekday": str(BACKUP_DEFAULT_WEEKDAY),
         "default_value_filter": DEFAULT_VALUE_FILTER, "default_value_filter_heartbeat": DEFAULT_VALUE_FILTER_HEARTBEAT,
         "purge_auto_enabled": DEFAULT_PURGE_AUTO_ENABLED, "purge_min_age_days": DEFAULT_PURGE_MIN_AGE_DAYS,
+        "compact_auto_enabled": DEFAULT_COMPACT_AUTO_ENABLED, "compact_min_age_months": DEFAULT_COMPACT_MIN_AGE_MONTHS,
     }
     before = {key: index.get_setting(key, None) for key in fallback}
     yield
@@ -94,3 +100,20 @@ def test_the_stored_minimum_age_survives_a_hidden_row(client, restore_settings) 
     # Wieder eingeschaltet, steht der gespeicherte Wert in der Zeile.
     html = client.post("/settings/purge-auto", data={"purge_auto_enabled": "on"}).text
     assert f'name="purge_min_age_days" id="purge-min-age-days-input" value="{kept}"' in html
+
+
+@pytest.mark.parametrize(("enabled", "shown"), [("off", False), ("on", True)])
+def test_the_compaction_minimum_age_follows_the_automatic_compaction(client, restore_settings, enabled: str, shown: bool) -> None:
+    html = client.post("/settings/compact", data={"compact_auto_enabled": enabled}).text
+    assert ('id="compact-min-age-months-btn"' in html) is shown
+    assert 'id="compact-auto-enabled-btn"' in html
+
+
+def test_the_stored_compaction_age_survives_a_hidden_row(client, restore_settings) -> None:
+    client.post("/settings/compact", data={"compact_auto_enabled": "on"})
+    client.post("/settings/compact", data={"compact_min_age_months": "12"})
+    kept = index.get_setting("compact_min_age_months", "")
+    client.post("/settings/compact", data={"compact_auto_enabled": "off"})
+    assert index.get_setting("compact_min_age_months", "") == kept
+    html = client.post("/settings/compact", data={"compact_auto_enabled": "on"}).text
+    assert f'name="compact_min_age_months" id="compact-min-age-months-input" value="{kept}"' in html

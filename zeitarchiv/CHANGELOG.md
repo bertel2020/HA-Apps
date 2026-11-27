@@ -75,6 +75,7 @@
   - Backup: the time of day is hidden while “Create automatically” is off
   - Archiving: “Default sign of life” is hidden while the default value change filter is off
   - Cleanup: “Minimum age of the mark” is hidden while “Automatic cleanup” is off
+  - Compaction: “Minimum age” is hidden while “Automatic compaction” is off
 
 ## 1.57.0 - 2026-11-24
 
