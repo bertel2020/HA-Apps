@@ -522,24 +522,35 @@ def snow_kenntage(days: list[dict], min_snow_s: float) -> dict:
     return {str(year): counts for year, counts in sorted(result.items())}
 
 
-def snow_seasons(days: list[dict], min_snow_s: float, today: date) -> list[dict]:
+def snow_seasons(
+    days: list[dict], min_snow_s: float, today: date, precip: dict[date, float] | None = None,
+) -> list[dict]:
     """Je Saison (1. Juli bis 30. Juni), neueste zuerst: erster und letzter Schneefalltag, Zahl der Schneefalltage und
     der Tage mit Daten, längste Folge. ``running`` ist die Saison, in der ``today`` liegt; ohne Schnee sind ``first``
-    und ``last`` None."""
+    und ``last`` None.
+
+    Mit ``precip`` (Niederschlag je Tag) kommen ``precip`` (Summe an den Schneefalltagen, ganze Tage, also mit Regen vom
+    selben Tag) und ``precip_days`` (Schneefalltage mit Wert) hinzu; fehlt der Wert an einem Schneefalltag, ist die
+    Summe nur ein Mindestwert."""
     by_season: dict[int, list[dict]] = {}
     for entry in _snow_seasoned(days, min_snow_s):
         by_season.setdefault(snow_season(entry["date"]), []).append(entry)
     out = []
     for start_year, entries in sorted(by_season.items(), reverse=True):
         snowy = [entry for entry in entries if entry["snow"]]
-        out.append({
+        season = {
             "season": f"{start_year}/{(start_year + 1) % 100:02d}", "start_year": start_year,
             "first": snowy[0]["date"].isoformat() if snowy else None,
             "last": snowy[-1]["date"].isoformat() if snowy else None,
             "snow_days": len(snowy), "days": len(entries),
             "longest": _longest_run(entries, lambda entry: entry["snow"]),
             "running": snow_season(today) == start_year,
-        })
+        }
+        if precip is not None:
+            with_value = [entry["date"] for entry in snowy if entry["date"] in precip]
+            season["precip"] = round(sum(precip[day] for day in with_value), 2) if with_value else None
+            season["precip_days"] = len(with_value)
+        out.append(season)
     return out
 
 

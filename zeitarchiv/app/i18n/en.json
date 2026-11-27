@@ -5029,6 +5029,7 @@
     "Spätester letzter Schnee": "Latest last snow",
     "Saison {season}": "Season {season}",
     "von {days}": "of {days}",
+    "Niederschlag: Wasseräquivalent der ganzen Tage, keine Schneehöhe; Regen am selben Tag zählt mit.": "Precipitation: water equivalent of the whole days, not snow depth; rain on the same day is included.",
     "Es fällt Schneeregen seit {since}.": "Sleet has been falling for {since}.",
     "Es hagelt seit {since}.": "It has been hailing for {since}.",
     "Es fällt Niederschlag seit {since}.": "Precipitation has been falling for {since}.",

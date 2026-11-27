@@ -2952,13 +2952,22 @@
         return season.longest ? t('{n} Tage', {n: season.longest.value}) : '–';
       },
 
+      // Niederschlag an den Schneefalltagen einer Saison (mm oder Regenstunden); „≥“, wenn an einem Schneefalltag der Wert fehlt.
+      snowPrecip(season) {
+        const info = this.longterm && this.longterm.snow_precip;
+        if (!info || season.precip == null) return '–';
+        const value = `${num(season.precip, 1)} ${info.unit}`;
+        return season.precip_days < season.snow_days ? `≥ ${value}` : value;
+      },
+
       // Satz unter der Saisontabelle: seit wann der Wetterzustand archiviert wird (frühere Winter fehlen) und woher er stammt.
       snowFoot() {
         const l = this.longterm;
         if (!l || !l.snow_since) return '';
         const since = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'})
           .format(new Date(l.snow_since + 'T12:00:00Z'));
-        return t('Archiviert seit {date}, frühere Winter fehlen. Angaben deiner Wetterquelle.', {date: since});
+        const base = t('Archiviert seit {date}, frühere Winter fehlen. Angaben deiner Wetterquelle.', {date: since});
+        return l.snow_precip ? base + ' ' + t('Niederschlag: Wasseräquivalent der ganzen Tage, keine Schneehöhe; Regen am selben Tag zählt mit.') : base;
       },
 
       // Solange noch kein Tag abgeschlossen ist, gibt es keine Saison; der Satz sagt, wann es losgeht.

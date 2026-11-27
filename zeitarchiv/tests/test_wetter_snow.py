@@ -324,3 +324,48 @@ def test_longterm_with_a_fresh_entity_only_says_since_when(setup) -> None:
 
     assert result["snow_enabled"] is True and result["snow_since"] == "2026-12-15"
     assert result["snow_kenntage"] is None and result["snow_seasons"] == []
+
+
+# -- Niederschlag an Schneefalltagen (Schritt 6) ---------------------------------------------
+
+def test_seasons_sum_the_precipitation_of_the_snowfall_days_and_say_when_a_day_is_missing() -> None:
+    days = _run(date(2025, 12, 1), [True, False, True, True])  # Schneefalltage am 1., 3. und 4.12.
+    precip = {date(2025, 12, 1): 2.5, date(2025, 12, 2): 9.0, date(2025, 12, 3): 1.0}  # der 4.12. fehlt
+
+    season = analysis.snow_seasons(days, MIN_S, date(2026, 1, 15), precip)[0]
+
+    assert season["precip"] == 3.5  # der trockene 2.12. zählt nicht
+    assert (season["precip_days"], season["snow_days"]) == (2, 3)
+
+
+def test_seasons_have_no_precipitation_without_the_data_and_none_without_a_value() -> None:
+    days = _run(date(2025, 12, 1), [True])
+
+    assert "precip" not in analysis.snow_seasons(days, MIN_S, date(2026, 1, 15))[0]
+    assert analysis.snow_seasons(days, MIN_S, date(2026, 1, 15), {})[0]["precip"] is None
+
+
+def test_longterm_adds_the_rain_hours_of_the_snowfall_days_in_hours(setup) -> None:
+    service, ingest, index = setup
+    for text, ts in WINTER:
+        ingest.ingest(_state(text, ts))
+    _with_temperature(ingest, index, datetime(2026, 11, 10, 12, tzinfo=TZ), datetime(2026, 12, 14, 12, tzinfo=TZ))
+    for value, ts in ((1, _ts(2026, 11, 10, 21)), (0, _ts(2026, 11, 10, 22, 30)), (1, _ts(2026, 11, 25, 8)), (0, _ts(2026, 11, 25, 9)), (0, _ts(2026, 12, 1, 8))):  # der letzte rotiert den November ins Archiv
+        ingest.ingest(IngestEvent(
+            event_id=uuid.uuid4().hex, entity_id="binary_sensor.regen", domain="binary_sensor", ts=ts, value=float(value),
+        ))
+    _configure(index, temperature="sensor.t", weather_state=ENTITY, precip_dur="binary_sensor.regen")
+
+    result = service.compute_longterm(datetime(2026, 12, 15, 12, tzinfo=TZ))
+
+    assert result["snow_precip"] == {"unit": "h", "mode": "dur"}
+    season = result["snow_seasons"][0]
+    assert season["precip"] == pytest.approx(1.5)  # nur der 10.11. war ein Schneefalltag, der 25.11. nicht
+    assert season["precip_days"] == 1
+
+
+def test_longterm_without_a_precipitation_role_has_no_precipitation_column(setup) -> None:
+    result = _longterm(setup, WINTER, weather_state=ENTITY)
+
+    assert result["snow_precip"] is None
+    assert "precip" not in result["snow_seasons"][0]

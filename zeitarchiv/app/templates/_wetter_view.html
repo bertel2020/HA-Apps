@@ -773,6 +773,7 @@
           <thead><tr>
             <th>{{ _("Saison") }}</th><th>{{ _("Erster Schnee") }}</th><th>{{ _("Letzter Schnee") }}</th>
             <th>{{ _("Tage mit Schnee") }}</th><th class="wt-snow-opt">{{ _("Längste Folge") }}</th>
+            <th class="wt-snow-opt" x-show="longterm && longterm.snow_precip" x-cloak>{{ _("Niederschlag") }}</th>
           </tr></thead>
           <tbody>
             <template x-for="season in ((longterm && longterm.snow_seasons) || [])" :key="season.season">
@@ -783,6 +784,7 @@
                 <td colspan="2" x-show="!season.first" x-cloak>{{ _("noch kein Schnee") }}</td>
                 <td><span x-text="season.snow_days"></span> <small class="wt-snow-opt" x-text="t('von {days}', {days: season.days})"></small></td>
                 <td class="wt-snow-opt" x-text="snowLongest(season)"></td>
+                <td class="wt-snow-opt" x-show="longterm && longterm.snow_precip" x-cloak x-text="snowPrecip(season)"></td>
               </tr>
             </template>
           </tbody>

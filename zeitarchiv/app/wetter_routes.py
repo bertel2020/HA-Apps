@@ -1598,7 +1598,10 @@ class WetterService:
         Kenntage und Saisons zeigen alle Jahre, die Rekorde nur die gewählten (wie die übrigen Rekorde)."""
         entity_id = config.get("weather_state")
         entity = self.deps.index.get_entity(entity_id) if entity_id else None
-        empty = {"snow_enabled": False, "snow_since": None, "snow_kenntage": None, "snow_seasons": [], "entries": []}
+        empty = {
+            "snow_enabled": False, "snow_since": None, "snow_kenntage": None, "snow_seasons": [], "snow_precip": None,
+            "entries": [],
+        }
         if entity is None or entity["aggregation_type"] != "state":
             return empty
         since = datetime.fromtimestamp(entity["first_ts"], self.deps.tz).date().isoformat() if entity["first_ts"] else None
@@ -1614,10 +1617,21 @@ class WetterService:
                 entry = {"key": key, "entity_id": entity_id, "unit": "", **found[key]}
                 entry["offset_days"] = (date.fromisoformat(entry["date"]) - today).days
                 entries.append(entry)
+        precip_role = self._precip_role(config, "mm")
+        precip: dict[date, float] | None = None
+        precip_info = None
+        if precip_role is not None:
+            # Menge in mm, Dauer des Regensensors in Stunden: derselbe Tageswert wie bei den Rekorden, nur in anderer Einheit.
+            factor, unit = (1.0, "mm") if precip_role[1] == "mm" else (1.0 / 3600.0, "h")
+            precip = {
+                analysis.day_of(point, self.deps.tz): (point.value or 0.0) * factor
+                for point in self._daily(precip_role[0], now_local) if analysis.day_of(point, self.deps.tz) < today
+            }
+            precip_info = {"unit": unit, "mode": precip_role[1]}
         return {
             "snow_enabled": True, "snow_since": since, "snow_min_minutes": config["rain_day_minutes"],
-            "snow_kenntage": analysis.snow_kenntage(days, min_s),
-            "snow_seasons": analysis.snow_seasons(days, min_s, today), "entries": entries,
+            "snow_kenntage": analysis.snow_kenntage(days, min_s), "snow_precip": precip_info,
+            "snow_seasons": analysis.snow_seasons(days, min_s, today, precip), "entries": entries,
         }
 
     # -- Kacheln -----------------------------------------------------------------------
