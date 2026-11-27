@@ -140,6 +140,7 @@ def _weather_config(lid, tr) -> dict:
         "wind_direction": lid(_sensor("windrichtung")),
         "sun_elevation": lid(_sensor("sonnenhoehe")),
         "pv_power": lid(_sensor("pv_leistung")),
+        "heating_flow": lid(_sensor("heizung_vorlauftemperatur")),
         "extra_temperatures": [
             {"entity_id": lid(_sensor("aussentemperatur_nord")), "name": tr(N_("Nordseite"))},
             # Räume (ROADMAP 1.51): je Raum Temperatur und Feuchte, in „Zeiträume im Vergleich“ unter dem Raum zusammengefasst.

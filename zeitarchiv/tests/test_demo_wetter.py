@@ -69,8 +69,12 @@ def test_weather_entities_are_registered_with_the_right_type_and_unit() -> None:
     assert demo_category_index("sensor.demo_waermepumpe_energie") == 4
     # Neue Entitäten stehen am Ende, damit die Zufallsfolge der früheren unverändert bleibt.
     rooms = len(ROOM_ENTITY_IDS)
-    assert [e.entity_id for e in DEMO_ENTITIES[-rooms:]] == list(ROOM_ENTITY_IDS)
-    assert [e.entity_id for e in DEMO_ENTITIES[-(len(WETTER_IDS) + rooms):-rooms]] == list(WETTER_IDS) == list(WETTER_ENTITY_IDS)
+    flow = "sensor.demo_heizung_vorlauftemperatur"
+    assert (by_id[flow].state_class, by_id[flow].unit) == ("measurement", "°C") and demo_category_index(flow) == 5
+    assert DEMO_ENTITIES[-1].entity_id == flow
+    assert [e.entity_id for e in DEMO_ENTITIES[-1 - rooms:-1]] == list(ROOM_ENTITY_IDS)
+    assert [e.entity_id for e in DEMO_ENTITIES[-(len(WETTER_IDS) + rooms + 1):-(rooms + 1)]] == list(WETTER_IDS)
+    assert list(WETTER_ENTITY_IDS) == [*WETTER_IDS, flow]
 
 
 def test_english_ids_are_unique_and_translated() -> None:
@@ -86,7 +90,7 @@ def test_same_seed_gives_the_same_weather(winter) -> None:
     again = _simulate(5, datetime(2024, 1, 1, tzinfo=TZ), 30)
     for key in (
         "luftdruck", "boe", "strahlung", "niederschlag", "outdoor_temp_nord", "waermepumpe_energie",
-        "helligkeit_sued", "helligkeit_daemmerung", "windrichtung", "sonnenhoehe",
+        "helligkeit_sued", "helligkeit_daemmerung", "windrichtung", "sonnenhoehe", "heizung_vorlauf",
     ):
         assert again[key] == winter[key], key
 
@@ -200,3 +204,22 @@ def test_south_illuminance_has_all_sky_classes_over_a_summer_month(summer) -> No
         peaks[day] = max(peaks.get(day, 0.0), lux)
     classes = {"trueb" if p < 15000 else "bewoelkt" if p < 25000 else "heiter" if p < 70000 else "sonnig" for p in peaks.values()}
     assert len(classes) >= 3, classes  # nicht fast nur sonnige Tage, damit Tagesbild und Heizen+Sonne etwas zeigen
+
+
+def test_flow_temperature_follows_the_heating_curve_and_cools_when_idle(winter, summer) -> None:
+    heating = dict(winter["heizung"])
+    running = [value for ts, value in winter["heizung_vorlauf"] if heating[ts] > 0]
+    idle = [value for ts, value in winter["heizung_vorlauf"] if heating[ts] == 0]
+    assert running and idle
+    assert 26.0 <= min(running) and max(running) <= 46.0
+    assert sum(running) / len(running) > sum(idle) / len(idle) + 2.0  # Betrieb über dem Stillstand (kurze Takte kühlen nur teilweise ab)
+    assert 23.0 <= min(idle) and max(idle) <= 46.0
+    assert max(value for _ts, value in summer["heizung_vorlauf"]) < 30.0  # im Sommer läuft die Heizung kaum
+
+
+def test_weather_setup_assigns_the_flow_temperature_role() -> None:
+    from app.demo_seed import _weather_config
+
+    config = _weather_config(lambda entity_id: entity_id, lambda text: text)
+    assert config["heating_flow"] == "sensor.demo_heizung_vorlauftemperatur"
+

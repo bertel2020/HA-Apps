@@ -37,11 +37,12 @@ def _at(rows: list, day: datetime, hour: float) -> float:
     return min(rows, key=lambda row: abs(row[0] - target))[1]
 
 
-def test_four_rooms_with_temperature_and_humidity_come_last() -> None:
+def test_four_rooms_with_temperature_and_humidity_come_last_before_the_flow_temperature() -> None:
     assert list(ROOM_NAMES) == ["schlafzimmer", "kueche", "bad", "keller"]
     assert len(ROOM_ENTITY_IDS) == 8 == len(ROOM_SERIES_KEYS)
-    assert [e.entity_id for e in DEMO_ENTITIES[-8:]] == list(ROOM_ENTITY_IDS)
-    for entity in DEMO_ENTITIES[-8:]:
+    # Danach folgt nur noch die Vorlauftemperatur der Heizung (siehe test_demo_wetter).
+    assert [e.entity_id for e in DEMO_ENTITIES[-9:-1]] == list(ROOM_ENTITY_IDS)
+    for entity in DEMO_ENTITIES[-9:-1]:
         assert entity.domain == "sensor" and entity.state_class == "measurement"
         assert entity.unit == ("°C" if entity.entity_id.endswith("_temperatur") else "%")
         # Übersetzt, sonst entstehen englische Entitäten ohne Namen

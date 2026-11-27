@@ -66,7 +66,7 @@ WETTER_ENTITY_IDS = (
     "sensor.demo_luftdruck", "sensor.demo_boe", "sensor.demo_strahlung", "sensor.demo_niederschlag",
     "sensor.demo_aussentemperatur_nord", "sensor.demo_waermepumpe_energie", "sensor.demo_heizstab_energie",
     "sensor.demo_konvektoren_energie", "sensor.demo_helligkeit_sued", "sensor.demo_helligkeit_daemmerung",
-    "sensor.demo_windrichtung", "sensor.demo_sonnenhoehe",
+    "sensor.demo_windrichtung", "sensor.demo_sonnenhoehe", "sensor.demo_heizung_vorlauftemperatur",
 )
 
 #: Historie der Wetter-Reihen in Monaten (5 Jahre). Die Auswertungen über mehrere Jahre (Monatstabelle, Jahresmatrix,
@@ -83,7 +83,7 @@ WEATHER_HISTORY_KEYS = {
     "sensor.demo_waermepumpe_energie": "waermepumpe_energie", "sensor.demo_heizstab_energie": "heizstab_energie",
     "sensor.demo_konvektoren_energie": "konvektoren_energie", "sensor.demo_helligkeit_sued": "helligkeit_sued",
     "sensor.demo_helligkeit_daemmerung": "helligkeit_daemmerung", "sensor.demo_windrichtung": "windrichtung",
-    "sensor.demo_sonnenhoehe": "sonnenhoehe",
+    "sensor.demo_sonnenhoehe": "sonnenhoehe", "sensor.demo_heizung_vorlauftemperatur": "heizung_vorlauf",
 }
 #: Räume für „Temperatur & Klima“ im Wetterdashboard (ROADMAP 1.51): je Raum ein Temperatur- und ein Feuchtesensor, zusätzlich zum
 #: Wohnzimmer. Schlüssel -> deutsche Raumnamen für die Anzeigenamen. Die Entitäten stehen am Ende von DEMO_ENTITIES.
@@ -327,6 +327,9 @@ DEMO_ENTITIES = [
     DemoEntity("sensor.demo_bad_luftfeuchte", "Demo Bad Luftfeuchte", "sensor", "measurement", "%"),
     DemoEntity("sensor.demo_keller_temperatur", "Demo Keller Temperatur", "sensor", "measurement", "°C"),
     DemoEntity("sensor.demo_keller_luftfeuchte", "Demo Keller Luftfeuchte", "sensor", "measurement", "%"),
+    # Vorlauftemperatur der Heizung (Wetterdashboard, Reiter Heizen: Heizkurve). Am Ende, damit die Zufallsfolge der früheren
+    # Entitäten unverändert bleibt.
+    DemoEntity("sensor.demo_heizung_vorlauftemperatur", "Demo Heizung Vorlauftemperatur", "sensor", "measurement", "°C"),
 ]
 
 
@@ -555,6 +558,16 @@ def _heating_power_at(dt: datetime, weather: WeatherContext, rng: random.Random)
     if step_index < round(duty * window_steps):
         return 1800.0 + rng.uniform(-150, 250)
     return 0.0
+
+
+def _flow_temp_at(previous: float, heating_w: float, outdoor: float, rng: random.Random) -> float:
+    """Vorlauftemperatur einer Wärmepumpe mit Heizkurve: läuft die Heizung, folgt sie der Außentemperatur (etwa 26 °C bei
+    15 °C draußen, 0,7 K mehr je Kelvin kälter, höchstens 45 °C); steht sie, kühlt der Vorlauf auf etwa 24 °C ab. Dadurch
+    ist der Tages-Ø verwässert wie bei einer echten Anlage."""
+    if heating_w > 0:
+        target = min(45.0, 26.0 + 0.7 * max(0.0, 15.0 - outdoor))
+        return target + rng.uniform(-0.8, 0.8)
+    return previous + (24.0 - previous) * 0.25 + rng.uniform(-0.2, 0.2)
 
 
 KUEHLSCHRANK_CYCLE_MINUTES = 35
@@ -958,6 +971,7 @@ def simulate_household(
         "pv_prognose_rest_heute": [], "pv_prognose_morgen": [], "co2_intensitaet": [],
         "luftdruck": [], "boe": [], "strahlung": [], "niederschlag": [], "outdoor_temp_nord": [],
         "helligkeit_sued": [], "helligkeit_daemmerung": [], "windrichtung": [], "sonnenhoehe": [],
+        "heizung_vorlauf": [],
         "waermepumpe_energie": [], "heizstab_energie": [], "konvektoren_energie": [],
         "balkon_pv": [], "balkon_ladeleistung": [], "balkon_entladeleistung": [],
         "balkon_soc_pct": [], "balkon_speicher_stand": [], "balkon_hausabgabe": [],
@@ -1003,6 +1017,8 @@ def simulate_household(
     # Eigener Zufallsstrom für die Helligkeit: die Werte der übrigen Wetterreihen bleiben dadurch unverändert.
     licht_rng = random.Random(int(start.timestamp()) + 1)
     richtung_rng = random.Random(int(start.timestamp()) + 2)
+    vorlauf_rng = random.Random(int(start.timestamp()) + 4)  # +3 gehört den Räumen (backfill_rooms)
+    vorlauf_c = 24.0  # Vorlauf im Stillstand pendelt um diese Temperatur
     niederschlag_total = counter_seed.get("niederschlag", 842.3)
     waermepumpe_total = counter_seed.get("waermepumpe_energie", 1480.0)
     heizstab_total = counter_seed.get("heizstab_energie", 160.0)
@@ -1090,6 +1106,8 @@ def simulate_household(
         series["outdoor_temp_nord"].append((ts, round(outdoor_raw - north_shade + wetter_rng.uniform(-0.3, 0.3), 2)))
 
         heizung_w = _heating_power_at(dt, weather, rng)
+        vorlauf_c = _flow_temp_at(vorlauf_c, heizung_w, outdoor_raw, vorlauf_rng)
+        series["heizung_vorlauf"].append((ts, round(vorlauf_c, 1)))
         waschmaschine_w = _appliance_power_at(schedules["waschmaschine"], WASCHMASCHINE_PROFILE, dt, rng)
         spuelmaschine_w = _appliance_power_at(schedules["spuelmaschine"], SPUELMASCHINE_PROFILE, dt, rng)
         trockner_w = _appliance_power_at(schedules["trockner"], TROCKNER_PROFILE, dt, rng)
@@ -1875,7 +1893,7 @@ _DEMO_CATEGORY_RULES = (
     (4, ("gesamtwirkleistung", "waschmaschine", "spuelmaschine", "trockner", "kuehlschrank", "herd", "homeoffice",
          "entertainment", "boiler", "werkstatt", "waermepumpe", "heizstab", "konvektoren")),
     (5, ("aussentemperatur", "luftfeuchte", "wind", "regensensor", "luftdruck", "boe", "strahlung", "niederschlag",
-         "helligkeit", "sonnenhoehe")),
+         "helligkeit", "sonnenhoehe", "heizung_vorlauf")),
 )
 
 
@@ -2380,6 +2398,7 @@ def run_generation(
         "sensor.demo_waermepumpe_energie": household["waermepumpe_energie"],
         "sensor.demo_heizstab_energie": household["heizstab_energie"],
         "sensor.demo_konvektoren_energie": household["konvektoren_energie"],
+        "sensor.demo_heizung_vorlauftemperatur": household["heizung_vorlauf"],
         "sensor.demo_helligkeit_sued": household["helligkeit_sued"],
         "sensor.demo_helligkeit_daemmerung": household["helligkeit_daemmerung"],
         "sensor.demo_windrichtung": household["windrichtung"],
