@@ -1456,12 +1456,22 @@ class ImportService:
                 "ha_name": row["friendly_name"] or row["entity_id"],
                 "is_custom": bool(row["custom_name"]),
                 "unit": row["unit"] or "",
+                # Für "Werte sind Summen je Zeitraum": die Option gilt nur für Zähler (siehe csv_cumulate_blocked()).
+                "aggregation_type": row["aggregation_type"] or "",
             }
             for row in entity_rows
         ]
+        cumulate_types = {option["entity_id"]: option["aggregation_type"] for option in csv_entity_options}
+        cumulate_blocked = self.csv_cumulate_blocked(
+            [entity_id, *[mapping["entity_id"] for mapping in (extra_mappings or [])]], cumulate_types,
+        )
+        # Ein gesetzter Haken fällt weg, wenn ein Ziel kein Zähler ist: sonst stünde er gesetzt und gesperrt in der Maske.
+        cumulate = cumulate and not cumulate_blocked
         base = {
             "entity_options": entity_options,
             "csv_entity_options": csv_entity_options,
+            "cumulate_types": cumulate_types,
+            "cumulate_blocked": cumulate_blocked,
             "delimiter_options": list(csv_import.DELIMITERS.items()),
             "ts_format_options": list(csv_import.TIMESTAMP_FORMATS.items()),
         }
@@ -1517,6 +1527,22 @@ class ImportService:
     @staticmethod
     def _csv_cumulate(form) -> bool:
         return form.get("cumulate") == "on"
+
+    @staticmethod
+    def csv_cumulate_blocked(entity_ids: list[str], types: dict[str, str]) -> bool:
+        """Ob "Werte sind Summen je Zeitraum" für diese Ziele nicht gilt.
+
+        Die Laufsumme ist für Zähler gedacht (laufende Stände, der Verlauf rechnet die Differenzen). Bei einem Sensor oder
+        Schalter wären die Werte danach aufaddiert und damit falsch, bei einer Zustands-Entität bliebe die Option ohne
+        Wirkung. Gesperrt ist sie, sobald eines der gewählten Ziele kein Zähler ist; ohne gewähltes Ziel nicht."""
+        return any(types.get(entity_id, "counter") != "counter" for entity_id in entity_ids if entity_id)
+
+    def _csv_cumulate_for(self, target: str, cumulate: bool) -> bool:
+        """Die Laufsumme für genau dieses Ziel: nur bei Zählern, was auch ein manipuliertes Formular nicht umgeht."""
+        if not cumulate or self.deps.index is None:
+            return False
+        entity = self.deps.index.get_entity(target)
+        return entity is not None and entity["aggregation_type"] == "counter"
 
     @staticmethod
     def _csv_include_existing(form) -> bool:
@@ -2802,7 +2828,8 @@ class ImportService:
                         dry_mapper = ha_import.dry_state_mapper_for(self.deps.index, target)
                         parsed = self._parse_csv_with_progress(
                             path, delimiter, has_header, ts_col, col, ts_format, custom_pattern,
-                            phase_label=tr("Datei wird gelesen…"), state_mapper=dry_mapper, cumulate=cumulate,
+                            phase_label=tr("Datei wird gelesen…"), state_mapper=dry_mapper,
+                            cumulate=self._csv_cumulate_for(target, cumulate),
                         )
                         self._csv_progress.set_phase(N_("Vorschau wird berechnet…"))
                         with self.deps.coordinator.entity(target):
@@ -2953,7 +2980,7 @@ class ImportService:
                             path, delimiter, has_header, ts_col, col, ts_format, custom_pattern,
                             phase_label=tr("Schritt 1/2 · Datei wird gelesen…"),
                             state_mapper=ha_import.state_mapper_for(self.deps.index, target),
-                            cumulate=cumulate,
+                            cumulate=self._csv_cumulate_for(target, cumulate),
                         )
                         # Zweite Phase ohne Gesamtzahl: Wie viele Monate wirklich
                         # geschrieben werden, entscheidet erst die Klassifizierung

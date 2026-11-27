@@ -166,6 +166,7 @@
     "Als veraltet markieren": "Mark as stale",
     "Veraltet-Schwelle wählen": "Choose stale threshold",
     "Nachkommastellen": "Decimal places",
+    "Nur für Zähler: Das gewählte Ziel ist keiner, die Werte würden sonst aufaddiert.": "Counters only: the chosen target is not one, the values would otherwise be summed up.",
     "Gilt nur mit eingeschaltetem „Nach Sonnenstand“ und der Rolle „Sonnenhöhe“.": "Only applies with “By sun position” switched on and the “Sun elevation” role assigned.",
     "Die Niederschlagsmenge gilt nur mit der Rolle „Niederschlag (Menge)“.": "The precipitation amount only applies with the “Precipitation (amount)” role.",
     "Die Regendauer gilt nur mit der Rolle „Regen (ein/aus)“.": "The rain duration only applies with the “Rain (on/off)” role.",

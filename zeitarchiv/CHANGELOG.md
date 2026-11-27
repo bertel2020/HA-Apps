@@ -43,6 +43,9 @@
 ### Fixed
 
 - **Archive**: an empty (0 byte) archive file no longer blocks the rebuild, the consistency check, or the energy dashboard; it is skipped like a missing file
+- **CSV import**: “Values are totals per period … store them as a running meter reading” only works for counters
+  - With a sensor, switch, or state entity as target the option is greyed out and unticked; before, a sensor would have received summed-up values
+  - The check also applies when the form is submitted by other means, per target column
 - **Charts**: "Raw values" is saved with the chart again; the switch in the editor no longer jumps back after reopening
 - **On/off entities**: bars and lines show durations (e.g. “2h 7m”) instead of bare numbers, whichever display mode is set
   - Applies to the entity page, the chart editor, dashboard tiles, and the Lovelace card

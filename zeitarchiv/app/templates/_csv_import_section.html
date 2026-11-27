@@ -12,7 +12,8 @@
          im Attributwert vorzeitig beendet hätten (derselbe Fix wie beim
          Migrations-Assistenten, siehe entity_field() in
          _energiedashboard_setup.html). #}
-      <span class="dd-picker-wrap csv-entity-picker" x-data='entityPicker({{ options | tojson }}, {{ selected | tojson }})' @click.outside="open = false">
+      {# Die Auswahl meldet sich per Ereignis, damit "Werte sind Summen je Zeitraum" (nur für Zähler) ohne neuen Abruf mitwechselt. #}
+      <span class="dd-picker-wrap csv-entity-picker" x-data='entityPicker({{ options | tojson }}, {{ selected | tojson }}, () => window.dispatchEvent(new CustomEvent("csv-target-changed")))' @click.outside="open = false">
         <button type="button" class="btn" :class="{'dd-picker-btn-clearable': entityId}"
                 @click="toggleOpen($refs.csvEntitySearch)"
                 @mouseenter="hoverSelf($el)" @mouseleave="clearHover()"
@@ -185,11 +186,26 @@
             hx-target="#csv-section" hx-swap="outerHTML">{{ _("+ Weitere Spalte in eine andere Entität importieren") }}</button>
   </p>
 
-  <label class="csv-cumulate" style="display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:calc(13px * var(--font-scale, 1));">
-    <input type="checkbox" name="cumulate"{% if cumulate %} checked{% endif %}
-           hx-post="import/csv/preview" hx-include="#csv-form" hx-target="#csv-section" hx-swap="outerHTML">
-    <span>{{ _("Werte sind Summen je Zeitraum (z. B. Monatserträge) — als laufenden Zählerstand speichern") }}</span>
-  </label>
+  {# Die Laufsumme gilt nur für Zähler (laufende Stände). Ist ein gewähltes Ziel keiner, ist der Haken gesperrt und ungesetzt:
+     bei Sensoren würden die Werte aufaddiert, bei Zuständen bliebe er ohne Wirkung. #}
+  <div style="margin:0 0 12px;"
+       x-data='{
+         types: {{ cumulate_types | tojson }}, blocked: {{ "true" if cumulate_blocked else "false" }},
+         refresh() {
+           const ids = [...document.querySelectorAll("#csv-form [name=entity_id], #csv-form [name=extra_entity]")].map((input) => input.value).filter(Boolean);
+           this.blocked = ids.some((id) => this.types[id] !== undefined && this.types[id] !== "counter");
+           if (this.blocked) this.$refs.box.checked = false;
+         },
+       }'
+       @csv-target-changed.window="$nextTick(() => refresh())">
+    <label class="csv-cumulate" style="display:flex;align-items:center;gap:8px;font-size:calc(13px * var(--font-scale, 1));"
+           :style="blocked ? 'opacity:.45' : ''">
+      <input type="checkbox" name="cumulate" x-ref="box"{% if cumulate %} checked{% endif %} :disabled="blocked"{% if cumulate_blocked %} disabled{% endif %}
+             hx-post="import/csv/preview" hx-include="#csv-form" hx-target="#csv-section" hx-swap="outerHTML">
+      <span>{{ _("Werte sind Summen je Zeitraum (z. B. Monatserträge) — als laufenden Zählerstand speichern") }}</span>
+    </label>
+    <p class="hint hint-status" x-show="blocked" x-cloak{% if not cumulate_blocked %} style="display:none;"{% endif %}>{{ _("Nur für Zähler: Das gewählte Ziel ist keiner, die Werte würden sonst aufaddiert.") }}</p>
+  </div>
 
   <label class="csv-include-existing" style="display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:calc(13px * var(--font-scale, 1));">
     <input type="checkbox" name="include_existing_months"{% if include_existing_months %} checked{% endif %}

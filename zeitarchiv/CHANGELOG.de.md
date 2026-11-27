@@ -43,6 +43,9 @@
 ### Behoben
 
 - **Archiv**: Eine leere Archivdatei (0 Bytes) blockiert Neuaufbau, Abgleich und Energiedashboard nicht mehr; sie wird wie eine fehlende Datei übersprungen
+- **CSV-Import**: „Werte sind Summen je Zeitraum … als laufenden Zählerstand speichern“ gilt nur für Zähler
+  - Bei einem Sensor, Schalter oder einer Zustands-Entität als Ziel ist die Option ausgegraut und nicht gesetzt; bisher hätte ein Sensor aufaddierte Werte bekommen
+  - Die Prüfung gilt auch, wenn das Formular anders abgeschickt wird, je Ziel-Spalte
 - **Charts**: „Rohwerte“ wird mit dem Chart gespeichert; der Schalter im Editor springt nach dem erneuten Öffnen nicht mehr zurück
 - **Schalter-Entitäten**: Balken und Linien zeigen Dauern (z. B. „2h 7m“) statt nackter Zahlen, gleich welcher Anzeigemodus gewählt ist
   - Gilt für Entitätsseite, Chart-Editor, Dashboard-Kacheln und Lovelace-Karte
