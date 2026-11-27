@@ -200,6 +200,9 @@
 {% if filter == 'outliers' and counter_decrease_enabled %}
 <p class="rows-hint">{{ _("Fällt ein Zählerstand, zum Beispiel auf 0, ist das kein Ausreißer, sondern ein Zählerrückgang. Du findest ihn im Filter „Zählerrückgänge“.") }}</p>
 {% endif %}
+{% if sort and pagination.capped %}
+<p class="rows-hint">{{ _("Nach Wert sortiert sind die ersten {count} Werte der Reihenfolge erreichbar; weitere liegen dahinter. Mit einem engeren Zeitraum oder einem Filter werden alle sichtbar.", count=((pagination.total_pages * pagination.page_size) | format_int)) }}</p>
+{% endif %}
 {% if rows %}
 {% set counter_verdicts_map = counter_verdicts(entity_id, rows) if counter_verdicts is defined and counter_decrease_enabled else {} %}
 {# Hinweis nur, wenn die Mehrheit der Rückgänge auf der Seite nach planmäßigem Reset aussieht: die Einstellung betrifft die ganze Entität, deshalb Link statt Knopf in der Zeile. #}
@@ -230,7 +233,12 @@
       {% else %}
       <th><input type="checkbox" onchange="toggleAllRows(this)" title="{{ _('Alle auf dieser Seite auswählen') }}"></th>
       {% endif %}
-      <th>{{ _("Zeitstempel") }}</th><th>{{ _("Wert") }}</th><th>{{ _("Status") }}</th>
+      <th>{{ _("Zeitstempel") }}</th>
+      {# Klick auf „Wert“ schaltet absteigend → aufsteigend → nach Zeit (cleanup.js, toggleValueSort). Die Richtung zeigt dieselbe Pfeil-Konvention wie die übrigen Tabellen (absteigend ↑, aufsteigend ↓). #}
+      <th class="dt-sortable-col{{ ' dt-sort-desc' if sort == 'value_desc' else (' dt-sort-asc' if sort == 'value_asc' else '') }}" tabindex="0" role="button"
+          aria-sort="{{ 'descending' if sort == 'value_desc' else ('ascending' if sort == 'value_asc' else 'none') }}"
+          title="{{ _('Nach Wert sortieren') }}" onclick="toggleValueSort()" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleValueSort(); }">{{ _("Wert") }}</th>
+      <th>{{ _("Status") }}</th>
     </tr>
     {% for row in rows %}
     {# Zeilenhintergrund nur, wenn sich etwas aufräumen lässt (Ausreißer, Duplikat, Wiederholung, Fehlwert); Lücke, „Noch offen“ und „Vermutlich Reset“ färben die Zeile nicht. #}

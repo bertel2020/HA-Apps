@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from ..i18n import tr
 
+import heapq
 import itertools
 import json
 import math
@@ -327,6 +328,10 @@ _NO_REASON = ""
 # tiefe Seiten auf zwei Durchläufe mit Fenster umschaltet (5.000 Wörterbücher sind rund 2 MB).
 MAX_RETAINED_MATCHES = 5000
 
+#: Sortierungen der Werte-Tabelle nach Wert (ohne: neueste zuerst). Bei Jahr/Gesamt reicht der Speicher nur für die
+#: ersten MAX_RETAINED_MATCHES Treffer der Reihenfolge; das sind die Extremwerte, um die es beim Sortieren geht.
+ROW_SORTS = ("value_desc", "value_asc")
+
 
 class GapDetector:
     """Entscheidet je Zeile, ob davor eine Lücke liegt — für beide Wege der Lücken-Erkennung.
@@ -460,6 +465,7 @@ def analyze_raw_rows_page(
     gap_stored_until: float | None = None,
     gap_tiers_since: float | None = None,
     outlier_tiers_since: float | None = None,
+    sort: str = "",
 ) -> dict:
     """Analysiert beliebig viele sortierte Rohwerte mit begrenztem Speicher.
 
@@ -487,6 +493,11 @@ def analyze_raw_rows_page(
     ``counts``/``daily``/``pagination`` lesen). Die Zahlen sind mit ``reasons=True`` identisch.
     """
     page_size = max(1, min(int(page_size), 1000))
+    # ``sort`` ("value_desc"/"value_asc", siehe ROW_SORTS): die Treffer stehen nach Wert statt nach Zeit. Behalten werden
+    # dann die ersten ``Seite × Seitengröße`` der Reihenfolge in einem Heap, und die Seiten reichen höchstens bis
+    # MAX_RETAINED_MATCHES (``pagination["capped"]``): ein vollständiges Sortieren von Millionen Zeilen bliebe nicht im Speicher.
+    sort = sort if sort in ROW_SORTS else ""
+    sort_pages = max(1, MAX_RETAINED_MATCHES // page_size)
     if int(page) <= 1:
         # Seite 1 gibt es immer (auch ohne Treffer): die Gesamtzahl wird für die Begrenzung nicht gebraucht und
         # im Hauptlauf mitgezählt. Das spart einen kompletten Lesedurchgang (bei den Archiven je Monat
@@ -498,7 +509,9 @@ def analyze_raw_rows_page(
             total_rows += 1
         upper_page = max(1, -(-total_rows // page_size))
         requested_page = max(1, min(int(page), upper_page))
-    if match_window is None and requested_page * page_size > MAX_RETAINED_MATCHES:
+    if sort:
+        requested_page = min(requested_page, sort_pages)
+    if not sort and match_window is None and requested_page * page_size > MAX_RETAINED_MATCHES:
         options = dict(
             filter_=filter_, gap_threshold_minutes=gap_threshold_minutes, outlier_factor=outlier_factor,
             tz=tz, decimals=decimals, counter_decrease_enabled=counter_decrease_enabled,
@@ -515,6 +528,10 @@ def analyze_raw_rows_page(
             match_window=(max(0, upper - page_size), upper), reasons=reasons, **options,
         )
     retained: deque[dict] = deque(maxlen=requested_page * page_size)
+    # Mit ``sort``: Heap der bisher besten Treffer als (Schlüssel, Zeitstempel, Zähler, Zeile); der kleinste Schlüssel
+    # liegt oben und fliegt zuerst heraus. Beim Absteigen ist der Schlüssel der Wert, beim Aufsteigen sein Negatives.
+    ranked: list[tuple[float, float, int, dict]] = []
+    ranked_size = requested_page * page_size
     collected = {name: deque(maxlen=limit) for name, limit in (collect or {}).items()}
     collected_totals = dict.fromkeys(collected, 0)
     gap_detector = GapDetector(
@@ -637,7 +654,15 @@ def analyze_raw_rows_page(
                     collected_totals[name] += 1
                     collected[name].append(row)
             if row_matches:
-                if match_window is None or match_window[0] <= total_matches < match_window[1]:
+                if sort:
+                    entry = (
+                        row["value"] if sort == "value_desc" else -row["value"], row["ts"], total_matches, row,
+                    )
+                    if len(ranked) < ranked_size:
+                        heapq.heappush(ranked, entry)
+                    else:
+                        heapq.heappushpop(ranked, entry)
+                elif match_window is None or match_window[0] <= total_matches < match_window[1]:
                     retained.append(row)
                 total_matches += 1
         group_rows = []
@@ -719,11 +744,17 @@ def analyze_raw_rows_page(
     counts["all"] = seen_rows
 
     total_pages = max(1, -(-total_matches // page_size))
+    if sort:
+        total_pages = min(total_pages, sort_pages)
     actual_page = max(1, min(requested_page, total_pages))
-    newest_first = list(reversed(retained))
     start_index = (actual_page - 1) * page_size
-    # Mit match_window besteht ``retained`` schon aus genau dieser Seite.
-    page_rows = newest_first if match_window is not None else newest_first[start_index : start_index + page_size]
+    if sort:
+        in_order = [entry[3] for entry in sorted(ranked, key=lambda entry: entry[:2], reverse=True)]
+        page_rows = in_order[start_index : start_index + page_size]
+    else:
+        newest_first = list(reversed(retained))
+        # Mit match_window besteht ``retained`` schon aus genau dieser Seite.
+        page_rows = newest_first if match_window is not None else newest_first[start_index : start_index + page_size]
     extra = {
         "collected": {
             name: {"rows": list(reversed(found)), "total": collected_totals[name]} for name, found in collected.items()
@@ -744,20 +775,17 @@ def analyze_raw_rows_page(
             "blind": tier_blind,
             "tiers": {format(tier, "g"): count for tier, count in tier_hits_total.items()},
         }
-    return {
-        **extra,
-        "rows": page_rows,
-        "counts": counts,
-        "daily": daily,
-        "pagination": {
-            "page": actual_page,
-            "page_size": page_size,
-            "total": total_matches,
-            "total_pages": total_pages,
-            "start": start_index + 1 if total_matches else 0,
-            "end": min(start_index + page_size, total_matches),
-        },
+    pagination = {
+        "page": actual_page,
+        "page_size": page_size,
+        "total": total_matches,
+        "total_pages": total_pages,
+        "start": start_index + 1 if total_matches else 0,
+        "end": min(start_index + page_size, total_matches),
     }
+    if sort:
+        pagination["capped"] = total_matches > sort_pages * page_size
+    return {**extra, "rows": page_rows, "counts": counts, "daily": daily, "pagination": pagination}
 
 
 def _sorted_within_timestamp(rows: Iterable[tuple[float, float]]) -> Iterator[tuple[float, float]]:

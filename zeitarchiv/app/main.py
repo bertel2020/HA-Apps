@@ -5161,9 +5161,10 @@ def _rows_period_label(range_key: str, offset: int, window_start: datetime, wind
 
 def _rows_fragment(
     request: Request, entity_id: str, filter_: str, range_key: str, offset: int = 0, page: int = 1, page_size: int = 20,
-    mode: str = "cleanup", deleted_count: int | None = None,
+    mode: str = "cleanup", sort: str = "", deleted_count: int | None = None,
 ) -> HTMLResponse:
     entity = index.get_entity(entity_id)
+    sort = sort if sort in cleanup.ROW_SORTS else ""
     decimals_int = decimals_to_int(entity["decimals"])
     now = datetime.now(TZ)
     if range_key not in cleanup_stats.CLEANUP_RANGE_KEYS:
@@ -5211,6 +5212,7 @@ def _rows_fragment(
             decimals=entity["decimals"],
             counter_decrease_enabled=cleanup_stats.counter_decreases_flagged(entity),
             outlier_mode=cleanup_stats.outlier_mode(entity),
+            sort=sort,
             gap_tiers_since=(now.timestamp() - gap_recommendation.WINDOW_DAYS * 86400) if range_key == "all" else None,
             outlier_tiers_since=(
                 now.timestamp() - outlier_recommendation.WINDOW_DAYS * 86400
@@ -5276,7 +5278,14 @@ def _rows_fragment(
         elif filter_ == "counter_decreases":
             rows = [(ts, value) for ts, value in rows if ts in counter_decreases]
 
-        rows = list(reversed(rows))
+        if sort:
+            # Nach Wert, bei gleichem Wert die neuere Zeile zuerst (wie die Zeitansicht).
+            if sort == "value_desc":
+                rows = sorted(rows, key=lambda row: (row[1], row[0]), reverse=True)
+            else:
+                rows = sorted(rows, key=lambda row: (row[1], -row[0]))
+        else:
+            rows = list(reversed(rows))
         page_rows, pagination = _paginate(rows, page, page_size)
         display_rows = [
             {
@@ -5357,6 +5366,7 @@ def _rows_fragment(
             "rows": display_rows,
             "state_options": state_options,
             "filter": filter_,
+            "sort": sort,
             "mode": mode,
             "range": range_key,
             "offset": offset,
@@ -5397,12 +5407,13 @@ def entity_rows(
     page: int = 1,
     page_size: int = 20,
     mode: str = "cleanup",
+    sort: str = "",
 ) -> HTMLResponse:
     _require_entity(entity_id)
-    return _rows_fragment(request, entity_id, filter, range_key, offset, page, page_size, mode)
+    return _rows_fragment(request, entity_id, filter, range_key, offset, page, page_size, mode, sort)
 
 
-def _rows_form_common(form) -> tuple[str, str, int, int, int, str]:
+def _rows_form_common(form) -> tuple[str, str, int, int, int, str, str]:
     filter_ = str(form.get("filter", "all"))
     range_key = str(form.get("range", "day"))
     try:
@@ -5412,7 +5423,7 @@ def _rows_form_common(form) -> tuple[str, str, int, int, int, str]:
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail=tr("Ungültiger Zahlenwert in der Anfrage.")) from None
     mode = str(form.get("mode", "cleanup"))
-    return filter_, range_key, offset, page, page_size, mode
+    return filter_, range_key, offset, page, page_size, mode, str(form.get("sort", ""))
 
 
 @app.post("/entities/{entity_id}/rows/delete", response_class=HTMLResponse)
@@ -5430,7 +5441,7 @@ async def delete_rows(request: Request, entity_id: str) -> HTMLResponse:
     except ValueError:
         timestamps, row_values = [math.nan], [None]
     _require_finite(*timestamps, *(v for v in row_values if v is not None))
-    filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
+    filter_, range_key, offset, page, page_size, mode, sort = _rows_form_common(form)
     source = str(form.get("source", "manual"))
     entity = _require_entity(entity_id)
     deleted_total = 0
@@ -5457,7 +5468,7 @@ async def delete_rows(request: Request, entity_id: str) -> HTMLResponse:
             cleanup.soft_delete(index, entity_id, to_mark, source=source, values=marked_values)
             deleted_total = len(to_mark)
             return _rows_fragment(
-                request, entity_id, filter_, range_key, offset, page, page_size, mode,
+                request, entity_id, filter_, range_key, offset, page, page_size, mode, sort,
                 deleted_count=len(to_mark) or None,
             )
 
@@ -5622,7 +5633,7 @@ def compact_rows(entity_id: str, body: _CompactValuesBody) -> dict:
 async def undo_rows(request: Request, entity_id: str) -> HTMLResponse:
     _require_entity(entity_id)
     form = await request.form()
-    filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
+    filter_, range_key, offset, page, page_size, mode, sort = _rows_form_common(form)
     # Die Vorschau gibt die Kennung der Charge mit, die sie gezeigt hat: genau
     # die wird zurückgenommen, auch wenn inzwischen eine neuere entstanden ist
     # (Zählerregel, zweiter Tab). Ohne Kennung (älteres Formular) gilt die jüngste.
@@ -5638,7 +5649,7 @@ async def undo_rows(request: Request, entity_id: str) -> HTMLResponse:
                 cleanup.undo_last_delete(index, entity_id)
             else:
                 cleanup.undo_delete_batch(index, entity_id, batch_at)
-            return _rows_fragment(request, entity_id, filter_, range_key, offset, page, page_size, mode)
+            return _rows_fragment(request, entity_id, filter_, range_key, offset, page, page_size, mode, sort)
 
     return await run_in_threadpool(undo_locked)
 
@@ -5656,7 +5667,7 @@ async def undo_preview(request: Request, entity_id: str) -> HTMLResponse:
     entity = _require_entity(entity_id)
     decimals_int = decimals_to_int(entity["decimals"])
     form = await request.form()
-    filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
+    filter_, range_key, offset, page, page_size, mode, sort = _rows_form_common(form)
 
     def load_preview() -> tuple[float | None, list[float], list[tuple[float, float]]]:
         with storage_coordinator.entity(entity_id, timeout=STORAGE_LOCKED_TIMEOUT_SECONDS):
@@ -5707,7 +5718,7 @@ async def duplicates_preview(request: Request, entity_id: str) -> HTMLResponse:
     entity = _require_entity(entity_id)
     decimals_int = decimals_to_int(entity["decimals"])
     form = await request.form()
-    filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
+    filter_, range_key, offset, page, page_size, mode, sort = _rows_form_common(form)
     now = datetime.now(TZ)
     offset = 0 if range_key == "all" else min(offset, 0)
     window_start, window_end = cleanup_stats.rows_window(range_key, offset, now, entity["first_ts"], TZ)
@@ -5756,7 +5767,7 @@ async def repetitions_preview(request: Request, entity_id: str) -> HTMLResponse:
     entity = _require_entity(entity_id)
     decimals_int = decimals_to_int(entity["decimals"])
     form = await request.form()
-    filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
+    filter_, range_key, offset, page, page_size, mode, sort = _rows_form_common(form)
     now = datetime.now(TZ)
     offset = 0 if range_key == "all" else min(offset, 0)
     window_start, window_end = cleanup_stats.rows_window(range_key, offset, now, entity["first_ts"], TZ)
@@ -5805,7 +5816,7 @@ async def repetitions_delete(request: Request, entity_id: str) -> HTMLResponse:
     """Verdichtet den gewählten Zeitraum streaming-basiert und soft-delete-sicher."""
     entity = _require_entity(entity_id)
     form = await request.form()
-    filter_, range_key, offset, page, page_size, mode = _rows_form_common(form)
+    filter_, range_key, offset, page, page_size, mode, sort = _rows_form_common(form)
     now = datetime.now(TZ)
     offset = 0 if range_key == "all" else min(offset, 0)
     window_start, window_end = cleanup_stats.rows_window(range_key, offset, now, entity["first_ts"], TZ)
@@ -5831,7 +5842,7 @@ async def repetitions_delete(request: Request, entity_id: str) -> HTMLResponse:
                 cleanup.soft_delete(index, entity_id, batch, deleted_at=deleted_at, source="repetitions")
                 deleted_total += len(batch)
             return _rows_fragment(
-                request, entity_id, filter_, range_key, offset, page, page_size, mode,
+                request, entity_id, filter_, range_key, offset, page, page_size, mode, sort,
                 deleted_count=deleted_total or None,
             )
 

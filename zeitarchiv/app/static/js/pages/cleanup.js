@@ -411,6 +411,14 @@
     function resetPage() {
       document.getElementById('page-field').value = '1';
     }
+    // Spalte „Wert“: absteigend (größte zuerst, findet verrutschte Ziffern), aufsteigend (findet Nullen), dann wieder nach Zeit.
+    // Das Feld liegt wie page-field außerhalb des Fragments und bleibt über Swaps erhalten.
+    function toggleValueSort() {
+      const field = document.getElementById('sort-field');
+      field.value = field.value === '' ? 'value_desc' : (field.value === 'value_desc' ? 'value_asc' : '');
+      resetPage();
+      field.dispatchEvent(new Event('change', {bubbles: true}));
+    }
     function setPage(v) {
       document.getElementById('page-field').value = Math.max(1, v);
       document.getElementById('page-field').dispatchEvent(new Event('change', {bubbles: true}));

@@ -1598,3 +1598,46 @@ def test_count_duplicate_rows_by_entity_counts_dense_entities_without_a_row_limi
         index.close()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _sorted_page(rows, sort, *, page=1, page_size=3, filter_="all"):
+    return cleanup.analyze_raw_rows_page(
+        lambda: iter(rows), filter_=filter_, page=page, page_size=page_size,
+        gap_threshold_minutes=None, outlier_factor=None, tz=TZ, sort=sort,
+    )
+
+
+def test_rows_can_be_sorted_by_value_in_both_directions() -> None:
+    """Sortierung der Werte-Tabelle (Jahr/Gesamt): absteigend findet verrutschte Ziffern, aufsteigend Nullen.
+    Bei gleichem Wert steht die neuere Zeile zuerst, wie in der Zeitansicht."""
+    werte = [5.0, 999.0, 7.0, 0.0, 7.0, 3.0, 1.0]
+    rows = [(float(i * 60), v) for i, v in enumerate(werte)]
+    desc = _sorted_page(rows, "value_desc")
+    assert [row["value"] for row in desc["rows"]] == [999.0, 7.0, 7.0]
+    assert [row["ts"] for row in desc["rows"]][1:] == [240.0, 120.0]
+    asc = _sorted_page(rows, "value_asc")
+    assert [row["value"] for row in asc["rows"]] == [0.0, 1.0, 3.0]
+    # Ohne Sortierung bleibt es bei „neueste zuerst“.
+    assert [row["ts"] for row in _sorted_page(rows, "")["rows"]] == [360.0, 300.0, 240.0]
+
+
+def test_sorted_rows_page_through_and_respect_the_filter() -> None:
+    werte = [5.0, 999.0, 7.0, 0.0, 7.0, 3.0, 1.0]
+    rows = [(float(i * 60), v) for i, v in enumerate(werte)]
+    second = _sorted_page(rows, "value_desc", page=2)
+    assert [row["value"] for row in second["rows"]] == [5.0, 3.0, 1.0]
+    assert second["pagination"]["page"] == 2 and second["pagination"]["total"] == 7
+    assert second["pagination"]["capped"] is False
+    assert "capped" not in _sorted_page(rows, "")["pagination"]
+    # Der Filter gilt vor dem Sortieren: nur die Duplikate-Zeilen (hier keine mit gleichem Zeitstempel) → leer.
+    assert _sorted_page(rows, "value_desc", filter_="duplicates")["rows"] == []
+
+
+def test_sorted_rows_beyond_the_memory_cap_are_flagged(monkeypatch) -> None:
+    monkeypatch.setattr(cleanup, "MAX_RETAINED_MATCHES", 6)
+    rows = [(float(i * 60), float(i)) for i in range(20)]
+    analysis = _sorted_page(rows, "value_desc", page=9, page_size=3)
+    # Höchstens MAX_RETAINED_MATCHES // Seitengröße = 2 Seiten erreichbar; die Gesamtzahl bleibt ehrlich.
+    assert analysis["pagination"]["page"] == 2 and analysis["pagination"]["total"] == 20
+    assert analysis["pagination"]["capped"] is True
+    assert [row["value"] for row in analysis["rows"]] == [16.0, 15.0, 14.0]
