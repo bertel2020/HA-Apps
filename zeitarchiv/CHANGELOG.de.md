@@ -19,6 +19,10 @@
 - **Wetterdashboard**: Heizkurve auf dem Reiter „Heizen“
   - Neue optionale Zuordnung „Vorlauftemperatur“ in der Einrichtung von Heizen
   - Ein Chip „Vorlauftemperatur“ über dem Streudiagramm schaltet es auf den Tages-Ø der Vorlauftemperatur gegen die Außentemperatur um
+- **Wetterdashboard**: neue optionale Zuordnung „Wetterzustand“
+  - Eine Wetter-Entität oder ein Sensor mit denselben Werten (rainy, snowy, …) sagt, ob es regnet, schneit oder hagelt
+  - Wetterlage und Regen-Kachel nennen dann „Schnee“, „Schneeregen“ oder „Hagel“ statt „Regen“
+  - Ohne sie steht bei höchstens 1 °C „Niederschlag“, da ein Ein/Aus-Regensensor Regen und Schnee nicht unterscheiden kann
 - **Wetter- und Energiedashboard**: Spaltenhervorhebung in der Vergleichstabelle
   - Einstellung „Spaltenhervorhebung“ in der Einrichtung des Dashboards: Aus, Paare abwechselnd (Vorgabe), Hauptspalten oder Eigene Auswahl
   - Bei Eigener Auswahl werden Zeiträume im Menü „Spalten“ mit einem Stern markiert; die Auswahl gilt je Browser
@@ -28,7 +32,6 @@
 
 ### Geändert
 
-- **Wetterdashboard**: bei höchstens 1 °C sagen Satz und Kachel „Niederschlag …“ statt „Regen …“, da ein Ein/Aus-Sensor Regen und Schnee nicht unterscheiden kann
 - **Tabellen**: Zusätze in Klammern hinter dem Zeilennamen (z. B. „(ab 60 % des klaren Himmels)“) stehen in einer zweiten Zeile; die erste Spalte kann schmaler werden
 - **Energiedashboard**: Feste Preise (Netzbezug, Einspeisung, Eigenverbrauch) werden in Cent eingetragen; bei einem Wert unter 1 erscheint ein Hinweis mit Korrektur per Klick (z. B. 0,0764 statt 7,64)
 

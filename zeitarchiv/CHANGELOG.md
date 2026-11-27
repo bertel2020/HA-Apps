@@ -19,6 +19,10 @@
 - **Weather dashboard**: heating curve on the “Heating” tab
   - New optional assignment “Flow temperature” in the Heating setup
   - A “Flow temperature” chip above the scatter chart switches it to the daily mean of the flow temperature against the outdoor temperature
+- **Weather dashboard**: new optional assignment “Weather condition”
+  - A weather entity or a sensor with the same values (rainy, snowy, …) tells whether it rains, snows, or hails
+  - The summary and the rain tile then say “Snow”, “Sleet”, or “Hail” instead of “Rain”
+  - Without it, at or below 1 °C they say “Precipitation”, since an on/off rain sensor cannot tell rain from snow
 - **Weather and energy dashboard**: column highlighting in the comparison table
   - Setting "Column highlighting" in the setup of each dashboard: off, alternating pairs (default), main columns, or own selection
   - With own selection, periods are marked with a star in the "Columns" menu; the selection is stored per browser
@@ -28,7 +32,6 @@
 
 ### Changed
 
-- **Weather dashboard**: at or below 1 °C the sentence and the tile read "Precipitation …" instead of "Rain …", since an on/off sensor cannot tell rain from snow
 - **Tables**: notes in brackets after the row name (e.g. "(from 60 % of clear sky)") appear in a second line; the first column can be narrower
 - **Energy dashboard**: fixed prices (grid, feed-in, self-consumption) are entered in cents; a value below 1 now shows a hint with a one-click correction (e.g. 0.0764 instead of 7.64)
 
