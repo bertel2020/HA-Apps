@@ -254,6 +254,19 @@
                 {% endif %}
               </div>
             </div>
+            {% if aggregation_type == 'switch' %}
+            <!-- ROADMAP 1.74: Balken/Linie eines Schalters zeigen die Einschaltdauer, die Zahl der Einschaltungen oder
+                 beides (Dauer als Balken, Anzahl als Linie auf der rechten Achse). Zeitstrahl und Rohwerte zeigen 0/1
+                 und kennen die Wahl nicht. -->
+            <div class="menu-row menu-row-stack" x-show="isSwitchBuckets">
+              <span class="menu-row-label">{{ _("Anzeige") }}</span>
+              <div class="seg">
+                <button :class="{active: switchMetric === 'duration'}" @click="setSwitchMetric('duration')">{{ _("Dauer") }}</button>
+                <button :class="{active: switchMetric === 'count'}" @click="setSwitchMetric('count')">{{ _("Anzahl") }}</button>
+                <button :class="{active: switchMetric === 'both'}" @click="setSwitchMetric('both')">{{ _("Beides") }}</button>
+              </div>
+            </div>
+            {% endif %}
             <!-- "Punkte" markiert einzelne Datenpunkte auf einer Linie,
                  "Werte anzeigen" schreibt eine Zahl an jeden Datenpunkt: bei
                  Balken bleibt das lesbar, an einer Linie (oft hunderte Punkte)
@@ -399,18 +412,21 @@
       </div>
       <div class="empty" x-show="!hasData" x-text="loading ? t('Lädt …') : (loadError ? t('Die Daten konnten nicht geladen werden.') : t('Keine Daten für diesen Zeitraum.'))"></div>
       <div class="empty" x-show="!hasData && loadError && !loading" x-cloak><button type="button" class="btn" @click="load()">{{ _("Erneut versuchen") }}</button></div>
+      <p class="hint" x-show="countsMissing" x-cloak>{{ _("Für diesen Zeitraum wurde die Anzahl der Einschaltungen noch nicht erfasst.") }}</p>
       <div class="chart-legend" x-show="!isState && points.length && chartStats && legendStyle === 'chips'">
-        <span class="chart-legend-item static">
-          <span class="dot" :style="{background: `var(--chart-${chartType === 'line' ? 'line' : 'bar'})`}"></span>
-          <span class="name">{{ display_name }}</span>
-          <span class="values">
-            <span x-show="legendMetrics.includes('last')">{{ _('Aktuell <strong x-text="entityStat.last"></strong>') }}</span>
-            <span x-show="legendMetrics.includes('min')">{{ _('Min <strong x-text="entityStat.min"></strong>') }}</span>
-            <span x-show="legendMetrics.includes('max')">{{ _('Max <strong x-text="entityStat.max"></strong>') }}</span>
-            <span x-show="legendMetrics.includes('average')">Ø <strong x-text="entityStat.average"></strong></span>
-            <span x-show="legendMetrics.includes('sum') && entityStat.sum !== null">Σ <strong x-text="entityStat.sum"></strong></span>
+        <template x-for="row in legendRows" :key="row.key">
+          <span class="chart-legend-item static">
+            <span class="dot" :style="{background: row.color}"></span>
+            <span class="name">{{ display_name }}<template x-if="row.suffix"><span x-text="' · ' + row.suffix"></span></template></span>
+            <span class="values">
+              <span x-show="legendMetrics.includes('last')">{{ _('Aktuell <strong x-text="row.stat.last"></strong>') }}</span>
+              <span x-show="legendMetrics.includes('min')">{{ _('Min <strong x-text="row.stat.min"></strong>') }}</span>
+              <span x-show="legendMetrics.includes('max')">{{ _('Max <strong x-text="row.stat.max"></strong>') }}</span>
+              <span x-show="legendMetrics.includes('average')">Ø <strong x-text="row.stat.average"></strong></span>
+              <span x-show="legendMetrics.includes('sum') && row.stat.sum !== null">Σ <strong x-text="row.stat.sum"></strong></span>
+            </span>
           </span>
-        </span>
+        </template>
       </div>
       <div class="tbl-wrap chart-legend-table-wrap" x-show="!isState && points.length && chartStats && legendStyle === 'table'">
         <table class="dt compact chart-legend-table">
@@ -425,19 +441,21 @@
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td class="legend-name-col">
-                <span class="legend-name-cell">
-                  <span class="dot" :style="{background: `var(--chart-${chartType === 'line' ? 'line' : 'bar'})`}"></span>
-                  <span>{{ display_name }}</span>
-                </span>
-              </td>
-              <td x-show="legendMetrics.includes('last')" x-text="entityStat.last"></td>
-              <td x-show="legendMetrics.includes('min')" x-text="entityStat.min"></td>
-              <td x-show="legendMetrics.includes('max')" x-text="entityStat.max"></td>
-              <td x-show="legendMetrics.includes('average')" x-text="entityStat.average"></td>
-              <td x-show="legendMetrics.includes('sum')" x-text="entityStat.sum ?? '—'"></td>
-            </tr>
+            <template x-for="row in legendRows" :key="row.key">
+              <tr>
+                <td class="legend-name-col">
+                  <span class="legend-name-cell">
+                    <span class="dot" :style="{background: row.color}"></span>
+                    <span>{{ display_name }}<template x-if="row.suffix"><span x-text="' · ' + row.suffix"></span></template></span>
+                  </span>
+                </td>
+                <td x-show="legendMetrics.includes('last')" x-text="row.stat.last"></td>
+                <td x-show="legendMetrics.includes('min')" x-text="row.stat.min"></td>
+                <td x-show="legendMetrics.includes('max')" x-text="row.stat.max"></td>
+                <td x-show="legendMetrics.includes('average')" x-text="row.stat.average"></td>
+                <td x-show="legendMetrics.includes('sum')" x-text="row.stat.sum ?? '—'"></td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -597,6 +615,7 @@
     // Konfigurationsbereich umschaltbar (Konzept: Anzeigemodus) — steuert, ob
     // die Bucket-Werte (on_seconds) als Dauer (h/m) statt als Rohsekunden
     // erscheinen, z. B. für einen Anwesenheitssensor.
+    const SWITCH_METRIC_DEFAULT = {{ ({'count': 'count', 'both': 'both'}.get(display_mode, 'duration')) | tojson }};
     const DURATION_DISPLAY = {{ (aggregation_type == 'switch' and display_mode == 'time') | tojson }};
   </script>
   <script src="{{ asset('js/pages/entity_detail.js') }}"></script>

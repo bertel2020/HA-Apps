@@ -203,6 +203,18 @@
       return gaps[Math.floor(gaps.length / 2)];
     }
 
+    // Zusatz zur mittleren Anzahl der Einschaltungen: je nach Bucket-Breite der Daten "je Stunde", "je Tag" …
+    // Leer, wenn die Breite keine dieser Einheiten ist (Minuten-Buckets) — eine falsche Einheit wäre schlimmer als keine.
+    function countPerLabel(points) {
+      const seconds = detectResolutionSeconds(points);
+      if (!seconds) return '';
+      if (seconds >= 365 * 86400 * 0.9) return t('je Jahr');
+      if (seconds >= 27 * 86400) return t('je Monat');
+      if (seconds >= 86400 * 0.9) return t('je Tag');
+      if (seconds >= 3600 * 0.9) return t('je Stunde');
+      return '';
+    }
+
     // Tooltip-Zeitstempel richten sich nach der TATSÄCHLICHEN Bucket-Breite der
     // Daten, nicht nach dem Zeitraum-Namen — die Uhrzeit ist bei Tages-Buckets
     // oder gröber ohnehin immer Mitternacht, also reine Information ohne Wert.
@@ -422,6 +434,10 @@ function selectBrush() {
           this.saveChartOptions();
         },
         setLegendSize(size) { this.legendSize = size; this.saveChartOptions(); },
+        // Schalter ohne Rohwerte (ROADMAP 1.74): was die Balken zeigen — 'duration' | 'count' | 'both'. Ohne eigene
+        // Wahl gilt der Anzeigemodus der Entität (SWITCH_METRIC_DEFAULT).
+        switchMetric: CHART_OPTIONS.switch_metric || SWITCH_METRIC_DEFAULT,
+        setSwitchMetric(metric) { this.switchMetric = metric; this.render(); this.saveChartOptions(); },
         decimals: CHART_OPTIONS.decimals,
         compare: false,
         compareMode: 'previous',
@@ -517,6 +533,45 @@ function selectBrush() {
         // statt Deltas); bei Schaltern dagegen AUCH im Rohwerte-/Zeitstrahl-
         // Modus möglich — dort kommt die Summe nicht aus den Punktwerten
         // (die sind nur 0/1), sondern aus switchOnDuration() weiter oben.
+        // Wofür die Bucket-Werte dieser Ansicht stehen. Nur Schalter in Balken/Linie ohne Rohwerte haben die Wahl; der
+        // Zeitstrahl und die Rohwerte-Linie zeigen 0/1.
+        get isSwitchBuckets() { return this.aggregationType === 'switch' && !this.raw && this.chartType !== 'timeline'; },
+        get bucketMetric() { return this.isSwitchBuckets ? this.switchMetric : 'duration'; },
+        // Anzahl gewählt, aber für den ganzen Zeitraum nicht erfasst (Rollup aus der Zeit vor der Zählung).
+        get countsMissing() {
+          return this.bucketMetric !== 'duration' && this.points.length > 0 && this.points.every(p => p.count == null);
+        },
+        // Eine Legenden-Zeile je gezeigter Kennzahl: bei "Beides" zwei (Dauer, Anzahl), sonst eine.
+        get legendRows() {
+          const metric = this.bucketMetric;
+          const barColor = `var(--chart-${this.chartType === 'line' ? 'line' : 'bar'})`;
+          const rows = [];
+          if (metric !== 'count') {
+            rows.push({key: 'duration', suffix: metric === 'both' ? t('Dauer') : '', color: barColor, stat: this.entityStat});
+          }
+          if (metric !== 'duration') {
+            rows.push({key: 'count', suffix: metric === 'both' ? t('Anzahl') : '', color: metric === 'both' ? 'var(--accent-line)' : barColor, stat: this.countStat});
+          }
+          return rows;
+        },
+        // Kennzahlen der Einschaltungen. Summe und Mittel sind unbekannt ("—"), sobald ein Bucket keine Anzahl hat:
+        // eine Teilsumme wäre falsch niedrig. Min, Max und Aktuell kommen aus den bekannten Buckets.
+        get countStat() {
+          const counts = this.points.map(p => p.count);
+          const known = counts.filter(Number.isFinite);
+          const complete = counts.length > 0 && known.length === counts.length;
+          const whole = value => NumberFormat.fmt(value, 0);
+          const total = complete ? known.reduce((sum, v) => sum + v, 0) : null;
+          const per = countPerLabel(this.points);
+          const lastCount = counts[counts.length - 1];
+          return {
+            last: Number.isFinite(lastCount) ? whole(lastCount) : '—',
+            min: known.length ? whole(Math.min(...known)) : '—',
+            max: known.length ? whole(Math.max(...known)) : '—',
+            average: complete ? NumberFormat.fmt(total / counts.length, 1) + (per ? ' ' + per : '') : '—',
+            sum: complete ? `${whole(total)} ${t('Einschaltungen')}` : '—',
+          };
+        },
         get entityStat() {
           const values = this.points.map(p => p.value).filter(Number.isFinite);
           const minima = this.points.map(p => Number.isFinite(p.min) ? p.min : p.value).filter(Number.isFinite);
@@ -1021,6 +1076,8 @@ function selectBrush() {
                 legend_metrics: this.legendMetrics, legend_style: this.legendStyle, legend_size: this.legendSize,
                 decimals: this.decimals, state_log: this.stateLog,
                 area_fill: this.areaFill, average_style: this.averageStyle,
+                // Nur eine eigene Wahl speichern: ohne sie folgt die Ansicht weiter dem Anzeigemodus der Entität.
+                switch_metric: this.switchMetric === SWITCH_METRIC_DEFAULT ? '' : this.switchMetric,
               }),
             });
           } catch (e) {
@@ -1071,6 +1128,7 @@ function selectBrush() {
             this.legendSize !== (CHART_DEFAULTS.legend_size || '') ||
             this.decimals !== CHART_DEFAULTS.decimals ||
             this.stateLog !== (CHART_DEFAULTS.state_log !== false) ||
+            (this.aggregationType === 'switch' && this.switchMetric !== (CHART_DEFAULTS.switch_metric || SWITCH_METRIC_DEFAULT)) ||
             JSON.stringify([...this.legendMetrics].sort()) !== JSON.stringify([...CHART_DEFAULTS.legend_metrics].sort())
           );
         },
@@ -1325,8 +1383,20 @@ function selectBrush() {
           // sekunden, gleich welcher Anzeigemodus gewählt ist — ohne Einheit wären es
           // unlesbare Zahlen (266 = 4 Min. 26 s). Der Anzeigemodus gilt nur für die
           // 0/1-Rohwerte.
-          const asDuration = DURATION_DISPLAY || (this.aggregationType === 'switch' && !this.raw);
-          const fmtV = v => asDuration ? NumberFormat.fmtDuration(v) : fmtValue(v);
+          const metric = this.bucketMetric;
+          const countView = metric === 'count';
+          const asDuration = !countView && (DURATION_DISPLAY || this.isSwitchBuckets);
+          const fmtV = v => countView ? NumberFormat.fmt(v, 0) : (asDuration ? NumberFormat.fmtDuration(v) : fmtValue(v));
+          // Der Wert, der auf der Hauptachse steht; "Beides" zeichnet die Dauer als Balken und die Anzahl als Linie.
+          const yOf = p => countView ? p.count : p.value;
+          // Tooltip einer Schalter-Ansicht: immer beides, auch wenn nur eines gezeichnet ist.
+          const switchTip = (seconds, count) => {
+            const parts = [];
+            if (Number.isFinite(count)) parts.push(`${NumberFormat.fmt(count, 0)} ${t('Einschaltungen')}`);
+            else if (metric !== 'duration') parts.push(t('Anzahl nicht erfasst'));
+            if (Number.isFinite(seconds)) parts.push(NumberFormat.fmtDuration(seconds));
+            return parts.join(' · ');
+          };
           if (!this.hasData) return;
           if (!chartInstance) {
             chartInstance = newChartInstance();
@@ -1456,11 +1526,11 @@ function selectBrush() {
           // nicht (die wird zeitlich verschoben, um sie optisch zu überlagern). Das
           // Tooltip liest weiter unten bewusst dieses Feld statt des x-Werts, sonst
           // würde die Vorperiode im Tooltip die heutige statt ihre echte Zeit zeigen.
-          const mainData = this.points.map(p => [p.ts * 1000, p.value, p.ts * 1000]);
+          const mainData = this.points.map(p => [p.ts * 1000, yOf(p), p.ts * 1000, p.value, p.count]);
           if (this.chartType === 'line' && mainData.length && this.windowEnd != null
               && mainData[mainData.length - 1][0] < this.windowEnd * 1000) {
             const last = mainData[mainData.length - 1];
-            mainData.push([this.windowEnd * 1000, last[1], last[2]]);
+            mainData.push([this.windowEnd * 1000, last[1], last[2], last[3], last[4]]);
           }
           const series = [{
             name: DISPLAY_NAME,
@@ -1530,11 +1600,11 @@ function selectBrush() {
               compareOffset, false, this.compareMode === 'year'
             );
             const seriesLabel = this.compareMode === 'year' ? previousYearPeriodLabel(this.range) : previousPeriodLabel(this.range);
-            const compareData = this.comparePoints.map(p => [p.ts * 1000 + shiftMs, p.value, p.ts * 1000]);
+            const compareData = this.comparePoints.map(p => [p.ts * 1000 + shiftMs, yOf(p), p.ts * 1000, p.value, p.count]);
             if (this.chartType === 'line' && compareData.length && this.windowEnd != null
                 && compareData[compareData.length - 1][0] < this.windowEnd * 1000) {
               const last = compareData[compareData.length - 1];
-              compareData.push([this.windowEnd * 1000, last[1], last[2]]);
+              compareData.push([this.windowEnd * 1000, last[1], last[2], last[3], last[4]]);
             }
             const compareSeries = {
               name: compareLabel ? `${seriesLabel} (${compareLabel})` : seriesLabel, type: this.chartType,
@@ -1549,6 +1619,16 @@ function selectBrush() {
             }
             if (this.chartType === 'line') compareSeries.smooth = true;
             series.push(compareSeries);
+          }
+          // "Beides": die Anzahl als Linie auf einer zweiten Achse rechts, die Dauer bleibt Balken (siehe yAxis unten).
+          if (metric === 'both') {
+            const accent = getComputedStyle(document.body).getPropertyValue('--accent-line');
+            series.push({
+              id: 'count', name: t('Anzahl'), type: 'line', yAxisIndex: 1,
+              data: this.points.map(p => [p.ts * 1000, p.count, p.ts * 1000, p.value, p.count]),
+              symbol: 'circle', symbolSize: 6, smooth: false,
+              lineStyle: {width: 2, color: accent}, itemStyle: {color: accent}, z: 4,
+            });
           }
           // Zur Löschung markierte Bereiche als senkrechte Bänder. markArea
           // und nicht eine zweite Serie: eine Serie bestimmte die
@@ -1595,7 +1675,7 @@ function selectBrush() {
           // Der Wert kommt aus denselben Punkten wie die Legende, Zahl und
           // Linie stimmen hier also immer überein.
           const rolling = this.averageLine && (this.averageStyle === 'rolling' || this.averageStyle === 'rolling_only') && this.chartType === 'line';
-          const durchschnitt = this.averageLine && !rolling ? averageOf(this.points.map(p => p.value)) : null;
+          const durchschnitt = this.averageLine && !rolling ? averageOf(this.points.map(yOf)) : null;
           if (this.chartType === 'line' && this.areaFill) {
             series[0].areaStyle = {color: getComputedStyle(document.body).getPropertyValue('--chart-line'), opacity: 0.08};
           }
@@ -1604,7 +1684,7 @@ function selectBrush() {
             series.push({
               name: t('{name} (Ø gleitend)', {name: DISPLAY_NAME}),
               type: 'line',
-              data: movingAverage(this.points, movingAverageWindow(this.points.length))
+              data: movingAverage(countView ? this.points.map(p => ({...p, value: p.count})) : this.points, movingAverageWindow(this.points.length))
                 .filter(p => p.value !== null).map(p => [p.ts * 1000, p.value]),
               smooth: true,
               symbol: 'none',
@@ -1653,7 +1733,7 @@ function selectBrush() {
             // Nachkommastellen plus Einheit) fehlte links eine Ziffer. Deshalb setzt AxisFit (axis-fit.js) den
             // Rand nach dem Zeichnen aus der gemessenen Breite; 24 gilt nur für das erste Bild und für
             // Diagramme, die AxisFit nicht anfasst (mehrere Raster oder Achsen).
-            grid: {left: 24, right: 20, top: (UNIT || asDuration) ? 36 : 20, bottom: this.compare ? 64 : 40, containLabel: true},
+            grid: {left: 24, right: 20, top: (UNIT || asDuration || countView) ? 36 : 20, bottom: this.compare ? 64 : 40, containLabel: true},
             // min/max explizit auf das Abfragefenster fixiert, statt ECharts
             // per Default auf den tatsächlichen Datenbereich auto-fitten zu
             // lassen — sonst hört die Achse (und damit sichtbar der Chart) beim
@@ -1700,7 +1780,9 @@ function selectBrush() {
             },
             yAxis: {
               type: 'value',
-              name: asDuration ? t('Dauer') : (UNIT || undefined),
+              name: asDuration ? t('Dauer') : (countView ? t('Anzahl') : (UNIT || undefined)),
+              // Ganze Zahlen: bei kleinen Anzahlen sonst Teilungen wie 0,5, die auf "1" gerundet doppelt erscheinen.
+              ...(countView ? {minInterval: 1} : {}),
               nameLocation: 'end',
               nameTextStyle: {align: 'left'},
               // "fest" bindet die Achse an 0, "dynamisch" lässt ECharts frei auf
@@ -1730,10 +1812,13 @@ function selectBrush() {
               // einheitlich ÜBER dem Wert. Keine Serien-Bezeichnung (Farbpunkt vom
               // Marker reicht zur Unterscheidung zwischen Haupt- und Vorperiode).
               formatter: params => {
+                // Die Anzahl-Linie von "Beides" hat keine eigene Zeile: die Zeile der Balken nennt schon beides.
+                if (this.isSwitchBuckets) params = params.filter(p => p.seriesId !== 'count');
                 const times = params.map(p => fmtTooltipTimestamp(p.data[2], tooltipBucketSeconds));
                 const sameTime = times.every(t => t === times[0]);
                 const row = p => {
-                  const val = UNIT ? `${fmtV(p.value[1])} ${escapeHtml(UNIT)}` : fmtV(p.value[1]);
+                  const val = this.isSwitchBuckets ? switchTip(p.data[3], p.data[4])
+                    : (UNIT ? `${fmtV(p.value[1])} ${escapeHtml(UNIT)}` : fmtV(p.value[1]));
                   return `<span style="display:flex;align-items:center;gap:5px;">${p.marker}<strong>${val}</strong></span>`;
                 };
                 if (sameTime) {
@@ -1742,7 +1827,7 @@ function selectBrush() {
                 }
                 return params.map((p, i) =>
                   `<div style="display:flex;align-items:center;gap:5px;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);margin-bottom:2px;">${p.marker}${times[i]}</div>`
-                  + `<strong style="display:block;margin-bottom:4px;">${UNIT ? `${fmtV(p.value[1])} ${escapeHtml(UNIT)}` : fmtV(p.value[1])}</strong>`
+                  + `<strong style="display:block;margin-bottom:4px;">${this.isSwitchBuckets ? switchTip(p.data[3], p.data[4]) : (UNIT ? `${fmtV(p.value[1])} ${escapeHtml(UNIT)}` : fmtV(p.value[1]))}</strong>`
                 ).join('');
               },
               // appendToBody: die Karte hat overflow:hidden (verhindert, dass die
@@ -1753,6 +1838,13 @@ function selectBrush() {
             },
             series,
           };
+          if (metric === 'both') {
+            option.yAxis = [option.yAxis, {
+              type: 'value', name: t('Anzahl'), nameLocation: 'end', nameTextStyle: {align: 'right'},
+              position: 'right', min: 0, minInterval: 1, splitLine: {show: false},
+              axisLabel: {formatter: v => NumberFormat.fmt(v, 0)},
+            }];
+          }
           // legend nur setzen, wenn wirklich gebraucht — ein explizit auf undefined
           // gesetzter Komponenten-Key (statt ihn wegzulassen) lässt ECharts beim
           // internen Normalisieren mit einer TypeError abstürzen, wodurch nicht nur

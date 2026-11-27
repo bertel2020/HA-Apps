@@ -24,7 +24,7 @@ const vm = require('vm');
 const alerts = [];
 let reloaded = false;
 const ctx = {
-  BASE: '', ENTITY_ID: 'sensor.a',
+  BASE: '', ENTITY_ID: 'sensor.a', SWITCH_METRIC_DEFAULT: 'duration',
   t: (s) => s,
   appAlert: async (m) => { alerts.push(m); return true; },
   location: {reload: () => { reloaded = true; }},

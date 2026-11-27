@@ -62,7 +62,9 @@ def test_each_page_averages_exactly_what_it_draws() -> None:
     resamplePoints(), und die fassen Zähler/Schalter per SUMME zusammen: ein
     Durchschnitt über die Rohpunkte läge dort um den Faktor der Bucketbreite
     unter den gezeichneten Balken."""
-    assert "averageOf(this.points.map(p => p.value))" in DETAIL_JS
+    # yOf: der Wert auf der Hauptachse — bei Schaltern mit "Anzahl" die Zahl der Einschaltungen, sonst p.value
+    assert "const yOf = p => countView ? p.count : p.value;" in DETAIL_JS
+    assert "averageOf(this.points.map(yOf))" in DETAIL_JS
     assert "averageOf(mainPoints.map(p => p.value))" in EDITOR_JS
     assert "averageOf(s.points" not in EDITOR_JS
 

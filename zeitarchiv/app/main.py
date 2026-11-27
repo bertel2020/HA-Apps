@@ -3236,6 +3236,7 @@ class _EntityChartOptionsBody(BaseModel):
     state_log: bool = True
     area_fill: bool = True
     average_style: Literal["flat", "rolling", "rolling_only"] = "flat"
+    switch_metric: Literal["", "duration", "count", "both"] = ""
 
 
 @app.post("/entities/{entity_id}/chart-options")
@@ -3529,6 +3530,7 @@ _ENTITY_CHART_OPTION_DEFAULTS = {
     # Zustands-Entitäten (ROADMAP 1.29): Wechsel-Protokoll unter dem
     # Zeitstrahl standardmäßig offen; ohne Wirkung bei allen anderen Typen.
     "state_log": True,
+    "switch_metric": "",  # Schalter (1.74): Balken zeigen Dauer/Anzahl/Beides; leer = folgt dem Anzeigemodus der Entität
 }
 _ENTITY_CHART_DECIMALS = {"auto", "0", "1", "2", "3", "4"}
 _ON_OFF_LABELS = {"1": N_("An"), "0": N_("Aus")}
