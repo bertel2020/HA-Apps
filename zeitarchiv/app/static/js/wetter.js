@@ -1287,9 +1287,9 @@
         else if (temp) parts.push(`${temp}.`);
         else if (wind) parts.push(t('{wind}.', {wind}));
         const rain = c.rain;
+        // Bei Frost sagt ein reiner Ein/Aus-Sensor nicht, ob es regnet oder schneit: neutraler Text.
+        const cold = !!(c.temp && c.temp.unit === '°C' && c.temp.value != null && c.temp.value <= 1);
         if (rain && rain.raining) {
-          // Bei Frost sagt ein reiner Ein/Aus-Sensor nicht, ob es regnet oder schneit: neutraler Text.
-          const cold = c.temp && c.temp.unit === '°C' && c.temp.value != null && c.temp.value <= 1;
           if (rain.minutes == null) parts.push(cold ? t('Es fällt Niederschlag seit mehr als {n} h.', {n: 48}) : t('Es regnet seit mehr als {n} h.', {n: 48}));
           else {
             const minutes = Math.round(rain.minutes);
@@ -1303,8 +1303,8 @@
           parts.push(rain.last == null
             ? t('Aktuell trocken.')
             : lastSameDay
-              ? t('Aktuell trocken, zuletzt Regen um {time}.', {time: fmtDate(formats.hm, rain.last)})
-              : t('Aktuell trocken, zuletzt Regen am {time}.', {time: `${fmtDate(formats.dm, rain.last)} ${fmtDate(formats.hm, rain.last)}`}));
+              ? (cold ? t('Aktuell trocken, zuletzt Niederschlag um {time}.', {time: fmtDate(formats.hm, rain.last)}) : t('Aktuell trocken, zuletzt Regen um {time}.', {time: fmtDate(formats.hm, rain.last)}))
+              : (cold ? t('Aktuell trocken, zuletzt Niederschlag am {time}.', {time: `${fmtDate(formats.dm, rain.last)} ${fmtDate(formats.hm, rain.last)}`}) : t('Aktuell trocken, zuletzt Regen am {time}.', {time: `${fmtDate(formats.dm, rain.last)} ${fmtDate(formats.hm, rain.last)}`})));
         }
         return parts.map(together);
       },

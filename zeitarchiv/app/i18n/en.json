@@ -5202,6 +5202,8 @@
     "Es fällt Niederschlag seit {h} h {m} min.": "Precipitation has been falling for {h} h {m} min.",
     "Aktuell trocken, zuletzt Regen um {time}.": "Dry at the moment, last rain at {time}.",
     "Aktuell trocken, zuletzt Regen am {time}.": "Dry at the moment, last rain on {time}.",
+    "Aktuell trocken, zuletzt Niederschlag um {time}.": "Dry at the moment, last precipitation at {time}.",
+    "Aktuell trocken, zuletzt Niederschlag am {time}.": "Dry at the moment, last precipitation on {time}.",
     "Aktuell trocken.": "Dry at the moment.",
     "Frostig": "Frosty",
     "Kalt": "Cold",
