@@ -25,7 +25,7 @@
 
 ### Geändert
 
-- **Wetterdashboard**: bei höchstens 1 °C steht „Es fällt Niederschlag seit …“ statt „Es regnet seit …“, da ein Ein/Aus-Sensor Regen und Schnee nicht unterscheiden kann
+- **Wetterdashboard**: bei höchstens 1 °C sagen Satz und Kachel „Niederschlag …“ statt „Regen …“, da ein Ein/Aus-Sensor Regen und Schnee nicht unterscheiden kann
 - **Tabellen**: Zusätze in Klammern hinter dem Zeilennamen (z. B. „(ab 60 % des klaren Himmels)“) stehen in einer zweiten Zeile; die erste Spalte kann schmaler werden
 - **Energiedashboard**: Feste Preise (Netzbezug, Einspeisung, Eigenverbrauch) werden in Cent eingetragen; bei einem Wert unter 1 erscheint ein Hinweis mit Korrektur per Klick (z. B. 0,0764 statt 7,64)
 

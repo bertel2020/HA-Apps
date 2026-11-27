@@ -1159,20 +1159,25 @@
         const rain = this.conditions && this.conditions.rain;
         if (!rain) return null;
         const mm = rain.mm_today ? ` · ${num(rain.mm_today, 1)} ${rain.mm_unit || 'mm'}` : '';
+        // Bei Frost sagt ein reiner Ein/Aus-Sensor nicht, ob es regnet oder schneit: neutraler Text.
+        const temp = this.conditions.temp;
+        const cold = !!(temp && temp.unit === '°C' && temp.value != null && temp.value <= 1);
         if (rain.raining) {
-          if (rain.minutes == null) return {text: t('Regen') + mm, sub: t('seit mehr als {n} h', {n: 48})};
+          if (rain.minutes == null) return {text: (cold ? t('Niederschlag') : t('Regen')) + mm, sub: t('seit mehr als {n} h', {n: 48})};
           const minutes = Math.round(rain.minutes);
-          const since = minutes < 120 ? t('Regen seit {n} min', {n: minutes}) : t('Regen seit {h} h {m} min', {h: Math.floor(minutes / 60), m: String(minutes % 60).padStart(2, '0')});
+          const since = minutes < 120
+            ? (cold ? t('Niederschlag seit {n} min', {n: minutes}) : t('Regen seit {n} min', {n: minutes}))
+            : (cold ? t('Niederschlag seit {h} h {m} min', {h: Math.floor(minutes / 60), m: String(minutes % 60).padStart(2, '0')}) : t('Regen seit {h} h {m} min', {h: Math.floor(minutes / 60), m: String(minutes % 60).padStart(2, '0')}));
           return {text: since + mm, sub: t('Beginn {time}', {time: fmtDate(formats.hm, rain.since)})};
         }
         let sub = '';
         if (rain.raining === false) {
-          if (rain.last == null) sub = t('in den letzten {n} h kein Regen', {n: 48});
+          if (rain.last == null) sub = cold ? t('in den letzten {n} h kein Niederschlag', {n: 48}) : t('in den letzten {n} h kein Regen', {n: 48});
           else {
             const sameDay = fmtDate(formats.dm, rain.last) === fmtDate(formats.dm, this.conditions.now);
             sub = sameDay
-              ? t('zuletzt Regen um {time}', {time: fmtDate(formats.hm, rain.last)})
-              : t('zuletzt Regen am {time}', {time: fmtDate(formats.dm, rain.last) + ' ' + fmtDate(formats.hm, rain.last)});
+              ? (cold ? t('zuletzt Niederschlag um {time}', {time: fmtDate(formats.hm, rain.last)}) : t('zuletzt Regen um {time}', {time: fmtDate(formats.hm, rain.last)}))
+              : (cold ? t('zuletzt Niederschlag am {time}', {time: fmtDate(formats.dm, rain.last) + ' ' + fmtDate(formats.hm, rain.last)}) : t('zuletzt Regen am {time}', {time: fmtDate(formats.dm, rain.last) + ' ' + fmtDate(formats.hm, rain.last)}));
           }
         }
         if (rain.raining == null && rain.mm_today) return {text: t('heute {value} {unit}', {value: num(rain.mm_today, 1), unit: rain.mm_unit || 'mm'}), sub};
