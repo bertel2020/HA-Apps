@@ -24,7 +24,7 @@ from .card_routes import create_card_router
 from .selection_routes import create_catalog_router
 from .chart_period import stichtag_or_400, stichtag_window
 from .chart_types import SERIES_STYLE_KINDS, SERIES_STYLE_TYPES
-from .switch_counts import SERIES_METRICS, switch_count_entries
+from .switch_counts import SERIES_METRICS, default_metric, switch_count_entries
 from .formatting import decimals_to_int, entity_display_name
 from .limits import (
     MAX_EVENT_TEXT_LENGTH,
@@ -925,8 +925,12 @@ def create_api_router(deps: ApiDependencies, state: ApiState) -> APIRouter:
                     deps.data_dir, deps.index, entity_id, deps.tz, now,
                     offset=offset, years=previous_years, read_cache=read_cache,
                 )
-            if not raw and metric_of.get(entity_id) and result["aggregation_type"] == "switch":
-                series.extend(switch_count_entries(entry, metric_of[entity_id]))
+            if result["aggregation_type"] == "switch":
+                # Ohne ausdrückliche Wahl gilt der Anzeigemodus der Entität; die Oberfläche zeigt ihn als Vorgabe.
+                entry["default_metric"] = default_metric(entry["display_mode"])
+                metric = metric_of.get(entity_id) or entry["default_metric"]
+            if not raw and result["aggregation_type"] == "switch" and metric != "duration":
+                series.extend(switch_count_entries(entry, metric))
             else:
                 series.append(entry)
             if window_start is None:

@@ -165,8 +165,8 @@ _HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 SERIES_STYLE_KINDS = ("bar", "line")
 #: Aggregationsarten, für die „Darstellung“ je Serie gilt: Schalter bleiben Balken, Zustände haben ihren Zeitstrahl.
 SERIES_STYLE_TYPES = ("counter", "standard")
-#: Schalter: Anzeige der Einschaltungen (ROADMAP 1.74), siehe switch_counts.py. Ohne Eintrag gilt die Dauer.
-SERIES_STYLE_METRICS = ("count", "both")
+#: Schalter: Anzeige der Einschaltungen (ROADMAP 1.74), siehe switch_counts.py. Ohne Eintrag gilt der Anzeigemodus der Entität; "duration" ist die ausdrückliche Wahl gegen einen anderen Standard.
+SERIES_STYLE_METRICS = ("duration", "count", "both")
 
 
 def series_style_clean(value: dict | None, entity_ids: list[str], aggregation_types: dict[str, str] | None = None) -> dict:

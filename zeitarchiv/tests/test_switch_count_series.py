@@ -49,17 +49,30 @@ def test_the_input_entry_is_not_changed() -> None:
 
 
 def test_series_style_keeps_the_metric_only_for_switches() -> None:
-    style = {"a": {"metric": "both"}, "b": {"metric": "count"}, "c": {"metric": "duration"}, "d": {"metric": "count", "kind": "line"}}
-    types = {"a": "switch", "b": "counter", "c": "switch", "d": "standard"}
-    assert chart_types.series_style_clean(style, list(types), types) == {"a": {"metric": "both"}, "d": {"kind": "line"}}
+    style = {
+        "a": {"metric": "both"}, "b": {"metric": "count"}, "c": {"metric": "duration"},
+        "d": {"metric": "count", "kind": "line"}, "e": {"metric": "bogus"},
+    }
+    types = {"a": "switch", "b": "counter", "c": "switch", "d": "standard", "e": "switch"}
+    assert chart_types.series_style_clean(style, list(types), types) == {
+        "a": {"metric": "both"}, "c": {"metric": "duration"}, "d": {"kind": "line"},
+    }
     # ohne Typen (Aufrufer ohne Zugriff auf den Index) bleiben gültige Werte stehen
     assert chart_types.series_style_clean(style, list(types)) == {
-        "a": {"metric": "both"}, "b": {"metric": "count"}, "d": {"metric": "count", "kind": "line"},
+        "a": {"metric": "both"}, "b": {"metric": "count"}, "c": {"metric": "duration"},
+        "d": {"metric": "count", "kind": "line"},
     }
 
 
 def test_the_query_rejects_an_unknown_metric(client) -> None:
     ok = client.get("/api/query-multi?entity_ids=ghost.one&range=day&metrics=ghost.one:count")
     assert ok.status_code == 200
-    bad = client.get("/api/query-multi?entity_ids=ghost.one&range=day&metrics=ghost.one:duration")
+    assert client.get("/api/query-multi?entity_ids=ghost.one&range=day&metrics=ghost.one:duration").status_code == 200
+    bad = client.get("/api/query-multi?entity_ids=ghost.one&range=day&metrics=ghost.one:bogus")
     assert bad.status_code == 400
+
+
+def test_the_display_mode_of_the_entity_is_the_default_metric() -> None:
+    assert [switch_counts.default_metric(mode) for mode in ("onoff", "time", "count", "both", None)] == [
+        "duration", "duration", "count", "both", "duration",
+    ]

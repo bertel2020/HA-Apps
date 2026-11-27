@@ -103,6 +103,5 @@ def test_table_aggregates_add_counts_only_for_switches() -> None:
     assert not any(key.startswith("count_") for key in api_routes._table_aggregates(counter))
 
 
-def test_count_display_modes_are_valid_but_not_yet_offered_in_the_form() -> None:
-    assert {"count", "both"} <= set(formatting.DISPLAY_MODE_LABELS)
-    assert formatting.DISPLAY_MODES_IN_FORM == ("onoff", "time")
+def test_count_display_modes_are_valid_and_offered_in_the_form() -> None:
+    assert list(formatting.DISPLAY_MODE_LABELS) == ["onoff", "time", "count", "both"]

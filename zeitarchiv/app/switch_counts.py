@@ -9,8 +9,10 @@ from __future__ import annotations
 
 from .i18n import tr
 
-#: Anzeige einer Schalter-Serie im Chart: nur die Anzahl, oder Dauer (Balken) und Anzahl (Linie) zusammen.
-SERIES_METRICS = ("count", "both")
+#: Anzeige einer Schalter-Serie im Chart: die Dauer, nur die Anzahl, oder Dauer (Balken) und Anzahl (Linie) zusammen.
+SERIES_METRICS = ("duration", "count", "both")
+#: Der Anzeigemodus der Entität (entities.display_mode) als Standard der Serie; "onoff" und "time" zeigen die Dauer.
+DISPLAY_MODE_METRICS = {"count": "count", "both": "both"}
 #: Anhang der Serien-Kennung für die zusätzliche Anzahl-Serie bei "Beides".
 COUNT_SUFFIX = "#count"
 
@@ -19,6 +21,11 @@ def _counted(points: list[dict] | None) -> list[dict] | None:
     if points is None:
         return None
     return [{"ts": p["ts"], "value": p.get("count"), "min": None, "max": None} for p in points]
+
+
+def default_metric(display_mode: str | None) -> str:
+    """Was ein Schalter ohne ausdrückliche Wahl im Chart zeigt."""
+    return DISPLAY_MODE_METRICS.get(display_mode or "", "duration")
 
 
 def switch_count_entries(entry: dict, metric: str) -> list[dict]:

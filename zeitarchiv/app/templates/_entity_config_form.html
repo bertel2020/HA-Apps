@@ -216,7 +216,7 @@
 {% if aggregation_type == 'switch' %}
 <div class="field cfg-row">
   <label>{{ _("Anzeigemodus") }} {{ hint_button(_('Anzeigemodus')) }}</label>
-  <p class="cfg-short">{{ _("Darstellung der Einschaltdauer") }}</p>
+  <p class="cfg-short">{{ _("Dauer oder Anzahl der Einschaltungen") }}</p>
   <span class="dd-picker-wrap">
     <button type="button" class="btn" id="display-mode-btn" onclick="toggleDDPicker('display-mode')">{% for k, l in display_mode_options %}{% if k == display_mode %}{{ l }}{% endif %}{% endfor %} ▾</button>
     <input type="hidden" name="display_mode" id="display-mode-input" value="{{ display_mode }}"
@@ -227,7 +227,7 @@
       {% endfor %}
     </div>
   </span>
-  {% call hint_body() %}{{ _("„Zeit“ formatiert die Einschaltdauer je Balken lesbar (z. B. 1h 29m) — sinnvoll bei Anwesenheits-, Tür- und Bewegungssensoren. „AN/AUS“ zeigt den Rohwert.") }}{% endcall %}
+  {% call hint_body() %}{{ _("„Zeit“ formatiert die Einschaltdauer je Balken lesbar (z. B. 1h 29m) — sinnvoll bei Anwesenheits-, Tür- und Bewegungssensoren. „Anzahl“ zählt, wie oft eingeschaltet wurde, „Zeit und Anzahl“ zeigt beides. Das gilt als Standard in Verlauf, Charts, Kacheln und Karte; dort lässt es sich je Serie ändern. „AN/AUS“ zeigt den Rohwert.") }}{% endcall %}
 </div>
 {% endif %}
 <div class="preview">
