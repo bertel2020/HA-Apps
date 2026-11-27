@@ -39,6 +39,9 @@
 
 - **Archive**: an empty (0 byte) archive file no longer blocks the rebuild, the consistency check, or the energy dashboard; it is skipped like a missing file
 - **Charts**: "Raw values" is saved with the chart again; the switch in the editor no longer jumps back after reopening
+- **Charts**: the editor menu no longer shows options that do nothing for the chosen chart type
+  - Timeline: “Points”, “Area” and “Line style”
+  - Donut of state entities: “Aggregation”
 
 ## 1.57.0 - 2026-11-24
 

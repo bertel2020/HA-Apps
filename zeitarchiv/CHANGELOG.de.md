@@ -39,6 +39,9 @@
 
 - **Archiv**: Eine leere Archivdatei (0 Bytes) blockiert Neuaufbau, Abgleich und Energiedashboard nicht mehr; sie wird wie eine fehlende Datei übersprungen
 - **Charts**: „Rohwerte“ wird mit dem Chart gespeichert; der Schalter im Editor springt nach dem erneuten Öffnen nicht mehr zurück
+- **Charts**: Das Editor-Menü zeigt keine Optionen mehr, die beim gewählten Diagrammtyp nichts bewirken
+  - Zeitstrahl: „Punkte“, „Fläche“ und „Linienstil“
+  - Donut bei Zustands-Entitäten: „Aggregation“
 
 ## 1.57.0 - 2026-11-24
 
