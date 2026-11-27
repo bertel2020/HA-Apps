@@ -55,7 +55,7 @@
   - Legend “Off”: “Statistics in legend” and “Legend size” are hidden (chart editor and entity page)
   - Entity page: “Decimal places”, “Dynamic Y axis” and “Average line” are hidden for the chart types where they have no effect; for on/off entities “Decimal places” is gone (also in the settings of a value tile), since they show “On”/“Off” or durations
   - Table editor: “Align units” and “Smaller units” are greyed out while units are hidden; “Set comparison columns apart” and “Deviation from comparison” while the table has no comparison column
-  - Energy dashboard setup: “Group by group” for the consumer shares is greyed out while the “Consumer shares” tile is hidden; the thresholds of the characteristic days while their section is unticked
+  - Energy dashboard setup: “Show by group” for the consumer shares is greyed out while the “Consumer shares” tile is hidden; the “Key day thresholds” while the “Characteristic days” section is unticked
   - Weather dashboard setup: the share-of-clear-sky thresholds are greyed out without “By sun position” and the “Sun elevation” role, the rain day amount and duration without their sensor role, and the heating thresholds without the “Heating” tab
 
 ## 1.57.0 - 2026-11-24
