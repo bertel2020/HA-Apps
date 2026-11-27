@@ -27,3 +27,9 @@ def test_editor_and_tile_use_the_same_helper() -> None:
     assert "StateEntities.onOffRows(" in TILE_JS
     # Die Kachel nimmt dieselbe Ausnahme wie der Editor: genau eine Schalter-Serie.
     assert "series.length === 1 && series[0].aggregation_type === 'switch'" in TILE_JS
+
+
+def test_the_donut_centre_text_is_bound_for_both_donut_kinds() -> None:
+    """Mitte des Rings: Summe bzw. Einschaltdauer in Ruhe, beim Überfahren der Wert der Scheibe."""
+    assert EDITOR_JS.count("this.bindDonutCenter(") == 2
+    assert "donutCenterGraphic(" in EDITOR_JS

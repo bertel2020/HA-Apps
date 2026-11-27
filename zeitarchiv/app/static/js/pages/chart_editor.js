@@ -3514,18 +3514,55 @@
           }, true);
           chartInstance.resize();
         },
+        // Text in der Ringmitte (Mockup „Donut“): in Ruhe die Summe bzw. bei einem Schalter die Einschaltdauer,
+        // beim Überfahren einer Scheibe deren Wert. items[i] = {main, sub} je Scheibe, resting = {main, sub} oder null.
+        donutCenterGraphic(text) {
+          const css = getComputedStyle(document.body);
+          const ink = css.getPropertyValue('--ink').trim();
+          const inkMuted = css.getPropertyValue('--ink-muted').trim();
+          return {
+            id: 'donut-center', silent: true,
+            elements: [{
+              id: 'donut-center-text', type: 'text', left: 'center', top: 'middle', silent: true,
+              style: {
+                text: text ? `{m|${text.main}}\n{s|${text.sub}}` : '',
+                textAlign: 'center', textVerticalAlign: 'middle',
+                rich: {
+                  m: {fontSize: 22, fontWeight: 600, fill: ink, lineHeight: 28, align: 'center'},
+                  s: {fontSize: 12, fill: inkMuted, lineHeight: 16, align: 'center'},
+                },
+              },
+            }],
+          };
+        },
+        bindDonutCenter(items, resting) {
+          const set = text => chartInstance.setOption({graphic: [{id: 'donut-center', elements: [{id: 'donut-center-text', style: {
+            text: text ? `{m|${text.main}}\n{s|${text.sub}}` : '',
+          }}]}]});
+          if (this._donutOver) chartInstance.off('mouseover', this._donutOver);
+          if (this._donutOut) chartInstance.off('globalout', this._donutOut);
+          this._donutOver = params => { if (params.seriesType === 'pie' && items[params.dataIndex]) set(items[params.dataIndex]); };
+          this._donutOut = () => set(resting);
+          chartInstance.on('mouseover', this._donutOver);
+          chartInstance.on('globalout', this._donutOut);
+        },
         renderDonut() {
           if (!chartInstance) chartInstance = newChartInstance();
           if (this.hasState) { this.renderStateDonuts(); return; }
           const surface = getComputedStyle(document.body).getPropertyValue('--surface');
           const inkFaint = getComputedStyle(document.body).getPropertyValue('--ink-faint');
           if (this.singleSwitch) {
+            const rows = this.singleSwitchRows();
+            const total = rows.reduce((sum, row) => sum + row.seconds, 0);
+            const items = rows.map(row => ({main: NumberFormat.fmtDuration(row.seconds), sub: `${row.label} · ${fmtNum(total ? row.seconds / total * 100 : 0, 1)} %`}));
             chartInstance.setOption({
               toolbox: toolboxOption(this.exportFilename, surface, inkFaint),
               legend: {show: false},
               tooltip: {trigger: 'item', formatter: StateEntities.onOffTooltip, appendToBody: true},
-              series: [StateEntities.onOffSeries(this.singleSwitchRows(), this.colorFor(this.series[0].entity_id), surface, inkFaint.trim())],
+              series: [StateEntities.onOffSeries(rows, this.colorFor(this.series[0].entity_id), surface, inkFaint.trim())],
+              graphic: this.donutCenterGraphic(items[0]),
             }, true);
+            this.bindDonutCenter(items, items[0]);
             chartInstance.resize();
             return;
           }
@@ -3546,7 +3583,15 @@
           this.series.forEach(s => {
             legendSelected[this.entityNames[s.entity_id] || s.friendly_name] = !this.legendHiddenIds.includes(s.entity_id);
           });
+          // Mitte: Wert und Anteil der überfahrenen Scheibe; in Ruhe die Summe, aber nur, wenn sie etwas
+          // bedeutet (Aggregation „Summe“ und alle Serien in derselben Einheit bzw. alle Dauern).
+          const valueText = (s, v) => this.isDurationSeries(s) ? NumberFormat.fmtDuration(v) : `${fmtNum(v, this.effectiveDecimals(s))}${s.unit ? ` ${s.unit}` : ''}`;
+          const sum = data.reduce((acc, d) => acc + d.value, 0);
+          const items = data.map((d, i) => ({main: valueText(this.series[i], d.value), sub: `${d.name} · ${fmtNum(sum ? d.value / sum * 100 : 0, 1)} %`}));
+          const sameUnit = this.series.every(s => this.isDurationSeries(s)) || (this.series.every(s => !this.isDurationSeries(s)) && new Set(this.series.map(s => s.unit || '')).size === 1);
+          const resting = this.donutAggregation === 'sum' && sameUnit ? {main: valueText(this.series[0], sum), sub: t('Summe')} : null;
           chartInstance.setOption({
+            graphic: this.donutCenterGraphic(resting),
             toolbox: toolboxOption(this.exportFilename, surface, inkFaint),
             legend: {show: false, data: data.map(d => d.name), selected: legendSelected},
             tooltip: {
@@ -3570,6 +3615,7 @@
               data,
             }],
           }, true);
+          this.bindDonutCenter(items, resting);
           chartInstance.resize();
         },
 
