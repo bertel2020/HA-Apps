@@ -109,7 +109,7 @@ ROLE_HELP = {
     "wind_direction": N_("Windrichtung in Grad, zum Beispiel „Windrichtung“."),
     "sun_elevation": N_("Höhe der Sonne in Grad, zum Beispiel der Sensor „Solare Elevation“ der Integration Sun (sensor.sun_solar_elevation, in den Entitäten der Integration zu aktivieren) oder ein Template-Sensor aus dem Attribut „elevation“ von sun.sun."),
     "pv_power": N_("Aktuelle Leistung der PV-Anlage in W oder kW, zum Beispiel „Solarleistung“."),
-    "weather_state": N_("Zustand der Wetterlage, zum Beispiel eine Wetter-Entität (weather.*) oder der Sensor „Wetterzustand“ der DWD. Mit ihm sagt die Wetterlage, ob es regnet, schneit oder hagelt. Die Entität muss im Archiv einzeln ausgewählt sein; Sensoren mit übersetztem Text oder Zahlencode passen nicht."),
+    "weather_state": N_("Zustand der Wetterlage, zum Beispiel eine Wetter-Entität (weather.*) oder der Sensor „Wetterzustand“ der DWD. Mit ihm sagt die Wetterlage, ob es regnet, schneit oder hagelt, und die Langzeit-Seite zählt die Schneefalltage. Die Entität muss im Archiv einzeln ausgewählt sein; Sensoren mit übersetztem Text oder Zahlencode passen nicht."),
     "heating_flow": N_("Vorlauftemperatur der Heizung in °C, zum Beispiel „Vorlauftemperatur“ der Wärmepumpe. Der Reiter „Heizen“ zeigt sie als Heizkurve gegen die Außentemperatur."),
 }
 ROLE_KEYS = tuple(key for key, _label, _types in ROLES)
