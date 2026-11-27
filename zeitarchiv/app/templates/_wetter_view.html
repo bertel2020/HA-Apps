@@ -754,14 +754,42 @@
         {% call hint_body() %}<span x-text="kenntageNote()"></span>{% endcall %}
       </div>
       <div class="wt-kk-grid">
-        {% for key, label in (("frost", _("Frosttage")), ("eis", _("Eistage")), ("sommer", _("Sommertage")), ("heiss", _("Heiße Tage")), ("sunny", _("Sonnentage")), ("overcast", _("Trübe Tage"))) %}
-        <div class="wt-kk"{% if key in ("sunny", "overcast") %} x-show="longterm && longterm.sun_kenntage" x-cloak{% endif %}>
+        {% for key, label in (("frost", _("Frosttage")), ("eis", _("Eistage")), ("sommer", _("Sommertage")), ("heiss", _("Heiße Tage")), ("sunny", _("Sonnentage")), ("overcast", _("Trübe Tage")), ("snow", _("Schneefalltage"))) %}
+        <div class="wt-kk"{% if key in ("sunny", "overcast") %} x-show="longterm && longterm.sun_kenntage" x-cloak{% elif key == "snow" %} x-show="longterm && longterm.snow_kenntage" x-cloak{% endif %}>
           <div class="wt-kk-head"><span class="wt-kk-swatch wt-kk-{{ key }}"></span><span class="wt-kk-name">{{ label }}</span><span class="wt-kk-avg" x-text="kenntageAvg('{{ key }}')"></span></div>
           <div class="wt-chart wt-kk-chart" x-ref="kenntageChart{{ key | capitalize }}"></div>
         </div>
         {% endfor %}
       </div>
       <p class="wt-foot" x-show="kenntageFoot()" x-text="kenntageFoot()" x-cloak></p>
+    </div>
+    <div class="card wt-card" x-show="longterm && longterm.snow_enabled" x-cloak>
+      <div class="wt-controls">
+        <h2 class="wt-h2">{{ _("Schnee-Saisons") }} {{ hint_button(_("Schnee-Saisons")) }}</h2>
+        {% call hint_body() %}{{ _("Eine Saison läuft vom 1. Juli bis zum 30. Juni. Ein Schneefalltag ist ein Tag mit Schnee oder Schneeregen laut Wetterzustand, mindestens so lange wie bei den Regentagen eingestellt.") }}{% endcall %}
+      </div>
+      <div class="tbl-wrap wt-table-wrap" x-show="longterm && longterm.snow_seasons && longterm.snow_seasons.length">
+        <table class="wt-table wt-table-full wt-snow-table">
+          <thead><tr>
+            <th>{{ _("Saison") }}</th><th>{{ _("Erster Schnee") }}</th><th>{{ _("Letzter Schnee") }}</th>
+            <th>{{ _("Tage mit Schnee") }}</th><th class="wt-snow-opt">{{ _("Längste Folge") }}</th>
+          </tr></thead>
+          <tbody>
+            <template x-for="season in ((longterm && longterm.snow_seasons) || [])" :key="season.season">
+              <tr :class="season.running ? 'wt-row-current' : ''">
+                <td><span x-text="season.season"></span> <small x-show="season.running">{{ _("läuft") }}</small></td>
+                <td x-show="season.first" x-text="season.first ? snowDate(season.first) : ''"></td>
+                <td x-show="season.first" x-text="season.last ? snowDate(season.last) : ''"></td>
+                <td colspan="2" x-show="!season.first" x-cloak>{{ _("noch kein Schnee") }}</td>
+                <td><span x-text="season.snow_days"></span> <small class="wt-snow-opt" x-text="t('von {days}', {days: season.days})"></small></td>
+                <td class="wt-snow-opt" x-text="snowLongest(season)"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <p class="hint hint-status" x-show="longterm && longterm.snow_enabled && !(longterm.snow_seasons && longterm.snow_seasons.length)" x-text="snowEmpty()" x-cloak></p>
+      <p class="wt-foot" x-show="snowFoot()" x-text="snowFoot()" x-cloak></p>
     </div>
     {% endif %}
     {% if show_monthyears %}

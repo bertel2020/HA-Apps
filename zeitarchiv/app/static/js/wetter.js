@@ -2939,7 +2939,31 @@
         const all = this.longterm ? this.longterm.kenntage : {};
         const days = Object.values(all).reduce((sum, year) => sum + year.days.reduce((a, b) => a + b, 0), 0);
         if (!days) return t('Noch keine Tage mit ausreichend Werten (mindestens 18 Stunden je Tag).');
-        return t('Frosttag: Tiefstwert unter 0 °C, Eistag: Höchstwert unter 0 °C, Sommertag: Höchstwert ab 25 °C, heißer Tag: ab 30 °C. Gezählt sind {days} abgeschlossene Tage mit mindestens 18 Stunden Werten; der laufende Tag zählt nicht. Sonnentage und trübe Tage richten sich nach dem Sonnenanteil des Tages wie im Tagesbild.', {days});
+        return t('Frosttag: Tiefstwert unter 0 °C, Eistag: Höchstwert unter 0 °C, Sommertag: Höchstwert ab 25 °C, heißer Tag: ab 30 °C. Gezählt sind {days} abgeschlossene Tage mit mindestens 18 Stunden Werten; der laufende Tag zählt nicht. Sonnentage und trübe Tage richten sich nach dem Sonnenanteil des Tages wie im Tagesbild.', {days})
+          + (this.longterm.snow_kenntage ? ' ' + t('Schneefalltage: Tage mit mindestens {minutes} Minuten Schnee oder Schneeregen laut Wetterzustand.', {minutes: this.longterm.snow_min_minutes}) : '');
+      },
+
+      // Kurzdatum der Schnee-Saisons („12. Nov.“) aus einem ISO-Datum.
+      snowDate(iso) {
+        return new Intl.DateTimeFormat(LOCALE, {day: 'numeric', month: 'short', timeZone: 'UTC'}).format(new Date(iso + 'T12:00:00Z'));
+      },
+
+      snowLongest(season) {
+        return season.longest ? t('{n} Tage', {n: season.longest.value}) : '–';
+      },
+
+      // Satz unter der Saisontabelle: seit wann der Wetterzustand archiviert wird (frühere Winter fehlen) und woher er stammt.
+      snowFoot() {
+        const l = this.longterm;
+        if (!l || !l.snow_since) return '';
+        const since = new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'})
+          .format(new Date(l.snow_since + 'T12:00:00Z'));
+        return t('Archiviert seit {date}, frühere Winter fehlen. Angaben deiner Wetterquelle.', {date: since});
+      },
+
+      // Solange noch kein Tag abgeschlossen ist, gibt es keine Saison; der Satz sagt, wann es losgeht.
+      snowEmpty() {
+        return t('Die Auswertung beginnt mit dem ersten abgeschlossenen Tag.');
       },
 
       // Fußnote zum laufenden Jahr (mit „*“ an der Jahreszahl markiert).
@@ -2960,14 +2984,17 @@
           {key: 'heiss', name: t('Heiße Tage'), color: cssVar('--chart-5')},
           {key: 'sunny', name: t('Sonnentage'), color: cssVar('--chart-7'), sun: true},
           {key: 'overcast', name: t('Trübe Tage'), color: cssVar('--ink-faint'), sun: true},
+          {key: 'snow', name: t('Schneefalltage'), color: cssVar('--chart-1'), snow: true},
         ];
       },
 
-      // Zähltabelle einer Art: Temperatur-Kenntage oder die der Sonne (dort fehlen Jahre vor dem Archivbeginn der Helligkeit).
+      // Zähltabelle einer Art: Temperatur-Kenntage, die der Sonne (dort fehlen Jahre vor dem Archivbeginn der Helligkeit)
+      // oder die Schneefalltage (ab Archivbeginn des Wetterzustands).
       kenntageSource(key) {
+        const l = this.longterm;
+        if (!l) return {};
         const sun = key === 'sunny' || key === 'overcast';
-        const source = this.longterm ? (sun ? this.longterm.sun_kenntage : this.longterm.kenntage) : null;
-        return source || {};
+        return (key === 'snow' ? l.snow_kenntage : sun ? l.sun_kenntage : l.kenntage) || {};
       },
 
       // Ø je Jahr über die abgeschlossenen Jahre der Auswahl (das laufende Jahr zählt nicht).
@@ -3761,10 +3788,13 @@
           lowest: t('Tiefster Wert'), strongest_gust: t('Stärkste Böe'), wettest_day: t('Nassester Tag'),
           rainiest_day: t('Regenreichster Tag'), sunniest_day: t('Sonnigster Tag'), sunniest_month: t('Sonnigster Monat'),
           longest_sunny_streak: t('Längste sonnige Folge'), longest_overcast_streak: t('Längste trübe Folge'),
+          longest_snow_streak: t('Längste Schneefolge'), earliest_first_snow: t('Frühester erster Schnee'),
+          latest_last_snow: t('Spätester letzter Schnee'),
         }[key] || key;
       },
 
       recordValue(record) {
+        if (record.season) return escapeHtml(this.snowDate(record.date));
         if (record.key.endsWith('_streak')) return escapeHtml(num(record.value, 0)) + `<small>${escapeHtml(t('Tage'))}</small>`;
         return escapeHtml(num(record.value, 1)) + (record.unit ? `<small>${escapeHtml(record.unit)}</small>` : '');
       },
@@ -3774,6 +3804,7 @@
         const at = (iso) => new Date(iso + 'T12:00:00Z');
         const full = (iso) => fmt({day: '2-digit', month: '2-digit', year: 'numeric'}).format(at(iso));
         if (record.key === 'sunniest_month') return fmt({month: 'long', year: 'numeric'}).format(at(record.date));
+        if (record.season) return t('Saison {season}', {season: record.season});
         if (record.end) {
           // Läuft die Folge noch, endet sie heute; im selben Jahr genügt beim Beginn Tag und Monat.
           if (record.ongoing) return t('{from} bis heute', {from: full(record.date)});
@@ -3790,7 +3821,7 @@
         const pick = (keys) => keys.map((k) => records.find((r) => r.key === k)).filter(Boolean);
         const groups = [
           ['temperature', ['highest', 'lowest'], ['warmest_day', 'coldest_day']],
-          ['wind', ['strongest_gust', 'wettest_day', 'rainiest_day'], []],
+          ['wind', ['strongest_gust', 'wettest_day', 'rainiest_day'], ['longest_snow_streak', 'earliest_first_snow', 'latest_last_snow']],
           ['sun', ['sunniest_day', 'sunniest_month'], ['longest_sunny_streak', 'longest_overcast_streak']],
         ];
         return groups
@@ -3806,7 +3837,9 @@
       // Die beiden Folgen als Balken im Verhältnis zur längeren; sonst kein Balken.
       recordBar(record) {
         if (!record.key.endsWith('_streak')) return null;
-        const streaks = (this.longterm ? this.longterm.records : []).filter((r) => r.key.endsWith('_streak'));
+        // Die Folgen der Sonne und die des Schnees stehen in verschiedenen Gruppen und werden nicht aneinander gemessen.
+        const snow = record.key.includes('snow');
+        const streaks = (this.longterm ? this.longterm.records : []).filter((r) => r.key.endsWith('_streak') && r.key.includes('snow') === snow);
         const longest = Math.max(...streaks.map((r) => r.value), 0);
         return longest ? Math.max(4, Math.round(record.value / longest * 100)) : null;
       },
