@@ -524,6 +524,8 @@ function selectBrush() {
         _rangeAnchorMs: null,
         get total() { return this.points.reduce((sum, p) => sum + (p.value || 0), 0); },
         get legendMetricOptions() { return LEGEND_METRIC_OPTIONS; },
+        // Min, Max und Ø sagen bei Schalter-Rohwerten (0/1) nichts: im Menü sperren.
+        metricUnavailable(key) { return ['min', 'max', 'average'].includes(key) && this.raw && this.aggregationType === 'switch'; },
         // Min/Max/Ø/Summe für den Legenden-Chip (siehe Template) — dieselbe
         // Berechnung wie seriesStats() in chart_editor.html, hier nur für die
         // eine Serie dieser Seite statt für eine Liste. Summe bei Zählern
@@ -578,6 +580,8 @@ function selectBrush() {
           const maxima = this.points.map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
           const isSwitch = this.aggregationType === 'switch';
           const hasSum = (this.aggregationType === 'counter' && !this.raw) || isSwitch;
+          // Schalter-Rohwerte (Zeitstrahl, Rohwerte-Linie) sind 0/1: Min, Max und Ø sagen nichts, daher null.
+          const noSpread = isSwitch && this.raw;
           // Schalter ohne Rohwerte: Bucket-Werte sind Sekunden (siehe render()).
           const asDuration = DURATION_DISPLAY || (isSwitch && !this.raw);
           const formatted = value => (asDuration ? NumberFormat.fmtDuration(value) : fmtValue(value)) + (!asDuration && UNIT ? ' ' + UNIT : '');
@@ -592,9 +596,9 @@ function selectBrush() {
           const sumFormatted = isSwitch ? NumberFormat.fmtDuration(sumValue) : formatted(sumValue);
           return {
             last: values.length ? formatted(values[values.length - 1]) : '—',
-            min: minima.length ? formatted(Math.min(...minima)) : '—',
-            max: maxima.length ? formatted(Math.max(...maxima)) : '—',
-            average: values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—',
+            min: noSpread ? null : (minima.length ? formatted(Math.min(...minima)) : '—'),
+            max: noSpread ? null : (maxima.length ? formatted(Math.max(...maxima)) : '—'),
+            average: noSpread ? null : (values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—'),
             sum: hasSum ? (values.length ? sumFormatted : '—') : null,
           };
         },

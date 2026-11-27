@@ -629,7 +629,7 @@
                     {# Siehe entity_detail.html: .filter-chip ist der app-weite
                        Standard für Chip-Mehrfachauswahl. #}
                     <label class="filter-chip">
-                      <input type="checkbox" :value="metric.value" x-model="legendMetrics" @change="render()">
+                      <input type="checkbox" :value="metric.value" x-model="legendMetrics" :disabled="metricUnavailable(metric.value)" @change="render()">
                       <span x-text="metric.label"></span>
                     </label>
                   </template>
@@ -796,9 +796,9 @@
               </span>
               <span class="values" x-show="chartStats && !stat.isState">
                 <span x-show="legendMetrics.includes('last')">{{ _('Aktuell <strong x-text="stat.last"></strong>') }}</span>
-                <span x-show="legendMetrics.includes('min')">{{ _('Min <strong x-text="stat.min"></strong>') }}</span>
-                <span x-show="legendMetrics.includes('max')">{{ _('Max <strong x-text="stat.max"></strong>') }}</span>
-                <span x-show="legendMetrics.includes('average')">Ø <strong x-text="stat.average"></strong></span>
+                <span x-show="legendMetrics.includes('min') && stat.min !== null">{{ _('Min <strong x-text="stat.min"></strong>') }}</span>
+                <span x-show="legendMetrics.includes('max') && stat.max !== null">{{ _('Max <strong x-text="stat.max"></strong>') }}</span>
+                <span x-show="legendMetrics.includes('average') && stat.average !== null">Ø <strong x-text="stat.average"></strong></span>
                 <span x-show="legendMetrics.includes('sum') && stat.sum !== null">Σ <strong x-text="stat.sum"></strong></span>
               </span>
               <!-- Gedämpfte Unterzeile für die Vergleichsperiode (Vorjahr/
@@ -836,9 +836,9 @@
               <span class="name" x-text="stat.name"></span>
               <span class="values" x-show="chartStats">
                 <span x-show="legendMetrics.includes('last')">{{ _('Aktuell <strong x-text="stat.last"></strong>') }}</span>
-                <span x-show="legendMetrics.includes('min')">{{ _('Min <strong x-text="stat.min"></strong>') }}</span>
-                <span x-show="legendMetrics.includes('max')">{{ _('Max <strong x-text="stat.max"></strong>') }}</span>
-                <span x-show="legendMetrics.includes('average')">Ø <strong x-text="stat.average"></strong></span>
+                <span x-show="legendMetrics.includes('min') && stat.min !== null">{{ _('Min <strong x-text="stat.min"></strong>') }}</span>
+                <span x-show="legendMetrics.includes('max') && stat.max !== null">{{ _('Max <strong x-text="stat.max"></strong>') }}</span>
+                <span x-show="legendMetrics.includes('average') && stat.average !== null">Ø <strong x-text="stat.average"></strong></span>
                 <span x-show="legendMetrics.includes('sum') && stat.sum !== null">Σ <strong x-text="stat.sum"></strong></span>
               </span>
             </span>
@@ -930,15 +930,15 @@
                     <span class="legend-compare-value" x-show="stat.compare" x-text="stat.compare?.last"></span>
                   </td>
                   <td x-show="legendMetrics.includes('min')">
-                    <span x-text="stat.min"></span>
+                    <span x-text="stat.min ?? '—'"></span>
                     <span class="legend-compare-value" x-show="stat.compare" x-text="stat.compare?.min"></span>
                   </td>
                   <td x-show="legendMetrics.includes('max')">
-                    <span x-text="stat.max"></span>
+                    <span x-text="stat.max ?? '—'"></span>
                     <span class="legend-compare-value" x-show="stat.compare" x-text="stat.compare?.max"></span>
                   </td>
                   <td x-show="legendMetrics.includes('average')">
-                    <span x-text="stat.average"></span>
+                    <span x-text="stat.average ?? '—'"></span>
                     <span class="legend-compare-value" x-show="stat.compare" x-text="stat.compare?.average"></span>
                   </td>
                   <td x-show="legendMetrics.includes('sum')">
@@ -996,9 +996,9 @@
               <span class="name" x-text="stat.name"></span>
               <span class="values" x-show="chartStats">
                 <span x-show="legendMetrics.includes('last')">{{ _('Aktuell <strong x-text="stat.last"></strong>') }}</span>
-                <span x-show="legendMetrics.includes('min')">{{ _('Min <strong x-text="stat.min"></strong>') }}</span>
-                <span x-show="legendMetrics.includes('max')">{{ _('Max <strong x-text="stat.max"></strong>') }}</span>
-                <span x-show="legendMetrics.includes('average')">Ø <strong x-text="stat.average"></strong></span>
+                <span x-show="legendMetrics.includes('min') && stat.min !== null">{{ _('Min <strong x-text="stat.min"></strong>') }}</span>
+                <span x-show="legendMetrics.includes('max') && stat.max !== null">{{ _('Max <strong x-text="stat.max"></strong>') }}</span>
+                <span x-show="legendMetrics.includes('average') && stat.average !== null">Ø <strong x-text="stat.average"></strong></span>
                 <span x-show="legendMetrics.includes('sum') && stat.sum !== null">Σ <strong x-text="stat.sum"></strong></span>
                 <span class="compare-cut" x-show="stat.delta" x-text="stat.delta"></span>
               </span>

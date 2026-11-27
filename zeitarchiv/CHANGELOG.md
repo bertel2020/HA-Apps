@@ -43,6 +43,7 @@
 - **On/off entities**: bars and lines show durations (e.g. “2h 7m”) instead of bare numbers, whichever display mode is set
   - Applies to the entity page, the chart editor, dashboard tiles, and the Lovelace card
   - The display mode now only applies to the raw 0/1 values (timeline)
+  - In the timeline the legend no longer offers “Min”, “Max” and “Ø”, which would only show 0 and 1
 - **Charts**: the editor menu no longer shows options that do nothing for the chosen chart type
   - Timeline: “Points”, “Area” and “Line style”
   - Donut of state entities: “Aggregation”

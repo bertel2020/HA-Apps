@@ -869,6 +869,11 @@
         // Dauer-Serien (Schalter im Anzeigemodus „Zeit“) formatiert NumberFormat.fmtDuration
         // als „2h 33m“ — Nachkommastellen werden dort nicht gelesen. Gilt für den ganzen
         // Chart nur, wenn jede Serie eine Dauer-Serie ist (wie isDurationSeries() in render()).
+        // Min, Max und Ø sagen bei Schalter-Rohwerten (0/1) nichts: im Menü sperren, wenn kein Chart-Eintrag sie braucht.
+        metricUnavailable(key) {
+          return ['min', 'max', 'average'].includes(key) && this.raw && this.series.length > 0
+            && this.series.every(s => s.aggregation_type === 'switch');
+        },
         get allDuration() { return this.series.length > 0 && this.series.every(s => this.isDurationSeries(s)); },
         // Bei Schaltern sind die Bucket-Werte (Balken/Linie ohne Rohwerte) Einschaltsekunden,
         // gleich welcher Anzeigemodus gewählt ist — ohne Einheit wären es unlesbare Zahlen
@@ -951,6 +956,9 @@
           // fmtNum()s generische 4-signifikante-Stellen-Rundung, die bei
           // größeren Sekundenwerten sichtbar ungenau wird.
           const sumFormatted = isSwitch ? NumberFormat.fmtDuration(sumValue) : formatted(sumValue);
+          // Schalter-Rohwerte (Zeitstrahl, Rohwerte-Linie) sind 0/1: Min und Max wären immer 0 und 1, Ø ein
+          // Anteil ohne Einheit — keine Aussage, deshalb null ("nicht angeboten", wie bei der Summe).
+          const noSpread = isSwitch && this.raw;
           return {
             // Rohwerte und Formatierer für die Summe über einen Stapel (legendEntries).
             lastRaw: values.length ? values[values.length - 1] : null,
@@ -958,9 +966,9 @@
             fmtValue: formatted,
             fmtSum: isSwitch ? NumberFormat.fmtDuration : formatted,
             last: values.length ? formatted(values[values.length - 1]) : '—',
-            min: minima.length ? formatted(Math.min(...minima)) : '—',
-            max: maxima.length ? formatted(Math.max(...maxima)) : '—',
-            average: values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—',
+            min: noSpread ? null : (minima.length ? formatted(Math.min(...minima)) : '—'),
+            max: noSpread ? null : (maxima.length ? formatted(Math.max(...maxima)) : '—'),
+            average: noSpread ? null : (values.length ? formatted(values.reduce((sum, v) => sum + v, 0) / values.length) : '—'),
             sum: hasSum ? (values.length ? sumFormatted : '—') : null,
           };
         },

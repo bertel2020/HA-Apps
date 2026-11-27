@@ -43,6 +43,7 @@
 - **Schalter-Entitäten**: Balken und Linien zeigen Dauern (z. B. „2h 7m“) statt nackter Zahlen, gleich welcher Anzeigemodus gewählt ist
   - Gilt für Entitätsseite, Chart-Editor, Dashboard-Kacheln und Lovelace-Karte
   - Der Anzeigemodus gilt nur noch für die 0/1-Rohwerte (Zeitstrahl)
+  - Im Zeitstrahl bietet die Legende „Min“, „Max“ und „Ø“ nicht mehr an, sie würden nur 0 und 1 zeigen
 - **Charts**: Das Editor-Menü zeigt keine Optionen mehr, die beim gewählten Diagrammtyp nichts bewirken
   - Zeitstrahl: „Punkte“, „Fläche“ und „Linienstil“
   - Donut bei Zustands-Entitäten: „Aggregation“
