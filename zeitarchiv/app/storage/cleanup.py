@@ -328,9 +328,31 @@ _NO_REASON = ""
 # tiefe Seiten auf zwei Durchläufe mit Fenster umschaltet (5.000 Wörterbücher sind rund 2 MB).
 MAX_RETAINED_MATCHES = 5000
 
-#: Sortierungen der Werte-Tabelle nach Wert (ohne: neueste zuerst). Bei Jahr/Gesamt reicht der Speicher nur für die
+#: Sortierungen der Werte-Tabelle (ohne: neueste zuerst): nach Wert, älteste zuerst und nach der Zahl der Befunde einer Zeile
+#: (``status_desc``: mit Befund zuerst, ``status_asc``: ohne Befund zuerst). Bei Jahr/Gesamt reicht der Speicher nur für die
 #: ersten MAX_RETAINED_MATCHES Treffer der Reihenfolge; das sind die Extremwerte, um die es beim Sortieren geht.
-ROW_SORTS = ("value_desc", "value_asc")
+ROW_SORT_KEYS: dict[str, Callable[[dict], float]] = {
+    "value_desc": lambda row: row["value"],
+    "value_asc": lambda row: -row["value"],
+    "time_asc": lambda row: -row["ts"],
+    "status_desc": lambda row: float(len(row.get("flags") or ())),
+    "status_asc": lambda row: -float(len(row.get("flags") or ())),
+}
+def sort_rows(rows: list[tuple[float, float]], sort: str, flag_sources: Iterable[Collection[float]]) -> list[tuple[float, float]]:
+    """Sortierte (Zeitstempel, Wert)-Zeilen für den Speicherpfad (Stunde bis Monat) mit denselben Schlüsseln wie das
+    Streaming (ROW_SORT_KEYS); ``flag_sources`` sind die Befund-Wörterbücher je Zeitstempel für die Sortierung nach Status."""
+    sources = tuple(flag_sources)
+    keys = {
+        "value_desc": lambda row: row[1],
+        "value_asc": lambda row: -row[1],
+        "time_asc": lambda row: -row[0],
+        "status_desc": lambda row: sum(row[0] in source for source in sources),
+        "status_asc": lambda row: -sum(row[0] in source for source in sources),
+    }
+    return sorted(rows, key=lambda row: (keys[sort](row), row[0]), reverse=True)
+
+
+ROW_SORTS = ("value_desc", "value_asc", "time_asc", "status_desc", "status_asc")
 
 
 class GapDetector:
@@ -529,7 +551,7 @@ def analyze_raw_rows_page(
         )
     retained: deque[dict] = deque(maxlen=requested_page * page_size)
     # Mit ``sort``: Heap der bisher besten Treffer als (Schlüssel, Zeitstempel, Zähler, Zeile); der kleinste Schlüssel
-    # liegt oben und fliegt zuerst heraus. Beim Absteigen ist der Schlüssel der Wert, beim Aufsteigen sein Negatives.
+    # liegt oben und fliegt zuerst heraus. Je Sortierung steht der Schlüssel in ROW_SORT_KEYS (größer = weiter vorn).
     ranked: list[tuple[float, float, int, dict]] = []
     ranked_size = requested_page * page_size
     collected = {name: deque(maxlen=limit) for name, limit in (collect or {}).items()}
@@ -655,9 +677,7 @@ def analyze_raw_rows_page(
                     collected[name].append(row)
             if row_matches:
                 if sort:
-                    entry = (
-                        row["value"] if sort == "value_desc" else -row["value"], row["ts"], total_matches, row,
-                    )
+                    entry = (ROW_SORT_KEYS[sort](row), row["ts"], total_matches, row)
                     if len(ranked) < ranked_size:
                         heapq.heappush(ranked, entry)
                     else:

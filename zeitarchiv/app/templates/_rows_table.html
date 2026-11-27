@@ -201,7 +201,7 @@
 <p class="rows-hint">{{ _("Fällt ein Zählerstand, zum Beispiel auf 0, ist das kein Ausreißer, sondern ein Zählerrückgang. Du findest ihn im Filter „Zählerrückgänge“.") }}</p>
 {% endif %}
 {% if sort and pagination.capped %}
-<p class="rows-hint">{{ _("Nach Wert sortiert sind die ersten {count} Werte der Reihenfolge erreichbar; weitere liegen dahinter. Mit einem engeren Zeitraum oder einem Filter werden alle sichtbar.", count=((pagination.total_pages * pagination.page_size) | format_int)) }}</p>
+<p class="rows-hint">{{ _("Sortiert sind die ersten {count} Werte der Reihenfolge erreichbar; weitere liegen dahinter. Mit einem engeren Zeitraum oder einem Filter werden alle sichtbar.", count=((pagination.total_pages * pagination.page_size) | format_int)) }}</p>
 {% endif %}
 {% if rows %}
 {% set counter_verdicts_map = counter_verdicts(entity_id, rows) if counter_verdicts is defined and counter_decrease_enabled else {} %}
@@ -233,12 +233,17 @@
       {% else %}
       <th><input type="checkbox" onchange="toggleAllRows(this)" title="{{ _('Alle auf dieser Seite auswählen') }}"></th>
       {% endif %}
-      <th>{{ _("Zeitstempel") }}</th>
-      {# Klick auf „Wert“ schaltet absteigend → aufsteigend → nach Zeit (cleanup.js, toggleValueSort). Die Richtung zeigt dieselbe Pfeil-Konvention wie die übrigen Tabellen (absteigend ↑, aufsteigend ↓). #}
-      <th class="dt-sortable-col{{ ' dt-sort-desc' if sort == 'value_desc' else (' dt-sort-asc' if sort == 'value_asc' else '') }}" tabindex="0" role="button"
-          aria-sort="{{ 'descending' if sort == 'value_desc' else ('ascending' if sort == 'value_asc' else 'none') }}"
-          title="{{ _('Nach Wert sortieren') }}" onclick="toggleValueSort()" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleValueSort(); }">{{ _("Wert") }}</th>
-      <th>{{ _("Status") }}</th>
+      {# Alle drei Köpfe sortieren (cleanup.js, toggleSort). Zeitstempel: neueste zuerst ↔ älteste zuerst; Wert: absteigend → aufsteigend → nach Zeit;
+         Status: mit Befund zuerst → ohne Befund zuerst → nach Zeit. Pfeile wie in den übrigen Tabellen (absteigend ↑, aufsteigend ↓). #}
+      {% macro sort_th(column, label, title, asc_value, desc_value) %}
+      {% set state = 'asc' if sort == asc_value else ('desc' if sort == desc_value or (column == 'time' and not sort) else '') %}
+      <th class="dt-sortable-col{{ ' dt-sort-' ~ state if state }}" tabindex="0" role="button"
+          aria-sort="{{ 'ascending' if state == 'asc' else ('descending' if state == 'desc' else 'none') }}"
+          title="{{ title }}" onclick="toggleSort('{{ column }}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleSort('{{ column }}'); }">{{ label }}</th>
+      {% endmacro %}
+      {{ sort_th('time', _("Zeitstempel"), _('Nach Zeitstempel sortieren'), 'time_asc', '') }}
+      {{ sort_th('value', _("Wert"), _('Nach Wert sortieren'), 'value_asc', 'value_desc') }}
+      {{ sort_th('status', _("Status"), _('Nach Status sortieren'), 'status_asc', 'status_desc') }}
     </tr>
     {% for row in rows %}
     {# Zeilenhintergrund nur, wenn sich etwas aufräumen lässt (Ausreißer, Duplikat, Wiederholung, Fehlwert); Lücke, „Noch offen“ und „Vermutlich Reset“ färben die Zeile nicht. #}

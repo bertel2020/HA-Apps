@@ -411,11 +411,18 @@
     function resetPage() {
       document.getElementById('page-field').value = '1';
     }
-    // Spalte „Wert“: absteigend (größte zuerst, findet verrutschte Ziffern), aufsteigend (findet Nullen), dann wieder nach Zeit.
+    // Klick auf eine Spaltenüberschrift. Zeitstempel: neueste zuerst ↔ älteste zuerst. Wert: absteigend (findet verrutschte
+    // Ziffern) → aufsteigend (findet Nullen) → wieder nach Zeit. Status: mit Befund zuerst → ohne Befund zuerst → nach Zeit.
     // Das Feld liegt wie page-field außerhalb des Fragments und bleibt über Swaps erhalten.
-    function toggleValueSort() {
+    const SORT_CYCLES = {
+      time: {'': 'time_asc', time_asc: ''},
+      value: {'': 'value_desc', value_desc: 'value_asc', value_asc: ''},
+      status: {'': 'status_desc', status_desc: 'status_asc', status_asc: ''},
+    };
+    function toggleSort(column) {
       const field = document.getElementById('sort-field');
-      field.value = field.value === '' ? 'value_desc' : (field.value === 'value_desc' ? 'value_asc' : '');
+      // Eine Sortierung einer anderen Spalte beginnt bei dieser Spalte mit der ersten Stufe, bei der Zeit mit „neueste zuerst“.
+      field.value = SORT_CYCLES[column][field.value] ?? (column === 'time' ? '' : SORT_CYCLES[column]['']);
       resetPage();
       field.dispatchEvent(new Event('change', {bubbles: true}));
     }

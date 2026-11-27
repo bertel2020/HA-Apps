@@ -1641,3 +1641,36 @@ def test_sorted_rows_beyond_the_memory_cap_are_flagged(monkeypatch) -> None:
     assert analysis["pagination"]["page"] == 2 and analysis["pagination"]["total"] == 20
     assert analysis["pagination"]["capped"] is True
     assert [row["value"] for row in analysis["rows"]] == [16.0, 15.0, 14.0]
+
+
+def test_rows_can_be_sorted_by_time_and_by_status() -> None:
+    """Zeitstempel: älteste zuerst. Status: nach der Zahl der Befunde einer Zeile, bei Gleichstand die neuere zuerst."""
+    werte = [20.0, 20.1, 19.9, 20.0, 20.2, 19.8, 250.0, 20.1, 20.0, 20.2]
+    rows = [(float(i * 60), v) for i, v in enumerate(werte)]
+    oldest = _sorted_page(rows, "time_asc", page_size=3)
+    assert [row["ts"] for row in oldest["rows"]] == [0.0, 60.0, 120.0]
+
+    def status_page(sort):
+        return cleanup.analyze_raw_rows_page(
+            lambda: iter(rows), filter_="all", page=1, page_size=3,
+            gap_threshold_minutes=None, outlier_factor=10, tz=TZ, sort=sort,
+        )
+
+    flagged_first = status_page("status_desc")["rows"]
+    assert flagged_first[0]["ts"] == 360.0 and flagged_first[0]["flags"]  # der Ausreißer steht vorn
+    unflagged_first = status_page("status_asc")["rows"]
+    assert all(not row["flags"] for row in unflagged_first)
+
+
+def test_in_memory_sort_matches_the_streaming_order() -> None:
+    """Stunde bis Monat (sort_rows) und Jahr/Gesamt (Heap in analyze_raw_rows_page) liefern dieselbe Reihenfolge."""
+    werte = [20.0, 20.1, 19.9, 20.0, 20.2, 19.8, 250.0, 20.1, 20.0, 0.0, 20.2]
+    rows = [(float(i * 60), v) for i, v in enumerate(werte)]
+    outliers = cleanup.detect_outliers(rows, 10, decimals="auto", tz=TZ)
+    for sort in cleanup.ROW_SORTS:
+        direkt = cleanup.sort_rows(rows, sort, (outliers,))
+        streaming = cleanup.analyze_raw_rows_page(
+            lambda: iter(rows), filter_="all", page=1, page_size=50,
+            gap_threshold_minutes=None, outlier_factor=10, tz=TZ, sort=sort,
+        )
+        assert [ts for ts, _value in direkt] == [row["ts"] for row in streaming["rows"]], sort

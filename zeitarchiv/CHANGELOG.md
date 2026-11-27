@@ -46,8 +46,10 @@
 - **Charts**: “Donut” can only be chosen with at least two entities; with a single value it was a full ring without information (state entities still work with one)
   - A single on/off entity is the exception: its donut splits the period into “On” and “Off” (also in tiles and the Lovelace card)
   - The donut shows a value in the middle: the total (or the on-time of an on/off entity, or the largest state of a state entity), and the value of a slice while hovering it; in tiles and the Lovelace card only when there is room for it
-- **Edit values**: the “Value” column can be sorted
-  - A click on the column header sorts descending (shifted digits come first), a second one ascending (zeros come first), a third one back to time order
+- **Edit values**: the columns can be sorted
+  - “Value”: a click sorts descending (shifted digits come first), a second one ascending (zeros come first), a third one back to time order
+  - “Timestamp”: switches between newest and oldest first
+  - “Status”: rows with findings first, then rows without findings first, then back to time order
   - The sort applies together with the filter and the period and is kept after marking values
   - With “Year” and “All”, the first 5,000 values of the order are reachable; a note says so
 - **Counter decreases**: after a single spike upwards, the good value that follows is no longer shown as “Probably a reset”

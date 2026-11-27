@@ -5280,11 +5280,7 @@ def _rows_fragment(
             rows = [(ts, value) for ts, value in rows if ts in counter_decreases]
 
         if sort:
-            # Nach Wert, bei gleichem Wert die neuere Zeile zuerst (wie die Zeitansicht).
-            if sort == "value_desc":
-                rows = sorted(rows, key=lambda row: (row[1], row[0]), reverse=True)
-            else:
-                rows = sorted(rows, key=lambda row: (row[1], -row[0]))
+            rows = cleanup.sort_rows(rows, sort, (outliers, gaps, duplicates, repetitions, counter_decreases))
         else:
             rows = list(reversed(rows))
         page_rows, pagination = _paginate(rows, page, page_size)
