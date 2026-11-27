@@ -349,8 +349,8 @@
               <div>
                 <p class="tbl-style-group-label">{{ _("Vergleich") }}</p>
                 <div class="tbl-style-group-chips">
-                  <button type="button" class="chip" :class="{active: style.comparison_columns}" data-tooltip="{{ _('Vergleichsspalten wie Vortag, Vormonat und Vorjahr optisch zurücknehmen') }}" @click="style.comparison_columns = !style.comparison_columns">{{ _("Vergleichsspalten absetzen") }}</button>
-                  <button type="button" class="chip" :class="{active: style.show_deviation}" data-tooltip="{{ _('Prozentuale Abweichung unter dem aktuellen Wert anzeigen, jeweils gegenüber der zugehörigen Vergleichsspalte') }}" @click="style.show_deviation = !style.show_deviation">{{ _("Abweichung zum Vergleich") }}</button>
+                  <button type="button" class="chip" :class="{active: style.comparison_columns && hasComparisonColumn}" :disabled="!hasComparisonColumn" data-tooltip="{{ _('Vergleichsspalten wie Vortag, Vormonat und Vorjahr optisch zurücknehmen') }}" @click="style.comparison_columns = !style.comparison_columns">{{ _("Vergleichsspalten absetzen") }}</button>
+                  <button type="button" class="chip" :class="{active: style.show_deviation && hasComparisonColumn}" :disabled="!hasComparisonColumn" data-tooltip="{{ _('Prozentuale Abweichung unter dem aktuellen Wert anzeigen, jeweils gegenüber der zugehörigen Vergleichsspalte') }}" @click="style.show_deviation = !style.show_deviation">{{ _("Abweichung zum Vergleich") }}</button>
                   <button type="button" class="chip" :class="{active: style.show_row_sum}" data-tooltip="{{ _('Zusätzliche Spalte mit der Summe über die Zeiträume je Zeile. Welche Spalten mitzählen, steht in der jeweiligen Spalte.') }}" @click="style.show_row_sum = !style.show_row_sum; recomputeRowSums()">{{ _("Summenspalte") }}</button>
                   <input type="text" class="tbl-sum-input" maxlength="12" x-show="style.show_row_sum" x-model="style.row_sum_label" placeholder="Σ" aria-label="{{ _('Beschriftung') }}" data-tooltip="{{ _('Beschriftung der Summenspalte') }}">
                   <span class="tbl-chip-split" x-show="style.show_row_sum" role="group" aria-label="{{ _('Position') }}" data-tooltip="{{ _('Summenspalte links oder rechts der Zeiträume') }}">
@@ -358,16 +358,18 @@
                     <button type="button" :class="{active: style.row_sum_position === 'right'}" @click="style.row_sum_position = 'right'">{{ _("Rechts") }}</button>
                   </span>
                 </div>
+                <p class="tbl-hint hint-status" x-show="!hasComparisonColumn" x-cloak>{{ _("„Vergleichsspalten absetzen“ und „Abweichung zum Vergleich“ brauchen eine Spalte mit Versatz oder Vorjahresvergleich.") }}</p>
               </div>
               <div>
                 <p class="tbl-style-group-label">{{ _("Zahlen / Einheiten") }}</p>
                 <div class="tbl-style-group-chips">
                   <button type="button" class="chip" :class="{active: style.show_units}" data-tooltip="{{ _('Einheiten wie kWh oder °C in Tabellenzellen ein- oder ausblenden') }}" @click="style.show_units = !style.show_units">{{ _("Einheiten anzeigen") }}</button>
-                  <button type="button" class="chip" :class="{active: style.align_units}" data-tooltip="{{ _('Einheiten innerhalb der Zahlenzellen in einer festen Spalte ausrichten') }}" @click="style.align_units = !style.align_units">{{ _("Einheiten ausrichten") }}</button>
-                  <button type="button" class="chip" :class="{active: style.small_units}" data-tooltip="{{ _('Einheiten kleiner und optisch zurückhaltender als den Zahlenwert darstellen') }}" @click="style.small_units = !style.small_units">{{ _("Einheiten kleiner") }}</button>
+                  <button type="button" class="chip" :class="{active: style.align_units && style.show_units}" :disabled="!style.show_units" data-tooltip="{{ _('Einheiten innerhalb der Zahlenzellen in einer festen Spalte ausrichten') }}" @click="style.align_units = !style.align_units">{{ _("Einheiten ausrichten") }}</button>
+                  <button type="button" class="chip" :class="{active: style.small_units && style.show_units}" :disabled="!style.show_units" data-tooltip="{{ _('Einheiten kleiner und optisch zurückhaltender als den Zahlenwert darstellen') }}" @click="style.small_units = !style.small_units">{{ _("Einheiten kleiner") }}</button>
                   <button type="button" class="chip" :class="{active: style.align_numbers}" data-tooltip="{{ _('Dezimaltrennzeichen und Nachkommastellen innerhalb jeder Spalte ausrichten') }}" @click="style.align_numbers = !style.align_numbers">{{ _("Dezimalstellen ausrichten") }}</button>
                   <button type="button" class="chip" :class="{active: style.explicit_missing}" data-tooltip="{{ _('Fehlende Werte als „Keine Daten“ statt als Gedankenstrich anzeigen') }}" @click="style.explicit_missing = !style.explicit_missing">{{ _("Fehlende Werte ausschreiben") }}</button>
                 </div>
+                <p class="tbl-hint hint-status" x-show="!style.show_units" x-cloak>{{ _("„Einheiten ausrichten“ und „Einheiten kleiner“ gelten nur bei eingeblendeten Einheiten.") }}</p>
               </div>
               <div>
                 <p class="tbl-style-group-label">{{ _("Layout") }}</p>

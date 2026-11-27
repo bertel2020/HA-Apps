@@ -772,6 +772,9 @@
           return !row.hidden && !this.rowIsEmpty(row);
         },
         isComparisonColumn(col) { return TableCompute.isComparisonColumn(col); },
+        // Abweichung und „Vergleichsspalten zurücknehmen“ brauchen mindestens eine Spalte mit Versatz oder
+        // Vorjahresvergleich — ohne sie bleibt die Tabelle gleich, die Chips sind dann gesperrt.
+        get hasComparisonColumn() { return this.columns.some(col => TableCompute.isComparisonColumn(col)); },
         deviationText(row, col) {
           const baseIndex = this.columns.findIndex(candidate => candidate.uid === col.uid);
           const comparisonIndex = TableCompute.comparisonIndexForBase(this.columns, baseIndex);
