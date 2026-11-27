@@ -39,6 +39,12 @@
   .empty-note{color:var(--ink-faint);font-size:calc(13px * var(--font-scale, 1));padding:24px 0;}
 
   .export-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;}
+  /* Schmal: das Filtermenü hängt an der Leiste und füllt ihre Breite, statt am Knopf zu kleben und rechts aus dem Bild zu ragen. */
+  @media (max-width:640px){
+    .export-controls{position:relative;}
+    #export-filter-wrap{position:static;}
+    #export-filter-popover.ent-filter-pop{left:0;right:0;width:auto;}
+  }
 
   .export-dt th.select,.export-dt td.select{text-align:center;vertical-align:middle;padding-left:0;padding-right:0;}
   .export-dt input[type=checkbox]{accent-color:var(--accent-line);width:16px;height:16px;cursor:pointer;}
