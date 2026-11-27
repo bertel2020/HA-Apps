@@ -204,7 +204,7 @@
              hx-post="import/csv/preview" hx-include="#csv-form" hx-target="#csv-section" hx-swap="outerHTML">
       <span>{{ _("Werte sind Summen je Zeitraum (z. B. Monatserträge) — als laufenden Zählerstand speichern") }}</span>
     </label>
-    <p class="hint hint-status" x-show="blocked" x-cloak{% if not cumulate_blocked %} style="display:none;"{% endif %}>{{ _("Nur für Zähler: Das gewählte Ziel ist keiner, die Werte würden sonst aufaddiert.") }}</p>
+    <p class="hint hint-status" x-show="blocked" x-cloak>{{ _("Nur für Zähler: Das gewählte Ziel ist keiner, die Werte würden sonst aufaddiert.") }}</p>
   </div>
 
   <label class="csv-include-existing" style="display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:calc(13px * var(--font-scale, 1));">

@@ -47,7 +47,7 @@ def test_a_counter_target_keeps_the_box_usable_and_set(client, uploaded) -> None
     box = _box(html)
     assert " checked" in box
     assert " disabled" not in box
-    assert "x-show=\"blocked\" x-cloak style=\"display:none;\"" in html  # der Hinweis bleibt verborgen
+    assert "blocked: false" in html  # Alpine blendet den Hinweis damit aus
 
 
 def test_a_sensor_target_blocks_the_box_and_drops_the_tick(client, uploaded) -> None:
@@ -56,7 +56,7 @@ def test_a_sensor_target_blocks_the_box_and_drops_the_tick(client, uploaded) -> 
     assert " disabled" in box
     assert " checked" not in box
     assert "Nur für Zähler" in html
-    assert "x-show=\"blocked\" x-cloak>" in html  # der Hinweis ist sichtbar
+    assert "blocked: true" in html  # Alpine zeigt den Hinweis damit an
 
 
 def test_no_target_yet_leaves_the_box_open(client, uploaded) -> None:
@@ -80,6 +80,21 @@ def test_the_options_carry_the_aggregation_type_for_the_live_switch(client, uplo
     assert types, "Typen der Ziele fehlen in der Maske"
     mapping = json.loads(types.group(1).replace("\\u0027", "'"))
     assert mapping[COUNTER] == "counter" and mapping[SENSOR] != "counter"
+
+
+@pytest.mark.parametrize(
+    ("entity_id", "ticked", "expected"),
+    [(COUNTER, True, True), (COUNTER, False, False), (SENSOR, True, False), ("sensor.not_archived", True, False), ("", True, False)],
+)
+def test_the_server_sums_up_only_for_a_counter_even_when_the_form_says_so(uploaded, entity_id: str, ticked: bool, expected: bool) -> None:
+    """Auch ein anderes Formular (Haken gesetzt, Ziel ein Sensor) bekommt keine aufaddierten Werte."""
+    from types import SimpleNamespace  # noqa: PLC0415
+
+    from app.import_routes import ImportService  # noqa: PLC0415
+
+    service = ImportService.__new__(ImportService)
+    service.deps = SimpleNamespace(index=index)
+    assert service._csv_cumulate_for(entity_id, ticked) is expected
 
 
 @pytest.mark.parametrize(
