@@ -23,6 +23,8 @@
   - Eine Wetter-Entität oder ein Sensor mit denselben Werten (rainy, snowy, …) sagt, ob es regnet, schneit oder hagelt
   - Wetterlage und Regen-Kachel nennen dann „Schnee“, „Schneeregen“ oder „Hagel“ statt „Regen“
   - Ohne sie steht bei höchstens 1 °C „Niederschlag“, da ein Ein/Aus-Regensensor Regen und Schnee nicht unterscheiden kann
+  - Der Reiter „Langzeit“ zählt Schneefalltage, listet jede Schnee-Saison (erster und letzter Schnee, Tage, längste Folge) und ergänzt Schnee-Rekorde; gezählt wird erst ab der Archivierung des Wetterzustands
+  - Mit einer Niederschlags-Zuordnung zeigt die Tabelle auch den Niederschlag dieser Tage (Wasseräquivalent, keine Schneehöhe)
 - **Wetter- und Energiedashboard**: Spaltenhervorhebung in der Vergleichstabelle
   - Einstellung „Spaltenhervorhebung“ in der Einrichtung des Dashboards: Aus, Paare abwechselnd (Vorgabe), Hauptspalten oder Eigene Auswahl
   - Bei Eigener Auswahl werden Zeiträume im Menü „Spalten“ mit einem Stern markiert; die Auswahl gilt je Browser

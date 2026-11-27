@@ -23,6 +23,8 @@
   - A weather entity or a sensor with the same values (rainy, snowy, …) tells whether it rains, snows, or hails
   - The summary and the rain tile then say “Snow”, “Sleet”, or “Hail” instead of “Rain”
   - Without it, at or below 1 °C they say “Precipitation”, since an on/off rain sensor cannot tell rain from snow
+  - The “Long-term” tab counts snowfall days, lists each snow season (first and last snow, days, longest streak), and adds snow records; only days since the weather condition is archived are counted
+  - With a precipitation assignment, the table also shows the precipitation of those days (water equivalent, not snow depth)
 - **Weather and energy dashboard**: column highlighting in the comparison table
   - Setting "Column highlighting" in the setup of each dashboard: off, alternating pairs (default), main columns, or own selection
   - With own selection, periods are marked with a star in the "Columns" menu; the selection is stored per browser
