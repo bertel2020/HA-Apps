@@ -19,6 +19,13 @@
 - **Weather and energy dashboard**: column highlighting in the comparison table
   - Setting "Column highlighting" in the setup of each dashboard: off, alternating pairs (default), main columns, or own selection
   - With own selection, periods are marked with a star in the "Columns" menu; the selection is stored per browser
+- **Tables**: duration format per row
+  - Hours can be shown as "DD hh:mm" (setting "Automatic" or "Duration" per entity, group, and formula row)
+  - Display only: values and totals stay in hours
+
+### Changed
+
+- **Tables**: notes in brackets after the row name (e.g. "(from 60 % of clear sky)") appear in a second line; the first column can be narrower
 
 ### Fixed
 

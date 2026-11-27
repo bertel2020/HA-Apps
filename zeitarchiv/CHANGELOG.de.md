@@ -19,6 +19,13 @@
 - **Wetter- und Energiedashboard**: Spaltenhervorhebung in der Vergleichstabelle
   - Einstellung „Spaltenhervorhebung“ in der Einrichtung des Dashboards: Aus, Paare abwechselnd (Vorgabe), Hauptspalten oder Eigene Auswahl
   - Bei Eigener Auswahl werden Zeiträume im Menü „Spalten“ mit einem Stern markiert; die Auswahl gilt je Browser
+- **Tabellen**: Dauerformat pro Zeile
+  - Stunden lassen sich als „TT hh:mm“ anzeigen (Einstellung „Automatisch“ oder „Dauer“ je Entitäts-, Gruppen- und Formelzeile)
+  - Nur Anzeige: Werte und Summen bleiben in Stunden
+
+### Geändert
+
+- **Tabellen**: Zusätze in Klammern hinter dem Zeilennamen (z. B. „(ab 60 % des klaren Himmels)“) stehen in einer zweiten Zeile; die erste Spalte kann schmaler werden
 
 ### Behoben
 
