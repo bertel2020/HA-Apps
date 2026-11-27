@@ -437,7 +437,7 @@
                     <button :class="{active: donutAggregation === 'last'}" @click="donutAggregation = 'last'; render()">{{ _("Letzter Wert") }}</button>
                   </div>
                 </div>
-                <label class="menu-row" x-show="hasLineSeries && !donut">
+                <label class="menu-row" x-show="hasLineSeries && !donut && !timeline">
                   <span class="menu-row-label">{{ _("Punkte") }}</span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="showPoints" @change="showPoints = !showPoints; render()">
@@ -448,7 +448,7 @@
                      dezente Füllfläche unter Linien-Serien. Dort fest an, hier
                      erstmals abschaltbar — Default an, damit ein Chart hier
                      nicht anders aussieht als angeheftet auf einem Dashboard. -->
-                <label class="menu-row" x-show="hasLineSeries && !donut">
+                <label class="menu-row" x-show="hasLineSeries && !donut && !timeline">
                   <span class="menu-row-label">{{ _("Fläche") }}</span>
                   <span class="menu-toggle">
                     <input type="checkbox" :checked="areaFill" @change="areaFill = !areaFill; render()">
