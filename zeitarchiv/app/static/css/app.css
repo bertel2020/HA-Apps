@@ -754,7 +754,7 @@ input[type="date"],input[type="time"],input[type="month"]{color-scheme:inherit;}
 }
 .filter-chip input:checked + span,.chip.active{background:var(--accent-line);border-color:var(--accent-line);color:var(--accent-contrast);font-weight:600;}
 .filter-chip input:disabled + span{opacity:.4;cursor:not-allowed;}
-.edash-dep-off{opacity:.4;}
+.edash-dep-off,.wt-dep-off{opacity:.4;}
 .chip:disabled{opacity:.35;cursor:default;}
 
 /* Dropdown-Picker — Button + Popover mit Checkbox-Zeilen (Mehrfachauswahl-

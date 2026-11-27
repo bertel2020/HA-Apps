@@ -56,6 +56,7 @@
   - Entitätsseite: „Nachkommastellen“, „Dynamische Y-Achse“ und „Durchschnittslinie“ sind bei den Diagrammtypen ausgeblendet, bei denen sie nichts bewirken; bei Schalter-Entitäten entfallen die „Nachkommastellen“ (auch in den Einstellungen einer Werte-Kachel), da sie „An“/„Aus“ oder eine Dauer zeigen
   - Tabellen-Editor: „Einheiten ausrichten“ und „Einheiten kleiner“ sind ausgegraut, solange die Einheiten ausgeblendet sind; „Vergleichsspalten absetzen“ und „Abweichung zum Vergleich“, solange die Tabelle keine Vergleichsspalte hat
   - Einrichtung Energiedashboard: „Nach Gruppe anzeigen“ bei den Verbraucheranteilen ist ausgegraut, solange die Kachel „Verbraucheranteile“ ausgeblendet ist; die Schwellen der Kenntage, solange ihr Bereich nicht angehakt ist
+  - Einrichtung Wetterdashboard: Die Schwellen für den Anteil am klaren Himmel sind ohne „Nach Sonnenstand“ und die Rolle „Sonnenhöhe“ ausgegraut, Regentag nach Menge und nach Dauer ohne ihre Sensor-Rolle, die Heizschwellen ohne den Reiter „Heizen“
 
 ## 1.57.0 - 2026-11-24
 
