@@ -880,7 +880,14 @@
         // (266 = 4 Min. 26 s). Der Anzeigemodus gilt nur für die 0/1-Rohwerte (wie auf der
         // Entitätsseite, entity_detail.js).
         isDurationSeries(s) { return s.aggregation_type === 'switch' && (s.display_mode === 'time' || !this.raw); },
-        get donutAvailable() { return this.hasStateOrUnknown || this.series.length >= 2; },
+        // Ein einzelner Schalter teilt den Ring in „An“ und „Aus“ (StateEntities.onOffRows()).
+        get singleSwitch() { return this.series.length === 1 && this.series[0].aggregation_type === 'switch'; },
+        get donutAvailable() { return this.hasStateOrUnknown || this.series.length >= 2 || this.singleSwitch; },
+        // Einschaltdauer in Sekunden und das gelaufene Fenster, aus dem der Donut „An“/„Aus“ bildet.
+        singleSwitchRows() {
+          const s = this.series[0];
+          return StateEntities.onOffRows(s.points.map(p => p.value).filter(Number.isFinite).reduce((sum, v) => sum + v, 0), this.windowStart, this.windowEnd);
+        },
         get hasStateOrUnknown() { return this.hasState || !this.series.length; },
         // Balken-Ansicht der Zustände gewünscht — solange noch keine Serien
         // geladen sind, gilt der gespeicherte Wunsch (load() prüft ihn danach).
@@ -3512,6 +3519,16 @@
           if (this.hasState) { this.renderStateDonuts(); return; }
           const surface = getComputedStyle(document.body).getPropertyValue('--surface');
           const inkFaint = getComputedStyle(document.body).getPropertyValue('--ink-faint');
+          if (this.singleSwitch) {
+            chartInstance.setOption({
+              toolbox: toolboxOption(this.exportFilename, surface, inkFaint),
+              legend: {show: false},
+              tooltip: {trigger: 'item', formatter: StateEntities.onOffTooltip, appendToBody: true},
+              series: [StateEntities.onOffSeries(this.singleSwitchRows(), this.colorFor(this.series[0].entity_id), surface, inkFaint.trim())],
+            }, true);
+            chartInstance.resize();
+            return;
+          }
           const data = this.series.map(s => ({
             name: this.entityNames[s.entity_id] || s.friendly_name,
             value: Math.max(0, this.donutValueFor(s)),
@@ -3575,6 +3592,14 @@
               this.stateRowsFor(s).forEach(row => {
                 lines.push([name, row.label, NumberFormat.fmtDuration(row.seconds), StateEntities.fmtShare(row.share)].map(csvEscape).join(';'));
               });
+            });
+          } else if (this.donut && this.singleSwitch) {
+            const name = this.entityNames[this.series[0].entity_id] || this.series[0].friendly_name;
+            lines.push([t('Entität'), t('Zustand'), t('Dauer'), t('Anteil')].map(csvEscape).join(';'));
+            const rows = this.singleSwitchRows();
+            const total = rows.reduce((sum, row) => sum + row.seconds, 0);
+            rows.forEach(row => {
+              lines.push([name, row.label, NumberFormat.fmtDuration(row.seconds), StateEntities.fmtShare(total ? row.seconds / total * 100 : 0)].map(csvEscape).join(';'));
             });
           } else if (this.donut) {
             lines.push([t('Entität'), t('Wert')].map(csvEscape).join(';'));

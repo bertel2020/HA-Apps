@@ -35,6 +35,7 @@
 - **Tabellen**: Zusätze in Klammern hinter dem Zeilennamen (z. B. „(ab 60 % des klaren Himmels)“) stehen in einer zweiten Zeile; die erste Spalte kann schmaler werden
 - **Energiedashboard**: Feste Preise (Netzbezug, Einspeisung, Eigenverbrauch) werden in Cent eingetragen; bei einem Wert unter 1 erscheint ein Hinweis mit Korrektur per Klick (z. B. 0,0764 statt 7,64)
 - **Charts**: „Donut“ lässt sich erst ab zwei Entitäten wählen; mit nur einem Wert war er ein voller Ring ohne Aussage (Zustands-Entitäten funktionieren weiter mit einer)
+  - Ausnahme ist eine einzelne An/Aus-Entität: Ihr Donut teilt den Zeitraum in „An“ und „Aus“ auf (auch in Kacheln und der Lovelace-Karte)
 
 ### Behoben
 
