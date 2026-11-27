@@ -629,6 +629,7 @@ ERWARTETE_QUELLEN = {
     "rotation": "Rotation",
     "hourly-backfill": "Stunden-Rollup",
     "rollup-rebuild": "Rollup-Neuaufbau",
+    "switch-count-backfill": "Einschaltungen nachrechnen",
     "index-optimize": "Index-Optimierung",
     "demo-generate": "Demo-Daten",
 }

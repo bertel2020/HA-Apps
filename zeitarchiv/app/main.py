@@ -160,6 +160,7 @@ from .export_routes import ExportDependencies, create_export_router
 from .entity_delete_routes import EntityDeleteDependencies, create_entity_delete_router
 from .entity_facts_routes import EntityFacts, EntityFactsDependencies, create_entity_facts_router, visible_row_count as _visible_row_count
 from .marked_values_routes import MarkedValuesDependencies, create_marked_values_router
+from .switch_count_routes import SwitchCountDependencies, create_switch_count_router
 from .report_routes import ReportDependencies, ReportService
 from .energiedashboard_routes import (
     SETTING_HOURLY_BACKFILL_PENDING,
@@ -3290,6 +3291,10 @@ _entity_facts_service = EntityFacts(EntityFactsDependencies(
 ))
 _entity_facts = _entity_facts_service.facts
 app.include_router(create_entity_facts_router(_entity_facts_service))
+app.include_router(create_switch_count_router(SwitchCountDependencies(
+    data_dir=DATA_DIR, tz=TZ, coordinator=storage_coordinator, templates=templates,
+    require_entity=lambda entity_id: _require_entity(entity_id),
+)))
 
 
 @app.get("/entities/{entity_id}/migrate", response_class=HTMLResponse)

@@ -229,6 +229,7 @@
   </span>
   {% call hint_body() %}{{ _("„Zeit“ formatiert die Einschaltdauer je Balken lesbar (z. B. 1h 29m) — sinnvoll bei Anwesenheits-, Tür- und Bewegungssensoren. „Anzahl“ zählt, wie oft eingeschaltet wurde, „Zeit und Anzahl“ zeigt beides. Das gilt als Standard in Verlauf, Charts, Kacheln und Karte; dort lässt es sich je Serie ändern. „AN/AUS“ zeigt den Rohwert.") }}{% endcall %}
 </div>
+<div hx-get="{{ app_root }}/entities/{{ entity_id }}/switch-counts" hx-trigger="load" hx-swap="outerHTML"></div>
 {% endif %}
 <div class="preview">
   <h3 class="eyebrow">{{ _("Vorschau: letzte 10 Werte") }}</h3>

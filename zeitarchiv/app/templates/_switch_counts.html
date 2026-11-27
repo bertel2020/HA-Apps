@@ -1,0 +1,12 @@
+{# Einschaltungen eines Schalters (ROADMAP 1.74): wie viele archivierte Monate noch keine Anzahl haben, und der Nachlauf. #}
+<div class="field cfg-row" id="switch-counts">
+  <label>{{ _("Einschaltungen zählen") }}</label>
+  <p class="cfg-short">
+    {% if total == 0 %}{{ _("Noch keine archivierten Monate.") }}
+    {% elif missing == 0 %}{{ _("Für alle archivierten Monate erfasst.") }}
+    {% else %}{{ _("Für {missing} von {total} archivierten Monaten noch nicht erfasst (Zeit vor der Zählung).", missing=missing, total=total) }}{% endif %}
+  </p>
+  {% if missing %}
+  <button type="button" class="btn" hx-post="{{ app_root }}/entities/{{ entity_id }}/switch-counts/rebuild" hx-swap="none" hx-disabled-elt="this">{{ _("Aus dem Archiv nachrechnen") }}</button>
+  {% endif %}
+</div>

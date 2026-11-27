@@ -984,6 +984,45 @@ def replace_month(
     )
 
 
+def switch_count_months(data_dir: Path, entity_id: str) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
+    """Archivierte Monate eines Schalters und davon die ohne Einschaltungs-Anzahl (ROADMAP 1.74).
+
+    Gemessen an der Monats-Stufe: sie bekommt für jeden archivierten Monat eine Zeile, die Stunden-Stufe nur bei Einschaltzeit.
+    Ein Monat gilt als erfasst, wenn sein Segment die Spalte ``on_count`` hat; ein Rollup in der alten Ein-Datei-Form
+    (ohne Segmente) kennt keine."""
+    months: list[tuple[int, int]] = []
+    for path in parquet_files(entity_dir(data_dir, "archive", entity_id), "????-??.parquet"):
+        try:
+            months.append((int(path.stem[:4]), int(path.stem[5:7])))
+        except ValueError:
+            continue
+    known: set[tuple[int, int]] = set()
+    level = rollup_path(data_dir, entity_id, "monat")
+    if level.is_dir():
+        for segment in parquet_files(level, "????-??.parquet"):
+            if "on_count" in pq.read_schema(segment).names:
+                known.add((int(segment.stem[:4]), int(segment.stem[5:7])))
+    return months, [month for month in months if month not in known]
+
+
+def backfill_switch_counts(data_dir: Path, entity_id: str, tz: ZoneInfo, on_month=None) -> int:
+    """Rechnet die Einschaltungs-Anzahl für alle archivierten Monate nach, die sie noch nicht haben.
+
+    Je Monat aus dem Archiv, wie beim Archivieren (replace_month); der Marker (pending) lässt einen Abbruch beim
+    nächsten Start aus dem Archiv nachziehen. Andere Monate und die Rollups ohne Archiv bleiben unangetastet — ein
+    Gesamtneuaufbau (rebuild_entity_rollups) würde Monate verlieren, deren Rohdaten es nicht mehr gibt.
+    ``on_month(fertig, gesamt, jahr, monat)`` meldet den Fortschritt. Gibt die Zahl der nachgerechneten Monate zurück."""
+    _, missing = switch_count_months(data_dir, entity_id)
+    for done, (year, month) in enumerate(missing, start=1):
+        archive_path = entity_dir(data_dir, "archive", entity_id) / f"{_month_str(year, month)}.parquet"
+        table = pq.read_table(archive_path)
+        with pending(archive_path):
+            replace_month(data_dir, entity_id, "switch", table, year, month, tz)
+        if on_month is not None:
+            on_month(done, len(missing), year, month)
+    return len(missing)
+
+
 def rebuild_entity_rollups(
     data_dir: Path,
     entity_id: str,
