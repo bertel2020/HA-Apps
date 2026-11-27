@@ -76,6 +76,7 @@
   - Archivierung: „Standard-Lebenszeichen“ ist ausgeblendet, solange der Standard-Wertänderungsfilter aus ist
   - Bereinigung: „Mindestalter der Markierung“ ist ausgeblendet, solange die „Automatische Bereinigung“ aus ist
   - Verdichtung: „Mindestalter“ ist ausgeblendet, solange die „Automatische Verdichtung“ aus ist
+  - Auswahl-Assistent: „Auch bereits einsortierte Entitäten umsortieren“ ist ausgegraut, solange „Keine Kategorie“ gewählt ist
 
 ## 1.57.0 - 2026-11-24
 

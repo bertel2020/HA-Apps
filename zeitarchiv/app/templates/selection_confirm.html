@@ -36,8 +36,10 @@
       {% if category.show %}
       <div class="field">
         <label for="apply-category">{{ _("Kategorie setzen") }}</label>
+        {# "Umsortieren" wirkt nur mit einer gewählten Kategorie (selection_category.apply() tut bei "Keine Kategorie" nichts): ohne sie ist der
+           Haken gesperrt und nicht gesetzt. #}
         <select name="category" id="apply-category"
-                onchange="document.getElementById('apply-category-new').hidden = !this.value.startsWith('new:')">
+                onchange="const box = document.getElementById('apply-recategorize'); box.disabled = !this.value; if (!this.value) box.checked = false; const added = document.getElementById('apply-category-new'); if (added) added.hidden = !this.value.startsWith('new:')">
           <option value=""{{ ' selected' if not category.selected }}>{{ _("Keine Kategorie") }}</option>
           {% for c in category.categories %}
           <option value="id:{{ c.id }}"{{ ' selected' if category.selected == 'id:' ~ c.id }}>{{ c.name }}</option>
@@ -47,7 +49,7 @@
           {% endif %}
         </select>
         <p class="hint">{{ _("Gilt für die {count} Entitäten, die jetzt neu in die Auswahl kommen. Bereits einsortierte behalten ihre Kategorie, außer du setzt den Haken.", count=count) }}</p>
-        <label class="filter-chip"><input type="checkbox" name="recategorize" value="1"><span>{{ _("Auch bereits einsortierte Entitäten umsortieren") }}</span></label>
+        <label class="filter-chip"><input type="checkbox" name="recategorize" id="apply-recategorize" value="1"{% if not category.selected %} disabled{% endif %}><span>{{ _("Auch bereits einsortierte Entitäten umsortieren") }}</span></label>
         {% if category.new_name %}
         <p class="hint" id="apply-category-new"{% if not category.selected.startswith('new:') %} hidden{% endif %}>{{ _("Die Kategorie „{name}“ gibt es noch nicht. Sie wird beim Übernehmen angelegt, ans Ende der Reihenfolge.", name=category.new_name) }}</p>
         {% endif %}

@@ -455,3 +455,28 @@ def test_overview_page_offers_the_filter_only_with_categories_and_keeps_it_in_li
     assert 'aria-label="Nach Kategorie filtern"' in with_cat
     assert f'name="category" value="{solar}"' in with_cat  # die Suche behält den Filter
     assert "category=none" in with_cat
+
+
+def test_the_recategorize_box_is_locked_while_no_category_is_chosen(client, entities, assistant_catalog) -> None:
+    """"Umsortieren" wirkt nur mit einer Kategorie (selection_category.apply() tut bei "Keine Kategorie" nichts)."""
+    import re
+
+    from app import main
+
+    def box(html: str) -> str:
+        return re.search(r'<input type="checkbox" name="recategorize"[^>]*>', html).group(0)
+
+    # Noch keine Kategorien: "Keine Kategorie" ist vorgewählt, der Haken ist gesperrt.
+    preview, _ = _apply_form(client)
+    assert " disabled" in box(preview.text)
+    # Der Handler der Auswahl schaltet ihn mit der Wahl frei und nimmt den Haken beim Abwählen zurück.
+    assert "box.disabled = !this.value" in preview.text and "box.checked = false" in preview.text
+
+    # Eine passende Kategorie ist vorgewählt: der Haken ist bedienbar.
+    category_id = main.index.create_entity_category("wetter")
+    try:
+        preview = client.post("/selection/apply", data={"topic": "wetter", "entity_id": "sensor.cat_aussen"})
+        assert " selected>wetter</option>" in preview.text
+        assert " disabled" not in box(preview.text)
+    finally:
+        main.index.delete_entity_category(category_id)
