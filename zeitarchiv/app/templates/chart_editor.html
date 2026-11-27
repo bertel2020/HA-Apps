@@ -429,7 +429,7 @@
                      Legende nennt weiterhin alle gewählten Kennzahlen, diese
                      Zeile bestimmt nur, welche davon den Donut selbst
                      zeichnet. -->
-                <div class="menu-row menu-row-stack" x-show="donut">
+                <div class="menu-row menu-row-stack" x-show="donut && !hasState">
                   <span class="menu-row-label">{{ _("Aggregation") }}</span>
                   <div class="seg">
                     <button :class="{active: donutAggregation === 'sum'}" @click="donutAggregation = 'sum'; render()">{{ _("Summe") }}</button>
