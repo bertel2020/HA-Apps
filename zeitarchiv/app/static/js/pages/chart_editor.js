@@ -859,6 +859,12 @@
         // sind — die Heatmap wird dann trotzdem mit angefragt (der Server
         // liefert Zellen nur für Zustände, sonst nichts).
         get heatmapAvailable() { return StateEntities.SERVER_SHARE_RANGES.includes(this.range); },
+        // Ein Donut vergleicht Anteile zwischen Serien: mit nur einer Zahl- oder
+        // Schalter-Serie ist er ein voller Ring ohne Aussage. Zustands-Entitäten
+        // teilen den Ring nach Zuständen auf (renderStateDonuts()), dort genügt
+        // eine. Vor dem ersten Laden gilt er als verfügbar, damit der Knopf nicht
+        // kurz gesperrt aufblitzt (wie hasStateOrUnknown).
+        get donutAvailable() { return this.hasStateOrUnknown || this.series.length >= 2; },
         get hasStateOrUnknown() { return this.hasState || !this.series.length; },
         // Balken-Ansicht der Zustände gewünscht — solange noch keine Serien
         // geladen sind, gilt der gespeicherte Wunsch (load() prüft ihn danach).

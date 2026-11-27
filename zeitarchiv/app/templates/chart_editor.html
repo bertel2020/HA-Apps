@@ -419,7 +419,8 @@
                     <template x-if="allSwitch && !hasState">
                       <button :class="{active: timeline && !donut}" :disabled="compare" @click="setDisplayMode('timeline')">{{ _("Zeitstrahl") }}</button>
                     </template>
-                    <button :class="{active: donut}" :disabled="compare" @click="setDisplayMode('donut')">{{ _("Donut") }}</button>
+                    <button :class="{active: donut}" :disabled="compare || !donutAvailable" @click="setDisplayMode('donut')"
+                            :title="donutAvailable ? '' : t('Der Donut braucht mindestens zwei Entitäten.')">{{ _("Donut") }}</button>
                   </div>
                 </div>
                 <!-- Nur bei aktivem Donut sichtbar — bestimmt, welcher

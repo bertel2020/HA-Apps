@@ -4887,6 +4887,7 @@
     "Anteile des gewählten Zeitraums.": "Shares of the selected period.",
     "Dunkler heißt: öfter in diesem Zustand. Blasse Zellen haben weniger als 3 Beobachtungen.": "Darker means more often in this state. Pale cells have fewer than 3 observations.",
     "Die Heatmap gibt es ab dem Zeitraum Monat.": "The heatmap is available from the Month range.",
+    "Der Donut braucht mindestens zwei Entitäten.": "The donut needs at least two entities.",
     "Uhr": "h",
     "keine Daten": "no data",
     "1 Beobachtung": "1 observation",
