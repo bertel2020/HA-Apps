@@ -45,7 +45,7 @@
   - Donut of state entities: “Aggregation”
   - Bar charts: “Dynamic Y axis”
   - Durations: “Decimal places” is greyed out, since durations always show hours and minutes
-  - Entity page: “Decimal places”, “Dynamic Y axis” and “Average line” are hidden for the chart types where they have no effect; for on/off entities “Decimal places” is gone, since they always show durations
+  - Entity page: “Decimal places”, “Dynamic Y axis” and “Average line” are hidden for the chart types where they have no effect; for on/off entities “Decimal places” is gone (also in the settings of a value tile), since they show “On”/“Off” or durations
 
 ## 1.57.0 - 2026-11-24
 

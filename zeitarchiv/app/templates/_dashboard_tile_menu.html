@@ -206,7 +206,9 @@
           </div>
         </div>
 
-        <div class="dtile-settings-section"{% if tile.is_state %} hidden{% endif %}>
+        {# Schalter zeigen „An“/„Aus“ oder eine Dauer (dashboard-tiles.js), beides ohne
+           Dezimalstellen — die Zeile gäbe es nur zum Schein. #}
+        <div class="dtile-settings-section"{% if tile.is_state or tile.is_switch %} hidden{% endif %}>
           <div class="dtile-decimals-picker-head">{{ _("Nachkommastellen") }}</div>
           <div class="dtile-decimals-row" role="group" aria-label="{{ _('Nachkommastellen wählen') }}">
             {% for value, label in [('auto', _('Auto')), ('0', '0'), ('1', '1'), ('2', '2'), ('3', '3'), ('4', '4')] %}
