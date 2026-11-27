@@ -234,7 +234,7 @@
                         <button type="button" class="btn" @click="row.aggPickerOpen = !row.aggPickerOpen"
                                 :data-tooltip="AGG_TITLES[row.aggregation]" x-text="AGG_SHORT_LABELS[row.aggregation] + ' ▾'"></button>
                         <div class="dd-picker-popover dd-picker-popover-alpine" x-show="row.aggPickerOpen" x-cloak>
-                          <template x-for="[value, label] in AGG_OPTIONS" :key="value">
+                          <template x-for="[value, label] in aggOptionsFor(row)" :key="value">
                             <div class="dd-picker-row" :class="{active: row.aggregation === value}"
                                  @click="row.aggregation = value; row.aggPickerOpen = false; load()" x-text="label"></div>
                           </template>

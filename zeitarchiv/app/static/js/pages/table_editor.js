@@ -265,10 +265,14 @@
     // ergeben für eine Summenzeile keinen Sinn (die bezieht sich immer auf
     // MEHRERE bereits aggregierte Zeilen, nicht auf einzelne Rohwerte).
     const SUMMARY_AGG_OPTIONS = [['sum', t('Σ Summe')], ['avg', t('Ø Durchschnitt')]];
-    const AGG_SHORT_LABELS = {auto: t('Auto'), avg: 'Ø', min: t('Min'), max: t('Max'), sum: 'Σ', last: t('Akt')};
+    // Nur für Zeilen mit einem Schalter (ROADMAP 1.74): wie oft er im Zeitraum eingeschaltet wurde.
+    const COUNT_AGG_OPTION = ['count_sum', t('Σ Einschaltungen')];
+    const ENTITY_TYPE_BY_ID = Object.fromEntries(ENTITY_OPTIONS.map(o => [o.entity_id, o.aggregation_type]));
+    const AGG_SHORT_LABELS = {auto: t('Auto'), avg: 'Ø', min: t('Min'), max: t('Max'), sum: 'Σ', last: t('Akt'), count_sum: 'Σ×'};
     const AGG_TITLES = {
       auto: t('Automatisch (Zähler/Schalter → Summe, sonst Durchschnitt)'),
       avg: t('Durchschnitt'), min: t('Minimum'), max: t('Maximum'), sum: t('Summe'), last: t('Zuletzt erfasster Wert im Zeitraum'),
+      count_sum: t('Wie oft eingeschaltet wurde (Summe der Einschaltungen)'),
     };
     const BORDER_OPTIONS = [['horizontal', t('Horizontal')], ['grid', t('Gitter')], ['none', t('Ohne Rahmen')]];
     const BORDER_LABELS = Object.fromEntries(BORDER_OPTIONS);
@@ -279,6 +283,11 @@
 
     function tableEditor() {
       return {
+        // Die Aggregationen, die diese Zeile anbietet: "Σ Einschaltungen" nur, wenn ein Schalter dabei ist (oder schon gewählt).
+        aggOptionsFor(row) {
+          const hasSwitch = (row.entity_ids || []).some(id => ENTITY_TYPE_BY_ID[id] === 'switch');
+          return hasSwitch || row.aggregation === 'count_sum' ? [...AGG_OPTIONS, COUNT_AGG_OPTION] : AGG_OPTIONS;
+        },
         tableId: TABLE_ID,
         name: TABLE_NAME,
         // Der "Bearbeiten"-Button auf der Tabellen-Übersicht verlinkt mit

@@ -22,7 +22,7 @@ def test_count_replaces_the_duration_series_by_a_counter() -> None:
     (series,) = switch_counts.switch_count_entries(_entry(), "count")
     assert (series["entity_id"], series["aggregation_type"], series["chart_type"]) == ("binary_sensor.defrost", "counter", "bar")
     assert series["source_type"] == "switch"
-    assert series["unit"] == "Einschaltungen" and series["decimals"] == 0 and series["display_mode"] == "onoff"
+    assert series["unit"] == "Einschaltungen" and series["decimals"] is None and series["display_mode"] == "onoff"
     assert [p["value"] for p in series["points"]] == [2, None]  # unbekannt bleibt None, nie 0
     assert [p["value"] for p in series["compare_points"]] == [1]
 

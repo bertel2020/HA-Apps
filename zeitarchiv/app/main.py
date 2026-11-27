@@ -4635,7 +4635,7 @@ class _TableColumnBody(BaseModel):
     in_sum: bool = True
 
 
-_TABLE_ROW_AGGREGATIONS = ("auto", "avg", "min", "max", "sum", "last")
+_TABLE_ROW_AGGREGATIONS = ("auto", "avg", "min", "max", "sum", "last", "count_sum")  # count_sum: Einschaltungen eines Schalters (1.74)
 _TABLE_ROW_SUM_MODES = ("auto", "yes", "no")
 # Zeilenbeschriftung/Abschnittsname — dieselbe Zahl wie das maxlength-Attribut
 # des Felds in table_editor.html, hier zusätzlich serverseitig durchgesetzt
@@ -4760,6 +4760,7 @@ def _table_editor_context(table: dict | None) -> dict:
             "label": entity_display_name(row["entity_id"], row["friendly_name"], row["custom_name"]),
             "ha_name": row["friendly_name"] or row["entity_id"],
             "is_custom": bool(row["custom_name"]),
+            "aggregation_type": row["aggregation_type"],
         }
         for row in index.list_entities()
     ]

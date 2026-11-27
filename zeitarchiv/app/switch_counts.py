@@ -36,7 +36,7 @@ def switch_count_entries(entry: dict, metric: str) -> list[dict]:
     ``source_type`` nennt den Schalter hinter der Zähler-Serie; die Oberfläche bietet dort die Anzeige weiter an.
     Eine unbekannte Anzahl (Rollup aus der Zeit vor der Zählung) bleibt ``None``, nie 0."""
     counted = dict(
-        entry, source_type="switch", aggregation_type="counter", unit=tr("Einschaltungen"), decimals=0, display_mode="onoff",
+        entry, source_type="switch", aggregation_type="counter", unit=tr("Einschaltungen"), decimals=None, display_mode="onoff",
         points=_counted(entry["points"]),
     )
     for key in ("compare_points", "compare_cut_points"):
