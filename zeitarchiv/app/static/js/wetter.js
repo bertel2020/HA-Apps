@@ -3575,7 +3575,8 @@
           }
           if (data) {
             series.push({
-              name: `${name} `, type: 'line', symbol: 'none', silent: true, z: 4, data,
+              // Gleicher Name wie die Punkte: Ein Klick auf die Legende blendet Punkte und Kurve zusammen aus.
+              name, type: 'line', symbol: 'none', silent: true, z: 4, data,
               lineStyle: {color, width: index === 0 ? 2.4 : 1.3, opacity: index === 0 ? 1 : 0.7}, tooltip: {show: false},
             });
           }
@@ -3587,7 +3588,8 @@
             type: 'value', name: t('Tages-Ø Außentemperatur (°C)'), nameLocation: 'middle', nameGap: 26,
             nameTextStyle: {color: colors.text}, ...axisStyle(colors),
             // Auf die Daten zugeschnitten (in 2-°C-Schritten) statt fester Fünferschritte: sonst bleibt links und rechts viel leere Fläche.
-            min: (value) => Math.floor(value.min / 2) * 2, max: (value) => Math.ceil(value.max / 2) * 2,
+            // Teilstriche in 2-°C-Schritten wie die Grenzen, sonst stehen -8 und 16 neben Fünferschritten.
+            min: (value) => Math.floor(value.min / 2) * 2, max: (value) => Math.ceil(value.max / 2) * 2, interval: 2,
           },
           // Einheit an den Teilstrichen statt als Achsenname: der Name landete in diesem Diagramm mitten in der Legende.
           yAxis: {
