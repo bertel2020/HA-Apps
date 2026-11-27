@@ -166,6 +166,8 @@
     "Als veraltet markieren": "Mark as stale",
     "Veraltet-Schwelle wählen": "Choose stale threshold",
     "Nachkommastellen": "Decimal places",
+    "Gilt nur, solange die Kachel „Verbraucheranteile“ oben sichtbar ist.": "Only applies while the “Consumer shares” tile above is visible.",
+    "Gelten nur, solange der Bereich „Kenntage“ oben angehakt ist.": "Only apply while the “Characteristic days” section above is ticked.",
     "„Einheiten ausrichten“ und „Einheiten kleiner“ gelten nur bei eingeblendeten Einheiten.": "“Align units” and “Smaller units” only apply while units are shown.",
     "„Vergleichsspalten absetzen“ und „Abweichung zum Vergleich“ brauchen eine Spalte mit Versatz oder Vorjahresvergleich.": "“Set comparison columns apart” and “Deviation from comparison” need a column with an offset or a year-over-year comparison.",
     "Nachkommastellen wählen": "Choose decimal places",

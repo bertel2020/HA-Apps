@@ -500,11 +500,18 @@
          ist kein Ein/Aus-Schalter für eine Kachel, sondern ein Darstellungs-
          Modus INNERHALB der Verbraucheranteile-Kachel — dieselbe Begründung
          wie beim Energiefluss-Feld oben. #}
-      <div class="field" style="margin-bottom:0;margin-top:14px;">
+      {# Wirkt nur in der Kachel/im Bericht „Verbraucheranteile“: ist deren Chip oben aus, bleibt die Option ohne Wirkung. Gesperrt per
+         `inert` statt `disabled`, damit der gespeicherte Wert beim Speichern weiter mitgeschickt wird. #}
+      <div class="field" style="margin-bottom:0;margin-top:14px;"
+           x-data="{on: document.querySelector('[name=show_verbraucheranteile]').checked}"
+           @change.window="on = document.querySelector('[name=show_verbraucheranteile]').checked">
         <label>{{ _("Verbraucheranteile") }} {{ hint_button(_('Verbraucheranteile-Gruppierung')) }}</label>
+        <div :class="{'edash-dep-off': !on}" :inert="!on">
         <div class="edash-toggle-list">
           <label class="filter-chip"><input type="checkbox" name="verbraucheranteile_gruppieren" {% if config.verbraucheranteile_gruppieren %}checked{% endif %}><span>{{ _("Nach Gruppe anzeigen") }}</span></label>
         </div>
+        </div>
+        <p class="hint hint-status" x-show="!on" x-cloak>{{ _("Gilt nur, solange die Kachel „Verbraucheranteile“ oben sichtbar ist.") }}</p>
         {% call hint_body() %}{{ _("Verbraucher mit zugewiesener Gruppe (siehe unten) erscheinen dann unter einer gemeinsamen Summenzeile, die sich zuklappen lässt. Geräte hinter einem Zwischenzähler gehören zur Gruppe des Zählers. Geräte ohne Gruppe bleiben unverändert einzeln aufgeführt.") }}{% endcall %}
       </div>
     </section>
@@ -1218,7 +1225,12 @@
       <p class="settings-section-description">{{ _("Ein leeres Feld verwendet die Vorgabe.") }}</p>
       {% call hint_body() %}{{ _("Fast autark zählt Tage, an denen der Netzbezug höchstens (100 − Wert) % des Verbrauchs ausmacht. Sonnentage brauchen bei jedem Erzeuger die Anlagenleistung (kWp). Trübe Tage vergleichen mit dem Tagesmittel des Jahres. Die beiden Speicher-Schwellen sind Prozent der Speicherkapazität und gelten für die Entladung je Tag; ohne bekannte Kapazität erscheinen die beiden Felder nicht. „Tage ohne Netzbezug“ zählt Tage mit höchstens 0,1 kWh Netzbezug und hat keine Schwelle zum Einstellen.") }}{% endcall %}
       {% set kt = config.kenntage or {} %}
-      <div class="edash-field-grid">
+      {# Gelten nur im Block „Kenntage“ (Reiter Langzeit): ist sein Chip oben aus, ist der Block nicht da. `inert` statt `disabled`, damit
+         eingetragene Schwellen beim Speichern weiter mitgeschickt werden. #}
+      <div x-data="{on: document.querySelector('[name=langzeit_zeigen][value=kenntage]').checked}"
+           @change.window="on = document.querySelector('[name=langzeit_zeigen][value=kenntage]').checked">
+      <p class="hint hint-status" x-show="!on" x-cloak>{{ _("Gelten nur, solange der Bereich „Kenntage“ oben angehakt ist.") }}</p>
+      <div class="edash-field-grid" :class="{'edash-dep-off': !on}" :inert="!on">
         <div class="field">
           <label>{{ _("Fast autark ab") }}</label>
           {{ number_field('kt_autark', kt.get('autark'), '90', '', '%') }}
@@ -1243,6 +1255,7 @@
           <label>{{ _("Hohe Einspeisung über") }}</label>
           {{ number_field('kt_einsp', kt.get('einspeisung'), '20', '', _('kWh am Tag')) }}
         </div>
+      </div>
       </div>
     </section>
 
