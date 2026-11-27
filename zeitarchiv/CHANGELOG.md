@@ -30,6 +30,7 @@
 
 ### Fixed
 
+- **Archive**: an empty (0 byte) archive file no longer blocks the rebuild, the consistency check, or the energy dashboard; it is skipped like a missing file
 - **Charts**: "Raw values" is saved with the chart again; the switch in the editor no longer jumps back after reopening
 
 ## 1.57.0 - 2026-11-24
