@@ -465,6 +465,29 @@ def sun_records(days: list[dict], monthly_hours: dict, today: date) -> dict | No
     return out
 
 
+# -- Schnee (Langzeit, ROADMAP 1.75) --------------------------------------------------------------
+
+def snow_day_totals(
+    hours: dict[float, dict[int, float]], snow_idx: set[int], unavailable_idx: int, tz: ZoneInfo,
+) -> list[dict]:
+    """Sekunden mit Schnee und bekannter Zustand je Ortstag aus Stunden-Zeilen einer Zustands-Entität.
+
+    ``hours`` ist ``{Stundenbeginn: {idx: Sekunden}}`` (``query_state_hours``), ``snow_idx`` die Indizes der Zustände
+    mit Schnee oder Schneeregen. Rückgabe, nach Datum sortiert: ``{"date", "snow_s", "known_s"}``; ``known_s`` zählt alles
+    außer „nicht verfügbar“. Der Tag ist der der Ortszeit am Stundenbeginn; die Stunden der Zeitumstellung gehören so
+    vollständig zu einem Tag."""
+    days: dict[date, list[float]] = {}
+    for start, states in hours.items():
+        entry = days.setdefault(datetime.fromtimestamp(start, tz).date(), [0.0, 0.0])
+        for idx, seconds in states.items():
+            if idx == unavailable_idx:
+                continue
+            entry[1] += seconds
+            if idx in snow_idx:
+                entry[0] += seconds
+    return [{"date": day, "snow_s": values[0], "known_s": values[1]} for day, values in sorted(days.items())]
+
+
 LEAP_SLOTS = 366  # Plätze der Jahr×Tag-Matrix: ein Schaltjahr, damit der 29.02. eine eigene Spalte hat
 
 

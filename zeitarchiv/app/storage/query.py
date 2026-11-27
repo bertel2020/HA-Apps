@@ -1722,6 +1722,29 @@ def _state_hour_rows(
     return rows
 
 
+def query_state_hours(
+    data_dir: Path, index: Index, entity_id: str, window_start: datetime, window_end: datetime,
+    tz: ZoneInfo, now: datetime, read_cache: QueryReadCache | None = None,
+) -> dict[float, dict[int, float]]:
+    """Sekunden je Zustand für jede Stunde in [window_start, window_end), als ``{Stundenbeginn: {idx: Sekunden}}``.
+
+    Dieselben Zeilen wie unter der Zustands-Heatmap (abgeschlossene Monate aus ``stunde.parquet``, der laufende live,
+    Monate ohne Wechsel mit dem vorher geltenden Zustand aufgefüllt); für Auswertungen, die Zustände nach Tagen zählen.
+    Eine unbekannte Entität ergibt ein leeres Ergebnis."""
+    entity = index.get_entity(entity_id)
+    if entity is None:
+        return {}
+    rows = _state_hour_rows(
+        data_dir, index, entity["first_ts"], entity_id, tz, now.astimezone(tz), window_start, window_end, read_cache
+    )
+    out: dict[float, dict[int, float]] = {}
+    for row in rows:
+        hour = out.setdefault(row.bucket_start, {})
+        for idx, (seconds, _entries) in (row.states or {}).items():
+            hour[idx] = hour.get(idx, 0.0) + seconds
+    return out
+
+
 def query_state_heatmap(
     data_dir: Path,
     index: Index,

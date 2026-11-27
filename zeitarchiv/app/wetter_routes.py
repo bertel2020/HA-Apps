@@ -48,7 +48,7 @@ from .formatting import decimals_to_int, entity_display_name
 from .period_columns import MODES, parse_stichtag
 from .storage import query as query_mod
 from .storage import rollup as rollup_mod
-from .storage.index import Index
+from .storage.index import STATE_UNAVAILABLE_INDEX, Index
 
 SETTING_ENABLED = "wetterdashboard_enabled"
 SETTING_CONFIG = "wetterdashboard_config"
@@ -1856,6 +1856,31 @@ class WetterService:
         first = datetime.fromtimestamp(entity["first_ts"], self.deps.tz).date()
         yesterday = now_local.date() - timedelta(days=1)
         return self._sun_days_cached(first, yesterday, config, now_local) if first <= yesterday else []
+
+    def snow_history(self, config: dict, now_local: datetime) -> list[dict]:
+        """Alle abgeschlossenen Tage seit Archivbeginn des Wetterzustands: ``{"date", "snow_s", "known_s"}``.
+
+        Schnee ist ``snowy`` oder ``snowy-rainy`` (nach dem Rohschlüssel, nie nach der Übersetzung). Leer ohne Rolle
+        „Wetterzustand“, ohne Entität, ohne Archivbeginn und für den laufenden Tag (er zählt nie). Kennt die Entität
+        noch keinen Schnee-Zustand, haben alle Tage ``snow_s`` 0: sie belegen dann Tage ohne Schnee."""
+        entity_id = config.get("weather_state")
+        entity = self.deps.index.get_entity(entity_id) if entity_id else None
+        if entity is None or entity["aggregation_type"] != "state" or not entity["first_ts"]:
+            return []
+        today_start = datetime.combine(now_local.date(), datetime.min.time(), tzinfo=self.deps.tz)
+        first = datetime.fromtimestamp(entity["first_ts"], self.deps.tz)
+        window_start = datetime.combine(first.date(), datetime.min.time(), tzinfo=self.deps.tz)
+        if window_start >= today_start:
+            return []
+        snow_idx = {
+            row["idx"] for row in self.deps.index.get_state_map(entity_id)
+            if conditions.precip_kind(row["text"]) in conditions.SNOW_KINDS
+        }
+        hours = query_mod.query_state_hours(
+            self.deps.data_dir, self.deps.index, entity_id, window_start, today_start, self.deps.tz, now_local,
+            query_mod.QueryReadCache(),
+        )
+        return analysis.snow_day_totals(hours, snow_idx, STATE_UNAVAILABLE_INDEX, self.deps.tz)
 
     def _sun_segment_stats(self, config: dict) -> dict[str, dict[str, tuple[int, int]]]:
         """Name, Änderungszeit und Größe aller Stundensegmente der Entitäten, die in die Sonnentage eingehen."""

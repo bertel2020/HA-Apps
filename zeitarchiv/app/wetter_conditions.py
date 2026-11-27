@@ -51,6 +51,8 @@ PRECIP_KINDS = {
 }
 #: Gibt es im Fenster mehrere Arten, gewinnt die seltenere (Hagel vor Schnee vor Schneeregen vor Regen).
 PRECIP_KIND_ORDER = ("hail", "snow", "sleet", "rain")
+#: Arten, die als Schneefall zählen (Schneefalltage, ROADMAP 1.75); Hagel gehört nicht dazu.
+SNOW_KINDS = ("snow", "sleet")
 #: „Zuletzt Schnee …“: So weit vor dem Ende des Niederschlags darf die Art im Wetterzustand liegen. Die Wetter-Entität
 #: steht manchmal schon auf „cloudy“, während der Regensensor noch tropft; ohne Grenze bekäme ein späterer Regen eine
 #: alte Schneeart.
