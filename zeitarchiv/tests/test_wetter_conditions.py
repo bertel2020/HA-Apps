@@ -268,3 +268,65 @@ def test_own_sky_limits_replace_the_automatic_ones(service) -> None:
     wetter_routes._save_config(service.deps.index, {**config, "sky_cuts_lx": [90000.0, 40000.0, 20000.0]})
     assert wetter_routes._load_config(service.deps.index)["sky_cuts_lx"] == []
     assert wetter_routes.sky_cuts({**config, "sky_cuts_lx": []}) == pytest.approx(cond.lx_cuts(config["sun_threshold_lx"]))
+
+
+def test_precip_kind_maps_the_standard_weather_states() -> None:
+    assert [cond.precip_kind(text) for text in ("rainy", "pouring", "lightning-rainy")] == ["rain"] * 3
+    assert cond.precip_kind("snowy") == "snow"
+    assert cond.precip_kind("snowy-rainy") == "sleet"
+    assert cond.precip_kind("hail") == "hail"
+    # Schreibweise: der Rohwert kann Leerzeichen oder Großbuchstaben tragen
+    assert cond.precip_kind("  Snowy ") == "snow"
+
+
+def test_precip_kind_ignores_states_without_precipitation_and_texts_in_other_languages() -> None:
+    for text in ("cloudy", "sunny", "fog", "windy", "clear-night", "partlycloudy", "exceptional", "lightning", "", None):
+        assert cond.precip_kind(text) is None
+    # Übersetzte Texte sind keine Schlüssel: „Schnee“ erkennt die Rolle bewusst nicht
+    assert cond.precip_kind("Schnee") is None
+    assert cond.precip_kind(804) is None  # type: ignore[arg-type]
+
+
+def test_kind_at_uses_the_last_state_up_to_the_moment() -> None:
+    timeline = [(100.0, "cloudy"), (200.0, "snowy"), (300.0, "cloudy")]
+    assert cond.kind_at(timeline, 50.0) is None  # vor dem ersten Wert
+    assert cond.kind_at(timeline, 150.0) is None
+    assert cond.kind_at(timeline, 200.0) == "snow"  # der Wechsel selbst zählt
+    assert cond.kind_at(timeline, 250.0) == "snow"
+    assert cond.kind_at(timeline, 350.0) is None
+    assert cond.kind_at(list(reversed(timeline)), 250.0) == "snow"  # Reihenfolge der Eingabe egal
+    assert cond.kind_at([], 10.0) is None
+
+
+def test_kind_at_treats_unavailable_as_unknown() -> None:
+    timeline = [(100.0, "snowy"), (200.0, None), (300.0, "snowy")]
+    assert cond.kind_at(timeline, 150.0) == "snow"
+    assert cond.kind_at(timeline, 250.0) is None  # nicht über die Lücke hinweg zurückschauen
+    assert cond.kind_at(timeline, 350.0) == "snow"
+
+
+def test_last_precip_kind_finds_the_kind_just_before_the_rain_ended() -> None:
+    until = 10_000.0
+    assert cond.last_precip_kind([(0.0, "snowy")], until) == "snow"  # schon vor dem Fenster, gilt noch
+    # Die Wetter-Entität wechselt kurz vor dem Ende auf „cloudy“: die Art im Fenster bleibt
+    assert cond.last_precip_kind([(0.0, "snowy"), (until - 600, "cloudy")], until) == "snow"
+    assert cond.last_precip_kind([(0.0, "cloudy"), (until - 600, "rainy")], until) == "rain"
+    assert cond.last_precip_kind([(0.0, "cloudy"), (until + 5, "snowy")], until) is None  # erst nach dem Ende
+
+
+def test_last_precip_kind_ignores_precipitation_older_than_the_window() -> None:
+    until = 10_000.0
+    old = [(0.0, "snowy"), (until - cond.RAIN_KIND_WINDOW_S - 1, "cloudy")]
+    assert cond.last_precip_kind(old, until) is None
+    edge = [(0.0, "snowy"), (until - cond.RAIN_KIND_WINDOW_S + 1, "cloudy")]
+    assert cond.last_precip_kind(edge, until) == "snow"
+    assert cond.last_precip_kind(old, until, window_s=7200.0) == "snow"
+    assert cond.last_precip_kind([], until) is None
+
+
+def test_last_precip_kind_prefers_the_rarer_kind_in_the_window() -> None:
+    until = 10_000.0
+    assert cond.last_precip_kind([(0.0, "rainy"), (until - 900, "snowy-rainy"), (until - 300, "rainy")], until) == "sleet"
+    assert cond.last_precip_kind([(0.0, "rainy"), (until - 900, "snowy")], until) == "snow"
+    assert cond.last_precip_kind([(0.0, "snowy"), (until - 900, "hail"), (until - 300, "rainy")], until) == "hail"
+

@@ -43,6 +43,19 @@ _TO_KMH = {"km/h": 1.0, "m/s": 3.6, "mph": 1.609344, "kn": 1.852}
 #: Regen, der länger zurückliegt, gilt als „seit langem trocken“; so weit wird der Schalter zurückgelesen.
 RAIN_LOOKBACK_HOURS = 48
 
+#: Wetterzustand (Standardliste der Wetter-Entitäten von Home Assistant, englische Schlüssel) → Art des Niederschlags.
+#: Alles andere (cloudy, fog, windy, sunny …) sagt nichts über Niederschlag und ergibt keine Art.
+PRECIP_KINDS = {
+    "rainy": "rain", "pouring": "rain", "lightning-rainy": "rain",
+    "snowy": "snow", "snowy-rainy": "sleet", "hail": "hail",
+}
+#: Gibt es im Fenster mehrere Arten, gewinnt die seltenere (Hagel vor Schnee vor Schneeregen vor Regen).
+PRECIP_KIND_ORDER = ("hail", "snow", "sleet", "rain")
+#: „Zuletzt Schnee …“: So weit vor dem Ende des Niederschlags darf die Art im Wetterzustand liegen. Die Wetter-Entität
+#: steht manchmal schon auf „cloudy“, während der Regensensor noch tropft; ohne Grenze bekäme ein späterer Regen eine
+#: alte Schneeart.
+RAIN_KIND_WINDOW_S = 3600.0
+
 
 def sky_class(value: float, cuts: tuple[float, float, float]) -> str:
     """Trüb, bewölkt, heiter oder sonnig nach den Untergrenzen ``cuts`` (bewölkt, heiter, sonnig)."""
@@ -109,3 +122,33 @@ def rain_state(timeline: list[tuple[float, bool]], now: float) -> dict | None:
             last = ordered[index][0]
             break
     return {"raining": False, "since": None, "last": last, "minutes": None}
+
+
+def precip_kind(text: str | None) -> str | None:
+    """Art des Niederschlags (rain, snow, sleet, hail) zu einem Wetterzustand; None, wenn er keine nennt."""
+    if not isinstance(text, str):
+        return None
+    return PRECIP_KINDS.get(text.strip().lower())
+
+
+def kind_at(timeline: list[tuple[float, str | None]], ts: float) -> str | None:
+    """Art des Niederschlags zum Zeitpunkt ``ts`` aus den Wechseln des Wetterzustands ``(Zeit, Text)``.
+
+    Es gilt der letzte Wert bis ``ts``; vor dem ersten Wert und bei „nicht verfügbar“ (Text None) gibt es keine Art."""
+    current = None
+    for moment, text in sorted(timeline, key=lambda row: row[0]):
+        if moment > ts:
+            break
+        current = text
+    return precip_kind(current)
+
+
+def last_precip_kind(timeline: list[tuple[float, str | None]], until: float, window_s: float = RAIN_KIND_WINDOW_S) -> str | None:
+    """Art des letzten Niederschlags: die seltenste Art, die in den ``window_s`` Sekunden bis ``until`` galt."""
+    start = until - window_s
+    kinds = {kind_at(timeline, start)}
+    kinds.update(precip_kind(text) for moment, text in timeline if start < moment <= until)
+    for kind in PRECIP_KIND_ORDER:
+        if kind in kinds:
+            return kind
+    return None
