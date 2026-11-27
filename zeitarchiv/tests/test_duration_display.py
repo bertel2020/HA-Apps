@@ -17,10 +17,10 @@ EDITOR_JS = (APP / "static/js/pages/chart_editor.js").read_text(encoding="utf-8"
 
 
 def test_the_tile_groups_duration_series_onto_their_own_axis() -> None:
-    """Dieselbe Regel wie chart_editor.js: aggregation_type=switch UND
-    display_mode=time bekommen einen synthetischen Achsen-Schlüssel statt
-    ihrer echten (meist leeren) unit."""
-    assert "isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time'" in TILES_JS
+    """Dieselbe Regel wie chart_editor.js: Schalter mit Anzeigemodus "Zeit" oder
+    ohne Rohwerte bekommen einen synthetischen Achsen-Schlüssel statt ihrer
+    echten (meist leeren) unit."""
+    assert "isDurationSeries = s => durationSeries(s, timeline)" in TILES_JS
     assert "axisKey = s => isDurationSeries(s) ? ' duration' : (ownAxis(s)" in TILES_JS
     assert "units.indexOf(axisKey(s))" in TILES_JS
 
@@ -49,6 +49,17 @@ def test_both_pages_use_the_same_duration_predicate() -> None:
     """Beide Dateien müssen dieselbe Definition von "Dauer-Serie" verwenden —
     sonst könnten Kachel und Editor bei einer künftigen Änderung wieder
     auseinanderlaufen."""
-    predicate = "s.aggregation_type === 'switch' && s.display_mode === 'time'"
-    assert TILES_JS.count(predicate) >= 1
-    assert EDITOR_JS.count(predicate) >= 1
+    # Bucket-Werte eines Schalters sind immer Einschaltsekunden; der Anzeigemodus
+    # gilt nur für die 0/1-Rohwerte (Zeitstrahl/Rohwerte-Linie). Kachel: raw =
+    # timeline, Editor: this.raw.
+    assert "return s.aggregation_type === 'switch' && (s.display_mode === 'time' || !raw);" in TILES_JS
+    assert "return s.aggregation_type === 'switch' && (s.display_mode === 'time' || !this.raw);" in EDITOR_JS
+
+
+def test_no_file_decides_the_duration_on_the_display_mode_alone() -> None:
+    """Ein Vergleich nur mit display_mode === 'time' ließe nackte Sekunden
+    erscheinen, sobald der Anzeigemodus "AN/AUS" ist."""
+    legend = (APP / "static/js/legend-render.js").read_text(encoding="utf-8")
+    for name, text in (("tile", TILES_JS), ("editor", EDITOR_JS), ("legend", legend)):
+        stripped = text.replace("s.display_mode === 'time' || !", "")
+        assert "&& s.display_mode === 'time'" not in stripped, name

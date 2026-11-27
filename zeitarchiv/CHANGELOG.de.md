@@ -40,6 +40,9 @@
 
 - **Archiv**: Eine leere Archivdatei (0 Bytes) blockiert Neuaufbau, Abgleich und Energiedashboard nicht mehr; sie wird wie eine fehlende Datei übersprungen
 - **Charts**: „Rohwerte“ wird mit dem Chart gespeichert; der Schalter im Editor springt nach dem erneuten Öffnen nicht mehr zurück
+- **Schalter-Entitäten**: Balken und Linien zeigen Dauern (z. B. „2h 7m“) statt nackter Zahlen, gleich welcher Anzeigemodus gewählt ist
+  - Gilt für Entitätsseite, Chart-Editor, Dashboard-Kacheln und Lovelace-Karte
+  - Der Anzeigemodus gilt nur noch für die 0/1-Rohwerte (Zeitstrahl)
 - **Charts**: Das Editor-Menü zeigt keine Optionen mehr, die beim gewählten Diagrammtyp nichts bewirken
   - Zeitstrahl: „Punkte“, „Fläche“ und „Linienstil“
   - Donut bei Zustands-Entitäten: „Aggregation“

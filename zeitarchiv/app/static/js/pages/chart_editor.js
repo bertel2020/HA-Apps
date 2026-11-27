@@ -869,7 +869,12 @@
         // Dauer-Serien (Schalter im Anzeigemodus „Zeit“) formatiert NumberFormat.fmtDuration
         // als „2h 33m“ — Nachkommastellen werden dort nicht gelesen. Gilt für den ganzen
         // Chart nur, wenn jede Serie eine Dauer-Serie ist (wie isDurationSeries() in render()).
-        get allDuration() { return this.series.length > 0 && this.series.every(s => s.aggregation_type === 'switch' && s.display_mode === 'time'); },
+        get allDuration() { return this.series.length > 0 && this.series.every(s => this.isDurationSeries(s)); },
+        // Bei Schaltern sind die Bucket-Werte (Balken/Linie ohne Rohwerte) Einschaltsekunden,
+        // gleich welcher Anzeigemodus gewählt ist — ohne Einheit wären es unlesbare Zahlen
+        // (266 = 4 Min. 26 s). Der Anzeigemodus gilt nur für die 0/1-Rohwerte (wie auf der
+        // Entitätsseite, entity_detail.js).
+        isDurationSeries(s) { return s.aggregation_type === 'switch' && (s.display_mode === 'time' || !this.raw); },
         get donutAvailable() { return this.hasStateOrUnknown || this.series.length >= 2; },
         get hasStateOrUnknown() { return this.hasState || !this.series.length; },
         // Balken-Ansicht der Zustände gewünscht — solange noch keine Serien
@@ -924,7 +929,7 @@
           const values = points.map(p => p.value).filter(Number.isFinite);
           const minima = points.map(p => Number.isFinite(p.min) ? p.min : p.value).filter(Number.isFinite);
           const maxima = points.map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
-          const isDuration = s.aggregation_type === 'switch' && s.display_mode === 'time';
+          const isDuration = this.isDurationSeries(s);
           const unit = s.unit ? ` ${s.unit}` : '';
           const formatted = value => isDuration ? NumberFormat.fmtDuration(value) : `${fmtNum(value, this.effectiveDecimals(s))}${unit}`;
           // Summe bei Zählern sinnvoll — Bucket-Werte sind dort bereits
@@ -1045,7 +1050,7 @@
               stateRows: s.aggregation_type === 'state' ? this.stateRowsFor(s) : [],
               color: this.colorFor(s.entity_id),
               stack: this.stackLabelFor(s.entity_id),
-              stackKey: this.stackLabelFor(s.entity_id) ? `${this.stackGroups.members[s.entity_id]}|${(s.aggregation_type === 'switch' && s.display_mode === 'time') ? ' duration' : s.unit}` : '',
+              stackKey: this.stackLabelFor(s.entity_id) ? `${this.stackGroups.members[s.entity_id]}|${this.isDurationSeries(s) ? ' duration' : s.unit}` : '',
               ...this.seriesStatsFor(s, s.points, this.windowEnd),
               // Min/Max/Ø über Zustandsindizes sind keine Aussage.
               ...(s.aggregation_type === 'state' ? {last: '—', min: '—', max: '—', average: '—', sum: null} : {}),
@@ -1636,10 +1641,16 @@
           const s = this.series.find(x => x.entity_id === id);
           return !!s && !this.donut && !this.timeline && !this.raw && (s.aggregation_type === 'switch' || s.source_type === 'switch');
         },
-        metricValue(id) { return (this.seriesStyle[id] && this.seriesStyle[id].metric) || 'duration'; },
+        // Ohne eigene Wahl gilt der Anzeigemodus der Entität (der Server liefert ihn als default_metric mit).
+        defaultMetricFor(id) {
+          const s = this.series.find(x => x.entity_id === id);
+          return (s && s.default_metric) || 'duration';
+        },
+        metricValue(id) { return (this.seriesStyle[id] && this.seriesStyle[id].metric) || this.defaultMetricFor(id); },
         setSeriesMetric(id, value) {
           const style = {...(this.seriesStyle[id] || {})};
-          if (value === 'count' || value === 'both') style.metric = value; else delete style.metric;
+          // Eine Wahl, die dem Standard der Entität entspricht, wird nicht gespeichert: das Chart folgt ihm weiter.
+          if (value === this.defaultMetricFor(id)) delete style.metric; else style.metric = value;
           this.writeSeriesStyle(id, style);
           // Die Antwort enthält je nach Wahl andere Serien: neu laden.
           this.load({silent: true});
@@ -1729,7 +1740,7 @@
           const members = (this.stackGroups && this.stackGroups.members) || {};
           const gid = members[id];
           if (!gid || !this.stackActive || !this.isBarId(id)) return '';
-          const unitOf = s => (s.aggregation_type === 'switch' && s.display_mode === 'time') ? ' duration' : s.unit;
+          const unitOf = s => this.isDurationSeries(s) ? ' duration' : s.unit;
           const mine = this.series.find(s => s.entity_id === id);
           const same = this.series.filter(s => s.chart_type === 'bar' && members[s.entity_id] === gid && unitOf(s) === unitOf(mine));
           if (same.length < 2) return '';
@@ -2202,7 +2213,7 @@
           // ihrer echten (meist leeren) unit — sonst würden sie sich fälschlich
           // eine Achse mit unitlosen Standard-Entitäten teilen und in Rohsekunden
           // statt als Dauer beschriftet.
-          const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
+          const isDurationSeries = s => this.isDurationSeries(s);
           // Linie mit „Eigene Achse“: Schlüssel mit Entität hinter einem Trennzeichen, die Achse zeigt davon
           // nur die Einheit (Parität mit chart-tile-render.js).
           const ownAxis = s => s.chart_type === 'line' && this.ownAxisOn(s.entity_id);
@@ -3059,7 +3070,7 @@
         // Durchschnitt-Fälle — für "Jahre" ohnehin nicht erreichbar.
         renderYearsCompare() {
           const MONTHS = [t('Jan'), t('Feb'), t('Mär'), t('Apr'), t('Mai'), t('Jun'), t('Jul'), t('Aug'), t('Sep'), t('Okt'), t('Nov'), t('Dez')];
-          const isDurationSeries = s => s.aggregation_type === 'switch' && s.display_mode === 'time';
+          const isDurationSeries = s => this.isDurationSeries(s);
           const axisUnit = s => isDurationSeries(s) ? ' duration' : s.unit;
           const hasCompare = s => !!s.compare_points;
           const isSoll = s => !!this.compareSollEntityId && s.entity_id === this.compareSollEntityId;

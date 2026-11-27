@@ -40,6 +40,9 @@
 
 - **Archive**: an empty (0 byte) archive file no longer blocks the rebuild, the consistency check, or the energy dashboard; it is skipped like a missing file
 - **Charts**: "Raw values" is saved with the chart again; the switch in the editor no longer jumps back after reopening
+- **On/off entities**: bars and lines show durations (e.g. “2h 7m”) instead of bare numbers, whichever display mode is set
+  - Applies to the entity page, the chart editor, dashboard tiles, and the Lovelace card
+  - The display mode now only applies to the raw 0/1 values (timeline)
 - **Charts**: the editor menu no longer shows options that do nothing for the chosen chart type
   - Timeline: “Points”, “Area” and “Line style”
   - Donut of state entities: “Aggregation”
