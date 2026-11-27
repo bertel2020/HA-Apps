@@ -402,10 +402,16 @@ def _measures(kind: str, window: _Window, decimals: int | None, tz: ZoneInfo) ->
     if kind == "switch":
         on_seconds = sum(p["value"] for p in points)
         elapsed = window.end.timestamp() - window.start.timestamp()
-        return {
+        measures = {
             "on_hours": round(on_seconds / 3600, 2),
             "on_share": round(on_seconds / elapsed, 3) if elapsed > 0 else None,
         }
+        # Wie oft eingeschaltet wurde; fehlt, solange ein Teil des Zeitraums aus der Zeit vor der Zählung stammt
+        # (eine Teilsumme wäre falsch niedrig).
+        counts = [p.get("count") for p in points]
+        if all(count is not None for count in counts):
+            measures["starts"] = sum(counts)
+        return measures
     lows = [(p["min"] if p["min"] is not None else p["value"], p["ts"]) for p in points]
     highs = [(p["max"] if p["max"] is not None else p["value"], p["ts"]) for p in points]
     low, low_ts = min(lows, key=lambda item: item[0])
@@ -814,7 +820,7 @@ _MEASURE_RULE = (
     "The measure depends on the type: counter gives total consumption, standard gives avg/min/max "
     "(avg is the mean of the per-bucket averages at the stated resolution, e.g. hourly for a day, "
     "not time-weighted, so another resolution gives a slightly different value; never add averages up), "
-    "switch gives on_hours and on_share."
+    "switch gives on_hours and on_share, plus starts (how often it was switched on) when that is known."
 )
 
 #: name -> (Titel de, Titel en, Beschreibung). Die Beschreibungen sind fest

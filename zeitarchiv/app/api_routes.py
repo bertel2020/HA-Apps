@@ -244,6 +244,7 @@ def _table_aggregates(result: dict, empty_is_none: bool = False) -> dict[str, fl
         if point["max"] is not None or point["value"] is not None
     ]
     automatic = total if result["aggregation_type"] in ("counter", "switch") else average
+    counts = _count_aggregates(points) if result["aggregation_type"] == "switch" else {}
     # Zuletzt erfasster Wert des Zeitraums (letzter Punkt mit Wert); bei Standard-
     # Linien trägt der Randpunkt am Fensteranfang den Wert auch ohne neue Messung.
     last_values = [point["value"] for point in points if point["value"] is not None]
@@ -256,6 +257,25 @@ def _table_aggregates(result: dict, empty_is_none: bool = False) -> dict[str, fl
         "min": min(minima) if minima else None,
         "max": max(maxima) if maxima else None,
         "sum": total,
+        **counts,
+    }
+
+
+def _count_aggregates(points: list[dict]) -> dict[str, float | int | None]:
+    """Kennzahlen der Einschaltvorgänge einer Schalter-Serie (ROADMAP 1.74), mit Präfix ``count_``.
+
+    Ein Zeitraum ohne bekannte Anzahl liefert überall None; eine einzige unbekannte Zahl macht auch die Summe und
+    den Mittelwert unbekannt (eine Teilsumme wäre falsch niedrig). Min, Max und "zuletzt" kommen aus den bekannten
+    Punkten."""
+    known = [point["count"] for point in points if point.get("count") is not None]
+    complete = bool(points) and len(known) == len(points)
+    total = sum(known) if complete else None
+    return {
+        "count_last": known[-1] if known else None,
+        "count_avg": total / len(points) if complete else None,
+        "count_min": min(known) if known else None,
+        "count_max": max(known) if known else None,
+        "count_sum": total,
     }
 
 

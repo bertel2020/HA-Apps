@@ -266,7 +266,13 @@ GAP_THRESHOLD_LABELS = {
 DISPLAY_MODE_LABELS = {
     "onoff": N_("AN/AUS (Rohwert)"),
     "time": N_("Zeit (Dauer)"),
+    # Einschaltvorgänge (ROADMAP 1.74): gespeichert und gültig, im Formular aber erst wählbar, wenn Entitätsseite,
+    # Chart-Editor und Kacheln sie darstellen können (DISPLAY_MODES_IN_FORM).
+    "count": N_("Anzahl (Einschaltvorgänge)"),
+    "both": N_("Zeit und Anzahl"),
 }
+#: Die Anzeigemodi, die das Konfigurationsformular schon anbietet.
+DISPLAY_MODES_IN_FORM = ("onoff", "time")
 # Vielfache des für die Entität Üblichen, nicht Prozent eines Werts — die
 # Begründung steht in storage/cleanup.py (OutlierDetector). Die Schlüssel sind
 # zugleich die gespeicherten Werte; die alte Prozent-Leiter (5/10/25) wird

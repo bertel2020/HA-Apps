@@ -913,6 +913,7 @@ class DailyPoint:
     max_value: float | None = None  # nur Standard: größter Rohwert des Tages
     hours: int = 24  # Stunden mit Werten (Standard, Schalter); beim Zähler nicht ermittelt
     covered: bool = True  # genug Stunden mit Werten (>= DAILY_MIN_HOURS); beim Zähler immer True
+    count: int | None = None  # nur Schalter: Einschaltvorgänge des Tages; None = nicht erfasst
 
 
 def _daily_points(
@@ -968,7 +969,7 @@ def _daily_points(
         if is_switch:
             points.append(DailyPoint(
                 day_start=day_start, value=sum(row.on_seconds for row in day_rows),
-                hours=hours, covered=hours >= DAILY_MIN_HOURS,
+                hours=hours, covered=hours >= DAILY_MIN_HOURS, count=rollup.sum_counts(day_rows),
             ))
             continue
         minima = [row.min_value for row in day_rows if row.min_value is not None]
@@ -1359,6 +1360,10 @@ def query_series(
         }
         for row in fine
     ]
+    if aggregation_type == "switch":
+        # Einschaltvorgänge je Bucket; None heißt "nicht erfasst" (Rollup aus der Zeit vor der Zählung), nicht 0.
+        for point, row in zip(points, fine, strict=True):
+            point["count"] = row.on_count
 
     # Standard-Linien stellen einen Zustand dar: der letzte bekannte Rohwert
     # gilt bis zum naechsten Messpunkt. Ein Randpunkt am Fensteranfang verhindert

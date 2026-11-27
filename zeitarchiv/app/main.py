@@ -55,6 +55,7 @@ from .formatting import (
     COMPACT_TARGET_LABELS,
     DECIMALS_LABELS,
     DISPLAY_MODE_LABELS,
+    DISPLAY_MODES_IN_FORM,
     FONT_SCALE_LABELS,
     GAP_THRESHOLD_LABELS,
     OUTLIER_BLOCKED_REASONS,
@@ -3021,7 +3022,7 @@ def _entity_config_context(entity) -> dict:
         "value_filter_heartbeat_options": list(VALUE_FILTER_HEARTBEAT_LABELS.items()),
         "gap_threshold_options": list(GAP_THRESHOLD_LABELS.items()),
         "outlier_threshold_options": list(OUTLIER_THRESHOLD_LABELS.items()),
-        "display_mode_options": list(DISPLAY_MODE_LABELS.items()),
+        "display_mode_options": [(key, label) for key, label in DISPLAY_MODE_LABELS.items() if key in DISPLAY_MODES_IN_FORM],
         "compact_target_options": list(COMPACT_TARGET_LABELS.items()),
         "preview_rows": preview_rows,
     }
