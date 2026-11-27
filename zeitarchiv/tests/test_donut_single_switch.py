@@ -40,3 +40,10 @@ def test_the_tile_draws_the_centre_text_only_when_it_fits() -> None:
     assert "function centerGraphic(" in STATE_JS and "function bindCenter(" in STATE_JS
     assert TILE_JS.count("StateEntities.bindCenter(") == 2
     assert "tileDonutCenterFits(chart)" in TILE_JS
+
+
+def test_the_state_donuts_get_a_centre_text_too() -> None:
+    """Zustands-Donuts (ein Ring je Entität): größter Zustand in Ruhe, beim Überfahren der Wert der Scheibe."""
+    assert "function stateCenter(" in STATE_JS and "function centerFits(" in STATE_JS
+    assert "StateEntities.bindCenterAt(" in EDITOR_JS
+    assert "StateEntities.bindCenterAt(" in TILE_JS

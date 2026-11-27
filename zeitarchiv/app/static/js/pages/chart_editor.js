@@ -3472,7 +3472,16 @@
           const pattern = StateEntities.unavailablePattern();
           const rows = this.series.filter(s => s.aggregation_type === 'state' && !this.legendHiddenIds.includes(s.entity_id));
           const width = 100 / Math.max(rows.length, 1);
+          // Mitte: größter Zustand in Ruhe, beim Überfahren der Wert der Scheibe (StateEntities.stateCenter()).
+          const centers = rows.map(s => StateEntities.stateCenter(this.stateRowsFor(s)));
+          const showCenter = StateEntities.centerFits(chartInstance, 38);
+          const centerCss = getComputedStyle(document.body);
           chartInstance.setOption({
+            graphic: StateEntities.centerGraphicAt(
+              rows.map((s, k) => ({x: chartInstance.getWidth() * (width * k + width / 2) / 100, y: chartInstance.getHeight() * (rows.length > 1 ? 0.45 : 0.5)})),
+              centers.map(c => showCenter ? c.resting : null),
+              centerCss.getPropertyValue('--ink').trim(), centerCss.getPropertyValue('--ink-muted').trim(),
+              rows.length > 1 ? {main: 16, sub: 11} : undefined),
             toolbox: toolboxOption(this.exportFilename, surface, inkFaint),
             tooltip: {trigger: 'item', appendToBody: true},
             series: rows.map((s, k) => ({
@@ -3512,6 +3521,7 @@
               },
             })) : [],
           }, true);
+          StateEntities.bindCenterAt(chartInstance, showCenter ? centers.map(c => c.items) : [], showCenter ? centers.map(c => c.resting) : []);
           chartInstance.resize();
         },
         // Text in der Ringmitte (Mockup „Donut“): in Ruhe die Summe bzw. bei einem Schalter die Einschaltdauer,
