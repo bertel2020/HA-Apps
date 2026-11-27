@@ -1934,3 +1934,41 @@ def test_heating_flow_role_is_saved_and_reported_with_the_heating_days(client) -
     assert client.post("/wetterdashboard/setup", data=base).status_code == 200
     assert wetter_routes._load_config(index)["heating_flow"] == ""  # leeres Feld entfernt die Zuordnung
 
+
+def test_weather_state_role_accepts_only_state_entities(service) -> None:
+    index = service.deps.index
+    index.get_or_create_entity("weather.test_lage", "weather", None, None, state=True)
+    _add(service, "sensor.t", "sensor", "measurement", "°C", [(_ts(20, 1), 12.0)])
+    assert wetter_routes._role_warning(index, "weather_state", "weather.test_lage") is None
+    assert wetter_routes._role_warning(index, "weather_state", "sensor.t")  # Zahl, kein Text-Zustand
+    assert wetter_routes._role_warning(index, "weather_state", "weather.fehlt")
+    assert wetter_routes._role_warning(index, "weather_state", "") is None
+
+
+def test_weather_state_role_is_saved_and_removed_again(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp6", "sensor", "measurement", "°C")
+    index.get_or_create_entity("weather.wetter_test_lage6", "weather", None, None, state=True)
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    base = {"temperature": "sensor.wetter_test_temp6"}
+    assert wetter_routes._empty_config()["weather_state"] == ""
+    assert client.post("/wetterdashboard/setup", data={**base, "weather_state": "weather.fehlt"}).status_code == 400
+    # Eine Zahl ist kein Wetterzustand
+    assert client.post("/wetterdashboard/setup", data={**base, "weather_state": "sensor.wetter_test_temp6"}).status_code == 400
+    assert client.post("/wetterdashboard/setup", data={**base, "weather_state": "weather.wetter_test_lage6"}).status_code == 200
+    assert wetter_routes._load_config(index)["weather_state"] == "weather.wetter_test_lage6"
+    assert client.post("/wetterdashboard/setup", data=base).status_code == 200
+    assert wetter_routes._load_config(index)["weather_state"] == ""  # leeres Feld entfernt die Zuordnung
+    form = client.get("/wetterdashboard/setup").text
+    assert 'data-role="weather_state"' in form and 'name="weather_state"' in form
+
+
+def test_weather_state_role_sits_in_the_setup_page_and_in_no_table_block() -> None:
+    keys = [key for key, _label, _types in wetter_routes.ROLES]
+    assert keys.index("weather_state") == keys.index("precip_dur") + 1
+    assert wetter_routes.ROLE_TYPES["weather_state"] == ("state",)
+    assert "weather_state" in wetter_routes.ROLE_HELP
+    for _key, _label, needs in wetter_routes.CARD_OPTIONS:
+        assert "weather_state" not in needs  # die Rolle erzeugt keine eigene Karte
+

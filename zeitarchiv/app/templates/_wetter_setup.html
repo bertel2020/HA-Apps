@@ -52,6 +52,7 @@
   {% if key == 'temperature' %}<path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0Z"/>
   {% elif key in ('precip_mm', 'humidity') %}<path d="M12 3s6 6.4 6 11a6 6 0 0 1-12 0c0-4.6 6-11 6-11Z"/>
   {% elif key == 'precip_dur' %}<path d="M7 15a4 4 0 0 1 .6-7.9A5.5 5.5 0 0 1 18 9a3.5 3.5 0 0 1-.5 7"/><path d="M9 19l1-2M13 19l1-2"/>
+  {% elif key == 'weather_state' %}<path d="M7 14a4 4 0 0 1 .6-7.9A5.5 5.5 0 0 1 18 8a3.5 3.5 0 0 1-.5 6"/><path d="M9 18v3M9 19.5h0M13 17.5v3M11.5 19h3M17 18v3M17 19.5h0"/>
   {% elif key == 'heating' %}<path d="M12 3c1 3 4 4.5 4 8.5a4 4 0 0 1-8 0c0-1.7.8-2.6 1.5-3.5.5 1 1 1.5 1.5 1.5 0-3 0-4.5 1-6.5Z"/>
   {% elif key == 'sun_elevation' %}<path d="M3 19h18"/><path d="M6 19a6 6 0 0 1 12 0"/><path d="M12 5v4M6.3 9.3l2.2 2.2M17.7 9.3l-2.2 2.2"/>
   {% elif key == 'wind_direction' %}<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13.4 13.4 8.5 15.5l2.1-4.9Z"/>
@@ -330,7 +331,8 @@
           const allowed = this.roleTypes[role] || ["standard"];
           const fits = (o) => allowed.includes(o.aggregation_type)
             && (role !== "extra" || this.isClimate(o) || o.entity_id === this.draft.entity_id);
-          const options = this.preferUnits(this.entityOptions.filter(fits), role);
+          let options = this.preferUnits(this.entityOptions.filter(fits), role);
+          if (role === "weather_state") options = this.preferWeather(options);
           return options.concat(this.nearMisses(role, allowed));
         },
         // Rollen mit festem Typ (Niederschlag: Zähler): Sensoren mit der passenden Einheit, die als Messwert geführt
@@ -343,6 +345,14 @@
             .map(o => ({...o, disabled: true}));
           if (rest.length) rest[0].sep = true;
           return rest;
+        },
+        // Wetterzustand: Wetter-Entitäten (weather.*) zuerst, danach andere Zustands-Sensoren.
+        preferWeather(opts) {
+          const match = opts.filter(o => o.entity_id.startsWith("weather."));
+          const rest = opts.filter(o => !o.entity_id.startsWith("weather."));
+          if (!match.length || !rest.length) return opts;
+          rest[0] = {...rest[0], sep: true};
+          return [...match, ...rest];
         },
         preferUnits(opts, role) {
           const units = this.roleUnits[role] || [];
@@ -403,7 +413,7 @@
   <p class="settings-section-description">{{ _("Ordnet jeder Rolle eine Entität zu. Nur die Außentemperatur ist Pflicht, alles andere bleibt leer, bis passende Sensoren vorhanden sind.") }}</p>
   <p class="wt-note" x-show="note" x-text="note" x-cloak></p>
   <p class="wt-note wt-note-missing" x-show="missingNote" x-cloak><span x-text="missingNote"></span> <a href="selection?topic=wetter">{{ _("Zum Auswahl-Assistenten") }}</a></p>
-  {% for group_title, in_group in ((_("Grundwerte"), ('temperature', 'precip_mm', 'precip_dur', 'humidity', 'pressure', 'wind')), (_("Weitere Messwerte"), ('gust', 'radiation', 'illuminance', 'illuminance_dawn', 'wind_direction', 'sun_elevation', 'pv_power'))) %}
+  {% for group_title, in_group in ((_("Grundwerte"), ('temperature', 'precip_mm', 'precip_dur', 'weather_state', 'humidity', 'pressure', 'wind')), (_("Weitere Messwerte"), ('gust', 'radiation', 'illuminance', 'illuminance_dawn', 'wind_direction', 'sun_elevation', 'pv_power'))) %}
   <h3 class="wt-group-h">{{ group_title }}</h3>
   <div class="wt-item-grid">
     {% for key, label, types in roles if key in in_group %}
