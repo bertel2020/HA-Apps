@@ -47,7 +47,9 @@
   - Zeitstrahl: „Punkte“, „Fläche“ und „Linienstil“
   - Donut bei Zustands-Entitäten: „Aggregation“
   - Balken-Charts: „Dynamische Y-Achse“
-  - Dauern: „Nachkommastellen“ ist ausgegraut, da Dauern immer Stunden und Minuten zeigen
+  - Dauern: „Nachkommastellen“, da Dauern immer Stunden und Minuten zeigen
+  - „Ausrichtung“ erst ab zwei Entitäten (bei einer war „Horizontal“ ein einzelner Balken); „Rollierend“ und „Dynamische Y-Achse“ entfallen in der horizontalen Ansicht
+  - Legende „Aus“: „Statistik in Legende“ und „Legendengröße“ sind ausgeblendet (Chart-Editor und Entitätsseite)
   - Entitätsseite: „Nachkommastellen“, „Dynamische Y-Achse“ und „Durchschnittslinie“ sind bei den Diagrammtypen ausgeblendet, bei denen sie nichts bewirken; bei Schalter-Entitäten entfallen die „Nachkommastellen“ (auch in den Einstellungen einer Werte-Kachel), da sie „An“/„Aus“ oder eine Dauer zeigen
 
 ## 1.57.0 - 2026-11-24
