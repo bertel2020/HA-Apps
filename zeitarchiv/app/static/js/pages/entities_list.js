@@ -210,6 +210,7 @@
       box.hidden = !tags.length;
       document.getElementById('ent-filter-count').textContent = tags.length ? ` ${tags.length}` : '';
       document.getElementById('ent-filter-btn').classList.toggle('is-active', tags.length > 0);
+      document.getElementById('ent-filter-reset').disabled = !tags.length;
       // Das Menü entfällt, wenn keine seiner Gruppen sichtbar ist.
       const any = ['type-filter-wrap', 'category-filter-wrap', 'area-filter-wrap', 'unit-filter-wrap']
         .some(id => { const w = document.getElementById(id); return w && w.style.display !== 'none'; });
@@ -245,7 +246,7 @@
     function onColumnToggle(key, visible) {
       const wrap = document.getElementById(key + '-filter-wrap');
       if (!wrap || !['type', 'category', 'area', 'unit'].includes(key)) return;
-      wrap.style.display = visible ? 'block' : 'none';
+      wrap.style.display = visible ? '' : 'none';
       if (!visible) {
         if (key === 'unit') {
           document.getElementById('unit-filter-input').value = 'all';

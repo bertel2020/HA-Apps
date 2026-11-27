@@ -25,7 +25,14 @@
           <span class="dd-picker-wrap ent-filter" id="ent-filter-wrap">
             <button type="button" class="btn" id="ent-filter-btn" aria-haspopup="true" onclick="toggleDDPicker('ent-filter')">{{ _("Filter") }} ▾<span class="ent-filter-n" id="ent-filter-count"></span></button>
             <div class="dd-picker-popover dd-picker-popover-left ent-filter-pop" id="ent-filter-popover" role="group" aria-label="{{ _('Filter nach Typ, Kategorie, Raum und Einheit') }}">
-              <div class="ent-filter-group" id="type-filter-wrap" style="display:{{ 'block' if 'type' in visible_columns else 'none' }};">
+              <div class="ent-filter-head">
+                <span class="ent-filter-title">{{ _("Filter") }}
+                  <button type="button" class="ent-filter-info" aria-label="{{ _('Mehrfachauswahl: innerhalb einer Gruppe ODER, zwischen Gruppen UND') }}">i<span class="ent-filter-tip" role="tooltip">{{ _("Mehrfachauswahl: innerhalb einer Gruppe ODER, zwischen Gruppen UND") }}</span></button>
+                </span>
+                <button type="button" class="ent-filter-reset" id="ent-filter-reset" onclick="resetAllFilters()" disabled>{{ _("Zurücksetzen") }}</button>
+              </div>
+              <div class="ent-filter-body">
+              <div class="ent-filter-group" id="type-filter-wrap" {% if 'type' not in visible_columns %}style="display:none;"{% endif %}>
                 <h4>{{ _("Typ") }}</h4>
                 <div id="type-filter-popover">
                   <label class="dd-picker-row" hidden><input type="checkbox" name="type" value="all" checked onchange="onTypeAllChange(this); resetEntitiesPage(); updateTypeFilterLabel();"><span>{{ _("Alle") }}</span></label>
@@ -36,7 +43,7 @@
                 </div>
               </div>
               {% if categories %}
-              <div class="ent-filter-group" id="category-filter-wrap" style="display:{{ 'block' if 'category' in visible_columns else 'none' }};">
+              <div class="ent-filter-group" id="category-filter-wrap" {% if 'category' not in visible_columns %}style="display:none;"{% endif %}>
                 <h4>{{ _("Kategorie") }}</h4>
                 <div id="category-filter-popover">
                   <label class="dd-picker-row" hidden><input type="checkbox" name="category" value="all" checked onchange="onCategoryAllChange(this); resetEntitiesPage(); updateCategoryFilterLabel();"><span>{{ _("Alle") }}</span></label>
@@ -48,7 +55,7 @@
               </div>
               {% endif %}
               {% if area_names %}
-              <div class="ent-filter-group" id="area-filter-wrap" style="display:{{ 'block' if 'area' in visible_columns else 'none' }};">
+              <div class="ent-filter-group" id="area-filter-wrap" {% if 'area' not in visible_columns %}style="display:none;"{% endif %}>
                 <h4>{{ _("Raum") }}</h4>
                 <div id="area-filter-popover">
                   <label class="dd-picker-row" hidden><input type="checkbox" name="area" value="all" checked onchange="onAreaAllChange(this); resetEntitiesPage(); updateAreaFilterLabel();"><span>{{ _("Alle") }}</span></label>
@@ -59,17 +66,17 @@
                 </div>
               </div>
               {% endif %}
-              <div class="ent-filter-group" id="unit-filter-wrap" style="display:{{ 'block' if 'unit' in visible_columns else 'none' }};">
+              <div class="ent-filter-group" id="unit-filter-wrap" {% if 'unit' not in visible_columns %}style="display:none;"{% endif %}>
                 <h4>{{ _("Einheit") }}</h4>
                 <input type="hidden" name="unit" id="unit-filter-input" value="all">
                 <div id="unit-filter-popover">
-                  <div class="dd-picker-row active" data-value="all" data-label="{{ _('Alle') }}" onclick="selectDDOption('unit-filter', this.dataset.value, this.dataset.label); resetEntitiesPage();">{{ _("Alle Einheiten") }}</div>
+                  <div class="dd-picker-row active" hidden data-value="all" data-label="{{ _('Alle') }}" onclick="selectDDOption('unit-filter', this.dataset.value, this.dataset.label); resetEntitiesPage();">{{ _("Alle Einheiten") }}</div>
                   {% for opt in unit_options %}
-                  <div class="dd-picker-row" data-value="{{ opt.value }}" data-label="{{ opt.label }}" onclick="selectDDOption('unit-filter', this.dataset.value, this.dataset.label); resetEntitiesPage();">{{ opt.label }}</div>
+                  <div class="dd-picker-row" data-value="{{ opt.value }}" data-label="{{ opt.label }}" onclick="selectDDOption('unit-filter', this.classList.contains('active') ? 'all' : this.dataset.value, this.dataset.label); resetEntitiesPage();">{{ opt.label }}</div>
                   {% endfor %}
                 </div>
               </div>
-              <p class="ent-filter-foot">{{ _("Mehrfachauswahl: innerhalb einer Gruppe ODER, zwischen Gruppen UND") }}</p>
+              </div>
             </div>
           </span>
           <!-- page ist hier die einzige Quelle der Wahrheit für die Seiten-Navigation
