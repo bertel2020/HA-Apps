@@ -7,6 +7,7 @@ neu: so bleiben Monate, deren Rohdaten es nicht mehr gibt, unangetastet."""
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,9 +22,48 @@ from .progress import JobProgress
 from .route_support import storage_locked
 from .storage import rollup
 from .storage.coordinator import StorageCoordinator
+from .storage.index import Index
 
 #: Fortschritt in der Kopfleiste, solange nachgerechnet wird.
 _progress = JobProgress("switch-count-backfill", unit=N_("Monate"), label=N_("Einschaltungen nachrechnen"))
+
+
+#: Warteschlange des automatischen Nachlaufs (JSON-Liste von Entitäten). Fehlt der Eintrag, ist die Suche noch nicht
+#: gelaufen. Eine leere Liste heißt "fertig": neue Monate bekommen die Anzahl schon beim Archivieren, es kommt nichts nach.
+SETTING_BACKFILL_PENDING = "switch_count_backfill_pending"
+
+
+def process_pending_backfill(data_dir: Path, index: Index, tz: ZoneInfo, coordinator: StorageCoordinator) -> None:
+    """Rechnet die Einschaltungs-Anzahl archivierter Monate nach dem Update von selbst nach (Wartungstakt, alle 30 s).
+
+    Der erste Lauf sucht einmal die Schalter mit Monaten ohne Anzahl und legt sie in eine Warteschlange; jeder weitere
+    Takt arbeitet höchstens EINE Entität ab, damit ein Takt auch bei langer Historie nicht spürbar blockiert (wie beim
+    Stunden-Rollup). Die Entität wird vor dem Rechnen aus der Warteschlange genommen: scheitert sie, versucht es kein
+    Takt endlos erneut; der Knopf in der Konfiguration bleibt der Rückweg."""
+    raw = index.get_setting(SETTING_BACKFILL_PENDING)
+    if raw is None:
+        pending = [
+            row["entity_id"] for row in index.list_entities()
+            if row["aggregation_type"] == "switch" and rollup.switch_count_months(data_dir, row["entity_id"])[1]
+        ]
+        index.set_setting(SETTING_BACKFILL_PENDING, json.dumps(pending))
+        return
+    try:
+        pending = json.loads(raw)
+    except ValueError:
+        pending = []
+    if not isinstance(pending, list) or not pending:
+        return
+    entity_id, *remaining = pending
+    index.set_setting(SETTING_BACKFILL_PENDING, json.dumps(remaining))
+    with coordinator.entity(entity_id):
+        entity = index.get_entity(entity_id)
+        if entity is None or entity["aggregation_type"] != "switch":
+            return
+        with _progress.track():
+            _progress.set_phase(tr("Einschaltungen werden nachgerechnet"), total=len(rollup.switch_count_months(data_dir, entity_id)[1]))
+            _progress.set_detail(entity_id)
+            rollup.backfill_switch_counts(data_dir, entity_id, tz, lambda done, _total, _year, _month: _progress.advance(done))
 
 
 @dataclass(frozen=True)

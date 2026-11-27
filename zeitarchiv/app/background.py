@@ -66,6 +66,7 @@ from .energiedashboard_routes import (
     sync_hourly_rollup_flags_for_current_config,
 )
 from .progress import JobBusy, JobProgress
+from .switch_count_routes import process_pending_backfill as process_pending_switch_count_backfill
 from .route_support import STORAGE_LOCKED_TIMEOUT_SECONDS, dir_size
 from .storage import backup, backup_external, cleanup, hotbuffer, reconcile, rollup
 from .storage import resolution as resolution_mod
@@ -1282,6 +1283,8 @@ class BackgroundService:
                     ha_integration.refresh_integration_version_check_if_stale(self.index)
                 with self._maintenance_step("hourly_backfill"):
                     process_pending_hourly_backfill(self.data_dir, self.index, self.tz, self.coordinator)
+                with self._maintenance_step("switch_count_backfill"):
+                    process_pending_switch_count_backfill(self.data_dir, self.index, self.tz, self.coordinator)
                 with self._maintenance_step("heatmap_weekday_cache"):
                     refresh_heatmap_weekday_cache_if_stale(self.energiedashboard_service)
                 with self._maintenance_step("backup_schedule"):

@@ -186,6 +186,10 @@ WARTUNGSPLANER_ZEILEN: dict[str, str | None] = {
     # der Effekt (Zeitfenster zu Ø/Min/Max zusammengefasst) ist direkt als
     # normale Zeile in der Roh-Werte-Tabelle der Entität sichtbar.
     "_flush_stale_resolution_windows": None,
+    # Einmaliger Nachlauf der Einschaltungs-Anzahl nach dem Update (ROADMAP 1.74): läuft sichtbar in der Glocke
+    # ("Einschaltungen nachrechnen"), sein Ergebnis steht in der Konfiguration der Schalter-Entität ("Für alle
+    # archivierten Monate erfasst"); danach tut der Schritt nichts mehr und braucht keine Dauer-Zeile.
+    "process_pending_switch_count_backfill": None,
     # Archiviert den Vormonat von Entitäten, die seit dem Monatswechsel nichts mehr gesendet haben. Ersetzt den
     # manuellen Anstoß, den es schon gibt (Housekeeping → Rotation, mit Zähler "rotation_pending"); der Effekt ist
     # der archivierte Monat selbst, ein eigener globaler Zustand entsteht nicht.
