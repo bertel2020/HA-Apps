@@ -198,6 +198,9 @@
 </section>
 <section class="cfg-sec" id="cfg-darstellung" aria-labelledby="cfg-darstellung-h">
   <div class="cfg-sec-head"><h3 id="cfg-darstellung-h">{{ _("Darstellung") }}</h3>{% if n_darstellung %}<small class="cfg-sec-adj">· {{ _("{n} angepasst", n=n_darstellung) }}</small>{% endif %}</div>
+{# Schalter (0/1) und Zustände (ganze Zustandsindizes) haben keine Nachkommastellen: weder die Anzeige noch die Rundung des
+   Wertänderungsfilters ändern sich damit. Die Zeile fehlt dort; der gespeicherte Wert bleibt. #}
+{% if aggregation_type not in ('switch', 'state') %}
 <div class="field cfg-row">
   <label>{{ _("Nachkommastellen") }} {{ hint_button(_('Nachkommastellen')) }}{{ adj('decimals') }}</label>
   <p class="cfg-short">{{ _("Anzeige und Wertänderungsfilter") }}</p>
@@ -213,6 +216,7 @@
   </span>
   {% call hint_body() %}{{ _("„Automatisch“ zeigt bis zu drei Stellen und lässt Nullen am Ende weg (4 statt 4,000). Eine feste Auswahl rundet und füllt auf (4,00 bei 2 Stellen).") }}{% endcall %}
 </div>
+{% endif %}
 {% if aggregation_type == 'switch' %}
 <div class="field cfg-row">
   <label>{{ _("Anzeigemodus") }} {{ hint_button(_('Anzeigemodus')) }}</label>

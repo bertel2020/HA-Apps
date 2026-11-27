@@ -105,3 +105,34 @@ def test_states_compare_against_the_enforced_values_not_the_global_ones(client, 
         assert 'class="badge adjusted"' not in client.get("/entities/sensor.cfg_state/config").text
     finally:
         main.index.delete_entity("sensor.cfg_state")
+
+
+def _decimals_row(html: str) -> bool:
+    return 'id="decimals-btn"' in html
+
+
+def test_the_decimals_row_exists_for_measurements_and_not_for_switches_and_states(client, entities) -> None:
+    """Schalter (0/1) und Zustände (ganze Indizes) haben keine Nachkommastellen, weder in der Anzeige noch in der Rundung des Filters."""
+    from app import main
+
+    assert _decimals_row(client.get(f"/entities/{entities[0]}/config").text)
+    assert not _decimals_row(client.get(f"/entities/{entities[1]}/config").text)
+    main.index.get_or_create_entity("sensor.cfg_state", "sensor", None, None, state=True)
+    try:
+        assert not _decimals_row(client.get("/entities/sensor.cfg_state/config").text)
+    finally:
+        main.index.delete_entity("sensor.cfg_state")
+
+
+def test_a_hidden_decimals_value_is_never_counted_as_a_deviation(client, entities) -> None:
+    from app import main
+
+    _set(entities[1], decimals="4")
+    html = client.get(f"/entities/{entities[1]}/config").text
+    assert 'class="badge adjusted"' not in html
+    assert "angepasst" not in html.split('id="cfg-darstellung"')[0].split('class="cfg-jump"')[-1]  # keine Zahl am Sprunglink
+    # Der gespeicherte Wert bleibt erhalten, die Zeile fehlt nur.
+    assert main.index.get_entity(entities[1])["decimals"] == "4"
+    # Bei einer Messung zählt dieselbe Abweichung weiter.
+    _set(entities[0], decimals="4")
+    assert 'class="badge adjusted"' in client.get(f"/entities/{entities[0]}/config").text

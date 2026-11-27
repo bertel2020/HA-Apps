@@ -81,6 +81,7 @@
   - Cleanup: “Minimum age of the mark” is hidden while “Automatic cleanup” is off
   - Compaction: “Minimum age” is hidden while “Automatic compaction” is off
   - Selection assistant: “Also re-sort entities that already have a category” is greyed out while “No category” is chosen
+  - Entity settings: “Decimal places” is hidden for on/off and state entities, which have none
 
 ## 1.57.0 - 2026-11-24
 

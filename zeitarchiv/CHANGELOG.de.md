@@ -81,6 +81,7 @@
   - Bereinigung: „Mindestalter der Markierung“ ist ausgeblendet, solange die „Automatische Bereinigung“ aus ist
   - Verdichtung: „Mindestalter“ ist ausgeblendet, solange die „Automatische Verdichtung“ aus ist
   - Auswahl-Assistent: „Auch bereits einsortierte Entitäten umsortieren“ ist ausgegraut, solange „Keine Kategorie“ gewählt ist
+  - Entitäts-Einstellungen: „Nachkommastellen“ ist bei Schalter- und Zustands-Entitäten ausgeblendet, sie haben keine
 
 ## 1.57.0 - 2026-11-24
 

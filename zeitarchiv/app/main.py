@@ -2919,6 +2919,7 @@ def _entity_config_adjusted(entity) -> dict[str, dict[str, str]]:
         for name, value in expected.items()
         if entity[name] != value and kind not in blocked.get(name, {})
         and not (name == "value_filter_heartbeat" and entity["value_filter"] != "decimals")  # nur bei aktivem Filter
+        and not (name == "decimals" and kind in ("switch", "state"))  # 0/1 und Zustandsindizes haben keine Nachkommastellen
     }
 
 
