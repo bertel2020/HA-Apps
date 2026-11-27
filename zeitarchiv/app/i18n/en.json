@@ -1932,6 +1932,7 @@
     "Zeit (Dauer)": "Time (duration)",
     "Anzahl (Einschaltvorgänge)": "Count (times switched on)",
     "Zeit und Anzahl": "Time and count",
+    "Einschaltungen": "switch-ons",
     "Anzahl": "Count",
     "Beides": "Both",
     "Für diesen Zeitraum wurde die Anzahl der Einschaltungen noch nicht erfasst.": "The number of switch-ons has not been recorded for this period yet.",

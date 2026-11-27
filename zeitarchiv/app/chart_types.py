@@ -165,12 +165,14 @@ _HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 SERIES_STYLE_KINDS = ("bar", "line")
 #: Aggregationsarten, für die „Darstellung“ je Serie gilt: Schalter bleiben Balken, Zustände haben ihren Zeitstrahl.
 SERIES_STYLE_TYPES = ("counter", "standard")
+#: Schalter: Anzeige der Einschaltungen (ROADMAP 1.74), siehe switch_counts.py. Ohne Eintrag gilt die Dauer.
+SERIES_STYLE_METRICS = ("count", "both")
 
 
 def series_style_clean(value: dict | None, entity_ids: list[str], aggregation_types: dict[str, str] | None = None) -> dict:
     """Darstellung je Serie (saved_charts.series_style).
 
-    Form: ``{entity_id: {"kind": "bar" | "line", "axis": "own", "legend": False}}``. Alle Schlüssel sind optional: fehlt ``kind``,
+    Form: ``{entity_id: {"kind": "bar" | "line", "axis": "own", "metric": "count" | "both", "legend": False}}``. Alle Schlüssel sind optional: fehlt ``kind``,
     gilt die Entitätsart (Zähler Balken, Messwert Linie), fehlt ``axis``, teilt die Serie die Achse ihrer Einheit.
     ``legend: False`` nimmt die Serie aus der Legende (Zeile und Kennzahlen), gezeichnet wird sie weiter; es gilt für
     jede Entitätsart, ``kind`` und ``axis`` nur für Zähler und Messwerte.
@@ -188,6 +190,8 @@ def series_style_clean(value: dict | None, entity_ids: list[str], aggregation_ty
             clean["kind"] = style["kind"]
         if styleable and style.get("axis") == "own":
             clean["axis"] = "own"
+        if style.get("metric") in SERIES_STYLE_METRICS and (aggregation_types is None or aggregation_types.get(entity_id) == "switch"):
+            clean["metric"] = style["metric"]
         if style.get("legend") is False:
             clean["legend"] = False
         if clean:

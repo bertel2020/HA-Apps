@@ -790,6 +790,8 @@
         // saved_charts.series_colors), sonst Palettenfarbe nach Position.
         // Gleiche Regel wie colorFor() in dashboard-tiles.js.
         colorFor(entityId) {
+          // Die Anzahl-Linie neben der Dauer ("Beides") hat keinen eigenen Eintrag in der Liste: feste Linienfarbe.
+          if (entityId.endsWith('#count')) return getComputedStyle(document.body).getPropertyValue('--accent-line').trim() || '#006787';
           const own = this.seriesColors[entityId];
           if (typeof own === 'string') {
             if (own.startsWith('palette:') && PALETTE[+own.slice(8)]) return PALETTE[+own.slice(8)];
@@ -1625,7 +1627,27 @@
         // Nur Zähler und Messwerte lassen die Wahl; Schalter bleiben Balken, Zustände haben ihren Zeitstrahl.
         canChooseKind(id) {
           const s = this.series.find(x => x.entity_id === id);
-          return !!s && !this.donut && !this.timeline && ['counter', 'standard'].includes(s.aggregation_type);
+          // Die Anzahl eines Schalters ist eine Zähler-Serie, bleibt aber Balken (Server: nur Zähler und Messwerte).
+          return !!s && !s.source_type && !this.donut && !this.timeline && ['counter', 'standard'].includes(s.aggregation_type);
+        },
+        // Schalter-Serien (auch als Anzahl) haben die Wahl Dauer / Anzahl / Beides (ROADMAP 1.74). Zeitstrahl und
+        // Rohwerte zeigen 0/1 und kennen sie nicht.
+        canChooseMetric(id) {
+          const s = this.series.find(x => x.entity_id === id);
+          return !!s && !this.donut && !this.timeline && !this.raw && (s.aggregation_type === 'switch' || s.source_type === 'switch');
+        },
+        metricValue(id) { return (this.seriesStyle[id] && this.seriesStyle[id].metric) || 'duration'; },
+        setSeriesMetric(id, value) {
+          const style = {...(this.seriesStyle[id] || {})};
+          if (value === 'count' || value === 'both') style.metric = value; else delete style.metric;
+          this.writeSeriesStyle(id, style);
+          // Die Antwort enthält je nach Wahl andere Serien: neu laden.
+          this.load({silent: true});
+        },
+        // Für die Abfrage: nur ausdrückliche Wahlen („entity:count,entity:both“).
+        metricsParam(ids) {
+          return ids.filter(id => this.seriesStyle[id] && this.seriesStyle[id].metric)
+            .map(id => `${id}:${this.seriesStyle[id].metric}`).join(',');
         },
         // Was „Auto“ aus der Serie macht: Zähler Balken, Messwert Linie.
         autoKindFor(id) {
@@ -1908,6 +1930,8 @@
           });
           const kinds = this.kindsParam(this.visibleEntityIds);
           if (kinds) params.set('kinds', kinds);
+          const metrics = this.metricsParam(this.visibleEntityIds);
+          if (metrics) params.set('metrics', metrics);
           if (this.multiYearRequested) params.set('previous_years', String(this.compareYears));
           // Heatmap: zusätzlich die Zellen (Wochentag x Stunde); Legende und
           // Kennzahlen kommen weiter aus den Anteilen derselben Abfrage.
@@ -2065,6 +2089,10 @@
             chartInstance = newChartInstance();
             AxisFit.attach(chartInstance);
           }
+          // Name der Anzahl-Linie neben der Dauer folgt dem (umbenennbaren) Namen der Dauer-Serie.
+          this.series.forEach(s => {
+            if (s.base_entity_id) s.friendly_name = `${this.entityNames[s.base_entity_id] || s.base_name} · ${t('Anzahl')}`;
+          });
           if (!this.hasData) { chartInstance.clear(); return; }
           // Nur die Zustands-Balken brauchen mehr Höhe (ein Diagramm je Entität).
           if (!(this.timeline && this.hasState && this.stateMode !== 'timeline')) document.getElementById('chart').style.height = '';

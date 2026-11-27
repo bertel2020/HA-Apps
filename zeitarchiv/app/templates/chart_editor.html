@@ -176,6 +176,13 @@
                   <option value="bar" :selected="kindValue(id) === 'bar'">{{ _("Balken") }}</option>
                   <option value="line" :selected="kindValue(id) === 'line'">{{ _("Linie") }}</option>
                 </select>
+                <select class="entity-name-stack entity-name-kind" x-show="canChooseMetric(id)" x-cloak
+                        :value="metricValue(id)" @change="setSeriesMetric(id, $event.target.value)"
+                        title="{{ _('Anzeige') }}" aria-label="{{ _('Anzeige') }}">
+                  <option value="duration" :selected="metricValue(id) === 'duration'">{{ _("Dauer") }}</option>
+                  <option value="count" :selected="metricValue(id) === 'count'">{{ _("Anzahl") }}</option>
+                  <option value="both" :selected="metricValue(id) === 'both'">{{ _("Beides") }}</option>
+                </select>
                 <label class="entity-name-axis" x-show="canOwnAxis(id)" x-cloak
                        title="{{ _('Die Linie bekommt eine eigene Achse, ihre Skala richtet sich nur nach ihr') }}">
                   <input type="checkbox" :checked="ownAxisOn(id)" @change="setSeriesAxis(id, $event.target.checked)">
