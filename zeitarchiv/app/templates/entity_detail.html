@@ -294,6 +294,9 @@
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
+            {# Schalter-Werte erscheinen auf dieser Seite immer als Dauer (fmtDuration), #}
+            {# Dezimalstellen werden dort nicht gelesen — die Zeile gäbe es nur zum Schein. #}
+            {% if aggregation_type != 'switch' %}
             <div class="menu-row menu-row-stack" x-show="chartType !== 'timeline'">
               <span class="menu-row-label">{{ _("Nachkommastellen") }}</span>
               <div class="seg">
@@ -305,6 +308,7 @@
                 <button :class="{active: decimals === '4'}" @click="setDecimals('4')">4</button>
               </div>
             </div>
+            {% endif %}
             <!-- Balken müssen bei 0 beginnen (render() ignoriert die Option bei
                  chartType 'bar'), der Zeitstrahl hat keine Y-Achse. -->
             <label class="menu-row" x-show="chartType === 'line'">
