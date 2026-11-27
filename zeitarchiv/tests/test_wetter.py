@@ -831,7 +831,7 @@ def test_toggles_are_app_chips_and_card_heads_keep_one_layout() -> None:
     from _paths import TEMPLATES
 
     text = (TEMPLATES / "_wetter_view.html").read_text(encoding="utf-8")
-    assert text.count('class="filter-chip"') == 2  # Spanne der Vorjahre, Heizzähler
+    assert text.count('class="filter-chip"') == 2 + 1  # Spanne der Vorjahre, Heizzähler, Vorlauftemperatur
     assert '<input type="checkbox" x-model="band"' in text and 'class="wt-check"><input type="checkbox"' not in text
     # Jede Karte beginnt mit der Kopfzeile: Titel links, Bedienelemente rechts.
     assert text.count('<div class="wt-controls">') >= 8
@@ -1916,3 +1916,21 @@ def test_daily_course_precipitation_follows_the_chosen_mode(service) -> None:
     assert minutes["unit"] == "min" and minutes["values"][1] == pytest.approx(30.0)
     amount = service.compute_daily_course("precip", start=date(2026, 8, 19), end=date(2026, 8, 20), compare="", now_local=NOW)
     assert amount["unit"] == "mm" and amount["values"][1] == pytest.approx(1.5)
+
+
+def test_heating_flow_role_is_saved_and_reported_with_the_heating_days(client) -> None:
+    from app.main import index
+
+    index.get_or_create_entity("sensor.wetter_test_temp5", "sensor", "measurement", "°C")
+    index.get_or_create_entity("sensor.wetter_test_wp5", "sensor", "total_increasing", "kWh")
+    index.get_or_create_entity("sensor.wetter_test_vl5", "sensor", "measurement", "°C")
+    index.set_setting(wetter_routes.SETTING_CONFIG, "")
+    base = {"temperature": "sensor.wetter_test_temp5", "heating_entity_id": "sensor.wetter_test_wp5"}
+    assert client.post("/wetterdashboard/setup", data={**base, "heating_flow": "sensor.fehlt"}).status_code == 400
+    assert client.post("/wetterdashboard/setup", data={**base, "heating_flow": "sensor.wetter_test_vl5"}).status_code == 200
+    assert wetter_routes._load_config(index)["heating_flow"] == "sensor.wetter_test_vl5"
+    answer = client.get("/wetterdashboard/heizen")
+    assert answer.status_code == 200 and answer.json()["flow_days"] == []  # eingerichtet, aber noch keine Werte
+    assert client.post("/wetterdashboard/setup", data=base).status_code == 200
+    assert wetter_routes._load_config(index)["heating_flow"] == ""  # leeres Feld entfernt die Zuordnung
+

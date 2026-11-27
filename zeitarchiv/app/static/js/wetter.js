@@ -351,6 +351,7 @@
       heatSeason: '',
       heatShown: 'auto',     // Heizperioden in Streudiagramm, Kacheln und Tabelle: 'auto' (nach Fensterbreite), '3', '5', '10' oder 'all'
       heatBySun: false,
+      heatMetric: 'energy',
       heatError: '',
       matrix: null,
       tempYears: null,
@@ -3211,6 +3212,7 @@
           this.heatRoom = String(saved.room || data.room).replace('.', ',');
           this.heatLimit = String(saved.limit || data.limit).replace('.', ',');
           this.heatBySun = !!saved.bySun;
+          this.heatMetric = saved.metric === 'flow' && (data.flow_days || []).length ? 'flow' : 'energy';
           this.heat = data;
           const periods = this.heatPeriods();
           this.heatSeason = String(periods[0] || '');
@@ -3262,7 +3264,43 @@
 
       toggleHeatCounter(index) {
         this.heatOn = this.heatOn.map((value, i) => (i === index ? !value : value));
+        this.heatMetric = 'energy';
         this.drawHeat();
+      },
+
+      // Vorlauftemperatur (Heizkurve): ein Chip neben den Zählern schaltet das Streudiagramm von kWh je Tag auf den
+      // Tages-Ø des Vorlaufs um. Die Außentemperatur bleibt waagerecht.
+      heatHasFlow() {
+        return !!(this.heat && this.heat.flow_days && this.heat.flow_days.length);
+      },
+
+      heatIsFlow() {
+        return this.heatMetric === 'flow' && this.heatHasFlow();
+      },
+
+      leaveHeatFlow() {
+        this.heatMetric = 'energy';
+        this.drawHeat();
+      },
+
+      setHeatFlow() {
+        this.heatMetric = 'flow';
+        this.drawHeat();
+      },
+
+      // Tage und Optionen des Streudiagramms. Die Vorlauftage haben dieselbe Form wie die Verbrauchstage
+      // ([Datum, Außen-Ø, [Wert]]), damit Periodenzuordnung, Glättung und Ausgleichsgerade dieselben bleiben.
+      heatChartDays() {
+        return this.heatIsFlow() ? this.heat.flow_days.map((day) => [day[0], day[1], [day[2]]]) : this.heat.days;
+      },
+
+      heatChartOpts() {
+        const o = this.heatOpts();
+        return this.heatIsFlow() ? {...o, on: [true]} : o;
+      },
+
+      heatChartUnit() {
+        return this.heatIsFlow() ? '°C' : this.heatUnit();
       },
 
       // Wärmste und kälteste Periode für die Tabelle: running = die laufende Heizperiode.
@@ -3350,15 +3388,17 @@
 
       heatSlopes() {
         if (!this.heat) return [];
-        const o = this.heatOpts();
+        const o = this.heatChartOpts();
+        const days = this.heatChartDays();
+        const flow = this.heatIsFlow();
         const info = this.heatPeriodInfo();
         const rows = [];
         this.heatPeriods().slice(0, this.heatChartSeasons()).forEach((period, index) => {
-          const line = WetterHeating.fit(this.heat.days, o, period, this.heatFitFrom(o));
+          const line = WetterHeating.fit(days, o, period, this.heatFitFrom(o));
           if (!line) return;
           const running = info.running && period === info.current;
           rows.push({
-            period, label: WetterHeating.label(period), color: this.heatColor(index), value: `${num(-line.slope, 2)} ${this.heatUnit()}/K`,
+            period, label: WetterHeating.label(period), color: this.heatColor(index), value: flow ? `${num(line.slope, 2)} K/K` : `${num(-line.slope, 2)} ${this.heatUnit()}/K`,
             sub: running ? `${t('{n} Tage', {n: line.n})} · ${t('bisher')}` : t('{n} Tage', {n: line.n}),
             title: `R² ${num(line.r2, 2)}`,
           });
@@ -3375,6 +3415,9 @@
       heatReadout() {
         if (!this.heatSlopes().length) return '';
         const o = this.heatOpts();
+        if (this.heatIsFlow()) {
+          return t('Ein Punkt je Tag (Tages-Ø des Vorlaufs). Der Tages-Ø ist verwässert, wenn die Heizung zeitweise steht oder Warmwasser bereitet; die Kurve wird dann flacher und verrauscht. K/K gilt für 0 bis {limit} °C.', {limit: num(o.limit, 0)});
+        }
         return this.heatFitFrom(o) === 0
           ? this.heatU(t('Ein Punkt je Tag (kWh pro Tag). Die Linien zeigen den geglätteten Verlauf; kWh je Kelvin gilt für 0 bis {limit} °C, darunter verläuft der Verbrauch oft flacher.', {limit: num(o.limit, 0)}))
           : this.heatU(t('Ein Punkt je Tag (kWh pro Tag). Die Linien zeigen den geglätteten Verlauf; kWh je Kelvin gilt für Tage unter der Heizgrenze.'));
@@ -3382,7 +3425,7 @@
 
       drawHeat() {
         if (!this.heat) return;
-        writeStore({heat: {on: this.heatOn, room: this.heatRoom, limit: this.heatLimit, bySun: this.heatBySun}});
+        writeStore({heat: {on: this.heatOn, room: this.heatRoom, limit: this.heatLimit, bySun: this.heatBySun, metric: this.heatMetric}});
         this.drawHeatScatter();
         this.drawHeatSun();
         this.drawHeatTable();
@@ -3482,10 +3525,12 @@
       drawHeatScatter() {
         const element = this.$refs.heatChart;
         if (!element) return;
-        const o = this.heatOpts();
+        const o = this.heatChartOpts();
+        const days = this.heatChartDays();
+        const flow = this.heatIsFlow();
         const colors = palette();
         const periods = this.heatPeriods().slice(0, this.heatChartSeasons());
-        const sunMode = this.heatBySun && this.heatHasSun();
+        const sunMode = this.heatBySun && this.heatHasSun() && !flow;
         const series = [];
         let legend = [];
         if (sunMode) {
@@ -3503,7 +3548,7 @@
           const name = WetterHeating.label(period);
           // Das Legendenzeichen in voller Deckkraft: die Punkte älterer Perioden sind blass, ihre Farbe soll lesbar bleiben.
           legend.push(legendEntry(name, color));
-          const points = this.heat.days
+          const points = days
             .filter((day) => WetterHeating.periodOf(day[0]) === period)
             .map((day) => [day[1], Math.round(WetterHeating.dayKwh(day, o.on) * 100) / 100, day[0]]);
           series.push({
@@ -3517,10 +3562,10 @@
             } : undefined,
           });
           // Geglättete Kurve; ohne genug Tage (laufende Periode, Frühherbst) die Ausgleichsgerade über den Datenbereich.
-          const curve = WetterHeating.smooth(this.heat.days, o, period);
+          const curve = WetterHeating.smooth(days, o, period);
           let data = curve;
           if (!data) {
-            const line = WetterHeating.fit(this.heat.days, o, period);
+            const line = WetterHeating.fit(days, o, period);
             if (line) {
               const below = points.filter((p) => p[0] < o.limit).map((p) => p[0]);
               const from = Math.min(...below);
@@ -3546,15 +3591,15 @@
           },
           // Einheit an den Teilstrichen statt als Achsenname: der Name landete in diesem Diagramm mitten in der Legende.
           yAxis: {
-            type: 'value', min: 0, ...axisStyle(colors),
-            axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => `${value} ${this.heatUnit()}`},
+            type: 'value', ...(flow ? {scale: true} : {min: 0}), ...axisStyle(colors),
+            axisLabel: {color: colors.text, fontSize: scaledFont(11), formatter: (value) => `${value} ${this.heatChartUnit()}`},
           },
           tooltip: {
             trigger: 'item', confine: true, backgroundColor: colors.surface, borderColor: colors.grid,
             textStyle: {color: colors.ink, fontSize: scaledFont(12)},
             formatter: (param) => (param.data && param.data[2]
               ? `<b>${escapeHtml(new Intl.DateTimeFormat(LOCALE, {day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC'}).format(new Date(param.data[2] + 'T12:00:00Z')))}</b>`
-                + `<br>${escapeHtml(num(param.data[0], 1))} °C<br>${escapeHtml(num(param.data[1], 1))} ${escapeHtml(this.heatUnit())}`
+                + `<br>${escapeHtml(num(param.data[0], 1))} °C<br>${escapeHtml(num(param.data[1], 1))} ${escapeHtml(this.heatChartUnit())}`
               : ''),
           },
           series,

@@ -545,3 +545,24 @@ def heating_days(
             continue
         days.append([day.isoformat(), round(point.value, 2), [round(v or 0.0, 3) for v in per_counter]])
     return days
+
+
+def heating_flow_days(
+    temperature: list[DailyPoint], flow: list[DailyPoint], tz: ZoneInfo, today: date,
+) -> list[list]:
+    """Tage der Heizperiode für die Heizkurve: ``[Datum, Tages-Ø Außentemperatur, Tages-Ø Vorlauf]``.
+
+    Dieselben Tage wie in :func:`heating_days` (abgeschlossen, Oktober bis April, Außentemperatur ausreichend
+    abgedeckt), dazu ein Vorlauf-Tagesmittel mit ausreichender Abdeckung. Der Tages-Ø ist verwässert, wenn die
+    Heizung zeitweise steht oder Warmwasser bereitet; die Kurve wird dann flacher."""
+    flow_by_day = {day_of(point, tz): point for point in flow if point.covered and point.value is not None}
+    days: list[list] = []
+    for point in temperature:
+        day = day_of(point, tz)
+        if day >= today or day.month not in HEATING_MONTHS or not point.covered or point.value is None:
+            continue
+        flow_point = flow_by_day.get(day)
+        if flow_point is None:
+            continue
+        days.append([day.isoformat(), round(point.value, 2), round(flow_point.value, 2)])
+    return days

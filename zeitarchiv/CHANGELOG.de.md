@@ -16,6 +16,9 @@
 
 - **Darstellung**: Mit Breiter Darstellung nutzen Energie- und Wetterdashboard
   die volle Breite statt bei 1440 px zu enden
+- **Wetterdashboard**: Heizkurve auf dem Reiter „Heizen“
+  - Neue optionale Zuordnung „Vorlauftemperatur“ in der Einrichtung von Heizen
+  - Ein Chip „Vorlauftemperatur“ über dem Streudiagramm schaltet es auf den Tages-Ø der Vorlauftemperatur gegen die Außentemperatur um
 - **Wetter- und Energiedashboard**: Spaltenhervorhebung in der Vergleichstabelle
   - Einstellung „Spaltenhervorhebung“ in der Einrichtung des Dashboards: Aus, Paare abwechselnd (Vorgabe), Hauptspalten oder Eigene Auswahl
   - Bei Eigener Auswahl werden Zeiträume im Menü „Spalten“ mit einem Stern markiert; die Auswahl gilt je Browser

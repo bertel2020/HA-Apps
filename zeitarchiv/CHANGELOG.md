@@ -16,6 +16,9 @@
 
 - **Appearance**: With wide layout, the energy and weather dashboard use the full
   width instead of stopping at 1440 px
+- **Weather dashboard**: heating curve on the “Heating” tab
+  - New optional assignment “Flow temperature” in the Heating setup
+  - A “Flow temperature” chip above the scatter chart switches it to the daily mean of the flow temperature against the outdoor temperature
 - **Weather and energy dashboard**: column highlighting in the comparison table
   - Setting "Column highlighting" in the setup of each dashboard: off, alternating pairs (default), main columns, or own selection
   - With own selection, periods are marked with a star in the "Columns" menu; the selection is stored per browser

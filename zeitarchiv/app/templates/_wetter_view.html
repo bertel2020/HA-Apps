@@ -850,14 +850,16 @@
       </template>
     </div>
     <div class="card wt-card">
-      <label class="wt-check" x-show="heatHasSun()" x-cloak>
+      <label class="wt-check" x-show="heatHasSun() && !heatIsFlow()" x-cloak>
         <input type="checkbox" x-model="heatBySun" @change="drawHeat()"> {{ _("Punkte nach Sonne einfärben") }} <span class="wt-badge">{{ _("experimentell") }}</span></label>
       {# Zähler als Auswahl-Pillen (.filter-chip aus app.css), mit Farbpunkt wie im Streudiagramm #}
-      <div class="wt-chips" role="group" aria-label="{{ _('Heizzähler') }}" x-show="heat && heat.counters.length > 1" x-cloak>
-        <template x-for="(counter, i) in (heat ? heat.counters : [])" :key="counter.entity_id">
-          <label class="filter-chip"><input type="checkbox" :checked="heatOn[i]" @change="toggleHeatCounter(i)">
+      <div class="wt-chips" role="group" aria-label="{{ _('Heizzähler') }}" x-show="heat && (heat.counters.length > 1 || heatHasFlow())" x-cloak>
+        <template x-for="(counter, i) in (heat && (heat.counters.length > 1 || heatHasFlow()) ? heat.counters : [])" :key="counter.entity_id">
+          <label class="filter-chip"><input type="checkbox" :checked="heatOn[i] && !heatIsFlow()" @change="toggleHeatCounter(i)">
             <span><i class="wt-swatch" :style="'background:' + heatColor(i)"></i><em x-text="counter.name"></em></span></label>
         </template>
+        <label class="filter-chip" x-show="heatHasFlow()" x-cloak><input type="checkbox" :checked="heatIsFlow()" @change="heatIsFlow() ? leaveHeatFlow() : setHeatFlow()">
+          <span><em>{{ _("Vorlauftemperatur") }}</em></span></label>
       </div>
       <div class="wt-chart wt-chart-tall" x-ref="heatChart"></div>
       <div class="wt-slopes" x-show="heatSlopes().length" x-cloak>

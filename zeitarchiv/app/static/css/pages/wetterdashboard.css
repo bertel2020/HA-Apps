@@ -236,7 +236,7 @@
   .wt-item-tile:hover{border-color:var(--border-strong);}
   .wt-item-tile:focus-visible{outline:2px solid var(--accent-line);outline-offset:2px;}
   .wt-item-tile[data-role="temperature"],.wt-item-tile[data-role="extra"],.wt-item-dialog[data-role="temperature"],.wt-item-dialog[data-role="extra"]{--wt-accent:var(--chart-2);}
-  .wt-item-tile[data-role="heating"],.wt-item-dialog[data-role="heating"]{--wt-accent:var(--chart-5);}
+  .wt-item-tile[data-role="heating"],.wt-item-dialog[data-role="heating"],.wt-item-tile[data-role="heating_flow"],.wt-item-dialog[data-role="heating_flow"]{--wt-accent:var(--chart-5);}
   .wt-item-tile[data-role="precip_mm"],.wt-item-tile[data-role="precip_dur"],.wt-item-dialog[data-role="precip_mm"],.wt-item-dialog[data-role="precip_dur"]{--wt-accent:var(--chart-3);}
   .wt-item-tile[data-role="humidity"],.wt-item-dialog[data-role="humidity"]{--wt-accent:var(--chart-6);}
   .wt-item-tile[data-role="pressure"],.wt-item-dialog[data-role="pressure"]{--wt-accent:var(--chart-4);}

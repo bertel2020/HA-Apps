@@ -302,6 +302,29 @@ def test_heating_days_without_counters_are_empty() -> None:
     assert wa.heating_days([_point(date(2026, 1, 5))], [[]], [1.0], TZ, date(2026, 2, 1)) == []
 
 
+def test_heating_flow_days_pair_outdoor_and_flow_means_on_closed_heating_days() -> None:
+    today = date(2026, 11, 3)
+    temperature = [
+        _point(date(2026, 10, 1), value=9.0),
+        _point(date(2026, 10, 2), value=8.0, covered=False),  # Außentemperatur zu dünn
+        _point(date(2026, 10, 3), value=7.0),  # Vorlauf fehlt
+        _point(date(2026, 7, 1), value=22.0),  # Sommer
+        _point(date(2026, 11, 3), value=4.0),  # heute
+        _point(date(2026, 11, 2), value=5.0),
+    ]
+    flow = [
+        _point(date(2026, 10, 1), value=31.456), _point(date(2026, 10, 2), value=33.0), _point(date(2026, 7, 1), value=40.0),
+        _point(date(2026, 11, 3), value=36.0), _point(date(2026, 11, 2), value=35.0, covered=False),
+    ]
+    assert wa.heating_flow_days(temperature, flow, TZ, today) == [["2026-10-01", 9.0, 31.46]]
+    flow[-1] = _point(date(2026, 11, 2), value=35.0)
+    assert wa.heating_flow_days(temperature, flow, TZ, today)[-1] == ["2026-11-02", 5.0, 35.0]
+
+
+def test_heating_flow_days_without_flow_are_empty() -> None:
+    assert wa.heating_flow_days([_point(date(2026, 1, 5))], [], TZ, date(2026, 2, 1)) == []
+
+
 def test_precipitation_months_compare_the_running_month_over_the_same_period() -> None:
     """Tabelle „Niederschlag je Monat“: Vorjahr und Ø begrenzen sich im laufenden Monat auf dessen bisherige Tage,
     spätere Monate haben nur Vorjahr und Ø, und Regentage zählen erst ab der Schwelle."""

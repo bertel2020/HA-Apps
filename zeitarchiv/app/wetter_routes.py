@@ -71,6 +71,7 @@ ROLES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("wind_direction", N_("Windrichtung"), ("standard",)),
     ("sun_elevation", N_("Sonnenhöhe"), ("standard",)),
     ("pv_power", N_("PV-Leistung"), ("standard",)),
+    ("heating_flow", N_("Vorlauftemperatur"), ("standard",)),
 )
 #: Erwartete Einheiten je Rolle: Entitäten damit stehen in der Auswahl zuerst (kein harter Filter,
 #: weil eine Einheit fehlen oder ungewöhnlich geschrieben sein kann).
@@ -87,6 +88,7 @@ ROLE_UNITS = {
     "wind_direction": ["°"],
     "sun_elevation": ["°"],
     "pv_power": ["kW", "W", "MW"],
+    "heating_flow": ["°C", "°F", "K"],
     "extra": ["°C", "°F", "K", "%"],
     "heating": ["kWh", "Wh", "MWh", "m³"],
 }
@@ -106,6 +108,7 @@ ROLE_HELP = {
     "wind_direction": N_("Windrichtung in Grad, zum Beispiel „Windrichtung“."),
     "sun_elevation": N_("Höhe der Sonne in Grad, zum Beispiel der Sensor „Solare Elevation“ der Integration Sun (sensor.sun_solar_elevation, in den Entitäten der Integration zu aktivieren) oder ein Template-Sensor aus dem Attribut „elevation“ von sun.sun."),
     "pv_power": N_("Aktuelle Leistung der PV-Anlage in W oder kW, zum Beispiel „Solarleistung“."),
+    "heating_flow": N_("Vorlauftemperatur der Heizung in °C, zum Beispiel „Vorlauftemperatur“ der Wärmepumpe. Der Reiter „Heizen“ zeigt sie als Heizkurve gegen die Außentemperatur."),
 }
 ROLE_KEYS = tuple(key for key, _label, _types in ROLES)
 ROLE_TYPES = {key: types for key, _label, types in ROLES}
@@ -1241,10 +1244,14 @@ class WetterService:
             self._daily(temperature, now_local), [self._daily(c["entity_id"], now_local) for c in counters],
             [c["scale"] for c in counters], self.deps.tz, now_local.date(),
         ) if counters else []
+        flow = config["heating_flow"]
+        flow_days = analysis.heating_flow_days(
+            self._daily(temperature, now_local), self._daily(flow, now_local), self.deps.tz, now_local.date(),
+        ) if flow and self.deps.index.get_entity(flow) is not None else []
         return {
             "counters": [{"entity_id": c["entity_id"], "name": c["name"]} for c in counters],
             "skipped": skipped, "unit": unit,
-            "days": days, "room": config["heating_room"], "limit": config["heating_limit"],
+            "days": days, "flow_days": flow_days, "room": config["heating_room"], "limit": config["heating_limit"],
             "sun": self._heating_sun(days, config, now_local),
             "today": now_local.date().isoformat(), "tz": str(self.deps.tz),
         }
@@ -2543,6 +2550,7 @@ class WetterService:
             illuminance: str = Form(""),
             illuminance_dawn: str = Form(""),
             pv_power: str = Form(""),
+            heating_flow: str = Form(""),
             wind_direction: str = Form(""),
             sun_elevation: str = Form(""),
             extra_entity_id: list[str] = Form([]),
@@ -2582,7 +2590,7 @@ class WetterService:
             submitted = {
                 "temperature": temperature, "precip_mm": precip_mm, "precip_dur": precip_dur,
                 "humidity": humidity, "pressure": pressure, "wind": wind, "gust": gust, "radiation": radiation,
-                "illuminance": illuminance, "illuminance_dawn": illuminance_dawn, "pv_power": pv_power, "wind_direction": wind_direction, "sun_elevation": sun_elevation,
+                "illuminance": illuminance, "illuminance_dawn": illuminance_dawn, "pv_power": pv_power, "heating_flow": heating_flow, "wind_direction": wind_direction, "sun_elevation": sun_elevation,
             }
             config = _empty_config()
             for key, value in submitted.items():
