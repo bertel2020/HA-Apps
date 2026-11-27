@@ -16,6 +16,7 @@ Gemeinsame Regeln:
 from __future__ import annotations
 
 import calendar
+from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -417,14 +418,14 @@ def sun_kenntage(days: list[dict]) -> dict:
     return {str(year): counts for year, counts in sorted(result.items())}
 
 
-def _longest_run(days: list[dict], kind: str) -> dict | None:
-    """Längste Folge aufeinanderfolgender Tage der Klasse ``kind``; bei Gleichstand die früheste."""
+def _longest_run(days: list[dict], matches: Callable[[dict], bool]) -> dict | None:
+    """Längste Folge aufeinanderfolgender Tage, für die ``matches`` gilt; bei Gleichstand die früheste."""
     best: tuple[int, date, date] | None = None
     start: date | None = None
     previous: date | None = None
     length = 0
     for entry in days:
-        if entry["class"] != kind:
+        if not matches(entry):
             start = None
         else:
             if start is None or previous is None or (entry["date"] - previous).days != 1:
@@ -459,7 +460,7 @@ def sun_records(days: list[dict], monthly_hours: dict, today: date) -> dict | No
     if best_month is not None:
         out["sunniest_month"] = {"value": round(best_month[0], 1), "date": date(best_month[1], best_month[2], 1).isoformat()}
     for key, kind in (("longest_sunny_streak", "sunny"), ("longest_overcast_streak", "overcast")):
-        run = _longest_run(days, kind)
+        run = _longest_run(days, lambda entry, kind=kind: entry["class"] == kind)
         if run:
             out[key] = run
     return out
@@ -486,6 +487,89 @@ def snow_day_totals(
             if idx in snow_idx:
                 entry[0] += seconds
     return [{"date": day, "snow_s": values[0], "known_s": values[1]} for day, values in sorted(days.items())]
+
+
+#: Ein Tag zählt als Tag mit Daten, wenn der Zustand mindestens so lange bekannt war (sonst nur mit Schnee).
+SNOW_MIN_KNOWN_S = 18 * 3600.0
+
+
+def _snow_seasoned(days: list[dict], min_snow_s: float) -> list[dict]:
+    """Tage mit Daten und der Angabe, ob Schnee fiel: ``{"date", "snow"}``. Ein Tag mit genug Schnee zählt immer
+    (der Beleg ist positiv), einer ohne nur, wenn der Zustand mindestens ``SNOW_MIN_KNOWN_S`` bekannt war."""
+    out = []
+    for entry in days:
+        snow = entry["snow_s"] >= min_snow_s > 0
+        if snow or entry["known_s"] >= SNOW_MIN_KNOWN_S:
+            out.append({"date": entry["date"], "snow": snow})
+    return out
+
+
+def snow_season(day: date) -> int:
+    """Startjahr der Saison, zu der ein Tag gehört: 1. Juli bis 30. Juni (2025/26 hat das Startjahr 2025)."""
+    return day.year if day.month >= 7 else day.year - 1
+
+
+def snow_kenntage(days: list[dict], min_snow_s: float) -> dict:
+    """Schneefalltage je Jahr und Monat (Form wie ``sun_kenntage``): ``snow`` zählt Tage mit mindestens ``min_snow_s``
+    Sekunden Schnee oder Schneeregen, ``days`` die Tage mit Daten (Grundlage für „n von m Tagen“)."""
+    result: dict[int, dict[str, list[int]]] = {}
+    for entry in _snow_seasoned(days, min_snow_s):
+        year = result.setdefault(entry["date"].year, {"snow": [0] * 12, "days": [0] * 12})
+        month = entry["date"].month - 1
+        year["days"][month] += 1
+        if entry["snow"]:
+            year["snow"][month] += 1
+    return {str(year): counts for year, counts in sorted(result.items())}
+
+
+def snow_seasons(days: list[dict], min_snow_s: float, today: date) -> list[dict]:
+    """Je Saison (1. Juli bis 30. Juni), neueste zuerst: erster und letzter Schneefalltag, Zahl der Schneefalltage und
+    der Tage mit Daten, längste Folge. ``running`` ist die Saison, in der ``today`` liegt; ohne Schnee sind ``first``
+    und ``last`` None."""
+    by_season: dict[int, list[dict]] = {}
+    for entry in _snow_seasoned(days, min_snow_s):
+        by_season.setdefault(snow_season(entry["date"]), []).append(entry)
+    out = []
+    for start_year, entries in sorted(by_season.items(), reverse=True):
+        snowy = [entry for entry in entries if entry["snow"]]
+        out.append({
+            "season": f"{start_year}/{(start_year + 1) % 100:02d}", "start_year": start_year,
+            "first": snowy[0]["date"].isoformat() if snowy else None,
+            "last": snowy[-1]["date"].isoformat() if snowy else None,
+            "snow_days": len(snowy), "days": len(entries),
+            "longest": _longest_run(entries, lambda entry: entry["snow"]),
+            "running": snow_season(today) == start_year,
+        })
+    return out
+
+
+def snow_records(days: list[dict], min_snow_s: float, today: date) -> dict | None:
+    """Rekorde des Schnees: längste Folge von Schneefalltagen (``ongoing``, wenn sie gestern endet), frühester erster
+    und spätester letzter Schnee einer Saison (gemessen am Kalender ab dem 1. Juli; der letzte Schnee der laufenden
+    Saison steht noch nicht fest und zählt nicht). None ohne einen Schneefalltag."""
+    seasons = [season for season in snow_seasons(days, min_snow_s, today) if season["first"]]
+    if not seasons:
+        return None
+
+    def offset(season: dict, key: str) -> int:
+        return (date.fromisoformat(season[key]) - date(season["start_year"], 7, 1)).days
+
+    def pick(season: dict, key: str) -> dict:
+        return {"value": season["season"], "date": season[key]}
+
+    out: dict = {}
+    streaks = [season["longest"] for season in seasons if season["longest"]]
+    best = max(streaks, key=lambda run: (run["value"], -date.fromisoformat(run["date"]).toordinal()))
+    out["longest_snow_streak"] = {
+        **best, "ongoing": best["end"] == (today - timedelta(days=1)).isoformat(),
+    }
+    earliest = min(seasons, key=lambda season: (offset(season, "first"), season["start_year"]))
+    out["earliest_first_snow"] = pick(earliest, "first")
+    finished = [season for season in seasons if not season["running"]]
+    if finished:
+        latest = max(finished, key=lambda season: (offset(season, "last"), -season["start_year"]))
+        out["latest_last_snow"] = pick(latest, "last")
+    return out
 
 
 LEAP_SLOTS = 366  # Plätze der Jahr×Tag-Matrix: ein Schaltjahr, damit der 29.02. eine eigene Spalte hat

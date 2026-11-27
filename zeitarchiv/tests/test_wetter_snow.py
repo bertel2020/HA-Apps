@@ -12,7 +12,7 @@ Geprüft wird die Datengrundlage der Schneefalltage:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -163,3 +163,95 @@ def test_an_entity_that_started_today_has_no_completed_day(setup) -> None:
     config = _configure(index, weather_state=ENTITY)
 
     assert service.snow_history(config, datetime(2026, 12, 15, 12, tzinfo=TZ)) == []
+
+
+# -- Auswertung (Schritt 2) ------------------------------------------------------------------
+
+MIN_S = 600.0  # 10 Minuten, die Einstellung der Regentage
+
+
+def _day(day: date, snow_min: float = 0.0, known_h: float = 24.0) -> dict:
+    return {"date": day, "snow_s": snow_min * 60.0, "known_s": known_h * HOUR}
+
+
+def _run(start: date, snow_flags: list[bool]) -> list[dict]:
+    return [_day(start + timedelta(days=i), 120.0 if flag else 0.0) for i, flag in enumerate(snow_flags)]
+
+
+def test_the_minimum_duration_decides_what_is_a_snowfall_day() -> None:
+    days = [_day(date(2026, 12, 1), 5), _day(date(2026, 12, 2), 10), _day(date(2026, 12, 3), 120)]
+
+    result = analysis.snow_kenntage(days, MIN_S)
+
+    assert result == {"2026": {"snow": [0] * 11 + [2], "days": [0] * 11 + [3]}}
+
+
+def test_a_gap_in_the_state_is_no_day_without_snow_but_snow_in_it_still_counts() -> None:
+    days = [
+        _day(date(2026, 12, 1), 0, known_h=10),  # Ausfall, kein Beleg für „kein Schnee“
+        _day(date(2026, 12, 2), 0, known_h=18),  # genug bekannt
+        _day(date(2026, 12, 3), 30, known_h=2),  # Schnee ist ein positiver Beleg
+    ]
+
+    december = analysis.snow_kenntage(days, MIN_S)["2026"]
+
+    assert december["days"][11] == 2 and december["snow"][11] == 1
+
+
+def test_seasons_run_from_july_to_june_and_list_the_newest_first() -> None:
+    days = (
+        _run(date(2026, 6, 28), [True, False, False])  # 28. bis 30.6. gehören noch zu 2025/26
+        + _run(date(2026, 11, 10), [True, True, False, True])
+        + _run(date(2026, 12, 1), [False])
+    )
+
+    seasons = analysis.snow_seasons(days, MIN_S, date(2026, 12, 15))
+
+    assert [s["season"] for s in seasons] == ["2026/27", "2025/26"]
+    running, finished = seasons
+    assert running["running"] is True and finished["running"] is False
+    assert (running["first"], running["last"], running["snow_days"], running["days"]) == (
+        "2026-11-10", "2026-11-13", 3, 5)
+    assert running["longest"] == {"value": 2, "date": "2026-11-10", "end": "2026-11-11"}
+    assert (finished["first"], finished["snow_days"]) == ("2026-06-28", 1)
+
+
+def test_a_season_without_snow_has_no_dates() -> None:
+    seasons = analysis.snow_seasons(_run(date(2026, 11, 1), [False, False]), MIN_S, date(2026, 12, 15))
+
+    assert seasons[0]["first"] is None and seasons[0]["last"] is None
+    assert seasons[0]["snow_days"] == 0 and seasons[0]["longest"] is None
+    assert analysis.snow_records(_run(date(2026, 11, 1), [False, False]), MIN_S, date(2026, 12, 15)) is None
+
+
+def test_a_streak_runs_over_a_month_and_year_change_and_breaks_at_a_missing_day() -> None:
+    days = _run(date(2025, 12, 30), [True, True, True, True])  # bis 2.1.
+    days += [_day(date(2026, 1, 4), 120.0), _day(date(2026, 1, 5), 120.0)]  # der 3.1. fehlt
+
+    seasons = analysis.snow_seasons(days, MIN_S, date(2026, 6, 1))
+
+    assert seasons[0]["longest"] == {"value": 4, "date": "2025-12-30", "end": "2026-01-02"}
+
+
+def test_records_pick_the_earliest_first_and_the_latest_last_snow_of_finished_seasons() -> None:
+    days = (
+        _run(date(2024, 12, 5), [True]) + _run(date(2025, 4, 9), [True])  # 2024/25: spät erster, spät letzter
+        + _run(date(2025, 11, 12), [True, True, True]) + _run(date(2026, 3, 29), [True])  # 2025/26
+        + _run(date(2026, 10, 20), [True])  # laufend, aber früh
+    )
+
+    records = analysis.snow_records(days, MIN_S, date(2026, 11, 27))
+
+    assert records["earliest_first_snow"] == {"value": "2026/27", "date": "2026-10-20"}
+    assert records["latest_last_snow"] == {"value": "2024/25", "date": "2025-04-09"}
+    assert records["longest_snow_streak"]["value"] == 3
+    assert records["longest_snow_streak"]["ongoing"] is False
+
+
+def test_the_running_season_gives_no_latest_last_snow_and_a_streak_to_yesterday_is_ongoing() -> None:
+    days = _run(date(2026, 11, 25), [True, True])  # 25. und 26.11., heute der 27.
+
+    records = analysis.snow_records(days, MIN_S, date(2026, 11, 27))
+
+    assert "latest_last_snow" not in records
+    assert records["longest_snow_streak"] == {"value": 2, "date": "2026-11-25", "end": "2026-11-26", "ongoing": True}
