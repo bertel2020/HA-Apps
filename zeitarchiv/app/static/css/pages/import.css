@@ -385,11 +385,22 @@
   .ha-filter-bar{display:flex;flex-direction:column;gap:6px;padding:6px 0 10px;}
   .ha-filter-bar .ha-filter-row{padding:0;}
   .ha-filter-menu{position:relative;display:inline-block;}
-  .ha-filter-pop{position:absolute;left:0;top:calc(100% + 6px);z-index:20;width:min(560px,86vw);display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;padding:12px 14px;background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 10px 24px -8px rgba(0,0,0,.28);}
+  .ha-filter-pop{position:absolute;left:0;top:calc(100% + 6px);z-index:20;width:min(680px,86vw);max-height:min(640px,80vh);display:flex;flex-direction:column;overflow:hidden;background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 10px 24px -8px rgba(0,0,0,.28);}
   .ha-filter-pop[hidden]{display:none;}
-  .ha-filter-group h4{margin:0 0 6px;font-size:calc(11px * var(--font-scale, 1));text-transform:uppercase;letter-spacing:.07em;color:var(--ink-faint);font-weight:600;}
-  .ha-filter-group label{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:calc(13px * var(--font-scale, 1));cursor:pointer;}
-  .ha-filter-foot{grid-column:1/-1;margin:0;padding-top:8px;border-top:1px solid var(--border);color:var(--ink-muted);font-size:calc(12px * var(--font-scale, 1));}
+  /* Optionen als Chips: der Haken ist unsichtbar, sein Nachbar-<span> trägt das Aussehen (wie die Zustands-Chips daneben). */
+  .ha-filter-opt{display:inline-flex;cursor:pointer;}
+  .ha-filter-opt input{position:absolute;opacity:0;pointer-events:none;}
+  .ha-filter-opt span{border:1px solid var(--border-strong);background:var(--surface);color:var(--ink-muted);border-radius:999px;padding:3px 11px;font-size:calc(12.5px * var(--font-scale, 1));white-space:nowrap;}
+  .ha-filter-opt:hover span{background:var(--surface-alt);}
+  .ha-filter-opt input:focus-visible+span{outline:2px solid var(--accent-line);outline-offset:2px;}
+  .ha-filter-opt input:checked+span{background:var(--accent-line-soft);border-color:var(--accent-line);color:var(--accent-line);font-weight:600;}
+  .ha-filter-opt input:checked+span::before{content:"\2713\00a0";}
+  /* Schmal: das Menü hängt an der Leiste und füllt ihre Breite, statt am Knopf zu kleben und rechts aus dem Bild zu ragen. */
+  @media (max-width:640px){
+    .ha-filter-row{position:relative;}
+    .ha-filter-menu{position:static;}
+    .ha-filter-pop{left:0;right:0;width:auto;}
+  }
   .ha-filter-tags{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
   .ha-filter-tags[hidden]{display:none;}
   .ha-filter-tag{display:inline-flex;align-items:center;gap:4px;padding:2px 4px 2px 9px;background:var(--accent-line-soft);color:var(--accent-line);border:1px solid var(--accent-line);border-radius:6px;font-size:calc(12.5px * var(--font-scale, 1));}

@@ -7,22 +7,32 @@
      groups  Liste von (Schlüssel, Beschriftung, Werte). Der Schlüssel benennt das data-f-<Schlüssel>-Attribut
              der Zeilen. Ohne Gruppen entfällt das Menü (Symcon). #}
 {% macro filter_bar(prefix, chips, groups=[]) %}
-<div class="ha-filter-bar" id="{{ prefix }}-filter" data-reset-label="{{ _('Attributfilter zurücksetzen') }}">
+<div class="ha-filter-bar" id="{{ prefix }}-filter" data-reset-label="{{ _('Attributfilter zurücksetzen') }}" data-hits-label="{{ _('Treffer') }}">
   <div class="ha-filter-row">
     <span class="ha-filter-label">{{ _("Filter") }}</span>
     {% if groups %}
     <span class="ha-filter-menu">
       <button type="button" class="ha-filter-chip" data-filter-menu-btn aria-haspopup="true" aria-expanded="false">{{ _("Auswahl") }} ▾<span class="n" data-filter-menu-count></span></button>
       <div class="ha-filter-pop" data-filter-pop hidden role="group" aria-label="{{ _('Filter nach Kategorie, Raum und Typ') }}">
-        {% for key, label, values in groups %}
-        <div class="ha-filter-group" data-filter-group="{{ key }}" data-label="{{ label }}">
-          <h4>{{ label }}</h4>
-          {% for value in values %}
-          <label><input type="checkbox" data-filter-attr data-group="{{ key }}" value="{{ value }}"> {{ value }}</label>
+        <div class="ent-filter-head">
+          <span class="ent-filter-title">{{ _("Filter") }}
+            <button type="button" class="ent-filter-info" aria-label="{{ _('Mehrfachauswahl: innerhalb einer Gruppe ODER, zwischen Gruppen UND') }}">i<span class="ent-filter-tip" role="tooltip">{{ _("Mehrfachauswahl: innerhalb einer Gruppe ODER, zwischen Gruppen UND") }}</span></button>
+          </span>
+          <button type="button" class="ent-filter-reset" data-filter-reset data-filter-reset-menu disabled>{{ _("Zurücksetzen") }}</button>
+        </div>
+        <div class="ent-filter-body">
+          {% for key, label, values in groups %}
+          <div class="ent-filter-group" data-filter-group="{{ key }}" data-label="{{ label }}">
+            <h4>{{ label }}</h4>
+            <div>
+              {% for value in values %}
+              <label class="ha-filter-opt"><input type="checkbox" data-filter-attr data-group="{{ key }}" value="{{ value }}"><span>{{ value }}</span></label>
+              {% endfor %}
+            </div>
+          </div>
           {% endfor %}
         </div>
-        {% endfor %}
-        <p class="ha-filter-foot">{{ _("Mehrfachauswahl: innerhalb einer Gruppe ODER, zwischen Gruppen UND") }}</p>
+        <div class="ent-filter-foot" data-filter-hits aria-live="polite"></div>
       </div>
     </span>
     {% endif %}

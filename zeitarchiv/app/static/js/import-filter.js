@@ -65,6 +65,11 @@
       }
       const pop = root.querySelector('[data-filter-pop]');
       if (pop) pop.hidden = !menuOpen;
+      // Kopf: „Zurücksetzen“ ist ohne gewählte Attribute gesperrt; Fuß: Zeilen, die die Filter durchlassen.
+      const resetMenu = root.querySelector('[data-filter-reset-menu]');
+      if (resetMenu) resetMenu.disabled = total === 0;
+      const hits = root.querySelector('[data-filter-hits]');
+      if (hits) hits.textContent = rows.filter(matches).length + ' ' + (root.dataset.hitsLabel || '');
       renderTags();
     }
 
