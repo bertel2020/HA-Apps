@@ -38,7 +38,7 @@ import pyarrow.parquet as pq
 
 from .atomic import replace_durably, write_file_atomically
 from .index import STATE_TYPE
-from .paths import entity_dir
+from .paths import entity_dir, parquet_files
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +98,7 @@ def last_value_before_month(data_dir: Path, entity_id: str, year: int, month: in
     if not archive_dir.exists():
         return None
     target = _month_str(year, month)
-    for path in sorted(archive_dir.glob("????-??.parquet"), reverse=True):
+    for path in parquet_files(archive_dir, "????-??.parquet", reverse=True):
         if path.stem >= target:
             continue
         table = pq.read_table(path, columns=["ts", "value"]).sort_by("ts")
@@ -974,14 +974,14 @@ def rebuild_entity_rollups(
         if archive_dir.exists():
             staged_archive_dir = staged_archive_parent / entity_id
             staged_archive_dir.mkdir(parents=True, exist_ok=True)
-            for source in archive_dir.glob("*.parquet"):
+            for source in parquet_files(archive_dir):
                 target = staged_archive_dir / source.name
                 try:
                     os.link(source, target)
                 except OSError:
                     shutil.copy2(source, target)
 
-        archive_files = sorted(archive_dir.glob("*.parquet")) if archive_dir.exists() else []
+        archive_files = parquet_files(archive_dir)
         for archive_path in archive_files:
             try:
                 year, month = (int(part) for part in archive_path.stem.split("-"))

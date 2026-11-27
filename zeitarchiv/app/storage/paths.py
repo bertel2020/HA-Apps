@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..i18n import tr
 
+import logging
 import re
 from pathlib import Path
 
@@ -11,6 +12,38 @@ ENTITY_ID_PATTERN = r"^[a-z][a-z0-9_]*\.[a-z0-9_]+$"
 ENTITY_ID_MAX_LENGTH = 240
 _ENTITY_ID_RE = re.compile(ENTITY_ID_PATTERN)
 _STORAGE_AREAS = {"hot", "archive", "rollup"}
+
+logger = logging.getLogger(__name__)
+_EMPTY_WARNED: set[str] = set()
+
+
+def is_empty_file(path: Path) -> bool:
+    """True für eine Datei mit 0 Bytes (z. B. nach hartem Abbruch beim Schreiben); die ist kein gültiges Parquet."""
+    try:
+        return path.stat().st_size == 0
+    except OSError:
+        return False
+
+
+def parquet_files(directory: Path, pattern: str = "*.parquet", *, reverse: bool = False) -> list[Path]:
+    """Sortierte Parquet-Dateien eines Verzeichnisses ohne leere (0-Byte-)Dateien.
+
+    Eine leere Datei lässt sich nicht öffnen und würde jeden lesenden Schritt dauerhaft abbrechen. Sie zählt wie eine
+    fehlende Datei; gewarnt wird je Pfad einmal pro Prozess, damit das Log nicht volläuft."""
+    if not directory.exists():
+        return []
+    result = []
+    for path in sorted(directory.glob(pattern), reverse=reverse):
+        if is_empty_file(path):
+            key = str(path)
+            if key not in _EMPTY_WARNED:
+                _EMPTY_WARNED.add(key)
+                logger.warning(
+                    "Leere Parquet-Datei (0 Bytes) wird übersprungen · event=empty_parquet_skipped path=%s", path,
+                )
+            continue
+        result.append(path)
+    return result
 
 
 def _resolve_safely(path: Path) -> Path:

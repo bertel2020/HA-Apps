@@ -16,7 +16,7 @@ import pyarrow.parquet as pq
 
 from . import hotbuffer
 from .index import Index, resolution_seconds
-from .paths import entity_dir, storage_area_dir
+from .paths import entity_dir, parquet_files, storage_area_dir
 
 
 def _parquet_bounds(parquet_file: pq.ParquetFile) -> tuple[float | None, float | None]:
@@ -41,7 +41,7 @@ def _parquet_bounds(parquet_file: pq.ParquetFile) -> tuple[float | None, float |
 
 def _entity_storage_stats(data_dir: Path, entity_id: str) -> dict:
     archive_dir = entity_dir(data_dir, "archive", entity_id)
-    archive_files = sorted(archive_dir.glob("*.parquet")) if archive_dir.exists() else []
+    archive_files = parquet_files(archive_dir)
     row_count = 0
     size_bytes = 0
     first_values: list[float] = []

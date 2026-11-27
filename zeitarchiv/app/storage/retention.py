@@ -27,7 +27,7 @@ import pyarrow.parquet as pq
 from .cleanup import remove_deleted_points_for_month
 from .hotbuffer import hot_path, read_full_rows, read_rows, write_records
 from .index import Index
-from .paths import entity_dir
+from .paths import entity_dir, parquet_files
 from .rollup import drop_rows_in_spans, period_span, rollup_path
 
 RETENTION_DAYS = {
@@ -107,7 +107,7 @@ def _update_first_ts(data_dir: Path, index: Index, entity_id: str, tz: ZoneInfo,
     auf längst entfernte Daten — sucht den neuen frühesten Wert im ältesten
     verbliebenen Archiv-Monat, sonst (kein Archiv mehr übrig) im Hot Buffer."""
     archive_dir = entity_dir(data_dir, "archive", entity_id)
-    remaining = sorted(archive_dir.glob("*.parquet")) if archive_dir.exists() else []
+    remaining = parquet_files(archive_dir)
     new_first_ts: float | None = None
     if remaining:
         table = pq.read_table(remaining[0], columns=["ts"])
@@ -145,7 +145,7 @@ def enforce_retention_for_entity(
 
     archive_dir = entity_dir(data_dir, "archive", entity_id)
     if archive_dir.exists():
-        for path in sorted(archive_dir.glob("*.parquet")):
+        for path in parquet_files(archive_dir):
             year_str, month_str = path.stem.split("-")
             year, month = int(year_str), int(month_str)
             days_in_month = calendar.monthrange(year, month)[1]
@@ -260,7 +260,7 @@ def _inspect_retention_for_entity(
     now_ts = now.timestamp()
     archive_dir = entity_dir(data_dir, "archive", entity_id)
     if archive_dir.exists():
-        for path in sorted(archive_dir.glob("*.parquet")):
+        for path in parquet_files(archive_dir):
             year_str, month_str = path.stem.split("-")
             year, month = int(year_str), int(month_str)
             days_in_month = calendar.monthrange(year, month)[1]

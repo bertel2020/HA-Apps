@@ -30,7 +30,7 @@ import pyarrow.parquet as pq
 from . import cleanup, rollup
 from .hotbuffer import hot_path, iter_records, read_rows
 from .index import STATE_TYPE, STATE_UNAVAILABLE_INDEX, Index, filter_deleted_occurrences
-from .paths import entity_dir
+from .paths import entity_dir, parquet_files
 from ..limits import MAX_COMPARE_YEARS, MAX_RAW_QUERY_POINTS
 
 RANGE_KEYS = ("hour", "day", "week", "month", "year", "decade")
@@ -422,7 +422,7 @@ def _boundary_value(
     archive_dir = entity_dir(data_dir, "archive", entity_id)
     if not archive_dir.exists():
         return None
-    for path in sorted(archive_dir.glob("????-??.parquet"), reverse=True):
+    for path in parquet_files(archive_dir, "????-??.parquet", reverse=True):
         if path.stem > current_month:
             continue
         deleted_in_month: dict[float, int] = {}

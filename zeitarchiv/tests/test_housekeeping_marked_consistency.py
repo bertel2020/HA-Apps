@@ -612,6 +612,36 @@ def test_empty_rollup_file_is_rebuilt_from_the_archive_at_startup(env) -> None:
     assert rollup.repair_pending(tmp, index, TZ) == 0  # idempotent
 
 
+def test_empty_archive_file_does_not_block_the_rollup_rebuild(env) -> None:
+    from app.storage import query, rollup
+
+    tmp, index = env
+    entity_id = "sensor.a"
+    index.get_or_create_entity(entity_id, "sensor", "measurement", "W")
+    entity = index.get_entity(entity_id)
+    archive_dir = tmp / "archive" / entity_id
+    archive_dir.mkdir(parents=True)
+    for year, month in ((2024, 6), (2024, 7)):
+        base = _ts(year, month, 5, 8)
+        table = pa.table({"ts": [base, base + 60], "value": [1.0, 3.0]})
+        pq.write_table(table, archive_dir / f"{year}-{month:02d}.parquet")
+        rollup.append_completed_month(tmp, entity_id, entity["aggregation_type"], table, year, month, TZ)
+
+    (archive_dir / "2024-07.parquet").write_bytes(b"")  # Archiv-Monat leer
+    for segment in (tmp / "rollup" / entity_id).glob("*.parquet/*.parquet"):
+        segment.write_bytes(b"")  # Rollup ebenfalls leer
+
+    assert rollup.repair_pending(tmp, index, TZ) == 1
+    for segment in (tmp / "rollup" / entity_id).glob("*.parquet/*.parquet"):
+        pq.read_table(segment)  # lesbar, kein 0-Byte-Rest
+    assert not (archive_dir / rollup.REBUILD_MARKER).exists()
+    assert rollup.repair_pending(tmp, index, TZ) == 0  # kein Dauer-Fehlversuch pro Start
+
+    # Lesende Pfade behandeln die leere Datei wie eine fehlende: der letzte Wert kommt aus dem Vormonat.
+    before = _ts(2024, 8, 1, 0)
+    assert query._boundary_value(tmp, entity_id, before, TZ, None, index=index) == 3.0
+
+
 def test_repair_continues_with_other_entities_when_one_fails(env, monkeypatch, caplog) -> None:
     from app.storage import rollup
 

@@ -43,7 +43,7 @@ from .index import (
     DeletedCounts, Index, deleted_values_of, filter_deleted_occurrences, marked_positions, resolution_seconds,
     should_accept_value,
 )
-from .paths import entity_dir
+from .paths import entity_dir, parquet_files
 
 
 def _format_val(value: float, decimals: str) -> str:
@@ -1472,7 +1472,7 @@ def preview_purge(
             # PERFORMANCE.md). Einmal gruppiert statt pro Monat neu gescannt,
             # siehe _group_by_month().
             remaining_by_month = _group_by_month(remaining, tz)
-            for path in sorted(archive_dir.glob("*.parquet")):
+            for path in parquet_files(archive_dir):
                 if path.stem not in remaining_by_month:
                     continue
                 table = pq.read_table(path, columns=["ts"])
@@ -1580,7 +1580,7 @@ def _update_first_ts_after_archive_purge(data_dir: Path, index: Index, entity_id
     komplett geleert hat (jeder Rohwert des Monats war weich gelöscht) — dann
     zeigt first_ts sonst weiter auf eine nicht mehr existierende Datei."""
     archive_dir = entity_dir(data_dir, "archive", entity_id)
-    remaining = sorted(archive_dir.glob("*.parquet")) if archive_dir.exists() else []
+    remaining = parquet_files(archive_dir)
     new_first_ts: float | None = None
     if remaining:
         table = pq.read_table(remaining[0], columns=["ts"])
@@ -1648,7 +1648,7 @@ def purge_archived_months(
         # markierten Zeitstempel dieser Entität zu scannen, siehe
         # _group_by_month().
         deleted_by_month = _group_by_month(deleted, tz)
-        for path in sorted(archive_dir.glob("*.parquet")):
+        for path in parquet_files(archive_dir):
             relevant = deleted_by_month.get(path.stem)
             if not relevant:
                 continue
@@ -2263,7 +2263,7 @@ def remove_deleted_points_with_no_matching_row(
         archive_dir = entity_dir(data_dir, "archive", entity_id)
         if archive_dir.exists():
             remaining_by_month = _group_by_month(remaining, tz)
-            for path in sorted(archive_dir.glob("*.parquet")):
+            for path in parquet_files(archive_dir):
                 if path.stem not in remaining_by_month:
                     continue
                 table = pq.read_table(path, columns=["ts"])
