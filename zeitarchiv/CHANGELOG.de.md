@@ -45,6 +45,7 @@
   - Donut bei Zustands-Entitäten: „Aggregation“
   - Balken-Charts: „Dynamische Y-Achse“
   - Dauern: „Nachkommastellen“ ist ausgegraut, da Dauern immer Stunden und Minuten zeigen
+  - Entitätsseite: „Nachkommastellen“, „Dynamische Y-Achse“ und „Durchschnittslinie“ sind bei den Diagrammtypen ausgeblendet, bei denen sie nichts bewirken
 
 ## 1.57.0 - 2026-11-24
 

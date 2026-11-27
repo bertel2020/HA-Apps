@@ -281,7 +281,7 @@
                 <span class="track"><span class="thumb"></span></span>
               </span>
             </label>
-            <div class="menu-row menu-row-stack">
+            <div class="menu-row menu-row-stack" x-show="chartType !== 'timeline'">
               <span class="menu-row-label">{{ _("Nachkommastellen") }}</span>
               <div class="seg">
                 <button :class="{active: decimals === 'auto'}" @click="setDecimals('auto')">{{ _("Auto") }}</button>
@@ -292,7 +292,9 @@
                 <button :class="{active: decimals === '4'}" @click="setDecimals('4')">4</button>
               </div>
             </div>
-            <label class="menu-row">
+            <!-- Balken müssen bei 0 beginnen (render() ignoriert die Option bei
+                 chartType 'bar'), der Zeitstrahl hat keine Y-Achse. -->
+            <label class="menu-row" x-show="chartType === 'line'">
               <span class="menu-row-label">{{ _("Dynamische Y-Achse") }}</span>
               <span class="menu-toggle">
                 <input type="checkbox" :checked="dynamicYAxis" @change="dynamicYAxis = !dynamicYAxis; render(); saveChartOptions()">
@@ -304,7 +306,7 @@
                Bild liegt. Das eine will man oft ohne das andere — und eine
                Zeile, die nur zusammen mit einer anderen Option erscheint, wäre
                ohne sie unauffindbar. #}
-            <label class="menu-row">
+            <label class="menu-row" x-show="chartType !== 'timeline'">
               <span class="menu-row-label">{{ _("Durchschnittslinie") }}</span>
               <span class="menu-toggle">
                 <input type="checkbox" :checked="averageLine" @change="averageLine = !averageLine; render(); saveChartOptions()">
