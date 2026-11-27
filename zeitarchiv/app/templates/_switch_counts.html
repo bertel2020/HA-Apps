@@ -7,6 +7,6 @@
     {% else %}{{ _("Für {missing} von {total} archivierten Monaten noch nicht erfasst (Zeit vor der Zählung).", missing=missing, total=total) }}{% endif %}
   </p>
   {% if missing %}
-  <button type="button" class="btn" hx-post="{{ app_root }}/entities/{{ entity_id }}/switch-counts/rebuild" hx-swap="none" hx-disabled-elt="this">{{ _("Aus dem Archiv nachrechnen") }}</button>
+  <span class="dd-picker-wrap"><button type="button" class="btn" hx-post="{{ app_root }}/entities/{{ entity_id }}/switch-counts/rebuild" hx-swap="none" hx-disabled-elt="this">{{ _("Aus dem Archiv nachrechnen") }}</button></span>
   {% endif %}
 </div>

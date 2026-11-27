@@ -11,9 +11,9 @@ DASHBOARD = tile_js()
 
 def test_all_line_chart_renderers_use_smooth_lines() -> None:
     assert "smooth: this.chartType === 'line'" in ENTITY
-    assert "main.smooth = true" in EDITOR
+    assert "main.smooth = !s.source_type" in EDITOR  # Linien geglättet, nur die Anzahl der Einschaltungen nicht
     assert "cmp.smooth = true" in EDITOR
-    assert "cfg.smooth = true" in DASHBOARD
+    assert "cfg.smooth = !s.source_type" in DASHBOARD
 
 
 def test_all_line_chart_renderers_extend_last_value_to_window_end() -> None:

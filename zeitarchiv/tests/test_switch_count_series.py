@@ -76,3 +76,15 @@ def test_the_display_mode_of_the_entity_is_the_default_metric() -> None:
     assert [switch_counts.default_metric(mode) for mode in ("onoff", "time", "count", "both", None)] == [
         "duration", "duration", "count", "both", "duration",
     ]
+
+
+def test_the_count_line_is_drawn_as_points_on_a_whole_number_axis_from_zero() -> None:
+    """Editor und Kachel behandeln die Anzahl (source_type) gleich: keine Glättung, keine Fläche, kein Haltepunkt bis zum
+    Fensterende, Achse ab 0 mit ganzzahliger Teilung — sonst läuft die Kurve zwischen die Werte."""
+    from _paths import APP, tile_js
+
+    editor = (APP / "static/js/pages/chart_editor.js").read_text(encoding="utf-8")
+    for source in (editor, tile_js()):
+        assert source.count("!s.source_type") >= 4
+        assert "minInterval: 1" in source
+        assert "&& !isCountAxis" in source

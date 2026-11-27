@@ -87,11 +87,11 @@ def test_the_dashboard_tile_gets_the_option_from_its_chart(client) -> None:
 
 
 def test_chart_editor_gates_areastyle_on_the_option() -> None:
-    assert "if (this.areaFill && !rollingOnly) main.areaStyle" in EDITOR_JS
+    assert "if (this.areaFill && !rollingOnly && !s.source_type) main.areaStyle" in EDITOR_JS
     assert "if (this.areaFill) cmp.areaStyle" in EDITOR_JS
 
 
 def test_dashboard_tile_gates_areastyle_on_the_option() -> None:
     assert "ds.areaFill !== 'false'" in TILES_JS
-    assert "if (areaFill && !rollingOnly) cfg.areaStyle" in TILES_JS
+    assert "if (areaFill && !rollingOnly && !s.source_type) cfg.areaStyle" in TILES_JS
     assert 'data-area-fill="{{' in TILES_TEMPLATE

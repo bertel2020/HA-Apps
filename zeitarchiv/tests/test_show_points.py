@@ -45,5 +45,5 @@ def test_editor_and_tile_use_the_option() -> None:
     assert "showPoints: SHOW_POINTS" in EDITOR_JS
     assert "show_points: this.showPoints" in EDITOR_JS
     assert "ds.showPoints === 'true'" in TILES_JS
-    assert "if (!showPoints || rollingOnly) cfg.symbol = 'none'" in TILES_JS
+    assert "if ((!showPoints && !s.source_type) || rollingOnly) cfg.symbol = 'none'" in TILES_JS
     assert 'data-show-points="{{' in TILES_TEMPLATE

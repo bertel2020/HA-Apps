@@ -2370,7 +2370,9 @@
             // Anteils-Achse, die nicht bei 0 beginnt oder über 100 hinausgeht,
             // würde die Prozentwerte selbst verzerrt darstellen.
             const isPercentAxis = normalizeActive && barOnlyAxis.has(u);
-            const axisDynamic = dynamicYAxis && !axisHasBar.has(u);
+            // Eine Anzahl beginnt immer bei 0: ein Ausschnitt von 1 bis 2 ließe aus einer Einschaltung eine Grundlinie werden.
+            const isCountAxis = chartSeries.some(s => s.source_type && axisKey(s) === u);
+            const axisDynamic = dynamicYAxis && !axisHasBar.has(u) && !isCountAxis;
             const unitText = axisUnitText(u);
             // Eigene Achse einer Linie: Beschriftung in der Serienfarbe.
             const ownSeries = chartSeries.find(s => ownAxis(s) && axisKey(s) === u);
@@ -2389,6 +2391,8 @@
               // undefined sind — ohne scale:true hätte "Dynamische Y-Achse"
               // also keine sichtbare Wirkung gegenüber der festen Variante.
               scale: isPercentAxis ? false : axisDynamic,
+              // Achse der Einschaltungen: nur ganze Zahlen als Teilung.
+              ...(isCountAxis ? {minInterval: 1} : {}),
               axisLabel: {color: axisInk, formatter: v => isPercentAxis ? `${fmtNum(v, 0)} %` : (isDuration ? NumberFormat.fmtDuration(v) : (unitText ? `${fmtNum(v, decimals)} ${unitText}` : fmtNum(v, decimals)))},
               // Gitterlinien nur von der ersten Achse und gestrichelt in Rahmenfarbe wie in der Dashboard-
               // Kachel: ECharts' Standard zeichnet je Achse eine durchgezogene helle Linie, bei zwei Achsen
@@ -2518,7 +2522,8 @@
               const pct = total ? (p.value / total) * 100 : 0;
               return [singleBucket ? slotOf[i] : p.ts * 1000, pct, p.ts * 1000, '%', 0, false, p.value, s.unit, seriesDecimals];
             });
-            if (!singleBucket && chartType === 'line' && mainData.length && this.windowEnd != null
+            // Kein Haltepunkt bis zum Fensterende bei der Anzahl (source_type): sie gilt nur je Zeitfenster.
+            if (!singleBucket && chartType === 'line' && !s.source_type && mainData.length && this.windowEnd != null
                 && mainData[mainData.length - 1][0] < this.windowEnd * 1000) {
               const last = mainData[mainData.length - 1];
               mainData.push([this.windowEnd * 1000, last[1], last[2], last[3], last[4], last[5]]);
@@ -2610,16 +2615,18 @@
               clip: singleBucket ? undefined : chartType !== 'bar',
             };
             if (chartType === 'line') {
-              main.smooth = true;
+              // Die Anzahl der Einschaltungen (source_type) sind ganze Zahlen je Zeitfenster: Punkte statt Glättung und
+              // Fläche, sonst läuft die Kurve zwischen die Werte.
+              main.smooth = !s.source_type;
               // symbol nie explizit auf undefined setzen (nur weglassen oder auf
               // 'none') — siehe entity_detail.html, ECharts' interne Options-
               // Normalisierung stürzt sonst ab.
-              if (!this.showPoints) main.symbol = 'none';
+              if (!this.showPoints && !s.source_type) main.symbol = 'none';
               // Dezente Füllfläche unter der Linie (Optionen-Menü, "Fläche") —
               // dieselbe Opacity wie auf der Dashboard-Kachel (dashboard-
               // tiles.js), damit ein angeheftetes Chart nicht anders aussieht
               // als auf seiner eigenen Seite.
-              if (this.areaFill && !rollingOnly) main.areaStyle = {color, opacity: 0.08};
+              if (this.areaFill && !rollingOnly && !s.source_type) main.areaStyle = {color, opacity: 0.08};
               if (rollingOnly) main.symbol = 'none';
             }
             // Durchschnittslinie (Optionen-Menü, "Darstellung") — je Serie eine,
@@ -2708,7 +2715,7 @@
                 const total = compareTotals.get(cmpStackKey).get(x) || 0;
                 return [x, total ? (p.value / total) * 100 : 0, p.ts * 1000, '%', 0, false, p.value, s.unit, seriesDecimals];
               });
-              if (chartType === 'line' && compareData.length && this.windowEnd != null
+              if (chartType === 'line' && !s.source_type && compareData.length && this.windowEnd != null
                   && compareData[compareData.length - 1][0] < this.windowEnd * 1000) {
                 const last = compareData[compareData.length - 1];
                 compareData.push([this.windowEnd * 1000, last[1], last[2], last[3], last[4], last[5]]);
