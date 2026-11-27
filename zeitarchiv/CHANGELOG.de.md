@@ -74,6 +74,7 @@
   - Einrichtung Wetterdashboard: die Schwellen für den Anteil am klaren Himmel ohne „Nach Sonnenstand“ und die Rolle „Sonnenhöhe“, Regentag nach Menge und nach Dauer ohne ihre Sensor-Rolle, die Heizschwellen ohne den Reiter „Heizen“
   - Backup: Die Uhrzeit ist ausgeblendet, solange „Automatisch erstellen“ aus ist
   - Archivierung: „Standard-Lebenszeichen“ ist ausgeblendet, solange der Standard-Wertänderungsfilter aus ist
+  - Bereinigung: „Mindestalter der Markierung“ ist ausgeblendet, solange die „Automatische Bereinigung“ aus ist
 
 ## 1.57.0 - 2026-11-24
 

@@ -74,6 +74,7 @@
   - Weather dashboard setup: the share-of-clear-sky thresholds without “By sun position” and the “Sun elevation” role, the rain day amount and duration without their sensor role, and the heating thresholds without the “Heating” tab
   - Backup: the time of day is hidden while “Create automatically” is off
   - Archiving: “Default sign of life” is hidden while the default value change filter is off
+  - Cleanup: “Minimum age of the mark” is hidden while “Automatic cleanup” is off
 
 ## 1.57.0 - 2026-11-24
 

@@ -3,7 +3,8 @@
 * Backup-Zeitplan: Die Uhrzeit gilt nur für einen automatischen Lauf. Bei "Aus" bleibt sie als verstecktes Feld im Formular, weil
   /backup/schedule die Uhrzeit bei jedem Speichern schreibt und sonst den Vorgabewert eintrüge.
 * Archivierung: Das Standard-Lebenszeichen gehört zum Wertänderungsfilter und steht nur bei aktivem Filter (wie im Formular einer
-  Entität)."""
+  Entität).
+* Automatische Bereinigung: Das Mindestalter der Markierung liest nur der tägliche Lauf, und der nur bei eingeschalteter Automatik."""
 
 from __future__ import annotations
 
@@ -22,9 +23,12 @@ def restore_settings():
     from app.main import BACKUP_DEFAULT_TIME, BACKUP_DEFAULT_WEEKDAY  # noqa: PLC0415
     from app.storage.index import DEFAULT_VALUE_FILTER, DEFAULT_VALUE_FILTER_HEARTBEAT  # noqa: PLC0415
 
+    from app.formatting import DEFAULT_PURGE_AUTO_ENABLED, DEFAULT_PURGE_MIN_AGE_DAYS  # noqa: PLC0415
+
     fallback = {
         "backup_schedule": "off", "backup_schedule_time": BACKUP_DEFAULT_TIME, "backup_schedule_weekday": str(BACKUP_DEFAULT_WEEKDAY),
         "default_value_filter": DEFAULT_VALUE_FILTER, "default_value_filter_heartbeat": DEFAULT_VALUE_FILTER_HEARTBEAT,
+        "purge_auto_enabled": DEFAULT_PURGE_AUTO_ENABLED, "purge_min_age_days": DEFAULT_PURGE_MIN_AGE_DAYS,
     }
     before = {key: index.get_setting(key, None) for key in fallback}
     yield
@@ -71,3 +75,22 @@ def test_the_stored_default_heartbeat_survives_a_hidden_row(client, restore_sett
     kept = index.get_setting("default_value_filter_heartbeat", "")
     client.post("/settings/archivierung", data={"default_value_filter": "off"})  # Zeile weg, Wert bleibt
     assert index.get_setting("default_value_filter_heartbeat", "") == kept
+
+
+@pytest.mark.parametrize(("enabled", "shown"), [("off", False), ("on", True)])
+def test_the_minimum_age_follows_the_automatic_purge(client, restore_settings, enabled: str, shown: bool) -> None:
+    html = client.post("/settings/purge-auto", data={"purge_auto_enabled": enabled}).text
+    assert ('id="purge-min-age-days-btn"' in html) is shown
+    # Der Schalter selbst bleibt immer wählbar.
+    assert 'id="purge-auto-enabled-btn"' in html
+
+
+def test_the_stored_minimum_age_survives_a_hidden_row(client, restore_settings) -> None:
+    client.post("/settings/purge-auto", data={"purge_auto_enabled": "on"})
+    client.post("/settings/purge-auto", data={"purge_min_age_days": "90"})
+    kept = index.get_setting("purge_min_age_days", "")
+    client.post("/settings/purge-auto", data={"purge_auto_enabled": "off"})  # Zeile weg, Wert bleibt
+    assert index.get_setting("purge_min_age_days", "") == kept
+    # Wieder eingeschaltet, steht der gespeicherte Wert in der Zeile.
+    html = client.post("/settings/purge-auto", data={"purge_auto_enabled": "on"}).text
+    assert f'name="purge_min_age_days" id="purge-min-age-days-input" value="{kept}"' in html

@@ -16,6 +16,9 @@
       </div>
     </span>
   </div>
+  {# Das Mindestalter liest nur der tägliche Lauf (background.py) und die Anzeige "nächster Lauf" der Aufräum-Kachel, beide nur bei
+     eingeschalteter Automatik. Der gespeicherte Wert bleibt; /settings/purge-auto ändert nur Felder, die mitkommen. #}
+  {% if purge_auto_enabled == 'on' %}
   <div class="settings-compact-row">
     <div class="settings-compact-row-text">
       <div class="settings-compact-label">{{ _("Mindestalter der Markierung") }}</div>
@@ -32,5 +35,6 @@
       </div>
     </span>
   </div>
+  {% endif %}
 </div>
 {% if purge_auto_saved %}<p class="save-status">{{ _("✓ Gespeichert") }}</p>{% endif %}
