@@ -10,7 +10,7 @@
 >
 > 🇩🇪 [Änderungen auf Deutsch](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.de.md)
 
-## Unreleased
+## 1.58.0 - 2026-11-27
 
 ### New
 
@@ -31,6 +31,11 @@
 - **Tables**: duration format per row
   - Hours can be shown as "DD hh:mm" (setting "Automatic" or "Duration" per entity, group, and formula row)
   - Display only: values and totals stay in hours
+- **Switches**: number of switch-ons
+  - Choose “Duration”, “Count”, or “Both” per switch on the entity page and per series in the chart editor; “Both” draws the duration as bars and the count as a line on a second axis
+  - The display mode of the entity is the default for charts, tiles, and the Lovelace card
+  - Tables: new row option “Σ Switch-ons”
+  - Months already in the archive are counted afterwards, automatically after the update or with “Recalculate from the archive” in the entity settings; until then a period shows that the count is not recorded yet
 
 ### Changed
 

@@ -10,7 +10,7 @@
 >
 > 🇬🇧 [English version](https://github.com/bertel2020/HA-Apps/blob/main/zeitarchiv/CHANGELOG.md)
 
-## Unreleased
+## 1.58.0 - 2026-11-27
 
 ### Neu
 
@@ -31,6 +31,11 @@
 - **Tabellen**: Dauerformat pro Zeile
   - Stunden lassen sich als „TT hh:mm“ anzeigen (Einstellung „Automatisch“ oder „Dauer“ je Entitäts-, Gruppen- und Formelzeile)
   - Nur Anzeige: Werte und Summen bleiben in Stunden
+- **Schalter**: Anzahl der Einschaltungen
+  - „Dauer“, „Anzahl“ oder „Beides“ pro Schalter auf der Entitätsseite und pro Serie im Chart-Editor; „Beides“ zeichnet die Dauer als Balken und die Anzahl als Linie auf einer zweiten Achse
+  - Der Anzeigemodus der Entität gilt als Vorgabe für Charts, Kacheln und die Lovelace-Karte
+  - Tabellen: neue Zeilenoption „Σ Einschaltungen“
+  - Bereits archivierte Monate werden nachgezählt, automatisch nach dem Update oder mit „Aus dem Archiv nachrechnen“ in den Entitäts-Einstellungen; bis dahin meldet ein Zeitraum, dass die Anzahl noch nicht erfasst ist
 
 ### Geändert
 
