@@ -134,7 +134,7 @@ def test_a_supported_chart_runs_the_same_query_as_the_tile() -> None:
     assert calls == [{
         "entity_ids": "sensor.a,sensor.b", "range": "month", "offset": 0, "continuous": True,
         "year_over_year": False, "compare": True, "compare_mode": "previous", "raw": False,
-        "previous_years": 1, "at": "2026-10-01", "heatmap": False, "columns": False, "px": 0, "kinds": "",
+        "previous_years": 1, "at": "2026-10-01", "heatmap": False, "columns": False, "px": 0, "kinds": "", "metrics": "",
     }]
 
 
@@ -703,3 +703,11 @@ def test_a_chosen_period_replaces_the_saved_one_even_a_fixed_period() -> None:
     client.get("/api/card/chart", params={"id": 2}, headers=AUTH)
     assert calls[0]["range"] == "year"
     assert client.get("/api/card/chart", params={"id": 2, "period": "jahrzehnt"}, headers=AUTH).status_code == 400
+
+
+def test_the_metric_of_a_switch_series_goes_into_the_query_like_on_the_tile() -> None:
+    """Wie fetchChartData(): ausdrückliche Wahlen je sichtbarer Serie (Dauer, Anzahl, beides), sonst leer."""
+    style = {"switch.a": {"metric": "both", "legend": False}, "switch.b": {"metric": "count"}, "switch.hidden": {"metric": "count"}}
+    client, calls = _client([_chart(1, ["switch.a", "switch.b", "switch.hidden"], hidden_entity_ids=["switch.hidden"], series_style=style)])
+    client.get("/api/card/chart", params={"id": 1}, headers=AUTH)
+    assert calls[0]["metrics"] == "switch.a:both,switch.b:count"

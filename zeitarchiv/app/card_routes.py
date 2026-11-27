@@ -274,6 +274,11 @@ def create_card_router(
                 f"{entity_id}:{style['kind']}" for entity_id, style in (chart.get("series_style") or {}).items()
                 if entity_id in visible and style.get("kind")
             ),
+            # Schalter als Dauer, Anzahl oder beides (ROADMAP 1.74), wie fetchChartData() es für die Kachel sendet.
+            "metrics": ",".join(
+                f"{entity_id}:{style['metric']}" for entity_id, style in (chart.get("series_style") or {}).items()
+                if entity_id in visible and style.get("metric")
+            ),
         }
         plain = {"compare": False, "compare_mode": "previous", "raw": False, "previous_years": 1}
         timeline = chart_type == "timeline"
