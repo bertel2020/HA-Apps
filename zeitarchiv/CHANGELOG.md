@@ -25,6 +25,7 @@
 
 ### Changed
 
+- **Weather dashboard**: at or below 1 °C the sentence reads "Precipitation has been falling for …" instead of "It has been raining for …", since an on/off sensor cannot tell rain from snow
 - **Tables**: notes in brackets after the row name (e.g. "(from 60 % of clear sky)") appear in a second line; the first column can be narrower
 - **Energy dashboard**: fixed prices (grid, feed-in, self-consumption) are entered in cents; a value below 1 now shows a hint with a one-click correction (e.g. 0.0764 instead of 7.64)
 

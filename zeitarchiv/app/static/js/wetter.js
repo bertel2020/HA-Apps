@@ -1283,11 +1283,15 @@
         else if (wind) parts.push(t('{wind}.', {wind}));
         const rain = c.rain;
         if (rain && rain.raining) {
-          if (rain.minutes == null) parts.push(t('Es regnet seit mehr als {n} h.', {n: 48}));
+          // Bei Frost sagt ein reiner Ein/Aus-Sensor nicht, ob es regnet oder schneit: neutraler Text.
+          const cold = c.temp && c.temp.unit === '°C' && c.temp.value != null && c.temp.value <= 1;
+          if (rain.minutes == null) parts.push(cold ? t('Es fällt Niederschlag seit mehr als {n} h.', {n: 48}) : t('Es regnet seit mehr als {n} h.', {n: 48}));
           else {
             const minutes = Math.round(rain.minutes);
-            parts.push(minutes < 120 ? t('Es regnet seit {n} min.', {n: minutes})
-              : t('Es regnet seit {h} h {m} min.', {h: Math.floor(minutes / 60), m: String(minutes % 60).padStart(2, '0')}));
+            parts.push(minutes < 120
+              ? (cold ? t('Es fällt Niederschlag seit {n} min.', {n: minutes}) : t('Es regnet seit {n} min.', {n: minutes}))
+              : (cold ? t('Es fällt Niederschlag seit {h} h {m} min.', {h: Math.floor(minutes / 60), m: String(minutes % 60).padStart(2, '0')})
+                : t('Es regnet seit {h} h {m} min.', {h: Math.floor(minutes / 60), m: String(minutes % 60).padStart(2, '0')})));
           }
         } else if (rain && rain.raining === false) {
           const lastSameDay = rain.last != null && fmtDate(formats.dm, rain.last) === fmtDate(formats.dm, c.now);
