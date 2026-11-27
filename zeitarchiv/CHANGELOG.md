@@ -36,8 +36,10 @@
 
 - **Entities list**: the filter menu shows its options as chips instead of tick lists
   - One row per group (type, category, room, unit) instead of three long columns, and the menu no longer scrolls inside itself
+  - The footer of the menu shows the number of matches while you choose
   - New “Reset” in the menu header; the hint on OR/AND combination sits behind the ⓘ
   - A selected unit can be unselected by clicking it again (the “All units” row is gone)
+- **CSV export**: step 1 uses the same filter menu as the entities list instead of three separate drop-downs (type, category, unit), with chips, “Reset” and the number of matches
 - **Tables**: notes in brackets after the row name (e.g. "(from 60 % of clear sky)") appear in a second line; the first column can be narrower
 - **Energy dashboard**: fixed prices (grid, feed-in, self-consumption) are entered in cents; a value below 1 now shows a hint with a one-click correction (e.g. 0.0764 instead of 7.64)
 - **Charts**: “Donut” can only be chosen with at least two entities; with a single value it was a full ring without information (state entities still work with one)

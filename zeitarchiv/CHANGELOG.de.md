@@ -36,8 +36,10 @@
 
 - **Entitätenliste**: Das Filtermenü zeigt seine Optionen als Chips statt als Haken-Listen
   - Eine Zeile je Gruppe (Typ, Kategorie, Raum, Einheit) statt drei langer Spalten, und das Menü scrollt nicht mehr in sich selbst
+  - Die Fußzeile des Menüs zeigt beim Auswählen die Zahl der Treffer
   - Neues „Zurücksetzen“ in der Kopfzeile des Menüs; der Hinweis zu ODER/UND steht hinter dem ⓘ
   - Eine gewählte Einheit lässt sich durch erneutes Anklicken wieder abwählen (die Zeile „Alle Einheiten“ entfällt)
+- **CSV-Export**: Schritt 1 nutzt dasselbe Filtermenü wie die Entitätenliste statt drei einzelner Dropdowns (Typ, Kategorie, Einheit), mit Chips, „Zurücksetzen“ und Trefferzahl
 - **Tabellen**: Zusätze in Klammern hinter dem Zeilennamen (z. B. „(ab 60 % des klaren Himmels)“) stehen in einer zweiten Zeile; die erste Spalte kann schmaler werden
 - **Energiedashboard**: Feste Preise (Netzbezug, Einspeisung, Eigenverbrauch) werden in Cent eingetragen; bei einem Wert unter 1 erscheint ein Hinweis mit Korrektur per Klick (z. B. 0,0764 statt 7,64)
 - **Charts**: „Donut“ lässt sich erst ab zwei Entitäten wählen; mit nur einem Wert war er ein voller Ring ohne Aussage (Zustands-Entitäten funktionieren weiter mit einer)

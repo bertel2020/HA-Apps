@@ -24,28 +24,33 @@
       const anyChecked = Array.from(document.querySelectorAll('input[name=category]:not([value=all])')).some(cb => cb.checked);
       if (!anyChecked) document.querySelector('input[name=category][value=all]').checked = true;
     }
-    function updateExportCategoryFilterLabel() {
-      const checked = Array.from(document.querySelectorAll('input[name=category]:checked'));
-      const btn = document.getElementById('export-category-filter-btn');
-      if (!checked.length || checked.some(cb => cb.value === 'all')) {
-        btn.textContent = t('Kategorie: Alle ▾');
-        return;
-      }
-      btn.textContent = t('Kategorie: ') + checked.map(cb => cb.parentElement.textContent.trim()).join(', ') + ' ▾';
+    // Ein Filtermenü: Die Zahl am Knopf zählt die gewählten Werte, „Zurücksetzen“ ist ohne Filter gesperrt.
+    // Die gewählte Einheit bekommt die Klasse active (Chip-Optik); ein zweiter Klick darauf wählt sie ab.
+    function updateExportFilterSummary() {
+      let n = 0;
+      ['type', 'category'].forEach(key => {
+        n += document.querySelectorAll(`input[name=${key}]:checked:not([value=all])`).length;
+      });
+      const unit = document.getElementById('export-unit-filter-input');
+      if (unit && unit.value !== 'all') n += 1;
+      document.querySelectorAll('#export-unit-filter-popover .dd-picker-row').forEach(r => r.classList.toggle('active', !!unit && r.dataset.value === unit.value));
+      document.getElementById('export-filter-count').textContent = n ? ` ${n}` : '';
+      document.getElementById('export-filter-btn').classList.toggle('is-active', n > 0);
+      document.getElementById('export-filter-reset').disabled = !n;
     }
+    // Alle Filter auf einmal zurücknehmen: ein einziges change-Ereignis lädt die Liste nur einmal neu.
+    function resetExportFilters() {
+      ['type', 'category'].forEach(key => {
+        document.querySelectorAll(`input[name=${key}]`).forEach(cb => cb.checked = cb.value === 'all');
+      });
+      document.getElementById('export-unit-filter-input').value = 'all';
+      resetExportPage();
+      document.getElementById('export-unit-filter-input').dispatchEvent(new Event('change', {bubbles: true}));
+    }
+    document.getElementById('export-unit-filter-input').addEventListener('change', updateExportFilterSummary);
 
-    // Öffnen/Schließen/Auswählen der .dd-picker-Dropdowns (Typ, Einheit)
+    // Öffnen/Schließen/Auswählen der .dd-picker-Dropdowns (Filtermenü)
     // kommt aus dem gemeinsamen static/js/dd-picker.js.
-    const EXPORT_TYPE_LABELS = {standard: t('Standard'), counter: t('Zähler'), switch: t('Schalter'), state: t('Zustand')};
-    function updateExportTypeFilterLabel() {
-      const checked = Array.from(document.querySelectorAll('input[name=type]:checked'));
-      const btn = document.getElementById('export-type-filter-btn');
-      if (!checked.length || checked.some(cb => cb.value === 'all')) {
-        btn.textContent = t('Typ: Alle ▾');
-        return;
-      }
-      btn.textContent = t('Typ: ') + checked.map(cb => EXPORT_TYPE_LABELS[cb.value]).join(', ') + ' ▾';
-    }
 
     // page-field ist die einzige Quelle der Wahrheit für die Seiten-Navigation —
     // jeder Control, der die zugrunde liegende Trefferliste ändert (Suche, Typ-/
@@ -494,7 +499,13 @@
         if (all) all.checked = boxes.length > 0 && boxes.every(cb => cb.checked);
         $('export-selcount').textContent = t('{n} ausgewählt', {n: state.selected.size});
       }
-      document.body.addEventListener('htmx:afterSwap', ev => { if (ev.target.id === 'export-table') markChecked(); });
+      document.body.addEventListener('htmx:afterSwap', ev => {
+        if (ev.target.id !== 'export-table') return;
+        markChecked();
+        // Trefferzahl in der Fußzeile des Filtermenüs: kommt mit der Tabelle (data-export-total), keine eigene Abfrage.
+        const total = ev.target.querySelector('[data-export-total]')?.dataset.exportTotal;
+        document.getElementById('export-filter-hits').textContent = total === undefined ? '' : `${total} ${t('Treffer')}`;
+      });
       $('export-table').addEventListener('change', ev => {
         const target = ev.target;
         if (target.matches('input[data-export-select]')) {

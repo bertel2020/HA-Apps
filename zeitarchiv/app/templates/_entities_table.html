@@ -95,7 +95,7 @@
   {% endif %}
 </div>
 
-<div class="pager" style="justify-content:space-between;">
+<div class="pager" data-total="{{ pagination.total }}" style="justify-content:space-between;">
   <div style="display:flex;align-items:center;gap:10px;">
     {% if pagination.page_size %}
     <span class="pager-range">{{ _("{start}&ndash;{end} von {total}", start=pagination.start, end=pagination.end, total=pagination.total) }}</span>

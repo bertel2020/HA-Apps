@@ -137,6 +137,9 @@
     // Der Server begrenzt die Seite auf den gültigen Bereich (z. B. nach gelöschten
     // Entitäten) — den tatsächlich gezeigten Wert übernehmen, damit nichts Ungültiges hängen bleibt.
     document.getElementById('entities-table').addEventListener('htmx:afterSwap', () => {
+      // Trefferzahl in der Fußzeile des Filtermenüs: kommt mit der Tabelle (data-total am Pager), keine eigene Abfrage.
+      const total = document.querySelector('#entities-table .pager')?.dataset.total;
+      document.getElementById('ent-filter-hits').textContent = total === undefined ? '' : `${total} ${t('Treffer')}`;
       const shown = document.querySelector('#entities-table .pager-page-input');
       if (!shown) return;
       document.getElementById('page-field').value = shown.value;
