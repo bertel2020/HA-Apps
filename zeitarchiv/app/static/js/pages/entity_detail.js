@@ -523,7 +523,9 @@ function selectBrush() {
           const maxima = this.points.map(p => Number.isFinite(p.max) ? p.max : p.value).filter(Number.isFinite);
           const isSwitch = this.aggregationType === 'switch';
           const hasSum = (this.aggregationType === 'counter' && !this.raw) || isSwitch;
-          const formatted = value => fmtValue(value) + (UNIT ? ' ' + UNIT : '');
+          // Schalter ohne Rohwerte: Bucket-Werte sind Sekunden (siehe render()).
+          const asDuration = DURATION_DISPLAY || (isSwitch && !this.raw);
+          const formatted = value => (asDuration ? NumberFormat.fmtDuration(value) : fmtValue(value)) + (!asDuration && UNIT ? ' ' + UNIT : '');
           const sumValue = this.raw && isSwitch ? switchOnDuration(this.points, this.windowEnd) : this.total;
           // Summe bei Schaltern ist immer eine Dauer in Sekunden (Bucket-
           // Summe der on_seconds bzw. switchOnDuration()) — unabhängig vom
@@ -1319,6 +1321,12 @@ function selectBrush() {
         },
 
         render() {
+          // Bei Schaltern sind die Bucket-Werte (Balken/Linie ohne Rohwerte) Einschalt-
+          // sekunden, gleich welcher Anzeigemodus gewählt ist — ohne Einheit wären es
+          // unlesbare Zahlen (266 = 4 Min. 26 s). Der Anzeigemodus gilt nur für die
+          // 0/1-Rohwerte.
+          const asDuration = DURATION_DISPLAY || (this.aggregationType === 'switch' && !this.raw);
+          const fmtV = v => asDuration ? NumberFormat.fmtDuration(v) : fmtValue(v);
           if (!this.hasData) return;
           if (!chartInstance) {
             chartInstance = newChartInstance();
@@ -1469,7 +1477,7 @@ function selectBrush() {
               position: 'top',
               fontSize: Math.round(10.5 * uiFontScale * 10) / 10,
               color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
-              formatter: params => fmtValue(params.value[1]),
+              formatter: params => fmtV(params.value[1]),
             },
             // Ohne Deckelung errechnet ECharts die Balkenbreite auf einer
             // Zeit-Achse aus dem Abstand zu benachbarten Punkten — bei nur
@@ -1625,7 +1633,7 @@ function selectBrush() {
                 position: 'insideEndTop',
                 fontSize: Math.round(10.5 * uiFontScale * 10) / 10,
                 color: getComputedStyle(document.body).getPropertyValue('--ink-muted'),
-                formatter: () => `Ø ${fmtValue(durchschnitt)}`,
+                formatter: () => `Ø ${fmtV(durchschnitt)}`,
               },
               data: [{yAxis: durchschnitt}],
             };
@@ -1645,7 +1653,7 @@ function selectBrush() {
             // Nachkommastellen plus Einheit) fehlte links eine Ziffer. Deshalb setzt AxisFit (axis-fit.js) den
             // Rand nach dem Zeichnen aus der gemessenen Breite; 24 gilt nur für das erste Bild und für
             // Diagramme, die AxisFit nicht anfasst (mehrere Raster oder Achsen).
-            grid: {left: 24, right: 20, top: (UNIT || DURATION_DISPLAY) ? 36 : 20, bottom: this.compare ? 64 : 40, containLabel: true},
+            grid: {left: 24, right: 20, top: (UNIT || asDuration) ? 36 : 20, bottom: this.compare ? 64 : 40, containLabel: true},
             // min/max explizit auf das Abfragefenster fixiert, statt ECharts
             // per Default auf den tatsächlichen Datenbereich auto-fitten zu
             // lassen — sonst hört die Achse (und damit sichtbar der Chart) beim
@@ -1692,7 +1700,7 @@ function selectBrush() {
             },
             yAxis: {
               type: 'value',
-              name: DURATION_DISPLAY ? t('Dauer') : (UNIT || undefined),
+              name: asDuration ? t('Dauer') : (UNIT || undefined),
               nameLocation: 'end',
               nameTextStyle: {align: 'left'},
               // "fest" bindet die Achse an 0, "dynamisch" lässt ECharts frei auf
@@ -1706,7 +1714,7 @@ function selectBrush() {
               min: (this.dynamicYAxis && this.chartType !== 'bar') ? undefined : value => Math.min(0, value.min),
               max: (this.dynamicYAxis && this.chartType !== 'bar') ? undefined : value => Math.max(0, value.max),
               scale: this.dynamicYAxis && this.chartType !== 'bar',
-              axisLabel: {formatter: v => UNIT ? `${fmtValue(v)} ${UNIT}` : fmtValue(v)},
+              axisLabel: {formatter: v => UNIT ? `${fmtV(v)} ${UNIT}` : fmtV(v)},
             },
             tooltip: {
               trigger: 'axis',
@@ -1725,7 +1733,7 @@ function selectBrush() {
                 const times = params.map(p => fmtTooltipTimestamp(p.data[2], tooltipBucketSeconds));
                 const sameTime = times.every(t => t === times[0]);
                 const row = p => {
-                  const val = UNIT ? `${fmtValue(p.value[1])} ${escapeHtml(UNIT)}` : fmtValue(p.value[1]);
+                  const val = UNIT ? `${fmtV(p.value[1])} ${escapeHtml(UNIT)}` : fmtV(p.value[1]);
                   return `<span style="display:flex;align-items:center;gap:5px;">${p.marker}<strong>${val}</strong></span>`;
                 };
                 if (sameTime) {
@@ -1734,7 +1742,7 @@ function selectBrush() {
                 }
                 return params.map((p, i) =>
                   `<div style="display:flex;align-items:center;gap:5px;font-size:calc(11px * var(--font-scale, 1));color:var(--ink-faint);margin-bottom:2px;">${p.marker}${times[i]}</div>`
-                  + `<strong style="display:block;margin-bottom:4px;">${UNIT ? `${fmtValue(p.value[1])} ${escapeHtml(UNIT)}` : fmtValue(p.value[1])}</strong>`
+                  + `<strong style="display:block;margin-bottom:4px;">${UNIT ? `${fmtV(p.value[1])} ${escapeHtml(UNIT)}` : fmtV(p.value[1])}</strong>`
                 ).join('');
               },
               // appendToBody: die Karte hat overflow:hidden (verhindert, dass die
