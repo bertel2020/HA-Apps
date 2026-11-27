@@ -53,6 +53,7 @@
   - „Ausrichtung“ erst ab zwei Entitäten (bei einer war „Horizontal“ ein einzelner Balken); „Rollierend“ und „Dynamische Y-Achse“ entfallen in der horizontalen Ansicht
   - Legende „Aus“: „Statistik in Legende“ und „Legendengröße“ sind ausgeblendet (Chart-Editor und Entitätsseite)
   - Entitätsseite: „Nachkommastellen“, „Dynamische Y-Achse“ und „Durchschnittslinie“ sind bei den Diagrammtypen ausgeblendet, bei denen sie nichts bewirken; bei Schalter-Entitäten entfallen die „Nachkommastellen“ (auch in den Einstellungen einer Werte-Kachel), da sie „An“/„Aus“ oder eine Dauer zeigen
+  - Tabellen-Editor: „Einheiten ausrichten“ und „Einheiten kleiner“ sind ausgegraut, solange die Einheiten ausgeblendet sind; „Vergleichsspalten absetzen“ und „Abweichung zum Vergleich“, solange die Tabelle keine Vergleichsspalte hat
 
 ## 1.57.0 - 2026-11-24
 
