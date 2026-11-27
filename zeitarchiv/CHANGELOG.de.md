@@ -12,6 +12,14 @@
 
 ## Unreleased
 
+### Neu
+
+- **Darstellung**: Mit Breiter Darstellung nutzen Energie- und Wetterdashboard
+  die volle Breite statt bei 1440 px zu enden
+- **Wetter- und Energiedashboard**: Spaltenhervorhebung in der Vergleichstabelle
+  - Einstellung „Spaltenhervorhebung“ in der Einrichtung des Dashboards: Aus, Paare abwechselnd (Vorgabe), Hauptspalten oder Eigene Auswahl
+  - Bei Eigener Auswahl werden Zeiträume im Menü „Spalten“ mit einem Stern markiert; die Auswahl gilt je Browser
+
 ### Behoben
 
 - **Charts**: „Rohwerte“ wird mit dem Chart gespeichert; der Schalter im Editor springt nach dem erneuten Öffnen nicht mehr zurück
